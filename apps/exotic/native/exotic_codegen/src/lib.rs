@@ -312,8 +312,6 @@ fn get_type<'a>(env: Env<'a>, ty: &syn::Type, header: &Header) -> Type {
 #[rustler::nif(schedule = "DirtyCpu")]
 // #[rustler::nif(schedule = "DirtyIo")]
 fn parse_header<'a>(env: Env<'a>, header: Header) -> NifResult<Term<'a>> {
-    // env_logger::Builder::from_env("EXOTIC_LOG").init();
-    env_logger::init();
     let b = bindgen::builder().header(&header.file);
     let bindings = &header
         .search_paths
