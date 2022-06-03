@@ -220,7 +220,8 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 1. Install Elixir, https://elixir-lang.org/install.html
 2. Install LLVM/MLIR
 
-- Option #1, build from source https://mlir.llvm.org/getting_started/
+<!-- - Option #1,  -->
+- build from source https://mlir.llvm.org/getting_started/
 
   Recommended install commands:
 
@@ -237,8 +238,8 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
   export LLVM_CONFIG_PATH=$HOME/llvm-install/bin/llvm-config
   ```
 
-- Option #2 (Ubuntu), Install from LLVM apt releases, https://apt.llvm.org/
-- Option #3 (macOS), Install from homebrew: `brew install llvm`
+<!-- - Option #2 (Ubuntu), Install from LLVM apt releases, https://apt.llvm.org/ -->
+<!-- - Option #3 (macOS), Install from homebrew: `brew install llvm` -->
 
 3. Run tests
 
