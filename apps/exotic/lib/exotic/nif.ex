@@ -1,0 +1,48 @@
+defmodule Exotic.NIF do
+  use Rustler, otp_app: :exotic, crate: "exotic_nif"
+
+  def get_ptr_type(), do: :erlang.nif_error(:nif_not_loaded)
+  def get_bool_type(), do: :erlang.nif_error(:nif_not_loaded)
+  def get_void_type(), do: :erlang.nif_error(:nif_not_loaded)
+  def get_size_type(), do: :erlang.nif_error(:nif_not_loaded)
+  def get_i8_type(), do: :erlang.nif_error(:nif_not_loaded)
+  def get_u8_type(), do: :erlang.nif_error(:nif_not_loaded)
+  def get_u16_type(), do: :erlang.nif_error(:nif_not_loaded)
+  def get_u32_type(), do: :erlang.nif_error(:nif_not_loaded)
+  def get_u64_type(), do: :erlang.nif_error(:nif_not_loaded)
+  def get_i16_type(), do: :erlang.nif_error(:nif_not_loaded)
+  def get_i32_type(), do: :erlang.nif_error(:nif_not_loaded)
+  def get_i64_type(), do: :erlang.nif_error(:nif_not_loaded)
+  def get_f32_type(), do: :erlang.nif_error(:nif_not_loaded)
+  def get_f64_type(), do: :erlang.nif_error(:nif_not_loaded)
+  def get_struct_type(_fields), do: :erlang.nif_error(:nif_not_loaded)
+  def get_lib(_lib), do: :erlang.nif_error(:nif_not_loaded)
+  def get_func(_func, _rtype, _args), do: :erlang.nif_error(:nif_not_loaded)
+  # pid is for the callback function handler
+  def get_closure(_pid, _callback_id, _rtype, _args), do: :erlang.nif_error(:nif_not_loaded)
+  def call_func(_lib, _func_wrapper, _args), do: :erlang.nif_error(:nif_not_loaded)
+
+  def get_u8_value(_v), do: :erlang.nif_error(:nif_not_loaded)
+  def get_u16_value(_v), do: :erlang.nif_error(:nif_not_loaded)
+  def get_u32_value(_v), do: :erlang.nif_error(:nif_not_loaded)
+  def get_u64_value(_v), do: :erlang.nif_error(:nif_not_loaded)
+  def get_i8_value(_v), do: :erlang.nif_error(:nif_not_loaded)
+  def get_i16_value(_v), do: :erlang.nif_error(:nif_not_loaded)
+  def get_i32_value(_v), do: :erlang.nif_error(:nif_not_loaded)
+  def get_i64_value(_v), do: :erlang.nif_error(:nif_not_loaded)
+  def get_f32_value(_v), do: :erlang.nif_error(:nif_not_loaded)
+  def get_f64_value(_v), do: :erlang.nif_error(:nif_not_loaded)
+  def get_c_string_value(_v), do: :erlang.nif_error(:nif_not_loaded)
+  def get_null_ptr_value(), do: :erlang.nif_error(:nif_not_loaded)
+  def get_struct_value(_type_refs, _value_refs), do: :erlang.nif_error(:nif_not_loaded)
+  def extract(_v), do: :erlang.nif_error(:nif_not_loaded)
+  def extract_struct(_types, _v), do: :erlang.nif_error(:nif_not_loaded)
+  def extract_c_string_as_binary_string(_ptr, _size), do: :erlang.nif_error(:nif_not_loaded)
+  def access_struct_field_as_value(_type, _v, _index), do: :erlang.nif_error(:nif_not_loaded)
+
+  def get_ptr(_v), do: :erlang.nif_error(:nif_not_loaded)
+  def as_ptr(_v), do: :erlang.nif_error(:nif_not_loaded)
+  def as_binary(_v), do: :erlang.nif_error(:nif_not_loaded)
+
+  def finish_callback(_token, _success), do: :erlang.nif_error(:nif_not_loaded)
+end

@@ -1,0 +1,23 @@
+[package]
+name = "exotic_codegen"
+version = "0.1.0"
+authors = []
+edition = "2018"
+
+[lib]
+name = "exotic_codegen"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+# For some reason, cargo doesn't use elixir's debug mode
+# [profile.release]
+# debug = true
+
+[dependencies]
+rustler = "0.25.0"
+exotic_nif = { path = "../exotic_nif" }
+bindgen = "0.59.1"
+proc-macro2 = "*"
+log = "0.4.0"
+env_logger = "0.8.4"
+syn = { version = "1.0.5", features = ["full", "extra-traits"] }
