@@ -38,6 +38,7 @@ defmodule Beaver.MLIR.Managed.Block do
 
   def push(id, block) when is_atom(id) do
     new = push(block)
+    if {__MODULE__, id} in Process.get_keys(), do: raise("block already exists, #{id}")
     Process.put({__MODULE__, id}, block)
     new
   end
