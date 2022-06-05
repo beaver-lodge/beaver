@@ -19,6 +19,9 @@ defmodule Beaver do
   @doc """
   This is a macro where Beaver's MLIR DSL expressions get transformed to MLIR API calls
   """
-  defmacro mlir do
+  defmacro mlir(do: block) do
+    quote do
+      unquote(block)
+    end
   end
 end
