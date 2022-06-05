@@ -226,7 +226,7 @@ end
 # will be transformed to:
 
 SomeDialect.some_op(
-  region: fn -> do
+  regions: fn -> do
     region = MLIR.Region.get() # first region created
     block = MLIR.Block.get(region: region, id: :entry)
     x = Arith.constant(...)
