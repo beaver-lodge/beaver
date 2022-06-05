@@ -203,7 +203,40 @@ Buildin.module do
   v2 = Arith.constant(1) :: ~t<i32>
 end
 # Buildin.module is a macro, it will transformed the SSA `v2= Arith.constant..` to:
-v2 = Arith.constant(1, return_type: ~t<i32>, insertion_point: ..., location: ...)
+v2 = Arith.constant(value: ~a{1}, return_type: ~t<i32>, insertion_point: ..., location: ...)
+```
+
+Also, using the declarative way to construct IR, proper dominance and operand reference is formed naturally.
+
+```elixir
+SomeDialect.some_op do
+  region do
+    block entry() do
+      x = Arith.constant(1) :: ~t<i32>
+      y = Arith.constant(1) :: ~t<i32>
+    end
+  end
+  region do
+    block entry() do
+      z = Arith.addi(x, y) :: ~t<i32>
+    end
+  end
+end
+
+# will be transformed to:
+
+SomeDialect.some_op(region:
+  fn x -> do
+    region = MLIR.Region.get() # first region created
+    block = MLIR.Block.get(region: region, id: :entry)
+    x = Arith.constant(...)
+    y = Arith.constant(...)
+
+    region = MLIR.Region.get() # second region created
+    block = MLIR.Block.get(region: region, id: :entry)
+    z = Arith.addi([x, y, ...]) # x and y dominate z
+  end
+)
 ```
 
 ## Is Beaver a compiler or binding to LLVM/MLIR or what?
