@@ -245,7 +245,8 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 ## Development
 
 1. Install Elixir, https://elixir-lang.org/install.html
-2. Install LLVM/MLIR
+2. Install Rust, https://rustup.rs/
+3. Install LLVM/MLIR
 
 <!-- - Option #1,  -->
 
@@ -269,8 +270,13 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 <!-- - Option #2 (Ubuntu), Install from LLVM apt releases, https://apt.llvm.org/ -->
 <!-- - Option #3 (macOS), Install from homebrew: `brew install llvm` -->
 
-3. Run tests
+4. Run tests
 
-```bash
-mix test
-```
+- Make sure LLVM environment variable is set properly
+  ```
+  echo $LLVM_CONFIG_PATH
+  ```
+- Run elixir tests
+  ```bash
+  mix test
+  ```
