@@ -273,7 +273,7 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 4. Run tests
 
 - Make sure LLVM environment variable is set properly
-  ```
+  ```bash
   echo $LLVM_CONFIG_PATH
   ```
 - Run elixir tests
