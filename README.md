@@ -53,7 +53,7 @@ defmodule Toy do
       Builtin.module do
         Func.func some_func() do
           region do
-            block bb1() do
+            block bb_entry() do
               v0 = Arith.constant({:value, ~a{0: i32}}) :: ~t<i32>
               cond0 = Arith.constant(true)
 
