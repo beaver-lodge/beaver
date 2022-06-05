@@ -1,6 +1,12 @@
 defmodule Beaver.MLIR.Dialect.Func do
   alias Beaver.MLIR
 
+  defmodule FuncOp do
+    def create(arguments) do
+      MLIR.Operation.create("func.func", arguments)
+    end
+  end
+
   defmacro func(call, do: block) do
     {func_name, args} = call |> Macro.decompose_call()
     if not is_atom(func_name), do: raise("func name must be an atom")
