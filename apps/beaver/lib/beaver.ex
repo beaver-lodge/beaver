@@ -15,4 +15,10 @@ defmodule Beaver do
   def hello do
     :world
   end
+
+  @doc """
+  This is a macro where Beaver's MLIR DSL expressions get transformed to MLIR API calls
+  """
+  defmacro mlir do
+  end
 end
