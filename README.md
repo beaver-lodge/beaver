@@ -272,11 +272,13 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 
 4. Run tests
 
-- Make sure LLVM environment variable is set properly
+- Clone the repo
+- Make sure LLVM environment variable is set properly, otherwise it might fail to build
   ```bash
   echo $LLVM_CONFIG_PATH
   ```
-- Run elixir tests
+- Build and elixir tests
   ```bash
+  mix deps.get
   mix test
   ```
