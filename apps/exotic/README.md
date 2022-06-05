@@ -87,7 +87,7 @@ You can create a `Exotic.Value` and pass it as a pointer to C function:
 ```elixir
 v = 2022.3 |> Exotic.Value.get()
 v |> Exotic.get_ptr() |> some_c_func()
-v |> Exotic.extract() |> IO.inspect() # value changed if `some_c_func` modified it
+v |> Exotic.extract()  # value changed if `some_c_func` modified it
 ```
 
 ### Transmit mechanism

@@ -21,21 +21,26 @@ defmodule GenIRTest do
       import MLIR.Sigils
 
       def gen_some_ir() do
-        Beaver.MLIR.Dialect.Builtin.module do
-          Beaver.MLIR.Dialect.Func.func some_func() :: ~t<i32> do
-            v0 = Arith.constant(0) :: ~t<i32>
-            cond0 = Arith.constant(true)
-            CF.cond_br(cond0, :bb1, {:bb2, [v0]})
+        Builtin.module do
+          Func.func some_func() do
+            region do
+              block bb1() do
+                v0 = Arith.constant({:value, ~a{0: i32}}) :: ~t<i32>
+                cond0 = Arith.constant(true)
 
-            MLIR.block bb1() do
-              v1 = Arith.constant(1) :: ~t<i32>
-              CF.br({:bb2, v1})
-            end
+                CF.cond_br(cond0, :bb1, {:bb2, [v0]})
+              end
 
-            MLIR.block bb2(arg :: ~t<i32>) do
-              v2 = Arith.constant(1) :: ~t<i32>
-              add = Arith.addi(arg, v2) :: ~t<i32>
-              Func.return(add) :: ~t<i32>
+              block bb1() do
+                v1 = Arith.constant({:value, ~a{0: i32}}) :: ~t<i32>
+                CF.br({:bb2, [v1]})
+              end
+
+              block bb2(arg :: ~t<i32>) do
+                v2 = Arith.constant({:value, ~a{0: i32}}) :: ~t<i32>
+                add = Arith.addi(arg, v2) :: ~t<i32>
+                Func.return(add)
+              end
             end
           end
         end
@@ -43,5 +48,7 @@ defmodule GenIRTest do
     end
 
     Toy.gen_some_ir()
+    |> MLIR.Operation.dump()
+    |> MLIR.Operation.verify!()
   end
 end

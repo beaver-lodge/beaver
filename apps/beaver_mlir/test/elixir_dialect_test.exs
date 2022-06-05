@@ -20,7 +20,6 @@ defmodule Adder do
   def main() do
     a = 100
     b = add(a, a)
-    IO.puts(b)
   end
 end
 
