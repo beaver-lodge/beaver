@@ -40,19 +40,46 @@ Also an example to build and verify a piece of IR in Beaver:
 
 ```elixir
 defmodule Toy do
+  require Beaver
   alias Beaver.MLIR
-  alias Beaver.MLIR.Builtin
-  alias Beaver.MLIR.Dialect.{Func, Arith}
+  alias Beaver.MLIR.Dialect.{Builtin, Func, Arith, CF}
+  import Builtin, only: :macros
+  import Func, only: :macros
+  import MLIR, only: :macros
+  import MLIR.Sigils
 
   def gen_some_ir() do
-    Builtin.module do
-      Func.func some_func(arg0, arg1, type: ~a/(i64, i64) -> (i64)/) do
-        Arith.addi(arg0, arg1)
+    Beaver.mlir do
+      Builtin.module do
+        Func.func some_func() do
+          region do
+            block bb1() do
+              v0 = Arith.constant({:value, ~a{0: i32}}) :: ~t<i32>
+              cond0 = Arith.constant(true)
+
+              CF.cond_br(cond0, :bb1, {:bb2, [v0]})
+            end
+
+            block bb1() do
+              v1 = Arith.constant({:value, ~a{0: i32}}) :: ~t<i32>
+              CF.br({:bb2, [v1]})
+            end
+
+            block bb2(arg :: ~t<i32>) do
+              v2 = Arith.constant({:value, ~a{0: i32}}) :: ~t<i32>
+              add = Arith.addi(arg, v2) :: ~t<i32>
+              Func.return(add)
+            end
+          end
+        end
       end
     end
-    |> MLIR.Operation.verify!()
   end
 end
+
+Toy.gen_some_ir()
+|> MLIR.Operation.dump()
+|> MLIR.Operation.verify!()
 ```
 
 From a high-level perspective, we are going through some interesting changes of the way we utilize accelerated-computing. The most notable project in this trend could be PyTorch. Before PyTorch, one typical way to unleash the full power of GPU to use a game engine, which is usually a library of fixed pipelines, iterations built with heavy weight languages like C++, and app developers use a more script-able language like Lua/C# to build the app/game as an extension to the engine. In ML world, TensorFlow 1 could be regarded as such as well. In contrast, the PyTorch approach puts the app developer in full command of control plane. They get to use Python to build the main loop themselves while having the full access to the accelerated-computing capability. This overturn significantly boosts the productivity and flexibility. As we can see, PyTorch already gets widespread adoption in ML and beyond.
@@ -221,6 +248,7 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 2. Install LLVM/MLIR
 
 <!-- - Option #1,  -->
+
 - build from source https://mlir.llvm.org/getting_started/
 
   Recommended install commands:
