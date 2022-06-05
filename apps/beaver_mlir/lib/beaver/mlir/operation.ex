@@ -3,6 +3,7 @@ defmodule Beaver.MLIR.Operation do
   alias Beaver.MLIR.CAPI.IR
   alias Beaver.MLIR.CAPI
   import Beaver.MLIR.CAPI
+  require Logger
 
   @doc """
   Create a new operation from a operation state
@@ -15,9 +16,10 @@ defmodule Beaver.MLIR.Operation do
   Create a new operation from arguments and insert to managed insertion point
   """
   def create(op_name, arguments) do
+    Logger.debug("create operation: #{op_name}")
+
     if MLIR.Trait.is_terminator?(op_name) do
       create_pending_terminator(op_name, arguments)
-      # do_create(op_name, arguments)
     else
       do_create(op_name, arguments)
     end
@@ -56,17 +58,14 @@ defmodule Beaver.MLIR.Operation do
   end
 
   defp do_create(op_name, arguments) when is_binary(op_name) and is_list(arguments) do
-    arguments =
-      arguments
-      |> Enum.filter(fn
-        {key, _val} ->
-          key != :block or key != :location
+    {_ctx, arguments} = arguments |> Keyword.pop(:mlir_ctx)
+    {block, arguments} = arguments |> Keyword.pop(:mlir_block)
+    {location, arguments} = arguments |> Keyword.pop(:mlir_location)
 
-        _ ->
-          true
-      end)
+    block = block || MLIR.Managed.Block.get()
+    location = location || MLIR.Managed.Location.get()
 
-    state = MLIR.Operation.State.get!(op_name, MLIR.Managed.Location.get())
+    state = MLIR.Operation.State.get!(op_name, location)
 
     for argument <- arguments do
       MLIR.Operation.State.add_argument(state, argument)
@@ -79,13 +78,11 @@ defmodule Beaver.MLIR.Operation do
     ip = MLIR.Managed.InsertionPoint.pop()
     ip.(op)
 
-    block = MLIR.Managed.Block.get()
-
     Beaver.MLIR.Managed.InsertionPoint.push(fn next_op ->
       Beaver.MLIR.CAPI.mlirBlockInsertOwnedOperationAfter(block, op, next_op)
     end)
 
-    MLIR.Operation.results(op)
+    op
   end
 
   @doc """

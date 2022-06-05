@@ -125,10 +125,11 @@ defmodule Beaver.MLIR.Operation.State do
 
   def add_argument(state, {:regions, region_filler}) when is_function(region_filler, 0) do
     # Mark regions pushed later should be collected
-    MLIR.Managed.Region.push(:delimiter)
-    region_filler.()
+    # MLIR.Managed.Region.push(:delimiter)
+    # region_filler.()
+    regions = []
     # pop regions and add them to state
-    regions = MLIR.Managed.Region.pop_until_delimiter()
+    # regions = MLIR.Managed.Region.pop_until_delimiter()
     add_regions(state, regions)
   end
 

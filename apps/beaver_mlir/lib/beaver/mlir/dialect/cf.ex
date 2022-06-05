@@ -19,6 +19,7 @@ defmodule Beaver.MLIR.Dialect.CF do
       "cf.br",
       [successor: dest] ++ args
     )
+    |> MLIR.Operation.results()
   end
 
   def cond_br(condition, true_dest, false_dest) do
@@ -40,5 +41,6 @@ defmodule Beaver.MLIR.Dialect.CF do
         successor: false_dest
       ] ++ true_args ++ false_args
     )
+    |> MLIR.Operation.results()
   end
 end
