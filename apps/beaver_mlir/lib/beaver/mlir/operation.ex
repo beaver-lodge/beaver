@@ -23,6 +23,18 @@ defmodule Beaver.MLIR.Operation do
     end
   end
 
+  def results(op) do
+    num_results = CAPI.mlirOperationGetNumResults(op) |> Exotic.Value.extract()
+
+    if num_results == 1 do
+      CAPI.mlirOperationGetResult(op, 0)
+    else
+      for i <- 0..(num_results - 1)//1 do
+        CAPI.mlirOperationGetResult(op, i)
+      end
+    end
+  end
+
   defp create_pending_terminator(op_name, arguments) do
     # if MLIR.Trait.is_terminator?(op_name) do
     block = MLIR.Managed.Block.get()
@@ -73,15 +85,7 @@ defmodule Beaver.MLIR.Operation do
       Beaver.MLIR.CAPI.mlirBlockInsertOwnedOperationAfter(block, op, next_op)
     end)
 
-    num_results = CAPI.mlirOperationGetNumResults(op) |> Exotic.Value.extract()
-
-    if num_results == 1 do
-      CAPI.mlirOperationGetResult(op, 0)
-    else
-      for i <- 0..(num_results - 1)//1 do
-        CAPI.mlirOperationGetResult(op, i)
-      end
-    end
+    MLIR.Operation.results(op)
   end
 
   @doc """
