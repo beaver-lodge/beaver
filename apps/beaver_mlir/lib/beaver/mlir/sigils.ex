@@ -8,6 +8,6 @@ defmodule Beaver.MLIR.Sigils do
     MLIR.Module.create(string)
   end
 
-  def sigil_a(string, []), do: String.upcase(string)
+  def sigil_a(string, []), do: MLIR.Attribute.get(string)
   def sigil_t(string, []), do: MLIR.Type.get(string)
 end

@@ -1,15 +1,10 @@
 defmodule Beaver.MLIR.Dialect.Builtin do
   defmacro module(call, do: block) do
-    IO.inspect(call)
-    IO.inspect(block)
-
     quote do
     end
   end
 
   defmacro module(do: block) do
-    block |> IO.inspect()
-
     # TODO: check sigil_t is from MLIR
     new_block_ast =
       Macro.prewalk(block, fn
@@ -23,16 +18,16 @@ defmodule Beaver.MLIR.Dialect.Builtin do
             ]},
            sigil_t = {:sigil_t, _, _}
          ]} ->
-          return_type_ast =
+          arguments_ast =
             quote do
-              [return_type: unquote(sigil_t)]
+              [unquote_splicing(args_ast), result_types: unquote(sigil_t)]
             end
 
           # TODO, check if last arg is keyword
           {:=, line2,
            [
              var,
-             {mf, line3, args_ast ++ [return_type_ast]}
+             {mf, line3, [arguments_ast]}
            ]}
 
         #  block arg
@@ -51,12 +46,12 @@ defmodule Beaver.MLIR.Dialect.Builtin do
            {mf, line2, args_ast},
            sigil_t = {:sigil_t, _, _}
          ]} ->
-          return_type_ast =
+          arguments_ast =
             quote do
-              [return_type: unquote(sigil_t)]
+              [unquote_splicing(args_ast), result_types: unquote(sigil_t)]
             end
 
-          {mf, line2, args_ast ++ [return_type_ast]}
+          {mf, line2, [arguments_ast]}
 
         other ->
           other
@@ -64,6 +59,25 @@ defmodule Beaver.MLIR.Dialect.Builtin do
 
     new_block_ast |> Macro.to_string() |> IO.puts()
 
-    new_block_ast
+    quote do
+      location = Beaver.MLIR.Managed.Location.get()
+      module = Beaver.MLIR.CAPI.mlirModuleCreateEmpty(location)
+      module_body_block = Beaver.MLIR.CAPI.mlirModuleGetBody(module)
+
+      __module__insert_point__ = fn op ->
+        Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(module_body_block, op)
+      end
+
+      Beaver.MLIR.Managed.InsertionPoint.push(__module__insert_point__)
+      unquote(new_block_ast)
+      Beaver.MLIR.Managed.InsertionPoint.pop()
+
+      Beaver.MLIR.Managed.Block.clear_ids()
+
+      if not Beaver.MLIR.Managed.InsertionPoint.empty?(),
+        do: raise("insertion point should be cleared")
+
+      module
+    end
   end
 end

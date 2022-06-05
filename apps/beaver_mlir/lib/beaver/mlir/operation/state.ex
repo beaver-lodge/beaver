@@ -1,5 +1,6 @@
 defmodule Beaver.MLIR.Operation.State do
   alias Beaver.MLIR
+  alias Beaver.MLIR.CAPI
   alias Beaver.MLIR.CAPI.IR
   alias Exotic.Value.Array
   alias Exotic.Value
@@ -28,14 +29,30 @@ defmodule Beaver.MLIR.Operation.State do
       for {k, v} <- attrs do
         k = Atom.to_string(k)
 
+        attr =
+          case v do
+            v when is_binary(v) ->
+              IR.mlirAttributeParseGet(ctx, IR.string_ref(v))
+
+            _ ->
+              v
+          end
+          |> Exotic.Value.transmit()
+
         IR.mlirNamedAttributeGet(
           IR.mlirIdentifierGet(ctx, IR.string_ref(k)),
-          IR.mlirAttributeParseGet(ctx, IR.string_ref(v))
-          |> Exotic.Value.transmit()
+          attr
         )
       end
 
-    MLIR.Operation.State.add_attrs(state, named_attrs)
+    array_ptr = named_attrs |> Enum.map(&Value.transmit/1) |> Array.get() |> Value.get_ptr()
+
+    IR.mlirOperationStateAddAttributes(
+      Value.get_ptr(state),
+      length(attrs),
+      array_ptr
+    )
+
     state
   end
 
@@ -55,8 +72,12 @@ defmodule Beaver.MLIR.Operation.State do
 
     array =
       result_types
-      |> Enum.map(fn t ->
-        IR.mlirTypeParseGet(context, IR.string_ref(t))
+      |> Enum.map(fn
+        t when is_binary(t) ->
+          IR.mlirTypeParseGet(context, IR.string_ref(t))
+
+        t ->
+          t
       end)
       |> Enum.map(&Exotic.Value.transmit/1)
       |> Array.get()
@@ -64,16 +85,6 @@ defmodule Beaver.MLIR.Operation.State do
 
     IR.mlirOperationStateAddResults(Exotic.Value.get_ptr(state), length(result_types), array)
     state
-  end
-
-  def add_attrs(state, attrs) when is_list(attrs) do
-    array_ptr = attrs |> Enum.map(&Value.transmit/1) |> Array.get() |> Value.get_ptr()
-
-    IR.mlirOperationStateAddAttributes(
-      Value.get_ptr(state),
-      length(attrs),
-      array_ptr
-    )
   end
 
   def add_regions(state, regions) when is_list(regions) do
@@ -86,5 +97,56 @@ defmodule Beaver.MLIR.Operation.State do
     )
 
     state
+  end
+
+  def add_successors(state, successors) when is_list(successors) do
+    array_ptr = successors |> Enum.map(&Value.transmit/1) |> Array.get() |> Value.get_ptr()
+
+    CAPI.mlirOperationStateAddSuccessors(
+      Exotic.Value.get_ptr(state),
+      length(successors),
+      array_ptr
+    )
+
+    state
+  end
+
+  def add_argument(state, value) when is_integer(value) do
+    add_attr(state, value: "#{value}")
+  end
+
+  def add_argument(state, {:result_types, result_types}) when is_list(result_types) do
+    add_result(state, result_types)
+  end
+
+  def add_argument(state, {:result_types, result_types}) do
+    add_result(state, [result_types])
+  end
+
+  def add_argument(state, {:successor, successor}) when is_atom(successor) do
+    successor_block = MLIR.Managed.Block.get(successor)
+
+    if is_nil(successor_block), do: raise("successor block not found: #{successor}")
+
+    state
+    |> add_successors([successor_block])
+  end
+
+  def add_argument(state, {name, attr}) do
+    add_attr(state, [{name, attr}])
+  end
+
+  def add_argument(
+        state,
+        operand = %Exotic.Value{type: %Exotic.Type{t: Beaver.MLIR.CAPI.IR.Value}}
+      ) do
+    add_operand(state, [operand])
+  end
+
+  def add_argument(
+        state,
+        operand = %Exotic.Value{type: {:type_def, Beaver.MLIR.CAPI.MlirValue}}
+      ) do
+    add_operand(state, [operand])
   end
 end

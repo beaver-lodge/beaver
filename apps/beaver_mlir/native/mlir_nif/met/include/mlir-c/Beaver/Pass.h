@@ -9,6 +9,8 @@ extern "C" {
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetArgument(MlirPass pass);
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetDescription(MlirPass pass);
+MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
+                                                 MlirContext context);
 
 #ifdef __cplusplus
 }
