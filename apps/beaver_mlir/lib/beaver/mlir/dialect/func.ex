@@ -37,13 +37,18 @@ defmodule Beaver.MLIR.Dialect.Func do
     func_ast
   end
 
+  @doc """
+  Create func.return op. It is a terminator, so this function doesn't returns the results
+  """
   def return(arguments) when is_list(arguments) do
     MLIR.Operation.create("func.return", arguments)
-    |> MLIR.Operation.results()
+
+    nil
   end
 
   def return(arg) do
     MLIR.Operation.create("func.return", [arg])
-    |> MLIR.Operation.results()
+
+    nil
   end
 end

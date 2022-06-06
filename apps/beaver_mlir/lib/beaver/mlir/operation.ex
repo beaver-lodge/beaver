@@ -25,6 +25,7 @@ defmodule Beaver.MLIR.Operation do
     end
   end
 
+  # TODO: add guard
   def results(op) do
     num_results = CAPI.mlirOperationGetNumResults(op) |> Exotic.Value.extract()
 
