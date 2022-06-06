@@ -81,7 +81,8 @@ defmodule Beaver.MLIR do
          [
            {mf, line2, args_ast},
            sigil_t = {:sigil_t, _, _}
-         ]} ->
+         ]}
+        when is_list(args_ast) ->
           arguments_ast =
             quote do
               [unquote_splicing(args_ast), result_types: unquote(sigil_t)]
@@ -99,13 +100,14 @@ defmodule Beaver.MLIR do
         Beaver.MLIR.Managed.Region.set(region)
 
         Beaver.MLIR.Region.create_blocks(region, fn region ->
+          var!(beaver_op_region, Beaver.MLIR) = region
           unquote(new_block_ast)
         end)
 
         Beaver.MLIR.Managed.Terminator.resolve()
+        [region]
       end
 
-    new_block_ast |> Macro.to_string() |> IO.puts()
     new_block_ast
   end
 end
