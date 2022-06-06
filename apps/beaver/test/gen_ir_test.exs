@@ -16,7 +16,7 @@ defmodule GenIRTest do
       def gen_some_ir() do
         Beaver.mlir do
           Builtin.module do
-            Func.func some_func() do
+            Func.func some_func(function_type: ~a"() -> i32") do
               region do
                 block bb_entry() do
                   v0 = Arith.constant({:value, ~a{0: i32}}) :: ~t<i32>

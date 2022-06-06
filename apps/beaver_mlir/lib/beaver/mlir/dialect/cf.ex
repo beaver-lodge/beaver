@@ -11,6 +11,9 @@ defmodule Beaver.MLIR.Dialect.CF do
     {dest, args}
   end
 
+  @doc """
+  Create cf.br op. It is a terminator, so this function doesn't returns the results
+  """
   def br(dest) do
     {dest, args} = extract_args(dest)
     length_args = length(args)
@@ -19,8 +22,13 @@ defmodule Beaver.MLIR.Dialect.CF do
       "cf.br",
       [successor: dest] ++ args
     )
+
+    nil
   end
 
+  @doc """
+  Create cf.cond_br op. It is a terminator, so this function doesn't returns the results
+  """
   def cond_br(condition, true_dest, false_dest) do
     {true_dest, true_args} = extract_args(true_dest)
     {false_dest, false_args} = extract_args(false_dest)
@@ -40,5 +48,7 @@ defmodule Beaver.MLIR.Dialect.CF do
         successor: false_dest
       ] ++ true_args ++ false_args
     )
+
+    nil
   end
 end
