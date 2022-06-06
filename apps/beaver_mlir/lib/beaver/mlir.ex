@@ -93,13 +93,19 @@ defmodule Beaver.MLIR do
           other
       end)
 
-    new_block_ast |> Macro.to_string() |> IO.puts()
+    new_block_ast =
+      quote do
+        region = Beaver.MLIR.CAPI.mlirRegionCreate()
+        Beaver.MLIR.Managed.Region.set(region)
 
-    quote do
-      func_region = Beaver.MLIR.CAPI.mlirRegionCreate()
-      Beaver.MLIR.Managed.Region.set(func_region)
-      unquote(new_block_ast)
-      Beaver.MLIR.Managed.Terminator.resolve()
-    end
+        Beaver.MLIR.Region.create_blocks(region, fn region ->
+          unquote(new_block_ast)
+        end)
+
+        Beaver.MLIR.Managed.Terminator.resolve()
+      end
+
+    new_block_ast |> Macro.to_string() |> IO.puts()
+    new_block_ast
   end
 end
