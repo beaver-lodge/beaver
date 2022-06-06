@@ -26,7 +26,7 @@ defmodule Beaver.MLIR.Dialect.Func do
             unquote_splicing(args) ++
               [
                 sym_name: "\"#{unquote(func_name)}\"",
-                regions: fn -> unquote(block) end
+                regions: fn state -> unquote(block) end
               ]
           )
 
