@@ -7,6 +7,7 @@ defmodule Beaver.MLIR.Region do
       Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, b)
     end
 
+    Beaver.MLIR.Managed.Terminator.resolve()
     region
   end
 end

@@ -107,7 +107,6 @@ defmodule Beaver.MLIR do
           var!(beaver_blocks_to_be_append, Beaver.MLIR)
         end)
 
-        Beaver.MLIR.Managed.Terminator.resolve()
         [region]
       end
 
