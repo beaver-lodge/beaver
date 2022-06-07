@@ -33,8 +33,10 @@ defmodule Beaver.MLIR do
 
         Beaver.MLIR.Managed.InsertionPoint.pop()
 
-        Beaver.MLIR.Managed.Region.get()
-        |> Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(Beaver.MLIR.Managed.Block.pop())
+        var!(beaver_blocks_to_be_append, Beaver.MLIR) =
+          var!(beaver_blocks_to_be_append, Beaver.MLIR) ++ [block]
+
+        Beaver.MLIR.Managed.Block.pop()
       end
 
     block_ast
@@ -99,9 +101,10 @@ defmodule Beaver.MLIR do
         region = Beaver.MLIR.CAPI.mlirRegionCreate()
         Beaver.MLIR.Managed.Region.set(region)
 
-        Beaver.MLIR.Region.create_blocks(region, fn region ->
-          var!(beaver_op_region, Beaver.MLIR) = region
+        Beaver.MLIR.Region.create_blocks(region, fn ->
+          var!(beaver_blocks_to_be_append, Beaver.MLIR) = []
           unquote(new_block_ast)
+          var!(beaver_blocks_to_be_append, Beaver.MLIR)
         end)
 
         Beaver.MLIR.Managed.Terminator.resolve()
