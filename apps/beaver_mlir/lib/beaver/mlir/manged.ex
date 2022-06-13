@@ -85,18 +85,11 @@ defmodule Beaver.MLIR.Managed.Region do
   Getting and setting managed MLIR region
   """
   def get() do
-    case Process.get(__MODULE__) do
-      nil ->
-        raise "region not set, create and set it with Beaver.MLIR.Managed.Region.set/1"
-
-      managed ->
-        managed
-    end
+    Process.get(__MODULE__)
   end
 
-  @doc """
-  Set a region as the contextual region. Usaully it's recommended to call unset/0 to make sure the region is not used by other op.
-  """
+  # This function should not be called by user
+  @doc false
   def set(region) do
     Process.put(__MODULE__, region)
     region
