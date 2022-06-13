@@ -41,4 +41,15 @@ defmodule Beaver.MLIR.Block do
       locs
     )
   end
+
+  @doc """
+  run function f and append ops created to block. This function only works when there is no uses across blocks. For instance, a ModuleOp has only one region and one block.
+  """
+  def under(block, f) when is_function(f, 0) do
+    previous_block = Beaver.MLIR.Managed.Block.get()
+    Beaver.MLIR.Managed.Block.set(block)
+    last_op = f.()
+    Beaver.MLIR.Managed.Block.set(previous_block)
+    last_op
+  end
 end

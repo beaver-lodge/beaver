@@ -30,6 +30,8 @@ defmodule Beaver.MLIR do
         if region = Beaver.MLIR.Managed.Region.get() do
           Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, block)
           Beaver.MLIR.Managed.Terminator.put_block(unquote(block_id), block)
+        else
+          raise "no managed region found"
         end
       end
 
