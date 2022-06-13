@@ -13,20 +13,9 @@ defmodule Beaver.MLIR.Dialect.Builtin do
       module = Beaver.MLIR.CAPI.mlirModuleCreateEmpty(location)
       module_body_block = Beaver.MLIR.CAPI.mlirModuleGetBody(module)
 
-      Beaver.MLIR.Managed.Block.push(:module_body_block, module_body_block)
-
-      Beaver.MLIR.Managed.InsertionPoint.push(fn op ->
-        Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(module_body_block, op)
+      Beaver.MLIR.Block.under(module_body_block, fn ->
+        unquote(block)
       end)
-
-      unquote(block)
-      Beaver.MLIR.Managed.InsertionPoint.pop()
-      Beaver.MLIR.Managed.Block.pop()
-
-      Beaver.MLIR.Managed.Block.clear_ids()
-
-      if not Beaver.MLIR.Managed.InsertionPoint.empty?(),
-        do: raise("insertion point should be cleared")
 
       module
     end

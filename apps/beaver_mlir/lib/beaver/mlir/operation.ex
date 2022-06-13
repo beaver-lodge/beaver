@@ -19,9 +19,24 @@ defmodule Beaver.MLIR.Operation do
     Logger.debug("create operation: #{op_name}")
 
     if MLIR.Trait.is_terminator?(op_name) do
-      create_pending_terminator(op_name, arguments)
+      if block = MLIR.Managed.Block.get() do
+        Beaver.MLIR.Managed.Terminator.defer(fn ->
+          op = do_create(op_name, arguments)
+          Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(block, op)
+        end)
+
+        :deferred
+      else
+        do_create(op_name, arguments)
+      end
     else
-      do_create(op_name, arguments)
+      op = do_create(op_name, arguments)
+
+      if block = MLIR.Managed.Block.get() do
+        Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(block, op)
+      end
+
+      op
     end
   end
 
@@ -38,26 +53,6 @@ defmodule Beaver.MLIR.Operation do
     end
   end
 
-  defp create_pending_terminator(op_name, arguments) do
-    # if MLIR.Trait.is_terminator?(op_name) do
-    block = MLIR.Managed.Block.get()
-
-    Beaver.MLIR.Managed.Terminator.defer(fn ->
-      Beaver.MLIR.Managed.InsertionPoint.push(fn next_op ->
-        Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(block, next_op)
-      end)
-
-      Beaver.MLIR.Managed.Block.push(block)
-      do_create(op_name, arguments)
-      Beaver.MLIR.Managed.Block.pop()
-      Beaver.MLIR.Managed.InsertionPoint.pop()
-    end)
-
-    # Beaver.MLIR.Managed.InsertionPoint.push(fn _next_op ->
-    #   raise "pending terminator found, can't insert after it"
-    # end)
-  end
-
   defp do_create(op_name, arguments) when is_binary(op_name) and is_list(arguments) do
     {_ctx, arguments} = arguments |> Keyword.pop(:mlir_ctx)
     {block, arguments} = arguments |> Keyword.pop(:mlir_block)
@@ -72,18 +67,8 @@ defmodule Beaver.MLIR.Operation do
       MLIR.Operation.State.add_argument(state, argument)
     end
 
-    op =
-      state
-      |> MLIR.Operation.create()
-
-    ip = MLIR.Managed.InsertionPoint.pop()
-    ip.(op)
-
-    Beaver.MLIR.Managed.InsertionPoint.push(fn next_op ->
-      Beaver.MLIR.CAPI.mlirBlockInsertOwnedOperationAfter(block, op, next_op)
-    end)
-
-    op
+    state
+    |> MLIR.Operation.create()
   end
 
   @doc """

@@ -41,4 +41,12 @@ defmodule Beaver.MLIR.Block do
       locs
     )
   end
+
+  def under(block, f) when is_function(f, 0) do
+    previous_block = Beaver.MLIR.Managed.Block.get()
+    Beaver.MLIR.Managed.Block.set(block)
+    last_op = f.()
+    Beaver.MLIR.Managed.Block.set(previous_block)
+    last_op
+  end
 end

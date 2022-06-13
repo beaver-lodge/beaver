@@ -124,9 +124,12 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   def add_argument(state, {:regions, region_filler}) when is_function(region_filler, 0) do
-    region_filler.()
-    regions = [MLIR.Managed.Region.get()]
+    regions = region_filler.()
     add_regions(state, regions)
+  end
+
+  def add_argument(_state, {:regions, _}) do
+    raise "the function to create regions shuold have a arity of 0"
   end
 
   def add_argument(state, {:result_types, result_types}) when is_list(result_types) do
@@ -138,7 +141,7 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   def add_argument(state, {:successor, successor}) when is_atom(successor) do
-    successor_block = MLIR.Managed.Block.get(successor)
+    successor_block = MLIR.Managed.Terminator.get_block(successor)
 
     if is_nil(successor_block), do: raise("successor block not found: #{successor}")
 
