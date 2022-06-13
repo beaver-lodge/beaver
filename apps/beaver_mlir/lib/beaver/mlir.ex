@@ -98,9 +98,7 @@ defmodule Beaver.MLIR do
 
     new_block_ast =
       quote do
-        outer_region = Beaver.MLIR.Managed.Region.get()
         region = Beaver.MLIR.CAPI.mlirRegionCreate()
-        Beaver.MLIR.Managed.Region.set(region)
 
         Beaver.MLIR.Region.create_blocks(region, fn ->
           var!(beaver_blocks_to_be_append, Beaver.MLIR) = []
@@ -108,7 +106,6 @@ defmodule Beaver.MLIR do
           var!(beaver_blocks_to_be_append, Beaver.MLIR)
         end)
 
-        Beaver.MLIR.Managed.Region.set(outer_region)
         [region]
       end
 
