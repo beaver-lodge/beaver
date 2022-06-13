@@ -12,8 +12,6 @@ defmodule Beaver.MLIR do
     {block_id, _} = Macro.decompose_call(call)
     if not is_atom(block_id), do: raise("block name must be an atom")
 
-    block_arg_var_ast |> Macro.to_string()
-
     block_ast =
       quote do
         unquote_splicing(args_type_ast)
@@ -21,22 +19,16 @@ defmodule Beaver.MLIR do
         block_arg_locs = [unquote_splicing(locations_var_ast)]
 
         block = Beaver.MLIR.Block.create(block_arg_types, block_arg_locs)
-        Beaver.MLIR.Managed.Block.push(unquote(block_id), block)
 
-        unquote_splicing(block_arg_var_ast)
-
-        Beaver.MLIR.Managed.InsertionPoint.push(fn op ->
-          Beaver.MLIR.CAPI.mlirBlockInsertOwnedOperation(block, 0, op)
+        Beaver.MLIR.Block.under(block, fn ->
+          unquote_splicing(block_arg_var_ast)
+          unquote(block)
         end)
 
-        unquote(block)
-
-        Beaver.MLIR.Managed.InsertionPoint.pop()
-
-        var!(beaver_blocks_to_be_append, Beaver.MLIR) =
-          var!(beaver_blocks_to_be_append, Beaver.MLIR) ++ [block]
-
-        Beaver.MLIR.Managed.Block.pop()
+        if region = Beaver.MLIR.Managed.Region.get() do
+          Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, block)
+          Beaver.MLIR.Managed.Terminator.put_block(unquote(block_id), block)
+        end
       end
 
     block_ast
@@ -100,10 +92,8 @@ defmodule Beaver.MLIR do
       quote do
         region = Beaver.MLIR.CAPI.mlirRegionCreate()
 
-        Beaver.MLIR.Region.create_blocks(region, fn ->
-          var!(beaver_blocks_to_be_append, Beaver.MLIR) = []
+        Beaver.MLIR.Region.under(region, fn ->
           unquote(new_block_ast)
-          var!(beaver_blocks_to_be_append, Beaver.MLIR)
         end)
 
         [region]

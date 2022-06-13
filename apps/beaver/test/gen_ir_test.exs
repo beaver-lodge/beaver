@@ -34,6 +34,16 @@ defmodule GenIRTest do
             end
           end
         end
+
+        Func.func some_func2(function_type: ~a"() -> i32") do
+          region do
+            block bb_entry() do
+              v0 = Arith.constant({:value, ~a{0: i32}}) :: ~t<i32>
+              add = Arith.addi(v0, v0) :: ~t<i32>
+              Func.return(add)
+            end
+          end
+        end
       end
     end
     |> MLIR.Operation.dump()
