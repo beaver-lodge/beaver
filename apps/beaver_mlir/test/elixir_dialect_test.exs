@@ -19,7 +19,7 @@ defmodule Adder do
   @mlir_spec "() -> ()"
   def main() do
     a = 100
-    b = add(a, a)
+    _b = add(a, a)
   end
 end
 

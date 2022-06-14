@@ -50,3 +50,25 @@ MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
   return OperationName(unwrap(op_name), unwrap(context))
       .mightHaveTrait<OpTrait::IsTerminator>();
 }
+
+MLIR_CAPI_EXPORTED intptr_t
+beaverGetNumRegisteredOperations(MlirContext context) {
+  return unwrap(context)->getRegisteredOperations().size();
+}
+
+MLIR_CAPI_EXPORTED MlirRegisteredOperationName
+beaverGetRegisteredOperationName(MlirContext context, intptr_t pos) {
+  mlir::RegisteredOperationName name =
+      unwrap(context)->getRegisteredOperations()[pos];
+  return wrap(name);
+}
+
+MLIR_CAPI_EXPORTED MlirStringRef
+beaverRegisteredOperationNameGetDialectName(MlirRegisteredOperationName name) {
+  return wrap(unwrap(name).getDialectNamespace());
+}
+
+MLIR_CAPI_EXPORTED MlirStringRef
+beaverRegisteredOperationNameGetOpName(MlirRegisteredOperationName name) {
+  return wrap(unwrap(name).stripDialect());
+}

@@ -3,7 +3,6 @@ defmodule Beaver.MLIR.Operation do
   alias Beaver.MLIR.CAPI.IR
   alias Beaver.MLIR.CAPI
   import Beaver.MLIR.CAPI
-  require Logger
 
   @doc """
   Create a new operation from a operation state
@@ -16,8 +15,6 @@ defmodule Beaver.MLIR.Operation do
   Create a new operation from arguments and insert to managed insertion point
   """
   def create(op_name, arguments) do
-    Logger.debug("create operation: #{op_name}")
-
     if MLIR.Trait.is_terminator?(op_name) do
       if block = MLIR.Managed.Block.get() do
         Beaver.MLIR.Managed.Terminator.defer(fn ->

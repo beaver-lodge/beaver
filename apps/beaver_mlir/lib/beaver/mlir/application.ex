@@ -6,7 +6,8 @@ defmodule Beaver.MLIR.Application do
         Beaver.MLIR.CAPI.Managed,
         Beaver.MLIR.CAPI.IR.Managed,
         Beaver.MLIR.CAPI.Registration.Managed,
-        Beaver.MLIR.Global.Context
+        Beaver.MLIR.Global.Context,
+        Beaver.MLIR.Dialect.Registry
       ],
       strategy: :one_for_one
     )

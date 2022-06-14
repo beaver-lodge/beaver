@@ -1,7 +1,12 @@
 defmodule Beaver.MLIR.Dialect.Arith do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
+  alias Beaver.MLIR.Dialect
   import MLIR.Sigils
+
+  use Beaver.MLIR.Dialect.Generator,
+    dialect: "arith",
+    ops: Dialect.Registry.ops("arith") |> Enum.reject(fn x -> x in ~w{constant} end)
 
   def constant(true) do
     MLIR.Operation.create("arith.constant", value: ~a{true}, result_types: ["i1"])
@@ -23,8 +28,8 @@ defmodule Beaver.MLIR.Dialect.Arith do
     |> MLIR.Operation.results()
   end
 
-  def addi(arguments) do
-    MLIR.Operation.create("arith.addi", arguments)
-    |> MLIR.Operation.results()
-  end
+  # def addi(arguments) do
+  #   MLIR.Operation.create("arith.addi", arguments)
+  #   |> MLIR.Operation.results()
+  # end
 end

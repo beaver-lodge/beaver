@@ -1,6 +1,6 @@
 defmodule LoadIRTest do
   use ExUnit.Case
-  alias Beaver.MLIR
+
   import Beaver.MLIR.Sigils
 
   test "example from upstream with br" do
