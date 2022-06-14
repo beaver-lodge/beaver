@@ -44,6 +44,7 @@ defprotocol Exotic.Valuable do
   """
   def holdings(data)
   def transmit(data, ref)
+  def type(v)
 end
 
 defimpl Exotic.Valuable, for: Any do
@@ -52,6 +53,14 @@ defimpl Exotic.Valuable, for: Any do
 
   def transmit(v = %{holdings: holdings}, ref),
     do: struct!(v, %{holdings: MapSet.put(holdings, ref)})
+
+  def type(%{type: type}) do
+    type
+  end
+
+  def type(%module{}) do
+    module
+  end
 end
 
 defmodule Exotic.Value do
@@ -79,7 +88,7 @@ defmodule Exotic.Value do
   defstruct [:ref, :type, holdings: MapSet.new()]
 
   # To support Access behavior, each struct should have its own elixir struct
-  def fetch(%__MODULE__{ref: v_ref, holdings: holdings}, module, key) when is_atom(module) do
+  def fetch(%{ref: v_ref, holdings: holdings}, module, key) when is_atom(module) do
     %Exotic.Type{ref: t_ref} = Exotic.Type.get(module)
     # TODO: native_fields is called twice, once in Exotic.Type.get and once below
     fields = apply(module, :native_fields_with_names, [])
@@ -113,7 +122,7 @@ defmodule Exotic.Value do
     Exotic.Valuable.resource(data) |> Exotic.NIF.as_binary()
   end
 
-  def transmit(v = %__MODULE__{ref: ref, holdings: holdings}) do
+  def transmit(v = %{ref: ref, holdings: holdings}) do
     struct!(v, %{holdings: MapSet.put(holdings, ref)})
   end
 
@@ -297,11 +306,10 @@ defmodule Exotic.Value do
 
       ref = NIF.get_struct_value(type_refs, value_refs)
 
-      %Value{
+      struct!(module, %{
         ref: ref,
-        type: module,
         holdings: MapSet.new()
-      }
+      })
     end
   end
 
@@ -313,7 +321,7 @@ defmodule Exotic.Value do
     def get(values) when length(values) > 0 do
       values = values |> Enum.map(&Value.get/1)
 
-      types = values |> Enum.map(&Map.fetch!(&1, :type)) |> Enum.map(&Type.get/1)
+      types = values |> Enum.map(&Exotic.Valuable.type/1) |> Enum.map(&Type.get/1)
 
       type = List.first(types)
       size = length(types)

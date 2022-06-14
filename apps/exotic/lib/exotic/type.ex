@@ -1,6 +1,13 @@
 defmodule Exotic.Type.Struct do
   defmacro __using__(fields: fields) do
     quote bind_quoted: [fields: fields] do
+      @enforce_keys [:ref]
+      defstruct ref: nil, holdings: MapSet.new()
+
+      @type t :: %__MODULE__{
+              ref: reference(),
+              holdings: MapSet.t(reference())
+            }
       Module.register_attribute(__MODULE__, :native_fields, accumulate: false, persist: true)
 
       @native_fields fields

@@ -13,6 +13,20 @@ defmodule Exotic do
     apply(managed_module, :value, [])
   end
 
+  defp create_return_value(result_ref, return_type, holdings) do
+    case return_type do
+      {:type_def, module} ->
+        struct!(module, %{
+          ref: result_ref,
+          holdings: holdings
+        })
+
+      _ ->
+        IO.inspect(return_type, label: "return_type")
+        struct!(Value, %{ref: result_ref, type: return_type, holdings: holdings})
+    end
+  end
+
   def call!(_, _, _args \\ :default)
 
   def call!(%Library{ref: lib_ref, functions: functions}, func_name, args)
@@ -33,7 +47,7 @@ defmodule Exotic do
       |> Map.fetch!({func_name, length(args)})
 
     result_ref = NIF.call_func(lib_ref, func_ref, arg_refs)
-    struct!(Value, %{ref: result_ref, type: return_type, holdings: holdings})
+    create_return_value(result_ref, return_type, holdings)
   end
 
   # TODO: benchmark to see if it faster to create function wrapper each time or cache it
@@ -55,7 +69,7 @@ defmodule Exotic do
 
     %Function{ref: func_ref} = Function.get(func_def)
     result_ref = NIF.call_func(lib_ref, func_ref, arg_refs)
-    struct!(Value, %{ref: result_ref, type: return_type, holdings: holdings})
+    create_return_value(result_ref, return_type, holdings)
   end
 
   def call!(module, func_name, args)
