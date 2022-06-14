@@ -13,14 +13,14 @@ defmodule Beaver.MLIR.Managed.Terminator do
   def resolve() do
     all = Process.delete(__MODULE__) || []
 
-    with key = {__MODULE__.Block, _} <- Process.get_keys() do
-      Process.delete(key)
-    end
-
-    Process.delete({__MODULE__.Blocks}) || []
-
     for f <- all do
       f.()
+    end
+
+    for key <- Process.get_keys() do
+      with {__MODULE__.Block, _} <- key do
+        Process.delete(key)
+      end
     end
   end
 
@@ -29,6 +29,12 @@ defmodule Beaver.MLIR.Managed.Terminator do
   end
 
   def get_block(id) do
-    Process.get({__MODULE__.Block, id})
+    block = Process.get({__MODULE__.Block, id})
+
+    if is_nil(block) do
+      raise "Block #{id} not found"
+    end
+
+    block
   end
 end
