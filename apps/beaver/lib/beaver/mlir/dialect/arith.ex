@@ -1,6 +1,5 @@
 defmodule Beaver.MLIR.Dialect.Arith do
   alias Beaver.MLIR
-  alias Beaver.MLIR.CAPI
   alias Beaver.MLIR.Dialect
   import MLIR.Sigils
 
