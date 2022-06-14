@@ -155,7 +155,7 @@ defmodule Beaver.MLIR.Operation.State do
 
   def add_argument(
         state,
-        operand = %Exotic.Value{type: %Exotic.Type{t: Beaver.MLIR.CAPI.IR.Value}}
+        operand = %Beaver.MLIR.CAPI.IR.Value{}
       ) do
     add_operand(state, [operand])
   end

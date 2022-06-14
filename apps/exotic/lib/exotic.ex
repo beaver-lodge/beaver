@@ -21,8 +21,21 @@ defmodule Exotic do
           holdings: holdings
         })
 
+      %Exotic.Type{t: :f64} ->
+        struct!(Value, %{ref: result_ref, type: return_type, holdings: holdings})
+
+      %Exotic.Type{t: module} ->
+        if function_exported?(module, :__struct__, 1) do
+          struct!(module, %{
+            ref: result_ref,
+            holdings: holdings
+          })
+        else
+          struct!(Value, %{ref: result_ref, type: return_type, holdings: holdings})
+        end
+
       _ ->
-        IO.inspect(return_type, label: "return_type")
+        # TODO: handle other types
         struct!(Value, %{ref: result_ref, type: return_type, holdings: holdings})
     end
   end
