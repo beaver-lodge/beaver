@@ -41,6 +41,12 @@ defmodule GenIRTest do
             block bb_entry() do
               v0 = Arith.constant({:value, ~a{0: i32}}) :: ~t<i32>
               add = Arith.addi(v0, v0) :: ~t<i32>
+              CF.br({:bb1, [v0]})
+            end
+
+            block bb1(arg :: ~t<i32>) do
+              v2 = Arith.constant({:value, ~a{0: i32}}) :: ~t<i32>
+              add = Arith.addi(arg, v2) :: ~t<i32>
               Func.return(add)
             end
           end
