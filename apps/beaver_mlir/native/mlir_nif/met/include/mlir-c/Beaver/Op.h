@@ -7,8 +7,30 @@
 extern "C" {
 #endif
 
+#define DEFINE_C_API_STRUCT(name, storage)                                     \
+  struct name {                                                                \
+    storage *ptr;                                                              \
+  };                                                                           \
+  typedef struct name name
+
+DEFINE_C_API_STRUCT(MlirRegisteredOperationName, void);
+
+#undef DEFINE_C_API_STRUCT
+
 MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
                                                  MlirContext context);
+
+MLIR_CAPI_EXPORTED intptr_t
+beaverGetNumRegisteredOperations(MlirContext context);
+
+MLIR_CAPI_EXPORTED MlirRegisteredOperationName
+beaverGetRegisteredOperationName(MlirContext context, intptr_t pos);
+
+MLIR_CAPI_EXPORTED MlirStringRef
+beaverRegisteredOperationNameGetDialectName(MlirRegisteredOperationName name);
+
+MLIR_CAPI_EXPORTED MlirStringRef
+beaverRegisteredOperationNameGetOpName(MlirRegisteredOperationName name);
 
 #ifdef __cplusplus
 }

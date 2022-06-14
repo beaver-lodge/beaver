@@ -1,5 +1,4 @@
 defmodule Beaver.MLIR.Dialect.CF do
-  alias Beaver.MLIR.CAPI
   alias Beaver.MLIR
   import Beaver.MLIR.Sigils
 
@@ -16,7 +15,6 @@ defmodule Beaver.MLIR.Dialect.CF do
   """
   def br(dest) do
     {dest, args} = extract_args(dest)
-    length_args = length(args)
 
     MLIR.Operation.create(
       "cf.br",
