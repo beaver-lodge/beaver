@@ -259,7 +259,7 @@ PDL really opens a door to non C++ programming languages to build MLIR tools. Be
 
 ## MLIR context management
 
-When calling higher-level APIs, it is ideal not to have MLIR context passing around everywhere. To archive this, we borrow the practice from upstream [MLIR Python Bindings](https://mlir.llvm.org/docs/Bindings/Python/) in LLVM repo and adapt it following Erlang/Elixir idiom. The basic idea is that all higher-level APIs are backed by Erlang [`process`](https://www.erlang.org/doc/reference_manual/processes.html) and [`ets`](https://www.erlang.org/doc/man/ets.html) to keep track of the contexts involved at different level of MLIR elements. By default it uses the global MLIR context get initialized as Erlang [application](https://www.erlang.org/doc/man/application.html)s start, or you can register a MLIR context for `self()` process.
+When calling higher-level APIs, it is ideal not to have MLIR context passing around everywhere. To achieve this, we borrow the practice from upstream [MLIR Python Bindings](https://mlir.llvm.org/docs/Bindings/Python/) in LLVM repo and adapt it following Erlang/Elixir idiom. The basic idea is that all higher-level APIs are backed by Erlang [`process`](https://www.erlang.org/doc/reference_manual/processes.html) and [`ets`](https://www.erlang.org/doc/man/ets.html) to keep track of the contexts involved at different level of MLIR elements. By default it uses the global MLIR context get initialized as Erlang [application](https://www.erlang.org/doc/man/application.html)s start, or you can register a MLIR context for `self()` process.
 
 ## Development
 
