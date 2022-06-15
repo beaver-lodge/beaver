@@ -4,7 +4,7 @@ set(LLVM_LINK_COMPONENTS
   Core
   Support
   AsmParser
-  )
+)
 
 if(MLIR_INCLUDE_TESTS)
   set(test_libs
@@ -26,7 +26,7 @@ if(MLIR_INCLUDE_TESTS)
     MLIRTestReducer
     MLIRTestRewrite
     MLIRTestTransforms
-    )
+  )
 endif()
 
 set(LIBS
@@ -42,17 +42,19 @@ set(LIBS
   MLIRTransformUtils
   MLIRSupport
   MLIRIR
-  )
+)
 
 message(STATUS "MLIR libs: ${LIBS}")
+
 # This lib is for dlopen
 add_mlir_aggregate(met
-SHARED
-EMBED_LIBS
-MLIRCAPIIR
-MLIRCAPIElixir
-MLIRCAPIRegistration
-MLIRCAPIConversion
-MLIRCAPITransforms
-MLIRCAPIExecutionEngine
+  SHARED
+  EMBED_LIBS
+  MLIRCAPIIR
+  MLIRCAPIElixir
+  MLIRCAPIRegistration
+  MLIRCAPIConversion
+  MLIRCAPITransforms
+  MLIRCAPIExecutionEngine
+  MLIRCAPILinalg
 )
