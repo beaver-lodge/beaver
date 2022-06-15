@@ -26,6 +26,10 @@ defmodule Beaver.MLIR.Pass.Composer.Generator do
             @doc """
             #{doc}
             """
+            def unquote(pass_arg)() do
+              CAPI.unquote(name)()
+            end
+
             def unquote(pass_arg)(composer_or_op = %Composer{}) do
               pass = CAPI.unquote(name)()
               Composer.add(composer_or_op, pass)

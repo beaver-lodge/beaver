@@ -11,6 +11,7 @@ defmodule TosaTest do
     import Builtin, only: :macros
     import MLIR, only: :macros
     import MLIR.Sigils
+    import MLIR.{Transforms, Conversion}
 
     Beaver.mlir do
       module do
@@ -27,7 +28,16 @@ defmodule TosaTest do
         end
       end
     end
-    |> MLIR.Operation.dump!()
     |> MLIR.Operation.verify!()
+    |> canonicalize
+    |> cse
+    |> tosa_to_scf
+    |> tosa_to_arith
+    |> MLIR.Pass.Composer.nested("func.func", [tosa_to_linalg()])
+    |> tosa_to_tensor()
+    |> convert_func_to_llvm
+    |> convert_arith_to_llvm
+    |> MLIR.Pass.Composer.run!()
+    |> MLIR.Operation.dump!()
   end
 end

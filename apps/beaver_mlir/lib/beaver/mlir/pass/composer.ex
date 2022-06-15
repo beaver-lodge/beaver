@@ -17,7 +17,17 @@ defmodule Beaver.MLIR.Pass.Composer do
     pm = mlirPassManagerCreate(ctx)
 
     for pass <- passes do
-      mlirPassManagerAddOwnedPass(pm, pass)
+      case pass do
+        {op_name, passes} when is_binary(op_name) ->
+          npm = mlirOpPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
+
+          for pass <- passes do
+            mlirPassManagerAddOwnedPass(npm, pass)
+          end
+
+        _ ->
+          mlirPassManagerAddOwnedPass(pm, pass)
+      end
     end
 
     status = mlirPassManagerRun(pm, op)
@@ -28,5 +38,14 @@ defmodule Beaver.MLIR.Pass.Composer do
 
     mlirPassManagerDestroy(pm)
     op
+  end
+
+  def nested(composer_or_op = %__MODULE__{}, op_name, passes) when is_list(passes) do
+    __MODULE__.add(composer_or_op, {op_name, passes})
+  end
+
+  def nested(composer_or_op, op_name, pass) do
+    composer = %__MODULE__{op: composer_or_op, passes: []}
+    nested(composer, op_name, pass)
   end
 end
