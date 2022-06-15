@@ -13,7 +13,7 @@ defmodule TosaTest do
     import MLIR.Sigils
 
     Beaver.mlir do
-      Builtin.module do
+      module do
         Func.func test_multibroadcast(
                     function_type: ~a"(tensor<1x3xf32>, tensor<2x1xf32>) -> tensor<2x3xf32>"
                   ) do
