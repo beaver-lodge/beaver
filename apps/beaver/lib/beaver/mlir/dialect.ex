@@ -4,7 +4,7 @@ defmodule Beaver.MLIR.Dialect do
 
   for d <-
         Dialect.Registry.dialects() |> Enum.reject(fn x -> x in ~w{cf pdl arith func builtin} end) do
-    module_name = String.capitalize(d)
+    module_name = d |> Dialect.Registry.normalize_dialect_name()
     module_name = Module.concat([__MODULE__, module_name])
 
     defmodule module_name do
