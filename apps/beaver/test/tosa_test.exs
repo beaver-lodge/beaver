@@ -7,7 +7,7 @@ defmodule TosaTest do
     require Beaver
     require Beaver.MLIR.Dialect.Func
     alias Beaver.MLIR
-    alias Beaver.MLIR.Dialect.{Builtin, Func, Arith, CF, TOSA}
+    alias Beaver.MLIR.Dialect.{Builtin, Func, TOSA}
     import Builtin, only: :macros
     import MLIR, only: :macros
     import MLIR.Sigils
