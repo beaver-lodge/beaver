@@ -7,4 +7,9 @@ defmodule Beaver.MLIR.Attribute do
     attr = MLIR.StringRef.create(attr)
     CAPI.mlirAttributeParseGet(ctx, attr)
   end
+
+  def unit() do
+    ctx = MLIR.Managed.Context.get()
+    CAPI.mlirUnitAttrGet(ctx)
+  end
 end
