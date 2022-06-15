@@ -33,8 +33,17 @@ defmodule TosaTest do
     |> cse
     |> tosa_to_scf
     |> tosa_to_arith
-    |> MLIR.Pass.Composer.nested("func.func", [tosa_to_linalg()])
     |> tosa_to_tensor()
+    |> convert_tensor_to_linalg()
+    |> MLIR.Pass.Composer.nested("func.func", [
+      tosa_to_linalg(),
+      linalg_bufferize(),
+      linalg_fuse_elementwise_ops()
+    ])
+    |> MLIR.Pass.Composer.pipeline("func-bufferize")
+    |> convert_func_to_llvm()
+    |> convert_memref_to_llvm
+    |> convert_cf_to_llvm()
     |> convert_func_to_llvm
     |> convert_arith_to_llvm
     |> MLIR.Pass.Composer.run!()

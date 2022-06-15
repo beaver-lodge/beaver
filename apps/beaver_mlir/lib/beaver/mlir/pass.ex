@@ -101,12 +101,13 @@ defmodule Beaver.MLIR.Pass do
     %__MODULE__{external: externalPass}
   end
 
-  def normalized_name(pass) do
-    pass
-    |> CAPI.beaverPassGetArgument()
-    |> MLIR.StringRef.extract()
-    |> String.replace("-", "_")
-    |> Macro.underscore()
-    |> String.to_atom()
+  def pipeline!(pm, pipeline_str) when is_binary(pipeline_str) do
+    status = CAPI.mlirParsePassPipeline(pm, MLIR.StringRef.create(pipeline_str))
+
+    if not MLIR.LogicalResult.success?(status) do
+      raise "Unexpected failure parsing pipeline: #{pipeline_str}"
+    end
+
+    pm
   end
 end

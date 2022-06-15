@@ -25,6 +25,9 @@ defmodule Beaver.MLIR.Pass.Composer do
             mlirPassManagerAddOwnedPass(npm, pass)
           end
 
+        pipeline_str when is_binary(pipeline_str) ->
+          MLIR.Pass.pipeline!(pm, pipeline_str)
+
         _ ->
           mlirPassManagerAddOwnedPass(pm, pass)
       end
@@ -47,5 +50,14 @@ defmodule Beaver.MLIR.Pass.Composer do
   def nested(composer_or_op, op_name, pass) do
     composer = %__MODULE__{op: composer_or_op, passes: []}
     nested(composer, op_name, pass)
+  end
+
+  def pipeline(composer_or_op = %__MODULE__{}, pipeline_str) when is_binary(pipeline_str) do
+    __MODULE__.add(composer_or_op, pipeline_str)
+  end
+
+  def pipeline(composer_or_op, pipeline_str) when is_binary(pipeline_str) do
+    composer = %__MODULE__{op: composer_or_op, passes: []}
+    pipeline(composer, pipeline_str)
   end
 end
