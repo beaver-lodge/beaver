@@ -40,6 +40,9 @@ defmodule TosaTest do
       linalg_bufferize(),
       linalg_fuse_elementwise_ops()
     ])
+    |> MLIR.Pass.Composer.nested("func.func", fn pm ->
+      MLIR.Pass.pipeline!(pm, "tensor-bufferize")
+    end)
     |> MLIR.Pass.Composer.pipeline("func-bufferize")
     |> convert_func_to_llvm()
     |> convert_memref_to_llvm
