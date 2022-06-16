@@ -4,7 +4,13 @@ defmodule Beaver.MLIR.Global.Context do
 
   def start_link([]) do
     # TODO: read opts from app config
-    Agent.start_link(fn -> MLIR.Context.create(allow_unregistered: true) end, name: __MODULE__)
+    Agent.start_link(
+      fn ->
+        MLIR.CAPI.mlirRegisterAllPasses()
+        MLIR.Context.create(allow_unregistered: true)
+      end,
+      name: __MODULE__
+    )
   end
 
   def get do

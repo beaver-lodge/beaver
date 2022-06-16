@@ -36,9 +36,11 @@ defmodule Beaver.MLIR.CAPI do
   end
 
   paths = Path.wildcard("native/mlir_nif/met/include/**/*.h")
+
   for path <- paths do
     @external_resource path
   end
+
   wrapper_header_path = "include/wrapper/llvm/14.h"
   @external_resource wrapper_header_path
 

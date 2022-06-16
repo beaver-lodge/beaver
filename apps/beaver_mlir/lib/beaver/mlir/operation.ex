@@ -90,6 +90,8 @@ defmodule Beaver.MLIR.Operation do
     if not is_success do
       raise "MLIR operation verification failed"
     end
+
+    op
   end
 
   def dump(op) do
