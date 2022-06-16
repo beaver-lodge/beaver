@@ -26,7 +26,13 @@ defmodule Beaver.MLIR.Pass.Composer do
           npm = mlirOpPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
 
           for pass <- passes do
-            mlirPassManagerAddOwnedPass(npm, pass)
+            case pass do
+              p when is_binary(p) ->
+                MLIR.Pass.pipeline!(npm, p)
+
+              _ ->
+                mlirPassManagerAddOwnedPass(npm, pass)
+            end
           end
 
         pipeline_str when is_binary(pipeline_str) ->
