@@ -56,7 +56,7 @@ defmodule GenIRTest do
         end
       end
     end
-    |> MLIR.Operation.dump!()
+    # |> MLIR.Operation.dump!()
     |> MLIR.Operation.verify!()
   end
 

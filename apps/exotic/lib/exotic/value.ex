@@ -280,12 +280,19 @@ defmodule Exotic.Value do
 
     defp get_values_by_types_and_names(types, values) do
       for {{name, type}, value} <- Enum.zip(types, values) do
-        case type do
-          %Exotic.Type{
-            ref: _,
-            t: [{:function, [_ret | _args_kv]}]
-          } ->
+        case {type, value} do
+          {%Exotic.Type{
+             ref: _,
+             t: [{:function, [_ret | _args_kv]}]
+           }, _} ->
             Exotic.Value.get_closure(type, value, name)
+
+          {%Exotic.Type{}, v = %{ref: _ref}} ->
+            v
+
+          {%Exotic.Type{ref: _ref, t: :i64}, i} when is_integer(i) ->
+            ref = Exotic.NIF.get_i64_value(i)
+            %Exotic.Value.I64{ref: ref, holdings: MapSet.new()}
 
           _ ->
             __MODULE__.get(type, value)
