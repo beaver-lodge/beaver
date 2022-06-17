@@ -556,9 +556,9 @@ impl Encoder for EncoderWrapper<'_> {
                     .collect();
                 terms.encode(env)
             },
-            (_, ValueWrapper::Struct(buffer)) => buffer.data.encode(env),
+            // (_, ValueWrapper::Struct(buffer)) => buffer.data.encode(env),
             _ => panic!(
-                "Unsupported value to encode type: {:?}, value: {:?}",
+                "Unsupported value to encode type: {:?}, value: {:?}, maybe what you need is `as_binary`?",
                 self.t, self.v
             ),
         }

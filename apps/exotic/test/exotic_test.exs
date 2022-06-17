@@ -61,8 +61,7 @@ defmodule ExoticTest do
   test "extract opaque" do
     assert [1, 2, 3, 4, 5, 6, 7, 8]
            |> Exotic.Value.Array.get()
-           |> Exotic.Value.extract()
-           |> IO.inspect(label: "extract") == [
+           |> Exotic.Value.as_binary() == <<
              1,
              0,
              0,
@@ -95,6 +94,6 @@ defmodule ExoticTest do
              0,
              0,
              0
-           ]
+           >>
   end
 end
