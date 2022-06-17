@@ -556,6 +556,7 @@ impl Encoder for EncoderWrapper<'_> {
                     .collect();
                 terms.encode(env)
             },
+            (_, ValueWrapper::Struct(buffer)) => buffer.data.encode(env),
             _ => panic!(
                 "Unsupported value to encode type: {:?}, value: {:?}",
                 self.t, self.v
