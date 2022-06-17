@@ -1,14 +1,23 @@
 defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
-  use Exotic.Type.Struct,
-    fields: [
+  def struct_fields(rank) when is_integer(rank) do
+    sized_array = List.duplicate(:i64, rank)
+
+    [
       allocated: :ptr,
       aligned: :ptr,
       offset: :i64,
-      shape: {:struct, [:i64, :i64]},
-      strides: {:struct, [:i64, :i64]}
+      shape: {:struct, sized_array},
+      strides: {:struct, sized_array}
     ]
+  end
 
   def create(elements, shape, strides) when is_list(elements) and is_list(shape) do
+    rank = length(shape)
+
+    if length(shape) != length(strides) do
+      raise "elements and shape must have the same length"
+    end
+
     arr = elements |> Exotic.Value.Array.get()
     arr_ptr = arr |> Exotic.Value.get_ptr()
 
@@ -22,7 +31,7 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
     strides = strides |> Enum.map(&Exotic.Value.get(:i64, &1)) |> Exotic.Value.Array.get()
 
     Exotic.Value.Struct.get(
-      __MODULE__,
+      __MODULE__.struct_fields(rank),
       [allocated, aligned, offset, shape, strides]
     )
   end

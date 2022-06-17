@@ -178,6 +178,10 @@ defmodule Exotic.Type do
   def get(t = {:struct, fields}) do
     struct_ref =
       fields
+      |> Enum.map(fn
+        {_, t} -> t
+        t -> t
+      end)
       |> Enum.map(&get/1)
       |> Enum.map(&Map.get(&1, :ref))
       |> Exotic.NIF.get_struct_type()

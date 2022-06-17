@@ -59,7 +59,7 @@ defmodule MemRefTest do
         [0, 0, 0]
       )
 
-    return = MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [arg0])
+    # return = MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [arg0])
 
     for i <- 1..100 do
       # IO.inspect(i)

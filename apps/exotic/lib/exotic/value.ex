@@ -88,14 +88,24 @@ defmodule Exotic.Value do
   defstruct [:ref, :type, holdings: MapSet.new()]
 
   # To support Access behavior, each struct should have its own elixir struct
+
   def fetch(%{ref: v_ref, holdings: holdings}, module, key) when is_atom(module) do
-    %Exotic.Type{ref: t_ref} = Exotic.Type.get(module)
-    # TODO: native_fields is called twice, once in Exotic.Type.get and once below
     fields = apply(module, :native_fields_with_names, [])
+    fetch(%{ref: v_ref, holdings: holdings}, fields, key)
+  end
+
+  def fetch(%{ref: v_ref, holdings: holdings}, fields, key) when is_list(fields) do
+    %Exotic.Type{ref: t_ref} = Exotic.Type.get({:struct, fields})
+
+    fields =
+      for {n, f} <- fields do
+        {n, Exotic.Type.get(f)}
+      end
+
     i = Enum.find_index(fields, fn {n, _f} -> n == key end)
     {_n, %Exotic.Type{ref: _, t: field_t}} = Enum.find(fields, fn {n, _f} -> n == key end)
     res_ref = Exotic.NIF.access_struct_field_as_value(t_ref, v_ref, i)
-    # althogh it is value semantic, still inherent transmits, to make it safer
+    # although it is value semantic, still inherent transmits, to make it safer
     %__MODULE__{
       ref: res_ref,
       type: %Exotic.Type{ref: nil, t: field_t},
@@ -279,6 +289,7 @@ defmodule Exotic.Value do
     Create and extract C structs.
     """
     alias Exotic.{Value, Type}
+    defstruct ref: nil, holdings: MapSet.new(), type: :struct
 
     def extract(module, %Exotic.Value{ref: ref}) when is_atom(module) do
       struct_t =
@@ -323,6 +334,15 @@ defmodule Exotic.Value do
     """
     def get(module, values) when is_atom(module) do
       types = apply(module, :native_fields_with_names, [])
+      get(types, values)
+    end
+
+    def get(types, values) when is_list(types) do
+      types =
+        for {n, f} <- types do
+          {n, Exotic.Type.get(f)}
+        end
+
       type_refs = types |> Enum.map(fn {_, t} -> t end) |> Enum.map(&Map.fetch!(&1, :ref))
 
       values = get_values_by_types_and_names(types, values)
@@ -335,7 +355,7 @@ defmodule Exotic.Value do
         |> Enum.map(&Map.get(&1, :holdings))
         |> Enum.reduce(MapSet.new(), &MapSet.union(&2, &1))
 
-      struct!(module, %{
+      struct!(__MODULE__, %{
         ref: ref,
         holdings: holdings
       })
