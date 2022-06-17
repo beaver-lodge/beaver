@@ -24,7 +24,9 @@ defmodule TosaTest do
             region do
               block entry(arg0 :: ~t{tensor<1x3xf32>}, arg1 :: ~t{tensor<2x1xf32>}) do
                 v0 = TOSA.add(arg0, arg1) :: ~t{tensor<2x3xf32>}
+                # v0 = TOSA.mul(arg0, arg1, {:shift, ~a{0 : i32}}) :: ~t{tensor<2x3xf32>}
                 Func.return(v0)
+                # Func.return(arg0)
               end
             end
           end
@@ -52,30 +54,47 @@ defmodule TosaTest do
         MLIR.Pass.pipeline!(pm, "tensor-bufferize")
       end)
       |> MLIR.Pass.Composer.pipeline("func-bufferize")
+      |> MLIR.Pass.Composer.run!()
       |> convert_vector_to_llvm
       |> convert_memref_to_llvm
       |> convert_func_to_llvm
       |> reconcile_unrealized_casts
       |> MLIR.Pass.Composer.run!()
 
-    # |> MLIR.Operation.dump!()
-
     jit = ir |> MLIR.ExecutionEngine.create!()
 
-    # tensor =
-    #   MemRefDescriptor.create(
-    #     [1.1, 2.2, 3.3],
-    #     [1, 3],
-    #     [0, 0]
-    #   )
+    arg0 =
+      MemRefDescriptor.create(
+        [1.1, 2.2, 3.3] |> Enum.map(&Exotic.Value.get(:f32, &1)),
+        [1, 3],
+        [0, 0]
+      )
 
-    # return =
-    #   MemRefDescriptor.create(
-    #     [1.1, 2.2, 3.3, 4.4, 5.5, 6.6],
-    #     [2, 3],
-    #     [0, 0]
-    #   )
+    arg1 =
+      MemRefDescriptor.create(
+        [1.1, 2.2] |> Enum.map(&Exotic.Value.get(:f32, &1)),
+        [2, 1],
+        [0, 0]
+      )
 
-    # return = MLIR.ExecutionEngine.invoke!(jit, "test_multi_broadcast", [tensor], return)
+    return0 =
+      MemRefDescriptor.create(
+        [1.1, 2.2, 3.3] |> Enum.map(&Exotic.Value.get(:f32, &1)),
+        [1, 3],
+        [0, 0]
+      )
+
+    return =
+      MemRefDescriptor.create(
+        [1.1, 2.2, 3.3, 4.4, 5.5, 6.6] |> Enum.map(&Exotic.Value.get(:f32, &1)),
+        [2, 3],
+        [0, 0]
+      )
+
+    for i <- 0..100 do
+      # IO.inspect(i, label: "i")
+      # _return = MLIR.ExecutionEngine.invoke!(jit, "test_multi_broadcast", [arg0, arg1], return0)
+      # _return = MLIR.ExecutionEngine.invoke!(jit, "test_multi_broadcast", [arg0, arg1], return)
+    end
   end
 end

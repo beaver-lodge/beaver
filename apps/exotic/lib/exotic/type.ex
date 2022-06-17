@@ -175,6 +175,16 @@ defmodule Exotic.Type do
     get(module)
   end
 
+  def get(t = {:struct, fields}) do
+    struct_ref =
+      fields
+      |> Enum.map(&get/1)
+      |> Enum.map(&Map.get(&1, :ref))
+      |> Exotic.NIF.get_struct_type()
+
+    %__MODULE__{ref: struct_ref, t: t}
+  end
+
   defmodule Array do
     alias Exotic.{Type, NIF}
     defstruct [:t, :size]

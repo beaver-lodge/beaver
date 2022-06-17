@@ -4,8 +4,8 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
       allocated: :ptr,
       aligned: :ptr,
       offset: :i64,
-      shape: :ptr,
-      strides: :ptr
+      shape: {:struct, [:i64, :i64]},
+      strides: {:struct, [:i64, :i64]}
     ]
 
   def create(elements, shape, strides) when is_list(elements) and is_list(shape) do
@@ -17,11 +17,9 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
 
     offset = 0
 
-    shape_arr = shape |> Exotic.Value.Array.get()
-    shape = shape_arr |> Exotic.Value.get_ptr()
+    shape = shape |> Enum.map(&Exotic.Value.get(:i64, &1)) |> Exotic.Value.Array.get()
 
-    strides_arr = strides |> Exotic.Value.Array.get()
-    strides = strides_arr |> Exotic.Value.get_ptr()
+    strides = strides |> Enum.map(&Exotic.Value.get(:i64, &1)) |> Exotic.Value.Array.get()
 
     Exotic.Value.Struct.get(
       __MODULE__,

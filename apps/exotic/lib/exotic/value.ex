@@ -186,6 +186,22 @@ defmodule Exotic.Value do
     }
   end
 
+  def get(t = :f32, v) when is_integer(v) do
+    %__MODULE__{
+      ref: NIF.get_f32_value(v),
+      holdings: MapSet.new(),
+      type: t
+    }
+  end
+
+  def get(t = :i64, v) when is_integer(v) do
+    %__MODULE__{
+      ref: NIF.get_i64_value(v),
+      holdings: MapSet.new(),
+      type: t
+    }
+  end
+
   @doc """
   create a closure ptr with a function type.
   If you want to use one process to handle multiple kinds of callbacks, you should use get/3 to provide a callback_id.
@@ -234,7 +250,7 @@ defmodule Exotic.Value do
     raise "Cannot extract value because it has a nif ref"
   end
 
-  def extract(%__MODULE__{ref: ref}) do
+  def extract(%{ref: ref}) do
     ref |> Exotic.NIF.extract()
   end
 
@@ -309,13 +325,19 @@ defmodule Exotic.Value do
       types = apply(module, :native_fields_with_names, [])
       type_refs = types |> Enum.map(fn {_, t} -> t end) |> Enum.map(&Map.fetch!(&1, :ref))
 
-      value_refs = get_values_by_types_and_names(types, values) |> Enum.map(&Map.fetch!(&1, :ref))
+      values = get_values_by_types_and_names(types, values)
+      value_refs = values |> Enum.map(&Map.fetch!(&1, :ref))
 
       ref = NIF.get_struct_value(type_refs, value_refs)
 
+      holdings =
+        values
+        |> Enum.map(&Map.get(&1, :holdings))
+        |> Enum.reduce(MapSet.new(), &MapSet.union(&2, &1))
+
       struct!(module, %{
         ref: ref,
-        holdings: MapSet.new()
+        holdings: holdings
       })
     end
   end
