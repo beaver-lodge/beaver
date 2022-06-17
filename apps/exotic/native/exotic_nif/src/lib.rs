@@ -556,7 +556,10 @@ impl Encoder for EncoderWrapper<'_> {
                     .collect();
                 terms.encode(env)
             },
-            _ => panic!("Unsupported value to encode {:?}", self.v),
+            _ => panic!(
+                "Unsupported value to encode type: {:?}, value: {:?}",
+                self.t, self.v
+            ),
         }
     }
 }
