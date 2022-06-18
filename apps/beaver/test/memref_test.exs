@@ -10,6 +10,7 @@ defmodule MemRefTest do
     jit =
       ~m"""
       #map0 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
+      #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
       func.func @generic_without_inputs(%arg0 : memref<?x?x?xf32>) attributes {llvm.emit_c_interface} {
         linalg.generic  {indexing_maps = [#map0],
                           iterator_types = ["parallel", "parallel", "parallel"]}
@@ -52,18 +53,21 @@ defmodule MemRefTest do
       |> MLIR.Operation.dump!()
       |> MLIR.ExecutionEngine.create!()
 
+    arr = [1.1, 2.2, 3.3, 1.1, 2.2, 3.3]
+    arr = [0.112122112, 0.2123213, 10020.9, 1_112_310.0, 0.2, 100.4]
+    arr = List.duplicate(0.0, 6)
+
     arg0 =
       MemRefDescriptor.create(
-        [1.1, 2.2, 3.3, 1.1, 2.2, 3.3] |> Enum.map(&Exotic.Value.get(:f32, &1)),
+        arr |> Enum.map(&Exotic.Value.get(:f32, &1)),
         [1, 2, 3],
         [0, 0, 0]
       )
 
-    # return = MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [arg0])
+    return = MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [arg0])
 
-    for i <- 1..100 do
-      # IO.inspect(i)
-      # return = MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [arg0])
+    for i <- 1..1000 do
+      return = MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [arg0])
     end
   end
 end
