@@ -121,6 +121,5 @@ defmodule MemRefTest do
                a4,
                a5
              ]
-             |> IO.inspect()
   end
 end
