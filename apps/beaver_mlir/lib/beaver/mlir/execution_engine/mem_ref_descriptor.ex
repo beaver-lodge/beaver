@@ -36,7 +36,6 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
         elements
         |> Exotic.Value.Array.get()
         |> Exotic.Value.as_binary()
-        |> IO.inspect(label: "as_binary")
 
         elements |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
       end
