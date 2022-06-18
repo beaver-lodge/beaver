@@ -88,7 +88,6 @@ defmodule TosaTest do
         :allocated
       )
       |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 2, 8))
-      |> IO.inspect(label: "arg1")
 
     assert [a0, a1] == [1.100000023841858, 2.200000047683716]
 
