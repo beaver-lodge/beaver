@@ -76,14 +76,21 @@ defmodule MemRefTest do
       )
       |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8))
 
-    [
-      a0,
-      a1,
-      a2,
-      a3,
-      a4,
-      a5
-    ] = [0.112122112, 0.2123213, 10020.9, 213_120.0, 0.2, 100.4]
+    assert [
+             a0,
+             a1,
+             a2,
+             a3,
+             a4,
+             a5
+           ] == [
+             0.11212211102247238,
+             0.21232129633426666,
+             10020.900390625,
+             213_120.0,
+             0.20000000298023224,
+             100.4000015258789
+           ]
 
     MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [Exotic.Value.get_ptr(arg0)])
 
