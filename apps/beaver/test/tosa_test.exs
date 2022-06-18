@@ -24,9 +24,8 @@ defmodule TosaTest do
             region do
               block entry(arg0 :: ~t{tensor<1x3xf32>}, arg1 :: ~t{tensor<2x1xf32>}) do
                 v0 = TOSA.add(arg0, arg1) :: ~t{tensor<2x3xf32>}
-                v0 = TOSA.mul(arg0, arg1, {:shift, ~a{0 : i32}}) :: ~t{tensor<2x3xf32>}
+                v0 = TOSA.mul(v0, arg1, {:shift, ~a{0 : i32}}) :: ~t{tensor<2x3xf32>}
                 Func.return(v0)
-                # Func.return(arg0)
               end
             end
           end
@@ -60,7 +59,6 @@ defmodule TosaTest do
       |> MLIR.Pass.Composer.run!()
       |> reconcile_unrealized_casts
       |> MLIR.Pass.Composer.run!()
-      |> MLIR.Operation.dump!()
 
     jit = ir |> MLIR.ExecutionEngine.create!()
 
@@ -99,7 +97,7 @@ defmodule TosaTest do
 
     return_ptr = Exotic.Value.get_ptr(return)
 
-    for i <- 0..100 do
+    for _i <- 0..100 do
       MLIR.ExecutionEngine.invoke!(
         jit,
         "test_multi_broadcast",
@@ -142,12 +140,12 @@ defmodule TosaTest do
         |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8))
 
       assert [x0, x1, x2, x3, x4, x5] == [
-               1.2100000381469727,
                2.4200000762939453,
-               3.630000114440918,
-               2.4200000762939453,
+               3.630000352859497,
                4.840000152587891,
-               7.260000228881836
+               7.260000705718994,
+               9.680000305175781,
+               12.100000381469727
              ]
 
       assert return

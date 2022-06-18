@@ -23,7 +23,6 @@ defmodule E2ETest do
       |> convert_func_to_llvm
       |> convert_arith_to_llvm
       |> MLIR.Pass.Composer.run!()
-      |> MLIR.Operation.dump!()
       |> MLIR.ExecutionEngine.create!()
 
     return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
