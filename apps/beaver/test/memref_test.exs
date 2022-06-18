@@ -50,12 +50,9 @@ defmodule MemRefTest do
       |> convert_func_to_llvm
       |> reconcile_unrealized_casts
       |> MLIR.Pass.Composer.run!()
-      |> MLIR.Operation.dump!()
       |> MLIR.ExecutionEngine.create!()
 
-    arr = [1.1, 2.2, 3.3, 1.1, 2.2, 3.3]
-    arr = [0.112122112, 0.2123213, 10020.9, 0.0, 0.2, 100.4]
-    # arr = List.duplicate(0.0, 6)
+    arr = [0.112122112, 0.2123213, 10020.9, 213_120.0, 0.2, 100.4]
 
     arg0 =
       MemRefDescriptor.create(
@@ -64,26 +61,27 @@ defmodule MemRefTest do
         [0, 0, 0]
       )
 
-    arg0
-    |> Exotic.Value.fetch(
-      Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(3),
-      :allocated
-    )
-    |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8))
-    |> IO.inspect(label: "read_as_binary")
+    assert arg0
+           |> Exotic.Value.fetch(
+             Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(3),
+             :allocated
+           )
+           |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8)) ==
+             <<144, 205, 50, 228, 8, 180, 188, 63, 26, 66, 223, 39, 88, 45, 203, 63, 51, 51, 51,
+               51, 115, 146, 195, 64>>
 
     MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [Exotic.Value.get_ptr(arg0)])
 
-    for i <- 1..1000 do
+    for _i <- 1..1000 do
       MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [Exotic.Value.get_ptr(arg0)])
     end
 
-    arg0
-    |> Exotic.Value.fetch(
-      Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(3),
-      :allocated
-    )
-    |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8))
-    |> IO.inspect(label: "read_as_binary")
+    assert arg0
+           |> Exotic.Value.fetch(
+             Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(3),
+             :allocated
+           )
+           |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8)) ==
+             <<0, 0, 0, 64, 0, 0, 0, 64, 0, 0, 0, 64, 0, 0, 0, 64, 0, 0, 0, 64, 0, 0, 0, 64>>
   end
 end

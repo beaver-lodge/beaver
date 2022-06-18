@@ -91,8 +91,8 @@ defmodule TosaTest do
         [0, 0]
       )
 
-    for i <- 0..100 do
-      _return =
+    for _i <- 0..100 do
+      return =
         MLIR.ExecutionEngine.invoke!(
           jit,
           "test_multi_broadcast",

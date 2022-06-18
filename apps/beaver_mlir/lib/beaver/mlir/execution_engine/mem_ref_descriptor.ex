@@ -19,19 +19,6 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
     end
 
     arr = elements |> Exotic.Value.Array.get()
-    IO.inspect({shape, strides})
-
-    arr
-    |> Exotic.Value.as_binary()
-    |> byte_size
-    |> div(8)
-    |> IO.inspect(label: "length")
-
-    arr
-    |> Exotic.Value.as_binary()
-
-    # |> IO.inspect()
-
     arr_ptr = arr |> Exotic.Value.get_ptr()
 
     allocated = arr_ptr
