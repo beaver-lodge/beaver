@@ -37,5 +37,13 @@ defmodule MemRefDescriptorTest do
            )
            |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 4, 8)) ==
              <<1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0>>
+
+    assert t
+           |> Exotic.Value.fetch(
+             Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(2),
+             :allocated
+           )
+           |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 4, 8)) ==
+             <<1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0>>
   end
 end
