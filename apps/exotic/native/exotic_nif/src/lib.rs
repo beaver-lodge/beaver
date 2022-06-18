@@ -511,6 +511,41 @@ fn as_binary(value: ResourceArc<ValueWrapper>) -> OwnedBinary {
     }
 }
 
+#[rustler::nif]
+fn read_ptr_content_as_binary(
+    value: ResourceArc<ValueWrapper>,
+    length: ResourceArc<ValueWrapper>,
+) -> OwnedBinary {
+    let length: i64 = match &*length {
+        // TODO: fix duplication
+        ValueWrapper::I8(v) => *v as i64,
+        ValueWrapper::I16(v) => *v as i64,
+        ValueWrapper::I32(v) => *v as i64,
+        ValueWrapper::I64(v) => *v as i64,
+        ValueWrapper::U8(v) => *v as i64,
+        ValueWrapper::U16(v) => *v as i64,
+        ValueWrapper::U32(v) => *v as i64,
+        ValueWrapper::U64(v) => *v as i64,
+        ValueWrapper::Size(v) => *v as i64,
+        v => {
+            panic!("expect a int value, got: {:?}", v);
+        }
+    };
+    if let ValueWrapper::Ptr(ptr) = *value {
+        let mut binary = OwnedBinary::new(length as usize).unwrap();
+        unsafe {
+            std::ptr::copy_nonoverlapping(
+                ptr as *const u8,
+                binary.as_mut_slice().as_mut_ptr(),
+                length as usize,
+            );
+        }
+        binary
+    } else {
+        panic!("expect a ptr value {:?}", *value);
+    }
+}
+
 // extract non-struct value directly
 // struct value should be extracted with types, because it is used to mimic array as well
 #[rustler::nif]
@@ -792,6 +827,7 @@ rustler::init!(
         get_ptr,
         as_ptr,
         as_binary,
+        read_ptr_content_as_binary,
         get_func,
         call_func,
         finish_callback,

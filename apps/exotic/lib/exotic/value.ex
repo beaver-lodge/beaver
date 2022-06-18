@@ -71,6 +71,11 @@ defmodule Exotic.Value do
     def null() do
       %Exotic.Value.Ptr{ref: Exotic.NIF.get_null_ptr_value(), holdings: MapSet.new()}
     end
+
+    def read_as_binary(%{ref: ptr_ref}, length) do
+      %{ref: length_ref} = Exotic.Value.get(length)
+      Exotic.NIF.read_ptr_content_as_binary(ptr_ref, length_ref)
+    end
   end
 
   defmodule I32 do

@@ -96,4 +96,12 @@ defmodule ExoticTest do
              0
            >>
   end
+
+  test "read opaque" do
+    assert [4, 3, 2, 1]
+           |> Exotic.Value.Array.get()
+           |> Exotic.Value.get_ptr()
+           |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 4, 8)) ==
+             <<4, 0, 0, 0, 3, 0, 0, 0, 2, 0, 0, 0, 1, 0, 0, 0>>
+  end
 end
