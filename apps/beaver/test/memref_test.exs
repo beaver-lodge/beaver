@@ -10,11 +10,10 @@ defmodule MemRefTest do
     jit =
       ~m"""
       #map0 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-      #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-      func.func @generic_without_inputs(%arg0 : memref<1x2x3xf32>) attributes {llvm.emit_c_interface} {
+      func.func @generic_without_inputs(%arg0 : memref<?x?x?xf32>) attributes {llvm.emit_c_interface} {
         linalg.generic  {indexing_maps = [#map0],
                           iterator_types = ["parallel", "parallel", "parallel"]}
-                        outs(%arg0 : memref<1x2x3xf32>) {
+                        outs(%arg0 : memref<?x?x?xf32>) {
           ^bb0(%arg3: f32):
             %cst = arith.constant 2.000000e+00 : f32
             linalg.yield %cst : f32
@@ -98,12 +97,30 @@ defmodule MemRefTest do
       MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [Exotic.Value.get_ptr(arg0)])
     end
 
-    assert arg0
-           |> Exotic.Value.fetch(
-             Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(3),
-             :allocated
-           )
-           |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8)) ==
-             <<0, 0, 0, 64, 0, 0, 0, 64, 0, 0, 0, 64, 0, 0, 0, 64, 0, 0, 0, 64, 0, 0, 0, 64>>
+    <<
+      a0::little-float-32,
+      a1::little-float-32,
+      a2::little-float-32,
+      a3::little-float-32,
+      a4::little-float-32,
+      a5::little-float-32
+    >> =
+      arg0
+      |> Exotic.Value.fetch(
+        Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(3),
+        :allocated
+      )
+      |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8))
+
+    assert [2.0, 2.0, 2.0, 213_120.0, 0.20000000298023224, 100.4000015258789] ==
+             [
+               a0,
+               a1,
+               a2,
+               a3,
+               a4,
+               a5
+             ]
+             |> IO.inspect()
   end
 end
