@@ -92,9 +92,13 @@ defmodule TosaTest do
       )
 
     for i <- 0..100 do
-      # IO.inspect(i, label: "i")
-      # _return = MLIR.ExecutionEngine.invoke!(jit, "test_multi_broadcast", [arg0, arg1], return0)
-      # _return = MLIR.ExecutionEngine.invoke!(jit, "test_multi_broadcast", [arg0, arg1], return)
+      _return =
+        MLIR.ExecutionEngine.invoke!(
+          jit,
+          "test_multi_broadcast",
+          [arg0, arg1] |> Enum.map(&Exotic.Value.get_ptr/1),
+          Exotic.Value.get_ptr(return0)
+        )
     end
   end
 end

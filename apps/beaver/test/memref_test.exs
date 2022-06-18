@@ -11,12 +11,12 @@ defmodule MemRefTest do
       ~m"""
       #map0 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
       #map1 = affine_map<(d0, d1, d2) -> (d0, d1, d2)>
-      func.func @generic_without_inputs(%arg0 : memref<?x?x?xf32>) attributes {llvm.emit_c_interface} {
+      func.func @generic_without_inputs(%arg0 : memref<1x2x3xf32>) attributes {llvm.emit_c_interface} {
         linalg.generic  {indexing_maps = [#map0],
                           iterator_types = ["parallel", "parallel", "parallel"]}
-                        outs(%arg0 : memref<?x?x?xf32>) {
+                        outs(%arg0 : memref<1x2x3xf32>) {
           ^bb0(%arg3: f32):
-            %cst = arith.constant 1.000000e+00 : f32
+            %cst = arith.constant 2.000000e+00 : f32
             linalg.yield %cst : f32
           }
         return
@@ -54,8 +54,8 @@ defmodule MemRefTest do
       |> MLIR.ExecutionEngine.create!()
 
     arr = [1.1, 2.2, 3.3, 1.1, 2.2, 3.3]
-    arr = [0.112122112, 0.2123213, 10020.9, 1_112_310.0, 0.2, 100.4]
-    arr = List.duplicate(0.0, 6)
+    arr = [0.112122112, 0.2123213, 10020.9, 0.0, 0.2, 100.4]
+    # arr = List.duplicate(0.0, 6)
 
     arg0 =
       MemRefDescriptor.create(
@@ -64,10 +64,26 @@ defmodule MemRefTest do
         [0, 0, 0]
       )
 
-    return = MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [arg0])
+    arg0
+    |> Exotic.Value.fetch(
+      Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(3),
+      :allocated
+    )
+    |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8))
+    |> IO.inspect(label: "read_as_binary")
+
+    MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [Exotic.Value.get_ptr(arg0)])
 
     for i <- 1..1000 do
-      return = MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [arg0])
+      MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [Exotic.Value.get_ptr(arg0)])
     end
+
+    arg0
+    |> Exotic.Value.fetch(
+      Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(3),
+      :allocated
+    )
+    |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8))
+    |> IO.inspect(label: "read_as_binary")
   end
 end
