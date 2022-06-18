@@ -43,6 +43,7 @@ defmodule Exotic.NIF do
   def get_ptr(_v), do: :erlang.nif_error(:nif_not_loaded)
   def as_ptr(_v), do: :erlang.nif_error(:nif_not_loaded)
   def as_binary(_v), do: :erlang.nif_error(:nif_not_loaded)
+  def read_ptr_content_as_binary(_v, _length), do: :erlang.nif_error(:nif_not_loaded)
 
   def finish_callback(_token, _success), do: :erlang.nif_error(:nif_not_loaded)
 end

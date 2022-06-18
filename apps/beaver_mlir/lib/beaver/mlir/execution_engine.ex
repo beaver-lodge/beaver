@@ -34,11 +34,11 @@ defmodule Beaver.MLIR.ExecutionEngine do
     jit
   end
 
-  defp do_invoke!(jit, symbol, arg_ptrs) do
+  defp do_invoke!(jit, symbol, arg_ptr_list) do
     sym = MLIR.StringRef.create(symbol)
 
     args_ptr =
-      arg_ptrs
+      arg_ptr_list
       |> Exotic.Value.Array.get()
       |> Exotic.Value.get_ptr()
 
@@ -49,9 +49,9 @@ defmodule Beaver.MLIR.ExecutionEngine do
   invoke a function by symbol name. The arguments should be a list of Exotic.Valuable
   """
   def invoke!(jit, symbol, args, return) when is_list(args) do
-    arg_ptrs = args |> Enum.map(&Exotic.Value.get_ptr/1)
+    arg_ptr_list = args |> Enum.map(&Exotic.Value.get_ptr/1)
     return_ptr = return |> Exotic.Value.get_ptr()
-    result = do_invoke!(jit, symbol, arg_ptrs ++ [return_ptr])
+    result = do_invoke!(jit, symbol, arg_ptr_list ++ [return_ptr])
 
     if MLIR.LogicalResult.success?(result) do
       return
@@ -64,8 +64,8 @@ defmodule Beaver.MLIR.ExecutionEngine do
   invoke a void function by symbol name. The arguments should be a list of Exotic.Valuable
   """
   def invoke!(jit, symbol, args) when is_list(args) do
-    arg_ptrs = args |> Enum.map(&Exotic.Value.get_ptr/1)
-    result = do_invoke!(jit, symbol, arg_ptrs)
+    arg_ptr_list = args |> Enum.map(&Exotic.Value.get_ptr/1)
+    result = do_invoke!(jit, symbol, arg_ptr_list)
 
     if not MLIR.LogicalResult.success?(result) do
       raise "Execution engine invoke failed"

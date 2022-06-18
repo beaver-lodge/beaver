@@ -12,8 +12,8 @@ defmodule E2ETest do
     jit =
       ~m"""
       module {
-        func.func @add(%arg0 : i32) -> i32 attributes { llvm.emit_c_interface } {
-          %res = arith.addi %arg0, %arg0 : i32
+        func.func @add(%arg0 : i32, %arg1 : i32) -> i32 attributes { llvm.emit_c_interface } {
+          %res = arith.addi %arg0, %arg1 : i32
           return %res : i32
         }
       }
@@ -22,9 +22,10 @@ defmodule E2ETest do
       |> cse
       |> convert_func_to_llvm
       |> convert_arith_to_llvm
+      |> MLIR.Pass.Composer.run!()
       |> MLIR.ExecutionEngine.create!()
 
-    return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg], return)
+    return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
 
     assert return |> Exotic.Value.extract() == 84
 
@@ -32,7 +33,7 @@ defmodule E2ETest do
       Task.async(fn ->
         arg = Exotic.Value.get(i)
         return = Exotic.Value.get(-1)
-        return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg], return)
+        return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
         # return here is a resource reference
         assert return == return
         assert return |> Exotic.Value.extract() == i * 2

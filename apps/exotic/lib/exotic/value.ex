@@ -71,6 +71,11 @@ defmodule Exotic.Value do
     def null() do
       %Exotic.Value.Ptr{ref: Exotic.NIF.get_null_ptr_value(), holdings: MapSet.new()}
     end
+
+    def read_as_binary(%{ref: ptr_ref}, length) do
+      %{ref: length_ref} = Exotic.Value.get(length)
+      Exotic.NIF.read_ptr_content_as_binary(ptr_ref, length_ref)
+    end
   end
 
   defmodule I32 do
@@ -88,14 +93,24 @@ defmodule Exotic.Value do
   defstruct [:ref, :type, holdings: MapSet.new()]
 
   # To support Access behavior, each struct should have its own elixir struct
+
   def fetch(%{ref: v_ref, holdings: holdings}, module, key) when is_atom(module) do
-    %Exotic.Type{ref: t_ref} = Exotic.Type.get(module)
-    # TODO: native_fields is called twice, once in Exotic.Type.get and once below
     fields = apply(module, :native_fields_with_names, [])
+    fetch(%{ref: v_ref, holdings: holdings}, fields, key)
+  end
+
+  def fetch(%{ref: v_ref, holdings: holdings}, fields, key) when is_list(fields) do
+    %Exotic.Type{ref: t_ref} = Exotic.Type.get({:struct, fields})
+
+    fields =
+      for {n, f} <- fields do
+        {n, Exotic.Type.get(f)}
+      end
+
     i = Enum.find_index(fields, fn {n, _f} -> n == key end)
     {_n, %Exotic.Type{ref: _, t: field_t}} = Enum.find(fields, fn {n, _f} -> n == key end)
     res_ref = Exotic.NIF.access_struct_field_as_value(t_ref, v_ref, i)
-    # althogh it is value semantic, still inherent transmits, to make it safer
+    # although it is value semantic, still inherent transmits, to make it safer
     %__MODULE__{
       ref: res_ref,
       type: %Exotic.Type{ref: nil, t: field_t},
@@ -201,8 +216,31 @@ defmodule Exotic.Value do
     get_closure(t, value, :invoke_callback)
   end
 
-  def get(_type, value) do
+  def get({:type_def, _module}, value) do
+    value
+  end
+
+  def get({:ptr, [:void]}, value) do
     get(value)
+  end
+
+  def get(:bool, value) when is_boolean(value), do: get(value)
+  def get({:i, 32}, value) when is_integer(value), do: get(value)
+
+  def get(:f32, value) when is_float(value) do
+    %__MODULE__{
+      ref: NIF.get_f32_value(value),
+      holdings: MapSet.new(),
+      type: :f32
+    }
+  end
+
+  def get(:i64, value) when is_integer(value) do
+    %__MODULE__{
+      ref: NIF.get_i64_value(value),
+      holdings: MapSet.new(),
+      type: :i64
+    }
   end
 
   def get_closure(
@@ -234,7 +272,7 @@ defmodule Exotic.Value do
     raise "Cannot extract value because it has a nif ref"
   end
 
-  def extract(%__MODULE__{ref: ref}) do
+  def extract(%{ref: ref}) do
     ref |> Exotic.NIF.extract()
   end
 
@@ -263,6 +301,7 @@ defmodule Exotic.Value do
     Create and extract C structs.
     """
     alias Exotic.{Value, Type}
+    defstruct ref: nil, holdings: MapSet.new(), type: :struct
 
     def extract(module, %Exotic.Value{ref: ref}) when is_atom(module) do
       struct_t =
@@ -280,12 +319,19 @@ defmodule Exotic.Value do
 
     defp get_values_by_types_and_names(types, values) do
       for {{name, type}, value} <- Enum.zip(types, values) do
-        case type do
-          %Exotic.Type{
-            ref: _,
-            t: [{:function, [_ret | _args_kv]}]
-          } ->
+        case {type, value} do
+          {%Exotic.Type{
+             ref: _,
+             t: [{:function, [_ret | _args_kv]}]
+           }, _} ->
             Exotic.Value.get_closure(type, value, name)
+
+          {%Exotic.Type{}, v = %{ref: _ref}} ->
+            v
+
+          {%Exotic.Type{ref: _ref, t: :i64}, i} when is_integer(i) ->
+            ref = Exotic.NIF.get_i64_value(i)
+            %Exotic.Value.I64{ref: ref, holdings: MapSet.new()}
 
           _ ->
             __MODULE__.get(type, value)
@@ -300,15 +346,30 @@ defmodule Exotic.Value do
     """
     def get(module, values) when is_atom(module) do
       types = apply(module, :native_fields_with_names, [])
+      get(types, values)
+    end
+
+    def get(types, values) when is_list(types) do
+      types =
+        for {n, f} <- types do
+          {n, Exotic.Type.get(f)}
+        end
+
       type_refs = types |> Enum.map(fn {_, t} -> t end) |> Enum.map(&Map.fetch!(&1, :ref))
 
-      value_refs = get_values_by_types_and_names(types, values) |> Enum.map(&Map.fetch!(&1, :ref))
+      values = get_values_by_types_and_names(types, values)
+      value_refs = values |> Enum.map(&Map.fetch!(&1, :ref))
 
       ref = NIF.get_struct_value(type_refs, value_refs)
 
-      struct!(module, %{
+      holdings =
+        values
+        |> Enum.map(&Map.get(&1, :holdings))
+        |> Enum.reduce(MapSet.new(), &MapSet.union(&2, &1))
+
+      struct!(__MODULE__, %{
         ref: ref,
-        holdings: MapSet.new()
+        holdings: holdings
       })
     end
   end
