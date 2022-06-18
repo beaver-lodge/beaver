@@ -61,14 +61,29 @@ defmodule MemRefTest do
         [0, 0, 0]
       )
 
-    assert arg0
-           |> Exotic.Value.fetch(
-             Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(3),
-             :allocated
-           )
-           |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8)) ==
-             <<144, 205, 50, 228, 8, 180, 188, 63, 26, 66, 223, 39, 88, 45, 203, 63, 51, 51, 51,
-               51, 115, 146, 195, 64>>
+    <<
+      a0::little-float-32,
+      a1::little-float-32,
+      a2::little-float-32,
+      a3::little-float-32,
+      a4::little-float-32,
+      a5::little-float-32
+    >> =
+      arg0
+      |> Exotic.Value.fetch(
+        Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(3),
+        :allocated
+      )
+      |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8))
+
+    [
+      a0,
+      a1,
+      a2,
+      a3,
+      a4,
+      a5
+    ] = [0.112122112, 0.2123213, 10020.9, 213_120.0, 0.2, 100.4]
 
     MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [Exotic.Value.get_ptr(arg0)])
 

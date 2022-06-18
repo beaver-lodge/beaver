@@ -11,18 +11,37 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
     ]
   end
 
-  def create(elements, shape, strides) when is_list(elements) and is_list(shape) do
+  @doc """
+  create descriptor without allocating elements, but with shape and strides. It is usually used as returned value.
+  """
+  def create(shape, strides) do
+    create([], shape, strides)
+  end
+
+  @doc """
+  create descriptor and allocate elements.
+  """
+  def create(elements, shape, strides)
+      when is_list(elements) and is_list(shape) do
     rank = length(shape)
 
     if length(shape) != length(strides) do
       raise "elements and shape must have the same length"
     end
 
-    arr = elements |> Exotic.Value.Array.get()
-    arr_ptr = arr |> Exotic.Value.get_ptr()
+    arr_ptr =
+      if elements == [] do
+        Exotic.Value.Ptr.null()
+      else
+        elements
+        |> Exotic.Value.Array.get()
+        |> Exotic.Value.as_binary()
+        |> IO.inspect(label: "as_binary")
 
-    allocated = arr_ptr
-    aligned = arr_ptr
+        elements |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
+      end
+
+    aligned = allocated = arr_ptr
 
     offset = 0
 

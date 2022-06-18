@@ -201,22 +201,6 @@ defmodule Exotic.Value do
     }
   end
 
-  def get(t = :f32, v) when is_integer(v) do
-    %__MODULE__{
-      ref: NIF.get_f32_value(v),
-      holdings: MapSet.new(),
-      type: t
-    }
-  end
-
-  def get(t = :i64, v) when is_integer(v) do
-    %__MODULE__{
-      ref: NIF.get_i64_value(v),
-      holdings: MapSet.new(),
-      type: t
-    }
-  end
-
   @doc """
   create a closure ptr with a function type.
   If you want to use one process to handle multiple kinds of callbacks, you should use get/3 to provide a callback_id.
@@ -232,8 +216,31 @@ defmodule Exotic.Value do
     get_closure(t, value, :invoke_callback)
   end
 
-  def get(_type, value) do
+  def get({:type_def, _module}, value) do
+    value
+  end
+
+  def get({:ptr, [:void]}, value) do
     get(value)
+  end
+
+  def get(:bool, value) when is_boolean(value), do: get(value)
+  def get({:i, 32}, value) when is_integer(value), do: get(value)
+
+  def get(:f32, value) when is_float(value) do
+    %__MODULE__{
+      ref: NIF.get_f32_value(value),
+      holdings: MapSet.new(),
+      type: :f32
+    }
+  end
+
+  def get(:i64, value) when is_integer(value) do
+    %__MODULE__{
+      ref: NIF.get_i64_value(value),
+      holdings: MapSet.new(),
+      type: :i64
+    }
   end
 
   def get_closure(
