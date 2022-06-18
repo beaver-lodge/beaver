@@ -24,7 +24,7 @@ defmodule TosaTest do
             region do
               block entry(arg0 :: ~t{tensor<1x3xf32>}, arg1 :: ~t{tensor<2x1xf32>}) do
                 v0 = TOSA.add(arg0, arg1) :: ~t{tensor<2x3xf32>}
-                # v0 = TOSA.mul(arg0, arg1, {:shift, ~a{0 : i32}}) :: ~t{tensor<2x3xf32>}
+                v0 = TOSA.mul(arg0, arg1, {:shift, ~a{0 : i32}}) :: ~t{tensor<2x3xf32>}
                 Func.return(v0)
                 # Func.return(arg0)
               end
@@ -137,11 +137,25 @@ defmodule TosaTest do
         return
         |> Exotic.Value.fetch(
           Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(2),
-          :allocated
+          :aligned
         )
         |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8))
 
-      IO.inspect([x0, x1, x2, x3, x4, x5], label: i)
+      assert [x0, x1, x2, x3, x4, x5] == [
+               1.2100000381469727,
+               2.4200000762939453,
+               3.630000114440918,
+               2.4200000762939453,
+               4.840000152587891,
+               7.260000228881836
+             ]
+
+      assert return
+             |> Exotic.Value.fetch(
+               Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(2),
+               :offset
+             )
+             |> Exotic.Value.extract() == 0
     end
   end
 end
