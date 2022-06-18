@@ -131,6 +131,7 @@ defmodule TosaTest do
         x5::little-float-32
       >> =
         return
+        # must use aligned ptr if it is allocated by LLVM
         |> Exotic.Value.fetch(
           Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(2),
           :aligned
