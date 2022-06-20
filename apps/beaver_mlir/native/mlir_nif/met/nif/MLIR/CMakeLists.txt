@@ -57,4 +57,5 @@ add_mlir_aggregate(met
   MLIRCAPITransforms
   MLIRCAPIExecutionEngine
   MLIRCAPILinalg
+  MLIRCAPIGPU
 )
