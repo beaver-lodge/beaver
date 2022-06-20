@@ -57,7 +57,7 @@ defmodule MemRefTest do
       MemRefDescriptor.create(
         arr |> Enum.map(&Exotic.Value.get(:f32, &1)),
         [1, 2, 3],
-        [0, 0, 0]
+        [6, 3, 1]
       )
 
     <<
