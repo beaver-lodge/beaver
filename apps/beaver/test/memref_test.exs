@@ -112,7 +112,7 @@ defmodule MemRefTest do
       )
       |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8))
 
-    assert [2.0, 2.0, 2.0, 213_120.0, 0.20000000298023224, 100.4000015258789] ==
+    assert [2.0, 2.0, 2.0, 2.0, 2.0, 2.0] ==
              [
                a0,
                a1,
