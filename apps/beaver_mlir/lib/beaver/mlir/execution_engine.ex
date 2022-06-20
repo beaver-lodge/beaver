@@ -16,13 +16,21 @@ defmodule Beaver.MLIR.ExecutionEngine do
     Composer.run!(composer_or_op) |> create!()
   end
 
-  def create!(module) do
+  def create!(module, opts \\ []) do
+    shared_lib_paths = Keyword.get(opts, :shared_lib_paths, [])
+
+    shared_lib_paths_ptr =
+      shared_lib_paths
+      |> Enum.map(&MLIR.StringRef.create/1)
+      |> Exotic.Value.Array.get()
+      |> Exotic.Value.get_ptr()
+
     jit =
       mlirExecutionEngineCreate(
         module,
         2,
-        0,
-        Exotic.Value.Ptr.null()
+        length(shared_lib_paths),
+        shared_lib_paths_ptr
       )
 
     is_null = is_null(jit)
