@@ -40,10 +40,20 @@ defmodule Exotic do
     end
   end
 
-  def call!(_, _, _args \\ :default)
+  defp call_if_dirty(true, lib_ref, func_ref, arg_refs) do
+    NIF.dirty_call_func(lib_ref, func_ref, arg_refs)
+  end
 
-  def call!(%Library{ref: lib_ref, functions: functions}, func_name, args)
+  defp call_if_dirty(false, lib_ref, func_ref, arg_refs) do
+    NIF.call_func(lib_ref, func_ref, arg_refs)
+  end
+
+  def call!(_, _, _args, opts \\ [dirty: true])
+
+  def call!(%Library{ref: lib_ref, functions: functions}, func_name, args, opts)
       when is_atom(func_name) do
+    is_dirty = Keyword.get(opts, :dirty, true)
+
     arg_values =
       args
       |> Enum.map(&Value.get/1)
@@ -59,7 +69,7 @@ defmodule Exotic do
       functions
       |> Map.fetch!({func_name, length(args)})
 
-    result_ref = NIF.call_func(lib_ref, func_ref, arg_refs)
+    result_ref = call_if_dirty(is_dirty, lib_ref, func_ref, arg_refs)
     create_return_value(result_ref, return_type, holdings)
   end
 
@@ -67,8 +77,11 @@ defmodule Exotic do
   def call!(
         %Library{ref: lib_ref},
         func_def = %Exotic.Function.Definition{return_type: return_type, arg_types: arg_types},
-        args
+        args,
+        opts
       ) do
+    is_dirty = Keyword.get(opts, :dirty, true)
+
     arg_values =
       Enum.zip(arg_types, args)
       |> Enum.map(fn {t, v} -> Value.get(t, v) end)
@@ -81,18 +94,18 @@ defmodule Exotic do
       |> Enum.reduce(MapSet.new(), &MapSet.union(&2, &1))
 
     %Function{ref: func_ref} = Function.get(func_def)
-    result_ref = NIF.call_func(lib_ref, func_ref, arg_refs)
+    result_ref = call_if_dirty(is_dirty, lib_ref, func_ref, arg_refs)
     create_return_value(result_ref, return_type, holdings)
   end
 
-  def call!(module, func_name, args)
+  def call!(module, func_name, args, opts)
       when is_atom(func_name) and is_atom(module) do
-    get_managed_libarary(module) |> call!(func_name, args)
+    get_managed_libarary(module) |> call!(func_name, args, opts)
   end
 
-  def call!(module, func_def = %Exotic.Function.Definition{}, args)
+  def call!(module, func_def = %Exotic.Function.Definition{}, args, opts)
       when is_atom(module) do
-    get_managed_libarary(module) |> call!(func_def, args)
+    get_managed_libarary(module) |> call!(func_def, args, opts)
   end
 
   def call(lib, fun, args \\ []) do

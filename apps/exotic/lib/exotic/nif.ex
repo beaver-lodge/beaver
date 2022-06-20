@@ -21,6 +21,7 @@ defmodule Exotic.NIF do
   # pid is for the callback function handler
   def get_closure(_pid, _callback_id, _rtype, _args), do: :erlang.nif_error(:nif_not_loaded)
   def call_func(_lib, _func_wrapper, _args), do: :erlang.nif_error(:nif_not_loaded)
+  def dirty_call_func(_lib, _func_wrapper, _args), do: :erlang.nif_error(:nif_not_loaded)
 
   def get_u8_value(_v), do: :erlang.nif_error(:nif_not_loaded)
   def get_u16_value(_v), do: :erlang.nif_error(:nif_not_loaded)

@@ -50,7 +50,8 @@ defmodule Beaver.MLIR.ExecutionEngine do
       |> Exotic.Value.Array.get()
       |> Exotic.Value.get_ptr()
 
-    mlirExecutionEngineInvokePacked(jit, sym, args_ptr)
+    Exotic.call!(MLIR.CAPI, :mlirExecutionEngineInvokePacked, [jit, sym, args_ptr], dirty: false)
+    # mlirExecutionEngineInvokePacked(jit, sym, args_ptr)
   end
 
   @doc """
