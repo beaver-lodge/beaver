@@ -7,9 +7,6 @@ defmodule VulkanRuntimeTest do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}
 
-    arg = Exotic.Value.get(42)
-    return = Exotic.Value.get(-1)
-
     jit =
       ~m"""
       module attributes {
@@ -51,7 +48,7 @@ defmodule VulkanRuntimeTest do
               blocks in (%cst8, %cst8, %cst8) threads in (%cst1, %cst1, %cst1)
               args(%arg0 : memref<8xi32>, %arg1 : memref<8x8xi32>, %arg2 : memref<8x8x8xi32>)
           %arg6 = memref.cast %arg5 : memref<?x?x?xi32> to memref<*xi32>
-          call @printMemrefI32(%arg6) : (memref<*xi32>) -> ()
+          //call @printMemrefI32(%arg6) : (memref<*xi32>) -> ()
           return
         }
         func.func private @fillResource1DInt(%0 : memref<?xi32>, %1 : i32)
@@ -78,7 +75,6 @@ defmodule VulkanRuntimeTest do
       |> reconcile_unrealized_casts
       |> launch_func_to_vulkan
       |> MLIR.Pass.Composer.run!()
-      |> MLIR.Operation.dump!()
       |> MLIR.ExecutionEngine.create!(
         shared_lib_paths: [
           Beaver.LLVM.Config.lib_dir() |> Path.join("libvulkan-runtime-wrappers.dylib"),
@@ -86,12 +82,12 @@ defmodule VulkanRuntimeTest do
         ]
       )
 
-    for i <- 0..10000_0 do
-      MLIR.ExecutionEngine.invoke!(jit, "main", [])
-
-      for i <- 0..1000 do
+    for _ <- 1..5 do
+      for _ <- 1..5 do
         Task.async(fn ->
-          MLIR.ExecutionEngine.invoke!(jit, "main", [])
+          for _ <- 1..2 do
+            MLIR.ExecutionEngine.invoke!(jit, "main", [])
+          end
         end)
       end
       |> Task.await_many()
