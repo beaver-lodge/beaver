@@ -739,9 +739,7 @@ fn get_lib(lib: &str) -> NifResult<ResourceArc<LibWrapper>> {
     return LibWrapper::new(lib).map(|x| ResourceArc::new(x));
 }
 
-// have to use dirty scheduler to prevent deadlock when callback is running on the current normal scheduler
-#[rustler::nif(schedule = "DirtyCpu")]
-fn call_func(
+fn do_call_func(
     lib_wrapper: ResourceArc<LibWrapper>,
     func_wrapper: ResourceArc<FuncWrapper>,
     iter: ListIterator, /* list of ValueWrapper */
@@ -769,6 +767,25 @@ fn call_func(
         );
         ResourceArc::new(value_from_buffer(&func_wrapper.ret, &ret_buffer))
     }
+}
+
+#[rustler::nif]
+fn call_func(
+    lib_wrapper: ResourceArc<LibWrapper>,
+    func_wrapper: ResourceArc<FuncWrapper>,
+    iter: ListIterator, /* list of ValueWrapper */
+) -> ResourceArc<ValueWrapper> {
+    do_call_func(lib_wrapper, func_wrapper, iter)
+}
+
+// have to use dirty scheduler to prevent deadlock when callback is running on the current normal scheduler
+#[rustler::nif(schedule = "DirtyCpu")]
+fn dirty_call_func(
+    lib_wrapper: ResourceArc<LibWrapper>,
+    func_wrapper: ResourceArc<FuncWrapper>,
+    iter: ListIterator, /* list of ValueWrapper */
+) -> ResourceArc<ValueWrapper> {
+    do_call_func(lib_wrapper, func_wrapper, iter)
 }
 
 pub fn on_load(env: Env) -> bool {
@@ -830,6 +847,7 @@ rustler::init!(
         read_ptr_content_as_binary,
         get_func,
         call_func,
+        dirty_call_func,
         finish_callback,
     ],
     load = load

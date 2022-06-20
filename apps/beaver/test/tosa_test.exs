@@ -94,13 +94,12 @@ defmodule TosaTest do
         [0, 0]
       )
 
-    return_ptr = Exotic.Value.get_ptr(return)
-
     for _i <- 0..100 do
+      # if return is a struct, it becomes first arg
       MLIR.ExecutionEngine.invoke!(
         jit,
         "test_multi_broadcast",
-        [return_ptr] ++ Enum.map([arg0, arg1], &Exotic.Value.get_ptr/1)
+        Enum.map([return, arg0, arg1], &Exotic.Value.get_ptr/1)
       )
 
       arg0
@@ -132,6 +131,7 @@ defmodule TosaTest do
         x5::little-float-32
       >> =
         return
+        # must use aligned ptr if it is allocated by LLVM
         |> Exotic.Value.fetch(
           Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(2),
           :aligned
