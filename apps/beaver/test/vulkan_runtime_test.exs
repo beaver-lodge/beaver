@@ -2,6 +2,7 @@ defmodule VulkanRuntimeTest do
   use ExUnit.Case
   alias Beaver.MLIR
 
+  @tag timeout: :infinity
   test "run ir with vulkan" do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}
@@ -78,13 +79,22 @@ defmodule VulkanRuntimeTest do
       |> launch_func_to_vulkan
       |> MLIR.Pass.Composer.run!()
       |> MLIR.Operation.dump!()
-      |> MLIR.ExecutionEngine.create!()
+      |> MLIR.ExecutionEngine.create!(
+        shared_lib_paths: [
+          Beaver.LLVM.Config.lib_dir() |> Path.join("libvulkan-runtime-wrappers.dylib"),
+          Beaver.LLVM.Config.lib_dir() |> Path.join("libmlir_runner_utils.dylib")
+        ]
+      )
 
-    for i <- 0..100_0 do
-      Task.async(fn ->
-        MLIR.ExecutionEngine.invoke!(jit, "main", [])
-      end)
+    for i <- 0..10000_0 do
+      MLIR.ExecutionEngine.invoke!(jit, "main", [])
+
+      for i <- 0..1000 do
+        Task.async(fn ->
+          MLIR.ExecutionEngine.invoke!(jit, "main", [])
+        end)
+      end
+      |> Task.await_many()
     end
-    |> Task.await_many()
   end
 end
