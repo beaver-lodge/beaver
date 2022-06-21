@@ -1,6 +1,6 @@
 # Beaver.Nx
 
-**TODO: Add description**
+Beaver compiler/backend for the [Nx](https://github.com/elixir-nx/nx/tree/main/nx#readme).
 
 ## Installation
 
@@ -18,4 +18,3 @@ end
 Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
 be found at <https://hexdocs.pm/beaver_nx>.
-
