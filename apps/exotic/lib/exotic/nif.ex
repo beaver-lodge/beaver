@@ -36,6 +36,7 @@ defmodule Exotic.NIF do
   def get_c_string_value(_v), do: :erlang.nif_error(:nif_not_loaded)
   def get_null_ptr_value(), do: :erlang.nif_error(:nif_not_loaded)
   def get_struct_value(_type_refs, _value_refs), do: :erlang.nif_error(:nif_not_loaded)
+  def get_struct_value_from_binary(_binary), do: :erlang.nif_error(:nif_not_loaded)
   def extract(_v), do: :erlang.nif_error(:nif_not_loaded)
   def extract_struct(_types, _v), do: :erlang.nif_error(:nif_not_loaded)
   def extract_c_string_as_binary_string(_ptr, _size), do: :erlang.nif_error(:nif_not_loaded)
