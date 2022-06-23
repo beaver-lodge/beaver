@@ -1,5 +1,5 @@
 defmodule TosaTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   alias Beaver.MLIR
   import Beaver.MLIR.Sigils
 
