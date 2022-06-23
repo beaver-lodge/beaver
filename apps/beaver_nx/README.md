@@ -2,6 +2,10 @@
 
 Beaver compiler/backend for the [Nx](https://github.com/elixir-nx/nx/tree/main/nx#readme).
 
+## Why do we need it?
+
+Instead of repurposing compilers built for Python, Beaver.Nx is about building a Nx compiler in Elixir and tailored for Elixir.
+
 ## Installation
 
 If [available in Hex](https://hex.pm/docs/publish), the package can be installed

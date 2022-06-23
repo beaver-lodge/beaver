@@ -1,4 +1,4 @@
-defmodule Beaver.NxTest do
+defmodule BeaverNxTest do
   @moduledoc """
   Tests for compliance with the Nx backend behavior. Many of these tests are adapted from EXLA
   """

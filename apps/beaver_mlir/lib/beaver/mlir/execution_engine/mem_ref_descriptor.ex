@@ -60,4 +60,20 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
     |> Exotic.Value.get_ptr()
     |> create_from_ptr(shape, strides)
   end
+
+  defp dense_stride(dims) when is_list(dims) and length(dims) > 0 do
+    dims |> Enum.reduce(&*/2)
+  end
+
+  defp dense_strides([_], strides) when is_list(strides) do
+    strides ++ [1]
+  end
+
+  defp dense_strides([_ | tail], strides) when is_list(strides) do
+    dense_strides(tail, strides ++ [dense_stride(tail)])
+  end
+
+  def dense_strides(shape) when is_list(shape) do
+    dense_strides(shape, [])
+  end
 end
