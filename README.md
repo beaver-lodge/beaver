@@ -78,7 +78,7 @@ Beaver is trying to adapt this design in Erlang/Elixir, which has great support 
 
 - Powered by Elixir's composable modularity and meta-programming features, provide a simple, intuitive, and extensible interface for MLIR.
 - Compile Elixir to native/WASM/GPU with the help from MLIR.
-- Revisit and reincarnate symbolic AI in the HW-accelerated world. Erlang/Elixir has a [Prolog](https://en.wikipedia.org/wiki/Prolog) root!
+- Revisit and reincarnate symbolic AI in the HW-accelerated world. Erlang/Elixir has [a Prolog root](https://www.erlang.org/blog/beam-compiler-history/#the-prolog-interpreter)!
 - Introduce a new stack to machine learning.
   - Higher-level: Elixir
   - Representation: MLIR
