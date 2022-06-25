@@ -26,6 +26,12 @@ defmodule Beaver.Nx do
   alias __MODULE__, as: B
 
   @impl true
+  def constant(out, constant, backend_options) do
+    binary_tensor = Nx.BinaryBackend.constant(out, constant, [])
+    Nx.BinaryBackend.backend_transfer(binary_tensor, __MODULE__, backend_options)
+  end
+
+  @impl true
   def from_binary(%T{shape: shape, type: _type} = tensor, binary, _backend_options) do
     shape = Tuple.to_list(shape)
 
