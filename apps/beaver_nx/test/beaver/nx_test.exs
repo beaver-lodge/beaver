@@ -48,4 +48,16 @@ defmodule BeaverNxTest do
     nt = Nx.backend_copy(et)
     assert Nx.to_binary(nt) == <<1::64-native, 2::64-native, 3::64-native, 4::64-native>>
   end
+
+  test "Kernel.inspect/2" do
+    t = Nx.tensor([1, 2, 3, 4], backend: Beaver.Nx)
+
+    assert inspect(t) ==
+             """
+             #Nx.Tensor<
+               s64[4]
+               [1, 2, 3, 4]
+             >\
+             """
+  end
 end

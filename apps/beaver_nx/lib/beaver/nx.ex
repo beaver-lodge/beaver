@@ -46,6 +46,15 @@ defmodule Beaver.Nx do
   end
 
   @impl true
+  def inspect(%T{} = tensor, inspect_opts) do
+    limit = if inspect_opts.limit == :infinity, do: :infinity, else: inspect_opts.limit + 1
+
+    tensor
+    |> to_binary(min(limit, Nx.size(tensor)))
+    |> then(&Nx.Backend.inspect(tensor, &1, inspect_opts))
+  end
+
+  @impl true
   def backend_copy(tensor, Nx.Tensor, backend_options) do
     backend_copy(tensor, Nx.BinaryBackend, backend_options)
   end
