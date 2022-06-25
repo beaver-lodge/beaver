@@ -1,4 +1,15 @@
 defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
+  @moduledoc """
+  Get a memref descriptor's fields for Exotic Struct definition. Shape and strides will be omitted if rank is 0.
+  """
+  def struct_fields(0) do
+    [
+      allocated: :ptr,
+      aligned: :ptr,
+      offset: :i64
+    ]
+  end
+
   def struct_fields(rank) when is_integer(rank) do
     sized_array = List.duplicate(:i64, rank)
 
@@ -71,6 +82,10 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
 
   defp dense_strides([_ | tail], strides) when is_list(strides) do
     dense_strides(tail, strides ++ [dense_stride(tail)])
+  end
+
+  def dense_strides([]) do
+    []
   end
 
   def dense_strides(shape) when is_list(shape) do
