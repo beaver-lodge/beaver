@@ -76,4 +76,14 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
   def dense_strides(shape) when is_list(shape) do
     dense_strides(shape, [])
   end
+
+  def read_as_binary(memref, len) when is_integer(len) do
+    memref
+    |> Exotic.Value.fetch(
+      # rank here should not matter so setting it to 1
+      __MODULE__.struct_fields(1),
+      :aligned
+    )
+    |> Exotic.Value.Ptr.read_as_binary(len)
+  end
 end

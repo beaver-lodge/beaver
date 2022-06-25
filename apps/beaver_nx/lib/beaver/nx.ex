@@ -1,7 +1,4 @@
 defmodule Beaver.Nx do
-  alias Beaver.MLIR
-  import Beaver.MLIR.Sigils
-  import MLIR.{Transforms, Conversion}
   alias Beaver.MLIR.ExecutionEngine.MemRefDescriptor
 
   @enforce_keys [:memref]
@@ -29,7 +26,7 @@ defmodule Beaver.Nx do
   alias __MODULE__, as: B
 
   @impl true
-  def from_binary(%T{shape: shape, type: type} = tensor, binary, backend_options) do
+  def from_binary(%T{shape: shape, type: _type} = tensor, binary, _backend_options) do
     shape = Tuple.to_list(shape)
 
     memref =
@@ -44,13 +41,8 @@ defmodule Beaver.Nx do
   end
 
   @impl true
-  def to_binary(%T{shape: shape, data: %B{memref: memref}, type: {_, size}}, limit) do
-    memref
-    |> Exotic.Value.fetch(
-      MemRefDescriptor.struct_fields(tuple_size(shape)),
-      :aligned
-    )
-    |> Exotic.Value.Ptr.read_as_binary(limit * div(size, 8))
+  def to_binary(%T{shape: _shape, data: %B{memref: memref}, type: {_, size}}, limit) do
+    MemRefDescriptor.read_as_binary(memref, limit * div(size, 8))
   end
 
   @impl true
@@ -63,14 +55,7 @@ defmodule Beaver.Nx do
       tensor
     else
       binary_len = Enum.reduce(Tuple.to_list(shape), 1, &*/2) * div(size, 8)
-
-      binary =
-        memref
-        |> Exotic.Value.fetch(
-          MemRefDescriptor.struct_fields(tuple_size(shape)),
-          :aligned
-        )
-        |> Exotic.Value.Ptr.read_as_binary(binary_len)
+      binary = MemRefDescriptor.read_as_binary(memref, binary_len)
 
       with :ok <- Beaver.Nx.MemrefAllocator.delete(memref) do
         Nx.BinaryBackend.from_binary(tensor, binary, backend_options)
