@@ -286,7 +286,7 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
   export LLVM_CONFIG_PATH=$HOME/llvm-install/bin/llvm-config
   ```
 
-  To usa Vulkan:
+  To use Vulkan:
 
   - Install Vulkan SDK (global installation is required), reference: https://vulkan.lunarg.com/sdk/home
   - Setting environment variable by adding commands these to your bash/zsh profile:
