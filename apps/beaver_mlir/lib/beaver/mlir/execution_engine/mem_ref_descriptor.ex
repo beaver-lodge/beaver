@@ -10,7 +10,7 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
     ]
   end
 
-  def struct_fields(rank) when is_integer(rank) do
+  def struct_fields(rank) when is_integer(rank) and rank > 0 do
     sized_array = List.duplicate(:i64, rank)
 
     [
