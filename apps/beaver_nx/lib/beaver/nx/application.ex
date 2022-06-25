@@ -10,6 +10,7 @@ defmodule Beaver.Nx.Application do
     children = [
       # Starts a worker by calling: Beaver.Nx.Worker.start_link(arg)
       # {Beaver.Nx.Worker, arg}
+      Beaver.Nx.MemrefAllocator
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
