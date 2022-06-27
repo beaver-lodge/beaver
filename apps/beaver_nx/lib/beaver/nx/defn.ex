@@ -47,17 +47,15 @@ defmodule Beaver.Nx.Defn do
         module do
           Func.func beaver_nx_main(function_type: ~a"(#{arg_types_str}) -> (#{return_t})") do
             region do
-              # TODO: extract the block management to a function accepts a callback fn
-              block = Beaver.MLIR.Block.create(entry_block_args)
-              previous_block = Beaver.MLIR.Managed.Block.get()
-              Beaver.MLIR.Managed.Block.set(block)
+              block = MLIR.Block.create(entry_block_args)
 
-              ret = %Beaver.MLIR.CAPI.MlirValue{} = gen_op(tree)
-              Func.return(ret)
+              MLIR.Block.under(block, fn ->
+                ret = %Beaver.MLIR.CAPI.MlirValue{} = gen_op(tree)
+                Func.return(ret)
+              end)
 
               region = MLIR.Managed.Region.get()
               Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, block)
-              Beaver.MLIR.Managed.Block.set(previous_block)
             end
           end
         end
