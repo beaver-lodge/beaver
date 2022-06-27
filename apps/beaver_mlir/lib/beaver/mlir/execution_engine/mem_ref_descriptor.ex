@@ -1,5 +1,16 @@
 defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
-  def struct_fields(rank) when is_integer(rank) do
+  @moduledoc """
+  Get a memref descriptor's fields for Exotic Struct definition. Shape and strides will be omitted if rank is 0.
+  """
+  def struct_fields(0) do
+    [
+      allocated: :ptr,
+      aligned: :ptr,
+      offset: :i64
+    ]
+  end
+
+  def struct_fields(rank) when is_integer(rank) and rank > 0 do
     sized_array = List.duplicate(:i64, rank)
 
     [
@@ -11,36 +22,15 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
     ]
   end
 
-  @doc """
-  create descriptor without allocating elements, but with shape and strides. It is usually used as returned value.
-  """
-  def create(shape, strides) do
-    create([], shape, strides)
-  end
-
-  @doc """
-  create descriptor and allocate elements.
-  """
-  def create(elements, shape, strides)
-      when is_list(elements) and is_list(shape) do
+  # TODO: make this func public when it is possible to check ptr type
+  defp create_from_ptr(ptr, shape, strides) do
     rank = length(shape)
 
     if length(shape) != length(strides) do
       raise "elements and shape must have the same length"
     end
 
-    arr_ptr =
-      if elements == [] do
-        Exotic.Value.Ptr.null()
-      else
-        elements
-        |> Exotic.Value.Array.get()
-        |> Exotic.Value.as_binary()
-
-        elements |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
-      end
-
-    aligned = allocated = arr_ptr
+    aligned = allocated = ptr
 
     offset = 0
 
@@ -52,5 +42,64 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
       __MODULE__.struct_fields(rank),
       [allocated, aligned, offset, shape, strides]
     )
+  end
+
+  @doc """
+  create descriptor without allocating elements, but with shape and strides. It is usually used as returned value.
+  """
+  def create(shape, strides) do
+    # TODO: extract a function
+    create([], shape, strides)
+  end
+
+  @doc """
+  create descriptor and allocate elements.
+  """
+  def create(elements, shape, strides)
+      when is_list(elements) and is_list(shape) do
+    arr_ptr =
+      if elements == [] do
+        Exotic.Value.Ptr.null()
+      else
+        elements |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
+      end
+
+    create_from_ptr(arr_ptr, shape, strides)
+  end
+
+  def create(binary, shape, strides) when is_binary(binary) do
+    Exotic.Value.Struct.get(binary)
+    |> Exotic.Value.get_ptr()
+    |> create_from_ptr(shape, strides)
+  end
+
+  defp dense_stride(dims) when is_list(dims) and length(dims) > 0 do
+    dims |> Enum.reduce(&*/2)
+  end
+
+  defp dense_strides([_], strides) when is_list(strides) do
+    strides ++ [1]
+  end
+
+  defp dense_strides([_ | tail], strides) when is_list(strides) do
+    dense_strides(tail, strides ++ [dense_stride(tail)])
+  end
+
+  def dense_strides([]) do
+    []
+  end
+
+  def dense_strides(shape) when is_list(shape) do
+    dense_strides(shape, [])
+  end
+
+  def read_as_binary(memref, len) when is_integer(len) do
+    memref
+    |> Exotic.Value.fetch(
+      # rank here should not matter so setting it to 1
+      __MODULE__.struct_fields(1),
+      :aligned
+    )
+    |> Exotic.Value.Ptr.read_as_binary(len)
   end
 end

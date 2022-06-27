@@ -1,5 +1,5 @@
 defmodule MlirTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI.{IR, Registration}
 

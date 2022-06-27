@@ -30,6 +30,15 @@ defmodule Beaver.MLIR.Block do
     IR.mlirBlockGetArgument(block, index) |> Exotic.Value.transmit()
   end
 
+  def create(arg_loc_pairs) when is_list(arg_loc_pairs) do
+    {args, locs} =
+      Enum.reduce(arg_loc_pairs, {[], []}, fn {arg, loc}, {args, locs} ->
+        {args ++ [arg], locs ++ [loc]}
+      end)
+
+    create(args, locs)
+  end
+
   def create(args, locs) when length(args) == length(locs) do
     len = length(args)
     args = args |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()

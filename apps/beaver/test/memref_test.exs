@@ -1,11 +1,15 @@
 defmodule MemRefTest do
   use ExUnit.Case
   alias Beaver.MLIR
+  alias Beaver.MLIR.ExecutionEngine.MemRefDescriptor
+
+  test "strides" do
+    assert [6, 3, 1] = MemRefDescriptor.dense_strides([1, 2, 3])
+  end
 
   test "run mlir module defined by sigil" do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}
-    alias Beaver.MLIR.ExecutionEngine.MemRefDescriptor
 
     jit =
       ~m"""
@@ -53,11 +57,13 @@ defmodule MemRefTest do
 
     arr = [0.112122112, 0.2123213, 10020.9, 213_120.0, 0.2, 100.4]
 
+    shape = [1, 2, 3]
+
     arg0 =
       MemRefDescriptor.create(
         arr |> Enum.map(&Exotic.Value.get(:f32, &1)),
-        [1, 2, 3],
-        [6, 3, 1]
+        shape,
+        MemRefDescriptor.dense_strides(shape)
       )
 
     <<

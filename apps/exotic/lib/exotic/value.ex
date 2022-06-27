@@ -372,6 +372,13 @@ defmodule Exotic.Value do
         holdings: holdings
       })
     end
+
+    def get(binary) when is_binary(binary),
+      do:
+        struct!(__MODULE__, %{
+          ref: Exotic.NIF.get_struct_value_from_binary(binary),
+          holdings: MapSet.new()
+        })
   end
 
   defmodule Array do

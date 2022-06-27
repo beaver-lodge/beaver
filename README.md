@@ -78,7 +78,7 @@ Beaver is trying to adapt this design in Erlang/Elixir, which has great support 
 
 - Powered by Elixir's composable modularity and meta-programming features, provide a simple, intuitive, and extensible interface for MLIR.
 - Compile Elixir to native/WASM/GPU with the help from MLIR.
-- Revisit and reincarnate symbolic AI in the HW-accelerated world. Erlang/Elixir has a [Prolog](https://en.wikipedia.org/wiki/Prolog) root!
+- Revisit and reincarnate symbolic AI in the HW-accelerated world. Erlang/Elixir has [a Prolog root](https://www.erlang.org/blog/beam-compiler-history/#the-prolog-interpreter)!
 - Introduce a new stack to machine learning.
   - Higher-level: Elixir
   - Representation: MLIR
@@ -243,7 +243,7 @@ Although this has the downside being confusing and overwhelming, mainly there ar
 
 - The most convenient way to ship a C/C++ library with a Elixir project is to use [the rustler project](https://github.com/rusterlium/rustler) to build a dynamic library.
 - The recommended way to build a non C++ binding to MLIR is to create an "aggregate" which is an achieve of all symbols of LLVM/MLIR APIs you want to use in one shared library.
-- Use libFFI to call functions dynamically whenever it is possible. Although this is less safe, it makes it possible to use macro to generate Elixir code from headers instead of writing hundreds of NIFs for all LLVM/MLIR API.
+- Use libFFI to call functions dynamically whenever it is possible. Although this is less safe, it makes it possible to use macro to generate Elixir code from headers instead of writing hundreds (if not thousands) of NIFs for all LLVM/MLIR API.
 
 Here is the hierarchy of a typical function call in Beaver:
 
@@ -286,7 +286,7 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
   export LLVM_CONFIG_PATH=$HOME/llvm-install/bin/llvm-config
   ```
 
-  To usa Vulkan:
+  To use Vulkan:
 
   - Install Vulkan SDK (global installation is required), reference: https://vulkan.lunarg.com/sdk/home
   - Setting environment variable by adding commands these to your bash/zsh profile:

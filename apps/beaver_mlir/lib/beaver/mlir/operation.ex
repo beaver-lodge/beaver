@@ -99,6 +99,9 @@ defmodule Beaver.MLIR.Operation do
     op
   end
 
+  @doc """
+  Verify the op and dump it. It raises if the verification fails.
+  """
   def dump!(op) do
     verify!(op)
     mlirOperationDump(op)

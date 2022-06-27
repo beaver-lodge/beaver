@@ -479,6 +479,17 @@ fn get_struct_value(types_iter: ListIterator, values: ListIterator) -> ResourceA
 }
 
 #[rustler::nif]
+fn get_struct_value_from_binary(binary: rustler::Binary) -> ResourceArc<ValueWrapper> {
+    let slice = binary.as_slice();
+    let mut buffer = StructBuffer::new(slice.len());
+    unsafe {
+        buffer.data.set_len(slice.len());
+    }
+    buffer.data.copy_from_slice(slice);
+    ResourceArc::new(ValueWrapper::Struct(buffer))
+}
+
+#[rustler::nif]
 fn get_ptr(value: ResourceArc<ValueWrapper>) -> ResourceArc<ValueWrapper> {
     ResourceArc::new(ValueWrapper::Ptr(value.get_ptr() as usize))
 }
@@ -837,6 +848,7 @@ rustler::init!(
         get_null_ptr_value,
         get_closure,
         get_struct_value,
+        get_struct_value_from_binary,
         extract,
         extract_struct,
         extract_c_string_as_binary_string,
