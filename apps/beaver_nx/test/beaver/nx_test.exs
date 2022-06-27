@@ -60,4 +60,14 @@ defmodule BeaverNxTest do
              >\
              """
   end
+
+  describe "within JIT" do
+    import Nx.Defn
+    defn(double(x \\ 0), do: transform(x, fn x -> Nx.backend_transfer(x * x) end))
+
+    test "invokes from within defn" do
+      result = double(Nx.tensor(11))
+      assert Nx.to_number(result) == 121
+    end
+  end
 end

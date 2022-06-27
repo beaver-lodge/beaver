@@ -1,26 +1,14 @@
 defmodule Beaver.Nx do
+  @moduledoc """
+  `Beaver.Nx` is a MLIR backend for the `Nx`. It mainly targets TOSA dialect.
+  """
+
   alias Beaver.MLIR.ExecutionEngine.MemRefDescriptor
 
   @enforce_keys [:memref]
   defstruct [:memref]
 
   @behaviour Nx.Backend
-  @moduledoc """
-  Documentation for `Beaver.Nx`.
-  """
-
-  @doc """
-  Hello world.
-
-  ## Examples
-
-      iex> Beaver.Nx.hello()
-      :world
-
-  """
-  def hello do
-    :world
-  end
 
   alias Nx.Tensor, as: T
   alias __MODULE__, as: B
@@ -103,5 +91,17 @@ defmodule Beaver.Nx do
   @impl true
   def backend_deallocate(%T{data: %B{memref: memref}}) do
     memref |> Beaver.Nx.MemrefAllocator.delete()
+  end
+
+  @impl true
+  def multiply(out, l, h) do
+    out = Nx.to_template(out)
+
+    expr_fun = fn t1, t2 ->
+      Nx.Defn.Expr.multiply(out, t1, t2)
+    end
+
+    options = [force: true]
+    Nx.Defn.jit(expr_fun, [l, h], Keyword.put(options, :compiler, Beaver.Nx.Compiler))
   end
 end
