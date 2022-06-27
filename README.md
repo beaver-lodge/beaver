@@ -243,7 +243,7 @@ Although this has the downside being confusing and overwhelming, mainly there ar
 
 - The most convenient way to ship a C/C++ library with a Elixir project is to use [the rustler project](https://github.com/rusterlium/rustler) to build a dynamic library.
 - The recommended way to build a non C++ binding to MLIR is to create an "aggregate" which is an achieve of all symbols of LLVM/MLIR APIs you want to use in one shared library.
-- Use libFFI to call functions dynamically whenever it is possible. Although this is less safe, it makes it possible to use macro to generate Elixir code from headers instead of writing hundreds of NIFs for all LLVM/MLIR API.
+- Use libFFI to call functions dynamically whenever it is possible. Although this is less safe, it makes it possible to use macro to generate Elixir code from headers instead of writing hundreds (if not thousands) of NIFs for all LLVM/MLIR API.
 
 Here is the hierarchy of a typical function call in Beaver:
 

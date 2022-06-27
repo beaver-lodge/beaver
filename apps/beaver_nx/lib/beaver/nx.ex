@@ -104,4 +104,21 @@ defmodule Beaver.Nx do
     options = [force: true]
     Nx.Defn.jit(expr_fun, [l, h], Keyword.put(options, :compiler, Beaver.Nx.Compiler))
   end
+
+  @doc """
+  Create a new tensor of null ptr memref. This should be used as as the return tensor of JIT function.
+  """
+  def tensor_of_null_memref(%T{shape: shape, type: _type} = tensor) do
+    shape = Tuple.to_list(shape)
+
+    memref =
+      MemRefDescriptor.create(
+        shape,
+        MemRefDescriptor.dense_strides(shape)
+      )
+
+    # TODO: delete the allocated ptr when this kind of tensor is deallocated by Nx
+    {memref} |> Beaver.Nx.MemrefAllocator.add()
+    put_in(tensor.data, %B{memref: memref})
+  end
 end

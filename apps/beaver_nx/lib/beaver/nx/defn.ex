@@ -1,73 +1,125 @@
 defmodule Beaver.Nx.Defn do
-  alias Nx.Defn.{Composite, Expr, Tree}
-  alias Nx.Tensor, as: T
-
   require Beaver
   import Beaver, only: [mlir: 1]
   require Beaver.MLIR.Dialect.Func
   alias Beaver.MLIR
-  alias Beaver.MLIR.Dialect.{Builtin, Func, TOSA, Arith}
+  alias Beaver.MLIR.Dialect.{Builtin, Func, TOSA}
   import Builtin, only: :macros
   import MLIR, only: :macros
   import MLIR.Sigils
 
-  defp gen_tensor_type_str(%Nx.Tensor{shape: {}, type: {:s, size}}) do
+  defp gen_type_str(%Nx.Tensor{shape: {}, type: {:s, size}}) do
     "tensor<i#{size}>"
   end
 
-  def gen_op(%Nx.Tensor{data: %Nx.Defn.Expr{op: :parameter, args: [pos]}})
-      when is_integer(pos) do
-    MLIR.Managed.Block.get()
-    |> Beaver.MLIR.Block.get_arg!(pos)
+  defp gen_op(%Nx.Tensor{data: %Nx.Defn.Expr{op: :parameter, args: [pos]}})
+       when is_integer(pos) do
+    MLIR.Managed.Block.get() |> Beaver.MLIR.Block.get_arg!(pos)
   end
 
-  def gen_op(%Nx.Tensor{data: %Nx.Defn.Expr{op: :multiply, args: [a, b]} = expr}) do
+  defp gen_op(%Nx.Tensor{data: %Nx.Defn.Expr{op: :multiply, args: [a, b]}} = t) do
     mlir do
       a = gen_op(a)
       b = gen_op(b)
-      # TOSA.mul(a, b, {:shift, ~a{0 : i32}}) :: ~t{tensor<i64>}
+      TOSA.mul(a, b, {:shift, ~a{0 : i32}}) :: ~t{#{gen_type_str(t)}}
     end
-
-    IO.inspect(expr, label: "to add", structs: false)
   end
 
   @doc false
-  def __jit__(key, vars, fun, args, options) do
-    exprs = fun.(vars) |> IO.inspect(label: "exprs")
-    IO.inspect(vars, label: "vars")
-    # IO.inspect({key, vars, fun, args, options})
+  def __jit__(_key, vars, fun, [args], _options) do
+    tree = fun.(vars)
 
     arg_types_str =
       for arg <- vars do
-        IO.inspect(arg, label: "arg", structs: false)
-        gen_tensor_type_str(arg)
+        gen_type_str(arg)
       end
       |> Enum.join(", ")
 
-    t = "tensor<i64>"
+    entry_block_args =
+      for arg <- vars do
+        {~t{#{gen_type_str(arg)}}, MLIR.Managed.Location.get()}
+      end
+
+    return_t = gen_type_str(tree)
 
     ir =
       mlir do
         module do
-          Func.func main(function_type: ~a"(#{arg_types_str}) -> ()") do
+          Func.func beaver_nx_main(function_type: ~a"(#{arg_types_str}) -> (#{return_t})") do
             region do
-              block entry(arg0 :: ~t{#{t}}, arg1 :: ~t{#{t}}) do
-                v0 = TOSA.mul(arg0, arg1, {:shift, ~a{0 : i32}}) :: ~t{#{t}}
+              # TODO: extract the block management to a function accepts a callback fn
+              block = Beaver.MLIR.Block.create(entry_block_args)
+              previous_block = Beaver.MLIR.Managed.Block.get()
+              Beaver.MLIR.Managed.Block.set(block)
 
-                Composite.reduce(exprs, [], fn %T{} = expr, acc ->
-                  # expr = gen_op(expr)
-                  [expr | acc]
-                end)
+              ret = %Beaver.MLIR.CAPI.MlirValue{} = gen_op(tree)
+              Func.return(ret)
 
-                Func.return([])
-              end
+              region = MLIR.Managed.Region.get()
+              Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, block)
+              Beaver.MLIR.Managed.Block.set(previous_block)
             end
           end
         end
       end
-      |> MLIR.Operation.dump!()
 
-    t = Nx.tensor(121) |> Beaver.Nx.from_binary(<<121::64-native>>, [])
-    [t]
+    llvm_ir = ir |> tosa_cpu()
+    jit = MLIR.ExecutionEngine.create!(llvm_ir)
+
+    arg_memrefs =
+      for a <- args do
+        a |> memref_from_tensor
+      end
+
+    # create a tensor containing memref and setting all the bits to 0
+    # TODO: create a memref with a null ptr
+    return_tensor = tree |> Beaver.Nx.tensor_of_null_memref()
+    return_memref = return_tensor |> memref_from_tensor
+
+    jit_args = [return_memref | arg_memrefs]
+    if List.improper?(jit_args), do: raise("jit arguments is not a proper list")
+    jit_args = Enum.map(jit_args, &Exotic.Value.get_ptr/1)
+
+    MLIR.ExecutionEngine.invoke!(jit, "beaver_nx_main", jit_args)
+
+    [return_tensor]
+  end
+
+  import MLIR.{Transforms, Conversion}
+
+  def memref_from_tensor(%Nx.Tensor{data: %Beaver.Nx{memref: memref}}), do: memref
+
+  def tosa_cpu(op) do
+    op
+    |> MLIR.Operation.verify!()
+    |> canonicalize
+    |> cse
+    |> tosa_to_scf
+    |> tosa_to_arith
+    |> tosa_to_tensor()
+    |> convert_tensor_to_linalg()
+    |> MLIR.Pass.Composer.nested("func.func", [
+      tosa_to_linalg(),
+      linalg_fuse_elementwise_ops(),
+      linalg_bufferize(),
+      convert_linalg_to_loops(),
+      lower_affine(),
+      convert_math_to_llvm(),
+      convert_scf_to_cf(),
+      "arith-expand",
+      "memref-expand"
+    ])
+    |> MLIR.Pass.Composer.nested("func.func", fn pm ->
+      MLIR.Pass.pipeline!(pm, "tensor-bufferize")
+    end)
+    |> MLIR.Pass.Composer.pipeline("func-bufferize")
+    |> MLIR.Pass.Composer.nested("func.func", fn pm ->
+      MLIR.Pass.pipeline!(pm, "llvm-request-c-wrappers")
+    end)
+    |> convert_vector_to_llvm
+    |> convert_memref_to_llvm
+    |> convert_func_to_llvm
+    |> reconcile_unrealized_casts
+    |> MLIR.Pass.Composer.run!()
   end
 end

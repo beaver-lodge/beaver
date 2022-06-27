@@ -48,6 +48,7 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
   create descriptor without allocating elements, but with shape and strides. It is usually used as returned value.
   """
   def create(shape, strides) do
+    # TODO: extract a function
     create([], shape, strides)
   end
 
