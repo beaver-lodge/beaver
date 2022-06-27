@@ -69,8 +69,6 @@ defmodule Beaver.Nx.Defn do
         a |> memref_from_tensor
       end
 
-    # create a tensor containing memref and setting all the bits to 0
-    # TODO: create a memref with a null ptr
     return_tensor = tree |> Beaver.Nx.tensor_of_null_memref()
     return_memref = return_tensor |> memref_from_tensor
 
