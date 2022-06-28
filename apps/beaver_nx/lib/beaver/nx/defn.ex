@@ -117,7 +117,7 @@ defmodule Beaver.Nx.Defn do
   end
 
   defp gen_op(tensor) do
-    raise "tensor unsupported: " <> inspect(tensor, structs: false, pretty: true)
+    raise "op unsupported: " <> inspect(tensor, structs: false, pretty: true)
   end
 
   @doc false
