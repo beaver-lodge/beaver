@@ -199,13 +199,10 @@ defmodule Beaver.Nx.Defn do
       Module.concat([module, name, "#{uniq}"])
       |> Atom.to_string()
 
-    Macro.unique_var(:symbol, __MODULE__)
     # generate ir
     ir =
       mlir do
         module do
-          Macro.var(:symbol, __MODULE__)
-
           Func.func beaver_nx_main(
                       sym_name: "\"#{symbol}\"",
                       function_type:
