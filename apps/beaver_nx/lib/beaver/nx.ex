@@ -48,7 +48,7 @@ defmodule Beaver.Nx do
     |> then(&Nx.Backend.inspect(tensor, &1, inspect_opts))
   end
 
-  def element_size(%T{type: {_, size}}), do: size
+  defp element_size(%T{type: {_, size}}), do: size
 
   @impl true
   def backend_copy(tensor, Nx.Tensor, backend_options) do
