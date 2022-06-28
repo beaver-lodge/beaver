@@ -4,6 +4,7 @@ defmodule Beaver.Defn.ExprTest do
   import Nx, only: :sigils
   import Nx.Defn
   alias Beaver.Nx.Assert
+  import Beaver.Nx.Assert
   require Assert
 
   setup do
@@ -120,6 +121,21 @@ defmodule Beaver.Defn.ExprTest do
     test "supports complex return types" do
       Assert.equal(return_complex(), Nx.tensor(Complex.new(1, 2)))
       Assert.equal(return_complex_tensor(), Nx.broadcast(Complex.new(1, 2), {3, 3, 3}))
+    end
+  end
+
+  describe "conjugate" do
+    defn(conjugate(x), do: Nx.conjugate(x))
+
+    test "correctly returns complex conjugate" do
+      assert_equal(conjugate(Nx.tensor(Complex.new(1, 2))), Nx.tensor(Complex.new(1, -2)))
+      # This differs from the Nx doctest, which I believe should also return -0
+      assert_equal(conjugate(Nx.tensor(1)), Nx.tensor(Complex.new(1, -0.0)))
+
+      assert_equal(
+        conjugate(Nx.tensor([Complex.new(1, 2), Complex.new(2, -4)])),
+        Nx.tensor([Complex.new(1, -2), Complex.new(2, 4)])
+      )
     end
   end
 end
