@@ -12,8 +12,8 @@ defmodule Beaver.Nx.Defn do
 
   defp get_type_name(:f), do: "f"
 
-  defp gen_type_str(%Nx.Tensor{shape: {}, type: {:c, size}}) do
-    "tensor<complex<f#{size}>>"
+  defp gen_type_str(%Nx.Tensor{shape: {}, type: {:c, size}} = t) do
+    "tensor<complex<f#{div(size, 2)}>>"
   end
 
   # TODO: stop using string interpolation because it is essentially a hack
@@ -108,8 +108,7 @@ defmodule Beaver.Nx.Defn do
          } = t
        ) do
     mlir do
-      # Dialect.Complex.constant({:value, ~a{[#{im}, #{re}]}}) :: ~t{#{gen_type_str(t)}}
-      Arith.constant({:value, ~a[dense<(#{im}, #{re})> : #{gen_type_str(t)}]}) ::
+      Arith.constant({:value, ~a[dense<(#{re}, #{im})> : #{gen_type_str(t)}]}) ::
         ~t{#{gen_type_str(t)}}
     end
   end
@@ -268,17 +267,6 @@ defmodule Beaver.Nx.Defn do
   - If it is a tensor, return a memref
   - If it is a tuple, recursively pack them into one struct.
   """
-  def memref_from_tensor(
-        %Nx.Tensor{
-          data: _,
-          shape: {},
-          type: {:c, size}
-        } = tensor
-      ) do
-    IO.inspect(tensor, structs: false)
-    raise "complex memref_from_tensor"
-  end
-
   def memref_from_tensor(%Nx.Tensor{data: %Beaver.Nx{memref: memref}}), do: memref
 
   def memref_from_tensor(
@@ -376,11 +364,13 @@ defmodule Beaver.Nx.Defn do
     |> MLIR.Pass.Composer.nested("func.func", fn pm ->
       MLIR.Pass.pipeline!(pm, "llvm-request-c-wrappers")
     end)
+    |> MLIR.Pass.Composer.run!(dump: true)
     |> convert_vector_to_llvm
     |> convert_memref_to_llvm
     |> convert_complex_to_llvm()
     |> convert_func_to_llvm
     |> reconcile_unrealized_casts
     |> MLIR.Pass.Composer.run!(dump_if_fail: true)
+    |> MLIR.Operation.dump!()
   end
 end

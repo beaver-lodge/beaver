@@ -20,10 +20,6 @@ defmodule Beaver.Nx do
   end
 
   @impl true
-  def from_binary(%T{shape: {}, type: {:c, size}} = tensor, binary, _backend_options) do
-    raise "from_binary complex"
-  end
-
   def from_binary(%T{shape: shape, type: _type} = tensor, binary, _backend_options) do
     shape = Tuple.to_list(shape)
 
@@ -39,8 +35,8 @@ defmodule Beaver.Nx do
   end
 
   @impl true
-  def to_binary(%T{shape: _shape, data: %B{memref: memref}, type: {_, size}}, limit) do
-    MemRefDescriptor.read_as_binary(memref, limit * div(size, 8))
+  def to_binary(%T{shape: _shape, data: %B{memref: memref} = tensor}, limit) do
+    MemRefDescriptor.read_as_binary(memref, limit * div(element_size(tensor), 8))
   end
 
   @impl true
@@ -52,6 +48,8 @@ defmodule Beaver.Nx do
     |> then(&Nx.Backend.inspect(tensor, &1, inspect_opts))
   end
 
+  def element_size(%T{type: {_, size}}), do: size
+
   @impl true
   def backend_copy(tensor, Nx.Tensor, backend_options) do
     backend_copy(tensor, Nx.BinaryBackend, backend_options)
@@ -59,11 +57,11 @@ defmodule Beaver.Nx do
 
   # TODO: Support direct transfers without going through Elixir
   def backend_copy(
-        %T{shape: shape, data: %B{memref: memref}, type: {_, size}} = tensor,
+        %T{shape: shape, data: %B{memref: memref}} = tensor,
         backend,
         backend_options
       ) do
-    binary_len = Enum.reduce(Tuple.to_list(shape), 1, &*/2) * div(size, 8)
+    binary_len = Enum.reduce(Tuple.to_list(shape), 1, &*/2) * div(element_size(tensor), 8)
 
     backend.from_binary(
       tensor,
@@ -112,10 +110,6 @@ defmodule Beaver.Nx do
   @doc """
   Create a new tensor of null ptr memref. This should be used as as the return tensor of JIT function.
   """
-  def tensor_of_null_memref(%T{shape: {}, type: {:c, size}} = tensor) do
-    raise "complex null"
-  end
-
   def tensor_of_null_memref(%T{shape: shape, type: _type} = tensor) do
     shape = Tuple.to_list(shape)
 
