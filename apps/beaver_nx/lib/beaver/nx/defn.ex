@@ -8,25 +8,29 @@ defmodule Beaver.Nx.Defn do
   import MLIR, only: :macros
   import MLIR.Sigils
 
-  defp get_type_name(:s), do: "i"
+  defp get_type_name({:s, size}), do: "i#{size}"
 
-  defp get_type_name(:f), do: "f"
+  defp get_type_name({:f, size}), do: "f#{size}"
 
-  defp gen_type_str(%Nx.Tensor{shape: {}, type: {:c, size}} = t) do
-    "tensor<complex<f#{div(size, 2)}>>"
+  defp get_type_name({:c, size}) do
+    "complex<f#{div(size, 2)}>"
   end
 
   # TODO: stop using string interpolation because it is essentially a hack
-  defp gen_type_str(%Nx.Tensor{shape: {}, type: {name, size}}) do
-    "tensor<#{get_type_name(name)}#{size}>"
+  defp gen_type_str(%Nx.Tensor{shape: {}, type: type}) do
+    "tensor<#{get_type_name(type)}>"
   end
 
-  defp gen_type_str(%Nx.Tensor{shape: {dim0}, type: {name, size}}) do
-    "tensor<#{dim0}x#{get_type_name(name)}#{size}>"
+  defp gen_type_str(%Nx.Tensor{shape: {dim0}, type: type}) do
+    "tensor<#{dim0}x#{get_type_name(type)}>"
   end
 
-  defp gen_type_str(%Nx.Tensor{shape: {dim0, dim1}, type: {name, size}}) do
-    "tensor<#{dim0}x#{dim1}x#{get_type_name(name)}#{size}>"
+  defp gen_type_str(%Nx.Tensor{shape: {dim0, dim1}, type: type}) do
+    "tensor<#{dim0}x#{dim1}x#{get_type_name(type)}>"
+  end
+
+  defp gen_type_str(%Nx.Tensor{shape: {dim0, dim1, dim2}, type: type}) do
+    "tensor<#{dim0}x#{dim1}x#{dim2}x#{get_type_name(type)}>"
   end
 
   defp gen_type_str(tuple) when is_tuple(tuple) do
