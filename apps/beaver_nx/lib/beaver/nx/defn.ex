@@ -3,26 +3,34 @@ defmodule Beaver.Nx.Defn do
   import Beaver, only: [mlir: 1]
   require Beaver.MLIR.Dialect.Func
   alias Beaver.MLIR
-  alias Beaver.MLIR.Dialect.{Builtin, Func, TOSA}
+  alias Beaver.MLIR.Dialect.{Builtin, Func, TOSA, Arith}
   import Builtin, only: :macros
   import MLIR, only: :macros
   import MLIR.Sigils
 
-  defp get_type_name(:s), do: "i"
+  defp get_type_name({:s, size}), do: "i#{size}"
 
-  defp get_type_name(:f), do: "f"
+  defp get_type_name({:f, size}), do: "f#{size}"
+
+  defp get_type_name({:c, size}) do
+    "complex<f#{div(size, 2)}>"
+  end
 
   # TODO: stop using string interpolation because it is essentially a hack
-  defp gen_type_str(%Nx.Tensor{shape: {}, type: {name, size}}) do
-    "tensor<#{get_type_name(name)}#{size}>"
+  defp gen_type_str(%Nx.Tensor{shape: {}, type: type}) do
+    "tensor<#{get_type_name(type)}>"
   end
 
-  defp gen_type_str(%Nx.Tensor{shape: {dim0}, type: {name, size}}) do
-    "tensor<#{dim0}x#{get_type_name(name)}#{size}>"
+  defp gen_type_str(%Nx.Tensor{shape: {dim0}, type: type}) do
+    "tensor<#{dim0}x#{get_type_name(type)}>"
   end
 
-  defp gen_type_str(%Nx.Tensor{shape: {dim0, dim1}, type: {name, size}}) do
-    "tensor<#{dim0}x#{dim1}x#{get_type_name(name)}#{size}>"
+  defp gen_type_str(%Nx.Tensor{shape: {dim0, dim1}, type: type}) do
+    "tensor<#{dim0}x#{dim1}x#{get_type_name(type)}>"
+  end
+
+  defp gen_type_str(%Nx.Tensor{shape: {dim0, dim1, dim2}, type: type}) do
+    "tensor<#{dim0}x#{dim1}x#{dim2}x#{get_type_name(type)}>"
   end
 
   defp gen_type_str(tuple) when is_tuple(tuple) do
@@ -86,12 +94,24 @@ defmodule Beaver.Nx.Defn do
          %Nx.Tensor{
            data: %Nx.Defn.Expr{op: :constant, args: [value]},
            shape: {},
-           type: {name, size}
+           type: type
          } = t
        )
        when is_integer(value) or is_float(value) do
     mlir do
-      TOSA.const({:value, ~a{dense<#{value}> : tensor<#{get_type_name(name)}#{size}>}}) ::
+      TOSA.const({:value, ~a{dense<#{value}> : tensor<#{get_type_name(type)}>}}) ::
+        ~t{#{gen_type_str(t)}}
+    end
+  end
+
+  defp gen_op(
+         %Nx.Tensor{
+           data: %Nx.Defn.Expr{op: :constant, args: [%Complex{im: im, re: re}]},
+           type: {:c, 64}
+         } = t
+       ) do
+    mlir do
+      Arith.constant({:value, ~a[dense<(#{re}, #{im})> : #{gen_type_str(t)}]}) ::
         ~t{#{gen_type_str(t)}}
     end
   end
@@ -168,15 +188,25 @@ defmodule Beaver.Nx.Defn do
   end
 
   @doc false
-  def __jit__(_key, vars, fun, [args], _options) do
+  def __jit__(key, vars, fun, [args], _options) do
     # call fun to generated tree
     tree = fun.(vars)
+
+    info = Function.info(key)
+    uniq = info |> Keyword.get(:uniq)
+    module = info |> Keyword.get(:module)
+    name = info |> Keyword.get(:name)
+
+    symbol =
+      Module.concat([module, name, "#{uniq}"])
+      |> Atom.to_string()
 
     # generate ir
     ir =
       mlir do
         module do
           Func.func beaver_nx_main(
+                      sym_name: "\"#{symbol}\"",
                       function_type:
                         ~a"#{gen_type_str(List.to_tuple(vars))} -> #{gen_type_str(tree)}"
                     ) do
@@ -212,7 +242,7 @@ defmodule Beaver.Nx.Defn do
     tree_return =
       tree
       |> Beaver.Nx.tensor_of_null_memref()
-      |> invoke(args, jit)
+      |> invoke(args, jit, symbol)
 
     [tree_return]
   end
@@ -220,14 +250,15 @@ defmodule Beaver.Nx.Defn do
   @doc """
   Invoke MLIR JIT with NX tensors. If there are tuples their memrefs will be packed into a single C struct.
   """
-  def invoke(return, args, jit) do
+
+  def invoke(return, args, jit, symbol) do
     # pack the tensor tuples into a C struct
     jit_args = [return_struct | _] = [return | args] |> Enum.map(&memref_from_tensor/1)
     if List.improper?(jit_args), do: raise("jit arguments is not a proper list")
 
     MLIR.ExecutionEngine.invoke!(
       jit,
-      "beaver_nx_main",
+      symbol,
       Enum.map(jit_args, &Exotic.Value.get_ptr/1)
     )
 
@@ -336,8 +367,10 @@ defmodule Beaver.Nx.Defn do
     |> MLIR.Pass.Composer.nested("func.func", fn pm ->
       MLIR.Pass.pipeline!(pm, "llvm-request-c-wrappers")
     end)
+    |> MLIR.Pass.Composer.run!(dump: false)
     |> convert_vector_to_llvm
     |> convert_memref_to_llvm
+    |> convert_complex_to_llvm()
     |> convert_func_to_llvm
     |> reconcile_unrealized_casts
     |> MLIR.Pass.Composer.run!(dump_if_fail: true)
