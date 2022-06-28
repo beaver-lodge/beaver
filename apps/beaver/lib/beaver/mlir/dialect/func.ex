@@ -22,13 +22,16 @@ defmodule Beaver.MLIR.Dialect.Func do
           do: raise("augument of Func.func must be a keyword")
 
         Beaver.MLIR.Dialect.Func.FuncOp.create(
-          unquote_splicing(args) ++
-            [
-              sym_name: "\"#{unquote(func_name)}\"",
-              regions: fn ->
-                unquote(block)
-              end
-            ]
+          Enum.uniq_by(
+            unquote_splicing(args) ++
+              [
+                sym_name: "\"#{unquote(func_name)}\"",
+                regions: fn ->
+                  unquote(block)
+                end
+              ],
+            fn {x, _} -> x end
+          )
         )
       end
 

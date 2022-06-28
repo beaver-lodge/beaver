@@ -20,6 +20,10 @@ defmodule Beaver.Nx do
   end
 
   @impl true
+  def from_binary(%T{shape: {}, type: {:c, size}} = tensor, binary, _backend_options) do
+    raise "from_binary complex"
+  end
+
   def from_binary(%T{shape: shape, type: _type} = tensor, binary, _backend_options) do
     shape = Tuple.to_list(shape)
 
@@ -108,6 +112,10 @@ defmodule Beaver.Nx do
   @doc """
   Create a new tensor of null ptr memref. This should be used as as the return tensor of JIT function.
   """
+  def tensor_of_null_memref(%T{shape: {}, type: {:c, size}} = tensor) do
+    raise "complex null"
+  end
+
   def tensor_of_null_memref(%T{shape: shape, type: _type} = tensor) do
     shape = Tuple.to_list(shape)
 

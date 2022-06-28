@@ -112,4 +112,14 @@ defmodule Beaver.Defn.ExprTest do
       Assert.equal(return_float(), Nx.tensor(1, type: {:f, 16}))
     end
   end
+
+  describe "complex" do
+    defn(return_complex, do: Nx.complex(1, 2))
+    defn(return_complex_tensor, do: Nx.broadcast(Nx.complex(1, 2), {3, 3, 3}))
+
+    test "supports complex return types" do
+      Assert.equal(return_complex(), Nx.tensor(Complex.new(1, 2)))
+      Assert.equal(return_complex_tensor(), Nx.broadcast(Complex.new(1, 2), {3, 3, 3}))
+    end
+  end
 end
