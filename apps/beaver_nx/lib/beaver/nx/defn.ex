@@ -107,7 +107,6 @@ defmodule Beaver.Nx.Defn do
   defp gen_op(
          %Nx.Tensor{
            data: %Nx.Defn.Expr{op: :constant, args: [%Complex{im: im, re: re}]},
-           shape: {},
            type: {:c, 64}
          } = t
        ) do
