@@ -104,4 +104,12 @@ defmodule Beaver.Defn.ExprTest do
       Assert.equal(infinity(), Nx.Constants.infinity())
     end
   end
+
+  describe "float16" do
+    defn(return_float, do: Nx.tensor(1, type: {:f, 16}))
+
+    test "supports float16 return types" do
+      Assert.equal(return_float(), Nx.tensor(1, type: {:f, 16}))
+    end
+  end
 end
