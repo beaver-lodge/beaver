@@ -84,4 +84,24 @@ defmodule Beaver.Defn.ExprTest do
       Assert.equal(add_2x2_constant(1), Nx.tensor([[2, 4], [6, 8]]))
     end
   end
+
+  describe "non finite" do
+    defn(infinity, do: Nx.Constants.infinity())
+    defn(neg_infinity, do: Nx.Constants.neg_infinity())
+    defn(nan, do: Nx.Constants.nan())
+
+    test "handles non-finite constants correctly" do
+      Assert.equal(infinity(), Nx.Constants.infinity())
+      Assert.equal(neg_infinity(), Nx.Constants.neg_infinity())
+      Assert.equal(nan(), Nx.Constants.nan())
+    end
+
+    defn(negate_infinity, do: Nx.negate(Nx.Constants.infinity()))
+    defn(negate_neg_infinity, do: Nx.negate(Nx.Constants.infinity()))
+
+    test "sanity check constants" do
+      Assert.equal(negate_infinity(), Nx.Constants.neg_infinity())
+      Assert.equal(infinity(), Nx.Constants.infinity())
+    end
+  end
 end

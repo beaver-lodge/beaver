@@ -45,14 +45,54 @@ defmodule Beaver.Nx.Defn do
 
   defp gen_op(
          %Nx.Tensor{
-           data: %Nx.Defn.Expr{op: :constant, args: [int_value]},
+           data: %Nx.Defn.Expr{op: :constant, args: [:nan]},
            shape: {},
-           type: {:s, size}
+           type: {:f, 32}
+         } = t
+       ) do
+    mlir do
+      TOSA.const({:value, ~a{dense<0x7F800001> : tensor<f32>}}) ::
+        ~t{#{gen_type_str(t)}}
+    end
+  end
+
+  defp gen_op(
+         %Nx.Tensor{
+           data: %Nx.Defn.Expr{op: :constant, args: [:infinity]},
+           shape: {},
+           type: {:f, 32}
+         } = t
+       ) do
+    mlir do
+      TOSA.const({:value, ~a{dense<0x7F800000> : tensor<f32>}}) ::
+        ~t{#{gen_type_str(t)}}
+    end
+  end
+
+  defp gen_op(
+         %Nx.Tensor{
+           data: %Nx.Defn.Expr{op: :constant, args: [:neg_infinity]},
+           shape: {},
+           type: {:f, 32}
+         } = t
+       ) do
+    mlir do
+      TOSA.const({:value, ~a{dense<0xFF800000> : tensor<f32>}}) ::
+        ~t{#{gen_type_str(t)}}
+    end
+  end
+
+  defp gen_op(
+         %Nx.Tensor{
+           data: %Nx.Defn.Expr{op: :constant, args: [value]},
+           shape: {},
+           type: {name, size}
          } = t
        )
-       when is_integer(int_value) do
+       when is_integer(value) or is_float(value) do
     mlir do
-      TOSA.const({:value, ~a{dense<#{int_value}> : tensor<i#{size}>}}) :: ~t{#{gen_type_str(t)}}
+      TOSA.const({:value, ~a{dense<#{value}> : tensor<#{get_type_name(name)}#{size}>}}) ::
+        ~t{#{gen_type_str(t)}}
     end
   end
 
@@ -83,6 +123,13 @@ defmodule Beaver.Nx.Defn do
   defp gen_op(%Nx.Tensor{data: %Nx.Defn.Expr{op: :parameter, args: [pos]}})
        when is_integer(pos) do
     MLIR.Managed.Block.get() |> Beaver.MLIR.Block.get_arg!(pos)
+  end
+
+  defp gen_op(%Nx.Tensor{data: %Nx.Defn.Expr{op: :negate, args: [input1]}} = t) do
+    mlir do
+      input1 = gen_op(input1)
+      TOSA.negate(input1) :: ~t{#{gen_type_str(t)}}
+    end
   end
 
   defp gen_op(%Nx.Tensor{data: %Nx.Defn.Expr{op: :multiply, args: [a, b]}} = t) do
@@ -117,7 +164,7 @@ defmodule Beaver.Nx.Defn do
   end
 
   defp gen_op(tensor) do
-    raise "op unsupported: " <> inspect(tensor, structs: false, pretty: true)
+    raise "op not supported: " <> inspect(tensor, structs: false, pretty: true)
   end
 
   @doc false
