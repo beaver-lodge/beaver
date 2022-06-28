@@ -94,12 +94,12 @@ defmodule Beaver.Nx.Defn do
          %Nx.Tensor{
            data: %Nx.Defn.Expr{op: :constant, args: [value]},
            shape: {},
-           type: {name, size}
+           type: type
          } = t
        )
        when is_integer(value) or is_float(value) do
     mlir do
-      TOSA.const({:value, ~a{dense<#{value}> : tensor<#{get_type_name(name)}#{size}>}}) ::
+      TOSA.const({:value, ~a{dense<#{value}> : tensor<#{get_type_name(type)}>}}) ::
         ~t{#{gen_type_str(t)}}
     end
   end
@@ -338,7 +338,7 @@ defmodule Beaver.Nx.Defn do
       MLIR.Pass.pipeline!(pm, "tosa-layerwise-constant-fold")
     end)
     |> cse
-    |> MLIR.Pass.Composer.run!(dump: true)
+    |> MLIR.Pass.Composer.run!(dump: false)
     |> tosa_to_scf
     |> tosa_to_arith
     |> tosa_to_tensor()
@@ -367,13 +367,12 @@ defmodule Beaver.Nx.Defn do
     |> MLIR.Pass.Composer.nested("func.func", fn pm ->
       MLIR.Pass.pipeline!(pm, "llvm-request-c-wrappers")
     end)
-    |> MLIR.Pass.Composer.run!(dump: true)
+    |> MLIR.Pass.Composer.run!(dump: false)
     |> convert_vector_to_llvm
     |> convert_memref_to_llvm
     |> convert_complex_to_llvm()
     |> convert_func_to_llvm
     |> reconcile_unrealized_casts
     |> MLIR.Pass.Composer.run!(dump_if_fail: true)
-    |> MLIR.Operation.dump!()
   end
 end

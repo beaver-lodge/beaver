@@ -35,7 +35,7 @@ defmodule Beaver.Nx do
   end
 
   @impl true
-  def to_binary(%T{shape: _shape, data: %B{memref: memref} = tensor}, limit) do
+  def to_binary(%T{shape: _shape, data: %B{memref: memref}} = tensor, limit) do
     MemRefDescriptor.read_as_binary(memref, limit * div(element_size(tensor), 8))
   end
 
