@@ -16,8 +16,8 @@ defmodule Beaver.Nx.Assert do
   end
 
   def all_close(left, right, opts \\ []) do
-    atol = opts[:atol] || 1.0e-4
-    rtol = opts[:rtol] || 1.0e-4
+    atol = Keyword.get(opts, :atol, 1.0e-4)
+    rtol = Keyword.get(opts, :rtol, 1.0e-4)
 
     equals =
       left

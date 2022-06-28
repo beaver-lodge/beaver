@@ -94,6 +94,10 @@ defmodule Exotic.Value do
 
   # To support Access behavior, each struct should have its own elixir struct
 
+  def fetch(%{ref: v_ref, holdings: holdings, fields: fields}, key) do
+    fetch(%{ref: v_ref, holdings: holdings}, fields, key)
+  end
+
   def fetch(%{ref: v_ref, holdings: holdings}, module, key) when is_atom(module) do
     fields = apply(module, :native_fields_with_names, [])
     fetch(%{ref: v_ref, holdings: holdings}, fields, key)
@@ -243,6 +247,10 @@ defmodule Exotic.Value do
     }
   end
 
+  def get(_t, %Exotic.Value{} = v) do
+    v
+  end
+
   def get_closure(
         %Exotic.Type{
           ref: _,
@@ -301,7 +309,7 @@ defmodule Exotic.Value do
     Create and extract C structs.
     """
     alias Exotic.{Value, Type}
-    defstruct ref: nil, holdings: MapSet.new(), type: :struct
+    defstruct ref: nil, holdings: MapSet.new(), type: :struct, fields: :undefined
 
     def extract(module, %Exotic.Value{ref: ref}) when is_atom(module) do
       struct_t =
@@ -349,6 +357,9 @@ defmodule Exotic.Value do
       get(types, values)
     end
 
+    def get([], _), do: raise("Cannot create struct with no fields")
+    def get(_, []), do: raise("Cannot create struct with no values")
+
     def get(types, values) when is_list(types) do
       types =
         for {n, f} <- types do
@@ -369,7 +380,8 @@ defmodule Exotic.Value do
 
       struct!(__MODULE__, %{
         ref: ref,
-        holdings: holdings
+        holdings: holdings,
+        fields: types
       })
     end
 

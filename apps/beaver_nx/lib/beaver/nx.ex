@@ -121,4 +121,11 @@ defmodule Beaver.Nx do
     {memref} |> Beaver.Nx.MemrefAllocator.add()
     put_in(tensor.data, %B{memref: memref})
   end
+
+  def tensor_of_null_memref(tuple) when is_tuple(tuple) do
+    for t <- tuple |> Tuple.to_list() do
+      tensor_of_null_memref(t)
+    end
+    |> List.to_tuple()
+  end
 end

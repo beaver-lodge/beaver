@@ -26,7 +26,7 @@ defmodule Beaver.MLIR.Block do
     end
   end
 
-  def get_arg!(block, index) do
+  def get_arg!(block, index) when not is_nil(block) do
     IR.mlirBlockGetArgument(block, index) |> Exotic.Value.transmit()
   end
 

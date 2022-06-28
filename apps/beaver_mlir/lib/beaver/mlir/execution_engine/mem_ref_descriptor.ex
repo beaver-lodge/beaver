@@ -94,12 +94,18 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
   end
 
   def read_as_binary(memref, len) when is_integer(len) do
-    memref
-    |> Exotic.Value.fetch(
-      # rank here should not matter so setting it to 1
-      __MODULE__.struct_fields(1),
-      :aligned
-    )
-    |> Exotic.Value.Ptr.read_as_binary(len)
+    ptr =
+      memref
+      |> Exotic.Value.fetch(
+        # rank here should not matter so set it to 1
+        __MODULE__.struct_fields(1),
+        :aligned
+      )
+
+    if Exotic.Value.extract(ptr) == Exotic.Value.extract(Exotic.Value.Ptr.null()) do
+      raise "cannot read from memref of null pointer"
+    end
+
+    ptr |> Exotic.Value.Ptr.read_as_binary(len)
   end
 end

@@ -1,4 +1,6 @@
 defmodule Beaver.MLIR.Pass.Composer do
+  require Logger
+
   @moduledoc """
   This module provide functions to compose passes.
   """
@@ -12,7 +14,7 @@ defmodule Beaver.MLIR.Pass.Composer do
   end
 
   # TODO: add keyword arguments
-  def run!(%__MODULE__{passes: passes, op: op}) do
+  def run!(%__MODULE__{passes: passes, op: op}, opts \\ [dump: false, dump_if_fail: false]) do
     ctx = MLIR.Managed.Context.get()
     pm = mlirPassManagerCreate(ctx)
 
@@ -46,9 +48,15 @@ defmodule Beaver.MLIR.Pass.Composer do
     status = mlirPassManagerRun(pm, op)
 
     if not MLIR.LogicalResult.success?(status) do
+      if Keyword.get(opts, :dump_if_fail, false) do
+        Logger.error("Failed to run pass, start dumping operation and this might crash")
+        MLIR.Operation.dump(op)
+      end
+
       raise "Unexpected failure running pass pipeline"
     end
 
+    if Keyword.get(opts, :dump, false), do: MLIR.Operation.dump(op)
     mlirPassManagerDestroy(pm)
     op
   end
