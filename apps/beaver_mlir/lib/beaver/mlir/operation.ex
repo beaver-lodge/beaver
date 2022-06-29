@@ -16,7 +16,7 @@ defmodule Beaver.MLIR.Operation do
   Create a new operation from arguments and insert to managed insertion point
   """
   def create(op_name, arguments) do
-    {defer_if_terminator, arguments} = Keyword.pop(arguments, :defer_if_terminator, true)
+    defer_if_terminator = Keyword.get(arguments, :defer_if_terminator, true)
 
     if defer_if_terminator and MLIR.Trait.is_terminator?(op_name) do
       if block = MLIR.Managed.Block.get() do

@@ -1,9 +1,21 @@
 defmodule Beaver.Nx.Defn do
   require Beaver
   import Beaver, only: [mlir: 1]
-  require Beaver.MLIR.Dialect.{Func, SCF}
+  require Beaver.MLIR.Dialect.{Func, SCF, Linalg}
   alias Beaver.MLIR
-  alias Beaver.MLIR.Dialect.{Builtin, Func, TOSA, Arith, SCF, Tensor, Bufferization, MemRef}
+
+  alias Beaver.MLIR.Dialect.{
+    Builtin,
+    Func,
+    TOSA,
+    Arith,
+    SCF,
+    Tensor,
+    Bufferization,
+    MemRef,
+    Linalg
+  }
+
   alias Beaver.MLIR.Dialect
   import Builtin, only: :macros
   import MLIR, only: :macros
@@ -257,6 +269,33 @@ defmodule Beaver.Nx.Defn do
       end
 
       conjugate_tensor
+    end
+  end
+
+  defp gen_op(
+         %Nx.Tensor{
+           data: %Nx.Defn.Expr{
+             op: :imag,
+             args: [%Nx.Tensor{type: {:c, 64}} = in_tensor]
+           },
+           shape: {}
+         } = t
+       ) do
+    mlir do
+      in_tensor = gen_op(in_tensor)
+      MLIR.Value.dump(in_tensor)
+
+      out_tensor = Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
+        ~t{#{gen_type_str(t)}}
+
+      Linalg.generic [in_tensor, out_tensor, operand_segment_sizes: ~a{dense<1> : vector<2xi32>}] do
+        region do
+          block b0(arg0 :: ~t<f32>complex) do
+            im = Dialect.Complex.im(arg0) :: ~t{f32}
+            Linalg.yield(im, defer_if_terminator: false) :: ~t{f32}
+          end
+        end
+      end :: ~t{#{gen_type_str(t)}}
     end
   end
 
