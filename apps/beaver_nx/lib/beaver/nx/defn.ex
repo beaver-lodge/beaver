@@ -285,8 +285,10 @@ defmodule Beaver.Nx.Defn do
       in_tensor = gen_op(in_tensor)
       MLIR.Value.dump(in_tensor)
 
+      out_t = ~t{#{gen_type_str(t)}}
+
       out_tensor = Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
-        ~t{#{gen_type_str(t)}}
+        out_t
 
       Linalg.generic [
         in_tensor,
@@ -296,7 +298,7 @@ defmodule Beaver.Nx.Defn do
         iterator_types: ~a{[]}
       ] do
         region do
-          block b0(arg0 :: ~t<f32>complex, arg1 :: ~t<f32>) do
+          block bb0(arg0 :: ~t<f32>complex, arg1 :: ~t<f32>) do
             im = Dialect.Complex.im(arg0) :: ~t{f32}
             Linalg.yield([im, defer_if_terminator: false])
           end
