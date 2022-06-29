@@ -288,11 +288,17 @@ defmodule Beaver.Nx.Defn do
       out_tensor = Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
         ~t{#{gen_type_str(t)}}
 
-      Linalg.generic [in_tensor, out_tensor, operand_segment_sizes: ~a{dense<1> : vector<2xi32>}] do
+      Linalg.generic [
+        in_tensor,
+        out_tensor,
+        operand_segment_sizes: ~a{dense<1> : vector<2xi32>},
+        indexing_maps: ~a{[affine_map<() -> ()>, affine_map<() -> ()>]},
+        iterator_types: ~a{[]}
+      ] do
         region do
-          block b0(arg0 :: ~t<f32>complex) do
+          block b0(arg0 :: ~t<f32>complex, arg1 :: ~t<f32>) do
             im = Dialect.Complex.im(arg0) :: ~t{f32}
-            Linalg.yield(im, defer_if_terminator: false) :: ~t{f32}
+            Linalg.yield([im, defer_if_terminator: false])
           end
         end
       end :: ~t{#{gen_type_str(t)}}
