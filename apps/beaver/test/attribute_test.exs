@@ -48,6 +48,7 @@ defmodule AttributeTest do
       assert Attribute.integer(Type.i(32), 1) |> Attribute.to_string() == "1 : i32"
       assert Attribute.equal?(Attribute.integer(Type.i(32), 0), ~a{0}i32)
       assert Attribute.equal?(Attribute.float(Type.f(32), 0.0), ~a{0.0}f32)
+      assert Attribute.equal?(Attribute.integer(Type.index(), 1), ~a{1}index)
     end
   end
 end

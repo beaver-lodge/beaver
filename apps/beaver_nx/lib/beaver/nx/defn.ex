@@ -184,7 +184,7 @@ defmodule Beaver.Nx.Defn do
     mlir do
       a = gen_op(a)
       b = gen_op(b)
-      TOSA.mul(a, b, shift: ~a{0}i32) :: ~t{#{gen_type_str(t)}}
+      TOSA.mul(a, b, shift: Attribute.integer(Type.i(32), 0)) :: ~t{#{gen_type_str(t)}}
     end
   end
 
@@ -215,8 +215,8 @@ defmodule Beaver.Nx.Defn do
        ) do
     mlir do
       complex_tensor = gen_op(complex_tensor)
-      complex_element = Tensor.extract(complex_tensor) :: ~t{complex<f32>}
-      conjugate_element = Dialect.Complex.conj(complex_element) :: ~t{complex<f32>}
+      complex_element = Tensor.extract(complex_tensor) :: Type.complex(Type.f32())
+      conjugate_element = Dialect.Complex.conj(complex_element) :: Type.complex(Type.f32())
 
       conjugate_tensor =
         Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
@@ -245,7 +245,7 @@ defmodule Beaver.Nx.Defn do
 
       imaginary = Arith.constant(value: Attribute.float(Type.f32(), 0.0)) :: Type.f32()
 
-      complex_element_t = ~t{#{get_type_name(complex_type)}}
+      complex_element_t = gen_type(complex_type)
       complex_element = Dialect.Complex.create(real, imaginary) :: complex_element_t
       conjugate_element = Dialect.Complex.conj(complex_element) :: complex_element_t
 
@@ -262,9 +262,9 @@ defmodule Beaver.Nx.Defn do
     mlir do
       element_cnt = Enum.reduce(Tuple.to_list(shape), 1, &*/2)
       complex_tensor = gen_op(complex_tensor)
-      lower = Arith.constant(value: ~a{0}index) :: Type.index()
-      upper = Arith.constant(value: ~a{#{element_cnt}}index) :: Type.index()
-      step = Arith.constant(value: ~a{1}index) :: Type.index()
+      lower = Arith.constant(value: Attribute.integer(Type.index(), 0)) :: Type.index()
+      upper = Arith.constant(value: Attribute.integer(Type.index(), element_cnt)) :: Type.index()
+      step = Arith.constant(value: Attribute.integer(Type.index(), 1)) :: Type.index()
 
       conjugate_tensor =
         Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
