@@ -460,6 +460,9 @@ defmodule Beaver.Nx.Defn do
     |> List.to_tuple()
   end
 
+  @doc """
+  Run passes to compile IR generated from NX expressions, mostly in TOSA and some LinAlg. The results should be in LLVM.
+  """
   def tosa_cpu(op) do
     import MLIR.{Transforms, Conversion}
 

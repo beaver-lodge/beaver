@@ -1,7 +1,7 @@
 defmodule Beaver.Defn.ExprTest do
   # TODO: running this in async will trigger multi-thread check in MLIR and crash
   use ExUnit.Case, async: true
-  import Nx, only: :sigils
+  # import Nx, only: :sigils
   import Nx.Defn
   alias Beaver.Nx.Assert
   import Beaver.Nx.Assert
@@ -12,9 +12,9 @@ defmodule Beaver.Defn.ExprTest do
     :ok
   end
 
-  defp evaluate(fun, args) do
-    fun |> Nx.Defn.jit(compiler: Nx.Defn.Evaluator) |> apply(args)
-  end
+  # defp evaluate(fun, args) do
+  #   fun |> Nx.Defn.jit(compiler: Nx.Defn.Evaluator) |> apply(args)
+  # end
 
   describe "tuples" do
     defn(add_subtract_tuple(a, b), do: {a + b, a - b})
@@ -146,10 +146,10 @@ defmodule Beaver.Defn.ExprTest do
       assert_equal(imag(Nx.tensor(Complex.new(1, 2))), Nx.tensor(2.0))
       assert_equal(imag(Nx.tensor(1)), Nx.tensor(0.0))
 
-      # assert_equal(
-      #   imag(Nx.tensor([Complex.new(1, 2), Complex.new(2, -4)])),
-      #   Nx.tensor([2.0, -4.0])
-      # )
+      assert_equal(
+        imag(Nx.tensor([Complex.new(1, 2), Complex.new(2, -4)])),
+        Nx.tensor([2.0, -4.0])
+      )
     end
   end
 end

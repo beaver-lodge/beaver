@@ -1,4 +1,5 @@
 defmodule Beaver.DSL do
+  @moduledoc false
   def transform_ssa(block) do
     Macro.prewalk(block, fn
       # one SSA
