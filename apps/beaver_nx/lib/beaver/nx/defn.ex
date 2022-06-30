@@ -283,8 +283,6 @@ defmodule Beaver.Nx.Defn do
        ) do
     mlir do
       in_tensor = gen_op(in_tensor)
-      MLIR.Value.dump(in_tensor)
-
       out_t = ~t{#{gen_type_str(t)}}
 
       out_tensor = Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
