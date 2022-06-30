@@ -221,7 +221,6 @@ defmodule Beaver.Nx.Defn do
        ) do
     mlir do
       real_tensor = gen_op(real_tensor)
-      real_tensor = TOSA.cast(real_tensor) :: ~t{tensor<f32>}
       real_tensor = TOSA.cast(real_tensor) :: Type.ranked_tensor([], Type.f32())
       real = Tensor.extract(real_tensor) :: ~t{f32}
 
