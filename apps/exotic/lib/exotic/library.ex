@@ -245,7 +245,7 @@ defmodule Exotic.Library do
 
     require Logger
 
-    if Enum.empty?(funcs), do: Logger.debug("no native functions found in module #{env.module}")
+    if Enum.empty?(funcs), do: Logger.warn("no native functions found in module #{env.module}")
 
     quote do
       # use a module to save meta info of this library, so it could be accessible in @on_load
