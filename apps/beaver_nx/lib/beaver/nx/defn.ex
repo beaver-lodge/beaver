@@ -220,7 +220,7 @@ defmodule Beaver.Nx.Defn do
 
       conjugate_tensor =
         Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
-        ~t{#{gen_type_str(t)}}
+        gen_type(t)
 
       Tensor.insert(conjugate_element, conjugate_tensor) ::
         ~t{#{gen_type_str(t)}}
@@ -237,13 +237,13 @@ defmodule Beaver.Nx.Defn do
     mlir do
       real_tensor = gen_op(real_tensor)
       real_tensor = TOSA.cast(real_tensor) :: Type.ranked_tensor([], Type.f32())
-      real = Tensor.extract(real_tensor) :: ~t{f32}
+      real = Tensor.extract(real_tensor) :: Type.f32()
 
       conjugate_tensor =
         Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
-        ~t{#{gen_type_str(t)}}
+        gen_type(t)
 
-      imaginary = Arith.constant(value: ~a{0.0}f32) :: ~t{f32}
+      imaginary = Arith.constant(value: ~a{0.0}f32) :: Type.f32()
 
       complex_element_t = ~t{#{get_type_name(complex_type)}}
       complex_element = Dialect.Complex.create(real, imaginary) :: complex_element_t
@@ -268,7 +268,7 @@ defmodule Beaver.Nx.Defn do
 
       conjugate_tensor =
         Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
-        ~t{#{gen_type_str(t)}}
+        gen_type(t)
 
       conjugate_memref = Bufferization.to_memref(conjugate_tensor) ::
         Type.memref([2], Type.complex(Type.f32()))
@@ -299,10 +299,9 @@ defmodule Beaver.Nx.Defn do
        ) do
     mlir do
       in_tensor = gen_op(in_tensor)
-      out_t = ~t{#{gen_type_str(t)}}
 
       out_tensor = Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
-        out_t
+        gen_type(t)
 
       Linalg.generic [
         in_tensor,
