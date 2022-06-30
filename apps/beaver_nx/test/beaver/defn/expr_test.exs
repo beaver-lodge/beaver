@@ -1,6 +1,6 @@
 defmodule Beaver.Defn.ExprTest do
   # TODO: running this in async will trigger multi-thread check in MLIR and crash
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
   import Nx, only: :sigils
   import Nx.Defn
   alias Beaver.Nx.Assert
