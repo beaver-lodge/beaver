@@ -1,4 +1,4 @@
-defmodule GenIRTest do
+defmodule CFTest do
   use ExUnit.Case
   alias Beaver.MLIR
   import Beaver.MLIR.Sigils
@@ -12,11 +12,10 @@ defmodule GenIRTest do
     alias Beaver.MLIR.Dialect.{Builtin, Func, Arith, CF}
     import Builtin, only: :macros
     import MLIR, only: :macros
-    import MLIR.Sigils
 
     mlir do
       module do
-        Func.func some_func(function_type: ~a"() -> i32") do
+        Func.func some_func(function_type: Attribute.type(Type.function([], [Type.i(32)]))) do
           region do
             block bb_entry() do
               v0 = Arith.constant({:value, Attribute.integer(Type.i(32), 0)}) :: Type.i(32)
@@ -38,7 +37,7 @@ defmodule GenIRTest do
           end
         end
 
-        Func.func some_func2(function_type: ~a"() -> i32") do
+        Func.func some_func2(function_type: Attribute.type(Type.function([], [Type.i(32)]))) do
           region do
             block bb_entry() do
               v0 = Arith.constant({:value, Attribute.integer(Type.i(32), 0)}) :: Type.i(32)

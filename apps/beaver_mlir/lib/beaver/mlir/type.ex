@@ -13,6 +13,14 @@ defmodule Beaver.MLIR.Type do
     CAPI.mlirTypeEqual(a, b) |> Exotic.Value.extract()
   end
 
+  def function(inputs, results, opts \\ []) do
+    num_inputs = length(inputs)
+    num_results = length(results)
+    inputs = inputs |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
+    results = results |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
+    function(num_inputs, inputs, num_results, results, opts)
+  end
+
   def ranked_tensor(
         shape,
         %MLIR.CAPI.MlirType{} = element_type,
