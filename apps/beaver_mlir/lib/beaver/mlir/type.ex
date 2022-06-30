@@ -27,6 +27,22 @@ defmodule Beaver.MLIR.Type do
     ranked_tensor(rank, shape, element_type, encoding)
   end
 
+  def memref(
+        shape,
+        %MLIR.CAPI.MlirType{} = element_type,
+        opts \\ [layout: Exotic.Value.Ptr.null(), memory_space: Exotic.Value.Ptr.null()]
+      )
+      when is_list(shape) do
+    rank = length(shape)
+
+    shape =
+      shape |> Enum.map(&Exotic.Value.get/1) |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
+
+    layout = Keyword.get(opts, :layout, Exotic.Value.Ptr.null())
+    memory_space = Keyword.get(opts, :memory_space, Exotic.Value.Ptr.null())
+    CAPI.mlirMemRefTypeGet(element_type, rank, shape, layout, memory_space)
+  end
+
   for {:function_signature,
        [
          f = %Exotic.CodeGen.Function{

@@ -256,7 +256,8 @@ defmodule Beaver.Nx.Defn do
         Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
         ~t{#{gen_type_str(t)}}
 
-      conjugate_memref = Bufferization.to_memref(conjugate_tensor) :: ~t{2xcomplex<f32>}memref
+      conjugate_memref = Bufferization.to_memref(conjugate_tensor) ::
+        Type.memref([2], Type.complex(Type.f32()))
 
       SCF.for [lower, upper, step] do
         region do

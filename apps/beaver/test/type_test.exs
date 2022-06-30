@@ -27,5 +27,9 @@ defmodule TypeTest do
     assert Type.ranked_tensor([], Type.f32())
            |> Type.to_string() ==
              "tensor<f32>"
+
+    assert Type.memref([], Type.f32())
+           |> Type.to_string() ==
+             "memref<f32>"
   end
 end
