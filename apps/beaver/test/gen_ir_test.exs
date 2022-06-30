@@ -36,6 +36,7 @@ defmodule CFTest do
             end
           end
         end
+        |> MLIR.Operation.verify!()
 
         Func.func some_func2(function_type: Attribute.type(Type.function([], [Type.i(32)]))) do
           region do

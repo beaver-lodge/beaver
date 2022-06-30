@@ -49,6 +49,32 @@ defmodule AttributeTest do
       assert Attribute.equal?(Attribute.integer(Type.i(32), 0), ~a{0}i32)
       assert Attribute.equal?(Attribute.float(Type.f(32), 0.0), ~a{0.0}f32)
       assert Attribute.equal?(Attribute.integer(Type.index(), 1), ~a{1}index)
+
+      assert not Attribute.is_null(
+               Attribute.type(
+                 Type.function(
+                   [Type.i(32)],
+                   [Type.i(32)]
+                 )
+               )
+             )
+
+      assert Type.function(
+               [Type.ranked_tensor([1, 2, 3, 4], Type.i(32))],
+               [Type.i(32)]
+             )
+             |> Type.to_string() ==
+               "(tensor<1x2x3x4xi32>) -> i32"
+
+      assert Attribute.equal?(
+               Attribute.type(
+                 Type.function(
+                   [Type.i(32)],
+                   [Type.i(32)]
+                 )
+               ),
+               ~a{(i32) -> (i32)}
+             )
     end
   end
 end

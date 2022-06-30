@@ -29,7 +29,7 @@ defmodule Beaver.MLIR.Type do
       when is_list(shape) do
     rank = length(shape)
 
-    shape = shape |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()
+    shape = shape |> Exotic.Value.Array.from_list({:i, 64}) |> Exotic.Value.get_ptr()
 
     ranked_tensor(rank, shape, element_type, encoding)
   end
@@ -42,7 +42,7 @@ defmodule Beaver.MLIR.Type do
       when is_list(shape) do
     rank = length(shape)
 
-    shape = shape |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()
+    shape = shape |> Exotic.Value.Array.from_list({:i, 64}) |> Exotic.Value.get_ptr()
 
     [layout: layout, memory_space: memory_space] =
       for k <- [:layout, :memory_space] do
@@ -54,11 +54,13 @@ defmodule Beaver.MLIR.Type do
 
   def tuple(elements) when is_list(elements) do
     num_elements = length(elements)
+    elements = elements |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()
     tuple(num_elements, elements, [])
   end
 
   def tuple(elements, opts) when is_list(elements) do
     num_elements = length(elements)
+    elements = elements |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()
     tuple(num_elements, elements, opts)
   end
 

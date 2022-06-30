@@ -349,10 +349,18 @@ defmodule Beaver.Nx.Defn do
     ir =
       mlir do
         module do
+          function_type =
+            Attribute.type(
+              Type.function(
+                Enum.map(vars, &gen_type/1),
+                [gen_type(tree)]
+              )
+            )
+
           Func.func beaver_nx_main(
                       sym_name: "\"#{symbol}\"",
-                      function_type:
-                        ~a"#{gen_type_str(List.to_tuple(vars))} -> #{gen_type_str(tree)}"
+                      function_type: function_type
+                      # ~a"#{gen_type_str(List.to_tuple(vars))} -> #{gen_type_str(tree)}"
                     ) do
             region do
               block =

@@ -271,6 +271,10 @@ defmodule Exotic.Value do
     }
   end
 
+  def get({:i, 64}, value) when is_integer(value) do
+    get(:i64, value)
+  end
+
   def get(_t, %Exotic.Value{} = v) do
     v
   end
@@ -453,6 +457,10 @@ defmodule Exotic.Value do
 
     def from_list(list) when is_list(list) do
       list |> Enum.map(&Exotic.Value.get/1) |> Exotic.Value.Array.get()
+    end
+
+    def from_list(list, type) when is_list(list) do
+      list |> Enum.map(&Exotic.Value.get(type, &1)) |> Exotic.Value.Array.get()
     end
 
     # TODO: if length(values) == 0, requires a type
