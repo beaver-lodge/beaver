@@ -1,7 +1,7 @@
 defmodule Beaver.Nx.Defn do
   require Beaver
   import Beaver, only: [mlir: 1]
-  require Beaver.MLIR.Dialect.{Func, SCF, Linalg}
+  require Beaver.MLIR.Dialect.{Func, SCF, Linalg, Builtin}
   alias Beaver.MLIR
   alias MLIR.{Type, Attribute}
 
@@ -36,6 +36,18 @@ defmodule Beaver.Nx.Defn do
     |> Enum.map(&gen_type/1)
     |> Type.tuple()
   end
+
+  @doc """
+  In upstream MLIR, there is no lower-able Op packing multiple values into a tuple.
+  If the Nx root type is a tuple, it should be converted to repeated results.
+  This function should always return a list of types
+  """
+  defp gen_root_types(tuple) when is_tuple(tuple) do
+    Tuple.to_list(tuple)
+    |> Enum.map(&gen_type/1)
+  end
+
+  defp gen_root_types(type), do: [gen_type(type)]
 
   defp get_type_name({:s, size}), do: "i#{size}"
 
@@ -353,7 +365,7 @@ defmodule Beaver.Nx.Defn do
             Attribute.type(
               Type.function(
                 Enum.map(vars, &gen_type/1),
-                [gen_type(tree)]
+                gen_root_types(tree)
               )
             )
 

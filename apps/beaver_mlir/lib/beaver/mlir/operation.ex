@@ -25,7 +25,7 @@ defmodule Beaver.MLIR.Operation do
           Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(block, op)
         end)
 
-        :deferred
+        {:deferred, {op_name, arguments}}
       else
         raise "deferred terminator creation requires a block"
       end
