@@ -435,6 +435,10 @@ defmodule Exotic.Value do
       0 |> Exotic.Value.get() |> Exotic.Value.as_ptr()
     end
 
+    def from_list(list) when is_list(list) do
+      list |> Enum.map(&Exotic.Value.get/1) |> Exotic.Value.Array.get()
+    end
+
     # TODO: if length(values) == 0, requires a type
   end
 end

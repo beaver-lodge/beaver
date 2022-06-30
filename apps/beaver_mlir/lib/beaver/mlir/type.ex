@@ -21,8 +21,7 @@ defmodule Beaver.MLIR.Type do
       when is_list(shape) do
     rank = length(shape)
 
-    shape =
-      shape |> Enum.map(&Exotic.Value.get/1) |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
+    shape = shape |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()
 
     ranked_tensor(rank, shape, element_type, encoding)
   end
@@ -35,8 +34,7 @@ defmodule Beaver.MLIR.Type do
       when is_list(shape) do
     rank = length(shape)
 
-    shape =
-      shape |> Enum.map(&Exotic.Value.get/1) |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
+    shape = shape |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()
 
     [layout: layout, memory_space: memory_space] =
       for k <- [:layout, :memory_space] do
