@@ -1,7 +1,6 @@
 defmodule Beaver.BEAM.SSA.MLIRGen do
-  @moduledoc """
-  Generate MLIR from different elements of BEAM SSA.
-  """
+  @moduledoc false
+  # Generate MLIR from different elements of BEAM SSA.
 
   def module({:b_module, %{}, _module_name, _exports, [], functions}) do
     functions |> Enum.map(&function/1)

@@ -1,7 +1,6 @@
 defmodule Beaver.MLIR.DSL.Block do
-  @doc """
-  Transform the ast of a elixir call into a block creation and block args bindings
-  """
+  @doc false
+  # Transform the ast of a elixir call into a block creation and block args bindings
   def transform_call(call) do
     {bb_name, args} = call |> Macro.decompose_call()
     if not is_atom(bb_name), do: raise("block name must be an atom")

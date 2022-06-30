@@ -1,4 +1,4 @@
-# Exotic
+# Exotic 👽
 
 Elixir binding to libffi built on top of Rust binding to libffi, with the help of Rustler. It has these major features:
 

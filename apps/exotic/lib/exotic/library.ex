@@ -58,9 +58,7 @@ defmodule Exotic.Library do
       defmodule Managed do
         use Agent
         @outer __outer__
-        @moduledoc """
-        Managed Exotic library instance for #{@outer}
-        """
+        @moduledoc false
         def start_link(_) do
           Agent.start_link(fn -> @outer.load!() end, name: __MODULE__)
         end

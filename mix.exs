@@ -9,8 +9,8 @@ defmodule Met.MixProject do
       deps: deps(),
       # Docs
       name: "MLIR",
-      source_url: "https://github.com/USER/PROJECT",
-      homepage_url: "http://YOUR_PROJECT_HOMEPAGE",
+      source_url: "https://github.com/beaver-project/beaver",
+      homepage_url: "https://hexdocs.pm/beaver",
       docs: docs()
     ]
   end
@@ -18,8 +18,9 @@ defmodule Met.MixProject do
   defp docs() do
     [
       # The main page in the docs
-      # main: "MLIR",
-      extras: ["README.md"],
+      main: "Beaver",
+      extras: ["README.md", "apps/exotic/README.md"],
+      api_reference: false,
       groups_for_modules: [
         DSL: [
           Beaver,
@@ -56,7 +57,10 @@ defmodule Met.MixProject do
         ]
       ],
       nest_modules_by_prefix: [
-        Beaver.MLIR.Dialect
+        Beaver.MLIR.Dialect,
+        Beaver.MLIR.CAPI,
+        Beaver.MLIR,
+        Exotic
       ]
     ]
   end
