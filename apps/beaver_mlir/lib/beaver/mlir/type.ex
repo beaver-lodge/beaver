@@ -38,8 +38,11 @@ defmodule Beaver.MLIR.Type do
     shape =
       shape |> Enum.map(&Exotic.Value.get/1) |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
 
-    layout = Keyword.get(opts, :layout, Exotic.Value.Ptr.null())
-    memory_space = Keyword.get(opts, :memory_space, Exotic.Value.Ptr.null())
+    [layout: layout, memory_space: memory_space] =
+      for k <- [:layout, :memory_space] do
+        {k, Keyword.get(opts, k, Exotic.Value.Ptr.null())}
+      end
+
     CAPI.mlirMemRefTypeGet(element_type, rank, shape, layout, memory_space)
   end
 
