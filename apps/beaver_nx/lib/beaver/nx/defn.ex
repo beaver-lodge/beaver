@@ -247,10 +247,9 @@ defmodule Beaver.Nx.Defn do
     mlir do
       element_cnt = Enum.reduce(Tuple.to_list(shape), 1, &*/2)
       complex_tensor = gen_op(complex_tensor)
-      index_t = ~t{index}
-      lower = Arith.constant(value: ~a{0}index) :: index_t
-      upper = Arith.constant(value: ~a{#{element_cnt}}index) :: index_t
-      step = Arith.constant(value: ~a{1}index) :: index_t
+      lower = Arith.constant(value: ~a{0}index) :: Type.index()
+      upper = Arith.constant(value: ~a{#{element_cnt}}index) :: Type.index()
+      step = Arith.constant(value: ~a{1}index) :: Type.index()
 
       conjugate_tensor =
         Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
@@ -263,7 +262,7 @@ defmodule Beaver.Nx.Defn do
         region do
           block inner(index :: ~t{index}) do
             complex_element = Tensor.extract(complex_tensor, index) :: Type.complex(Type.f32())
-            conjugate_element = Dialect.Complex.conj(complex_element) :: ~t{f32}complex
+            conjugate_element = Dialect.Complex.conj(complex_element) :: Type.complex(Type.f32())
             MemRef.store([conjugate_element, conjugate_memref, index])
             SCF.yield(defer_if_terminator: false)
           end
