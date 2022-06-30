@@ -1,5 +1,6 @@
 #include <mlir-c/AffineExpr.h>
 #include <mlir-c/AffineMap.h>
+#include <mlir-c/Beaver/Context.h>
 #include <mlir-c/Beaver/Op.h>
 #include <mlir-c/Beaver/PDL.h>
 #include <mlir-c/Beaver/Pass.h>
