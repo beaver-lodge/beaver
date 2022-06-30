@@ -84,7 +84,7 @@ defmodule Beaver.MLIR.Operation do
     )
 
     string_ref_callback_closure
-    |> MLIR.StringRef.Callback.collect_and_destory()
+    |> MLIR.StringRef.Callback.collect_and_destroy()
   end
 
   def verify!(op, opts \\ [dump: false, dump_if_fail: false]) do

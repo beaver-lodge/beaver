@@ -3,6 +3,7 @@ defmodule Beaver.Nx.Defn do
   import Beaver, only: [mlir: 1]
   require Beaver.MLIR.Dialect.{Func, SCF, Linalg}
   alias Beaver.MLIR
+  alias MLIR.Type
 
   alias Beaver.MLIR.Dialect.{
     Builtin,
@@ -260,7 +261,7 @@ defmodule Beaver.Nx.Defn do
       SCF.for [lower, upper, step] do
         region do
           block inner(index :: ~t{index}) do
-            complex_element = Tensor.extract(complex_tensor, index) :: ~t{f32}complex
+            complex_element = Tensor.extract(complex_tensor, index) :: Type.complex(Type.f32())
             conjugate_element = Dialect.Complex.conj(complex_element) :: ~t{f32}complex
             MemRef.store([conjugate_element, conjugate_memref, index])
             SCF.yield(defer_if_terminator: false)
@@ -296,8 +297,8 @@ defmodule Beaver.Nx.Defn do
         iterator_types: ~a{[]}
       ] do
         region do
-          block bb0(arg0 :: ~t<f32>complex, arg1 :: ~t<f32>) do
-            im = Dialect.Complex.im(arg0) :: ~t{f32}
+          block bb0(arg0 :: ~t<f32>complex, arg1 :: Type.f(32)) do
+            im = Dialect.Complex.im(arg0) :: Type.f32()
             Linalg.yield([im, defer_if_terminator: false])
           end
         end

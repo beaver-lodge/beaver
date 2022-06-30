@@ -247,6 +247,14 @@ defmodule Exotic.Value do
     }
   end
 
+  def get({:u, 32}, value) when is_integer(value) do
+    %__MODULE__{
+      ref: NIF.get_u32_value(value),
+      holdings: MapSet.new(),
+      type: :u32
+    }
+  end
+
   def get(_t, %Exotic.Value{} = v) do
     v
   end

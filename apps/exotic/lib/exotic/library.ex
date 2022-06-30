@@ -21,6 +21,7 @@ defmodule Exotic.Library do
       Module.register_attribute(__MODULE__, :before_compile, accumulate: false, persist: true)
       Module.register_attribute(__MODULE__, :native_definitions, accumulate: false, persist: true)
       Module.register_attribute(__MODULE__, :include, accumulate: true)
+      Module.register_attribute(__MODULE__, :function_signature, accumulate: true, persist: true)
 
       def native_definitions() do
         __MODULE__.__info__(:attributes)
@@ -206,14 +207,16 @@ defmodule Exotic.Library do
           end
 
         funcs =
-          for f = %Exotic.CodeGen.Function{name: name, args: args} <- functions do
+          for cf = %Exotic.CodeGen.Function{name: name, args: args} <- functions do
             args =
               args
               |> Enum.map(fn {name, _type} -> {name, [line: 0], nil} end)
 
-            f = Exotic.Function.Definition.from_code_gen(f)
+            f = Exotic.Function.Definition.from_code_gen(cf)
 
             quote do
+              Module.put_attribute(__MODULE__, :function_signature, unquote(Macro.escape(cf)))
+
               def unquote(name)(unquote_splicing(args)) do
                 Exotic.call!(
                   __MODULE__,
