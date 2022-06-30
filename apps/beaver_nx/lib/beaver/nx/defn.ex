@@ -311,7 +311,7 @@ defmodule Beaver.Nx.Defn do
         iterator_types: ~a{[]}
       ] do
         region do
-          block bb0(arg0 :: ~t<f32>complex, arg1 :: Type.f(32)) do
+          block bb0(arg0 :: Type.complex(Type.f32()), arg1 :: Type.f(32)) do
             im = Dialect.Complex.im(arg0) :: Type.f32()
             Linalg.yield([im, defer_if_terminator: false])
           end
