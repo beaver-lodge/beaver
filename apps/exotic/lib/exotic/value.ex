@@ -205,6 +205,14 @@ defmodule Exotic.Value do
     }
   end
 
+  def get(t = {:i, 64}, v) when is_integer(v) do
+    %__MODULE__{
+      ref: NIF.get_i64_value(v),
+      holdings: MapSet.new(),
+      type: t
+    }
+  end
+
   @doc """
   create a closure ptr with a function type.
   If you want to use one process to handle multiple kinds of callbacks, you should use get/3 to provide a callback_id.

@@ -3,7 +3,7 @@ defmodule Beaver.Nx.Defn do
   import Beaver, only: [mlir: 1]
   require Beaver.MLIR.Dialect.{Func, SCF, Linalg}
   alias Beaver.MLIR
-  alias MLIR.Type
+  alias MLIR.{Type, Attribute}
 
   alias Beaver.MLIR.Dialect.{
     Builtin,
