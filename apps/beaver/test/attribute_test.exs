@@ -75,6 +75,25 @@ defmodule AttributeTest do
                ),
                ~a{(i32) -> (i32)}
              )
+
+      vec2xi32 = Type.vector([2], Type.i(32))
+      assert Type.to_string(vec2xi32) == "vector<2xi32>"
+      i0attr = Attribute.integer(Type.i(32), 0)
+
+      assert Attribute.equal?(
+               Attribute.dense_elements([i0attr, i0attr], vec2xi32),
+               ~a{dense<0> : vector<2xi32>}
+             )
+
+      assert Attribute.equal?(
+               Attribute.dense_elements([i0attr], vec2xi32),
+               ~a{dense<0> : vector<2xi32>}
+             )
+
+      assert Attribute.equal?(
+               MLIR.ODS.operand_segment_sizes([0, 0]),
+               ~a{dense<0> : vector<2xi32>}
+             )
     end
   end
 end

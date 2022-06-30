@@ -52,6 +52,12 @@ defmodule Beaver.MLIR.Type do
     CAPI.mlirMemRefTypeGet(element_type, rank, shape, layout, memory_space)
   end
 
+  def vector(shape, element_type) when is_list(shape) do
+    rank = length(shape)
+    shape = shape |> Exotic.Value.Array.from_list({:i, 64}) |> Exotic.Value.get_ptr()
+    vector(rank, shape, element_type)
+  end
+
   def tuple(elements) when is_list(elements) do
     num_elements = length(elements)
     elements = elements |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()

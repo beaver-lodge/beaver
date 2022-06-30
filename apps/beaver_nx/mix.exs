@@ -27,7 +27,8 @@ defmodule Beaver.Nx.MixProject do
   defp deps do
     [
       {:nx, "~> 0.2"},
-      {:beaver, in_umbrella: true}
+      {:beaver, in_umbrella: true},
+      {:beaver_mlir, in_umbrella: true}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"},
       # {:sibling_app_in_umbrella, in_umbrella: true}

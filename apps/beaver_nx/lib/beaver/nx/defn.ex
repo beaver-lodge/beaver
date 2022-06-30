@@ -3,7 +3,7 @@ defmodule Beaver.Nx.Defn do
   import Beaver, only: [mlir: 1]
   require Beaver.MLIR.Dialect.{Func, SCF, Linalg, Builtin}
   alias Beaver.MLIR
-  alias MLIR.{Type, Attribute}
+  alias MLIR.{Type, Attribute, ODS, Dialect}
 
   alias Beaver.MLIR.Dialect.{
     Builtin,
@@ -17,7 +17,6 @@ defmodule Beaver.Nx.Defn do
     Linalg
   }
 
-  alias Beaver.MLIR.Dialect
   import Builtin, only: :macros
   import MLIR, only: :macros
   import MLIR.Sigils
@@ -231,7 +230,7 @@ defmodule Beaver.Nx.Defn do
       conjugate_element = Dialect.Complex.conj(complex_element) :: Type.complex(Type.f32())
 
       conjugate_tensor =
-        Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
+        Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) ::
         gen_type(t)
 
       Tensor.insert(conjugate_element, conjugate_tensor) ::
@@ -252,7 +251,7 @@ defmodule Beaver.Nx.Defn do
       real = Tensor.extract(real_tensor) :: Type.f32()
 
       conjugate_tensor =
-        Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
+        Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) ::
         gen_type(t)
 
       imaginary = Arith.constant(value: Attribute.float(Type.f32(), 0.0)) :: Type.f32()
@@ -279,7 +278,7 @@ defmodule Beaver.Nx.Defn do
       step = Arith.constant(value: Attribute.integer(Type.index(), 1)) :: Type.index()
 
       conjugate_tensor =
-        Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
+        Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) ::
         gen_type(t)
 
       conjugate_memref = Bufferization.to_memref(conjugate_tensor) ::
@@ -287,7 +286,7 @@ defmodule Beaver.Nx.Defn do
 
       SCF.for [lower, upper, step] do
         region do
-          block inner(index :: ~t{index}) do
+          block inner(index :: Type.index()) do
             complex_element = Tensor.extract(complex_tensor, index) :: Type.complex(Type.f32())
             conjugate_element = Dialect.Complex.conj(complex_element) :: Type.complex(Type.f32())
             MemRef.store([conjugate_element, conjugate_memref, index])
@@ -312,13 +311,14 @@ defmodule Beaver.Nx.Defn do
     mlir do
       in_tensor = gen_op(in_tensor)
 
-      out_tensor = Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
+      out_tensor =
+        Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) ::
         gen_type(t)
 
       Linalg.generic [
         in_tensor,
         out_tensor,
-        operand_segment_sizes: ~a{dense<1> : vector<2xi32>},
+        operand_segment_sizes: ODS.operand_segment_sizes([1, 1]),
         indexing_maps: ~a{[affine_map<() -> ()>, affine_map<() -> ()>]},
         iterator_types: ~a{[]}
       ] do

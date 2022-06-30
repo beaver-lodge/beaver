@@ -38,6 +38,12 @@ defmodule Beaver.MLIR.Attribute do
     CAPI.mlirFloatAttrDoubleGet(ctx, type, value)
   end
 
+  def dense_elements(elements, shaped_type) when is_list(elements) do
+    num_elements = length(elements)
+    elements = elements |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()
+    dense_elements(shaped_type, num_elements, elements)
+  end
+
   for {:function_signature,
        [
          f = %Exotic.CodeGen.Function{
