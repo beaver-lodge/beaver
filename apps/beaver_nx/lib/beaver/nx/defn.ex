@@ -22,6 +22,21 @@ defmodule Beaver.Nx.Defn do
   import MLIR, only: :macros
   import MLIR.Sigils
 
+  defp gen_type({:s, size}), do: Type.i(size)
+  defp gen_type({:f, size}), do: Type.f(size)
+  defp gen_type({:c, size}), do: Type.complex(Type.f(div(size, 2)))
+
+  defp gen_type(%Nx.Tensor{shape: shape, type: type}) do
+    Tuple.to_list(shape)
+    |> Type.ranked_tensor(gen_type(type))
+  end
+
+  defp gen_type(tuple) when is_tuple(tuple) do
+    Tuple.to_list(tuple)
+    |> Enum.map(&gen_type/1)
+    |> Type.tuple()
+  end
+
   defp get_type_name({:s, size}), do: "i#{size}"
 
   defp get_type_name({:f, size}), do: "f#{size}"

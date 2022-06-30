@@ -44,6 +44,16 @@ defmodule Beaver.MLIR.Type do
     CAPI.mlirMemRefTypeGet(element_type, rank, shape, layout, memory_space)
   end
 
+  def tuple(elements) when is_list(elements) do
+    num_elements = length(elements)
+    tuple(num_elements, elements, [])
+  end
+
+  def tuple(elements, opts) when is_list(elements) do
+    num_elements = length(elements)
+    tuple(num_elements, elements, opts)
+  end
+
   for {:function_signature,
        [
          f = %Exotic.CodeGen.Function{
@@ -106,6 +116,8 @@ defmodule Beaver.MLIR.Type do
   def f(bitwidth, opts \\ []) when is_integer(bitwidth) do
     apply(__MODULE__, String.to_atom("f#{bitwidth}"), [opts])
   end
+
+  defdelegate i(bitwidth, opts \\ []), to: __MODULE__, as: :integer
 
   def to_string(type) do
     MLIR.StringRef.to_string(type, CAPI, :mlirTypePrint)
