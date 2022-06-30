@@ -23,5 +23,9 @@ defmodule TypeTest do
              "tensor<*xcomplex<f32>>"
 
     assert Type.equal?(Type.unranked_tensor(Type.f32()), ~t{tensor<*xf32>})
+
+    assert Type.ranked_tensor([], Type.f32())
+           |> Type.to_string() ==
+             "tensor<f32>"
   end
 end
