@@ -243,7 +243,7 @@ defmodule Beaver.Nx.Defn do
         Bufferization.alloc_tensor(operand_segment_sizes: ~a{dense<0> : vector<2xi32>}) ::
         gen_type(t)
 
-      imaginary = Arith.constant(value: ~a{0.0}f32) :: Type.f32()
+      imaginary = Arith.constant(value: Attribute.float(Type.f32(), 0.0)) :: Type.f32()
 
       complex_element_t = ~t{#{get_type_name(complex_type)}}
       complex_element = Dialect.Complex.create(real, imaginary) :: complex_element_t

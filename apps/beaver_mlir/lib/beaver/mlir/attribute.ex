@@ -33,6 +33,11 @@ defmodule Beaver.MLIR.Attribute do
     MLIR.StringRef.to_string(attr, CAPI, :mlirAttributePrint)
   end
 
+  def float(type, value, opts \\ []) do
+    ctx = MLIR.Managed.Context.from_opts(opts)
+    CAPI.mlirFloatAttrDoubleGet(ctx, type, value)
+  end
+
   for {:function_signature,
        [
          f = %Exotic.CodeGen.Function{

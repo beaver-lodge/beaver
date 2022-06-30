@@ -213,6 +213,14 @@ defmodule Exotic.Value do
     }
   end
 
+  def get(t = {:f, 64}, v) when is_float(v) do
+    %__MODULE__{
+      ref: NIF.get_f64_value(v),
+      holdings: MapSet.new(),
+      type: t
+    }
+  end
+
   @doc """
   create a closure ptr with a function type.
   If you want to use one process to handle multiple kinds of callbacks, you should use get/3 to provide a callback_id.
