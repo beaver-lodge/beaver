@@ -135,6 +135,14 @@ defmodule Beaver.MLIR.Type do
 
   defdelegate i(bitwidth, opts \\ []), to: __MODULE__, as: :integer
 
+  for bitwidth <- [1, 8, 16, 32, 64, 128] do
+    i_name = "i#{bitwidth}" |> String.to_atom()
+
+    def unquote(i_name)() do
+      apply(__MODULE__, :i, [unquote(bitwidth)])
+    end
+  end
+
   def to_string(type) do
     MLIR.StringRef.to_string(type, CAPI, :mlirTypePrint)
   end
