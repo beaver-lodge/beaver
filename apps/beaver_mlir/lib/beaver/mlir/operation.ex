@@ -15,6 +15,10 @@ defmodule Beaver.MLIR.Operation do
   @doc """
   Create a new operation from arguments and insert to managed insertion point
   """
+  def create(op_name, %Beaver.DSL.SSA{arguments: arguments, results: results}) do
+    create(op_name, arguments ++ [result_types: results])
+  end
+
   def create(op_name, arguments) do
     defer_if_terminator = Keyword.get(arguments, :defer_if_terminator, true)
 

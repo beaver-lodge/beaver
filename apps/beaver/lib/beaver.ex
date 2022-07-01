@@ -12,9 +12,9 @@ defmodule Beaver do
   end
   # will be transform to:
   [res0, res1] =
-    %MLIR.SSA{}
-    |> MLIR.SSA.arguments([operand0, operand1, attr0: ~a{11 : i32}, attr1: ~a{11 : i32}])
-    |> MLIR.SSA.results([~t{f32}])
+    %DSL.SSA{}
+    |> DSL.SSA.arguments([operand0, operand1, attr0: ~a{11 : i32}, attr1: ~a{11 : i32}])
+    |> DSL.SSA.results([~t{f32}])
     |> TestDialect.some_op()
   ```
   If there is no returns, add a `[]` to make the transformation effective:
@@ -36,7 +36,7 @@ defmodule Beaver do
   end :: ~t{f32}
   """
   defmacro mlir(do: block) do
-    new_block_ast = Beaver.DSL.transform_ssa(block)
+    new_block_ast = Beaver.DSL.transform_ssa(block) |> Beaver.DSL.SSA.transform()
 
     quote do
       unquote(new_block_ast)
@@ -59,5 +59,11 @@ defmodule Beaver do
     quote do
       unquote(new_block_ast)
     end
+  end
+
+  def _call >>> _results do
+    raise(
+      "`>>>` operator is expected to be transformed away. Maybe you forget to put the expression inside the Beaver.mlir/1 macro's do block?"
+    )
   end
 end

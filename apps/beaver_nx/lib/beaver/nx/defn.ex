@@ -1,6 +1,6 @@
 defmodule Beaver.Nx.Defn do
   require Beaver
-  import Beaver, only: [mlir: 1]
+  import Beaver
   require Beaver.MLIR.Dialect.{Func, SCF, Linalg, Builtin}
   alias Beaver.MLIR
   alias MLIR.{Type, Attribute, ODS, Dialect}
@@ -312,8 +312,8 @@ defmodule Beaver.Nx.Defn do
       in_tensor = gen_op(in_tensor)
 
       out_tensor =
-        Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) ::
-        gen_type(t)
+        Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) >>>
+          gen_type(t)
 
       Linalg.generic [
         in_tensor,
