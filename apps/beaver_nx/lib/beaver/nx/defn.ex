@@ -124,8 +124,8 @@ defmodule Beaver.Nx.Defn do
          } = t
        ) do
     mlir do
-      TOSA.const({:value, ~a{dense<0xFF800000> : tensor<f32>}}) ::
-        ~t{#{gen_type_str(t)}}
+      _r = TOSA.const({:value, ~a{dense<0xFF800000> : tensor<f32>}}) ::
+        gen_type(t)
     end
   end
 
@@ -138,8 +138,8 @@ defmodule Beaver.Nx.Defn do
        )
        when is_integer(value) or is_float(value) do
     mlir do
-      TOSA.const({:value, ~a{dense<#{value}> : tensor<#{get_type_name(type)}>}}) ::
-        ~t{#{gen_type_str(t)}}
+      _r = TOSA.const({:value, ~a{dense<#{value}> : tensor<#{get_type_name(type)}>}}) ::
+        gen_type(t)
     end
   end
 
@@ -168,14 +168,14 @@ defmodule Beaver.Nx.Defn do
 
       tensor_attr =
         MLIR.CAPI.mlirDenseElementsAttrRawBufferGet(
-          ~t{#{gen_type_str(t)}},
+          gen_type(t),
           Exotic.Value.get(:isize, byte_size(binary)),
           Exotic.Value.get_ptr(raw_buffer)
         )
 
       if MLIR.Attribute.is_null(tensor_attr), do: raise("fail to parse tensor dense elements")
 
-      TOSA.const({:value, tensor_attr}) :: ~t{#{gen_type_str(t)}}
+      _r = TOSA.const({:value, tensor_attr}) :: gen_type(t)
     end
   end
 
@@ -187,7 +187,7 @@ defmodule Beaver.Nx.Defn do
   defp gen_op(%Nx.Tensor{data: %Nx.Defn.Expr{op: :negate, args: [input1]}} = t) do
     mlir do
       input1 = gen_op(input1)
-      TOSA.negate(input1) :: ~t{#{gen_type_str(t)}}
+      _ = TOSA.negate(input1) :: gen_type(t)
     end
   end
 
@@ -203,7 +203,7 @@ defmodule Beaver.Nx.Defn do
     mlir do
       a = gen_op(a)
       b = gen_op(b)
-      TOSA.add(a, b) :: ~t{#{gen_type_str(t)}}
+      _ = TOSA.add(a, b) :: gen_type(t)
     end
   end
 
@@ -211,7 +211,7 @@ defmodule Beaver.Nx.Defn do
     mlir do
       a = gen_op(a)
       b = gen_op(b)
-      TOSA.sub(a, b) :: ~t{#{gen_type_str(t)}}
+      _ = TOSA.sub(a, b) :: gen_type(t)
     end
   end
 
@@ -233,8 +233,8 @@ defmodule Beaver.Nx.Defn do
         Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) ::
         gen_type(t)
 
-      Tensor.insert(conjugate_element, conjugate_tensor) ::
-        ~t{#{gen_type_str(t)}}
+      _ = Tensor.insert(conjugate_element, conjugate_tensor) ::
+        gen_type(t)
     end
   end
 
@@ -260,7 +260,7 @@ defmodule Beaver.Nx.Defn do
       complex_element = Dialect.Complex.create(real, imaginary) :: complex_element_t
       conjugate_element = Dialect.Complex.conj(complex_element) :: complex_element_t
 
-      Tensor.insert(conjugate_element, conjugate_tensor) :: ~t{#{gen_type_str(t)}}
+      _ = Tensor.insert(conjugate_element, conjugate_tensor) :: gen_type(t)
     end
   end
 
@@ -372,12 +372,11 @@ defmodule Beaver.Nx.Defn do
           Func.func beaver_nx_main(
                       sym_name: "\"#{symbol}\"",
                       function_type: function_type
-                      # ~a"#{gen_type_str(List.to_tuple(vars))} -> #{gen_type_str(tree)}"
                     ) do
             region do
               block =
                 for arg <- vars do
-                  {~t{#{gen_type_str(arg)}}, MLIR.Managed.Location.get()}
+                  {gen_type(arg), MLIR.Managed.Location.get()}
                 end
                 |> MLIR.Block.create()
 
