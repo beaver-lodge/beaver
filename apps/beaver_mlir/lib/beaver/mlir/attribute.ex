@@ -44,6 +44,24 @@ defmodule Beaver.MLIR.Attribute do
     dense_elements(shaped_type, num_elements, elements)
   end
 
+  def array(elements) when is_list(elements) do
+    array(elements, [])
+  end
+
+  def array(elements, opts) when is_list(elements) do
+    num_elements = length(elements)
+    elements = elements |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()
+    array(num_elements, elements, opts)
+  end
+
+  def string(str) when is_binary(str) do
+    string(MLIR.StringRef.create(str), [])
+  end
+
+  def string(str, opts) when is_binary(str) do
+    string(MLIR.StringRef.create(str), opts)
+  end
+
   for {:function_signature,
        [
          f = %Exotic.CodeGen.Function{

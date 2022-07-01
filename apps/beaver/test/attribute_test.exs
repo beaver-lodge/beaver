@@ -100,5 +100,15 @@ defmodule AttributeTest do
                ~a{dense<[1, 0]> : vector<2xi32>}
              )
     end
+
+    test "iterator_types" do
+      parallel = Attribute.string("parallel")
+      parallel2 = Attribute.array([parallel, parallel])
+
+      assert Attribute.equal?(
+               parallel2,
+               ~a{["parallel", "parallel"]}
+             )
+    end
   end
 end
