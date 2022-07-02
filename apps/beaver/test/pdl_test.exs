@@ -89,9 +89,8 @@ defmodule PDLTest do
       alias Beaver.MLIR
       use MLIR.Pattern
 
-      pattern replace_test_op(t = %TOSA.Add{a, b}) do
+      pattern replace_add_op(t = %TOSA.Add{a, b}) do
         %TOSA.Sub{a, b}
-        erase(t)
       end
     end
 

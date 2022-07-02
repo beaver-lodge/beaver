@@ -29,15 +29,15 @@ defmodule Beaver.MLIR.Pattern do
           PDL.pattern benefit: Attribute.integer(Type.i16(), 1) do
             region do
               block some_pattern() do
-                # t = PDL.type(type: Attribute.type(Type.i32())) >>> ~t{!pdl.type}
+                t = PDL.type() >>> ~t{!pdl.type}
                 a = PDL.operand() >>> ~t{!pdl.value}
                 b = PDL.operand() >>> ~t{!pdl.value}
 
                 root =
-                  PDL.operation(a, b,
+                  PDL.operation(a, b, t,
                     name: Attribute.string("tosa.add"),
                     attributeNames: Attribute.array([]),
-                    operand_segment_sizes: ODS.operand_segment_sizes([2, 0, 0])
+                    operand_segment_sizes: ODS.operand_segment_sizes([2, 0, 1])
                   ) >>> ~t{!pdl.operation}
 
                 PDL.rewrite [
@@ -60,7 +60,7 @@ defmodule Beaver.MLIR.Pattern do
                         operand_segment_sizes: ODS.operand_segment_sizes([1, 1, 0])
                       ]) >>> []
 
-                      PDL.erase(root) >>> []
+                      # PDL.erase(root) >>> []
                     end
                   end
                 end
