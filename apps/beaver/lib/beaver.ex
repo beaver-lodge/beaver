@@ -8,7 +8,7 @@ defmodule Beaver do
   This transformation will works on any expression of this form, so it is also possible to call any other function/macro rather than an Op creation function.
   ```
   mlir do
-    [res0, res1] = TestDialect.some_op(operand0, operand1, attr0: ~a{11 : i32}) :: ~t{f32}
+    [res0, res1] = TestDialect.some_op(operand0, operand1, attr0: ~a{11 : i32}) >>> ~t{f32}
   end
   # will be transform to:
   [res0, res1] =
@@ -19,7 +19,7 @@ defmodule Beaver do
   ```
   If there is no returns, add a `[]` to make the transformation effective:
   ```
-  TestDialect.some_op(operand0) :: []
+  TestDialect.some_op(operand0) >>> []
   ```
   By default, the creation of a terminator will be deferred in case its successor block has not been created. To force the creation of the terminator, add the `!` suffix:
   ```
@@ -29,34 +29,47 @@ defmodule Beaver do
   ```
   TestDialect.op_with_region [operand0, attr0: ~a{1}i32] do
     region do
-      block(arg :: ~t{f32}) do
-        TestDialect.some_op(arg) :: ~t{f32}
+      block(arg >>> ~t{f32}) do
+        TestDialect.some_op(arg) >>> ~t{f32}
       end
     end
-  end :: ~t{f32}
+  end >>> ~t{f32}
   """
-  defmacro mlir(do: block) do
-    new_block_ast = Beaver.DSL.transform_ssa(block) |> Beaver.DSL.SSA.transform()
-
+  defmacro __using__(_) do
     quote do
-      unquote(new_block_ast)
+      import Beaver
+      alias Beaver.MLIR
     end
   end
 
-  @doc false
-  defmacro mlir_debug(do: block) do
-    new_block_ast = Beaver.DSL.transform_ssa(block)
+  defmacro mlir(do: block) do
+    new_block_ast = block |> Beaver.DSL.SSA.transform()
 
-    env = __CALLER__
-    new_block_ast |> Macro.to_string() |> IO.puts()
+    alias Beaver.MLIR.Dialect
 
-    block
-    |> Macro.expand(env)
-    # |> Macro.prewalk(&Macro.expand(&1, env))
-    |> Macro.to_string()
-    |> IO.puts()
+    alias_dialects =
+      for d <-
+            Dialect.Registry.dialects() do
+        module_name = d |> Dialect.Registry.normalize_dialect_name()
+        module_name = Module.concat([Beaver.MLIR.Dialect, module_name])
+
+        quote do
+          alias unquote(module_name)
+          require unquote(module_name)
+        end
+      end
+      |> List.flatten()
 
     quote do
+      alias Beaver.MLIR
+      import Beaver.MLIR
+      alias Beaver.MLIR.Type
+      alias Beaver.MLIR.Attribute
+      import Beaver.MLIR.Sigils
+      unquote(alias_dialects)
+      import Builtin
+      import CF
+
       unquote(new_block_ast)
     end
   end

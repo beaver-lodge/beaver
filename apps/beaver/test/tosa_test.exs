@@ -8,6 +8,7 @@ defmodule TosaTest do
     require Beaver.MLIR.Dialect.Func
     alias Beaver.MLIR
     alias Beaver.MLIR.Dialect.{Builtin, Func, TOSA}
+    alias Beaver.MLIR.{Type, Attribute}
     import Builtin, only: :macros
     import MLIR, only: :macros
     import MLIR.Sigils
@@ -17,14 +18,20 @@ defmodule TosaTest do
     ir =
       Beaver.mlir do
         module do
-          Func.func test_multi_broadcast([
-                      {:function_type, ~a"(tensor<1x3xf32>, tensor<2x1xf32>) -> tensor<2x3xf32>"},
-                      {:"llvm.emit_c_interface", MLIR.Attribute.unit()}
-                    ]) do
+          Func.func test_multi_broadcast(
+                      function_type: ~a"(tensor<1x3xf32>, tensor<2x1xf32>) -> tensor<2x3xf32>"
+                    ) do
             region do
-              block entry(arg0 :: ~t{tensor<1x3xf32>}, arg1 :: ~t{tensor<2x1xf32>}) do
-                v0 = TOSA.add(arg0, arg1) :: ~t{tensor<2x3xf32>}
-                v0 = TOSA.mul(v0, arg1, {:shift, ~a{0 : i32}}) :: ~t{tensor<2x3xf32>}
+              block entry(
+                      arg0 :: Type.ranked_tensor([1, 3], Type.f32()),
+                      arg1 :: Type.ranked_tensor([2, 1], Type.f32())
+                    ) do
+                v0 = TOSA.add(arg0, arg1) >>> Type.ranked_tensor([2, 3], Type.f32())
+
+                v0 =
+                  TOSA.mul(v0, arg1, {:shift, ~a{0 : i32}}) >>>
+                    Type.ranked_tensor([2, 3], Type.f32())
+
                 Func.return(v0)
               end
             end
@@ -53,6 +60,9 @@ defmodule TosaTest do
         MLIR.Pass.pipeline!(pm, "tensor-bufferize")
       end)
       |> MLIR.Pass.Composer.pipeline("func-bufferize")
+      |> MLIR.Pass.Composer.nested("func.func", fn pm ->
+        MLIR.Pass.pipeline!(pm, "llvm-request-c-wrappers")
+      end)
       |> convert_vector_to_llvm
       |> convert_memref_to_llvm
       |> convert_func_to_llvm

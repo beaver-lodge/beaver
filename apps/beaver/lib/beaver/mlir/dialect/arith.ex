@@ -27,8 +27,8 @@ defmodule Beaver.MLIR.Dialect.Arith do
     |> MLIR.Operation.results()
   end
 
-  # def addi(arguments) do
-  #   MLIR.Operation.create("arith.addi", arguments)
-  #   |> MLIR.Operation.results()
-  # end
+  def constant(%Beaver.DSL.SSA{} = arguments) do
+    MLIR.Operation.create("arith.constant", arguments)
+    |> MLIR.Operation.results()
+  end
 end

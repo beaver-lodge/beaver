@@ -1,6 +1,6 @@
 defmodule Beaver.DSL.SSA do
   alias Beaver.MLIR
-  defstruct arguments: [], results: []
+  defstruct arguments: [], results: [], filler: nil
 
   def put_arguments(%__MODULE__{arguments: arguments} = ssa, additional_arguments)
       when is_list(additional_arguments) do
@@ -16,28 +16,64 @@ defmodule Beaver.DSL.SSA do
     %__MODULE__{ssa | results: results ++ additional_results}
   end
 
+  def put_filler(%__MODULE__{} = ssa, filler) when is_function(filler) do
+    %__MODULE__{ssa | filler: filler}
+  end
+
   defp do_transform(
-         {:>>>, [line: 315],
+         {:>>>, _line,
           [
-            {call, line, args},
+            {call, line, [args, [do: ast_block]]},
             results
-          ]} = ast
+          ]}
        ) do
-    empty_call = {call, line, []}
+    empty_call = {call, line, [[do: ast_block]]}
 
     ast =
       quote do
+        args = List.flatten([unquote_splicing(args)])
+
         %Beaver.DSL.SSA{}
-        |> Beaver.DSL.SSA.put_arguments(unquote_splicing(args))
+        |> Beaver.DSL.SSA.put_arguments(args)
         |> Beaver.DSL.SSA.put_results(unquote(results))
+        |> Beaver.DSL.SSA.put_filler(fn -> unquote(ast_block) end)
         |> unquote(empty_call)
       end
 
+    Macro.to_string(ast) |> IO.puts()
     ast
-    |> Macro.to_string()
-    |> IO.puts()
+  end
 
-    ast
+  defp do_transform(
+         {:>>>, _line,
+          [
+            {call, line, args},
+            results
+          ]}
+       ) do
+    empty_call = {call, line, []}
+
+    quote do
+      args = List.flatten([unquote_splicing(args)])
+
+      %Beaver.DSL.SSA{}
+      |> Beaver.DSL.SSA.put_arguments(args)
+      |> Beaver.DSL.SSA.put_results(unquote(results))
+      |> unquote(empty_call)
+    end
+  end
+
+  # block arguments
+  defp do_transform(
+         {:"::", _,
+          [
+            var = {_var_name, _, nil},
+            type
+          ]}
+       ) do
+    quote do
+      {unquote(var), unquote(type)}
+    end
   end
 
   defp do_transform(ast), do: ast

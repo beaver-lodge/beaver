@@ -99,7 +99,7 @@ defmodule Beaver.Nx.Defn do
          } = t
        ) do
     mlir do
-      TOSA.const({:value, ~a{dense<0x7F800001> : tensor<f32>}}) :: ~t{#{gen_type_str(t)}}
+      TOSA.const({:value, ~a{dense<0x7F800001> : tensor<f32>}}) >>> gen_type(t)
     end
   end
 
@@ -111,7 +111,7 @@ defmodule Beaver.Nx.Defn do
          } = t
        ) do
     mlir do
-      TOSA.const({:value, ~a{dense<0x7F800000> : tensor<f32>}}) ::
+      TOSA.const({:value, ~a{dense<0x7F800000> : tensor<f32>}}) >>>
         ~t{#{gen_type_str(t)}}
     end
   end
@@ -124,8 +124,9 @@ defmodule Beaver.Nx.Defn do
          } = t
        ) do
     mlir do
-      _r = TOSA.const({:value, ~a{dense<0xFF800000> : tensor<f32>}}) ::
-        gen_type(t)
+      _r =
+        TOSA.const({:value, ~a{dense<0xFF800000> : tensor<f32>}}) >>>
+          gen_type(t)
     end
   end
 
@@ -138,8 +139,9 @@ defmodule Beaver.Nx.Defn do
        )
        when is_integer(value) or is_float(value) do
     mlir do
-      _r = TOSA.const({:value, ~a{dense<#{value}> : tensor<#{get_type_name(type)}>}}) ::
-        gen_type(t)
+      _r =
+        TOSA.const({:value, ~a{dense<#{value}> : tensor<#{get_type_name(type)}>}}) >>>
+          gen_type(t)
     end
   end
 
@@ -150,7 +152,7 @@ defmodule Beaver.Nx.Defn do
          } = t
        ) do
     mlir do
-      Arith.constant({:value, ~a[dense<(#{re}, #{im})> : #{gen_type_str(t)}]}) ::
+      Arith.constant({:value, ~a[dense<(#{re}, #{im})> : #{gen_type_str(t)}]}) >>>
         ~t{#{gen_type_str(t)}}
     end
   end
@@ -175,7 +177,7 @@ defmodule Beaver.Nx.Defn do
 
       if MLIR.Attribute.is_null(tensor_attr), do: raise("fail to parse tensor dense elements")
 
-      _r = TOSA.const({:value, tensor_attr}) :: gen_type(t)
+      TOSA.const({:value, tensor_attr}) >>> gen_type(t)
     end
   end
 
@@ -187,7 +189,7 @@ defmodule Beaver.Nx.Defn do
   defp gen_op(%Nx.Tensor{data: %Nx.Defn.Expr{op: :negate, args: [input1]}} = t) do
     mlir do
       input1 = gen_op(input1)
-      _ = TOSA.negate(input1) :: gen_type(t)
+      TOSA.negate(input1) >>> gen_type(t)
     end
   end
 
@@ -195,7 +197,7 @@ defmodule Beaver.Nx.Defn do
     mlir do
       a = gen_op(a)
       b = gen_op(b)
-      TOSA.mul(a, b, shift: Attribute.integer(Type.i(32), 0)) :: ~t{#{gen_type_str(t)}}
+      TOSA.mul(a, b, shift: Attribute.integer(Type.i(32), 0)) >>> gen_type(t)
     end
   end
 
@@ -203,7 +205,7 @@ defmodule Beaver.Nx.Defn do
     mlir do
       a = gen_op(a)
       b = gen_op(b)
-      _ = TOSA.add(a, b) :: gen_type(t)
+      TOSA.add(a, b) >>> gen_type(t)
     end
   end
 
@@ -211,7 +213,7 @@ defmodule Beaver.Nx.Defn do
     mlir do
       a = gen_op(a)
       b = gen_op(b)
-      _ = TOSA.sub(a, b) :: gen_type(t)
+      TOSA.sub(a, b) >>> gen_type(t)
     end
   end
 
@@ -226,14 +228,14 @@ defmodule Beaver.Nx.Defn do
        ) do
     mlir do
       complex_tensor = gen_op(complex_tensor)
-      complex_element = Tensor.extract(complex_tensor) :: Type.complex(Type.f32())
-      conjugate_element = Dialect.Complex.conj(complex_element) :: Type.complex(Type.f32())
+      complex_element = Tensor.extract(complex_tensor) >>> Type.complex(Type.f32())
+      conjugate_element = Dialect.Complex.conj(complex_element) >>> Type.complex(Type.f32())
 
       conjugate_tensor =
-        Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) ::
-        gen_type(t)
+        Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) >>>
+          gen_type(t)
 
-      _ = Tensor.insert(conjugate_element, conjugate_tensor) ::
+      Tensor.insert(conjugate_element, conjugate_tensor) >>>
         gen_type(t)
     end
   end
@@ -247,20 +249,20 @@ defmodule Beaver.Nx.Defn do
        ) do
     mlir do
       real_tensor = gen_op(real_tensor)
-      real_tensor = TOSA.cast(real_tensor) :: Type.ranked_tensor([], Type.f32())
-      real = Tensor.extract(real_tensor) :: Type.f32()
+      real_tensor = TOSA.cast(real_tensor) >>> Type.ranked_tensor([], Type.f32())
+      real = Tensor.extract(real_tensor) >>> Type.f32()
 
       conjugate_tensor =
-        Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) ::
-        gen_type(t)
+        Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) >>>
+          gen_type(t)
 
-      imaginary = Arith.constant(value: Attribute.float(Type.f32(), 0.0)) :: Type.f32()
+      imaginary = Arith.constant(value: Attribute.float(Type.f32(), 0.0)) >>> Type.f32()
 
       complex_element_t = gen_type(complex_type)
-      complex_element = Dialect.Complex.create(real, imaginary) :: complex_element_t
-      conjugate_element = Dialect.Complex.conj(complex_element) :: complex_element_t
+      complex_element = Dialect.Complex.create(real, imaginary) >>> complex_element_t
+      conjugate_element = Dialect.Complex.conj(complex_element) >>> complex_element_t
 
-      _ = Tensor.insert(conjugate_element, conjugate_tensor) :: gen_type(t)
+      _ = Tensor.insert(conjugate_element, conjugate_tensor) >>> gen_type(t)
     end
   end
 
@@ -273,22 +275,23 @@ defmodule Beaver.Nx.Defn do
     mlir do
       element_cnt = Enum.reduce(Tuple.to_list(shape), 1, &*/2)
       complex_tensor = gen_op(complex_tensor)
-      lower = Arith.constant(value: Attribute.integer(Type.index(), 0)) :: Type.index()
-      upper = Arith.constant(value: Attribute.integer(Type.index(), element_cnt)) :: Type.index()
-      step = Arith.constant(value: Attribute.integer(Type.index(), 1)) :: Type.index()
+      lower = Arith.constant(value: Attribute.integer(Type.index(), 0)) >>> Type.index()
+      upper = Arith.constant(value: Attribute.integer(Type.index(), element_cnt)) >>> Type.index()
+      step = Arith.constant(value: Attribute.integer(Type.index(), 1)) >>> Type.index()
 
       conjugate_tensor =
-        Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) ::
-        gen_type(t)
+        Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) >>>
+          gen_type(t)
 
-      conjugate_memref = Bufferization.to_memref(conjugate_tensor) ::
-        Type.memref([2], Type.complex(Type.f32()))
+      conjugate_memref =
+        Bufferization.to_memref(conjugate_tensor) >>>
+          Type.memref([2], Type.complex(Type.f32()))
 
       SCF.for [lower, upper, step] do
         region do
           block inner(index :: Type.index()) do
-            complex_element = Tensor.extract(complex_tensor, index) :: Type.complex(Type.f32())
-            conjugate_element = Dialect.Complex.conj(complex_element) :: Type.complex(Type.f32())
+            complex_element = Tensor.extract(complex_tensor, index) >>> Type.complex(Type.f32())
+            conjugate_element = Dialect.Complex.conj(complex_element) >>> Type.complex(Type.f32())
             MemRef.store([conjugate_element, conjugate_memref, index])
             SCF.yield(defer_if_terminator: false)
           end
@@ -324,11 +327,11 @@ defmodule Beaver.Nx.Defn do
       ] do
         region do
           block bb0(arg0 :: Type.complex(Type.f32()), arg1 :: Type.f(32)) do
-            im = Dialect.Complex.im(arg0) :: Type.f32()
+            im = Dialect.Complex.im(arg0) >>> Type.f32()
             Linalg.yield([im, defer_if_terminator: false])
           end
         end
-      end :: ~t{#{gen_type_str(t)}}
+      end >>> gen_type(t)
     end
   end
 
