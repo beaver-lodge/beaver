@@ -59,8 +59,6 @@ defmodule Beaver.MLIR.Pattern do
                         repl,
                         operand_segment_sizes: ODS.operand_segment_sizes([1, 1, 0])
                       ]) >>> []
-
-                      # PDL.erase(root) >>> []
                     end
                   end
                 end
