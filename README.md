@@ -41,19 +41,27 @@ end
 |> MLIR.Operation.verify!()
 ```
 
-And a small example to showcase what it is like to define and run passes in Beaver:
+And a small example to showcase what it is like to define a pass in Beaver:
 
 ```elixir
 defmodule ToyPass do
-  use Beaver.Pass
+  use Beaver
 
   pattern replace_test_op(t = %test.op{}) do
     erase(t)
     create(%test.success{})
   end
 
+  pattern replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
+    %TOSA.Sub{operands: [a, b]}
+  end
+
   def run(module) do
-    module |> MLIR.Module.walk(patterns: [replace_test_op])
+    pattern_set =
+      MLIR.PatternSet.get()
+      |> MLIR.PatternSet.insert(replace_add_op())
+
+    MLIR.PatternSet.apply!(module, pattern_set)
   end
 end
 

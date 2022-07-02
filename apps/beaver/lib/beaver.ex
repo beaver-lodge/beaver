@@ -108,8 +108,6 @@ defmodule Beaver do
         |> Beaver.MLIR.Operation.verify!(dump_if_fail: true)
       end
 
-    pdl_pattern_op |> Macro.to_string() |> IO.puts()
-
     quote do
       Module.register_attribute(__MODULE__, :compiled_pattern, accumulate: true, persist: true)
 

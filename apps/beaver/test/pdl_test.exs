@@ -93,8 +93,6 @@ defmodule PDLTest do
       end
     end
 
-    ctx = MLIR.Context.create(allow_unregistered: true)
-
     ir_module =
       mlir do
         module do

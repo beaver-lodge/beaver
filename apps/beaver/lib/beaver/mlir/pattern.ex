@@ -14,7 +14,7 @@ defmodule Beaver.MLIR.Pattern do
     apply(module, :__info__, [:attributes])[:compiled_pattern]
   end
 
-  def from_string(ctx, pdl_pattern_str) when is_binary(pdl_pattern_str) do
+  def from_string(pdl_pattern_str) when is_binary(pdl_pattern_str) do
     pattern_module = ~m{#{pdl_pattern_str}}
     if MLIR.Module.is_null(pattern_module), do: raise("fail to parse module")
     MLIR.Operation.verify!(pattern_module)

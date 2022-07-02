@@ -21,5 +21,6 @@ defmodule Beaver.MLIR.PatternSet do
     region = CAPI.mlirOperationGetFirstRegion(module)
     result = CAPI.beaverApplyOwnedPatternSet(region, pattern_set)
     if not MLIR.LogicalResult.success?(result), do: raise("fail to apply patterns")
+    module
   end
 end

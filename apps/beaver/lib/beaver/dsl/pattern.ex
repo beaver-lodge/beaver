@@ -6,9 +6,8 @@ defmodule Beaver.DSL.Pattern do
           [
             struct_name,
             {:%{}, _, map_args}
-          ]} = ast
+          ]} = _ast
        ) do
-    IO.inspect(ast, label: "match")
     operands = map_args |> Keyword.get(:operands, [])
     results = map_args |> Keyword.get(:results, [])
     attributes = map_args |> Keyword.get(:attributes, [])
@@ -54,7 +53,6 @@ defmodule Beaver.DSL.Pattern do
     ast
   end
 
-  # defp do_transform(ast), do: ast |> IO.inspect()
   defp do_transform_match(ast), do: ast
 
   def transform_match(ast) do
@@ -66,9 +64,8 @@ defmodule Beaver.DSL.Pattern do
           [
             struct_name,
             {:%{}, _, map_args}
-          ]} = ast
+          ]} = _ast
        ) do
-    IO.inspect(ast, label: "rewrite")
     operands = map_args |> Keyword.get(:operands, [])
     results = map_args |> Keyword.get(:results, [])
     attributes = map_args |> Keyword.get(:attributes, [])
@@ -114,7 +111,6 @@ defmodule Beaver.DSL.Pattern do
     ast
   end
 
-  # defp do_transform(ast), do: ast |> IO.inspect()
   defp do_transform_rewrite(ast), do: ast
 
   def transform_rewrite(ast) do
