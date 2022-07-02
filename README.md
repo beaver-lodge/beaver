@@ -1,6 +1,6 @@
 # Beaver 🦫
 
-**Boost the almighty LLVM dragon with some magical Elixir!**
+**Boost the almighty LLVM dragon with some magical Elixir!** 🧙
 
 ## Motivation
 
