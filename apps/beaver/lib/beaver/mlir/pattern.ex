@@ -72,7 +72,7 @@ defmodule Beaver.MLIR.Pattern do
 
     pattern_string = MLIR.Operation.to_string(pdl_pattern_op) |> String.trim()
 
-    MLIR.Operation.verify!(pdl_pattern_op, dump: true)
+    MLIR.Operation.verify!(pdl_pattern_op, dump_if_fail: true)
 
     quote do
       @compiled_pattern unquote(pattern_string)
