@@ -35,10 +35,41 @@ defmodule Beaver do
     end
   end :: ~t{f32}
   """
+  defmacro __using__(_) do
+    quote do
+      import Beaver
+      alias Beaver.MLIR
+    end
+  end
+
   defmacro mlir(do: block) do
     new_block_ast = Beaver.DSL.transform_ssa(block) |> Beaver.DSL.SSA.transform()
 
+    alias Beaver.MLIR.Dialect
+
+    alias_dialects =
+      for d <-
+            Dialect.Registry.dialects() do
+        module_name = d |> Dialect.Registry.normalize_dialect_name()
+        module_name = Module.concat([Beaver.MLIR.Dialect, module_name])
+
+        quote do
+          alias unquote(module_name)
+          require unquote(module_name)
+        end
+      end
+      |> List.flatten()
+
     quote do
+      alias Beaver.MLIR
+      import Beaver.MLIR
+      alias Beaver.MLIR.Type
+      alias Beaver.MLIR.Attribute
+      import Beaver.MLIR.Sigils
+      unquote(alias_dialects)
+      import Builtin
+      import CF
+
       unquote(new_block_ast)
     end
   end

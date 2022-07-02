@@ -1,18 +1,8 @@
 defmodule CFTest do
   use ExUnit.Case
-  alias Beaver.MLIR
-  import Beaver.MLIR.Sigils
+  use Beaver
 
   test "generate mlir with function calls" do
-    require Beaver
-    import Beaver
-    require Beaver.MLIR.Dialect.Func
-    alias Beaver.MLIR
-    alias MLIR.{Type, Attribute}
-    alias Beaver.MLIR.Dialect.{Builtin, Func, Arith, CF}
-    import Builtin, only: :macros
-    import MLIR, only: :macros
-
     mlir do
       module do
         Func.func some_func(function_type: Attribute.type(Type.function([], [Type.i(32)]))) do
