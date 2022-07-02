@@ -10,9 +10,7 @@ defmodule Beaver.DSL.Pattern do
        ) do
     operands = map_args |> Keyword.get(:operands, [])
     results = map_args |> Keyword.get(:results, [])
-    attributes = map_args |> Keyword.get(:attributes, [])
-
-    arguments = operands ++ results ++ attributes
+    _attributes = map_args |> Keyword.get(:attributes, [])
 
     operands =
       for operand <- operands do
@@ -30,24 +28,15 @@ defmodule Beaver.DSL.Pattern do
 
     ast =
       quote do
-        mlir do
-          op_name = apply(unquote(struct_name), :op_name, [])
+        unquote_splicing(operands)
+        unquote_splicing(results)
 
-          unquote_splicing(operands)
-          unquote_splicing(results)
-
-          beaver_gen_root =
-            Beaver.MLIR.Dialect.PDL.operation(unquote_splicing(arguments),
-              name: Beaver.MLIR.Attribute.string(op_name),
-              attributeNames: Beaver.MLIR.Attribute.array([]),
-              operand_segment_sizes:
-                Beaver.MLIR.ODS.operand_segment_sizes([
-                  unquote(length(operands)),
-                  unquote(length(attributes)),
-                  unquote(length(results))
-                ])
-            ) >>> ~t{!pdl.operation}
-        end
+        beaver_gen_root =
+          Beaver.DSL.Op.Prototype.dispatch(
+            unquote(struct_name),
+            unquote(map_args),
+            &Beaver.DSL.Pattern.create_root/2
+          )
       end
 
     ast
@@ -80,6 +69,29 @@ defmodule Beaver.DSL.Pattern do
   end
 
   defp do_transform_rewrite(ast), do: ast
+
+  def create_root(
+        op_name,
+        %Beaver.DSL.Op.Prototype{operands: operands, attributes: attributes, results: results}
+      ) do
+    mlir do
+      arguments = operands ++ attributes ++ results
+
+      Beaver.MLIR.Dialect.PDL.operation(
+        arguments ++
+          [
+            name: Beaver.MLIR.Attribute.string(op_name),
+            attributeNames: Beaver.MLIR.Attribute.array([]),
+            operand_segment_sizes:
+              Beaver.MLIR.ODS.operand_segment_sizes([
+                length(operands),
+                length(attributes),
+                length(results)
+              ])
+          ]
+      ) >>> ~t{!pdl.operation}
+    end
+  end
 
   def create_rewrite(
         op_name,

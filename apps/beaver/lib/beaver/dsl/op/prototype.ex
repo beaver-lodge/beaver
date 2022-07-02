@@ -8,6 +8,10 @@ defmodule Beaver.DSL.Op.Prototype do
   @doc """
   Dispatch the op name and map to the callback `cb` if this is a module implement the behavior this module define.
   """
+  def dispatch(module, fields, cb) when is_function(cb, 2) do
+    dispatch(module, fields, :placeholder, fn n, p, :placeholder -> cb.(n, p) end)
+  end
+
   def dispatch(module, fields, extra_arg, cb) when is_function(cb, 3) do
     if __MODULE__ in (module.module_info[:attributes][:behaviour] || []) do
       cb.(module.op_name(), struct!(Beaver.DSL.Op.Prototype, fields), extra_arg)
