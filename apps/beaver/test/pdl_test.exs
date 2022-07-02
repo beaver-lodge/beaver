@@ -129,6 +129,7 @@ defmodule PDLTest do
     pattern_set = MLIR.PatternSet.get(ctx, TestTOSAPatterns)
     MLIR.PatternSet.apply!(ir_module, pattern_set)
     MLIR.Operation.verify!(ir_module)
+    ir_module = ir_module |> MLIR.Transforms.canonicalize() |> MLIR.Pass.Composer.run!()
     ir_string = MLIR.Operation.to_string(ir_module)
     assert not String.contains?(ir_string, "tosa.add"), ir_string
     assert String.contains?(ir_string, "tosa.sub"), ir_string
