@@ -39,6 +39,7 @@ defmodule Beaver do
     quote do
       import Beaver
       alias Beaver.MLIR
+      import MLIR.Sigils
     end
   end
 
@@ -79,5 +80,40 @@ defmodule Beaver do
     raise(
       "`>>>` operator is expected to be transformed away. Maybe you forget to put the expression inside the Beaver.mlir/1 macro's do block?"
     )
+  end
+
+  defmacro pattern(call, do: block) do
+    {name, args} = Macro.decompose_call(call)
+
+    match = args |> Beaver.DSL.Pattern.transform_match()
+    replace = block |> Beaver.DSL.Pattern.transform_rewrite()
+    alias Beaver.MLIR.Dialect.PDL
+    alias Beaver.MLIR.Attribute
+    alias Beaver.MLIR.Type
+
+    pdl_pattern_op =
+      quote do
+        mlir do
+          module do
+            PDL.pattern benefit: Attribute.integer(Type.i16(), 1) do
+              region do
+                block some_pattern() do
+                  unquote_splicing(match)
+                  unquote(replace)
+                end
+              end
+            end
+          end
+        end
+        |> Beaver.MLIR.Operation.verify!(dump_if_fail: true)
+      end
+
+    quote do
+      Module.register_attribute(__MODULE__, :compiled_pattern, accumulate: true, persist: true)
+
+      def unquote(name)() do
+        unquote(pdl_pattern_op)
+      end
+    end
   end
 end

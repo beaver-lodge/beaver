@@ -102,13 +102,13 @@ defmodule Beaver.MLIR.Operation do
     is_success = IR.mlirOperationVerify(op) |> Exotic.Value.extract()
 
     if dump do
-      Logger.error("Start dumping op not verified. This might crash.")
+      Logger.warning("Start dumping op not verified. This might crash.")
       dump(op)
     end
 
     if not is_success do
       if dump_if_fail do
-        Logger.error("Start dumping op fails in the verification. This might crash.")
+        Logger.warning("Start dumping op failed to pass the verification. This might crash.")
         dump(op)
       end
 

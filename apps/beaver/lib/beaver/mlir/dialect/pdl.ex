@@ -1,4 +1,8 @@
 defmodule Beaver.MLIR.Dialect.PDL do
+  use Beaver.MLIR.Dialect.Generator,
+    dialect: "pdl",
+    ops: Beaver.MLIR.Dialect.Registry.ops("pdl")
+
   @moduledoc """
   This module provides functions to compile definitions in Elixir to PDL IR. Usually the generated PDL patterns is used in a MLIR external pass in Elixir. With proper composition, functions in this module should provide equivalent features of PDLL.
   """
