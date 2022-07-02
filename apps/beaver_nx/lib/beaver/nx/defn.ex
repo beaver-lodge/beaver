@@ -1,25 +1,6 @@
 defmodule Beaver.Nx.Defn do
-  require Beaver
-  import Beaver
-  require Beaver.MLIR.Dialect.{Func, SCF, Linalg, Builtin}
-  alias Beaver.MLIR
-  alias MLIR.{Type, Attribute, ODS, Dialect}
-
-  alias Beaver.MLIR.Dialect.{
-    Builtin,
-    Func,
-    TOSA,
-    Arith,
-    SCF,
-    Tensor,
-    Bufferization,
-    MemRef,
-    Linalg
-  }
-
-  import Builtin, only: :macros
-  import MLIR, only: :macros
-  import MLIR.Sigils
+  use Beaver
+  alias MLIR.{Type, Attribute}
 
   defp gen_type({:s, size}), do: Type.i(size)
   defp gen_type({:f, size}), do: Type.f(size)
@@ -229,7 +210,7 @@ defmodule Beaver.Nx.Defn do
     mlir do
       complex_tensor = gen_op(complex_tensor)
       complex_element = Tensor.extract(complex_tensor) >>> Type.complex(Type.f32())
-      conjugate_element = Dialect.Complex.conj(complex_element) >>> Type.complex(Type.f32())
+      conjugate_element = Complex.conj(complex_element) >>> Type.complex(Type.f32())
 
       conjugate_tensor =
         Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) >>>
@@ -259,8 +240,8 @@ defmodule Beaver.Nx.Defn do
       imaginary = Arith.constant(value: Attribute.float(Type.f32(), 0.0)) >>> Type.f32()
 
       complex_element_t = gen_type(complex_type)
-      complex_element = Dialect.Complex.create(real, imaginary) >>> complex_element_t
-      conjugate_element = Dialect.Complex.conj(complex_element) >>> complex_element_t
+      complex_element = Complex.create(real, imaginary) >>> complex_element_t
+      conjugate_element = Complex.conj(complex_element) >>> complex_element_t
 
       _ = Tensor.insert(conjugate_element, conjugate_tensor) >>> gen_type(t)
     end
@@ -291,7 +272,7 @@ defmodule Beaver.Nx.Defn do
         region do
           block inner(index :: Type.index()) do
             complex_element = Tensor.extract(complex_tensor, index) >>> Type.complex(Type.f32())
-            conjugate_element = Dialect.Complex.conj(complex_element) >>> Type.complex(Type.f32())
+            conjugate_element = Complex.conj(complex_element) >>> Type.complex(Type.f32())
             MemRef.store([conjugate_element, conjugate_memref, index])
             SCF.yield(defer_if_terminator: false)
           end
@@ -327,7 +308,7 @@ defmodule Beaver.Nx.Defn do
       ] do
         region do
           block bb0(arg0 :: Type.complex(Type.f32()), arg1 :: Type.f(32)) do
-            im = Dialect.Complex.im(arg0) >>> Type.f32()
+            im = Complex.im(arg0) >>> Type.f32()
             Linalg.yield([im, defer_if_terminator: false])
           end
         end
