@@ -8,35 +8,7 @@ In the de-facto way of using MLIR, we need to work with C/C++, TableGen, CMake a
 
 Elixir could actually be a good fit as a MLIR front end. Elixir has SSA, pattern-matching, pipe-operator. We can use these language features to define MLIR patterns and pass pipeline in a natural and uniformed way. Elixir is strong-typed but not static-typed which makes it a great choice for quickly building prototypes to validate and explore new ideas.
 
-Here is a small example to showcase what it is like to define and run passes in Beaver:
-
-```elixir
-defmodule ToyPass do
-  use Beaver.Pass
-
-  pattern replace_test_op(t = %test.op{}) do
-    erase(t)
-    create(%test.success{})
-  end
-
-  def run(module) do
-    module |> MLIR.Module.walk(patterns: [replace_test_op])
-  end
-end
-
-defmodule ToyCompiler do
-  import MLIR.{Passes, Sigils}
-  def demo() do
-    ~m"""
-    module @ir {
-      "test.op"() { test_attr } : () -> ()
-    }
-    """ |> ToyPass.run |> canonicalize |> cse |> llvm |> MLIR.ExecutionEngine.run!()
-  end
-end
-```
-
-Also an example to build and verify a piece of IR in Beaver:
+Here is an example to build and verify a piece of IR in Beaver:
 
 ```elixir
 mlir do
@@ -67,6 +39,34 @@ mlir do
 end
 |> MLIR.Operation.dump()
 |> MLIR.Operation.verify!()
+```
+
+And a small example to showcase what it is like to define and run passes in Beaver:
+
+```elixir
+defmodule ToyPass do
+  use Beaver.Pass
+
+  pattern replace_test_op(t = %test.op{}) do
+    erase(t)
+    create(%test.success{})
+  end
+
+  def run(module) do
+    module |> MLIR.Module.walk(patterns: [replace_test_op])
+  end
+end
+
+defmodule ToyCompiler do
+  import MLIR.{Passes, Sigils}
+  def demo() do
+    ~m"""
+    module @ir {
+      "test.op"() { test_attr } : () -> ()
+    }
+    """ |> ToyPass.run |> canonicalize |> cse |> llvm |> MLIR.ExecutionEngine.run!()
+  end
+end
 ```
 
 From a high-level perspective, we are going through some interesting changes of the way we utilize accelerated-computing. The most notable project in this trend could be PyTorch. Before PyTorch, one typical way to unleash the full power of GPU is to use a game engine, usually in the form of a library of fixed pipelines, iterations built with heavy weight languages like C++, and app developers use a more script-able language like Lua/C# to build the app/game as an extension to the engine. In ML world, TensorFlow 1 could be regarded as such as well. In contrast, the PyTorch approach puts the app developer in full command of control plane. They get to use Python to build the main loop themselves while having the full access to the accelerated-computing capability. This overturn significantly boosts the productivity and flexibility. As we can see, PyTorch already gets widespread adoption in ML and beyond.
