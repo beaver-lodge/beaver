@@ -19,17 +19,28 @@ defmodule Beaver.DSL.Pattern do
         end
       end
 
-    results =
+    results_match =
       for result <- results do
         quote do
           unquote(result) = Beaver.MLIR.Dialect.PDL.type() >>> ~t{!pdl.type}
         end
       end
 
+    results_rebind =
+      for {result, i} <- Enum.with_index(results) do
+        quote do
+          unquote(result) =
+            Beaver.MLIR.Dialect.PDL.result(
+              beaver_gen_root,
+              index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), unquote(i))
+            ) >>> ~t{!pdl.value}
+        end
+      end
+
     ast =
       quote do
         unquote_splicing(operands)
-        unquote_splicing(results)
+        unquote_splicing(results_match)
 
         beaver_gen_root =
           Beaver.DSL.Op.Prototype.dispatch(
@@ -37,6 +48,9 @@ defmodule Beaver.DSL.Pattern do
             unquote(map_args),
             &Beaver.DSL.Pattern.create_root/2
           )
+
+        unquote_splicing(results_rebind)
+        beaver_gen_root
       end
 
     ast

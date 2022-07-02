@@ -130,7 +130,7 @@ defmodule PDLTest do
                     res,
                     b
                   ],
-                  results: [res]
+                  results: [res2]
                 }
               ) do
         %TOSA.Sub{operands: [a, b]}
