@@ -43,7 +43,7 @@ defmodule Beaver do
   end
 
   defmacro mlir(do: block) do
-    new_block_ast = Beaver.DSL.transform_ssa(block) |> Beaver.DSL.SSA.transform()
+    new_block_ast = block |> Beaver.DSL.SSA.transform()
 
     alias Beaver.MLIR.Dialect
 
@@ -70,24 +70,6 @@ defmodule Beaver do
       import Builtin
       import CF
 
-      unquote(new_block_ast)
-    end
-  end
-
-  @doc false
-  defmacro mlir_debug(do: block) do
-    new_block_ast = Beaver.DSL.transform_ssa(block)
-
-    env = __CALLER__
-    new_block_ast |> Macro.to_string() |> IO.puts()
-
-    block
-    |> Macro.expand(env)
-    # |> Macro.prewalk(&Macro.expand(&1, env))
-    |> Macro.to_string()
-    |> IO.puts()
-
-    quote do
       unquote(new_block_ast)
     end
   end

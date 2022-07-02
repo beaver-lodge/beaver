@@ -63,6 +63,19 @@ defmodule Beaver.DSL.SSA do
     end
   end
 
+  # block arguments
+  defp do_transform(
+         {:"::", _,
+          [
+            var = {_var_name, _, nil},
+            type
+          ]}
+       ) do
+    quote do
+      {unquote(var), unquote(type)}
+    end
+  end
+
   defp do_transform(ast), do: ast
 
   def transform(ast) do
