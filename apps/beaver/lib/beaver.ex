@@ -85,62 +85,37 @@ defmodule Beaver do
   defmacro pattern(call, do: block) do
     {name, args} = Macro.decompose_call(call)
 
+    match = args |> Beaver.DSL.Pattern.transform_match()
+    replace = block |> Beaver.DSL.Pattern.transform_rewrite()
     alias Beaver.MLIR.Dialect.PDL
     alias Beaver.MLIR.Attribute
     alias Beaver.MLIR.Type
 
     pdl_pattern_op =
-      mlir do
-        module do
-          PDL.pattern benefit: Attribute.integer(Type.i16(), 1) do
-            region do
-              block some_pattern() do
-                t = PDL.type() >>> ~t{!pdl.type}
-                a = PDL.operand() >>> ~t{!pdl.value}
-                b = PDL.operand() >>> ~t{!pdl.value}
-
-                root =
-                  PDL.operation(a, b, t,
-                    name: Attribute.string("tosa.add"),
-                    attributeNames: Attribute.array([]),
-                    operand_segment_sizes: ODS.operand_segment_sizes([2, 0, 1])
-                  ) >>> ~t{!pdl.operation}
-
-                PDL.rewrite [
-                  root,
-                  defer_if_terminator: false,
-                  operand_segment_sizes: ODS.operand_segment_sizes([1, 0])
-                ] do
-                  region do
-                    block some() do
-                      repl =
-                        PDL.operation(a, b,
-                          name: Attribute.string("tosa.sub"),
-                          attributeNames: Attribute.array([]),
-                          operand_segment_sizes: ODS.operand_segment_sizes([2, 0, 0])
-                        ) >>> ~t{!pdl.operation}
-
-                      PDL.replace([
-                        root,
-                        repl,
-                        operand_segment_sizes: ODS.operand_segment_sizes([1, 1, 0])
-                      ]) >>> []
-                    end
-                  end
+      quote do
+        mlir do
+          module do
+            PDL.pattern benefit: Attribute.integer(Type.i16(), 1) do
+              region do
+                block some_pattern() do
+                  unquote_splicing(match)
+                  unquote(replace)
                 end
               end
             end
           end
         end
+        |> Beaver.MLIR.Operation.verify!(dump_if_fail: true)
       end
 
-    pattern_string = MLIR.Operation.to_string(pdl_pattern_op) |> String.trim()
-
-    MLIR.Operation.verify!(pdl_pattern_op, dump_if_fail: true)
+    pdl_pattern_op |> Macro.to_string() |> IO.puts()
 
     quote do
       Module.register_attribute(__MODULE__, :compiled_pattern, accumulate: true, persist: true)
-      @compiled_pattern unquote(pattern_string)
+
+      def unquote(name)() do
+        unquote(pdl_pattern_op)
+      end
     end
   end
 end

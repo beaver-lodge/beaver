@@ -88,8 +88,8 @@ defmodule PDLTest do
     defmodule TestTOSAPatterns do
       alias Beaver.MLIR
 
-      pattern replace_add_op(t = %TOSA.Add{a, b}) do
-        %TOSA.Sub{a, b}
+      pattern replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
+        %TOSA.Sub{operands: [a, b]}
       end
     end
 
@@ -124,9 +124,9 @@ defmodule PDLTest do
       end
 
     MLIR.Operation.verify!(ir_module)
-    pattern_set = MLIR.PatternSet.get(ctx, TestTOSAPatterns)
+    pattern_set = MLIR.PatternSet.get(ctx, TestTOSAPatterns.replace_add_op())
     MLIR.PatternSet.apply!(ir_module, pattern_set)
-    MLIR.Operation.verify!(ir_module)
+    MLIR.Operation.verify!(ir_module, dump_if_fail: true)
     ir_module = ir_module |> MLIR.Transforms.canonicalize() |> MLIR.Pass.Composer.run!()
     ir_string = MLIR.Operation.to_string(ir_module)
     assert not String.contains?(ir_string, "tosa.add"), ir_string

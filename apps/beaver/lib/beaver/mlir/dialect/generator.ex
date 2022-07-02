@@ -5,6 +5,21 @@ defmodule Beaver.MLIR.Dialect.Generator do
         func_name = Beaver.MLIR.Dialect.Registry.normalize_op_name(op)
         full_name = Enum.join([dialect, op], ".")
 
+        module_name = dialect |> Beaver.MLIR.Dialect.Registry.normalize_dialect_name()
+
+        op_module_name =
+          Module.concat([
+            Beaver.MLIR.Dialect,
+            module_name,
+            Macro.camelize(Atom.to_string(func_name))
+          ])
+
+        defmodule op_module_name do
+          def op_name() do
+            unquote(full_name)
+          end
+        end
+
         def unquote(func_name)() do
           Beaver.MLIR.Operation.create(
             unquote(full_name),
