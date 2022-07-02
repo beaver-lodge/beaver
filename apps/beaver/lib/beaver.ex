@@ -39,6 +39,7 @@ defmodule Beaver do
     quote do
       import Beaver
       alias Beaver.MLIR
+      import MLIR.Sigils
     end
   end
 

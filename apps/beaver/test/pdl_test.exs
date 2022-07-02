@@ -1,5 +1,6 @@
 defmodule PDLTest do
   use ExUnit.Case
+  use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
@@ -83,26 +84,53 @@ defmodule PDLTest do
     CAPI.mlirContextDestroy(ctx)
   end
 
-  @tag pattern: true
-  test "simple pattern" do
-    defmodule TestPatterns do
+  test "replace tosa" do
+    defmodule TestTOSAPatterns do
       alias Beaver.MLIR
       use MLIR.Pattern
 
-      pattern replace_test_op(t = %test.op{}) do
-        %test.success{}
+      pattern replace_test_op(t = %TOSA.Add{a, b}) do
+        %TOSA.Sub{a, b}
         erase(t)
       end
     end
 
     ctx = MLIR.Context.create(allow_unregistered: true)
-    ir_module = MLIR.Module.create(ctx, @apply_rewrite_op_ir)
+
+    ir_module =
+      mlir do
+        module do
+          Func.func test_multi_broadcast(
+                      function_type:
+                        Attribute.type(
+                          Type.function(
+                            [
+                              Type.ranked_tensor([1, 3], Type.f32()),
+                              Type.ranked_tensor([2, 1], Type.f32())
+                            ],
+                            [Type.ranked_tensor([2, 3], Type.f32())]
+                          )
+                        )
+                    ) do
+            region do
+              block entry(
+                      arg0 :: Type.ranked_tensor([1, 3], Type.f32()),
+                      arg1 :: Type.ranked_tensor([2, 1], Type.f32())
+                    ) do
+                v0 = TOSA.add(arg0, arg1) >>> Type.ranked_tensor([2, 3], Type.f32())
+                Func.return(v0)
+              end
+            end
+          end
+        end
+      end
+
     MLIR.Operation.verify!(ir_module)
-    pattern_set = MLIR.PatternSet.get(ctx, TestPatterns)
+    pattern_set = MLIR.PatternSet.get(ctx, TestTOSAPatterns)
     MLIR.PatternSet.apply!(ir_module, pattern_set)
     MLIR.Operation.verify!(ir_module)
     ir_string = MLIR.Operation.to_string(ir_module)
-    assert not String.contains?(ir_string, "test.op")
-    assert String.contains?(ir_string, "test.success")
+    assert not String.contains?(ir_string, "tosa.add"), ir_string
+    assert String.contains?(ir_string, "tosa.sub"), ir_string
   end
 end

@@ -1,4 +1,5 @@
 defmodule Beaver.MLIR.Pattern do
+  use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
@@ -16,59 +17,62 @@ defmodule Beaver.MLIR.Pattern do
   end
 
   defmacro pattern(call, do: block) do
-    ex_loc = Macro.Env.location(__ENV__)
-    ctx = MLIR.Context.create()
-    loc = MLIR.Location.get!(ctx, ex_loc)
-    _module = MLIR.CAPI.mlirModuleCreateEmpty(loc)
     {name, args} = Macro.decompose_call(call)
 
-    region = CAPI.mlirRegionCreate()
-    pattern_block = MLIR.Block.create([], [])
-    CAPI.mlirRegionAppendOwnedBlock(region, pattern_block)
+    alias Beaver.MLIR.Dialect.PDL
+    alias Beaver.MLIR.Attribute
+    alias Beaver.MLIR.Type
 
     pdl_pattern_op =
-      MLIR.Operation.State.get!("pdl.pattern", loc)
-      |> MLIR.Operation.State.add_regions([region])
-      |> MLIR.Operation.State.add_attr(sym_name: "\"#{name}\"", benefit: "1 : i16")
-      |> MLIR.Operation.create()
+      mlir do
+        module do
+          PDL.pattern benefit: Attribute.integer(Type.i16(), 1) do
+            region do
+              block some_pattern() do
+                # t = PDL.type(type: Attribute.type(Type.i32())) >>> ~t{!pdl.type}
+                a = PDL.operand() >>> ~t{!pdl.value}
+                b = PDL.operand() >>> ~t{!pdl.value}
 
-    # create constraints in the matcher body of a `pdl.pattern` from arguments
-    {_ast, pattern_code_gen_ctx} =
-      args
-      |> Macro.postwalk(
-        %MLIR.Pattern.CodeGen.Context{block: pattern_block, mlir_ctx: ctx, ex_loc: ex_loc},
-        &MLIR.Pattern.CodeGen.from_ast/2
-      )
+                root =
+                  PDL.operation(a, b,
+                    name: Attribute.string("tosa.add"),
+                    attributeNames: Attribute.array([]),
+                    operand_segment_sizes: ODS.operand_segment_sizes([2, 0, 0])
+                  ) >>> ~t{!pdl.operation}
 
-    # TODO: get root by querying value of first node in prewalk
-    # create rewrite
+                PDL.rewrite [
+                  root,
+                  defer_if_terminator: false,
+                  operand_segment_sizes: ODS.operand_segment_sizes([1, 0])
+                ] do
+                  region do
+                    block some() do
+                      repl =
+                        PDL.operation(a, b,
+                          name: Attribute.string("tosa.sub"),
+                          attributeNames: Attribute.array([]),
+                          operand_segment_sizes: ODS.operand_segment_sizes([2, 0, 0])
+                        ) >>> ~t{!pdl.operation}
 
-    rewrite_region = CAPI.mlirRegionCreate()
-    rewrite_block = MLIR.Block.create([], [])
-    CAPI.mlirRegionAppendOwnedBlock(rewrite_region, rewrite_block)
+                      PDL.replace([
+                        root,
+                        repl,
+                        operand_segment_sizes: ODS.operand_segment_sizes([1, 1, 0])
+                      ]) >>> []
 
-    pdl_rewrite_op =
-      MLIR.Operation.State.get!("pdl.rewrite", loc)
-      |> MLIR.Operation.State.add_operand([pattern_code_gen_ctx.root])
-      |> MLIR.Operation.State.add_regions([rewrite_region])
-      |> MLIR.Operation.State.add_attr(operand_segment_sizes: "dense<[1, 0]> : vector<2xi32>")
-      |> MLIR.Operation.create()
-
-    # create ops in rewrite block
-
-    {_ast, _rewrite_code_gen_ctx} =
-      block
-      |> Macro.postwalk(
-        %MLIR.Pattern.CodeGen.Context{pattern_code_gen_ctx | block: rewrite_block},
-        &MLIR.Pattern.CodeGen.from_ast/2
-      )
-
-    CAPI.mlirBlockAppendOwnedOperation(pattern_block, pdl_rewrite_op)
+                      PDL.erase(root) >>> []
+                    end
+                  end
+                end
+              end
+            end
+          end
+        end
+      end
 
     pattern_string = MLIR.Operation.to_string(pdl_pattern_op) |> String.trim()
 
-    MLIR.Operation.verify!(pdl_pattern_op)
-    CAPI.mlirContextDestroy(ctx)
+    MLIR.Operation.verify!(pdl_pattern_op, dump: true)
 
     quote do
       @compiled_pattern unquote(pattern_string)
@@ -80,7 +84,7 @@ defmodule Beaver.MLIR.Pattern do
   end
 
   def from_string(ctx, pdl_pattern_str) when is_binary(pdl_pattern_str) do
-    pattern_module = MLIR.Module.create(ctx, pdl_pattern_str)
+    pattern_module = ~m{#{pdl_pattern_str}}
     if MLIR.Module.is_null(pattern_module), do: raise("fail to parse module")
     MLIR.Operation.verify!(pattern_module)
     pdl_pattern = CAPI.beaverPDLPatternGet(pattern_module)
