@@ -21,7 +21,7 @@ defmodule Beaver.DSL.SSA do
           [
             {call, line, args},
             results
-          ]} = ast
+          ]}
        ) do
     empty_call = {call, line, []}
 
@@ -34,10 +34,6 @@ defmodule Beaver.DSL.SSA do
         |> Beaver.DSL.SSA.put_results(unquote(results))
         |> unquote(empty_call)
       end
-
-    ast
-    |> Macro.to_string()
-    |> IO.puts()
 
     ast
   end
