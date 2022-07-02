@@ -124,8 +124,9 @@ defmodule Beaver.Nx.Defn do
          } = t
        ) do
     mlir do
-      _r = TOSA.const({:value, ~a{dense<0xFF800000> : tensor<f32>}}) ::
-        gen_type(t)
+      _r =
+        TOSA.const({:value, ~a{dense<0xFF800000> : tensor<f32>}}) >>>
+          gen_type(t)
     end
   end
 
@@ -138,8 +139,9 @@ defmodule Beaver.Nx.Defn do
        )
        when is_integer(value) or is_float(value) do
     mlir do
-      _r = TOSA.const({:value, ~a{dense<#{value}> : tensor<#{get_type_name(type)}>}}) ::
-        gen_type(t)
+      _r =
+        TOSA.const({:value, ~a{dense<#{value}> : tensor<#{get_type_name(type)}>}}) >>>
+          gen_type(t)
     end
   end
 
@@ -150,7 +152,7 @@ defmodule Beaver.Nx.Defn do
          } = t
        ) do
     mlir do
-      Arith.constant({:value, ~a[dense<(#{re}, #{im})> : #{gen_type_str(t)}]}) ::
+      Arith.constant({:value, ~a[dense<(#{re}, #{im})> : #{gen_type_str(t)}]}) >>>
         ~t{#{gen_type_str(t)}}
     end
   end
@@ -226,8 +228,8 @@ defmodule Beaver.Nx.Defn do
        ) do
     mlir do
       complex_tensor = gen_op(complex_tensor)
-      complex_element = Tensor.extract(complex_tensor) :: Type.complex(Type.f32())
-      conjugate_element = Dialect.Complex.conj(complex_element) :: Type.complex(Type.f32())
+      complex_element = Tensor.extract(complex_tensor) >>> Type.complex(Type.f32())
+      conjugate_element = Dialect.Complex.conj(complex_element) >>> Type.complex(Type.f32())
 
       conjugate_tensor =
         Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) ::
@@ -257,10 +259,10 @@ defmodule Beaver.Nx.Defn do
       imaginary = Arith.constant(value: Attribute.float(Type.f32(), 0.0)) :: Type.f32()
 
       complex_element_t = gen_type(complex_type)
-      complex_element = Dialect.Complex.create(real, imaginary) :: complex_element_t
-      conjugate_element = Dialect.Complex.conj(complex_element) :: complex_element_t
+      complex_element = Dialect.Complex.create(real, imaginary) >>> complex_element_t
+      conjugate_element = Dialect.Complex.conj(complex_element) >>> complex_element_t
 
-      _ = Tensor.insert(conjugate_element, conjugate_tensor) :: gen_type(t)
+      _ = Tensor.insert(conjugate_element, conjugate_tensor) >>> gen_type(t)
     end
   end
 
