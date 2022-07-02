@@ -21,4 +21,15 @@ defmodule Beaver.MLIR.Pattern do
     pdl_pattern = CAPI.beaverPDLPatternGet(pattern_module)
     pdl_pattern
   end
+
+  def apply!(op, patterns) when is_list(patterns) do
+    pattern_set = MLIR.PatternSet.get()
+
+    for p <- patterns do
+      MLIR.PatternSet.insert(pattern_set, p)
+    end
+
+    MLIR.PatternSet.apply!(op, pattern_set)
+    op
+  end
 end

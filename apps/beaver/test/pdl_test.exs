@@ -3,6 +3,7 @@ defmodule PDLTest do
   use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
+  import Beaver.MLIR.Transforms
 
   @apply_rewrite_op_patterns """
   module @patterns {
@@ -123,15 +124,44 @@ defmodule PDLTest do
 
     MLIR.Operation.verify!(ir_module)
 
-    pattern_set =
-      MLIR.PatternSet.get()
-      |> MLIR.PatternSet.insert(TestTOSAPatterns.replace_add_op())
+    MLIR.Pattern.apply!(ir_module, [TestTOSAPatterns.replace_add_op()])
+    |> MLIR.Operation.verify!(dump_if_fail: true)
+    |> MLIR.Transforms.canonicalize()
+    |> MLIR.Pass.Composer.run!()
 
-    MLIR.PatternSet.apply!(ir_module, pattern_set)
-    MLIR.Operation.verify!(ir_module, dump_if_fail: true)
-    ir_module = ir_module |> MLIR.Transforms.canonicalize() |> MLIR.Pass.Composer.run!()
     ir_string = MLIR.Operation.to_string(ir_module)
     assert not String.contains?(ir_string, "tosa.add"), ir_string
     assert String.contains?(ir_string, "tosa.sub"), ir_string
+  end
+
+  test "toy compiler with pass" do
+    defmodule ToyPass do
+      use Beaver
+
+      pattern replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
+        %TOSA.Sub{operands: [a, b]}
+      end
+
+      def run(module) do
+        MLIR.Pattern.apply!(module, [replace_add_op()])
+      end
+    end
+
+    ir =
+      ~m"""
+      module {
+        func.func @tosa_add(%arg0: tensor<1x3xf32>, %arg1: tensor<2x1xf32>) -> tensor<2x3xf32> {
+          %0 = "tosa.add"(%arg0, %arg1) : (tensor<1x3xf32>, tensor<2x1xf32>) -> tensor<2x3xf32>
+          return %0 : tensor<2x3xf32>
+        }
+      }
+      """
+      |> ToyPass.run()
+      |> canonicalize
+      |> MLIR.Pass.Composer.run!()
+
+    ir_string = MLIR.Operation.to_string(ir)
+    assert not (ir_string =~ "tosa.add")
+    assert ir_string =~ "tosa.sub"
   end
 end
