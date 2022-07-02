@@ -1,0 +1,20 @@
+defmodule Beaver.DSL.Op.Prototype do
+  @moduledoc """
+  Beaver.DSL.Prototype is a struct holding an Op's operands, results, attributes before creating it. It is similar to Beaver.DSL.SSA but there are applicable in different scenarios. Beaver.DSL.Prototype should be used where it is desired to get the createdMLIR MLIR Op rather than the MLIR values of its results.
+  """
+
+  defstruct operands: [], attributes: [], results: []
+
+  @doc """
+  Dispatch the op name and map to the callback `cb` if this is a module implement the behavior this module define.
+  """
+  def dispatch(module, map, cb) when is_function(cb, 2) do
+    if __MODULE__ in module.module_info[:attributes][:behaviour] do
+      cb.(module.op_name(), struct!(Beaver.DSL.Op.Prototype, map))
+    else
+      struct!(module, map)
+    end
+  end
+
+  @callback op_name() :: String.t()
+end
