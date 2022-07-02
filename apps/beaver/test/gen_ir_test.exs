@@ -42,7 +42,7 @@ defmodule CFTest do
           region do
             block bb_entry() do
               v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-              _add = Arith.addi(v0, v0) :: Type.i(32)
+              _add = Arith.addi(v0, v0) >>> Type.i(32)
               CF.br({:bb1, [v0]})
             end
 
