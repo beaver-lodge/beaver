@@ -124,7 +124,11 @@ defmodule PDLTest do
       end
 
     MLIR.Operation.verify!(ir_module)
-    pattern_set = MLIR.PatternSet.get(ctx, TestTOSAPatterns.replace_add_op())
+
+    pattern_set =
+      MLIR.PatternSet.get()
+      |> MLIR.PatternSet.insert(TestTOSAPatterns.replace_add_op())
+
     MLIR.PatternSet.apply!(ir_module, pattern_set)
     MLIR.Operation.verify!(ir_module, dump_if_fail: true)
     ir_module = ir_module |> MLIR.Transforms.canonicalize() |> MLIR.Pass.Composer.run!()

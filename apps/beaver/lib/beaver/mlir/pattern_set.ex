@@ -2,16 +2,19 @@ defmodule Beaver.MLIR.PatternSet do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  def get(ctx, %Beaver.MLIR.CAPI.MlirModule{} = module) do
-    pattern_set = CAPI.beaverRewritePatternSetGet(ctx)
-    module = CAPI.beaverPDLPatternGet(module)
-    CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, module)
-    pattern_set
+  def get(opts \\ []) do
+    ctx = MLIR.Managed.Context.from_opts(opts)
+    CAPI.beaverRewritePatternSetGet(ctx)
   end
 
-  def insert(pattern_set, pattern) do
-    # TODO: support extracting mlir context from pattern_set so it could support create from string
-    CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pattern)
+  def insert(pattern_set, %Beaver.MLIR.CAPI.MlirModule{} = module) do
+    pattern_module = CAPI.beaverPDLPatternGet(module)
+    insert(pattern_set, pattern_module)
+  end
+
+  def insert(pattern_set, %Beaver.MLIR.CAPI.MlirPDLPatternModule{} = pattern_module) do
+    CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pattern_module)
+    pattern_set
   end
 
   def apply!(module, pattern_set) do
