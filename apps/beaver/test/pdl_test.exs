@@ -86,16 +86,6 @@ defmodule PDLTest do
   end
 
   test "replace tosa" do
-    defmodule TestTOSAPatterns do
-      alias Beaver.MLIR
-
-      pattern replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
-        # create a common struct to see if the pattern transformation would skip it
-        assert %Range{first: 1, last: 10, step: 2} |> Range.size() == 5
-        %TOSA.Sub{operands: [a, b]}
-      end
-    end
-
     ir_module =
       mlir do
         module do
@@ -124,9 +114,35 @@ defmodule PDLTest do
         end
       end
 
+    defmodule TestTOSAPatterns do
+      alias Beaver.MLIR
+
+      pattern replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
+        # create a common struct to see if the pattern transformation would skip it
+        assert %Range{first: 1, last: 10, step: 2} |> Range.size() == 5
+        %TOSA.Sub{operands: [a, b]}
+      end
+
+      pattern replace_multi_add_op(
+                %TOSA.Add{operands: [a, b], results: [res]},
+                _t = %TOSA.Add{
+                  operands: [
+                    res,
+                    b
+                  ],
+                  results: [res]
+                }
+              ) do
+        %TOSA.Sub{operands: [a, b]}
+      end
+    end
+
     MLIR.Operation.verify!(ir_module)
 
-    MLIR.Pattern.apply!(ir_module, [TestTOSAPatterns.replace_add_op()])
+    MLIR.Pattern.apply!(ir_module, [
+      TestTOSAPatterns.replace_add_op(),
+      TestTOSAPatterns.replace_multi_add_op()
+    ])
     |> MLIR.Operation.verify!(dump_if_fail: true)
     |> MLIR.Transforms.canonicalize()
     |> MLIR.Pass.Composer.run!()
