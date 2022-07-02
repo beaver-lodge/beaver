@@ -99,7 +99,7 @@ defmodule Beaver.Nx.Defn do
          } = t
        ) do
     mlir do
-      TOSA.const({:value, ~a{dense<0x7F800001> : tensor<f32>}}) >>> ~t{#{gen_type_str(t)}}
+      TOSA.const({:value, ~a{dense<0x7F800001> : tensor<f32>}}) >>> gen_type(t)
     end
   end
 
@@ -197,7 +197,7 @@ defmodule Beaver.Nx.Defn do
     mlir do
       a = gen_op(a)
       b = gen_op(b)
-      TOSA.mul(a, b, shift: Attribute.integer(Type.i(32), 0)) >>> ~t{#{gen_type_str(t)}}
+      TOSA.mul(a, b, shift: Attribute.integer(Type.i(32), 0)) >>> gen_type(t)
     end
   end
 
@@ -331,7 +331,7 @@ defmodule Beaver.Nx.Defn do
             Linalg.yield([im, defer_if_terminator: false])
           end
         end
-      end >>> ~t{#{gen_type_str(t)}}
+      end >>> gen_type(t)
     end
   end
 
