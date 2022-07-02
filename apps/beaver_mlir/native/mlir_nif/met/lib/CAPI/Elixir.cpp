@@ -72,3 +72,11 @@ MLIR_CAPI_EXPORTED MlirStringRef
 beaverRegisteredOperationNameGetOpName(MlirRegisteredOperationName name) {
   return wrap(unwrap(name).stripDialect());
 }
+
+MLIR_CAPI_EXPORTED void beaverEnterMultiThreadedExecution(MlirContext context) {
+  unwrap(context)->enterMultiThreadedExecution();
+}
+
+MLIR_CAPI_EXPORTED void beaverExitMultiThreadedExecution(MlirContext context) {
+  unwrap(context)->exitMultiThreadedExecution();
+}

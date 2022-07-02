@@ -36,4 +36,23 @@ defmodule Beaver.Nx.Assert do
       """)
     end
   end
+
+  defmacro assert_all_close(left, right, opts \\ []) do
+    quote bind_quoted: [
+            left: left,
+            right: right,
+            opts: opts
+          ] do
+      all_close(left, right, opts)
+    end
+  end
+
+  defmacro assert_equal(left, right) do
+    quote bind_quoted: [
+            left: left,
+            right: right
+          ] do
+      equal(left, right)
+    end
+  end
 end

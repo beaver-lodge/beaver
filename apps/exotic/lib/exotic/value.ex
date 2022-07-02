@@ -205,6 +205,22 @@ defmodule Exotic.Value do
     }
   end
 
+  def get(t = {:i, 64}, v) when is_integer(v) do
+    %__MODULE__{
+      ref: NIF.get_i64_value(v),
+      holdings: MapSet.new(),
+      type: t
+    }
+  end
+
+  def get(t = {:f, 64}, v) when is_float(v) do
+    %__MODULE__{
+      ref: NIF.get_f64_value(v),
+      holdings: MapSet.new(),
+      type: t
+    }
+  end
+
   @doc """
   create a closure ptr with a function type.
   If you want to use one process to handle multiple kinds of callbacks, you should use get/3 to provide a callback_id.
@@ -245,6 +261,18 @@ defmodule Exotic.Value do
       holdings: MapSet.new(),
       type: :i64
     }
+  end
+
+  def get({:u, 32}, value) when is_integer(value) do
+    %__MODULE__{
+      ref: NIF.get_u32_value(value),
+      holdings: MapSet.new(),
+      type: :u32
+    }
+  end
+
+  def get({:i, 64}, value) when is_integer(value) do
+    get(:i64, value)
   end
 
   def get(_t, %Exotic.Value{} = v) do
@@ -425,6 +453,14 @@ defmodule Exotic.Value do
 
     def get([]) do
       0 |> Exotic.Value.get() |> Exotic.Value.as_ptr()
+    end
+
+    def from_list(list) when is_list(list) do
+      list |> Enum.map(&Exotic.Value.get/1) |> Exotic.Value.Array.get()
+    end
+
+    def from_list(list, type) when is_list(list) do
+      list |> Enum.map(&Exotic.Value.get(type, &1)) |> Exotic.Value.Array.get()
     end
 
     # TODO: if length(values) == 0, requires a type

@@ -35,10 +35,23 @@ defmodule Beaver.MLIR.StringRef do
       {:pass, state <> MLIR.StringRef.extract(string_ref)}
     end
 
-    def collect_and_destory(closure) do
+    def collect_and_destroy(closure) do
       collected = closure |> Exotic.Closure.state()
       closure |> Exotic.Closure.destroy()
       collected
     end
+  end
+
+  def to_string(object, module, function) do
+    string_ref_callback_closure = Callback.create()
+
+    apply(module, function, [
+      object,
+      Exotic.Value.as_ptr(string_ref_callback_closure),
+      Exotic.Value.Ptr.null()
+    ])
+
+    string_ref_callback_closure
+    |> Callback.collect_and_destroy()
   end
 end

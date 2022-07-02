@@ -54,7 +54,9 @@ defmodule Beaver.MLIR.CAPI do
     Exotic.load!(__MODULE__, lib_path)
   end
 
-  paths = Path.wildcard("native/mlir_nif/met/include/**/*.h")
+  paths =
+    Path.wildcard("native/mlir_nif/met/include/**/*.h") ++
+      Path.wildcard("include/wrapper/**/*.h")
 
   for path <- paths do
     @external_resource path

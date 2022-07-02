@@ -1,7 +1,6 @@
 defmodule Beaver.BEAM.SSA do
-  @moduledoc """
-  this module contains functions compiling BEAM SSA to MLIR.
-  """
+  @moduledoc false
+  # this module contains functions compiling BEAM SSA to MLIR.
   def from_file!(path) do
     {:ok, tokens, _EndLocation} =
       File.read!(path)

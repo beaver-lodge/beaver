@@ -85,8 +85,6 @@ defmodule Beaver.MLIR.Managed.Location do
 end
 
 defmodule Beaver.MLIR.Managed.Region do
-  alias Beaver.MLIR.CAPI
-
   @moduledoc """
   Getting and setting managed MLIR region
   """

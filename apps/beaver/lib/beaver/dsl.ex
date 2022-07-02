@@ -1,4 +1,5 @@
 defmodule Beaver.DSL do
+  @moduledoc false
   def transform_ssa(block) do
     Macro.prewalk(block, fn
       # one SSA
@@ -9,11 +10,19 @@ defmodule Beaver.DSL do
             var,
             {mf, line3, args_ast}
           ]},
-         sigil_t = {:sigil_t, _, _}
+         sigil_t
        ]} ->
         arguments_ast =
-          quote do
-            [unquote_splicing(args_ast), result_types: unquote(sigil_t)]
+          case args_ast do
+            [arg_list] when is_list(arg_list) ->
+              quote do
+                unquote(arg_list) ++ [result_types: unquote(sigil_t)]
+              end
+
+            _ ->
+              quote do
+                [unquote_splicing(args_ast), result_types: unquote(sigil_t)]
+              end
           end
 
         # TODO, check if last arg is keyword
@@ -27,7 +36,7 @@ defmodule Beaver.DSL do
       {:"::", _,
        [
          var = {_var_name, _, nil},
-         sigil_t = {:sigil_t, _, _}
+         sigil_t
        ]} ->
         quote do
           {unquote(var), unquote(sigil_t)}
@@ -40,12 +49,54 @@ defmodule Beaver.DSL do
          sigil_t = {:sigil_t, _, _}
        ]}
       when is_list(args_ast) ->
-        arguments_ast =
-          quote do
-            [unquote_splicing(args_ast), result_types: unquote(sigil_t)]
-          end
+        case args_ast do
+          [args, [do: ast_block]] when is_list(args) ->
+            {mf, line2,
+             quote do
+               [unquote(args) ++ [result_types: unquote(sigil_t)], [do: unquote(ast_block)]]
+             end}
 
-        {mf, line2, [arguments_ast]}
+          [args] when is_list(args) ->
+            {mf, line2,
+             [
+               quote do
+                 unquote(args) ++ [result_types: unquote(sigil_t)]
+               end
+             ]}
+
+          all_args when is_list(all_args) and length(all_args) >= 2 ->
+            {others, _} = Enum.split(all_args, -1)
+            last = List.last(all_args)
+
+            # if last arg is a keyword, join them all
+            if is_list(last) do
+              {mf, line2,
+               [
+                 quote do
+                   [
+                     unquote_splicing(others),
+                     unquote_splicing(last),
+                     result_types: unquote(sigil_t)
+                   ]
+                 end
+               ]}
+            else
+              {mf, line2,
+               [
+                 quote do
+                   [unquote_splicing(args_ast), result_types: unquote(sigil_t)]
+                 end
+               ]}
+            end
+
+          _ ->
+            {mf, line2,
+             [
+               quote do
+                 [unquote_splicing(args_ast), result_types: unquote(sigil_t)]
+               end
+             ]}
+        end
 
       other ->
         other

@@ -3,6 +3,7 @@ defmodule Beaver.MLIR.Operation do
   alias Beaver.MLIR.CAPI.IR
   alias Beaver.MLIR.CAPI
   import Beaver.MLIR.CAPI
+  require Logger
 
   @doc """
   Create a new operation from a operation state
@@ -14,17 +15,23 @@ defmodule Beaver.MLIR.Operation do
   @doc """
   Create a new operation from arguments and insert to managed insertion point
   """
+  def create(op_name, %Beaver.DSL.SSA{arguments: arguments, results: results}) do
+    create(op_name, arguments ++ [result_types: results])
+  end
+
   def create(op_name, arguments) do
-    if MLIR.Trait.is_terminator?(op_name) do
+    defer_if_terminator = Keyword.get(arguments, :defer_if_terminator, true)
+
+    if defer_if_terminator and MLIR.Trait.is_terminator?(op_name) do
       if block = MLIR.Managed.Block.get() do
         Beaver.MLIR.Managed.Terminator.defer(fn ->
           op = do_create(op_name, arguments)
           Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(block, op)
         end)
 
-        :deferred
+        {:deferred, {op_name, arguments}}
       else
-        do_create(op_name, arguments)
+        raise "deferred terminator creation requires a block"
       end
     else
       op = do_create(op_name, arguments)
@@ -81,13 +88,25 @@ defmodule Beaver.MLIR.Operation do
     )
 
     string_ref_callback_closure
-    |> MLIR.StringRef.Callback.collect_and_destory()
+    |> MLIR.StringRef.Callback.collect_and_destroy()
   end
 
-  def verify!(op) do
+  def verify!(op, opts \\ [dump: false, dump_if_fail: false]) do
+    dump = opts |> Keyword.get(:dump, false)
+    dump_if_fail = opts |> Keyword.get(:dump_if_fail, false)
     is_success = IR.mlirOperationVerify(op) |> Exotic.Value.extract()
 
+    if dump do
+      Logger.error("Start dumping op not verified. This might crash.")
+      dump(op)
+    end
+
     if not is_success do
+      if dump_if_fail do
+        Logger.error("Start dumping op fails in the verification. This might crash.")
+        dump(op)
+      end
+
       raise "MLIR operation verification failed"
     end
 
