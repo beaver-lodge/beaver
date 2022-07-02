@@ -65,6 +65,7 @@ defmodule Beaver do
       import Beaver.MLIR
       alias Beaver.MLIR.Type
       alias Beaver.MLIR.Attribute
+      alias Beaver.MLIR.ODS
       import Beaver.MLIR.Sigils
       unquote(alias_dialects)
       import Builtin
