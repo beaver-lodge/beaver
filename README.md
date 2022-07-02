@@ -1,6 +1,6 @@
 # Beaver 🦫
 
-Beaver, a LLVM/MLIR Toolkit in Elixir.
+**Boost the almighty LLVM dragon with some magical Elixir!**
 
 ## Motivation
 
