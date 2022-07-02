@@ -24,6 +24,14 @@ defmodule Beaver.MLIR.Operation do
     create(op_name, arguments ++ [result_types: results])
   end
 
+  def create(op_name, %Beaver.DSL.Op.Prototype{
+        operands: operands,
+        attributes: attributes,
+        results: results
+      }) do
+    create(op_name, operands ++ attributes ++ [result_types: results])
+  end
+
   def create(op_name, arguments) do
     defer_if_terminator = Keyword.get(arguments, :defer_if_terminator, true)
 

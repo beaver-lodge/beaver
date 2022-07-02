@@ -74,6 +74,12 @@ defmodule Beaver.DSL.Pattern do
 
     ast =
       quote do
+        Beaver.DSL.Op.Prototype.dispatch(
+          unquote(struct_name),
+          unquote(map_args),
+          &Beaver.MLIR.Operation.create/2
+        )
+
         mlir do
           Beaver.MLIR.Dialect.PDL.rewrite [
             beaver_gen_root,
