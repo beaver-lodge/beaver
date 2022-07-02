@@ -17,7 +17,7 @@ defmodule Beaver.DSL.SSA do
   end
 
   defp do_transform(
-         {:>>>, [line: 315],
+         {:>>>, _line,
           [
             {call, line, args},
             results
@@ -27,8 +27,10 @@ defmodule Beaver.DSL.SSA do
 
     ast =
       quote do
+        args = List.flatten([unquote_splicing(args)])
+
         %Beaver.DSL.SSA{}
-        |> Beaver.DSL.SSA.put_arguments(unquote_splicing(args))
+        |> Beaver.DSL.SSA.put_arguments(args)
         |> Beaver.DSL.SSA.put_results(unquote(results))
         |> unquote(empty_call)
       end
