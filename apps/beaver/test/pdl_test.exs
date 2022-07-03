@@ -103,11 +103,11 @@ defmodule PDLTest do
                     ) do
             region do
               block entry(
-                      arg0 :: Type.ranked_tensor([1, 3], Type.f32()),
-                      arg1 :: Type.ranked_tensor([2, 1], Type.f32())
+                      a :: Type.ranked_tensor([1, 3], Type.f32()),
+                      b :: Type.ranked_tensor([2, 1], Type.f32())
                     ) do
-                v0 = TOSA.add(arg0, arg1) >>> Type.ranked_tensor([2, 3], Type.f32())
-                v0 = TOSA.add(v0, arg0) >>> Type.ranked_tensor([2, 3], Type.f32())
+                res = TOSA.add(a, b) >>> Type.ranked_tensor([2, 3], Type.f32())
+                v0 = TOSA.add(res, a) >>> Type.ranked_tensor([2, 3], Type.f32())
                 Func.return(v0)
               end
             end
