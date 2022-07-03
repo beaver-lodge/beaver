@@ -34,6 +34,9 @@ defmodule Beaver.MLIR.Operation.State do
             v when is_binary(v) ->
               IR.mlirAttributeParseGet(ctx, IR.string_ref(v))
 
+            %Beaver.MLIR.CAPI.MlirType{} = type ->
+              Beaver.MLIR.Attribute.type(type)
+
             _ ->
               v
           end

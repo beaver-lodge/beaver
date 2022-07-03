@@ -17,11 +17,9 @@ defmodule Beaver.Nx.Defn do
     |> Type.tuple()
   end
 
-  @doc """
-  In upstream MLIR, there is no lower-able Op packing multiple values into a tuple.
-  If the Nx root type is a tuple, it should be converted to repeated results.
-  This function should always return a list of types
-  """
+  # In upstream MLIR, there is no lower-able Op packing multiple values into a tuple.
+  # If the Nx root type is a tuple, it should be converted to repeated results.
+  # This function should always return a list of types
   defp gen_root_types(tuple) when is_tuple(tuple) do
     Tuple.to_list(tuple)
     |> Enum.map(&gen_type/1)
@@ -346,11 +344,9 @@ defmodule Beaver.Nx.Defn do
       mlir do
         module do
           function_type =
-            Attribute.type(
-              Type.function(
-                Enum.map(vars, &gen_type/1),
-                gen_root_types(tree)
-              )
+            Type.function(
+              Enum.map(vars, &gen_type/1),
+              gen_root_types(tree)
             )
 
           Func.func beaver_nx_main(

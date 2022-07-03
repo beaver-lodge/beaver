@@ -5,7 +5,7 @@ defmodule CFTest do
   test "generate mlir with function calls" do
     mlir do
       module do
-        Func.func some_func(function_type: Attribute.type(Type.function([], [Type.i(32)]))) do
+        Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
           region do
             block bb_entry() do
               v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
@@ -26,9 +26,9 @@ defmodule CFTest do
             end
           end
         end
-        |> MLIR.Operation.verify!()
+        |> MLIR.Operation.verify!(dump_if_fail: true)
 
-        Func.func some_func2(function_type: Attribute.type(Type.function([], [Type.i(32)]))) do
+        Func.func some_func2(function_type: Type.function([], [Type.i(32)])) do
           region do
             block bb_entry() do
               v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
