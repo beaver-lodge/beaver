@@ -104,7 +104,10 @@ defmodule PDLTest do
                       a :: Type.ranked_tensor([1, 3], Type.f32()),
                       b :: Type.ranked_tensor([2, 1], Type.f32())
                     ) do
-                res = TOSA.add(a, b) >>> Type.ranked_tensor([2, 3], Type.f32())
+                res =
+                  TOSA.add(a, b, one: MLIR.Attribute.integer(MLIR.Type.i32(), 1)) >>>
+                    Type.ranked_tensor([2, 3], Type.f32())
+
                 res1 = TOSA.add(res, b) >>> Type.ranked_tensor([2, 3], Type.f32())
                 Func.return(res1)
               end
@@ -114,14 +117,19 @@ defmodule PDLTest do
       end
 
     defmodule TestTOSAPatterns do
-      pattern replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
+      pattern replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res]}) do
         # create a common struct to see if the pattern transformation would skip it
         assert %Range{first: 1, last: 10, step: 2} |> Range.size() == 5
         %TOSA.Sub{operands: [a, b]}
       end
 
       pattern replace_multi_add_op(
-                %TOSA.Add{operands: [a, b], results: [res]},
+                one = Attribute.integer(MLIR.Type.i32(), 1),
+                %TOSA.Add{
+                  operands: [a, b],
+                  results: [res],
+                  attributes: [one: ^one]
+                },
                 _t = %TOSA.Add{
                   operands: [
                     ^res,
