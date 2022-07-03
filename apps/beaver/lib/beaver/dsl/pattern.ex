@@ -89,8 +89,17 @@ defmodule Beaver.DSL.Pattern do
         {_k, other} -> other
       end)
 
-    map_args = Keyword.put(map_args, :operands, filtered_operands)
-    map_args = Keyword.put(map_args, :attributes, filtered_attributes)
+    filtered_results =
+      Enum.map(results, fn
+        {:bound, bound} -> bound
+        other -> other
+      end)
+
+    map_args =
+      map_args
+      |> Keyword.put(:operands, filtered_operands)
+      |> Keyword.put(:attributes, filtered_attributes)
+      |> Keyword.put(:results, filtered_results)
 
     # generate bounds between operand variables and pdl.operand
     operands =
@@ -128,23 +137,46 @@ defmodule Beaver.DSL.Pattern do
 
     # generate bounds between result variables and pdl.type
     results_match =
-      for result <- results do
-        quote do
-          unquote(result) = Beaver.MLIR.Dialect.PDL.type() >>> ~t{!pdl.type}
+      if is_list(results) do
+        for result <- results do
+          case result do
+            {:bound, bound} ->
+              quote do
+                Beaver.DSL.Pattern.gen_pdl(unquote(bound))
+              end
+
+            _ ->
+              quote do
+                unquote(result) = Beaver.MLIR.Dialect.PDL.type() >>> ~t{!pdl.type}
+              end
+          end
         end
+      else
+        []
       end
 
     # generate bounds between result variables and pdl.value produced by pdl.result
     # preceding expression should use pin operator (^var) to access these version of binding otherwise it will get bound to a pdl.value produced by pdl.operand
+    # must use a list of unbound variables to do the match
     results_rebind =
-      for {result, i} <- Enum.with_index(results) do
-        quote do
-          unquote(result) =
-            Beaver.MLIR.Dialect.PDL.result(
-              beaver_gen_root,
-              index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), unquote(i))
-            ) >>> ~t{!pdl.value}
+      if is_list(results) do
+        for {result, i} <- Enum.with_index(results) do
+          case result do
+            {:bound, _bound} ->
+              []
+
+            _ ->
+              quote do
+                unquote(result) =
+                  Beaver.MLIR.Dialect.PDL.result(
+                    beaver_gen_root,
+                    index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), unquote(i))
+                  ) >>> ~t{!pdl.value}
+              end
+          end
         end
+      else
+        []
       end
 
     # injecting all variables and dispatch the op creation
