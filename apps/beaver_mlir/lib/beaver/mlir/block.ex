@@ -1,23 +1,22 @@
 defmodule Beaver.MLIR.Block do
   alias Beaver.MLIR
-  alias Beaver.MLIR.CAPI.IR
 
   # TODO: remote ctx in these funcs
 
   # TODO: use the struct to replace the Exotic.Value here in pattern after Exotic gets updated with Protocol support
-  def do_add_arg!(block, _ctx, {t = %Beaver.MLIR.CAPI.IR.Type{}, loc}) do
-    IR.mlirBlockAddArgument(block, t, loc)
+  def do_add_arg!(block, _ctx, {t = %Beaver.MLIR.CAPI.MlirType{}, loc}) do
+    MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
   def do_add_arg!(block, ctx, {t, loc}) do
-    t = IR.mlirTypeParseGet(ctx, IR.string_ref(t))
-    IR.mlirBlockAddArgument(block, t, loc)
+    t = MLIR.CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create(t))
+    MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
   def do_add_arg!(block, ctx, t) do
-    loc = IR.mlirLocationUnknownGet(ctx)
-    t = IR.mlirTypeParseGet(ctx, IR.string_ref(t))
-    IR.mlirBlockAddArgument(block, t, loc)
+    loc = MLIR.CAPI.mlirLocationUnknownGet(ctx)
+    t = MLIR.CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create(t))
+    MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
   def add_arg!(block, ctx, args) do
@@ -27,7 +26,7 @@ defmodule Beaver.MLIR.Block do
   end
 
   def get_arg!(block, index) when not is_nil(block) do
-    IR.mlirBlockGetArgument(block, index) |> Exotic.Value.transmit()
+    MLIR.CAPI.mlirBlockGetArgument(block, index) |> Exotic.Value.transmit()
   end
 
   def create(arg_loc_pairs) when is_list(arg_loc_pairs) do

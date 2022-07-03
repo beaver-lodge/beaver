@@ -1,25 +1,24 @@
 defmodule Beaver.MLIR.Operation.State do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
-  alias Beaver.MLIR.CAPI.IR
   alias Exotic.Value.Array
   alias Exotic.Value
   defstruct [:ref]
 
   def get!(name, location) when is_binary(name) do
-    IR.mlirOperationStateGet(
-      IR.string_ref(name),
+    CAPI.mlirOperationStateGet(
+      MLIR.StringRef.create(name),
       location
     )
   end
 
   def get!(context, name) when is_binary(name) do
-    get!(name, IR.mlirLocationUnknownGet(context))
+    get!(name, CAPI.mlirLocationUnknownGet(context))
   end
 
   defp get_context(state) do
-    location = Exotic.Value.fetch(state, IR.OperationState, :location)
-    IR.mlirLocationGetContext(location)
+    location = Exotic.Value.fetch(state, CAPI.MlirOperationState, :location)
+    CAPI.mlirLocationGetContext(location)
   end
 
   def add_attr(state, attrs) when is_list(attrs) do
@@ -32,7 +31,7 @@ defmodule Beaver.MLIR.Operation.State do
         attr =
           case v do
             v when is_binary(v) ->
-              IR.mlirAttributeParseGet(ctx, IR.string_ref(v))
+              CAPI.mlirAttributeParseGet(ctx, MLIR.StringRef.create(v))
 
             %Beaver.MLIR.CAPI.MlirType{} = type ->
               Beaver.MLIR.Attribute.type(type)
@@ -42,15 +41,15 @@ defmodule Beaver.MLIR.Operation.State do
           end
           |> Exotic.Value.transmit()
 
-        IR.mlirNamedAttributeGet(
-          IR.mlirIdentifierGet(ctx, IR.string_ref(k)),
+        CAPI.mlirNamedAttributeGet(
+          CAPI.mlirIdentifierGet(ctx, MLIR.StringRef.create(k)),
           attr
         )
       end
 
     array_ptr = named_attrs |> Enum.map(&Value.transmit/1) |> Array.get() |> Value.get_ptr()
 
-    IR.mlirOperationStateAddAttributes(
+    CAPI.mlirOperationStateAddAttributes(
       Value.get_ptr(state),
       length(attrs),
       array_ptr
@@ -66,7 +65,7 @@ defmodule Beaver.MLIR.Operation.State do
       |> Array.get()
       |> Value.get_ptr()
 
-    IR.mlirOperationStateAddOperands(Value.get_ptr(state), length(operands), array)
+    CAPI.mlirOperationStateAddOperands(Value.get_ptr(state), length(operands), array)
     state
   end
 
@@ -77,7 +76,7 @@ defmodule Beaver.MLIR.Operation.State do
       result_types
       |> Enum.map(fn
         t when is_binary(t) ->
-          IR.mlirTypeParseGet(context, IR.string_ref(t))
+          CAPI.mlirTypeParseGet(context, MLIR.StringRef.create(t))
 
         t ->
           t
@@ -86,14 +85,14 @@ defmodule Beaver.MLIR.Operation.State do
       |> Array.get()
       |> Value.get_ptr()
 
-    IR.mlirOperationStateAddResults(Exotic.Value.get_ptr(state), length(result_types), array)
+    CAPI.mlirOperationStateAddResults(Exotic.Value.get_ptr(state), length(result_types), array)
     state
   end
 
   def add_regions(state, regions) when is_list(regions) do
     array_ptr = regions |> Enum.map(&Value.transmit/1) |> Array.get() |> Value.get_ptr()
 
-    IR.mlirOperationStateAddOwnedRegions(
+    CAPI.mlirOperationStateAddOwnedRegions(
       Value.get_ptr(state),
       length(regions),
       array_ptr
@@ -162,7 +161,7 @@ defmodule Beaver.MLIR.Operation.State do
 
   def add_argument(
         state,
-        operand = %Beaver.MLIR.CAPI.IR.Value{}
+        operand = %Beaver.MLIR.CAPI.MlirValue{}
       ) do
     add_operand(state, [operand])
   end

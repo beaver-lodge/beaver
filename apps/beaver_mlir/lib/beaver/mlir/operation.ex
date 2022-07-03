@@ -1,6 +1,5 @@
 defmodule Beaver.MLIR.Operation do
   alias Beaver.MLIR
-  alias Beaver.MLIR.CAPI.IR
   alias Beaver.MLIR.CAPI
   import Beaver.MLIR.CAPI
   require Logger
@@ -9,7 +8,7 @@ defmodule Beaver.MLIR.Operation do
   Create a new operation from a operation state
   """
   def create(state) do
-    state |> Exotic.Value.get_ptr() |> IR.mlirOperationCreate()
+    state |> Exotic.Value.get_ptr() |> MLIR.CAPI.mlirOperationCreate()
   end
 
   @doc """
@@ -57,26 +56,23 @@ defmodule Beaver.MLIR.Operation do
     end
   end
 
-  # TODO: add guard
-  def results(op) do
-    num_results = CAPI.mlirOperationGetNumResults(op) |> Exotic.Value.extract()
+  def results(%MLIR.CAPI.MlirOperation{} = op) do
+    case CAPI.mlirOperationGetNumResults(op) |> Exotic.Value.extract() do
+      0 ->
+        op
 
-    if num_results == 1 do
-      CAPI.mlirOperationGetResult(op, 0)
-    else
-      for i <- 0..(num_results - 1)//1 do
-        CAPI.mlirOperationGetResult(op, i)
-      end
+      1 ->
+        CAPI.mlirOperationGetResult(op, 0)
+
+      n when n > 1 ->
+        for i <- 0..(n - 1)//1 do
+          CAPI.mlirOperationGetResult(op, i)
+        end
     end
   end
 
   defp do_create(op_name, arguments) when is_binary(op_name) and is_list(arguments) do
-    {_ctx, arguments} = arguments |> Keyword.pop(:mlir_ctx)
-    {block, arguments} = arguments |> Keyword.pop(:mlir_block)
-    {location, arguments} = arguments |> Keyword.pop(:mlir_location)
-
-    block = block || MLIR.Managed.Block.get()
-    location = location || MLIR.Managed.Location.get()
+    location = MLIR.Managed.Location.get()
 
     state = MLIR.Operation.State.get!(op_name, location)
 
@@ -118,7 +114,7 @@ defmodule Beaver.MLIR.Operation do
     should_raise = opts |> Keyword.get(:should_raise, false)
     dump = opts |> Keyword.get(:dump, false)
     dump_if_fail = opts |> Keyword.get(:dump_if_fail, false)
-    is_success = IR.mlirOperationVerify(op) |> Exotic.Value.extract()
+    is_success = MLIR.CAPI.mlirOperationVerify(op) |> Exotic.Value.extract()
 
     if dump do
       Logger.warning("Start dumping op not verified. This might crash.")

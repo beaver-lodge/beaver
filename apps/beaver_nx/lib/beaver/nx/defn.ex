@@ -365,7 +365,7 @@ defmodule Beaver.Nx.Defn do
                   ret = %Beaver.MLIR.CAPI.MlirValue{} ->
                     Func.return(ret)
 
-                  ret = %Beaver.MLIR.CAPI.IR.Value{} ->
+                  ret = %Beaver.MLIR.CAPI.MlirValue{} ->
                     Func.return(ret)
 
                   tuple_ret when is_tuple(tuple_ret) ->
