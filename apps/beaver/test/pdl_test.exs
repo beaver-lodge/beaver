@@ -107,8 +107,8 @@ defmodule PDLTest do
                       b :: Type.ranked_tensor([2, 1], Type.f32())
                     ) do
                 res = TOSA.add(a, b) >>> Type.ranked_tensor([2, 3], Type.f32())
-                v0 = TOSA.add(res, a) >>> Type.ranked_tensor([2, 3], Type.f32())
-                Func.return(v0)
+                res1 = TOSA.add(res, b) >>> Type.ranked_tensor([2, 3], Type.f32())
+                Func.return(res1)
               end
             end
           end
@@ -126,10 +126,10 @@ defmodule PDLTest do
                 %TOSA.Add{operands: [a, b], results: [res]},
                 _t = %TOSA.Add{
                   operands: [
-                    {:bound, res},
-                    {:bound, a}
+                    ^res,
+                    ^b
                   ],
-                  results: [res2]
+                  results: [res1]
                 }
               ) do
         %TOSA.Sub{operands: [a, b]}

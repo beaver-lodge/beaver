@@ -1,6 +1,10 @@
 defmodule Beaver.DSL.Pattern do
   use Beaver
 
+  defp do_transform_match({:^, _, [var]}) do
+    {:bound, var}
+  end
+
   defp do_transform_match(
          {:%, _,
           [
