@@ -185,6 +185,13 @@ defmodule Beaver.DSL.Pattern do
           ]} = _ast
        ) do
     attributes = map_args |> Keyword.get(:attributes, [])
+
+    filtered_attributes =
+      Enum.map(attributes, fn
+        {_k, other} -> other
+      end)
+
+    map_args = Keyword.put(map_args, :attributes, filtered_attributes)
     attributes_keys = Keyword.keys(attributes)
 
     ast =
