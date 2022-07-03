@@ -197,6 +197,12 @@ defmodule Beaver.DSL.Pattern do
     end
   end
 
+  @doc """
+  transform a do block to PDL rewrite operation.
+  Every Prototype form within the block should be transformed to create a PDL operation.
+  The last expression will be replaced by the root op in the match by default.
+  TODO: wrap this function with a macro rewrite/1, so that it could be use in a independent function
+  """
   def transform_rewrite(ast) do
     rewrite_block_ast = Macro.postwalk(ast, &do_transform_rewrite/1)
 
