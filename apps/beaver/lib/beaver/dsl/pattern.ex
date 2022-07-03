@@ -87,6 +87,10 @@ defmodule Beaver.DSL.Pattern do
               {_k, other} -> other
             end)
         end
+
+      _ ->
+        raise "Must pass a list or a variable to operands/attributes/results, got: " <>
+                Macro.to_string(args)
     end
   end
 

@@ -264,4 +264,20 @@ defmodule PDLTest do
     assert not (ir_string =~ "tosa.add")
     assert ir_string =~ "tosa.sub"
   end
+
+  test "raise" do
+    assert_raise RuntimeError,
+                 ~r"Must pass a list or a variable to operands/attributes/results, got: %{a: 1}",
+                 fn ->
+                   defmodule ToyPass do
+                     use Beaver
+
+                     defpat replace_add_op(
+                              _t = %TOSA.Add{operands: %{a: 1}, results: [_res], attributes: []}
+                            ) do
+                       %TOSA.Sub{operands: [a, b]}
+                     end
+                   end
+                 end
+  end
 end
