@@ -138,6 +138,12 @@ defmodule PDLTest do
                   results: [res1]
                 }
               ) do
+        %TOSA.Sub{operands: [a, b], results: [Type.ranked_tensor([2, 3], Type.f32())]}
+        %TOSA.Sub{operands: [a, b], results: [Type.ranked_tensor([2, 3], Type.f32())]}
+        %TOSA.Sub{operands: [a, b], results: [Type.ranked_tensor([2, 3], Type.f32())]}
+        %TOSA.Add{operands: [a, b], results: [Type.ranked_tensor([2, 3], Type.f32())]}
+        %TOSA.Sub{operands: [a, b], results: [Type.ranked_tensor([2, 3], Type.f32())]}
+        %TOSA.Sub{operands: [a, b], results: [Type.ranked_tensor([2, 3], Type.f32())]}
         %TOSA.Sub{operands: [a, b]}
       end
     end

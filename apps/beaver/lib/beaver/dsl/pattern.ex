@@ -1,6 +1,17 @@
 defmodule Beaver.DSL.Pattern do
   use Beaver
 
+  # generate PDL ops for types and attributes
+  def gen_pdl(%MLIR.CAPI.MlirType{} = type) do
+    mlir do
+      Beaver.MLIR.Dialect.PDL.type(type: type) >>> ~t{!pdl.type}
+    end
+  end
+
+  def gen_pdl(%MLIR.CAPI.MlirValue{} = value) do
+    value
+  end
+
   @doc """
   The difference between a pdl.operation creation in a match body and a rewrite body:
   - in a match body, pdl.attribute/pdl.operand/pdl.result will be generated for unbound variables
@@ -12,6 +23,8 @@ defmodule Beaver.DSL.Pattern do
         %Beaver.MLIR.CAPI.MlirAttribute{} = attribute_names
       ) do
     mlir do
+      results = results |> Enum.map(&gen_pdl/1)
+
       Beaver.MLIR.Dialect.PDL.operation(
         operands ++
           attributes ++
