@@ -8,6 +8,13 @@ defmodule Beaver.DSL.Pattern do
     end
   end
 
+  def gen_pdl(%Beaver.MLIR.CAPI.MlirAttribute{} = attribute) do
+    mlir do
+      Beaver.MLIR.Dialect.PDL.attribute(value: attribute) >>>
+        ~t{!pdl.attribute}
+    end
+  end
+
   def gen_pdl(%MLIR.CAPI.MlirValue{} = value) do
     value
   end
@@ -24,6 +31,7 @@ defmodule Beaver.DSL.Pattern do
       ) do
     mlir do
       results = results |> Enum.map(&gen_pdl/1)
+      attributes = attributes |> Enum.map(&gen_pdl/1)
 
       Beaver.MLIR.Dialect.PDL.operation(
         operands ++
@@ -106,17 +114,7 @@ defmodule Beaver.DSL.Pattern do
         case attribute do
           {:bound, bound} ->
             quote do
-              unquote(bound) =
-                case unquote(bound) do
-                  # if bound variable is a pdl.attribute's result value
-                  %Beaver.MLIR.CAPI.MlirValue{} ->
-                    unquote(bound)
-
-                  # if bound variable is a real attribute
-                  %Beaver.MLIR.CAPI.MlirAttribute{} ->
-                    Beaver.MLIR.Dialect.PDL.attribute(value: unquote(bound)) >>>
-                      ~t{!pdl.attribute}
-                end
+              unquote(bound) = Beaver.DSL.Pattern.gen_pdl(unquote(bound))
             end
 
           _ ->

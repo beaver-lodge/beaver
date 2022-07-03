@@ -130,7 +130,7 @@ defmodule PDLTest do
                   results: [res],
                   attributes: [one: ^one]
                 },
-                _t = %TOSA.Add{
+                t = %TOSA.Add{
                   operands: [
                     ^res,
                     ^b
