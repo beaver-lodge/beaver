@@ -46,7 +46,7 @@ And a small example to showcase what it is like to define and run a pass in Beav
 defmodule ToyPass do
   use Beaver
 
-  pattern replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
+  defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
     %TOSA.Sub{operands: [a, b]}
   end
 
