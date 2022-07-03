@@ -17,7 +17,7 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   defp get_context(state) do
-    location = Exotic.Value.fetch(state, CAPI.OperationState, :location)
+    location = Exotic.Value.fetch(state, CAPI.MlirOperationState, :location)
     CAPI.mlirLocationGetContext(location)
   end
 

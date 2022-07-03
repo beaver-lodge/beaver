@@ -1,31 +1,23 @@
 defmodule MlirTest do
   use ExUnit.Case, async: true
-  alias Beaver.MLIR
-  alias Beaver.MLIR.CAPI.{IR, Registration}
-
-  setup_all do
-    MLIR.CAPI.call_to_load_code()
-    IR.load(Beaver.MLIR.CAPI)
-    MLIR.CAPI.Registration.load!(Beaver.MLIR.CAPI)
-    []
-  end
+  use Beaver
 
   test "call wrapped apis" do
     ctx =
-      MLIR.CAPI.IR.mlirContextCreate()
+      MLIR.CAPI.mlirContextCreate()
       |> Exotic.Value.transmit()
 
     Registration.mlirRegisterAllDialects(ctx)
 
     location =
-      MLIR.CAPI.IR.mlirLocationFileLineColGet(
+      MLIR.CAPI.mlirLocationFileLineColGet(
         ctx,
         __DIR__,
         1,
         2
       )
 
-    _module = MLIR.CAPI.IR.mlirModuleCreateEmpty(location)
+    _module = MLIR.CAPI.mlirModuleCreateEmpty(location)
 
     module =
       MLIR.Module.create(ctx, """
@@ -34,7 +26,7 @@ defmodule MlirTest do
       """)
 
     MLIR.Operation.verify!(module)
-    _operation = MLIR.CAPI.IR.mlirModuleGetOperation(module)
+    _operation = MLIR.CAPI.mlirModuleGetOperation(module)
 
     Exotic.LibC.load()
 
@@ -44,19 +36,18 @@ defmodule MlirTest do
 
     for _i <- 0..200 do
       operation_state_ptr = operation_state |> Exotic.Value.get_ptr()
-      _ret_op = IR.mlirOperationCreate(operation_state_ptr)
-      # MLIR.CAPI.IR.mlirOperationDump(ret_op)
+      _ret_op = MLIR.CAPI.mlirOperationCreate(operation_state_ptr)
     end
 
-    i64_t = IR.mlirTypeParseGet(ctx, IR.string_ref("i64"))
+    i64_t = MLIR.CAPI.mlirTypeParseGet(ctx, IR.string_ref("i64"))
     # create func body entry block
     funcBodyArgTypes = [i64_t]
     funcBodyArgLocs = [location]
-    funcBodyRegion = IR.mlirRegionCreate()
+    funcBodyRegion = MLIR.CAPI.mlirRegionCreate()
     funcBody = MLIR.Block.create(funcBodyArgTypes, funcBodyArgLocs)
     [arg1] = funcBody |> MLIR.Block.add_arg!(ctx, ["i64"])
     # append block to region
-    IR.mlirRegionAppendOwnedBlock(funcBodyRegion, funcBody)
+    MLIR.CAPI.mlirRegionAppendOwnedBlock(funcBodyRegion, funcBody)
     # create func
     operation_state = ctx |> MLIR.Operation.State.get!("func.func")
 
@@ -73,17 +64,17 @@ defmodule MlirTest do
       |> MLIR.Operation.State.add_operand([MLIR.Block.get_arg!(funcBody, 0), arg1])
       |> MLIR.Operation.State.add_result(["i64"])
 
-    name = Exotic.Value.fetch(add_op_state, IR.OperationState, :name)
+    name = Exotic.Value.fetch(add_op_state, MLIR.CAPI.MlirOperationState, :name)
 
     assert 10 ==
              Exotic.Value.fetch(name, IR.StringRef, :length)
              |> Exotic.Value.extract()
 
-    location1 = Exotic.Value.fetch(add_op_state, IR.OperationState, :location)
-    nResults = Exotic.Value.fetch(add_op_state, IR.OperationState, :nResults)
-    nOperands = Exotic.Value.fetch(add_op_state, IR.OperationState, :nOperands)
-    nRegions = Exotic.Value.fetch(add_op_state, IR.OperationState, :nRegions)
-    nAttributes = Exotic.Value.fetch(add_op_state, IR.OperationState, :nAttributes)
+    location1 = Exotic.Value.fetch(add_op_state, MLIR.CAPI.MlirOperationState, :location)
+    nResults = Exotic.Value.fetch(add_op_state, MLIR.CAPI.MlirOperationState, :nResults)
+    nOperands = Exotic.Value.fetch(add_op_state, MLIR.CAPI.MlirOperationState, :nOperands)
+    nRegions = Exotic.Value.fetch(add_op_state, MLIR.CAPI.MlirOperationState, :nRegions)
+    nAttributes = Exotic.Value.fetch(add_op_state, MLIR.CAPI.MlirOperationState, :nAttributes)
 
     assert 0 == nRegions |> Exotic.Value.extract()
     assert 1 == nResults |> Exotic.Value.extract()
@@ -91,10 +82,10 @@ defmodule MlirTest do
     assert 0 == nAttributes |> Exotic.Value.extract()
     add_op = add_op_state |> MLIR.Operation.create()
 
-    _ctx = IR.mlirLocationGetContext(location)
-    ctx = IR.mlirLocationGetContext(location1)
+    _ctx = MLIR.CAPI.mlirLocationGetContext(location)
+    ctx = MLIR.CAPI.mlirLocationGetContext(location1)
 
-    r = IR.mlirOperationGetResult(add_op, 0)
+    r = MLIR.CAPI.mlirOperationGetResult(add_op, 0)
 
     return_op =
       ctx
@@ -102,19 +93,19 @@ defmodule MlirTest do
       |> MLIR.Operation.State.add_operand([r])
       |> MLIR.Operation.create()
 
-    IR.mlirBlockInsertOwnedOperation(funcBody, 0, add_op)
-    IR.mlirBlockInsertOwnedOperationAfter(funcBody, add_op, return_op)
-    moduleBody = IR.mlirModuleGetBody(module)
-    IR.mlirBlockInsertOwnedOperation(moduleBody, 0, func_op)
+    MLIR.CAPI.mlirBlockInsertOwnedOperation(funcBody, 0, add_op)
+    MLIR.CAPI.mlirBlockInsertOwnedOperationAfter(funcBody, add_op, return_op)
+    moduleBody = MLIR.CAPI.mlirModuleGetBody(module)
+    MLIR.CAPI.mlirBlockInsertOwnedOperation(moduleBody, 0, func_op)
 
     MLIR.Operation.verify!(module)
 
-    MLIR.CAPI.IR.mlirContextDestroy(ctx)
+    MLIR.CAPI.mlirContextDestroy(ctx)
   end
 
   test "elixir dialect" do
     ctx =
-      MLIR.CAPI.IR.mlirContextCreate()
+      MLIR.CAPI.mlirContextCreate()
       |> Exotic.Value.transmit()
 
     Registration.register_elixir_dialect(ctx)
@@ -151,14 +142,14 @@ defmodule MlirTest do
 
   test "run a simple pass" do
     ctx =
-      MLIR.CAPI.IR.mlirContextCreate()
+      MLIR.CAPI.mlirContextCreate()
       |> Exotic.Value.transmit()
 
     Registration.mlirRegisterAllDialects(ctx)
 
     module = create_adder_module(ctx)
 
-    assert IR.mlirOperationVerify(module) |> Exotic.Value.extract()
+    assert MLIR.CAPI.mlirOperationVerify(module) |> Exotic.Value.extract()
     CAPI.Pass.load!(Beaver.MLIR.CAPI)
     CAPI.load!(Beaver.MLIR.CAPI)
 

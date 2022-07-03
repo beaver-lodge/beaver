@@ -8,7 +8,7 @@ defmodule Beaver.MLIR.Operation do
   Create a new operation from a operation state
   """
   def create(state) do
-    state |> Exotic.Value.get_ptr() |> IR.mlirOperationCreate()
+    state |> Exotic.Value.get_ptr() |> MLIR.CAPI.mlirOperationCreate()
   end
 
   @doc """
@@ -114,7 +114,7 @@ defmodule Beaver.MLIR.Operation do
     should_raise = opts |> Keyword.get(:should_raise, false)
     dump = opts |> Keyword.get(:dump, false)
     dump_if_fail = opts |> Keyword.get(:dump_if_fail, false)
-    is_success = IR.mlirOperationVerify(op) |> Exotic.Value.extract()
+    is_success = MLIR.CAPI.mlirOperationVerify(op) |> Exotic.Value.extract()
 
     if dump do
       Logger.warning("Start dumping op not verified. This might crash.")
