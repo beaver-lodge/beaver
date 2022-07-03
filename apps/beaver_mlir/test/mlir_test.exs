@@ -7,12 +7,12 @@ defmodule MlirTest do
       MLIR.CAPI.mlirContextCreate()
       |> Exotic.Value.transmit()
 
-    Registration.mlirRegisterAllDialects(ctx)
+    MLIR.CAPI.mlirRegisterAllDialects(ctx)
 
     location =
       MLIR.CAPI.mlirLocationFileLineColGet(
         ctx,
-        __DIR__,
+        MLIR.StringRef.create(__DIR__),
         1,
         2
       )
@@ -30,7 +30,7 @@ defmodule MlirTest do
 
     Exotic.LibC.load()
 
-    _ret_str = IR.string_ref("func.return")
+    _ret_str = MLIR.StringRef.create("func.return")
 
     operation_state = MLIR.Operation.State.get!("func.return", location)
 
@@ -39,7 +39,7 @@ defmodule MlirTest do
       _ret_op = MLIR.CAPI.mlirOperationCreate(operation_state_ptr)
     end
 
-    i64_t = MLIR.CAPI.mlirTypeParseGet(ctx, IR.string_ref("i64"))
+    i64_t = MLIR.CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create("i64"))
     # create func body entry block
     funcBodyArgTypes = [i64_t]
     funcBodyArgLocs = [location]
@@ -67,7 +67,7 @@ defmodule MlirTest do
     name = Exotic.Value.fetch(add_op_state, MLIR.CAPI.MlirOperationState, :name)
 
     assert 10 ==
-             Exotic.Value.fetch(name, IR.StringRef, :length)
+             Exotic.Value.fetch(name, MLIR.CAPI.MlirStringRef, :length)
              |> Exotic.Value.extract()
 
     location1 = Exotic.Value.fetch(add_op_state, MLIR.CAPI.MlirOperationState, :location)
@@ -108,8 +108,8 @@ defmodule MlirTest do
       MLIR.CAPI.mlirContextCreate()
       |> Exotic.Value.transmit()
 
-    Registration.register_elixir_dialect(ctx)
-    Registration.mlirRegisterAllDialects(ctx)
+    MLIR.CAPI.mlirDialectHandleRegisterDialect(MLIR.CAPI.mlirGetDialectHandle__elixir__(), ctx)
+    MLIR.CAPI.mlirRegisterAllDialects(ctx)
 
     _add_op =
       MLIR.Operation.State.get!(ctx, "elixir.add")
@@ -145,13 +145,11 @@ defmodule MlirTest do
       MLIR.CAPI.mlirContextCreate()
       |> Exotic.Value.transmit()
 
-    Registration.mlirRegisterAllDialects(ctx)
+    CAPI.mlirRegisterAllDialects(ctx)
 
     module = create_adder_module(ctx)
 
     assert MLIR.CAPI.mlirOperationVerify(module) |> Exotic.Value.extract()
-    CAPI.Pass.load!(Beaver.MLIR.CAPI)
-    CAPI.load!(Beaver.MLIR.CAPI)
 
     CAPI.MlirExternalPass.native_fields_with_names()
 

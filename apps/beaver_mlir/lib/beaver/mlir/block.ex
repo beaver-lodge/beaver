@@ -9,13 +9,13 @@ defmodule Beaver.MLIR.Block do
   end
 
   def do_add_arg!(block, ctx, {t, loc}) do
-    t = MLIR.CAPI.mlirTypeParseGet(ctx, IR.string_ref(t))
+    t = MLIR.CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create(t))
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
   def do_add_arg!(block, ctx, t) do
     loc = MLIR.CAPI.mlirLocationUnknownGet(ctx)
-    t = MLIR.CAPI.mlirTypeParseGet(ctx, IR.string_ref(t))
+    t = MLIR.CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create(t))
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
