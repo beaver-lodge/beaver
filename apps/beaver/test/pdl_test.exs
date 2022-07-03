@@ -107,6 +107,7 @@ defmodule PDLTest do
                       arg1 :: Type.ranked_tensor([2, 1], Type.f32())
                     ) do
                 v0 = TOSA.add(arg0, arg1) >>> Type.ranked_tensor([2, 3], Type.f32())
+                v0 = TOSA.add(v0, arg1) >>> Type.ranked_tensor([2, 3], Type.f32())
                 Func.return(v0)
               end
             end
@@ -127,7 +128,7 @@ defmodule PDLTest do
                 %TOSA.Add{operands: [a, b], results: [res]},
                 _t = %TOSA.Add{
                   operands: [
-                    res,
+                    {:bound, res},
                     b
                   ],
                   results: [res2]
@@ -140,7 +141,6 @@ defmodule PDLTest do
     MLIR.Operation.verify!(ir_module)
 
     MLIR.Pattern.apply!(ir_module, [
-      TestTOSAPatterns.replace_add_op(),
       TestTOSAPatterns.replace_multi_add_op()
     ])
     |> MLIR.Operation.verify!(dump_if_fail: true)

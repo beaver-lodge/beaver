@@ -12,10 +12,26 @@ defmodule Beaver.DSL.Pattern do
     results = map_args |> Keyword.get(:results, [])
     _attributes = map_args |> Keyword.get(:attributes, [])
 
+    filtered_operands =
+      Enum.map(operands, fn
+        {:bound, bound} -> bound
+        other -> other
+      end)
+
+    map_args = Keyword.put(map_args, :operands, filtered_operands)
+
     operands =
       for operand <- operands do
-        quote do
-          unquote(operand) = Beaver.MLIR.Dialect.PDL.operand() >>> ~t{!pdl.value}
+        case operand do
+          {:bound, _bound} ->
+            quote do
+              []
+            end
+
+          _ ->
+            quote do
+              unquote(operand) = Beaver.MLIR.Dialect.PDL.operand() >>> ~t{!pdl.value}
+            end
         end
       end
 
