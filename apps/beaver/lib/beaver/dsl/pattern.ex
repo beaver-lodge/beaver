@@ -118,7 +118,7 @@ defmodule Beaver.DSL.Pattern do
             unquote(struct_name),
             unquote(map_args),
             attribute_names,
-            &Beaver.DSL.Pattern.create_root/3
+            &Beaver.DSL.Pattern.create_operation/3
           )
 
         unquote_splicing(results_rebind)
@@ -156,16 +156,16 @@ defmodule Beaver.DSL.Pattern do
 
   defp do_transform_rewrite(ast), do: ast
 
-  def create_root(
+  def create_operation(
         op_name,
         %Beaver.DSL.Op.Prototype{operands: operands, attributes: attributes, results: results},
         %Beaver.MLIR.CAPI.MlirAttribute{} = attribute_names
       ) do
     mlir do
-      arguments = operands ++ attributes ++ results
-
       Beaver.MLIR.Dialect.PDL.operation(
-        arguments ++
+        operands ++
+          attributes ++
+          results ++
           [
             name: Beaver.MLIR.Attribute.string(op_name),
             attributeNames: attribute_names,
@@ -182,25 +182,12 @@ defmodule Beaver.DSL.Pattern do
 
   def create_replace(
         op_name,
-        %Beaver.DSL.Op.Prototype{operands: operands, attributes: attributes} = prototype,
+        %Beaver.DSL.Op.Prototype{operands: operands, attributes: attributes, results: results} =
+          prototype,
         beaver_gen_root
       ) do
     mlir do
-      repl =
-        Beaver.MLIR.Dialect.PDL.operation(
-          operands ++
-            [
-              name: Beaver.MLIR.Attribute.string(op_name),
-              attributeNames: Beaver.MLIR.Attribute.array([]),
-              operand_segment_sizes:
-                Beaver.MLIR.ODS.operand_segment_sizes([
-                  length(operands),
-                  length(attributes),
-                  # in replacement length of results should always be 0
-                  0
-                ])
-            ]
-        ) >>> ~t{!pdl.operation}
+      repl = create_operation(op_name, prototype, Beaver.MLIR.Attribute.array([]))
 
       Beaver.MLIR.Dialect.PDL.replace([
         beaver_gen_root,
