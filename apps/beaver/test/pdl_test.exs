@@ -125,6 +125,7 @@ defmodule PDLTest do
 
       pattern replace_multi_add_op(
                 one = Attribute.integer(MLIR.Type.i32(), 1),
+                ty = Type.ranked_tensor([2, 3], Type.f32()),
                 %TOSA.Add{
                   operands: [a, b],
                   results: [res],
@@ -135,7 +136,7 @@ defmodule PDLTest do
                     ^res,
                     ^b
                   ],
-                  results: [res1]
+                  results: [^ty]
                 }
               ) do
         types = [Type.ranked_tensor([2, 3], Type.f32())]
@@ -147,6 +148,25 @@ defmodule PDLTest do
         a = Pattern.result(a, 0)
         a = %TOSA.Sub{operands: [a, b], results: types, attributes: [one: one]}
         a = Pattern.result(a, 0)
+        %TOSA.Sub{operands: [a, b]}
+      end
+
+      pattern replace_multi_add_op(
+                one = Attribute.integer(MLIR.Type.i32(), 1),
+                ty = Type.ranked_tensor([2, 3], Type.f32()),
+                %TOSA.Add{
+                  operands: [a, b],
+                  results: [res],
+                  attributes: [one: ^one]
+                },
+                t = %TOSA.Add{
+                  operands: [
+                    ^res,
+                    ^b
+                  ],
+                  results: [ty]
+                }
+              ) do
         %TOSA.Sub{operands: [a, b]}
       end
     end
