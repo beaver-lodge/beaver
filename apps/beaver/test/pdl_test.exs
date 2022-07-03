@@ -116,8 +116,6 @@ defmodule PDLTest do
       end
 
     defmodule TestTOSAPatterns do
-      alias Beaver.MLIR
-
       pattern replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
         # create a common struct to see if the pattern transformation would skip it
         assert %Range{first: 1, last: 10, step: 2} |> Range.size() == 5
