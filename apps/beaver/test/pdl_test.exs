@@ -130,7 +130,7 @@ defmodule PDLTest do
                   results: [res],
                   attributes: [one: ^one]
                 },
-                _t = %TOSA.Add{
+                t = %TOSA.Add{
                   operands: [
                     ^res,
                     ^b
@@ -138,12 +138,15 @@ defmodule PDLTest do
                   results: [res1]
                 }
               ) do
-        %TOSA.Sub{operands: [a, b], results: [Type.ranked_tensor([2, 3], Type.f32())]}
-        %TOSA.Sub{operands: [a, b], results: [Type.ranked_tensor([2, 3], Type.f32())]}
-        %TOSA.Sub{operands: [a, b], results: [Type.ranked_tensor([2, 3], Type.f32())]}
-        %TOSA.Add{operands: [a, b], results: [Type.ranked_tensor([2, 3], Type.f32())]}
-        %TOSA.Sub{operands: [a, b], results: [Type.ranked_tensor([2, 3], Type.f32())]}
-        %TOSA.Sub{operands: [a, b], results: [Type.ranked_tensor([2, 3], Type.f32())]}
+        types = [Type.ranked_tensor([2, 3], Type.f32())]
+        a = %TOSA.Sub{operands: [a, b], results: types}
+        a = Pattern.result(a, 0)
+        a = %TOSA.Sub{operands: [a, b], results: types}
+        a = Pattern.result(a, 0)
+        a = %TOSA.Sub{operands: [a, b], results: types}
+        a = Pattern.result(a, 0)
+        a = %TOSA.Sub{operands: [a, b], results: types, attributes: [one: one]}
+        a = Pattern.result(a, 0)
         %TOSA.Sub{operands: [a, b]}
       end
     end

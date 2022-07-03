@@ -114,6 +114,7 @@ defmodule Beaver do
       Module.register_attribute(__MODULE__, :compiled_pattern, accumulate: true, persist: true)
 
       def unquote(name)() do
+        alias Beaver.DSL.Pattern
         pdl_pattern_op = unquote(pdl_pattern_op)
 
         with {:ok, pdl_pattern_op} <-
