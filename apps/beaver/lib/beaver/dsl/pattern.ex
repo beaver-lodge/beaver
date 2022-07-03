@@ -1,6 +1,44 @@
 defmodule Beaver.DSL.Pattern do
   use Beaver
 
+  @doc """
+  The difference between a pdl.operation creation in a match body and a rewrite body:
+  - in a match body, pdl.attribute/pdl.operand/pdl.result will be generated for unbound variables
+  - in a rewrite body, all variables are considered bound before creation pdl ops
+  """
+  def create_operation(
+        op_name,
+        %Beaver.DSL.Op.Prototype{operands: operands, attributes: attributes, results: results},
+        %Beaver.MLIR.CAPI.MlirAttribute{} = attribute_names
+      ) do
+    mlir do
+      Beaver.MLIR.Dialect.PDL.operation(
+        operands ++
+          attributes ++
+          results ++
+          [
+            name: Beaver.MLIR.Attribute.string(op_name),
+            attributeNames: attribute_names,
+            operand_segment_sizes:
+              Beaver.MLIR.ODS.operand_segment_sizes([
+                length(operands),
+                length(attributes),
+                length(results)
+              ])
+          ]
+      ) >>> ~t{!pdl.operation}
+    end
+  end
+
+  def gen_attribute_names(attributes_keys) do
+    for key <- attributes_keys do
+      key
+      |> Atom.to_string()
+      |> Beaver.MLIR.Attribute.string()
+    end
+    |> Beaver.MLIR.Attribute.array()
+  end
+
   defp do_transform_match({:^, _, [var]}) do
     {:bound, var}
   end
@@ -105,13 +143,7 @@ defmodule Beaver.DSL.Pattern do
         unquote_splicing(attributes_match)
         unquote_splicing(results_match)
 
-        attribute_names =
-          for key <- unquote(attributes_keys) do
-            key
-            |> Atom.to_string()
-            |> Beaver.MLIR.Attribute.string()
-          end
-          |> Beaver.MLIR.Attribute.array()
+        attribute_names = Beaver.DSL.Pattern.gen_attribute_names(unquote(attributes_keys))
 
         beaver_gen_root =
           Beaver.DSL.Op.Prototype.dispatch(
@@ -141,13 +173,18 @@ defmodule Beaver.DSL.Pattern do
             {:%{}, _, map_args}
           ]} = _ast
        ) do
+    attributes = map_args |> Keyword.get(:attributes, [])
+    attributes_keys = Keyword.keys(attributes)
+
     ast =
       quote do
+        attribute_names = Beaver.DSL.Pattern.gen_attribute_names(unquote(attributes_keys))
+
         Beaver.DSL.Op.Prototype.dispatch(
           unquote(struct_name),
           unquote(map_args),
-          beaver_gen_root,
-          &Beaver.DSL.Pattern.create_replace/3
+          attribute_names,
+          &Beaver.DSL.Pattern.create_operation/3
         )
       end
 
@@ -155,52 +192,6 @@ defmodule Beaver.DSL.Pattern do
   end
 
   defp do_transform_rewrite(ast), do: ast
-
-  @doc """
-  The difference between a pdl.operation creation in a match body and a rewrite body:
-  - in a match body, pdl.attribute/pdl.operand/pdl.result will be generated for unbound variables
-  - in a rewrite body, all variables are considered bound before creation pdl ops
-  """
-  def create_operation(
-        op_name,
-        %Beaver.DSL.Op.Prototype{operands: operands, attributes: attributes, results: results},
-        %Beaver.MLIR.CAPI.MlirAttribute{} = attribute_names
-      ) do
-    mlir do
-      Beaver.MLIR.Dialect.PDL.operation(
-        operands ++
-          attributes ++
-          results ++
-          [
-            name: Beaver.MLIR.Attribute.string(op_name),
-            attributeNames: attribute_names,
-            operand_segment_sizes:
-              Beaver.MLIR.ODS.operand_segment_sizes([
-                length(operands),
-                length(attributes),
-                length(results)
-              ])
-          ]
-      ) >>> ~t{!pdl.operation}
-    end
-  end
-
-  def create_replace(
-        op_name,
-        %Beaver.DSL.Op.Prototype{operands: operands, attributes: attributes, results: results} =
-          prototype,
-        beaver_gen_root
-      ) do
-    mlir do
-      repl = create_operation(op_name, prototype, Beaver.MLIR.Attribute.array([]))
-
-      Beaver.MLIR.Dialect.PDL.replace([
-        beaver_gen_root,
-        repl,
-        operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 1, 0])
-      ]) >>> []
-    end
-  end
 
   @doc """
   transform a do block to PDL rewrite operation.
@@ -219,7 +210,13 @@ defmodule Beaver.DSL.Pattern do
       ] do
         region do
           block some() do
-            unquote(rewrite_block_ast)
+            repl = unquote(rewrite_block_ast)
+
+            Beaver.MLIR.Dialect.PDL.replace([
+              beaver_gen_root,
+              repl,
+              operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 1, 0])
+            ]) >>> []
           end
         end
       end
