@@ -40,7 +40,6 @@ defmodule Beaver.DSL.SSA do
         |> unquote(empty_call)
       end
 
-    Macro.to_string(ast) |> IO.puts()
     ast
   end
 

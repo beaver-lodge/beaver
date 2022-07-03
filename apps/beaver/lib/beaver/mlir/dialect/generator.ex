@@ -15,6 +15,9 @@ defmodule Beaver.MLIR.Dialect.Generator do
           ])
 
         defmodule op_module_name do
+          @behaviour Beaver.DSL.Op.Prototype
+
+          @impl Beaver.DSL.Op.Prototype
           def op_name() do
             unquote(full_name)
           end

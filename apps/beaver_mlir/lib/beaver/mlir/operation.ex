@@ -24,6 +24,14 @@ defmodule Beaver.MLIR.Operation do
     create(op_name, arguments ++ [result_types: results])
   end
 
+  def create(op_name, %Beaver.DSL.Op.Prototype{
+        operands: operands,
+        attributes: attributes,
+        results: results
+      }) do
+    create(op_name, operands ++ attributes ++ [result_types: results])
+  end
+
   def create(op_name, arguments) do
     defer_if_terminator = Keyword.get(arguments, :defer_if_terminator, true)
 
@@ -96,7 +104,18 @@ defmodule Beaver.MLIR.Operation do
     |> MLIR.StringRef.Callback.collect_and_destroy()
   end
 
-  def verify!(op, opts \\ [dump: false, dump_if_fail: false]) do
+  @default_verify_opts [dump: false, dump_if_fail: false]
+  def verify!(op, opts \\ @default_verify_opts) do
+    with {:ok, op} <-
+           verify(op, opts ++ [should_raise: true]) do
+      op
+    else
+      :fail -> raise "MLIR operation verification failed"
+    end
+  end
+
+  def verify(op, opts \\ @default_verify_opts) do
+    should_raise = opts |> Keyword.get(:should_raise, false)
     dump = opts |> Keyword.get(:dump, false)
     dump_if_fail = opts |> Keyword.get(:dump_if_fail, false)
     is_success = IR.mlirOperationVerify(op) |> Exotic.Value.extract()
@@ -106,16 +125,16 @@ defmodule Beaver.MLIR.Operation do
       dump(op)
     end
 
-    if not is_success do
+    if is_success do
+      {:ok, op}
+    else
       if dump_if_fail do
         Logger.warning("Start dumping op failed to pass the verification. This might crash.")
         dump(op)
       end
 
-      raise "MLIR operation verification failed"
+      :fail
     end
-
-    op
   end
 
   def dump(op) do
