@@ -60,6 +60,47 @@ defmodule Beaver.DSL.Pattern do
     |> Beaver.MLIR.Attribute.array()
   end
 
+  def gen_prototype_args(kind, map_args) do
+    args = map_args |> Keyword.get(kind, [])
+
+    case args do
+      # a variable, do nothing
+      {_name, _line, nil} ->
+        args
+
+      {:bound, var} ->
+        var
+
+      args when is_list(args) ->
+        case kind do
+          # Transform unbound variables of operands/results. If is bound, it means it is another operation's result (get bound in a previous expression)
+          kind when kind in [:operands, :results] ->
+            Enum.map(args, fn
+              {:bound, bound} -> bound
+              other -> other
+            end)
+
+          # extract unbound variables from attributes keyword
+          :attributes ->
+            Enum.map(args, fn
+              {_k, {:bound, bound}} -> bound
+              {_k, other} -> other
+            end)
+        end
+    end
+  end
+
+  @doc """
+  generate arguments for prototype dispatch
+  """
+  def gen_prototype_args(map_args) do
+    map_args =
+      map_args
+      |> Keyword.put(:operands, gen_prototype_args(:operands, map_args))
+      |> Keyword.put(:attributes, gen_prototype_args(:attributes, map_args))
+      |> Keyword.put(:results, gen_prototype_args(:results, map_args))
+  end
+
   defp do_transform_match({:^, _, [var]}) do
     {:bound, var}
   end
@@ -75,31 +116,7 @@ defmodule Beaver.DSL.Pattern do
     results = map_args |> Keyword.get(:results, [])
     attributes = map_args |> Keyword.get(:attributes, [])
 
-    # Transform unbound variables of operands. If is bound, it means it is another operation's result (get bound in a previous expression)
-    filtered_operands =
-      Enum.map(operands, fn
-        {:bound, bound} -> bound
-        other -> other
-      end)
-
-    # extract unbound variables from attributes keyword
-    filtered_attributes =
-      Enum.map(attributes, fn
-        {_k, {:bound, bound}} -> bound
-        {_k, other} -> other
-      end)
-
-    filtered_results =
-      Enum.map(results, fn
-        {:bound, bound} -> bound
-        other -> other
-      end)
-
-    map_args =
-      map_args
-      |> Keyword.put(:operands, filtered_operands)
-      |> Keyword.put(:attributes, filtered_attributes)
-      |> Keyword.put(:results, filtered_results)
+    map_args = map_args |> gen_prototype_args
 
     # generate bounds between operand variables and pdl.operand
     operands =
@@ -119,18 +136,22 @@ defmodule Beaver.DSL.Pattern do
 
     # generate bounds between attribute variables and pdl.attribute
     attributes_match =
-      for {_name, attribute} <- attributes do
-        case attribute do
-          {:bound, bound} ->
-            quote do
-              unquote(bound) = Beaver.DSL.Pattern.gen_pdl(unquote(bound))
-            end
+      if Keyword.keyword?(attributes) do
+        for {_name, attribute} <- attributes do
+          case attribute do
+            {:bound, bound} ->
+              quote do
+                unquote(bound) = Beaver.DSL.Pattern.gen_pdl(unquote(bound))
+              end
 
-          _ ->
-            quote do
-              unquote(attribute) = Beaver.MLIR.Dialect.PDL.attribute() >>> ~t{!pdl.attribute}
-            end
+            _ ->
+              quote do
+                unquote(attribute) = Beaver.MLIR.Dialect.PDL.attribute() >>> ~t{!pdl.attribute}
+              end
+          end
         end
+      else
+        []
       end
 
     attributes_keys = Keyword.keys(attributes)

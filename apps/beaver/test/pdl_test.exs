@@ -86,37 +86,38 @@ defmodule PDLTest do
   end
 
   test "replace tosa" do
-    ir_module =
-      mlir do
-        module do
-          Func.func test_multi_broadcast(
-                      function_type:
-                        Type.function(
-                          [
-                            Type.ranked_tensor([1, 3], Type.f32()),
-                            Type.ranked_tensor([2, 1], Type.f32())
-                          ],
-                          [Type.ranked_tensor([2, 3], Type.f32())]
-                        )
-                    ) do
-            region do
-              block entry(
-                      a :: Type.ranked_tensor([1, 3], Type.f32()),
-                      b :: Type.ranked_tensor([2, 1], Type.f32())
-                    ) do
-                res =
-                  TOSA.add(a, b, one: MLIR.Attribute.integer(MLIR.Type.i32(), 1)) >>>
-                    Type.ranked_tensor([2, 3], Type.f32())
+    defmodule TestTOSAPatterns do
+      def gen_ir_module() do
+        mlir do
+          module do
+            Func.func test_multi_broadcast(
+                        function_type:
+                          Type.function(
+                            [
+                              Type.ranked_tensor([1, 3], Type.f32()),
+                              Type.ranked_tensor([2, 1], Type.f32())
+                            ],
+                            [Type.ranked_tensor([2, 3], Type.f32())]
+                          )
+                      ) do
+              region do
+                block entry(
+                        a :: Type.ranked_tensor([1, 3], Type.f32()),
+                        b :: Type.ranked_tensor([2, 1], Type.f32())
+                      ) do
+                  res =
+                    TOSA.add(a, b, one: MLIR.Attribute.integer(MLIR.Type.i32(), 1)) >>>
+                      Type.ranked_tensor([2, 3], Type.f32())
 
-                res1 = TOSA.add(res, b) >>> Type.ranked_tensor([2, 3], Type.f32())
-                Func.return(res1)
+                  res1 = TOSA.add(res, b) >>> Type.ranked_tensor([2, 3], Type.f32())
+                  Func.return(res1)
+                end
               end
             end
           end
         end
       end
 
-    defmodule TestTOSAPatterns do
       pattern replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res]}) do
         # create a common struct to see if the pattern transformation would skip it
         assert %Range{first: 1, last: 10, step: 2} |> Range.size() == 5
@@ -151,7 +152,7 @@ defmodule PDLTest do
         %TOSA.Sub{operands: [a, b]}
       end
 
-      pattern replace_multi_add_op(
+      pattern replace_multi_add_op1(
                 one = Attribute.integer(MLIR.Type.i32(), 1),
                 ty = Type.ranked_tensor([2, 3], Type.f32()),
                 %TOSA.Add{
@@ -169,20 +170,66 @@ defmodule PDLTest do
               ) do
         %TOSA.Sub{operands: [a, b]}
       end
+
+      pattern replace_multi_add_op2(
+                one = Attribute.integer(MLIR.Type.i32(), 1),
+                types = [Type.ranked_tensor([2, 3], Type.f32())],
+                %TOSA.Add{
+                  operands: [a, b],
+                  results: [res],
+                  attributes: [one: ^one]
+                },
+                t = %TOSA.Add{
+                  operands: [
+                    ^res,
+                    ^b
+                  ],
+                  results: ^types
+                }
+              ) do
+        %TOSA.Sub{operands: [a, b]}
+      end
+
+      pattern replace_multi_add_op3(
+                one = Attribute.integer(MLIR.Type.i32(), 1),
+                types = [Type.ranked_tensor([2, 3], Type.f32())],
+                %TOSA.Add{
+                  operands: [a, b],
+                  results: [res],
+                  attributes: [one: ^one]
+                },
+                t = %TOSA.Add{
+                  operands: [
+                    ^res,
+                    ^b
+                  ],
+                  results: types
+                }
+              ) do
+        %TOSA.Sub{operands: [a, b]}
+      end
     end
 
-    MLIR.Operation.verify!(ir_module)
+    for pattern <- [
+          TestTOSAPatterns.replace_multi_add_op(),
+          TestTOSAPatterns.replace_multi_add_op1(),
+          TestTOSAPatterns.replace_multi_add_op2(),
+          TestTOSAPatterns.replace_multi_add_op3()
+        ] do
+      ir_module = TestTOSAPatterns.gen_ir_module()
+      MLIR.Operation.verify!(ir_module)
 
-    MLIR.Pattern.apply!(ir_module, [
-      TestTOSAPatterns.replace_multi_add_op()
-    ])
-    |> MLIR.Operation.verify!(dump_if_fail: true)
-    |> MLIR.Transforms.canonicalize()
-    |> MLIR.Pass.Composer.run!()
+      MLIR.Pattern.apply!(ir_module, [
+        pattern
+      ])
+      |> MLIR.Operation.verify!(dump_if_fail: true)
+      |> MLIR.Transforms.canonicalize()
+      |> MLIR.Pass.Composer.run!()
 
-    ir_string = MLIR.Operation.to_string(ir_module)
-    assert not String.contains?(ir_string, "tosa.add"), ir_string
-    assert String.contains?(ir_string, "tosa.sub"), ir_string
+      ir_string = MLIR.Operation.to_string(ir_module)
+      assert not String.contains?(ir_string, "tosa.add"), ir_string
+      assert String.contains?(ir_string, "tosa.sub"), ir_string
+    end
   end
 
   test "toy compiler with pass" do
