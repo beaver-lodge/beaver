@@ -91,14 +91,12 @@ defmodule PDLTest do
         module do
           Func.func test_multi_broadcast(
                       function_type:
-                        Attribute.type(
-                          Type.function(
-                            [
-                              Type.ranked_tensor([1, 3], Type.f32()),
-                              Type.ranked_tensor([2, 1], Type.f32())
-                            ],
-                            [Type.ranked_tensor([2, 3], Type.f32())]
-                          )
+                        Type.function(
+                          [
+                            Type.ranked_tensor([1, 3], Type.f32()),
+                            Type.ranked_tensor([2, 1], Type.f32())
+                          ],
+                          [Type.ranked_tensor([2, 3], Type.f32())]
                         )
                     ) do
             region do
