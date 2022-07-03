@@ -91,7 +91,7 @@ defmodule Beaver.DSL.Pattern do
           unquote(struct_name),
           unquote(map_args),
           beaver_gen_root,
-          &Beaver.DSL.Pattern.create_rewrite/3
+          &Beaver.DSL.Pattern.create_replace/3
         )
       end
 
@@ -123,12 +123,40 @@ defmodule Beaver.DSL.Pattern do
     end
   end
 
-  def create_rewrite(
+  def create_replace(
         op_name,
         %Beaver.DSL.Op.Prototype{operands: operands, attributes: attributes} = prototype,
         beaver_gen_root
       ) do
     mlir do
+      repl =
+        Beaver.MLIR.Dialect.PDL.operation(
+          operands ++
+            [
+              name: Beaver.MLIR.Attribute.string(op_name),
+              attributeNames: Beaver.MLIR.Attribute.array([]),
+              operand_segment_sizes:
+                Beaver.MLIR.ODS.operand_segment_sizes([
+                  length(operands),
+                  length(attributes),
+                  # in replacement length of results should always be 0
+                  0
+                ])
+            ]
+        ) >>> ~t{!pdl.operation}
+
+      Beaver.MLIR.Dialect.PDL.replace([
+        beaver_gen_root,
+        repl,
+        operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 1, 0])
+      ]) >>> []
+    end
+  end
+
+  def transform_rewrite(ast) do
+    rewrite_block_ast = Macro.postwalk(ast, &do_transform_rewrite/1)
+
+    quote do
       Beaver.MLIR.Dialect.PDL.rewrite [
         beaver_gen_root,
         defer_if_terminator: false,
@@ -136,34 +164,10 @@ defmodule Beaver.DSL.Pattern do
       ] do
         region do
           block some() do
-            repl =
-              Beaver.MLIR.Dialect.PDL.operation(
-                operands ++
-                  [
-                    name: Beaver.MLIR.Attribute.string(op_name),
-                    attributeNames: Beaver.MLIR.Attribute.array([]),
-                    operand_segment_sizes:
-                      Beaver.MLIR.ODS.operand_segment_sizes([
-                        length(operands),
-                        length(attributes),
-                        # in replacement length of results should always be 0
-                        0
-                      ])
-                  ]
-              ) >>> ~t{!pdl.operation}
-
-            Beaver.MLIR.Dialect.PDL.replace([
-              beaver_gen_root,
-              repl,
-              operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 1, 0])
-            ]) >>> []
+            unquote(rewrite_block_ast)
           end
         end
       end
     end
-  end
-
-  def transform_rewrite(ast) do
-    Macro.postwalk(ast, &do_transform_rewrite/1)
   end
 end
