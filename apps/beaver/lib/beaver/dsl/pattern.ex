@@ -235,4 +235,11 @@ defmodule Beaver.DSL.Pattern do
       end
     end
   end
+
+  def result(%Beaver.MLIR.CAPI.MlirValue{} = v, i) when is_integer(i) do
+    mlir do
+      PDL.result(v, index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), i)) >>>
+        ~t{!pdl.value}
+    end
+  end
 end
