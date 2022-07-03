@@ -1,6 +1,5 @@
 defmodule Beaver.MLIR.Operation do
   alias Beaver.MLIR
-  alias Beaver.MLIR.CAPI.IR
   alias Beaver.MLIR.CAPI
   import Beaver.MLIR.CAPI
   require Logger
@@ -57,26 +56,23 @@ defmodule Beaver.MLIR.Operation do
     end
   end
 
-  # TODO: add guard
-  def results(op) do
-    num_results = CAPI.mlirOperationGetNumResults(op) |> Exotic.Value.extract()
+  def results(%MLIR.CAPI.MlirOperation{} = op) do
+    case CAPI.mlirOperationGetNumResults(op) |> Exotic.Value.extract() do
+      0 ->
+        op
 
-    if num_results == 1 do
-      CAPI.mlirOperationGetResult(op, 0)
-    else
-      for i <- 0..(num_results - 1)//1 do
-        CAPI.mlirOperationGetResult(op, i)
-      end
+      1 ->
+        CAPI.mlirOperationGetResult(op, 0)
+
+      n when n > 1 ->
+        for i <- 0..(n - 1)//1 do
+          CAPI.mlirOperationGetResult(op, i)
+        end
     end
   end
 
   defp do_create(op_name, arguments) when is_binary(op_name) and is_list(arguments) do
-    {_ctx, arguments} = arguments |> Keyword.pop(:mlir_ctx)
-    {block, arguments} = arguments |> Keyword.pop(:mlir_block)
-    {location, arguments} = arguments |> Keyword.pop(:mlir_location)
-
-    block = block || MLIR.Managed.Block.get()
-    location = location || MLIR.Managed.Location.get()
+    location = MLIR.Managed.Location.get()
 
     state = MLIR.Operation.State.get!(op_name, location)
 

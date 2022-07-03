@@ -9,13 +9,6 @@
 # move said applications out of the umbrella.
 import Config
 
-# TODO: change this to a supervisor tree
-config :exotic,
-  auto_load: [
-    Beaver.MLIR.CAPI,
-    Beaver.MLIR.CAPI.IR
-  ]
-
 # Sample configuration:
 #
 #     config :logger, :console,
