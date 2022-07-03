@@ -51,7 +51,6 @@ defmodule Beaver.DSL.Pattern do
         case attribute do
           {:bound, bound} ->
             quote do
-              # TODO: match if it is a pdl attr or real attr
               unquote(bound) =
                 case unquote(bound) do
                   %Beaver.MLIR.CAPI.MlirValue{} ->
