@@ -1,6 +1,57 @@
 defmodule Beaver.DSL.Pattern do
   use Beaver
 
+  # generate PDL ops for types and attributes
+  def gen_pdl(%MLIR.CAPI.MlirType{} = type) do
+    mlir do
+      Beaver.MLIR.Dialect.PDL.type(type: type) >>> ~t{!pdl.type}
+    end
+  end
+
+  def gen_pdl(%MLIR.CAPI.MlirValue{} = value) do
+    value
+  end
+
+  @doc """
+  The difference between a pdl.operation creation in a match body and a rewrite body:
+  - in a match body, pdl.attribute/pdl.operand/pdl.result will be generated for unbound variables
+  - in a rewrite body, all variables are considered bound before creation pdl ops
+  """
+  def create_operation(
+        op_name,
+        %Beaver.DSL.Op.Prototype{operands: operands, attributes: attributes, results: results},
+        %Beaver.MLIR.CAPI.MlirAttribute{} = attribute_names
+      ) do
+    mlir do
+      results = results |> Enum.map(&gen_pdl/1)
+
+      Beaver.MLIR.Dialect.PDL.operation(
+        operands ++
+          attributes ++
+          results ++
+          [
+            name: Beaver.MLIR.Attribute.string(op_name),
+            attributeNames: attribute_names,
+            operand_segment_sizes:
+              Beaver.MLIR.ODS.operand_segment_sizes([
+                length(operands),
+                length(attributes),
+                length(results)
+              ])
+          ]
+      ) >>> ~t{!pdl.operation}
+    end
+  end
+
+  def gen_attribute_names(attributes_keys) do
+    for key <- attributes_keys do
+      key
+      |> Atom.to_string()
+      |> Beaver.MLIR.Attribute.string()
+    end
+    |> Beaver.MLIR.Attribute.array()
+  end
+
   defp do_transform_match({:^, _, [var]}) do
     {:bound, var}
   end
@@ -105,20 +156,14 @@ defmodule Beaver.DSL.Pattern do
         unquote_splicing(attributes_match)
         unquote_splicing(results_match)
 
-        attribute_names =
-          for key <- unquote(attributes_keys) do
-            key
-            |> Atom.to_string()
-            |> Beaver.MLIR.Attribute.string()
-          end
-          |> Beaver.MLIR.Attribute.array()
+        attribute_names = Beaver.DSL.Pattern.gen_attribute_names(unquote(attributes_keys))
 
         beaver_gen_root =
           Beaver.DSL.Op.Prototype.dispatch(
             unquote(struct_name),
             unquote(map_args),
             attribute_names,
-            &Beaver.DSL.Pattern.create_root/3
+            &Beaver.DSL.Pattern.create_operation/3
           )
 
         unquote_splicing(results_rebind)
@@ -141,13 +186,18 @@ defmodule Beaver.DSL.Pattern do
             {:%{}, _, map_args}
           ]} = _ast
        ) do
+    attributes = map_args |> Keyword.get(:attributes, [])
+    attributes_keys = Keyword.keys(attributes)
+
     ast =
       quote do
+        attribute_names = Beaver.DSL.Pattern.gen_attribute_names(unquote(attributes_keys))
+
         Beaver.DSL.Op.Prototype.dispatch(
           unquote(struct_name),
           unquote(map_args),
-          beaver_gen_root,
-          &Beaver.DSL.Pattern.create_replace/3
+          attribute_names,
+          &Beaver.DSL.Pattern.create_operation/3
         )
       end
 
@@ -156,60 +206,12 @@ defmodule Beaver.DSL.Pattern do
 
   defp do_transform_rewrite(ast), do: ast
 
-  def create_root(
-        op_name,
-        %Beaver.DSL.Op.Prototype{operands: operands, attributes: attributes, results: results},
-        %Beaver.MLIR.CAPI.MlirAttribute{} = attribute_names
-      ) do
-    mlir do
-      arguments = operands ++ attributes ++ results
-
-      Beaver.MLIR.Dialect.PDL.operation(
-        arguments ++
-          [
-            name: Beaver.MLIR.Attribute.string(op_name),
-            attributeNames: attribute_names,
-            operand_segment_sizes:
-              Beaver.MLIR.ODS.operand_segment_sizes([
-                length(operands),
-                length(attributes),
-                length(results)
-              ])
-          ]
-      ) >>> ~t{!pdl.operation}
-    end
-  end
-
-  def create_replace(
-        op_name,
-        %Beaver.DSL.Op.Prototype{operands: operands, attributes: attributes} = prototype,
-        beaver_gen_root
-      ) do
-    mlir do
-      repl =
-        Beaver.MLIR.Dialect.PDL.operation(
-          operands ++
-            [
-              name: Beaver.MLIR.Attribute.string(op_name),
-              attributeNames: Beaver.MLIR.Attribute.array([]),
-              operand_segment_sizes:
-                Beaver.MLIR.ODS.operand_segment_sizes([
-                  length(operands),
-                  length(attributes),
-                  # in replacement length of results should always be 0
-                  0
-                ])
-            ]
-        ) >>> ~t{!pdl.operation}
-
-      Beaver.MLIR.Dialect.PDL.replace([
-        beaver_gen_root,
-        repl,
-        operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 1, 0])
-      ]) >>> []
-    end
-  end
-
+  @doc """
+  transform a do block to PDL rewrite operation.
+  Every Prototype form within the block should be transformed to create a PDL operation.
+  The last expression will be replaced by the root op in the match by default.
+  TODO: wrap this function with a macro rewrite/1, so that it could be use in a independent function
+  """
   def transform_rewrite(ast) do
     rewrite_block_ast = Macro.postwalk(ast, &do_transform_rewrite/1)
 
@@ -221,7 +223,13 @@ defmodule Beaver.DSL.Pattern do
       ] do
         region do
           block some() do
-            unquote(rewrite_block_ast)
+            repl = unquote(rewrite_block_ast)
+
+            Beaver.MLIR.Dialect.PDL.replace([
+              beaver_gen_root,
+              repl,
+              operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 1, 0])
+            ]) >>> []
           end
         end
       end
