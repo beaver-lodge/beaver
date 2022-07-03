@@ -218,6 +218,8 @@ defmodule PDLTest do
         ] do
       ir_module = TestTOSAPatterns.gen_ir_module()
       MLIR.Operation.verify!(ir_module)
+      ir_string = MLIR.Operation.to_string(ir_module)
+      assert not String.contains?(ir_string, "tosa.sub"), ir_string
 
       MLIR.Pattern.apply!(ir_module, [
         pattern
