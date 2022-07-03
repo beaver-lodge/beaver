@@ -156,6 +156,11 @@ defmodule Beaver.DSL.Pattern do
 
   defp do_transform_rewrite(ast), do: ast
 
+  @doc """
+  The difference between a pdl.operation creation in a match body and a rewrite body:
+  - in a match body, pdl.attribute/pdl.operand/pdl.result will be generated for unbound variables
+  - in a rewrite body, all variables are considered bound before creation pdl ops
+  """
   def create_operation(
         op_name,
         %Beaver.DSL.Op.Prototype{operands: operands, attributes: attributes, results: results},
