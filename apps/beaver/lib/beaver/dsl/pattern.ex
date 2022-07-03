@@ -16,12 +16,14 @@ defmodule Beaver.DSL.Pattern do
     results = map_args |> Keyword.get(:results, [])
     attributes = map_args |> Keyword.get(:attributes, [])
 
+    # Transform unbound variables of operands. If is bound, it means it is another operation's result (get bound in a previous expression)
     filtered_operands =
       Enum.map(operands, fn
         {:bound, bound} -> bound
         other -> other
       end)
 
+    # extract unbound variables from attributes keyword
     filtered_attributes =
       Enum.map(attributes, fn
         {_k, {:bound, bound}} -> bound
@@ -31,6 +33,7 @@ defmodule Beaver.DSL.Pattern do
     map_args = Keyword.put(map_args, :operands, filtered_operands)
     map_args = Keyword.put(map_args, :attributes, filtered_attributes)
 
+    # generate bounds between operand variables and pdl.operand
     operands =
       for operand <- operands do
         case operand do
@@ -46,6 +49,7 @@ defmodule Beaver.DSL.Pattern do
         end
       end
 
+    # generate bounds between attribute variables and pdl.attribute
     attributes_match =
       for {_name, attribute} <- attributes do
         case attribute do
@@ -53,9 +57,11 @@ defmodule Beaver.DSL.Pattern do
             quote do
               unquote(bound) =
                 case unquote(bound) do
+                  # if bound variable is a pdl.attribute's result value
                   %Beaver.MLIR.CAPI.MlirValue{} ->
                     unquote(bound)
 
+                  # if bound variable is a real attribute
                   %Beaver.MLIR.CAPI.MlirAttribute{} ->
                     Beaver.MLIR.Dialect.PDL.attribute(value: unquote(bound)) >>>
                       ~t{!pdl.attribute}
@@ -71,6 +77,7 @@ defmodule Beaver.DSL.Pattern do
 
     attributes_keys = Keyword.keys(attributes)
 
+    # generate bounds between result variables and pdl.type
     results_match =
       for result <- results do
         quote do
@@ -78,6 +85,8 @@ defmodule Beaver.DSL.Pattern do
         end
       end
 
+    # generate bounds between result variables and pdl.value produced by pdl.result
+    # preceding expression should use pin operator (^var) to access these version of binding otherwise it will get bound to a pdl.value produced by pdl.operand
     results_rebind =
       for {result, i} <- Enum.with_index(results) do
         quote do
@@ -89,6 +98,7 @@ defmodule Beaver.DSL.Pattern do
         end
       end
 
+    # injecting all variables and dispatch the op creation
     ast =
       quote do
         unquote_splicing(operands)
