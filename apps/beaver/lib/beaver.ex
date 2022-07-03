@@ -82,7 +82,7 @@ defmodule Beaver do
     )
   end
 
-  defmacro pattern(call, do: block) do
+  defmacro defpat(call, do: block) do
     {name, args} = Macro.decompose_call(call)
 
     match = args |> Beaver.DSL.Pattern.transform_match()

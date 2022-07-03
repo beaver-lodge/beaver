@@ -118,28 +118,28 @@ defmodule PDLTest do
         end
       end
 
-      pattern replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res]}) do
+      defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res]}) do
         # create a common struct to see if the pattern transformation would skip it
         assert %Range{first: 1, last: 10, step: 2} |> Range.size() == 5
         %TOSA.Sub{operands: [a, b]}
       end
 
-      pattern replace_multi_add_op(
-                one = Attribute.integer(MLIR.Type.i32(), 1),
-                ty = Type.ranked_tensor([2, 3], Type.f32()),
-                %TOSA.Add{
-                  operands: [a, b],
-                  results: [res],
-                  attributes: [one: ^one]
-                },
-                t = %TOSA.Add{
-                  operands: [
-                    ^res,
-                    ^b
-                  ],
-                  results: [^ty]
-                }
-              ) do
+      defpat replace_multi_add_op(
+               one = Attribute.integer(MLIR.Type.i32(), 1),
+               ty = Type.ranked_tensor([2, 3], Type.f32()),
+               %TOSA.Add{
+                 operands: [a, b],
+                 results: [res],
+                 attributes: [one: ^one]
+               },
+               t = %TOSA.Add{
+                 operands: [
+                   ^res,
+                   ^b
+                 ],
+                 results: [^ty]
+               }
+             ) do
         types = [Type.ranked_tensor([2, 3], Type.f32())]
         a = %TOSA.Sub{operands: [a, b], results: types}
         a = Pattern.result(a, 0)
@@ -152,60 +152,60 @@ defmodule PDLTest do
         %TOSA.Sub{operands: [a, b]}
       end
 
-      pattern replace_multi_add_op1(
-                one = Attribute.integer(MLIR.Type.i32(), 1),
-                ty = Type.ranked_tensor([2, 3], Type.f32()),
-                %TOSA.Add{
-                  operands: [a, b],
-                  results: [res],
-                  attributes: [one: ^one]
-                },
-                t = %TOSA.Add{
-                  operands: [
-                    ^res,
-                    ^b
-                  ],
-                  results: [ty]
-                }
-              ) do
+      defpat replace_multi_add_op1(
+               one = Attribute.integer(MLIR.Type.i32(), 1),
+               ty = Type.ranked_tensor([2, 3], Type.f32()),
+               %TOSA.Add{
+                 operands: [a, b],
+                 results: [res],
+                 attributes: [one: ^one]
+               },
+               t = %TOSA.Add{
+                 operands: [
+                   ^res,
+                   ^b
+                 ],
+                 results: [ty]
+               }
+             ) do
         %TOSA.Sub{operands: [a, b]}
       end
 
-      pattern replace_multi_add_op2(
-                one = Attribute.integer(MLIR.Type.i32(), 1),
-                types = [Type.ranked_tensor([2, 3], Type.f32())],
-                %TOSA.Add{
-                  operands: [a, b],
-                  results: [res],
-                  attributes: [one: ^one]
-                },
-                t = %TOSA.Add{
-                  operands: [
-                    ^res,
-                    ^b
-                  ],
-                  results: ^types
-                }
-              ) do
+      defpat replace_multi_add_op2(
+               one = Attribute.integer(MLIR.Type.i32(), 1),
+               types = [Type.ranked_tensor([2, 3], Type.f32())],
+               %TOSA.Add{
+                 operands: [a, b],
+                 results: [res],
+                 attributes: [one: ^one]
+               },
+               t = %TOSA.Add{
+                 operands: [
+                   ^res,
+                   ^b
+                 ],
+                 results: ^types
+               }
+             ) do
         %TOSA.Sub{operands: [a, b]}
       end
 
-      pattern replace_multi_add_op3(
-                one = Attribute.integer(MLIR.Type.i32(), 1),
-                types = [Type.ranked_tensor([2, 3], Type.f32())],
-                %TOSA.Add{
-                  operands: [a, b],
-                  results: [res],
-                  attributes: [one: ^one]
-                },
-                t = %TOSA.Add{
-                  operands: [
-                    ^res,
-                    ^b
-                  ],
-                  results: types
-                }
-              ) do
+      defpat replace_multi_add_op3(
+               one = Attribute.integer(MLIR.Type.i32(), 1),
+               types = [Type.ranked_tensor([2, 3], Type.f32())],
+               %TOSA.Add{
+                 operands: [a, b],
+                 results: [res],
+                 attributes: [one: ^one]
+               },
+               t = %TOSA.Add{
+                 operands: [
+                   ^res,
+                   ^b
+                 ],
+                 results: types
+               }
+             ) do
         %TOSA.Sub{operands: [a, b]}
       end
     end
@@ -238,7 +238,7 @@ defmodule PDLTest do
     defmodule ToyPass do
       use Beaver
 
-      pattern replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
+      defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
         %TOSA.Sub{operands: [a, b]}
       end
 
