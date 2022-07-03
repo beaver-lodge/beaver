@@ -1,6 +1,6 @@
 defmodule Beaver.DSL.Op.Prototype do
   @moduledoc """
-  Beaver.DSL.Prototype is a struct holding an Op's operands, results, attributes before creating it. It is similar to Beaver.DSL.SSA but there are applicable in different scenarios. Beaver.DSL.Prototype should be used where it is desired to get the createdMLIR MLIR Op rather than the MLIR values of its results.
+  Beaver.DSL.Prototype is a struct holding an Op's operands, results, attributes before creating it. It is similar to Beaver.DSL.SSA but there are applicable in different scenarios. Beaver.DSL.Prototype should be used where it is desired to get the created MLIR Op rather than the MLIR values of its results.
   Unlike SSA, operands/attributes/results in Prototype don't necessary contain real operands/attributes/results. They could be other types for abstraction or representation.
   For instance, when Prototype is used to compiling Elixir patterns to PDL, these fields contains MLIR Value.
   """
