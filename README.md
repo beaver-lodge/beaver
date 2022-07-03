@@ -13,7 +13,7 @@ Here is an example to build and verify a piece of IR in Beaver:
 ```elixir
 mlir do
   module do
-    Func.func some_func(function_type: Attribute.type(Type.function([], [Type.i(32)]))) do
+    Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
       region do
         block bb_entry() do
           v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
@@ -34,11 +34,10 @@ mlir do
         end
       end
     end
-    end
+    |> MLIR.Operation.verify!(dump_if_fail: true)
   end
 end
-|> MLIR.Operation.dump()
-|> MLIR.Operation.verify!()
+|> MLIR.Operation.verify!(dump_if_fail: true)
 ```
 
 And a small example to showcase what it is like to define and run a pass in Beaver:
@@ -312,7 +311,7 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
   ```bash
   echo $LLVM_CONFIG_PATH
   ```
-- Build and elixir tests
+- Build and run Elixir tests
   ```bash
   mix deps.get
   mix test
