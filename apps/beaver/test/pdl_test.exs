@@ -147,10 +147,6 @@ defmodule PDLTest do
         a = Pattern.result(a, 0)
         a = %TOSA.Sub{operands: [a, b], results: types, attributes: [one: one]}
         a = Pattern.result(a, 0)
-        a = %TOSA.Sub{operands: [a, b], results: types}
-        a = Pattern.result(a, 0)
-        a = %TOSA.Sub{operands: [a, b], results: types}
-        a = Pattern.result(a, 0)
         %TOSA.Sub{operands: [a, b]}
       end
     end
