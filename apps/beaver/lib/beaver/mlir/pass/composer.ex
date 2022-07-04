@@ -13,6 +13,11 @@ defmodule Beaver.MLIR.Pass.Composer do
     %__MODULE__{composer | passes: passes ++ [pass]}
   end
 
+  defp get_op_name(op_name) when is_binary(op_name), do: op_name
+
+  defp get_op_name(op_module) when is_atom(op_module),
+    do: Beaver.DSL.Op.Prototype.op_name!(op_module)
+
   # TODO: add keyword arguments
   def run!(%__MODULE__{passes: passes, op: op}, opts \\ [dump: false, dump_if_fail: false]) do
     ctx = MLIR.Managed.Context.get()
@@ -20,11 +25,13 @@ defmodule Beaver.MLIR.Pass.Composer do
 
     for pass <- passes do
       case pass do
-        {op_name, f} when is_binary(op_name) and is_function(f, 1) ->
+        {op_name, f} when (is_binary(op_name) or is_atom(op_name)) and is_function(f, 1) ->
+          op_name = get_op_name(op_name)
           npm = mlirOpPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
           f.(npm)
 
-        {op_name, passes} when is_binary(op_name) and is_list(passes) ->
+        {op_name, passes} when (is_binary(op_name) or is_atom(op_name)) and is_list(passes) ->
+          op_name = get_op_name(op_name)
           npm = mlirOpPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
 
           for pass <- passes do

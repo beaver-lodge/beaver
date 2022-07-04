@@ -10,12 +10,7 @@ defmodule Beaver.MLIR.Pass do
 
   def get_op_name(opts) do
     op_module = Keyword.get(opts, :on, MLIR.Dialect.Func.Func)
-
-    if Beaver.DSL.Op.Prototype.is_compliant(op_module) do
-      op_module.op_name()
-    else
-      raise "Pass must run on a registered op like Beaver.MLIR.Dialect.Func.Func"
-    end
+    Beaver.DSL.Op.Prototype.op_name!(op_module)
   end
 
   defmacro __using__(opts) do
