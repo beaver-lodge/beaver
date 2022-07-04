@@ -37,4 +37,12 @@ defmodule Beaver.DSL.Op.Prototype do
   end
 
   @callback op_name() :: String.t()
+
+  def op_name!(op_module) do
+    if is_compliant(op_module) do
+      op_module.op_name()
+    else
+      raise "required a registered op like Beaver.MLIR.Dialect.Func.Func"
+    end
+  end
 end

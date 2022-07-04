@@ -255,12 +255,12 @@ defmodule PDLTest do
   end
 
   test "toy compiler with pass" do
+    alias Beaver.MLIR.Dialect.Func
+
     defmodule ToyPass do
-      alias Beaver.MLIR.Dialect.Func.FuncOp
+      use Beaver.MLIR.Pass, on: Func.Func
 
-      use Beaver.MLIR.Pass, on: FuncOp
-
-      defpat(replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []})) do
+      defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
         %MLIR.CAPI.MlirValue{} = res
         %TOSA.Sub{operands: [a, b]}
       end
@@ -280,7 +280,9 @@ defmodule PDLTest do
         }
       }
       """
-      |> ToyPass.delay()
+      |> MLIR.Pass.Composer.nested(Func.Func, [
+        ToyPass.create()
+      ])
       |> canonicalize
       |> MLIR.Pass.Composer.run!()
 

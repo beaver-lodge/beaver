@@ -13,7 +13,7 @@ defmodule Beaver.MLIR.ExternalPass do
     description = MLIR.StringRef.create("")
     emptyOpName = MLIR.StringRef.create(op_name)
     passID = CAPI.mlirTypeIDAllocatorAllocateTypeID(typeIDAllocator)
-    name = CAPI.mlirStringRefCreateFromCString("TestExternalFuncPass")
+    name = CAPI.mlirStringRefCreateFromCString(Atom.to_string(pass_module))
     argument = CAPI.mlirStringRefCreateFromCString("test-external-pass")
 
     callbacks =

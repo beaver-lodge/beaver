@@ -8,11 +8,16 @@ defmodule Beaver.MLIR.Pass do
     run.(op)
   end
 
+  def get_op_name(opts) do
+    op_module = Keyword.get(opts, :on, MLIR.Dialect.Func.Func)
+    Beaver.DSL.Op.Prototype.op_name!(op_module)
+  end
+
   defmacro __using__(opts) do
     use Beaver
     alias Beaver.MLIR.Pass.Composer
 
-    quote(bind_quoted: [opts: opts]) do
+    quote do
       require Logger
       @behaviour MLIR.Pass
 
@@ -41,13 +46,19 @@ defmodule Beaver.MLIR.Pass do
         end
       end
 
-      def delay(composer_or_op = %Composer{}) do
+      def create() do
         # TODO: manage this typeIDAllocator
         type_id_allocator = CAPI.mlirTypeIDAllocatorCreate()
 
-        external_pass =
-          %MLIR.CAPI.MlirPass{} = MLIR.ExternalPass.create(__MODULE__, type_id_allocator)
+        MLIR.ExternalPass.create(
+          __MODULE__,
+          type_id_allocator,
+          Beaver.MLIR.Pass.get_op_name(unquote(opts))
+        )
+      end
 
+      def delay(composer_or_op = %Composer{}) do
+        external_pass = create()
         Composer.add(composer_or_op, external_pass)
       end
 

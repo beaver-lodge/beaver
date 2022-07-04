@@ -43,12 +43,12 @@ end
 And a small example to showcase what it is like to define and run a pass in Beaver:
 
 ```elixir
+alias Beaver.MLIR.Dialect.Func
+
 defmodule ToyPass do
-  alias Beaver.MLIR.Dialect.Func.FuncOp
+  use Beaver.MLIR.Pass, on: Func.Func
 
-  use Beaver.MLIR.Pass, on: FuncOp
-
-  defpat(replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []})) do
+  defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
     %MLIR.CAPI.MlirValue{} = res
     %TOSA.Sub{operands: [a, b]}
   end
@@ -67,7 +67,9 @@ module {
   }
 }
 """
-|> ToyPass.delay()
+|> MLIR.Pass.Composer.nested(Func.Func, [
+  ToyPass.create()
+])
 |> canonicalize
 |> MLIR.Pass.Composer.run!()
 ```
