@@ -1,9 +1,9 @@
-defmodule Beaver.Nx.MixProject do
+defmodule Beaver.MLIR.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :beaver_nx,
+      app: :beaver_capi,
       version: "0.1.0",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
@@ -18,20 +18,18 @@ defmodule Beaver.Nx.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
-      mod: {Beaver.Nx.Application, []}
+      mod: {Beaver.MLIR.Application, []},
+      extra_applications: [:logger]
     ]
   end
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:nx, "~> 0.2"},
-      {:beaver, in_umbrella: true},
-      {:beaver_capi, in_umbrella: true}
+      {:rustler, "~> 0.25.0"},
+      {:exotic, in_umbrella: true}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"},
-      # {:sibling_app_in_umbrella, in_umbrella: true}
     ]
   end
 end

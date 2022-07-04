@@ -40,10 +40,5 @@ defmodule E2ETest do
       end)
     end
     |> Task.await_many()
-
-    # |> llvm
-
-    ~t<i64>
-    ~a/(i64, i64) -> (i64)/
   end
 end

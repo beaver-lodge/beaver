@@ -1,9 +1,9 @@
-defmodule Beaver.Nx.MixProject do
+defmodule Beaver.MLIR.Dialect.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :beaver_nx,
+      app: :beaver_dialect,
       version: "0.1.0",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
@@ -19,15 +19,13 @@ defmodule Beaver.Nx.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {Beaver.Nx.Application, []}
+      mod: {Beaver.MLIR.Dialect.Application, []}
     ]
   end
 
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:nx, "~> 0.2"},
-      {:beaver, in_umbrella: true},
       {:beaver_capi, in_umbrella: true}
       # {:dep_from_hexpm, "~> 0.3.0"},
       # {:dep_from_git, git: "https://github.com/elixir-lang/my_dep.git", tag: "0.1.0"},

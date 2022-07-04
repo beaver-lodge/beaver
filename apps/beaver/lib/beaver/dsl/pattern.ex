@@ -1,7 +1,9 @@
 defmodule Beaver.DSL.Pattern do
   use Beaver
 
-  # generate PDL ops for types and attributes
+  @doc """
+  generate PDL ops for types and attributes
+  """
   def gen_pdl(%MLIR.CAPI.MlirType{} = type) do
     mlir do
       Beaver.MLIR.Dialect.PDL.type(type: type) >>> ~t{!pdl.type}
@@ -87,6 +89,10 @@ defmodule Beaver.DSL.Pattern do
               {_k, other} -> other
             end)
         end
+
+      _ ->
+        raise "Must pass a list or a variable to operands/attributes/results, got: \n" <>
+                Macro.to_string(args)
     end
   end
 
@@ -94,23 +100,15 @@ defmodule Beaver.DSL.Pattern do
   generate arguments for prototype dispatch
   """
   def gen_prototype_args(map_args) do
-    map_args =
-      map_args
-      |> Keyword.put(:operands, gen_prototype_args(:operands, map_args))
-      |> Keyword.put(:attributes, gen_prototype_args(:attributes, map_args))
-      |> Keyword.put(:results, gen_prototype_args(:results, map_args))
+    map_args
+    |> Keyword.put(:operands, gen_prototype_args(:operands, map_args))
+    |> Keyword.put(:attributes, gen_prototype_args(:attributes, map_args))
+    |> Keyword.put(:results, gen_prototype_args(:results, map_args))
   end
 
-  defp do_transform_match({:^, _, [var]}) do
-    {:bound, var}
-  end
-
-  defp do_transform_match(
-         {:%, _,
-          [
-            struct_name,
-            {:%{}, _, map_args}
-          ]} = _ast
+  defp create_op_in_match(
+         struct_name,
+         map_args
        ) do
     operands = map_args |> Keyword.get(:operands, [])
     results = map_args |> Keyword.get(:results, [])
@@ -224,18 +222,9 @@ defmodule Beaver.DSL.Pattern do
     ast
   end
 
-  defp do_transform_match(ast), do: ast
-
-  def transform_match(ast) do
-    Macro.postwalk(ast, &do_transform_match/1)
-  end
-
-  defp do_transform_rewrite(
-         {:%, _,
-          [
-            struct_name,
-            {:%{}, _, map_args}
-          ]} = _ast
+  defp create_op_in_rewrite(
+         struct_name,
+         map_args
        ) do
     attributes = map_args |> Keyword.get(:attributes, [])
 
@@ -262,7 +251,51 @@ defmodule Beaver.DSL.Pattern do
     ast
   end
 
-  defp do_transform_rewrite(ast), do: ast
+  defp transform_struct_to_op_creation(
+         {:%, _,
+          [
+            struct_name,
+            {:%{}, _, map_args}
+          ]} = ast,
+         cb
+       )
+       when is_function(cb, 2) do
+    module =
+      case struct_name do
+        {:__aliases__, _line, op_name} when is_list(op_name) ->
+          Module.concat([Beaver.MLIR.Dialect | op_name])
+
+        _ ->
+          raise "expect form like %TOSA.Add{operands: [a, b]}, found unsupported struct syntax: " <>
+                  inspect(struct_name)
+      end
+
+    if Beaver.DSL.Op.Prototype.is_compliant(module) do
+      apply(cb, [struct_name, map_args])
+    else
+      ast
+    end
+  end
+
+  defp transform_struct_to_op_creation(ast, _cb), do: ast
+
+  defp do_transform_match({:^, _, [var]}) do
+    {:bound, var}
+  end
+
+  defp do_transform_match(ast), do: ast |> transform_struct_to_op_creation(&create_op_in_match/2)
+
+  defp do_transform_rewrite(ast),
+    do: ast |> transform_struct_to_op_creation(&create_op_in_rewrite/2)
+
+  @doc """
+  transform a macro's call to PDL operations to match operands, attributes, results.
+  Every Prototype form within the block should be transformed to create a PDL operation.
+  """
+
+  def transform_match(ast) do
+    Macro.postwalk(ast, &do_transform_match/1)
+  end
 
   @doc """
   transform a do block to PDL rewrite operation.

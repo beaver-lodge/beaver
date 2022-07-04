@@ -19,7 +19,7 @@ defmodule Beaver.MLIR.Pass.Composer.Generator do
       alias Beaver.MLIR.Pass.Composer
 
       # We are calling C functions dynamically at compile time, so we need to make sure managed libraries get loaded.
-      Application.ensure_all_started(:beaver_mlir)
+      Application.ensure_all_started(:beaver_capi)
 
       for fa <- CAPI.__info__(:functions) do
         with {name, 0} <- fa do

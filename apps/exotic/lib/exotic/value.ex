@@ -196,6 +196,24 @@ defmodule Exotic.Value do
     v
   end
 
+  def get({:type_def, module}, ref) when is_reference(ref) do
+    types = apply(module, :native_fields_with_names, [])
+
+    struct!(module, %{
+      ref: ref,
+      holdings: MapSet.new(),
+      fields: types
+    })
+  end
+
+  def get(type, ref) when is_reference(ref) do
+    %__MODULE__{
+      ref: ref,
+      holdings: MapSet.new(),
+      type: type
+    }
+  end
+
   # TODO: add isize NIF
   def get(t = :isize, v) when is_integer(v) do
     %__MODULE__{
@@ -230,10 +248,10 @@ defmodule Exotic.Value do
           ref: _,
           t: [{:function, [_ret, _args_kv]}]
         },
-        value
+        callback_module
       )
-      when is_atom(value) do
-    get_closure(t, value, :invoke_callback)
+      when is_atom(callback_module) do
+    get_closure(t, callback_module, :invoke_callback)
   end
 
   def get({:type_def, _module}, value) do
@@ -280,19 +298,33 @@ defmodule Exotic.Value do
   end
 
   def get_closure(
+        func_type,
+        value,
+        callback_id \\ :invoke_callback
+      )
+
+  def get_closure(
+        %Exotic.Type{
+          ref: _,
+          t: [{:function, _}]
+        },
+        %Exotic.Value.Ptr{} = ptr,
+        _callback_id
+      ) do
+    ptr
+  end
+
+  def get_closure(
         %Exotic.Type{
           ref: _,
           t: [{:function, [ret | args_kv]}]
         },
         value,
-        callback_id \\ :invoke_callback
+        callback_id
       )
       when is_atom(value) do
-    args_types = args_kv |> Enum.map(fn type -> Exotic.Type.get(type) end)
-    ret_type = Exotic.Type.get(ret)
-
     Exotic.Closure.create(
-      %Exotic.Closure.Definition{arg_types: args_types, return_type: ret_type},
+      %Exotic.Closure.Definition{arg_types: args_kv, return_type: ret},
       value,
       callback_id
     )
@@ -382,13 +414,17 @@ defmodule Exotic.Value do
     """
     def get(module, values) when is_atom(module) do
       types = apply(module, :native_fields_with_names, [])
-      get(types, values)
+      get(module, types, values)
     end
 
     def get([], _), do: raise("Cannot create struct with no fields")
     def get(_, []), do: raise("Cannot create struct with no values")
 
     def get(types, values) when is_list(types) do
+      get(__MODULE__, types, values)
+    end
+
+    def get(module, types, values) when is_list(types) do
       types =
         for {n, f} <- types do
           {n, Exotic.Type.get(f)}
@@ -406,7 +442,7 @@ defmodule Exotic.Value do
         |> Enum.map(&Map.get(&1, :holdings))
         |> Enum.reduce(MapSet.new(), &MapSet.union(&2, &1))
 
-      struct!(__MODULE__, %{
+      struct!(module, %{
         ref: ref,
         holdings: holdings,
         fields: types

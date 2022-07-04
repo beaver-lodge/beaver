@@ -2,7 +2,8 @@ defmodule Exotic.Type.Struct do
   defmacro __using__(fields: fields) do
     quote bind_quoted: [fields: fields] do
       @enforce_keys [:ref]
-      defstruct ref: nil, holdings: MapSet.new()
+      @native_fields fields
+      defstruct ref: nil, holdings: MapSet.new(), fields: @native_fields
 
       @type t :: %__MODULE__{
               ref: reference(),

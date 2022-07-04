@@ -85,6 +85,21 @@ defmodule PDLTest do
     CAPI.mlirContextDestroy(ctx)
   end
 
+  test "load from string" do
+    %MLIR.CAPI.MlirPDLPatternModule{} =
+      """
+      module @erase {
+        pdl.pattern : benefit(1) {
+          %root = operation "foo.op"
+          rewrite %root {
+            erase %root
+          }
+        }
+      }
+      """
+      |> MLIR.Pattern.from_string()
+  end
+
   test "replace tosa" do
     defmodule TestTOSAPatterns do
       def gen_ir_module() do
@@ -119,6 +134,7 @@ defmodule PDLTest do
       end
 
       defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res]}) do
+        %MLIR.CAPI.MlirValue{} = res
         # create a common struct to see if the pattern transformation would skip it
         assert %Range{first: 1, last: 10, step: 2} |> Range.size() == 5
         %TOSA.Sub{operands: [a, b]}
@@ -126,13 +142,14 @@ defmodule PDLTest do
 
       defpat replace_multi_add_op(
                one = Attribute.integer(MLIR.Type.i32(), 1),
+               _x = %Range{first: 1, last: 10, step: 2},
                ty = Type.ranked_tensor([2, 3], Type.f32()),
                %TOSA.Add{
                  operands: [a, b],
                  results: [res],
                  attributes: [one: ^one]
                },
-               t = %TOSA.Add{
+               _t = %TOSA.Add{
                  operands: [
                    ^res,
                    ^b
@@ -154,13 +171,13 @@ defmodule PDLTest do
 
       defpat replace_multi_add_op1(
                one = Attribute.integer(MLIR.Type.i32(), 1),
-               ty = Type.ranked_tensor([2, 3], Type.f32()),
+               _ty = Type.ranked_tensor([2, 3], Type.f32()),
                %TOSA.Add{
                  operands: [a, b],
                  results: [res],
                  attributes: [one: ^one]
                },
-               t = %TOSA.Add{
+               _t = %TOSA.Add{
                  operands: [
                    ^res,
                    ^b
@@ -168,6 +185,7 @@ defmodule PDLTest do
                  results: [ty]
                }
              ) do
+        %MLIR.CAPI.MlirValue{} = ty
         %TOSA.Sub{operands: [a, b]}
       end
 
@@ -179,7 +197,7 @@ defmodule PDLTest do
                  results: [res],
                  attributes: [one: ^one]
                },
-               t = %TOSA.Add{
+               _t = %TOSA.Add{
                  operands: [
                    ^res,
                    ^b
@@ -191,14 +209,14 @@ defmodule PDLTest do
       end
 
       defpat replace_multi_add_op3(
-               one = Attribute.integer(MLIR.Type.i32(), 1),
+               _one = Attribute.integer(MLIR.Type.i32(), 1),
                types = [Type.ranked_tensor([2, 3], Type.f32())],
                %TOSA.Add{
                  operands: [a, b],
                  results: [res],
-                 attributes: [one: ^one]
+                 attributes: [one: one]
                },
-               t = %TOSA.Add{
+               _t = %TOSA.Add{
                  operands: [
                    ^res,
                    ^b
@@ -206,11 +224,13 @@ defmodule PDLTest do
                  results: types
                }
              ) do
+        %MLIR.CAPI.MlirValue{} = one
         %TOSA.Sub{operands: [a, b]}
       end
     end
 
     for pattern <- [
+          TestTOSAPatterns.replace_add_op(),
           TestTOSAPatterns.replace_multi_add_op(),
           TestTOSAPatterns.replace_multi_add_op1(),
           TestTOSAPatterns.replace_multi_add_op2(),
@@ -236,14 +256,18 @@ defmodule PDLTest do
 
   test "toy compiler with pass" do
     defmodule ToyPass do
-      use Beaver
+      alias Beaver.MLIR.Dialect.Func.FuncOp
 
-      defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
+      use Beaver.MLIR.Pass, on: FuncOp
+
+      defpat(replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []})) do
+        %MLIR.CAPI.MlirValue{} = res
         %TOSA.Sub{operands: [a, b]}
       end
 
       def run(module) do
         MLIR.Pattern.apply!(module, [replace_add_op()])
+        :ok
       end
     end
 
@@ -256,12 +280,28 @@ defmodule PDLTest do
         }
       }
       """
-      |> ToyPass.run()
+      |> ToyPass.delay()
       |> canonicalize
       |> MLIR.Pass.Composer.run!()
 
     ir_string = MLIR.Operation.to_string(ir)
     assert not (ir_string =~ "tosa.add")
     assert ir_string =~ "tosa.sub"
+  end
+
+  test "raise" do
+    assert_raise RuntimeError,
+                 ~r"Must pass a list or a variable to operands/attributes/results, got: \n%{a: 1}",
+                 fn ->
+                   defmodule PassWithIllegalPattern do
+                     use Beaver
+
+                     defpat replace_add_op(
+                              _t = %TOSA.Add{operands: %{a: 1}, results: [_res], attributes: []}
+                            ) do
+                       %TOSA.Sub{operands: [a, b]}
+                     end
+                   end
+                 end
   end
 end

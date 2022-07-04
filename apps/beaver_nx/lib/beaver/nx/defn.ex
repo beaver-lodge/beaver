@@ -306,6 +306,7 @@ defmodule Beaver.Nx.Defn do
       ] do
         region do
           block bb0(arg0 :: Type.complex(Type.f32()), arg1 :: Type.f(32)) do
+            %MLIR.CAPI.MlirValue{} = arg1
             im = Complex.im(arg0) >>> Type.f32()
             Linalg.yield([im, defer_if_terminator: false])
           end
@@ -362,9 +363,6 @@ defmodule Beaver.Nx.Defn do
 
               MLIR.Block.under(block, fn ->
                 case gen_op(tree) do
-                  ret = %Beaver.MLIR.CAPI.MlirValue{} ->
-                    Func.return(ret)
-
                   ret = %Beaver.MLIR.CAPI.MlirValue{} ->
                     Func.return(ret)
 
