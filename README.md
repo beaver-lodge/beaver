@@ -211,25 +211,27 @@ One example:
 
 ```elixir
 Buildin.module do
-  v2 = Arith.constant(1) :: ~t<i32>
+  v2 = Arith.constant(1) >>> ~t<i32>
 end
 # Buildin.module is a macro, it will transformed the SSA `v2= Arith.constant..` to:
-v2 = Arith.constant(value: ~a{1}, return_type: ~t<i32>, insertion_point: ..., location: ...)
+v2 = Arith.constant(value: ~a{1}, return_type: ~t<i32>)
 ```
 
 Also, using the declarative way to construct IR, proper dominance and operand reference is formed naturally.
+
+<!-- TODO: use real code here -->
 
 ```elixir
 SomeDialect.some_op do
   region do
     block entry() do
-      x = Arith.constant(1) :: ~t<i32>
+      x = Arith.constant(1) >>> ~t<i32>
       y = Arith.constant(1) :: ~t<i32>
     end
   end
   region do
     block entry() do
-      z = Arith.addi(x, y) :: ~t<i32>
+      z = Arith.addi(x, y) >>> ~t<i32>
     end
   end
 end
@@ -249,6 +251,14 @@ SomeDialect.some_op(
   end
 )
 ```
+
+### Prefer smaller functions and avoid type cast in native functions (Erlang NIF)
+
+- In Beaver and Exotic, all native Rust/C functions shouldn't do any type cast for the arguments.
+- Type correctness/safety and dispatching based on type should be done by pattern matching on the struct types of C types in Elixir.
+- This will eliminate a lot of potential bugs because incorrect types will only lead to pattern matching rather than segfault.
+- This should also simplify the development/debugging process because it requires less recompilation.
+- This could lead to a larger number of smaller function calls but it might have better performance considering Erlang scheduler prefer smaller functions.
 
 ## Is Beaver a compiler or binding to LLVM/MLIR or what?
 
@@ -275,7 +285,7 @@ Here is the hierarchy of a typical function call in Beaver:
 - Higher level API in Elixir
 - libFFI in Elixir ([Exotic](/apps/exotic/README.md))
 - libFFI in Rust
-- default MLIR C API and [some extensions](/apps/mlir/native/mlir_nif/README.md), built as a dynamic library by Cargo and CMake
+- default MLIR C API and some extensions, built as a dynamic library by Cargo and CMake
 - MLIR C++ API (wrap and unwrap following MLIR C API convention)
 
 ## How Beaver works with MLIR ODS definitions?
