@@ -298,12 +298,29 @@ defmodule Exotic.Value do
   end
 
   def get_closure(
+        func_type,
+        value,
+        callback_id \\ :invoke_callback
+      )
+
+  def get_closure(
+        %Exotic.Type{
+          ref: _,
+          t: [{:function, _}]
+        },
+        %Exotic.Value.Ptr{} = ptr,
+        _callback_id
+      ) do
+    ptr
+  end
+
+  def get_closure(
         %Exotic.Type{
           ref: _,
           t: [{:function, [ret | args_kv]}]
         },
         value,
-        callback_id \\ :invoke_callback
+        callback_id
       )
       when is_atom(value) do
     Exotic.Closure.create(

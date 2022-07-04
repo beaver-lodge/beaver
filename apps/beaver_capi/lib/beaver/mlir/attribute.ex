@@ -74,12 +74,6 @@ defmodule Beaver.MLIR.Attribute do
       generated_func_name = generated_func_name |> String.slice(0..-8) |> Macro.underscore()
       generated_func_name = generated_func_name |> String.to_atom()
 
-      arg_names =
-        for {arg_name, _} <- args do
-          arg_name |> Atom.to_string() |> Macro.underscore()
-        end
-        |> Enum.join(", ")
-
       @doc """
       generated from
       ```

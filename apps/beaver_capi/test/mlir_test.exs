@@ -187,33 +187,6 @@ defmodule MlirTest do
   end
 
   defmodule TestPass do
-    defmacro print_id do
-      quote do
-        id = var!(id)
-        state = var!(state)
-        IO.inspect({self(), id, state})
-      end
-    end
-
-    # use MLIR.Pass
-    @behaviour MLIR.CAPI.MlirExternalPassCallbacks.Closures
-
-    @impl true
-    def handle_invoke(:construct = id, [a], state) do
-      print_id()
-      {:return, a, id}
-    end
-
-    def handle_invoke(:destruct = id, [a], state) do
-      print_id()
-      {:return, a, id}
-    end
-
-    def handle_invoke(:initialize = id, [%MLIR.CAPI.MlirContext{}, userData], state) do
-      print_id()
-      {:return, userData, id}
-    end
-
     def handle_invoke(
           :run = id,
           [
@@ -221,18 +194,11 @@ defmodule MlirTest do
             pass,
             userData
           ],
-          state
+          _state
         ) do
-      print_id()
       %Beaver.MLIR.CAPI.MlirExternalPass{} = pass
       MLIR.Operation.verify!(op)
-      MLIR.Operation.dump!(op)
       {:return, userData, id}
-    end
-
-    def handle_invoke(:clone = id, [_a], state) do
-      print_id()
-      {:pass, id}
     end
   end
 

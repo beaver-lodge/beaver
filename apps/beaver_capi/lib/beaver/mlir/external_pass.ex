@@ -9,7 +9,7 @@ defmodule Beaver.MLIR.ExternalPass do
   @doc """
   Create a pass by passing a callback module
   """
-  def create(callback_module, typeIDAllocator, op_name \\ "") do
+  def create(pass_module, typeIDAllocator, op_name \\ "") do
     description = MLIR.StringRef.create("")
     emptyOpName = MLIR.StringRef.create(op_name)
     passID = CAPI.mlirTypeIDAllocatorAllocateTypeID(typeIDAllocator)
@@ -21,11 +21,12 @@ defmodule Beaver.MLIR.ExternalPass do
       Exotic.Value.Struct.get(
         CAPI.MlirExternalPassCallbacks,
         [
-          callback_module,
-          callback_module,
-          callback_module,
-          callback_module,
-          callback_module
+          __MODULE__,
+          __MODULE__,
+          # we should only expose run and initialize is optional, so pass a null ptr
+          Exotic.Value.Ptr.null(),
+          __MODULE__,
+          pass_module
         ]
       )
 
@@ -40,5 +41,21 @@ defmodule Beaver.MLIR.ExternalPass do
       callbacks,
       Exotic.Value.Ptr.null()
     )
+  end
+
+  def handle_invoke(:construct = id, [a], state) do
+    {:return, a, id}
+  end
+
+  def handle_invoke(:destruct = id, [a], state) do
+    {:return, a, id}
+  end
+
+  def handle_invoke(:initialize = id, [%MLIR.CAPI.MlirContext{}, userData], state) do
+    {:return, userData, id}
+  end
+
+  def handle_invoke(:clone = id, [_a], state) do
+    {:pass, id}
   end
 end
