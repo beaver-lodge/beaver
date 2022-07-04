@@ -104,16 +104,9 @@ defmodule Beaver.DSL.Pattern do
     |> Keyword.put(:results, gen_prototype_args(:results, map_args))
   end
 
-  defp do_transform_match({:^, _, [var]}) do
-    {:bound, var}
-  end
-
-  defp do_transform_match(
-         {:%, _,
-          [
-            struct_name,
-            {:%{}, _, map_args}
-          ]} = _ast
+  defp create_op_in_match(
+         struct_name,
+         map_args
        ) do
     operands = map_args |> Keyword.get(:operands, [])
     results = map_args |> Keyword.get(:results, [])
@@ -227,12 +220,6 @@ defmodule Beaver.DSL.Pattern do
     ast
   end
 
-  defp do_transform_match(ast), do: ast
-
-  def transform_match(ast) do
-    Macro.postwalk(ast, &do_transform_match/1)
-  end
-
   defp create_op_in_rewrite(
          struct_name,
          map_args
@@ -262,13 +249,15 @@ defmodule Beaver.DSL.Pattern do
     ast
   end
 
-  defp do_transform_rewrite(
+  defp transform_struct_to_op_creation(
          {:%, _,
           [
             struct_name,
             {:%{}, _, map_args}
-          ]} = ast
-       ) do
+          ]} = ast,
+         cb
+       )
+       when is_function(cb, 2) do
     module =
       case struct_name do
         {:__aliases__, _line, op_name} when is_list(op_name) ->
@@ -280,13 +269,26 @@ defmodule Beaver.DSL.Pattern do
       end
 
     if Beaver.DSL.Op.Prototype.is_compliant(module) do
-      create_op_in_rewrite(struct_name, map_args)
+      apply(cb, [struct_name, map_args])
     else
       ast
     end
   end
 
-  defp do_transform_rewrite(ast), do: ast
+  defp transform_struct_to_op_creation(ast, _cb), do: ast
+
+  defp do_transform_match({:^, _, [var]}) do
+    {:bound, var}
+  end
+
+  defp do_transform_match(ast), do: ast |> transform_struct_to_op_creation(&create_op_in_match/2)
+
+  def transform_match(ast) do
+    Macro.postwalk(ast, &do_transform_match/1)
+  end
+
+  defp do_transform_rewrite(ast),
+    do: ast |> transform_struct_to_op_creation(&create_op_in_rewrite/2)
 
   @doc """
   transform a do block to PDL rewrite operation.

@@ -142,6 +142,7 @@ defmodule PDLTest do
 
       defpat replace_multi_add_op(
                one = Attribute.integer(MLIR.Type.i32(), 1),
+               _x = %Range{first: 1, last: 10, step: 2},
                ty = Type.ranked_tensor([2, 3], Type.f32()),
                %TOSA.Add{
                  operands: [a, b],
