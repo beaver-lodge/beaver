@@ -1,6 +1,8 @@
 defmodule MlirTest do
   use ExUnit.Case, async: true
   use Beaver
+  alias Beaver.MLIR
+  alias Beaver.MLIR.CAPI
 
   test "call wrapped apis" do
     ctx =

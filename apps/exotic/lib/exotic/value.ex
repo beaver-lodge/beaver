@@ -382,13 +382,17 @@ defmodule Exotic.Value do
     """
     def get(module, values) when is_atom(module) do
       types = apply(module, :native_fields_with_names, [])
-      get(types, values)
+      get(module, types, values)
     end
 
     def get([], _), do: raise("Cannot create struct with no fields")
     def get(_, []), do: raise("Cannot create struct with no values")
 
     def get(types, values) when is_list(types) do
+      get(__MODULE__, types, values)
+    end
+
+    def get(module, types, values) when is_list(types) do
       types =
         for {n, f} <- types do
           {n, Exotic.Type.get(f)}
@@ -406,7 +410,7 @@ defmodule Exotic.Value do
         |> Enum.map(&Map.get(&1, :holdings))
         |> Enum.reduce(MapSet.new(), &MapSet.union(&2, &1))
 
-      struct!(__MODULE__, %{
+      struct!(module, %{
         ref: ref,
         holdings: holdings,
         fields: types

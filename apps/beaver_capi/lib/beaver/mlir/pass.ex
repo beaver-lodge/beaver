@@ -52,16 +52,17 @@ defmodule Beaver.MLIR.Pass do
           clone: clone,
           run: run
         ) do
-      Exotic.Value.Struct.get(
-        CAPI.MlirExternalPassCallbacks,
-        [
-          construct,
-          destruct,
-          initialize,
-          clone,
-          run
-        ]
-      )
+      %CAPI.MlirExternalPassCallbacks{} =
+        Exotic.Value.Struct.get(
+          CAPI.MlirExternalPassCallbacks,
+          [
+            construct,
+            destruct,
+            initialize,
+            clone,
+            run
+          ]
+        )
     end
   end
 
