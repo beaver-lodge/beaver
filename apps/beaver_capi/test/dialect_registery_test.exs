@@ -9,7 +9,7 @@ defmodule DialectRegistryTest do
     assert Dialect.Registry.ops("cf") == ["switch", "cond_br", "br", "assert"]
 
     tuples =
-      for d <- Dialect.Registry.dialects() do
+      for d <- Dialect.Registry.dialects(full: true) do
         {d, Dialect.Registry.normalize_dialect_name(d)}
       end
 

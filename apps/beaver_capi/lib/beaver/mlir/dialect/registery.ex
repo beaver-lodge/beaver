@@ -38,13 +38,53 @@ defmodule Beaver.MLIR.Dialect.Registry do
     :ets.match(__MODULE__, {dialect, :"$1"}) |> List.flatten()
   end
 
-  def dialects() do
+  @less_used ~w{nvgpu
+  gpu
+  pdl_interp
+  x86vector
+  vector
+  omp
+  emitc
+  sparse_tensor
+  amdgpu
+  async
+  llvm
+  transform
+  ml_program
+  amx
+  arm_neon
+  spv
+  math
+  quant
+  arm_sve
+  rocdl
+  acc
+  shape
+  nvvm}
+
+  @doc """
+  Get dialects registered, if it is dev env in Mix, less used dialects will not be returned. Pass option dialects(full: true) to get all dialects.
+  """
+  def dialects(opts \\ [full: false]) do
+    full = Keyword.get(opts, :full, true)
     Application.ensure_all_started(:beaver_capi)
 
-    for [dialect, _] <- :ets.match(__MODULE__, {:"$1", :"$2"}) do
-      dialect
+    all_dialects =
+      for [dialect, _] <- :ets.match(__MODULE__, {:"$1", :"$2"}) do
+        dialect
+      end
+      |> Enum.uniq()
+
+    case {full, Mix.env()} do
+      {true, _} ->
+        all_dialects
+
+      {_, :prod} ->
+        all_dialects
+
+      _ ->
+        all_dialects |> Enum.reject(fn x -> x in @less_used end)
     end
-    |> Enum.uniq()
   end
 
   defp query_ops() do

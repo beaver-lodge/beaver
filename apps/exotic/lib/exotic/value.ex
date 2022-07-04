@@ -288,11 +288,8 @@ defmodule Exotic.Value do
         callback_id \\ :invoke_callback
       )
       when is_atom(value) do
-    args_types = args_kv |> Enum.map(fn type -> Exotic.Type.get(type) end)
-    ret_type = Exotic.Type.get(ret)
-
     Exotic.Closure.create(
-      %Exotic.Closure.Definition{arg_types: args_types, return_type: ret_type},
+      %Exotic.Closure.Definition{arg_types: args_kv, return_type: ret},
       value,
       callback_id
     )
