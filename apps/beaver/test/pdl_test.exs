@@ -85,6 +85,21 @@ defmodule PDLTest do
     CAPI.mlirContextDestroy(ctx)
   end
 
+  test "load from string" do
+    %MLIR.CAPI.MlirPDLPatternModule{} =
+      """
+      module @erase {
+        pdl.pattern : benefit(1) {
+          %root = operation "foo.op"
+          rewrite %root {
+            erase %root
+          }
+        }
+      }
+      """
+      |> MLIR.Pattern.from_string()
+  end
+
   test "replace tosa" do
     defmodule TestTOSAPatterns do
       def gen_ir_module() do
