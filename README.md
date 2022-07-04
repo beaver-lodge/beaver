@@ -48,7 +48,7 @@ defmodule ToyPass do
 
   use Beaver.MLIR.Pass, on: FuncOp
 
-  defpat(replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []})) do
+  defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
     %MLIR.CAPI.MlirValue{} = res
     %TOSA.Sub{operands: [a, b]}
   end
