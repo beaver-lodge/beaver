@@ -104,11 +104,26 @@ defmodule MlirTest do
   end
 
   test "elixir dialect" do
+    require MLIR.Context
+
     ctx =
       MLIR.CAPI.mlirContextCreate()
       |> Exotic.Value.transmit()
 
-    MLIR.CAPI.mlirDialectHandleRegisterDialect(MLIR.CAPI.mlirGetDialectHandle__elixir__(), ctx)
+    # This api might trigger NDEBUG assert, so run it more
+    for _ <- 1..200 do
+      Task.async(fn ->
+        %Exotic.Value{
+          type: :void
+        } =
+          MLIR.CAPI.mlirDialectHandleRegisterDialect(
+            MLIR.CAPI.mlirGetDialectHandle__elixir__(),
+            ctx
+          )
+      end)
+    end
+    |> Task.await_many()
+
     MLIR.CAPI.mlirRegisterAllDialects(ctx)
 
     _add_op =
@@ -158,8 +173,7 @@ defmodule MlirTest do
     CAPI.MlirStringCallback.module_info()[:attributes]
 
     pm = CAPI.mlirPassManagerCreate(ctx)
-    print_op_stats_pass = CAPI.mlirCreateTransformsPrintOpStats()
-    CAPI.mlirPassManagerAddOwnedPass(pm, print_op_stats_pass)
+    CAPI.mlirPassManagerAddOwnedPass(pm, CAPI.mlirCreateTransformsCSE())
     success = CAPI.mlirPassManagerRun(pm, module)
 
     # equivalent to mlirLogicalResultIsSuccess
@@ -223,9 +237,8 @@ defmodule MlirTest do
       MLIR.Pass.create(TestPass, %TestPass.State{}, typeIDAllocator)
 
     pm = CAPI.mlirPassManagerCreate(ctx)
-    print_op_stats_pass = CAPI.mlirCreateTransformsPrintOpStats()
     CAPI.mlirPassManagerAddOwnedPass(pm, external)
-    CAPI.mlirPassManagerAddOwnedPass(pm, print_op_stats_pass)
+    CAPI.mlirPassManagerAddOwnedPass(pm, CAPI.mlirCreateTransformsCSE())
     success = CAPI.mlirPassManagerRun(pm, module)
 
     # equivalent to mlirLogicalResultIsSuccess
@@ -347,7 +360,6 @@ defmodule MlirTest do
     module = MLIR.Module.create(ctx, module_str)
     MLIR.Operation.verify!(module)
     lower_to_llvm(ctx, module)
-    MLIR.Operation.dump!(module)
     jit = MLIR.ExecutionEngine.create!(module)
     arg = Exotic.Value.get(42)
     return = Exotic.Value.get(-1)
