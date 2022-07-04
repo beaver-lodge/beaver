@@ -10,7 +10,7 @@ defmodule Beaver.MLIR.Dialect.Builtin do
 
     @impl true
     def op_name() do
-      "func.func"
+      "builtin.module"
     end
   end
 
