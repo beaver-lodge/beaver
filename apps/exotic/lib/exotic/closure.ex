@@ -50,21 +50,9 @@ defmodule Exotic.Closure.Server do
         } = state
       )
       when is_atom(callback_id) do
-    case definition do
-      %Exotic.Closure.Definition{
-        arg_types: [type_def: Beaver.MLIR.CAPI.MlirStringRef, ptr: [:void]],
-        return_type: :void
-      } ->
-        nil
-
-      _ ->
-        IO.inspect(definition, label: "closure_def")
-    end
-
     args =
       for {t, ref} <- Enum.zip(arg_types, arg_values) do
         Exotic.Value.get(t, ref)
-        %Exotic.Value{ref: ref, type: t, holdings: MapSet.new()}
       end
 
     new_user_state =

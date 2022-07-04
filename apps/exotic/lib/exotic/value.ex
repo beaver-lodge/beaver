@@ -196,6 +196,24 @@ defmodule Exotic.Value do
     v
   end
 
+  def get({:type_def, module}, ref) when is_reference(ref) do
+    types = apply(module, :native_fields_with_names, [])
+
+    struct!(module, %{
+      ref: ref,
+      holdings: MapSet.new(),
+      fields: types
+    })
+  end
+
+  def get(type, ref) when is_reference(ref) do
+    %__MODULE__{
+      ref: ref,
+      holdings: MapSet.new(),
+      type: type
+    }
+  end
+
   # TODO: add isize NIF
   def get(t = :isize, v) when is_integer(v) do
     %__MODULE__{

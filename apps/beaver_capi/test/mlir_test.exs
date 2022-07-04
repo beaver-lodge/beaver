@@ -207,16 +207,14 @@ defmodule MlirTest do
 
     @impl true
     def handle_invoke(:construct, [a], state) do
-      IO.inspect(a)
       {:return, a, state}
     end
 
     def handle_invoke(:destruct, [a], state) do
-      IO.inspect(a)
       {:return, a, state}
     end
 
-    def handle_invoke(:initialize, [_ctx, userData], state) do
+    def handle_invoke(:initialize, [%MLIR.CAPI.MlirContext{}, userData], state) do
       {:return, userData, state}
     end
 
