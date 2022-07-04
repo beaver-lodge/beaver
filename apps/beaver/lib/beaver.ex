@@ -116,8 +116,6 @@ defmodule Beaver do
     pdl_pattern_module_op_str = pdl_pattern_module_op |> Macro.to_string()
 
     quote do
-      Module.register_attribute(__MODULE__, :compiled_pattern, accumulate: true, persist: true)
-
       def unquote(name)() do
         alias Beaver.DSL.Pattern
         pdl_pattern_module_op = unquote(pdl_pattern_module_op)
