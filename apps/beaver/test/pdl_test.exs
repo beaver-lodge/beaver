@@ -169,6 +169,7 @@ defmodule PDLTest do
                  results: [ty]
                }
              ) do
+        %MLIR.CAPI.MlirValue{} = ty
         %TOSA.Sub{operands: [a, b]}
       end
 
@@ -241,6 +242,7 @@ defmodule PDLTest do
       use Beaver
 
       defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
+        %MLIR.CAPI.MlirValue{} = res
         %TOSA.Sub{operands: [a, b]}
       end
 

@@ -134,16 +134,19 @@ be found at <https://hexdocs.pm/beaver>.
 
 ## Erlang apps under the Beaver umbrella project
 
-LLVM/MLIR is a giant project, to properly ship it and streamline the development process, we need to carefully break the functionalities at different level into different Erlang apps under the same umbrella.
+LLVM/MLIR is a giant project, Beaver have hundreds of Erlang modules and thousands of functions. To properly ship LLVM/MLIR and streamline the development process, we need to carefully break the functionalities at different level into different Erlang apps under the same umbrella.
 
+- `:beaver_nx`: Pure Elixir, compiler backend for [Nx](https://github.com/elixir-nx/nx/tree/main/nx#readme).
 - `:beaver`: Pure Elixir, top level app ships the high level functionalities including IR generation and pattern definition.
-- `:beaver_dialects`: Pure Elixir, all the Ops defined in stock MLIR dialects, built by querying the registry. This app will ship MLIR Ops with Erlang idiomatic practices like behavior compliance.
+- `:beaver_dialect`: Pure Elixir, all the Ops defined in stock MLIR dialects, built by querying the registry. This app will ship MLIR Ops with Erlang idiomatic practices like behavior compliance.
 - `:beaver_capi`: Elixir and C/C++ hybrid, MLIR CAPI wrappers built by parsing LLVM/MLIR CAPI C headers and some middle level helper functions to hide the C pointer related operations. This app will add the loaded MLIR C library and managed MLIR context to Erlang supervisor tree. Rust is also used in this app, but mainly for LLVM/MLIR CMake integration.
 - `:exotic`: Elixir and Rust hybrid, ship the libffi functionality in Elixir. This app also handle the C library opening and provides functions and types to work with C data structures.
 
 ### Notes on consuming and development
 
-- Only `:beaver` and `:exotic` are designed to be used as stand-alone app being directly consumed by other apps. `:beaver_dialects` and `:beaver_capi` are created to ensure the correct order of Erlang module loading by forming a dependency between Erlang apps, so that the meta-programming will work.
+- Only `:beaver` and `:exotic` are designed to be used as stand-alone app being directly consumed by other apps.
+- `:beaver_dialect` and `:beaver_capi` are created to ensure the correct order of Erlang module compiling and loading. The meta-programming will only work when forming a dependency between Erlang apps both at compile time and runtime.
+- `:beaver_nx` could only work with Nx.
 - Although `:exotic` is built for Beaver, any Erlang/Elixir app with interest bundling some C API could take advantage of it as well.
 - Any new feature not relying on meta-programming should be added in `:beaver_capi`.
 - There is no strict requirements on the consistency between the Erlang app name and Elixir module name. Of course redefinition of Elixir modules of same name should be avoided.

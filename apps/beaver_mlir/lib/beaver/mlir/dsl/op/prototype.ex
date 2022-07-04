@@ -26,8 +26,14 @@ defmodule Beaver.DSL.Op.Prototype do
   check if this module exist and compliant to Op.Prototype
   """
   def is_compliant(module) do
-    function_exported?(module, :__info__, 1) and
-      __MODULE__ in (module.module_info[:attributes][:behaviour] || [])
+    case Code.ensure_loaded(module) do
+      {:module, module} ->
+        function_exported?(module, :__info__, 1) and
+          __MODULE__ in (module.module_info[:attributes][:behaviour] || [])
+
+      {:error, :nofile} ->
+        false
+    end
   end
 
   @callback op_name() :: String.t()

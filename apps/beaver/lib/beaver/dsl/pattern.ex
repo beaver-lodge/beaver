@@ -283,8 +283,6 @@ defmodule Beaver.DSL.Pattern do
     if Beaver.DSL.Op.Prototype.is_compliant(module) do
       create_op_in_rewrite(struct_name, map_args)
     else
-      IO.inspect({:ignore, module})
-      IO.puts(Macro.to_string(ast))
       ast
     end
   end

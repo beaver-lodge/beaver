@@ -1,14 +1,12 @@
 defmodule Beaver.MLIR.Dialect.Builtin do
-  alias Beaver.MLIR
   alias Beaver.MLIR.Dialect
 
   use Beaver.MLIR.Dialect.Generator,
     dialect: "builtin",
     ops: Dialect.Registry.ops("builtin") |> Enum.reject(fn x -> x in ~w{module} end)
 
-  defmacro module(call, do: block) do
-    quote do
-    end
+  defmacro module(_call, do: _block) do
+    raise "TODO: support module with symbol"
   end
 
   @doc """
