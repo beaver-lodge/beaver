@@ -17,6 +17,11 @@ defmodule Beaver do
     |> DSL.SSA.results([~t{f32}])
     |> TestDialect.some_op()
   ```
+  The SSA form will return:
+  - For op with multiple result: the results of this op in a list.
+  - For op with one single result: the result
+  - For op with no result: the op itself (for instance, module, func, and terminators)
+
   If there is no returns, add a `[]` to make the transformation effective:
   ```
   TestDialect.some_op(operand0) >>> []
