@@ -6,32 +6,6 @@ defmodule Beaver.MLIR.ExternalPass do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  defmodule Callbacks do
-    @moduledoc """
-    Callbacks are used to implement a pass. Each field of the struct is a closure handler process pid.
-    """
-
-    def get(
-          construct: construct,
-          destruct: destruct,
-          initialize: initialize,
-          clone: clone,
-          run: run
-        ) do
-      %CAPI.MlirExternalPassCallbacks{} =
-        Exotic.Value.Struct.get(
-          CAPI.MlirExternalPassCallbacks,
-          [
-            construct,
-            destruct,
-            initialize,
-            clone,
-            run
-          ]
-        )
-    end
-  end
-
   @doc """
   Create a pass by passing a callback module
   """
@@ -43,12 +17,16 @@ defmodule Beaver.MLIR.ExternalPass do
     argument = CAPI.mlirStringRefCreateFromCString("test-external-pass")
 
     callbacks =
-      Callbacks.get(
-        construct: callback_module,
-        destruct: callback_module,
-        initialize: callback_module,
-        clone: callback_module,
-        run: callback_module
+      %CAPI.MlirExternalPassCallbacks{} =
+      Exotic.Value.Struct.get(
+        CAPI.MlirExternalPassCallbacks,
+        [
+          callback_module,
+          callback_module,
+          callback_module,
+          callback_module,
+          callback_module
+        ]
       )
 
     CAPI.mlirCreateExternalPass(
