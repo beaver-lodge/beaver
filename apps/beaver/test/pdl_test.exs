@@ -209,12 +209,12 @@ defmodule PDLTest do
       end
 
       defpat replace_multi_add_op3(
-               one = Attribute.integer(MLIR.Type.i32(), 1),
+               _one = Attribute.integer(MLIR.Type.i32(), 1),
                types = [Type.ranked_tensor([2, 3], Type.f32())],
                %TOSA.Add{
                  operands: [a, b],
                  results: [res],
-                 attributes: [one: ^one]
+                 attributes: [one: one]
                },
                _t = %TOSA.Add{
                  operands: [
@@ -224,6 +224,7 @@ defmodule PDLTest do
                  results: types
                }
              ) do
+        %MLIR.CAPI.MlirValue{} = one
         %TOSA.Sub{operands: [a, b]}
       end
     end
