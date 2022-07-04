@@ -256,7 +256,7 @@ defmodule PDLTest do
 
   test "toy compiler with pass" do
     defmodule ToyPass do
-      use Beaver
+      use Beaver.MLIR.Pass
 
       defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
         %MLIR.CAPI.MlirValue{} = res

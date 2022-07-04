@@ -5,6 +5,8 @@ defmodule Beaver.MLIR.Pass do
   @callback run(MLIR.CAPI.MlirOperation.t()) :: :ok | :error
 
   defmacro __using__(opts) do
+    use Beaver
+
     quote(bind_quoted: [opts: opts]) do
       @behaviour MLIR.Pass
 
@@ -17,7 +19,7 @@ defmodule Beaver.MLIR.Pass do
             ],
             state
           ) do
-        with :ok <- run() do
+        with :ok <- run(op) do
           {:return, userData, state}
         else
           :error -> :error

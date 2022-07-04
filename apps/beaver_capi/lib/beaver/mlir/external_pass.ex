@@ -43,19 +43,19 @@ defmodule Beaver.MLIR.ExternalPass do
     )
   end
 
-  def handle_invoke(:construct = id, [a], state) do
-    {:return, a, id}
+  def handle_invoke(:construct, [user_data_ptr], state) do
+    {:return, user_data_ptr, state}
   end
 
-  def handle_invoke(:destruct = id, [a], state) do
-    {:return, a, id}
+  def handle_invoke(:destruct, [user_data_ptr], state) do
+    {:return, user_data_ptr, state}
   end
 
-  def handle_invoke(:initialize = id, [%MLIR.CAPI.MlirContext{}, userData], state) do
-    {:return, userData, id}
+  def handle_invoke(:initialize, [%MLIR.CAPI.MlirContext{}, user_data_ptr], state) do
+    {:return, user_data_ptr, state}
   end
 
-  def handle_invoke(:clone = id, [_a], state) do
-    {:pass, id}
+  def handle_invoke(:clone, [_user_data_ptr], state) do
+    {:pass, state}
   end
 end
