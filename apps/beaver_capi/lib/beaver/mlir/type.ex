@@ -86,13 +86,6 @@ defmodule Beaver.MLIR.Type do
       "mlir" <> generated_func_name = name_str
       generated_func_name = generated_func_name |> String.slice(0..-8) |> Macro.underscore()
       generated_func_name = generated_func_name |> String.to_atom()
-      IO.inspect(f)
-
-      arg_names =
-        for {arg_name, _} <- args do
-          arg_name |> Atom.to_string() |> Macro.underscore()
-        end
-        |> Enum.join(", ")
 
       @doc """
       generated from
@@ -102,8 +95,6 @@ defmodule Beaver.MLIR.Type do
       """
       case args do
         [{_ctx, {:type_def, Beaver.MLIR.CAPI.MlirContext}} | rest_args] ->
-          IO.inspect("#{generated_func_name}(#{arg_names})")
-
           args =
             for {arg_name, _} <- rest_args do
               arg_name = arg_name |> Atom.to_string() |> Macro.underscore() |> String.to_atom()
