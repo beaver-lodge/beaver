@@ -165,11 +165,4 @@ defmodule Beaver.MLIR.Operation.State do
       ) do
     add_operand(state, [operand])
   end
-
-  def add_argument(
-        state,
-        operand = %Beaver.MLIR.CAPI.MlirValue{}
-      ) do
-    add_operand(state, [operand])
-  end
 end

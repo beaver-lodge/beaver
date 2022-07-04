@@ -98,11 +98,10 @@ defmodule Beaver.DSL.Pattern do
   generate arguments for prototype dispatch
   """
   def gen_prototype_args(map_args) do
-    map_args =
-      map_args
-      |> Keyword.put(:operands, gen_prototype_args(:operands, map_args))
-      |> Keyword.put(:attributes, gen_prototype_args(:attributes, map_args))
-      |> Keyword.put(:results, gen_prototype_args(:results, map_args))
+    map_args
+    |> Keyword.put(:operands, gen_prototype_args(:operands, map_args))
+    |> Keyword.put(:attributes, gen_prototype_args(:attributes, map_args))
+    |> Keyword.put(:results, gen_prototype_args(:results, map_args))
   end
 
   defp do_transform_match({:^, _, [var]}) do
@@ -272,7 +271,7 @@ defmodule Beaver.DSL.Pattern do
        ) do
     module =
       case struct_name do
-        {:__aliases__, line, op_name} when is_list(op_name) ->
+        {:__aliases__, _line, op_name} when is_list(op_name) ->
           Module.concat([Beaver.MLIR.Dialect | op_name])
 
         _ ->

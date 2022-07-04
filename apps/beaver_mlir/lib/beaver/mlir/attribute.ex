@@ -24,11 +24,6 @@ defmodule Beaver.MLIR.Attribute do
     CAPI.mlirAttributeEqual(a, b) |> Exotic.Value.extract()
   end
 
-  def unit() do
-    ctx = MLIR.Managed.Context.get()
-    CAPI.mlirUnitAttrGet(ctx)
-  end
-
   def to_string(attr) do
     MLIR.StringRef.to_string(attr, CAPI, :mlirAttributePrint)
   end

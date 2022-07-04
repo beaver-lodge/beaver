@@ -1,8 +1,8 @@
 defmodule Beaver.MLIR do
   defmacro block(call, do: block) do
     {
-      block_args,
-      block_opts,
+      _block_args,
+      _block_opts,
       args_type_ast,
       args_var_ast,
       locations_var_ast,
