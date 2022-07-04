@@ -248,10 +248,10 @@ defmodule Exotic.Value do
           ref: _,
           t: [{:function, [_ret, _args_kv]}]
         },
-        value
+        callback_module
       )
-      when is_atom(value) do
-    get_closure(t, value, :invoke_callback)
+      when is_atom(callback_module) do
+    get_closure(t, callback_module, :invoke_callback)
   end
 
   def get({:type_def, _module}, value) do

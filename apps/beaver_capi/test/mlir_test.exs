@@ -167,13 +167,6 @@ defmodule MlirTest do
     module = create_adder_module(ctx)
 
     assert MLIR.CAPI.mlirOperationVerify(module) |> Exotic.Value.extract()
-
-    CAPI.MlirExternalPass.native_fields_with_names()
-
-    CAPI.MlirExternalPassCallbacks.native_fields_with_names()
-
-    CAPI.MlirStringCallback.module_info()[:attributes]
-
     pm = CAPI.mlirPassManagerCreate(ctx)
     CAPI.mlirPassManagerAddOwnedPass(pm, CAPI.mlirCreateTransformsCSE())
     success = CAPI.mlirPassManagerRun(pm, module)
@@ -194,32 +187,38 @@ defmodule MlirTest do
   end
 
   defmodule TestPass do
+    defmacro print_id do
+      quote do
+        id = var!(id)
+        state = var!(state)
+        IO.inspect({self(), id, state})
+      end
+    end
+
     # use MLIR.Pass
     @behaviour MLIR.CAPI.MlirExternalPassCallbacks.Closures
-    defmodule State do
-      use MLIR.Pass.State
+    defmodule TestState do
       defstruct init: false, construct: false, destruct: false, run: false, clone: false
     end
 
-    def fold_transpose(a = %TransposeOp{a: %TransposeOp{}}) do
-      a
-    end
-
     @impl true
-    def handle_invoke(:construct, [a], state) do
-      {:return, a, state}
+    def handle_invoke(:construct = id, [a], state) do
+      print_id()
+      {:return, a, id}
     end
 
-    def handle_invoke(:destruct, [a], state) do
-      {:return, a, state}
+    def handle_invoke(:destruct = id, [a], state) do
+      print_id()
+      {:return, a, id}
     end
 
-    def handle_invoke(:initialize, [%MLIR.CAPI.MlirContext{}, userData], state) do
-      {:return, userData, state}
+    def handle_invoke(:initialize = id, [%MLIR.CAPI.MlirContext{}, userData], state) do
+      print_id()
+      {:return, userData, id}
     end
 
     def handle_invoke(
-          :run,
+          :run = id,
           [
             %Beaver.MLIR.CAPI.MlirOperation{} = op,
             pass,
@@ -227,13 +226,16 @@ defmodule MlirTest do
           ],
           state
         ) do
+      print_id()
       %Beaver.MLIR.CAPI.MlirExternalPass{} = pass
       MLIR.Operation.verify!(op)
-      {:return, userData, state}
+      MLIR.Operation.dump!(op)
+      {:return, userData, id}
     end
 
-    def handle_invoke(:clone, [_a], state) do
-      {:pass, state}
+    def handle_invoke(:clone = id, [_a], state) do
+      print_id()
+      {:pass, id}
     end
   end
 
@@ -245,7 +247,7 @@ defmodule MlirTest do
     typeIDAllocator = CAPI.mlirTypeIDAllocatorCreate()
 
     %MLIR.Pass{external: external} =
-      MLIR.Pass.create(TestPass, %TestPass.State{}, typeIDAllocator)
+      MLIR.Pass.create(TestPass, %TestPass.TestState{}, typeIDAllocator)
 
     pm = CAPI.mlirPassManagerCreate(ctx)
     CAPI.mlirPassManagerAddOwnedPass(pm, external)
@@ -273,7 +275,7 @@ defmodule MlirTest do
     typeIDAllocator = CAPI.mlirTypeIDAllocatorCreate()
 
     %MLIR.Pass{external: external} =
-      MLIR.Pass.create(TestPass, %TestPass.State{}, typeIDAllocator, "func.func")
+      MLIR.Pass.create(TestPass, %TestPass.TestState{}, typeIDAllocator, "func.func")
 
     pm = CAPI.mlirPassManagerCreate(ctx)
     npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
@@ -301,7 +303,7 @@ defmodule MlirTest do
     typeIDAllocator = CAPI.mlirTypeIDAllocatorCreate()
 
     %MLIR.Pass{external: external} =
-      MLIR.Pass.create(TestPass, %TestPass.State{}, typeIDAllocator, "func.func")
+      MLIR.Pass.create(TestPass, %TestPass.TestState{}, typeIDAllocator, "func.func")
 
     pm = CAPI.mlirPassManagerCreate(ctx)
     npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))

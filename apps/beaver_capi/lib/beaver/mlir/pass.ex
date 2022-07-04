@@ -18,28 +18,6 @@ defmodule Beaver.MLIR.Pass do
   @callback destruct(map()) :: map()
   @callback clone(map()) :: map()
 
-  defmodule UserData do
-    @moduledoc """
-    This module create a C struct contain a PID and passing it to the callback. This is implementation detail. You won't use it directly.
-    """
-    use Exotic.Type.Struct, fields: [ptr: :i64]
-    # this fields are just for creating a C struct, currently we don't use it
-
-    def create() do
-      Exotic.Value.Struct.get(__MODULE__, [100])
-    end
-  end
-
-  defmodule State do
-    # TODO: ptrs here is ptrs or closures, improve this
-    defstruct user_data: nil, closures: []
-
-    defmacro __using__(_) do
-      quote([]) do
-      end
-    end
-  end
-
   defmodule Callbacks do
     @moduledoc """
     Callbacks are used to implement a pass. Each field of the struct is a closure handler process pid.
@@ -69,8 +47,7 @@ defmodule Beaver.MLIR.Pass do
   @doc """
   Create a pass by passing a callback module
   """
-  def create(callback_module, user_data, typeIDAllocator, op_name \\ "") do
-    _s = %State{user_data: user_data}
+  def create(callback_module, user_state, typeIDAllocator, op_name \\ "") do
     description = MLIR.StringRef.create("")
     emptyOpName = MLIR.StringRef.create(op_name)
     passID = CAPI.mlirTypeIDAllocatorAllocateTypeID(typeIDAllocator)
