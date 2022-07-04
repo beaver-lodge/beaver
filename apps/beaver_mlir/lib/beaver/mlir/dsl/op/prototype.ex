@@ -15,11 +15,19 @@ defmodule Beaver.DSL.Op.Prototype do
   end
 
   def dispatch(module, fields, extra_arg, cb) when is_function(cb, 3) do
-    if __MODULE__ in (module.module_info[:attributes][:behaviour] || []) do
+    if is_compliant(module) do
       cb.(module.op_name(), struct!(Beaver.DSL.Op.Prototype, fields), extra_arg)
     else
       struct!(module, fields)
     end
+  end
+
+  @doc """
+  check if this module exist and compliant to Op.Prototype
+  """
+  def is_compliant(module) do
+    function_exported?(module, :__info__, 1) and
+      __MODULE__ in (module.module_info[:attributes][:behaviour] || [])
   end
 
   @callback op_name() :: String.t()

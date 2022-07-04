@@ -119,6 +119,7 @@ defmodule PDLTest do
       end
 
       defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res]}) do
+        %MLIR.CAPI.MlirValue{} = res
         # create a common struct to see if the pattern transformation would skip it
         assert %Range{first: 1, last: 10, step: 2} |> Range.size() == 5
         %TOSA.Sub{operands: [a, b]}
@@ -132,7 +133,7 @@ defmodule PDLTest do
                  results: [res],
                  attributes: [one: ^one]
                },
-               t = %TOSA.Add{
+               _t = %TOSA.Add{
                  operands: [
                    ^res,
                    ^b
@@ -154,13 +155,13 @@ defmodule PDLTest do
 
       defpat replace_multi_add_op1(
                one = Attribute.integer(MLIR.Type.i32(), 1),
-               ty = Type.ranked_tensor([2, 3], Type.f32()),
+               _ty = Type.ranked_tensor([2, 3], Type.f32()),
                %TOSA.Add{
                  operands: [a, b],
                  results: [res],
                  attributes: [one: ^one]
                },
-               t = %TOSA.Add{
+               _t = %TOSA.Add{
                  operands: [
                    ^res,
                    ^b
@@ -179,7 +180,7 @@ defmodule PDLTest do
                  results: [res],
                  attributes: [one: ^one]
                },
-               t = %TOSA.Add{
+               _t = %TOSA.Add{
                  operands: [
                    ^res,
                    ^b
@@ -198,7 +199,7 @@ defmodule PDLTest do
                  results: [res],
                  attributes: [one: ^one]
                },
-               t = %TOSA.Add{
+               _t = %TOSA.Add{
                  operands: [
                    ^res,
                    ^b
@@ -211,6 +212,7 @@ defmodule PDLTest do
     end
 
     for pattern <- [
+          TestTOSAPatterns.replace_add_op(),
           TestTOSAPatterns.replace_multi_add_op(),
           TestTOSAPatterns.replace_multi_add_op1(),
           TestTOSAPatterns.replace_multi_add_op2(),
@@ -269,7 +271,7 @@ defmodule PDLTest do
     assert_raise RuntimeError,
                  ~r"Must pass a list or a variable to operands/attributes/results, got: \n%{a: 1}",
                  fn ->
-                   defmodule ToyPass do
+                   defmodule PassWithIllegalPattern do
                      use Beaver
 
                      defpat replace_add_op(

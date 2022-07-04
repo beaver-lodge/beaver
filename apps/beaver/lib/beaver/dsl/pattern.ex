@@ -234,12 +234,9 @@ defmodule Beaver.DSL.Pattern do
     Macro.postwalk(ast, &do_transform_match/1)
   end
 
-  defp do_transform_rewrite(
-         {:%, _,
-          [
-            struct_name,
-            {:%{}, _, map_args}
-          ]} = _ast
+  defp create_op_in_rewrite(
+         struct_name,
+         map_args
        ) do
     attributes = map_args |> Keyword.get(:attributes, [])
 
@@ -264,6 +261,32 @@ defmodule Beaver.DSL.Pattern do
       end
 
     ast
+  end
+
+  defp do_transform_rewrite(
+         {:%, _,
+          [
+            struct_name,
+            {:%{}, _, map_args}
+          ]} = ast
+       ) do
+    module =
+      case struct_name do
+        {:__aliases__, line, op_name} when is_list(op_name) ->
+          Module.concat([Beaver.MLIR.Dialect | op_name])
+
+        _ ->
+          raise "expect form like %TOSA.Add{operands: [a, b]}, found unsupported struct syntax: " <>
+                  inspect(struct_name)
+      end
+
+    if Beaver.DSL.Op.Prototype.is_compliant(module) do
+      create_op_in_rewrite(struct_name, map_args)
+    else
+      IO.inspect({:ignore, module})
+      IO.puts(Macro.to_string(ast))
+      ast
+    end
   end
 
   defp do_transform_rewrite(ast), do: ast
