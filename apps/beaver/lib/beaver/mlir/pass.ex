@@ -51,18 +51,19 @@ defmodule Beaver.MLIR.Pass do
         end
       end
 
-      def delay(composer_or_op = %Composer{}) do
+      def create() do
         # TODO: manage this typeIDAllocator
         type_id_allocator = CAPI.mlirTypeIDAllocatorCreate()
 
-        external_pass =
-          %MLIR.CAPI.MlirPass{} =
-          MLIR.ExternalPass.create(
-            __MODULE__,
-            type_id_allocator,
-            Beaver.MLIR.Pass.get_op_name(unquote(opts))
-          )
+        MLIR.ExternalPass.create(
+          __MODULE__,
+          type_id_allocator,
+          Beaver.MLIR.Pass.get_op_name(unquote(opts))
+        )
+      end
 
+      def delay(composer_or_op = %Composer{}) do
+        external_pass = create()
         Composer.add(composer_or_op, external_pass)
       end
 

@@ -5,6 +5,15 @@ defmodule Beaver.MLIR.Dialect.Builtin do
     dialect: "builtin",
     ops: Dialect.Registry.ops("builtin") |> Enum.reject(fn x -> x in ~w{module} end)
 
+  defmodule Module do
+    @behaviour Beaver.DSL.Op.Prototype
+
+    @impl true
+    def op_name() do
+      "func.func"
+    end
+  end
+
   defmacro module(_call, do: _block) do
     raise "TODO: support module with symbol"
   end

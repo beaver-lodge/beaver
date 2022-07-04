@@ -280,7 +280,9 @@ defmodule PDLTest do
         }
       }
       """
-      |> ToyPass.delay()
+      |> MLIR.Pass.Composer.nested("func.func", [
+        ToyPass.create()
+      ])
       |> canonicalize
       |> MLIR.Pass.Composer.run!()
 
