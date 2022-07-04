@@ -10,7 +10,7 @@ by adding `mlir` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:beaver_mlir, "~> 0.1.0"}
+    {:beaver_capi, "~> 0.1.0"}
   ]
 end
 ```

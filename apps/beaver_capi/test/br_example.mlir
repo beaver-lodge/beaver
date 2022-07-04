@@ -1,4 +1,4 @@
-// To debug, run mlir-opt --mlir-print-op-generic apps/beaver_mlir/test/br_example.mlir
+// To debug, run mlir-opt --mlir-print-op-generic apps/beaver_capi/test/br_example.mlir
 
 // CHECK-LABEL: func @up_propagate
 func.func @up_propagate() -> i32 {

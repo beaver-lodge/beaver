@@ -3,7 +3,7 @@ defmodule Beaver.MLIR.MixProject do
 
   def project do
     [
-      app: :beaver_mlir,
+      app: :beaver_capi,
       version: "0.1.0",
       build_path: "../../_build",
       config_path: "../../config/config.exs",

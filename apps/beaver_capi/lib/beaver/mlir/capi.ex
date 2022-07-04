@@ -49,7 +49,7 @@ defmodule Beaver.MLIR.CAPI do
     Beaver.MLIR.NIF.add(1, 2)
 
     path = Beaver.MLIR.NIF.load_from_path()
-    path = Path.join(Application.app_dir(:beaver_mlir), path)
+    path = Path.join(Application.app_dir(:beaver_capi), path)
     lib_path = Path.wildcard("#{path}*") |> List.first()
     Exotic.load!(__MODULE__, lib_path)
   end

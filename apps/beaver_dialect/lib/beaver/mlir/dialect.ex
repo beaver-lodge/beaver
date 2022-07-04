@@ -1,6 +1,6 @@
 defmodule Beaver.MLIR.Dialect do
   alias Beaver.MLIR.Dialect
-  Application.ensure_all_started(:beaver_mlir)
+  Application.ensure_all_started(:beaver_capi)
 
   for d <-
         Dialect.Registry.dialects()

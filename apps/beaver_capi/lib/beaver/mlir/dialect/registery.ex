@@ -34,12 +34,12 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def normalize_dialect_name(other), do: other |> Macro.camelize()
 
   def ops(dialect) do
-    Application.ensure_all_started(:beaver_mlir)
+    Application.ensure_all_started(:beaver_capi)
     :ets.match(__MODULE__, {dialect, :"$1"}) |> List.flatten()
   end
 
   def dialects() do
-    Application.ensure_all_started(:beaver_mlir)
+    Application.ensure_all_started(:beaver_capi)
 
     for [dialect, _] <- :ets.match(__MODULE__, {:"$1", :"$2"}) do
       dialect
