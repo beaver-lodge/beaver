@@ -1,7 +1,9 @@
 defmodule Beaver.DSL.Pattern do
   use Beaver
 
-  # generate PDL ops for types and attributes
+  @doc """
+  generate PDL ops for types and attributes
+  """
   def gen_pdl(%MLIR.CAPI.MlirType{} = type) do
     mlir do
       Beaver.MLIR.Dialect.PDL.type(type: type) >>> ~t{!pdl.type}
@@ -283,12 +285,17 @@ defmodule Beaver.DSL.Pattern do
 
   defp do_transform_match(ast), do: ast |> transform_struct_to_op_creation(&create_op_in_match/2)
 
+  defp do_transform_rewrite(ast),
+    do: ast |> transform_struct_to_op_creation(&create_op_in_rewrite/2)
+
+  @doc """
+  transform a macro's call to PDL operations to match operands, attributes, results.
+  Every Prototype form within the block should be transformed to create a PDL operation.
+  """
+
   def transform_match(ast) do
     Macro.postwalk(ast, &do_transform_match/1)
   end
-
-  defp do_transform_rewrite(ast),
-    do: ast |> transform_struct_to_op_creation(&create_op_in_rewrite/2)
 
   @doc """
   transform a do block to PDL rewrite operation.
