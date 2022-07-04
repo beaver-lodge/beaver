@@ -35,7 +35,7 @@ defmodule Beaver.MLIR.ExternalPass do
   @doc """
   Create a pass by passing a callback module
   """
-  def create(callback_module, user_state, typeIDAllocator, op_name \\ "") do
+  def create(callback_module, typeIDAllocator, op_name \\ "") do
     description = MLIR.StringRef.create("")
     emptyOpName = MLIR.StringRef.create(op_name)
     passID = CAPI.mlirTypeIDAllocatorAllocateTypeID(typeIDAllocator)

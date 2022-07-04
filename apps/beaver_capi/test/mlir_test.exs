@@ -197,9 +197,6 @@ defmodule MlirTest do
 
     # use MLIR.Pass
     @behaviour MLIR.CAPI.MlirExternalPassCallbacks.Closures
-    defmodule TestState do
-      defstruct init: false, construct: false, destruct: false, run: false, clone: false
-    end
 
     @impl true
     def handle_invoke(:construct = id, [a], state) do
@@ -246,9 +243,7 @@ defmodule MlirTest do
     # TODO: create a supervisor to manage a TypeIDAllocator by mlir application
     typeIDAllocator = CAPI.mlirTypeIDAllocatorCreate()
 
-    external =
-      %MLIR.CAPI.MlirPass{} =
-      MLIR.ExternalPass.create(TestPass, %TestPass.TestState{}, typeIDAllocator)
+    external = %MLIR.CAPI.MlirPass{} = MLIR.ExternalPass.create(TestPass, typeIDAllocator)
 
     pm = CAPI.mlirPassManagerCreate(ctx)
     CAPI.mlirPassManagerAddOwnedPass(pm, external)
@@ -276,8 +271,7 @@ defmodule MlirTest do
     typeIDAllocator = CAPI.mlirTypeIDAllocatorCreate()
 
     external =
-      %MLIR.CAPI.MlirPass{} =
-      MLIR.ExternalPass.create(TestPass, %TestPass.TestState{}, typeIDAllocator, "func.func")
+      %MLIR.CAPI.MlirPass{} = MLIR.ExternalPass.create(TestPass, typeIDAllocator, "func.func")
 
     pm = CAPI.mlirPassManagerCreate(ctx)
     npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
@@ -305,8 +299,7 @@ defmodule MlirTest do
     typeIDAllocator = CAPI.mlirTypeIDAllocatorCreate()
 
     external =
-      %MLIR.CAPI.MlirPass{} =
-      MLIR.ExternalPass.create(TestPass, %TestPass.TestState{}, typeIDAllocator, "func.func")
+      %MLIR.CAPI.MlirPass{} = MLIR.ExternalPass.create(TestPass, typeIDAllocator, "func.func")
 
     pm = CAPI.mlirPassManagerCreate(ctx)
     npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
