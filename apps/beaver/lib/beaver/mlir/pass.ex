@@ -8,11 +8,21 @@ defmodule Beaver.MLIR.Pass do
     run.(op)
   end
 
+  def get_op_name(opts) do
+    op_module = Keyword.get(opts, :on, MLIR.Dialect.Func.Func)
+
+    if Beaver.DSL.Op.Prototype.is_compliant(op_module) do
+      op_module.op_name()
+    else
+      raise "Pass must run on a registered op like Beaver.MLIR.Dialect.Func.Func"
+    end
+  end
+
   defmacro __using__(opts) do
     use Beaver
     alias Beaver.MLIR.Pass.Composer
 
-    quote(bind_quoted: [opts: opts]) do
+    quote do
       require Logger
       @behaviour MLIR.Pass
 
@@ -46,7 +56,12 @@ defmodule Beaver.MLIR.Pass do
         type_id_allocator = CAPI.mlirTypeIDAllocatorCreate()
 
         external_pass =
-          %MLIR.CAPI.MlirPass{} = MLIR.ExternalPass.create(__MODULE__, type_id_allocator)
+          %MLIR.CAPI.MlirPass{} =
+          MLIR.ExternalPass.create(
+            __MODULE__,
+            type_id_allocator,
+            Beaver.MLIR.Pass.get_op_name(unquote(opts))
+          )
 
         Composer.add(composer_or_op, external_pass)
       end

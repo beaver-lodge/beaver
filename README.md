@@ -44,9 +44,9 @@ And a small example to showcase what it is like to define and run a pass in Beav
 
 ```elixir
 defmodule ToyPass do
-  alias Beaver.MLIR.Dialect.Func.FuncOp
+  alias Beaver.MLIR.Dialect.Func
 
-  use Beaver.MLIR.Pass, on: FuncOp
+  use Beaver.MLIR.Pass, on: Func.Func
 
   defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
     %MLIR.CAPI.MlirValue{} = res

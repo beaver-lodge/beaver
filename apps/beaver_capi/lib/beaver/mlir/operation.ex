@@ -31,6 +31,11 @@ defmodule Beaver.MLIR.Operation do
     create(op_name, operands ++ attributes ++ [result_types: results])
   end
 
+  # one single value, usually a terminator
+  def create(op_name, %MLIR.CAPI.MlirValue{} = op) do
+    create(op_name, [op])
+  end
+
   def create(op_name, arguments) do
     defer_if_terminator = Keyword.get(arguments, :defer_if_terminator, true)
 
@@ -69,6 +74,10 @@ defmodule Beaver.MLIR.Operation do
           CAPI.mlirOperationGetResult(op, i)
         end
     end
+  end
+
+  def results({:deferred, {_func_name, _arguments}} = deferred) do
+    deferred
   end
 
   defp do_create(op_name, arguments) when is_binary(op_name) and is_list(arguments) do

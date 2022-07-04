@@ -1,9 +1,21 @@
 defmodule Beaver.MLIR.Dialect.Func do
   alias Beaver.MLIR
+  alias Beaver.MLIR.Dialect
 
-  defmodule FuncOp do
+  use Dialect.Generator,
+    dialect: "func",
+    ops: Dialect.Registry.ops("func") |> Enum.reject(fn x -> x in ~w{func} end)
+
+  defmodule Func do
     def create(arguments) do
       MLIR.Operation.create("func.func", arguments)
+    end
+
+    @behaviour Beaver.DSL.Op.Prototype
+
+    @impl true
+    def op_name() do
+      "func.func"
     end
   end
 
@@ -21,7 +33,7 @@ defmodule Beaver.MLIR.Dialect.Func do
         if not is_list(unquote_splicing(args)),
           do: raise("augument of Func.func must be a keyword")
 
-        Beaver.MLIR.Dialect.Func.FuncOp.create(
+        Beaver.MLIR.Dialect.Func.Func.create(
           Enum.uniq_by(
             unquote_splicing(args) ++
               [
@@ -36,20 +48,5 @@ defmodule Beaver.MLIR.Dialect.Func do
       end
 
     func_ast
-  end
-
-  @doc """
-  Create func.return op. It is a terminator, so this function doesn't returns the results
-  """
-  def return(arguments) when is_list(arguments) do
-    MLIR.Operation.create("func.return", arguments)
-
-    nil
-  end
-
-  def return(arg) do
-    MLIR.Operation.create("func.return", [arg])
-
-    nil
   end
 end
