@@ -134,7 +134,7 @@ be found at <https://hexdocs.pm/beaver>.
 
 ## Erlang apps under the Beaver umbrella project
 
-LLVM/MLIR is a giant project, Beaver have hundreds of Erlang modules and thousands of functions. To properly ship LLVM/MLIR and streamline the development process, we need to carefully break the functionalities at different level into different Erlang apps under the same umbrella.
+LLVM/MLIR is a giant project, and built around that Beaver have hundreds of Erlang modules and thousands of functions. To properly ship LLVM/MLIR and streamline the development process, we need to carefully break the functionalities at different level into different Erlang apps under the same umbrella.
 
 - `:beaver_nx`: Pure Elixir, compiler backend for [Nx](https://github.com/elixir-nx/nx/tree/main/nx#readme).
 - `:beaver`: Pure Elixir, top level app ships the high level functionalities including IR generation and pattern definition.
