@@ -218,7 +218,16 @@ defmodule MlirTest do
       {:return, userData, state}
     end
 
-    def handle_invoke(:run, [op, _pass, userData], state) do
+    def handle_invoke(
+          :run,
+          [
+            %Beaver.MLIR.CAPI.MlirOperation{} = op,
+            pass,
+            userData
+          ],
+          state
+        ) do
+      %Beaver.MLIR.CAPI.MlirExternalPass{} = pass
       MLIR.Operation.verify!(op)
       {:return, userData, state}
     end
