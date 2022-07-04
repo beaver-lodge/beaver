@@ -75,15 +75,12 @@ defmodule Beaver.MLIR.Dialect.Registry do
       end
       |> Enum.uniq()
 
-    case {full, Mix.env()} do
-      {true, _} ->
-        all_dialects
+    skip_dialects = Application.get_env(:beaver_capi, :skip_dialects, [])
 
-      {_, :prod} ->
-        all_dialects
-
-      _ ->
-        all_dialects |> Enum.reject(fn x -> x in @less_used end)
+    if full do
+      all_dialects
+    else
+      all_dialects |> Enum.reject(fn x -> x in skip_dialects end)
     end
   end
 

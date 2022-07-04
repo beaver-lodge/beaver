@@ -9,13 +9,10 @@ defmodule Beaver.MLIR.Dialect do
     IO.puts("building Elixir module for #{d} => #{module_name}")
     module_name = Module.concat([__MODULE__, module_name])
 
-    Task.async(fn ->
-      defmodule module_name do
-        use Beaver.MLIR.Dialect.Generator,
-          dialect: d,
-          ops: Dialect.Registry.ops(d)
-      end
-    end)
+    defmodule module_name do
+      use Beaver.MLIR.Dialect.Generator,
+        dialect: d,
+        ops: Dialect.Registry.ops(d)
+    end
   end
-  |> Task.await_many(:infinity)
 end
