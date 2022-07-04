@@ -267,7 +267,7 @@ defmodule PDLTest do
 
   test "raise" do
     assert_raise RuntimeError,
-                 ~r"Must pass a list or a variable to operands/attributes/results, got: %{a: 1}",
+                 ~r"Must pass a list or a variable to operands/attributes/results, got: \n%{a: 1}",
                  fn ->
                    defmodule ToyPass do
                      use Beaver
