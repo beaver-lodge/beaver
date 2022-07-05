@@ -155,7 +155,9 @@ LLVM/MLIR is a giant project, and built around that Beaver have hundreds of Erla
 - `:beaver_nx` could only work with Nx.
 - Although `:exotic` is built for Beaver, any Erlang/Elixir app with interest bundling some C API could take advantage of it as well.
 - Any new feature not relying on meta-programming should be added in `:beaver_capi`.
-- There is no strict requirements on the consistency between the Erlang app name and Elixir module name. Of course redefinition of Elixir modules with an identical name should be avoided.
+- The namespace `Beaver.MLIR` is for standard features are generally expected in any MLIR tools.
+- The namespace `Beaver` is for concepts and practice only exists in Beaver, which are mostly in a DSL provided as a set of macros (including `mlir/0`, `block/1`, `defpat/2`, etc). The implementations are usually under `Beaver.DSL` namespace.
+- In Beaver, there is no strict requirements on the consistency between the Erlang app name and Elixir module name. Two modules with same namespace prefix could locate in different Erlang apps (this happens a lot to the `Beaver.MLIR` namespace). Of course redefinition of Elixir modules with an identical name should be avoided.
 
 ## How it works?
 
