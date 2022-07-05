@@ -1,6 +1,7 @@
 defmodule Beaver.Env do
   @moduledoc """
   Provide macros to insert MLIR context and IR element of structure. These macros are designed to mimic the behavior and aesthetics of __MODULE__/0, __CALLER__/0 in Elixir.
+  Its distinguished form is to indicate this should not be expected to be a function or a macro works like a function.
   """
 
   defmacro mlir__CONTEXT__() do
