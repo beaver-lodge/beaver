@@ -43,9 +43,7 @@ defmodule Exotic.Closure.Server do
         {callback_id, arg_values, _ret_ptr_value, token},
         %State{
           callback_module: callback_module,
-          def:
-            %Exotic.Closure.Definition{arg_types: arg_types, return_type: _return_type} =
-              definition,
+          def: %Exotic.Closure.Definition{arg_types: arg_types, return_type: _return_type},
           user_state: user_state
         } = state
       )
