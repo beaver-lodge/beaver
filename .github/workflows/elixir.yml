@@ -32,6 +32,6 @@ jobs:
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
-          version: "15.0"
+          version: "14.0"
       - name: Run tests
         run: mix test
