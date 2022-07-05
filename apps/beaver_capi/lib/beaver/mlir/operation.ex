@@ -4,6 +4,21 @@ defmodule Beaver.MLIR.Operation do
   import Beaver.MLIR.CAPI
   require Logger
 
+  defp defer_if_terminator(arguments) do
+    arguments
+    |> Enum.reduce(
+      true,
+      fn
+        # if it is atom, defer the creation of the defer_if_terminator
+        {:successor, %Beaver.MLIR.CAPI.MlirBlock{}}, acc ->
+          false && acc
+
+        _, acc ->
+          acc
+      end
+    )
+  end
+
   @doc """
   Create a new operation from a operation state
   """
@@ -37,9 +52,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def create(op_name, arguments) do
-    defer_if_terminator = Keyword.get(arguments, :defer_if_terminator, true)
-
-    if defer_if_terminator and MLIR.Trait.is_terminator?(op_name) do
+    if MLIR.Trait.is_terminator?(op_name) && defer_if_terminator(arguments) do
       if block = MLIR.Managed.Block.get() do
         Beaver.MLIR.Managed.Terminator.defer(fn ->
           op = do_create(op_name, arguments)
