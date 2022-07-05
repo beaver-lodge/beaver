@@ -35,10 +35,10 @@ defmodule Beaver.MLIR do
         end
 
         unquote_splicing(block_arg_var_ast)
-        block_ret = unquote(block)
+        unquote(block)
         Beaver.MLIR.Managed.Block.set(previous_block)
 
-        block_ret
+        block
       end
 
     block_ast

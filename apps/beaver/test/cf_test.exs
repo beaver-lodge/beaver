@@ -83,14 +83,13 @@ defmodule CfTest do
         end
       end
 
-      mlir do
-        block bbnext(arg :: Type.f32()) do
-          bbnext = mlir__BLOCK__()
+      bb_next =
+        mlir do
+          block bbnext(arg :: Type.f32()) do
+          end
         end
-      end
 
-      # TODO: should update acc with block arg with bb2
-      {arg, update_block(acc, bbnext)}
+      {arg, update_block(acc, bb_next)}
     end
 
     # an assign, it is different from binding in Elixir, so we want to generate IR of mutable semantic
@@ -189,7 +188,7 @@ defmodule CfTest do
 
     # In most of LLVM or other compiler guidance, it starts with ast parsing.
     # In Elixir we don't have to, just reuse the Elixir ast and use macro to do the magic!
-    defmacro defmut(call, do: block) do
+    defmacro defmlir(call, do: block) do
       mlir_asm =
         MutCompiler.gen_func(call, block)
         |> MLIR.Operation.to_string()
@@ -205,7 +204,7 @@ defmodule CfTest do
     import MutCompiler
 
     mlir =
-      defmut get_lr(total_iters, factor, base_lr, step) do
+      defmlir get_lr(total_iters, factor, base_lr, step) do
         base_lr = base_lr * factor
 
         return(base_lr)
@@ -214,7 +213,7 @@ defmodule CfTest do
     assert mlir =~ "%0 = arith.mulf %arg2, %arg1 : f32", mlir
 
     mlir =
-      defmut get_lr_with_ctrl_flow(total_iters, factor, base_lr, step) do
+      defmlir get_lr_with_ctrl_flow(total_iters, factor, base_lr, step) do
         base_lr =
           if step < total_iters do
             base_lr * factor
