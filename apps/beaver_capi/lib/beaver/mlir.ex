@@ -22,17 +22,23 @@ defmodule Beaver.MLIR do
 
         # can't put code here inside a function like Region.under, because we need to support uses across blocks
         previous_block = Beaver.MLIR.Managed.Block.get()
+
         Beaver.MLIR.Managed.Block.set(block)
-        unquote_splicing(block_arg_var_ast)
-        unquote(block)
-        Beaver.MLIR.Managed.Block.set(previous_block)
 
         if region = Beaver.MLIR.Managed.Region.get() do
+          # insert the block to region
           Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, block)
+          # put the block to managed terminator => block id (name in decomposed block call)
           Beaver.MLIR.Managed.Terminator.put_block(unquote(block_id), block)
         else
-          raise "no managed region found"
+          raise "no managed region found to append block"
         end
+
+        unquote_splicing(block_arg_var_ast)
+        block_ret = unquote(block)
+        Beaver.MLIR.Managed.Block.set(previous_block)
+
+        block_ret
       end
 
     block_ast

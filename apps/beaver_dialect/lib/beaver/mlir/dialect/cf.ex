@@ -46,7 +46,22 @@ defmodule Beaver.MLIR.Dialect.CF do
         successor: false_dest
       ] ++ true_args ++ false_args
     )
+  end
 
-    nil
+  def cond_br(condition, true_dest) do
+    {true_dest, true_args} = extract_args(true_dest)
+
+    length_true_args = length(true_args)
+
+    operand_segment_sizes = ~a{dense<[1, #{length_true_args}, 0]> : vector<3xi32>}
+
+    MLIR.Operation.create(
+      "cf.cond_br",
+      [
+        condition,
+        successor: true_dest,
+        operand_segment_sizes: operand_segment_sizes
+      ] ++ true_args
+    )
   end
 end

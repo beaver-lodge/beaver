@@ -38,7 +38,12 @@ defmodule Beaver.MLIR.Block do
     create(args, locs)
   end
 
-  def create(args, locs) when length(args) == length(locs) do
+  def create(args, locs) when is_list(args) and is_list(locs) do
+    # TODO: improve this
+    if length(args) != length(locs) do
+      raise "Different length of block args and types. Make sure the block/1 macro in call within mlir/1 macro"
+    end
+
     len = length(args)
     args = args |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
     locs = locs |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()

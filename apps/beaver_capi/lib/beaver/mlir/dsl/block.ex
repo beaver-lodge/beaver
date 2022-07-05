@@ -5,7 +5,6 @@ defmodule Beaver.MLIR.DSL.Block do
     {bb_name, args} = call |> Macro.decompose_call()
     if not is_atom(bb_name), do: raise("block name must be an atom")
 
-    args = Enum.take(args, -2)
     opts = List.last(args)
     # transform {arg, type} into arg = type
     args_type_ast =
