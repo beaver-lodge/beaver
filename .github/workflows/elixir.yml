@@ -29,9 +29,12 @@ jobs:
           restore-keys: ${{ runner.os }}-mix-
       - name: Install dependencies
         run: mix deps.get
+      - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Install LLVM and Clang
         uses: KyleMayes/install-llvm-action@v1
         with:
           version: "14.0"
       - name: Run tests
+        env:
+          LLVM_CONFIG_PATH: "/home/runner/work/beaver/beaver/llvm/bin/llvm-config"
         run: mix test
