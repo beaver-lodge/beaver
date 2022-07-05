@@ -146,6 +146,11 @@ defmodule Beaver.MLIR.Operation.State do
     add_result(state, [result_types])
   end
 
+  def add_argument(state, {:successor, %Beaver.MLIR.CAPI.MlirBlock{} = successor_block}) do
+    state
+    |> add_successors([successor_block])
+  end
+
   def add_argument(state, {:successor, successor}) when is_atom(successor) do
     successor_block = MLIR.Managed.Terminator.get_block(successor)
 

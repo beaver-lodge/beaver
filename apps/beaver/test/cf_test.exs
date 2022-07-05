@@ -66,22 +66,28 @@ defmodule CfTest do
          ) do
       mlir do
         {condition, acc} = gen_mlir(cond_ast, acc)
-        CF.cond_br(condition, :_true_branch, :_false_branch)
+        entry = mlir__BLOCK__()
       end
 
-      mlir do
-        block _true_branch() do
-          {%MLIR.CAPI.MlirValue{} = mlir, acc} = gen_mlir(do_block_ast, acc)
-          CF.br({:bbnext, [mlir]})
+      true_branch =
+        mlir do
+          block _true_branch() do
+            {%MLIR.CAPI.MlirValue{} = mlir, acc} = gen_mlir(do_block_ast, acc)
+            CF.br({:bbnext, [mlir]})
+          end
         end
-      end
 
-      mlir do
-        block _false_branch() do
-          {%MLIR.CAPI.MlirValue{} = mlir, acc} = gen_mlir(else_block_ast, acc)
-          CF.br({:bbnext, [mlir]})
+      false_branch =
+        mlir do
+          block _false_branch() do
+            {%MLIR.CAPI.MlirValue{} = mlir, acc} = gen_mlir(else_block_ast, acc)
+            CF.br({:bbnext, [mlir]})
+          end
         end
-      end
+
+      MLIR.Block.under(entry, fn ->
+        CF.cond_br(condition, true_branch, false_branch, defer_if_terminator: false)
+      end)
 
       bb_next =
         mlir do
