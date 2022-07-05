@@ -43,6 +43,7 @@ defmodule Beaver do
   defmacro __using__(_) do
     quote do
       import Beaver
+      import Beaver.Env
       alias Beaver.MLIR
       import MLIR.Sigils
     end
