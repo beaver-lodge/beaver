@@ -85,7 +85,7 @@ defmodule CfTest do
 
       mlir do
         block bbnext(arg :: Type.f32()) do
-          bbnext = mlir__BLOCK__
+          bbnext = mlir__BLOCK__()
         end
       end
 
