@@ -2,6 +2,10 @@ defmodule Beaver.MLIR.Dialect.CF do
   alias Beaver.MLIR
   import Beaver.MLIR.Sigils
 
+  defp extract_args(block = %Beaver.MLIR.CAPI.MlirBlock{}) do
+    {block, []}
+  end
+
   defp extract_args(dest) when is_atom(dest) do
     {dest, []}
   end
@@ -25,9 +29,9 @@ defmodule Beaver.MLIR.Dialect.CF do
   end
 
   @doc """
-  Create cf.cond_br op. It is a terminator, so this function doesn't returns the results
+  Create cf.cond_br op. Passing atom will lead to defer the creation of this terminator.
   """
-  def cond_br(condition, true_dest, false_dest) do
+  def cond_br(condition, true_dest, false_dest, opts \\ []) do
     {true_dest, true_args} = extract_args(true_dest)
     {false_dest, false_args} = extract_args(false_dest)
 
@@ -44,7 +48,7 @@ defmodule Beaver.MLIR.Dialect.CF do
         successor: true_dest,
         operand_segment_sizes: operand_segment_sizes,
         successor: false_dest
-      ] ++ true_args ++ false_args
+      ] ++ true_args ++ false_args ++ opts
     )
   end
 

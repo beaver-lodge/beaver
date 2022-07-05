@@ -121,9 +121,6 @@ defmodule Beaver.MLIR.Operation.State do
   - {:result_types, types} as the return types of the operation
   - {:successor, block} a successor block
   """
-  def add_argument(state, {:defer_if_terminator, _}) do
-    state
-  end
 
   def add_argument(state, value) when is_integer(value) do
     add_attr(state, value: "#{value}")
@@ -144,6 +141,11 @@ defmodule Beaver.MLIR.Operation.State do
 
   def add_argument(state, {:result_types, result_types}) do
     add_result(state, [result_types])
+  end
+
+  def add_argument(state, {:successor, %Beaver.MLIR.CAPI.MlirBlock{} = successor_block}) do
+    state
+    |> add_successors([successor_block])
   end
 
   def add_argument(state, {:successor, successor}) when is_atom(successor) do

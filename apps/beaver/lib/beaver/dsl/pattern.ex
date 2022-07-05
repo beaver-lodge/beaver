@@ -309,7 +309,6 @@ defmodule Beaver.DSL.Pattern do
     quote do
       Beaver.MLIR.Dialect.PDL.rewrite [
         beaver_gen_root,
-        defer_if_terminator: false,
         operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 0])
       ] do
         region do

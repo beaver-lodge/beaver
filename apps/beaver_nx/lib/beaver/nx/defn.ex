@@ -272,7 +272,7 @@ defmodule Beaver.Nx.Defn do
             complex_element = Tensor.extract(complex_tensor, index) >>> Type.complex(Type.f32())
             conjugate_element = Complex.conj(complex_element) >>> Type.complex(Type.f32())
             MemRef.store([conjugate_element, conjugate_memref, index])
-            SCF.yield(defer_if_terminator: false)
+            SCF.yield()
           end
         end
       end
@@ -308,7 +308,7 @@ defmodule Beaver.Nx.Defn do
           block bb0(arg0 :: Type.complex(Type.f32()), arg1 :: Type.f(32)) do
             %MLIR.CAPI.MlirValue{} = arg1
             im = Complex.im(arg0) >>> Type.f32()
-            Linalg.yield([im, defer_if_terminator: false])
+            Linalg.yield([im])
           end
         end
       end >>> gen_type(t)
