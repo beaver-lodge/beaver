@@ -86,7 +86,7 @@ defmodule CfTest do
         end
 
       MLIR.Block.under(entry, fn ->
-        CF.cond_br(condition, true_branch, false_branch, defer_if_terminator: false)
+        CF.cond_br(condition, true_branch, false_branch)
       end)
 
       bb_next =

@@ -121,9 +121,6 @@ defmodule Beaver.MLIR.Operation.State do
   - {:result_types, types} as the return types of the operation
   - {:successor, block} a successor block
   """
-  def add_argument(state, {:defer_if_terminator, _}) do
-    state
-  end
 
   def add_argument(state, value) when is_integer(value) do
     add_attr(state, value: "#{value}")
