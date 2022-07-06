@@ -1,3 +1,5 @@
+alias Beaver.MLIR
+
 alias Beaver.MLIR.CAPI.{
   MlirModule,
   MlirOperation,
@@ -29,12 +31,13 @@ defmodule Beaver.MLIR.Walker do
           element_equal: (element(), element() -> Exotic.Value.t() | integer()) | nil,
           get_first: (container() -> element()) | nil,
           get_next: (element() -> element()) | nil,
-          get_parent: (element() -> container()) | nil
+          get_parent: (element() -> container()) | nil,
+          is_null: (element() -> Exotic.Value.t() | bool()) | nil
         }
 
   container_keys = [:container, :element_module]
   index_func_keys = [:get_num, :get_element, :element_equal]
-  iter_func_keys = [:get_first, :get_next, :get_parent]
+  iter_func_keys = [:get_first, :get_next, :get_parent, :is_null]
   @enforce_keys container_keys
   defstruct container_keys ++ index_func_keys ++ iter_func_keys
 
@@ -91,11 +94,13 @@ defmodule Beaver.MLIR.Walker do
         element_module,
         get_first: get_first,
         get_next: get_next,
-        get_parent: get_parent
+        get_parent: get_parent,
+        is_null: is_null
       )
       when is_function(get_first, 1) and
              is_function(get_next, 1) and
-             is_function(get_parent, 1) do
+             is_function(get_parent, 1) and
+             is_function(is_null, 1) do
     container = %container_module{} = to_container(container)
     verify_nesting!(container_module, element_module)
 
@@ -104,7 +109,8 @@ defmodule Beaver.MLIR.Walker do
       element_module: element_module,
       get_first: get_first,
       get_next: get_next,
-      get_parent: get_parent
+      get_parent: get_parent,
+      is_null: is_null
     }
   end
 
@@ -182,7 +188,8 @@ defmodule Beaver.MLIR.Walker do
       MlirBlock,
       get_first: &CAPI.mlirRegionGetFirstBlock/1,
       get_next: &CAPI.mlirBlockGetNextInRegion/1,
-      get_parent: &CAPI.mlirBlockGetParentRegion/1
+      get_parent: &CAPI.mlirBlockGetParentRegion/1,
+      is_null: &MLIR.Block.is_null/1
     )
   end
 end
@@ -236,5 +243,36 @@ defimpl Enumerable, for: Walker do
       value = get_element.(container, pos)
       fun.(value, acc)
     end)
+  end
+
+  def reduce(
+        %Walker{
+          get_next: get_next,
+          is_null: is_null
+        },
+        {:cont, {acc, last}},
+        fun
+      ) do
+    acc = fun.(last, acc)
+    next = get_next.(last)
+
+    if is_null.(next) do
+      {_, acc} = acc
+      {:done, acc}
+    else
+      {cmd, acc} = acc
+      {cmd, {acc, next}}
+    end
+  end
+
+  def reduce(
+        %Walker{container: container, get_first: get_first, get_next: get_next, is_null: is_null} =
+          walker,
+        {:cont, acc},
+        fun
+      )
+      when is_function(get_first, 1) and is_function(get_next, 1) and is_function(is_null, 1) do
+    first = get_first.(container)
+    reduce(walker, {:cont, {acc, first}}, fun)
   end
 end

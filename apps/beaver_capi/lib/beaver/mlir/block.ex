@@ -65,4 +65,10 @@ defmodule Beaver.MLIR.Block do
     Beaver.MLIR.Managed.Block.set(previous_block)
     last_op
   end
+
+  def is_null(block = %MLIR.CAPI.MlirBlock{}) do
+    block
+    |> Exotic.Value.fetch(MLIR.CAPI.MlirBlock, :ptr)
+    |> Exotic.Value.extract() == 0
+  end
 end
