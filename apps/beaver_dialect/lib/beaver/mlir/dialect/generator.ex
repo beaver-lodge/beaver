@@ -15,12 +15,7 @@ defmodule Beaver.MLIR.Dialect.Generator do
           ])
 
         defmodule op_module_name do
-          use Beaver.DSL.Op.Prototype
-
-          @impl Beaver.DSL.Op.Prototype
-          def op_name() do
-            unquote(full_name)
-          end
+          use Beaver.DSL.Op.Prototype, op_name: unquote(full_name)
         end
 
         def unquote(func_name)() do

@@ -7,10 +7,17 @@ defmodule Beaver.DSL.Op.Prototype do
 
   defstruct operands: [], attributes: [], results: []
 
-  defmacro __using__(_) do
+  defmacro __using__(opts) do
+    op_name = Keyword.fetch!(opts, :op_name)
+
     quote do
       @behaviour Beaver.DSL.Op.Prototype
       defstruct operands: [], attributes: [], results: []
+
+      @impl true
+      def op_name() do
+        unquote(op_name)
+      end
     end
   end
 

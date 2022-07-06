@@ -1,6 +1,4 @@
 defmodule Beaver.MLIR.DSL.Op.Registry do
-  alias Beaver.MLIR
-  alias Beaver.MLIR.CAPI
   use GenServer
 
   def start_link([]) do
