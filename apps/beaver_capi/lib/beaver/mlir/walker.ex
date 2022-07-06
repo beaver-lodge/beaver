@@ -32,14 +32,16 @@ defmodule Beaver.MLIR.Walker do
           get_first: (container() -> element()) | nil,
           get_next: (element() -> element()) | nil,
           get_parent: (element() -> container()) | nil,
-          is_null: (element() -> Exotic.Value.t() | bool()) | nil
+          is_null: (element() -> Exotic.Value.t() | bool()) | nil,
+          this: element() | nil
         }
 
   container_keys = [:container, :element_module]
   index_func_keys = [:get_num, :get_element, :element_equal]
+  iter_keys = [:this]
   iter_func_keys = [:get_first, :get_next, :get_parent, :is_null]
   @enforce_keys container_keys
-  defstruct container_keys ++ index_func_keys ++ iter_func_keys
+  defstruct container_keys ++ index_func_keys ++ iter_keys ++ iter_func_keys
 
   # operands, results, attributes of one operation
   defp verify_nesting!(MlirOperation, MlirValue), do: :ok
@@ -48,7 +50,7 @@ defmodule Beaver.MLIR.Walker do
   defp verify_nesting!(MlirOperation, MlirRegion), do: :ok
   # successor blocks of a operation
   defp verify_nesting!(MlirOperation, MlirBlock), do: :ok
-  # blocks in a regions
+  # blocks in a region
   defp verify_nesting!(MlirRegion, MlirBlock), do: :ok
   # operations in a block
   defp verify_nesting!(MlirBlock, MlirOperation), do: :ok
@@ -85,7 +87,7 @@ defmodule Beaver.MLIR.Walker do
       element_module: element_module,
       get_num: get_num,
       get_element: get_element,
-      element_equal: get_element
+      element_equal: element_equal
     }
   end
 
@@ -180,6 +182,16 @@ defmodule Beaver.MLIR.Walker do
   end
 
   def operations(block) do
+    raise "todo"
+
+    new(
+      block,
+      MlirBlock,
+      get_first: &CAPI.mlirBlock/1,
+      get_next: &CAPI.mlirBlockGetNextInRegion/1,
+      get_parent: &CAPI.mlirBlockGetParentRegion/1,
+      is_null: &MLIR.Block.is_null/1
+    )
   end
 
   def blocks(region) do
@@ -197,8 +209,13 @@ end
 alias Beaver.MLIR.Walker
 
 defimpl Enumerable, for: Walker do
+  @spec count(Walker.t()) :: {:ok, non_neg_integer()} | {:error, module()}
   def count(%Walker{container: container, get_num: get_num}) when is_function(get_num, 1) do
-    get_num.(container) |> Exotic.Value.extract()
+    {:ok, get_num.(container) |> Exotic.Value.extract()}
+  end
+
+  def count(%Walker{container: %container_module{}}) do
+    {:error, container_module}
   end
 
   @spec member?(Walker.t(), Walker.element()) :: {:ok, boolean()} | {:error, module()}
@@ -216,53 +233,60 @@ defimpl Enumerable, for: Walker do
           {:ok, size :: non_neg_integer(), Enumerable.slicing_fun()} | {:error, module()}
   def slice(walker = %Walker{container: container, get_element: get_element})
       when is_function(get_element, 2) do
-    {:ok, count(walker),
-     fn start, length ->
-       pos_range = start..(start + length - 1)
+    with {:ok, count} <- count(walker) do
+      {:ok, count,
+       fn start, length ->
+         pos_range = start..(start + length - 1)
 
-       for pos <- pos_range do
-         get_element.(container, pos)
-       end
-     end}
+         for pos <- pos_range do
+           get_element.(container, pos)
+         end
+       end}
+    else
+      error -> error
+    end
   end
 
   @spec reduce(Walker.t(), Enumerable.acc(), Enumerable.reducer()) :: Enumerable.result()
 
-  # Do nothing special if :halt
+  # Do nothing special receiving :halt or :suspend
   def reduce(_walker, {:halt, acc}, _fun), do: {:halted, acc}
-  # Do nothing special if :suspend
+
   def reduce(walker, {:suspend, acc}, fun),
     do: {:suspended, acc, &reduce(walker, &1, fun)}
 
   # Reduce all in one :cont
   def reduce(%Walker{container: container, get_element: get_element} = walker, {:cont, acc}, fun)
       when is_function(get_element, 2) do
-    pos_range = 0..(count(walker) - 1)//1
+    with {:ok, count} <- count(walker) do
+      pos_range = 0..(count - 1)//1
 
-    Enum.reduce(pos_range, acc, fn pos, acc ->
-      value = get_element.(container, pos)
-      fun.(value, acc)
-    end)
+      Enum.reduce(pos_range, acc, fn pos, acc ->
+        value = get_element.(container, pos)
+        fun.(value, acc)
+      end)
+    else
+      error -> error
+    end
   end
 
   def reduce(
         %Walker{
           get_next: get_next,
-          is_null: is_null
-        },
-        {:cont, {acc, last}},
+          is_null: is_null,
+          element_module: element_module,
+          this: %element_module{} = this
+        } = walker,
+        {:cont, %{acc: acc, this: this}},
         fun
       )
       when is_function(get_next, 1) and is_function(is_null, 1) do
-    acc = fun.(last, acc)
-    next = get_next.(last)
+    next = get_next.(this)
 
     if is_null.(next) do
-      {_, acc} = acc
       {:done, acc}
     else
-      {cmd, acc} = acc
-      {cmd, {acc, next}}
+      reduce(%Walker{walker | this: next}, {:cont, fun.(this, acc)}, fun)
     end
   end
 
@@ -273,7 +297,13 @@ defimpl Enumerable, for: Walker do
         fun
       )
       when is_function(get_first, 1) and is_function(get_next, 1) and is_function(is_null, 1) do
-    first = get_first.(container)
-    reduce(walker, {:cont, {acc, first}}, fun)
+    this = get_first.(container)
+    next = get_next.(this)
+
+    if is_null.(next) do
+      {:done, acc}
+    else
+      reduce(%Walker{walker | this: next}, {:cont, fun.(this, acc)}, fun)
+    end
   end
 end
