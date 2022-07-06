@@ -7,6 +7,13 @@ defmodule Beaver.DSL.Op.Prototype do
 
   defstruct operands: [], attributes: [], results: []
 
+  defmacro __using__(_) do
+    quote do
+      @behaviour Beaver.DSL.Op.Prototype
+      defstruct operands: [], attributes: [], results: []
+    end
+  end
+
   @doc """
   Dispatch the op name and map to the callback `cb` if this is a module implement the behavior this module define.
   """

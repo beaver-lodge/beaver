@@ -11,7 +11,7 @@ defmodule Beaver.MLIR.Dialect.Func do
       MLIR.Operation.create("func.func", arguments)
     end
 
-    @behaviour Beaver.DSL.Op.Prototype
+    use Beaver.DSL.Op.Prototype
 
     @impl true
     def op_name() do

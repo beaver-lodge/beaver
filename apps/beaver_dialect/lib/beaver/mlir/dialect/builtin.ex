@@ -6,7 +6,7 @@ defmodule Beaver.MLIR.Dialect.Builtin do
     ops: Dialect.Registry.ops("builtin") |> Enum.reject(fn x -> x in ~w{module} end)
 
   defmodule Module do
-    @behaviour Beaver.DSL.Op.Prototype
+    use Beaver.DSL.Op.Prototype
 
     @impl true
     def op_name() do
