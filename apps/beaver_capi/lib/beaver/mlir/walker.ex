@@ -252,7 +252,8 @@ defimpl Enumerable, for: Walker do
         },
         {:cont, {acc, last}},
         fun
-      ) do
+      )
+      when is_function(get_next, 1) and is_function(is_null, 1) do
     acc = fun.(last, acc)
     next = get_next.(last)
 
