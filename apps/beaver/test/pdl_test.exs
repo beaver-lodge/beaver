@@ -265,7 +265,10 @@ defmodule PDLTest do
         %TOSA.Sub{operands: [a, b]}
       end
 
-      def run(module) do
+      def run(%MLIR.CAPI.MlirOperation{} = module) do
+        %MLIR.Dialect.Func.Func{attributes: [], operands: [], results: []} =
+          module |> MLIR.Operation.to_prototype()
+
         MLIR.Pattern.apply!(module, [replace_add_op()])
         :ok
       end

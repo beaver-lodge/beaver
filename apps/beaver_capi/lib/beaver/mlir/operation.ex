@@ -171,6 +171,9 @@ defmodule Beaver.MLIR.Operation do
   def to_prototype(%MLIR.CAPI.MlirOperation{} = operation) do
     op_name =
       MLIR.CAPI.mlirOperationGetName(operation)
+      |> MLIR.CAPI.mlirIdentifierStr()
       |> MLIR.StringRef.extract()
+
+    struct!(MLIR.DSL.Op.Registry.lookup(op_name), %{})
   end
 end

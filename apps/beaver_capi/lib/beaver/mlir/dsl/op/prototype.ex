@@ -14,9 +14,21 @@ defmodule Beaver.DSL.Op.Prototype do
       @behaviour Beaver.DSL.Op.Prototype
       defstruct operands: [], attributes: [], results: []
 
+      require Logger
       @impl true
       def op_name() do
         unquote(op_name)
+      end
+
+      @on_load :register_op_prototype
+
+      def register_op_prototype do
+        Logger.debug(
+          "loading op prototype: #{unquote(op_name)} => #{Macro.to_string(__MODULE__)}"
+        )
+
+        Beaver.MLIR.DSL.Op.Registry.register(unquote(op_name), __MODULE__)
+        :ok
       end
     end
   end
