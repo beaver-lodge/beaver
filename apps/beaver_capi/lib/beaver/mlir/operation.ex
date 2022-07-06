@@ -167,4 +167,10 @@ defmodule Beaver.MLIR.Operation do
     mlirOperationDump(op)
     op
   end
+
+  def to_prototype(%MLIR.CAPI.MlirOperation{} = operation) do
+    op_name =
+      MLIR.CAPI.mlirOperationGetName(operation)
+      |> MLIR.StringRef.extract()
+  end
 end
