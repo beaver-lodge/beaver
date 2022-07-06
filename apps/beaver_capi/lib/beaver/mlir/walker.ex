@@ -16,8 +16,6 @@ defmodule Beaver.MLIR.Walker do
 
   @type container() :: MlirOperation.t() | MlirRegion.t() | MlirBlock.t()
 
-  @type container_module() :: MlirOperation | MlirRegion | MlirBlock
-
   @type element() ::
           MlirOperation.t() | MlirRegion.t() | MlirBlock.t() | MlirValue.t() | MlirAttribute.t()
 
@@ -25,7 +23,6 @@ defmodule Beaver.MLIR.Walker do
 
   @type t :: %__MODULE__{
           container: container(),
-          container_module: element_module(),
           element_module: element_module(),
           get_num: (container() -> Exotic.Value.t() | integer()) | nil,
           get_element: (container(), integer() | Exotic.Value.t() -> element()) | nil,
@@ -35,10 +32,10 @@ defmodule Beaver.MLIR.Walker do
           get_parent: (element() -> container()) | nil
         }
 
-  container_keys = [:container, :container_module, :element_module]
+  container_keys = [:container, :element_module]
   index_func_keys = [:get_num, :get_element, :element_equal]
   iter_func_keys = [:get_first, :get_next, :get_parent]
-  @enforce_keys [:container, :container_module, :element_module]
+  @enforce_keys container_keys
   defstruct container_keys ++ index_func_keys ++ iter_func_keys
 
   # operands, results, attributes of one operation
@@ -82,7 +79,6 @@ defmodule Beaver.MLIR.Walker do
 
     %__MODULE__{
       container: container,
-      container_module: container_module,
       element_module: element_module,
       get_num: get_num,
       get_element: get_element,
@@ -105,7 +101,6 @@ defmodule Beaver.MLIR.Walker do
 
     %__MODULE__{
       container: container,
-      container_module: container_module,
       element_module: element_module,
       get_first: get_first,
       get_next: get_next,
