@@ -9,7 +9,7 @@ defmodule Beaver.MLIR.Operation do
     |> Enum.reduce(
       true,
       fn
-        # if it is atom, defer the creation of the defer_if_terminator
+        # if it is real block, don't defer the creation
         {:successor, %Beaver.MLIR.CAPI.MlirBlock{}}, acc ->
           false && acc
 
