@@ -182,16 +182,7 @@ defmodule Beaver.MLIR.Walker do
   end
 
   def operations(block) do
-    raise "todo"
-
-    new(
-      block,
-      MlirBlock,
-      get_first: &CAPI.mlirBlock/1,
-      get_next: &CAPI.mlirBlockGetNextInRegion/1,
-      get_parent: &CAPI.mlirBlockGetParentRegion/1,
-      is_null: &MLIR.Block.is_null/1
-    )
+    raise "x"
   end
 
   def blocks(region) do
@@ -277,16 +268,16 @@ defimpl Enumerable, for: Walker do
           element_module: element_module,
           this: %element_module{} = this
         } = walker,
-        {:cont, %{acc: acc, this: this}},
+        {:cont, acc},
         fun
       )
       when is_function(get_next, 1) and is_function(is_null, 1) do
     next = get_next.(this)
 
-    if is_null.(next) do
+    if is_null.(this) do
       {:done, acc}
     else
-      reduce(%Walker{walker | this: next}, {:cont, fun.(this, acc)}, fun)
+      reduce(%Walker{walker | this: next}, fun.(this, acc), fun)
     end
   end
 
@@ -300,10 +291,10 @@ defimpl Enumerable, for: Walker do
     this = get_first.(container)
     next = get_next.(this)
 
-    if is_null.(next) do
+    if is_null.(this) do
       {:done, acc}
     else
-      reduce(%Walker{walker | this: next}, {:cont, fun.(this, acc)}, fun)
+      reduce(%Walker{walker | this: next}, fun.(this, acc), fun)
     end
   end
 end
