@@ -16,7 +16,12 @@ defmodule Beaver.MLIR.DSL.Op.Registry do
   end
 
   def lookup(op_name) when is_binary(op_name) do
-    [[op_module]] = :ets.match(__MODULE__, {op_name, :"$1"})
-    op_module
+    case :ets.match(__MODULE__, {op_name, :"$1"}) do
+      [[op_module]] ->
+        op_module
+
+      [] ->
+        raise "unknown op: #{op_name}"
+    end
   end
 end

@@ -6,8 +6,14 @@ defmodule Beaver.MLIR.Global.Context do
     # TODO: read opts from app config
     Agent.start_link(
       fn ->
-        MLIR.CAPI.mlirRegisterAllPasses()
-        MLIR.Context.create(allow_unregistered: true)
+        require Beaver.MLIR.Context
+        ctx = MLIR.Context.create(allow_unregistered: true)
+
+        MLIR.Context.allow_multi_thread ctx do
+          MLIR.CAPI.mlirRegisterAllPasses()
+        end
+
+        ctx
       end,
       name: __MODULE__
     )

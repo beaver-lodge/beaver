@@ -3,7 +3,8 @@ defmodule Beaver.MLIR.Dialect.Builtin do
 
   use Beaver.MLIR.Dialect.Generator,
     dialect: "builtin",
-    ops: Dialect.Registry.ops("builtin") |> Enum.reject(fn x -> x in ~w{module} end)
+    ops: Dialect.Registry.ops("builtin"),
+    skips: ~w{module}
 
   defmodule Module do
     use Beaver.DSL.Op.Prototype, op_name: "builtin.module"

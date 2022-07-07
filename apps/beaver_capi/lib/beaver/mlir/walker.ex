@@ -7,8 +7,34 @@ alias Beaver.MLIR.CAPI.{
   MlirAttribute,
   MlirBlock,
   MlirValue,
-  MlirNamedAttribute
+  MlirNamedAttribute,
+  MlirType
 }
+
+defmodule Beaver.MLIR.Walker.Operation do
+  @moduledoc """
+  Operation prototype built for post walk
+  """
+  defstruct operands: [],
+            attributes: [],
+            results: [],
+            regions: [],
+            successors: []
+end
+
+defmodule Beaver.MLIR.Walker.Region do
+  @moduledoc """
+  Region prototype built for post walk
+  """
+  defstruct blocks: []
+end
+
+defmodule Beaver.MLIR.Walker.Block do
+  @moduledoc """
+  Block prototype built for post walk
+  """
+  defstruct arguments: [], operations: []
+end
 
 defmodule Beaver.MLIR.Walker do
   alias Beaver.MLIR.CAPI
@@ -225,69 +251,99 @@ defmodule Beaver.MLIR.Walker do
         ) ::
           {container() | element(), any()}
   def traverse(mlir, acc, pre, post) when is_function(pre, 2) and is_function(post, 2) do
-    {mlir, acc} = pre.(mlir, acc)
+    mlir = to_container(mlir)
     do_traverse(mlir, acc, pre, post)
   end
 
-  defp do_traverse(%Beaver.MLIR.CAPI.MlirModule{} = module, acc, pre, post) do
-    operation = to_container(module)
-    do_traverse(operation, acc, pre, post)
-  end
-
-  defp do_traverse(%MlirOperation{} = operation, acc, pre, post) do
-    operands = operands(operation)
-    {operands, acc} = do_traverse(operands, acc, pre, post)
-    post.(operands, acc)
-
-    attributes = attributes(operation)
-    {attributes, acc} = do_traverse(attributes, acc, pre, post)
-    post.(attributes, acc)
-
-    # TODO: to differentiate result values and operand values?
-    results = results(operation)
-    {results, acc} = do_traverse(results, acc, pre, post)
-    post.(results, acc)
-
-    regions = regions(operation)
-    {regions, acc} = do_traverse(regions, acc, pre, post)
-    post.(regions, acc)
-
-    # TODO: to differentiate successor blocks and nested blocks?
-    successors = regions(operation)
-    {successors, acc} = do_traverse(successors, acc, pre, post)
-    post.(successors, acc)
-  end
-
-  defp do_traverse(%MlirRegion{} = region, acc, pre, post) do
-    blocks = blocks(region)
-    {blocks, acc} = do_traverse(blocks, acc, pre, post)
-    post.(blocks, acc)
-  end
-
-  defp do_traverse(%MlirBlock{} = block, acc, pre, post) do
-    # TODO: to differentiate argument values and operand/result values?
-    arguments = arguments(block)
-    {arguments, acc} = do_traverse(arguments, acc, pre, post)
-    post.(arguments, acc)
-
-    operations = operations(block)
-    {operations, acc} = do_traverse(operations, acc, pre, post)
-    post.(operations, acc)
-  end
-
+  # traverse the nested with the walker
   defp do_traverse(%__MODULE__{} = walker, acc, pre, post) do
+    do_traverse(Enum.to_list(walker), acc, pre, post)
+  end
+
+  defp do_traverse(list, acc, pre, post) when is_list(list) do
     :lists.mapfoldl(
       fn x, acc ->
-        {x, acc} = pre.(x, acc)
         do_traverse(x, acc, pre, post)
       end,
       acc,
-      Enum.to_list(walker)
+      list
     )
   end
 
-  defp do_traverse(x, acc, _pre, post) do
+  defp do_traverse(%MlirOperation{} = operation, acc, pre, post) do
+    {operation, acc} = pre.(operation, acc)
+
+    {operands, acc} = operands(operation) |> do_traverse(acc, pre, post)
+    {attributes, acc} = attributes(operation) |> do_traverse(acc, pre, post)
+
+    {results, acc} =
+      results(operation)
+      |> Enum.map(fn value -> {:result, CAPI.mlirValueGetType(value)} end)
+      |> do_traverse(acc, pre, post)
+
+    {regions, acc} = regions(operation) |> do_traverse(acc, pre, post)
+
+    {successors, acc} =
+      successors(operation)
+      |> Enum.map(fn successor -> {:successor, successor} end)
+      |> do_traverse(acc, pre, post)
+
+    post.(operation, acc)
+  end
+
+  defp do_traverse(%MlirRegion{} = region, acc, pre, post) do
+    {region, acc} = pre.(region, acc)
+    {blocks, acc} = blocks(region) |> do_traverse(acc, pre, post)
+
+    post.(region, acc)
+  end
+
+  defp do_traverse(%MlirBlock{} = block, acc, pre, post) do
+    {block, acc} = pre.(block, acc)
+
+    {arguments, acc} =
+      arguments(block)
+      |> Enum.map(fn value -> {:argument, CAPI.mlirValueGetType(value)} end)
+      |> do_traverse(acc, pre, post)
+
+    {operations, acc} = operations(block) |> do_traverse(acc, pre, post)
+
+    post.(block, acc)
+  end
+
+  defp do_traverse({:successor, %MlirBlock{}} = successor, acc, pre, post) do
+    {successor, acc} = pre.(successor, acc)
+    post.(successor, acc)
+  end
+
+  defp do_traverse({:argument, %MlirType{}} = argument, acc, pre, post) do
+    {argument, acc} = pre.(argument, acc)
+    post.(argument, acc)
+  end
+
+  defp do_traverse({:result, %MlirType{}} = result, acc, pre, post) do
+    {result, acc} = pre.(result, acc)
+    post.(result, acc)
+  end
+
+  defp do_traverse(%MlirValue{} = x, acc, pre, post) do
+    {x, acc} = pre.(x, acc)
     post.(x, acc)
+  end
+
+  defp do_traverse(%MlirNamedAttribute{} = named_attribute, acc, pre, post) do
+    name =
+      %MLIR.CAPI.MlirIdentifier{} =
+      named_attribute |> Exotic.Value.fetch(MLIR.CAPI.MlirNamedAttribute, :name)
+
+    attribute =
+      %MLIR.CAPI.MlirAttribute{} =
+      named_attribute |> Exotic.Value.fetch(MLIR.CAPI.MlirNamedAttribute, :attribute)
+
+    {{name, attribute}, acc} = pre.({name, attribute}, acc)
+    {{name, attribute}, acc} = post.({name, attribute}, acc)
+    named_attribute = MLIR.CAPI.mlirNamedAttributeGet(name, attribute)
+    {named_attribute, acc}
   end
 end
 

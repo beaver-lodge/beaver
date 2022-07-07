@@ -38,6 +38,89 @@ defmodule PDLTest do
     ctx = MLIR.Context.create()
     CAPI.mlirContextSetAllowUnregisteredDialects(ctx, true)
     pattern_module = MLIR.Module.create(ctx, @apply_rewrite_op_patterns)
+
+    inspector = fn
+      {:successor, %CAPI.MlirBlock{} = successor}, acc ->
+        {{:successor, successor}, acc}
+
+      {:argument, %CAPI.MlirType{}} = argument, acc ->
+        {argument, acc}
+
+      {:result, %CAPI.MlirType{}} = result, acc ->
+        {result, acc}
+
+      {name, %CAPI.MlirAttribute{} = attribute}, acc ->
+        {{name, attribute}, acc}
+
+      %element{} = mlir, acc ->
+        {mlir, [element | acc]}
+    end
+
+    {mlir, acc} =
+      pattern_module
+      |> MLIR.Walker.traverse([], inspector, inspector)
+
+    assert acc == [
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.CAPI.MlirOperation
+           ]
+
+    assert MLIR.CAPI.mlirOperationEqual(mlir, pattern_module) |> Exotic.Value.extract()
+
     ir_module = MLIR.Module.create(ctx, @apply_rewrite_op_ir)
     MLIR.Operation.verify!(pattern_module)
     MLIR.Operation.verify!(ir_module)
