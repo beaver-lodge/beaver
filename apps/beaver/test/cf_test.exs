@@ -194,7 +194,7 @@ defmodule CfTest do
 
     # In most of LLVM or other compiler guidance, it starts with ast parsing.
     # In Elixir we don't have to, just reuse the Elixir ast and use macro to do the magic!
-    defmacro defmlir(call, do: block) do
+    defmacro defnative(call, do: block) do
       mlir_asm =
         MutCompiler.gen_func(call, block)
         |> MLIR.Operation.to_string()
@@ -202,6 +202,7 @@ defmodule CfTest do
       quote do
         alias MLIR.Dialect.Func
         unquote(Macro.escape(mlir_asm))
+        # TODO: return a function capturing the JIT
       end
     end
   end
@@ -210,7 +211,7 @@ defmodule CfTest do
     import MutCompiler
 
     mlir =
-      defmlir get_lr(total_iters, factor, base_lr, step) do
+      defnative get_lr(total_iters, factor, base_lr, step) do
         base_lr = base_lr * factor
 
         return(base_lr)
@@ -219,7 +220,7 @@ defmodule CfTest do
     assert mlir =~ "%0 = arith.mulf %arg2, %arg1 : f32", mlir
 
     mlir =
-      defmlir get_lr_with_ctrl_flow(total_iters, factor, base_lr, step) do
+      defnative get_lr_with_ctrl_flow(total_iters, factor, base_lr, step) do
         base_lr =
           if step < total_iters do
             base_lr * factor
