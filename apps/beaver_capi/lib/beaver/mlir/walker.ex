@@ -6,7 +6,8 @@ alias Beaver.MLIR.CAPI.{
   MlirRegion,
   MlirAttribute,
   MlirBlock,
-  MlirValue
+  MlirValue,
+  MlirNamedAttribute
 }
 
 defmodule Beaver.MLIR.Walker do
@@ -16,10 +17,15 @@ defmodule Beaver.MLIR.Walker do
   Walkers traverses MLIR structures including operands, results, successors, attributes, regions
   """
 
-  @type container() :: MlirOperation.t() | MlirRegion.t() | MlirBlock.t()
+  # TODO: traverse MlirNamedAttribute?
+  @type container() :: MlirOperation.t() | MlirRegion.t() | MlirBlock.t() | MlirNamedAttribute.t()
 
   @type element() ::
-          MlirOperation.t() | MlirRegion.t() | MlirBlock.t() | MlirValue.t() | MlirAttribute.t()
+          MlirOperation.t()
+          | MlirRegion.t()
+          | MlirBlock.t()
+          | MlirValue.t()
+          | MlirNamedAttribute.t()
 
   @type element_module() :: MlirOperation | MlirRegion | MlirBlock | MlirValue | MlirAttribute
 
@@ -47,7 +53,7 @@ defmodule Beaver.MLIR.Walker do
 
   # operands, results, attributes of one operation
   defp verify_nesting!(MlirOperation, MlirValue), do: :ok
-  defp verify_nesting!(MlirOperation, MlirAttribute), do: :ok
+  defp verify_nesting!(MlirOperation, MlirNamedAttribute), do: :ok
   # regions of one operation
   defp verify_nesting!(MlirOperation, MlirRegion), do: :ok
   # successor blocks of a operation
@@ -144,7 +150,7 @@ defmodule Beaver.MLIR.Walker do
   def regions(op) do
     new(
       op,
-      MlirValue,
+      MlirRegion,
       get_num: &CAPI.mlirOperationGetNumRegions/1,
       get_element: &CAPI.mlirOperationGetRegion/2,
       element_equal: &CAPI.mlirRegionEqual/2
@@ -166,13 +172,14 @@ defmodule Beaver.MLIR.Walker do
   def attributes(op) do
     new(
       op,
-      MlirAttribute,
+      MlirNamedAttribute,
       get_num: &CAPI.mlirOperationGetNumAttributes/1,
       get_element: &CAPI.mlirOperationGetAttribute/2,
       element_equal: &CAPI.mlirAttributeEqual/2
     )
   end
 
+  @spec attributes(MlirBlock.t()) :: Enumerable.result()
   def arguments(block) do
     new(
       block,
@@ -183,6 +190,7 @@ defmodule Beaver.MLIR.Walker do
     )
   end
 
+  @spec attributes(MlirBlock.t()) :: Enumerable.result()
   def operations(block) do
     new(
       block,
@@ -194,6 +202,7 @@ defmodule Beaver.MLIR.Walker do
     )
   end
 
+  @spec attributes(MlirRegion.t()) :: Enumerable.result()
   def blocks(region) do
     new(
       region,
@@ -203,6 +212,82 @@ defmodule Beaver.MLIR.Walker do
       get_parent: &CAPI.mlirBlockGetParentRegion/1,
       is_null: &MLIR.Block.is_null/1
     )
+  end
+
+  @doc """
+  Traverse a container, it could be a operation, region, block.
+  """
+  @spec traverse(
+          container(),
+          any(),
+          (container() | element(), any() -> {container() | element(), any()}),
+          (container() | element(), any() -> {container() | element(), any()})
+        ) ::
+          {container() | element(), any()}
+  def traverse(mlir, acc, pre, post) when is_function(pre, 2) and is_function(post, 2) do
+    {mlir, acc} = pre.(mlir, acc)
+    do_traverse(mlir, acc, pre, post)
+  end
+
+  defp do_traverse(%Beaver.MLIR.CAPI.MlirModule{} = module, acc, pre, post) do
+    operation = to_container(module)
+    do_traverse(operation, acc, pre, post)
+  end
+
+  defp do_traverse(%MlirOperation{} = operation, acc, pre, post) do
+    operands = operands(operation)
+    {operands, acc} = do_traverse(operands, acc, pre, post)
+    post.(operands, acc)
+
+    attributes = attributes(operation)
+    {attributes, acc} = do_traverse(attributes, acc, pre, post)
+    post.(attributes, acc)
+
+    # TODO: to differentiate result values and operand values?
+    results = results(operation)
+    {results, acc} = do_traverse(results, acc, pre, post)
+    post.(results, acc)
+
+    regions = regions(operation)
+    {regions, acc} = do_traverse(regions, acc, pre, post)
+    post.(regions, acc)
+
+    # TODO: to differentiate successor blocks and nested blocks?
+    successors = regions(operation)
+    {successors, acc} = do_traverse(successors, acc, pre, post)
+    post.(successors, acc)
+  end
+
+  defp do_traverse(%MlirRegion{} = region, acc, pre, post) do
+    blocks = blocks(region)
+    {blocks, acc} = do_traverse(blocks, acc, pre, post)
+    post.(blocks, acc)
+  end
+
+  defp do_traverse(%MlirBlock{} = block, acc, pre, post) do
+    # TODO: to differentiate argument values and operand/result values?
+    arguments = arguments(block)
+    {arguments, acc} = do_traverse(arguments, acc, pre, post)
+    post.(arguments, acc)
+
+    operations = operations(block)
+    {operations, acc} = do_traverse(operations, acc, pre, post)
+    post.(operations, acc)
+  end
+
+  defp do_traverse(%__MODULE__{} = walker, acc, pre, post) do
+    :lists.mapfoldl(
+      fn x, acc ->
+        {x, acc} = pre.(x, acc)
+        do_traverse(x, acc, pre, post)
+      end,
+      acc,
+      Enum.to_list(walker)
+    )
+  end
+
+  defp do_traverse(x, acc, _pre, post) do
+    post.(x, acc)
   end
 end
 
@@ -285,14 +370,20 @@ defimpl Enumerable, for: Walker do
   end
 
   def reduce(
-        %Walker{container: container, get_element: get_element, this: pos, num: num} = walker,
+        %Walker{
+          container: container,
+          element_module: element_module,
+          get_element: get_element,
+          this: pos,
+          num: num
+        } = walker,
         {:cont, acc},
         fun
       )
       when is_function(get_element, 2) and
              is_integer(pos) and pos >= 0 do
     if pos < num do
-      value = get_element.(container, pos)
+      value = get_element.(container, pos) |> expect_element!(element_module)
       reduce(%Walker{walker | this: pos + 1}, fun.(value, acc), fun)
     else
       {:done, acc}
@@ -303,6 +394,7 @@ defimpl Enumerable, for: Walker do
   def reduce(
         %Walker{
           container: container,
+          element_module: element_module,
           get_first: get_first,
           get_next: get_next,
           is_null: is_null,
@@ -312,7 +404,7 @@ defimpl Enumerable, for: Walker do
         fun
       )
       when is_function(get_first, 1) and is_function(get_next, 1) and is_function(is_null, 1) do
-    this = get_first.(container)
+    this = get_first.(container) |> expect_element!(element_module)
     reduce(%Walker{walker | this: this}, {:cont, acc}, fun)
   end
 
@@ -330,8 +422,17 @@ defimpl Enumerable, for: Walker do
     if is_null.(this) do
       {:done, acc}
     else
-      next = get_next.(this)
+      next = get_next.(this) |> expect_element!(element_module)
       reduce(%Walker{walker | this: next}, fun.(this, acc), fun)
+    end
+  end
+
+  # TODO: this could be a macro erased in :prod
+  defp expect_element!(%module{} = element, element_module) do
+    if element_module != module do
+      raise "Expected element module #{element_module}, got #{module}"
+    else
+      element
     end
   end
 end
