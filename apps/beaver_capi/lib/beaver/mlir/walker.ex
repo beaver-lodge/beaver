@@ -268,6 +268,29 @@ defimpl Enumerable, for: Walker do
     end
   end
 
+  # reduce by following the link, 1st
+  def reduce(
+        %Walker{
+          container: container,
+          get_first: get_first,
+          get_next: get_next,
+          is_null: is_null,
+          this: nil
+        } = walker,
+        {:cont, acc},
+        fun
+      )
+      when is_function(get_first, 1) and is_function(get_next, 1) and is_function(is_null, 1) do
+    this = get_first.(container)
+
+    if is_null.(this) do
+      {:done, acc}
+    else
+      next = get_next.(this)
+      reduce(%Walker{walker | this: next}, fun.(this, acc), fun)
+    end
+  end
+
   # reduce by following the link, nth
   def reduce(
         %Walker{
@@ -280,24 +303,6 @@ defimpl Enumerable, for: Walker do
         fun
       )
       when is_function(get_next, 1) and is_function(is_null, 1) do
-    if is_null.(this) do
-      {:done, acc}
-    else
-      next = get_next.(this)
-      reduce(%Walker{walker | this: next}, fun.(this, acc), fun)
-    end
-  end
-
-  # reduce by following the link, 1st
-  def reduce(
-        %Walker{container: container, get_first: get_first, get_next: get_next, is_null: is_null} =
-          walker,
-        {:cont, acc},
-        fun
-      )
-      when is_function(get_first, 1) and is_function(get_next, 1) and is_function(is_null, 1) do
-    this = get_first.(container)
-
     if is_null.(this) do
       {:done, acc}
     else
