@@ -33,12 +33,13 @@ defmodule Beaver.MLIR.Walker do
           get_next: (element() -> element()) | nil,
           get_parent: (element() -> container()) | nil,
           is_null: (element() -> Exotic.Value.t() | bool()) | nil,
-          this: element() | non_neg_integer() | nil
+          this: element() | non_neg_integer() | nil,
+          num: non_neg_integer() | nil
         }
 
   container_keys = [:container, :element_module]
   index_func_keys = [:get_num, :get_element, :element_equal]
-  iter_keys = [:this]
+  iter_keys = [:this, :num]
   iter_func_keys = [:get_first, :get_next, :get_parent, :is_null]
   @enforce_keys container_keys
   defstruct container_keys ++ index_func_keys ++ iter_keys ++ iter_func_keys
@@ -255,30 +256,30 @@ defimpl Enumerable, for: Walker do
 
   # Reduce by index
   def reduce(
-        %Walker{get_element: get_element, this: nil} = walker,
+        %Walker{get_element: get_element, this: nil, num: nil} = walker,
         {:cont, acc},
         fun
       )
       when is_function(get_element, 2) do
-    reduce(%Walker{walker | this: 0}, {:cont, acc}, fun)
+    with {:ok, count} <- count(walker) do
+      reduce(%Walker{walker | this: 0, num: count}, {:cont, acc}, fun)
+    else
+      error -> error
+    end
   end
 
   def reduce(
-        %Walker{container: container, get_element: get_element, this: pos} = walker,
+        %Walker{container: container, get_element: get_element, this: pos, num: num} = walker,
         {:cont, acc},
         fun
       )
       when is_function(get_element, 2) and
              is_integer(pos) and pos >= 0 do
-    with {:ok, count} <- count(walker) do
-      if pos < count do
-        value = get_element.(container, pos)
-        reduce(%Walker{walker | this: pos + 1}, fun.(value, acc), fun)
-      else
-        {:done, acc}
-      end
+    if pos < num do
+      value = get_element.(container, pos)
+      reduce(%Walker{walker | this: pos + 1}, fun.(value, acc), fun)
     else
-      error -> error
+      {:done, acc}
     end
   end
 
