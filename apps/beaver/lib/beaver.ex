@@ -200,4 +200,6 @@ defmodule Beaver do
   def prototype(%Beaver.MLIR.CAPI.MlirOperation{} = op) do
     Beaver.MLIR.Operation.to_prototype(op)
   end
+
+  defdelegate traverse(mlir, acc, pre, post), to: Beaver.MLIR.Walker
 end
