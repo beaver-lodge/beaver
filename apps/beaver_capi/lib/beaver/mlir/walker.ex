@@ -229,9 +229,13 @@ defmodule Beaver.MLIR.Walker do
   """
   @type cont() :: :cont
   @typedoc """
+  command to have the current MLIR structure erased
+  """
+  @type erase() :: :erase
+  @typedoc """
   command reducer should return as first element in the tuple
   """
-  @type command() :: replace() | skip() | cont()
+  @type command() :: replace() | skip() | cont() | erase()
 
   @doc """
   Traverse a container, it could be a operation, region, block.
