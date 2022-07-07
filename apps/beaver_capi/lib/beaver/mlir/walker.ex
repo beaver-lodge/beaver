@@ -231,11 +231,15 @@ defmodule Beaver.MLIR.Walker do
   @typedoc """
   command to have the current MLIR structure erased
   """
+  @type apply() :: {:apply, MLIR.CAPI.MlirPDLPatternModule.t()}
+  @typedoc """
+  apply a pattern defined by `defpat/2`
+  """
   @type erase() :: :erase
   @typedoc """
   command reducer should return as first element in the tuple
   """
-  @type command() :: replace() | skip() | cont() | erase()
+  @type command() :: replace() | skip() | cont() | apply() | erase()
 
   @doc """
   Traverse a container, it could be a operation, region, block.
@@ -246,7 +250,7 @@ defmodule Beaver.MLIR.Walker do
   You can use both if it is proper to do so.
   Please be aware that the command `:erase` and `replace` will only trigger inplace update on operand, attribute.
   To manipulate results, successors and regions, the parent operation will be replaced with a new operation.
-  It is not a issue if your approach is very functional but might cause crash or bugs if somewhere else is keeping a reference of the replaced op.
+  It could be mind-boggling to think the IR is mutable. It is not a issue if your approach is very functional but might cause crash or bugs if somewhere else is keeping a reference of the replaced op. So the rule of thumb here is to avoid mutating IR in you reducer function and always have the walker mutate the IR for you by returning a command.
   """
   @spec traverse(
           container(),
