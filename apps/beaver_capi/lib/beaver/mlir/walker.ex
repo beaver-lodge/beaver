@@ -32,6 +32,7 @@ defmodule Beaver.MLIR.Walker do
           get_first: (container() -> element()) | nil,
           get_next: (element() -> element()) | nil,
           get_parent: (element() -> container()) | nil,
+          parent_equal: (element(), element() -> Exotic.Value.t() | integer()) | nil,
           is_null: (element() -> Exotic.Value.t() | bool()) | nil,
           this: element() | non_neg_integer() | nil,
           num: non_neg_integer() | nil
@@ -40,7 +41,7 @@ defmodule Beaver.MLIR.Walker do
   container_keys = [:container, :element_module]
   index_func_keys = [:get_num, :get_element, :element_equal]
   iter_keys = [:this, :num]
-  iter_func_keys = [:get_first, :get_next, :get_parent, :is_null]
+  iter_func_keys = [:get_first, :get_next, :get_parent, :is_null, :parent_equal]
   @enforce_keys container_keys
   defstruct container_keys ++ index_func_keys ++ iter_keys ++ iter_func_keys
 
@@ -221,10 +222,25 @@ defimpl Enumerable, for: Walker do
   def member?(
         walker = %Walker{element_equal: element_equal, element_module: element_module},
         %element_module{} = element
-      ) do
+      )
+      when is_function(element_equal, 2) do
     is_member =
       Enum.any?(walker, fn member -> element_equal.(member, element) |> Exotic.Value.extract() end)
 
+    {:ok, is_member}
+  end
+
+  @spec member?(Walker.t(), Walker.element()) :: {:ok, boolean()} | {:error, module()}
+  def member?(
+        %Walker{
+          get_parent: get_parent,
+          parent_equal: parent_equal,
+          element_module: element_module
+        },
+        %element_module{} = element
+      )
+      when is_function(get_parent, 1) and is_function(parent_equal, 2) do
+    is_member = parent_equal.(get_parent.(element)) |> Exotic.Value.extract()
     {:ok, is_member}
   end
 
