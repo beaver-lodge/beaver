@@ -239,6 +239,7 @@ defmodule Beaver.MLIR.Walker do
   In the traversal, there are generally two choices to manipulate the IR:
   - Use `Beaver.prototype/1` to extract a op/attribute to a elixir structure, and generate a new op/attribute as replacement.
   - Use a pattern defined by macro `Beaver.defpat/2` to have the PDL interpreter transform the IR for you.
+  You can use both if it is proper to do so.
   """
   @spec traverse(
           container(),
