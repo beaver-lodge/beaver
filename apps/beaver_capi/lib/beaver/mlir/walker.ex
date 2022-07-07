@@ -282,13 +282,7 @@ defimpl Enumerable, for: Walker do
       )
       when is_function(get_first, 1) and is_function(get_next, 1) and is_function(is_null, 1) do
     this = get_first.(container)
-
-    if is_null.(this) do
-      {:done, acc}
-    else
-      next = get_next.(this)
-      reduce(%Walker{walker | this: next}, fun.(this, acc), fun)
-    end
+    reduce(%Walker{walker | this: this}, {:cont, acc}, fun)
   end
 
   # reduce by following the link, nth
