@@ -242,7 +242,7 @@ defmodule Beaver.MLIR.Walker do
   @type command() :: replace() | skip() | cont() | apply() | erase()
 
   @doc """
-  Traverse a container, it could be a operation, region, block.
+  Traverse and transform a container, it could be a operation, region, block.
   You might expect this function works like `Macro.traverse/4` with an exception that you need to return a `command()` in your reducer.
   In the traversal, there are generally two choices to manipulate the IR:
   - Use `Beaver.prototype/1` to extract a op/attribute to a elixir structure, and generate a new op/attribute as replacement.
@@ -251,7 +251,7 @@ defmodule Beaver.MLIR.Walker do
   Please be aware that the command `:erase` and `replace` will only trigger inplace update on operand, attribute.
   To manipulate results, successors and regions, the parent operation will be replaced with a new operation.
   It could be mind-boggling to think the IR is mutable. It is not a issue if your approach is very functional but might cause crash or bugs if somewhere else is keeping a reference of the replaced op. So the rule of thumb here is to avoid mutating IR in you reducer function and always have the walker mutate the IR for you by returning a command.
-  """
+  You can run traversals in a MLIR pass by calling them in `run/1` so that it joins the general MLIR pass manager's orchestration.
   @spec traverse(
           container(),
           any(),
