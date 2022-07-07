@@ -174,7 +174,13 @@ defmodule Beaver.MLIR.Operation do
       |> MLIR.CAPI.mlirIdentifierStr()
       |> MLIR.StringRef.extract()
 
-    struct!(MLIR.DSL.Op.Registry.lookup(op_name), %{})
+    struct!(MLIR.DSL.Op.Registry.lookup(op_name), %{
+      operands: MLIR.Walker.operands(operation),
+      attributes: MLIR.Walker.attributes(operation),
+      results: MLIR.Walker.results(operation),
+      successors: MLIR.Walker.successors(operation),
+      regions: MLIR.Walker.regions(operation)
+    })
   end
 
   def is_null(operation = %MLIR.CAPI.MlirOperation{}) do

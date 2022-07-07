@@ -25,13 +25,21 @@ defmodule Beaver.MLIR.ExecutionEngine do
       |> Exotic.Value.Array.get()
       |> Exotic.Value.get_ptr()
 
-    jit =
-      mlirExecutionEngineCreate(
-        module,
-        2,
-        length(shared_lib_paths),
-        shared_lib_paths_ptr
-      )
+    ctx =
+      MLIR.CAPI.mlirModuleGetOperation(module)
+      |> MLIR.CAPI.mlirOperationGetContext()
+
+    require MLIR.Context
+
+    MLIR.Context.allow_multi_thread ctx do
+      jit =
+        mlirExecutionEngineCreate(
+          module,
+          2,
+          length(shared_lib_paths),
+          shared_lib_paths_ptr
+        )
+    end
 
     is_null = is_null(jit)
 

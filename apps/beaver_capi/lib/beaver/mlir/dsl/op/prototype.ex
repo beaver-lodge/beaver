@@ -5,14 +5,14 @@ defmodule Beaver.DSL.Op.Prototype do
   For instance, when Prototype is used to compiling Elixir patterns to PDL, these fields contains MLIR values of PDL handles.
   """
 
-  defstruct operands: [], attributes: [], results: []
+  defstruct operands: [], attributes: [], results: [], successors: [], regions: []
 
   defmacro __using__(opts) do
     op_name = Keyword.fetch!(opts, :op_name)
 
     quote do
       @behaviour Beaver.DSL.Op.Prototype
-      defstruct operands: [], attributes: [], results: []
+      defstruct operands: [], attributes: [], results: [], successors: [], regions: []
 
       require Logger
       @impl true

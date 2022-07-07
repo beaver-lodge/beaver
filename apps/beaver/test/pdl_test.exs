@@ -52,71 +52,75 @@ defmodule PDLTest do
       {name, %CAPI.MlirAttribute{} = attribute}, acc ->
         {{name, attribute}, acc}
 
+      %CAPI.MlirOperation{} = mlir, acc ->
+        %op{} = mlir |> Beaver.prototype()
+        {mlir, [op | acc]}
+
       %element{} = mlir, acc ->
         {mlir, [element | acc]}
     end
 
     {mlir, acc} =
       pattern_module
-      |> MLIR.Walker.traverse([], inspector, inspector)
+      |> Beaver.MLIR.Walker.traverse([], inspector, inspector)
 
     assert acc == [
-             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.Dialect.Builtin.Module,
              Beaver.MLIR.CAPI.MlirRegion,
              Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.Dialect.Builtin.Module,
              Beaver.MLIR.CAPI.MlirRegion,
              Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.Dialect.PDLInterp.Func,
              Beaver.MLIR.CAPI.MlirRegion,
              Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.CAPI.MlirOperation,
-             Beaver.MLIR.CAPI.MlirOperation,
-             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.Dialect.PDLInterp.Finalize,
+             Beaver.MLIR.Dialect.PDLInterp.Finalize,
+             Beaver.MLIR.Dialect.PDLInterp.Erase,
              Beaver.MLIR.CAPI.MlirValue,
              Beaver.MLIR.CAPI.MlirValue,
-             Beaver.MLIR.CAPI.MlirOperation,
-             Beaver.MLIR.CAPI.MlirOperation,
-             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.Dialect.PDLInterp.Erase,
+             Beaver.MLIR.Dialect.PDLInterp.CreateOperation,
+             Beaver.MLIR.Dialect.PDLInterp.CreateOperation,
              Beaver.MLIR.CAPI.MlirBlock,
              Beaver.MLIR.CAPI.MlirRegion,
-             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.Dialect.PDLInterp.Func,
              Beaver.MLIR.CAPI.MlirBlock,
              Beaver.MLIR.CAPI.MlirRegion,
-             Beaver.MLIR.CAPI.MlirOperation,
-             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.Dialect.Builtin.Module,
+             Beaver.MLIR.Dialect.PDLInterp.Func,
              Beaver.MLIR.CAPI.MlirRegion,
              Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.CAPI.MlirOperation,
-             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.Dialect.PDLInterp.Finalize,
+             Beaver.MLIR.Dialect.PDLInterp.Finalize,
              Beaver.MLIR.CAPI.MlirBlock,
              Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.Dialect.PDLInterp.RecordMatch,
              Beaver.MLIR.CAPI.MlirValue,
              Beaver.MLIR.CAPI.MlirValue,
              Beaver.MLIR.CAPI.MlirValue,
              Beaver.MLIR.CAPI.MlirValue,
-             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.Dialect.PDLInterp.RecordMatch,
              Beaver.MLIR.CAPI.MlirBlock,
              Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.Dialect.PDLInterp.AreEqual,
              Beaver.MLIR.CAPI.MlirValue,
              Beaver.MLIR.CAPI.MlirValue,
              Beaver.MLIR.CAPI.MlirValue,
              Beaver.MLIR.CAPI.MlirValue,
-             Beaver.MLIR.CAPI.MlirOperation,
-             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.Dialect.PDLInterp.AreEqual,
+             Beaver.MLIR.Dialect.PDLInterp.GetAttribute,
              Beaver.MLIR.CAPI.MlirValue,
              Beaver.MLIR.CAPI.MlirValue,
-             Beaver.MLIR.CAPI.MlirOperation,
-             Beaver.MLIR.CAPI.MlirOperation,
-             Beaver.MLIR.CAPI.MlirOperation,
-             Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.CAPI.MlirRegion,
-             Beaver.MLIR.CAPI.MlirOperation,
+             Beaver.MLIR.Dialect.PDLInterp.GetAttribute,
+             Beaver.MLIR.Dialect.PDLInterp.CreateAttribute,
+             Beaver.MLIR.Dialect.PDLInterp.CreateAttribute,
              Beaver.MLIR.CAPI.MlirBlock,
              Beaver.MLIR.CAPI.MlirRegion,
-             Beaver.MLIR.CAPI.MlirOperation
+             Beaver.MLIR.Dialect.PDLInterp.Func,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.Dialect.Builtin.Module
            ]
 
     assert MLIR.CAPI.mlirOperationEqual(mlir, pattern_module) |> Exotic.Value.extract()
@@ -349,7 +353,7 @@ defmodule PDLTest do
       end
 
       def run(%MLIR.CAPI.MlirOperation{} = module) do
-        %MLIR.Dialect.Func.Func{attributes: [], operands: [], results: []} =
+        %MLIR.Dialect.Func.Func{attributes: _, operands: _, results: _} =
           module |> MLIR.Operation.to_prototype()
 
         MLIR.Pattern.apply!(module, [replace_add_op()])

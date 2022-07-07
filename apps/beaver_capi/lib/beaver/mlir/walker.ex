@@ -180,7 +180,7 @@ defmodule Beaver.MLIR.Walker do
     )
   end
 
-  @spec attributes(MlirBlock.t()) :: Enumerable.result()
+  @spec arguments(MlirBlock.t()) :: Enumerable.result()
   def arguments(block) do
     new(
       block,
@@ -191,7 +191,7 @@ defmodule Beaver.MLIR.Walker do
     )
   end
 
-  @spec attributes(MlirBlock.t()) :: Enumerable.result()
+  @spec operations(MlirBlock.t()) :: Enumerable.result()
   def operations(block) do
     new(
       block,
@@ -203,7 +203,7 @@ defmodule Beaver.MLIR.Walker do
     )
   end
 
-  @spec attributes(MlirRegion.t()) :: Enumerable.result()
+  @spec blocks(MlirRegion.t()) :: Enumerable.result()
   def blocks(region) do
     new(
       region,
