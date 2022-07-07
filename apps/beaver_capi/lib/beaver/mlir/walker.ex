@@ -245,7 +245,7 @@ defmodule Beaver.MLIR.Walker do
   - Use a pattern defined by macro `Beaver.defpat/2` to have the PDL interpreter transform the IR for you.
   You can use both if it is proper to do so.
   Please be aware that the command `:erase` and `replace` will only trigger inplace update on operand, attribute, and operation.
-  To manipulate successors and regions, the parent op will be updated.
+  To manipulate successors and regions, the parent operation will be replaced with a new operation.
   It is not a issue if your approach is very functional but might cause crash or bugs if somewhere else is keeping a reference of the replaced op.
   """
   @spec traverse(
