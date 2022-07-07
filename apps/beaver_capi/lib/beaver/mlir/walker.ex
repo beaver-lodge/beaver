@@ -182,7 +182,14 @@ defmodule Beaver.MLIR.Walker do
   end
 
   def operations(block) do
-    raise "x"
+    new(
+      block,
+      MlirOperation,
+      get_first: &CAPI.mlirBlockGetFirstOperation/1,
+      get_next: &CAPI.mlirOperationGetNextInBlock/1,
+      get_parent: &CAPI.mlirOperationGetBlock/1,
+      is_null: &MLIR.Operation.is_null/1
+    )
   end
 
   def blocks(region) do
