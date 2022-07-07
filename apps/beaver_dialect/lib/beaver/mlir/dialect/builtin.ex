@@ -3,15 +3,11 @@ defmodule Beaver.MLIR.Dialect.Builtin do
 
   use Beaver.MLIR.Dialect.Generator,
     dialect: "builtin",
-    ops: Dialect.Registry.ops("builtin") |> Enum.reject(fn x -> x in ~w{module} end)
+    ops: Dialect.Registry.ops("builtin"),
+    skips: ~w{module}
 
   defmodule Module do
-    @behaviour Beaver.DSL.Op.Prototype
-
-    @impl true
-    def op_name() do
-      "builtin.module"
-    end
+    use Beaver.DSL.Op.Prototype, op_name: "builtin.module"
   end
 
   defmacro module(_call, do: _block) do

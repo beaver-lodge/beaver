@@ -112,14 +112,40 @@ defmodule Exotic.Value do
       end
 
     i = Enum.find_index(fields, fn {n, _f} -> n == key end)
-    {_n, %Exotic.Type{ref: _, t: field_t}} = Enum.find(fields, fn {n, _f} -> n == key end)
+    found = Enum.find(fields, fn {n, _f} -> n == key end)
+
+    if is_nil(found) do
+      raise "field not found: #{inspect(key)}"
+    end
+
+    {_n, %Exotic.Type{ref: _, t: field_t}} = found
     res_ref = Exotic.NIF.access_struct_field_as_value(t_ref, v_ref, i)
     # although it is value semantic, still inherent transmits, to make it safer
-    %__MODULE__{
+    s0 = %{
       ref: res_ref,
-      type: %Exotic.Type{ref: nil, t: field_t},
       holdings: MapSet.put(holdings, v_ref)
     }
+
+    s1 = s0 |> Map.put(:type, %Exotic.Type{ref: nil, t: field_t})
+
+    not_a_primitive_type = field_t not in [:size, :i64, :ptr, :isize]
+
+    case field_t do
+      module when is_atom(module) and not_a_primitive_type ->
+        # TODO: very expensive to check the existence of module by ensure_loading if not loaded
+        case Code.ensure_loaded(module) do
+          {:module, module} ->
+            struct!(module, s0)
+
+          _ ->
+            require Logger
+            Logger.error("module not loaded: #{inspect(module)}")
+            struct!(__MODULE__, s1)
+        end
+
+      _ ->
+        struct!(__MODULE__, s1)
+    end
   end
 
   @doc """

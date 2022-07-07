@@ -9,7 +9,7 @@ defmodule Beaver.MLIR.Operation do
     |> Enum.reduce(
       true,
       fn
-        # if it is atom, defer the creation of the defer_if_terminator
+        # if it is real block, don't defer the creation
         {:successor, %Beaver.MLIR.CAPI.MlirBlock{}}, acc ->
           false && acc
 
@@ -166,5 +166,26 @@ defmodule Beaver.MLIR.Operation do
     verify!(op)
     mlirOperationDump(op)
     op
+  end
+
+  def to_prototype(%MLIR.CAPI.MlirOperation{} = operation) do
+    op_name =
+      MLIR.CAPI.mlirOperationGetName(operation)
+      |> MLIR.CAPI.mlirIdentifierStr()
+      |> MLIR.StringRef.extract()
+
+    struct!(MLIR.DSL.Op.Registry.lookup(op_name), %{
+      operands: MLIR.Walker.operands(operation),
+      attributes: MLIR.Walker.attributes(operation),
+      results: MLIR.Walker.results(operation),
+      successors: MLIR.Walker.successors(operation),
+      regions: MLIR.Walker.regions(operation)
+    })
+  end
+
+  def is_null(operation = %MLIR.CAPI.MlirOperation{}) do
+    operation
+    |> Exotic.Value.fetch(MLIR.CAPI.MlirOperation, :ptr)
+    |> Exotic.Value.extract() == 0
   end
 end

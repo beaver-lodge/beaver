@@ -263,6 +263,13 @@ SomeDialect.some_op(
   - keep the complicity of types and dispatching in Erlang/Elixir, away from C/C++/Rust
   - eliminate a lot of potential bugs difficult to locate because incorrect types will only lead to pattern matching rather than segfault.
 
+### High level API in Erlang/Elixir idiom
+
+- When possible, lower level C APIs should be wrapped as Elixir struct with support to common Elixir protocols.
+  For instance the iteration over one MLIR operation's operands, results, successors, attributes, regions should be implemented in Elixir's Enumerable protocol.
+  This enable the possibility to use the rich collection of functions in Elixir standard libraries and Hex packages.
+- Erlang Modules to work with Ops in different MLIR dialects should implement behaviors like `Beaver.DSL.Op.Prototype`.
+
 ## Is Beaver a compiler or binding to LLVM/MLIR or what?
 
 Elixir is a programming language built for all purposes. There are multiple sub-ecosystems in the general Erlang/Elixir ecosystem.

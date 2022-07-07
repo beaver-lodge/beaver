@@ -38,6 +38,93 @@ defmodule PDLTest do
     ctx = MLIR.Context.create()
     CAPI.mlirContextSetAllowUnregisteredDialects(ctx, true)
     pattern_module = MLIR.Module.create(ctx, @apply_rewrite_op_patterns)
+
+    inspector = fn
+      {:successor, %CAPI.MlirBlock{} = successor}, acc ->
+        {{:successor, successor}, acc}
+
+      {:argument, %CAPI.MlirType{}} = argument, acc ->
+        {argument, acc}
+
+      {:result, %CAPI.MlirType{}} = result, acc ->
+        {result, acc}
+
+      {name, %CAPI.MlirAttribute{} = attribute}, acc ->
+        {{name, attribute}, acc}
+
+      %CAPI.MlirOperation{} = mlir, acc ->
+        %op{} = mlir |> Beaver.prototype()
+        {mlir, [op | acc]}
+
+      %element{} = mlir, acc ->
+        {mlir, [element | acc]}
+    end
+
+    {mlir, acc} =
+      pattern_module
+      |> Beaver.MLIR.Walker.traverse([], inspector, inspector)
+
+    assert acc == [
+             Beaver.MLIR.Dialect.Builtin.Module,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Dialect.Builtin.Module,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Dialect.PDLInterp.Func,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Dialect.PDLInterp.Finalize,
+             Beaver.MLIR.Dialect.PDLInterp.Finalize,
+             Beaver.MLIR.Dialect.PDLInterp.Erase,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.Dialect.PDLInterp.Erase,
+             Beaver.MLIR.Dialect.PDLInterp.CreateOperation,
+             Beaver.MLIR.Dialect.PDLInterp.CreateOperation,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.Dialect.PDLInterp.Func,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.Dialect.Builtin.Module,
+             Beaver.MLIR.Dialect.PDLInterp.Func,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Dialect.PDLInterp.Finalize,
+             Beaver.MLIR.Dialect.PDLInterp.Finalize,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Dialect.PDLInterp.RecordMatch,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.Dialect.PDLInterp.RecordMatch,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Dialect.PDLInterp.AreEqual,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.Dialect.PDLInterp.AreEqual,
+             Beaver.MLIR.Dialect.PDLInterp.GetAttribute,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.CAPI.MlirValue,
+             Beaver.MLIR.Dialect.PDLInterp.GetAttribute,
+             Beaver.MLIR.Dialect.PDLInterp.CreateAttribute,
+             Beaver.MLIR.Dialect.PDLInterp.CreateAttribute,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.Dialect.PDLInterp.Func,
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirRegion,
+             Beaver.MLIR.Dialect.Builtin.Module
+           ]
+
+    assert MLIR.CAPI.mlirOperationEqual(mlir, pattern_module) |> Exotic.Value.extract()
+
     ir_module = MLIR.Module.create(ctx, @apply_rewrite_op_ir)
     MLIR.Operation.verify!(pattern_module)
     MLIR.Operation.verify!(ir_module)
@@ -265,7 +352,10 @@ defmodule PDLTest do
         %TOSA.Sub{operands: [a, b]}
       end
 
-      def run(module) do
+      def run(%MLIR.CAPI.MlirOperation{} = module) do
+        %MLIR.Dialect.Func.Func{attributes: _, operands: _, results: _} =
+          module |> MLIR.Operation.to_prototype()
+
         MLIR.Pattern.apply!(module, [replace_add_op()])
         :ok
       end

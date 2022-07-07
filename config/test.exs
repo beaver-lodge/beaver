@@ -3,7 +3,6 @@ import Config
 config :beaver_capi,
   skip_dialects: ~w{nvgpu
   gpu
-  pdl_interp
   x86vector
   vector
   omp
