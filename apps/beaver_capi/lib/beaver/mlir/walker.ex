@@ -33,7 +33,7 @@ defmodule Beaver.MLIR.Walker do
           get_next: (element() -> element()) | nil,
           get_parent: (element() -> container()) | nil,
           is_null: (element() -> Exotic.Value.t() | bool()) | nil,
-          this: element() | nil
+          this: element() | non_neg_integer() | nil
         }
 
   container_keys = [:container, :element_module]
@@ -253,22 +253,36 @@ defimpl Enumerable, for: Walker do
   def reduce(walker, {:suspend, acc}, fun),
     do: {:suspended, acc, &reduce(walker, &1, fun)}
 
-  # Reduce all in one :cont
-  def reduce(%Walker{container: container, get_element: get_element} = walker, {:cont, acc}, fun)
+  # Reduce by index
+  def reduce(
+        %Walker{get_element: get_element, this: nil} = walker,
+        {:cont, acc},
+        fun
+      )
       when is_function(get_element, 2) do
-    with {:ok, count} <- count(walker) do
-      pos_range = 0..(count - 1)//1
+    reduce(%Walker{walker | this: 0}, {:cont, acc}, fun)
+  end
 
-      Enum.reduce(pos_range, acc, fn pos, acc ->
+  def reduce(
+        %Walker{container: container, get_element: get_element, this: pos} = walker,
+        {:cont, acc},
+        fun
+      )
+      when is_function(get_element, 2) and
+             is_integer(pos) and pos >= 0 do
+    with {:ok, count} <- count(walker) do
+      if pos < count do
         value = get_element.(container, pos)
-        fun.(value, acc)
-      end)
+        reduce(%Walker{walker | this: pos + 1}, fun.(value, acc), fun)
+      else
+        {:done, acc}
+      end
     else
       error -> error
     end
   end
 
-  # reduce by following the link, 1st
+  # reduce by following the link
   def reduce(
         %Walker{
           container: container,
@@ -285,7 +299,6 @@ defimpl Enumerable, for: Walker do
     reduce(%Walker{walker | this: this}, {:cont, acc}, fun)
   end
 
-  # reduce by following the link, nth
   def reduce(
         %Walker{
           get_next: get_next,

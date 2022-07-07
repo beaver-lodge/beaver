@@ -176,4 +176,10 @@ defmodule Beaver.MLIR.Operation do
 
     struct!(MLIR.DSL.Op.Registry.lookup(op_name), %{})
   end
+
+  def is_null(operation = %MLIR.CAPI.MlirOperation{}) do
+    operation
+    |> Exotic.Value.fetch(MLIR.CAPI.MlirOperation, :ptr)
+    |> Exotic.Value.extract() == 0
+  end
 end
