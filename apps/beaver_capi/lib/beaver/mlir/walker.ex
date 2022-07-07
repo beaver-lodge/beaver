@@ -11,31 +11,6 @@ alias Beaver.MLIR.CAPI.{
   MlirType
 }
 
-defmodule Beaver.MLIR.Walker.Operation do
-  @moduledoc """
-  Operation prototype built for post walk
-  """
-  defstruct operands: [],
-            attributes: [],
-            results: [],
-            regions: [],
-            successors: []
-end
-
-defmodule Beaver.MLIR.Walker.Region do
-  @moduledoc """
-  Region prototype built for post walk
-  """
-  defstruct blocks: []
-end
-
-defmodule Beaver.MLIR.Walker.Block do
-  @moduledoc """
-  Block prototype built for post walk
-  """
-  defstruct arguments: [], operations: []
-end
-
 defmodule Beaver.MLIR.Walker do
   alias Beaver.MLIR.CAPI
 
@@ -240,16 +215,35 @@ defmodule Beaver.MLIR.Walker do
     )
   end
 
+  @type mlir() :: container() | element()
+  @typedoc """
+  command to have a MLIR structure to replace the original
+  """
+  @type replace() :: {:replace, mlir()}
+  @typedoc """
+  command to skip current container's traversing. This will have not effect if it not a container.
+  """
+  @type skip() :: :skip
+  @typedoc """
+  command to have the walker continue the traversing.
+  """
+  @type cont() :: :cont
+  @typedoc """
+  command reducer should return as first element in the tuple
+  """
+  @type command() :: replace() | skip() | cont()
+
   @doc """
   Traverse a container, it could be a operation, region, block.
+  You might expect this function works like `Macro.traverse/4` with an exception that you need to return a command in your reducer.
   """
   @spec traverse(
           container(),
           any(),
-          (container() | element(), any() -> {container() | element(), any()}),
-          (container() | element(), any() -> {container() | element(), any()})
+          (container() | element(), any() -> {command(), any()}),
+          (container() | element(), any() -> {command(), any()})
         ) ::
-          {container() | element(), any()}
+          {command(), any()}
   def traverse(mlir, acc, pre, post) when is_function(pre, 2) and is_function(post, 2) do
     mlir = to_container(mlir)
     do_traverse(mlir, acc, pre, post)
@@ -376,12 +370,13 @@ defimpl Enumerable, for: Walker do
         %Walker{
           get_parent: get_parent,
           parent_equal: parent_equal,
-          element_module: element_module
+          element_module: element_module,
+          container: container
         },
         %element_module{} = element
       )
       when is_function(get_parent, 1) and is_function(parent_equal, 2) do
-    is_member = parent_equal.(get_parent.(element)) |> Exotic.Value.extract()
+    is_member = parent_equal.(container, get_parent.(element)) |> Exotic.Value.extract()
     {:ok, is_member}
   end
 
