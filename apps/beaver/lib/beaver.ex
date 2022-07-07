@@ -196,4 +196,8 @@ defmodule Beaver do
       end
     end
   end
+
+  def prototype(%Beaver.MLIR.CAPI.MlirOperation{} = op) do
+    Beaver.MLIR.Operation.to_prototype(op)
+  end
 end
