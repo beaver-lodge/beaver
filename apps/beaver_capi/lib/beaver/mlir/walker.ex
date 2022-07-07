@@ -244,6 +244,9 @@ defmodule Beaver.MLIR.Walker do
   - Use `Beaver.prototype/1` to extract a op/attribute to a elixir structure, and generate a new op/attribute as replacement.
   - Use a pattern defined by macro `Beaver.defpat/2` to have the PDL interpreter transform the IR for you.
   You can use both if it is proper to do so.
+  Please be aware that the command `:erase` and `replace` will only trigger inplace update on operand, attribute, and operation.
+  To manipulate successors and regions, the parent op will be updated.
+  It is not a issue if your approach is very functional but might cause crash or bugs if somewhere else is keeping a reference of the replaced op.
   """
   @spec traverse(
           container(),
@@ -290,6 +293,20 @@ defmodule Beaver.MLIR.Walker do
       |> Enum.map(fn successor -> {:successor, successor} end)
       |> do_traverse(acc, pre, post)
 
+    # operands
+    # mlirOperationSetOperand
+
+    # attributes
+    # mlirOperationSetAttributeByName
+    # mlirOperationRemoveAttributeByName
+
+    # results
+    # log warning to generate new op
+
+    # regions
+    # log warning to generate new op
+
+    # for successor, log warning if it is not skip or cont
     post.(operation, acc)
   end
 
@@ -310,6 +327,9 @@ defmodule Beaver.MLIR.Walker do
 
     {operations, acc} = operations(block) |> do_traverse(acc, pre, post)
 
+    # Note: Erlang now owns the removed operation. call erase
+    # mlirOperationRemoveFromParent
+    # mlirBlockDestroy
     post.(block, acc)
   end
 
