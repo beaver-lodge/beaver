@@ -57,9 +57,6 @@ defmodule ToyPass do
           2 <- Enum.count(attributes),
           {:ok, _} <- MLIR.Pattern.apply_(operation, [replace_add_op()]) do
       :ok
-    else
-      :error ->
-        :error
     end
   end
 end
