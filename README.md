@@ -261,7 +261,7 @@ SomeDialect.some_op(
   - could lead to a larger number of smaller function calls but it might have better performance considering Erlang schedulers prefer smaller functions.
 - Type correctness/safety and dispatching based on type should be done by pattern matching on the Elixir struct types defined for a C type. By doing so, this will:
   - keep the complicity of types and dispatching in Erlang/Elixir, away from C/C++/Rust
-  - eliminate a lot of potential bugs difficult to locate because incorrect types will only lead to pattern matching rather than segfault.
+  - eliminate a lot of potential bugs difficult to locate because incorrect types will only lead to a pattern matching failure rather than segfault.
 
 ### High level API in Erlang/Elixir idiom
 
