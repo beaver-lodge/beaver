@@ -231,6 +231,7 @@ defmodule Beaver.MLIR.Walker do
   @typedoc """
   command to have the current MLIR structure erased
   """
+  # TODO: Apply is dangerous because it might erase the operation
   @type apply() :: {:apply, MLIR.CAPI.MlirPDLPatternModule.t()}
   @typedoc """
   apply a pattern defined by `defpat/2`
