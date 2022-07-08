@@ -30,9 +30,15 @@ MLIR_CAPI_EXPORTED MlirRewritePatternSet beaverPatternSetAddOwnedPDLPattern(
   return wrap(&set);
 }
 
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyOwnedPatternSet(
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyOwnedPatternSetOnRegion(
     MlirRegion region, MlirRewritePatternSet patternList) {
   return wrap(applyPatternsAndFoldGreedily(*unwrap(region),
+                                           std::move(*unwrap(patternList))));
+}
+
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyOwnedPatternSetOnOperation(
+    MlirOperation op, MlirRewritePatternSet patternList) {
+  return wrap(applyPatternsAndFoldGreedily(unwrap(op),
                                            std::move(*unwrap(patternList))));
 }
 

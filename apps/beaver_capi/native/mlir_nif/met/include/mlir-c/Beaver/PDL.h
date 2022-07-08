@@ -27,8 +27,11 @@ beaverRewritePatternSetGet(MlirContext context);
 MLIR_CAPI_EXPORTED MlirRewritePatternSet beaverPatternSetAddOwnedPDLPattern(
     MlirRewritePatternSet patternList, MlirPDLPatternModule pdlPattern);
 
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyOwnedPatternSet(
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyOwnedPatternSetOnRegion(
     MlirRegion region, MlirRewritePatternSet patternList);
+
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyOwnedPatternSetOnOperation(
+    MlirOperation op, MlirRewritePatternSet patternList);
 
 #ifdef __cplusplus
 }

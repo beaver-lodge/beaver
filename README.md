@@ -40,7 +40,7 @@ end
 |> MLIR.Operation.verify!(dump_if_fail: true)
 ```
 
-And a small example to showcase what it is like to define and run a pass in Beaver:
+And a small example to showcase what it is like to define and run a pass in Beaver (with some monad magic):
 
 ```elixir
 alias Beaver.MLIR.Dialect.Func
@@ -53,8 +53,15 @@ defmodule ToyPass do
     %TOSA.Sub{operands: [a, b]}
   end
 
-  def run(module) do
-    MLIR.Pattern.apply!(module, [replace_add_op()])
+  def run(%MLIR.CAPI.MlirOperation{} = operation) do
+    with %MLIR.Dialect.Func.Func{attributes: attributes} <- Beaver.concrete(operation),
+          2 <- Enum.count(attributes) do
+      MLIR.Pattern.apply!(operation, [replace_add_op()])
+    else
+      _ ->
+        raise "not a func we want"
+    end
+
     :ok
   end
 end

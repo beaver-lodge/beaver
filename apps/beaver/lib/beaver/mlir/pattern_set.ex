@@ -17,10 +17,19 @@ defmodule Beaver.MLIR.PatternSet do
     pattern_set
   end
 
-  def apply!(module, pattern_set) do
-    region = CAPI.mlirOperationGetFirstRegion(module)
-    result = CAPI.beaverApplyOwnedPatternSet(region, pattern_set)
+  def apply!(region = %CAPI.MlirRegion{}, pattern_set) do
+    result = CAPI.beaverApplyOwnedPatternSetOnRegion(region, pattern_set)
     if not MLIR.LogicalResult.success?(result), do: raise("fail to apply patterns")
-    module
+    region
+  end
+
+  def apply!(operation = %CAPI.MlirOperation{}, pattern_set) do
+    result = CAPI.beaverApplyOwnedPatternSetOnOperation(operation, pattern_set)
+    if not MLIR.LogicalResult.success?(result), do: raise("fail to apply patterns")
+    operation
+  end
+
+  def apply!(module = %CAPI.MlirModule{}, pattern_set) do
+    MLIR.Operation.from_module(module) |> apply!(pattern_set)
   end
 end

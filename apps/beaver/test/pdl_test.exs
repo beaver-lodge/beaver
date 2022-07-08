@@ -53,7 +53,7 @@ defmodule PDLTest do
         {{name, attribute}, acc}
 
       %CAPI.MlirOperation{} = mlir, acc ->
-        %op{} = mlir |> Beaver.prototype()
+        %op{} = mlir |> Beaver.concrete()
         {mlir, [op | acc]}
 
       %element{} = mlir, acc ->
@@ -132,7 +132,7 @@ defmodule PDLTest do
     pattern_set = CAPI.beaverRewritePatternSetGet(ctx)
     pattern_set = CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pdl_pattern)
     region = CAPI.mlirOperationGetFirstRegion(ir_module)
-    result = CAPI.beaverApplyOwnedPatternSet(region, pattern_set)
+    result = CAPI.beaverApplyOwnedPatternSetOnRegion(region, pattern_set)
 
     assert result
            |> Exotic.Value.fetch(MLIR.CAPI.MlirLogicalResult, :value)
@@ -162,7 +162,7 @@ defmodule PDLTest do
     pattern_set = CAPI.beaverRewritePatternSetGet(ctx)
     pattern_set = CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pdl_pattern)
     region = CAPI.mlirOperationGetFirstRegion(ir_module)
-    result = CAPI.beaverApplyOwnedPatternSet(region, pattern_set)
+    result = CAPI.beaverApplyOwnedPatternSetOnRegion(region, pattern_set)
 
     assert MLIR.LogicalResult.success?(result), "fail to apply pattern"
 
@@ -352,11 +352,15 @@ defmodule PDLTest do
         %TOSA.Sub{operands: [a, b]}
       end
 
-      def run(%MLIR.CAPI.MlirOperation{} = module) do
-        %MLIR.Dialect.Func.Func{attributes: _, operands: _, results: _} =
-          module |> MLIR.Operation.to_prototype()
+      def run(%MLIR.CAPI.MlirOperation{} = operation) do
+        with %MLIR.Dialect.Func.Func{attributes: attributes} <- Beaver.concrete(operation),
+             2 <- Enum.count(attributes) do
+          MLIR.Pattern.apply!(operation, [replace_add_op()])
+        else
+          _ ->
+            raise "not a func we want"
+        end
 
-        MLIR.Pattern.apply!(module, [replace_add_op()])
         :ok
       end
     end

@@ -203,6 +203,7 @@ defmodule CfTest do
         alias MLIR.Dialect.Func
         unquote(Macro.escape(mlir_asm))
         # TODO: return a function capturing the JIT
+        # TODO: show how to canonicalize the IR and fold some computation to constants
       end
     end
   end
