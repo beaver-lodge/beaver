@@ -358,7 +358,7 @@ defmodule PDLTest do
              {:ok, _} <- MLIR.Pattern.apply_(operation, [replace_add_op()]) do
           :ok
         else
-          _ ->
+          :error ->
             :error
         end
       end
