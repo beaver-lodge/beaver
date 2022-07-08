@@ -18,6 +18,10 @@ defmodule Beaver.MLIR.Pattern do
     pdl_pattern
   end
 
+  @doc """
+  Apply patterns on a container (region, operation, module).
+  It returns the container if it succeeds otherwise it raises.
+  """
   def apply!(op, patterns) when is_list(patterns) do
     pattern_set = MLIR.PatternSet.get()
 
@@ -26,6 +30,19 @@ defmodule Beaver.MLIR.Pattern do
     end
 
     MLIR.PatternSet.apply!(op, pattern_set)
-    op
+  end
+
+  @doc """
+  Apply patterns on a container (region, operation, module).
+  It is named `apply_` with a underscore to avoid name collision with `Kernel.apply/2`
+  """
+  def apply_(op, patterns) when is_list(patterns) do
+    pattern_set = MLIR.PatternSet.get()
+
+    for p <- patterns do
+      MLIR.PatternSet.insert(pattern_set, p)
+    end
+
+    MLIR.PatternSet.apply_(op, pattern_set)
   end
 end

@@ -49,20 +49,18 @@ defmodule ToyPass do
   use Beaver.MLIR.Pass, on: Func.Func
 
   defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
-    %MLIR.CAPI.MlirValue{} = res
     %TOSA.Sub{operands: [a, b]}
   end
 
   def run(%MLIR.CAPI.MlirOperation{} = operation) do
     with %Func.Func{attributes: attributes} <- Beaver.concrete(operation),
-          2 <- Enum.count(attributes) do
-      MLIR.Pattern.apply!(operation, [replace_add_op()])
+          2 <- Enum.count(attributes),
+          {:ok, _} <- MLIR.Pattern.apply_(operation, [replace_add_op()]) do
+      :ok
     else
       _ ->
-        raise "not a func we want"
+        :error
     end
-
-    :ok
   end
 end
 
