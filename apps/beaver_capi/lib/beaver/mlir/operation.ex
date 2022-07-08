@@ -188,4 +188,8 @@ defmodule Beaver.MLIR.Operation do
     |> Exotic.Value.fetch(MLIR.CAPI.MlirOperation, :ptr)
     |> Exotic.Value.extract() == 0
   end
+
+  def from_module(module = %CAPI.MlirModule{}) do
+    CAPI.mlirModuleGetOperation(module)
+  end
 end

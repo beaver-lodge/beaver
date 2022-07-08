@@ -67,11 +67,11 @@ defmodule Beaver.MLIR.Walker do
   defp verify_nesting!(MlirBlock, MlirValue), do: :ok
 
   defp verify_nesting!(container_module, element_module) do
-    raise "not a legal structure could be walked in MLIR: #{inspect(container_module)}(#{inspect(element_module)})"
+    raise "not a legal 2-level structure could be walked in MLIR: #{inspect(container_module)}(#{inspect(element_module)})"
   end
 
   defp to_container(module = %MlirModule{}) do
-    CAPI.mlirModuleGetOperation(module)
+    MLIR.Operation.from_module(module)
   end
 
   defp to_container(container) do
@@ -126,7 +126,7 @@ defmodule Beaver.MLIR.Walker do
   end
 
   @spec operands(MlirOperation.t()) :: Enumerable.result()
-  def operands(op) do
+  def operands(%MlirOperation{} = op) do
     new(
       op,
       MlirValue,
@@ -137,7 +137,7 @@ defmodule Beaver.MLIR.Walker do
   end
 
   @spec results(MlirOperation.t()) :: Enumerable.result()
-  def results(op) do
+  def results(%MlirOperation{} = op) do
     new(
       op,
       MlirValue,
@@ -148,7 +148,7 @@ defmodule Beaver.MLIR.Walker do
   end
 
   @spec regions(MlirOperation.t()) :: Enumerable.result()
-  def regions(op) do
+  def regions(%MlirOperation{} = op) do
     new(
       op,
       MlirRegion,
@@ -159,7 +159,7 @@ defmodule Beaver.MLIR.Walker do
   end
 
   @spec successors(MlirOperation.t()) :: Enumerable.result()
-  def successors(op) do
+  def successors(%MlirOperation{} = op) do
     new(
       op,
       MlirBlock,
@@ -170,7 +170,7 @@ defmodule Beaver.MLIR.Walker do
   end
 
   @spec attributes(MlirOperation.t()) :: Enumerable.result()
-  def attributes(op) do
+  def attributes(%MlirOperation{} = op) do
     new(
       op,
       MlirNamedAttribute,
@@ -181,7 +181,7 @@ defmodule Beaver.MLIR.Walker do
   end
 
   @spec arguments(MlirBlock.t()) :: Enumerable.result()
-  def arguments(block) do
+  def arguments(%MlirBlock{} = block) do
     new(
       block,
       MlirValue,
@@ -192,7 +192,7 @@ defmodule Beaver.MLIR.Walker do
   end
 
   @spec operations(MlirBlock.t()) :: Enumerable.result()
-  def operations(block) do
+  def operations(%MlirBlock{} = block) do
     new(
       block,
       MlirOperation,
@@ -204,7 +204,7 @@ defmodule Beaver.MLIR.Walker do
   end
 
   @spec blocks(MlirRegion.t()) :: Enumerable.result()
-  def blocks(region) do
+  def blocks(%MlirRegion{} = region) do
     new(
       region,
       MlirBlock,
@@ -229,17 +229,30 @@ defmodule Beaver.MLIR.Walker do
   """
   @type cont() :: :cont
   @typedoc """
+  command to have the current MLIR structure erased
+  """
+  # TODO: Apply is dangerous because it might erase the operation
+  @type apply() :: {:apply, MLIR.CAPI.MlirPDLPatternModule.t()}
+  @typedoc """
+  apply a pattern defined by `defpat/2`
+  """
+  @type erase() :: :erase
+  @typedoc """
   command reducer should return as first element in the tuple
   """
-  @type command() :: replace() | skip() | cont()
+  @type command() :: replace() | skip() | cont() | apply() | erase()
 
   @doc """
-  Traverse a container, it could be a operation, region, block.
-  You might expect this function works like `Macro.traverse/4` with an exception that you need to return a command in your reducer.
-  In the traversal, there are generally two choices to manipulate the IR:
-  - Use `Beaver.prototype/1` to extract a op/attribute to a elixir structure, and generate a new op/attribute as replacement.
+  Traverse and transform a container in MLIR, it could be a operation, region, block.
+  You might expect this function works like `Macro.traverse/4` with an exception that you need to return a `command()` in your reducer.
+  During the traversal, there are generally two choices to manipulate the IR:
+  - Use `Beaver.concrete/1` to extract a op/attribute to a elixir structure, and generate a new op/attribute as replacement.
   - Use a pattern defined by macro `Beaver.defpat/2` to have the PDL interpreter transform the IR for you.
   You can use both if it is proper to do so.
+  Please be aware that the command `:erase` and `replace` will only trigger inplace update on operand, attribute.
+  To manipulate results, successors and regions, the parent operation should be replaced with a new operation.
+  It could be mind-boggling to think the IR is mutable but not an issue if your approach is very functional. Inappropriate mutation might cause crash or bugs if somewhere else is keeping a reference of the replaced op. So the rule of thumb here is to avoid mutating IR in you reducer function and always have the walker mutate the IR for you by returning a command.
+  You can run traversals in a MLIR pass by calling them in `run/1` so that it joins the general MLIR pass manager's orchestration and will be run in parallel when possible.
   """
   @spec traverse(
           container(),
@@ -286,6 +299,16 @@ defmodule Beaver.MLIR.Walker do
       |> Enum.map(fn successor -> {:successor, successor} end)
       |> do_traverse(acc, pre, post)
 
+    # operands
+    # mlirOperationSetOperand
+
+    # attributes
+    # mlirOperationSetAttributeByName
+    # mlirOperationRemoveAttributeByName
+
+    # results/regions/successor
+    # replace with new op
+
     post.(operation, acc)
   end
 
@@ -306,6 +329,9 @@ defmodule Beaver.MLIR.Walker do
 
     {operations, acc} = operations(block) |> do_traverse(acc, pre, post)
 
+    # Note: Erlang now owns the removed operation. call erase
+    # mlirOperationRemoveFromParent
+    # mlirBlockDestroy
     post.(block, acc)
   end
 
@@ -342,6 +368,10 @@ defmodule Beaver.MLIR.Walker do
     {{name, attribute}, acc} = post.({name, attribute}, acc)
     named_attribute = MLIR.CAPI.mlirNamedAttributeGet(name, attribute)
     {named_attribute, acc}
+  end
+
+  @spec process_result(command(), container()) :: any()
+  defp process_result(:erase, %MlirOperation{} = op) do
   end
 end
 

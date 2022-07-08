@@ -40,7 +40,7 @@ end
 |> MLIR.Operation.verify!(dump_if_fail: true)
 ```
 
-And a small example to showcase what it is like to define and run a pass in Beaver:
+And a small example to showcase what it is like to define and run a pass in Beaver (with some monad magic):
 
 ```elixir
 alias Beaver.MLIR.Dialect.Func
@@ -49,13 +49,15 @@ defmodule ToyPass do
   use Beaver.MLIR.Pass, on: Func.Func
 
   defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
-    %MLIR.CAPI.MlirValue{} = res
     %TOSA.Sub{operands: [a, b]}
   end
 
-  def run(module) do
-    MLIR.Pattern.apply!(module, [replace_add_op()])
-    :ok
+  def run(%MLIR.CAPI.MlirOperation{} = operation) do
+    with %Func.Func{attributes: attributes} <- Beaver.concrete(operation),
+          2 <- Enum.count(attributes),
+          {:ok, _} <- MLIR.Pattern.apply_(operation, [replace_add_op()]) do
+      :ok
+    end
   end
 end
 
@@ -261,7 +263,7 @@ SomeDialect.some_op(
   - could lead to a larger number of smaller function calls but it might have better performance considering Erlang schedulers prefer smaller functions.
 - Type correctness/safety and dispatching based on type should be done by pattern matching on the Elixir struct types defined for a C type. By doing so, this will:
   - keep the complicity of types and dispatching in Erlang/Elixir, away from C/C++/Rust
-  - eliminate a lot of potential bugs difficult to locate because incorrect types will only lead to pattern matching rather than segfault.
+  - eliminate a lot of potential bugs difficult to locate because incorrect types will only lead to a pattern matching failure rather than segfault.
 
 ### High level API in Erlang/Elixir idiom
 
