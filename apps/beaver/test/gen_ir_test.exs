@@ -19,7 +19,7 @@ defmodule CFTest do
               CF.br({:bb2, [v1]})
             end
 
-            block bb2(arg :: Type.i(32)) do
+            block bb2(arg >>> Type.i(32)) do
               v2 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
               add = Arith.addi(arg, v2) >>> Type.i(32)
               Func.return(add)
@@ -36,7 +36,7 @@ defmodule CFTest do
               CF.br({:bb1, [v0]})
             end
 
-            block bb1(arg :: Type.i(32)) do
+            block bb1(arg >>> Type.i(32)) do
               v2 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
               add = Arith.addi(arg, v2) >>> Type.i(32)
               _sub = Arith.subi(arg, v2) >>> Type.i(32)

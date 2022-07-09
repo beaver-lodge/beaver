@@ -14,8 +14,8 @@ defmodule TosaTest do
                     ) do
             region do
               block entry(
-                      arg0 :: Type.ranked_tensor([1, 3], Type.f32()),
-                      arg1 :: Type.ranked_tensor([2, 1], Type.f32())
+                      arg0 >>> Type.ranked_tensor([1, 3], Type.f32()),
+                      arg1 >>> Type.ranked_tensor([2, 1], Type.f32())
                     ) do
                 v0 = TOSA.add(arg0, arg1) >>> Type.ranked_tensor([2, 3], Type.f32())
 

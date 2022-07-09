@@ -237,6 +237,7 @@ defmodule Beaver.Walker do
   @doc """
   Traverse and transform a container in MLIR, it could be a operation, region, block.
   You might expect this function works like `Macro.traverse/4` with an exception that you need to return a `command()` in your reducer.
+  ### More on manipulating the IR
   During the traversal, there are generally two choices to manipulate the IR:
   - Use `Beaver.concrete/1` to extract a op/attribute to a elixir structure, and generate a new op/attribute as replacement.
   - Use a pattern defined by macro `Beaver.defpat/2` to have the PDL interpreter transform the IR for you.

@@ -73,7 +73,7 @@ defmodule CfTest do
         mlir do
           block _true_branch() do
             {%MLIR.CAPI.MlirValue{} = mlir, acc} = gen_mlir(do_block_ast, acc)
-            CF.br({:bbnext, [mlir]})
+            CF.br({:bb_next, [mlir]})
           end
         end
 
@@ -81,7 +81,7 @@ defmodule CfTest do
         mlir do
           block _false_branch() do
             {%MLIR.CAPI.MlirValue{} = mlir, acc} = gen_mlir(else_block_ast, acc)
-            CF.br({:bbnext, [mlir]})
+            CF.br({:bb_next, [mlir]})
           end
         end
 
@@ -91,7 +91,7 @@ defmodule CfTest do
 
       bb_next =
         mlir do
-          block bbnext(arg :: Type.f32()) do
+          block bb_next(arg >>> Type.f32()) do
           end
         end
 
@@ -163,10 +163,10 @@ defmodule CfTest do
                     ) do
             region do
               block bb_entry(
-                      total_iters :: Type.f32(),
-                      factor :: Type.f(32),
-                      base_lr :: Type.f(32),
-                      step :: Type.f(32)
+                      total_iters >>> Type.f32(),
+                      factor >>> Type.f(32),
+                      base_lr >>> Type.f(32),
+                      step >>> Type.f(32)
                     ) do
                 # Put the MLIR Values for args into a Map
                 vars = %{total_iters: total_iters, factor: factor, base_lr: base_lr, step: step}

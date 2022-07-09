@@ -27,7 +27,7 @@ mlir do
           CF.br({:bb2, [v1]})
         end
 
-        block bb2(arg :: Type.i(32)) do
+        block bb2(arg >>> Type.i(32)) do
           v2 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
           add = Arith.addi(arg, v2) >>> Type.i(32)
           Func.return(add)
@@ -230,7 +230,7 @@ SomeDialect.some_op do
   region do
     block entry() do
       x = Arith.constant(1) >>> ~t<i32>
-      y = Arith.constant(1) :: ~t<i32>
+      y = Arith.constant(1) >>> ~t<i32>
     end
   end
   region do
@@ -280,7 +280,7 @@ To name a few:
 
 - [Phoenix Framework](https://phoenixframework.org/) for web application and realtime message
 - [Nerves Project](https://www.nerves-project.org/) for embedded device and IoT
-- [NX](https://github.com/elixir-nx/nx) for tensor and numerical
+- [Nx](https://github.com/elixir-nx/nx) for tensor and numerical
 
 Each of these sub-ecosystems starts with a seed project/library. Beaver should evolve to become a sub-ecosystem for compilers built with Elixir and MLIR.
 
