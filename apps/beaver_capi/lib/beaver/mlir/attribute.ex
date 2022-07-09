@@ -49,12 +49,8 @@ defmodule Beaver.MLIR.Attribute do
     array(num_elements, elements, opts)
   end
 
-  def string(str) when is_binary(str) do
-    string(MLIR.StringRef.create(str), [])
-  end
-
-  def string(str, opts) when is_binary(str) do
-    string(MLIR.StringRef.create(str), opts)
+  def string(str, opts \\ []) when is_binary(str) do
+    string_(MLIR.StringRef.create(str), opts)
   end
 
   for {:function_signature,
@@ -73,6 +69,15 @@ defmodule Beaver.MLIR.Attribute do
       "mlir" <> generated_func_name = name_str
       generated_func_name = generated_func_name |> String.slice(0..-8) |> Macro.underscore()
       generated_func_name = generated_func_name |> String.to_atom()
+
+      generated_func_name =
+        case generated_func_name do
+          :string ->
+            :string_
+
+          _ ->
+            generated_func_name
+        end
 
       @doc """
       generated from

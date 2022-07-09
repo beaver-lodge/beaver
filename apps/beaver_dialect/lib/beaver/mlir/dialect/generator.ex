@@ -12,23 +12,11 @@ defmodule Beaver.MLIR.Dialect.Generator do
 
           module_name = dialect |> Beaver.MLIR.Dialect.Registry.normalize_dialect_name()
 
-          func_name =
-            case func_name do
-              :tilezero ->
-                :x86_tilezero
-
-              :tile_zero ->
-                :tile_zero
-
-              _ ->
-                func_name
-            end
-
           module_name =
             Module.concat([
               Beaver.MLIR.Dialect,
               module_name,
-              Macro.camelize(Atom.to_string(func_name))
+              Beaver.MLIR.Dialect.Registry.op_module_name(op)
             ])
 
           if op not in skips do
