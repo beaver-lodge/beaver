@@ -28,9 +28,9 @@ defmodule Beaver do
   ```
   TestDialect.some_op(operand0) >>> []
   ```
-  By default, the creation of a terminator will be deferred in case its successor block has not been created. To force the creation of the terminator, add the `!` suffix:
+  To defer the creation of a terminator in case its successor block has not been created. You can pass an atom of the name in the block's call form.
   ```
-  Linalg.yield!()
+  CF.cond_br(cond0, :bb1, {:bb2, [v0]})
   ```
   To create region, call the op with a do block. The block macro works like the function definition in Elixir, and in the do block of `block` macro you can reference an argument by name. One caveat is that if it is a Op with region, it requires all arguments to be passed in one list to make it to call the macro version of the Op creation function.
   ```
