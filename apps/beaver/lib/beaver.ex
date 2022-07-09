@@ -7,7 +7,7 @@ defmodule Beaver do
 
   @doc """
   This is a macro where Beaver's MLIR DSL expressions get transformed to MLIR API calls.
-  This transformation will works on any expression of this form, so it is also possible to call any other function/macro rather than an Op creation function.
+  This transformation will works on any expression of this form, so it is also possible to call any other function/macro rather than an Op creation function. There is one operator `>>>` for typing the result of the SSA or an argument of a block. It kind of works like the `::` in specs and types of Elixir. Here is how is works under the hood:
   ```
   mlir do
     [res0, res1] = TestDialect.some_op(operand0, operand1, attr0: ~a{11 : i32}) >>> ~t{f32}
