@@ -3,6 +3,7 @@ defmodule AttributeTest do
   alias Beaver.MLIR
   alias MLIR.{Type, Attribute}
   import MLIR.Sigils
+  doctest Beaver.MLIR.Sigils
 
   describe "type apis" do
     test "generated" do

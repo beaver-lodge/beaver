@@ -21,7 +21,13 @@ defmodule Beaver.MLIR.Dialect do
       module_name
     end
 
-  @module_names module_names
+  @module_names module_names ++
+                  [
+                    Beaver.MLIR.Dialect.CF,
+                    Beaver.MLIR.Dialect.Arith,
+                    Beaver.MLIR.Dialect.Func,
+                    Beaver.MLIR.Dialect.Builtin
+                  ]
 
   @on_load :load_dialects
 
