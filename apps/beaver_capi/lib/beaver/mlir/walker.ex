@@ -373,6 +373,38 @@ defmodule Beaver.MLIR.Walker do
   @spec process_result(command(), container()) :: any()
   defp process_result(:erase, %MlirOperation{} = op) do
   end
+
+  @doc """
+  Performs a depth-first, pre-order traversal of a MLIR structure.
+  """
+  @spec prewalk(t, (t -> t)) :: t
+  def prewalk(ast, fun) when is_function(fun, 1) do
+    elem(prewalk(ast, nil, fn x, nil -> {fun.(x), nil} end), 0)
+  end
+
+  @doc """
+  Performs a depth-first, pre-order traversal of a MLIR structure using an accumulator.
+  """
+  @spec prewalk(t, any, (t, any -> {t, any})) :: {t, any}
+  def prewalk(ast, acc, fun) when is_function(fun, 2) do
+    traverse(ast, acc, fun, fn x, a -> {x, a} end)
+  end
+
+  @doc """
+  Performs a depth-first, post-order traversal of a MLIR structure.
+  """
+  @spec postwalk(mlir(), (mlir() -> mlir())) :: mlir()
+  def postwalk(ast, fun) when is_function(fun, 1) do
+    elem(postwalk(ast, nil, fn x, nil -> {fun.(x), nil} end), 0)
+  end
+
+  @doc """
+  Performs a depth-first, post-order traversal of a MLIR structure using an accumulator.
+  """
+  @spec postwalk(mlir(), any, (mlir(), any -> {mlir(), any})) :: {mlir(), any}
+  def postwalk(ast, acc, fun) when is_function(fun, 2) do
+    traverse(ast, acc, fn x, a -> {x, a} end, fun)
+  end
 end
 
 alias Beaver.MLIR.Walker
