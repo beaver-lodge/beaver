@@ -163,7 +163,9 @@ defmodule Beaver do
       quote do
         mlir do
           module do
-            PDL.pattern benefit: Attribute.integer(Type.i16(), 1),
+            benefit = Keyword.get(opts, :benefit, 1)
+
+            PDL.pattern benefit: Attribute.integer(Type.i16(), benefit),
                         sym_name: "\"#{unquote(name)}\"" do
               region do
                 block some_pattern() do
@@ -179,7 +181,7 @@ defmodule Beaver do
     pdl_pattern_module_op_str = pdl_pattern_module_op |> Macro.to_string()
 
     quote do
-      def unquote(name)() do
+      def unquote(name)(opts \\ [benefit: 1]) do
         alias Beaver.DSL.Pattern
         pdl_pattern_module_op = unquote(pdl_pattern_module_op)
 

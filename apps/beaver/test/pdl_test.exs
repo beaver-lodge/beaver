@@ -358,7 +358,7 @@ defmodule PDLTest do
       def run(%MLIR.CAPI.MlirOperation{} = operation) do
         with %Func.Func{attributes: attributes} <- Beaver.concrete(operation),
              2 <- Enum.count(attributes),
-             {:ok, _} <- MLIR.Pattern.apply_(operation, [replace_add_op()]) do
+             {:ok, _} <- MLIR.Pattern.apply_(operation, [replace_add_op(benefit: 2)]) do
           :ok
         end
       end
