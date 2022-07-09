@@ -1,4 +1,4 @@
-defmodule Met.MixProject do
+defmodule Beaver.Umbrella.MixProject do
   use Mix.Project
 
   def project do
@@ -7,7 +7,6 @@ defmodule Met.MixProject do
       version: "0.1.0",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
-      # Docs
       name: "MLIR",
       source_url: "https://github.com/beaver-project/beaver",
       homepage_url: "https://hexdocs.pm/beaver",
@@ -17,7 +16,6 @@ defmodule Met.MixProject do
 
   defp docs() do
     [
-      # The main page in the docs
       main: "Beaver",
       extras: ["README.md", "apps/exotic/README.md"],
       api_reference: false,
@@ -65,11 +63,6 @@ defmodule Met.MixProject do
     ]
   end
 
-  # Dependencies listed here are available only for this
-  # project and cannot be accessed from applications inside
-  # the apps folder.
-  #
-  # Run "mix help deps" for examples and options.
   defp deps do
     [{:ex_doc, "~> 0.27", only: :dev, runtime: false}]
   end

@@ -18,7 +18,7 @@ mod atoms {
     rustler::atoms! { void, i, u, f, array, bool }
 }
 
-// This follows type convention in NX
+// This follows type convention in Nx
 #[derive(NifTuple, Debug)]
 pub struct SizedType {
     name: Atom,
