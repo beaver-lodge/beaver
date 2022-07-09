@@ -103,7 +103,9 @@ defmodule Exotic do
       create_return_value(result_ref, return_type, holdings)
     rescue
       value ->
-        raise "fail to call #{name}, exception: #{inspect(value)}"
+        require Logger
+        Logger.error("fail to call #{name}")
+        raise value
     else
       value ->
         value
