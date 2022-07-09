@@ -50,7 +50,7 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   def string(str, opts \\ []) when is_binary(str) do
-    string(MLIR.StringRef.create(str), opts)
+    string_(MLIR.StringRef.create(str), opts)
   end
 
   for {:function_signature,
