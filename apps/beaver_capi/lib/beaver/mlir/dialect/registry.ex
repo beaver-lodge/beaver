@@ -17,8 +17,32 @@ defmodule Beaver.MLIR.Dialect.Registry do
     {:ok, init_arg}
   end
 
+  defp pre_process(op_name) do
+    case op_name do
+      "tilezero" ->
+        "x86_tilezero"
+
+      "tile_zero" ->
+        "tile_zero"
+
+      _ ->
+        op_name
+    end
+  end
+
   def normalize_op_name(op_name) do
-    op_name |> String.replace(".", "_") |> Macro.underscore() |> String.to_atom()
+    pre_process(op_name) |> String.replace(".", "_") |> Macro.underscore() |> String.to_atom()
+  end
+
+  def op_module_name(op_name) do
+    pre_process(op_name)
+    |> String.split(".")
+    |> Enum.join("_")
+    |> Macro.camelize()
+    |> String.to_atom()
+
+    # |> Enum.map(&Macro.camelize/1)
+    # |> Module.concat()
   end
 
   def normalize_dialect_name(to_upcase)

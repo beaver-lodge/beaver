@@ -114,14 +114,16 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   @doc """
-  Add an ODS argument to state. It the could one of the following:
-  - An value/result as an operand
-  - {name, attribute} pair as a named attribute
-  - {:regions, fn/0} a function to create regions
-  - {:result_types, types} as the return types of the operation
-  - {:successor, block} a successor block
+  Add an ODS argument to state.
   """
 
+  @type argument() ::
+          CAPI.MlirValue.t()
+          | {atom(), CAPI.MlirAttribute.t()}
+          | {:regions, function()}
+          | {:result_types, [CAPI.MlirType.t()]}
+          | {:successor, CAPI.MlirBlock.t()}
+  @spec add_argument(CAPI.MlirOperationState.t(), argument()) :: CAPI.MlirOperationState.t()
   def add_argument(state, value) when is_integer(value) do
     add_attr(state, value: "#{value}")
   end

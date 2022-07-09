@@ -64,6 +64,7 @@ defimpl Exotic.Valuable, for: Any do
 end
 
 defmodule Exotic.Value do
+  @type t() :: any()
   defmodule Ptr do
     @enforce_keys [:ref, :holdings]
     defstruct ref: nil, holdings: MapSet.new(), type: :ptr
