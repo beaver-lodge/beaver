@@ -62,7 +62,7 @@ defmodule PDLTest do
 
     {mlir, acc} =
       pattern_module
-      |> Beaver.MLIR.Walker.traverse([], inspector, inspector)
+      |> Beaver.Walker.traverse([], inspector, inspector)
 
     assert acc == [
              Beaver.MLIR.Dialect.Builtin.Module,

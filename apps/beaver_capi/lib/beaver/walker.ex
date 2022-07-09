@@ -11,7 +11,7 @@ alias Beaver.MLIR.CAPI.{
   MlirType
 }
 
-defmodule Beaver.MLIR.Walker do
+defmodule Beaver.Walker do
   alias Beaver.MLIR.CAPI
 
   @moduledoc """
@@ -399,7 +399,7 @@ defmodule Beaver.MLIR.Walker do
   end
 end
 
-alias Beaver.MLIR.Walker
+alias Beaver.Walker
 
 defimpl Enumerable, for: Walker do
   @spec count(Walker.t()) :: {:ok, non_neg_integer()} | {:error, module()}

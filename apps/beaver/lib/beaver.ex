@@ -208,11 +208,11 @@ defmodule Beaver do
   end
 
   def container(%{
-        operands: %Beaver.MLIR.Walker{container: container},
-        attributes: %Beaver.MLIR.Walker{container: container},
-        results: %Beaver.MLIR.Walker{container: container},
-        successors: %Beaver.MLIR.Walker{container: container},
-        regions: %Beaver.MLIR.Walker{container: container}
+        operands: %Beaver.Walker{container: container},
+        attributes: %Beaver.Walker{container: container},
+        results: %Beaver.Walker{container: container},
+        successors: %Beaver.Walker{container: container},
+        regions: %Beaver.Walker{container: container}
       }) do
     container
   end

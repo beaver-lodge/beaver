@@ -178,11 +178,11 @@ defmodule Beaver.MLIR.Operation do
     op_name = name(operation)
 
     struct!(MLIR.DSL.Op.Registry.lookup(op_name), %{
-      operands: MLIR.Walker.operands(operation),
-      attributes: MLIR.Walker.attributes(operation),
-      results: MLIR.Walker.results(operation),
-      successors: MLIR.Walker.successors(operation),
-      regions: MLIR.Walker.regions(operation)
+      operands: Beaver.Walker.operands(operation),
+      attributes: Beaver.Walker.attributes(operation),
+      results: Beaver.Walker.results(operation),
+      successors: Beaver.Walker.successors(operation),
+      regions: Beaver.Walker.regions(operation)
     })
   end
 
