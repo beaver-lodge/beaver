@@ -53,7 +53,7 @@ defmodule Beaver do
     end
   end >>> ~t{f32}
   """
-  defmacro mlir(do: block) do
+  defmacro mlir([do: block] = _dsl_block) do
     new_block_ast = block |> Beaver.DSL.SSA.transform()
 
     alias Beaver.MLIR.Dialect
