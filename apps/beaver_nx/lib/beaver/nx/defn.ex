@@ -268,7 +268,7 @@ defmodule Beaver.Nx.Defn do
 
       SCF.for [lower, upper, step] do
         region do
-          block inner(index :: Type.index()) do
+          block inner(index >>> Type.index()) do
             complex_element = Tensor.extract(complex_tensor, index) >>> Type.complex(Type.f32())
             conjugate_element = Complex.conj(complex_element) >>> Type.complex(Type.f32())
             MemRef.store([conjugate_element, conjugate_memref, index])
@@ -305,7 +305,7 @@ defmodule Beaver.Nx.Defn do
         iterator_types: ~a{[]}
       ] do
         region do
-          block bb0(arg0 :: Type.complex(Type.f32()), arg1 :: Type.f(32)) do
+          block bb0(arg0 >>> Type.complex(Type.f32()), arg1 >>> Type.f(32)) do
             %MLIR.CAPI.MlirValue{} = arg1
             im = Complex.im(arg0) >>> Type.f32()
             Linalg.yield([im])

@@ -20,6 +20,19 @@ defmodule Beaver.DSL.SSA do
     %__MODULE__{ssa | filler: filler}
   end
 
+  # block arguments
+  defp do_transform(
+         {:>>>, _,
+          [
+            var = {_var_name, _, nil},
+            type
+          ]}
+       ) do
+    quote do
+      {unquote(var), unquote(type)}
+    end
+  end
+
   defp do_transform(
          {:>>>, _line,
           [
@@ -59,19 +72,6 @@ defmodule Beaver.DSL.SSA do
       |> Beaver.DSL.SSA.put_arguments(args)
       |> Beaver.DSL.SSA.put_results(unquote(results))
       |> unquote(empty_call)
-    end
-  end
-
-  # block arguments
-  defp do_transform(
-         {:"::", _,
-          [
-            var = {_var_name, _, nil},
-            type
-          ]}
-       ) do
-    quote do
-      {unquote(var), unquote(type)}
     end
   end
 

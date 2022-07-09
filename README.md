@@ -27,7 +27,7 @@ mlir do
           CF.br({:bb2, [v1]})
         end
 
-        block bb2(arg :: Type.i(32)) do
+        block bb2(arg >>> Type.i(32)) do
           v2 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
           add = Arith.addi(arg, v2) >>> Type.i(32)
           Func.return(add)
@@ -230,7 +230,7 @@ SomeDialect.some_op do
   region do
     block entry() do
       x = Arith.constant(1) >>> ~t<i32>
-      y = Arith.constant(1) :: ~t<i32>
+      y = Arith.constant(1) >>> ~t<i32>
     end
   end
   region do

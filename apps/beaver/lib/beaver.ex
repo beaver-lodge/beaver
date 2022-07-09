@@ -7,7 +7,7 @@ defmodule Beaver do
 
   @doc """
   This is a macro where Beaver's MLIR DSL expressions get transformed to MLIR API calls.
-  This transformation will works on any expression of this form, so it is also possible to call any other function/macro rather than an Op creation function.
+  This transformation will works on any expression of this form, so it is also possible to call any other function/macro rather than an Op creation function. There is one operator `>>>` for typing the result of the SSA or an argument of a block. It kind of works like the `::` in specs and types of Elixir. Here is how is works under the hood:
   ```
   mlir do
     [res0, res1] = TestDialect.some_op(operand0, operand1, attr0: ~a{11 : i32}) >>> ~t{f32}
@@ -28,9 +28,9 @@ defmodule Beaver do
   ```
   TestDialect.some_op(operand0) >>> []
   ```
-  By default, the creation of a terminator will be deferred in case its successor block has not been created. To force the creation of the terminator, add the `!` suffix:
+  To defer the creation of a terminator in case its successor block has not been created. You can pass an atom of the name in the block's call form.
   ```
-  Linalg.yield!()
+  CF.cond_br(cond0, :bb1, {:bb2, [v0]})
   ```
   To create region, call the op with a do block. The block macro works like the function definition in Elixir, and in the do block of `block` macro you can reference an argument by name. One caveat is that if it is a Op with region, it requires all arguments to be passed in one list to make it to call the macro version of the Op creation function.
   ```
