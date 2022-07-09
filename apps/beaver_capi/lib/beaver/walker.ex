@@ -11,7 +11,7 @@ alias Beaver.MLIR.CAPI.{
   MlirType
 }
 
-defmodule Beaver.MLIR.Walker do
+defmodule Beaver.Walker do
   alias Beaver.MLIR.CAPI
 
   @moduledoc """
@@ -70,14 +70,6 @@ defmodule Beaver.MLIR.Walker do
     raise "not a legal 2-level structure could be walked in MLIR: #{inspect(container_module)}(#{inspect(element_module)})"
   end
 
-  defp to_container(module = %MlirModule{}) do
-    MLIR.Operation.from_module(module)
-  end
-
-  defp to_container(container) do
-    container
-  end
-
   def new(
         container,
         element_module,
@@ -88,7 +80,7 @@ defmodule Beaver.MLIR.Walker do
       when is_function(get_num, 1) and
              is_function(get_element, 2) and
              is_function(element_equal, 2) do
-    container = %container_module{} = to_container(container)
+    container = %container_module{} = Beaver.container(container)
     verify_nesting!(container_module, element_module)
 
     %__MODULE__{
@@ -112,7 +104,7 @@ defmodule Beaver.MLIR.Walker do
              is_function(get_next, 1) and
              is_function(get_parent, 1) and
              is_function(is_null, 1) do
-    container = %container_module{} = to_container(container)
+    container = %container_module{} = Beaver.container(container)
     verify_nesting!(container_module, element_module)
 
     %__MODULE__{
@@ -126,7 +118,7 @@ defmodule Beaver.MLIR.Walker do
   end
 
   @spec operands(MlirOperation.t()) :: Enumerable.result()
-  def operands(%MlirOperation{} = op) do
+  def operands(op) do
     new(
       op,
       MlirValue,
@@ -137,7 +129,7 @@ defmodule Beaver.MLIR.Walker do
   end
 
   @spec results(MlirOperation.t()) :: Enumerable.result()
-  def results(%MlirOperation{} = op) do
+  def results(op) do
     new(
       op,
       MlirValue,
@@ -148,7 +140,7 @@ defmodule Beaver.MLIR.Walker do
   end
 
   @spec regions(MlirOperation.t()) :: Enumerable.result()
-  def regions(%MlirOperation{} = op) do
+  def regions(op) do
     new(
       op,
       MlirRegion,
@@ -159,7 +151,7 @@ defmodule Beaver.MLIR.Walker do
   end
 
   @spec successors(MlirOperation.t()) :: Enumerable.result()
-  def successors(%MlirOperation{} = op) do
+  def successors(op) do
     new(
       op,
       MlirBlock,
@@ -170,7 +162,7 @@ defmodule Beaver.MLIR.Walker do
   end
 
   @spec attributes(MlirOperation.t()) :: Enumerable.result()
-  def attributes(%MlirOperation{} = op) do
+  def attributes(op) do
     new(
       op,
       MlirNamedAttribute,
@@ -262,7 +254,7 @@ defmodule Beaver.MLIR.Walker do
         ) ::
           {command(), any()}
   def traverse(mlir, acc, pre, post) when is_function(pre, 2) and is_function(post, 2) do
-    mlir = to_container(mlir)
+    mlir = Beaver.container(mlir)
     do_traverse(mlir, acc, pre, post)
   end
 
@@ -373,9 +365,41 @@ defmodule Beaver.MLIR.Walker do
   @spec process_result(command(), container()) :: any()
   defp process_result(:erase, %MlirOperation{} = op) do
   end
+
+  @doc """
+  Performs a depth-first, pre-order traversal of a MLIR structure.
+  """
+  @spec prewalk(t, (t -> t)) :: t
+  def prewalk(ast, fun) when is_function(fun, 1) do
+    elem(prewalk(ast, nil, fn x, nil -> {fun.(x), nil} end), 0)
+  end
+
+  @doc """
+  Performs a depth-first, pre-order traversal of a MLIR structure using an accumulator.
+  """
+  @spec prewalk(t, any, (t, any -> {t, any})) :: {t, any}
+  def prewalk(ast, acc, fun) when is_function(fun, 2) do
+    traverse(ast, acc, fun, fn x, a -> {x, a} end)
+  end
+
+  @doc """
+  Performs a depth-first, post-order traversal of a MLIR structure.
+  """
+  @spec postwalk(mlir(), (mlir() -> mlir())) :: mlir()
+  def postwalk(ast, fun) when is_function(fun, 1) do
+    elem(postwalk(ast, nil, fn x, nil -> {fun.(x), nil} end), 0)
+  end
+
+  @doc """
+  Performs a depth-first, post-order traversal of a MLIR structure using an accumulator.
+  """
+  @spec postwalk(mlir(), any, (mlir(), any -> {mlir(), any})) :: {mlir(), any}
+  def postwalk(ast, acc, fun) when is_function(fun, 2) do
+    traverse(ast, acc, fn x, a -> {x, a} end, fun)
+  end
 end
 
-alias Beaver.MLIR.Walker
+alias Beaver.Walker
 
 defimpl Enumerable, for: Walker do
   @spec count(Walker.t()) :: {:ok, non_neg_integer()} | {:error, module()}

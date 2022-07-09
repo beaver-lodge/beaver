@@ -168,18 +168,21 @@ defmodule Beaver.MLIR.Operation do
     op
   end
 
+  def name(%MLIR.CAPI.MlirOperation{} = operation) do
+    MLIR.CAPI.mlirOperationGetName(operation)
+    |> MLIR.CAPI.mlirIdentifierStr()
+    |> MLIR.StringRef.extract()
+  end
+
   def to_prototype(%MLIR.CAPI.MlirOperation{} = operation) do
-    op_name =
-      MLIR.CAPI.mlirOperationGetName(operation)
-      |> MLIR.CAPI.mlirIdentifierStr()
-      |> MLIR.StringRef.extract()
+    op_name = name(operation)
 
     struct!(MLIR.DSL.Op.Registry.lookup(op_name), %{
-      operands: MLIR.Walker.operands(operation),
-      attributes: MLIR.Walker.attributes(operation),
-      results: MLIR.Walker.results(operation),
-      successors: MLIR.Walker.successors(operation),
-      regions: MLIR.Walker.regions(operation)
+      operands: Beaver.Walker.operands(operation),
+      attributes: Beaver.Walker.attributes(operation),
+      results: Beaver.Walker.results(operation),
+      successors: Beaver.Walker.successors(operation),
+      regions: Beaver.Walker.regions(operation)
     })
   end
 

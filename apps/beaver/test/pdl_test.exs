@@ -53,7 +53,7 @@ defmodule PDLTest do
         {{name, attribute}, acc}
 
       %CAPI.MlirOperation{} = mlir, acc ->
-        %op{} = mlir |> Beaver.concrete()
+        mlir = %op{} = mlir |> Beaver.concrete()
         {mlir, [op | acc]}
 
       %element{} = mlir, acc ->
@@ -62,7 +62,7 @@ defmodule PDLTest do
 
     {mlir, acc} =
       pattern_module
-      |> Beaver.MLIR.Walker.traverse([], inspector, inspector)
+      |> Beaver.Walker.traverse([], inspector, inspector)
 
     assert acc == [
              Beaver.MLIR.Dialect.Builtin.Module,
@@ -123,7 +123,10 @@ defmodule PDLTest do
              Beaver.MLIR.Dialect.Builtin.Module
            ]
 
-    assert MLIR.CAPI.mlirOperationEqual(mlir, pattern_module) |> Exotic.Value.extract()
+    assert mlir
+           |> Beaver.container()
+           |> MLIR.CAPI.mlirOperationEqual(pattern_module)
+           |> Exotic.Value.extract()
 
     ir_module = MLIR.Module.create(ctx, @apply_rewrite_op_ir)
     MLIR.Operation.verify!(pattern_module)

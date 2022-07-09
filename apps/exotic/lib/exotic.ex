@@ -76,26 +76,40 @@ defmodule Exotic do
   # TODO: benchmark to see if it faster to create function wrapper each time or cache it
   def call!(
         %Library{ref: lib_ref},
-        func_def = %Exotic.Function.Definition{return_type: return_type, arg_types: arg_types},
+        func_def = %Exotic.Function.Definition{
+          name: name,
+          return_type: return_type,
+          arg_types: arg_types
+        },
         args,
         opts
       ) do
-    is_dirty = Keyword.get(opts, :dirty, true)
+    try do
+      is_dirty = Keyword.get(opts, :dirty, true)
 
-    arg_values =
-      Enum.zip(arg_types, args)
-      |> Enum.map(fn {t, v} -> Value.get(t, v) end)
+      arg_values =
+        Enum.zip(arg_types, args)
+        |> Enum.map(fn {t, v} -> Value.get(t, v) end)
 
-    arg_refs = arg_values |> Enum.map(&extract_ref/1)
+      arg_refs = arg_values |> Enum.map(&extract_ref/1)
 
-    holdings =
-      arg_values
-      |> Enum.map(&Map.get(&1, :holdings))
-      |> Enum.reduce(MapSet.new(), &MapSet.union(&2, &1))
+      holdings =
+        arg_values
+        |> Enum.map(&Map.get(&1, :holdings))
+        |> Enum.reduce(MapSet.new(), &MapSet.union(&2, &1))
 
-    %Function{ref: func_ref} = Function.get(func_def)
-    result_ref = call_if_dirty(is_dirty, lib_ref, func_ref, arg_refs)
-    create_return_value(result_ref, return_type, holdings)
+      %Function{ref: func_ref} = Function.get(func_def)
+      result_ref = call_if_dirty(is_dirty, lib_ref, func_ref, arg_refs)
+      create_return_value(result_ref, return_type, holdings)
+    rescue
+      value ->
+        require Logger
+        Logger.error("fail to call #{name}")
+        raise value
+    else
+      value ->
+        value
+    end
   end
 
   def call!(module, func_name, args, opts)

@@ -1,4 +1,6 @@
 defmodule Beaver do
+  alias Beaver.MLIR
+
   @moduledoc """
   This module contains top level functions and macros for Beaver DSL for MLIR.
   """
@@ -197,7 +199,25 @@ defmodule Beaver do
     end
   end
 
-  def concrete(%Beaver.MLIR.CAPI.MlirOperation{} = op) do
-    Beaver.MLIR.Operation.to_prototype(op)
+  def concrete(%MLIR.CAPI.MlirOperation{} = op) do
+    MLIR.Operation.to_prototype(op)
+  end
+
+  def container(module = %MLIR.CAPI.MlirModule{}) do
+    MLIR.Operation.from_module(module)
+  end
+
+  def container(%{
+        operands: %Beaver.Walker{container: container},
+        attributes: %Beaver.Walker{container: container},
+        results: %Beaver.Walker{container: container},
+        successors: %Beaver.Walker{container: container},
+        regions: %Beaver.Walker{container: container}
+      }) do
+    container
+  end
+
+  def container(container) do
+    container
   end
 end
