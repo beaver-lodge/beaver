@@ -280,7 +280,7 @@ To name a few:
 
 - [Phoenix Framework](https://phoenixframework.org/) for web application and realtime message
 - [Nerves Project](https://www.nerves-project.org/) for embedded device and IoT
-- [NX](https://github.com/elixir-nx/nx) for tensor and numerical
+- [Nx](https://github.com/elixir-nx/nx) for tensor and numerical
 
 Each of these sub-ecosystems starts with a seed project/library. Beaver should evolve to become a sub-ecosystem for compilers built with Elixir and MLIR.
 

@@ -392,7 +392,7 @@ defmodule Beaver.Nx.Defn do
   end
 
   @doc """
-  Invoke MLIR JIT with NX tensors. If there are tuples their memrefs will be packed into a single C struct.
+  Invoke MLIR JIT with Nx tensors. If there are tuples their memrefs will be packed into a single C struct.
   """
 
   def invoke(return, args, jit, symbol) do
@@ -473,7 +473,7 @@ defmodule Beaver.Nx.Defn do
   end
 
   @doc """
-  Run passes to compile IR generated from NX expressions, mostly in TOSA and some LinAlg. The results should be in LLVM.
+  Run passes to compile IR generated from Nx expressions, mostly in TOSA and some LinAlg. The results should be in LLVM.
   """
   def tosa_cpu(op) do
     import MLIR.{Transforms, Conversion}
