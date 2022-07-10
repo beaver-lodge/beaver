@@ -233,7 +233,7 @@ defmodule Beaver.Walker do
   command reducer should return as first element in the tuple
   """
   @type command() :: replace() | skip() | cont() | apply() | erase()
-
+  # TODO: is it possible to walk the generated PDL and check if it erases or replaces?
   @doc """
   Traverse and transform a container in MLIR, it could be a operation, region, block.
   You might expect this function works like `Macro.traverse/4` with an exception that you need to return a `command()` in your reducer.
@@ -245,9 +245,10 @@ defmodule Beaver.Walker do
   Please be aware that the command `:erase` and `replace` will only trigger inplace update on operand, attribute.
   To manipulate results, successors and regions, the parent operation should be replaced with a new operation.
   It could be mind-boggling to think the IR is mutable but not an issue if your approach is very functional. Inappropriate mutation might cause crash or bugs if somewhere else is keeping a reference of the replaced op.
-  The rule of thumb here:
-  - avoid mutating IR in you reducer function and always have the walker mutate the IR for you by returning a command.
-  - use `defpat` if you want MLIR's greedy pattern application based on benefits instead of implementing something alike yourself.
+  Some rules of thumb here:
+  - If your matching is very complicated, using `with/1` in Elixir should cover it.
+  - Avoid mutating IR in you reducer function and always have the walker mutate the IR for you by returning a command.
+  - Use `defpat` if you want MLIR's greedy pattern application based on benefits instead of implementing something alike yourself.
   You can run traversals in a MLIR pass by calling them in `run/1` so that it joins the general MLIR pass manager's orchestration and will be run in parallel when possible.
   """
   @spec traverse(
@@ -280,12 +281,16 @@ defmodule Beaver.Walker do
   defp do_traverse(%MlirOperation{} = operation, acc, pre, post) do
     {operation, acc} = pre.(operation, acc)
 
-    {operands, acc} = operands(operation) |> do_traverse(acc, pre, post)
+    {operands, acc} =
+      operands(operation)
+      |> Enum.map(fn value -> {:operand, value} end)
+      |> do_traverse(acc, pre, post)
+
     {attributes, acc} = attributes(operation) |> do_traverse(acc, pre, post)
 
     {results, acc} =
       results(operation)
-      |> Enum.map(fn value -> {:result, CAPI.mlirValueGetType(value)} end)
+      |> Enum.map(fn value -> {:result, value} end)
       |> do_traverse(acc, pre, post)
 
     {regions, acc} = regions(operation) |> do_traverse(acc, pre, post)
@@ -320,7 +325,7 @@ defmodule Beaver.Walker do
 
     {arguments, acc} =
       arguments(block)
-      |> Enum.map(fn value -> {:argument, CAPI.mlirValueGetType(value)} end)
+      |> Enum.map(fn value -> {:argument, value} end)
       |> do_traverse(acc, pre, post)
 
     {operations, acc} = operations(block) |> do_traverse(acc, pre, post)
@@ -336,19 +341,10 @@ defmodule Beaver.Walker do
     post.(successor, acc)
   end
 
-  defp do_traverse({:argument, %MlirType{}} = argument, acc, pre, post) do
-    {argument, acc} = pre.(argument, acc)
-    post.(argument, acc)
-  end
-
-  defp do_traverse({:result, %MlirType{}} = result, acc, pre, post) do
-    {result, acc} = pre.(result, acc)
-    post.(result, acc)
-  end
-
-  defp do_traverse(%MlirValue{} = x, acc, pre, post) do
-    {x, acc} = pre.(x, acc)
-    post.(x, acc)
+  defp do_traverse({value_kind, %MlirValue{}} = value, acc, pre, post)
+       when value_kind in [:result, :operand, :argument] do
+    {{value_kind, %MlirValue{}} = value, acc} = pre.(value, acc)
+    post.(value, acc)
   end
 
   defp do_traverse(%MlirNamedAttribute{} = named_attribute, acc, pre, post) do

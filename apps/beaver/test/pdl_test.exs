@@ -43,11 +43,14 @@ defmodule PDLTest do
       {:successor, %CAPI.MlirBlock{} = successor}, acc ->
         {{:successor, successor}, acc}
 
-      {:argument, %CAPI.MlirType{}} = argument, acc ->
+      {:argument, %CAPI.MlirValue{}} = argument, acc ->
         {argument, acc}
 
-      {:result, %CAPI.MlirType{}} = result, acc ->
+      {:result, %CAPI.MlirValue{}} = result, acc ->
         {result, acc}
+
+      {:operand, %CAPI.MlirValue{}} = operand, acc ->
+        {operand, acc}
 
       {name, %CAPI.MlirAttribute{} = attribute}, acc ->
         {{name, attribute}, acc}
@@ -77,8 +80,6 @@ defmodule PDLTest do
              Beaver.MLIR.Dialect.PDLInterp.Finalize,
              Beaver.MLIR.Dialect.PDLInterp.Finalize,
              Beaver.MLIR.Dialect.PDLInterp.Erase,
-             Beaver.MLIR.CAPI.MlirValue,
-             Beaver.MLIR.CAPI.MlirValue,
              Beaver.MLIR.Dialect.PDLInterp.Erase,
              Beaver.MLIR.Dialect.PDLInterp.CreateOperation,
              Beaver.MLIR.Dialect.PDLInterp.CreateOperation,
@@ -96,22 +97,12 @@ defmodule PDLTest do
              Beaver.MLIR.CAPI.MlirBlock,
              Beaver.MLIR.CAPI.MlirBlock,
              Beaver.MLIR.Dialect.PDLInterp.RecordMatch,
-             Beaver.MLIR.CAPI.MlirValue,
-             Beaver.MLIR.CAPI.MlirValue,
-             Beaver.MLIR.CAPI.MlirValue,
-             Beaver.MLIR.CAPI.MlirValue,
              Beaver.MLIR.Dialect.PDLInterp.RecordMatch,
              Beaver.MLIR.CAPI.MlirBlock,
              Beaver.MLIR.CAPI.MlirBlock,
              Beaver.MLIR.Dialect.PDLInterp.AreEqual,
-             Beaver.MLIR.CAPI.MlirValue,
-             Beaver.MLIR.CAPI.MlirValue,
-             Beaver.MLIR.CAPI.MlirValue,
-             Beaver.MLIR.CAPI.MlirValue,
              Beaver.MLIR.Dialect.PDLInterp.AreEqual,
              Beaver.MLIR.Dialect.PDLInterp.GetAttribute,
-             Beaver.MLIR.CAPI.MlirValue,
-             Beaver.MLIR.CAPI.MlirValue,
              Beaver.MLIR.Dialect.PDLInterp.GetAttribute,
              Beaver.MLIR.Dialect.PDLInterp.CreateAttribute,
              Beaver.MLIR.Dialect.PDLInterp.CreateAttribute,
