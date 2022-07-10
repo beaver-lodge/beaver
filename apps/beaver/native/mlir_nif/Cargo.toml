@@ -1,0 +1,19 @@
+[package]
+name = "mlir_nif"
+version = "0.1.0"
+authors = []
+edition = "2018"
+
+[lib]
+name = "mlir_nif"
+path = "src/lib.rs"
+crate-type = ["cdylib"]
+
+[dependencies]
+rustler = "0.25.0"
+
+[build-dependencies]
+cmake = "0.1"
+which = "4.2.5"
+glob = "0.3.0"
+bindgen = "*"

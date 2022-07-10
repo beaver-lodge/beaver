@@ -24,20 +24,21 @@ defmodule Beaver.MixProject do
   defp package() do
     [
       licenses: ["Apache-2.0", "MIT"],
-      links: %{"GitHub" => "https://github.com/MLIR-China/beaver"}
+      links: %{"GitHub" => "https://github.com/beaver-project/beaver"}
     ]
   end
 
   def application do
     [
+      mod: {Beaver.Application, []},
+      start_phases: [load_dialect_modules: []],
       extra_applications: [:logger]
     ]
   end
 
   defp deps do
     [
-      {:beaver_capi, in_umbrella: true},
-      {:beaver_dialect, in_umbrella: true},
+      {:exotic, in_umbrella: true},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end

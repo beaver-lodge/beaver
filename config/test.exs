@@ -1,6 +1,6 @@
 import Config
 
-config :beaver_capi,
+config :beaver,
   skip_dialects: ~w{nvgpu
   gpu
   x86vector
