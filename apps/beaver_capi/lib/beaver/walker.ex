@@ -281,12 +281,16 @@ defmodule Beaver.Walker do
   defp do_traverse(%MlirOperation{} = operation, acc, pre, post) do
     {operation, acc} = pre.(operation, acc)
 
-    {operands, acc} = operands(operation) |> do_traverse(acc, pre, post)
+    {operands, acc} =
+      operands(operation)
+      |> Enum.map(fn value -> {:operand, value} end)
+      |> do_traverse(acc, pre, post)
+
     {attributes, acc} = attributes(operation) |> do_traverse(acc, pre, post)
 
     {results, acc} =
       results(operation)
-      |> Enum.map(fn value -> {:result, CAPI.mlirValueGetType(value)} end)
+      |> Enum.map(fn value -> {:result, value} end)
       |> do_traverse(acc, pre, post)
 
     {regions, acc} = regions(operation) |> do_traverse(acc, pre, post)
@@ -321,7 +325,7 @@ defmodule Beaver.Walker do
 
     {arguments, acc} =
       arguments(block)
-      |> Enum.map(fn value -> {:argument, CAPI.mlirValueGetType(value)} end)
+      |> Enum.map(fn value -> {:argument, value} end)
       |> do_traverse(acc, pre, post)
 
     {operations, acc} = operations(block) |> do_traverse(acc, pre, post)
@@ -337,19 +341,10 @@ defmodule Beaver.Walker do
     post.(successor, acc)
   end
 
-  defp do_traverse({:argument, %MlirType{}} = argument, acc, pre, post) do
-    {argument, acc} = pre.(argument, acc)
-    post.(argument, acc)
-  end
-
-  defp do_traverse({:result, %MlirType{}} = result, acc, pre, post) do
-    {result, acc} = pre.(result, acc)
-    post.(result, acc)
-  end
-
-  defp do_traverse(%MlirValue{} = x, acc, pre, post) do
-    {x, acc} = pre.(x, acc)
-    post.(x, acc)
+  defp do_traverse({value_kind, %MlirValue{}} = value, acc, pre, post)
+       when value_kind in [:result, :operand, :argument] do
+    {{value_kind, %MlirValue{}} = value, acc} = pre.(value, acc)
+    post.(value, acc)
   end
 
   defp do_traverse(%MlirNamedAttribute{} = named_attribute, acc, pre, post) do
