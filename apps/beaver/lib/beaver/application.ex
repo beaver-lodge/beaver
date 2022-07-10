@@ -15,9 +15,6 @@ defmodule Beaver.Application do
 
   def start_phase(:load_dialect_modules, :normal, []) do
     for dialect_module <- Beaver.MLIR.Dialect.dialects() do
-      require Logger
-      Logger.debug("loading dialect module #{dialect_module}")
-
       for op_module <- apply(dialect_module, :ops, []) do
         apply(op_module, :register_op_prototype, [])
       end
