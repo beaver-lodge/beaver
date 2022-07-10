@@ -1,6 +1,4 @@
 defmodule Beaver.MLIR.Dialect.Registry do
-  alias Beaver.MLIR
-  alias Beaver.MLIR.CAPI
   use GenServer
 
   require Beaver.MLIR.CAPI
@@ -59,18 +57,14 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def normalize_dialect_name("pdl_interp"), do: "PDLInterp"
   def normalize_dialect_name(other), do: other |> Macro.camelize()
 
-  defp do_ops(dialect, query: false) do
-    :ets.match(__MODULE__, {dialect, :"$1"}) |> List.flatten()
-  end
-
-  defp do_ops(dialect, query: true) do
-    for {^dialect, o} <- query_ops() do
-      o
-    end
-  end
-
   def ops(dialect, opts \\ [query: false]) do
-    do_ops(dialect, opts)
+    if Keyword.get(opts, :query, false) do
+      for {^dialect, o} <- query_ops() do
+        o
+      end
+    else
+      :ets.match(__MODULE__, {dialect, :"$1"}) |> List.flatten()
+    end
   end
 
   @doc """

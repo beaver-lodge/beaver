@@ -4,7 +4,8 @@ defmodule Beaver.MLIR.Dialect.Func do
 
   use Dialect.Generator,
     dialect: "func",
-    ops: Dialect.Registry.ops("func", query: true) |> Enum.reject(fn x -> x in ~w{func} end)
+    ops: Dialect.Registry.ops("func", query: true),
+    skips: ~w{func}
 
   defmodule Func do
     def create(arguments) do
