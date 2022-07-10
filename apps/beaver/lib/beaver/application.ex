@@ -1,4 +1,4 @@
-defmodule Beaver.MLIR.Application do
+defmodule Beaver.Application do
   @moduledoc false
   def start(_type, _args) do
     Supervisor.start_link(
