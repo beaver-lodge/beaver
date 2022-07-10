@@ -1,6 +1,5 @@
 defmodule Beaver.MLIR.Dialect do
   alias Beaver.MLIR.Dialect
-  {:ok, _} = Application.ensure_all_started(:beaver_capi)
 
   require Logger
 

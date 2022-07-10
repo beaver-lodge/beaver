@@ -25,8 +25,7 @@ defmodule Beaver.Nx.MixProject do
   defp deps do
     [
       {:nx, "~> 0.2"},
-      {:beaver, in_umbrella: true},
-      {:beaver_capi, in_umbrella: true}
+      {:beaver, in_umbrella: true}
     ]
   end
 end

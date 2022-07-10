@@ -58,17 +58,15 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def normalize_dialect_name(other), do: other |> Macro.camelize()
 
   def ops(dialect) do
-    Application.ensure_all_started(:beaver_capi)
     :ets.match(__MODULE__, {dialect, :"$1"}) |> List.flatten()
   end
 
   @doc """
-  Get dialects registered, if it is dev/test env with config key :skip_dialects of app :beaver_capi configured,
+  Get dialects registered, if it is dev/test env with config key :skip_dialects of app :beaver configured,
   these dialects will not be returned (usually to speedup the compilation). Pass option dialects(full: true) to get all dialects anyway.
   """
   def dialects(opts \\ [full: false]) do
     full = Keyword.get(opts, :full, true)
-    Application.ensure_all_started(:beaver_capi)
 
     all_dialects =
       for [dialect, _] <- :ets.match(__MODULE__, {:"$1", :"$2"}) do
@@ -79,7 +77,7 @@ defmodule Beaver.MLIR.Dialect.Registry do
     if full do
       all_dialects
     else
-      skip_dialects = Application.get_env(:beaver_capi, :skip_dialects, [])
+      skip_dialects = Application.get_env(:beaver, :skip_dialects, [])
       all_dialects |> Enum.reject(fn x -> x in skip_dialects end)
     end
   end

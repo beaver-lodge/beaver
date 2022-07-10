@@ -36,8 +36,7 @@ defmodule Beaver.MixProject do
 
   defp deps do
     [
-      {:beaver_capi, in_umbrella: true},
-      {:beaver_dialect, in_umbrella: true},
+      {:exotic, in_umbrella: true},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
