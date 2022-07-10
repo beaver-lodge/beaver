@@ -245,7 +245,7 @@ defmodule Beaver.Walker do
   Please be aware that the command `:erase` and `replace` will only trigger inplace update on operand, attribute.
   To manipulate results, successors and regions, the parent operation should be replaced with a new operation.
   It could be mind-boggling to think the IR is mutable but not an issue if your approach is very functional. Inappropriate mutation might cause crash or bugs if somewhere else is keeping a reference of the replaced op.
-  Some rules of thumb here:
+  ### Some tips
   - If your matching is very complicated, using `with/1` in Elixir should cover it.
   - Avoid mutating IR in you reducer function and always have the walker mutate the IR for you by returning a command.
   - Use `defpat` if you want MLIR's greedy pattern application based on benefits instead of implementing something alike yourself.
