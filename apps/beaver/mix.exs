@@ -24,7 +24,7 @@ defmodule Beaver.MixProject do
   defp package() do
     [
       licenses: ["Apache-2.0", "MIT"],
-      links: %{"GitHub" => "https://github.com/MLIR-China/beaver"}
+      links: %{"GitHub" => "https://github.com/beaver-project/beaver"}
     ]
   end
 
