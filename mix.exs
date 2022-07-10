@@ -17,6 +17,7 @@ defmodule Beaver.Umbrella.MixProject do
   defp docs() do
     [
       main: "Beaver",
+      ignore_apps: [:exotic],
       extras: ["README.md", "apps/exotic/README.md"],
       filter_modules: fn m, _meta ->
         name = Atom.to_string(m)
