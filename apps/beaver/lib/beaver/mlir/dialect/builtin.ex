@@ -3,7 +3,7 @@ defmodule Beaver.MLIR.Dialect.Builtin do
 
   use Beaver.MLIR.Dialect.Generator,
     dialect: "builtin",
-    ops: Dialect.Registry.ops("builtin"),
+    ops: Dialect.Registry.ops("builtin", query: false),
     skips: ~w{module}
 
   defmodule Module do

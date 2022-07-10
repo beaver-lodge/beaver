@@ -15,7 +15,7 @@ defmodule Beaver.MLIR.Dialect do
       defmodule module_name do
         use Beaver.MLIR.Dialect.Generator,
           dialect: d,
-          ops: Dialect.Registry.ops(d)
+          ops: Dialect.Registry.ops(d, query: false)
       end
 
       module_name

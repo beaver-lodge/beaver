@@ -59,8 +59,16 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def normalize_dialect_name("pdl_interp"), do: "PDLInterp"
   def normalize_dialect_name(other), do: other |> Macro.camelize()
 
-  def ops(dialect) do
+  defp do_ops(dialect, query: true) do
     :ets.match(__MODULE__, {dialect, :"$1"}) |> List.flatten()
+  end
+
+  defp do_ops(dialect, query: false) do
+    raise "xx"
+  end
+
+  def ops(dialect, opts \\ [query: true]) do
+    do_ops(dialect, opts)
   end
 
   @doc """
@@ -108,8 +116,3 @@ defmodule Beaver.MLIR.Dialect.Registry do
     end
   end
 end
-
-require Beaver.MLIR.Managed.Context
-{:ok, _} = Beaver.MLIR.CAPI.Managed.start_link([])
-{:ok, _} = Beaver.MLIR.Global.Context.start_link([])
-{:ok, _} = Beaver.MLIR.Dialect.Registry.start_link([])
