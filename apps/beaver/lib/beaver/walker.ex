@@ -249,7 +249,7 @@ defmodule Beaver.Walker do
   - If your matching is very complicated, using `with/1` in Elixir should cover it.
   - Avoid mutating IR in you reducer function and always have the walker mutate the IR for you by returning a command.
   - Use `defpat` if you want MLIR's greedy pattern application based on benefits instead of implementing something alike yourself.
-  You can run traversals in a MLIR pass by calling them in `run/1` so that it joins the general MLIR pass manager's orchestration and will be run in parallel when possible.
+  - You can run traversals in a MLIR pass by calling them in `run/1` so that it joins the general MLIR pass manager's orchestration and will be run in parallel when possible.
   """
   @spec traverse(
           container(),
