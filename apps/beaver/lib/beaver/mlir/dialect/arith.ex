@@ -5,7 +5,7 @@ defmodule Beaver.MLIR.Dialect.Arith do
 
   use Beaver.MLIR.Dialect.Generator,
     dialect: "arith",
-    ops: Dialect.Registry.ops("arith", query: false) |> Enum.reject(fn x -> x in ~w{constant} end)
+    ops: Dialect.Registry.ops("arith", query: true) |> Enum.reject(fn x -> x in ~w{constant} end)
 
   def constant(true) do
     MLIR.Operation.create("arith.constant", value: ~a{true}, result_types: ["i1"])

@@ -59,15 +59,17 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def normalize_dialect_name("pdl_interp"), do: "PDLInterp"
   def normalize_dialect_name(other), do: other |> Macro.camelize()
 
-  defp do_ops(dialect, query: true) do
+  defp do_ops(dialect, query: false) do
     :ets.match(__MODULE__, {dialect, :"$1"}) |> List.flatten()
   end
 
-  defp do_ops(dialect, query: false) do
-    raise "xx"
+  defp do_ops(dialect, query: true) do
+    for {^dialect, o} <- query_ops() do
+      o
+    end
   end
 
-  def ops(dialect, opts \\ [query: true]) do
+  def ops(dialect, opts \\ [query: false]) do
     do_ops(dialect, opts)
   end
 
@@ -75,12 +77,18 @@ defmodule Beaver.MLIR.Dialect.Registry do
   Get dialects registered, if it is dev/test env with config key :skip_dialects of app :beaver configured,
   these dialects will not be returned (usually to speedup the compilation). Pass option dialects(full: true) to get all dialects anyway.
   """
-  def dialects(opts \\ [full: false]) do
+  def dialects(opts \\ [full: false, query: false]) do
+    query = Keyword.get(opts, :query, false)
+
     full = Keyword.get(opts, :full, true)
 
     all_dialects =
-      for [dialect, _] <- :ets.match(__MODULE__, {:"$1", :"$2"}) do
-        dialect
+      if query do
+        query_ops() |> Enum.map(fn {d, _o} -> d end)
+      else
+        for [dialect, _] <- :ets.match(__MODULE__, {:"$1", :"$2"}) do
+          dialect
+        end
       end
       |> Enum.uniq()
 
@@ -93,26 +101,32 @@ defmodule Beaver.MLIR.Dialect.Registry do
   end
 
   defp query_ops() do
-    context = MLIR.Managed.Context.get()
+    lib = MLIR.CAPI.load!()
+    context = Exotic.call!(lib, :mlirContextCreate, [])
+    Exotic.call!(lib, :mlirRegisterAllDialects, [context])
 
     num_op =
-      CAPI.beaverGetNumRegisteredOperations(context)
+      Exotic.call!(lib, :beaverGetNumRegisteredOperations, [context])
       |> Exotic.Value.extract()
 
     for i <- 0..(num_op - 1)//1 do
-      op_name = CAPI.beaverGetRegisteredOperationName(context, i)
+      op_name =
+        Exotic.call!(lib, :beaverGetRegisteredOperationName, [context, Exotic.Value.get(:i64, i)])
 
       dialect_name =
         op_name
-        |> CAPI.beaverRegisteredOperationNameGetDialectName()
+        |> then(fn name ->
+          Exotic.call!(lib, :beaverRegisteredOperationNameGetDialectName, [name])
+        end)
         |> MLIR.StringRef.extract()
 
       op_name =
         op_name
-        |> CAPI.beaverRegisteredOperationNameGetOpName()
+        |> then(fn name ->
+          Exotic.call!(lib, :beaverRegisteredOperationNameGetOpName, [name])
+        end)
         |> MLIR.StringRef.extract()
 
       {dialect_name, op_name}
-    end
   end
 end

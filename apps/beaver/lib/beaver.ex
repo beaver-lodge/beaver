@@ -61,7 +61,7 @@ defmodule Beaver do
 
     alias_dialects =
       for d <-
-            Dialect.Registry.dialects() do
+            Dialect.Registry.dialects(query: true) do
         module_name = d |> Dialect.Registry.normalize_dialect_name()
         module_name = Module.concat([Beaver.MLIR.Dialect, module_name])
 

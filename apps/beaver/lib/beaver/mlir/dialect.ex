@@ -6,7 +6,7 @@ defmodule Beaver.MLIR.Dialect do
 
   module_names =
     for d <-
-          Dialect.Registry.dialects()
+          Dialect.Registry.dialects(query: true)
           |> Enum.reject(fn x -> x in ~w{cf arith func builtin} end) do
       module_name = d |> Dialect.Registry.normalize_dialect_name()
       Logger.debug("building Elixir module for dialect #{d} => #{module_name}")
@@ -15,7 +15,7 @@ defmodule Beaver.MLIR.Dialect do
       defmodule module_name do
         use Beaver.MLIR.Dialect.Generator,
           dialect: d,
-          ops: Dialect.Registry.ops(d, query: false)
+          ops: Dialect.Registry.ops(d, query: true)
       end
 
       module_name
