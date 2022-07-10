@@ -29,13 +29,9 @@ defmodule Beaver.MLIR.Dialect do
                     Beaver.MLIR.Dialect.Builtin
                   ]
 
-  @on_load :load_dialects
-
-  def load_dialects() do
+  def dialects() do
     for module_name <- @module_names do
-      Code.ensure_loaded!(module_name)
+      module_name
     end
-
-    :ok
   end
 end

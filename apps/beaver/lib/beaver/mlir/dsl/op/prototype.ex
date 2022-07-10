@@ -20,8 +20,6 @@ defmodule Beaver.DSL.Op.Prototype do
         unquote(op_name)
       end
 
-      @on_load :register_op_prototype
-
       def register_op_prototype do
         Beaver.MLIR.DSL.Op.Registry.register(unquote(op_name), __MODULE__)
         :ok

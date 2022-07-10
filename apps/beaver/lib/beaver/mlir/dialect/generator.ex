@@ -73,14 +73,11 @@ defmodule Beaver.MLIR.Dialect.Generator do
       end
 
       @module_names module_names
-      @on_load :load_ops
 
-      def load_ops() do
+      def ops() do
         for module_name <- @module_names do
-          Code.ensure_loaded!(module_name)
+          module_name
         end
-
-        :ok
       end
     end
   end

@@ -31,7 +31,7 @@ defmodule Beaver.MixProject do
   def application do
     [
       mod: {Beaver.Application, []},
-      start_phases: [load_c_library: [], generate_c_apis: [], generate_dialects: []],
+      start_phases: [load_dialect_modules: []],
       extra_applications: [:logger]
     ]
   end

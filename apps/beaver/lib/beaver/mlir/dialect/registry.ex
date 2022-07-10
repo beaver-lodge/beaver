@@ -80,7 +80,7 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def dialects(opts \\ [full: false, query: false]) do
     query = Keyword.get(opts, :query, false)
 
-    full = Keyword.get(opts, :full, true)
+    full = Keyword.get(opts, :full, false)
 
     all_dialects =
       if query do

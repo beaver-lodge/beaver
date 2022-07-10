@@ -68,4 +68,8 @@ defmodule Beaver.MLIR.Dialect.CF do
       ] ++ true_args
     )
   end
+
+  def ops() do
+    []
+  end
 end
