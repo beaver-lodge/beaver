@@ -1,5 +1,5 @@
 defmodule Beaver.MLIR.DSL.Block do
-  @doc false
+  @moduledoc false
   # Transform the ast of a elixir call into a block creation and block args bindings
   def transform_call(call) do
     {bb_name, args} = call |> Macro.decompose_call()
