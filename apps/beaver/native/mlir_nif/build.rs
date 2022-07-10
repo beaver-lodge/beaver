@@ -2,6 +2,7 @@ use std::{path::Path, process::Command};
 
 use cmake;
 use glob::glob;
+use std::env;
 use which::which;
 
 // llvm config code from: https://github.com/femtomc/mlir-sys
@@ -59,6 +60,7 @@ fn main() {
             Err(e) => println!("{:?}", e),
         }
     }
+    println!("cargo:rerun-if-changed=wrapper.h");
     let libdir = llvm_config_shim("--libdir");
     for entry in glob(Path::new(&libdir).join("**/*").to_str().unwrap())
         .expect("Failed to read glob pattern")
@@ -77,6 +79,15 @@ fn main() {
         .build();
 
     let lib_dir = Path::new(&dst.display().to_string()).join("lib");
+    bindgen::builder()
+        .header("wrapper.h")
+        .clang_arg(format!("-I{}", llvm_config_shim("--includedir")))
+        .clang_arg(format!("-I{}", "met/include"))
+        .parse_callbacks(Box::new(bindgen::CargoCallbacks))
+        .generate()
+        .unwrap()
+        .write_to_file(Path::new(&env::var("OUT_DIR").unwrap()).join("bindings.rs"))
+        .unwrap();
     println!("cargo:rustc-link-search=native={}", lib_dir.display());
     println!("cargo:rustc-link-lib=dylib=met");
     // println!("cargo:rustc-cdylib-link-arg=-Wl,-rpath,$ORIGIN");

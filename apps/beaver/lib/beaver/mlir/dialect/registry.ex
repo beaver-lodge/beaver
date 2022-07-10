@@ -101,33 +101,6 @@ defmodule Beaver.MLIR.Dialect.Registry do
   end
 
   defp query_ops() do
-    lib = MLIR.CAPI.load!()
-    context = Exotic.call!(lib, :mlirContextCreate, [])
-    Exotic.call!(lib, :mlirRegisterAllDialects, [context])
-
-    num_op =
-      Exotic.call!(lib, :beaverGetNumRegisteredOperations, [context])
-      |> Exotic.Value.extract()
-
-    for i <- 0..(num_op - 1)//1 do
-      op_name =
-        Exotic.call!(lib, :beaverGetRegisteredOperationName, [context, Exotic.Value.get(:i64, i)])
-
-      dialect_name =
-        op_name
-        |> then(fn name ->
-          Exotic.call!(lib, :beaverRegisteredOperationNameGetDialectName, [name])
-        end)
-        |> MLIR.StringRef.extract()
-
-      op_name =
-        op_name
-        |> then(fn name ->
-          Exotic.call!(lib, :beaverRegisteredOperationNameGetOpName, [name])
-        end)
-        |> MLIR.StringRef.extract()
-
-      {dialect_name, op_name}
-    end
+    Beaver.MLIR.NIF.registered_ops()
   end
 end
