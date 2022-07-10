@@ -128,5 +128,6 @@ defmodule Beaver.MLIR.Dialect.Registry do
         |> MLIR.StringRef.extract()
 
       {dialect_name, op_name}
+    end
   end
 end
