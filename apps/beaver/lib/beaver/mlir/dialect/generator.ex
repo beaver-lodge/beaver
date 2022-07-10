@@ -5,6 +5,8 @@ defmodule Beaver.MLIR.Dialect.Generator do
     skips = Keyword.get(opts, :skips, [])
 
     quote(bind_quoted: [dialect: dialect, ops: ops, skips: skips]) do
+      require Beaver.MLIR.Dialect.Registry
+
       module_names =
         for op <- ops do
           func_name = Beaver.MLIR.Dialect.Registry.normalize_op_name(op)

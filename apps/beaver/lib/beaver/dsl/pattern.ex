@@ -1,5 +1,6 @@
 defmodule Beaver.DSL.Pattern do
   use Beaver
+  require Beaver.MLIR.Dialect.Registry
 
   @doc """
   generate PDL ops for types and attributes

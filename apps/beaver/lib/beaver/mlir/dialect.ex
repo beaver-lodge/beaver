@@ -2,6 +2,7 @@ defmodule Beaver.MLIR.Dialect do
   alias Beaver.MLIR.Dialect
 
   require Logger
+  require Beaver.MLIR.Dialect.Registry
 
   module_names =
     for d <-

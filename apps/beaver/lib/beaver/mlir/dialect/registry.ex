@@ -3,6 +3,8 @@ defmodule Beaver.MLIR.Dialect.Registry do
   alias Beaver.MLIR.CAPI
   use GenServer
 
+  require Beaver.MLIR.CAPI
+
   def start_link([]) do
     GenServer.start_link(__MODULE__, [])
   end
@@ -106,3 +108,8 @@ defmodule Beaver.MLIR.Dialect.Registry do
     end
   end
 end
+
+require Beaver.MLIR.Managed.Context
+{:ok, _} = Beaver.MLIR.CAPI.Managed.start_link([])
+{:ok, _} = Beaver.MLIR.Global.Context.start_link([])
+{:ok, _} = Beaver.MLIR.Dialect.Registry.start_link([])

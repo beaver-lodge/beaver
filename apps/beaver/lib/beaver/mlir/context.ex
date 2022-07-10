@@ -28,3 +28,8 @@ defmodule Beaver.MLIR.Context do
     end
   end
 end
+
+require Beaver.MLIR.CAPI
+require Beaver.MLIR.CAPI.Managed
+{:ok, _} = Beaver.MLIR.CAPI.Managed.start_link([])
+{:ok, _} = Beaver.MLIR.Global.Context.start_link([])
