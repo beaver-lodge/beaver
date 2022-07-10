@@ -17,7 +17,14 @@ defmodule Beaver.Umbrella.MixProject do
   defp docs() do
     [
       main: "Beaver",
+      ignore_apps: [:exotic],
       extras: ["README.md", "apps/exotic/README.md"],
+      filter_modules: fn m, _meta ->
+        name = Atom.to_string(m)
+
+        not (String.contains?(name, "Beaver.MLIR.Dialect.") ||
+               String.contains?(name, "Beaver.MLIR.CAPI."))
+      end,
       api_reference: false,
       groups_for_modules: [
         DSL: [
@@ -53,12 +60,6 @@ defmodule Beaver.Umbrella.MixProject do
           Exotic.Value.Struct,
           Exotic.Value.Array
         ]
-      ],
-      nest_modules_by_prefix: [
-        Beaver.MLIR.Dialect,
-        Beaver.MLIR.CAPI,
-        Beaver.MLIR,
-        Exotic
       ]
     ]
   end

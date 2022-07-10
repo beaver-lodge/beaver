@@ -76,5 +76,3 @@ defmodule Beaver.MLIR.CAPI do
   def call_to_load_code do
   end
 end
-
-{:ok, _} = Beaver.MLIR.CAPI.Managed.start_link([])
