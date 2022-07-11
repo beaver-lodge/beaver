@@ -71,4 +71,21 @@ defmodule Beaver.MLIR.Block do
     |> Exotic.Value.fetch(MLIR.CAPI.MlirBlock, :ptr)
     |> Exotic.Value.extract() == 0
   end
+
+  defp clone_op(values) when is_list(values) do
+  end
+
+  defp clone_op(%MLIR.CAPI.MlirOperation{} = op) do
+    op
+  end
+
+  @doc """
+  Clone a block with ops might be rewritten with new ops or values.
+  """
+  @spec clone(MLIR.CAPI.MlirBlock.t(), [MLIR.CAPI.MlirOperation.t() | [MLIR.CAPI.MlirValue.t()]]) ::
+          MLIR.CAPI.MlirBlock.t()
+  def clone(%MLIR.CAPI.MlirBlock{} = block, ops) do
+    Enum.map(ops, &clone_op/1)
+    block
+  end
 end

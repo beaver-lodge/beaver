@@ -371,6 +371,10 @@ defmodule Beaver.Walker do
 
     {operations, acc} = operations(block) |> do_traverse(acc, pre, post)
 
+    operations
+    |> Enum.map(&Beaver.container/1)
+    |> then(fn operations -> MLIR.Block.clone(block, operations) end)
+
     # Note: Erlang now owns the removed operation. call erase
     # mlirOperationRemoveFromParent
     # mlirBlockDestroy
