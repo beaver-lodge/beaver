@@ -19,7 +19,7 @@ defmodule RedundantTransposeTest do
       end
 
       def perms_attr(), do: Attribute.dense_elements(perm_int_attrs(), perm_t())
-      def perms_T_attr(), do: Attribute.dense_elements(Enum.reverse(perm_int_attrs()), perm_t)
+      def perms_T_attr(), do: Attribute.dense_elements(Enum.reverse(perm_int_attrs()), perm_t())
       def tensor_t(), do: Type.unranked_tensor(Type.f32())
     end
 
