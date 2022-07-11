@@ -207,8 +207,16 @@ defmodule Beaver do
   @doc """
   Create a Op prototype of a concrete op type from `Beaver.MLIR.CAPI.MlirOperation`.
   """
-  def concrete(%MLIR.CAPI.MlirOperation{} = op) do
-    MLIR.Operation.to_prototype(op)
+  def concrete(%MLIR.CAPI.MlirOperation{} = operation) do
+    op_name = MLIR.Operation.name(operation)
+
+    struct!(MLIR.DSL.Op.Registry.lookup(op_name), %{
+      operands: Beaver.Walker.operands(operation),
+      attributes: Beaver.Walker.attributes(operation),
+      results: Beaver.Walker.results(operation),
+      successors: Beaver.Walker.successors(operation),
+      regions: Beaver.Walker.regions(operation)
+    })
   end
 
   @doc """

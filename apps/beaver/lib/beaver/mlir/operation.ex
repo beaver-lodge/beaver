@@ -174,18 +174,6 @@ defmodule Beaver.MLIR.Operation do
     |> MLIR.StringRef.extract()
   end
 
-  def to_prototype(%MLIR.CAPI.MlirOperation{} = operation) do
-    op_name = name(operation)
-
-    struct!(MLIR.DSL.Op.Registry.lookup(op_name), %{
-      operands: Beaver.Walker.operands(operation),
-      attributes: Beaver.Walker.attributes(operation),
-      results: Beaver.Walker.results(operation),
-      successors: Beaver.Walker.successors(operation),
-      regions: Beaver.Walker.regions(operation)
-    })
-  end
-
   def is_null(operation = %MLIR.CAPI.MlirOperation{}) do
     operation
     |> Exotic.Value.fetch(MLIR.CAPI.MlirOperation, :ptr)
