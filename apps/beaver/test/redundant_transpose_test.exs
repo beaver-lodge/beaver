@@ -83,7 +83,7 @@ defmodule RedundantTransposeTest do
           %MLIR.CAPI.MlirOperation{} = operation ->
             with %TOSA.Transpose{operands: operands} = transpose_op <- Beaver.concrete(operation),
                  true <- MLIR.Value.result?(operands[0]),
-                 transpose_input_op <- MLIR.CAPI.mlirOpResultGetOwner(operands[0]),
+                 transpose_input_op = MLIR.CAPI.mlirOpResultGetOwner(operands[0]),
                  %TOSA.Transpose{} = transpose_input_op <-
                    Beaver.concrete(transpose_input_op),
                  {:ok, transpose_perm_attr} <- const_value(transpose_op),
