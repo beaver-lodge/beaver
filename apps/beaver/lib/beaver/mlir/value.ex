@@ -12,4 +12,12 @@ defmodule Beaver.MLIR.Value do
   def result?(%CAPI.MlirValue{} = value) do
     CAPI.mlirValueIsAOpResult(value) |> Exotic.Value.extract()
   end
+
+  def owner(value) do
+    if result?(value) do
+      {:ok, CAPI.mlirOpResultGetOwner(value)}
+    else
+      {:error, "not a result"}
+    end
+  end
 end
