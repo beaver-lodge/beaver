@@ -162,7 +162,7 @@ defmodule Beaver.MLIR.Operation do
   @doc """
   Verify the op and dump it. It raises if the verification fails.
   """
-  def dump!(op) do
+  def dump!(%MLIR.CAPI.MlirOperation{} = op) do
     verify!(op)
     mlirOperationDump(op)
     op

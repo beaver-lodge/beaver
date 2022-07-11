@@ -15,7 +15,8 @@ defmodule Beaver.Walker do
   alias Beaver.MLIR.CAPI
 
   @moduledoc """
-  Walkers traverses MLIR structures including operands, results, successors, attributes, regions
+  Walker to traverse MLIR structures including operands, results, successors, attributes, regions.
+  It implements the `Enumerable` protocol and the `Access` behavior.
   """
 
   # TODO: traverse MlirNamedAttribute?
@@ -205,6 +206,23 @@ defmodule Beaver.Walker do
       get_parent: &CAPI.mlirBlockGetParentRegion/1,
       is_null: &MLIR.Block.is_null/1
     )
+  end
+
+  @behaviour Access
+  def fetch(%__MODULE{element_module: MlirValue} = walker, key) when is_integer(key) do
+    with %MlirValue{} = value <- Enum.at(walker, key) do
+      {:ok, value}
+    else
+      nil -> :error
+    end
+  end
+
+  def get_and_update(_data, _key, _function) do
+    raise "get_and_update not supported"
+  end
+
+  def pop(_data, _key) do
+    raise "pop not supported"
   end
 
   @type mlir() :: container() | element()
