@@ -204,10 +204,16 @@ defmodule Beaver do
     end
   end
 
+  @doc """
+  Create a Op prototype of a concrete op type from `Beaver.MLIR.CAPI.MlirOperation`.
+  """
   def concrete(%MLIR.CAPI.MlirOperation{} = op) do
     MLIR.Operation.to_prototype(op)
   end
 
+  @doc """
+  Extract a container could be traversed by walker from an Op prototype or a `Beaver.MLIR.CAPI.MlirModule`.
+  """
   def container(module = %MLIR.CAPI.MlirModule{}) do
     MLIR.Operation.from_module(module)
   end
