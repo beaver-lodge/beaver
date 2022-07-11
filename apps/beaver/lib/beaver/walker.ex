@@ -222,12 +222,12 @@ defmodule Beaver.Walker do
     found =
       walker
       |> Enum.find(fn named_attribute ->
-        with ^key <-
+        with name <-
                named_attribute
                |> Exotic.Value.fetch(MLIR.CAPI.MlirNamedAttribute, :name)
                |> MLIR.CAPI.mlirIdentifierStr()
                |> MLIR.StringRef.extract() do
-          true
+          name == key
         end
       end)
 
