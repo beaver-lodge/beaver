@@ -47,7 +47,6 @@ defmodule RedundantTransposeTest do
           end
         end
         |> MLIR.Operation.verify!(dump_if_fail: true)
-        |> MLIR.Operation.from_module()
         |> MLIR.dump!()
       end
 
