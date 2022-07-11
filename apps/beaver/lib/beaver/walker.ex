@@ -209,6 +209,7 @@ defmodule Beaver.Walker do
   end
 
   @behaviour Access
+  @impl true
   def fetch(%__MODULE{element_module: MlirValue} = walker, key) when is_integer(key) do
     with %MlirValue{} = value <- Enum.at(walker, key) do
       {:ok, value}
@@ -217,10 +218,32 @@ defmodule Beaver.Walker do
     end
   end
 
+  def fetch(%__MODULE{element_module: MlirNamedAttribute} = walker, key) when is_binary(key) do
+    found =
+      walker
+      |> Enum.find(fn named_attribute ->
+        with ^key <-
+               named_attribute
+               |> Exotic.Value.fetch(MLIR.CAPI.MlirNamedAttribute, :name)
+               |> MLIR.CAPI.mlirIdentifierStr()
+               |> MLIR.StringRef.extract() do
+          true
+        end
+      end)
+
+    with %MlirNamedAttribute{} <- found do
+      {:ok, Exotic.Value.fetch(found, MLIR.CAPI.MlirNamedAttribute, :attribute)}
+    else
+      :error -> :error
+    end
+  end
+
+  @impl true
   def get_and_update(_data, _key, _function) do
     raise "get_and_update not supported"
   end
 
+  @impl true
   def pop(_data, _key) do
     raise "pop not supported"
   end

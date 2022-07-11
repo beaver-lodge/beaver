@@ -70,19 +70,11 @@ defmodule RedundantTransposeTest do
                    Beaver.concrete(const) do
               MLIR.Operation.dump!(transpose_input_op)
               MLIR.Operation.dump!(operation)
+
               MLIR.Operation.dump!(const)
 
               const_perms_attr =
-                const_attributes
-                |> Enum.find(fn named_attribute ->
-                  with "value" <-
-                         %MLIR.CAPI.MlirIdentifier{} =
-                           named_attribute
-                           |> Exotic.Value.fetch(MLIR.CAPI.MlirNamedAttribute, :name) do
-                    MLIR.CAPI.mlirIdentifierStr() |> MLIR.StringRef.extract()
-                  end
-                end)
-                |> Exotic.Value.fetch(MLIR.CAPI.MlirNamedAttribute, :attribute)
+                const_attributes["value"]
                 |> Beaver.MLIR.dump!()
                 |> IO.inspect(label: "attr")
 
