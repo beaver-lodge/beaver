@@ -54,34 +54,42 @@ defmodule RedundantTransposeTest do
     defmodule DeduplicateTransposePass do
       use Beaver.MLIR.Pass, on: Func.Func
 
+      def const_value(%TOSA.Transpose{operands: operands}) do
+        with true <- MLIR.Value.result?(operands[1]),
+             const <- MLIR.CAPI.mlirOpResultGetOwner(operands[1]),
+             %TOSA.Const{attributes: const_attributes} <-
+               Beaver.concrete(const) do
+          {:ok, const_attributes["value"]}
+        end
+      end
+
+      def redundant?(%MLIR.CAPI.MlirAttribute{} = attr1, %MLIR.CAPI.MlirAttribute{} = attr2) do
+        case1 =
+          MLIR.Attribute.equal?(Helper.perms_attr(), attr1) &&
+            MLIR.Attribute.equal?(Helper.perms_T_attr(), attr2)
+
+        case2 =
+          MLIR.Attribute.equal?(Helper.perms_attr(), attr2) &&
+            MLIR.Attribute.equal?(Helper.perms_T_attr(), attr1)
+
+        case1 || case2
+      end
+
       def run(%MLIR.CAPI.MlirOperation{} = operation) do
         %Func.Func{} = func = Beaver.concrete(operation)
 
         func
         |> Beaver.Walker.postwalk(fn
           %MLIR.CAPI.MlirOperation{} = operation ->
-            with %TOSA.Transpose{operands: operands} <- Beaver.concrete(operation),
+            with %TOSA.Transpose{operands: operands} = transpose_op <- Beaver.concrete(operation),
                  true <- MLIR.Value.result?(operands[0]),
                  transpose_input_op <- MLIR.CAPI.mlirOpResultGetOwner(operands[0]),
-                 %TOSA.Transpose{operands: operands} <- Beaver.concrete(transpose_input_op),
-                 true <- MLIR.Value.result?(operands[1]),
-                 const <- MLIR.CAPI.mlirOpResultGetOwner(operands[1]),
-                 %TOSA.Const{attributes: const_attributes} <-
-                   Beaver.concrete(const) do
-              MLIR.Operation.dump!(transpose_input_op)
+                 %TOSA.Transpose{operands: operands} = transpose_input_op <-
+                   Beaver.concrete(transpose_input_op),
+                 {:ok, transpose_perm_attr} <- const_value(transpose_op),
+                 {:ok, transpose_input_perm_attr} <- const_value(transpose_input_op),
+                 true <- redundant?(transpose_perm_attr, transpose_input_perm_attr) do
               MLIR.Operation.dump!(operation)
-
-              MLIR.Operation.dump!(const)
-
-              const_perms_attr =
-                const_attributes["value"]
-                |> Beaver.MLIR.dump!()
-                |> IO.inspect(label: "attr")
-
-              MLIR.CAPI.mlirAttributeEqual(Helper.perms_attr(), const_perms_attr)
-              |> Exotic.Value.extract()
-              |> IO.inspect(label: "mlirAttributeEqual")
-
               operation
             else
               _ -> operation
