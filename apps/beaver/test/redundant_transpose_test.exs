@@ -90,7 +90,7 @@ defmodule RedundantTransposeTest do
                  {:ok, transpose_perm_attr} <- const_value(transpose_op),
                  {:ok, transpose_input_perm_attr} <- const_value(transpose_input_op),
                  true <- redundant?(transpose_perm_attr, transpose_input_perm_attr) do
-              MLIR.Operation.dump!(operation)
+              MLIR.dump!(operation)
               # operation
               [input]
             else
