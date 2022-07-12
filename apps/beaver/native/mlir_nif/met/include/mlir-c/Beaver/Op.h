@@ -14,14 +14,13 @@ extern "C" {
   typedef struct name name
 
 DEFINE_C_API_STRUCT(MlirRegisteredOperationName, void);
+#undef DEFINE_C_API_STRUCT
 
 #define MlirOperandSize 16
 struct MlirOperand {
   uint8_t buffer[MlirOperandSize];
 };
 typedef struct MlirOperand MlirOperand;
-
-#undef DEFINE_C_API_STRUCT
 
 MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
                                                  MlirContext context);
