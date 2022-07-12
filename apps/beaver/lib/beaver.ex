@@ -112,13 +112,11 @@ defmodule Beaver do
 
         Beaver.MLIR.Managed.Block.set(block)
 
-        if region = Beaver.MLIR.Managed.Region.get() do
+        if region = Beaver.Env.mlir__REGION__() do
           # insert the block to region
           Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, block)
           # put the block to managed terminator => block id (name in decomposed block call)
           Beaver.MLIR.Managed.Terminator.put_block(unquote(block_id), block)
-        else
-          raise "no managed region found to append block"
         end
 
         unquote_splicing(block_arg_var_ast)

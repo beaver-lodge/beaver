@@ -8,11 +8,23 @@ alias Beaver.MLIR.CAPI.{
   MlirBlock,
   MlirValue,
   MlirNamedAttribute,
-  MlirType
+  MlirType,
+  MlirOperand
 }
 
 defmodule Beaver.Walker do
   alias Beaver.MLIR.CAPI
+
+  defmodule Replacement do
+    @type t() :: %__MODULE__{
+            operands: Beaver.Walker.t(),
+            attributes: Beaver.Walker.t(),
+            results: Beaver.Walker.t(),
+            successors: Beaver.Walker.t(),
+            regions: Beaver.Walker.t()
+          }
+    defstruct operands: [], attributes: [], results: [], successors: [], regions: []
+  end
 
   @moduledoc """
   Walker to traverse MLIR structures including operands, results, successors, attributes, regions.
@@ -66,6 +78,8 @@ defmodule Beaver.Walker do
   defp verify_nesting!(MlirBlock, MlirOperation), do: :ok
   # arguments of a block
   defp verify_nesting!(MlirBlock, MlirValue), do: :ok
+  defp verify_nesting!(Replacement, MlirValue), do: :ok
+  defp verify_nesting!(MlirValue, MlirOperand), do: :ok
 
   defp verify_nesting!(container_module, element_module) do
     raise "not a legal 2-level structure could be walked in MLIR: #{inspect(container_module)}(#{inspect(element_module)})"
@@ -118,7 +132,7 @@ defmodule Beaver.Walker do
     }
   end
 
-  @spec operands(MlirOperation.t()) :: Enumerable.result()
+  @spec operands(MlirOperation.t()) :: Enumerable.t()
   def operands(op) do
     new(
       op,
@@ -129,7 +143,7 @@ defmodule Beaver.Walker do
     )
   end
 
-  @spec results(MlirOperation.t()) :: Enumerable.result()
+  @spec results(MlirOperation.t()) :: Enumerable.t()
   def results(op) do
     new(
       op,
@@ -140,7 +154,7 @@ defmodule Beaver.Walker do
     )
   end
 
-  @spec regions(MlirOperation.t()) :: Enumerable.result()
+  @spec regions(MlirOperation.t()) :: Enumerable.t()
   def regions(op) do
     new(
       op,
@@ -151,7 +165,7 @@ defmodule Beaver.Walker do
     )
   end
 
-  @spec successors(MlirOperation.t()) :: Enumerable.result()
+  @spec successors(MlirOperation.t()) :: Enumerable.t()
   def successors(op) do
     new(
       op,
@@ -162,7 +176,7 @@ defmodule Beaver.Walker do
     )
   end
 
-  @spec attributes(MlirOperation.t()) :: Enumerable.result()
+  @spec attributes(MlirOperation.t()) :: Enumerable.t()
   def attributes(op) do
     new(
       op,
@@ -173,7 +187,7 @@ defmodule Beaver.Walker do
     )
   end
 
-  @spec arguments(MlirBlock.t()) :: Enumerable.result()
+  @spec arguments(MlirBlock.t()) :: Enumerable.t()
   def arguments(%MlirBlock{} = block) do
     new(
       block,
@@ -184,7 +198,7 @@ defmodule Beaver.Walker do
     )
   end
 
-  @spec operations(MlirBlock.t()) :: Enumerable.result()
+  @spec operations(MlirBlock.t()) :: Enumerable.t()
   def operations(%MlirBlock{} = block) do
     new(
       block,
@@ -196,7 +210,7 @@ defmodule Beaver.Walker do
     )
   end
 
-  @spec blocks(MlirRegion.t()) :: Enumerable.result()
+  @spec blocks(MlirRegion.t()) :: Enumerable.t()
   def blocks(%MlirRegion{} = region) do
     new(
       region,
@@ -205,6 +219,18 @@ defmodule Beaver.Walker do
       get_next: &CAPI.mlirBlockGetNextInRegion/1,
       get_parent: &CAPI.mlirBlockGetParentRegion/1,
       is_null: &MLIR.Block.is_null/1
+    )
+  end
+
+  @spec uses(MlirValue.t()) :: Enumerable.t()
+  def uses(%MlirValue{} = value) do
+    new(
+      value,
+      MlirOperand,
+      get_first: &CAPI.beaverValueGetFirstOperand/1,
+      get_next: &CAPI.beaverOperandGetNext/1,
+      get_parent: &CAPI.beaverOperandGetValue/1,
+      is_null: fn x -> CAPI.beaverOperandIsNull(x) |> Exotic.Value.extract() end
     )
   end
 
@@ -284,8 +310,8 @@ defmodule Beaver.Walker do
   - Use a pattern defined by macro `Beaver.defpat/2` to have the PDL interpreter transform the IR for you.
   You can use both if it is proper to do so.
   Please be aware that the command `:erase` and `replace` will only trigger inplace update on operand, attribute.
-  To manipulate results, successors and regions, the parent operation should be replaced with a new operation.
-  It could be mind-boggling to think the IR is mutable but not an issue if your approach is very functional. Inappropriate mutation might cause crash or bugs if somewhere else is keeping a reference of the replaced op.
+  To manipulate results, successors and regions, the parent operation should be Replacement with a new operation.
+  It could be mind-boggling to think the IR is mutable but not an issue if your approach is very functional. Inappropriate mutation might cause crash or bugs if somewhere else is keeping a reference of the Replacement op.
   ### Some tips
   - If your matching is very complicated, using `with/1` in Elixir should cover it.
   - Avoid mutating IR in you reducer function and always have the walker mutate the IR for you by returning a command.
@@ -371,6 +397,13 @@ defmodule Beaver.Walker do
 
     {operations, acc} = operations(block) |> do_traverse(acc, pre, post)
 
+    use Beaver
+
+    mlir do
+      block cloned() do
+      end
+    end
+
     operations
     |> Enum.map(&Beaver.container/1)
     |> then(fn operations -> MLIR.Block.clone(block, operations) end)
@@ -441,6 +474,24 @@ defmodule Beaver.Walker do
   @spec postwalk(mlir(), any, (mlir(), any -> {mlir(), any})) :: {mlir(), any}
   def postwalk(ast, acc, fun) when is_function(fun, 2) do
     traverse(ast, acc, fn x, a -> {x, a} end, fun)
+  end
+
+  @spec replace(MlirOperation.t(), [MlirValue.t()] | MlirValue.t()) :: Replacement.t()
+  @doc """
+  Replace a operation with a value
+  """
+  def replace(%MlirOperation{} = op, %MlirValue{} = value) do
+    if Enum.count(results(op)) != 1 do
+      raise "Operation should have one and only result"
+    end
+
+    for %Beaver.MLIR.CAPI.MlirOperand{} = operand <- uses(results(op)[0]) do
+      CAPI.beaverOperandGetOwner(operand)
+    end
+
+    %Replacement{
+      results: [value]
+    }
   end
 end
 

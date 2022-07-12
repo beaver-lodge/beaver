@@ -40,7 +40,7 @@ defmodule RedundantTransposeTest do
                 t = TOSA.transpose(arg0, perms) >>> Helper.tensor_t()
                 t = TOSA.transpose(t, perms1) >>> Helper.tensor_t()
                 t = TOSA.transpose(t, perms) >>> Helper.tensor_t()
-                _t = TOSA.transpose(t, perms1) >>> Helper.tensor_t()
+                t = TOSA.transpose(t, perms1) >>> Helper.tensor_t()
                 Func.return(t) >>> []
               end
             end
@@ -78,20 +78,20 @@ defmodule RedundantTransposeTest do
         %Func.Func{} = func = Beaver.concrete(operation)
 
         func
-        |> Beaver.Walker.postwalk(fn
+        |> Beaver.Walker.prewalk(fn
           # |> Beaver.Walker.prewalk(fn
           %MLIR.CAPI.MlirOperation{} = operation ->
             with %TOSA.Transpose{operands: operands} = transpose_op <- Beaver.concrete(operation),
                  input = operands[0],
                  {:ok, transpose_input_op} <- MLIR.Value.owner(input),
-                 %TOSA.Transpose{} = transpose_input_op <-
+                 %TOSA.Transpose{results: results} = transpose_input_op <-
                    Beaver.concrete(transpose_input_op),
                  {:ok, transpose_perm_attr} <- const_value(transpose_op),
                  {:ok, transpose_input_perm_attr} <- const_value(transpose_input_op),
                  true <- redundant?(transpose_perm_attr, transpose_input_perm_attr) do
-              MLIR.dump!(operation)
-              # operation
-              [input]
+              Beaver.Walker.replace(operation, input)
+
+              operation
             else
               _ -> operation
             end

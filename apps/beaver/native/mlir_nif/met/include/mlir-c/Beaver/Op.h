@@ -15,6 +15,12 @@ extern "C" {
 
 DEFINE_C_API_STRUCT(MlirRegisteredOperationName, void);
 
+#define MlirOperandSize 16
+struct MlirOperand {
+  uint8_t buffer[MlirOperandSize];
+};
+typedef struct MlirOperand MlirOperand;
+
 #undef DEFINE_C_API_STRUCT
 
 MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
@@ -31,6 +37,16 @@ beaverRegisteredOperationNameGetDialectName(MlirRegisteredOperationName name);
 
 MLIR_CAPI_EXPORTED MlirStringRef
 beaverRegisteredOperationNameGetOpName(MlirRegisteredOperationName name);
+
+MLIR_CAPI_EXPORTED MlirOperand beaverValueGetFirstOperand(MlirValue value);
+
+MLIR_CAPI_EXPORTED MlirOperand beaverOperandGetNext(MlirOperand operand);
+
+MLIR_CAPI_EXPORTED bool beaverOperandIsNull(MlirOperand operand);
+
+MLIR_CAPI_EXPORTED MlirValue beaverOperandGetValue(MlirOperand operand);
+
+MLIR_CAPI_EXPORTED MlirOperation beaverOperandGetOwner(MlirOperand operand);
 
 #ifdef __cplusplus
 }
