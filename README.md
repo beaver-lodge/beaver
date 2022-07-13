@@ -115,7 +115,8 @@ Beaver is essentially LLVM/MLIR on Erlang/Elixir. It is kind of interesting to s
   - It gets compiled to Erlang and runs on BEAM (Erlang's VM). So it has all the fault-tolerance and concurrency features of Erlang.
   - As a Lisp, Elixir has all the good stuff of a Lisp-y language including hygienic macro, protocol-based polymorphism.
   - Elixir has a powerful [higher-order module system](https://elixir-lang.org/getting-started/module-attributes.html) to persist compile-time data and this allows library users to easily adjust runtime behavior.
-  <!-- TODO: some rephrase -->
+
+<!-- TODO: some rephrase -->
 
 - Check out [the official guide](https://elixir-lang.org/getting-started/introduction.html) of Elixir.
 
@@ -346,9 +347,6 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 
   - use `vulkaninfo` and `vkvia` to verify Vulkan is working
   - Add `-DMLIR_ENABLE_VULKAN_RUNNER=ON` in LLVM CMake config command
-
-<!-- - Option #2 (Ubuntu), Install from LLVM apt releases, https://apt.llvm.org/ -->
-<!-- - Option #3 (macOS), Install from homebrew: `brew install llvm` -->
 
 4. Run tests
 

@@ -13,9 +13,7 @@ defmodule RedundantTransposeTest do
       def perm_t(), do: Type.ranked_tensor([2], Type.i32())
 
       defp perm_int_attrs() do
-        for perm <- 0..1 do
-          Attribute.integer(Type.i32(), perm)
-        end
+        for perm <- 0..1, do: Attribute.integer(Type.i32(), perm)
       end
 
       def perms_T_attr(), do: Attribute.dense_elements(Enum.reverse(perm_int_attrs()), perm_t())
