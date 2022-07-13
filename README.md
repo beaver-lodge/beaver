@@ -104,7 +104,7 @@ Beaver is essentially LLVM/MLIR on Erlang/Elixir. It is kind of interesting to s
 
 - Explain this MLIR thing to me in one sentence
 
-  MLIR is like the XML/JSON for compilers. You can build your own compiler with it or use it to "talk" to other compilers with MLIR support.
+  MLIR is like the HTTP for compilers. You can build your own compiler with it or use it to "talk" to other compilers with MLIR support.
 
 - Check out [the home page](https://mlir.llvm.org/) of MLIR.
 
