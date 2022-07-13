@@ -126,14 +126,6 @@ defmodule Exotic do
     {:ok, call!(lib, fun, args)}
   end
 
-  def load(module, path) do
-    {:ok, load!(module, path)}
-  end
-
-  def load(path) do
-    {:ok, load!(path)}
-  end
-
   defp get_functions(module) do
     got =
       apply(Module.concat(module, Meta), :native_definitions, [])
@@ -143,20 +135,30 @@ defmodule Exotic do
     got
   end
 
-  def load!(module, path) when is_atom(module) and is_binary(path) do
-    ref = NIF.get_lib(path)
-    %Library{ref: ref, path: path, functions: get_functions(module), id: module}
+  def load(module, path) when is_atom(module) and is_binary(path) do
+    case NIF.get_lib(path) do
+      {:error, error} ->
+        {:error, error}
+
+      ref when is_reference(ref) ->
+        {:ok, %Library{ref: ref, path: path, functions: get_functions(module), id: module}}
+    end
   end
 
-  def load!(module, loaded_module)
+  def load(module, loaded_module)
       when is_atom(module) and is_atom(loaded_module) and not is_nil(loaded_module) do
     %Library{ref: ref, path: path} = get_managed_libarary(loaded_module)
     %Library{ref: ref, path: path, functions: get_functions(module), id: module}
   end
 
-  def load!(path) when is_binary(path) do
-    ref = NIF.get_lib(path)
-    %Library{ref: ref, path: path, functions: %{}, id: :unknown}
+  def load(path) when is_binary(path) do
+    case NIF.get_lib(path) do
+      {:error, error} ->
+        {:error, error}
+
+      ref when is_reference(ref) ->
+        %Library{ref: ref, path: path, functions: %{}, id: :unknown}
+    end
   end
 
   def load!(module) when is_atom(module) do

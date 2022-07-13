@@ -30,8 +30,6 @@ defmodule MlirTest do
     MLIR.Operation.verify!(module)
     _operation = MLIR.CAPI.mlirModuleGetOperation(module)
 
-    Exotic.LibC.load()
-
     _ret_str = MLIR.StringRef.create("func.return")
 
     operation_state = MLIR.Operation.State.get!("func.return", location)

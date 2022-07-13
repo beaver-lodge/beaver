@@ -24,7 +24,7 @@ defmodule ExoticTest do
     [libc: LibC.load!()]
   end
 
-  test "test arith" do
+  test "arith" do
     assert LibC.sin(3.1415926535 * 0.5) |> Exotic.Value.extract() == 1.0
     assert LibC.cos(3.1415926535) |> Exotic.Value.extract() == -1.0
   end

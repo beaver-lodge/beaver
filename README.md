@@ -359,4 +359,5 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
   ```bash
   mix deps.get
   mix test
+  mix test --exclude slow --exclude vulkan # use this to skip slow or vulkan tests
   ```
