@@ -47,11 +47,21 @@ defmodule Exotic.Library do
 
       def load() do
         # TODO: support loading multiple paths by trying one by one
-        Exotic.load(__MODULE__, library_paths() |> List.first())
+        Exotic.load(
+          __MODULE__,
+          library_paths()
+          |> Enum.reduce(nil, fn acc, path ->
+            if acc == nil do
+              Exotic.load(__MODULE__, path)
+            else
+              acc
+            end
+          end)
+        )
       end
 
       def load!() do
-        Exotic.load!(__MODULE__, library_paths() |> List.first())
+        Exotic.load(__MODULE__, library_paths())
       end
 
       defoverridable load!: 0
