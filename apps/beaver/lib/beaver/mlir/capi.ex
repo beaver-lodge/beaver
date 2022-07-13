@@ -56,7 +56,12 @@ defmodule Beaver.MLIR.CAPI do
       raise "fail to find MLIR library"
     end
 
-    Exotic.load!(__MODULE__, lib_path)
+    with {:ok, lib} <- Exotic.load(__MODULE__, lib_path) do
+      lib
+    else
+      {:error, error} ->
+        raise error
+    end
   end
 
   paths =
