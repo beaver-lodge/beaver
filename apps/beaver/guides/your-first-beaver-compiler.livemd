@@ -8,7 +8,7 @@ Mix.install([
 
 ## What makes a compiler
 
-Before start coding anything. Let's get some intuition about what a compiler is made of.
+Before start coding anything. Let's get some intuition about what a typical compiler is made of.
 
 - IR
 - Pass
