@@ -481,17 +481,22 @@ defmodule Beaver.Walker do
   Replace a operation with a value
   """
   def replace(%MlirOperation{} = op, %MlirValue{} = value) do
-    if Enum.count(results(op)) != 1 do
-      raise "Operation should have one and only result"
-    end
+    with results <- results(op),
+         1 <- Enum.count(results),
+         %CAPI.MlirValue{} = result = results[0] do
+      for %Beaver.MLIR.CAPI.MlirOperand{} = operand <- uses(result) do
+        op = CAPI.beaverOperandGetOwner(operand)
+        pos = CAPI.beaverOperandGetNumber(operand)
+        CAPI.mlirOperationSetOperand(op, pos, value)
+      end
 
-    for %Beaver.MLIR.CAPI.MlirOperand{} = operand <- uses(results(op)[0]) do
-      CAPI.beaverOperandGetOwner(operand)
+      %Replacement{
+        results: [value]
+      }
+    else
+      _ ->
+        raise "Operation should have one and only result"
     end
-
-    %Replacement{
-      results: [value]
-    }
   end
 end
 

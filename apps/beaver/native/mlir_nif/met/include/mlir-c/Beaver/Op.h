@@ -47,6 +47,8 @@ MLIR_CAPI_EXPORTED MlirValue beaverOperandGetValue(MlirOperand operand);
 
 MLIR_CAPI_EXPORTED MlirOperation beaverOperandGetOwner(MlirOperand operand);
 
+MLIR_CAPI_EXPORTED uint32_t beaverOperandGetNumber(MlirOperand operand);
+
 #ifdef __cplusplus
 }
 #endif

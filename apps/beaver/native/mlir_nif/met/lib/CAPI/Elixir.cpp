@@ -123,3 +123,7 @@ MLIR_CAPI_EXPORTED MlirValue beaverOperandGetValue(MlirOperand operand) {
 MLIR_CAPI_EXPORTED MlirOperation beaverOperandGetOwner(MlirOperand operand) {
   return wrap((unwrap(operand))->getOwner());
 }
+
+MLIR_CAPI_EXPORTED uint32_t beaverOperandGetNumber(MlirOperand operand) {
+  return unwrap(operand)->getOperandNumber();
+}

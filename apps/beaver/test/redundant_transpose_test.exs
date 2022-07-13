@@ -13,12 +13,11 @@ defmodule RedundantTransposeTest do
       def perm_t(), do: Type.ranked_tensor([2], Type.i32())
 
       defp perm_int_attrs() do
-        for perm <- [0, 1] do
+        for perm <- 0..1 do
           Attribute.integer(Type.i32(), perm)
         end
       end
 
-      def perms_attr(), do: Attribute.dense_elements(perm_int_attrs(), perm_t())
       def perms_T_attr(), do: Attribute.dense_elements(Enum.reverse(perm_int_attrs()), perm_t())
       def tensor_t(), do: Type.unranked_tensor(Type.f32())
     end
@@ -31,16 +30,14 @@ defmodule RedundantTransposeTest do
                     ) do
             region do
               block bb_entry(arg0 >>> Type.unranked_tensor(Type.f32())) do
-                perms = TOSA.const(value: Helper.perms_attr()) >>> Helper.perm_t()
-
-                perms1 =
+                permsT =
                   TOSA.const(value: Helper.perms_T_attr()) >>>
                     Helper.perm_t()
 
-                t = TOSA.transpose(arg0, perms) >>> Helper.tensor_t()
-                t = TOSA.transpose(t, perms1) >>> Helper.tensor_t()
-                t = TOSA.transpose(t, perms) >>> Helper.tensor_t()
-                t = TOSA.transpose(t, perms1) >>> Helper.tensor_t()
+                t = TOSA.transpose(arg0, permsT) >>> Helper.tensor_t()
+                t = TOSA.transpose(t, permsT) >>> Helper.tensor_t()
+                t = TOSA.transpose(t, permsT) >>> Helper.tensor_t()
+                t = TOSA.transpose(t, permsT) >>> Helper.tensor_t()
                 Func.return(t) >>> []
               end
             end
@@ -63,15 +60,7 @@ defmodule RedundantTransposeTest do
       end
 
       def redundant?(%MLIR.CAPI.MlirAttribute{} = attr1, %MLIR.CAPI.MlirAttribute{} = attr2) do
-        case1 =
-          MLIR.Attribute.equal?(Helper.perms_attr(), attr1) &&
-            MLIR.Attribute.equal?(Helper.perms_T_attr(), attr2)
-
-        case2 =
-          MLIR.Attribute.equal?(Helper.perms_attr(), attr2) &&
-            MLIR.Attribute.equal?(Helper.perms_T_attr(), attr1)
-
-        case1 || case2
+        MLIR.Attribute.equal?(attr1, attr2)
       end
 
       def run(%MLIR.CAPI.MlirOperation{} = operation) do
@@ -84,12 +73,12 @@ defmodule RedundantTransposeTest do
             with %TOSA.Transpose{operands: operands} = transpose_op <- Beaver.concrete(operation),
                  input = operands[0],
                  {:ok, transpose_input_op} <- MLIR.Value.owner(input),
-                 %TOSA.Transpose{results: results} = transpose_input_op <-
+                 %TOSA.Transpose{operands: input_operands} = transpose_input_op <-
                    Beaver.concrete(transpose_input_op),
                  {:ok, transpose_perm_attr} <- const_value(transpose_op),
                  {:ok, transpose_input_perm_attr} <- const_value(transpose_input_op),
                  true <- redundant?(transpose_perm_attr, transpose_input_perm_attr) do
-              Beaver.Walker.replace(operation, input)
+              Beaver.Walker.replace(operation, input_operands[0])
 
               operation
             else
@@ -110,5 +99,6 @@ defmodule RedundantTransposeTest do
     ])
     |> canonicalize
     |> MLIR.Pass.Composer.run!()
+    |> MLIR.dump!()
   end
 end
