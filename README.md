@@ -1,6 +1,6 @@
 # Beaver 🦫
 
-**Boost the almighty blue-silver dragon with some magical elixir!** 🧙
+**Boost the almighty blue-silver dragon with some magical elixir!** 🧙🧙‍♀️🧙‍♂️
 
 ## Motivation
 
@@ -94,7 +94,7 @@ Beaver is trying to adapt this design in Erlang/Elixir, which has great support 
 
 ## Why is it called Beaver?
 
-Beaver is an umbrella species increase biodiversity. We hope this project could enable other compilers and applications in the way a beaver pond becomes the habitat of many other creatures. Many Elixir projects also use animal names as their package names and it is often about raising awareness of endangered species. To read more about why beavers are important to our planet, check out [this National Geographic article](https://www.nationalgeographic.com/animals/article/beavers-climate-change-conservation-news).
+If it has to be an abbreviation. It could be **BEA**M **Ve**rsatile **R**epresentation. Beaver is an umbrella species increase biodiversity. We hope this project could enable other compilers and applications in the way a beaver pond becomes the habitat of many other creatures. Many Elixir projects also use animal names as their package names and it is often about raising awareness of endangered species. To read more about why beavers are important to our planet, check out [this National Geographic article](https://www.nationalgeographic.com/animals/article/beavers-climate-change-conservation-news).
 
 ## Quick introduction
 
@@ -104,7 +104,7 @@ Beaver is essentially LLVM/MLIR on Erlang/Elixir. It is kind of interesting to s
 
 - Explain this MLIR thing to me in one sentence
 
-  MLIR is like the XML/JSON for compilers. You can build your own compiler with it or use it to "talk" to other compilers with MLIR support.
+  MLIR is like the HTTP for compilers. You can build your own compiler with it or use it to "talk" to other compilers with MLIR support.
 
 - Check out [the home page](https://mlir.llvm.org/) of MLIR.
 
@@ -115,7 +115,8 @@ Beaver is essentially LLVM/MLIR on Erlang/Elixir. It is kind of interesting to s
   - It gets compiled to Erlang and runs on BEAM (Erlang's VM). So it has all the fault-tolerance and concurrency features of Erlang.
   - As a Lisp, Elixir has all the good stuff of a Lisp-y language including hygienic macro, protocol-based polymorphism.
   - Elixir has a powerful [higher-order module system](https://elixir-lang.org/getting-started/module-attributes.html) to persist compile-time data and this allows library users to easily adjust runtime behavior.
-  <!-- TODO: some rephrase -->
+
+<!-- TODO: some rephrase -->
 
 - Check out [the official guide](https://elixir-lang.org/getting-started/introduction.html) of Elixir.
 
@@ -346,9 +347,6 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 
   - use `vulkaninfo` and `vkvia` to verify Vulkan is working
   - Add `-DMLIR_ENABLE_VULKAN_RUNNER=ON` in LLVM CMake config command
-
-<!-- - Option #2 (Ubuntu), Install from LLVM apt releases, https://apt.llvm.org/ -->
-<!-- - Option #3 (macOS), Install from homebrew: `brew install llvm` -->
 
 4. Run tests
 

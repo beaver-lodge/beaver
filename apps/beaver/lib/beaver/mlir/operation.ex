@@ -162,7 +162,7 @@ defmodule Beaver.MLIR.Operation do
   @doc """
   Verify the op and dump it. It raises if the verification fails.
   """
-  def dump!(op) do
+  def dump!(%MLIR.CAPI.MlirOperation{} = op) do
     verify!(op)
     mlirOperationDump(op)
     op
@@ -172,18 +172,6 @@ defmodule Beaver.MLIR.Operation do
     MLIR.CAPI.mlirOperationGetName(operation)
     |> MLIR.CAPI.mlirIdentifierStr()
     |> MLIR.StringRef.extract()
-  end
-
-  def to_prototype(%MLIR.CAPI.MlirOperation{} = operation) do
-    op_name = name(operation)
-
-    struct!(MLIR.DSL.Op.Registry.lookup(op_name), %{
-      operands: Beaver.Walker.operands(operation),
-      attributes: Beaver.Walker.attributes(operation),
-      results: Beaver.Walker.results(operation),
-      successors: Beaver.Walker.successors(operation),
-      regions: Beaver.Walker.regions(operation)
-    })
   end
 
   def is_null(operation = %MLIR.CAPI.MlirOperation{}) do

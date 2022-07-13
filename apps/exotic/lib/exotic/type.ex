@@ -180,7 +180,7 @@ defmodule Exotic.Type do
     struct_ref =
       fields
       |> Enum.map(fn
-        {_, t} -> t
+        {_, t} when not is_integer(t) -> t
         t -> t
       end)
       |> Enum.map(&get/1)

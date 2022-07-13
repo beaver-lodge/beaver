@@ -53,21 +53,17 @@ defmodule Beaver.MLIR do
     :ok
   end
 
-  def dump(%mlir{}, opts \\ [raise: false, warning: true]) do
-    error_msg = "can't dump #{inspect(mlir)}"
-
-    if Keyword.get(opts, :raise, false) do
-      raise error_msg
-    end
-
-    if Keyword.get(opts, :warning, true) do
-      Logger.warning(error_msg)
-    end
-
+  def dump(_) do
     :error
   end
 
   def dump!(mlir) do
-    dump(mlir, raise: true)
+    with :ok <- dump(mlir) do
+      mlir
+    else
+      :error ->
+        error_msg = "can't dump #{inspect(mlir)}"
+        raise error_msg
+    end
   end
 end

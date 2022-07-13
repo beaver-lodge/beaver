@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.18.0)
+cmake_minimum_required(VERSION 3.13.4)
 set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "")
 project(met)
 set(CMAKE_INSTALL_MESSAGE LAZY CACHE STRING "" FORCE)
