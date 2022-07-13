@@ -44,7 +44,6 @@ defmodule RedundantTransposeTest do
           end
         end
         |> MLIR.Operation.verify!(dump_if_fail: true)
-        |> MLIR.dump!()
       end
 
     defmodule DeduplicateTransposePass do
@@ -63,41 +62,38 @@ defmodule RedundantTransposeTest do
         MLIR.Attribute.equal?(attr1, attr2)
       end
 
-      def run(%MLIR.CAPI.MlirOperation{} = operation) do
-        %Func.Func{} = func = Beaver.concrete(operation)
-
+      def run(func) do
         func
         |> Beaver.Walker.prewalk(fn
-          # |> Beaver.Walker.prewalk(fn
-          %MLIR.CAPI.MlirOperation{} = operation ->
-            with %TOSA.Transpose{operands: operands} = transpose_op <- Beaver.concrete(operation),
+          # |> Beaver.Walker.postwalk(fn
+          x ->
+            with %MLIR.CAPI.MlirOperation{} <- x,
+                 %TOSA.Transpose{operands: operands} = transpose_op <- Beaver.concrete(x),
                  {:ok, transpose_input_op} <- MLIR.Value.owner(operands[0]),
                  %TOSA.Transpose{operands: input_op_operands} = transpose_input_op <-
                    Beaver.concrete(transpose_input_op),
                  {:ok, transpose_perm_attr} <- const_value(transpose_op),
                  {:ok, transpose_input_perm_attr} <- const_value(transpose_input_op),
                  true <- redundant?(transpose_perm_attr, transpose_input_perm_attr) do
-              Beaver.Walker.replace(operation, input_op_operands[0])
-
-              operation
+              Beaver.Walker.replace(x, input_op_operands[0])
             else
-              _ -> operation
+              _ -> x
             end
-
-          x ->
-            x
         end)
 
         :ok
       end
     end
 
-    ir
-    |> MLIR.Pass.Composer.nested(Func.Func, [
-      DeduplicateTransposePass.create()
-    ])
-    |> canonicalize
-    |> MLIR.Pass.Composer.run!()
-    |> MLIR.dump!()
+    ir_string =
+      ir
+      |> MLIR.Pass.Composer.nested(Func.Func, [
+        DeduplicateTransposePass.create()
+      ])
+      |> canonicalize
+      |> MLIR.Pass.Composer.run!()
+      |> MLIR.Operation.to_string()
+
+    assert ir_string =~ "return %arg0 : tensor<*xf32>", ir_string
   end
 end

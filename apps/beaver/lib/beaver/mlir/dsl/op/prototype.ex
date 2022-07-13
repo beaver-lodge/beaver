@@ -5,6 +5,7 @@ defmodule Beaver.DSL.Op.Prototype do
   For instance, when Prototype is used to compiling Elixir patterns to PDL, these fields contains MLIR values of PDL handles.
   """
 
+  @type t() :: any()
   defstruct operands: [], attributes: [], results: [], successors: [], regions: []
 
   defmacro __using__(opts) do

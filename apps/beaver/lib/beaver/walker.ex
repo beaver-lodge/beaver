@@ -15,13 +15,13 @@ alias Beaver.MLIR.CAPI.{
 defmodule Beaver.Walker do
   alias Beaver.MLIR.CAPI
 
-  defmodule Replacement do
+  defmodule OpReplacement do
     @type t() :: %__MODULE__{
-            operands: Beaver.Walker.t(),
-            attributes: Beaver.Walker.t(),
-            results: Beaver.Walker.t(),
-            successors: Beaver.Walker.t(),
-            regions: Beaver.Walker.t()
+            operands: Beaver.Walker.t() | list(),
+            attributes: Beaver.Walker.t() | list(),
+            results: Beaver.Walker.t() | list(),
+            successors: Beaver.Walker.t() | list(),
+            regions: Beaver.Walker.t() | list()
           }
     defstruct operands: [], attributes: [], results: [], successors: [], regions: []
   end
@@ -32,7 +32,14 @@ defmodule Beaver.Walker do
   """
 
   # TODO: traverse MlirNamedAttribute?
-  @type container() :: MlirOperation.t() | MlirRegion.t() | MlirBlock.t() | MlirNamedAttribute.t()
+  @type operation() ::
+          MlirModule.t() | MlirOperation.t() | OpReplacement.t() | Beaver.DSL.Op.Prototype.t()
+  @type container() ::
+          MlirOperation.t()
+          | MlirRegion.t()
+          | MlirBlock.t()
+          | MlirNamedAttribute.t()
+          | operation()
 
   @type element() ::
           MlirOperation.t()
@@ -67,18 +74,21 @@ defmodule Beaver.Walker do
 
   # operands, results, attributes of one operation
   defp verify_nesting!(MlirOperation, MlirValue), do: :ok
+  defp verify_nesting!(OpReplacement, MlirValue), do: :ok
   defp verify_nesting!(MlirOperation, MlirNamedAttribute), do: :ok
+  defp verify_nesting!(OpReplacement, MlirNamedAttribute), do: :ok
   # regions of one operation
   defp verify_nesting!(MlirOperation, MlirRegion), do: :ok
-  # successor blocks of a operation
+  defp verify_nesting!(OpReplacement, MlirRegion), do: :ok
+  # successor blocks of one operation
   defp verify_nesting!(MlirOperation, MlirBlock), do: :ok
+  defp verify_nesting!(OpReplacement, MlirBlock), do: :ok
   # blocks in a region
   defp verify_nesting!(MlirRegion, MlirBlock), do: :ok
   # operations in a block
   defp verify_nesting!(MlirBlock, MlirOperation), do: :ok
   # arguments of a block
   defp verify_nesting!(MlirBlock, MlirValue), do: :ok
-  defp verify_nesting!(Replacement, MlirValue), do: :ok
   defp verify_nesting!(MlirValue, MlirOperand), do: :ok
 
   defp verify_nesting!(container_module, element_module) do
@@ -132,7 +142,11 @@ defmodule Beaver.Walker do
     }
   end
 
-  @spec operands(MlirOperation.t()) :: Enumerable.t()
+  @spec operands(operation()) :: Enumerable.t()
+  def operands(%OpReplacement{operands: operands}) do
+    operands
+  end
+
   def operands(op) do
     new(
       op,
@@ -143,7 +157,11 @@ defmodule Beaver.Walker do
     )
   end
 
-  @spec results(MlirOperation.t()) :: Enumerable.t()
+  @spec results(operation()) :: Enumerable.t()
+  def results(%OpReplacement{results: results}) do
+    results
+  end
+
   def results(op) do
     new(
       op,
@@ -154,7 +172,11 @@ defmodule Beaver.Walker do
     )
   end
 
-  @spec regions(MlirOperation.t()) :: Enumerable.t()
+  @spec regions(operation()) :: Enumerable.t()
+  def regions(%OpReplacement{regions: regions}) do
+    regions
+  end
+
   def regions(op) do
     new(
       op,
@@ -165,7 +187,11 @@ defmodule Beaver.Walker do
     )
   end
 
-  @spec successors(MlirOperation.t()) :: Enumerable.t()
+  @spec successors(operation()) :: Enumerable.t()
+  def successors(%OpReplacement{successors: successors}) do
+    successors
+  end
+
   def successors(op) do
     new(
       op,
@@ -176,7 +202,11 @@ defmodule Beaver.Walker do
     )
   end
 
-  @spec attributes(MlirOperation.t()) :: Enumerable.t()
+  @spec attributes(operation()) :: Enumerable.t()
+  def attributes(%OpReplacement{attributes: attributes}) do
+    attributes
+  end
+
   def attributes(op) do
     new(
       op,
@@ -306,12 +336,12 @@ defmodule Beaver.Walker do
   You might expect this function works like `Macro.traverse/4` with an exception that you need to return a `command()` in your reducer.
   ### More on manipulating the IR
   During the traversal, there are generally two choices to manipulate the IR:
-  - Use `Beaver.concrete/1` to extract a op/attribute to a elixir structure, and generate a new op/attribute as replacement.
+  - Use `Beaver.concrete/1` to extract a op/attribute to a elixir structure, and generate a new op/attribute as Opreplacement.
   - Use a pattern defined by macro `Beaver.defpat/2` to have the PDL interpreter transform the IR for you.
   You can use both if it is proper to do so.
   Please be aware that the command `:erase` and `replace` will only trigger inplace update on operand, attribute.
-  To manipulate results, successors and regions, the parent operation should be Replacement with a new operation.
-  It could be mind-boggling to think the IR is mutable but not an issue if your approach is very functional. Inappropriate mutation might cause crash or bugs if somewhere else is keeping a reference of the Replacement op.
+  To manipulate results, successors and regions, the parent operation should be OpReplacement with a new operation.
+  It could be mind-boggling to think the IR is mutable but not an issue if your approach is very functional. Inappropriate mutation might cause crash or bugs if somewhere else is keeping a reference of the OpReplacement op.
   ### Some tips
   - If your matching is very complicated, using `with/1` in Elixir should cover it.
   - Avoid mutating IR in you reducer function and always have the walker mutate the IR for you by returning a command.
@@ -476,7 +506,7 @@ defmodule Beaver.Walker do
     traverse(ast, acc, fn x, a -> {x, a} end, fun)
   end
 
-  @spec replace(MlirOperation.t(), [MlirValue.t()] | MlirValue.t()) :: Replacement.t()
+  @spec replace(MlirOperation.t(), [MlirValue.t()] | MlirValue.t()) :: OpReplacement.t()
   @doc """
   Replace a operation with a value
   """
@@ -490,12 +520,12 @@ defmodule Beaver.Walker do
         CAPI.mlirOperationSetOperand(op, pos, value)
       end
 
-      %Replacement{
+      %OpReplacement{
         results: [value]
       }
     else
       _ ->
-        raise "Operation should have one and only result"
+        raise "Operation being replace should have one and only result"
     end
   end
 end
