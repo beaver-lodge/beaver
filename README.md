@@ -1,6 +1,6 @@
 # Beaver 🦫
 
-**Boost the almighty blue-silver dragon with some magical elixir!** 🧙
+**Boost the almighty blue-silver dragon with some magical elixir!** 🧙🧙‍♀️🧙‍♂️
 
 ## Motivation
 
