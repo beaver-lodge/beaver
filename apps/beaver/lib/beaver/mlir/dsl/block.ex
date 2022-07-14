@@ -36,7 +36,7 @@ defmodule Beaver.MLIR.DSL.Block do
       for {{var, _}, index} <- Enum.with_index(args) do
         quote do
           unquote(var) =
-            Beaver.MLIR.Managed.Block.get()
+            Beaver.Env.mlir__BLOCK__()
             |> Beaver.MLIR.Block.get_arg!(unquote(index))
         end
       end
