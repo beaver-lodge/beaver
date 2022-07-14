@@ -35,14 +35,13 @@ defmodule Beaver.Walker do
   @type operation() ::
           MlirModule.t() | MlirOperation.t() | OpReplacement.t() | Beaver.DSL.Op.Prototype.t()
   @type container() ::
-          MlirOperation.t()
+          operation()
           | MlirRegion.t()
           | MlirBlock.t()
           | MlirNamedAttribute.t()
-          | operation()
 
   @type element() ::
-          MlirOperation.t()
+          operation()
           | MlirRegion.t()
           | MlirBlock.t()
           | MlirValue.t()
