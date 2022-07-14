@@ -44,17 +44,17 @@ defmodule Beaver.DSL.SSA do
             results
           ]}
        ) do
-    empty_call = {call, line, [[do: ast_block]]}
+    empty_call = {call, line, []}
 
     ast =
       quote do
         args = List.flatten([unquote_splicing(args)])
 
         %Beaver.DSL.SSA{}
+        |> Beaver.DSL.SSA.put_filler(fn -> unquote(ast_block) end)
         |> Beaver.DSL.SSA.put_arguments(args)
         |> Beaver.DSL.SSA.put_block(Beaver.Env.mlir__BLOCK__())
         |> Beaver.DSL.SSA.put_results(unquote(results))
-        |> Beaver.DSL.SSA.put_filler(fn -> unquote(ast_block) end)
         |> unquote(empty_call)
       end
 

@@ -30,7 +30,12 @@ defmodule Beaver.MLIR.Operation do
   Create a new operation from arguments and insert to managed insertion point
   """
 
-  def create(op_name, %Beaver.DSL.SSA{arguments: arguments, results: results, filler: filler}) do
+  def create(op_name, %Beaver.DSL.SSA{
+        block: %MLIR.CAPI.MlirBlock{} = block,
+        arguments: arguments,
+        results: results,
+        filler: filler
+      }) do
     filler =
       if is_function(filler, 0) do
         [regions: filler]
@@ -38,7 +43,7 @@ defmodule Beaver.MLIR.Operation do
         []
       end
 
-    create(op_name, arguments ++ [result_types: results] ++ filler)
+    create(op_name, arguments ++ [result_types: results] ++ filler, block)
   end
 
   def create(op_name, %Beaver.DSL.Op.Prototype{
@@ -54,24 +59,17 @@ defmodule Beaver.MLIR.Operation do
     create(op_name, [op])
   end
 
-  def create(op_name, arguments) do
+  def create(op_name, arguments, %MLIR.CAPI.MlirBlock{} = block) when is_list(arguments) do
     if MLIR.Trait.is_terminator?(op_name) && defer_if_terminator(arguments) do
-      if block = MLIR.Managed.Block.get() do
-        Beaver.MLIR.Managed.Terminator.defer(fn ->
-          op = do_create(op_name, arguments)
-          Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(block, op)
-        end)
+      Beaver.MLIR.Managed.Terminator.defer(fn ->
+        op = do_create(op_name, arguments)
+        Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(block, op)
+      end)
 
-        {:deferred, {op_name, arguments}}
-      else
-        raise "deferred terminator creation requires a block"
-      end
+      {:deferred, {op_name, arguments}}
     else
       op = do_create(op_name, arguments)
-
-      if block = MLIR.Managed.Block.get() do
-        Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(block, op)
-      end
+      Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(block, op)
 
       op
     end

@@ -324,9 +324,7 @@ defmodule Beaver.DSL.Pattern do
             ]) >>> []
           end
         end
-      end
-
-      # TODO: adding  >>> [] cause crash
+      end >>> []
     end
   end
 

@@ -36,12 +36,13 @@ defmodule Beaver.MLIR.Dialect.CF do
   @doc """
   Create cf.br op. It is a terminator, so this function doesn't returns the results
   """
-  def br(%Beaver.DSL.SSA{arguments: arguments}) do
+  def br(%Beaver.DSL.SSA{arguments: arguments, block: block}) do
     {arguments, _} = collect_arguments(arguments)
 
     MLIR.Operation.create(
       "cf.br",
-      arguments
+      arguments,
+      block
     )
 
     nil
@@ -50,7 +51,7 @@ defmodule Beaver.MLIR.Dialect.CF do
   @doc """
   Create cf.cond_br op. Passing atom will lead to defer the creation of this terminator.
   """
-  def cond_br(%Beaver.DSL.SSA{arguments: arguments}) do
+  def cond_br(%Beaver.DSL.SSA{arguments: arguments, block: block}) do
     {arguments, seg_sizes} = collect_arguments(arguments)
 
     if length(seg_sizes) not in [1, 2] do
@@ -62,7 +63,8 @@ defmodule Beaver.MLIR.Dialect.CF do
 
     MLIR.Operation.create(
       "cf.cond_br",
-      arguments ++ [operand_segment_sizes: operand_segment_sizes]
+      arguments ++ [operand_segment_sizes: operand_segment_sizes],
+      block
     )
   end
 

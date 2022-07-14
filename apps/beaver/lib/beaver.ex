@@ -208,7 +208,7 @@ defmodule Beaver do
                   unquote(replace)
                 end
               end
-            end
+            end >>> []
           end
         end
       end

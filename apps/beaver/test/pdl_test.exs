@@ -206,7 +206,7 @@ defmodule PDLTest do
                       Type.ranked_tensor([2, 3], Type.f32())
 
                   res1 = TOSA.add(res, b) >>> Type.ranked_tensor([2, 3], Type.f32())
-                  Func.return(res1)
+                  Func.return(res1) >>> []
                 end
               end
             end
