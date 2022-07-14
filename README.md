@@ -17,7 +17,7 @@ mlir do
       region do
         block bb_entry() do
           v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-          cond0 = Arith.constant(true)
+          cond0 = Arith.constant(true) >>> Type.i(1)
           CF.cond_br(cond0, :bb1, {:bb2, [v0]})  >>> []
         end
 
