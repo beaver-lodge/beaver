@@ -339,14 +339,14 @@ defmodule Beaver.Nx.Defn do
     end
   end
 
-  defp gen_op(%Env{block: block} = env, tuple) when is_tuple(tuple) do
+  defp gen_op(%Env{} = env, tuple) when is_tuple(tuple) do
     tuple
     |> Tuple.to_list()
     |> Enum.map(&gen_op(env, &1))
     |> List.to_tuple()
   end
 
-  defp gen_op(%Env{block: block} = env, tensor) do
+  defp gen_op(_, tensor) do
     raise "op not supported: " <> inspect(tensor, structs: false, pretty: true)
   end
 
