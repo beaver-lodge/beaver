@@ -12,9 +12,10 @@ defmodule DialectRegistryTest do
       for d <- Dialect.Registry.dialects(full: true) do
         {d, Dialect.Registry.normalize_dialect_name(d)}
       end
+      |> Enum.sort()
 
     assert tuples ==
-             [
+             Enum.sort([
                {"affine", "Affine"},
                {"builtin", "Builtin"},
                {"tosa", "TOSA"},
@@ -51,6 +52,6 @@ defmodule DialectRegistryTest do
                {"pdl", "PDL"},
                {"nvvm", "NVVM"},
                {"scf", "SCF"}
-             ]
+             ])
   end
 end

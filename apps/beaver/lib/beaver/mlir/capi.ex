@@ -51,7 +51,17 @@ defmodule Beaver.MLIR.CAPI do
     path = Beaver.MLIR.NIF.load_from_path()
     path = Path.join(Application.app_dir(:beaver), path)
     lib_path = Path.wildcard("#{path}*") |> List.first()
-    Exotic.load!(__MODULE__, lib_path)
+
+    if lib_path == nil do
+      raise "fail to find MLIR library"
+    end
+
+    with {:ok, lib} <- Exotic.load(__MODULE__, lib_path) do
+      lib
+    else
+      {:error, error} ->
+        raise error
+    end
   end
 
   paths =

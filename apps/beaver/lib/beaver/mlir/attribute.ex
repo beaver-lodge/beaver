@@ -20,7 +20,7 @@ defmodule Beaver.MLIR.Attribute do
     attr
   end
 
-  def equal?(a, b) do
+  def equal?(%MLIR.CAPI.MlirAttribute{} = a, %MLIR.CAPI.MlirAttribute{} = b) do
     CAPI.mlirAttributeEqual(a, b) |> Exotic.Value.extract()
   end
 

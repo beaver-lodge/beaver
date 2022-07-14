@@ -11,12 +11,11 @@ defmodule Exotic.Library do
   defstruct [:ref, :path, :functions, :id]
   # TODO: check if module is still necessary
 
-  defmacro __using__(_opts) do
+  defmacro __using__(opts) do
     quote do
       __outer__ = __MODULE__
 
       @before_compile Exotic.Library
-      Module.register_attribute(__MODULE__, :path, accumulate: true, persist: true)
       Module.register_attribute(__MODULE__, :native, accumulate: false, persist: true)
       Module.register_attribute(__MODULE__, :before_compile, accumulate: false, persist: true)
       Module.register_attribute(__MODULE__, :native_definitions, accumulate: false, persist: true)
@@ -29,8 +28,15 @@ defmodule Exotic.Library do
       end
 
       def library_paths() do
-        __MODULE__.__info__(:attributes)
-        |> Keyword.get(:path)
+        paths = Keyword.get(unquote(opts), :path, [])
+
+        case paths do
+          paths when is_list(paths) ->
+            paths
+
+          path when is_binary(path) ->
+            [path]
+        end
       end
 
       def native_definition(fun) do
@@ -42,16 +48,38 @@ defmodule Exotic.Library do
       end
 
       def load!(path) do
-        Exotic.load!(__MODULE__, path)
+        with {:ok, lib} <- Exotic.load(__MODULE__, path) do
+          lib
+        else
+          {:error, error} ->
+            raise error
+        end
       end
 
       def load() do
-        # TODO: support loading multiple paths by trying one by one
-        Exotic.load(__MODULE__, library_paths() |> List.first())
+        require Logger
+
+        library_paths()
+        |> Enum.reduce_while({:error, "not path given"}, fn
+          path, acc ->
+            Logger.debug("try loading library #{path}")
+
+            with {:ok, lib} <- Exotic.load(__MODULE__, path) do
+              {:halt, {:ok, lib}}
+            else
+              {:error, error} ->
+                {:cont, {:error, error}}
+            end
+        end)
       end
 
       def load!() do
-        Exotic.load!(__MODULE__, library_paths() |> List.first())
+        with {:ok, lib} <- load() do
+          lib
+        else
+          {:error, error} ->
+            raise error
+        end
       end
 
       defoverridable load!: 0

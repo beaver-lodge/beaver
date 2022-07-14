@@ -1,0 +1,112 @@
+# Your first compiler with Beaver!
+
+```elixir
+Mix.install([
+  {:beaver, "~> 0.2"}
+])
+```
+
+## What makes a compiler
+
+Before start coding anything. Let's get some intuition about what a typical compiler is made of.
+
+- IR
+- Pass
+- CodeGen
+
+## A taste of MLIR
+
+Most of LLVM tutorial starts with AST and parser. Guess what we are building it with Elixir and it rocks.
+So we can start with something fun, generating the IR.
+
+```elixir
+use Beaver
+ir = mlir do
+  module do
+    Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+      region do
+        block bb_entry() do
+          v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+          Func.return(v0)
+        end
+    end
+  end
+end
+MLIR.to_string(ir) |> IO.puts
+```
+
+As you can see, with MLIR we are not working with those low level LLVM instructions you might have seen somewhere else.
+Here we have this `Func.func` and `Func.return` thing looks like a function and return statement in a programming language.
+And the `Arith` stuff seems to be doing some arithmetic for us.
+Now you might take some time to look at the IR printed by `IO.puts` and think about it.
+
+If you find the text full of `%1`, `%2` not so interesting, don't worry.
+The only thing you need to know is that this is called MLIR's "textual form".
+Let's carry on.
+
+## Entering the LLVM realm
+
+The Next Big Thing™ we are going to do is to convert what we got so far to LLVM IR.
+Why? Long story short, MLIR is like a cinematic universe.
+Instead of having different hero franchises, we got a bunch of "dialects". The `Func`, `Arith` are both dialects.
+There is a dialect called `LLVM` we haven't seen. `LLVM` is a dialect kind of magical and kind of different from others.
+It is magical that if we can convert IR to `LLVM`, we can generate native machine code and run it.
+
+This is how it is done with Beaver:
+
+```elixir
+import MLIR.Transforms
+llvm_ir = ir
+|> convert_func_to_llvm
+|> convert_arith_to_llvm
+|> MLIR.Pass.Composer.run!()
+
+llvm_ir
+|> MLIR.to_string
+|> IO.puts
+```
+
+Now you can see the IR seems to "grow" a lot. It is called "lowering".
+What we just did is running two passes `convert_func_to_llvm` and `convert_arith_to_llvm` on our IR.
+So that the higher level abstraction like `Func` and `Arith` are lowered to LLVM IR,
+which is a representation closer to the hardware instruction.
+
+Remember what I told you, if we get to LLVM Dialect, basically we should get native machine code to run right?
+Let's do it!
+
+## Run it!
+
+```elixir
+jit =
+llvm_ir
+|> MLIR.Pass.Composer.nested(Func.Func, fn pm ->
+    MLIR.Pass.pipeline!(pm, "llvm-request-c-wrappers")
+end)
+|> MLIR.Pass.Composer.run!()
+|> MLIR.ExecutionEngine.create!()
+
+return = Exotic.Value.get(0)
+arguments = []
+MLIR.ExecutionEngine.invoke!(jit, "some_func", arguments, return)
+|> Exotic.Value.extract
+|> IO.inspect
+```
+
+## Recap
+
+Congratulations! You have just built your first compiler with Beaver.
+There could be a lot to unpack and here is the summary:
+
+- First we generate some MLIR with the `mlir/1` macro.
+- Then we convert it to LLVM IR with `convert_func_to_llvm` and `convert_arith_to_llvm` passes.
+- Later we create a JIT engine from the generated LLVM IR with `MLIR.ExecutionEngine.create!` and run the native function.
+
+These three steps are corespondent to what makes a compiler
+
+- IR
+- Pass
+- CodeGen
+
+In next tutorial we are taking a more programable approach to generate the IR, converting Elixir AST to MLIR.
+By doing it we will pick up concepts like region, block, operations appear here but didn't receive much attention for now.
+You might want to look at the full list of MLIR dialects [here](https://mlir.llvm.org/docs/Dialects/).

@@ -41,7 +41,7 @@ defmodule Beaver do
   ```
   To defer the creation of a terminator in case its successor block has not been created. You can pass an atom of the name in the block's call form.
   ```
-  CF.cond_br(cond0, :bb1, {:bb2, [v0]})
+  CF.cond_br(cond0, :bb1, {:bb2, [v0]})  >>> []
   ```
   To create region, call the op with a do block. The block macro works like the function definition in Elixir, and in the do block of `block` macro you can reference an argument by name. One caveat is that if it is a Op with region, it requires all arguments to be passed in one list to make it to call the macro version of the Op creation function.
   ```
@@ -54,23 +54,8 @@ defmodule Beaver do
   end >>> ~t{f32}
   ```
   """
-  defmacro mlir([do: block] = _dsl_block) do
-    new_block_ast = block |> Beaver.DSL.SSA.transform()
-
-    alias Beaver.MLIR.Dialect
-
-    alias_dialects =
-      for d <-
-            Dialect.Registry.dialects(query: true) do
-        module_name = d |> Dialect.Registry.normalize_dialect_name()
-        module_name = Module.concat([Beaver.MLIR.Dialect, module_name])
-
-        quote do
-          alias unquote(module_name)
-          require unquote(module_name)
-        end
-      end
-      |> List.flatten()
+  defmacro mlir([do: dsl_block] = _dsl_block) do
+    dsl_block_ast = dsl_block |> Beaver.DSL.SSA.transform()
 
     quote do
       alias Beaver.MLIR
@@ -78,12 +63,55 @@ defmodule Beaver do
       alias Beaver.MLIR.Attribute
       alias Beaver.MLIR.ODS
       import Beaver.MLIR.Sigils
-      unquote(alias_dialects)
+      unquote(alias_dialects())
       import Builtin
       import CF
 
-      unquote(new_block_ast)
+      unquote(dsl_block_ast)
     end
+  end
+
+  defmacro mlir(opts, [do: dsl_block] = _dsl_block) do
+    dsl_block_ast = dsl_block |> Beaver.DSL.SSA.transform()
+
+    block_ast =
+      if Keyword.has_key?(opts, :block) do
+        quote do
+          block = Keyword.fetch!(unquote(opts), :block)
+          Kernel.var!(beaver_internal_env_block) = block
+          %MLIR.CAPI.MlirBlock{} = Kernel.var!(beaver_internal_env_block)
+        end
+      end
+
+    quote do
+      alias Beaver.MLIR
+      alias Beaver.MLIR.Type
+      alias Beaver.MLIR.Attribute
+      alias Beaver.MLIR.ODS
+      import Beaver.MLIR.Sigils
+      unquote(alias_dialects())
+      import Builtin
+      import CF
+
+      unquote(block_ast)
+      unquote(dsl_block_ast)
+    end
+  end
+
+  defp alias_dialects do
+    alias Beaver.MLIR.Dialect
+
+    for d <-
+          Dialect.Registry.dialects(query: true) do
+      module_name = d |> Dialect.Registry.normalize_dialect_name()
+      module_name = Module.concat([Beaver.MLIR.Dialect, module_name])
+
+      quote do
+        alias unquote(module_name)
+        require unquote(module_name)
+      end
+    end
+    |> List.flatten()
   end
 
   defmacro block(call, do: block) do
@@ -99,6 +127,16 @@ defmodule Beaver do
     {block_id, _} = Macro.decompose_call(call)
     if not is_atom(block_id), do: raise("block name must be an atom")
 
+    region_insert_ast =
+      quote do
+        if region = Beaver.Env.mlir__REGION__() do
+          # insert the block to region
+          Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, block)
+          # put the block to managed terminator => block id (name in decomposed block call)
+          Beaver.MLIR.Managed.Terminator.put_block(unquote(block_id), block)
+        end
+      end
+
     block_ast =
       quote do
         unquote_splicing(args_type_ast)
@@ -112,15 +150,10 @@ defmodule Beaver do
 
         Beaver.MLIR.Managed.Block.set(block)
 
-        if region = Beaver.MLIR.Managed.Region.get() do
-          # insert the block to region
-          Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, block)
-          # put the block to managed terminator => block id (name in decomposed block call)
-          Beaver.MLIR.Managed.Terminator.put_block(unquote(block_id), block)
-        else
-          raise "no managed region found to append block"
-        end
+        unquote(region_insert_ast)
 
+        Kernel.var!(beaver_internal_env_block) = block
+        %MLIR.CAPI.MlirBlock{} = Kernel.var!(beaver_internal_env_block)
         unquote_splicing(block_arg_var_ast)
         unquote(block)
         Beaver.MLIR.Managed.Block.set(previous_block)
@@ -137,6 +170,8 @@ defmodule Beaver do
       region = Beaver.MLIR.CAPI.mlirRegionCreate()
 
       Beaver.MLIR.Region.under(region, fn ->
+        Kernel.var!(beaver_env_region) = region
+        %Beaver.MLIR.CAPI.MlirRegion{} = Kernel.var!(beaver_env_region)
         unquote(block)
       end)
 
@@ -173,7 +208,7 @@ defmodule Beaver do
                   unquote(replace)
                 end
               end
-            end
+            end >>> []
           end
         end
       end
@@ -204,10 +239,24 @@ defmodule Beaver do
     end
   end
 
-  def concrete(%MLIR.CAPI.MlirOperation{} = op) do
-    MLIR.Operation.to_prototype(op)
+  @doc """
+  Create a Op prototype of a concrete op type from `Beaver.MLIR.CAPI.MlirOperation`.
+  """
+  def concrete(%MLIR.CAPI.MlirOperation{} = operation) do
+    op_name = MLIR.Operation.name(operation)
+
+    struct!(MLIR.DSL.Op.Registry.lookup(op_name), %{
+      operands: Beaver.Walker.operands(operation),
+      attributes: Beaver.Walker.attributes(operation),
+      results: Beaver.Walker.results(operation),
+      successors: Beaver.Walker.successors(operation),
+      regions: Beaver.Walker.regions(operation)
+    })
   end
 
+  @doc """
+  Extract a container could be traversed by walker from an Op prototype or a `Beaver.MLIR.CAPI.MlirModule`.
+  """
   def container(module = %MLIR.CAPI.MlirModule{}) do
     MLIR.Operation.from_module(module)
   end

@@ -89,33 +89,3 @@ defmodule Beaver.MLIR.Managed.Location do
     end
   end
 end
-
-defmodule Beaver.MLIR.Managed.Region do
-  @moduledoc """
-  Getting and setting managed MLIR region
-  """
-  def get() do
-    Process.get(__MODULE__)
-  end
-
-  # This function should not be called by user
-  @doc false
-  def set(region) do
-    Process.put(__MODULE__, region)
-    region
-  end
-
-  def unset() do
-    Process.delete(__MODULE__)
-  end
-
-  def from_opts(opts) when is_list(opts) do
-    region = opts[:region]
-
-    if region do
-      region
-    else
-      get()
-    end
-  end
-end

@@ -1,23 +1,24 @@
 defmodule Beaver.DSL.Pattern do
   use Beaver
+  alias Beaver.MLIR
 
   @doc """
   generate PDL ops for types and attributes
   """
-  def gen_pdl(%MLIR.CAPI.MlirType{} = type) do
-    mlir do
+  def gen_pdl(block, %MLIR.CAPI.MlirType{} = type) do
+    mlir block: block do
       Beaver.MLIR.Dialect.PDL.type(type: type) >>> ~t{!pdl.type}
     end
   end
 
-  def gen_pdl(%Beaver.MLIR.CAPI.MlirAttribute{} = attribute) do
-    mlir do
+  def gen_pdl(block, %Beaver.MLIR.CAPI.MlirAttribute{} = attribute) do
+    mlir block: block do
       Beaver.MLIR.Dialect.PDL.attribute(value: attribute) >>>
         ~t{!pdl.attribute}
     end
   end
 
-  def gen_pdl(%MLIR.CAPI.MlirValue{} = value) do
+  def gen_pdl(_block, %MLIR.CAPI.MlirValue{} = value) do
     value
   end
 
@@ -29,11 +30,11 @@ defmodule Beaver.DSL.Pattern do
   def create_operation(
         op_name,
         %Beaver.DSL.Op.Prototype{operands: operands, attributes: attributes, results: results},
-        %Beaver.MLIR.CAPI.MlirAttribute{} = attribute_names
+        [%MLIR.CAPI.MlirBlock{} = block, %Beaver.MLIR.CAPI.MlirAttribute{} = attribute_names]
       ) do
-    mlir do
-      results = results |> Enum.map(&gen_pdl/1)
-      attributes = attributes |> Enum.map(&gen_pdl/1)
+    mlir block: block do
+      results = results |> Enum.map(&gen_pdl(block, &1))
+      attributes = attributes |> Enum.map(&gen_pdl(block, &1))
 
       Beaver.MLIR.Dialect.PDL.operation(
         operands ++
@@ -139,7 +140,8 @@ defmodule Beaver.DSL.Pattern do
           case attribute do
             {:bound, bound} ->
               quote do
-                unquote(bound) = Beaver.DSL.Pattern.gen_pdl(unquote(bound))
+                unquote(bound) =
+                  Beaver.DSL.Pattern.gen_pdl(Beaver.Env.mlir__BLOCK__(), unquote(bound))
               end
 
             _ ->
@@ -161,7 +163,7 @@ defmodule Beaver.DSL.Pattern do
           case result do
             {:bound, bound} ->
               quote do
-                Beaver.DSL.Pattern.gen_pdl(unquote(bound))
+                Beaver.DSL.Pattern.gen_pdl(Beaver.Env.mlir__BLOCK__(), unquote(bound))
               end
 
             _ ->
@@ -211,7 +213,7 @@ defmodule Beaver.DSL.Pattern do
           Beaver.DSL.Op.Prototype.dispatch(
             unquote(struct_name),
             unquote(map_args),
-            attribute_names,
+            [Beaver.Env.mlir__BLOCK__(), attribute_names],
             &Beaver.DSL.Pattern.create_operation/3
           )
 
@@ -243,7 +245,7 @@ defmodule Beaver.DSL.Pattern do
         Beaver.DSL.Op.Prototype.dispatch(
           unquote(struct_name),
           unquote(map_args),
-          attribute_names,
+          [Beaver.Env.mlir__BLOCK__(), attribute_names],
           &Beaver.DSL.Pattern.create_operation/3
         )
       end
@@ -322,12 +324,13 @@ defmodule Beaver.DSL.Pattern do
             ]) >>> []
           end
         end
-      end
+      end >>> []
     end
   end
 
-  def result(%Beaver.MLIR.CAPI.MlirValue{} = v, i) when is_integer(i) do
-    mlir do
+  # TODO: accepting block here is ugly, change it to %Beaver.Env{block: block}
+  def result(block, %Beaver.MLIR.CAPI.MlirValue{} = v, i) when is_integer(i) do
+    mlir block: block do
       PDL.result(v, index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), i)) >>>
         ~t{!pdl.value}
     end

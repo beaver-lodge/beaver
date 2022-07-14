@@ -1,7 +1,5 @@
 defmodule Exotic.LibC do
-  use Exotic.Library
-  @path "libSystem.B.dylib"
-  @path "libc.so"
+  use Exotic.Library, path: ["libm.so.6", "libm.so", "libSystem.B.dylib"]
   def puts(:ptr), do: :void
   def sin(:f64), do: :f64
   def cos(:f64), do: :f64

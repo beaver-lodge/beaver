@@ -1,5 +1,10 @@
 defmodule Beaver.Nx.Defn do
+  defmodule Env do
+    defstruct block: nil
+  end
+
   use Beaver
+  alias Beaver.MLIR
   alias MLIR.{Type, Attribute}
 
   defp gen_type({:s, size}), do: Type.i(size)
@@ -65,44 +70,49 @@ defmodule Beaver.Nx.Defn do
     raise "type unsupported: " <> inspect(t, structs: false, pretty: true)
   end
 
-  defp gen_op(%Nx.Tensor{data: %Nx.Defn.Expr{op: :parameter, args: [pos]}})
+  defp gen_op(%Env{block: block}, %Nx.Tensor{
+         data: %Nx.Defn.Expr{op: :parameter, args: [pos]}
+       })
        when is_integer(pos) do
-    MLIR.Managed.Block.get() |> Beaver.MLIR.Block.get_arg!(pos)
+    block |> Beaver.MLIR.Block.get_arg!(pos)
   end
 
   defp gen_op(
+         %Env{block: block},
          %Nx.Tensor{
            data: %Nx.Defn.Expr{op: :constant, args: [:nan]},
            shape: {},
            type: {:f, 32}
          } = t
        ) do
-    mlir do
+    mlir block: block do
       TOSA.const({:value, ~a{dense<0x7F800001> : tensor<f32>}}) >>> gen_type(t)
     end
   end
 
   defp gen_op(
+         %Env{block: block},
          %Nx.Tensor{
            data: %Nx.Defn.Expr{op: :constant, args: [:infinity]},
            shape: {},
            type: {:f, 32}
          } = t
        ) do
-    mlir do
+    mlir block: block do
       TOSA.const({:value, ~a{dense<0x7F800000> : tensor<f32>}}) >>>
         ~t{#{gen_type_str(t)}}
     end
   end
 
   defp gen_op(
+         %Env{block: block},
          %Nx.Tensor{
            data: %Nx.Defn.Expr{op: :constant, args: [:neg_infinity]},
            shape: {},
            type: {:f, 32}
          } = t
        ) do
-    mlir do
+    mlir block: block do
       _r =
         TOSA.const({:value, ~a{dense<0xFF800000> : tensor<f32>}}) >>>
           gen_type(t)
@@ -110,6 +120,7 @@ defmodule Beaver.Nx.Defn do
   end
 
   defp gen_op(
+         %Env{block: block},
          %Nx.Tensor{
            data: %Nx.Defn.Expr{op: :constant, args: [value]},
            shape: {},
@@ -117,7 +128,7 @@ defmodule Beaver.Nx.Defn do
          } = t
        )
        when is_integer(value) or is_float(value) do
-    mlir do
+    mlir block: block do
       _r =
         TOSA.const({:value, ~a{dense<#{value}> : tensor<#{get_type_name(type)}>}}) >>>
           gen_type(t)
@@ -125,18 +136,20 @@ defmodule Beaver.Nx.Defn do
   end
 
   defp gen_op(
+         %Env{block: block},
          %Nx.Tensor{
            data: %Nx.Defn.Expr{op: :constant, args: [%Complex{im: im, re: re}]},
            type: {:c, 64}
          } = t
        ) do
-    mlir do
+    mlir block: block do
       Arith.constant({:value, ~a[dense<(#{re}, #{im})> : #{gen_type_str(t)}]}) >>>
         ~t{#{gen_type_str(t)}}
     end
   end
 
   defp gen_op(
+         %Env{block: block},
          %Nx.Tensor{
            data: %Nx.Defn.Expr{
              args: [%Nx.Tensor{data: %Nx.BinaryBackend{state: binary}}],
@@ -144,7 +157,7 @@ defmodule Beaver.Nx.Defn do
            }
          } = t
        ) do
-    mlir do
+    mlir block: block do
       raw_buffer = Exotic.Value.Struct.get(binary)
 
       tensor_attr =
@@ -160,43 +173,51 @@ defmodule Beaver.Nx.Defn do
     end
   end
 
-  defp gen_op(%Nx.Tensor{data: %Nx.Defn.Expr{op: :parameter, args: [pos]}})
-       when is_integer(pos) do
-    MLIR.Managed.Block.get() |> Beaver.MLIR.Block.get_arg!(pos)
-  end
-
-  defp gen_op(%Nx.Tensor{data: %Nx.Defn.Expr{op: :negate, args: [input1]}} = t) do
-    mlir do
-      input1 = gen_op(input1)
+  defp gen_op(
+         %Env{block: block} = env,
+         %Nx.Tensor{data: %Nx.Defn.Expr{op: :negate, args: [input1]}} = t
+       ) do
+    mlir block: block do
+      input1 = gen_op(env, input1)
       TOSA.negate(input1) >>> gen_type(t)
     end
   end
 
-  defp gen_op(%Nx.Tensor{data: %Nx.Defn.Expr{op: :multiply, args: [a, b]}} = t) do
-    mlir do
-      a = gen_op(a)
-      b = gen_op(b)
+  defp gen_op(
+         %Env{block: block} = env,
+         %Nx.Tensor{data: %Nx.Defn.Expr{op: :multiply, args: [a, b]}} = t
+       ) do
+    mlir block: block do
+      a = gen_op(env, a)
+      b = gen_op(env, b)
       TOSA.mul(a, b, shift: Attribute.integer(Type.i(32), 0)) >>> gen_type(t)
     end
   end
 
-  defp gen_op(%Nx.Tensor{data: %Nx.Defn.Expr{op: :add, args: [a, b]}} = t) do
-    mlir do
-      a = gen_op(a)
-      b = gen_op(b)
+  defp gen_op(
+         %Env{block: block} = env,
+         %Nx.Tensor{data: %Nx.Defn.Expr{op: :add, args: [a, b]}} = t
+       ) do
+    mlir block: block do
+      a = gen_op(env, a)
+      b = gen_op(env, b)
       TOSA.add(a, b) >>> gen_type(t)
     end
   end
 
-  defp gen_op(%Nx.Tensor{data: %Nx.Defn.Expr{op: :subtract, args: [a, b]}} = t) do
-    mlir do
-      a = gen_op(a)
-      b = gen_op(b)
+  defp gen_op(
+         %Env{block: block} = env,
+         %Nx.Tensor{data: %Nx.Defn.Expr{op: :subtract, args: [a, b]}} = t
+       ) do
+    mlir block: block do
+      a = gen_op(env, a)
+      b = gen_op(env, b)
       TOSA.sub(a, b) >>> gen_type(t)
     end
   end
 
   defp gen_op(
+         %Env{block: block} = env,
          %Nx.Tensor{
            data: %Nx.Defn.Expr{
              op: :conjugate,
@@ -205,8 +226,8 @@ defmodule Beaver.Nx.Defn do
            shape: {}
          } = t
        ) do
-    mlir do
-      complex_tensor = gen_op(complex_tensor)
+    mlir block: block do
+      complex_tensor = gen_op(env, complex_tensor)
       complex_element = Tensor.extract(complex_tensor) >>> Type.complex(Type.f32())
       conjugate_element = Complex.conj(complex_element) >>> Type.complex(Type.f32())
 
@@ -220,14 +241,15 @@ defmodule Beaver.Nx.Defn do
   end
 
   defp gen_op(
+         %Env{block: block} = env,
          %Nx.Tensor{
            data: %Nx.Defn.Expr{op: :conjugate, args: [%Nx.Tensor{} = real_tensor]},
            shape: {},
            type: complex_type = {:c, 64}
          } = t
        ) do
-    mlir do
-      real_tensor = gen_op(real_tensor)
+    mlir block: block do
+      real_tensor = gen_op(env, real_tensor)
       real_tensor = TOSA.cast(real_tensor) >>> Type.ranked_tensor([], Type.f32())
       real = Tensor.extract(real_tensor) >>> Type.f32()
 
@@ -246,14 +268,15 @@ defmodule Beaver.Nx.Defn do
   end
 
   defp gen_op(
+         %Env{block: block} = env,
          %Nx.Tensor{
            data: %Nx.Defn.Expr{op: :conjugate, args: [complex_tensor]},
            shape: shape
          } = t
        ) do
-    mlir do
+    mlir block: block do
       element_cnt = Enum.reduce(Tuple.to_list(shape), 1, &*/2)
-      complex_tensor = gen_op(complex_tensor)
+      complex_tensor = gen_op(env, complex_tensor)
       lower = Arith.constant(value: Attribute.integer(Type.index(), 0)) >>> Type.index()
       upper = Arith.constant(value: Attribute.integer(Type.index(), element_cnt)) >>> Type.index()
       step = Arith.constant(value: Attribute.integer(Type.index(), 1)) >>> Type.index()
@@ -271,17 +294,18 @@ defmodule Beaver.Nx.Defn do
           block inner(index >>> Type.index()) do
             complex_element = Tensor.extract(complex_tensor, index) >>> Type.complex(Type.f32())
             conjugate_element = Complex.conj(complex_element) >>> Type.complex(Type.f32())
-            MemRef.store([conjugate_element, conjugate_memref, index])
-            SCF.yield()
+            MemRef.store([conjugate_element, conjugate_memref, index]) >>> []
+            SCF.yield() >>> []
           end
         end
-      end
+      end >>> []
 
       conjugate_tensor
     end
   end
 
   defp gen_op(
+         %Env{block: block} = env,
          %Nx.Tensor{
            data: %Nx.Defn.Expr{
              op: :imag,
@@ -290,8 +314,8 @@ defmodule Beaver.Nx.Defn do
            shape: {}
          } = t
        ) do
-    mlir do
-      in_tensor = gen_op(in_tensor)
+    mlir block: block do
+      in_tensor = gen_op(env, in_tensor)
 
       out_tensor =
         Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) >>>
@@ -308,21 +332,21 @@ defmodule Beaver.Nx.Defn do
           block bb0(arg0 >>> Type.complex(Type.f32()), arg1 >>> Type.f(32)) do
             %MLIR.CAPI.MlirValue{} = arg1
             im = Complex.im(arg0) >>> Type.f32()
-            Linalg.yield([im])
+            Linalg.yield([im]) >>> []
           end
         end
       end >>> gen_type(t)
     end
   end
 
-  defp gen_op(tuple) when is_tuple(tuple) do
+  defp gen_op(%Env{} = env, tuple) when is_tuple(tuple) do
     tuple
     |> Tuple.to_list()
-    |> Enum.map(&gen_op/1)
+    |> Enum.map(&gen_op(env, &1))
     |> List.to_tuple()
   end
 
-  defp gen_op(tensor) do
+  defp gen_op(_, tensor) do
     raise "op not supported: " <> inspect(tensor, structs: false, pretty: true)
   end
 
@@ -355,24 +379,26 @@ defmodule Beaver.Nx.Defn do
                       function_type: function_type
                     ) do
             region do
-              block =
+              entry =
                 for arg <- vars do
                   {gen_type(arg), MLIR.Managed.Location.get()}
                 end
                 |> MLIR.Block.create()
 
-              MLIR.Block.under(block, fn ->
-                case gen_op(tree) do
+              root = gen_op(%Env{block: entry}, tree)
+
+              mlir block: entry do
+                case root do
                   ret = %Beaver.MLIR.CAPI.MlirValue{} ->
-                    Func.return(ret)
+                    Func.return(ret) >>> []
 
                   tuple_ret when is_tuple(tuple_ret) ->
-                    Func.return(Tuple.to_list(tuple_ret))
+                    Func.return(Tuple.to_list(tuple_ret)) >>> []
                 end
-              end)
+              end
 
-              MLIR.Managed.Region.get()
-              |> Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(block)
+              Beaver.Env.mlir__REGION__()
+              |> Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(entry)
             end
           end
         end

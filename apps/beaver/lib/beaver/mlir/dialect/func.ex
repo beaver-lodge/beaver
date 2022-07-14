@@ -1,5 +1,4 @@
 defmodule Beaver.MLIR.Dialect.Func do
-  alias Beaver.MLIR
   alias Beaver.MLIR.Dialect
 
   use Dialect.Generator,
@@ -8,10 +7,6 @@ defmodule Beaver.MLIR.Dialect.Func do
     skips: ~w{func}
 
   defmodule Func do
-    def create(arguments) do
-      MLIR.Operation.create("func.func", arguments)
-    end
-
     use Beaver.DSL.Op.Prototype, op_name: "func.func"
   end
 
@@ -29,7 +24,7 @@ defmodule Beaver.MLIR.Dialect.Func do
         if not is_list(unquote_splicing(args)),
           do: raise("augument of Func.func must be a keyword")
 
-        Beaver.MLIR.Dialect.Func.Func.create(
+        arguments =
           Enum.uniq_by(
             unquote_splicing(args) ++
               [
@@ -40,7 +35,8 @@ defmodule Beaver.MLIR.Dialect.Func do
               ],
             fn {x, _} -> x end
           )
-        )
+
+        Beaver.MLIR.Operation.create("func.func", arguments, Beaver.Env.mlir__BLOCK__())
       end
 
     func_ast

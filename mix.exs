@@ -18,7 +18,10 @@ defmodule Beaver.Umbrella.MixProject do
     [
       main: "Beaver",
       ignore_apps: [:exotic],
-      extras: ["README.md", "apps/exotic/README.md"],
+      extras: [
+        "README.md",
+        "apps/beaver/guides/your-first-beaver-compiler.livemd"
+      ],
       filter_modules: fn m, _meta ->
         name = Atom.to_string(m)
 

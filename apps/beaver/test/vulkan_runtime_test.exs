@@ -2,7 +2,7 @@ defmodule VulkanRuntimeTest do
   use ExUnit.Case
   alias Beaver.MLIR
 
-  @tag timeout: :infinity
+  @tag timeout: :infinity, vulkan: true
   test "run ir with vulkan" do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}

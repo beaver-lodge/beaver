@@ -1,6 +1,6 @@
 defmodule Beaver.DSL.SSA do
   alias Beaver.MLIR
-  defstruct arguments: [], results: [], filler: nil
+  defstruct arguments: [], results: [], filler: nil, block: nil
 
   def put_arguments(%__MODULE__{arguments: arguments} = ssa, additional_arguments)
       when is_list(additional_arguments) do
@@ -18,6 +18,10 @@ defmodule Beaver.DSL.SSA do
 
   def put_filler(%__MODULE__{} = ssa, filler) when is_function(filler) do
     %__MODULE__{ssa | filler: filler}
+  end
+
+  def put_block(%__MODULE__{} = ssa, block) do
+    %__MODULE__{ssa | block: block}
   end
 
   # block arguments
@@ -40,16 +44,17 @@ defmodule Beaver.DSL.SSA do
             results
           ]}
        ) do
-    empty_call = {call, line, [[do: ast_block]]}
+    empty_call = {call, line, []}
 
     ast =
       quote do
         args = List.flatten([unquote_splicing(args)])
 
         %Beaver.DSL.SSA{}
-        |> Beaver.DSL.SSA.put_arguments(args)
-        |> Beaver.DSL.SSA.put_results(unquote(results))
         |> Beaver.DSL.SSA.put_filler(fn -> unquote(ast_block) end)
+        |> Beaver.DSL.SSA.put_arguments(args)
+        |> Beaver.DSL.SSA.put_block(Beaver.Env.mlir__BLOCK__())
+        |> Beaver.DSL.SSA.put_results(unquote(results))
         |> unquote(empty_call)
       end
 
@@ -70,6 +75,7 @@ defmodule Beaver.DSL.SSA do
 
       %Beaver.DSL.SSA{}
       |> Beaver.DSL.SSA.put_arguments(args)
+      |> Beaver.DSL.SSA.put_block(Beaver.Env.mlir__BLOCK__())
       |> Beaver.DSL.SSA.put_results(unquote(results))
       |> unquote(empty_call)
     end

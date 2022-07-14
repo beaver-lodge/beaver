@@ -24,43 +24,22 @@ defmodule Beaver.MLIR.Dialect.Generator do
               use Beaver.DSL.Op.Prototype, op_name: unquote(full_name)
             end
 
-            def unquote(func_name)() do
-              Beaver.MLIR.Operation.create(
-                unquote(full_name),
-                []
-              )
-              |> Beaver.MLIR.Operation.results()
-            end
+            require Beaver.Env
 
-            def unquote(func_name)(args) do
+            def unquote(func_name)(%Beaver.DSL.SSA{} = ssa) do
               Beaver.MLIR.Operation.create(
                 unquote(full_name),
-                args
+                ssa
               )
               |> Beaver.MLIR.Operation.results()
             end
 
             # persistent the fullname so the caller module could access it
             @full_name full_name
-            defmacro unquote(func_name)(args, do: ast_block) do
-              quote(bind_quoted: [args: args, full_name: @full_name, ast_block: ast_block]) do
-                if is_list(args) do
-                  filler = fn -> ast_block end
-
-                  Beaver.MLIR.Operation.create(
-                    full_name,
-                    args ++
-                      [
-                        regions: filler
-                      ]
-                  )
-                  |> Beaver.MLIR.Operation.results()
-                else
-                  ssa = args
-
-                  Beaver.MLIR.Operation.create(full_name, ssa)
-                  |> Beaver.MLIR.Operation.results()
-                end
+            defmacro unquote(func_name)(%Beaver.DSL.SSA{} = ssa, do: ast_block) do
+              quote(bind_quoted: [ssa: ssa, full_name: @full_name, ast_block: ast_block]) do
+                Beaver.MLIR.Operation.create(full_name, ssa)
+                |> Beaver.MLIR.Operation.results()
               end
             end
           end
