@@ -4,6 +4,7 @@ defmodule Beaver.Nx.Defn do
   end
 
   use Beaver
+  alias Beaver.MLIR
   alias MLIR.{Type, Attribute}
 
   defp gen_type({:s, size}), do: Type.i(size)
@@ -69,15 +70,15 @@ defmodule Beaver.Nx.Defn do
     raise "type unsupported: " <> inspect(t, structs: false, pretty: true)
   end
 
-  defp gen_op(%Env{block: block} = env, %Nx.Tensor{
+  defp gen_op(%Env{block: block}, %Nx.Tensor{
          data: %Nx.Defn.Expr{op: :parameter, args: [pos]}
        })
        when is_integer(pos) do
-    MLIR.Managed.Block.get() |> Beaver.MLIR.Block.get_arg!(pos)
+    block |> Beaver.MLIR.Block.get_arg!(pos)
   end
 
   defp gen_op(
-         %Env{block: block} = env,
+         %Env{block: block},
          %Nx.Tensor{
            data: %Nx.Defn.Expr{op: :constant, args: [:nan]},
            shape: {},
@@ -90,7 +91,7 @@ defmodule Beaver.Nx.Defn do
   end
 
   defp gen_op(
-         %Env{block: block} = env,
+         %Env{block: block},
          %Nx.Tensor{
            data: %Nx.Defn.Expr{op: :constant, args: [:infinity]},
            shape: {},
@@ -104,7 +105,7 @@ defmodule Beaver.Nx.Defn do
   end
 
   defp gen_op(
-         %Env{block: block} = env,
+         %Env{block: block},
          %Nx.Tensor{
            data: %Nx.Defn.Expr{op: :constant, args: [:neg_infinity]},
            shape: {},
@@ -119,7 +120,7 @@ defmodule Beaver.Nx.Defn do
   end
 
   defp gen_op(
-         %Env{block: block} = env,
+         %Env{block: block},
          %Nx.Tensor{
            data: %Nx.Defn.Expr{op: :constant, args: [value]},
            shape: {},
@@ -135,7 +136,7 @@ defmodule Beaver.Nx.Defn do
   end
 
   defp gen_op(
-         %Env{block: block} = env,
+         %Env{block: block},
          %Nx.Tensor{
            data: %Nx.Defn.Expr{op: :constant, args: [%Complex{im: im, re: re}]},
            type: {:c, 64}
@@ -148,7 +149,7 @@ defmodule Beaver.Nx.Defn do
   end
 
   defp gen_op(
-         %Env{block: block} = env,
+         %Env{block: block},
          %Nx.Tensor{
            data: %Nx.Defn.Expr{
              args: [%Nx.Tensor{data: %Nx.BinaryBackend{state: binary}}],
@@ -293,11 +294,11 @@ defmodule Beaver.Nx.Defn do
           block inner(index >>> Type.index()) do
             complex_element = Tensor.extract(complex_tensor, index) >>> Type.complex(Type.f32())
             conjugate_element = Complex.conj(complex_element) >>> Type.complex(Type.f32())
-            MemRef.store([conjugate_element, conjugate_memref, index])
-            SCF.yield()
+            MemRef.store([conjugate_element, conjugate_memref, index]) >>> []
+            SCF.yield() >>> []
           end
         end
-      end
+      end >>> []
 
       conjugate_tensor
     end
@@ -331,7 +332,7 @@ defmodule Beaver.Nx.Defn do
           block bb0(arg0 >>> Type.complex(Type.f32()), arg1 >>> Type.f(32)) do
             %MLIR.CAPI.MlirValue{} = arg1
             im = Complex.im(arg0) >>> Type.f32()
-            Linalg.yield([im])
+            Linalg.yield([im]) >>> []
           end
         end
       end >>> gen_type(t)
@@ -378,24 +379,26 @@ defmodule Beaver.Nx.Defn do
                       function_type: function_type
                     ) do
             region do
-              block =
+              entry =
                 for arg <- vars do
                   {gen_type(arg), MLIR.Managed.Location.get()}
                 end
                 |> MLIR.Block.create()
 
-              MLIR.Block.under(block, fn ->
-                case gen_op(%Env{block: block}, tree) do
+              root = gen_op(%Env{block: entry}, tree)
+
+              mlir block: entry do
+                case root do
                   ret = %Beaver.MLIR.CAPI.MlirValue{} ->
-                    Func.return(ret)
+                    Func.return(ret) >>> []
 
                   tuple_ret when is_tuple(tuple_ret) ->
-                    Func.return(Tuple.to_list(tuple_ret))
+                    Func.return(Tuple.to_list(tuple_ret)) >>> []
                 end
-              end)
+              end
 
               Beaver.Env.mlir__REGION__()
-              |> Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(block)
+              |> Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(entry)
             end
           end
         end
