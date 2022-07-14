@@ -305,56 +305,29 @@ defmodule Beaver.Walker do
   end
 
   @type mlir() :: container() | element()
-  @typedoc """
-  command to have a MLIR structure to replace the original
-  """
-  @type replace() :: {:replace, mlir()}
-  @typedoc """
-  command to skip current container's traversing. This will have not effect if it not a container.
-  """
-  @type skip() :: :skip
-  @typedoc """
-  command to have the walker continue the traversing.
-  """
-  @type cont() :: :cont
-  @typedoc """
-  command to have the current MLIR structure erased
-  """
-  # TODO: Apply is dangerous because it might erase the operation
-  @type apply() :: {:apply, MLIR.CAPI.MlirPDLPatternModule.t()}
-  @typedoc """
-  apply a pattern defined by `defpat/2`
-  """
-  @type erase() :: :erase
-  @typedoc """
-  command reducer should return as first element in the tuple
-  """
-  @type command() :: replace() | skip() | cont() | apply() | erase()
-  # TODO: is it possible to walk the generated PDL and check if it erases or replaces?
+
   @doc """
   Traverse and transform a container in MLIR, it could be a operation, region, block.
-  You might expect this function works like `Macro.traverse/4` with an exception that you need to return a `command()` in your reducer.
+  You might expect this function works like `Macro.traverse/4`.
   ### More on manipulating the IR
   During the traversal, there are generally two choices to manipulate the IR:
   - Use `Beaver.concrete/1` to extract a op/attribute to a elixir structure, and generate a new op/attribute as Opreplacement.
   - Use a pattern defined by macro `Beaver.defpat/2` to have the PDL interpreter transform the IR for you.
   You can use both if it is proper to do so.
-  Please be aware that the command `:erase` and `replace` will only trigger inplace update on operand, attribute.
   To manipulate results, successors and regions, the parent operation should be OpReplacement with a new operation.
-  It could be mind-boggling to think the IR is mutable but not an issue if your approach is very functional. Inappropriate mutation might cause crash or bugs if somewhere else is keeping a reference of the OpReplacement op.
+  It could be mind-boggling to think the IR is mutable but not an issue if your approach is very functional. Inappropriate mutation might cause crash or bugs if somewhere else is keeping a reference of the replace op.
   ### Some tips
   - If your matching is very complicated, using `with/1` in Elixir should cover it.
-  - Avoid mutating IR in you reducer function and always have the walker mutate the IR for you by returning a command.
   - Use `defpat` if you want MLIR's greedy pattern application based on benefits instead of implementing something alike yourself.
   - You can run traversals in a MLIR pass by calling them in `run/1` so that it joins the general MLIR pass manager's orchestration and will be run in parallel when possible.
   """
   @spec traverse(
           container(),
           any(),
-          (container() | element(), any() -> {command(), any()}),
-          (container() | element(), any() -> {command(), any()})
+          (container() | element(), any() -> {mlir(), any()}),
+          (container() | element(), any() -> {mlir(), any()})
         ) ::
-          {command(), any()}
+          {mlir(), any()}
   def traverse(mlir, acc, pre, post) when is_function(pre, 2) and is_function(post, 2) do
     mlir = Beaver.container(mlir)
     do_traverse(mlir, acc, pre, post)
