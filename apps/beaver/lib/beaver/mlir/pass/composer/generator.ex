@@ -3,8 +3,10 @@ defmodule Beaver.MLIR.Pass.Composer.Generator do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  def normalized_name(lib, pass) do
-    Exotic.call!(lib, :beaverPassGetArgument, [pass])
+  def normalized_name(pass) do
+    # Exotic.call!(lib, :beaverPassGetArgument, [pass])
+    pass
+    |> CAPI.beaverPassGetArgument()
     |> MLIR.StringRef.extract()
     |> String.replace("-", "_")
     |> Macro.underscore()
@@ -23,14 +25,12 @@ defmodule Beaver.MLIR.Pass.Composer.Generator do
         with {name, 0} <- fa do
           is_transform = name |> Atom.to_string() |> String.contains?(prefix)
 
-          lib = CAPI.load!()
-
           if is_transform do
-            pass = Exotic.call!(lib, name, [])
+          pass = apply(CAPI, name, [])
 
-            pass_arg = MLIR.Pass.Composer.Generator.normalized_name(lib, pass)
+            pass_arg = MLIR.Pass.Composer.Generator.normalized_name(pass)
 
-            doc = Exotic.call!(lib, :beaverPassGetDescription, [pass]) |> MLIR.StringRef.extract()
+            doc = pass |> CAPI.beaverPassGetDescription() |> MLIR.StringRef.extract()
 
             @doc """
             #{doc}

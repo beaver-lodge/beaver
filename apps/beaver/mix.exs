@@ -13,12 +13,18 @@ defmodule Beaver.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       description: description(),
-      package: package()
+      package: package(),
+      compilers: [:beaver_setup] ++ Mix.compilers() ++ [:beaver_teardown],
+      aliases: aliases()
     ]
   end
 
   defp description() do
     "Beaver, a MLIR Toolkit in Elixir"
+  end
+
+  defp aliases do
+    ["compile.beaver_setup": &setup/1, "compile.beaver_teardown": &teardown/1]
   end
 
   defp package() do
@@ -41,5 +47,19 @@ defmodule Beaver.MixProject do
       {:exotic, in_umbrella: true},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
+  end
+
+  defp setup(_) do
+    Beaver.MLIR.CAPI.Managed.start_link([])
+
+    :ok
+  end
+
+  defp teardown(_) do
+    pid = Process.whereis(Beaver.MLIR.CAPI.Managed)
+    Process.unlink(pid)
+    Process.exit(pid, :kill)
+
+    :ok
   end
 end
