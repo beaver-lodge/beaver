@@ -23,7 +23,7 @@ defmodule TosaTest do
                   TOSA.mul(v0, arg1, {:shift, ~a{0 : i32}}) >>>
                     Type.ranked_tensor([2, 3], Type.f32())
 
-                Func.return(v0)
+                Func.return(v0) >>> []
               end
             end
           end

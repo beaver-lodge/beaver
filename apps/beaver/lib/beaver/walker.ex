@@ -400,11 +400,6 @@ defmodule Beaver.Walker do
 
     use Beaver
 
-    mlir do
-      block cloned() do
-      end
-    end
-
     operations
     |> Enum.map(&Beaver.container/1)
     |> then(fn operations -> MLIR.Block.clone(block, operations) end)
@@ -422,7 +417,7 @@ defmodule Beaver.Walker do
 
   defp do_traverse({value_kind, %MlirValue{}} = value, acc, pre, post)
        when value_kind in [:result, :operand, :argument] do
-    {{value_kind, %MlirValue{}} = value, acc} = pre.(value, acc)
+    {{^value_kind, %MlirValue{}} = value, acc} = pre.(value, acc)
     post.(value, acc)
   end
 

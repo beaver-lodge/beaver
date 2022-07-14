@@ -69,7 +69,12 @@ defmodule Beaver.MLIR.Operation.State do
     state
   end
 
-  def add_result(state, result_types) do
+  def add_result(state, []) do
+    CAPI.mlirOperationStateAddResults(Exotic.Value.get_ptr(state), 0, Exotic.Value.Ptr.null())
+    state
+  end
+
+  def add_result(state, result_types) when is_list(result_types) do
     context = get_context(state)
 
     array =
@@ -90,6 +95,14 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   def add_regions(state, regions) when is_list(regions) do
+    Enum.each(regions, fn
+      %CAPI.MlirRegion{} ->
+        :ok
+
+      other ->
+        raise "not a region: #{inspect(other)}"
+    end)
+
     array_ptr = regions |> Enum.map(&Value.transmit/1) |> Array.get() |> Value.get_ptr()
 
     CAPI.mlirOperationStateAddOwnedRegions(
@@ -124,6 +137,7 @@ defmodule Beaver.MLIR.Operation.State do
           | {:result_types, [CAPI.MlirType.t()]}
           | {:successor, CAPI.MlirBlock.t()}
   @spec add_argument(CAPI.MlirOperationState.t(), argument()) :: CAPI.MlirOperationState.t()
+
   def add_argument(state, value) when is_integer(value) do
     add_attr(state, value: "#{value}")
   end

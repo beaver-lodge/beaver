@@ -25,14 +25,24 @@ defmodule Beaver.Env do
   end
 
   defmacro mlir__REGION__() do
-    quote do
-      Beaver.MLIR.Managed.Region.get()
+    if Macro.Env.has_var?(__CALLER__, {:beaver_env_region, nil}) do
+      quote do
+        Kernel.var!(beaver_env_region)
+      end
+    else
+      quote do
+        nil
+      end
     end
   end
 
   defmacro mlir__BLOCK__() do
-    quote do
-      Beaver.MLIR.Managed.Block.get()
+    if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_block, nil}) do
+      quote do
+        Kernel.var!(beaver_internal_env_block)
+      end
+    else
+      raise "no block in environment, maybe you forgot to put the ssa form inside the Beaver.mlir/2 macro or a block/1 macro?"
     end
   end
 
