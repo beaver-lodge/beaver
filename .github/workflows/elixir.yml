@@ -1,13 +1,15 @@
 name: Elixir CI
 
 on:
-  push:
-    branches: ["main"]
   pull_request:
     branches: ["main"]
 
 permissions:
   contents: read
+
+concurrency:
+  group: build-and-test-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
@@ -38,5 +40,4 @@ jobs:
         env:
           LLVM_CONFIG_PATH: "/home/runner/llvm-install/home/runner/llvm-install/bin/llvm-config"
         run: |
-          mix docs
           mix test --exclude vulkan
