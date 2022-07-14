@@ -30,11 +30,11 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
       - uses: seanmiddleditch/gha-setup-ninja@master
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v1
-        with:
-          version: "14.0"
+      - name: Download pre-build LLVM
+        run: |
+          wget https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-07-13-1706/llvm-install.zip
+          unzip llvm-install.zip -d $HOME/llvm-install
       - name: Run tests
         env:
-          LLVM_CONFIG_PATH: "/home/runner/work/beaver/beaver/llvm/bin/llvm-config"
-        run: mix test
+          LLVM_CONFIG_PATH: "/home/runner/llvm-install/home/runner/llvm-install/bin/llvm-config"
+        run: mix test --exclude vulkan
