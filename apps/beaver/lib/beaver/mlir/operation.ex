@@ -29,13 +29,16 @@ defmodule Beaver.MLIR.Operation do
   @doc """
   Create a new operation from arguments and insert to managed insertion point
   """
-  def create(op_name, %Beaver.DSL.SSA{arguments: arguments, results: results, filler: filler})
-      when is_function(filler, 0) do
-    create(op_name, arguments ++ [result_types: results, regions: filler])
-  end
 
-  def create(op_name, %Beaver.DSL.SSA{arguments: arguments, results: results}) do
-    create(op_name, arguments ++ [result_types: results])
+  def create(op_name, %Beaver.DSL.SSA{arguments: arguments, results: results, filler: filler}) do
+    filler =
+      if is_function(filler, 0) do
+        [regions: filler]
+      else
+        []
+      end
+
+    create(op_name, arguments ++ [result_types: results] ++ filler)
   end
 
   def create(op_name, %Beaver.DSL.Op.Prototype{
