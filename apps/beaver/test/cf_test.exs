@@ -182,7 +182,7 @@ defmodule CfTest do
 
                 # keep generating until we meet a terminator
                 {_mlir, _acc} =
-                  Macro.prewalk(block, acc, fn ast, %Acc{block: block} = acc ->
+                  Macro.prewalk(block, acc, fn ast, %Acc{} = acc ->
                     gen_mlir(ast, acc)
                   end)
               end
