@@ -36,5 +36,5 @@ jobs:
           unzip llvm-install.zip -d $HOME/llvm-install
       - name: Run tests
         env:
-          LLVM_CONFIG_PATH: "/home/runner/llvm-install/bin/llvm-config"
-        run: mix test
+          LLVM_CONFIG_PATH: "/home/runner/llvm-install/home/runner/llvm-install/bin/llvm-config"
+        run: mix test --exclude vulkan
