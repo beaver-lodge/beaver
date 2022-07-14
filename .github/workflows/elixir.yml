@@ -37,4 +37,6 @@ jobs:
       - name: Run tests
         env:
           LLVM_CONFIG_PATH: "/home/runner/llvm-install/home/runner/llvm-install/bin/llvm-config"
-        run: mix test --exclude vulkan
+        run: |
+          mix docs
+          mix test --exclude vulkan
