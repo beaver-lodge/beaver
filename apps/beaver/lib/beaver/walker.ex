@@ -310,10 +310,9 @@ defmodule Beaver.Walker do
   You might expect this function works like `Macro.traverse/4`.
   ### More on manipulating the IR
   During the traversal, there are generally two choices to manipulate the IR:
-  - Use `Beaver.concrete/1` to extract a op/attribute to a elixir structure, and generate a new op/attribute as Opreplacement.
+  - Use `Beaver.concrete/1` to extract a op/attribute to a elixir structure, and generate a new `OpReplacement` with `replace/2`.
   - Use a pattern defined by macro `Beaver.defpat/2` to have the PDL interpreter transform the IR for you.
   You can use both if it is proper to do so.
-  To manipulate results, successors and regions, the parent operation should be OpReplacement with a new operation.
   It could be mind-boggling to think the IR is mutable but not an issue if your approach is very functional. Inappropriate mutation might cause crash or bugs if somewhere else is keeping a reference of the replace op.
   ### Some tips
   - If your matching is very complicated, using `with/1` in Elixir should cover it.
