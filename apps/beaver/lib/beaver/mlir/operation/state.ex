@@ -155,8 +155,8 @@ defmodule Beaver.MLIR.Operation.State do
     add_result(state, result_types)
   end
 
-  def add_argument(state, {:result_types, result_types}) do
-    add_result(state, [result_types])
+  def add_argument(state, {:result_types, %MLIR.CAPI.MlirType{} = result_type}) do
+    add_result(state, [result_type])
   end
 
   def add_argument(state, {:successor, %Beaver.MLIR.CAPI.MlirBlock{} = successor_block}) do
@@ -173,14 +173,19 @@ defmodule Beaver.MLIR.Operation.State do
     |> add_successors([successor_block])
   end
 
-  def add_argument(state, {name, attr}) do
+  def add_argument(state, {name, %MLIR.CAPI.MlirAttribute{} = attr}) when is_atom(name) do
     add_attr(state, [{name, attr}])
   end
 
-  def add_argument(
-        state,
-        operand = %Beaver.MLIR.CAPI.MlirValue{}
-      ) do
+  def add_argument(state, {name, %MLIR.CAPI.MlirType{} = type_attr}) when is_atom(name) do
+    add_attr(state, [{name, type_attr}])
+  end
+
+  def add_argument(state, {name, attr}) when is_atom(name) and is_binary(attr) do
+    add_attr(state, [{name, attr}])
+  end
+
+  def add_argument(state, %Beaver.MLIR.CAPI.MlirValue{} = operand) do
     add_operand(state, [operand])
   end
 end
