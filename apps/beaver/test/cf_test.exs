@@ -9,7 +9,8 @@ defmodule CfTest do
     use Beaver
 
     defmodule Acc do
-      defstruct vars: %{}, block: nil
+      @enforce_keys [:vars, :block, :region]
+      defstruct vars: %{}, block: nil, region: nil
     end
 
     # 3. use the var in acc
@@ -34,14 +35,14 @@ defmodule CfTest do
     # 1. starts with "root", the return expression
     defp gen_mlir(
            {:return, _line, [arg]},
-           acc
+           %Acc{block: block} = acc
          ) do
       # we expect it to be a MLIR Value
       {arg = %MLIR.CAPI.MlirValue{}, acc} = gen_mlir(arg, acc)
 
       mlir =
-        mlir do
-          Func.return(arg)
+        mlir block: block do
+          Func.return(arg) >>> []
         end
 
       {mlir, acc}
@@ -62,18 +63,22 @@ defmodule CfTest do
     # For `:if` it is kind of tricky, we need to generate block for it
     defp gen_mlir(
            {:if, _, [cond_ast, [do: do_block_ast, else: else_block_ast]]},
-           acc
+           %Acc{region: region, block: entry} = acc
          ) do
-      mlir do
-        {condition, acc} = gen_mlir(cond_ast, acc)
-        entry = mlir__BLOCK__()
-      end
+      {condition, acc} = gen_mlir(cond_ast, acc)
+
+      bb_next =
+        mlir do
+          block bb_next(arg >>> Type.f32()) do
+          end
+        end
 
       true_branch =
         mlir do
           block _true_branch() do
             {%MLIR.CAPI.MlirValue{} = mlir, acc} = gen_mlir(do_block_ast, acc)
-            CF.br({:bb_next, [mlir]})
+            %MLIR.CAPI.MlirBlock{} = Beaver.Env.mlir__BLOCK__()
+            CF.br({bb_next, [mlir]}) >>> []
           end
         end
 
@@ -81,19 +86,17 @@ defmodule CfTest do
         mlir do
           block _false_branch() do
             {%MLIR.CAPI.MlirValue{} = mlir, acc} = gen_mlir(else_block_ast, acc)
-            CF.br({:bb_next, [mlir]})
+            CF.br({bb_next, [mlir]}) >>> []
           end
         end
 
-      MLIR.Block.under(entry, fn ->
-        CF.cond_br(condition, true_branch, false_branch)
-      end)
+      mlir block: entry do
+        CF.cond_br(condition, true_branch, false_branch) >>> []
+      end
 
-      bb_next =
-        mlir do
-          block bb_next(arg >>> Type.f32()) do
-          end
-        end
+      Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, true_branch)
+      Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, false_branch)
+      Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, bb_next)
 
       {arg, update_block(acc, bb_next)}
     end
@@ -113,12 +116,12 @@ defmodule CfTest do
     end
 
     # in real world, this should be merged with the gen_mlir for :+
-    defp gen_mlir({:<, _, [left, right]}, acc) do
+    defp gen_mlir({:<, _, [left, right]}, %Acc{block: block} = acc) do
       {left = %MLIR.CAPI.MlirValue{}, acc} = gen_mlir(left, acc)
       {right = %MLIR.CAPI.MlirValue{}, acc} = gen_mlir(right, acc)
 
       less =
-        mlir do
+        mlir block: block do
           Arith.cmpf(left, right, predicate: Attribute.integer(Type.i64(), 0)) >>> Type.i1()
         end
 
@@ -127,12 +130,12 @@ defmodule CfTest do
 
     # after adding this, you should see this kind of IR printed
     # %0 = arith.mulf %arg2, %arg1 : f32
-    defp gen_mlir({:*, _line, [left, right]}, acc) do
+    defp gen_mlir({:*, _line, [left, right]}, %Acc{block: block} = acc) do
       {left = %MLIR.CAPI.MlirValue{}, acc} = gen_mlir(left, acc)
       {right = %MLIR.CAPI.MlirValue{}, acc} = gen_mlir(right, acc)
       # we only work with float 32 for now
       add =
-        mlir do
+        mlir block: block do
           Arith.mulf(left, right) >>> Type.f32()
         end
 
@@ -170,18 +173,18 @@ defmodule CfTest do
                     ) do
                 # Put the MLIR Values for args into a Map
                 vars = %{total_iters: total_iters, factor: factor, base_lr: base_lr, step: step}
-                acc = %Acc{vars: vars}
+
+                acc = %Acc{
+                  vars: vars,
+                  region: Beaver.Env.mlir__REGION__(),
+                  block: Beaver.Env.mlir__BLOCK__()
+                }
+
                 # keep generating until we meet a terminator
                 {_mlir, _acc} =
-                  Macro.prewalk(block, acc, fn ast, acc ->
-                    case {ast, acc} = gen_mlir(ast, acc) do
-                      {_, %Acc{block: nil}} ->
-                        gen_mlir(ast, acc)
-
-                      {_, %Acc{block: block}} when not is_nil(block) ->
-                        Beaver.Env.set_container(block)
-                        gen_mlir(ast, acc)
-                    end
+                  Macro.prewalk(block, acc, fn ast, %Acc{block: block} = acc ->
+                    Beaver.Env.set_container(block)
+                    gen_mlir(ast, acc)
                   end)
               end
             end

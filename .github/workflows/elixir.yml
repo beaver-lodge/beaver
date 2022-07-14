@@ -34,10 +34,10 @@ jobs:
       - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Download pre-build LLVM
         run: |
-          wget https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-07-13-1706/llvm-install.zip
+          wget https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-07-14-0254/llvm-install.zip
           unzip llvm-install.zip -d $HOME/llvm-install
       - name: Run tests
         env:
-          LLVM_CONFIG_PATH: "/home/runner/llvm-install/home/runner/llvm-install/bin/llvm-config"
+          LLVM_CONFIG_PATH: "/home/runner/llvm-install/bin/llvm-config"
         run: |
           mix test --exclude vulkan

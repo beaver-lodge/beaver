@@ -24,6 +24,8 @@ defmodule Beaver.MLIR.Dialect.Builtin do
       module_body_block = Beaver.MLIR.CAPI.mlirModuleGetBody(module)
 
       Beaver.MLIR.Block.under(module_body_block, fn ->
+        Kernel.var!(beaver_internal_env_block) = module_body_block
+        %Beaver.MLIR.CAPI.MlirBlock{} = Kernel.var!(beaver_internal_env_block)
         unquote(block)
       end)
 
