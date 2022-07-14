@@ -443,10 +443,6 @@ defmodule Beaver.Walker do
     {named_attribute, acc}
   end
 
-  @spec process_result(command(), container()) :: any()
-  defp process_result(:erase, %MlirOperation{} = op) do
-  end
-
   @doc """
   Performs a depth-first, pre-order traversal of a MLIR structure.
   """
