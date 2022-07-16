@@ -50,12 +50,25 @@ message(STATUS "MLIR libs: ${LIBS}")
 add_mlir_aggregate(met
   SHARED
   EMBED_LIBS
-  MLIRCAPIIR
-  MLIRCAPIElixir
-  MLIRCAPIRegistration
+  MLIRCAPIInterfaces
+  MLIRCAPIAsync
+  MLIRCAPIControlFlow
   MLIRCAPIConversion
-  MLIRCAPITransforms
+  MLIRCAPIDebug
   MLIRCAPIExecutionEngine
-  MLIRCAPILinalg
+  MLIRCAPIFunc
   MLIRCAPIGPU
+  MLIRCAPIIR
+  MLIRCAPIInterfaces
+  MLIRCAPILLVM
+  MLIRCAPILinalg
+  MLIRCAPIPDL
+  MLIRCAPIQuant
+  MLIRCAPIRegistration
+  MLIRCAPISCF
+  MLIRCAPIShape
+  MLIRCAPISparseTensor
+  MLIRCAPITensor
+  MLIRCAPITransforms
+  MLIRCAPIElixir
 )
