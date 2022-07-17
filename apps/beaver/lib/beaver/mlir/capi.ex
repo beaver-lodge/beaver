@@ -20,6 +20,9 @@ defmodule Beaver.MLIR.CAPI do
       include_paths: %{
         llvm_include: Beaver.LLVM.Config.include_dir(),
         beaver_include: beaver_include
+      },
+      library_paths: %{
+        beaver_libdir: Path.join([Mix.Project.build_path(), "mlir-c-install", "lib"])
       }
     )
 

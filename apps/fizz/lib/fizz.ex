@@ -6,16 +6,16 @@ defmodule Fizz do
   @doc """
   Generate Zig code from a header and build a Zig project to produce a NIF library
   """
-  def gen(wrapper, project_dir, opts \\ [include_paths: %{}, lib_paths: %{}]) do
+  def gen(wrapper, project_dir, opts \\ [include_paths: %{}, library_paths: %{}]) do
     include_paths = Keyword.get(opts, :include_paths, %{})
-    lib_paths = Keyword.get(opts, :lib_paths, %{})
+    library_paths = Keyword.get(opts, :library_paths, %{})
 
     if not is_map(include_paths) do
       raise "include_paths must be a map so that we could generate variables for build.zig. Got: #{inspect(include_paths)}"
     end
 
-    if not is_map(lib_paths) do
-      raise "lib_paths must be a map so that we could generate variables for build.zig. Got: #{inspect(lib_paths)}"
+    if not is_map(library_paths) do
+      raise "library_paths must be a map so that we could generate variables for build.zig. Got: #{inspect(library_paths)}"
     end
 
     include_path_args =
@@ -185,14 +185,26 @@ defmodule Fizz do
       |> Enum.join()
 
     build_source =
+      for {name, path} <- library_paths do
+        """
+        pub var #{name} = "#{path}";
+        """
+      end
+      |> Enum.join()
+      |> Kernel.<>(build_source)
+
+    # TODO: make this a arg
+    dest_dir = "#{Path.join(Mix.Project.build_path(), "mlir-c-install")}"
+
+    build_source =
       build_source <>
         """
-        pub var dest_dir = "#{Path.join(Mix.Project.build_path(), "mlir-c-install")}";
+        pub var cache_root = "#{Path.join([Mix.Project.build_path(), "mlir-zig-build", "zig-cache"])}";
         """
 
     File.write!(Path.join(src_dir, "build.fizz.gen.zig"), build_source)
 
-    with {_, 0} <- System.cmd("zig", ["build"], cd: project_dir) do
+    with {_, 0} <- System.cmd("zig", ["build", "--prefix", dest_dir], cd: project_dir) do
       :ok
     else
       {_error, _} ->

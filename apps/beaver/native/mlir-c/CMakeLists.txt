@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.13.4)
 set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "")
-project(beaver)
+project(mlir-beaver)
 if(POLICY CMP0116)
   cmake_policy(SET CMP0116 OLD)
 endif()
@@ -21,7 +21,7 @@ include_directories(${PROJECT_BINARY_DIR}/include)
 
 add_subdirectory(include)
 add_subdirectory(lib)
-add_subdirectory(nif)
+add_subdirectory(aggregate)
 
 add_custom_target(symlink_compile_commands_json ALL)
 add_custom_command(TARGET symlink_compile_commands_json
