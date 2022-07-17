@@ -6,14 +6,7 @@ defmodule Beaver.MLIR.Module do
   def create(str, opts \\ [])
 
   def create(str, opts) when is_binary(str) and is_list(opts) do
-    ctx =
-      with ctx = %Exotic.Value{} <- opts[:ctx] do
-        ctx
-      else
-        nil ->
-          MLIR.Managed.Context.get()
-      end
-
+    ctx = MLIR.Managed.Context.from_opts(opts)
     create(ctx, str)
   end
 

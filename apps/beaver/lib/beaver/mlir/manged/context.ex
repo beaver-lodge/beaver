@@ -46,12 +46,6 @@ defmodule Beaver.MLIR.Managed.Context do
   end
 
   def from_opts(opts) when is_list(opts) do
-    ctx = opts[:ctx]
-
-    if ctx do
-      ctx
-    else
-      get()
-    end
+    Keyword.get(opts, :ctx, get())
   end
 end
