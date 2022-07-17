@@ -125,7 +125,12 @@ defmodule Fizz do
         arg_vars =
           for {arg, i} <- Enum.with_index(args) do
             """
-            var arg#{i}: #{arg} = undefined; arg#{i} = beam.fetch_resource(arg#{i}, env, #{Function.resource_type_var(arg)}, args[#{i}]);
+              var arg#{i}: #{arg} = undefined;
+              if (beam.fetch_resource(arg#{i}, env, #{Function.resource_type_var(arg)}, args[#{i}])) |value| {
+                arg#{i} = value;
+              } else |_| {
+                return beam.make_error_binary(env, "fail to fetch resource for arg#{i}");
+              }
             """
           end
 
@@ -135,7 +140,7 @@ defmodule Fizz do
         }
 
         export fn fizz_nif_#{name}(env: beam.env, _: c_int, #{if length(args) == 0, do: "_", else: "args"}: [*c] const beam.term) beam.term {
-          #{Enum.join(arg_vars, "  ")}
+        #{Enum.join(arg_vars, "")}
           var ptr : ?*anyopaque = e.enif_alloc_resource(#{Function.resource_type_var(ret)}, @sizeOf(#{ret}));
 
           const RType = #{ret};

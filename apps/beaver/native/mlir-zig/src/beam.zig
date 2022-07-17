@@ -1449,12 +1449,12 @@ pub export fn blank_upgrade(
     return 0;
 }
 
-pub fn fetch_resource(x: anytype, environment: env, res_typ: resource_type, res_trm: term) @TypeOf(x) {
+pub fn fetch_resource(x: anytype, environment: env, res_typ: resource_type, res_trm: term) !@TypeOf(x) {
   var obj: ?*anyopaque = undefined;
 
   if (0 == e.enif_get_resource(environment, res_trm, res_typ, @ptrCast([*c]?*anyopaque, &obj))) {
     print("fail to get resource of type: {}\n", .{ @TypeOf(x) });
-    unreachable;
+    return Error.FunctionClauseError;
   }
 
   // according to the erlang documentation:

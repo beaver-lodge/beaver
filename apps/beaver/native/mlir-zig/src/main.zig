@@ -42,7 +42,12 @@ export fn registered_ops(env: beam.env, _: c_int, _: [*c] const beam.term) beam.
 }
 
 export fn cstring_to_charlist(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
-  var arg0: [*c]const u8 = undefined; arg0 = beam.fetch_resource(arg0, env, fizz.resource_type__c_ptr_const_u8, args[0]);
+  var arg0: [*c]const u8 = undefined;
+  if (beam.fetch_resource(arg0, env, fizz.resource_type__c_ptr_const_u8, args[0])) |value| {
+    arg0 = value;
+  } else |_| {
+    return beam.make_error_binary(env, "fail to fetch resource");
+  }
   return beam.make_cstring_charlist(env, arg0);
 }
 

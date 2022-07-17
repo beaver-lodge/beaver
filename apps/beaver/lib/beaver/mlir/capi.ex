@@ -66,7 +66,7 @@ defmodule Beaver.MLIR.CAPI do
     def unquote(String.to_atom(name))(unquote_splicing(args_ast)) do
       refs = Fizz.unwrap_ref([unquote_splicing(args_ast)])
       ref = apply(__MODULE__, unquote(fizz_func_name), refs)
-      struct!(unquote(return_module), %{ref: ref, zig_t: String.to_atom(unquote(ret))})
+      struct!(unquote(return_module), %{ref: check!(ref), zig_t: String.to_atom(unquote(ret))})
     end
 
     def unquote(fizz_func_name)(unquote_splicing(args_ast)),
@@ -79,13 +79,17 @@ defmodule Beaver.MLIR.CAPI do
   def get_resource_c_string(_), do: raise("NIF not loaded")
   def bool(value) when is_boolean(value), do: %__MODULE__.Bool{ref: get_resource_bool(value)}
 
-  def c_string(value) when is_binary(value) do
-    case get_resource_c_string(value) do
+  def check!(ref) do
+    case ref do
       {:error, e} ->
         raise e
 
       ref ->
-        %__MODULE__.CString{ref: ref}
+        ref
     end
+  end
+
+  def c_string(value) when is_binary(value) do
+    %__MODULE__.CString{ref: check!(get_resource_c_string(value))}
   end
 end
