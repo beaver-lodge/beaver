@@ -19,7 +19,7 @@ defmodule Beaver.MLIR.Type do
     num_results = length(results)
     inputs = inputs |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
     results = results |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
-    function(num_inputs, inputs, num_results, results, opts)
+    CAPI.mlirFunctionTypeGet(num_inputs, inputs, num_results, results, opts)
   end
 
   def ranked_tensor(
@@ -72,56 +72,6 @@ defmodule Beaver.MLIR.Type do
   end
 
   MLIR.CAPI.__info__(:attributes) |> IO.inspect()
-
-  for {:function_signature,
-       [
-         f = %Fizz.CodeGen.Function{
-           name: name_str,
-           args: args,
-           ret: _
-         }
-       ]} <-
-        MLIR.CAPI.__info__(:attributes) do
-    name = String.to_atom(name_str)
-    is_type_get = name_str |> String.ends_with?("TypeGet")
-
-    if is_type_get do
-      "mlir" <> generated_func_name = name_str
-      generated_func_name = generated_func_name |> String.slice(0..-8) |> Macro.underscore()
-      generated_func_name = generated_func_name |> String.to_atom()
-
-      @doc """
-      generated from
-      ```
-      #{inspect(f, pretty: true)}
-      ```
-      """
-      case args do
-        [{_ctx, {:type_def, Beaver.MLIR.CAPI.MlirContext}} | rest_args] ->
-          args =
-            for {arg_name, _} <- rest_args do
-              arg_name = arg_name |> Atom.to_string() |> Macro.underscore() |> String.to_atom()
-              {arg_name, [], nil}
-            end
-
-          def unquote(generated_func_name)(unquote_splicing(args), opts \\ []) do
-            ctx = MLIR.Managed.Context.from_opts(opts)
-            apply(Beaver.MLIR.CAPI, unquote(name), [ctx, unquote_splicing(args)])
-          end
-
-        args ->
-          args =
-            for {arg_name, _} <- args do
-              arg_name = arg_name |> Atom.to_string() |> Macro.underscore() |> String.to_atom()
-              {arg_name, [], nil}
-            end
-
-          def unquote(generated_func_name)(unquote_splicing(args)) do
-            apply(Beaver.MLIR.CAPI, unquote(name), [unquote_splicing(args)])
-          end
-      end
-    end
-  end
 
   def f(bitwidth, opts \\ []) when is_integer(bitwidth) do
     apply(__MODULE__, String.to_atom("f#{bitwidth}"), [opts])
