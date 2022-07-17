@@ -41,17 +41,19 @@ export fn registered_ops(env: beam.env, _: c_int, _: [*c] const beam.term) beam.
     return get_all_registered_ops(env) catch beam.make_error_binary(env, "launching nif");
 }
 
-pub export var handwritten_nifs = [_]e.ErlNifFunc{
+pub export const handwritten_nifs = ([_]e.ErlNifFunc{
   e.ErlNifFunc{.name = "registered_ops", .arity = 0, .fptr = registered_ops, .flags = 0},
-};
+});
 
+pub export const num_nifs = fizz.generated_nifs.len + handwritten_nifs.len;
+pub export var nifs: [num_nifs]e.ErlNifFunc = undefined;
 
 const entry = e.ErlNifEntry{
   .major = 2,
   .minor = 16,
   .name = "Elixir.Beaver.MLIR.CAPI",
-  .num_of_funcs = fizz.generated_nifs.len,
-  .funcs = &(fizz.generated_nifs[0]),
+  .num_of_funcs = num_nifs,
+  .funcs = &(nifs[0]),
   .load = nif_load,
   .reload = null,   // currently unsupported
   .upgrade = null,  // currently unsupported
@@ -63,5 +65,13 @@ const entry = e.ErlNifEntry{
 };
 
 export fn nif_init() *const e.ErlNifEntry{
+  var i: usize = 0;
+  while (i < fizz.generated_nifs.len) : ({ i += 1; }) {
+      nifs[i] = fizz.generated_nifs[i];
+  }
+  var j: usize = 0;
+  while (j < handwritten_nifs.len) : ({ j += 1; }) {
+      nifs[fizz.generated_nifs.len + j] = handwritten_nifs[j];
+  }
   return &entry;
 }
