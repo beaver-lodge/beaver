@@ -102,6 +102,7 @@ const e = @import("erl_nif.zig");
 const std = @import("std");
 const builtin = @import("builtin");
 const BeamMutex = @import("beam_mutex.zig").BeamMutex;
+const print = @import("std").debug.print;
 
 ///////////////////////////////////////////////////////////////////////////////
 // BEAM allocator definitions
@@ -1452,6 +1453,7 @@ pub fn fetch_resource(x: anytype, environment: env, res_typ: resource_type, res_
   var obj: ?*anyopaque = undefined;
 
   if (0 == e.enif_get_resource(environment, res_trm, res_typ, @ptrCast([*c]?*anyopaque, &obj))) {
+    print("fail to get resource of type: {}\n", .{ @TypeOf(x) });
     unreachable;
   }
 

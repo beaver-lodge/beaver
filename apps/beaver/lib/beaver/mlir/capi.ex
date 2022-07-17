@@ -74,5 +74,9 @@ defmodule Beaver.MLIR.CAPI do
   def registered_ops(), do: raise("NIF not loaded")
   def cstring_to_charlist(_), do: raise("NIF not loaded")
   def get_resource_bool(_), do: raise("NIF not loaded")
-  def bool(value), do: %__MODULE__.Bool{ref: get_resource_bool(value)}
+  def get_resource_c_string(_), do: raise("NIF not loaded")
+  def bool(value) when is_boolean(value), do: %__MODULE__.Bool{ref: get_resource_bool(value)}
+
+  def c_string(value) when is_binary(value),
+    do: %__MODULE__.CString{ref: get_resource_c_string(value)}
 end

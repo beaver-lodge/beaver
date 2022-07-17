@@ -229,6 +229,10 @@ defmodule Fizz do
     struct_name |> String.to_atom()
   end
 
+  def module_name("[*c]const u8") do
+    CString
+  end
+
   def module_name(type) do
     type |> String.capitalize() |> String.to_atom()
   end
