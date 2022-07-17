@@ -455,27 +455,7 @@ defmodule Beaver.Nx.Defn do
   end
 
   def memref_from_tensor(tuple) when is_tuple(tuple) do
-    # convert to a list of memrefs and fields
-    {list_of_fields, memrefs} =
-      for tensor <- Tuple.to_list(tuple) do
-        tensor |> memref_from_tensor
-      end
-      # TODO: code here is really ugly
-      |> Enum.reduce({[], []}, fn %Exotic.Value.Struct{fields: fields} = memref,
-                                  {fields_acc, memref_acc} ->
-        {
-          fields_acc ++ [fields],
-          memref_acc ++ [memref]
-        }
-      end)
-
-    # generate fields for the nested struct
-    list_of_fields =
-      for {fields, i} <- Enum.with_index(list_of_fields) do
-        {String.to_atom("packed_struct_#{i}"), {:struct, fields}}
-      end
-
-    Exotic.Value.Struct.get(list_of_fields, memrefs)
+    raise "TODO"
   end
 
   @doc """
@@ -486,16 +466,9 @@ defmodule Beaver.Nx.Defn do
     %{tensor | data: %Beaver.Nx{memref: memref}}
   end
 
-  def populate_tensor_from_memref(tuple, %Exotic.Value.Struct{fields: fields} = nested_struct)
+  def populate_tensor_from_memref(tuple, nested_struct)
       when is_tuple(tuple) do
-    Enum.zip(Tuple.to_list(tuple), fields)
-    |> Enum.map(fn {tensor, {packed_field_name, _}} ->
-      populate_tensor_from_memref(
-        tensor,
-        Exotic.Value.fetch(nested_struct, packed_field_name)
-      )
-    end)
-    |> List.to_tuple()
+    raise "TODO"
   end
 
   @doc """
