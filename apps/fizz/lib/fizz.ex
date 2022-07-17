@@ -179,7 +179,7 @@ defmodule Fizz do
     build_source =
       for {name, path} <- include_paths do
         """
-        pub var #{name} = "#{path}";
+        pub const #{name} = "#{path}";
         """
       end
       |> Enum.join()
@@ -187,7 +187,7 @@ defmodule Fizz do
     build_source =
       for {name, path} <- library_paths do
         """
-        pub var #{name} = "#{path}";
+        pub const #{name} = "#{path}";
         """
       end
       |> Enum.join()
@@ -196,10 +196,18 @@ defmodule Fizz do
     # TODO: make this a arg
     dest_dir = "#{Path.join(Mix.Project.build_path(), "mlir-c-install")}"
 
+    erts_include =
+      Path.join([
+        List.to_string(:code.root_dir()),
+        "erts-#{:erlang.system_info(:version)}",
+        "include"
+      ])
+
     build_source =
       build_source <>
         """
-        pub var cache_root = "#{Path.join([Mix.Project.build_path(), "mlir-zig-build", "zig-cache"])}";
+        pub const cache_root = "#{Path.join([Mix.Project.build_path(), "mlir-zig-build", "zig-cache"])}";
+        pub const erts_include = "#{erts_include}";
         """
 
     File.write!(Path.join(src_dir, "build.fizz.gen.zig"), build_source)

@@ -11,7 +11,7 @@ pub fn build(b: *std.build.Builder) void {
     lib.setBuildMode(mode);
 
     // TODO: import from a generated file to include erlang headers
-    lib.addSystemIncludeDir("/opt/homebrew/Cellar/erlang/25.0/lib/erlang/erts-13.0/include");
+    lib.addSystemIncludeDir(fizz.erts_include);
     lib.addSystemIncludeDir(fizz.llvm_include);
     lib.addSystemIncludeDir(fizz.beaver_include);
     lib.addLibPath(fizz.beaver_libdir);
