@@ -10,10 +10,13 @@ defmodule Beaver.MLIR.StringRef do
     |> CAPI.mlirStringRefCreateFromCString()
   end
 
-  def extract(string_ref) do
-    data = Exotic.Value.fetch(string_ref, CAPI.MlirStringRef, :data)
-    length = Exotic.Value.fetch(string_ref, CAPI.MlirStringRef, :length)
-    Exotic.Value.String.extract(data, length)
+  def extract(%Beaver.MLIR.CAPI.MlirStringRef{} = string_ref) do
+    %{ref: ref} =
+      string_ref
+      |> CAPI.beaverStringRefGetData()
+
+    CAPI.cstring_to_charlist(ref)
+    |> List.to_string()
   end
 
   defmodule Callback do

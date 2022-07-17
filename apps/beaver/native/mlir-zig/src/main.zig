@@ -41,8 +41,14 @@ export fn registered_ops(env: beam.env, _: c_int, _: [*c] const beam.term) beam.
     return get_all_registered_ops(env) catch beam.make_error_binary(env, "launching nif");
 }
 
+export fn cstring_to_charlist(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
+  var arg0: [*c]const u8 = undefined; arg0 = beam.fetch_resource(arg0, env, fizz.resource_type__c_ptr_const_u8, args[0]);
+  return beam.make_cstring_charlist(env, arg0);
+}
+
 pub export const handwritten_nifs = ([_]e.ErlNifFunc{
   e.ErlNifFunc{.name = "registered_ops", .arity = 0, .fptr = registered_ops, .flags = 0},
+  e.ErlNifFunc{.name = "cstring_to_charlist", .arity = 1, .fptr = cstring_to_charlist, .flags = 0},
 });
 
 pub export const num_nifs = fizz.generated_nifs.len + handwritten_nifs.len;

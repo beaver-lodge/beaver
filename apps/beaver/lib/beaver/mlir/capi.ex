@@ -81,4 +81,5 @@ defmodule Beaver.MLIR.CAPI do
   end
 
   def registered_ops(), do: raise("NIF not loaded")
+  def cstring_to_charlist(_), do: raise("NIF not loaded")
 end
