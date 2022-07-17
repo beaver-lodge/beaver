@@ -17,7 +17,7 @@ defmodule Beaver.Umbrella.MixProject do
   defp docs() do
     [
       main: "Beaver",
-      ignore_apps: [:exotic],
+      ignore_apps: [:fizz],
       extras: [
         "README.md",
         "apps/beaver/guides/your-first-beaver-compiler.livemd"
@@ -54,14 +54,6 @@ defmodule Beaver.Umbrella.MixProject do
           Beaver.Nx.Compiler,
           Beaver.Nx.Defn,
           Beaver.Nx.MemrefAllocator
-        ],
-        Exotic: [
-          Exotic,
-          Exotic.NIF,
-          Exotic.Value,
-          Exotic.Valuable,
-          Exotic.Value.Struct,
-          Exotic.Value.Array
         ]
       ]
     ]

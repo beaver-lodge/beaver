@@ -5,6 +5,7 @@ defmodule Beaver.MLIR.ExternalPass do
   defstruct external: nil
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
+  require Beaver.MLIR.CAPI
 
   @doc """
   Create a pass by passing a callback module

@@ -12,6 +12,7 @@ pub fn build(b: *std.build.Builder) void {
     // TODO: import from a generated file to include erlang headers
     lib.addSystemIncludeDir("/opt/homebrew/Cellar/erlang/25.0/lib/erlang/erts-13.0/include");
     lib.addSystemIncludeDir(fizz.llvm_include);
+    lib.addSystemIncludeDir(fizz.beaver_include);
     lib.addSystemIncludeDir("src");
     lib.addLibPath(b.pathFromRoot("zig-out/lib"));
     lib.linkSystemLibrary("met");

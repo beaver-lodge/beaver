@@ -4,18 +4,22 @@ defmodule Fizz do
   """
 
   @doc """
-  Generate Zig code from a header
+  Generate Zig code from a header and build a Zig project to produce a NIF library
   """
-  def gen(wrapper, opts \\ [include_paths: []]) do
+  def gen(wrapper, project_dir, opts \\ [include_paths: []]) do
     include_paths = Keyword.get(opts, :include_paths, [])
 
-    include_paths =
-      for i <- include_paths do
-        ["-I", i]
+    if not is_map(include_paths) do
+      raise "include_paths must be a map so that we could generate variables for build.zig. Got: #{inspect(include_paths)}"
+    end
+
+    include_path_args =
+      for {_, path} <- include_paths do
+        ["-I", path]
       end
       |> List.flatten()
 
-    {out, 0} = System.cmd("zig", ["translate-c", wrapper] ++ include_paths)
+    {out, 0} = System.cmd("zig", ["translate-c", wrapper] ++ include_path_args)
 
     functions =
       String.split(out, "\n")
@@ -63,7 +67,7 @@ defmodule Fizz do
     dst = "tmp/print_arity.zig"
     File.write!(dst, source)
 
-    {out, 0} = System.cmd("zig", ["run", dst] ++ include_paths, stderr_to_stdout: true)
+    {out, 0} = System.cmd("zig", ["run", dst] ++ include_path_args, stderr_to_stdout: true)
 
     alias Fizz.CodeGen.Function
 
@@ -134,7 +138,7 @@ defmodule Fizz do
     source = """
     const c = @cImport({
       @cDefine("_NO_CRT_STDIO_INLINE", "1");
-      @cInclude("llvm-15.h");
+      @cInclude("#{wrapper}");
     });
     const beam = @import("beam.zig");
     const e = @import("erl_nif.zig");
@@ -151,16 +155,20 @@ defmodule Fizz do
     };
     """
 
-    zig_lib_dir = "capi"
-    File.write!(Path.join([zig_lib_dir, "src", "mlir.fizz.gen.zig"]), source)
+    src_dir = Path.join(project_dir, "src")
+    File.write!(Path.join(src_dir, "mlir.fizz.gen.zig"), source)
 
-    build_source = """
-    pub var llvm_include = "#{Fizz.LLVM.Config.include_dir()}";
-    """
+    build_source =
+      for {name, path} <- include_paths do
+        """
+        pub var #{name} = "#{path}";
+        """
+      end
+      |> Enum.join()
 
-    File.write!(Path.join([zig_lib_dir, "src", "build.fizz.gen.zig"]), build_source)
+    File.write!(Path.join(src_dir, "build.fizz.gen.zig"), build_source)
 
-    with {_, 0} <- System.cmd("zig", ["build"], cd: zig_lib_dir) do
+    with {_, 0} <- System.cmd("zig", ["build"], cd: project_dir) do
       :ok
     else
       {_error, _} ->

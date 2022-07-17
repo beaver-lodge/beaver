@@ -3,7 +3,6 @@ defmodule FizzTest do
   doctest Fizz
 
   test "greets the world" do
-    x = Fizz.MLIR.CAPI.mlirContextCreate() |> IO.inspect()
-    Fizz.MLIR.CAPI.mlirContextDestroy(x) |> IO.inspect()
+    assert true
   end
 end
