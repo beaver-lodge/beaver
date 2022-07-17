@@ -67,7 +67,7 @@ const mem = @import("std").mem;
 export fn get_resource_c_string(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
   const RType = [*c] u8;
   var bin: beam.binary = undefined;
-  if (0 != e.enif_inspect_binary(env, args[0], &bin)) {
+  if (0 == e.enif_inspect_binary(env, args[0], &bin)) {
     return beam.make_error_binary(env, "not a binary");
   }
   var ptr : ?*anyopaque = e.enif_alloc_resource(fizz.resource_type__c_ptr_const_u8, bin.size);
