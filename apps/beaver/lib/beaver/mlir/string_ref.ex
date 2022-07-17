@@ -6,7 +6,6 @@ defmodule Beaver.MLIR.StringRef do
   """
   def create(value) when is_binary(value) do
     CAPI.c_string(value)
-    |> IO.inspect()
     |> CAPI.mlirStringRefCreateFromCString()
   end
 

@@ -5,7 +5,7 @@ defmodule StringRefTest do
 
   test "StringRef" do
     s = "hello world"
-    r = MLIR.StringRef.create(s) |> IO.inspect()
+    r = MLIR.StringRef.create(s)
     assert s == MLIR.StringRef.extract(r)
   end
 end
