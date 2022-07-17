@@ -66,6 +66,11 @@ defmodule Beaver.MLIR.Type do
     CAPI.mlirTupleTypeGet(ctx, num_elements, elements)
   end
 
+  def f32(opts \\ []) do
+    ctx = MLIR.Managed.Context.from_opts(opts)
+    CAPI.mlirF32TypeGet(ctx)
+  end
+
   def f(bitwidth, opts \\ []) when is_integer(bitwidth) do
     apply(__MODULE__, String.to_atom("f#{bitwidth}"), [opts])
   end
