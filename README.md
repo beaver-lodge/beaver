@@ -90,7 +90,7 @@ Beaver is trying to adapt this design in Erlang/Elixir, which has great support 
 - Introduce a new stack to machine learning.
   - Higher-level: Elixir
   - Representation: MLIR
-  - Lower-level: Rust/Zig
+  - Lower-level: Zig
 
 ## Why is it called Beaver?
 

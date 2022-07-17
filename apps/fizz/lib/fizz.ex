@@ -34,7 +34,7 @@ defmodule Fizz do
 
     functions =
       String.split(out, "\n")
-      |> Enum.filter(fn x -> String.contains?(x, "mlir") end)
+      |> Enum.filter(fn x -> String.contains?(x, "mlir") || String.contains?(x, "beaver") end)
 
       # |> Enum.map(&IO.inspect/1)
       |> Enum.filter(fn x -> String.contains?(x, "pub extern fn") end)
@@ -211,7 +211,7 @@ defmodule Fizz do
         raise "fail to run zig compiler"
     end
 
-    {functions, types}
+    {functions, types, dest_dir}
   end
 
   @doc """

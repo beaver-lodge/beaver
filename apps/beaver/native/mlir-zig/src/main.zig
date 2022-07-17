@@ -20,7 +20,7 @@ export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
 const entry = e.ErlNifEntry{
   .major = 2,
   .minor = 16,
-  .name = "Elixir.Fizz.MLIR.CAPI",
+  .name = "Elixir.Beaver.MLIR.CAPI",
   .num_of_funcs = fizz.generated_nifs.len,
   .funcs = &(fizz.generated_nifs[0]),
   .load = nif_load,

@@ -15,7 +15,7 @@ defmodule Beaver.MLIR.CAPI do
   wrapper_header_path = Path.join(File.cwd!(), "native/wrapper.h")
   beaver_include = Path.join(File.cwd!(), "native/mlir-c/include")
 
-  {functions, types} =
+  {functions, types, dest_dir} =
     Fizz.gen(wrapper_header_path, "native/mlir-zig",
       include_paths: %{
         llvm_include: Beaver.LLVM.Config.include_dir(),
@@ -28,8 +28,17 @@ defmodule Beaver.MLIR.CAPI do
 
   @on_load :load_nifs
 
+  @dest_dir dest_dir
   def load_nifs do
-    :erlang.load_nif('native/mlir-zig/zig-out/lib/libBeaverCAPI', 0)
+    nif_path = Path.join(@dest_dir, "lib/libBeaverNIF")
+    dylib = "#{nif_path}.dylib"
+    so = "#{nif_path}.so"
+
+    if File.exists?(dylib) do
+      File.ln_s(dylib, so)
+    end
+
+    :erlang.load_nif(nif_path, 0)
   end
 
   for type <- types do
