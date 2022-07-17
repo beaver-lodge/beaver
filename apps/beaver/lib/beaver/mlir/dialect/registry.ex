@@ -95,6 +95,8 @@ defmodule Beaver.MLIR.Dialect.Registry do
   end
 
   defp query_ops() do
-    Beaver.MLIR.CAPI.registered_ops()
+    for {dialect, op} <- Beaver.MLIR.CAPI.registered_ops() do
+      {List.to_string(dialect), List.to_string(op)}
+    end
   end
 end
