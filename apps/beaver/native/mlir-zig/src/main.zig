@@ -62,21 +62,23 @@ export fn get_resource_bool(env: beam.env, _: c_int, args: [*c] const beam.term)
   }
 }
 
+// create a C string resource by copying given binary
+const mem = @import("std").mem;
 export fn get_resource_c_string(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
-  const RType = [*c]u8;
-  var ptr : ?*anyopaque = e.enif_alloc_resource(fizz.resource_type__c_ptr_const_u8, @sizeOf(RType));
+  const RType = [*c] u8;
+  var bin: beam.binary = undefined;
+  if (0 != e.enif_inspect_binary(env, args[0], &bin)) {
+    return beam.make_error_binary(env, "not a binary");
+  }
+  var ptr : ?*anyopaque = e.enif_alloc_resource(fizz.resource_type__c_ptr_const_u8, bin.size);
   var obj : *RType = undefined;
   if (ptr == null) {
     unreachable();
   } else {
     obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
   }
-  if (beam.get_c_string(env, args[0])) |value| {
-      obj.* = value;
-      return e.enif_make_resource(env, ptr);
-  } else |_| {
-    return beam.make_error_binary(env, "launching nif");
-  }
+  mem.copy(u8, obj.*[0..bin.size], bin.data[0..bin.size]);
+  return e.enif_make_resource(env, ptr);
 }
 
 pub export const handwritten_nifs = ([_]e.ErlNifFunc{

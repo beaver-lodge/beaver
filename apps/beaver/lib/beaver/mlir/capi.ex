@@ -77,6 +77,13 @@ defmodule Beaver.MLIR.CAPI do
   def get_resource_c_string(_), do: raise("NIF not loaded")
   def bool(value) when is_boolean(value), do: %__MODULE__.Bool{ref: get_resource_bool(value)}
 
-  def c_string(value) when is_binary(value),
-    do: %__MODULE__.CString{ref: get_resource_c_string(value)}
+  def c_string(value) when is_binary(value) do
+    case get_resource_c_string(value) do
+      {:error, e} ->
+        raise e
+
+      ref ->
+        %__MODULE__.CString{ref: ref}
+    end
+  end
 end
