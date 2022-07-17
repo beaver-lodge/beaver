@@ -47,7 +47,7 @@ set(LIBS
 message(STATUS "MLIR libs: ${LIBS}")
 
 # This lib is for dlopen
-add_mlir_aggregate(met
+add_mlir_aggregate(beaver
   SHARED
   EMBED_LIBS
   MLIRCAPIInterfaces

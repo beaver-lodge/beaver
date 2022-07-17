@@ -2,6 +2,7 @@ const std = @import("std");
 const fizz = @import("src/build.fizz.gen.zig");
 
 pub fn build(b: *std.build.Builder) void {
+    b.dest_dir = fizz.dest_dir;
     // Standard release options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const mode = b.standardReleaseOptions();
@@ -15,7 +16,7 @@ pub fn build(b: *std.build.Builder) void {
     lib.addSystemIncludeDir(fizz.beaver_include);
     lib.addSystemIncludeDir("src");
     lib.addLibPath(b.pathFromRoot("zig-out/lib"));
-    lib.linkSystemLibrary("met");
+    lib.linkSystemLibrary("beaver");
     lib.linker_allow_shlib_undefined = true;
     lib.addRPath(b.pathFromRoot("zig-out/lib"));
 

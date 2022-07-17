@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.13.4)
 set(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING "")
-project(met)
+project(beaver)
 if(POLICY CMP0116)
   cmake_policy(SET CMP0116 OLD)
 endif()

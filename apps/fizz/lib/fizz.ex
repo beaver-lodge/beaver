@@ -6,11 +6,16 @@ defmodule Fizz do
   @doc """
   Generate Zig code from a header and build a Zig project to produce a NIF library
   """
-  def gen(wrapper, project_dir, opts \\ [include_paths: []]) do
-    include_paths = Keyword.get(opts, :include_paths, [])
+  def gen(wrapper, project_dir, opts \\ [include_paths: %{}, lib_paths: %{}]) do
+    include_paths = Keyword.get(opts, :include_paths, %{})
+    lib_paths = Keyword.get(opts, :lib_paths, %{})
 
     if not is_map(include_paths) do
       raise "include_paths must be a map so that we could generate variables for build.zig. Got: #{inspect(include_paths)}"
+    end
+
+    if not is_map(lib_paths) do
+      raise "lib_paths must be a map so that we could generate variables for build.zig. Got: #{inspect(lib_paths)}"
     end
 
     include_path_args =
@@ -19,7 +24,13 @@ defmodule Fizz do
       end
       |> List.flatten()
 
-    {out, 0} = System.cmd("zig", ["translate-c", wrapper] ++ include_path_args)
+    out =
+      with {out, 0} <- System.cmd("zig", ["translate-c", wrapper] ++ include_path_args) do
+        out
+      else
+        {_error, _} ->
+          raise "fail to run zig translate-c"
+      end
 
     functions =
       String.split(out, "\n")
@@ -67,7 +78,14 @@ defmodule Fizz do
     dst = "tmp/print_arity.zig"
     File.write!(dst, source)
 
-    {out, 0} = System.cmd("zig", ["run", dst] ++ include_path_args, stderr_to_stdout: true)
+    out =
+      with {out, 0} <-
+             System.cmd("zig", ["run", dst] ++ include_path_args, stderr_to_stdout: true) do
+        out
+      else
+        {_error, _} ->
+          raise "fail to run zig compiler"
+      end
 
     alias Fizz.CodeGen.Function
 
@@ -165,6 +183,12 @@ defmodule Fizz do
         """
       end
       |> Enum.join()
+
+    build_source =
+      build_source <>
+        """
+        pub var dest_dir = "#{Path.join(Mix.Project.build_path(), "mlir-c-install")}";
+        """
 
     File.write!(Path.join(src_dir, "build.fizz.gen.zig"), build_source)
 
