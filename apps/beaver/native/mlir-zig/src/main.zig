@@ -71,13 +71,13 @@ export fn get_resource_c_string(env: beam.env, _: c_int, args: [*c] const beam.t
     return beam.make_error_binary(env, "not a binary");
   }
   var ptr : ?*anyopaque = e.enif_alloc_resource(fizz.resource_type__c_ptr_const_u8, bin.size);
-  var obj : *RType = undefined;
+  var obj : RType = undefined;
   if (ptr == null) {
     unreachable();
   } else {
-    obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
+    obj = @ptrCast([*c] u8, ptr);
   }
-  mem.copy(u8, obj.*[0..bin.size], bin.data[0..bin.size]);
+  mem.copy(u8, obj[0..bin.size], bin.data[0..bin.size]);
   return e.enif_make_resource(env, ptr);
 }
 
