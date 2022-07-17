@@ -54,7 +54,7 @@ export fn get_resource_bool(env: beam.env, _: c_int, args: [*c] const beam.term)
   } else {
     obj = @ptrCast(*bool, @alignCast(@alignOf(*bool), ptr));
   }
-  if (beam.get_bool(env, args[0])) |value| {
+  if (beam.get(bool, env, args[0])) |value| {
       obj.* = value;
       return e.enif_make_resource(env, ptr);
   } else |_| {

@@ -350,6 +350,7 @@ pub fn get(comptime T: type, env_: env, value: term) !T {
     f16    => return get_f16(env_, value),
     f32    => return get_f32(env_, value),
     f64    => return get_f64(env_, value),
+    bool    => return get_bool(env_, value),
     else   => unreachable
   }
 }
