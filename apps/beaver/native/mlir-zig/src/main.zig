@@ -64,20 +64,25 @@ export fn get_resource_bool(env: beam.env, _: c_int, args: [*c] const beam.term)
 
 // create a C string resource by copying given binary
 const mem = @import("std").mem;
+// memory layout {address, real_binary}
 export fn get_resource_c_string(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
   const RType = [*c] u8;
   var bin: beam.binary = undefined;
   if (0 == e.enif_inspect_binary(env, args[0], &bin)) {
     return beam.make_error_binary(env, "not a binary");
   }
-  var ptr : ?*anyopaque = e.enif_alloc_resource(fizz.resource_type__c_ptr_const_u8, bin.size);
-  var obj : RType = undefined;
+  var ptr : ?*anyopaque = e.enif_alloc_resource(fizz.resource_type__c_ptr_const_u8, @sizeOf(RType) + bin.size);
+  var obj : *RType = undefined;
+  obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
+  var real_binary : RType = undefined;
   if (ptr == null) {
     unreachable();
   } else {
-    obj = @ptrCast([*c] u8, ptr);
+    real_binary = @ptrCast(RType, ptr);
+    real_binary += @sizeOf(RType);
+    obj.* = real_binary;
   }
-  mem.copy(u8, obj[0..bin.size], bin.data[0..bin.size]);
+  mem.copy(u8, real_binary[0..bin.size], bin.data[0..bin.size]);
   return e.enif_make_resource(env, ptr);
 }
 
