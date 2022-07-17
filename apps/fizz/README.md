@@ -11,6 +11,23 @@ The approach here is highly inspired by the TableGen/.inc source code generating
 - Everything in Fizz is a NIF resource, including primitive types like integer and C struct. This makes it possible to pass them to C functions as pointers.
 - Fizz will generate a NIF function for every C function in your wrapper header, and register every C struct as NIF resource.
 
+## Cool features in FizZ enabled by Zig
+
+- Packing anything into a resource
+
+  Almost all C++/Rust implementation seems to force you to map a fixed size type to a resource type.
+  In fact for same resource type, you can have Erlang allocate memory of any size.
+  With Zig's comptime `sizeof` you can easily pack a list of items into an array/struct without adding any abstraction and overhead. An illustration:
+
+  ```
+    [(address to item1), item1, item2, item3, ...]
+  ```
+
+  So the memory is totally managed by Erlang, and you can safely read packed items because basically you can use Zig's comptime feature to infer everything involved.
+
+- Saving lib/include path to a Zig source and use them in your `build.zig`. You can use Elixir to find all the paths. It is way better than do it with make/CMake because you got a whole programming language to do it.
+- Inter NIF resource exchange. Because it is Zig, just import the Zig source from another Hex package.
+
 ## Difference from Zigler
 
 Fizz borrows a lot of good ideas ~~and code~~ from Zigler (Zigler is awesome~) but there are some differences:
