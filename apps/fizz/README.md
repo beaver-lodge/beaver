@@ -2,7 +2,7 @@
 
 FizZ (**F**oreign **i**nterface **z**eal in **Z**ig) is an Elixir package for binding a C library.
 The zeal here is that an Erlang/Elixir user shouldn't be required to write a NIF to call a C function.
-The approach here is highly inspired by the rocket-science-advanced TableGen/.inc technology in LLVM.
+The approach here is highly inspired by the TableGen/.inc source code generating in LLVM.
 
 ## What FizZ does
 
