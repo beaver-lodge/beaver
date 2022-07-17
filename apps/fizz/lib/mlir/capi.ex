@@ -1,6 +1,46 @@
+defmodule Fizz.LLVM.Config do
+  def include_dir() do
+    llvm_config = System.get_env("LLVM_CONFIG_PATH", "llvm-config")
+
+    path =
+      with {path, 0} <- System.cmd(llvm_config, ["--includedir"]) do
+        path
+      else
+        _ ->
+          with {path, 0} <- System.shell("llvm-config-15 --includedir") do
+            path
+          else
+            _ ->
+              raise "fail to run llvm-config"
+          end
+      end
+
+    path |> String.trim()
+  end
+
+  def lib_dir() do
+    llvm_config = System.get_env("LLVM_CONFIG_PATH", "llvm-config")
+
+    path =
+      with {path, 0} <- System.cmd(llvm_config, ["--libdir"]) do
+        path
+      else
+        _ ->
+          with {path, 0} <- System.shell("llvm-config-15 --libdir") do
+            path
+          else
+            _ ->
+              raise "fail to run llvm-config"
+          end
+      end
+
+    path |> String.trim()
+  end
+end
+
 defmodule Fizz.MLIR.CAPI do
   wrapper = Path.join(File.cwd!(), "capi/src/llvm-15.h")
-  {functions, types} = Fizz.MLIR.NIFGen.gen(wrapper)
+  {functions, types} = Fizz.gen(wrapper, include_paths: [Fizz.LLVM.Config.include_dir()])
   @on_load :load_nifs
 
   def load_nifs do
@@ -8,7 +48,7 @@ defmodule Fizz.MLIR.CAPI do
   end
 
   for type <- types do
-    defmodule Module.concat(__MODULE__, Fizz.MLIR.NIFGen.module_name(type)) do
+    defmodule Module.concat(__MODULE__, Fizz.module_name(type)) do
       defstruct ref: nil, zig_t: String.to_atom(type)
     end
   end
@@ -25,7 +65,7 @@ defmodule Fizz.MLIR.CAPI do
 
     fizz_func_name = String.to_atom("fizz_nif_" <> name)
 
-    return_module = Module.concat(__MODULE__, Fizz.MLIR.NIFGen.module_name(ret))
+    return_module = Module.concat(__MODULE__, Fizz.module_name(ret))
 
     def unquote(String.to_atom(name))(unquote_splicing(args_ast)) do
       refs =
