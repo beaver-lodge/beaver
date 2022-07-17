@@ -26,12 +26,6 @@ defmodule Beaver.MLIR.CAPI do
       }
     )
 
-  Module.register_attribute(__MODULE__, :function_signature, accumulate: true, persist: true)
-
-  for f <- functions do
-    @function_signature f
-  end
-
   @on_load :load_nifs
 
   @dest_dir dest_dir

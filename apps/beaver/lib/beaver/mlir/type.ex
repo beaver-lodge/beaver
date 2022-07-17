@@ -32,7 +32,7 @@ defmodule Beaver.MLIR.Type do
 
     shape = shape |> Exotic.Value.Array.from_list({:i, 64}) |> Exotic.Value.get_ptr()
 
-    ranked_tensor(rank, shape, element_type, encoding)
+    CAPI.mlirRankedTensorTypeGet(rank, shape, element_type, encoding)
   end
 
   def memref(
@@ -56,22 +56,15 @@ defmodule Beaver.MLIR.Type do
   def vector(shape, element_type) when is_list(shape) do
     rank = length(shape)
     shape = shape |> Exotic.Value.Array.from_list({:i, 64}) |> Exotic.Value.get_ptr()
-    vector(rank, shape, element_type)
+    CAPI.mlirVectorTypeGet(rank, shape, element_type)
   end
 
-  def tuple(elements) when is_list(elements) do
+  def tuple(elements, opts \\ []) when is_list(elements) do
     num_elements = length(elements)
     elements = elements |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()
-    tuple(num_elements, elements, [])
+    ctx = MLIR.Managed.Context.from_opts(opts)
+    CAPI.mlirTupleTypeGet(ctx, num_elements, elements)
   end
-
-  def tuple(elements, opts) when is_list(elements) do
-    num_elements = length(elements)
-    elements = elements |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()
-    tuple(num_elements, elements, opts)
-  end
-
-  MLIR.CAPI.__info__(:attributes) |> IO.inspect()
 
   def f(bitwidth, opts \\ []) when is_integer(bitwidth) do
     apply(__MODULE__, String.to_atom("f#{bitwidth}"), [opts])
