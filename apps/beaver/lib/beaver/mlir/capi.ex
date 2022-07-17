@@ -8,6 +8,8 @@ defmodule Beaver.MLIR.CAPI do
       Path.wildcard("native/mlir-zig/src/**") ++
       ["native/mlir-zig/build.zig"]
 
+  paths = paths |> Enum.reject(&String.contains?(&1, "fizz.gen.zig"))
+
   for path <- paths do
     @external_resource path
   end
