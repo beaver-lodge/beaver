@@ -1,6 +1,7 @@
 defmodule Beaver.MLIR.PatternSet do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
+  require Beaver.MLIR.CAPI
 
   def get(opts \\ []) do
     ctx = MLIR.Managed.Context.from_opts(opts)

@@ -1,6 +1,6 @@
 defmodule Beaver.MLIR.Block do
   alias Beaver.MLIR
-
+  require Beaver.MLIR.CAPI
   # TODO: remote ctx in these funcs
 
   # TODO: use the struct to replace the Exotic.Value here in pattern after Exotic gets updated with Protocol support

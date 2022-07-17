@@ -26,6 +26,12 @@ defmodule Beaver.MLIR.CAPI do
       }
     )
 
+  Module.register_attribute(__MODULE__, :function_signature, accumulate: true, persist: true)
+
+  for f <- functions do
+    @function_signature f
+  end
+
   @on_load :load_nifs
 
   @dest_dir dest_dir
@@ -73,4 +79,6 @@ defmodule Beaver.MLIR.CAPI do
     def unquote(fizz_func_name)(unquote_splicing(args_ast)),
       do: "failed to load NIF"
   end
+
+  def registered_ops(), do: raise("NIF not loaded")
 end

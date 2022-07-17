@@ -1,6 +1,7 @@
 defmodule Beaver.MLIR.Dialect.CF do
   alias Beaver.MLIR
   import Beaver.MLIR.Sigils
+  require Beaver.MLIR.CAPI
 
   defp extract_args(block = %Beaver.MLIR.CAPI.MlirBlock{}) do
     {:ok, {block, []}}

@@ -1,5 +1,6 @@
 defmodule Beaver do
   alias Beaver.MLIR
+  require Beaver.MLIR.CAPI
 
   @moduledoc """
   This module contains top level functions and macros for Beaver DSL for MLIR.

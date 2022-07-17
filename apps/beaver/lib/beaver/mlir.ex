@@ -1,6 +1,7 @@
 defmodule Beaver.MLIR do
   require Logger
   alias Beaver.MLIR.CAPI
+  require Beaver.MLIR.CAPI
 
   alias Beaver.MLIR.CAPI.{
     MlirModule,

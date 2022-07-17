@@ -1,6 +1,7 @@
 defmodule Beaver.MLIR.Type do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
+  require Beaver.MLIR.CAPI
 
   def get(string, opts \\ [])
 
@@ -70,16 +71,18 @@ defmodule Beaver.MLIR.Type do
     tuple(num_elements, elements, opts)
   end
 
+  MLIR.CAPI.__info__(:attributes) |> IO.inspect()
+
   for {:function_signature,
        [
-         f = %Exotic.CodeGen.Function{
-           name: name,
+         f = %Fizz.CodeGen.Function{
+           name: name_str,
            args: args,
-           ret: {:type_def, Beaver.MLIR.CAPI.MlirType}
+           ret: _
          }
        ]} <-
         MLIR.CAPI.__info__(:attributes) do
-    name_str = Atom.to_string(name)
+    name = String.to_atom(name_str)
     is_type_get = name_str |> String.ends_with?("TypeGet")
 
     if is_type_get do

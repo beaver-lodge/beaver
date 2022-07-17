@@ -1,6 +1,7 @@
 defmodule Beaver.MLIR.Module do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
+  require Beaver.MLIR.CAPI
 
   def create(str, opts \\ [])
 

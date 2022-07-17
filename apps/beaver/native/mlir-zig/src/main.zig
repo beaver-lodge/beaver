@@ -11,11 +11,40 @@ test "basic add functionality" {
 const beam = @import("beam.zig");
 const e = @import("erl_nif.zig");
 const fizz = @import("mlir.fizz.gen.zig");
+pub const c = fizz.c;
 
 export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
   fizz.open_generated_resource_types(env);
   return 0;
 }
+
+fn get_all_registered_ops(env: beam.env) !beam.term {
+    const ctx = c.mlirContextCreate();
+    c.mlirRegisterAllDialects(ctx);
+    const num_op: isize = c.beaverGetNumRegisteredOperations(ctx);
+    var i: isize = 0;
+    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(usize, num_op));
+    while (i < num_op) : ({ i += 1; }) {
+        const registered_op_name = c.beaverGetRegisteredOperationName(ctx, i);
+        const dialect_name = c.beaverRegisteredOperationNameGetDialectName(registered_op_name);
+        const op_name = c.beaverRegisteredOperationNameGetOpName(registered_op_name);
+        var tuple_slice: []beam.term = try beam.allocator.alloc(beam.term, 2);
+        defer beam.allocator.free(tuple_slice);
+        tuple_slice[0] = beam.make_cstring_charlist(env, dialect_name.data);
+        tuple_slice[1] = beam.make_cstring_charlist(env, op_name.data);
+        ret[@intCast(usize, i)] = beam.make_tuple(env, tuple_slice);
+    }
+    c.mlirContextDestroy(ctx);
+    return beam.make_term_list(env, ret);
+}
+export fn registered_ops(env: beam.env, _: c_int, _: [*c] const beam.term) beam.term {
+    return get_all_registered_ops(env) catch beam.make_error_binary(env, "launching nif");
+}
+
+pub export var handwritten_nifs = [_]e.ErlNifFunc{
+  e.ErlNifFunc{.name = "registered_ops", .arity = 0, .fptr = registered_ops, .flags = 0},
+};
+
 
 const entry = e.ErlNifEntry{
   .major = 2,

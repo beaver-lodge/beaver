@@ -1,6 +1,7 @@
 defmodule Beaver.MLIR.Operation.State do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
+  require Beaver.MLIR.CAPI
   alias Exotic.Value.Array
   alias Exotic.Value
   defstruct [:ref]

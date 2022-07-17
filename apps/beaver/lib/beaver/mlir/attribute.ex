@@ -1,5 +1,6 @@
 defmodule Beaver.MLIR.Attribute do
   alias Beaver.MLIR.CAPI
+  require Beaver.MLIR.CAPI
   alias Beaver.MLIR
 
   def is_null(jit) do
@@ -55,14 +56,14 @@ defmodule Beaver.MLIR.Attribute do
 
   for {:function_signature,
        [
-         f = %Exotic.CodeGen.Function{
-           name: name,
+         f = %Fizz.CodeGen.Function{
+           name: name_str,
            args: args,
-           ret: {:type_def, Beaver.MLIR.CAPI.MlirAttribute}
+           ret: _
          }
        ]} <-
         MLIR.CAPI.__info__(:attributes) do
-    name_str = Atom.to_string(name)
+    name = String.to_atom(name_str)
     is_type_get = name_str |> String.ends_with?("AttrGet")
 
     if is_type_get do

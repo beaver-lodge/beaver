@@ -5,12 +5,8 @@ defmodule Fizz.CodeGen.Function do
     "c.#{arg}"
   end
 
-  def process_type("[*c].cimport:3:11." <> arg) do
-    "[*c]#{process_type(arg)}"
-  end
-
   def process_type(arg) do
-    arg |> String.replace(".cimport:3:11.", "c.")
+    String.replace(arg, ~r/\.cimport.+?\./, "c.")
   end
 
   def do_resource_type_var("?*anyopaque") do

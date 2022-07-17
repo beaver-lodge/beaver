@@ -95,6 +95,6 @@ defmodule Beaver.MLIR.Dialect.Registry do
   end
 
   defp query_ops() do
-    Beaver.MLIR.NIF.registered_ops()
+    Beaver.MLIR.CAPI.registered_ops()
   end
 end

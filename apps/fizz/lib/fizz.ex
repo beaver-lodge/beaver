@@ -154,7 +154,7 @@ defmodule Fizz do
       |> Enum.join("\n")
 
     source = """
-    const c = @cImport({
+    pub const c = @cImport({
       @cDefine("_NO_CRT_STDIO_INLINE", "1");
       @cInclude("#{wrapper}");
     });

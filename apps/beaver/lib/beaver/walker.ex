@@ -12,6 +12,8 @@ alias Beaver.MLIR.CAPI.{
   MlirOperand
 }
 
+require Beaver.MLIR.CAPI
+
 defmodule Beaver.Walker do
   alias Beaver.MLIR.CAPI
 
