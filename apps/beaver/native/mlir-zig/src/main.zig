@@ -46,9 +46,26 @@ export fn cstring_to_charlist(env: beam.env, _: c_int, args: [*c] const beam.ter
   return beam.make_cstring_charlist(env, arg0);
 }
 
+export fn get_resource_bool(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
+  var ptr : ?*anyopaque = e.enif_alloc_resource(fizz.resource_type_bool, @sizeOf(bool));
+  var obj : *bool = undefined;
+  if (ptr == null) {
+    unreachable();
+  } else {
+    obj = @ptrCast(*bool, @alignCast(@alignOf(*bool), ptr));
+  }
+  if (beam.get_bool(env, args[0])) |value| {
+      obj.* = value;
+      return e.enif_make_resource(env, ptr);
+  } else |_| {
+    return beam.make_error_binary(env, "launching nif");
+  }
+}
+
 pub export const handwritten_nifs = ([_]e.ErlNifFunc{
   e.ErlNifFunc{.name = "registered_ops", .arity = 0, .fptr = registered_ops, .flags = 0},
   e.ErlNifFunc{.name = "cstring_to_charlist", .arity = 1, .fptr = cstring_to_charlist, .flags = 0},
+  e.ErlNifFunc{.name = "get_resource_bool", .arity = 1, .fptr = get_resource_bool, .flags = 0},
 });
 
 pub export const num_nifs = fizz.generated_nifs.len + handwritten_nifs.len;

@@ -7,8 +7,13 @@ defmodule Beaver.MLIR.Context do
   def create(allow_unregistered: allow_unregistered) do
     ctx = MLIR.CAPI.mlirContextCreate()
     MLIR.CAPI.mlirRegisterAllDialects(ctx)
-    MLIR.CAPI.mlirContextSetAllowUnregisteredDialects(ctx, allow_unregistered)
-    ctx |> Exotic.Value.transmit()
+
+    MLIR.CAPI.mlirContextSetAllowUnregisteredDialects(
+      ctx,
+      MLIR.CAPI.bool(allow_unregistered)
+    )
+
+    ctx
   end
 
   def create() do
