@@ -116,3 +116,12 @@ MLIR_CAPI_EXPORTED MlirOperation beaverOperandGetOwner(MlirOperand operand) {
 MLIR_CAPI_EXPORTED uint32_t beaverOperandGetNumber(MlirOperand operand) {
   return (*unwrap(operand))->getOperandNumber();
 }
+
+MLIR_CAPI_EXPORTED const char *
+beaverStringRefGetData(MlirStringRef string_ref) {
+  return string_ref.data;
+}
+
+MLIR_CAPI_EXPORTED size_t beaverStringRefGetLength(MlirStringRef string_ref) {
+  return string_ref.length;
+}
