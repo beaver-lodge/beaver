@@ -107,7 +107,12 @@ defmodule Beaver.MixProject do
         "-DCMAKE_INSTALL_PREFIX=#{install}"
       ])
 
-    {_, 0} = System.cmd("cmake", ["--build", build, "--target", "install"])
-    :ok
+    with {_, 0} <- System.cmd("cmake", ["--build", build, "--target", "install"]) do
+      :ok
+    else
+      {error, _} ->
+        IO.puts(error)
+        {:error, [error]}
+    end
   end
 end

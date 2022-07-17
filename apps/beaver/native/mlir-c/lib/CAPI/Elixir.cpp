@@ -87,22 +87,10 @@ MLIR_CAPI_EXPORTED void beaverExitMultiThreadedExecution(MlirContext context) {
   unwrap(context)->exitMultiThreadedExecution();
 }
 
-static_assert(sizeof(mlir::Value::use_iterator) < MlirOperandSize,
-              "MlirOperandSize too small");
-static inline MlirOperand wrap(mlir::Value::use_iterator cpp) {
-  MlirOperand ret;
-  memcpy(ret.buffer, &cpp, sizeof(mlir::Value::use_iterator));
-  return ret;
-}
-
-static inline mlir::Value::use_iterator unwrap(MlirOperand c) {
-  mlir::Value::use_iterator ret;
-  memcpy(&ret, c.buffer, sizeof(mlir::Value::use_iterator));
-  return ret;
-}
-
 MLIR_CAPI_EXPORTED MlirOperand beaverValueGetFirstOperand(MlirValue value) {
-  return wrap(unwrap(value).use_begin());
+  auto *iter = new mlir::Value::use_iterator();
+  *iter = unwrap(value).use_begin();
+  return wrap(iter);
 }
 
 MLIR_CAPI_EXPORTED MlirOperand beaverOperandGetNext(MlirOperand operand) {
@@ -113,17 +101,18 @@ MLIR_CAPI_EXPORTED MlirOperand beaverOperandGetNext(MlirOperand operand) {
 
 MLIR_CAPI_EXPORTED bool beaverOperandIsNull(MlirOperand operand) {
   auto unwrapped = unwrap(operand);
-  return unwrapped == nullptr || unwrapped == unwrap(operand)->get().use_end();
+  return (*unwrapped) == nullptr ||
+         (*unwrapped) == (*unwrap(operand))->get().use_end();
 }
 
 MLIR_CAPI_EXPORTED MlirValue beaverOperandGetValue(MlirOperand operand) {
-  return wrap(unwrap(operand)->get());
+  return wrap((*unwrap(operand))->get());
 }
 
 MLIR_CAPI_EXPORTED MlirOperation beaverOperandGetOwner(MlirOperand operand) {
-  return wrap((unwrap(operand))->getOwner());
+  return wrap((*unwrap(operand))->getOwner());
 }
 
 MLIR_CAPI_EXPORTED uint32_t beaverOperandGetNumber(MlirOperand operand) {
-  return unwrap(operand)->getOperandNumber();
+  return (*unwrap(operand))->getOperandNumber();
 }
