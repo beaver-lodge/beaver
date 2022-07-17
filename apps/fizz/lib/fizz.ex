@@ -232,4 +232,12 @@ defmodule Fizz do
   def module_name(type) do
     type |> String.capitalize() |> String.to_atom()
   end
+
+  def unwrap_ref(%{ref: ref}) do
+    ref
+  end
+
+  def unwrap_ref(arguments) when is_list(arguments) do
+    Enum.map(arguments, &unwrap_ref/1)
+  end
 end

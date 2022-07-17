@@ -62,10 +62,7 @@ defmodule Beaver.MLIR.CAPI do
     return_module = Module.concat(__MODULE__, Fizz.module_name(ret))
 
     def unquote(String.to_atom(name))(unquote_splicing(args_ast)) do
-      refs =
-        [unquote_splicing(args_ast)]
-        |> Enum.map(fn %{ref: ref} -> ref end)
-
+      refs = Fizz.unwrap_ref([unquote_splicing(args_ast)])
       ref = apply(__MODULE__, unquote(fizz_func_name), refs)
       struct!(unquote(return_module), %{ref: ref, zig_t: String.to_atom(unquote(ret))})
     end
