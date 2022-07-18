@@ -9,7 +9,7 @@ defmodule Fizz do
   Generate Zig code from a header and build a Zig project to produce a NIF library
   """
   def gen(wrapper, project_dir, opts \\ [include_paths: %{}, library_paths: %{}]) do
-    Logger.debug("[FizZ] Generating Zig code for wrapper: #{wrapper}")
+    Logger.debug("[FizZ] generating Zig code for wrapper: #{wrapper}")
     include_paths = Keyword.get(opts, :include_paths, %{})
     library_paths = Keyword.get(opts, :library_paths, %{})
 
