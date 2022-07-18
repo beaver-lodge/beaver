@@ -89,12 +89,14 @@ defmodule Beaver.MixProject do
     end
   end
 
+  require Logger
+
   defp cmake(_) do
     cmake_project = "native/mlir-c"
     build = Path.join(Mix.Project.build_path(), "mlir-c-build")
     install = Path.join(Mix.Project.build_path(), "mlir-c-install")
 
-    IO.puts("[CMake] configuring...")
+    Logger.debug("[CMake] configuring...")
 
     {_, 0} =
       System.cmd("cmake", [
@@ -109,14 +111,14 @@ defmodule Beaver.MixProject do
         "-DCMAKE_INSTALL_PREFIX=#{install}"
       ])
 
-    IO.puts("[CMake] building...")
+    Logger.debug("[CMake] building...")
 
     with {_, 0} <- System.cmd("cmake", ["--build", build, "--target", "install"]) do
-      IO.puts("[CMake] installed to #{install}")
+      Logger.debug("[CMake] installed to #{install}")
       :ok
     else
       {error, _} ->
-        IO.puts(error)
+        Logger.error(error)
         {:error, [error]}
     end
   end
