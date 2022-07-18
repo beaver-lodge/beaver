@@ -1,17 +1,17 @@
-# FizZ
+# Fizz
 
-FizZ (**F**oreign **i**nterface **z**eal in **Z**ig) is an Elixir package for binding a C library.
+Fizz (**F**oreign **i**nterface **z**eal in **Z**ig) is an Elixir package for binding a C library.
 The zeal here is that an Erlang/Elixir user shouldn't be required to write a NIF to call a C function.
 The approach here is highly inspired by the TableGen/.inc source code generating in LLVM.
 
-## What FizZ does
+## What Fizz does
 
 - Make NIF a purely function dispatch. So that you can deal with the complicity in C/Zig and Elixir.
 - Make it possible to pattern matching a C type in Elixir.
 - Everything in Fizz is a NIF resource, including primitive types like integer and C struct. This makes it possible to pass them to C functions as pointers.
 - Fizz will generate a NIF function for every C function in your wrapper header, and register every C struct as NIF resource.
 
-## Cool features in FizZ enabled by Zig
+## Cool features in Fizz enabled by Zig
 
 - Packing anything into a resource
 
