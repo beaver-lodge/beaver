@@ -1,4 +1,6 @@
 defmodule Fizz do
+  require Logger
+
   @moduledoc """
   Documentation for `Fizz`.
   """
@@ -7,6 +9,7 @@ defmodule Fizz do
   Generate Zig code from a header and build a Zig project to produce a NIF library
   """
   def gen(wrapper, project_dir, opts \\ [include_paths: %{}, library_paths: %{}]) do
+    Logger.debug("[FizZ] Generating Zig code for wrapper: #{wrapper}")
     include_paths = Keyword.get(opts, :include_paths, %{})
     library_paths = Keyword.get(opts, :library_paths, %{})
 
@@ -218,6 +221,7 @@ defmodule Fizz do
     File.write!(Path.join(src_dir, "build.fizz.gen.zig"), build_source)
 
     with {_, 0} <- System.cmd("zig", ["build", "--prefix", dest_dir], cd: project_dir) do
+      Logger.debug("[FizZ] Zig library installed to: #{dest_dir}")
       :ok
     else
       {_error, _} ->
