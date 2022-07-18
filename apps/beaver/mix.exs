@@ -94,6 +94,8 @@ defmodule Beaver.MixProject do
     build = Path.join(Mix.Project.build_path(), "mlir-c-build")
     install = Path.join(Mix.Project.build_path(), "mlir-c-install")
 
+    IO.puts("[CMake] configuring...")
+
     {_, 0} =
       System.cmd("cmake", [
         "-S",
@@ -107,7 +109,7 @@ defmodule Beaver.MixProject do
         "-DCMAKE_INSTALL_PREFIX=#{install}"
       ])
 
-    IO.puts("[CMake] running")
+    IO.puts("[CMake] building...")
 
     with {_, 0} <- System.cmd("cmake", ["--build", build, "--target", "install"]) do
       IO.puts("[CMake] done")
