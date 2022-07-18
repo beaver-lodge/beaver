@@ -138,7 +138,7 @@ defmodule Fizz do
           for {arg, i} <- Enum.with_index(args) do
             """
               var arg#{i}: #{arg} = undefined;
-              if (beam.fetch_resource(arg#{i}, env, #{Function.resource_type_var(arg)}, args[#{i}])) |value| {
+              if (beam.fetch_resource(#{arg}, env, #{Function.resource_type_var(arg)}, args[#{i}])) |value| {
                 arg#{i} = value;
               } else |_| {
                 return beam.make_error_binary(env, "fail to fetch resource for arg#{i}, expected: #{arg}");
@@ -200,7 +200,7 @@ defmodule Fizz do
         """
         export fn #{Function.primitive_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
           var arg0: #{type} = undefined;
-          if (beam.fetch_resource(arg0, env, #{Function.resource_type_var(type)}, args[0])) |value| {
+          if (beam.fetch_resource(#{type}, env, #{Function.resource_type_var(type)}, args[0])) |value| {
             arg0 = value;
           } else |_| {
             return beam.make_error_binary(env, "fail to fetch resource, expected: #{type}");

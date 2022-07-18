@@ -44,8 +44,9 @@ export fn registered_ops(env: beam.env, _: c_int, _: [*c]const beam.term) beam.t
 }
 
 export fn resource_cstring_to_term_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var arg0: [*c]const u8 = undefined;
-    if (beam.fetch_resource(arg0, env, fizz.resource_type__c_ptr_const_u8, args[0])) |value| {
+    const T = [*c]const u8;
+    var arg0: T = undefined;
+    if (beam.fetch_resource(T, env, fizz.resource_type__c_ptr_const_u8, args[0])) |value| {
         arg0 = value;
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource");
@@ -55,7 +56,7 @@ export fn resource_cstring_to_term_charlist(env: beam.env, _: c_int, args: [*c]c
 
 export fn resource_bool_to_term(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var arg0: bool = undefined;
-    if (beam.fetch_resource(arg0, env, fizz.resource_type_bool, args[0])) |value| {
+    if (beam.fetch_resource(bool, env, fizz.resource_type_bool, args[0])) |value| {
         arg0 = value;
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource");

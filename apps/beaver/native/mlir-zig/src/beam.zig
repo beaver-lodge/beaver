@@ -1476,18 +1476,18 @@ pub export fn blank_upgrade(_: env, _: [*c]?*anyopaque, _: [*c]?*anyopaque, _: t
     return 0;
 }
 
-pub fn fetch_resource(x: anytype, environment: env, res_typ: resource_type, res_trm: term) !@TypeOf(x) {
+pub fn fetch_resource(comptime T: type, environment: env, res_typ: resource_type, res_trm: term) !T {
     var obj: ?*anyopaque = undefined;
 
     if (0 == e.enif_get_resource(environment, res_trm, res_typ, @ptrCast([*c]?*anyopaque, &obj))) {
         // not a resource, try getting a primitive term
-        return try get(@TypeOf(x), environment, res_trm);
+        return try get(T, environment, res_trm);
     }
     if (obj != null) {
-        var val: *@TypeOf(x) = @ptrCast(*@TypeOf(x), @alignCast(@alignOf(*@TypeOf(x)), obj));
+        var val: *T = @ptrCast(*T, @alignCast(@alignOf(*T), obj));
         return val.*;
     } else {
-        print("fail to get resource of type: {}\n", .{@TypeOf(x)});
+        print("fail to get resource of type: {}\n", .{T});
         return Error.FunctionClauseError;
     }
 }
@@ -1530,7 +1530,7 @@ pub fn get_resource_array_from_list(comptime ElementType: type, environment: env
 
     while (idx < size) {
         head = try get_head_and_iter(environment, &movable_list);
-        array_ptr[idx] = try fetch_resource(array_ptr[idx], environment, resource_type_element, head);
+        array_ptr[idx] = try fetch_resource(ElementType, environment, resource_type_element, head);
         // TODO: implement the getter, adding an argument of the element resource, and copy it to the array.
         idx += 1;
     }
