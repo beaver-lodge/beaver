@@ -23,7 +23,7 @@ The approach here is highly inspired by the TableGen/.inc source code generating
     [(address to item1), item1, item2, item3, ...]
   ```
 
-  So the memory is totally managed by Erlang, and you can safely read packed items because basically you can use Zig's comptime feature to infer everything involved.
+  So the memory is totally managed by Erlang, and you can use Zig's comptime feature to infer everything involved.
 
 - Saving lib/include path to a Zig source and use them in your `build.zig`. You can use Elixir to find all the paths. It is way better than do it with make/CMake because you got a whole programming language to do it.
 - Inter NIF resource exchange. Because it is Zig, just import the Zig source from another Hex package.
