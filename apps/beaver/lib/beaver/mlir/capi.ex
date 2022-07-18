@@ -71,7 +71,7 @@ defmodule Beaver.MLIR.CAPI do
         def unquote(String.to_atom(nif_name))(unquote_splicing(args_ast)),
           do: "failed to load NIF"
 
-      %Fizz.CodeGen.NIF{name: name, nif_name: nif_name, arity: arity, ret: ret} ->
+      %Fizz.CodeGen.NIF{name: name, nif_name: nif_name, ret: ret} ->
         return_module = Module.concat(__MODULE__, Fizz.module_name(ret))
 
         def unquote(String.to_atom(name))(unquote_splicing(args_ast)) do
