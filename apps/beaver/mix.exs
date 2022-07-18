@@ -112,7 +112,7 @@ defmodule Beaver.MixProject do
     IO.puts("[CMake] building...")
 
     with {_, 0} <- System.cmd("cmake", ["--build", build, "--target", "install"]) do
-      IO.puts("[CMake] done")
+      IO.puts("[CMake] installed to #{install}")
       :ok
     else
       {error, _} ->
