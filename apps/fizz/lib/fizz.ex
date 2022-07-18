@@ -38,15 +38,13 @@ defmodule Fizz do
     functions =
       String.split(out, "\n")
       |> Enum.filter(fn x -> String.contains?(x, "mlir") || String.contains?(x, "beaver") end)
-
-      # |> Enum.map(&IO.inspect/1)
       |> Enum.filter(fn x -> String.contains?(x, "pub extern fn") end)
 
+    # collecting functions with zig translate
     prints =
       for f <- functions do
         "pub extern fn " <> name = f
         name = name |> String.split("(") |> Enum.at(0)
-        # |> IO.inspect()
 
         """
         {
@@ -113,6 +111,17 @@ defmodule Fizz do
       |> Enum.uniq()
       |> Enum.sort()
 
+    array_types =
+      for type <- types do
+        Function.array_type_name(type)
+      end
+
+    ptr_types =
+      for type <- types do
+        Function.ptr_type_name(type)
+      end
+
+    # generate wrapper.inc.zig source
     source =
       for %Function{name: name, args: args, ret: ret} <- functions do
         proxy_args =
@@ -132,7 +141,7 @@ defmodule Fizz do
               if (beam.fetch_resource(arg#{i}, env, #{Function.resource_type_var(arg)}, args[#{i}])) |value| {
                 arg#{i} = value;
               } else |_| {
-                return beam.make_error_binary(env, "fail to fetch resource for arg#{i}");
+                return beam.make_error_binary(env, "fail to fetch resource for arg#{i}, expected: #{arg}");
               }
             """
           end
@@ -161,6 +170,76 @@ defmodule Fizz do
       end
       |> Enum.join("\n")
 
+    # types to generate array and pointer makers for. only C abi compatible types are supported.
+    element_types =
+      for "c.struct_" <> _ = type <- types do
+        type
+      end
+
+    primitive_types = [
+      "bool",
+      "c_int",
+      "c_uint",
+      "f32",
+      "f64",
+      "i16",
+      "i32",
+      "i64",
+      "i8",
+      "isize",
+      "u16",
+      "u32",
+      "u64",
+      "u8",
+      "usize",
+      "void"
+    ]
+
+    primitive_makers =
+      for type <- primitive_types do
+        """
+        export fn #{Function.primitive_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
+          var arg0: #{type} = undefined;
+          if (beam.fetch_resource(arg0, env, #{Function.resource_type_var(type)}, args[0])) |value| {
+            arg0 = value;
+          } else |_| {
+            return beam.make_error_binary(env, "fail to fetch resource, expected: #{type}");
+          }
+          return beam.make(#{type}, env, arg0) catch beam.make_error_binary(env, "fail create primitive from resource of #{type}");
+        }
+        """
+      end
+      |> Enum.join("\n")
+
+    makers =
+      for type <- element_types do
+        """
+        export fn #{Function.array_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
+          const ElementType: type = #{Function.process_type(type)};
+          const resource_type_element = #{Function.resource_type_var(type)};
+          const resource_type_array = #{Function.resource_type_var(Function.array_type_name(type))};
+          return beam.get_resource_array_from_list(ElementType, env, resource_type_element, resource_type_array, args[0]) catch beam.make_error_binary(env, "fail create array of #{type}");
+        }
+
+        export fn #{Function.ptr_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
+          const ElementType: type = #{Function.process_type(type)};
+          const resource_type_element = #{Function.resource_type_var(type)};
+          const resource_type_array = #{Function.resource_type_var(Function.ptr_type_name(type))};
+          return beam.get_resource_ptr_from_term(ElementType, env, resource_type_element, resource_type_array, args[0]) catch beam.make_error_binary(env, "fail create ptr of #{type}");
+        }
+        """
+      end
+      |> Enum.join("\n")
+
+    makers = makers <> primitive_makers
+    resource_types = Enum.uniq(types ++ array_types ++ ptr_types)
+
+    nifs =
+      Enum.map(functions, &Fizz.CodeGen.NIF.from_function/1) ++
+        Enum.map(element_types, &Fizz.CodeGen.NIF.array_maker/1) ++
+        Enum.map(element_types, &Fizz.CodeGen.NIF.ptr_maker/1) ++
+        Enum.map(primitive_types, &Fizz.CodeGen.NIF.primitive_maker/1)
+
     source = """
     pub const c = @cImport({
       @cDefine("_NO_CRT_STDIO_INLINE", "1");
@@ -168,22 +247,23 @@ defmodule Fizz do
     });
     const beam = @import("beam.zig");
     const e = @import("erl_nif.zig");
-    #{types |> Enum.map(&Function.resource_type_global/1) |> Enum.join("")}
+    #{resource_types |> Enum.map(&Function.resource_type_global/1) |> Enum.join("")}
     #{source}
-
+    #{makers}
     pub export fn __destroy__(_: beam.env, _: ?*anyopaque) void {
     }
     pub fn open_generated_resource_types(env: beam.env) void {
-      #{Enum.map(types, &Function.resource_open/1) |> Enum.join("  ")}
+    #{Enum.map(resource_types, &Function.resource_open/1) |> Enum.join("")}
     }
     pub export var generated_nifs = [_]e.ErlNifFunc{
-      #{Enum.map(functions, &Function.nif_declaration/1) |> Enum.join("  ")}
+      #{nifs |> Enum.map(&Fizz.CodeGen.NIF.gen/1) |> Enum.join("  ")}
     };
     """
 
     src_dir = Path.join(project_dir, "src")
     File.write!(Path.join(src_dir, "mlir.fizz.gen.zig"), source)
 
+    # generate build.inc.zig source
     build_source =
       for {name, path} <- include_paths do
         """
@@ -220,6 +300,15 @@ defmodule Fizz do
 
     File.write!(Path.join(src_dir, "build.fizz.gen.zig"), build_source)
 
+    if Mix.env() in [:test, :dev] do
+      with {_, 0} <- System.cmd("zig", ["fmt", "."], cd: project_dir) do
+        :ok
+      else
+        {_error, _} ->
+          Logger.warn("fail to run zig fmt")
+      end
+    end
+
     with {_, 0} <- System.cmd("zig", ["build", "--prefix", dest_dir], cd: project_dir) do
       Logger.debug("[Fizz] Zig library installed to: #{dest_dir}")
       :ok
@@ -228,7 +317,7 @@ defmodule Fizz do
         raise "fail to run zig compiler"
     end
 
-    {functions, types, dest_dir}
+    {nifs, types, dest_dir}
   end
 
   @doc """
@@ -242,6 +331,14 @@ defmodule Fizz do
     CString
   end
 
+  def module_name("[*c]const " <> type) do
+    "Array#{module_name(type)}" |> String.to_atom()
+  end
+
+  def module_name("[*c]" <> type) do
+    "Ptr#{module_name(type)}" |> String.to_atom()
+  end
+
   def module_name(type) do
     type |> String.capitalize() |> String.to_atom()
   end
@@ -252,5 +349,9 @@ defmodule Fizz do
 
   def unwrap_ref(arguments) when is_list(arguments) do
     Enum.map(arguments, &unwrap_ref/1)
+  end
+
+  def unwrap_ref(term) do
+    term
   end
 end

@@ -11,15 +11,16 @@ defmodule Beaver.MLIR.Type do
   end
 
   def equal?(a, b) do
-    CAPI.mlirTypeEqual(a, b) |> Exotic.Value.extract()
+    CAPI.mlirTypeEqual(a, b) |> CAPI.to_term()
   end
 
   def function(inputs, results, opts \\ []) do
     num_inputs = length(inputs)
     num_results = length(results)
-    inputs = inputs |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
-    results = results |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
-    CAPI.mlirFunctionTypeGet(num_inputs, inputs, num_results, results, opts)
+    inputs = inputs |> CAPI.array()
+    results = results |> CAPI.array()
+    ctx = MLIR.Managed.Context.from_opts(opts)
+    CAPI.mlirFunctionTypeGet(ctx, num_inputs, inputs, num_results, results)
   end
 
   def ranked_tensor(
@@ -33,6 +34,14 @@ defmodule Beaver.MLIR.Type do
     shape = shape |> Exotic.Value.Array.from_list({:i, 64}) |> Exotic.Value.get_ptr()
 
     CAPI.mlirRankedTensorTypeGet(rank, shape, element_type, encoding)
+  end
+
+  def unranked_tensor(%MLIR.CAPI.MlirType{} = element_type) do
+    CAPI.mlirUnrankedTensorTypeGet(element_type)
+  end
+
+  def complex(%MLIR.CAPI.MlirType{} = element_type) do
+    CAPI.mlirComplexTypeGet(element_type)
   end
 
   def memref(
@@ -66,13 +75,28 @@ defmodule Beaver.MLIR.Type do
     CAPI.mlirTupleTypeGet(ctx, num_elements, elements)
   end
 
+  def f16(opts \\ []) do
+    ctx = MLIR.Managed.Context.from_opts(opts)
+    CAPI.mlirF16TypeGet(ctx)
+  end
+
   def f32(opts \\ []) do
     ctx = MLIR.Managed.Context.from_opts(opts)
     CAPI.mlirF32TypeGet(ctx)
   end
 
+  def f64(opts \\ []) do
+    ctx = MLIR.Managed.Context.from_opts(opts)
+    CAPI.mlirF64TypeGet(ctx)
+  end
+
   def f(bitwidth, opts \\ []) when is_integer(bitwidth) do
     apply(__MODULE__, String.to_atom("f#{bitwidth}"), [opts])
+  end
+
+  def integer(bitwidth, opts \\ []) do
+    ctx = MLIR.Managed.Context.from_opts(opts)
+    CAPI.mlirIntegerTypeGet(ctx, bitwidth)
   end
 
   defdelegate i(bitwidth, opts \\ []), to: __MODULE__, as: :integer

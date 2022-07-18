@@ -1,4 +1,6 @@
 defmodule Beaver.MLIR.CAPI do
+  require Logger
+
   @moduledoc """
   This module calls C API of MLIR. These FFIs are generated from headers in LLVM repo and this repo's headers providing supplemental functions.
   """
@@ -17,7 +19,7 @@ defmodule Beaver.MLIR.CAPI do
   wrapper_header_path = Path.join(File.cwd!(), "native/wrapper.h")
   beaver_include = Path.join(File.cwd!(), "native/mlir-c/include")
 
-  {functions, types, dest_dir} =
+  {nifs, types, dest_dir} =
     Fizz.gen(wrapper_header_path, "native/mlir-zig",
       include_paths: %{
         llvm_include: Beaver.LLVM.Config.include_dir(),
@@ -40,7 +42,14 @@ defmodule Beaver.MLIR.CAPI do
       File.ln_s(dylib, so)
     end
 
-    :erlang.load_nif(nif_path, 0)
+    Logger.debug("[MLIR] loading NIF")
+
+    with :ok <- :erlang.load_nif(nif_path, 0) do
+      Logger.debug("[MLIR] NIF loaded")
+      :ok
+    else
+      error -> error
+    end
   end
 
   for type <- types do
@@ -54,27 +63,32 @@ defmodule Beaver.MLIR.CAPI do
   end
 
   @external_resource "capi/build.zig"
-  for %Fizz.CodeGen.Function{name: name, args: args, ret: ret} <- functions do
-    arity = length(args)
+  for nif <- nifs do
+    args_ast = Macro.generate_unique_arguments(nif.arity, __MODULE__)
 
-    args_ast = Macro.generate_unique_arguments(arity, __MODULE__)
+    case nif do
+      %Fizz.CodeGen.NIF{name: nil, nif_name: nif_name} ->
+        def unquote(String.to_atom(nif_name))(unquote_splicing(args_ast)),
+          do: "failed to load NIF"
 
-    fizz_func_name = String.to_atom("fizz_nif_" <> name)
+      %Fizz.CodeGen.NIF{name: name, nif_name: nif_name, arity: arity, ret: ret} ->
+        return_module = Module.concat(__MODULE__, Fizz.module_name(ret))
 
-    return_module = Module.concat(__MODULE__, Fizz.module_name(ret))
+        def unquote(String.to_atom(name))(unquote_splicing(args_ast)) do
+          refs = Fizz.unwrap_ref([unquote_splicing(args_ast)])
+          ref = apply(__MODULE__, unquote(String.to_atom(nif_name)), refs)
 
-    def unquote(String.to_atom(name))(unquote_splicing(args_ast)) do
-      refs = Fizz.unwrap_ref([unquote_splicing(args_ast)])
-      ref = apply(__MODULE__, unquote(fizz_func_name), refs)
-      struct!(unquote(return_module), %{ref: check!(ref), zig_t: String.to_atom(unquote(ret))})
+          struct!(unquote(return_module), %{ref: check!(ref), zig_t: String.to_atom(unquote(ret))})
+        end
+
+        def unquote(String.to_atom(nif_name))(unquote_splicing(args_ast)),
+          do: "failed to load NIF"
     end
-
-    def unquote(fizz_func_name)(unquote_splicing(args_ast)),
-      do: "failed to load NIF"
   end
 
   def registered_ops(), do: raise("NIF not loaded")
-  def cstring_to_charlist(_), do: raise("NIF not loaded")
+  def resource_bool_to_term(_), do: raise("NIF not loaded")
+  def resource_cstring_to_term_charlist(_), do: raise("NIF not loaded")
   def get_resource_bool(_), do: raise("NIF not loaded")
   def get_resource_c_string(_), do: raise("NIF not loaded")
   def bool(value) when is_boolean(value), do: %__MODULE__.Bool{ref: get_resource_bool(value)}
@@ -91,5 +105,60 @@ defmodule Beaver.MLIR.CAPI do
 
   def c_string(value) when is_binary(value) do
     %__MODULE__.CString{ref: check!(get_resource_c_string(value))}
+  end
+
+  def array(list) when is_list(list) do
+    uniq = Enum.map(list, fn %mod{} -> mod end) |> Enum.uniq()
+
+    case uniq |> Enum.count() do
+      1 ->
+        [%{zig_t: zig_t} | _] = list
+
+        maker =
+          zig_t
+          |> Atom.to_string()
+          |> Fizz.CodeGen.Function.array_maker_name()
+          |> String.to_atom()
+
+        ref = apply(__MODULE__, maker, [Enum.map(list, &Fizz.unwrap_ref/1)])
+
+        zig_t
+        |> Atom.to_string()
+        |> Fizz.CodeGen.Function.array_type_name()
+        |> Fizz.module_name()
+        |> then(fn m -> Module.concat(__MODULE__, m) end)
+        |> struct!(%{ref: check!(ref)})
+
+      0 ->
+        raise "TODO: return a null ptr"
+
+      _ ->
+        raise "not a list of same type"
+    end
+  end
+
+  def to_term(%{ref: ref, zig_t: zig_t}) do
+    apply(
+      __MODULE__,
+      String.to_atom(Fizz.CodeGen.Function.primitive_maker_name(Atom.to_string(zig_t))),
+      [ref]
+    )
+  end
+
+  def ptr(%{ref: ref, zig_t: zig_t}) do
+    maker =
+      zig_t
+      |> Atom.to_string()
+      |> Fizz.CodeGen.Function.ptr_maker_name()
+      |> String.to_atom()
+
+    ref = apply(__MODULE__, maker, [ref])
+
+    zig_t
+    |> Atom.to_string()
+    |> Fizz.CodeGen.Function.ptr_type_name()
+    |> Fizz.module_name()
+    |> then(fn m -> Module.concat(__MODULE__, m) end)
+    |> struct!(%{ref: check!(ref)})
   end
 end

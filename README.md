@@ -284,22 +284,6 @@ To name a few:
 
 Each of these sub-ecosystems starts with a seed project/library. Beaver should evolve to become a sub-ecosystem for compilers built with Elixir and MLIR.
 
-## Why Beaver uses C, C++ and Rust?
-
-Although this has the downside being confusing and overwhelming, mainly there are these considerations:
-
-- The most convenient way to ship a C/C++ library with a Elixir project is to use [the rustler project](https://github.com/rusterlium/rustler) to build a dynamic library.
-- The recommended way to build a non C++ binding to MLIR is to create an "aggregate" which is an achieve of all symbols of LLVM/MLIR APIs you want to use in one shared library.
-- Use libFFI to call functions dynamically whenever it is possible. Although this is less safe, it makes it possible to use macro to generate Elixir code from headers instead of writing hundreds (if not thousands) of NIFs for all LLVM/MLIR API.
-
-Here is the hierarchy of a typical function call in Beaver:
-
-- Higher level API in Elixir
-- libFFI in Elixir ([Exotic](/apps/exotic/README.md))
-- libFFI in Rust
-- default MLIR C API and some extensions, built as a dynamic library by Cargo and CMake
-- MLIR C++ API (wrap and unwrap following MLIR C API convention)
-
 ## How Beaver works with MLIR ODS definitions?
 
 PDL really opens a door to non C++ programming languages to build MLIR tools. Beaver will reuse PDL's implementations in LSP and C++ source codegen to generate Elixir code. The prominent part is that all ODS definitions will have their correspondent Elixir [Structs](https://elixir-lang.org/getting-started/structs.html) to be used in patterns and builders. Although this is actually a hack, it is kind of reliable considering PDL will always be part of the upstream LLVM mono-repo. We could update to its new APIs as PDL's implementation evolves. As long as it provides features like code completions and code generations, there will be some APIs in PDL's implementation we could reuse to collect and query ODS meta data.
@@ -311,7 +295,7 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 ## Development
 
 1. Install Elixir, https://elixir-lang.org/install.html
-2. Install Rust, https://rustup.rs/
+2. Install Zig, https://ziglang.org/learn/getting-started/#installing-zig
 3. Install LLVM/MLIR
 
 <!-- - Option #1,  -->

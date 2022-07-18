@@ -15,8 +15,7 @@
         "llvm-vs-code-extensions.vscode-clangd",
         "ms-vscode.cmake-tools",
         "JakeBecker.elixir-ls",
-        "llvm-vs-code-extensions.vscode-mlir",
-        "rust-lang.rust"
+        "llvm-vs-code-extensions.vscode-mlir"
     ],
     // Use 'forwardPorts' to make a list of ports inside the container available locally.
     // "forwardPorts": [],

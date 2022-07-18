@@ -3,10 +3,8 @@ defmodule Beaver.MLIR.Attribute do
   require Beaver.MLIR.CAPI
   alias Beaver.MLIR
 
-  def is_null(jit) do
-    jit
-    |> Exotic.Value.fetch(MLIR.CAPI.MlirAttribute, :ptr)
-    |> Exotic.Value.extract() == 0
+  def is_null(a) do
+    CAPI.beaverAttributeIsNull(a) |> CAPI.to_term()
   end
 
   def get(attr_str) when is_binary(attr_str) do
@@ -22,7 +20,7 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   def equal?(%MLIR.CAPI.MlirAttribute{} = a, %MLIR.CAPI.MlirAttribute{} = b) do
-    CAPI.mlirAttributeEqual(a, b) |> Exotic.Value.extract()
+    CAPI.mlirAttributeEqual(a, b) |> CAPI.to_term()
   end
 
   def to_string(attr) do
@@ -40,17 +38,22 @@ defmodule Beaver.MLIR.Attribute do
     CAPI.mlirDenseElementsAttrGet(shaped_type, num_elements, elements)
   end
 
-  def array(elements) when is_list(elements) do
-    array(elements, [])
-  end
-
-  def array(elements, opts) when is_list(elements) do
+  def array(elements, opts \\ []) when is_list(elements) do
+    ctx = MLIR.Managed.Context.from_opts(opts)
     num_elements = length(elements)
-    elements = elements |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()
-    CAPI.mlirArrayAttrGet(num_elements, elements, opts)
+    CAPI.mlirArrayAttrGet(ctx, num_elements, CAPI.array(elements))
   end
 
   def string(str, opts \\ []) when is_binary(str) do
-    CAPI.mlirStringAttrGet(MLIR.StringRef.create(str), opts)
+    ctx = MLIR.Managed.Context.from_opts(opts)
+    CAPI.mlirStringAttrGet(ctx, MLIR.StringRef.create(str))
+  end
+
+  def type(%CAPI.MlirType{} = t) do
+    CAPI.mlirTypeAttrGet(t)
+  end
+
+  def integer(%CAPI.MlirType{} = t, value) do
+    CAPI.mlirIntegerAttrGet(t, value)
   end
 end

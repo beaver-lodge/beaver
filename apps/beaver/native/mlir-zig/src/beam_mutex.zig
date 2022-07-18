@@ -2,9 +2,7 @@
 
 const e = @import("erl_nif.zig");
 
-const MutexError = error {
-    CreationFail
-};
+const MutexError = error{CreationFail};
 
 pub fn BeamMutex(comptime name: []const u8) type {
     return struct {
@@ -36,8 +34,7 @@ pub fn BeamMutex(comptime name: []const u8) type {
                     break :zero true;
                 },
                 e.EBUSY => false,
-                _ => unreachable
-
+                _ => unreachable,
             };
         }
 

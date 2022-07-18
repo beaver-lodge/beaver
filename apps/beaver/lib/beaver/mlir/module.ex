@@ -21,9 +21,7 @@ defmodule Beaver.MLIR.Module do
   end
 
   def is_null(module) do
-    module
-    |> Exotic.Value.fetch(MLIR.CAPI.MlirModule, :ptr)
-    |> Exotic.Value.extract() == 0
+    raise "TODO: add beaverModuleIsNull"
   end
 
   defp not_null!(module) do

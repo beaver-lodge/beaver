@@ -14,7 +14,7 @@ defmodule Beaver.MLIR.StringRef do
       string_ref
       |> CAPI.beaverStringRefGetData()
 
-    CAPI.cstring_to_charlist(ref)
+    CAPI.resource_cstring_to_term_charlist(ref)
     |> List.to_string()
   end
 

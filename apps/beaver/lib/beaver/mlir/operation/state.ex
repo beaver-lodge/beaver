@@ -2,8 +2,6 @@ defmodule Beaver.MLIR.Operation.State do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
   require Beaver.MLIR.CAPI
-  alias Exotic.Value.Array
-  alias Exotic.Value
   defstruct [:ref]
 
   def get!(name, location) when is_binary(name) do
@@ -18,7 +16,7 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   defp get_context(state) do
-    location = Exotic.Value.fetch(state, CAPI.MlirOperationState, :location)
+    location = CAPI.beaverMlirOperationStateGetLocation(state)
     CAPI.mlirLocationGetContext(location)
   end
 
@@ -40,7 +38,6 @@ defmodule Beaver.MLIR.Operation.State do
             _ ->
               v
           end
-          |> Exotic.Value.transmit()
 
         CAPI.mlirNamedAttributeGet(
           CAPI.mlirIdentifierGet(ctx, MLIR.StringRef.create(k)),
@@ -48,10 +45,10 @@ defmodule Beaver.MLIR.Operation.State do
         )
       end
 
-    array_ptr = named_attrs |> Enum.map(&Value.transmit/1) |> Array.get() |> Value.get_ptr()
+    array_ptr = named_attrs |> CAPI.array()
 
     CAPI.mlirOperationStateAddAttributes(
-      Value.get_ptr(state),
+      CAPI.ptr(state),
       length(attrs),
       array_ptr
     )
@@ -60,18 +57,14 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   def add_operand(state, operands) do
-    array =
-      operands
-      |> Enum.map(&Exotic.Value.transmit/1)
-      |> Array.get()
-      |> Value.get_ptr()
+    array = CAPI.array(operands)
 
-    CAPI.mlirOperationStateAddOperands(Value.get_ptr(state), length(operands), array)
+    CAPI.mlirOperationStateAddOperands(CAPI.ptr(state), length(operands), array)
     state
   end
 
   def add_result(state, []) do
-    CAPI.mlirOperationStateAddResults(Exotic.Value.get_ptr(state), 0, Exotic.Value.Ptr.null())
+    CAPI.mlirOperationStateAddResults(CAPI.ptr(state), 0, Exotic.Value.Ptr.null())
     state
   end
 
@@ -87,11 +80,9 @@ defmodule Beaver.MLIR.Operation.State do
         t ->
           t
       end)
-      |> Enum.map(&Exotic.Value.transmit/1)
-      |> Array.get()
-      |> Value.get_ptr()
+      |> CAPI.array()
 
-    CAPI.mlirOperationStateAddResults(Exotic.Value.get_ptr(state), length(result_types), array)
+    CAPI.mlirOperationStateAddResults(CAPI.ptr(state), length(result_types), array)
     state
   end
 
@@ -104,10 +95,10 @@ defmodule Beaver.MLIR.Operation.State do
         raise "not a region: #{inspect(other)}"
     end)
 
-    array_ptr = regions |> Enum.map(&Value.transmit/1) |> Array.get() |> Value.get_ptr()
+    array_ptr = regions |> CAPI.array()
 
     CAPI.mlirOperationStateAddOwnedRegions(
-      Value.get_ptr(state),
+      CAPI.ptr(state),
       length(regions),
       array_ptr
     )
@@ -116,10 +107,10 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   def add_successors(state, successors) when is_list(successors) do
-    array_ptr = successors |> Enum.map(&Value.transmit/1) |> Array.get() |> Value.get_ptr()
+    array_ptr = successors |> CAPI.array()
 
     CAPI.mlirOperationStateAddSuccessors(
-      Exotic.Value.get_ptr(state),
+      CAPI.ptr(state),
       length(successors),
       array_ptr
     )

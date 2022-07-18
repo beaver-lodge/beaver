@@ -125,3 +125,29 @@ beaverStringRefGetData(MlirStringRef string_ref) {
 MLIR_CAPI_EXPORTED size_t beaverStringRefGetLength(MlirStringRef string_ref) {
   return string_ref.length;
 }
+
+MLIR_CAPI_EXPORTED bool beaverContextIsNull(MlirContext w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverDialectIsNull(MlirDialect w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverDialectRegistryIsNull(MlirDialectRegistry w) {
+  return !w.ptr;
+}
+MLIR_CAPI_EXPORTED bool beaverLocationIsNull(MlirLocation w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverModuleIsNull(MlirModule w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverOperationIsNull(MlirOperation w) {
+  return !w.ptr;
+}
+MLIR_CAPI_EXPORTED bool beaverRegionIsNull(MlirRegion w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverBlockIsNull(MlirBlock w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverValueIsNull(MlirValue w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverTypeIsNull(MlirType w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverAttributeIsNull(MlirAttribute w) {
+  return !w.ptr;
+}
+MLIR_CAPI_EXPORTED bool beaverSymbolTableIsNull(MlirSymbolTable w) {
+  return !w.ptr;
+}
+
+MLIR_CAPI_EXPORTED MlirLocation
+beaverMlirOperationStateGetLocation(MlirOperationState state) {
+  return state.location;
+}

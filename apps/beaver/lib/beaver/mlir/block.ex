@@ -26,7 +26,7 @@ defmodule Beaver.MLIR.Block do
   end
 
   def get_arg!(block, index) when not is_nil(block) do
-    MLIR.CAPI.mlirBlockGetArgument(block, index) |> Exotic.Value.transmit()
+    MLIR.CAPI.mlirBlockGetArgument(block, index)
   end
 
   def create(arg_loc_pairs) when is_list(arg_loc_pairs) do
@@ -45,8 +45,8 @@ defmodule Beaver.MLIR.Block do
     end
 
     len = length(args)
-    args = args |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
-    locs = locs |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
+    args = args |> MLIR.CAPI.array()
+    locs = locs |> MLIR.CAPI.array()
 
     MLIR.CAPI.mlirBlockCreate(
       len,

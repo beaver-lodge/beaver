@@ -23,7 +23,7 @@ defmodule Beaver.MLIR.Operation do
   Create a new operation from a operation state
   """
   def create(state) do
-    state |> Exotic.Value.get_ptr() |> MLIR.CAPI.mlirOperationCreate()
+    state |> CAPI.ptr() |> MLIR.CAPI.mlirOperationCreate()
   end
 
   @doc """
@@ -76,7 +76,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def results(%MLIR.CAPI.MlirOperation{} = op) do
-    case CAPI.mlirOperationGetNumResults(op) |> Exotic.Value.extract() do
+    case CAPI.mlirOperationGetNumResults(op) |> CAPI.to_term() do
       0 ->
         op
 
@@ -134,9 +134,10 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def verify(op, opts \\ @default_verify_opts) do
+    op = from_module(op)
     dump = opts |> Keyword.get(:dump, false)
     dump_if_fail = opts |> Keyword.get(:dump_if_fail, false)
-    is_success = MLIR.CAPI.mlirOperationVerify(op) |> Exotic.Value.extract()
+    is_success = MLIR.CAPI.mlirOperationVerify(op) |> CAPI.to_term()
 
     if dump do
       Logger.warning("Start dumping op not verified. This might crash.")
@@ -183,5 +184,9 @@ defmodule Beaver.MLIR.Operation do
 
   def from_module(module = %CAPI.MlirModule{}) do
     CAPI.mlirModuleGetOperation(module)
+  end
+
+  def from_module(%CAPI.MlirOperation{} = op) do
+    op
   end
 end

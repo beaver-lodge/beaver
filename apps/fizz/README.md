@@ -34,6 +34,7 @@ Fizz borrows a lot of good ideas ~~and code~~ from Zigler (Zigler is awesome~) b
 
 - Fizz's primary goal is to help you consume a C library, not helping you write NIFs in Zig. With Fizz you don't write NIF directly, instead you provide NIF resource type conversion functions.
 - Fizz expects you to have a `build.zig` to build the Zig source generated from C header along with your hand-written Zig code. So if you want to also sneak CMake inside, go for it.
+- Fizz expects all memory are allocated and managed by Erlang as resource.
 
 ## Installation
 
