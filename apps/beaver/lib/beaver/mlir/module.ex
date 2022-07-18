@@ -21,7 +21,7 @@ defmodule Beaver.MLIR.Module do
   end
 
   def is_null(module) do
-    raise "TODO: add beaverModuleIsNull"
+    CAPI.beaverModuleIsNull(module) |> CAPI.to_term()
   end
 
   defp not_null!(module) do

@@ -34,7 +34,7 @@ defmodule Beaver.MLIR.Attribute do
 
   def dense_elements(elements, shaped_type) when is_list(elements) do
     num_elements = length(elements)
-    elements = elements |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()
+    elements = elements |> CAPI.array()
     CAPI.mlirDenseElementsAttrGet(shaped_type, num_elements, elements)
   end
 

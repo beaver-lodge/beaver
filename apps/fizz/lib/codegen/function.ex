@@ -52,16 +52,48 @@ defmodule Fizz.CodeGen.Function do
     "fizz_nif_#{func}"
   end
 
+  def array_maker_name(type) when is_atom(type) do
+    type
+    |> Atom.to_string()
+    |> array_maker_name()
+    |> String.to_atom()
+  end
+
   def array_maker_name(type) do
     "fizz_nif_get_resource_array_#{resource_type_var(type)}"
+  end
+
+  def ptr_maker_name(type) when is_atom(type) do
+    type
+    |> Atom.to_string()
+    |> ptr_maker_name()
+    |> String.to_atom()
   end
 
   def ptr_maker_name(type) do
     "fizz_nif_get_resource_ptr_#{resource_type_var(type)}"
   end
 
+  def primitive_maker_name(type) when is_atom(type) do
+    type
+    |> Atom.to_string()
+    |> primitive_maker_name()
+    |> String.to_atom()
+  end
+
   def primitive_maker_name(type) do
     "fizz_nif_get_primitive_from_#{resource_type_var(type)}"
+  end
+
+  def resource_maker_name(type) when is_atom(type) do
+    type
+    |> Atom.to_string()
+    |> primitive_maker_name()
+    |> String.to_atom()
+  end
+
+  def resource_maker_name(type) do
+    "fizz_nif_get_resource_of_#{resource_type_var(type)}"
   end
 
   def array_type_name(type) do

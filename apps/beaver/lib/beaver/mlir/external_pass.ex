@@ -25,7 +25,7 @@ defmodule Beaver.MLIR.ExternalPass do
           __MODULE__,
           __MODULE__,
           # we should only expose run and initialize is optional, so pass a null ptr
-          Exotic.Value.Ptr.null(),
+          nil,
           __MODULE__,
           pass_module
         ]
@@ -38,9 +38,9 @@ defmodule Beaver.MLIR.ExternalPass do
       description,
       emptyOpName,
       0,
-      Exotic.Value.Ptr.null(),
+      nil,
       callbacks,
-      Exotic.Value.Ptr.null()
+      nil
     )
   end
 

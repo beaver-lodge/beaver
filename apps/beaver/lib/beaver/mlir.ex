@@ -67,4 +67,8 @@ defmodule Beaver.MLIR do
         raise error_msg
     end
   end
+
+  def is_null(%MlirAttribute{} = v) do
+    CAPI.beaverAttributeIsNull(v) |> CAPI.to_term()
+  end
 end

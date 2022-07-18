@@ -105,12 +105,41 @@ export fn get_resource_c_string(env: beam.env, _: c_int, args: [*c]const beam.te
     return e.enif_make_resource(env, ptr);
 }
 
+export fn beaver_nif_NamedAttributeGet(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+    var arg0: c.struct_MlirIdentifier = undefined;
+    if (beam.fetch_resource(c.struct_MlirIdentifier, env, fizz.resource_type_c_struct_MlirIdentifier, args[0])) |value| {
+        arg0 = value;
+    } else |_| {
+        return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirIdentifier");
+    }
+    var arg1: c.struct_MlirAttribute = undefined;
+    if (beam.fetch_resource(c.struct_MlirAttribute, env, fizz.resource_type_c_struct_MlirAttribute, args[1])) |value| {
+        arg1 = value;
+    } else |_| {
+        return beam.make_error_binary(env, "fail to fetch resource for argument #2, expected: c.struct_MlirAttribute");
+    }
+
+    var ptr: ?*anyopaque = e.enif_alloc_resource(fizz.resource_type_c_struct_MlirNamedAttribute, @sizeOf(c.struct_MlirNamedAttribute));
+
+    const RType = c.struct_MlirNamedAttribute;
+    var obj: *RType = undefined;
+
+    if (ptr == null) {
+        unreachable();
+    } else {
+        obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
+        obj.* = c.struct_MlirNamedAttribute{ .name = arg0, .attribute = arg1 };
+    }
+    return e.enif_make_resource(env, ptr);
+}
+
 pub export const handwritten_nifs = ([_]e.ErlNifFunc{
     e.ErlNifFunc{ .name = "registered_ops", .arity = 0, .fptr = registered_ops, .flags = 0 },
     e.ErlNifFunc{ .name = "resource_cstring_to_term_charlist", .arity = 1, .fptr = resource_cstring_to_term_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "resource_bool_to_term", .arity = 1, .fptr = resource_bool_to_term, .flags = 0 },
     e.ErlNifFunc{ .name = "get_resource_bool", .arity = 1, .fptr = get_resource_bool, .flags = 0 },
     e.ErlNifFunc{ .name = "get_resource_c_string", .arity = 1, .fptr = get_resource_c_string, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_nif_MlirNamedAttributeGet", .arity = 2, .fptr = beaver_nif_NamedAttributeGet, .flags = 0 },
 });
 
 pub export const num_nifs = fizz.generated_nifs.len + handwritten_nifs.len;

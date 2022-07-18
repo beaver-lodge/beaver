@@ -1476,10 +1476,31 @@ pub export fn blank_upgrade(_: env, _: [*c]?*anyopaque, _: [*c]?*anyopaque, _: t
     return 0;
 }
 
-pub fn fetch_resource(comptime T: type, environment: env, res_typ: resource_type, res_trm: term) !T {
-    var obj: ?*anyopaque = undefined;
+const nil_slice = "nil"[0..];
+pub fn is_nil(environment: env, val: term) !bool {
+    var str: []u8 = undefined;
+    str = try get_atom_slice(environment, val);
+    defer allocator.free(str);
+    if (str_cmp(nil_slice, str)) {
+        return true;
+    } else {
+        return false;
+    }
+}
 
+pub fn is_nil2(environment: env, val: term) bool {
+    return is_nil(environment, val) catch false;
+}
+
+pub fn fetch_resource(comptime T: type, environment: env, res_typ: resource_type, res_trm: term) !T {
+    var obj: ?*anyopaque = null;
+    // print("Type of T {s}\n", .{T});
     if (0 == e.enif_get_resource(environment, res_trm, res_typ, @ptrCast([*c]?*anyopaque, &obj))) {
+        // if it nil, return null
+        // if (is_nil2(environment, res_trm)) {
+        //     var val: *T = @ptrCast(*T, @alignCast(@alignOf(*T), obj));
+        //     return val.*;
+        // }
         // not a resource, try getting a primitive term
         return try get(T, environment, res_trm);
     }
@@ -1522,7 +1543,11 @@ pub fn get_resource_array_from_list(comptime ElementType: type, environment: env
         var offset_ptr = @ptrCast(U8Ptr, ptr);
         offset_ptr += @alignOf(ArrayPtr);
         array_ptr = @ptrCast(ArrayPtr, @alignCast(@alignOf(ElementType), offset_ptr));
-        obj.* = @ptrCast(ArrayPtr, @alignCast(@alignOf(ArrayPtr), offset_ptr));
+        if (size > 0) {
+            obj.* = @ptrCast(ArrayPtr, @alignCast(@alignOf(ArrayPtr), offset_ptr));
+        } else {
+            obj.* = 0;
+        }
     }
     var idx: usize = 0;
     var head: term = undefined;
@@ -1531,7 +1556,6 @@ pub fn get_resource_array_from_list(comptime ElementType: type, environment: env
     while (idx < size) {
         head = try get_head_and_iter(environment, &movable_list);
         array_ptr[idx] = try fetch_resource(ElementType, environment, resource_type_element, head);
-        // TODO: implement the getter, adding an argument of the element resource, and copy it to the array.
         idx += 1;
     }
     return e.enif_make_resource(environment, ptr);

@@ -61,9 +61,39 @@ MLIR_CAPI_EXPORTED bool beaverValueIsNull(MlirValue value);
 MLIR_CAPI_EXPORTED bool beaverTypeIsNull(MlirType type);
 MLIR_CAPI_EXPORTED bool beaverAttributeIsNull(MlirAttribute attr);
 MLIR_CAPI_EXPORTED bool beaverSymbolTableIsNull(MlirSymbolTable symbolTable);
+
+MLIR_CAPI_EXPORTED MlirStringRef
+beaverMlirOperationStateGetName(MlirOperationState state);
+MLIR_CAPI_EXPORTED MlirContext
+beaverMlirOperationStateGetContext(MlirOperationState state);
 MLIR_CAPI_EXPORTED MlirLocation
 beaverMlirOperationStateGetLocation(MlirOperationState state);
+MLIR_CAPI_EXPORTED intptr_t
+beaverMlirOperationStateGetNumResults(MlirOperationState state);
+MLIR_CAPI_EXPORTED intptr_t
+beaverMlirOperationStateGetNumOperands(MlirOperationState state);
+MLIR_CAPI_EXPORTED intptr_t
+beaverMlirOperationStateGetNumRegions(MlirOperationState state);
+MLIR_CAPI_EXPORTED intptr_t
+beaverMlirOperationStateGetNumAttributes(MlirOperationState state);
 
+MLIR_CAPI_EXPORTED bool beaverLogicalResultIsSuccess(MlirLogicalResult res);
+MLIR_CAPI_EXPORTED bool beaverLogicalResultIsFailure(MlirLogicalResult res);
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultSuccess();
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultFailure();
+
+MLIR_CAPI_EXPORTED
+MlirIdentifier beaverMlirNamedAttributeGetName(MlirNamedAttribute);
+MLIR_CAPI_EXPORTED
+MlirAttribute beaverMlirNamedAttributeGetAttribute(MlirNamedAttribute);
+MLIR_CAPI_EXPORTED void
+beaverOperationStateAddAttributes(MlirOperationState *state, intptr_t n,
+                                  MlirStringRef const *names,
+                                  MlirAttribute const *attributes);
+
+#include "mlir-c/ExecutionEngine.h"
+
+MLIR_CAPI_EXPORTED bool beaverMlirExecutionEngineIsNull(MlirExecutionEngine w);
 #ifdef __cplusplus
 }
 #endif

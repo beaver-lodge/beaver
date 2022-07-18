@@ -59,7 +59,7 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
       when is_list(elements) and is_list(shape) do
     arr_ptr =
       if elements == [] do
-        Exotic.Value.Ptr.null()
+        nil
       else
         elements |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
       end
@@ -102,7 +102,7 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
         :aligned
       )
 
-    if Exotic.Value.extract(ptr) == Exotic.Value.extract(Exotic.Value.Ptr.null()) do
+    if Exotic.Value.extract(ptr) == Exotic.Value.extract(nil) do
       raise "cannot read from memref of null pointer"
     end
 

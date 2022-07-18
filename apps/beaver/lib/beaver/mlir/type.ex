@@ -23,16 +23,28 @@ defmodule Beaver.MLIR.Type do
     CAPI.mlirFunctionTypeGet(ctx, num_inputs, inputs, num_results, results)
   end
 
+  def ranked_tensor(shape, element_type, encoding \\ nil)
+
   def ranked_tensor(
         shape,
         %MLIR.CAPI.MlirType{} = element_type,
-        encoding \\ Exotic.Value.Ptr.null()
+        nil
+      )
+      when is_list(shape) do
+    ranked_tensor(shape, element_type, CAPI.mlirAttributeGetNull())
+  end
+
+  def ranked_tensor(
+        shape,
+        %MLIR.CAPI.MlirType{} = element_type,
+        encoding
       )
       when is_list(shape) do
     rank = length(shape)
 
-    shape = shape |> Exotic.Value.Array.from_list({:i, 64}) |> Exotic.Value.get_ptr()
+    shape = shape |> MLIR.CAPI.array()
 
+    CAPI.mlirAttributeGetNull()
     CAPI.mlirRankedTensorTypeGet(rank, shape, element_type, encoding)
   end
 
@@ -47,16 +59,16 @@ defmodule Beaver.MLIR.Type do
   def memref(
         shape,
         %MLIR.CAPI.MlirType{} = element_type,
-        opts \\ [layout: Exotic.Value.Ptr.null(), memory_space: Exotic.Value.Ptr.null()]
+        opts \\ [layout: nil, memory_space: nil]
       )
       when is_list(shape) do
     rank = length(shape)
 
-    shape = shape |> Exotic.Value.Array.from_list({:i, 64}) |> Exotic.Value.get_ptr()
+    shape = shape |> MLIR.CAPI.array()
 
     [layout: layout, memory_space: memory_space] =
       for k <- [:layout, :memory_space] do
-        {k, Keyword.get(opts, k, Exotic.Value.Ptr.null())}
+        {k, Keyword.get(opts, k, nil)}
       end
 
     CAPI.mlirMemRefTypeGet(element_type, rank, shape, layout, memory_space)
@@ -64,13 +76,13 @@ defmodule Beaver.MLIR.Type do
 
   def vector(shape, element_type) when is_list(shape) do
     rank = length(shape)
-    shape = shape |> Exotic.Value.Array.from_list({:i, 64}) |> Exotic.Value.get_ptr()
+    shape = shape |> CAPI.array()
     CAPI.mlirVectorTypeGet(rank, shape, element_type)
   end
 
   def tuple(elements, opts \\ []) when is_list(elements) do
     num_elements = length(elements)
-    elements = elements |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()
+    elements = elements |> CAPI.array()
     ctx = MLIR.Managed.Context.from_opts(opts)
     CAPI.mlirTupleTypeGet(ctx, num_elements, elements)
   end

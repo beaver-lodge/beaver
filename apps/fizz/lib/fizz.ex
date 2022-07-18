@@ -84,8 +84,8 @@ defmodule Fizz do
              System.cmd("zig", ["run", dst] ++ include_path_args, stderr_to_stdout: true) do
         out
       else
-        {_error, _} ->
-          raise "fail to run zig compiler"
+        {_error, ret_code} ->
+          raise "fail to run reflection, ret_code: #{ret_code}"
       end
 
     alias Fizz.CodeGen.Function
@@ -124,11 +124,6 @@ defmodule Fizz do
     # generate wrapper.inc.zig source
     source =
       for %Function{name: name, args: args, ret: ret} <- functions do
-        proxy_args =
-          for {_arg, i} <- Enum.with_index(args) do
-            "arg#{i}: anytype"
-          end
-
         proxy_arg_uses =
           for {_arg, i} <- Enum.with_index(args) do
             "arg#{i}"
@@ -141,16 +136,12 @@ defmodule Fizz do
               if (beam.fetch_resource(#{arg}, env, #{Function.resource_type_var(arg)}, args[#{i}])) |value| {
                 arg#{i} = value;
               } else |_| {
-                return beam.make_error_binary(env, "fail to fetch resource for arg#{i}, expected: #{arg}");
+                return beam.make_error_binary(env, "fail to fetch resource for argument ##{i + 1}, expected: #{arg}");
               }
             """
           end
 
         """
-        fn #{name}Wrapper(ret: anytype, #{Enum.join(proxy_args, ", ")}) void {
-          ret.* = c.#{name}(#{Enum.join(proxy_arg_uses, ", ")});
-        }
-
         export fn fizz_nif_#{name}(env: beam.env, _: c_int, #{if length(args) == 0, do: "_", else: "args"}: [*c] const beam.term) beam.term {
         #{Enum.join(arg_vars, "")}
           var ptr : ?*anyopaque = e.enif_alloc_resource(#{Function.resource_type_var(ret)}, @sizeOf(#{ret}));
@@ -162,8 +153,8 @@ defmodule Fizz do
             unreachable();
           } else {
             obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
+            obj.* = c.#{name}(#{Enum.join(proxy_arg_uses, ", ")});
           }
-          #{name}Wrapper(obj, #{Enum.join(proxy_arg_uses, ", ")});
           return e.enif_make_resource(env, ptr);
         }
         """
@@ -176,27 +167,10 @@ defmodule Fizz do
         type
       end
 
-    primitive_types = [
-      "bool",
-      "c_int",
-      "c_uint",
-      "f32",
-      "f64",
-      "i16",
-      "i32",
-      "i64",
-      "i8",
-      "isize",
-      "u16",
-      "u32",
-      "u64",
-      "u8",
-      "usize",
-      "void"
-    ]
+    element_types = element_types ++ Enum.reject(primitive_types(), fn t -> t == "void" end)
 
     primitive_makers =
-      for type <- primitive_types do
+      for type <- primitive_types() do
         """
         export fn #{Function.primitive_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
           var arg0: #{type} = undefined;
@@ -206,6 +180,22 @@ defmodule Fizz do
             return beam.make_error_binary(env, "fail to fetch resource, expected: #{type}");
           }
           return beam.make(#{type}, env, arg0) catch beam.make_error_binary(env, "fail create primitive from resource of #{type}");
+        }
+        export fn #{Function.resource_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
+          var ptr: ?*anyopaque = e.enif_alloc_resource(#{Function.resource_type_var(type)}, @sizeOf(#{type}));
+          const RType = #{type};
+          var obj: *RType = undefined;
+          if (ptr == null) {
+              unreachable();
+          } else {
+              obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
+          }
+          if (beam.get(RType, env, args[0])) |value| {
+              obj.* = value;
+              return e.enif_make_resource(env, ptr);
+          } else |_| {
+              return beam.make_error_binary(env, "launching nif");
+          }
         }
         """
       end
@@ -238,7 +228,8 @@ defmodule Fizz do
       Enum.map(functions, &Fizz.CodeGen.NIF.from_function/1) ++
         Enum.map(element_types, &Fizz.CodeGen.NIF.array_maker/1) ++
         Enum.map(element_types, &Fizz.CodeGen.NIF.ptr_maker/1) ++
-        Enum.map(primitive_types, &Fizz.CodeGen.NIF.primitive_maker/1)
+        Enum.map(primitive_types(), &Fizz.CodeGen.NIF.resource_maker/1) ++
+        Enum.map(primitive_types(), &Fizz.CodeGen.NIF.primitive_maker/1)
 
     source = """
     pub const c = @cImport({
@@ -313,8 +304,8 @@ defmodule Fizz do
       Logger.debug("[Fizz] Zig library installed to: #{dest_dir}")
       :ok
     else
-      {_error, _} ->
-        raise "fail to run zig compiler"
+      {_error, ret_code} ->
+        raise "fail to run zig compiler, ret_code: #{ret_code}"
     end
 
     {nifs, types, dest_dir}
@@ -343,6 +334,18 @@ defmodule Fizz do
     type |> String.capitalize() |> String.to_atom()
   end
 
+  def is_array("[*c]const " <> _type) do
+    true
+  end
+
+  def is_array(type) when is_binary(type) do
+    false
+  end
+
+  def element_type("[*c]const " <> type) do
+    type
+  end
+
   def unwrap_ref(%{ref: ref}) do
     ref
   end
@@ -353,5 +356,32 @@ defmodule Fizz do
 
   def unwrap_ref(term) do
     term
+  end
+
+  def primitive_types do
+    [
+      "bool",
+      "c_int",
+      "c_uint",
+      "f32",
+      "f64",
+      "i16",
+      "i32",
+      "i64",
+      "i8",
+      "isize",
+      "u16",
+      "u32",
+      "u64",
+      "u8",
+      "usize",
+      "void"
+    ]
+  end
+
+  def is_primitive("void"), do: false
+
+  def is_primitive(type) do
+    type in primitive_types()
   end
 end

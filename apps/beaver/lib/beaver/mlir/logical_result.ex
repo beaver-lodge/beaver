@@ -3,7 +3,7 @@ defmodule Beaver.MLIR.LogicalResult do
 
   def success?(result) do
     result
-    |> Exotic.Value.fetch(MLIR.CAPI.MlirLogicalResult, :value)
-    |> Exotic.Value.extract() != 0
+    |> MLIR.CAPI.beaverLogicalResultIsSuccess()
+    |> MLIR.CAPI.to_term()
   end
 end

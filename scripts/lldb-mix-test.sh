@@ -9,7 +9,7 @@ EXE=$BINDIR/erlexec
 echo "ROOT_DIR: $ROOT_DIR"
 echo "VERSION: $VERSION"
 echo "EXE: $EXE"
-FULL=$(ELIXIR_CLI_DRY_RUN=1 mix test --exclude slow)
+FULL=$(ELIXIR_CLI_DRY_RUN=1 mix test)
 FULL=${FULL/erl/${EXE}}
 echo "FULL: $FULL"
 lldb -- $FULL

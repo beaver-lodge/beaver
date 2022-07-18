@@ -34,6 +34,13 @@ defmodule Fizz.CodeGen.NIF do
     }
   end
 
+  def resource_maker(type) do
+    %__MODULE__{
+      nif_name: Fizz.CodeGen.Function.resource_maker_name(type),
+      arity: 1
+    }
+  end
+
   def gen(%__MODULE__{nif_name: nif_name, arity: arity}) do
     """
     e.ErlNifFunc{.name = "#{nif_name}", .arity = #{arity}, .fptr = #{nif_name}, .flags = 0},

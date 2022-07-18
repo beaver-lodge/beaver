@@ -1,12 +1,13 @@
 defmodule Beaver.MLIR.ExecutionEngine do
   alias Beaver.MLIR
   alias Beaver.MLIR.Pass.Composer
+  alias Beaver.MLIR.CAPI
   import Beaver.MLIR.CAPI
 
   def is_null(jit) do
     jit
-    |> Exotic.Value.fetch(MLIR.CAPI.MlirExecutionEngine, :ptr)
-    |> Exotic.Value.extract() == 0
+    |> beaverMlirExecutionEngineIsNull()
+    |> to_term()
   end
 
   @doc """
@@ -20,10 +21,15 @@ defmodule Beaver.MLIR.ExecutionEngine do
     shared_lib_paths = Keyword.get(opts, :shared_lib_paths, [])
 
     shared_lib_paths_ptr =
-      shared_lib_paths
-      |> Enum.map(&MLIR.StringRef.create/1)
-      |> Exotic.Value.Array.get()
-      |> Exotic.Value.get_ptr()
+      case shared_lib_paths do
+        [] ->
+          MLIR.CAPI.ArrayMlirStringRef.create([])
+
+        _ ->
+          shared_lib_paths
+          |> Enum.map(&MLIR.StringRef.create/1)
+          |> MLIR.CAPI.array()
+      end
 
     ctx =
       MLIR.CAPI.mlirModuleGetOperation(module)
@@ -66,8 +72,8 @@ defmodule Beaver.MLIR.ExecutionEngine do
   invoke a function by symbol name. The arguments should be a list of Exotic.Valuable
   """
   def invoke!(jit, symbol, args, return) when is_list(args) do
-    arg_ptr_list = args |> Enum.map(&Exotic.Value.get_ptr/1)
-    return_ptr = return |> Exotic.Value.get_ptr()
+    arg_ptr_list = args |> Enum.map(&CAPI.ptr/1)
+    return_ptr = return |> CAPI.ptr()
     result = do_invoke!(jit, symbol, arg_ptr_list ++ [return_ptr])
 
     if MLIR.LogicalResult.success?(result) do

@@ -146,8 +146,81 @@ MLIR_CAPI_EXPORTED bool beaverAttributeIsNull(MlirAttribute w) {
 MLIR_CAPI_EXPORTED bool beaverSymbolTableIsNull(MlirSymbolTable w) {
   return !w.ptr;
 }
+MLIR_CAPI_EXPORTED bool beaverMlirExecutionEngineIsNull(MlirExecutionEngine w) {
+  return !w.ptr;
+}
 
 MLIR_CAPI_EXPORTED MlirLocation
 beaverMlirOperationStateGetLocation(MlirOperationState state) {
   return state.location;
+}
+
+MLIR_CAPI_EXPORTED intptr_t
+beaverMlirOperationStateGetNumResults(MlirOperationState state) {
+  return state.nResults;
+}
+
+MLIR_CAPI_EXPORTED intptr_t
+beaverMlirOperationStateGetNumOperands(MlirOperationState state) {
+  return state.nOperands;
+}
+
+MLIR_CAPI_EXPORTED intptr_t
+beaverMlirOperationStateGetNumRegions(MlirOperationState state) {
+  return state.nRegions;
+}
+
+MLIR_CAPI_EXPORTED intptr_t
+beaverMlirOperationStateGetNumAttributes(MlirOperationState state) {
+  return state.nAttributes;
+}
+
+MLIR_CAPI_EXPORTED MlirStringRef
+beaverMlirOperationStateGetName(MlirOperationState state) {
+  return state.name;
+}
+
+MLIR_CAPI_EXPORTED MlirContext
+beaverMlirOperationStateGetContext(MlirOperationState state) {
+  return mlirLocationGetContext(state.location);
+}
+
+MLIR_CAPI_EXPORTED bool beaverLogicalResultIsSuccess(MlirLogicalResult res) {
+  return mlirLogicalResultIsSuccess(res);
+}
+
+MLIR_CAPI_EXPORTED bool beaverLogicalResultIsFailure(MlirLogicalResult res) {
+  return mlirLogicalResultIsFailure(res);
+}
+
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultSuccess() {
+  return mlirLogicalResultSuccess();
+}
+
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultFailure() {
+  return mlirLogicalResultFailure();
+}
+
+MLIR_CAPI_EXPORTED
+MlirIdentifier beaverMlirNamedAttributeGetName(MlirNamedAttribute na) {
+  return na.name;
+}
+
+MLIR_CAPI_EXPORTED
+MlirAttribute beaverMlirNamedAttributeGetAttribute(MlirNamedAttribute na) {
+  return na.attribute;
+}
+
+MLIR_CAPI_EXPORTED
+void beaverOperationStateAddAttributes(MlirOperationState *state, intptr_t n,
+                                       MlirStringRef const *names,
+                                       MlirAttribute const *attributes) {
+  MlirNamedAttribute na_arr[n];
+  for (intptr_t i = 0; i < n; ++i) {
+    auto attr = unwrap(attributes[i]);
+    auto name = mlirIdentifierGet(wrap(attr.getContext()), names[i]);
+    auto na = MlirNamedAttribute{name, wrap(attr)};
+    na_arr[i] = na;
+  }
+  mlirOperationStateAddAttributes(state, n, na_arr);
 }

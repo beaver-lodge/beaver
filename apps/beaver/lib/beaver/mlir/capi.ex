@@ -53,8 +53,37 @@ defmodule Beaver.MLIR.CAPI do
   end
 
   for type <- types do
+    IO.inspect(type)
+
     defmodule Module.concat(__MODULE__, Fizz.module_name(type)) do
       defstruct ref: nil, zig_t: String.to_atom(type)
+
+      if Fizz.is_array(type) do
+        @maker Fizz.element_type(type)
+               |> Fizz.CodeGen.Function.array_maker_name()
+               |> String.to_atom()
+
+        def create(list) do
+          ref = Beaver.MLIR.CAPI.check!(apply(Beaver.MLIR.CAPI, @maker, [list]))
+
+          %__MODULE__{
+            ref: ref
+          }
+        end
+      end
+
+      if Fizz.is_primitive(type) do
+        @maker Fizz.CodeGen.Function.resource_maker_name(type)
+               |> String.to_atom()
+
+        def create(list) do
+          ref = Beaver.MLIR.CAPI.check!(apply(Beaver.MLIR.CAPI, @maker, [list]))
+
+          %__MODULE__{
+            ref: ref
+          }
+        end
+      end
     end
   end
 
@@ -90,6 +119,7 @@ defmodule Beaver.MLIR.CAPI do
   def resource_bool_to_term(_), do: raise("NIF not loaded")
   def resource_cstring_to_term_charlist(_), do: raise("NIF not loaded")
   def get_resource_bool(_), do: raise("NIF not loaded")
+  def beaver_nif_MlirNamedAttributeGet(_, _), do: raise("NIF not loaded")
   def get_resource_c_string(_), do: raise("NIF not loaded")
   def bool(value) when is_boolean(value), do: %__MODULE__.Bool{ref: get_resource_bool(value)}
 
@@ -107,6 +137,20 @@ defmodule Beaver.MLIR.CAPI do
     %__MODULE__.CString{ref: check!(get_resource_c_string(value))}
   end
 
+  def array([]) do
+    raise "Empty list found. Use a maker to create empty array. For instance: CAPI.ArrayI64.create([])"
+  end
+
+  def array([head | tail] = list) when is_integer(head) do
+    if not Enum.all?(tail, &is_integer/1) do
+      raise "all elements must be integers"
+    end
+
+    %__MODULE__.ArrayI64{
+      ref: fizz_nif_get_resource_array_resource_type_i64(list)
+    }
+  end
+
   def array(list) when is_list(list) do
     uniq = Enum.map(list, fn %mod{} -> mod end) |> Enum.uniq()
 
@@ -114,11 +158,7 @@ defmodule Beaver.MLIR.CAPI do
       1 ->
         [%{zig_t: zig_t} | _] = list
 
-        maker =
-          zig_t
-          |> Atom.to_string()
-          |> Fizz.CodeGen.Function.array_maker_name()
-          |> String.to_atom()
+        maker = Fizz.CodeGen.Function.array_maker_name(zig_t)
 
         ref = apply(__MODULE__, maker, [Enum.map(list, &Fizz.unwrap_ref/1)])
 
@@ -128,9 +168,6 @@ defmodule Beaver.MLIR.CAPI do
         |> Fizz.module_name()
         |> then(fn m -> Module.concat(__MODULE__, m) end)
         |> struct!(%{ref: check!(ref)})
-
-      0 ->
-        raise "TODO: return a null ptr"
 
       _ ->
         raise "not a list of same type"
@@ -146,11 +183,7 @@ defmodule Beaver.MLIR.CAPI do
   end
 
   def ptr(%{ref: ref, zig_t: zig_t}) do
-    maker =
-      zig_t
-      |> Atom.to_string()
-      |> Fizz.CodeGen.Function.ptr_maker_name()
-      |> String.to_atom()
+    maker = Fizz.CodeGen.Function.ptr_maker_name(zig_t)
 
     ref = apply(__MODULE__, maker, [ref])
 

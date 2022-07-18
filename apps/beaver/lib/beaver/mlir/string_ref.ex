@@ -50,7 +50,7 @@ defmodule Beaver.MLIR.StringRef do
     apply(module, function, [
       object,
       Exotic.Value.as_ptr(string_ref_callback_closure),
-      Exotic.Value.Ptr.null()
+      nil
     ])
 
     string_ref_callback_closure

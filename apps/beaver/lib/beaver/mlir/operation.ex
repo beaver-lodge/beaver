@@ -22,6 +22,10 @@ defmodule Beaver.MLIR.Operation do
   @doc """
   Create a new operation from a operation state
   """
+  def create(%MLIR.Operation.State{} = state) do
+    state |> MLIR.Operation.State.create() |> CAPI.ptr() |> MLIR.CAPI.mlirOperationCreate()
+  end
+
   def create(state) do
     state |> CAPI.ptr() |> MLIR.CAPI.mlirOperationCreate()
   end
@@ -97,13 +101,11 @@ defmodule Beaver.MLIR.Operation do
   defp do_create(op_name, arguments) when is_binary(op_name) and is_list(arguments) do
     location = MLIR.Managed.Location.get()
 
-    state = MLIR.Operation.State.get!(op_name, location)
-
-    for argument <- arguments do
-      MLIR.Operation.State.add_argument(state, argument)
-    end
+    state = %MLIR.Operation.State{name: op_name, location: location}
+    state = Enum.reduce(arguments, state, &MLIR.Operation.State.add_argument(&2, &1))
 
     state
+    |> MLIR.Operation.State.create()
     |> MLIR.Operation.create()
   end
 
@@ -116,7 +118,7 @@ defmodule Beaver.MLIR.Operation do
     MLIR.CAPI.mlirOperationPrint(
       operation,
       Exotic.Value.as_ptr(string_ref_callback_closure),
-      Exotic.Value.Ptr.null()
+      nil
     )
 
     string_ref_callback_closure
