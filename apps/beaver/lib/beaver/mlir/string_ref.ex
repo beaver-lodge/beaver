@@ -5,8 +5,10 @@ defmodule Beaver.MLIR.StringRef do
   StringRef is very commom in LLVM projects. It is a wrapper of a C string. This function will create a Elixir owned C string from a Elixir bitstring and create a StringRef from it. StringRef will keep a reference to the C string to prevent it from being garbage collected by BEAM.
   """
   def create(value) when is_binary(value) do
-    CAPI.c_string(value)
-    |> CAPI.mlirStringRefCreateFromCString()
+    c_string = CAPI.c_string(value)
+
+    CAPI.mlirStringRefCreateFromCString(c_string)
+    |> CAPI.bag(c_string)
   end
 
   def extract(%Beaver.MLIR.CAPI.MlirStringRef{} = string_ref) do

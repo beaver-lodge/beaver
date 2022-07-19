@@ -54,7 +54,7 @@ defmodule Beaver.MLIR.CAPI do
 
   for type <- types do
     defmodule Module.concat(__MODULE__, Fizz.module_name(type)) do
-      defstruct ref: nil, zig_t: String.to_atom(type)
+      defstruct ref: nil, zig_t: String.to_atom(type), bag: []
 
       if Fizz.is_array(type) do
         @maker Fizz.element_type(type)
@@ -191,5 +191,9 @@ defmodule Beaver.MLIR.CAPI do
     |> Fizz.module_name()
     |> then(fn m -> Module.concat(__MODULE__, m) end)
     |> struct!(%{ref: check!(ref)})
+  end
+
+  def bag(%{bag: bag} = v, item) do
+    %{v | bag: [item | bag]}
   end
 end
