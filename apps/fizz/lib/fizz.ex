@@ -12,6 +12,7 @@ defmodule Fizz do
     Logger.debug("[Fizz] generating Zig code for wrapper: #{wrapper}")
     include_paths = Keyword.get(opts, :include_paths, %{})
     library_paths = Keyword.get(opts, :library_paths, %{})
+    cache_root = Path.join([Mix.Project.build_path(), "mlir-zig-build", "zig-cache"])
 
     if not is_map(include_paths) do
       raise "include_paths must be a map so that we could generate variables for build.zig. Got: #{inspect(include_paths)}"
@@ -28,7 +29,11 @@ defmodule Fizz do
       |> List.flatten()
 
     out =
-      with {out, 0} <- System.cmd("zig", ["translate-c", wrapper] ++ include_path_args) do
+      with {out, 0} <-
+             System.cmd(
+               "zig",
+               ["translate-c", wrapper, "--cache-dir", cache_root] ++ include_path_args
+             ) do
         out
       else
         {_error, _} ->
@@ -81,7 +86,9 @@ defmodule Fizz do
 
     out =
       with {out, 0} <-
-             System.cmd("zig", ["run", dst] ++ include_path_args, stderr_to_stdout: true) do
+             System.cmd("zig", ["run", dst, "--cache-dir", cache_root] ++ include_path_args,
+               stderr_to_stdout: true
+             ) do
         out
       else
         {_error, ret_code} ->
@@ -273,7 +280,7 @@ defmodule Fizz do
       |> Kernel.<>(build_source)
 
     # TODO: make this a arg
-    dest_dir = "#{Path.join(Mix.Project.build_path(), "mlir-c-install")}"
+    dest_dir = "#{Path.join(Mix.Project.build_path(), "native-install")}"
 
     erts_include =
       Path.join([
@@ -285,7 +292,7 @@ defmodule Fizz do
     build_source =
       build_source <>
         """
-        pub const cache_root = "#{Path.join([Mix.Project.build_path(), "mlir-zig-build", "zig-cache"])}";
+        pub const cache_root = "#{cache_root}";
         pub const erts_include = "#{erts_include}";
         """
 

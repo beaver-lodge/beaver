@@ -72,6 +72,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
   invoke a function by symbol name. The arguments should be a list of Exotic.Valuable
   """
   def invoke!(jit, symbol, args, return) when is_list(args) do
+    raise "TODO: support opaque ptr"
     arg_ptr_list = args |> Enum.map(&CAPI.ptr/1)
     return_ptr = return |> CAPI.ptr()
     result = do_invoke!(jit, symbol, arg_ptr_list ++ [return_ptr])
