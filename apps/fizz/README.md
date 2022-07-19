@@ -25,7 +25,10 @@ The approach here is highly inspired by the TableGen/.inc source code generating
 
   So the memory is totally managed by Erlang, and you can use Zig's comptime feature to infer everything involved.
 
-- Saving lib/include path to a Zig source and use them in your `build.zig`. You can use Elixir to find all the paths. It is way better than do it with make/CMake because you got a whole programming language to do it.
+- Saving lib/include path to a Zig source and use them in your `build.zig`. You can use Elixir to find all the paths. It is way better than do it with make/CMake because you got a whole programming language to do it. It is described in Zig doc as:
+
+  > Surfacing build configuration as comptime values by providing a file that can be imported by Zig code.
+
 - Inter NIF resource exchange. Because it is Zig, just import the Zig source from another Hex package.
 
 ## Difference from Zigler
