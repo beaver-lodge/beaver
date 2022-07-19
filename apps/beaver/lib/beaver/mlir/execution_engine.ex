@@ -57,22 +57,13 @@ defmodule Beaver.MLIR.ExecutionEngine do
   end
 
   defp do_invoke!(jit, symbol, arg_ptr_list) do
-    sym = MLIR.StringRef.create(symbol)
-
-    args_ptr =
-      arg_ptr_list
-      |> Exotic.Value.Array.get()
-      |> Exotic.Value.get_ptr()
-
-    Exotic.call!(MLIR.CAPI, :mlirExecutionEngineInvokePacked, [jit, sym, args_ptr], dirty: false)
-    # mlirExecutionEngineInvokePacked(jit, sym, args_ptr)
+    mlirExecutionEngineInvokePacked(jit, MLIR.StringRef.create(symbol), CAPI.array(arg_ptr_list))
   end
 
   @doc """
-  invoke a function by symbol name. The arguments should be a list of Exotic.Valuable
+  invoke a function by symbol name.
   """
   def invoke!(jit, symbol, args, return) when is_list(args) do
-    raise "TODO: support opaque ptr"
     arg_ptr_list = args |> Enum.map(&CAPI.ptr/1)
     return_ptr = return |> CAPI.ptr()
     result = do_invoke!(jit, symbol, arg_ptr_list ++ [return_ptr])
@@ -85,13 +76,15 @@ defmodule Beaver.MLIR.ExecutionEngine do
   end
 
   @doc """
-  invoke a void function by symbol name. The arguments should be a list of Exotic.Valuable
+  invoke a void function by symbol name.
   """
   def invoke!(jit, symbol, args) when is_list(args) do
-    arg_ptr_list = args |> Enum.map(&Exotic.Value.get_ptr/1)
+    arg_ptr_list = args |> Enum.map(&CAPI.ptr/1)
     result = do_invoke!(jit, symbol, arg_ptr_list)
 
-    if not MLIR.LogicalResult.success?(result) do
+    if MLIR.LogicalResult.success?(result) do
+      :ok
+    else
       raise "Execution engine invoke failed"
     end
   end
