@@ -5,12 +5,14 @@ defmodule Beaver.MLIR.Dialect.Generator do
     skips = Keyword.get(opts, :skips, [])
 
     quote(bind_quoted: [dialect: dialect, ops: ops, skips: skips]) do
+      require Logger
+      module_name = dialect |> Beaver.MLIR.Dialect.Registry.normalize_dialect_name()
+      Logger.debug("building Elixir module for dialect #{dialect} => #{module_name}")
+
       module_names =
         for op <- ops do
           func_name = Beaver.MLIR.Dialect.Registry.normalize_op_name(op)
           full_name = Enum.join([dialect, op], ".")
-
-          module_name = dialect |> Beaver.MLIR.Dialect.Registry.normalize_dialect_name()
 
           module_name =
             Module.concat([
