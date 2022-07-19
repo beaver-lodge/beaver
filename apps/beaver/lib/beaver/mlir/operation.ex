@@ -23,11 +23,11 @@ defmodule Beaver.MLIR.Operation do
   Create a new operation from a operation state
   """
   def create(%MLIR.Operation.State{} = state) do
-    state |> MLIR.Operation.State.create() |> CAPI.ptr() |> MLIR.CAPI.mlirOperationCreate()
+    state |> MLIR.Operation.State.create() |> create
   end
 
   def create(state) do
-    state |> CAPI.ptr() |> MLIR.CAPI.mlirOperationCreate()
+    state |> CAPI.ptr() |> CAPI.bag(state) |> MLIR.CAPI.mlirOperationCreate()
   end
 
   @doc """
