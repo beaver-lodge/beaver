@@ -115,8 +115,10 @@ defmodule Fizz do
     types =
       Enum.map(functions, fn f -> [f.ret, f.args] end)
       |> List.flatten()
-      |> Enum.uniq()
-      |> Enum.sort()
+
+    extra = primitive_types() |> Enum.map(&Fizz.CodeGen.Function.ptr_type_name/1)
+
+    types = Enum.sort(types ++ extra) |> Enum.uniq()
 
     array_types =
       for type <- types do

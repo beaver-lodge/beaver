@@ -53,8 +53,6 @@ defmodule Beaver.MLIR.CAPI do
   end
 
   for type <- types do
-    IO.inspect(type)
-
     defmodule Module.concat(__MODULE__, Fizz.module_name(type)) do
       defstruct ref: nil, zig_t: String.to_atom(type)
 
