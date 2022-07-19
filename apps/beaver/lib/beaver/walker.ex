@@ -493,7 +493,7 @@ alias Beaver.Walker
 defimpl Enumerable, for: Walker do
   @spec count(Walker.t()) :: {:ok, non_neg_integer()} | {:error, module()}
   def count(%Walker{container: container, get_num: get_num}) when is_function(get_num, 1) do
-    {:ok, get_num.(container) |> Exotic.Value.extract()}
+    {:ok, get_num.(container) |> MLIR.CAPI.to_term()}
   end
 
   def count(%Walker{container: %container_module{}}) do
@@ -507,7 +507,7 @@ defimpl Enumerable, for: Walker do
       )
       when is_function(element_equal, 2) do
     is_member =
-      Enum.any?(walker, fn member -> element_equal.(member, element) |> Exotic.Value.extract() end)
+      Enum.any?(walker, fn member -> element_equal.(member, element) |> CAPI.to_term() end)
 
     {:ok, is_member}
   end
@@ -523,7 +523,7 @@ defimpl Enumerable, for: Walker do
         %element_module{} = element
       )
       when is_function(get_parent, 1) and is_function(parent_equal, 2) do
-    is_member = parent_equal.(container, get_parent.(element)) |> Exotic.Value.extract()
+    is_member = parent_equal.(container, get_parent.(element)) |> MLIR.CAPI.to_term()
     {:ok, is_member}
   end
 
