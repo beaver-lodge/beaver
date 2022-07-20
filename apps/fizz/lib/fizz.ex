@@ -60,7 +60,11 @@ defmodule Fizz do
           print("func: #{name}\\n", .{});
           inline while (i < func_type.Fn.args.len) : (i += 1) {
             const arg_type = func_type.Fn.args[i];
-            print("arg: {}\\n", .{ arg_type.arg_type });
+            if (arg_type.arg_type) |t| {
+              print("arg: {s}\\n", .{ @typeName(t) });
+            } else {
+              unreachable;
+            }
           }
           print("ret: {}\\n", .{ func_type.Fn.return_type });
         }
@@ -89,9 +93,11 @@ defmodule Fizz do
              System.cmd("zig", ["run", dst, "--cache-dir", cache_root] ++ include_path_args,
                stderr_to_stdout: true
              ) do
+        File.write!("#{dst}.out.txt", out)
         out
       else
-        {_error, ret_code} ->
+        {error, ret_code} ->
+          Logger.error("[Zig] #{error}")
           raise "fail to run reflection, ret_code: #{ret_code}"
       end
 
