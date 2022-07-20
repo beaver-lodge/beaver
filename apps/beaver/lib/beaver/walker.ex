@@ -237,7 +237,7 @@ defmodule Beaver.Walker do
       get_first: &CAPI.mlirBlockGetFirstOperation/1,
       get_next: &CAPI.mlirOperationGetNextInBlock/1,
       get_parent: &CAPI.mlirOperationGetBlock/1,
-      is_null: &MLIR.Operation.is_null/1
+      is_null: &MLIR.is_null/1
     )
   end
 
@@ -261,7 +261,7 @@ defmodule Beaver.Walker do
       get_first: &CAPI.beaverValueGetFirstOperand/1,
       get_next: &CAPI.beaverOperandGetNext/1,
       get_parent: &CAPI.beaverOperandGetValue/1,
-      is_null: fn x -> CAPI.beaverOperandIsNull(x) |> Exotic.Value.extract() end
+      is_null: fn x -> CAPI.beaverOperandIsNull(x) |> MLIR.CAPI.to_term() end
     )
   end
 
@@ -281,7 +281,7 @@ defmodule Beaver.Walker do
       |> Enum.find(fn named_attribute ->
         with name <-
                named_attribute
-               |> Exotic.Value.fetch(MLIR.CAPI.MlirNamedAttribute, :name)
+               |> MLIR.CAPI.beaverMlirNamedAttributeGetName()
                |> MLIR.CAPI.mlirIdentifierStr()
                |> MLIR.StringRef.extract() do
           name == key
@@ -289,7 +289,7 @@ defmodule Beaver.Walker do
       end)
 
     with %MlirNamedAttribute{} <- found do
-      {:ok, Exotic.Value.fetch(found, MLIR.CAPI.MlirNamedAttribute, :attribute)}
+      {:ok, MLIR.CAPI.beaverMlirNamedAttributeGetAttribute(found)}
     else
       :error -> :error
     end
@@ -351,21 +351,21 @@ defmodule Beaver.Walker do
   defp do_traverse(%MlirOperation{} = operation, acc, pre, post) do
     {operation, acc} = pre.(operation, acc)
 
-    {operands, acc} =
+    {_operands, acc} =
       operands(operation)
       |> Enum.map(fn value -> {:operand, value} end)
       |> do_traverse(acc, pre, post)
 
-    {attributes, acc} = attributes(operation) |> do_traverse(acc, pre, post)
+    {_attributes, acc} = attributes(operation) |> do_traverse(acc, pre, post)
 
-    {results, acc} =
+    {_results, acc} =
       results(operation)
       |> Enum.map(fn value -> {:result, value} end)
       |> do_traverse(acc, pre, post)
 
-    {regions, acc} = regions(operation) |> do_traverse(acc, pre, post)
+    {_regions, acc} = regions(operation) |> do_traverse(acc, pre, post)
 
-    {successors, acc} =
+    {_successors, acc} =
       successors(operation)
       |> Enum.map(fn successor -> {:successor, successor} end)
       |> do_traverse(acc, pre, post)
@@ -385,7 +385,7 @@ defmodule Beaver.Walker do
 
   defp do_traverse(%MlirRegion{} = region, acc, pre, post) do
     {region, acc} = pre.(region, acc)
-    {blocks, acc} = blocks(region) |> do_traverse(acc, pre, post)
+    {_blocks, acc} = blocks(region) |> do_traverse(acc, pre, post)
 
     post.(region, acc)
   end
@@ -393,12 +393,12 @@ defmodule Beaver.Walker do
   defp do_traverse(%MlirBlock{} = block, acc, pre, post) do
     {block, acc} = pre.(block, acc)
 
-    {arguments, acc} =
+    {_arguments, acc} =
       arguments(block)
       |> Enum.map(fn value -> {:argument, value} end)
       |> do_traverse(acc, pre, post)
 
-    {operations, acc} = operations(block) |> do_traverse(acc, pre, post)
+    {_operations, acc} = operations(block) |> do_traverse(acc, pre, post)
 
     # Note: Erlang now owns the removed operation. call erase
     # mlirOperationRemoveFromParent
@@ -419,12 +419,11 @@ defmodule Beaver.Walker do
 
   defp do_traverse(%MlirNamedAttribute{} = named_attribute, acc, pre, post) do
     name =
-      %MLIR.CAPI.MlirIdentifier{} =
-      named_attribute |> Exotic.Value.fetch(MLIR.CAPI.MlirNamedAttribute, :name)
+      %MLIR.CAPI.MlirIdentifier{} = named_attribute |> MLIR.CAPI.beaverMlirNamedAttributeGetName()
 
     attribute =
       %MLIR.CAPI.MlirAttribute{} =
-      named_attribute |> Exotic.Value.fetch(MLIR.CAPI.MlirNamedAttribute, :attribute)
+      named_attribute |> MLIR.CAPI.beaverMlirNamedAttributeGetAttribute()
 
     {{name, attribute}, acc} = pre.({name, attribute}, acc)
     {{name, attribute}, acc} = post.({name, attribute}, acc)
@@ -507,7 +506,7 @@ defimpl Enumerable, for: Walker do
       )
       when is_function(element_equal, 2) do
     is_member =
-      Enum.any?(walker, fn member -> element_equal.(member, element) |> CAPI.to_term() end)
+      Enum.any?(walker, fn member -> element_equal.(member, element) |> MLIR.CAPI.to_term() end)
 
     {:ok, is_member}
   end

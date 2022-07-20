@@ -2,14 +2,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
   alias Fizz.CodeGen.Type
 
   def type_gen("?fn(c.struct_MlirStringRef, ?*anyopaque) callconv(.C) void" = type) do
-    {:ok,
-     %Type{
-       zig_t: type,
-       module_name: :MlirStringCallback,
-       delegates: [
-         {Beaver.MLIR.StringRef.CallbackImpl, :create, 0}
-       ]
-     }}
+    {:ok, %Type{zig_t: type, module_name: :MlirStringCallback}}
   end
 
   def type_gen("?fn(?*anyopaque) callconv(.C) void" = type) do

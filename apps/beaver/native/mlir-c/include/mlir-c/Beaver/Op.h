@@ -91,10 +91,9 @@ MLIR_CAPI_EXPORTED
 MlirIdentifier beaverMlirNamedAttributeGetName(MlirNamedAttribute);
 MLIR_CAPI_EXPORTED
 MlirAttribute beaverMlirNamedAttributeGetAttribute(MlirNamedAttribute);
-MLIR_CAPI_EXPORTED void
-beaverOperationStateAddAttributes(MlirOperationState *state, intptr_t n,
-                                  MlirStringRef const *names,
-                                  MlirAttribute const *attributes);
+MLIR_CAPI_EXPORTED void beaverOperationStateAddAttributes(
+    MlirContext context, MlirOperationState *state, intptr_t n,
+    MlirStringRef const *names, MlirAttribute const *attributes);
 
 #include "mlir-c/ExecutionEngine.h"
 

@@ -1,12 +1,12 @@
 defmodule Beaver.MLIR.Context do
   alias Beaver.MLIR
+  require MLIR.CAPI
 
   @doc """
   create a MLIR context and register all dialects
   """
   def create(allow_unregistered: allow_unregistered) do
-    ctx = MLIR.CAPI.mlirContextCreate()
-    MLIR.CAPI.mlirRegisterAllDialects(ctx)
+    ctx = %MLIR.CAPI.MlirContext{ref: MLIR.CAPI.beaver_get_context_load_all_dialects()}
 
     MLIR.CAPI.mlirContextSetAllowUnregisteredDialects(
       ctx,

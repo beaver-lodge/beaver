@@ -45,8 +45,8 @@ defmodule Beaver.MLIR.Block do
     end
 
     len = length(args)
-    args = args |> MLIR.CAPI.array()
-    locs = locs |> MLIR.CAPI.array()
+    args = args |> MLIR.CAPI.ArrayMlirType.create()
+    locs = locs |> MLIR.CAPI.ArrayMlirLocation.create()
 
     MLIR.CAPI.mlirBlockCreate(
       len,

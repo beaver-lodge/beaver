@@ -30,8 +30,9 @@ defmodule Beaver.DSL.Pattern do
   def create_operation(
         op_name,
         %Beaver.DSL.Op.Prototype{operands: operands, attributes: attributes, results: results},
-        [%MLIR.CAPI.MlirBlock{} = block, %Beaver.MLIR.CAPI.MlirAttribute{} = attribute_names]
-      ) do
+        [%MLIR.CAPI.MlirBlock{} = block, attribute_names]
+      )
+      when is_list(attribute_names) do
     mlir block: block do
       results = results |> Enum.map(&gen_pdl(block, &1))
       attributes = attributes |> Enum.map(&gen_pdl(block, &1))
@@ -42,7 +43,7 @@ defmodule Beaver.DSL.Pattern do
           results ++
           [
             name: Beaver.MLIR.Attribute.string(op_name),
-            attributeNames: attribute_names,
+            attributeNames: Beaver.MLIR.Attribute.array(attribute_names),
             operand_segment_sizes:
               Beaver.MLIR.ODS.operand_segment_sizes([
                 length(operands),
@@ -60,7 +61,6 @@ defmodule Beaver.DSL.Pattern do
       |> Atom.to_string()
       |> Beaver.MLIR.Attribute.string()
     end
-    |> Beaver.MLIR.Attribute.array()
   end
 
   def gen_prototype_args(kind, map_args) do

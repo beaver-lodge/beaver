@@ -26,8 +26,19 @@ defmodule Beaver.MLIR.Dialect.CF do
   defp collect_arguments(arguments) do
     Enum.reduce(arguments, {[], []}, fn x, {arguments, seg_sizes} ->
       with {:ok, {dest, args}} <- extract_args(x) do
-        arguments = arguments ++ [successor: dest] ++ args
-        {arguments, seg_sizes ++ [length(args)]}
+        arguments = arguments ++ args
+
+        blocks = [
+          case dest do
+            dest when is_atom(dest) ->
+              [successor: dest]
+
+            %MLIR.CAPI.MlirBlock{} ->
+              dest
+          end
+        ]
+
+        {arguments ++ blocks, seg_sizes ++ [length(args)]}
       else
         {:other, x} -> {arguments ++ [x], seg_sizes}
       end
@@ -37,13 +48,12 @@ defmodule Beaver.MLIR.Dialect.CF do
   @doc """
   Create cf.br op. It is a terminator, so this function doesn't returns the results
   """
-  def br(%Beaver.DSL.SSA{arguments: arguments, block: block}) do
-    {arguments, _} = collect_arguments(arguments)
+  def br(%Beaver.DSL.SSA{arguments: arguments} = ssa) do
+    {arguments, _arg_size} = collect_arguments(arguments)
 
     MLIR.Operation.create(
       "cf.br",
-      arguments,
-      block
+      %Beaver.DSL.SSA{ssa | arguments: arguments}
     )
 
     nil

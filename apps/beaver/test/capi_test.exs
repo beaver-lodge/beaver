@@ -5,9 +5,7 @@ defmodule MlirTest do
   alias Beaver.MLIR.CAPI
 
   test "call wrapped apis" do
-    ctx = MLIR.CAPI.mlirContextCreate()
-
-    MLIR.CAPI.mlirRegisterAllDialects(ctx)
+    ctx = MLIR.Context.create()
 
     location =
       MLIR.CAPI.mlirLocationFileLineColGet(
@@ -103,7 +101,7 @@ defmodule MlirTest do
   test "elixir dialect" do
     require MLIR.Context
 
-    ctx = MLIR.CAPI.mlirContextCreate()
+    ctx = MLIR.Context.create()
 
     # This api might trigger NDEBUG assert, so run it more
     for _ <- 1..200 do
@@ -117,7 +115,7 @@ defmodule MlirTest do
     end
     |> Task.await_many()
 
-    MLIR.CAPI.mlirRegisterAllDialects(ctx)
+    MLIR.CAPI.mlirContextLoadAllAvailableDialects(ctx)
 
     _add_op =
       %MLIR.Operation.State{name: "elixir.add", context: ctx}
@@ -148,9 +146,7 @@ defmodule MlirTest do
   end
 
   test "run a simple pass" do
-    ctx = MLIR.CAPI.mlirContextCreate()
-
-    CAPI.mlirRegisterAllDialects(ctx)
+    ctx = MLIR.Context.create()
 
     module = create_adder_module(ctx)
     module_op = module |> MLIR.CAPI.mlirModuleGetOperation()
@@ -203,11 +199,7 @@ defmodule MlirTest do
     CAPI.mlirPassManagerAddOwnedPass(pm, CAPI.mlirCreateTransformsCSE())
     success = CAPI.mlirPassManagerRun(pm, module)
 
-    # equivalent to mlirLogicalResultIsSuccess
-    # TODO: add a Exotic.Value.as_bool/1
-    assert success
-           |> Exotic.Value.fetch(MLIR.CAPI.MlirLogicalResult, :value)
-           |> Exotic.Value.extract() != 0
+    assert Beaver.MLIR.LogicalResult.success?(success)
 
     CAPI.mlirPassManagerDestroy(pm)
     CAPI.mlirModuleDestroy(module)
@@ -233,9 +225,7 @@ defmodule MlirTest do
 
     # equivalent to mlirLogicalResultIsSuccess
     # TODO: add a Exotic.Value.as_bool/1
-    assert success
-           |> Exotic.Value.fetch(MLIR.CAPI.MlirLogicalResult, :value)
-           |> Exotic.Value.extract() != 0
+    assert Beaver.MLIR.LogicalResult.success?(success)
 
     CAPI.mlirPassManagerDestroy(pm)
     CAPI.mlirModuleDestroy(module)
@@ -258,12 +248,7 @@ defmodule MlirTest do
     npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
     CAPI.mlirPassManagerAddOwnedPass(npm, external)
     success = CAPI.mlirPassManagerRun(pm, module)
-
-    # equivalent to mlirLogicalResultIsSuccess
-    # TODO: add a Exotic.Value.as_bool/1
-    assert success
-           |> Exotic.Value.fetch(MLIR.CAPI.MlirLogicalResult, :value)
-           |> Exotic.Value.extract() != 0
+    assert Beaver.MLIR.LogicalResult.success?(success)
 
     CAPI.mlirPassManagerDestroy(pm)
     CAPI.mlirModuleDestroy(module)

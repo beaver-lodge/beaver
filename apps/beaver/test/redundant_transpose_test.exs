@@ -90,7 +90,7 @@ defmodule RedundantTransposeTest do
       ])
       |> canonicalize
       |> MLIR.Pass.Composer.run!()
-      |> MLIR.Operation.to_string()
+      |> MLIR.to_string()
 
     assert ir_string =~ "return %arg0 : tensor<*xf32>", ir_string
   end

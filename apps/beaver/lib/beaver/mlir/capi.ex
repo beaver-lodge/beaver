@@ -44,10 +44,10 @@ defmodule Beaver.MLIR.CAPI do
       File.ln_s(dylib, so)
     end
 
-    Logger.debug("[MLIR] loading NIF")
+    Logger.debug("[Beaver] loading NIF")
 
     with :ok <- :erlang.load_nif(nif_path, 0) do
-      Logger.debug("[MLIR] NIF loaded")
+      Logger.debug("[Beaver] NIF loaded")
       :ok
     else
       error -> error
@@ -57,7 +57,7 @@ defmodule Beaver.MLIR.CAPI do
   for %Fizz.CodeGen.Type{module_name: module_name, zig_t: zig_t, delegates: delegates} = type <-
         types do
     defmodule Module.concat(__MODULE__, module_name) do
-      defstruct ref: nil, zig_t: zig_t, bag: []
+      defstruct ref: nil, zig_t: zig_t, bag: MapSet.new()
 
       if Fizz.is_array(type) do
         @maker Fizz.element_type(type)
@@ -66,7 +66,7 @@ defmodule Beaver.MLIR.CAPI do
 
         def create(list) do
           %__MODULE__{
-            ref: Beaver.MLIR.CAPI.check!(apply(Beaver.MLIR.CAPI, @maker, [list]))
+            ref: Beaver.MLIR.CAPI.check!(apply(Beaver.MLIR.CAPI, @maker, [Fizz.unwrap_ref(list)]))
           }
         end
       end
@@ -117,10 +117,14 @@ defmodule Beaver.MLIR.CAPI do
     end
   end
 
+  def beaver_get_context_load_all_dialects(), do: raise("NIF not loaded")
   def registered_ops(), do: raise("NIF not loaded")
   def registered_ops_of_dialect(_), do: raise("NIF not loaded")
   def resource_bool_to_term(_), do: raise("NIF not loaded")
   def resource_cstring_to_term_charlist(_), do: raise("NIF not loaded")
+  def beaver_attribute_to_charlist(_), do: raise("NIF not loaded")
+  def beaver_type_to_charlist(_), do: raise("NIF not loaded")
+  def beaver_operation_to_charlist(_), do: raise("NIF not loaded")
   def get_resource_bool(_), do: raise("NIF not loaded")
   def beaver_nif_MlirNamedAttributeGet(_, _), do: raise("NIF not loaded")
   def get_resource_c_string(_), do: raise("NIF not loaded")
@@ -196,7 +200,11 @@ defmodule Beaver.MLIR.CAPI do
     |> struct!(%{ref: check!(ref)})
   end
 
+  def bag(%{bag: bag} = v, list) when is_list(list) do
+    %{v | bag: MapSet.union(MapSet.new(list), bag)}
+  end
+
   def bag(%{bag: bag} = v, item) do
-    %{v | bag: [item | bag]}
+    %{v | bag: MapSet.put(bag, item)}
   end
 end

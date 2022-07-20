@@ -28,7 +28,7 @@ defmodule Beaver.MLIR.CAPI.FizzTest do
   end
 
   test "empty array mlir type" do
-    %Beaver.MLIR.CAPI.ArrayMlirType{ref: ref, zig_t: :"[*c]const c.struct_MlirType"} =
+    %Beaver.MLIR.CAPI.ArrayMlirType{ref: ref, zig_t: "[*c]const c.struct_MlirType"} =
       CAPI.ArrayMlirType.create([])
 
     assert is_reference(ref)

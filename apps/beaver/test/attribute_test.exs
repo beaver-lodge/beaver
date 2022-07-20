@@ -26,17 +26,17 @@ defmodule AttributeTest do
       assert Type.equal?(Type.integer(128), Type.get("i128"))
       assert Type.equal?(Type.complex(Type.f32()), Type.get("complex<f32>"))
 
-      assert Type.unranked_tensor(Type.complex(Type.f32())) |> Type.to_string() ==
+      assert Type.unranked_tensor(Type.complex(Type.f32())) |> MLIR.to_string() ==
                "tensor<*xcomplex<f32>>"
 
       assert Type.equal?(Type.unranked_tensor(Type.f32()), ~t{tensor<*xf32>})
 
       assert Type.ranked_tensor([], Type.f32())
-             |> Type.to_string() ==
+             |> MLIR.to_string() ==
                "tensor<f32>"
 
       assert Type.memref([], Type.f32())
-             |> Type.to_string() ==
+             |> MLIR.to_string() ==
                "memref<f32>"
     end
   end
@@ -51,7 +51,7 @@ defmodule AttributeTest do
 
     test "generate" do
       assert Attribute.equal?(Attribute.type(Type.f32()), Attribute.type(Type.f32()))
-      assert Attribute.integer(Type.i(32), 1) |> Attribute.to_string() == "1 : i32"
+      assert Attribute.integer(Type.i(32), 1) |> MLIR.to_string() == "1 : i32"
       assert Attribute.equal?(Attribute.integer(Type.i(32), 0), ~a{0}i32)
       assert Attribute.equal?(Attribute.float(Type.f(32), 0.0), ~a{0.0}f32)
       assert Attribute.equal?(Attribute.integer(Type.index(), 1), ~a{1}index)
@@ -69,7 +69,7 @@ defmodule AttributeTest do
                [Type.ranked_tensor([1, 2, 3, 4], Type.i(32))],
                [Type.i(32)]
              )
-             |> Type.to_string() ==
+             |> MLIR.to_string() ==
                "(tensor<1x2x3x4xi32>) -> i32"
 
       assert Attribute.equal?(
@@ -83,7 +83,7 @@ defmodule AttributeTest do
              )
 
       vec2xi32 = Type.vector([2], Type.i(32))
-      assert Type.to_string(vec2xi32) == "vector<2xi32>"
+      assert MLIR.to_string(vec2xi32) == "vector<2xi32>"
       i0attr = Attribute.integer(Type.i(32), 0)
 
       assert Attribute.equal?(
@@ -115,6 +115,12 @@ defmodule AttributeTest do
                parallel2,
                ~a{["parallel", "parallel"]}
              )
+    end
+
+    test "empty" do
+      empty = Attribute.array([])
+
+      assert empty
     end
   end
 end

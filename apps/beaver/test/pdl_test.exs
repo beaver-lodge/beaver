@@ -128,11 +128,9 @@ defmodule PDLTest do
     region = CAPI.mlirOperationGetFirstRegion(ir_module)
     result = CAPI.beaverApplyOwnedPatternSetOnRegion(region, pattern_set)
 
-    assert result
-           |> Exotic.Value.fetch(MLIR.CAPI.MlirLogicalResult, :value)
-           |> Exotic.Value.extract() != 0
+    assert Beaver.MLIR.LogicalResult.success?(result)
 
-    ir_string = MLIR.Operation.to_string(ir_module)
+    ir_string = MLIR.to_string(ir_module)
     assert not String.contains?(ir_string, "test.op")
     assert String.contains?(ir_string, "test.success")
     CAPI.mlirContextDestroy(ctx)
@@ -149,7 +147,7 @@ defmodule PDLTest do
     ir_module = MLIR.Module.create(ctx, @apply_rewrite_op_ir)
     MLIR.Operation.verify!(pattern_module)
     MLIR.Operation.verify!(ir_module)
-    pattern_string = MLIR.Operation.to_string(pattern_module)
+    pattern_string = MLIR.to_string(pattern_module)
     assert String.contains?(pattern_string, "test.op")
     assert String.contains?(pattern_string, "test.success2")
     pdl_pattern = CAPI.beaverPDLPatternGet(pattern_module)
@@ -160,7 +158,7 @@ defmodule PDLTest do
 
     assert MLIR.LogicalResult.success?(result), "fail to apply pattern"
 
-    ir_string = MLIR.Operation.to_string(ir_module)
+    ir_string = MLIR.to_string(ir_module)
     assert not String.contains?(ir_string, "test.op")
     assert String.contains?(ir_string, "test.success2")
     CAPI.mlirContextDestroy(ctx)
@@ -319,7 +317,7 @@ defmodule PDLTest do
         ] do
       ir_module = TestTOSAPatterns.gen_ir_module()
       MLIR.Operation.verify!(ir_module)
-      ir_string = MLIR.Operation.to_string(ir_module)
+      ir_string = MLIR.to_string(ir_module)
       assert not String.contains?(ir_string, "tosa.sub"), ir_string
 
       MLIR.Pattern.apply!(ir_module, [
@@ -329,7 +327,7 @@ defmodule PDLTest do
       |> MLIR.Transforms.canonicalize()
       |> MLIR.Pass.Composer.run!()
 
-      ir_string = MLIR.Operation.to_string(ir_module)
+      ir_string = MLIR.to_string(ir_module)
       assert not String.contains?(ir_string, "tosa.add"), ir_string
       assert String.contains?(ir_string, "tosa.sub"), ir_string
     end
@@ -370,7 +368,7 @@ defmodule PDLTest do
       |> canonicalize
       |> MLIR.Pass.Composer.run!()
 
-    ir_string = MLIR.Operation.to_string(ir)
+    ir_string = MLIR.to_string(ir)
     assert not (ir_string =~ "tosa.add")
     assert ir_string =~ "tosa.sub"
   end

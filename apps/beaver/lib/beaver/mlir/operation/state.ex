@@ -26,12 +26,49 @@ defmodule Beaver.MLIR.Operation.State do
     state
   end
 
+  # defp add_attributes(%MLIR.CAPI.MlirOperationState{} = state, attr_kw)
+  #      when is_list(attr_kw) do
+  #   ctx = CAPI.beaverMlirOperationStateGetContext(state)
+
+  #   named_list =
+  #     for {k, v} <- attr_kw do
+  #       attr =
+  #         case v do
+  #           v when is_binary(v) ->
+  #             CAPI.mlirAttributeParseGet(ctx, MLIR.StringRef.create(v))
+
+  #           %Beaver.MLIR.CAPI.MlirType{} = type ->
+  #             Beaver.MLIR.Attribute.type(type)
+
+  #           %Beaver.MLIR.CAPI.MlirAttribute{} ->
+  #             v
+  #         end
+
+  #       if MLIR.is_null(attr) do
+  #         raise "attribute can't be null, #{inspect({k, v})}"
+  #       end
+
+  #       CAPI.mlirIdentifierGet(ctx, MLIR.StringRef.create(k))
+  #       |> CAPI.mlirNamedAttributeGet(attr)
+  #     end
+  #     |> CAPI.ArrayMlirNamedAttribute.create()
+
+  #   state
+  #   |> CAPI.ptr()
+  #   |> CAPI.mlirOperationStateAddAttributes(
+  #     length(attr_kw),
+  #     named_list
+  #   )
+
+  #   state |> CAPI.bag(named_list)
+  # end
+
   defp add_attributes(%MLIR.CAPI.MlirOperationState{} = state, attr_kw)
        when is_list(attr_kw) do
     ctx = CAPI.beaverMlirOperationStateGetContext(state)
 
     attr_list =
-      for {_k, v} <- attr_kw do
+      for {k, v} <- attr_kw do
         attr =
           case v do
             v when is_binary(v) ->
@@ -45,7 +82,7 @@ defmodule Beaver.MLIR.Operation.State do
           end
 
         if MLIR.is_null(attr) do
-          raise "attribute is null: #{v}"
+          raise "attribute can't be null, #{inspect({k, v})}"
         end
 
         attr
@@ -54,10 +91,11 @@ defmodule Beaver.MLIR.Operation.State do
     name_list = Enum.map(attr_kw, fn {k, _} -> Atom.to_string(k) |> MLIR.StringRef.create() end)
 
     CAPI.beaverOperationStateAddAttributes(
+      ctx,
       CAPI.ptr(state),
       length(attr_kw),
-      CAPI.array(name_list),
-      CAPI.array(attr_list)
+      CAPI.ArrayMlirStringRef.create(name_list),
+      CAPI.ArrayMlirAttribute.create(attr_list)
     )
 
     state
@@ -68,7 +106,7 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   defp add_operands(%MLIR.CAPI.MlirOperationState{} = state, operands) do
-    array = CAPI.array(operands)
+    array = operands |> CAPI.ArrayMlirValue.create()
 
     CAPI.mlirOperationStateAddOperands(CAPI.ptr(state), length(operands), array)
     state
@@ -88,10 +126,10 @@ defmodule Beaver.MLIR.Operation.State do
         t when is_binary(t) ->
           CAPI.mlirTypeParseGet(context, MLIR.StringRef.create(t))
 
-        t ->
+        %CAPI.MlirType{} = t ->
           t
       end)
-      |> CAPI.array()
+      |> CAPI.ArrayMlirType.create()
 
     CAPI.mlirOperationStateAddResults(CAPI.ptr(state), length(result_types), array)
     state
@@ -110,7 +148,7 @@ defmodule Beaver.MLIR.Operation.State do
         raise "not a region: #{inspect(other)}"
     end)
 
-    array_ptr = regions |> CAPI.array()
+    array_ptr = regions |> CAPI.ArrayMlirRegion.create()
 
     CAPI.mlirOperationStateAddOwnedRegions(
       CAPI.ptr(state),
@@ -127,7 +165,7 @@ defmodule Beaver.MLIR.Operation.State do
 
   defp add_successors(%MLIR.CAPI.MlirOperationState{} = state, successors)
        when is_list(successors) do
-    array_ptr = successors |> CAPI.array()
+    array_ptr = successors |> CAPI.ArrayMlirBlock.create()
 
     CAPI.mlirOperationStateAddSuccessors(
       CAPI.ptr(state),
@@ -175,10 +213,9 @@ defmodule Beaver.MLIR.Operation.State do
       context: _context
     } = state
 
-    CAPI.mlirOperationStateGet(
-      MLIR.StringRef.create(name),
-      location
-    )
+    name
+    |> MLIR.StringRef.create()
+    |> CAPI.mlirOperationStateGet(location)
     |> add_attributes(attributes)
     |> add_operands(operands)
     |> add_successors(successors)
@@ -227,7 +264,7 @@ defmodule Beaver.MLIR.Operation.State do
         %__MODULE__{successors: successors} = state,
         {:successor, %Beaver.MLIR.CAPI.MlirBlock{} = successor_block}
       ) do
-    %{state | results: successors ++ [successor_block]}
+    %{state | successors: successors ++ [successor_block]}
   end
 
   def add_argument(%__MODULE__{successors: successors} = state, {:successor, successor})
@@ -235,7 +272,14 @@ defmodule Beaver.MLIR.Operation.State do
     successor_block = MLIR.Managed.Terminator.get_block(successor)
 
     if is_nil(successor_block), do: raise("successor block not found: #{successor}")
-    %{state | results: successors ++ [successor_block]}
+    %{state | successors: successors ++ [successor_block]}
+  end
+
+  def add_argument(
+        %__MODULE__{successors: successors} = state,
+        %MLIR.CAPI.MlirBlock{} = successor
+      ) do
+    %{state | successors: successors ++ [successor]}
   end
 
   def add_argument(

@@ -1095,6 +1095,10 @@ pub fn make_cstring_charlist(environment: env, val: [*c]const u8) term {
     return e.enif_make_string(environment, val, __latin1);
 }
 
+pub fn make_charlist_len(environment: env, val: [*c]const u8, length: usize) term {
+    return e.enif_make_string_len(environment, val, length, __latin1);
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // list-generic
 
@@ -1494,14 +1498,7 @@ pub fn is_nil2(environment: env, val: term) bool {
 
 pub fn fetch_resource(comptime T: type, environment: env, res_typ: resource_type, res_trm: term) !T {
     var obj: ?*anyopaque = null;
-    // print("Type of T {s}\n", .{T});
     if (0 == e.enif_get_resource(environment, res_trm, res_typ, @ptrCast([*c]?*anyopaque, &obj))) {
-        // if it nil, return null
-        // if (is_nil2(environment, res_trm)) {
-        //     var val: *T = @ptrCast(*T, @alignCast(@alignOf(*T), obj));
-        //     return val.*;
-        // }
-        // not a resource, try getting a primitive term
         return try get(T, environment, res_trm);
     }
     if (obj != null) {
@@ -1533,18 +1530,17 @@ pub fn get_resource_array_from_list(comptime ElementType: type, environment: env
 
     const U8Ptr = [*c]u8;
     const ArrayPtr = [*c]ElementType;
-    const ptr: ?*anyopaque = e.enif_alloc_resource(resource_type_array, @alignOf(ArrayPtr) + size * @alignOf(ElementType));
-    var array_ptr: ArrayPtr = undefined;
+    const ptr: ?*anyopaque = e.enif_alloc_resource(resource_type_array, @sizeOf(ArrayPtr) + size * @sizeOf(ElementType));
+    var data_ptr: ArrayPtr = undefined;
     var obj: *ArrayPtr = undefined;
     obj = @ptrCast(*ArrayPtr, @alignCast(@alignOf(*ArrayPtr), ptr));
     if (ptr == null) {
         unreachable();
     } else {
-        var offset_ptr = @ptrCast(U8Ptr, ptr);
-        offset_ptr += @alignOf(ArrayPtr);
-        array_ptr = @ptrCast(ArrayPtr, @alignCast(@alignOf(ElementType), offset_ptr));
+        var array_ptr = @ptrCast(U8Ptr, ptr);
+        data_ptr = @ptrCast(ArrayPtr, @alignCast(@alignOf(ElementType), array_ptr + @sizeOf(ArrayPtr)));
         if (size > 0) {
-            obj.* = @ptrCast(ArrayPtr, @alignCast(@alignOf(ArrayPtr), offset_ptr));
+            obj.* = @ptrCast(ArrayPtr, @alignCast(@alignOf(ArrayPtr), data_ptr));
         } else {
             obj.* = 0;
         }
@@ -1555,7 +1551,7 @@ pub fn get_resource_array_from_list(comptime ElementType: type, environment: env
 
     while (idx < size) {
         head = try get_head_and_iter(environment, &movable_list);
-        array_ptr[idx] = try fetch_resource(ElementType, environment, resource_type_element, head);
+        data_ptr[idx] = try fetch_resource(ElementType, environment, resource_type_element, head);
         idx += 1;
     }
     return e.enif_make_resource(environment, ptr);
@@ -1563,7 +1559,7 @@ pub fn get_resource_array_from_list(comptime ElementType: type, environment: env
 
 pub fn get_resource_ptr_from_term(comptime ElementType: type, environment: env, resource_type_element: resource_type, resource_type_ptr: resource_type, element: term) !term {
     const RType = [*c]ElementType;
-    const ptr: ?*anyopaque = e.enif_alloc_resource(resource_type_ptr, @alignOf(RType));
+    const ptr: ?*anyopaque = e.enif_alloc_resource(resource_type_ptr, @sizeOf(RType));
     var obj: *RType = undefined;
     obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
     if (ptr == null) {

@@ -18,12 +18,16 @@ export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     return 0;
 }
 
+pub fn make_charlist_from_string_ref(environment: beam.env, val: c.struct_MlirStringRef) beam.term {
+    return beam.make_charlist_len(environment, val.data, val.length);
+}
+
 fn get_all_registered_ops(env: beam.env) !beam.term {
-    const ctx = c.mlirContextCreate();
-    c.mlirRegisterAllDialects(ctx);
+    const ctx = get_context_load_all_dialects();
     const num_op: isize = c.beaverGetNumRegisteredOperations(ctx);
     var i: isize = 0;
     var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(usize, num_op));
+    defer beam.allocator.free(ret);
     while (i < num_op) : ({
         i += 1;
     }) {
@@ -32,17 +36,26 @@ fn get_all_registered_ops(env: beam.env) !beam.term {
         const op_name = c.beaverRegisteredOperationNameGetOpName(registered_op_name);
         var tuple_slice: []beam.term = try beam.allocator.alloc(beam.term, 2);
         defer beam.allocator.free(tuple_slice);
-        tuple_slice[0] = beam.make_cstring_charlist(env, dialect_name.data);
-        tuple_slice[1] = beam.make_cstring_charlist(env, op_name.data);
+        tuple_slice[0] = make_charlist_from_string_ref(env, dialect_name);
+        tuple_slice[1] = make_charlist_from_string_ref(env, op_name);
         ret[@intCast(usize, i)] = beam.make_tuple(env, tuple_slice);
     }
     c.mlirContextDestroy(ctx);
     return beam.make_term_list(env, ret);
 }
 
-fn get_all_registered_ops2(env: beam.env, dialect : c.struct_MlirStringRef) !beam.term {
+fn get_context_load_all_dialects() c.struct_MlirContext {
     const ctx = c.mlirContextCreate();
-    c.mlirRegisterAllDialects(ctx);
+    var registry = c.mlirDialectRegistryCreate();
+    c.mlirRegisterAllDialects(registry);
+    c.mlirContextAppendDialectRegistry(ctx, registry);
+    c.mlirDialectRegistryDestroy(registry);
+    c.mlirContextLoadAllAvailableDialects(ctx);
+    return ctx;
+}
+
+fn get_all_registered_ops2(env: beam.env, dialect : c.struct_MlirStringRef) !beam.term {
+    const ctx = get_context_load_all_dialects();
     var num_op: usize = 0;
     var names: [300]c.struct_MlirRegisteredOperationName = undefined;
     c.beaverRegisteredOperationsOfDialect(ctx, dialect, &names, &num_op);
@@ -50,6 +63,7 @@ fn get_all_registered_ops2(env: beam.env, dialect : c.struct_MlirStringRef) !bea
         return beam.make_error_binary(env, "no ops found for dialect");
     }
     var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(usize, num_op));
+    defer beam.allocator.free(ret);
     var i: usize = 0;
     while (i < num_op) : ({
         i += 1;
@@ -121,13 +135,13 @@ export fn get_resource_c_string(env: beam.env, _: c_int, args: [*c]const beam.te
     if (0 == e.enif_inspect_binary(env, args[0], &bin)) {
         return beam.make_error_binary(env, "not a binary");
     }
-    var ptr: ?*anyopaque = e.enif_alloc_resource(fizz.resource_type__cptr_const_u8, @alignOf(RType) + bin.size + 1);
+    var ptr: ?*anyopaque = e.enif_alloc_resource(fizz.resource_type__cptr_const_u8, @sizeOf(RType) + bin.size + 1);
     var obj: *RType = undefined;
-    obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
     var real_binary: RType = undefined;
     if (ptr == null) {
         unreachable();
     } else {
+        obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
         real_binary = @ptrCast(RType, ptr);
         real_binary += @alignOf(RType);
         real_binary[bin.size] = 0;
@@ -165,10 +179,75 @@ export fn beaver_nif_NamedAttributeGet(env: beam.env, _: c_int, args: [*c]const 
     return e.enif_make_resource(env, ptr);
 }
 
+const StringRefCollector = struct {
+    env: beam.env,
+    list: std.ArrayList(beam.term)
+};
+
+fn collect_string_ref(string_ref: c.struct_MlirStringRef, collector: ?*anyopaque) callconv(.C) void {
+    var collector_ptr = @ptrCast(*StringRefCollector, @alignCast(@alignOf(*StringRefCollector), collector));
+    collector_ptr.*.list.append(make_charlist_from_string_ref(collector_ptr.*.env, string_ref)) catch unreachable;
+}
+
+fn print_mlir(env: beam.env, element: anytype, printer: anytype) beam.term {
+    var list = std.ArrayList(beam.term).init(beam.allocator);
+    var collector = StringRefCollector{.env = env, .list = list};
+    defer list.deinit();
+    printer(element, collect_string_ref, &collector);
+    return beam.make_term_list(env, collector.list.items);
+}
+
+export fn beaver_attribute_to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+    var arg0: c.struct_MlirAttribute = undefined;
+    if (beam.fetch_resource(c.struct_MlirAttribute, env, fizz.resource_type_c_struct_MlirAttribute, args[0])) |value| {
+        arg0 = value;
+    } else |_| {
+        return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirAttribute");
+    }
+    return print_mlir(env, arg0, c.mlirAttributePrint);
+}
+
+export fn beaver_type_to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+    var arg0: c.struct_MlirType = undefined;
+    if (beam.fetch_resource(c.struct_MlirType, env, fizz.resource_type_c_struct_MlirType, args[0])) |value| {
+        arg0 = value;
+    } else |_| {
+        return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirType");
+    }
+    return print_mlir(env, arg0, c.mlirTypePrint);
+}
+
+export fn beaver_operation_to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+    var arg0: c.struct_MlirOperation = undefined;
+    if (beam.fetch_resource(c.struct_MlirOperation, env, fizz.resource_type_c_struct_MlirOperation, args[0])) |value| {
+        arg0 = value;
+    } else |_| {
+        return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirOperation");
+    }
+    return print_mlir(env, arg0, c.mlirOperationPrint);
+}
+
+export fn beaver_get_context_load_all_dialects(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
+    var ptr: ?*anyopaque = e.enif_alloc_resource(fizz.resource_type_c_struct_MlirContext, @sizeOf(c.struct_MlirContext));
+    const RType = c.struct_MlirContext;
+    var obj: *RType = undefined;
+    if (ptr == null) {
+        unreachable();
+    } else {
+        obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
+        obj.* = get_context_load_all_dialects();
+    }
+    return e.enif_make_resource(env, ptr);
+}
+
 pub export const handwritten_nifs = ([_]e.ErlNifFunc{
+    e.ErlNifFunc{ .name = "beaver_get_context_load_all_dialects", .arity = 0, .fptr = beaver_get_context_load_all_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "registered_ops", .arity = 0, .fptr = registered_ops, .flags = 1 },
     e.ErlNifFunc{ .name = "registered_ops_of_dialect", .arity = 1, .fptr = registered_ops_of_dialect, .flags = 1 },
     e.ErlNifFunc{ .name = "resource_cstring_to_term_charlist", .arity = 1, .fptr = resource_cstring_to_term_charlist, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_attribute_to_charlist", .arity = 1, .fptr = beaver_attribute_to_charlist, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_type_to_charlist", .arity = 1, .fptr = beaver_type_to_charlist, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_operation_to_charlist", .arity = 1, .fptr = beaver_operation_to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "resource_bool_to_term", .arity = 1, .fptr = resource_bool_to_term, .flags = 0 },
     e.ErlNifFunc{ .name = "get_resource_bool", .arity = 1, .fptr = get_resource_bool, .flags = 0 },
     e.ErlNifFunc{ .name = "get_resource_c_string", .arity = 1, .fptr = get_resource_c_string, .flags = 0 },

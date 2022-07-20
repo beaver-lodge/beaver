@@ -24,7 +24,7 @@ defmodule Beaver.MLIR.Sigils do
 
       iex> Attribute.equal?(Attribute.float(Type.f(32), 0.0), ~a{0.0}f32)
       true
-      iex> ~a{1 : i32} |> Attribute.to_string()
+      iex> ~a{1 : i32} |> MLIR.to_string()
       "1 : i32"
   """
   def sigil_a(string, []), do: MLIR.Attribute.get(string)

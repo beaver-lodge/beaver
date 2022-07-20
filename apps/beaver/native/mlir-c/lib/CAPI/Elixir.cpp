@@ -107,6 +107,7 @@ MLIR_CAPI_EXPORTED void beaverExitMultiThreadedExecution(MlirContext context) {
 }
 
 MLIR_CAPI_EXPORTED MlirOperand beaverValueGetFirstOperand(MlirValue value) {
+  // TODO: fix the leakage here
   auto *iter = new mlir::Value::use_iterator();
   *iter = unwrap(value).use_begin();
   return wrap(iter);
@@ -231,13 +232,19 @@ MlirAttribute beaverMlirNamedAttributeGetAttribute(MlirNamedAttribute na) {
 }
 
 MLIR_CAPI_EXPORTED
-void beaverOperationStateAddAttributes(MlirOperationState *state, intptr_t n,
+void beaverOperationStateAddAttributes(MlirContext context,
+                                       MlirOperationState *state, intptr_t n,
                                        MlirStringRef const *names,
                                        MlirAttribute const *attributes) {
+  if (state->nAttributes != 0 || state->attributes != nullptr) {
+    llvm::errs() << "attributes already set/n";
+    exit(1);
+  }
+
   MlirNamedAttribute na_arr[n];
   for (intptr_t i = 0; i < n; ++i) {
     auto attr = unwrap(attributes[i]);
-    auto name = mlirIdentifierGet(wrap(attr.getContext()), names[i]);
+    auto name = mlirIdentifierGet(context, names[i]);
     auto na = MlirNamedAttribute{name, wrap(attr)};
     na_arr[i] = na;
   }

@@ -204,7 +204,7 @@ One example:
 
 ### Transformation over builder
 
-It is very common to use builder pattern to construct IR, especially in a OO programming language like C++/Python.
+It is very common to use builder pattern to construct IR, especially in an OO programming language like C++/Python.
 One problem this approach has is that the compiler code looks very different from the code it is generating.
 Because Erlang/Elixir is SSA by its nature, in Beaver a MLIR Op's creation is very declarative and its container will transform it with the correct contextual information. By doing this, we could:
 

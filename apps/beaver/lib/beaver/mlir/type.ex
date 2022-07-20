@@ -17,8 +17,8 @@ defmodule Beaver.MLIR.Type do
   def function(inputs, results, opts \\ []) do
     num_inputs = length(inputs)
     num_results = length(results)
-    inputs = inputs |> CAPI.array()
-    results = results |> CAPI.array()
+    inputs = inputs |> CAPI.ArrayMlirType.create()
+    results = results |> CAPI.ArrayMlirType.create()
     ctx = MLIR.Managed.Context.from_opts(opts)
     CAPI.mlirFunctionTypeGet(ctx, num_inputs, inputs, num_results, results)
   end
@@ -42,7 +42,7 @@ defmodule Beaver.MLIR.Type do
       when is_list(shape) do
     rank = length(shape)
 
-    shape = shape |> MLIR.CAPI.array()
+    shape = shape |> CAPI.ArrayI64.create()
 
     CAPI.mlirAttributeGetNull()
     CAPI.mlirRankedTensorTypeGet(rank, shape, element_type, encoding)
@@ -64,12 +64,11 @@ defmodule Beaver.MLIR.Type do
       when is_list(shape) do
     rank = length(shape)
 
-    shape = shape |> MLIR.CAPI.array()
+    shape = shape |> CAPI.ArrayI64.create()
 
-    [layout: layout, memory_space: memory_space] =
-      for k <- [:layout, :memory_space] do
-        {k, Keyword.get(opts, k, nil)}
-      end
+    default_null = CAPI.mlirAttributeGetNull()
+    layout = Keyword.get(opts, :layout) || default_null
+    memory_space = Keyword.get(opts, :memory_space) || default_null
 
     CAPI.mlirMemRefTypeGet(element_type, rank, shape, layout, memory_space)
   end
@@ -109,6 +108,11 @@ defmodule Beaver.MLIR.Type do
   def integer(bitwidth, opts \\ []) do
     ctx = MLIR.Managed.Context.from_opts(opts)
     CAPI.mlirIntegerTypeGet(ctx, bitwidth)
+  end
+
+  def index(opts \\ []) do
+    ctx = MLIR.Managed.Context.from_opts(opts)
+    CAPI.mlirIndexTypeGet(ctx)
   end
 
   defdelegate i(bitwidth, opts \\ []), to: __MODULE__, as: :integer

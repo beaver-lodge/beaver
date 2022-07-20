@@ -4,6 +4,7 @@ defmodule CfTest do
   alias Beaver.MLIR
   alias Beaver.MLIR.Type
   alias Beaver.MLIR.Attribute
+  alias Beaver.MLIR.Dialect.{CF, Arith}
 
   defmodule MutCompiler do
     use Beaver
@@ -199,7 +200,7 @@ defmodule CfTest do
     defmacro defnative(call, do: block) do
       mlir_asm =
         MutCompiler.gen_func(call, block)
-        |> MLIR.Operation.to_string()
+        |> MLIR.to_string()
 
       quote do
         alias MLIR.Dialect.Func

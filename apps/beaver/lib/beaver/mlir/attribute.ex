@@ -23,10 +23,6 @@ defmodule Beaver.MLIR.Attribute do
     CAPI.mlirAttributeEqual(a, b) |> CAPI.to_term()
   end
 
-  def to_string(attr) do
-    MLIR.StringRef.to_string(attr, CAPI, :mlirAttributePrint)
-  end
-
   def float(type, value, opts \\ []) do
     ctx = MLIR.Managed.Context.from_opts(opts)
     CAPI.mlirFloatAttrDoubleGet(ctx, type, value)
@@ -41,7 +37,7 @@ defmodule Beaver.MLIR.Attribute do
   def array(elements, opts \\ []) when is_list(elements) do
     ctx = MLIR.Managed.Context.from_opts(opts)
     num_elements = length(elements)
-    CAPI.mlirArrayAttrGet(ctx, num_elements, CAPI.array(elements))
+    CAPI.mlirArrayAttrGet(ctx, num_elements, CAPI.ArrayMlirAttribute.create(elements))
   end
 
   def string(str, opts \\ []) when is_binary(str) do

@@ -64,7 +64,7 @@ add_mlir_aggregate(MLIRBeaver
   MLIRCAPILinalg
   MLIRCAPIPDL
   MLIRCAPIQuant
-  MLIRCAPIRegistration
+  MLIRCAPIRegisterEverything
   MLIRCAPISCF
   MLIRCAPIShape
   MLIRCAPISparseTensor

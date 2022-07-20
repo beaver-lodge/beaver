@@ -109,22 +109,6 @@ defmodule Beaver.MLIR.Operation do
     |> MLIR.Operation.create()
   end
 
-  @doc """
-  Print operation to a Elixir `String`. This function could be very expensive. It is recommended to use it at compile-time or debugging.
-  """
-  def to_string(operation) do
-    string_ref_callback_closure = MLIR.StringRef.Callback.create()
-
-    MLIR.CAPI.mlirOperationPrint(
-      operation,
-      Exotic.Value.as_ptr(string_ref_callback_closure),
-      nil
-    )
-
-    string_ref_callback_closure
-    |> MLIR.StringRef.Callback.collect_and_destroy()
-  end
-
   @default_verify_opts [dump: false, dump_if_fail: false]
   def verify!(op, opts \\ @default_verify_opts) do
     with {:ok, op} <-
@@ -176,12 +160,6 @@ defmodule Beaver.MLIR.Operation do
     MLIR.CAPI.mlirOperationGetName(operation)
     |> MLIR.CAPI.mlirIdentifierStr()
     |> MLIR.StringRef.extract()
-  end
-
-  def is_null(operation = %MLIR.CAPI.MlirOperation{}) do
-    operation
-    |> Exotic.Value.fetch(MLIR.CAPI.MlirOperation, :ptr)
-    |> Exotic.Value.extract() == 0
   end
 
   def from_module(module = %CAPI.MlirModule{}) do
