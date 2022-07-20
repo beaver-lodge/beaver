@@ -33,6 +33,11 @@ beaverRegisteredOperationNameGetDialectName(MlirRegisteredOperationName name);
 MLIR_CAPI_EXPORTED MlirStringRef
 beaverRegisteredOperationNameGetOpName(MlirRegisteredOperationName name);
 
+MLIR_CAPI_EXPORTED void
+beaverRegisteredOperationsOfDialect(MlirContext context, MlirStringRef dialect,
+                                    MlirRegisteredOperationName *ret,
+                                    size_t *num);
+
 MLIR_CAPI_EXPORTED MlirOperand beaverValueGetFirstOperand(MlirValue value);
 
 MLIR_CAPI_EXPORTED MlirOperand beaverOperandGetNext(MlirOperand operand);

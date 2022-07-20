@@ -1,1 +1,5 @@
-*.fizz.gen.zig
+*.imp.zig
+zig-cache
+test/src
+prod/src
+dev/src

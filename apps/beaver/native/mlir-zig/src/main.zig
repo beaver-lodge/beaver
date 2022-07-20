@@ -10,7 +10,7 @@ test "basic add functionality" {
 }
 const beam = @import("beam.zig");
 const e = @import("erl_nif.zig");
-const fizz = @import("mlir.fizz.gen.zig");
+const fizz = @import("mlir.imp.zig");
 pub const c = fizz.c;
 
 export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
@@ -39,14 +39,46 @@ fn get_all_registered_ops(env: beam.env) !beam.term {
     c.mlirContextDestroy(ctx);
     return beam.make_term_list(env, ret);
 }
+
+fn get_all_registered_ops2(env: beam.env, dialect : c.struct_MlirStringRef) !beam.term {
+    const ctx = c.mlirContextCreate();
+    c.mlirRegisterAllDialects(ctx);
+    var num_op: usize = 0;
+    var names: [300]c.struct_MlirRegisteredOperationName = undefined;
+    c.beaverRegisteredOperationsOfDialect(ctx, dialect, &names, &num_op);
+    if (num_op == 0) {
+        return beam.make_error_binary(env, "no ops found for dialect");
+    }
+    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(usize, num_op));
+    var i: usize = 0;
+    while (i < num_op) : ({
+        i += 1;
+    }) {
+        const registered_op_name = names[i];
+        const op_name = c.beaverRegisteredOperationNameGetOpName(registered_op_name);
+        ret[@intCast(usize, i)] = beam.make_cstring_charlist(env, op_name.data);
+    }
+    return beam.make_term_list(env, ret);
+}
+
 export fn registered_ops(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
     return get_all_registered_ops(env) catch beam.make_error_binary(env, "launching nif");
+}
+
+export fn registered_ops_of_dialect(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+    var dialect: c.struct_MlirStringRef = undefined;
+    if (beam.fetch_resource(c.struct_MlirStringRef, env, fizz.resource_type_c_struct_MlirStringRef, args[0])) |value| {
+        dialect = value;
+    } else |_| {
+        return beam.make_error_binary(env, "fail to fetch resource for dialect, expected: c.struct_MlirStringRef");
+    }
+    return get_all_registered_ops2(env, dialect) catch beam.make_error_binary(env, "launching nif");
 }
 
 export fn resource_cstring_to_term_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     const T = [*c]const u8;
     var arg0: T = undefined;
-    if (beam.fetch_resource(T, env, fizz.resource_type__c_ptr_const_u8, args[0])) |value| {
+    if (beam.fetch_resource(T, env, fizz.resource_type__cptr_const_u8, args[0])) |value| {
         arg0 = value;
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource");
@@ -89,7 +121,7 @@ export fn get_resource_c_string(env: beam.env, _: c_int, args: [*c]const beam.te
     if (0 == e.enif_inspect_binary(env, args[0], &bin)) {
         return beam.make_error_binary(env, "not a binary");
     }
-    var ptr: ?*anyopaque = e.enif_alloc_resource(fizz.resource_type__c_ptr_const_u8, @alignOf(RType) + bin.size + 1);
+    var ptr: ?*anyopaque = e.enif_alloc_resource(fizz.resource_type__cptr_const_u8, @alignOf(RType) + bin.size + 1);
     var obj: *RType = undefined;
     obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
     var real_binary: RType = undefined;
@@ -134,7 +166,8 @@ export fn beaver_nif_NamedAttributeGet(env: beam.env, _: c_int, args: [*c]const 
 }
 
 pub export const handwritten_nifs = ([_]e.ErlNifFunc{
-    e.ErlNifFunc{ .name = "registered_ops", .arity = 0, .fptr = registered_ops, .flags = 0 },
+    e.ErlNifFunc{ .name = "registered_ops", .arity = 0, .fptr = registered_ops, .flags = 1 },
+    e.ErlNifFunc{ .name = "registered_ops_of_dialect", .arity = 1, .fptr = registered_ops_of_dialect, .flags = 1 },
     e.ErlNifFunc{ .name = "resource_cstring_to_term_charlist", .arity = 1, .fptr = resource_cstring_to_term_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "resource_bool_to_term", .arity = 1, .fptr = resource_bool_to_term, .flags = 0 },
     e.ErlNifFunc{ .name = "get_resource_bool", .arity = 1, .fptr = get_resource_bool, .flags = 0 },

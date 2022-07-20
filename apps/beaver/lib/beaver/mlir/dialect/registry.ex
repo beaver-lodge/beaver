@@ -2,6 +2,8 @@ defmodule Beaver.MLIR.Dialect.Registry do
   use GenServer
 
   require Beaver.MLIR.CAPI
+  alias Beaver.MLIR.CAPI
+  alias Beaver.MLIR
 
   def start_link([]) do
     GenServer.start_link(__MODULE__, [])
@@ -59,9 +61,8 @@ defmodule Beaver.MLIR.Dialect.Registry do
 
   def ops(dialect, opts \\ [query: false]) do
     if Keyword.get(opts, :query, false) do
-      for {^dialect, o} <- query_ops() do
-        o
-      end
+      CAPI.check!(CAPI.registered_ops_of_dialect(MLIR.StringRef.create(dialect).ref))
+      |> Enum.map(&List.to_string/1)
     else
       :ets.match(__MODULE__, {dialect, :"$1"}) |> List.flatten()
     end

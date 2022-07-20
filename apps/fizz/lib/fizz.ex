@@ -1,17 +1,31 @@
 defmodule Fizz do
+  alias Fizz.CodeGen.{Function, Type, Resource}
   require Logger
 
   @moduledoc """
   Documentation for `Fizz`.
   """
 
+  defp gen_type(type, cb) do
+    with {:ok, t} <- cb.(type) do
+      t
+    else
+      _ -> raise "failed to generate type: #{type}"
+    end
+  end
+
   @doc """
   Generate Zig code from a header and build a Zig project to produce a NIF library
   """
-  def gen(wrapper, project_dir, opts \\ [include_paths: %{}, library_paths: %{}]) do
+  def gen(wrapper, project_dir, opts \\ [include_paths: %{}, library_paths: %{}, type_gen: nil]) do
+    project_dir = Path.join(File.cwd!(), project_dir)
+    source_dir = Path.join(project_dir, "src")
+    project_dir = Path.join(project_dir, Atom.to_string(Mix.env()))
+    project_source_dir = Path.join(project_dir, "src")
     Logger.debug("[Fizz] generating Zig code for wrapper: #{wrapper}")
     include_paths = Keyword.get(opts, :include_paths, %{})
     library_paths = Keyword.get(opts, :library_paths, %{})
+    type_gen = Keyword.get(opts, :type_gen, &Type.default/1)
     cache_root = Path.join([Mix.Project.build_path(), "mlir-zig-build", "zig-cache"])
 
     if not is_map(include_paths) do
@@ -101,8 +115,6 @@ defmodule Fizz do
           raise "fail to run reflection, ret_code: #{ret_code}"
       end
 
-    alias Fizz.CodeGen.Function
-
     functions =
       out
       |> String.trim()
@@ -118,22 +130,24 @@ defmodule Fizz do
           [%{f | ret: Function.process_type(ret)} | tail]
       end)
 
+    File.write!("#{dst}.functions.ex", inspect(functions, pretty: true, limit: :infinity))
+
     types =
       Enum.map(functions, fn f -> [f.ret, f.args] end)
       |> List.flatten()
 
-    extra = primitive_types() |> Enum.map(&Fizz.CodeGen.Function.ptr_type_name/1)
+    extra = primitive_types() |> Enum.map(&Type.ptr_type_name/1)
 
     types = Enum.sort(types ++ extra) |> Enum.uniq()
 
     array_types =
       for type <- types do
-        Function.array_type_name(type)
+        Type.array_type_name(type)
       end
 
     ptr_types =
       for type <- types do
-        Function.ptr_type_name(type)
+        Type.ptr_type_name(type)
       end
 
     # generate wrapper.inc.zig source
@@ -148,7 +162,7 @@ defmodule Fizz do
           for {arg, i} <- Enum.with_index(args) do
             """
               var arg#{i}: #{arg} = undefined;
-              if (beam.fetch_resource(#{arg}, env, #{Function.resource_type_var(arg)}, args[#{i}])) |value| {
+              if (beam.fetch_resource(#{arg}, env, #{Resource.resource_type_var(arg)}, args[#{i}])) |value| {
                 arg#{i} = value;
               } else |_| {
                 return beam.make_error_binary(env, "fail to fetch resource for argument ##{i + 1}, expected: #{arg}");
@@ -159,11 +173,9 @@ defmodule Fizz do
         """
         export fn fizz_nif_#{name}(env: beam.env, _: c_int, #{if length(args) == 0, do: "_", else: "args"}: [*c] const beam.term) beam.term {
         #{Enum.join(arg_vars, "")}
-          var ptr : ?*anyopaque = e.enif_alloc_resource(#{Function.resource_type_var(ret)}, @sizeOf(#{ret}));
-
+          var ptr : ?*anyopaque = e.enif_alloc_resource(#{Resource.resource_type_var(ret)}, @sizeOf(#{ret}));
           const RType = #{ret};
           var obj : *RType = undefined;
-
           if (ptr == null) {
             unreachable();
           } else {
@@ -189,7 +201,7 @@ defmodule Fizz do
         """
         export fn #{Function.primitive_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
           var arg0: #{type} = undefined;
-          if (beam.fetch_resource(#{type}, env, #{Function.resource_type_var(type)}, args[0])) |value| {
+          if (beam.fetch_resource(#{type}, env, #{Resource.resource_type_var(type)}, args[0])) |value| {
             arg0 = value;
           } else |_| {
             return beam.make_error_binary(env, "fail to fetch resource, expected: #{type}");
@@ -197,7 +209,7 @@ defmodule Fizz do
           return beam.make(#{type}, env, arg0) catch beam.make_error_binary(env, "fail create primitive from resource of #{type}");
         }
         export fn #{Function.resource_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
-          var ptr: ?*anyopaque = e.enif_alloc_resource(#{Function.resource_type_var(type)}, @sizeOf(#{type}));
+          var ptr: ?*anyopaque = e.enif_alloc_resource(#{Resource.resource_type_var(type)}, @sizeOf(#{type}));
           const RType = #{type};
           var obj: *RType = undefined;
           if (ptr == null) {
@@ -221,15 +233,15 @@ defmodule Fizz do
         """
         export fn #{Function.array_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
           const ElementType: type = #{Function.process_type(type)};
-          const resource_type_element = #{Function.resource_type_var(type)};
-          const resource_type_array = #{Function.resource_type_var(Function.array_type_name(type))};
+          const resource_type_element = #{Resource.resource_type_var(type)};
+          const resource_type_array = #{Resource.resource_type_var(Type.array_type_name(type))};
           return beam.get_resource_array_from_list(ElementType, env, resource_type_element, resource_type_array, args[0]) catch beam.make_error_binary(env, "fail create array of #{type}");
         }
 
         export fn #{Function.ptr_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
           const ElementType: type = #{Function.process_type(type)};
-          const resource_type_element = #{Function.resource_type_var(type)};
-          const resource_type_array = #{Function.resource_type_var(Function.ptr_type_name(type))};
+          const resource_type_element = #{Resource.resource_type_var(type)};
+          const resource_type_array = #{Resource.resource_type_var(Type.ptr_type_name(type))};
           return beam.get_resource_ptr_from_term(ElementType, env, resource_type_element, resource_type_array, args[0]) catch beam.make_error_binary(env, "fail create ptr of #{type}");
         }
         """
@@ -253,21 +265,23 @@ defmodule Fizz do
     });
     const beam = @import("beam.zig");
     const e = @import("erl_nif.zig");
-    #{resource_types |> Enum.map(&Function.resource_type_global/1) |> Enum.join("")}
+    #{resource_types |> Enum.map(&Resource.resource_type_global/1) |> Enum.join("")}
     #{source}
     #{makers}
     pub export fn __destroy__(_: beam.env, _: ?*anyopaque) void {
     }
     pub fn open_generated_resource_types(env: beam.env) void {
-    #{Enum.map(resource_types, &Function.resource_open/1) |> Enum.join("")}
+    #{Enum.map(resource_types, &Resource.resource_open/1) |> Enum.join("")}
     }
     pub export var generated_nifs = [_]e.ErlNifFunc{
       #{nifs |> Enum.map(&Fizz.CodeGen.NIF.gen/1) |> Enum.join("  ")}
     };
     """
 
-    src_dir = Path.join(project_dir, "src")
-    File.write!(Path.join(src_dir, "mlir.fizz.gen.zig"), source)
+    dst = Path.join(project_source_dir, "mlir.imp.zig")
+    File.mkdir_p(project_source_dir)
+    Logger.debug("[Fizz] writing source import to: #{dst}")
+    File.write!(dst, source)
 
     # generate build.inc.zig source
     build_source =
@@ -304,7 +318,9 @@ defmodule Fizz do
         pub const erts_include = "#{erts_include}";
         """
 
-    File.write!(Path.join(src_dir, "build.fizz.gen.zig"), build_source)
+    dst = Path.join(project_dir, "build.imp.zig")
+    Logger.debug("[Fizz] writing build import to: #{dst}")
+    File.write!(dst, build_source)
 
     if Mix.env() in [:test, :dev] do
       with {_, 0} <- System.cmd("zig", ["fmt", "."], cd: project_dir) do
@@ -315,6 +331,22 @@ defmodule Fizz do
       end
     end
 
+    sym_src_dir = Path.join(project_dir, "src")
+    File.mkdir_p(sym_src_dir)
+
+    for zig_source <- Path.wildcard(Path.join(source_dir, "*.zig")) do
+      zig_source_link = Path.join(sym_src_dir, Path.basename(zig_source))
+      Logger.debug("[Fizz] sym linking source #{zig_source} => #{zig_source_link}")
+
+      if File.exists?(zig_source_link) do
+        File.rm(zig_source_link)
+      end
+
+      File.ln_s(zig_source, zig_source_link)
+    end
+
+    Logger.debug("[Fizz] building Zig project in: #{project_dir}")
+
     with {_, 0} <- System.cmd("zig", ["build", "--prefix", dest_dir], cd: project_dir) do
       Logger.debug("[Fizz] Zig library installed to: #{dest_dir}")
       :ok
@@ -323,18 +355,30 @@ defmodule Fizz do
         raise "fail to run zig compiler, ret_code: #{ret_code}"
     end
 
-    {nifs, types, dest_dir}
+    {nifs, Enum.map(types, &gen_type(&1, type_gen)), dest_dir}
   end
 
   @doc """
   Get Elixir module name from a Zig type
   """
+  def module_name(%Type{module_name: module_name}) do
+    module_name
+  end
+
   def module_name("c.struct_" <> struct_name) do
     struct_name |> String.to_atom()
   end
 
+  def module_name("c_int") do
+    :CInt
+  end
+
+  def module_name("c_uint") do
+    :CUInt
+  end
+
   def module_name("[*c]const u8") do
-    CString
+    :CString
   end
 
   def module_name("[*c]const " <> type) do
@@ -345,8 +389,28 @@ defmodule Fizz do
     "Ptr#{module_name(type)}" |> String.to_atom()
   end
 
+  def module_name("?*anyopaque") do
+    :PtrAnyOpaque
+  end
+
+  def module_name("?*const anyopaque") do
+    :PtrConstAnyOpaque
+  end
+
+  def module_name("?fn(" <> _ = fn_name) do
+    raise "need module name for fn: #{fn_name}"
+  end
+
   def module_name(type) do
-    type |> String.capitalize() |> String.to_atom()
+    if String.contains?(type, "_") do
+      raise "need module name for type: #{type}"
+    else
+      type |> String.capitalize() |> String.to_atom()
+    end
+  end
+
+  def is_array(%Type{zig_t: type}) do
+    is_array(type)
   end
 
   def is_array("[*c]const " <> _type) do
@@ -355,6 +419,10 @@ defmodule Fizz do
 
   def is_array(type) when is_binary(type) do
     false
+  end
+
+  def element_type(%Type{zig_t: type}) do
+    element_type(type)
   end
 
   def element_type("[*c]const " <> type) do
@@ -399,4 +467,8 @@ defmodule Fizz do
   def is_primitive(type) do
     type in primitive_types()
   end
+
+  def is_function("?fn(" <> _), do: true
+
+  def is_function(_), do: false
 end

@@ -1,5 +1,5 @@
 defmodule Fizz.CodeGen.NIF do
-  alias Fizz.CodeGen.Function
+  alias Fizz.CodeGen.{Function, Type}
   defstruct(name: nil, nif_name: nil, arity: 0, ret: nil)
 
   def from_function(%Fizz.CodeGen.Function{name: name, args: args, ret: ret}) do
@@ -15,7 +15,7 @@ defmodule Fizz.CodeGen.NIF do
     %__MODULE__{
       nif_name: Fizz.CodeGen.Function.array_maker_name(type),
       arity: 1,
-      ret: Function.array_type_name(type)
+      ret: Type.array_type_name(type)
     }
   end
 
@@ -23,7 +23,7 @@ defmodule Fizz.CodeGen.NIF do
     %__MODULE__{
       nif_name: Fizz.CodeGen.Function.ptr_maker_name(type),
       arity: 1,
-      ret: Function.ptr_type_name(type)
+      ret: Type.ptr_type_name(type)
     }
   end
 

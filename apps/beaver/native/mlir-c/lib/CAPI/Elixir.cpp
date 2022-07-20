@@ -79,6 +79,25 @@ beaverRegisteredOperationNameGetOpName(MlirRegisteredOperationName name) {
   return wrap(unwrap(name).stripDialect());
 }
 
+MLIR_CAPI_EXPORTED void
+beaverRegisteredOperationsOfDialect(MlirContext context, MlirStringRef dialect,
+                                    MlirRegisteredOperationName *ret,
+                                    size_t *num) {
+  int i = 0;
+  for (auto &op : unwrap(context)->getRegisteredOperations()) {
+    if (std::string(op.getDialectNamespace()) == std::string(unwrap(dialect))) {
+      if (i > 300) {
+        llvm::errs() << "dialect " << unwrap(dialect) << " has more than 300 "
+                     << "operations\n";
+        exit(1);
+      }
+      ret[i] = wrap(op);
+      i += 1;
+    }
+  }
+  *num = i;
+}
+
 MLIR_CAPI_EXPORTED void beaverEnterMultiThreadedExecution(MlirContext context) {
   unwrap(context)->enterMultiThreadedExecution();
 }
