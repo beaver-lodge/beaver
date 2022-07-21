@@ -12,11 +12,12 @@
     "settings": {},
     // Add the IDs of extensions you want installed when the container is created.
     "extensions": [
-        "llvm-vs-code-extensions.vscode-clangd",
-        "ms-vscode.cmake-tools",
-        "JakeBecker.elixir-ls",
-        "llvm-vs-code-extensions.vscode-mlir"
-    ],
+		"llvm-vs-code-extensions.vscode-clangd",
+		"ms-vscode.cmake-tools",
+		"JakeBecker.elixir-ls",
+		"llvm-vs-code-extensions.vscode-mlir",
+		"tiehuis.zig"
+	],
     // Use 'forwardPorts' to make a list of ports inside the container available locally.
     // "forwardPorts": [],
     // Use 'postCreateCommand' to run commands after the container is created.

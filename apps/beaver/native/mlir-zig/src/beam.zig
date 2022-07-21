@@ -1532,15 +1532,14 @@ pub fn get_resource_array_from_list(comptime ElementType: type, environment: env
     const ArrayPtr = [*c]ElementType;
     const ptr: ?*anyopaque = e.enif_alloc_resource(resource_type_array, @sizeOf(ArrayPtr) + size * @sizeOf(ElementType));
     var data_ptr: ArrayPtr = undefined;
-    var obj: *ArrayPtr = undefined;
-    obj = @ptrCast(*ArrayPtr, @alignCast(@alignOf(*ArrayPtr), ptr));
     if (ptr == null) {
         unreachable();
     } else {
-        var array_ptr = @ptrCast(U8Ptr, ptr);
-        data_ptr = @ptrCast(ArrayPtr, @alignCast(@alignOf(ElementType), array_ptr + @sizeOf(ArrayPtr)));
+        var obj: *ArrayPtr = undefined;
+        obj = @ptrCast(*ArrayPtr, @alignCast(@alignOf(*ArrayPtr), ptr));
+        data_ptr = @ptrCast(ArrayPtr, @alignCast(@alignOf(ArrayPtr), @ptrCast(U8Ptr, ptr) + @sizeOf(ArrayPtr)));
         if (size > 0) {
-            obj.* = @ptrCast(ArrayPtr, @alignCast(@alignOf(ArrayPtr), data_ptr));
+            obj.* = data_ptr;
         } else {
             obj.* = 0;
         }
