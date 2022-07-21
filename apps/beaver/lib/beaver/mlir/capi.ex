@@ -102,6 +102,7 @@ defmodule Beaver.MLIR.CAPI do
 
     case nif do
       %Fizz.CodeGen.NIF{name: nil, nif_name: nif_name} ->
+        @doc false
         def unquote(String.to_atom(nif_name))(unquote_splicing(args_ast)),
           do: "failed to load NIF"
 
@@ -115,6 +116,7 @@ defmodule Beaver.MLIR.CAPI do
           struct!(unquote(return_module), %{ref: check!(ref), zig_t: unquote(ret)})
         end
 
+        @doc false
         def unquote(String.to_atom(nif_name))(unquote_splicing(args_ast)),
           do: "failed to load MLIR NIF"
     end
