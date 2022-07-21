@@ -57,6 +57,9 @@ defmodule Beaver.MLIR.CAPI do
   for %Fizz.CodeGen.Type{module_name: module_name, zig_t: zig_t, delegates: delegates} = type <-
         types do
     defmodule Module.concat(__MODULE__, module_name) do
+      @moduledoc """
+      #{zig_t}
+      """
       defstruct ref: nil, zig_t: zig_t, bag: MapSet.new()
 
       if Fizz.is_array(type) do
