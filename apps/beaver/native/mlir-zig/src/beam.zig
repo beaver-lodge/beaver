@@ -1581,3 +1581,12 @@ pub fn make_resource(environment: env, value: anytype, rst: resource_type) !term
     }
     return e.enif_make_resource(environment, ptr);
 }
+
+pub fn make_resource_wrapped(environment: env, value: anytype) !term {
+    return make_resource(environment, value, @TypeOf(value).resource_type);
+}
+
+export fn destroy_do_nothing(_: env, _: ?*anyopaque) void {}
+pub fn open_resource_wrapped(environment: env, comptime T: type) void {
+    T.resource_type = e.enif_open_resource_type(environment, null, T.resource_name, destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
+}

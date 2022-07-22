@@ -233,6 +233,13 @@ export fn beaver_get_context_load_all_dialects(env: beam.env, _: c_int, _: [*c]c
     return e.enif_make_resource(env, ptr);
 }
 
+const PassToken = struct {
+    lock: *std.Thread.Mutex,
+    cond: *std.Thread.Condition,
+    pub var resource_type: beam.resource_type = undefined;
+    pub const resource_name = "Beaver" ++ @typeName(@This());
+};
+
 const print = @import("std").debug.print;
 const BeaverPass = struct {
     const UserData = struct { handler: beam.pid };
@@ -262,11 +269,18 @@ const BeaverPass = struct {
         };
         defer e.enif_clear_env(env);
         const handler = ud.*.handler;
-        var tuple_slice: []beam.term = beam.allocator.alloc(beam.term, 2) catch unreachable;
+        var tuple_slice: []beam.term = beam.allocator.alloc(beam.term, 3) catch unreachable;
         defer beam.allocator.free(tuple_slice);
         tuple_slice[0] = beam.make_atom(env, "run");
         tuple_slice[1] = beam.make_resource(env, op, fizz.resource_type_c_struct_MlirOperation) catch {
             print("fail to make res: {}\n", .{@TypeOf(op)});
+            unreachable;
+        };
+        var mutex: std.Thread.Mutex = .{};
+        var cond: std.Thread.Condition = .{};
+        var token = PassToken{ .lock = &mutex, .cond = &cond };
+        tuple_slice[2] = beam.make_resource_wrapped(env, token) catch {
+            print("fail to make token: {}\n", .{@TypeOf(token)});
             unreachable;
         };
         if (!beam.send(env, handler, beam.make_tuple(env, tuple_slice))) {
@@ -372,6 +386,7 @@ const entry = e.ErlNifEntry{
 
 export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     fizz.open_generated_resource_types(env);
+    beam.open_resource_wrapped(env, PassToken);
     return 0;
 }
 
