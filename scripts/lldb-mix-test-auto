@@ -14,4 +14,4 @@ FULL=$(ELIXIR_CLI_DRY_RUN=1 mix test $@)
 FULL=${FULL/erl/${EXE}}
 echo "FULL: $FULL"
 THIS_DIR=$(dirname -- "${BASH_SOURCE[0]}")
-lldb -o run -o c -- $FULL
+lldb -b -o run -s ${THIS_DIR}/autorun -- $FULL

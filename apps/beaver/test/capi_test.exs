@@ -213,14 +213,13 @@ defmodule MlirTest do
     module = create_adder_module(ctx)
     assert not MLIR.Module.is_null(module)
     # TODO: create a supervisor to manage a TypeIDAllocator by mlir application
-    typeIDAllocator = CAPI.mlirTypeIDAllocatorCreate()
 
     external =
-      %MLIR.CAPI.MlirPass{} = MLIR.ExternalPass.create(TestPass, typeIDAllocator, "func.func")
+      %MLIR.CAPI.MlirPass{} = MLIR.ExternalPass.create(TestPass, "func.func") |> IO.inspect()
 
     pm = CAPI.mlirPassManagerCreate(ctx)
     npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
-    CAPI.mlirPassManagerAddOwnedPass(npm, external)
+    CAPI.mlirOpPassManagerAddOwnedPass(npm, external)
     success = CAPI.mlirPassManagerRun(pm, module)
 
     # equivalent to mlirLogicalResultIsSuccess
@@ -229,7 +228,6 @@ defmodule MlirTest do
 
     CAPI.mlirPassManagerDestroy(pm)
     CAPI.mlirModuleDestroy(module)
-    CAPI.mlirTypeIDAllocatorDestroy(typeIDAllocator)
     CAPI.mlirContextDestroy(ctx)
     # TODO: values above could be moved to setup
   end

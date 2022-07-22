@@ -54,13 +54,18 @@ defmodule Beaver.MLIR.CAPI do
     end
   end
 
-  for %Fizz.CodeGen.Type{module_name: module_name, zig_t: zig_t, delegates: delegates} = type <-
+  for %Fizz.CodeGen.Type{
+        module_name: module_name,
+        zig_t: zig_t,
+        delegates: delegates,
+        fields: fields
+      } = type <-
         types do
     defmodule Module.concat(__MODULE__, module_name) do
       @moduledoc """
       #{zig_t}
       """
-      defstruct ref: nil, zig_t: zig_t, bag: MapSet.new()
+      defstruct [ref: nil, zig_t: zig_t, bag: MapSet.new()] ++ fields
 
       if Fizz.is_array(type) do
         @maker Fizz.element_type(type)
@@ -123,6 +128,16 @@ defmodule Beaver.MLIR.CAPI do
   end
 
   def beaver_get_context_load_all_dialects(), do: raise("NIF not loaded")
+
+  def beaver_raw_create_mlir_pass(
+        _name,
+        _argument,
+        _description,
+        _op_name,
+        _handler
+      ),
+      do: raise("NIF not loaded")
+
   def registered_ops(), do: raise("NIF not loaded")
   def registered_ops_of_dialect(_), do: raise("NIF not loaded")
   def resource_bool_to_term(_), do: raise("NIF not loaded")

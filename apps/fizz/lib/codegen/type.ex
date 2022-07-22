@@ -1,5 +1,5 @@
 defmodule Fizz.CodeGen.Type do
-  defstruct zig_t: nil, module_name: nil, delegates: [], backer: nil
+  defstruct zig_t: nil, module_name: nil, delegates: [], backer: nil, fields: []
 
   def array_type_name(type) do
     "[*c]const " <> type

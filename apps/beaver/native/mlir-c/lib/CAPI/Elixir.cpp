@@ -250,3 +250,19 @@ void beaverOperationStateAddAttributes(MlirContext context,
   }
   mlirOperationStateAddAttributes(state, n, na_arr);
 }
+
+MLIR_CAPI_EXPORTED MlirPass beaverCreateExternalPass(
+    void (*construct)(void *userData), MlirTypeID passID, MlirStringRef name,
+    MlirStringRef argument, MlirStringRef description, MlirStringRef opName,
+    intptr_t nDependentDialects, MlirDialectHandle *dependentDialects,
+    void (*destruct)(void *userData),
+    MlirLogicalResult (*initialize)(MlirContext ctx, void *userData),
+    void *(*clone)(void *userData),
+    void (*run)(MlirOperation op, MlirExternalPass pass, void *userData),
+    void *userData) {
+  return mlirCreateExternalPass(
+      passID, name, argument, description, opName, nDependentDialects,
+      dependentDialects,
+      MlirExternalPassCallbacks{construct, destruct, initialize, clone, run},
+      userData);
+}

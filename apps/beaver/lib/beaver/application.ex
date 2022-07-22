@@ -1,5 +1,6 @@
 defmodule Beaver.Application do
   use Application
+  require Logger
   @moduledoc false
   def start(_type, _args) do
     Supervisor.start_link(
@@ -22,6 +23,7 @@ defmodule Beaver.Application do
     end
     |> Task.await_many()
 
+    Logger.debug("[Beaver] dialect modules loaded")
     :ok
   end
 end

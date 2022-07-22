@@ -173,16 +173,8 @@ defmodule Fizz do
         """
         export fn fizz_nif_#{name}(env: beam.env, _: c_int, #{if length(args) == 0, do: "_", else: "args"}: [*c] const beam.term) beam.term {
         #{Enum.join(arg_vars, "")}
-          var ptr : ?*anyopaque = e.enif_alloc_resource(#{Resource.resource_type_var(ret)}, @sizeOf(#{ret}));
-          const RType = #{ret};
-          var obj : *RType = undefined;
-          if (ptr == null) {
-            unreachable();
-          } else {
-            obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
-            obj.* = c.#{name}(#{Enum.join(proxy_arg_uses, ", ")});
-          }
-          return e.enif_make_resource(env, ptr);
+          return beam.make_resource(env, c.#{name}(#{Enum.join(proxy_arg_uses, ", ")}), #{Resource.resource_type_var(ret)})
+          catch return beam.make_error_binary(env, "fail to make resource for #{ret}");
         }
         """
       end
@@ -397,8 +389,24 @@ defmodule Fizz do
     :PtrConstAnyOpaque
   end
 
+  def module_name("?fn(?*anyopaque) callconv(.C) ?*anyopaque") do
+    :ExternalPassConstruct
+  end
+
+  def module_name(
+        "?fn(c.struct_MlirContext, ?*anyopaque) callconv(.C) c.struct_MlirLogicalResult"
+      ) do
+    :ExternalPassInitialize
+  end
+
+  def module_name(
+        "?fn(c.struct_MlirOperation, c.struct_MlirExternalPass, ?*anyopaque) callconv(.C) void"
+      ) do
+    :ExternalPassRun
+  end
+
   def module_name("?fn(" <> _ = fn_name) do
-    raise "need module name for fn: #{fn_name}"
+    raise "need module name for function type: #{fn_name}"
   end
 
   def module_name(type) do

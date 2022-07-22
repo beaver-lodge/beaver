@@ -102,7 +102,7 @@ const e = @import("erl_nif.zig");
 const std = @import("std");
 const builtin = @import("builtin");
 const BeamMutex = @import("beam_mutex.zig").BeamMutex;
-const print = @import("std").debug.print;
+pub const print = @import("std").debug.print;
 
 ///////////////////////////////////////////////////////////////////////////////
 // BEAM allocator definitions
@@ -1565,6 +1565,19 @@ pub fn get_resource_ptr_from_term(comptime ElementType: type, environment: env, 
         unreachable();
     } else {
         obj.* = try fetch_resource_ptr(ElementType, environment, resource_type_element, element);
+    }
+    return e.enif_make_resource(environment, ptr);
+}
+
+pub fn make_resource(environment: env, value: anytype, rst: resource_type) !term {
+    const RType = @TypeOf(value);
+    var ptr: ?*anyopaque = e.enif_alloc_resource(rst, @sizeOf(RType));
+    var obj: *RType = undefined;
+    if (ptr == null) {
+        return Error.FunctionClauseError;
+    } else {
+        obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
+        obj.* = value;
     }
     return e.enif_make_resource(environment, ptr);
 }

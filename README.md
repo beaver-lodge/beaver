@@ -312,6 +312,7 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
     -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_ENABLE_OCAMLDOC=OFF \
     -DLLVM_ENABLE_BINDINGS=OFF \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DCMAKE_INSTALL_PREFIX=${HOME}/llvm-install
   cmake --build build -t install
   export LLVM_CONFIG_PATH=$HOME/llvm-install/bin/llvm-config
@@ -345,3 +346,8 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
   mix test
   mix test --exclude vulkan # use this to skip vulkan tests
   ```
+
+5. debug
+
+- setting environment variable to control Erlang scheduler number, `ERL_AFLAGS="+S 10:5"`
+- run mix test under LLDB, `scripts/lldb-mix-test`

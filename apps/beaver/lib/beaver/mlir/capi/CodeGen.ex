@@ -27,6 +27,10 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
     {:ok, %Type{zig_t: type, module_name: :MlirTypesCallback}}
   end
 
+  def type_gen("c.struct_MlirPass" = type) do
+    {:ok, %Type{zig_t: type, module_name: :MlirPass, fields: [handler: nil]}}
+  end
+
   def type_gen(type) do
     Type.default(type)
   end
