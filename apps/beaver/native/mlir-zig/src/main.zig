@@ -257,10 +257,29 @@ export fn beaver_get_context_load_all_dialects(env: beam.env, _: c_int, _: [*c]c
 }
 
 const PassToken = struct {
-    lock: *std.Thread.Mutex,
-    cond: *std.Thread.Condition,
+    mutex: std.Thread.Mutex = .{},
+    cond: std.Thread.Condition = .{},
+    done: bool = false,
     pub var resource_type: beam.resource_type = undefined;
     pub const resource_name = "Beaver" ++ @typeName(@This());
+    fn wait(self: *@This()) void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        while (!self.done) {
+            self.cond.wait(&self.mutex);
+        }
+    }
+    fn signal(self: *@This()) void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        self.done = true;
+        self.cond.signal();
+    }
+    export fn pass_token_signal(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+        var token = beam.fetch_ptr_resource_wrapped(@This(), env, args[0]) catch return beam.make_error_binary(env, "fail to fetch resource for pass token");
+        token.signal();
+        return beam.make_ok(env);
+    }
 };
 
 const print = @import("std").debug.print;
@@ -299,17 +318,16 @@ const BeaverPass = struct {
             print("fail to make res: {}\n", .{@TypeOf(op)});
             unreachable;
         };
-        var mutex: std.Thread.Mutex = .{};
-        var cond: std.Thread.Condition = .{};
-        var token = PassToken{ .lock = &mutex, .cond = &cond };
-        tuple_slice[2] = beam.make_resource_wrapped(env, token) catch {
-            print("fail to make token: {}\n", .{@TypeOf(token)});
+        var token = PassToken{};
+        print("token: {}\n", .{@TypeOf(token)});
+        tuple_slice[2] = beam.make_ptr_resource_wrapped(env, &token) catch {
             unreachable;
         };
         if (!beam.send(env, handler, beam.make_tuple(env, tuple_slice))) {
             print("fail to send message to pass handler.\n", .{});
             c.mlirExternalPassSignalFailure(pass);
         }
+        token.wait();
     }
 };
 
@@ -379,6 +397,7 @@ pub export const handwritten_nifs = ([_]e.ErlNifFunc{
     e.ErlNifFunc{ .name = "registered_ops_of_dialect", .arity = 1, .fptr = registered_ops_of_dialect, .flags = 1 },
     e.ErlNifFunc{ .name = "registered_dialects", .arity = 0, .fptr = registered_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_create_mlir_pass", .arity = 5, .fptr = beaver_raw_create_mlir_pass, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_pass_token_signal", .arity = 1, .fptr = PassToken.pass_token_signal, .flags = 0 },
     e.ErlNifFunc{ .name = "resource_cstring_to_term_charlist", .arity = 1, .fptr = resource_cstring_to_term_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_attribute_to_charlist", .arity = 1, .fptr = beaver_attribute_to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_type_to_charlist", .arity = 1, .fptr = beaver_type_to_charlist, .flags = 0 },

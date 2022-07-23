@@ -1,5 +1,5 @@
 defmodule Fizz do
-  alias Fizz.CodeGen.{Function, Type, Resource}
+  alias Fizz.CodeGen.{Function, Type, Resource, NIF}
   require Logger
 
   @moduledoc """
@@ -17,7 +17,11 @@ defmodule Fizz do
   @doc """
   Generate Zig code from a header and build a Zig project to produce a NIF library
   """
-  def gen(wrapper, project_dir, opts \\ [include_paths: %{}, library_paths: %{}, type_gen: nil]) do
+  def gen(
+        wrapper,
+        project_dir,
+        opts \\ [include_paths: %{}, library_paths: %{}, type_gen: nil, nif_gen: nil]
+      ) do
     project_dir = Path.join(File.cwd!(), project_dir)
     source_dir = Path.join(project_dir, "src")
     project_dir = Path.join(project_dir, Atom.to_string(Mix.env()))
@@ -25,7 +29,8 @@ defmodule Fizz do
     Logger.debug("[Fizz] generating Zig code for wrapper: #{wrapper}")
     include_paths = Keyword.get(opts, :include_paths, %{})
     library_paths = Keyword.get(opts, :library_paths, %{})
-    type_gen = Keyword.get(opts, :type_gen, &Type.default/1)
+    type_gen = Keyword.get(opts, :type_gen) || (&Type.default/1)
+    nif_gen = Keyword.get(opts, :nif_gen) || (&NIF.from_function/1)
     cache_root = Path.join([Mix.Project.build_path(), "mlir-zig-build", "zig-cache"])
 
     if not is_map(include_paths) do
@@ -244,7 +249,7 @@ defmodule Fizz do
     resource_types = Enum.uniq(types ++ array_types ++ ptr_types)
 
     nifs =
-      Enum.map(functions, &Fizz.CodeGen.NIF.from_function/1) ++
+      Enum.map(functions, nif_gen) ++
         Enum.map(element_types, &Fizz.CodeGen.NIF.array_maker/1) ++
         Enum.map(element_types, &Fizz.CodeGen.NIF.ptr_maker/1) ++
         Enum.map(primitive_types(), &Fizz.CodeGen.NIF.resource_maker/1) ++

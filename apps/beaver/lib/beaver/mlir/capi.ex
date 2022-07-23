@@ -29,7 +29,8 @@ defmodule Beaver.MLIR.CAPI do
       library_paths: %{
         beaver_libdir: Path.join([Mix.Project.build_path(), "native-install", "lib"])
       },
-      type_gen: &__MODULE__.CodeGen.type_gen/1
+      type_gen: &__MODULE__.CodeGen.type_gen/1,
+      nif_gen: &__MODULE__.CodeGen.nif_gen/1
     )
 
   @on_load :load_nifs
@@ -138,6 +139,7 @@ defmodule Beaver.MLIR.CAPI do
       ),
       do: raise("NIF not loaded")
 
+  def beaver_raw_pass_token_signal(_), do: raise("NIF not loaded")
   def registered_ops(), do: raise("NIF not loaded")
   def registered_ops_of_dialect(_), do: raise("NIF not loaded")
   def registered_dialects(), do: raise("NIF not loaded")

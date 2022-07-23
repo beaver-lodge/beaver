@@ -1510,6 +1510,14 @@ pub fn fetch_resource(comptime T: type, environment: env, res_typ: resource_type
     }
 }
 
+pub fn fetch_resource_wrapped(comptime T: type, environment: env, arg: term) !T {
+    return fetch_resource(T, environment, T.resource_type, arg);
+}
+
+pub fn fetch_ptr_resource_wrapped(comptime T: type, environment: env, arg: term) !*T {
+    return fetch_resource(*T, environment, T.resource_type, arg);
+}
+
 pub fn fetch_resource_ptr(comptime T: type, environment: env, res_typ: resource_type, res_trm: term) !*T {
     var obj: ?*anyopaque = undefined;
     if (0 == e.enif_get_resource(environment, res_trm, res_typ, @ptrCast([*c]?*anyopaque, &obj))) {
@@ -1584,6 +1592,10 @@ pub fn make_resource(environment: env, value: anytype, rst: resource_type) !term
 
 pub fn make_resource_wrapped(environment: env, value: anytype) !term {
     return make_resource(environment, value, @TypeOf(value).resource_type);
+}
+
+pub fn make_ptr_resource_wrapped(environment: env, ptr: anytype) !term {
+    return make_resource(environment, ptr, @TypeOf(ptr.*).resource_type);
 }
 
 export fn destroy_do_nothing(_: env, _: ?*anyopaque) void {}

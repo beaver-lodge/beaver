@@ -1,5 +1,5 @@
 defmodule Beaver.MLIR.CAPI.CodeGen do
-  alias Fizz.CodeGen.Type
+  alias Fizz.CodeGen.{Type, NIF, Function}
 
   def type_gen("?fn(c.struct_MlirStringRef, ?*anyopaque) callconv(.C) void" = type) do
     {:ok, %Type{zig_t: type, module_name: :MlirStringCallback}}
@@ -33,5 +33,17 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
 
   def type_gen(type) do
     Type.default(type)
+  end
+
+  def nif_gen(
+        %Function{
+          name: "mlirPassManagerRun"
+        } = f
+      ) do
+    %{NIF.from_function(f) | dirty: :cpu}
+  end
+
+  def nif_gen(f) do
+    NIF.from_function(f)
   end
 end

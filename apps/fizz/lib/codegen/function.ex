@@ -1,4 +1,9 @@
 defmodule Fizz.CodeGen.Function do
+  @type t() :: %__MODULE__{
+          name: String.t(),
+          args: list(),
+          ret: String.t()
+        }
   defstruct name: nil, args: [], ret: nil
   import Fizz.CodeGen.Resource
 

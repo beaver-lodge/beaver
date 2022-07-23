@@ -214,8 +214,7 @@ defmodule MlirTest do
     assert not MLIR.Module.is_null(module)
     # TODO: create a supervisor to manage a TypeIDAllocator by mlir application
 
-    external =
-      %MLIR.CAPI.MlirPass{} = MLIR.ExternalPass.create(TestPass, "func.func") |> IO.inspect()
+    external = %MLIR.CAPI.MlirPass{} = MLIR.ExternalPass.create(TestPass, "func.func")
 
     pm = CAPI.mlirPassManagerCreate(ctx)
     npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
