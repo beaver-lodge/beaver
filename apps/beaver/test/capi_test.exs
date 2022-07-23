@@ -170,18 +170,9 @@ defmodule MlirTest do
   end
 
   defmodule TestPass do
-    def handle_invoke(
-          :run = id,
-          [
-            %Beaver.MLIR.CAPI.MlirOperation{} = op,
-            pass,
-            userData
-          ],
-          _state
-        ) do
-      %Beaver.MLIR.CAPI.MlirExternalPass{} = pass
+    def run(%Beaver.MLIR.CAPI.MlirOperation{} = op) do
       MLIR.Operation.verify!(op)
-      {:return, userData, id}
+      :ok
     end
   end
 
