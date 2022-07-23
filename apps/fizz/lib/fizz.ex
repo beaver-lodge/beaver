@@ -155,6 +155,18 @@ defmodule Fizz do
         Type.ptr_type_name(type)
       end
 
+    resource_structs =
+      types
+      |> Enum.reject(fn x -> String.starts_with?(x, "[*c]") end)
+      |> Enum.reject(fn x -> x in ["void"] end)
+      |> Enum.map(&gen_type(&1, type_gen))
+      |> Enum.map(&IO.inspect/1)
+
+    resource_struct_map =
+      resource_structs
+      |> Enum.map(fn %{zig_t: zig_t, module_name: module_name} -> {zig_t, module_name} end)
+      |> Map.new()
+
     # generate wrapper.inc.zig source
     source =
       for %Function{name: name, args: args, ret: ret} <- functions do
@@ -167,7 +179,7 @@ defmodule Fizz do
           for {arg, i} <- Enum.with_index(args) do
             """
               var arg#{i}: #{arg} = undefined;
-              if (beam.fetch_resource(#{arg}, env, #{Resource.resource_type_var(arg)}, args[#{i}])) |value| {
+              if (beam.fetch_resource(#{arg}, env, #{Resource.resource_type_var(arg, resource_struct_map)}, args[#{i}])) |value| {
                 arg#{i} = value;
               } else |_| {
                 return beam.make_error_binary(env, "fail to fetch resource for argument ##{i + 1}, expected: #{arg}");
@@ -175,13 +187,23 @@ defmodule Fizz do
             """
           end
 
-        """
-        export fn fizz_nif_#{name}(env: beam.env, _: c_int, #{if length(args) == 0, do: "_", else: "args"}: [*c] const beam.term) beam.term {
-        #{Enum.join(arg_vars, "")}
-          return beam.make_resource(env, c.#{name}(#{Enum.join(proxy_arg_uses, ", ")}), #{Resource.resource_type_var(ret)})
-          catch return beam.make_error_binary(env, "fail to make resource for #{ret}");
-        }
-        """
+        if ret == "void" do
+          """
+          export fn fizz_nif_#{name}(env: beam.env, _: c_int, #{if length(args) == 0, do: "_", else: "args"}: [*c] const beam.term) beam.term {
+          #{Enum.join(arg_vars, "")}
+            c.#{name}(#{Enum.join(proxy_arg_uses, ", ")});
+            return beam.make_ok(env);
+          }
+          """
+        else
+          """
+          export fn fizz_nif_#{name}(env: beam.env, _: c_int, #{if length(args) == 0, do: "_", else: "args"}: [*c] const beam.term) beam.term {
+          #{Enum.join(arg_vars, "")}
+            return beam.make_resource(env, c.#{name}(#{Enum.join(proxy_arg_uses, ", ")}), #{Resource.resource_type_var(ret, resource_struct_map)})
+            catch return beam.make_error_binary(env, "fail to make resource for #{ret}");
+          }
+          """
+        end
       end
       |> Enum.join("\n")
 
@@ -198,7 +220,7 @@ defmodule Fizz do
         """
         export fn #{Function.primitive_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
           var arg0: #{type} = undefined;
-          if (beam.fetch_resource(#{type}, env, #{Resource.resource_type_var(type)}, args[0])) |value| {
+          if (beam.fetch_resource(#{type}, env, #{Resource.resource_type_var(type, resource_struct_map)}, args[0])) |value| {
             arg0 = value;
           } else |_| {
             return beam.make_error_binary(env, "fail to fetch resource, expected: #{type}");
@@ -206,7 +228,7 @@ defmodule Fizz do
           return beam.make(#{type}, env, arg0) catch beam.make_error_binary(env, "fail create primitive from resource of #{type}");
         }
         export fn #{Function.resource_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
-          var ptr: ?*anyopaque = e.enif_alloc_resource(#{Resource.resource_type_var(type)}, @sizeOf(#{type}));
+          var ptr: ?*anyopaque = e.enif_alloc_resource(#{Resource.resource_type_var(type, resource_struct_map)}, @sizeOf(#{type}));
           const RType = #{type};
           var obj: *RType = undefined;
           if (ptr == null) {
@@ -230,15 +252,15 @@ defmodule Fizz do
         """
         export fn #{Function.array_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
           const ElementType: type = #{Function.process_type(type)};
-          const resource_type_element = #{Resource.resource_type_var(type)};
-          const resource_type_array = #{Resource.resource_type_var(Type.array_type_name(type))};
+          const resource_type_element = #{Resource.resource_type_var(type, resource_struct_map)};
+          const resource_type_array = #{Resource.resource_type_var(Type.array_type_name(type), resource_struct_map)};
           return beam.get_resource_array_from_list(ElementType, env, resource_type_element, resource_type_array, args[0]) catch beam.make_error_binary(env, "fail create array of #{type}");
         }
 
         export fn #{Function.ptr_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
           const ElementType: type = #{Function.process_type(type)};
-          const resource_type_element = #{Resource.resource_type_var(type)};
-          const resource_type_array = #{Resource.resource_type_var(Type.ptr_type_name(type))};
+          const resource_type_element = #{Resource.resource_type_var(type, resource_struct_map)};
+          const resource_type_array = #{Resource.resource_type_var(Type.ptr_type_name(type), resource_struct_map)};
           return beam.get_resource_ptr_from_term(ElementType, env, resource_type_element, resource_type_array, args[0]) catch beam.make_error_binary(env, "fail create ptr of #{type}");
         }
         """
@@ -248,6 +270,20 @@ defmodule Fizz do
     makers = makers <> primitive_makers
     resource_types = Enum.uniq(types ++ array_types ++ ptr_types)
 
+    types = Enum.map(types, &gen_type(&1, type_gen))
+
+    resource_structs_str =
+      resource_structs
+      |> Enum.map(&Type.gen_resource_struct/1)
+      |> Enum.join()
+
+    resource_structs_str_open_str =
+      resource_structs
+      |> Enum.map(&Resource.resource_open/1)
+      |> Enum.join()
+
+    source = resource_structs_str <> source
+
     nifs =
       Enum.map(functions, nif_gen) ++
         Enum.map(element_types, &Fizz.CodeGen.NIF.array_maker/1) ++
@@ -256,24 +292,28 @@ defmodule Fizz do
         Enum.map(primitive_types(), &Fizz.CodeGen.NIF.primitive_maker/1)
 
     source = """
-    pub const c = @cImport({
-      @cDefine("_NO_CRT_STDIO_INLINE", "1");
-      @cInclude("#{wrapper}");
-    });
-    const beam = @import("beam.zig");
-    const e = @import("erl_nif.zig");
-    #{resource_types |> Enum.map(&Resource.resource_type_global/1) |> Enum.join("")}
     #{source}
     #{makers}
     pub export fn __destroy__(_: beam.env, _: ?*anyopaque) void {
     }
     pub fn open_generated_resource_types(env: beam.env) void {
-    #{Enum.map(resource_types, &Resource.resource_open/1) |> Enum.join("")}
+    #{resource_structs_str_open_str}
     }
-    pub export var generated_nifs = [_]e.ErlNifFunc{
+    pub export const generated_nifs = .{
       #{nifs |> Enum.map(&Fizz.CodeGen.NIF.gen/1) |> Enum.join("  ")}
-    };
+    } ++ #{Enum.map(resource_structs, fn %{module_name: module_name} -> "#{module_name}.nifs" end) |> Enum.join(" ++ ")};
     """
+
+    source =
+      """
+      pub const c = @cImport({
+        @cDefine("_NO_CRT_STDIO_INLINE", "1");
+        @cInclude("#{wrapper}");
+      });
+      const beam = @import("beam.zig");
+      const e = @import("erl_nif.zig");
+      pub const root_module = "Elixir.Beaver.MLIR.CAPI";
+      """ <> source
 
     dst = Path.join(project_source_dir, "mlir.imp.zig")
     File.mkdir_p(project_source_dir)
@@ -352,7 +392,7 @@ defmodule Fizz do
         raise "fail to run zig compiler, ret_code: #{ret_code}"
     end
 
-    {nifs, Enum.map(types, &gen_type(&1, type_gen)), dest_dir}
+    {nifs, types, resource_structs, dest_dir}
   end
 
   @doc """
@@ -387,11 +427,11 @@ defmodule Fizz do
   end
 
   def module_name("?*anyopaque") do
-    :PtrAnyOpaque
+    :OpaquePtr
   end
 
   def module_name("?*const anyopaque") do
-    :PtrConstAnyOpaque
+    :OpaqueArray
   end
 
   def module_name("?fn(?*anyopaque) callconv(.C) ?*anyopaque") do
@@ -470,15 +510,18 @@ defmodule Fizz do
       "u32",
       "u64",
       "u8",
-      "usize",
-      "void"
+      "usize"
     ]
   end
 
   def is_primitive("void"), do: false
 
-  def is_primitive(type) do
+  def is_primitive(type) when is_binary(type) do
     type in primitive_types()
+  end
+
+  def is_primitive(%Type{zig_t: type}) do
+    is_primitive(type)
   end
 
   def is_function("?fn(" <> _), do: true

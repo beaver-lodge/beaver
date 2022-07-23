@@ -1602,3 +1602,70 @@ export fn destroy_do_nothing(_: env, _: ?*anyopaque) void {}
 pub fn open_resource_wrapped(environment: env, comptime T: type) void {
     T.resource_type = e.enif_open_resource_type(environment, null, T.resource_name, destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
 }
+
+pub fn get_element_struct(comptime ElementType: type, module_name: anytype) type {
+    return struct {
+        const T = ElementType;
+        pub const resource = struct {
+            pub var t: resource_type = undefined;
+            pub const name = @typeName(ElementType);
+            pub fn make(environment: env, value: T) !term {
+                return make_resource(environment, value, t);
+            }
+            pub fn fetch(environment: env, arg: term) !T {
+                return fetch_resource(T, environment, t, arg);
+            }
+            pub fn fetch_ptr(environment: env, arg: term) !*T {
+                return fetch_resource_ptr(T, environment, t, arg);
+            }
+        };
+        const PtrType = [*c]ElementType;
+        pub const Ptr = struct {
+            const T = PtrType;
+            pub const resource = struct {
+                pub var t: resource_type = undefined;
+                pub const name = @typeName(PtrType);
+                pub fn make(environment: env, value: PtrType) !term {
+                    return make_resource(environment, value, t);
+                }
+                pub fn fetch(environment: env, arg: term) !PtrType {
+                    return fetch_resource(PtrType, environment, t, arg);
+                }
+            };
+        };
+        const ArrayType = [*c]const ElementType;
+        pub const Array = struct {
+            const T = ArrayType;
+            pub const resource = struct {
+                pub var t: resource_type = undefined;
+                pub const name = @typeName(ArrayType);
+                pub fn make(environment: env, value: ArrayType) !term {
+                    return make_resource(environment, value, t);
+                }
+                pub fn fetch(environment: env, arg: term) !ArrayType {
+                    return fetch_resource(ArrayType, environment, t, arg);
+                }
+            };
+        };
+        fn ptr(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
+            return get_resource_ptr_from_term(T, environment, @This().resource.t, Ptr.resource.t, args[0]) catch return make_error_binary(environment, "fail to create ptr" ++ @typeName(T));
+        }
+        fn array(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
+            return get_resource_array_from_list(T, environment, @This().resource.t, Array.resource.t, args[0]) catch return make_error_binary(environment, "fail to create array" ++ @typeName(T));
+        }
+        fn primitive(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
+            const v = resource.fetch(environment, args[0]) catch return make_error_binary(environment, "fail to extract pritimive from " ++ @typeName(T));
+            return make(T, environment, v) catch return make_error_binary(environment, "fail to create primitive " ++ @typeName(T));
+        }
+        fn create(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
+            const v = get(T, environment, args[0]) catch return make_error_binary(environment, "fail to fetch " ++ @typeName(T));
+            return resource.make(environment, v) catch return make_error_binary(environment, "fail to create " ++ @typeName(T));
+        }
+        pub const nifs = .{
+            e.ErlNifFunc{ .name = module_name ++ ".ptr", .arity = 1, .fptr = ptr, .flags = 0 },
+            e.ErlNifFunc{ .name = module_name ++ ".array", .arity = 1, .fptr = array, .flags = 0 },
+            e.ErlNifFunc{ .name = module_name ++ ".primitive", .arity = 1, .fptr = primitive, .flags = 0 },
+            e.ErlNifFunc{ .name = module_name ++ ".create", .arity = 1, .fptr = create, .flags = 0 },
+        };
+    };
+}

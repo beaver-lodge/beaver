@@ -20,7 +20,7 @@ defmodule Beaver.MLIR.CAPI do
   wrapper_header_path = Path.join(File.cwd!(), "native/wrapper.h")
   beaver_include = Path.join(File.cwd!(), "native/mlir-c/include")
 
-  {nifs, types, dest_dir} =
+  {nifs, types, resource_structs, dest_dir} =
     Fizz.gen(wrapper_header_path, "native/mlir-zig",
       include_paths: %{
         llvm_include: Beaver.LLVM.Config.include_dir(),
@@ -139,12 +139,22 @@ defmodule Beaver.MLIR.CAPI do
       ),
       do: raise("NIF not loaded")
 
+  for %{module_name: module_name} <- resource_structs do
+    for f <- ~w{ptr
+    array
+    primitive
+    create} do
+      name = Module.concat([__MODULE__, module_name, f])
+      def unquote(name)(_), do: raise("NIF not loaded")
+    end
+  end
+
   def beaver_raw_pass_token_signal(_), do: raise("NIF not loaded")
   def registered_ops(), do: raise("NIF not loaded")
   def registered_ops_of_dialect(_), do: raise("NIF not loaded")
   def registered_dialects(), do: raise("NIF not loaded")
   def resource_bool_to_term(_), do: raise("NIF not loaded")
-  def resource_cstring_to_term_charlist(_), do: raise("NIF not loaded")
+  def beaver_raw_resource_cstring_to_term_charlist(_), do: raise("NIF not loaded")
   def beaver_attribute_to_charlist(_), do: raise("NIF not loaded")
   def beaver_type_to_charlist(_), do: raise("NIF not loaded")
   def beaver_operation_to_charlist(_), do: raise("NIF not loaded")

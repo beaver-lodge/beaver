@@ -9,7 +9,13 @@ defmodule Fizz.CodeGen.Type do
     "[*c]" <> type
   end
 
-  def default(type) do
+  def default(type) when is_binary(type) do
     {:ok, %__MODULE__{zig_t: type, module_name: Fizz.module_name(type)}}
+  end
+
+  def gen_resource_struct(%__MODULE__{module_name: module_name, zig_t: zig_t}) do
+    """
+    pub const #{module_name} = beam.get_element_struct(#{zig_t}, root_module ++ ".#{module_name}");
+    """
   end
 end

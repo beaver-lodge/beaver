@@ -6,6 +6,7 @@ defmodule Fizz.CodeGen.Function do
         }
   defstruct name: nil, args: [], ret: nil
   import Fizz.CodeGen.Resource
+  alias Fizz.CodeGen.Type
 
   def process_type("struct_" <> _ = arg) do
     "c.#{arg}"
@@ -25,6 +26,10 @@ defmodule Fizz.CodeGen.Function do
 
   def primitive_maker_name(type) do
     "fizz_nif_get_primitive_from_#{resource_type_var(type)}"
+  end
+
+  def resource_maker_name(%Type{zig_t: type}) do
+    resource_maker_name(type)
   end
 
   def resource_maker_name(type) do
