@@ -120,10 +120,9 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def verify(op, opts \\ @default_verify_opts) do
-    op = from_module(op)
     dump = opts |> Keyword.get(:dump, false)
     dump_if_fail = opts |> Keyword.get(:dump_if_fail, false)
-    is_success = MLIR.CAPI.mlirOperationVerify(op) |> CAPI.to_term()
+    is_success = from_module(op) |> MLIR.CAPI.mlirOperationVerify() |> CAPI.to_term()
 
     if dump do
       Logger.warning("Start dumping op not verified. This might crash.")

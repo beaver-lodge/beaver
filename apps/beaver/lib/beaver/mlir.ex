@@ -7,6 +7,7 @@ defmodule Beaver.MLIR do
     MlirModule,
     MlirOperation,
     MlirAttribute,
+    MlirBlock,
     MlirValue,
     MlirAffineExpr,
     MlirAffineMap,
@@ -70,6 +71,14 @@ defmodule Beaver.MLIR do
 
   def is_null(%MlirAttribute{} = v) do
     CAPI.beaverAttributeIsNull(v) |> CAPI.to_term()
+  end
+
+  def is_null(%MlirOperation{} = v) do
+    CAPI.beaverOperationIsNull(v) |> CAPI.to_term()
+  end
+
+  def is_null(%MlirBlock{} = v) do
+    CAPI.beaverBlockIsNull(v) |> CAPI.to_term()
   end
 
   def to_string(%MlirAttribute{ref: ref}) do

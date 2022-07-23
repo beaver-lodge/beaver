@@ -239,7 +239,7 @@ defmodule MlirTest do
 
     pm = CAPI.mlirPassManagerCreate(ctx)
     npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
-    CAPI.mlirPassManagerAddOwnedPass(npm, external)
+    CAPI.mlirOpPassManagerAddOwnedPass(npm, external)
     success = CAPI.mlirPassManagerRun(pm, module)
     assert Beaver.MLIR.LogicalResult.success?(success)
 

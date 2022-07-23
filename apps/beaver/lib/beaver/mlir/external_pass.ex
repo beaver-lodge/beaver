@@ -18,7 +18,7 @@ defmodule Beaver.MLIR.ExternalPass do
     argument =
       Module.split(pass_module) |> List.last() |> Macro.underscore() |> MLIR.StringRef.create()
 
-    {:ok, pid} = GenServer.start_link(MLIR.Pass.Server, [])
+    {:ok, pid} = GenServer.start_link(MLIR.Pass.Server, pass_module: pass_module)
 
     ref =
       CAPI.beaver_raw_create_mlir_pass(

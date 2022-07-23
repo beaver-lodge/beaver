@@ -116,8 +116,8 @@ defmodule PDLTest do
 
     assert mlir
            |> Beaver.container()
-           |> MLIR.CAPI.mlirOperationEqual(pattern_module)
-           |> Exotic.Value.extract()
+           |> MLIR.CAPI.mlirOperationEqual(MLIR.Operation.from_module(pattern_module))
+           |> MLIR.CAPI.to_term()
 
     ir_module = MLIR.Module.create(ctx, @apply_rewrite_op_ir)
     MLIR.Operation.verify!(pattern_module)
@@ -125,7 +125,12 @@ defmodule PDLTest do
     pdl_pattern = CAPI.beaverPDLPatternGet(pattern_module)
     pattern_set = CAPI.beaverRewritePatternSetGet(ctx)
     pattern_set = CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pdl_pattern)
-    region = CAPI.mlirOperationGetFirstRegion(ir_module)
+
+    region =
+      ir_module
+      |> MLIR.Operation.from_module()
+      |> CAPI.mlirOperationGetFirstRegion()
+
     result = CAPI.beaverApplyOwnedPatternSetOnRegion(region, pattern_set)
 
     assert Beaver.MLIR.LogicalResult.success?(result)
@@ -153,7 +158,7 @@ defmodule PDLTest do
     pdl_pattern = CAPI.beaverPDLPatternGet(pattern_module)
     pattern_set = CAPI.beaverRewritePatternSetGet(ctx)
     pattern_set = CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pdl_pattern)
-    region = CAPI.mlirOperationGetFirstRegion(ir_module)
+    region = ir_module |> MLIR.Operation.from_module() |> CAPI.mlirOperationGetFirstRegion()
     result = CAPI.beaverApplyOwnedPatternSetOnRegion(region, pattern_set)
 
     assert MLIR.LogicalResult.success?(result), "fail to apply pattern"

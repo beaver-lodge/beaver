@@ -9,20 +9,26 @@ defmodule Beaver.MLIR.Pass.Server do
   use GenServer
 
   @impl true
-  def init(_) do
-    {:ok, []}
+  def init(opts) do
+    {:ok, Map.new(opts)}
   end
 
   @impl true
-  def handle_info({:run, op_ref, token_ref}, state) do
-    str =
-      %MLIR.CAPI.MlirOperation{ref: op_ref}
-      |> MLIR.to_string()
+  def handle_info({:run, op_ref, pass_ref, token_ref}, %{pass_module: pass_module} = state) do
+    op = %MLIR.CAPI.MlirOperation{ref: op_ref}
+    pass = %MLIR.CAPI.MlirExternalPass{ref: pass_ref}
 
-    Logger.debug("op in pass: #{str}")
+    with :ok <- apply(pass_module, :run, [op]) do
+      :ok
+    else
+      :error ->
+        MLIR.CAPI.mlirExternalPassSignalFailure(pass)
+
+      other ->
+        raise "must return :ok or :error in run/1 of the pass #{__MODULE__}, get: #{inspect(other)}"
+    end
 
     :ok = MLIR.CAPI.beaver_raw_pass_token_signal(token_ref)
-    Logger.debug("beaver_raw_pass_token_signal: #{:ok}")
     {:noreply, state}
   end
 

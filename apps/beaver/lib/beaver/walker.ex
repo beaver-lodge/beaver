@@ -249,7 +249,7 @@ defmodule Beaver.Walker do
       get_first: &CAPI.mlirRegionGetFirstBlock/1,
       get_next: &CAPI.mlirBlockGetNextInRegion/1,
       get_parent: &CAPI.mlirBlockGetParentRegion/1,
-      is_null: &MLIR.Block.is_null/1
+      is_null: &MLIR.is_null/1
     )
   end
 

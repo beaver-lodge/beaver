@@ -4,10 +4,6 @@ defmodule Beaver.MLIR.Pass do
 
   @callback run(MLIR.CAPI.MlirOperation.t()) :: :ok | :error
 
-  def run_on_operation(%Beaver.MLIR.CAPI.MlirOperation{} = op, run) when is_function(run, 1) do
-    run.(op)
-  end
-
   def get_op_name(opts) do
     op_module = Keyword.get(opts, :on, MLIR.Dialect.Func.Func)
     Beaver.DSL.Op.Prototype.op_name!(op_module)
@@ -21,38 +17,9 @@ defmodule Beaver.MLIR.Pass do
       require Logger
       @behaviour MLIR.Pass
 
-      def handle_invoke(
-            :run,
-            [
-              op,
-              %Beaver.MLIR.CAPI.MlirExternalPass{} = pass,
-              userData
-            ],
-            state
-          ) do
-        with :ok <- Beaver.MLIR.Pass.run_on_operation(op, &run/1) do
-          {:return, userData, state}
-        else
-          :error ->
-            Logger.error("fail to run pass #{__MODULE__}")
-            :error
-
-          other ->
-            Logger.error(
-              "must return :ok or :error in run/1 of the pass #{__MODULE__}, get: #{inspect(other)}"
-            )
-
-            :error
-        end
-      end
-
       def create() do
-        # TODO: manage this typeIDAllocator
-        type_id_allocator = CAPI.mlirTypeIDAllocatorCreate()
-
         MLIR.ExternalPass.create(
           __MODULE__,
-          type_id_allocator,
           Beaver.MLIR.Pass.get_op_name(unquote(opts))
         )
       end

@@ -311,16 +311,19 @@ const BeaverPass = struct {
         };
         defer e.enif_clear_env(env);
         const handler = ud.*.handler;
-        var tuple_slice: []beam.term = beam.allocator.alloc(beam.term, 3) catch unreachable;
+        var tuple_slice: []beam.term = beam.allocator.alloc(beam.term, 4) catch unreachable;
         defer beam.allocator.free(tuple_slice);
         tuple_slice[0] = beam.make_atom(env, "run");
         tuple_slice[1] = beam.make_resource(env, op, fizz.resource_type_c_struct_MlirOperation) catch {
             print("fail to make res: {}\n", .{@TypeOf(op)});
             unreachable;
         };
+        tuple_slice[2] = beam.make_resource(env, pass, fizz.resource_type_c_struct_MlirExternalPass) catch {
+            print("fail to make res: {}\n", .{@TypeOf(pass)});
+            unreachable;
+        };
         var token = PassToken{};
-        print("token: {}\n", .{@TypeOf(token)});
-        tuple_slice[2] = beam.make_ptr_resource_wrapped(env, &token) catch {
+        tuple_slice[3] = beam.make_ptr_resource_wrapped(env, &token) catch {
             unreachable;
         };
         if (!beam.send(env, handler, beam.make_tuple(env, tuple_slice))) {
