@@ -285,22 +285,22 @@ const PassToken = struct {
 const print = @import("std").debug.print;
 const BeaverPass = struct {
     const UserData = struct { handler: beam.pid };
-    export fn construct(_: ?*anyopaque) callconv(.C) void {}
+    fn construct(_: ?*anyopaque) callconv(.C) void {}
 
-    export fn destruct(userData: ?*anyopaque) callconv(.C) void {
+    fn destruct(userData: ?*anyopaque) callconv(.C) void {
         const ptr = @ptrCast(*UserData, @alignCast(@alignOf(UserData), userData));
         beam.allocator.destroy(ptr);
     }
-    export fn initialize(_: c.struct_MlirContext, _: ?*anyopaque) callconv(.C) c.struct_MlirLogicalResult {
+    fn initialize(_: c.struct_MlirContext, _: ?*anyopaque) callconv(.C) c.struct_MlirLogicalResult {
         return c.struct_MlirLogicalResult{ .value = 1 };
     }
-    export fn clone(userData: ?*anyopaque) callconv(.C) ?*anyopaque {
+    fn clone(userData: ?*anyopaque) callconv(.C) ?*anyopaque {
         const old = @ptrCast(*UserData, @alignCast(@alignOf(*UserData), userData));
         var new = beam.allocator.create(UserData) catch unreachable;
         new.* = old.*;
         return new;
     }
-    export fn run(op: c.struct_MlirOperation, pass: c.struct_MlirExternalPass, userData: ?*anyopaque) callconv(.C) void {
+    fn run(op: c.struct_MlirOperation, pass: c.struct_MlirExternalPass, userData: ?*anyopaque) callconv(.C) void {
         if (1 > 2) {
             c.mlirExternalPassSignalFailure(pass);
         }
