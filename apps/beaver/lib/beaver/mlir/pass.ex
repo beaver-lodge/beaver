@@ -41,13 +41,18 @@ defmodule Beaver.MLIR.Pass do
     end
   end
 
-  def pipeline!(pm, pipeline_str) when is_binary(pipeline_str) do
+  def pipeline!(%CAPI.MlirOpPassManager{} = pm, pipeline_str) when is_binary(pipeline_str) do
     status = CAPI.mlirParsePassPipeline(pm, MLIR.StringRef.create(pipeline_str))
 
     if not MLIR.LogicalResult.success?(status) do
       raise "Unexpected failure parsing pipeline: #{pipeline_str}"
     end
 
+    pm
+  end
+
+  def pipeline!(%CAPI.MlirPassManager{} = pm, pipeline_str) when is_binary(pipeline_str) do
+    pm |> CAPI.mlirPassManagerGetAsOpPassManager() |> pipeline!(pipeline_str)
     pm
   end
 end
