@@ -7,14 +7,14 @@ defmodule Beaver.MLIR.Value do
   end
 
   def argument?(%CAPI.MlirValue{} = value) do
-    CAPI.mlirValueIsABlockArgument(value) |> Exotic.Value.extract()
+    CAPI.mlirValueIsABlockArgument(value) |> CAPI.to_term()
   end
 
   @doc """
   Returns true if the value is a result of an operation.
   """
   def result?(%CAPI.MlirValue{} = value) do
-    CAPI.mlirValueIsAOpResult(value) |> Exotic.Value.extract()
+    CAPI.mlirValueIsAOpResult(value) |> CAPI.to_term()
   end
 
   @doc """

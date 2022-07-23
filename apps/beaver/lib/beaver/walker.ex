@@ -288,6 +288,8 @@ defmodule Beaver.Walker do
         end
       end)
 
+    raise "TODO: Zig ABI complicated struct"
+
     with %MlirNamedAttribute{} <- found do
       {:ok, MLIR.CAPI.beaverMlirNamedAttributeGetAttribute(found)}
     else
@@ -420,6 +422,8 @@ defmodule Beaver.Walker do
   defp do_traverse(%MlirNamedAttribute{} = named_attribute, acc, pre, post) do
     name =
       %MLIR.CAPI.MlirIdentifier{} = named_attribute |> MLIR.CAPI.beaverMlirNamedAttributeGetName()
+
+    raise "TODO: Zig ABI complicated struct"
 
     attribute =
       %MLIR.CAPI.MlirAttribute{} =
