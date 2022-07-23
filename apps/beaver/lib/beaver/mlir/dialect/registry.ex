@@ -78,14 +78,11 @@ defmodule Beaver.MLIR.Dialect.Registry do
     full = Keyword.get(opts, :full, false)
 
     all_dialects =
-      if query do
-        query_ops() |> Enum.map(fn {d, _o} -> d end)
-      else
-        for [dialect, _] <- :ets.match(__MODULE__, {:"$1", :"$2"}) do
-          dialect
-        end
-      end
+      CAPI.registered_dialects()
+      |> Enum.map(&List.to_string/1)
+      |> CAPI.check!()
       |> Enum.uniq()
+      |> Enum.sort()
 
     if full do
       all_dialects

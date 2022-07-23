@@ -140,6 +140,7 @@ defmodule Beaver.MLIR.CAPI do
 
   def registered_ops(), do: raise("NIF not loaded")
   def registered_ops_of_dialect(_), do: raise("NIF not loaded")
+  def registered_dialects(), do: raise("NIF not loaded")
   def resource_bool_to_term(_), do: raise("NIF not loaded")
   def resource_cstring_to_term_charlist(_), do: raise("NIF not loaded")
   def beaver_attribute_to_charlist(_), do: raise("NIF not loaded")
