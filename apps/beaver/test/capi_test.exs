@@ -192,7 +192,7 @@ defmodule MlirTest do
     # TODO: create a supervisor to manage a TypeIDAllocator by mlir application
     typeIDAllocator = CAPI.mlirTypeIDAllocatorCreate()
 
-    external = %MLIR.CAPI.MlirPass{} = MLIR.ExternalPass.create(TestPass, typeIDAllocator)
+    external = %MLIR.CAPI.MlirPass{} = MLIR.ExternalPass.create(TestPass, "")
 
     pm = CAPI.mlirPassManagerCreate(ctx)
     CAPI.mlirPassManagerAddOwnedPass(pm, external)
@@ -235,11 +235,7 @@ defmodule MlirTest do
     ctx = MLIR.Context.create()
     module = create_redundant_transpose_module(ctx)
     assert not MLIR.Module.is_null(module)
-    # TODO: create a supervisor to manage a TypeIDAllocator by mlir application
-    typeIDAllocator = CAPI.mlirTypeIDAllocatorCreate()
-
-    external =
-      %MLIR.CAPI.MlirPass{} = MLIR.ExternalPass.create(TestPass, typeIDAllocator, "func.func")
+    external = %MLIR.CAPI.MlirPass{} = MLIR.ExternalPass.create(TestPass, "func.func")
 
     pm = CAPI.mlirPassManagerCreate(ctx)
     npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
@@ -249,7 +245,6 @@ defmodule MlirTest do
 
     CAPI.mlirPassManagerDestroy(pm)
     CAPI.mlirModuleDestroy(module)
-    CAPI.mlirTypeIDAllocatorDestroy(typeIDAllocator)
     CAPI.mlirContextDestroy(ctx)
     # TODO: values above could be moved to setup
   end
