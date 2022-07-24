@@ -23,12 +23,12 @@ defmodule Beaver.MLIR.ExecutionEngine do
     shared_lib_paths_ptr =
       case shared_lib_paths do
         [] ->
-          MLIR.CAPI.ArrayMlirStringRef.create([])
+          MLIR.CAPI.array([], MLIR.CAPI.MlirStringRef)
 
         _ ->
           shared_lib_paths
           |> Enum.map(&MLIR.StringRef.create/1)
-          |> MLIR.CAPI.array()
+          |> MLIR.CAPI.array(MLIR.CAPI.MlirStringRef)
       end
 
     ctx =

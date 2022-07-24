@@ -37,7 +37,7 @@ defmodule Beaver.MLIR.Attribute do
   def array(elements, opts \\ []) when is_list(elements) do
     ctx = MLIR.Managed.Context.from_opts(opts)
     num_elements = length(elements)
-    CAPI.mlirArrayAttrGet(ctx, num_elements, CAPI.ArrayMlirAttribute.create(elements))
+    CAPI.mlirArrayAttrGet(ctx, num_elements, CAPI.MlirAttribute.array(elements))
   end
 
   def string(str, opts \\ []) when is_binary(str) do

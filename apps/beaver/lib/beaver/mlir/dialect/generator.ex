@@ -7,7 +7,7 @@ defmodule Beaver.MLIR.Dialect.Generator do
     quote(bind_quoted: [dialect: dialect, ops: ops, skips: skips]) do
       require Logger
       module_name = dialect |> Beaver.MLIR.Dialect.Registry.normalize_dialect_name()
-      Logger.debug("building Elixir module for dialect #{dialect} => #{module_name}")
+      Logger.debug("[Beaver] building Elixir module for dialect #{dialect} => #{module_name}")
 
       module_names =
         for op <- ops do

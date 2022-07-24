@@ -12,6 +12,11 @@ defmodule Beaver.MLIR.CAPI.FizzTest do
     assert is_reference(ref)
   end
 
+  test "array i64 wrapped" do
+    %Beaver.MLIR.CAPI.Array{ref: ref, zig_t: "[*c]const i64"} = CAPI.I64.array([1, 2, 3])
+    assert is_reference(ref)
+  end
+
   test "array i32" do
     ref = CAPI.fizz_nif_get_resource_array_resource_type_i32([1, 2, 3])
     assert is_reference(ref)
@@ -28,8 +33,8 @@ defmodule Beaver.MLIR.CAPI.FizzTest do
   end
 
   test "empty array mlir type" do
-    %Beaver.MLIR.CAPI.ArrayMlirType{ref: ref, zig_t: "[*c]const c.struct_MlirType"} =
-      CAPI.ArrayMlirType.create([])
+    %Beaver.MLIR.CAPI.Array{ref: ref, zig_t: "[*c]const c.struct_MlirType"} =
+      CAPI.MlirType.array([])
 
     assert is_reference(ref)
   end

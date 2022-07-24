@@ -160,7 +160,6 @@ defmodule Fizz do
       |> Enum.reject(fn x -> String.starts_with?(x, "[*c]") end)
       |> Enum.reject(fn x -> x in ["void"] end)
       |> Enum.map(&gen_type(&1, type_gen))
-      |> Enum.map(&IO.inspect/1)
 
     resource_struct_map =
       resource_structs
@@ -404,6 +403,14 @@ defmodule Fizz do
 
   def module_name("c.struct_" <> struct_name) do
     struct_name |> String.to_atom()
+  end
+
+  def module_name("isize") do
+    :ISize
+  end
+
+  def module_name("usize") do
+    :USize
   end
 
   def module_name("c_int") do

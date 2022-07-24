@@ -1648,10 +1648,10 @@ pub fn get_element_struct(comptime ElementType: type, module_name: anytype) type
             };
         };
         fn ptr(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
-            return get_resource_ptr_from_term(T, environment, @This().resource.t, Ptr.resource.t, args[0]) catch return make_error_binary(environment, "fail to create ptr" ++ @typeName(T));
+            return get_resource_ptr_from_term(T, environment, @This().resource.t, Ptr.resource.t, args[0]) catch return make_error_binary(environment, "fail to create ptr " ++ @typeName(T));
         }
         fn array(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
-            return get_resource_array_from_list(T, environment, @This().resource.t, Array.resource.t, args[0]) catch return make_error_binary(environment, "fail to create array" ++ @typeName(T));
+            return get_resource_array_from_list(T, environment, @This().resource.t, Array.resource.t, args[0]) catch return make_error_binary(environment, "fail to create array " ++ @typeName(T));
         }
         fn primitive(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
             const v = resource.fetch(environment, args[0]) catch return make_error_binary(environment, "fail to extract pritimive from " ++ @typeName(T));

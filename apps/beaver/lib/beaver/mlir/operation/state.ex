@@ -51,7 +51,7 @@ defmodule Beaver.MLIR.Operation.State do
   #       CAPI.mlirIdentifierGet(ctx, MLIR.StringRef.create(k))
   #       |> CAPI.mlirNamedAttributeGet(attr)
   #     end
-  #     |> CAPI.ArrayMlirNamedAttribute.create()
+  #     |> CAPI.MlirNamedAttribute.array()
 
   #   state
   #   |> CAPI.ptr()
@@ -94,8 +94,8 @@ defmodule Beaver.MLIR.Operation.State do
       ctx,
       CAPI.ptr(state),
       length(attr_kw),
-      CAPI.ArrayMlirStringRef.create(name_list),
-      CAPI.ArrayMlirAttribute.create(attr_list)
+      CAPI.MlirStringRef.array(name_list),
+      CAPI.MlirAttribute.array(attr_list)
     )
 
     state
@@ -106,7 +106,7 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   defp add_operands(%MLIR.CAPI.MlirOperationState{} = state, operands) do
-    array = operands |> CAPI.ArrayMlirValue.create()
+    array = operands |> CAPI.MlirValue.array()
 
     CAPI.mlirOperationStateAddOperands(CAPI.ptr(state), length(operands), array)
     state
@@ -129,7 +129,7 @@ defmodule Beaver.MLIR.Operation.State do
         %CAPI.MlirType{} = t ->
           t
       end)
-      |> CAPI.ArrayMlirType.create()
+      |> CAPI.MlirType.array()
 
     CAPI.mlirOperationStateAddResults(CAPI.ptr(state), length(result_types), array)
     state
@@ -148,7 +148,7 @@ defmodule Beaver.MLIR.Operation.State do
         raise "not a region: #{inspect(other)}"
     end)
 
-    array_ptr = regions |> CAPI.ArrayMlirRegion.create()
+    array_ptr = regions |> CAPI.MlirRegion.array()
 
     CAPI.mlirOperationStateAddOwnedRegions(
       CAPI.ptr(state),
@@ -165,7 +165,7 @@ defmodule Beaver.MLIR.Operation.State do
 
   defp add_successors(%MLIR.CAPI.MlirOperationState{} = state, successors)
        when is_list(successors) do
-    array_ptr = successors |> CAPI.ArrayMlirBlock.create()
+    array_ptr = successors |> CAPI.MlirBlock.array()
 
     CAPI.mlirOperationStateAddSuccessors(
       CAPI.ptr(state),

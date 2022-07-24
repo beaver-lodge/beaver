@@ -55,40 +55,33 @@ defmodule Beaver.MLIR.CAPI do
     end
   end
 
+  defmodule Ptr do
+    defstruct ref: nil, zig_t: nil, bag: MapSet.new()
+  end
+
+  defmodule Array do
+    defstruct ref: nil, zig_t: nil, bag: MapSet.new()
+  end
+
   for %Fizz.CodeGen.Type{
         module_name: module_name,
         zig_t: zig_t,
         delegates: delegates,
         fields: fields
       } = type <-
-        types do
+        resource_structs do
+    Logger.debug("[Beaver] building resource module #{module_name}")
+
     defmodule Module.concat(__MODULE__, module_name) do
       @moduledoc """
       #{zig_t}
       """
       defstruct [ref: nil, zig_t: zig_t, bag: MapSet.new()] ++ fields
 
-      if Fizz.is_array(type) do
-        @maker Fizz.element_type(type)
-               |> Fizz.CodeGen.Function.array_maker_name()
-               |> String.to_atom()
+      def zig_t(), do: unquote(zig_t)
 
-        def create(list) do
-          %__MODULE__{
-            ref: Beaver.MLIR.CAPI.check!(apply(Beaver.MLIR.CAPI, @maker, [Fizz.unwrap_ref(list)]))
-          }
-        end
-      end
-
-      if Fizz.is_primitive(type) do
-        @maker Fizz.CodeGen.Function.resource_maker_name(type)
-               |> String.to_atom()
-
-        def create(value) do
-          %__MODULE__{
-            ref: Beaver.MLIR.CAPI.check!(apply(Beaver.MLIR.CAPI, @maker, [value]))
-          }
-        end
+      def array(list) when is_list(list) do
+        Beaver.MLIR.CAPI.array(list, __MODULE__)
       end
 
       for {m, f, a} <- delegates do
@@ -96,6 +89,10 @@ defmodule Beaver.MLIR.CAPI do
         defdelegate unquote(f)(unquote_splicing(args)), to: m
       end
     end
+  end
+
+  defmodule CString do
+    defstruct ref: nil, zig_t: "[*c]const u8", bag: MapSet.new()
   end
 
   for f <- Path.wildcard("capi/src") do
@@ -113,13 +110,21 @@ defmodule Beaver.MLIR.CAPI do
           do: "failed to load NIF"
 
       %Fizz.CodeGen.NIF{name: name, nif_name: nif_name, ret: ret} ->
-        return_module = Module.concat(__MODULE__, Fizz.module_name(ret))
+        if ret == "void" do
+          def unquote(String.to_atom(name))(unquote_splicing(args_ast)) do
+            refs = Fizz.unwrap_ref([unquote_splicing(args_ast)])
+            ref = apply(__MODULE__, unquote(String.to_atom(nif_name)), refs)
+            :ok = check!(ref)
+          end
+        else
+          return_module = Module.concat(__MODULE__, Fizz.module_name(ret))
 
-        def unquote(String.to_atom(name))(unquote_splicing(args_ast)) do
-          refs = Fizz.unwrap_ref([unquote_splicing(args_ast)])
-          ref = apply(__MODULE__, unquote(String.to_atom(nif_name)), refs)
+          def unquote(String.to_atom(name))(unquote_splicing(args_ast)) do
+            refs = Fizz.unwrap_ref([unquote_splicing(args_ast)])
+            ref = apply(__MODULE__, unquote(String.to_atom(nif_name)), refs)
 
-          struct!(unquote(return_module), %{ref: check!(ref), zig_t: unquote(ret)})
+            struct!(unquote(return_module), %{ref: check!(ref), zig_t: unquote(ret)})
+          end
         end
 
         @doc false
@@ -177,60 +182,51 @@ defmodule Beaver.MLIR.CAPI do
     %__MODULE__.CString{ref: check!(get_resource_c_string(value))}
   end
 
-  def array([]) do
-    raise "Empty list found. Use a maker to create empty array. For instance: CAPI.ArrayI64.create([])"
+  def ptr(%{ref: ref, zig_t: zig_t}) do
+    mod = Fizz.module_name(zig_t)
+    maker = Module.concat([__MODULE__, mod, :ptr])
+
+    struct!(__MODULE__.Ptr, %{
+      ref: apply(__MODULE__, maker, [ref]) |> check!(),
+      zig_t: Fizz.CodeGen.Type.ptr_type_name(zig_t)
+    })
   end
 
-  def array([head | tail] = list) when is_integer(head) do
-    if not Enum.all?(tail, &is_integer/1) do
-      raise "all elements must be integers"
+  def ptr(%{ref: ref, zig_t: zig_t}, module) do
+    if zig_t != module.zig_t do
+      raise "type mismatch"
     end
 
-    %__MODULE__.ArrayI64{
-      ref: fizz_nif_get_resource_array_resource_type_i64(list)
-    }
+    ptr_t = Fizz.CodeGen.Type.ptr_type_name(module.zig_t)
+
+    ref =
+      apply(Beaver.MLIR.CAPI, Module.concat([module, "ptr"]), [ref])
+      |> Beaver.MLIR.CAPI.check!()
+
+    %Beaver.MLIR.CAPI.Ptr{ref: ref, zig_t: ptr_t}
   end
 
-  def array(list) when is_list(list) do
-    uniq = Enum.map(list, fn %mod{} -> mod end) |> Enum.uniq()
+  def array(list, module) when is_list(list) do
+    array_t = Fizz.CodeGen.Type.array_type_name(module.zig_t)
 
-    case uniq |> Enum.count() do
-      1 ->
-        [%{zig_t: zig_t} | _] = list
+    ref =
+      apply(Beaver.MLIR.CAPI, Module.concat([module, "array"]), [
+        Enum.map(list, &Fizz.unwrap_ref/1)
+      ])
+      |> Beaver.MLIR.CAPI.check!()
 
-        maker = Fizz.CodeGen.Function.array_maker_name(zig_t) |> String.to_atom()
-
-        ref = apply(__MODULE__, maker, [Enum.map(list, &Fizz.unwrap_ref/1)])
-
-        zig_t
-        |> Fizz.CodeGen.Type.array_type_name()
-        |> Fizz.module_name()
-        |> then(fn m -> Module.concat(__MODULE__, m) end)
-        |> struct!(%{ref: check!(ref)})
-
-      _ ->
-        raise "not a list of same type"
-    end
+    %Beaver.MLIR.CAPI.Array{ref: ref, zig_t: array_t}
   end
 
   def to_term(%{ref: ref, zig_t: zig_t}) do
+    mod = Fizz.module_name(zig_t)
+    maker = Module.concat([__MODULE__, mod, :primitive])
+
     apply(
       __MODULE__,
-      String.to_atom(Fizz.CodeGen.Function.primitive_maker_name(zig_t)),
+      maker,
       [ref]
     )
-  end
-
-  def ptr(%{ref: ref, zig_t: zig_t}) do
-    maker = Fizz.CodeGen.Function.ptr_maker_name(zig_t) |> String.to_atom()
-
-    ref = apply(__MODULE__, maker, [ref])
-
-    zig_t
-    |> Fizz.CodeGen.Type.ptr_type_name()
-    |> Fizz.module_name()
-    |> then(fn m -> Module.concat(__MODULE__, m) end)
-    |> struct!(%{ref: check!(ref)})
   end
 
   def bag(%{bag: bag} = v, list) when is_list(list) do

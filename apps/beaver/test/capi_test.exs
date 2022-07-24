@@ -106,7 +106,7 @@ defmodule MlirTest do
     # This api might trigger NDEBUG assert, so run it more
     for _ <- 1..200 do
       Task.async(fn ->
-        %MLIR.CAPI.Void{} =
+        :ok =
           MLIR.CAPI.mlirDialectHandleRegisterDialect(
             MLIR.CAPI.mlirGetDialectHandle__elixir__(),
             ctx
