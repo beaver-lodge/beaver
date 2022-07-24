@@ -3,21 +3,25 @@ defmodule Fizz.CodeGen.Resource do
 
   def resource_type_struct("[*c]const " <> type, %{} = resource_struct_map) do
     mod = Map.fetch!(resource_struct_map, type)
-    "#{mod}.Array.resource"
+    "#{mod}.Array"
   end
 
   def resource_type_struct("[*c]" <> type, %{} = resource_struct_map) do
     mod = Map.fetch!(resource_struct_map, type)
-    "#{mod}.Ptr.resource"
+    "#{mod}.Ptr"
   end
 
   def resource_type_struct(type, %{} = resource_struct_map) do
     mod = Map.fetch!(resource_struct_map, type)
-    "#{mod}.resource"
+    "#{mod}"
+  end
+
+  def resource_type_resource_struct(type, %{} = resource_struct_map) do
+    resource_type_struct(type, resource_struct_map) <> ".resource"
   end
 
   def resource_type_var(type, %{} = resource_struct_map) do
-    resource_type_struct(type, resource_struct_map) <> ".t"
+    resource_type_resource_struct(type, resource_struct_map) <> ".t"
   end
 
   def resource_open(%Type{module_name: module_name}) do

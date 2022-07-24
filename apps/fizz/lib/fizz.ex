@@ -167,7 +167,7 @@ defmodule Fizz do
         arg_vars =
           for {arg, i} <- Enum.with_index(args) do
             """
-              var arg#{i}: #{arg} = #{Resource.resource_type_struct(arg, resource_struct_map)}.fetch(env, args[#{i}])
+              var arg#{i}: #{Resource.resource_type_struct(arg, resource_struct_map)}.T = #{Resource.resource_type_resource_struct(arg, resource_struct_map)}.fetch(env, args[#{i}])
               catch
               return beam.make_error_binary(env, "fail to fetch resource for argument ##{i + 1}, expected: #{arg}");
             """

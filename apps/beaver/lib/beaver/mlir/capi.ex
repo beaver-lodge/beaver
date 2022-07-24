@@ -85,6 +85,17 @@ defmodule Beaver.MLIR.CAPI do
         Beaver.MLIR.CAPI.array(list, __MODULE__)
       end
 
+      def create(value) do
+        %__MODULE__{
+          ref:
+            apply(
+              Beaver.MLIR.CAPI,
+              Module.concat([__MODULE__, "create"]) |> Beaver.MLIR.CAPI.check!(),
+              [value]
+            )
+        }
+      end
+
       for {m, f, a} <- delegates do
         args = Macro.generate_arguments(a, nil)
         defdelegate unquote(f)(unquote_splicing(args)), to: m

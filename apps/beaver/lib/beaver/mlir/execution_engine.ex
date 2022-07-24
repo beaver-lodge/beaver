@@ -57,7 +57,11 @@ defmodule Beaver.MLIR.ExecutionEngine do
   end
 
   defp do_invoke!(jit, symbol, arg_ptr_list) do
-    mlirExecutionEngineInvokePacked(jit, MLIR.StringRef.create(symbol), CAPI.array(arg_ptr_list))
+    mlirExecutionEngineInvokePacked(
+      jit,
+      MLIR.StringRef.create(symbol),
+      CAPI.array(arg_ptr_list, CAPI.OpaqueArray)
+    )
   end
 
   @doc """

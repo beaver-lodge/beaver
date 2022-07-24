@@ -1605,7 +1605,7 @@ pub fn open_resource_wrapped(environment: env, comptime T: type) void {
 
 pub fn get_element_struct(comptime ElementType: type, module_name: anytype) type {
     return struct {
-        const T = ElementType;
+        pub const T = ElementType;
         pub const resource = struct {
             pub var t: resource_type = undefined;
             pub const name = @typeName(ElementType);
@@ -1621,7 +1621,7 @@ pub fn get_element_struct(comptime ElementType: type, module_name: anytype) type
         };
         const PtrType = [*c]ElementType;
         pub const Ptr = struct {
-            const T = PtrType;
+            pub const T = PtrType;
             pub const resource = struct {
                 pub var t: resource_type = undefined;
                 pub const name = @typeName(PtrType);
@@ -1635,7 +1635,7 @@ pub fn get_element_struct(comptime ElementType: type, module_name: anytype) type
         };
         const ArrayType = [*c]const ElementType;
         pub const Array = struct {
-            const T = ArrayType;
+            pub const T = ArrayType;
             pub const resource = struct {
                 pub var t: resource_type = undefined;
                 pub const name = @typeName(ArrayType);
