@@ -145,16 +145,6 @@ defmodule Fizz do
 
     types = Enum.sort(types ++ extra) |> Enum.uniq()
 
-    array_types =
-      for type <- types do
-        Type.array_type_name(type)
-      end
-
-    ptr_types =
-      for type <- types do
-        Type.ptr_type_name(type)
-      end
-
     resource_structs =
       types
       |> Enum.reject(fn x -> String.starts_with?(x, "[*c]") end)
@@ -177,12 +167,9 @@ defmodule Fizz do
         arg_vars =
           for {arg, i} <- Enum.with_index(args) do
             """
-              var arg#{i}: #{arg} = undefined;
-              if (beam.fetch_resource(#{arg}, env, #{Resource.resource_type_var(arg, resource_struct_map)}, args[#{i}])) |value| {
-                arg#{i} = value;
-              } else |_| {
-                return beam.make_error_binary(env, "fail to fetch resource for argument ##{i + 1}, expected: #{arg}");
-              }
+              var arg#{i}: #{arg} = #{Resource.resource_type_struct(arg, resource_struct_map)}.fetch(env, args[#{i}])
+              catch
+              return beam.make_error_binary(env, "fail to fetch resource for argument ##{i + 1}, expected: #{arg}");
             """
           end
 
@@ -206,69 +193,6 @@ defmodule Fizz do
       end
       |> Enum.join("\n")
 
-    # types to generate array and pointer makers for. only C abi compatible types are supported.
-    element_types =
-      for "c.struct_" <> _ = type <- types do
-        type
-      end
-
-    element_types = element_types ++ Enum.reject(primitive_types(), fn t -> t == "void" end)
-
-    primitive_makers =
-      for type <- primitive_types() do
-        """
-        export fn #{Function.primitive_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
-          var arg0: #{type} = undefined;
-          if (beam.fetch_resource(#{type}, env, #{Resource.resource_type_var(type, resource_struct_map)}, args[0])) |value| {
-            arg0 = value;
-          } else |_| {
-            return beam.make_error_binary(env, "fail to fetch resource, expected: #{type}");
-          }
-          return beam.make(#{type}, env, arg0) catch beam.make_error_binary(env, "fail create primitive from resource of #{type}");
-        }
-        export fn #{Function.resource_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
-          var ptr: ?*anyopaque = e.enif_alloc_resource(#{Resource.resource_type_var(type, resource_struct_map)}, @sizeOf(#{type}));
-          const RType = #{type};
-          var obj: *RType = undefined;
-          if (ptr == null) {
-              unreachable();
-          } else {
-              obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
-          }
-          if (beam.get(RType, env, args[0])) |value| {
-              obj.* = value;
-              return e.enif_make_resource(env, ptr);
-          } else |_| {
-              return beam.make_error_binary(env, "launching nif");
-          }
-        }
-        """
-      end
-      |> Enum.join("\n")
-
-    makers =
-      for type <- element_types do
-        """
-        export fn #{Function.array_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
-          const ElementType: type = #{Function.process_type(type)};
-          const resource_type_element = #{Resource.resource_type_var(type, resource_struct_map)};
-          const resource_type_array = #{Resource.resource_type_var(Type.array_type_name(type), resource_struct_map)};
-          return beam.get_resource_array_from_list(ElementType, env, resource_type_element, resource_type_array, args[0]) catch beam.make_error_binary(env, "fail create array of #{type}");
-        }
-
-        export fn #{Function.ptr_maker_name(type)}(env: beam.env, _: c_int, args: [*c] const beam.term) beam.term {
-          const ElementType: type = #{Function.process_type(type)};
-          const resource_type_element = #{Resource.resource_type_var(type, resource_struct_map)};
-          const resource_type_array = #{Resource.resource_type_var(Type.ptr_type_name(type), resource_struct_map)};
-          return beam.get_resource_ptr_from_term(ElementType, env, resource_type_element, resource_type_array, args[0]) catch beam.make_error_binary(env, "fail create ptr of #{type}");
-        }
-        """
-      end
-      |> Enum.join("\n")
-
-    makers = makers <> primitive_makers
-    resource_types = Enum.uniq(types ++ array_types ++ ptr_types)
-
     types = Enum.map(types, &gen_type(&1, type_gen))
 
     resource_structs_str =
@@ -283,16 +207,10 @@ defmodule Fizz do
 
     source = resource_structs_str <> source
 
-    nifs =
-      Enum.map(functions, nif_gen) ++
-        Enum.map(element_types, &Fizz.CodeGen.NIF.array_maker/1) ++
-        Enum.map(element_types, &Fizz.CodeGen.NIF.ptr_maker/1) ++
-        Enum.map(primitive_types(), &Fizz.CodeGen.NIF.resource_maker/1) ++
-        Enum.map(primitive_types(), &Fizz.CodeGen.NIF.primitive_maker/1)
+    nifs = Enum.map(functions, nif_gen)
 
     source = """
     #{source}
-    #{makers}
     pub export fn __destroy__(_: beam.env, _: ?*anyopaque) void {
     }
     pub fn open_generated_resource_types(env: beam.env) void {

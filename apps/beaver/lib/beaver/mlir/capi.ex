@@ -63,6 +63,7 @@ defmodule Beaver.MLIR.CAPI do
     defstruct ref: nil, zig_t: nil, bag: MapSet.new()
   end
 
+  # generate resource modules
   for %Fizz.CodeGen.Type{
         module_name: module_name,
         zig_t: zig_t,
@@ -99,6 +100,7 @@ defmodule Beaver.MLIR.CAPI do
     @external_resource f
   end
 
+  # generate C function NIFs
   @external_resource "capi/build.zig"
   for nif <- nifs do
     args_ast = Macro.generate_unique_arguments(nif.arity, __MODULE__)
@@ -133,6 +135,14 @@ defmodule Beaver.MLIR.CAPI do
     end
   end
 
+  # generate resource NIFs
+  for %{module_name: module_name} <- resource_structs do
+    for f <- ~w{ptr array primitive create} do
+      name = Module.concat([__MODULE__, module_name, f])
+      def unquote(name)(_), do: raise("NIF not loaded")
+    end
+  end
+
   def beaver_get_context_load_all_dialects(), do: raise("NIF not loaded")
 
   def beaver_raw_create_mlir_pass(
@@ -143,16 +153,6 @@ defmodule Beaver.MLIR.CAPI do
         _handler
       ),
       do: raise("NIF not loaded")
-
-  for %{module_name: module_name} <- resource_structs do
-    for f <- ~w{ptr
-    array
-    primitive
-    create} do
-      name = Module.concat([__MODULE__, module_name, f])
-      def unquote(name)(_), do: raise("NIF not loaded")
-    end
-  end
 
   def beaver_raw_pass_token_signal(_), do: raise("NIF not loaded")
   def registered_ops(), do: raise("NIF not loaded")
@@ -168,6 +168,7 @@ defmodule Beaver.MLIR.CAPI do
   def get_resource_c_string(_), do: raise("NIF not loaded")
   def bool(value) when is_boolean(value), do: %__MODULE__.Bool{ref: get_resource_bool(value)}
 
+  # user APIs
   def check!(ref) do
     case ref do
       {:error, e} ->
