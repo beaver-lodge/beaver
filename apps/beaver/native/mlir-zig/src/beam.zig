@@ -1603,6 +1603,8 @@ pub fn open_resource_wrapped(environment: env, comptime T: type) void {
     T.resource_type = e.enif_open_resource_type(environment, null, T.resource_name, destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
 }
 
+pub const InternalOpaquePtr = get_element_struct(?*anyopaque, "Internal.OpaquePtr");
+
 pub fn get_element_struct(comptime ElementType: type, module_name: anytype) type {
     return struct {
         pub const T = ElementType;
@@ -1650,8 +1652,15 @@ pub fn get_element_struct(comptime ElementType: type, module_name: anytype) type
         fn ptr(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
             return get_resource_ptr_from_term(T, environment, @This().resource.t, Ptr.resource.t, args[0]) catch return make_error_binary(environment, "fail to create ptr " ++ @typeName(T));
         }
+        fn opaque_ptr(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
+            const ptr_to_resource_memory = get_resource_ptr_from_term(T, environment, @This().resource.t, Ptr.resource.t, args[0]) catch return make_error_binary(environment, "fail to create ptr " ++ @typeName(T));
+            return InternalOpaquePtr.resource.make(environment, @intToPtr(InternalOpaquePtr.T, ptr_to_resource_memory)) catch return make_error_binary(environment, "fail to make resource for: " ++ @typeName(InternalOpaquePtr.T));
+        }
         fn array(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
             return get_resource_array_from_list(T, environment, @This().resource.t, Array.resource.t, args[0]) catch return make_error_binary(environment, "fail to create array " ++ @typeName(T));
+        }
+        fn mut_array(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
+            return get_resource_array_from_list(T, environment, @This().resource.t, Ptr.resource.t, args[0]) catch return make_error_binary(environment, "fail to create mut array " ++ @typeName(T));
         }
         fn primitive(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
             const v = resource.fetch(environment, args[0]) catch return make_error_binary(environment, "fail to extract pritimive from " ++ @typeName(T));
@@ -1663,7 +1672,9 @@ pub fn get_element_struct(comptime ElementType: type, module_name: anytype) type
         }
         pub const nifs = .{
             e.ErlNifFunc{ .name = module_name ++ ".ptr", .arity = 1, .fptr = ptr, .flags = 0 },
+            e.ErlNifFunc{ .name = module_name ++ ".opaque_ptr", .arity = 1, .fptr = opaque_ptr, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".array", .arity = 1, .fptr = array, .flags = 0 },
+            e.ErlNifFunc{ .name = module_name ++ ".mut_array", .arity = 1, .fptr = mut_array, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".primitive", .arity = 1, .fptr = primitive, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".create", .arity = 1, .fptr = create, .flags = 0 },
         };

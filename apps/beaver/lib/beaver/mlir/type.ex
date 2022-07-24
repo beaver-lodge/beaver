@@ -75,13 +75,13 @@ defmodule Beaver.MLIR.Type do
 
   def vector(shape, element_type) when is_list(shape) do
     rank = length(shape)
-    shape = shape |> CAPI.array()
+    shape = shape |> CAPI.I64.array()
     CAPI.mlirVectorTypeGet(rank, shape, element_type)
   end
 
   def tuple(elements, opts \\ []) when is_list(elements) do
     num_elements = length(elements)
-    elements = elements |> CAPI.array()
+    elements = elements |> CAPI.ISize.array()
     ctx = MLIR.Managed.Context.from_opts(opts)
     CAPI.mlirTupleTypeGet(ctx, num_elements, elements)
   end

@@ -185,7 +185,7 @@ defmodule Fizz do
           """
           export fn fizz_nif_#{name}(env: beam.env, _: c_int, #{if length(args) == 0, do: "_", else: "args"}: [*c] const beam.term) beam.term {
           #{Enum.join(arg_vars, "")}
-            return beam.make_resource(env, c.#{name}(#{Enum.join(proxy_arg_uses, ", ")}), #{Resource.resource_type_var(ret, resource_struct_map)})
+            return #{Resource.resource_type_resource_struct(ret, resource_struct_map)}.make(env, c.#{name}(#{Enum.join(proxy_arg_uses, ", ")}))
             catch return beam.make_error_binary(env, "fail to make resource for: " ++ @typeName(#{Resource.resource_type_struct(ret, resource_struct_map)}.T));
           }
           """
@@ -215,6 +215,9 @@ defmodule Fizz do
     }
     pub fn open_generated_resource_types(env: beam.env) void {
     #{resource_structs_str_open_str}
+    beam.InternalOpaquePtr.resource.t = OpaquePtr.resource.t;
+    beam.InternalOpaquePtr.Ptr.resource.t = OpaquePtr.Ptr.resource.t;
+    beam.InternalOpaquePtr.Array.resource.t = OpaquePtr.Array.resource.t;
     }
     pub export const generated_nifs = .{
       #{nifs |> Enum.map(&Fizz.CodeGen.NIF.gen/1) |> Enum.join("  ")}

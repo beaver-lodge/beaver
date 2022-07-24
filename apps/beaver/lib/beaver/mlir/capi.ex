@@ -81,8 +81,8 @@ defmodule Beaver.MLIR.CAPI do
 
       def zig_t(), do: unquote(zig_t)
 
-      def array(list) when is_list(list) do
-        Beaver.MLIR.CAPI.array(list, __MODULE__)
+      def array(list, opts \\ []) when is_list(list) do
+        Beaver.MLIR.CAPI.array(list, __MODULE__, opts)
       end
 
       def create(value) do
@@ -148,7 +148,7 @@ defmodule Beaver.MLIR.CAPI do
 
   # generate resource NIFs
   for %{module_name: module_name} <- resource_structs do
-    for f <- ~w{ptr array primitive create} do
+    for f <- ~w{ptr opaque_ptr array mut_array primitive create} do
       name = Module.concat([__MODULE__, module_name, f])
       def unquote(name)(_), do: raise("NIF not loaded")
     end
@@ -204,25 +204,28 @@ defmodule Beaver.MLIR.CAPI do
     })
   end
 
-  def ptr(%{ref: ref, zig_t: zig_t}, module) do
-    if zig_t != module.zig_t do
-      raise "type mismatch"
-    end
+  def opaque_ptr(%mod{ref: ref}) do
+    maker = Module.concat([mod, :opaque_ptr])
 
-    ptr_t = Fizz.CodeGen.Type.ptr_type_name(module.zig_t)
-
-    ref =
-      apply(Beaver.MLIR.CAPI, Module.concat([module, "ptr"]), [ref])
-      |> Beaver.MLIR.CAPI.check!()
-
-    %Beaver.MLIR.CAPI.Ptr{ref: ref, zig_t: ptr_t}
+    struct!(__MODULE__.Ptr, %{
+      ref: apply(__MODULE__, maker, [ref]) |> check!(),
+      zig_t: "?*anyopaque"
+    })
   end
 
-  def array(list, module) when is_list(list) do
-    array_t = Fizz.CodeGen.Type.array_type_name(module.zig_t)
+  def array(list, module, opts \\ [mut: false]) when is_list(list) do
+    mut = Keyword.get(opts, :mut) || false
+    func = if mut, do: "mut_array", else: "array"
+
+    array_t =
+      if mut do
+        Fizz.CodeGen.Type.ptr_type_name(module.zig_t)
+      else
+        Fizz.CodeGen.Type.array_type_name(module.zig_t)
+      end
 
     ref =
-      apply(Beaver.MLIR.CAPI, Module.concat([module, "array"]), [
+      apply(Beaver.MLIR.CAPI, Module.concat([module, func]), [
         Enum.map(list, &Fizz.unwrap_ref/1)
       ])
       |> Beaver.MLIR.CAPI.check!()

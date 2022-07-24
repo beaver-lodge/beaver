@@ -60,7 +60,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
     mlirExecutionEngineInvokePacked(
       jit,
       MLIR.StringRef.create(symbol),
-      CAPI.array(arg_ptr_list, CAPI.OpaqueArray)
+      CAPI.OpaquePtr.array(arg_ptr_list, mut: true)
     )
   end
 
@@ -68,8 +68,8 @@ defmodule Beaver.MLIR.ExecutionEngine do
   invoke a function by symbol name.
   """
   def invoke!(jit, symbol, args, return) when is_list(args) do
-    arg_ptr_list = args |> Enum.map(&CAPI.ptr/1)
-    return_ptr = return |> CAPI.ptr()
+    arg_ptr_list = args |> Enum.map(&CAPI.opaque_ptr/1)
+    return_ptr = return |> CAPI.opaque_ptr()
     result = do_invoke!(jit, symbol, arg_ptr_list ++ [return_ptr])
 
     if MLIR.LogicalResult.success?(result) do
@@ -83,7 +83,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
   invoke a void function by symbol name.
   """
   def invoke!(jit, symbol, args) when is_list(args) do
-    arg_ptr_list = args |> Enum.map(&CAPI.ptr/1)
+    arg_ptr_list = args |> Enum.map(&CAPI.opaque_ptr/1)
     result = do_invoke!(jit, symbol, arg_ptr_list)
 
     if MLIR.LogicalResult.success?(result) do
