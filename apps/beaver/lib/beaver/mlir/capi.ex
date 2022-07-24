@@ -85,6 +85,20 @@ defmodule Beaver.MLIR.CAPI do
         Beaver.MLIR.CAPI.array(list, __MODULE__, opts)
       end
 
+      def memref(
+            allocated,
+            aligned,
+            offset,
+            sizes,
+            strides
+          ) do
+        apply(
+          Beaver.MLIR.CAPI,
+          Module.concat([__MODULE__, "create_memref"]) |> Beaver.MLIR.CAPI.check!(),
+          [allocated, aligned, offset, sizes, strides]
+        )
+      end
+
       def create(value) do
         %__MODULE__{
           ref:
@@ -97,7 +111,8 @@ defmodule Beaver.MLIR.CAPI do
       end
 
       for {m, f, a} <- delegates do
-        args = Macro.generate_arguments(a, nil)
+        args = List.duplicate({:_, [if_undefined: :apply], Elixir}, a)
+
         defdelegate unquote(f)(unquote_splicing(args)), to: m
       end
     end
@@ -148,9 +163,18 @@ defmodule Beaver.MLIR.CAPI do
 
   # generate resource NIFs
   for %{module_name: module_name} <- resource_structs do
-    for f <- ~w{ptr opaque_ptr array mut_array primitive create} do
+    for {f, a} <- [
+          ptr: 1,
+          opaque_ptr: 1,
+          array: 1,
+          mut_array: 1,
+          primitive: 1,
+          create: 1,
+          create_memref: 5
+        ] do
       name = Module.concat([__MODULE__, module_name, f])
-      def unquote(name)(_), do: raise("NIF not loaded")
+      args = List.duplicate({:_, [if_undefined: :apply], Elixir}, a)
+      def unquote(name)(unquote_splicing(args)), do: raise("NIF not loaded")
     end
   end
 
@@ -177,6 +201,15 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_get_resource_bool(_), do: raise("NIF not loaded")
   def beaver_raw_mlir_named_attribute_get(_, _), do: raise("NIF not loaded")
   def beaver_raw_get_resource_c_string(_), do: raise("NIF not loaded")
+
+  def beaver_raw_create_mem_ref_descriptor(
+        _allocated,
+        _aligned,
+        _offset,
+        _sizes,
+        _strides
+      ),
+      do: raise("NIF not loaded")
 
   def bool(value) when is_boolean(value),
     do: %__MODULE__.Bool{ref: beaver_raw_get_resource_bool(value)}

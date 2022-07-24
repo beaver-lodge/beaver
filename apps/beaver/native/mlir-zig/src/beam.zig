@@ -1608,6 +1608,7 @@ pub const InternalOpaquePtr = get_element_struct(?*anyopaque, "Internal.OpaquePt
 pub fn get_element_struct(comptime ElementType: type, module_name: anytype) type {
     return struct {
         pub const T = ElementType;
+        pub const module_name = module_name;
         pub const resource = struct {
             pub var t: resource_type = undefined;
             pub const name = @typeName(ElementType);

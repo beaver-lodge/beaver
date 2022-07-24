@@ -394,6 +394,64 @@ export fn beaver_raw_create_mlir_pass(env: beam.env, _: c_int, args: [*c]const b
     return e.enif_make_resource(env, ptr);
 }
 
+fn MemRefDescriptor(comptime T: type, comptime N: usize) type {
+    return extern struct {
+        allocated: *T,
+        aligned: *T,
+        offset: i64,
+        sizes: [N]i64,
+        strides: [N]i64,
+    };
+}
+
+fn BeaverMemRef(comptime ResourceKind: type, rank: i64) type {
+    return struct {
+        const Descriptor = MemRefDescriptor(ResourceKind.T, rank);
+        fn create_descriptor(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            const d = Descriptor;
+            var allocated: ResourceKind.Ptr.T = ResourceKind.Ptr.resource.fetch(env, args[0]) catch
+                return beam.make_error_binary(env, "fail to fetch allocated. expected: " ++ @typeName(ResourceKind.Ptr.T));
+            var aligned: ResourceKind.Ptr.T = ResourceKind.Ptr.resource.fetch(env, args[1]) catch
+                return beam.make_error_binary(env, "fail to fetch aligned. expected: " ++ @typeName(ResourceKind.Ptr.T));
+            var offset: fizz.I64.T = fizz.I64.resource.fetch(env, args[2]) catch
+                return beam.make_error_binary(env, "fail to fetch offset");
+            const sizes = beam.get_slice_of(i64, env, args[3]) catch return beam.make_error_binary(env, "fail to sizes ");
+            const strides = beam.get_slice_of(i64, env, args[4]) catch return beam.make_error_binary(env, "fail to get strides ");
+            const des: d = .{
+                .allocated = allocated,
+                .aligned = aligned,
+                .offset = offset,
+                .sizes = .{ sizes[0], sizes[1] },
+                .strides = .{ strides[0], strides[1] },
+            };
+            print("des: {}\n", .{des});
+            return beam.make_ok(env);
+        }
+        const nif = e.ErlNifFunc{ .name = ResourceKind.module_name ++ ".create_memref", .arity = 5, .fptr = create_descriptor, .flags = 0 };
+    };
+}
+
+export fn beaver_raw_create_mem_ref_descriptor(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+    const d = MemRefDescriptor(f32, 2);
+    var allocated: fizz.F32.Ptr.T = fizz.F32.Ptr.resource.fetch(env, args[0]) catch
+        return beam.make_error_binary(env, "fail to fetch allocated. expected: " ++ @typeName(fizz.F32.Ptr.T));
+    var aligned: fizz.F32.Ptr.T = fizz.F32.Ptr.resource.fetch(env, args[1]) catch
+        return beam.make_error_binary(env, "fail to fetch aligned. expected: " ++ @typeName(fizz.F32.Ptr.T));
+    var offset: fizz.I64.T = fizz.I64.resource.fetch(env, args[2]) catch
+        return beam.make_error_binary(env, "fail to fetch offset");
+    const sizes = beam.get_slice_of(i64, env, args[3]) catch return beam.make_error_binary(env, "fail to sizes ");
+    const strides = beam.get_slice_of(i64, env, args[4]) catch return beam.make_error_binary(env, "fail to get strides ");
+    const des: d = .{
+        .allocated = allocated,
+        .aligned = aligned,
+        .offset = offset,
+        .sizes = .{ sizes[0], sizes[1] },
+        .strides = .{ strides[0], strides[1] },
+    };
+    print("des: {}\n", .{des});
+    return beam.make_ok(env);
+}
+
 pub export const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_get_context_load_all_dialects", .arity = 0, .fptr = beaver_raw_get_context_load_all_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_ops", .arity = 0, .fptr = beaver_raw_registered_ops, .flags = 1 },
@@ -409,6 +467,8 @@ pub export const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_get_resource_bool", .arity = 1, .fptr = beaver_raw_get_resource_bool, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_get_resource_c_string", .arity = 1, .fptr = beaver_raw_get_resource_c_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_mlir_named_attribute_get", .arity = 2, .fptr = beaver_raw_mlir_named_attribute_get, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_create_mem_ref_descriptor", .arity = 5, .fptr = beaver_raw_create_mem_ref_descriptor, .flags = 0 },
+    BeaverMemRef(fizz.F32, 2).nif,
 };
 
 pub export const num_nifs = fizz.generated_nifs.len + handwritten_nifs.len;

@@ -3,6 +3,14 @@ defmodule MemRefTest do
   alias Beaver.MLIR
   alias Beaver.MLIR.ExecutionEngine.MemRefDescriptor
 
+  test "creation" do
+    array = MLIR.CAPI.F32.array([1.1, 2.2, 3.3], mut: true) |> IO.inspect()
+    :ok = MLIR.CAPI.beaver_raw_create_mem_ref_descriptor(array.ref, array.ref, 0, [1, 2], [0, 0])
+    :ok = MLIR.CAPI.F32.memref(array.ref, array.ref, 0, [1, 2], [0, 0])
+
+    assert true
+  end
+
   test "strides" do
     assert [6, 3, 1] = MemRefDescriptor.dense_strides([1, 2, 3])
   end
