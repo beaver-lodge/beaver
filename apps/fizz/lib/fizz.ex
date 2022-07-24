@@ -169,7 +169,7 @@ defmodule Fizz do
             """
               var arg#{i}: #{Resource.resource_type_struct(arg, resource_struct_map)}.T = #{Resource.resource_type_resource_struct(arg, resource_struct_map)}.fetch(env, args[#{i}])
               catch
-              return beam.make_error_binary(env, "fail to fetch resource for argument ##{i + 1}, expected: #{arg}");
+              return beam.make_error_binary(env, "fail to fetch resource for argument ##{i + 1}, expected: " ++ @typeName(#{Resource.resource_type_struct(arg, resource_struct_map)}.T));
             """
           end
 
@@ -186,7 +186,7 @@ defmodule Fizz do
           export fn fizz_nif_#{name}(env: beam.env, _: c_int, #{if length(args) == 0, do: "_", else: "args"}: [*c] const beam.term) beam.term {
           #{Enum.join(arg_vars, "")}
             return beam.make_resource(env, c.#{name}(#{Enum.join(proxy_arg_uses, ", ")}), #{Resource.resource_type_var(ret, resource_struct_map)})
-            catch return beam.make_error_binary(env, "fail to make resource for #{ret}");
+            catch return beam.make_error_binary(env, "fail to make resource for: " ++ @typeName(#{Resource.resource_type_struct(ret, resource_struct_map)}.T));
           }
           """
         end
