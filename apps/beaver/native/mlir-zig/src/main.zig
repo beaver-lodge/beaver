@@ -69,7 +69,7 @@ fn get_all_registered_ops2(env: beam.env, dialect: c.struct_MlirStringRef) !beam
     return beam.make_term_list(env, ret);
 }
 
-export fn registered_ops(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
+export fn beaver_raw_registered_ops(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
     return get_all_registered_ops(env) catch beam.make_error_binary(env, "launching nif");
 }
 
@@ -94,7 +94,7 @@ fn get_registered_dialects(env: beam.env) !beam.term {
     return beam.make_term_list(env, ret);
 }
 
-export fn registered_ops_of_dialect(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+export fn beaver_raw_registered_ops_of_dialect(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var dialect: c.struct_MlirStringRef = undefined;
     if (beam.fetch_resource(c.struct_MlirStringRef, env, fizz.MlirStringRef.resource.t, args[0])) |value| {
         dialect = value;
@@ -104,7 +104,7 @@ export fn registered_ops_of_dialect(env: beam.env, _: c_int, args: [*c]const bea
     return get_all_registered_ops2(env, dialect) catch beam.make_error_binary(env, "launching nif");
 }
 
-export fn registered_dialects(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
+export fn beaver_raw_registered_dialects(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
     return get_registered_dialects(env) catch beam.make_error_binary(env, "launching nif");
 }
 
@@ -119,7 +119,7 @@ export fn beaver_raw_resource_cstring_to_term_charlist(env: beam.env, _: c_int, 
     return beam.make_cstring_charlist(env, arg0);
 }
 
-export fn resource_bool_to_term(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+export fn beaver_raw_resource_bool_to_term(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var arg0: bool = undefined;
     if (beam.fetch_resource(bool, env, fizz.Bool.resource.t, args[0])) |value| {
         arg0 = value;
@@ -129,7 +129,7 @@ export fn resource_bool_to_term(env: beam.env, _: c_int, args: [*c]const beam.te
     return beam.make_bool(env, arg0);
 }
 
-export fn get_resource_bool(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+export fn beaver_raw_get_resource_bool(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var ptr: ?*anyopaque = e.enif_alloc_resource(fizz.Bool.resource.t, @sizeOf(bool));
     var obj: *bool = undefined;
     if (ptr == null) {
@@ -148,7 +148,7 @@ export fn get_resource_bool(env: beam.env, _: c_int, args: [*c]const beam.term) 
 // create a C string resource by copying given binary
 const mem = @import("std").mem;
 // memory layout {address, real_binary, null}
-export fn get_resource_c_string(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+export fn beaver_raw_get_resource_c_string(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     const RType = [*c]u8;
     var bin: beam.binary = undefined;
     if (0 == e.enif_inspect_binary(env, args[0], &bin)) {
@@ -170,7 +170,7 @@ export fn get_resource_c_string(env: beam.env, _: c_int, args: [*c]const beam.te
     return e.enif_make_resource(env, ptr);
 }
 
-export fn beaver_nif_NamedAttributeGet(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+export fn beaver_raw_mlir_named_attribute_get(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var arg0: c.struct_MlirIdentifier = undefined;
     if (beam.fetch_resource(c.struct_MlirIdentifier, env, fizz.MlirIdentifier.resource.t, args[0])) |value| {
         arg0 = value;
@@ -213,7 +213,7 @@ fn print_mlir(env: beam.env, element: anytype, printer: anytype) beam.term {
     return beam.make_term_list(env, collector.list.items);
 }
 
-export fn beaver_attribute_to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+export fn beaver_raw_beaver_attribute_to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var arg0: c.struct_MlirAttribute = undefined;
     if (beam.fetch_resource(c.struct_MlirAttribute, env, fizz.MlirAttribute.resource.t, args[0])) |value| {
         arg0 = value;
@@ -223,7 +223,7 @@ export fn beaver_attribute_to_charlist(env: beam.env, _: c_int, args: [*c]const 
     return print_mlir(env, arg0, c.mlirAttributePrint);
 }
 
-export fn beaver_type_to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+export fn beaver_raw_beaver_type_to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var arg0: c.struct_MlirType = undefined;
     if (beam.fetch_resource(c.struct_MlirType, env, fizz.MlirType.resource.t, args[0])) |value| {
         arg0 = value;
@@ -233,7 +233,7 @@ export fn beaver_type_to_charlist(env: beam.env, _: c_int, args: [*c]const beam.
     return print_mlir(env, arg0, c.mlirTypePrint);
 }
 
-export fn beaver_operation_to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+export fn beaver_raw_beaver_operation_to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var arg0: c.struct_MlirOperation = undefined;
     if (beam.fetch_resource(c.struct_MlirOperation, env, fizz.MlirOperation.resource.t, args[0])) |value| {
         arg0 = value;
@@ -243,7 +243,7 @@ export fn beaver_operation_to_charlist(env: beam.env, _: c_int, args: [*c]const 
     return print_mlir(env, arg0, c.mlirOperationPrint);
 }
 
-export fn beaver_get_context_load_all_dialects(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
+export fn beaver_raw_get_context_load_all_dialects(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
     var ptr: ?*anyopaque = e.enif_alloc_resource(fizz.MlirContext.resource.t, @sizeOf(c.struct_MlirContext));
     const RType = c.struct_MlirContext;
     var obj: *RType = undefined;
@@ -395,20 +395,20 @@ export fn beaver_raw_create_mlir_pass(env: beam.env, _: c_int, args: [*c]const b
 }
 
 pub export const handwritten_nifs = .{
-    e.ErlNifFunc{ .name = "beaver_get_context_load_all_dialects", .arity = 0, .fptr = beaver_get_context_load_all_dialects, .flags = 1 },
-    e.ErlNifFunc{ .name = "registered_ops", .arity = 0, .fptr = registered_ops, .flags = 1 },
-    e.ErlNifFunc{ .name = "registered_ops_of_dialect", .arity = 1, .fptr = registered_ops_of_dialect, .flags = 1 },
-    e.ErlNifFunc{ .name = "registered_dialects", .arity = 0, .fptr = registered_dialects, .flags = 1 },
+    e.ErlNifFunc{ .name = "beaver_raw_get_context_load_all_dialects", .arity = 0, .fptr = beaver_raw_get_context_load_all_dialects, .flags = 1 },
+    e.ErlNifFunc{ .name = "beaver_raw_registered_ops", .arity = 0, .fptr = beaver_raw_registered_ops, .flags = 1 },
+    e.ErlNifFunc{ .name = "beaver_raw_registered_ops_of_dialect", .arity = 1, .fptr = beaver_raw_registered_ops_of_dialect, .flags = 1 },
+    e.ErlNifFunc{ .name = "beaver_raw_registered_dialects", .arity = 0, .fptr = beaver_raw_registered_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_create_mlir_pass", .arity = 5, .fptr = beaver_raw_create_mlir_pass, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_pass_token_signal", .arity = 1, .fptr = PassToken.pass_token_signal, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_resource_cstring_to_term_charlist", .arity = 1, .fptr = beaver_raw_resource_cstring_to_term_charlist, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_attribute_to_charlist", .arity = 1, .fptr = beaver_attribute_to_charlist, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_type_to_charlist", .arity = 1, .fptr = beaver_type_to_charlist, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_operation_to_charlist", .arity = 1, .fptr = beaver_operation_to_charlist, .flags = 0 },
-    e.ErlNifFunc{ .name = "resource_bool_to_term", .arity = 1, .fptr = resource_bool_to_term, .flags = 0 },
-    e.ErlNifFunc{ .name = "get_resource_bool", .arity = 1, .fptr = get_resource_bool, .flags = 0 },
-    e.ErlNifFunc{ .name = "get_resource_c_string", .arity = 1, .fptr = get_resource_c_string, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_nif_MlirNamedAttributeGet", .arity = 2, .fptr = beaver_nif_NamedAttributeGet, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_attribute_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_attribute_to_charlist, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_type_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_type_to_charlist, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_operation_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_operation_to_charlist, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_resource_bool_to_term", .arity = 1, .fptr = beaver_raw_resource_bool_to_term, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_get_resource_bool", .arity = 1, .fptr = beaver_raw_get_resource_bool, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_get_resource_c_string", .arity = 1, .fptr = beaver_raw_get_resource_c_string, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_mlir_named_attribute_get", .arity = 2, .fptr = beaver_raw_mlir_named_attribute_get, .flags = 0 },
 };
 
 pub export const num_nifs = fizz.generated_nifs.len + handwritten_nifs.len;

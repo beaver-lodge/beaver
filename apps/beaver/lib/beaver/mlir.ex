@@ -82,11 +82,11 @@ defmodule Beaver.MLIR do
   end
 
   def to_string(%MlirAttribute{ref: ref}) do
-    CAPI.beaver_attribute_to_charlist(ref) |> CAPI.check!() |> List.to_string()
+    CAPI.beaver_raw_beaver_attribute_to_charlist(ref) |> CAPI.check!() |> List.to_string()
   end
 
   def to_string(%MlirOperation{ref: ref}) do
-    CAPI.beaver_operation_to_charlist(ref) |> CAPI.check!() |> List.to_string()
+    CAPI.beaver_raw_beaver_operation_to_charlist(ref) |> CAPI.check!() |> List.to_string()
   end
 
   def to_string(%MlirModule{} = module) do
@@ -94,6 +94,6 @@ defmodule Beaver.MLIR do
   end
 
   def to_string(%MlirType{ref: ref}) do
-    CAPI.beaver_type_to_charlist(ref) |> CAPI.check!() |> List.to_string()
+    CAPI.beaver_raw_beaver_type_to_charlist(ref) |> CAPI.check!() |> List.to_string()
   end
 end

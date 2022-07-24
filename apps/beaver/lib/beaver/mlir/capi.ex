@@ -154,7 +154,7 @@ defmodule Beaver.MLIR.CAPI do
     end
   end
 
-  def beaver_get_context_load_all_dialects(), do: raise("NIF not loaded")
+  def beaver_raw_get_context_load_all_dialects(), do: raise("NIF not loaded")
 
   def beaver_raw_create_mlir_pass(
         _name,
@@ -166,18 +166,20 @@ defmodule Beaver.MLIR.CAPI do
       do: raise("NIF not loaded")
 
   def beaver_raw_pass_token_signal(_), do: raise("NIF not loaded")
-  def registered_ops(), do: raise("NIF not loaded")
-  def registered_ops_of_dialect(_), do: raise("NIF not loaded")
-  def registered_dialects(), do: raise("NIF not loaded")
-  def resource_bool_to_term(_), do: raise("NIF not loaded")
+  def beaver_raw_registered_ops(), do: raise("NIF not loaded")
+  def beaver_raw_registered_ops_of_dialect(_), do: raise("NIF not loaded")
+  def beaver_raw_registered_dialects(), do: raise("NIF not loaded")
+  def beaver_raw_resource_bool_to_term(_), do: raise("NIF not loaded")
   def beaver_raw_resource_cstring_to_term_charlist(_), do: raise("NIF not loaded")
-  def beaver_attribute_to_charlist(_), do: raise("NIF not loaded")
-  def beaver_type_to_charlist(_), do: raise("NIF not loaded")
-  def beaver_operation_to_charlist(_), do: raise("NIF not loaded")
-  def get_resource_bool(_), do: raise("NIF not loaded")
-  def beaver_nif_MlirNamedAttributeGet(_, _), do: raise("NIF not loaded")
-  def get_resource_c_string(_), do: raise("NIF not loaded")
-  def bool(value) when is_boolean(value), do: %__MODULE__.Bool{ref: get_resource_bool(value)}
+  def beaver_raw_beaver_attribute_to_charlist(_), do: raise("NIF not loaded")
+  def beaver_raw_beaver_type_to_charlist(_), do: raise("NIF not loaded")
+  def beaver_raw_beaver_operation_to_charlist(_), do: raise("NIF not loaded")
+  def beaver_raw_get_resource_bool(_), do: raise("NIF not loaded")
+  def beaver_raw_mlir_named_attribute_get(_, _), do: raise("NIF not loaded")
+  def beaver_raw_get_resource_c_string(_), do: raise("NIF not loaded")
+
+  def bool(value) when is_boolean(value),
+    do: %__MODULE__.Bool{ref: beaver_raw_get_resource_bool(value)}
 
   # user APIs
   def check!(ref) do
@@ -191,7 +193,7 @@ defmodule Beaver.MLIR.CAPI do
   end
 
   def c_string(value) when is_binary(value) do
-    %__MODULE__.CString{ref: check!(get_resource_c_string(value))}
+    %__MODULE__.CString{ref: check!(beaver_raw_get_resource_c_string(value))}
   end
 
   def ptr(%{ref: ref, zig_t: zig_t}) do

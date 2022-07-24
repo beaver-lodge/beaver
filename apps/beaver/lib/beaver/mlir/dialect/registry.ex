@@ -61,7 +61,7 @@ defmodule Beaver.MLIR.Dialect.Registry do
 
   def ops(dialect, opts \\ [query: false]) do
     if Keyword.get(opts, :query, false) do
-      CAPI.check!(CAPI.registered_ops_of_dialect(MLIR.StringRef.create(dialect).ref))
+      CAPI.check!(CAPI.beaver_raw_registered_ops_of_dialect(MLIR.StringRef.create(dialect).ref))
       |> Enum.map(&List.to_string/1)
     else
       :ets.match(__MODULE__, {dialect, :"$1"}) |> List.flatten()
@@ -78,7 +78,7 @@ defmodule Beaver.MLIR.Dialect.Registry do
     full = Keyword.get(opts, :full, false)
 
     all_dialects =
-      CAPI.registered_dialects()
+      CAPI.beaver_raw_registered_dialects()
       |> Enum.map(&List.to_string/1)
       |> CAPI.check!()
       |> Enum.uniq()
@@ -93,7 +93,7 @@ defmodule Beaver.MLIR.Dialect.Registry do
   end
 
   defp query_ops() do
-    for {dialect, op} <- Beaver.MLIR.CAPI.registered_ops() do
+    for {dialect, op} <- Beaver.MLIR.CAPI.beaver_raw_registered_ops() do
       {List.to_string(dialect), List.to_string(op)}
     end
   end
