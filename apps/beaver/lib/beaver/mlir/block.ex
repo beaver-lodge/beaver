@@ -3,7 +3,6 @@ defmodule Beaver.MLIR.Block do
   require Beaver.MLIR.CAPI
   # TODO: remote ctx in these funcs
 
-  # TODO: use the struct to replace the Exotic.Value here in pattern after Exotic gets updated with Protocol support
   def do_add_arg!(block, _ctx, {t = %Beaver.MLIR.CAPI.MlirType{}, loc}) do
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end

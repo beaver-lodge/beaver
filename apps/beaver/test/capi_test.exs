@@ -213,7 +213,6 @@ defmodule MlirTest do
     success = CAPI.mlirPassManagerRun(pm, module)
 
     # equivalent to mlirLogicalResultIsSuccess
-    # TODO: add a Exotic.Value.as_bool/1
     assert Beaver.MLIR.LogicalResult.success?(success)
 
     CAPI.mlirPassManagerDestroy(pm)
