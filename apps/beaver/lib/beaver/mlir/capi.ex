@@ -242,6 +242,7 @@ defmodule Beaver.MLIR.CAPI do
       maker,
       [ref]
     )
+    |> check!()
   end
 
   def bag(%{bag: bag} = v, list) when is_list(list) do

@@ -937,6 +937,7 @@ pub fn make(comptime T: type, environment: env, val: T) !term {
         f16 => return make_f16(environment, val),
         f32 => return make_f32(environment, val),
         f64 => return make_f64(environment, val),
+        ?*anyopaque => return make_u64(environment, @ptrToInt(val)),
         else => return Error.FunctionClauseError,
     }
 }
@@ -1519,13 +1520,12 @@ pub fn fetch_ptr_resource_wrapped(comptime T: type, environment: env, arg: term)
 }
 
 pub fn fetch_resource_ptr(comptime T: type, environment: env, res_typ: resource_type, res_trm: term) !*T {
-    var obj: ?*anyopaque = undefined;
+    var obj: ?*T = undefined;
     if (0 == e.enif_get_resource(environment, res_trm, res_typ, @ptrCast([*c]?*anyopaque, &obj))) {
         return Error.FunctionClauseError;
     }
     if (obj != null) {
-        var val: *T = @ptrCast(*T, @alignCast(@alignOf(*T), obj));
-        return val;
+        return obj.?;
     } else {
         print("fail to get ptr of resource of type: {}\n", .{T});
         return Error.FunctionClauseError;
@@ -1653,8 +1653,8 @@ pub fn get_element_struct(comptime ElementType: type, module_name: anytype) type
             return get_resource_ptr_from_term(T, environment, @This().resource.t, Ptr.resource.t, args[0]) catch return make_error_binary(environment, "fail to create ptr " ++ @typeName(T));
         }
         fn opaque_ptr(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
-            const ptr_to_resource_memory = get_resource_ptr_from_term(T, environment, @This().resource.t, Ptr.resource.t, args[0]) catch return make_error_binary(environment, "fail to create ptr " ++ @typeName(T));
-            return InternalOpaquePtr.resource.make(environment, @intToPtr(InternalOpaquePtr.T, ptr_to_resource_memory)) catch return make_error_binary(environment, "fail to make resource for: " ++ @typeName(InternalOpaquePtr.T));
+            const ptr_to_resource_memory: Ptr.T = fetch_resource_ptr(T, environment, @This().resource.t, args[0]) catch return make_error_binary(environment, "fail to create ptr " ++ @typeName(T));
+            return InternalOpaquePtr.resource.make(environment, ptr_to_resource_memory) catch return make_error_binary(environment, "fail to make resource for: " ++ @typeName(InternalOpaquePtr.T));
         }
         fn array(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
             return get_resource_array_from_list(T, environment, @This().resource.t, Array.resource.t, args[0]) catch return make_error_binary(environment, "fail to create array " ++ @typeName(T));

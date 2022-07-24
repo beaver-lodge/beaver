@@ -293,17 +293,24 @@ defmodule MlirTest do
     jit = MLIR.ExecutionEngine.create!(module)
     arg = CAPI.I32.create(42)
     return = CAPI.I32.create(-1)
+
+    before_ptr = return |> CAPI.opaque_ptr() |> CAPI.to_term()
     return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg], return)
+    after_ptr = return |> CAPI.opaque_ptr() |> CAPI.to_term()
+
+    assert before_ptr == after_ptr
+
+    return |> CAPI.opaque_ptr() |> CAPI.to_term()
     assert return |> CAPI.to_term() == 84
 
     for i <- 0..100_0 do
       Task.async(fn ->
-        arg = Exotic.Value.get(i)
-        return = Exotic.Value.get(-1)
+        arg = CAPI.I32.create(i)
+        return = CAPI.I32.create(-1)
         return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg], return)
         # return here is a resource reference
         assert return == return
-        assert return |> Exotic.Value.extract() == i * 2
+        assert return |> CAPI.to_term() == i * 2
       end)
     end
     |> Task.await_many()
