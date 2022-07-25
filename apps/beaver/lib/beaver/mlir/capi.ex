@@ -85,6 +85,7 @@ defmodule Beaver.MLIR.CAPI do
       @moduledoc """
       #{zig_t}
       """
+
       use Fizz.ResourceKind, root_module: root_module, zig_t: zig_t, fields: fields
 
       for {m, f, a} <- delegates do
@@ -105,33 +106,25 @@ defmodule Beaver.MLIR.CAPI do
   for nif <- nifs do
     args_ast = Macro.generate_unique_arguments(nif.arity, __MODULE__)
 
-    case nif do
-      %Fizz.CodeGen.NIF{name: nil, nif_name: nif_name} ->
-        @doc false
-        def unquote(String.to_atom(nif_name))(unquote_splicing(args_ast)),
-          do: "failed to load NIF"
+    %Fizz.CodeGen.NIF{name: name, nif_name: nif_name, ret: ret} = nif
+    @doc false
+    def unquote(nif_name)(unquote_splicing(args_ast)), do: "failed to load NIF"
 
-      %Fizz.CodeGen.NIF{name: name, nif_name: nif_name, ret: ret} ->
-        if ret == "void" do
-          def unquote(String.to_atom(name))(unquote_splicing(args_ast)) do
-            refs = Fizz.unwrap_ref([unquote_splicing(args_ast)])
-            ref = apply(__MODULE__, unquote(String.to_atom(nif_name)), refs)
-            :ok = check!(ref)
-          end
-        else
-          return_module = Fizz.module_name(ret, __MODULE__, zig_t_module_map)
+    if ret == "void" do
+      def unquote(String.to_atom(name))(unquote_splicing(args_ast)) do
+        refs = Fizz.unwrap_ref([unquote_splicing(args_ast)])
+        ref = apply(__MODULE__, unquote(nif_name), refs)
+        :ok = check!(ref)
+      end
+    else
+      return_module = Fizz.module_name(ret, __MODULE__, zig_t_module_map)
 
-          def unquote(String.to_atom(name))(unquote_splicing(args_ast)) do
-            refs = Fizz.unwrap_ref([unquote_splicing(args_ast)])
-            ref = apply(__MODULE__, unquote(String.to_atom(nif_name)), refs)
+      def unquote(String.to_atom(name))(unquote_splicing(args_ast)) do
+        refs = Fizz.unwrap_ref([unquote_splicing(args_ast)])
+        ref = apply(__MODULE__, unquote(nif_name), refs)
 
-            struct!(unquote(return_module), %{ref: check!(ref), zig_t: unquote(ret)})
-          end
-        end
-
-        @doc false
-        def unquote(String.to_atom(nif_name))(unquote_splicing(args_ast)),
-          do: "failed to load MLIR NIF"
+        struct!(unquote(return_module), %{ref: check!(ref), zig_t: unquote(ret)})
+      end
     end
   end
 

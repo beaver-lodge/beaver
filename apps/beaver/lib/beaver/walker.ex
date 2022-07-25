@@ -8,7 +8,6 @@ alias Beaver.MLIR.CAPI.{
   MlirAttribute,
   MlirBlock,
   MlirNamedAttribute,
-  MlirType,
   MlirOperand
 }
 

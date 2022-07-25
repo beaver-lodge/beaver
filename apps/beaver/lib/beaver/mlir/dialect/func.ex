@@ -3,7 +3,7 @@ defmodule Beaver.MLIR.Dialect.Func do
 
   use Dialect.Generator,
     dialect: "func",
-    ops: Dialect.Registry.ops("func", query: true),
+    ops: Dialect.Registry.ops("func"),
     skips: ~w{func}
 
   defmodule Func do

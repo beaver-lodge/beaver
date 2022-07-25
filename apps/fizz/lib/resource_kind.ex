@@ -7,6 +7,11 @@ defmodule Fizz.ResourceKind do
     quote bind_quoted: [root_module: root_module, zig_t: zig_t, fields: fields] do
       defstruct [ref: nil, zig_t: zig_t, bag: MapSet.new()] ++ fields
 
+      @type t :: %__MODULE__{
+              ref: reference(),
+              zig_t: binary(),
+              bag: MapSet.t()
+            }
       def zig_t(), do: unquote(zig_t)
 
       def array(list, opts \\ []) when is_list(list) do

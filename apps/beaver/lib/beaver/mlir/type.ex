@@ -124,8 +124,4 @@ defmodule Beaver.MLIR.Type do
       apply(__MODULE__, :i, [unquote(bitwidth)])
     end
   end
-
-  def to_string(type) do
-    MLIR.StringRef.to_string(type, CAPI, :mlirTypePrint)
-  end
 end

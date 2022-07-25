@@ -48,7 +48,7 @@ defmodule Beaver.MLIR.Dialect.Registry do
   end
 
   def normalize_dialect_name(to_upcase)
-      when to_upcase in ~w{tosa gpu nvgpu omp nvvm llvm cf pdl rocdl spv amx amdgpu scf acc},
+      when to_upcase in ~w{tosa gpu nvgpu omp nvvm llvm cf pdl rocdl spv amx amdgpu scf acc dlti},
       do: String.upcase(to_upcase)
 
   def normalize_dialect_name("memref"), do: "MemRef"
@@ -59,22 +59,16 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def normalize_dialect_name("pdl_interp"), do: "PDLInterp"
   def normalize_dialect_name(other), do: other |> Macro.camelize()
 
-  def ops(dialect, opts \\ [query: false]) do
-    if Keyword.get(opts, :query, false) do
-      CAPI.check!(CAPI.beaver_raw_registered_ops_of_dialect(MLIR.StringRef.create(dialect).ref))
-      |> Enum.map(&List.to_string/1)
-    else
-      :ets.match(__MODULE__, {dialect, :"$1"}) |> List.flatten()
-    end
+  def ops(dialect) do
+    CAPI.check!(CAPI.beaver_raw_registered_ops_of_dialect(MLIR.StringRef.create(dialect).ref))
+    |> Enum.map(&List.to_string/1)
   end
 
   @doc """
   Get dialects registered, if it is dev/test env with config key :skip_dialects of app :beaver configured,
   these dialects will not be returned (usually to speedup the compilation). Pass option dialects(full: true) to get all dialects anyway.
   """
-  def dialects(opts \\ [full: false, query: false]) do
-    query = Keyword.get(opts, :query, false)
-
+  def dialects(opts \\ [full: false]) do
     full = Keyword.get(opts, :full, false)
 
     all_dialects =

@@ -12,6 +12,12 @@ defmodule Fizz do
 
   defp gen_kind_name_from_module_name(t), do: t
 
+  defp gen_nif_name_from_module_name(module_name, %NIF{name: name, nif_name: nil} = nif) do
+    %{nif | nif_name: Module.concat(module_name, name)}
+  end
+
+  defp gen_nif_name_from_module_name(f), do: f
+
   @doc """
   Generate Zig code from a header and build a Zig project to produce a NIF library
   """
@@ -181,23 +187,26 @@ defmodule Fizz do
             """
           end
 
-        if ret == "void" do
-          """
-          export fn fizz_nif_#{name}(env: beam.env, _: c_int, #{if length(args) == 0, do: "_", else: "args"}: [*c] const beam.term) beam.term {
-          #{Enum.join(arg_vars, "")}
+        body =
+          if ret == "void" do
+            """
+            #{Enum.join(arg_vars, "")}
             c.#{name}(#{Enum.join(proxy_arg_uses, ", ")});
             return beam.make_ok(env);
-          }
-          """
-        else
-          """
-          export fn fizz_nif_#{name}(env: beam.env, _: c_int, #{if length(args) == 0, do: "_", else: "args"}: [*c] const beam.term) beam.term {
-          #{Enum.join(arg_vars, "")}
+            """
+          else
+            """
+            #{Enum.join(arg_vars, "")}
             return #{Resource.resource_type_resource_kind(ret, resource_kind_map)}.make(env, c.#{name}(#{Enum.join(proxy_arg_uses, ", ")}))
             catch return beam.make_error_binary(env, "fail to make resource for: " ++ @typeName(#{Resource.resource_type_struct(ret, resource_kind_map)}.T));
-          }
-          """
-        end
+            """
+          end
+
+        """
+        fn #{name}(env: beam.env, _: c_int, #{if length(args) == 0, do: "_", else: "args"}: [*c] const beam.term) callconv(.C) beam.term {
+          #{body}
+        }
+        """
       end
       |> Enum.join("\n")
 
@@ -213,12 +222,12 @@ defmodule Fizz do
 
     source = resource_kinds_str <> source
 
-    nifs = Enum.map(functions, nif_gen)
+    nifs =
+      Enum.map(functions, nif_gen)
+      |> Enum.map(&gen_nif_name_from_module_name(root_module, &1))
 
     source = """
     #{source}
-    pub export fn __destroy__(_: beam.env, _: ?*anyopaque) void {
-    }
     pub fn open_generated_resource_types(env: beam.env) void {
     #{resource_kinds_str_open_str}
     beam.InternalOpaquePtr.resource.t = OpaquePtr.resource.t;
