@@ -3,7 +3,7 @@ defmodule Beaver.MLIR.Dialect.Arith do
   alias Beaver.MLIR.Dialect
   import MLIR.Sigils
 
-  use Beaver.MLIR.Dialect.Generator,
+  use Beaver.MLIR.Dialect,
     dialect: "arith",
     ops: Dialect.Registry.ops("arith") |> Enum.reject(fn x -> x in ~w{constant} end)
 

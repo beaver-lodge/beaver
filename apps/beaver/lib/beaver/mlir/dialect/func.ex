@@ -1,9 +1,7 @@
 defmodule Beaver.MLIR.Dialect.Func do
-  alias Beaver.MLIR.Dialect
-
-  use Dialect.Generator,
+  use Beaver.MLIR.Dialect,
     dialect: "func",
-    ops: Dialect.Registry.ops("func"),
+    ops: Beaver.MLIR.Dialect.Registry.ops("func"),
     skips: ~w{func}
 
   defmodule Func do

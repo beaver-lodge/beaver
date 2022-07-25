@@ -1,7 +1,7 @@
 defmodule Beaver.MLIR.Dialect.Builtin do
   alias Beaver.MLIR.Dialect
 
-  use Beaver.MLIR.Dialect.Generator,
+  use Beaver.MLIR.Dialect,
     dialect: "builtin",
     ops: Dialect.Registry.ops("builtin"),
     skips: ~w{module}
