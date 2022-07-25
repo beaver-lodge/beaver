@@ -39,7 +39,7 @@ defmodule Beaver.MLIR.Pass do
         delay(composer)
       end
 
-      def delay(%Beaver.MLIR.CAPI.MlirModule{} = composer_or_op) do
+      def delay(%Beaver.MLIR.Module{} = composer_or_op) do
         composer = %Composer{op: composer_or_op, passes: []}
         delay(composer)
       end

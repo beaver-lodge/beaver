@@ -2,7 +2,7 @@ alias Beaver.MLIR
 alias Beaver.MLIR.Value
 
 alias Beaver.MLIR.CAPI.{
-  MlirModule,
+  Module,
   MlirOperation,
   MlirRegion,
   MlirAttribute,
@@ -34,7 +34,7 @@ defmodule Beaver.Walker do
 
   # TODO: traverse MlirNamedAttribute?
   @type operation() ::
-          MlirModule.t() | MlirOperation.t() | OpReplacement.t() | Beaver.DSL.Op.Prototype.t()
+          Module.t() | MlirOperation.t() | OpReplacement.t() | Beaver.DSL.Op.Prototype.t()
   @type container() ::
           operation()
           | MlirRegion.t()

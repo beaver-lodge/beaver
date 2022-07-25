@@ -161,7 +161,7 @@ defmodule Beaver.MLIR.Operation do
     |> MLIR.StringRef.extract()
   end
 
-  def from_module(module = %CAPI.MlirModule{}) do
+  def from_module(module = %MLIR.Module{}) do
     CAPI.mlirModuleGetOperation(module)
   end
 

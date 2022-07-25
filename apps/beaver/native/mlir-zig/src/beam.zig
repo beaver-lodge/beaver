@@ -1667,7 +1667,7 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
             const v = resource.fetch(environment, args[0]) catch return make_error_binary(environment, "fail to extract pritimive from " ++ @typeName(T));
             return make(T, environment, v) catch return make_error_binary(environment, "fail to create primitive " ++ @typeName(T));
         }
-        fn create(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
+        fn make_(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
             const v = get(T, environment, args[0]) catch return make_error_binary(environment, "fail to fetch " ++ @typeName(T));
             return resource.make(environment, v) catch return make_error_binary(environment, "fail to create " ++ @typeName(T));
         }
@@ -1677,7 +1677,7 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
             e.ErlNifFunc{ .name = module_name ++ ".array", .arity = 1, .fptr = array, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".mut_array", .arity = 1, .fptr = mut_array, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".primitive", .arity = 1, .fptr = primitive, .flags = 0 },
-            e.ErlNifFunc{ .name = module_name ++ ".create", .arity = 1, .fptr = create, .flags = 0 },
+            e.ErlNifFunc{ .name = module_name ++ ".make", .arity = 1, .fptr = make_, .flags = 0 },
         };
         pub fn open(environment: env) void {
             @This().resource.t = e.enif_open_resource_type(environment, null, @This().resource.name, destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);

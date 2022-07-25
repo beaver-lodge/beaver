@@ -252,9 +252,9 @@ defmodule Beaver do
   end
 
   @doc """
-  Extract a container could be traversed by walker from an Op prototype or a `Beaver.MLIR.CAPI.MlirModule`.
+  Extract a container could be traversed by walker from an Op prototype or a `Beaver.MLIR.Module`.
   """
-  def container(module = %MLIR.CAPI.MlirModule{}) do
+  def container(module = %MLIR.Module{}) do
     MLIR.Operation.from_module(module)
   end
 

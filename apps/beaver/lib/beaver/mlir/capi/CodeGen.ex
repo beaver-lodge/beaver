@@ -68,6 +68,10 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
     {:ok, %Type{zig_t: type, module_name: Beaver.MLIR.Value}}
   end
 
+  def type_gen(_root_module, "c.struct_MlirModule" = type) do
+    {:ok, %Type{zig_t: type, module_name: Beaver.MLIR.Module}}
+  end
+
   def type_gen(root_module, type) do
     Type.default(root_module, type)
   end

@@ -1,7 +1,6 @@
 defmodule Beaver.MLIR.Module do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
-  require Beaver.MLIR.CAPI
 
   def create(str, opts \\ [])
 
@@ -19,6 +18,10 @@ defmodule Beaver.MLIR.Module do
     verify!(module)
     module
   end
+
+  use Fizz.ResourceKind,
+    root_module: CAPI,
+    zig_t: "c.struct_MlirModule"
 
   def is_null(module) do
     CAPI.beaverModuleIsNull(module) |> CAPI.to_term()

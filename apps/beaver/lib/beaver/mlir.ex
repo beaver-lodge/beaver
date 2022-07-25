@@ -6,7 +6,6 @@ defmodule Beaver.MLIR do
   alias Beaver.MLIR.Value
 
   alias Beaver.MLIR.CAPI.{
-    MlirModule,
     MlirOperation,
     MlirAttribute,
     MlirBlock,
@@ -16,7 +15,7 @@ defmodule Beaver.MLIR do
     MlirType
   }
 
-  def dump(%MlirModule{} = mlir) do
+  def dump(%__MODULE__.Module{} = mlir) do
     CAPI.mlirModuleGetOperation(mlir)
     |> dump
   end
@@ -90,7 +89,7 @@ defmodule Beaver.MLIR do
     CAPI.beaver_raw_beaver_operation_to_charlist(ref) |> CAPI.check!() |> List.to_string()
   end
 
-  def to_string(%MlirModule{} = module) do
+  def to_string(%__MODULE__.Module{} = module) do
     module |> __MODULE__.Operation.from_module() |> __MODULE__.to_string()
   end
 

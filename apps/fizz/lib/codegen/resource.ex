@@ -37,7 +37,7 @@ defmodule Fizz.CodeGen.Resource do
           array: 1,
           mut_array: 1,
           primitive: 1,
-          create: 1,
+          make: 1,
           create_memref: 5
         ] do
       quote bind_quoted: [f: f, a: a, module_name: module_name] do

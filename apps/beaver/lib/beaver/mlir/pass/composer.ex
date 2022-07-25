@@ -20,7 +20,7 @@ defmodule Beaver.MLIR.Pass.Composer do
 
   # TODO: add keyword arguments
   def run!(
-        %__MODULE__{passes: passes, op: %MLIR.CAPI.MlirModule{} = op},
+        %__MODULE__{passes: passes, op: %MLIR.Module{} = op},
         opts \\ [dump: false, dump_if_fail: false]
       ) do
     ctx = MLIR.Managed.Context.get()

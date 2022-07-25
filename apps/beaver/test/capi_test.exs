@@ -290,8 +290,8 @@ defmodule MlirTest do
     MLIR.Operation.verify!(module)
     lower_to_llvm(ctx, module)
     jit = MLIR.ExecutionEngine.create!(module)
-    arg = CAPI.I32.create(42)
-    return = CAPI.I32.create(-1)
+    arg = CAPI.I32.make(42)
+    return = CAPI.I32.make(-1)
 
     before_ptr = return |> CAPI.opaque_ptr() |> CAPI.to_term()
     return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg], return)
@@ -304,8 +304,8 @@ defmodule MlirTest do
 
     for i <- 0..100_0 do
       Task.async(fn ->
-        arg = CAPI.I32.create(i)
-        return = CAPI.I32.create(-1)
+        arg = CAPI.I32.make(i)
+        return = CAPI.I32.make(-1)
         return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg], return)
         # return here is a resource reference
         assert return == return

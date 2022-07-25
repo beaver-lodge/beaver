@@ -6,8 +6,8 @@ defmodule E2ETest do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}
 
-    arg = MLIR.CAPI.I32.create(42)
-    return = MLIR.CAPI.I32.create(-1)
+    arg = MLIR.CAPI.I32.make(42)
+    return = MLIR.CAPI.I32.make(-1)
 
     jit =
       ~m"""
@@ -31,8 +31,8 @@ defmodule E2ETest do
 
     for i <- 0..100_0 do
       Task.async(fn ->
-        arg = MLIR.CAPI.I32.create(i)
-        return = MLIR.CAPI.I32.create(-1)
+        arg = MLIR.CAPI.I32.make(i)
+        return = MLIR.CAPI.I32.make(-1)
         return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
         # return here is a resource reference
         assert return == return

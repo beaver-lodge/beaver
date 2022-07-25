@@ -33,12 +33,12 @@ defmodule Fizz.ResourceKind do
         )
       end
 
-      def create(value) do
+      def make(value) do
         %__MODULE__{
           ref:
             apply(
               unquote(root_module),
-              Module.concat([__MODULE__, "create"]) |> unquote(root_module).check!(),
+              Module.concat([__MODULE__, "make"]) |> unquote(root_module).check!(),
               [value]
             )
         }

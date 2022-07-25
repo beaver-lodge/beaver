@@ -4,7 +4,7 @@ defmodule Beaver.MLIR.Sigils do
   @doc """
   Create a module with global MLIR context or process MLIR context if registered.
   ## Examples
-      iex> %MLIR.CAPI.MlirModule{} = ~m\"""
+      iex> %MLIR.Module{} = ~m\"""
       ...> module {
       ...>   func.func @add(%arg0 : i32, %arg1 : i32) -> i32 attributes { llvm.emit_c_interface } {
       ...>     %res = arith.addi %arg0, %arg1 : i32
