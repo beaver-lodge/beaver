@@ -30,6 +30,6 @@ defmodule Beaver.MLIR.ExternalPass do
       )
       |> CAPI.check!()
 
-    %CAPI.MlirPass{ref: ref, handler: pid}
+    %MLIR.Pass{ref: ref, handler: pid}
   end
 end

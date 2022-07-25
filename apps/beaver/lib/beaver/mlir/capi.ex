@@ -20,8 +20,13 @@ defmodule Beaver.MLIR.CAPI do
   wrapper_header_path = Path.join(File.cwd!(), "native/wrapper.h")
   beaver_include = Path.join(File.cwd!(), "native/mlir-c/include")
 
-  {nifs, types, resource_structs, dest_dir} =
-    Fizz.gen(wrapper_header_path, "native/mlir-zig",
+  %{
+    nifs: nifs,
+    resource_kinds: resource_kinds,
+    dest_dir: dest_dir,
+    zig_t_module_map: zig_t_module_map
+  } =
+    Fizz.gen(__MODULE__, wrapper_header_path, "native/mlir-zig",
       include_paths: %{
         llvm_include: Beaver.LLVM.Config.include_dir(),
         beaver_include: beaver_include
@@ -29,7 +34,7 @@ defmodule Beaver.MLIR.CAPI do
       library_paths: %{
         beaver_libdir: Path.join([Mix.Project.build_path(), "native-install", "lib"])
       },
-      type_gen: &__MODULE__.CodeGen.type_gen/1,
+      type_gen: &__MODULE__.CodeGen.type_gen/2,
       nif_gen: &__MODULE__.CodeGen.nif_gen/1
     )
 
@@ -63,6 +68,7 @@ defmodule Beaver.MLIR.CAPI do
     defstruct ref: nil, zig_t: nil, bag: MapSet.new()
   end
 
+  root_module = __MODULE__
   # generate resource modules
   for %Fizz.CodeGen.Type{
         module_name: module_name,
@@ -70,45 +76,16 @@ defmodule Beaver.MLIR.CAPI do
         delegates: delegates,
         fields: fields
       } = type <-
-        resource_structs do
+        resource_kinds,
+      Atom.to_string(module_name)
+      |> String.starts_with?(Atom.to_string(__MODULE__)) do
     Logger.debug("[Beaver] building resource module #{module_name}")
 
-    defmodule Module.concat(__MODULE__, module_name) do
+    defmodule module_name do
       @moduledoc """
       #{zig_t}
       """
-      defstruct [ref: nil, zig_t: zig_t, bag: MapSet.new()] ++ fields
-
-      def zig_t(), do: unquote(zig_t)
-
-      def array(list, opts \\ []) when is_list(list) do
-        Beaver.MLIR.CAPI.array(list, __MODULE__, opts)
-      end
-
-      def memref(
-            allocated,
-            aligned,
-            offset,
-            sizes,
-            strides
-          ) do
-        apply(
-          Beaver.MLIR.CAPI,
-          Module.concat([__MODULE__, "create_memref"]) |> Beaver.MLIR.CAPI.check!(),
-          [allocated, aligned, offset, sizes, strides]
-        )
-      end
-
-      def create(value) do
-        %__MODULE__{
-          ref:
-            apply(
-              Beaver.MLIR.CAPI,
-              Module.concat([__MODULE__, "create"]) |> Beaver.MLIR.CAPI.check!(),
-              [value]
-            )
-        }
-      end
+      use Fizz.ResourceKind, root_module: root_module, zig_t: zig_t, fields: fields
 
       for {m, f, a} <- delegates do
         args = List.duplicate({:_, [if_undefined: :apply], Elixir}, a)
@@ -118,15 +95,12 @@ defmodule Beaver.MLIR.CAPI do
     end
   end
 
-  defmodule CString do
-    defstruct ref: nil, zig_t: "[*c]const u8", bag: MapSet.new()
-  end
-
   for f <- Path.wildcard("capi/src") do
     @external_resource f
   end
 
   # generate C function NIFs
+  Logger.debug("[Beaver] generating NIF wrapper")
   @external_resource "capi/build.zig"
   for nif <- nifs do
     args_ast = Macro.generate_unique_arguments(nif.arity, __MODULE__)
@@ -145,7 +119,7 @@ defmodule Beaver.MLIR.CAPI do
             :ok = check!(ref)
           end
         else
-          return_module = Module.concat(__MODULE__, Fizz.module_name(ret))
+          return_module = Fizz.module_name(ret, __MODULE__, zig_t_module_map)
 
           def unquote(String.to_atom(name))(unquote_splicing(args_ast)) do
             refs = Fizz.unwrap_ref([unquote_splicing(args_ast)])
@@ -161,21 +135,10 @@ defmodule Beaver.MLIR.CAPI do
     end
   end
 
+  require Fizz.CodeGen.Resource
   # generate resource NIFs
-  for %{module_name: module_name} <- resource_structs do
-    for {f, a} <- [
-          ptr: 1,
-          opaque_ptr: 1,
-          array: 1,
-          mut_array: 1,
-          primitive: 1,
-          create: 1,
-          create_memref: 5
-        ] do
-      name = Module.concat([__MODULE__, module_name, f])
-      args = List.duplicate({:_, [if_undefined: :apply], Elixir}, a)
-      def unquote(name)(unquote_splicing(args)), do: raise("NIF not loaded")
-    end
+  for %{module_name: module_name} <- resource_kinds do
+    Fizz.CodeGen.Resource.gen_resource_functions(module_name)
   end
 
   def beaver_raw_get_context_load_all_dialects(), do: raise("NIF not loaded")
@@ -202,15 +165,6 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_mlir_named_attribute_get(_, _), do: raise("NIF not loaded")
   def beaver_raw_get_resource_c_string(_), do: raise("NIF not loaded")
 
-  def beaver_raw_create_mem_ref_descriptor(
-        _allocated,
-        _aligned,
-        _offset,
-        _sizes,
-        _strides
-      ),
-      do: raise("NIF not loaded")
-
   def bool(value) when is_boolean(value),
     do: %__MODULE__.Bool{ref: beaver_raw_get_resource_bool(value)}
 
@@ -223,6 +177,11 @@ defmodule Beaver.MLIR.CAPI do
       ref ->
         ref
     end
+  end
+
+  # move this to Beaver.Data
+  defmodule CString do
+    defstruct ref: nil, zig_t: "[*c]const u8", bag: MapSet.new()
   end
 
   def c_string(value) when is_binary(value) do

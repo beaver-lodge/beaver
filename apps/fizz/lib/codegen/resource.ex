@@ -1,34 +1,51 @@
 defmodule Fizz.CodeGen.Resource do
   alias Fizz.CodeGen.Type
 
-  def resource_type_struct("[*c]const " <> type, %{} = resource_struct_map) do
-    mod = Map.fetch!(resource_struct_map, type)
+  def resource_type_struct("[*c]const " <> type, %{} = resource_kind_map) do
+    mod = Map.fetch!(resource_kind_map, type)
     "#{mod}.Array"
   end
 
-  def resource_type_struct("[*c]" <> type, %{} = resource_struct_map) do
-    mod = Map.fetch!(resource_struct_map, type)
+  def resource_type_struct("[*c]" <> type, %{} = resource_kind_map) do
+    mod = Map.fetch!(resource_kind_map, type)
     "#{mod}.Ptr"
   end
 
-  def resource_type_struct(type, %{} = resource_struct_map) do
-    mod = Map.fetch!(resource_struct_map, type)
+  def resource_type_struct(type, %{} = resource_kind_map) do
+    mod = Map.fetch!(resource_kind_map, type)
     "#{mod}"
   end
 
-  def resource_type_resource_struct(type, %{} = resource_struct_map) do
-    resource_type_struct(type, resource_struct_map) <> ".resource"
+  def resource_type_resource_kind(type, %{} = resource_kind_map) do
+    resource_type_struct(type, resource_kind_map) <> ".resource"
   end
 
-  def resource_type_var(type, %{} = resource_struct_map) do
-    resource_type_resource_struct(type, resource_struct_map) <> ".t"
+  def resource_type_var(type, %{} = resource_kind_map) do
+    resource_type_resource_kind(type, resource_kind_map) <> ".t"
   end
 
-  def resource_open(%Type{module_name: module_name}) do
+  def resource_open(%Type{kind_name: kind_name}) do
     """
-    #{module_name}.resource.t = e.enif_open_resource_type(env, null, #{module_name}.resource.name, __destroy__, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
-    #{module_name}.Ptr.resource.t = e.enif_open_resource_type(env, null, #{module_name}.Ptr.resource.name, __destroy__, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
-    #{module_name}.Array.resource.t = e.enif_open_resource_type(env, null, #{module_name}.Array.resource.name, __destroy__, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
+    #{kind_name}.open_all(env);
     """
+  end
+
+  defmacro gen_resource_functions(module_name) do
+    for {f, a} <- [
+          ptr: 1,
+          opaque_ptr: 1,
+          array: 1,
+          mut_array: 1,
+          primitive: 1,
+          create: 1,
+          create_memref: 5
+        ] do
+      quote bind_quoted: [f: f, a: a, module_name: module_name] do
+        name = Module.concat(module_name, f)
+        args = List.duplicate({:_, [if_undefined: :apply], Elixir}, a)
+        def unquote(name)(unquote_splicing(args)), do: raise("NIF not loaded")
+      end
+    end
+    |> List.flatten()
   end
 end

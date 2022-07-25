@@ -2,6 +2,11 @@ defmodule Beaver.MLIR.Pass do
   use Beaver
   alias MLIR.CAPI
 
+  use Fizz.ResourceKind,
+    root_module: CAPI,
+    zig_t: "c.struct_MlirPass",
+    fields: [handler: nil]
+
   @callback run(MLIR.CAPI.MlirOperation.t()) :: :ok | :error
 
   def get_op_name(opts) do

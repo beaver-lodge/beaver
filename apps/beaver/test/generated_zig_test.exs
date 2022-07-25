@@ -8,27 +8,22 @@ defmodule Beaver.MLIR.CAPI.FizzTest do
   end
 
   test "array i64" do
-    ref = CAPI.fizz_nif_get_resource_array_resource_type_i64([1, 2, 3])
-    assert is_reference(ref)
-  end
-
-  test "array i64 wrapped" do
-    %Beaver.MLIR.CAPI.Array{ref: ref, zig_t: "[*c]const i64"} = CAPI.I64.array([1, 2, 3])
+    %CAPI.Array{ref: ref, zig_t: "[*c]const i64"} = CAPI.I64.array([1, 2, 3])
     assert is_reference(ref)
   end
 
   test "array i32" do
-    ref = CAPI.fizz_nif_get_resource_array_resource_type_i32([1, 2, 3])
+    %CAPI.Array{ref: ref, zig_t: "[*c]const i32"} = CAPI.I32.array([1, 2, 3])
     assert is_reference(ref)
   end
 
   test "array f64" do
-    ref = CAPI.fizz_nif_get_resource_array_resource_type_f64([1.0, 2.0, 3.0])
+    %CAPI.Array{ref: ref, zig_t: "[*c]const f64"} = CAPI.F64.array([1.0, 2.0, 3.0])
     assert is_reference(ref)
   end
 
   test "empty array f64" do
-    ref = CAPI.fizz_nif_get_resource_array_resource_type_f64([])
+    %CAPI.Array{ref: ref, zig_t: "[*c]const f64"} = CAPI.F64.array([])
     assert is_reference(ref)
   end
 

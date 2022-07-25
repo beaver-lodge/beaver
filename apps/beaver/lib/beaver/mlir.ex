@@ -3,12 +3,13 @@ defmodule Beaver.MLIR do
   alias Beaver.MLIR.CAPI
   require Beaver.MLIR.CAPI
 
+  alias Beaver.MLIR.Value
+
   alias Beaver.MLIR.CAPI.{
     MlirModule,
     MlirOperation,
     MlirAttribute,
     MlirBlock,
-    MlirValue,
     MlirAffineExpr,
     MlirAffineMap,
     MlirIntegerSet,
@@ -30,7 +31,7 @@ defmodule Beaver.MLIR do
     :ok
   end
 
-  def dump(%MlirValue{} = mlir) do
+  def dump(%Value{} = mlir) do
     CAPI.mlirValueDump(mlir)
     :ok
   end

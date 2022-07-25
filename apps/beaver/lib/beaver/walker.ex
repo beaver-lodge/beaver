@@ -1,4 +1,5 @@
 alias Beaver.MLIR
+alias Beaver.MLIR.Value
 
 alias Beaver.MLIR.CAPI.{
   MlirModule,
@@ -6,7 +7,6 @@ alias Beaver.MLIR.CAPI.{
   MlirRegion,
   MlirAttribute,
   MlirBlock,
-  MlirValue,
   MlirNamedAttribute,
   MlirType,
   MlirOperand
@@ -46,10 +46,10 @@ defmodule Beaver.Walker do
           operation()
           | MlirRegion.t()
           | MlirBlock.t()
-          | MlirValue.t()
+          | Value.t()
           | MlirNamedAttribute.t()
 
-  @type element_module() :: MlirOperation | MlirRegion | MlirBlock | MlirValue | MlirAttribute
+  @type element_module() :: MlirOperation | MlirRegion | MlirBlock | Value | MlirAttribute
 
   @type t :: %__MODULE__{
           container: container(),
@@ -74,8 +74,8 @@ defmodule Beaver.Walker do
   defstruct container_keys ++ index_func_keys ++ iter_keys ++ iter_func_keys
 
   # operands, results, attributes of one operation
-  defp verify_nesting!(MlirOperation, MlirValue), do: :ok
-  defp verify_nesting!(OpReplacement, MlirValue), do: :ok
+  defp verify_nesting!(MlirOperation, Value), do: :ok
+  defp verify_nesting!(OpReplacement, Value), do: :ok
   defp verify_nesting!(MlirOperation, MlirNamedAttribute), do: :ok
   defp verify_nesting!(OpReplacement, MlirNamedAttribute), do: :ok
   # regions of one operation
@@ -89,8 +89,8 @@ defmodule Beaver.Walker do
   # operations in a block
   defp verify_nesting!(MlirBlock, MlirOperation), do: :ok
   # arguments of a block
-  defp verify_nesting!(MlirBlock, MlirValue), do: :ok
-  defp verify_nesting!(MlirValue, MlirOperand), do: :ok
+  defp verify_nesting!(MlirBlock, Value), do: :ok
+  defp verify_nesting!(Value, MlirOperand), do: :ok
 
   defp verify_nesting!(container_module, element_module) do
     raise "not a legal 2-level structure could be walked in MLIR: #{inspect(container_module)}(#{inspect(element_module)})"
@@ -151,7 +151,7 @@ defmodule Beaver.Walker do
   def operands(op) do
     new(
       op,
-      MlirValue,
+      Value,
       get_num: &CAPI.mlirOperationGetNumOperands/1,
       get_element: &CAPI.mlirOperationGetOperand/2,
       element_equal: &CAPI.mlirValueEqual/2
@@ -166,7 +166,7 @@ defmodule Beaver.Walker do
   def results(op) do
     new(
       op,
-      MlirValue,
+      Value,
       get_num: &CAPI.mlirOperationGetNumResults/1,
       get_element: &CAPI.mlirOperationGetResult/2,
       element_equal: &CAPI.mlirValueEqual/2
@@ -222,7 +222,7 @@ defmodule Beaver.Walker do
   def arguments(%MlirBlock{} = block) do
     new(
       block,
-      MlirValue,
+      Value,
       get_num: &CAPI.mlirBlockGetNumArguments/1,
       get_element: &CAPI.mlirBlockGetArgument/2,
       element_equal: &CAPI.mlirValueEqual/2
@@ -253,8 +253,8 @@ defmodule Beaver.Walker do
     )
   end
 
-  @spec uses(MlirValue.t()) :: Enumerable.t()
-  def uses(%MlirValue{} = value) do
+  @spec uses(Value.t()) :: Enumerable.t()
+  def uses(%Value{} = value) do
     new(
       value,
       MlirOperand,
@@ -267,8 +267,8 @@ defmodule Beaver.Walker do
 
   @behaviour Access
   @impl true
-  def fetch(%__MODULE{element_module: MlirValue} = walker, key) when is_integer(key) do
-    with %MlirValue{} = value <- Enum.at(walker, key) do
+  def fetch(%__MODULE{element_module: Value} = walker, key) when is_integer(key) do
+    with %Value{} = value <- Enum.at(walker, key) do
       {:ok, value}
     else
       nil -> :error
@@ -413,9 +413,9 @@ defmodule Beaver.Walker do
     post.(successor, acc)
   end
 
-  defp do_traverse({value_kind, %MlirValue{}} = value, acc, pre, post)
+  defp do_traverse({value_kind, %Value{}} = value, acc, pre, post)
        when value_kind in [:result, :operand, :argument] do
-    {{^value_kind, %MlirValue{}} = value, acc} = pre.(value, acc)
+    {{^value_kind, %Value{}} = value, acc} = pre.(value, acc)
     post.(value, acc)
   end
 
@@ -467,14 +467,14 @@ defmodule Beaver.Walker do
     traverse(ast, acc, fn x, a -> {x, a} end, fun)
   end
 
-  @spec replace(MlirOperation.t(), [MlirValue.t()] | MlirValue.t()) :: OpReplacement.t()
+  @spec replace(MlirOperation.t(), [Value.t()] | Value.t()) :: OpReplacement.t()
   @doc """
   Replace a operation with a value
   """
-  def replace(%MlirOperation{} = op, %MlirValue{} = value) do
+  def replace(%MlirOperation{} = op, %Value{} = value) do
     with results <- results(op),
          1 <- Enum.count(results),
-         %CAPI.MlirValue{} = result = results[0] do
+         %Value{} = result = results[0] do
       for %Beaver.MLIR.CAPI.MlirOperand{} = operand <- uses(result) do
         op = CAPI.beaverOperandGetOwner(operand)
         pos = CAPI.beaverOperandGetNumber(operand)

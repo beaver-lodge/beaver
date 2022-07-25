@@ -59,7 +59,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   # one single value, usually a terminator
-  def create(op_name, %MLIR.CAPI.MlirValue{} = op) do
+  def create(op_name, %MLIR.Value{} = op) do
     create(op_name, [op])
   end
 

@@ -6,18 +6,17 @@ defmodule Fizz do
   Documentation for `Fizz`.
   """
 
-  defp gen_type(type, cb) do
-    with {:ok, t} <- cb.(type) do
-      t
-    else
-      _ -> raise "failed to generate type: #{type}"
-    end
+  defp gen_kind_name_from_module_name(%Type{module_name: module_name, kind_name: nil} = t) do
+    %{t | kind_name: Module.split(module_name) |> List.last()}
   end
+
+  defp gen_kind_name_from_module_name(t), do: t
 
   @doc """
   Generate Zig code from a header and build a Zig project to produce a NIF library
   """
   def gen(
+        root_module,
         wrapper,
         project_dir,
         opts \\ [include_paths: %{}, library_paths: %{}, type_gen: nil, nif_gen: nil]
@@ -29,7 +28,7 @@ defmodule Fizz do
     Logger.debug("[Fizz] generating Zig code for wrapper: #{wrapper}")
     include_paths = Keyword.get(opts, :include_paths, %{})
     library_paths = Keyword.get(opts, :library_paths, %{})
-    type_gen = Keyword.get(opts, :type_gen) || (&Type.default/1)
+    type_gen = Keyword.get(opts, :type_gen) || (&Type.default/2)
     nif_gen = Keyword.get(opts, :nif_gen) || (&NIF.from_function/1)
     cache_root = Path.join([Mix.Project.build_path(), "mlir-zig-build", "zig-cache"])
 
@@ -145,14 +144,23 @@ defmodule Fizz do
 
     types = Enum.sort(types ++ extra) |> Enum.uniq()
 
-    resource_structs =
+    resource_kinds =
       types
       |> Enum.reject(fn x -> String.starts_with?(x, "[*c]") end)
       |> Enum.reject(fn x -> x in ["void"] end)
-      |> Enum.map(&gen_type(&1, type_gen))
+      |> Enum.map(fn x ->
+        # TODO: support skip
+        {:ok, t} = type_gen.(root_module, x)
+        t |> gen_kind_name_from_module_name
+      end)
 
-    resource_struct_map =
-      resource_structs
+    resource_kind_map =
+      resource_kinds
+      |> Enum.map(fn %{zig_t: zig_t, kind_name: kind_name} -> {zig_t, kind_name} end)
+      |> Map.new()
+
+    zig_t_module_map =
+      resource_kinds
       |> Enum.map(fn %{zig_t: zig_t, module_name: module_name} -> {zig_t, module_name} end)
       |> Map.new()
 
@@ -167,9 +175,9 @@ defmodule Fizz do
         arg_vars =
           for {arg, i} <- Enum.with_index(args) do
             """
-              var arg#{i}: #{Resource.resource_type_struct(arg, resource_struct_map)}.T = #{Resource.resource_type_resource_struct(arg, resource_struct_map)}.fetch(env, args[#{i}])
+              var arg#{i}: #{Resource.resource_type_struct(arg, resource_kind_map)}.T = #{Resource.resource_type_resource_kind(arg, resource_kind_map)}.fetch(env, args[#{i}])
               catch
-              return beam.make_error_binary(env, "fail to fetch resource for argument ##{i + 1}, expected: " ++ @typeName(#{Resource.resource_type_struct(arg, resource_struct_map)}.T));
+              return beam.make_error_binary(env, "fail to fetch resource for argument ##{i + 1}, expected: " ++ @typeName(#{Resource.resource_type_struct(arg, resource_kind_map)}.T));
             """
           end
 
@@ -185,27 +193,25 @@ defmodule Fizz do
           """
           export fn fizz_nif_#{name}(env: beam.env, _: c_int, #{if length(args) == 0, do: "_", else: "args"}: [*c] const beam.term) beam.term {
           #{Enum.join(arg_vars, "")}
-            return #{Resource.resource_type_resource_struct(ret, resource_struct_map)}.make(env, c.#{name}(#{Enum.join(proxy_arg_uses, ", ")}))
-            catch return beam.make_error_binary(env, "fail to make resource for: " ++ @typeName(#{Resource.resource_type_struct(ret, resource_struct_map)}.T));
+            return #{Resource.resource_type_resource_kind(ret, resource_kind_map)}.make(env, c.#{name}(#{Enum.join(proxy_arg_uses, ", ")}))
+            catch return beam.make_error_binary(env, "fail to make resource for: " ++ @typeName(#{Resource.resource_type_struct(ret, resource_kind_map)}.T));
           }
           """
         end
       end
       |> Enum.join("\n")
 
-    types = Enum.map(types, &gen_type(&1, type_gen))
-
-    resource_structs_str =
-      resource_structs
-      |> Enum.map(&Type.gen_resource_struct/1)
+    resource_kinds_str =
+      resource_kinds
+      |> Enum.map(&Type.gen_resource_kind/1)
       |> Enum.join()
 
-    resource_structs_str_open_str =
-      resource_structs
+    resource_kinds_str_open_str =
+      resource_kinds
       |> Enum.map(&Resource.resource_open/1)
       |> Enum.join()
 
-    source = resource_structs_str <> source
+    source = resource_kinds_str <> source
 
     nifs = Enum.map(functions, nif_gen)
 
@@ -214,14 +220,15 @@ defmodule Fizz do
     pub export fn __destroy__(_: beam.env, _: ?*anyopaque) void {
     }
     pub fn open_generated_resource_types(env: beam.env) void {
-    #{resource_structs_str_open_str}
+    #{resource_kinds_str_open_str}
     beam.InternalOpaquePtr.resource.t = OpaquePtr.resource.t;
     beam.InternalOpaquePtr.Ptr.resource.t = OpaquePtr.Ptr.resource.t;
     beam.InternalOpaquePtr.Array.resource.t = OpaquePtr.Array.resource.t;
     }
     pub export const generated_nifs = .{
       #{nifs |> Enum.map(&Fizz.CodeGen.NIF.gen/1) |> Enum.join("  ")}
-    } ++ #{Enum.map(resource_structs, fn %{module_name: module_name} -> "#{module_name}.nifs" end) |> Enum.join(" ++ ")};
+    }
+    ++ #{Enum.map(resource_kinds, fn %{kind_name: kind_name} -> "#{kind_name}.nifs" end) |> Enum.join(" ++ \n")};
     """
 
     source =
@@ -312,7 +319,12 @@ defmodule Fizz do
         raise "fail to run zig compiler, ret_code: #{ret_code}"
     end
 
-    {nifs, types, resource_structs, dest_dir}
+    %{
+      nifs: nifs,
+      resource_kinds: resource_kinds,
+      dest_dir: dest_dir,
+      zig_t_module_map: zig_t_module_map
+    }
   end
 
   @doc """
@@ -362,22 +374,6 @@ defmodule Fizz do
     :OpaqueArray
   end
 
-  def module_name("?fn(?*anyopaque) callconv(.C) ?*anyopaque") do
-    :ExternalPassConstruct
-  end
-
-  def module_name(
-        "?fn(c.struct_MlirContext, ?*anyopaque) callconv(.C) c.struct_MlirLogicalResult"
-      ) do
-    :ExternalPassInitialize
-  end
-
-  def module_name(
-        "?fn(c.struct_MlirOperation, c.struct_MlirExternalPass, ?*anyopaque) callconv(.C) void"
-      ) do
-    :ExternalPassRun
-  end
-
   def module_name("?fn(" <> _ = fn_name) do
     raise "need module name for function type: #{fn_name}"
   end
@@ -399,6 +395,14 @@ defmodule Fizz do
   end
 
   def is_array(type) when is_binary(type) do
+    false
+  end
+
+  def is_ptr("[*c]" <> _type) do
+    true
+  end
+
+  def is_ptr(type) when is_binary(type) do
     false
   end
 
@@ -455,4 +459,16 @@ defmodule Fizz do
   def is_function("?fn(" <> _), do: true
 
   def is_function(_), do: false
+
+  def module_name(zig_t, root_module, zig_t_module_map) do
+    if is_array(zig_t) do
+      root_module |> Module.concat("Array")
+    else
+      if is_ptr(zig_t) do
+        root_module |> Module.concat("Ptr")
+      else
+        zig_t_module_map |> Map.fetch!(zig_t)
+      end
+    end
+  end
 end

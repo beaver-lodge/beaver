@@ -330,7 +330,7 @@ defmodule Beaver.Nx.Defn do
       ] do
         region do
           block bb0(arg0 >>> Type.complex(Type.f32()), arg1 >>> Type.f(32)) do
-            %MLIR.CAPI.MlirValue{} = arg1
+            %MLIR.Value{} = arg1
             im = Complex.im(arg0) >>> Type.f32()
             Linalg.yield([im]) >>> []
           end
@@ -389,7 +389,7 @@ defmodule Beaver.Nx.Defn do
 
               mlir block: entry do
                 case root do
-                  ret = %Beaver.MLIR.CAPI.MlirValue{} ->
+                  ret = %Beaver.MLIR.Value{} ->
                     Func.return(ret) >>> []
 
                   tuple_ret when is_tuple(tuple_ret) ->

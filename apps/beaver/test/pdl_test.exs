@@ -43,13 +43,13 @@ defmodule PDLTest do
       {:successor, %CAPI.MlirBlock{} = successor}, acc ->
         {{:successor, successor}, acc}
 
-      {:argument, %CAPI.MlirValue{}} = argument, acc ->
+      {:argument, %Value{}} = argument, acc ->
         {argument, acc}
 
-      {:result, %CAPI.MlirValue{}} = result, acc ->
+      {:result, %Value{}} = result, acc ->
         {result, acc}
 
-      {:operand, %CAPI.MlirValue{}} = operand, acc ->
+      {:operand, %Value{}} = operand, acc ->
         {operand, acc}
 
       {name, %CAPI.MlirAttribute{} = attribute}, acc ->
@@ -218,7 +218,7 @@ defmodule PDLTest do
       end
 
       defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res]}) do
-        %MLIR.CAPI.MlirValue{} = res
+        %MLIR.Value{} = res
         # create a common struct to see if the pattern transformation would skip it
         assert %Range{first: 1, last: 10, step: 2} |> Range.size() == 5
         %TOSA.Sub{operands: [a, b]}
@@ -269,7 +269,7 @@ defmodule PDLTest do
                  results: [ty]
                }
              ) do
-        %MLIR.CAPI.MlirValue{} = ty
+        %MLIR.Value{} = ty
         %TOSA.Sub{operands: [a, b]}
       end
 
@@ -308,7 +308,7 @@ defmodule PDLTest do
                  results: types
                }
              ) do
-        %MLIR.CAPI.MlirValue{} = one
+        %MLIR.Value{} = one
         %TOSA.Sub{operands: [a, b]}
       end
     end
@@ -345,7 +345,7 @@ defmodule PDLTest do
       use Beaver.MLIR.Pass, on: Func.Func
 
       defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
-        %MLIR.CAPI.MlirValue{} = res
+        %MLIR.Value{} = res
         %TOSA.Sub{operands: [a, b]}
       end
 

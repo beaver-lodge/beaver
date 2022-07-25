@@ -18,7 +18,7 @@ defmodule Beaver.DSL.Pattern do
     end
   end
 
-  def gen_pdl(_block, %MLIR.CAPI.MlirValue{} = value) do
+  def gen_pdl(_block, %MLIR.Value{} = value) do
     value
   end
 
@@ -329,7 +329,7 @@ defmodule Beaver.DSL.Pattern do
   end
 
   # TODO: accepting block here is ugly, change it to %Beaver.Env{block: block}
-  def result(block, %Beaver.MLIR.CAPI.MlirValue{} = v, i) when is_integer(i) do
+  def result(block, %Beaver.MLIR.Value{} = v, i) when is_integer(i) do
     mlir block: block do
       PDL.result(v, index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), i)) >>>
         ~t{!pdl.value}

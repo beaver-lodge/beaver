@@ -1603,9 +1603,9 @@ pub fn open_resource_wrapped(environment: env, comptime T: type) void {
     T.resource_type = e.enif_open_resource_type(environment, null, T.resource_name, destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
 }
 
-pub const InternalOpaquePtr = get_element_struct(?*anyopaque, "Internal.OpaquePtr");
+pub const InternalOpaquePtr = ResourceKind(?*anyopaque, "Internal.OpaquePtr");
 
-pub fn get_element_struct(comptime ElementType: type, module_name: anytype) type {
+pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
     return struct {
         pub const T = ElementType;
         pub const module_name = module_name;
@@ -1679,5 +1679,19 @@ pub fn get_element_struct(comptime ElementType: type, module_name: anytype) type
             e.ErlNifFunc{ .name = module_name ++ ".primitive", .arity = 1, .fptr = primitive, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".create", .arity = 1, .fptr = create, .flags = 0 },
         };
+        pub fn open(environment: env) void {
+            @This().resource.t = e.enif_open_resource_type(environment, null, @This().resource.name, destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
+        }
+        pub fn open_ptr(environment: env) void {
+            @This().Ptr.resource.t = e.enif_open_resource_type(environment, null, @This().Ptr.resource.name, destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
+        }
+        pub fn open_array(environment: env) void {
+            @This().Array.resource.t = e.enif_open_resource_type(environment, null, @This().Array.resource.name, destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
+        }
+        pub fn open_all(environment: env) void {
+            open(environment);
+            open_ptr(environment);
+            open_array(environment);
+        }
     };
 }

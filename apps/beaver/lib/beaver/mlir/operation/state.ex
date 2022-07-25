@@ -106,7 +106,7 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   defp add_operands(%MLIR.CAPI.MlirOperationState{} = state, operands) do
-    array = operands |> CAPI.MlirValue.array()
+    array = operands |> MLIR.Value.array()
 
     CAPI.mlirOperationStateAddOperands(CAPI.ptr(state), length(operands), array)
     state
@@ -224,7 +224,7 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   @type argument() ::
-          CAPI.MlirValue.t()
+          Value.t()
           | {atom(), CAPI.MlirAttribute.t()}
           | {:regions, function()}
           | {:result_types, [CAPI.MlirType.t()]}
@@ -316,7 +316,7 @@ defmodule Beaver.MLIR.Operation.State do
 
   def add_argument(
         %__MODULE__{operands: operands} = state,
-        %Beaver.MLIR.CAPI.MlirValue{} = operand
+        %Beaver.MLIR.Value{} = operand
       ) do
     %{state | operands: operands ++ [operand]}
   end
