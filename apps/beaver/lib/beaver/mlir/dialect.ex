@@ -2,36 +2,75 @@ defmodule Beaver.MLIR.Dialect do
   alias Beaver.MLIR.Dialect
 
   require Logger
-  require Beaver.MLIR.Dialect.Registry
 
-  module_names =
-    for d <-
-          Dialect.Registry.dialects(query: true)
-          |> Enum.reject(fn x -> x in ~w{cf arith func builtin} end) do
-      module_name = d |> Dialect.Registry.normalize_dialect_name()
-      Logger.debug("building Elixir module for dialect #{d} => #{module_name}")
-      module_name = Module.concat([__MODULE__, module_name])
+  defmacro __using__(opts) do
+    dialect = Keyword.fetch!(opts, :dialect)
+    ops = Keyword.fetch!(opts, :ops)
+    skips = Keyword.get(opts, :skips, [])
 
-      defmodule module_name do
-        use Beaver.MLIR.Dialect.Generator,
-          dialect: d,
-          ops: Dialect.Registry.ops(d, query: true)
+    quote(bind_quoted: [dialect: dialect, ops: ops, skips: skips]) do
+      require Logger
+      module_name = dialect |> Beaver.MLIR.Dialect.Registry.normalize_dialect_name()
+      Logger.debug("[Beaver] building Elixir module for dialect #{dialect} => #{module_name}")
+
+      module_names =
+        for op <- ops do
+          func_name = Beaver.MLIR.Dialect.Registry.normalize_op_name(op)
+          full_name = Enum.join([dialect, op], ".")
+
+          module_name =
+            Module.concat([
+              Beaver.MLIR.Dialect,
+              module_name,
+              Beaver.MLIR.Dialect.Registry.op_module_name(op)
+            ])
+
+          if op not in skips do
+            defmodule module_name do
+              use Beaver.DSL.Op.Prototype, op_name: unquote(full_name)
+            end
+
+            require Beaver.Env
+
+            def unquote(func_name)(%Beaver.DSL.SSA{} = ssa) do
+              Beaver.MLIR.Operation.create(
+                unquote(full_name),
+                ssa
+              )
+              |> Beaver.MLIR.Operation.results()
+            end
+
+            # persistent the fullname so the caller module could access it
+            @full_name full_name
+            defmacro unquote(func_name)(%Beaver.DSL.SSA{} = ssa, do: ast_block) do
+              quote(bind_quoted: [ssa: ssa, full_name: @full_name, ast_block: ast_block]) do
+                Beaver.MLIR.Operation.create(full_name, ssa)
+                |> Beaver.MLIR.Operation.results()
+              end
+            end
+          end
+
+          module_name
+        end
+
+      if length(module_names) != MapSet.size(MapSet.new(module_names)) do
+        raise "duplicate op name found in dialect: #{dialect}"
       end
 
-      module_name
-    end
+      @module_names module_names
 
-  @module_names module_names ++
-                  [
-                    Beaver.MLIR.Dialect.CF,
-                    Beaver.MLIR.Dialect.Arith,
-                    Beaver.MLIR.Dialect.Func,
-                    Beaver.MLIR.Dialect.Builtin
-                  ]
+      def ops() do
+        for module_name <- @module_names do
+          module_name
+        end
+      end
+    end
+  end
 
   def dialects() do
-    for module_name <- @module_names do
-      module_name
+    for d <- Dialect.Registry.dialects() do
+      module_name = d |> Dialect.Registry.normalize_dialect_name()
+      Module.concat([__MODULE__, module_name])
     end
   end
 end

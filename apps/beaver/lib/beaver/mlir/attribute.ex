@@ -1,11 +1,10 @@
 defmodule Beaver.MLIR.Attribute do
   alias Beaver.MLIR.CAPI
+  require Beaver.MLIR.CAPI
   alias Beaver.MLIR
 
-  def is_null(jit) do
-    jit
-    |> Exotic.Value.fetch(MLIR.CAPI.MlirAttribute, :ptr)
-    |> Exotic.Value.extract() == 0
+  def is_null(a) do
+    CAPI.beaverAttributeIsNull(a) |> CAPI.to_term()
   end
 
   def get(attr_str) when is_binary(attr_str) do
@@ -21,11 +20,7 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   def equal?(%MLIR.CAPI.MlirAttribute{} = a, %MLIR.CAPI.MlirAttribute{} = b) do
-    CAPI.mlirAttributeEqual(a, b) |> Exotic.Value.extract()
-  end
-
-  def to_string(attr) do
-    MLIR.StringRef.to_string(attr, CAPI, :mlirAttributePrint)
+    CAPI.mlirAttributeEqual(a, b) |> CAPI.to_term()
   end
 
   def float(type, value, opts \\ []) do
@@ -35,80 +30,26 @@ defmodule Beaver.MLIR.Attribute do
 
   def dense_elements(elements, shaped_type) when is_list(elements) do
     num_elements = length(elements)
-    elements = elements |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()
-    dense_elements(shaped_type, num_elements, elements)
+    elements = elements |> CAPI.MlirAttribute.array()
+    CAPI.mlirDenseElementsAttrGet(shaped_type, num_elements, elements)
   end
 
-  def array(elements) when is_list(elements) do
-    array(elements, [])
-  end
-
-  def array(elements, opts) when is_list(elements) do
+  def array(elements, opts \\ []) when is_list(elements) do
+    ctx = MLIR.Managed.Context.from_opts(opts)
     num_elements = length(elements)
-    elements = elements |> Exotic.Value.Array.from_list() |> Exotic.Value.get_ptr()
-    array(num_elements, elements, opts)
+    CAPI.mlirArrayAttrGet(ctx, num_elements, CAPI.MlirAttribute.array(elements))
   end
 
   def string(str, opts \\ []) when is_binary(str) do
-    string_(MLIR.StringRef.create(str), opts)
+    ctx = MLIR.Managed.Context.from_opts(opts)
+    CAPI.mlirStringAttrGet(ctx, MLIR.StringRef.create(str))
   end
 
-  for {:function_signature,
-       [
-         f = %Exotic.CodeGen.Function{
-           name: name,
-           args: args,
-           ret: {:type_def, Beaver.MLIR.CAPI.MlirAttribute}
-         }
-       ]} <-
-        MLIR.CAPI.__info__(:attributes) do
-    name_str = Atom.to_string(name)
-    is_type_get = name_str |> String.ends_with?("AttrGet")
+  def type(%CAPI.MlirType{} = t) do
+    CAPI.mlirTypeAttrGet(t)
+  end
 
-    if is_type_get do
-      "mlir" <> generated_func_name = name_str
-      generated_func_name = generated_func_name |> String.slice(0..-8) |> Macro.underscore()
-      generated_func_name = generated_func_name |> String.to_atom()
-
-      generated_func_name =
-        case generated_func_name do
-          :string ->
-            :string_
-
-          _ ->
-            generated_func_name
-        end
-
-      @doc """
-      generated from
-      ```
-      #{inspect(f, pretty: true)}
-      ```
-      """
-      case args do
-        [{_ctx, {:type_def, Beaver.MLIR.CAPI.MlirContext}} | rest_args] ->
-          args =
-            for {arg_name, _} <- rest_args do
-              arg_name = arg_name |> Atom.to_string() |> Macro.underscore() |> String.to_atom()
-              {arg_name, [], nil}
-            end
-
-          def unquote(generated_func_name)(unquote_splicing(args), opts \\ []) do
-            ctx = MLIR.Managed.Context.from_opts(opts)
-            apply(Beaver.MLIR.CAPI, unquote(name), [ctx, unquote_splicing(args)])
-          end
-
-        args ->
-          args =
-            for {arg_name, _} <- args do
-              arg_name = arg_name |> Atom.to_string() |> Macro.underscore() |> String.to_atom()
-              {arg_name, [], nil}
-            end
-
-          def unquote(generated_func_name)(unquote_splicing(args)) do
-            apply(Beaver.MLIR.CAPI, unquote(name), [unquote_splicing(args)])
-          end
-      end
-    end
+  def integer(%CAPI.MlirType{} = t, value) do
+    CAPI.mlirIntegerAttrGet(t, value)
   end
 end

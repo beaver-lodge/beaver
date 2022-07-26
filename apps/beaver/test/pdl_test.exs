@@ -43,13 +43,13 @@ defmodule PDLTest do
       {:successor, %CAPI.MlirBlock{} = successor}, acc ->
         {{:successor, successor}, acc}
 
-      {:argument, %CAPI.MlirValue{}} = argument, acc ->
+      {:argument, %Value{}} = argument, acc ->
         {argument, acc}
 
-      {:result, %CAPI.MlirValue{}} = result, acc ->
+      {:result, %Value{}} = result, acc ->
         {result, acc}
 
-      {:operand, %CAPI.MlirValue{}} = operand, acc ->
+      {:operand, %Value{}} = operand, acc ->
         {operand, acc}
 
       {name, %CAPI.MlirAttribute{} = attribute}, acc ->
@@ -116,8 +116,8 @@ defmodule PDLTest do
 
     assert mlir
            |> Beaver.container()
-           |> MLIR.CAPI.mlirOperationEqual(pattern_module)
-           |> Exotic.Value.extract()
+           |> MLIR.CAPI.mlirOperationEqual(MLIR.Operation.from_module(pattern_module))
+           |> MLIR.CAPI.to_term()
 
     ir_module = MLIR.Module.create(ctx, @apply_rewrite_op_ir)
     MLIR.Operation.verify!(pattern_module)
@@ -125,14 +125,17 @@ defmodule PDLTest do
     pdl_pattern = CAPI.beaverPDLPatternGet(pattern_module)
     pattern_set = CAPI.beaverRewritePatternSetGet(ctx)
     pattern_set = CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pdl_pattern)
-    region = CAPI.mlirOperationGetFirstRegion(ir_module)
+
+    region =
+      ir_module
+      |> MLIR.Operation.from_module()
+      |> CAPI.mlirOperationGetFirstRegion()
+
     result = CAPI.beaverApplyOwnedPatternSetOnRegion(region, pattern_set)
 
-    assert result
-           |> Exotic.Value.fetch(MLIR.CAPI.MlirLogicalResult, :value)
-           |> Exotic.Value.extract() != 0
+    assert Beaver.MLIR.LogicalResult.success?(result)
 
-    ir_string = MLIR.Operation.to_string(ir_module)
+    ir_string = MLIR.to_string(ir_module)
     assert not String.contains?(ir_string, "test.op")
     assert String.contains?(ir_string, "test.success")
     CAPI.mlirContextDestroy(ctx)
@@ -149,18 +152,18 @@ defmodule PDLTest do
     ir_module = MLIR.Module.create(ctx, @apply_rewrite_op_ir)
     MLIR.Operation.verify!(pattern_module)
     MLIR.Operation.verify!(ir_module)
-    pattern_string = MLIR.Operation.to_string(pattern_module)
+    pattern_string = MLIR.to_string(pattern_module)
     assert String.contains?(pattern_string, "test.op")
     assert String.contains?(pattern_string, "test.success2")
     pdl_pattern = CAPI.beaverPDLPatternGet(pattern_module)
     pattern_set = CAPI.beaverRewritePatternSetGet(ctx)
     pattern_set = CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pdl_pattern)
-    region = CAPI.mlirOperationGetFirstRegion(ir_module)
+    region = ir_module |> MLIR.Operation.from_module() |> CAPI.mlirOperationGetFirstRegion()
     result = CAPI.beaverApplyOwnedPatternSetOnRegion(region, pattern_set)
 
     assert MLIR.LogicalResult.success?(result), "fail to apply pattern"
 
-    ir_string = MLIR.Operation.to_string(ir_module)
+    ir_string = MLIR.to_string(ir_module)
     assert not String.contains?(ir_string, "test.op")
     assert String.contains?(ir_string, "test.success2")
     CAPI.mlirContextDestroy(ctx)
@@ -215,7 +218,7 @@ defmodule PDLTest do
       end
 
       defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res]}) do
-        %MLIR.CAPI.MlirValue{} = res
+        %MLIR.Value{} = res
         # create a common struct to see if the pattern transformation would skip it
         assert %Range{first: 1, last: 10, step: 2} |> Range.size() == 5
         %TOSA.Sub{operands: [a, b]}
@@ -266,7 +269,7 @@ defmodule PDLTest do
                  results: [ty]
                }
              ) do
-        %MLIR.CAPI.MlirValue{} = ty
+        %MLIR.Value{} = ty
         %TOSA.Sub{operands: [a, b]}
       end
 
@@ -305,7 +308,7 @@ defmodule PDLTest do
                  results: types
                }
              ) do
-        %MLIR.CAPI.MlirValue{} = one
+        %MLIR.Value{} = one
         %TOSA.Sub{operands: [a, b]}
       end
     end
@@ -319,7 +322,7 @@ defmodule PDLTest do
         ] do
       ir_module = TestTOSAPatterns.gen_ir_module()
       MLIR.Operation.verify!(ir_module)
-      ir_string = MLIR.Operation.to_string(ir_module)
+      ir_string = MLIR.to_string(ir_module)
       assert not String.contains?(ir_string, "tosa.sub"), ir_string
 
       MLIR.Pattern.apply!(ir_module, [
@@ -329,7 +332,7 @@ defmodule PDLTest do
       |> MLIR.Transforms.canonicalize()
       |> MLIR.Pass.Composer.run!()
 
-      ir_string = MLIR.Operation.to_string(ir_module)
+      ir_string = MLIR.to_string(ir_module)
       assert not String.contains?(ir_string, "tosa.add"), ir_string
       assert String.contains?(ir_string, "tosa.sub"), ir_string
     end
@@ -342,7 +345,7 @@ defmodule PDLTest do
       use Beaver.MLIR.Pass, on: Func.Func
 
       defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
-        %MLIR.CAPI.MlirValue{} = res
+        %MLIR.Value{} = res
         %TOSA.Sub{operands: [a, b]}
       end
 
@@ -370,7 +373,7 @@ defmodule PDLTest do
       |> canonicalize
       |> MLIR.Pass.Composer.run!()
 
-    ir_string = MLIR.Operation.to_string(ir)
+    ir_string = MLIR.to_string(ir)
     assert not (ir_string =~ "tosa.add")
     assert ir_string =~ "tosa.sub"
   end

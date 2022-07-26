@@ -1,19 +1,23 @@
 defmodule Beaver.MLIR.Value do
   alias Beaver.MLIR.CAPI
 
+  use Fizz.ResourceKind,
+    root_module: CAPI,
+    zig_t: "c.struct_MlirValue"
+
   def dump(value) do
     value |> CAPI.mlirValueDump()
   end
 
-  def argument?(%CAPI.MlirValue{} = value) do
-    CAPI.mlirValueIsABlockArgument(value) |> Exotic.Value.extract()
+  def argument?(%__MODULE__{} = value) do
+    CAPI.mlirValueIsABlockArgument(value) |> CAPI.to_term()
   end
 
   @doc """
   Returns true if the value is a result of an operation.
   """
-  def result?(%CAPI.MlirValue{} = value) do
-    CAPI.mlirValueIsAOpResult(value) |> Exotic.Value.extract()
+  def result?(%__MODULE__{} = value) do
+    CAPI.mlirValueIsAOpResult(value) |> CAPI.to_term()
   end
 
   @doc """

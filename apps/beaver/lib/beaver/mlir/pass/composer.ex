@@ -19,20 +19,25 @@ defmodule Beaver.MLIR.Pass.Composer do
     do: Beaver.DSL.Op.Prototype.op_name!(op_module)
 
   # TODO: add keyword arguments
-  def run!(%__MODULE__{passes: passes, op: op}, opts \\ [dump: false, dump_if_fail: false]) do
+  def run!(
+        %__MODULE__{passes: passes, op: %MLIR.Module{} = op},
+        opts \\ [dump: false, dump_if_fail: false]
+      ) do
     ctx = MLIR.Managed.Context.get()
     pm = mlirPassManagerCreate(ctx)
 
     for pass <- passes do
       case pass do
+        # nested pm
         {op_name, f} when (is_binary(op_name) or is_atom(op_name)) and is_function(f, 1) ->
           op_name = get_op_name(op_name)
-          npm = mlirOpPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
+          npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
           f.(npm)
 
+        # nest pipeline
         {op_name, passes} when (is_binary(op_name) or is_atom(op_name)) and is_list(passes) ->
           op_name = get_op_name(op_name)
-          npm = mlirOpPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
+          npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
 
           for pass <- passes do
             case pass do
@@ -40,7 +45,7 @@ defmodule Beaver.MLIR.Pass.Composer do
                 MLIR.Pass.pipeline!(npm, p)
 
               _ ->
-                mlirPassManagerAddOwnedPass(npm, pass)
+                mlirOpPassManagerAddOwnedPass(npm, pass)
             end
           end
 

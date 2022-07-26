@@ -1,16 +1,17 @@
 alias Beaver.MLIR
+alias Beaver.MLIR.Value
 
 alias Beaver.MLIR.CAPI.{
-  MlirModule,
+  Module,
   MlirOperation,
   MlirRegion,
   MlirAttribute,
   MlirBlock,
-  MlirValue,
   MlirNamedAttribute,
-  MlirType,
   MlirOperand
 }
+
+require Beaver.MLIR.CAPI
 
 defmodule Beaver.Walker do
   alias Beaver.MLIR.CAPI
@@ -33,7 +34,7 @@ defmodule Beaver.Walker do
 
   # TODO: traverse MlirNamedAttribute?
   @type operation() ::
-          MlirModule.t() | MlirOperation.t() | OpReplacement.t() | Beaver.DSL.Op.Prototype.t()
+          Module.t() | MlirOperation.t() | OpReplacement.t() | Beaver.DSL.Op.Prototype.t()
   @type container() ::
           operation()
           | MlirRegion.t()
@@ -44,10 +45,10 @@ defmodule Beaver.Walker do
           operation()
           | MlirRegion.t()
           | MlirBlock.t()
-          | MlirValue.t()
+          | Value.t()
           | MlirNamedAttribute.t()
 
-  @type element_module() :: MlirOperation | MlirRegion | MlirBlock | MlirValue | MlirAttribute
+  @type element_module() :: MlirOperation | MlirRegion | MlirBlock | Value | MlirAttribute
 
   @type t :: %__MODULE__{
           container: container(),
@@ -72,8 +73,8 @@ defmodule Beaver.Walker do
   defstruct container_keys ++ index_func_keys ++ iter_keys ++ iter_func_keys
 
   # operands, results, attributes of one operation
-  defp verify_nesting!(MlirOperation, MlirValue), do: :ok
-  defp verify_nesting!(OpReplacement, MlirValue), do: :ok
+  defp verify_nesting!(MlirOperation, Value), do: :ok
+  defp verify_nesting!(OpReplacement, Value), do: :ok
   defp verify_nesting!(MlirOperation, MlirNamedAttribute), do: :ok
   defp verify_nesting!(OpReplacement, MlirNamedAttribute), do: :ok
   # regions of one operation
@@ -87,8 +88,8 @@ defmodule Beaver.Walker do
   # operations in a block
   defp verify_nesting!(MlirBlock, MlirOperation), do: :ok
   # arguments of a block
-  defp verify_nesting!(MlirBlock, MlirValue), do: :ok
-  defp verify_nesting!(MlirValue, MlirOperand), do: :ok
+  defp verify_nesting!(MlirBlock, Value), do: :ok
+  defp verify_nesting!(Value, MlirOperand), do: :ok
 
   defp verify_nesting!(container_module, element_module) do
     raise "not a legal 2-level structure could be walked in MLIR: #{inspect(container_module)}(#{inspect(element_module)})"
@@ -149,7 +150,7 @@ defmodule Beaver.Walker do
   def operands(op) do
     new(
       op,
-      MlirValue,
+      Value,
       get_num: &CAPI.mlirOperationGetNumOperands/1,
       get_element: &CAPI.mlirOperationGetOperand/2,
       element_equal: &CAPI.mlirValueEqual/2
@@ -164,7 +165,7 @@ defmodule Beaver.Walker do
   def results(op) do
     new(
       op,
-      MlirValue,
+      Value,
       get_num: &CAPI.mlirOperationGetNumResults/1,
       get_element: &CAPI.mlirOperationGetResult/2,
       element_equal: &CAPI.mlirValueEqual/2
@@ -220,7 +221,7 @@ defmodule Beaver.Walker do
   def arguments(%MlirBlock{} = block) do
     new(
       block,
-      MlirValue,
+      Value,
       get_num: &CAPI.mlirBlockGetNumArguments/1,
       get_element: &CAPI.mlirBlockGetArgument/2,
       element_equal: &CAPI.mlirValueEqual/2
@@ -235,7 +236,7 @@ defmodule Beaver.Walker do
       get_first: &CAPI.mlirBlockGetFirstOperation/1,
       get_next: &CAPI.mlirOperationGetNextInBlock/1,
       get_parent: &CAPI.mlirOperationGetBlock/1,
-      is_null: &MLIR.Operation.is_null/1
+      is_null: &MLIR.is_null/1
     )
   end
 
@@ -247,26 +248,26 @@ defmodule Beaver.Walker do
       get_first: &CAPI.mlirRegionGetFirstBlock/1,
       get_next: &CAPI.mlirBlockGetNextInRegion/1,
       get_parent: &CAPI.mlirBlockGetParentRegion/1,
-      is_null: &MLIR.Block.is_null/1
+      is_null: &MLIR.is_null/1
     )
   end
 
-  @spec uses(MlirValue.t()) :: Enumerable.t()
-  def uses(%MlirValue{} = value) do
+  @spec uses(Value.t()) :: Enumerable.t()
+  def uses(%Value{} = value) do
     new(
       value,
       MlirOperand,
       get_first: &CAPI.beaverValueGetFirstOperand/1,
       get_next: &CAPI.beaverOperandGetNext/1,
       get_parent: &CAPI.beaverOperandGetValue/1,
-      is_null: fn x -> CAPI.beaverOperandIsNull(x) |> Exotic.Value.extract() end
+      is_null: fn x -> CAPI.beaverOperandIsNull(x) |> MLIR.CAPI.to_term() end
     )
   end
 
   @behaviour Access
   @impl true
-  def fetch(%__MODULE{element_module: MlirValue} = walker, key) when is_integer(key) do
-    with %MlirValue{} = value <- Enum.at(walker, key) do
+  def fetch(%__MODULE{element_module: Value} = walker, key) when is_integer(key) do
+    with %Value{} = value <- Enum.at(walker, key) do
       {:ok, value}
     else
       nil -> :error
@@ -279,15 +280,17 @@ defmodule Beaver.Walker do
       |> Enum.find(fn named_attribute ->
         with name <-
                named_attribute
-               |> Exotic.Value.fetch(MLIR.CAPI.MlirNamedAttribute, :name)
+               |> MLIR.CAPI.beaverMlirNamedAttributeGetName()
                |> MLIR.CAPI.mlirIdentifierStr()
                |> MLIR.StringRef.extract() do
           name == key
         end
       end)
 
+    raise "TODO: Zig ABI complicated struct"
+
     with %MlirNamedAttribute{} <- found do
-      {:ok, Exotic.Value.fetch(found, MLIR.CAPI.MlirNamedAttribute, :attribute)}
+      {:ok, MLIR.CAPI.beaverMlirNamedAttributeGetAttribute(found)}
     else
       :error -> :error
     end
@@ -349,21 +352,21 @@ defmodule Beaver.Walker do
   defp do_traverse(%MlirOperation{} = operation, acc, pre, post) do
     {operation, acc} = pre.(operation, acc)
 
-    {operands, acc} =
+    {_operands, acc} =
       operands(operation)
       |> Enum.map(fn value -> {:operand, value} end)
       |> do_traverse(acc, pre, post)
 
-    {attributes, acc} = attributes(operation) |> do_traverse(acc, pre, post)
+    {_attributes, acc} = attributes(operation) |> do_traverse(acc, pre, post)
 
-    {results, acc} =
+    {_results, acc} =
       results(operation)
       |> Enum.map(fn value -> {:result, value} end)
       |> do_traverse(acc, pre, post)
 
-    {regions, acc} = regions(operation) |> do_traverse(acc, pre, post)
+    {_regions, acc} = regions(operation) |> do_traverse(acc, pre, post)
 
-    {successors, acc} =
+    {_successors, acc} =
       successors(operation)
       |> Enum.map(fn successor -> {:successor, successor} end)
       |> do_traverse(acc, pre, post)
@@ -383,7 +386,7 @@ defmodule Beaver.Walker do
 
   defp do_traverse(%MlirRegion{} = region, acc, pre, post) do
     {region, acc} = pre.(region, acc)
-    {blocks, acc} = blocks(region) |> do_traverse(acc, pre, post)
+    {_blocks, acc} = blocks(region) |> do_traverse(acc, pre, post)
 
     post.(region, acc)
   end
@@ -391,12 +394,12 @@ defmodule Beaver.Walker do
   defp do_traverse(%MlirBlock{} = block, acc, pre, post) do
     {block, acc} = pre.(block, acc)
 
-    {arguments, acc} =
+    {_arguments, acc} =
       arguments(block)
       |> Enum.map(fn value -> {:argument, value} end)
       |> do_traverse(acc, pre, post)
 
-    {operations, acc} = operations(block) |> do_traverse(acc, pre, post)
+    {_operations, acc} = operations(block) |> do_traverse(acc, pre, post)
 
     # Note: Erlang now owns the removed operation. call erase
     # mlirOperationRemoveFromParent
@@ -409,20 +412,21 @@ defmodule Beaver.Walker do
     post.(successor, acc)
   end
 
-  defp do_traverse({value_kind, %MlirValue{}} = value, acc, pre, post)
+  defp do_traverse({value_kind, %Value{}} = value, acc, pre, post)
        when value_kind in [:result, :operand, :argument] do
-    {{^value_kind, %MlirValue{}} = value, acc} = pre.(value, acc)
+    {{^value_kind, %Value{}} = value, acc} = pre.(value, acc)
     post.(value, acc)
   end
 
   defp do_traverse(%MlirNamedAttribute{} = named_attribute, acc, pre, post) do
     name =
-      %MLIR.CAPI.MlirIdentifier{} =
-      named_attribute |> Exotic.Value.fetch(MLIR.CAPI.MlirNamedAttribute, :name)
+      %MLIR.CAPI.MlirIdentifier{} = named_attribute |> MLIR.CAPI.beaverMlirNamedAttributeGetName()
+
+    raise "TODO: Zig ABI complicated struct"
 
     attribute =
       %MLIR.CAPI.MlirAttribute{} =
-      named_attribute |> Exotic.Value.fetch(MLIR.CAPI.MlirNamedAttribute, :attribute)
+      named_attribute |> MLIR.CAPI.beaverMlirNamedAttributeGetAttribute()
 
     {{name, attribute}, acc} = pre.({name, attribute}, acc)
     {{name, attribute}, acc} = post.({name, attribute}, acc)
@@ -462,14 +466,14 @@ defmodule Beaver.Walker do
     traverse(ast, acc, fn x, a -> {x, a} end, fun)
   end
 
-  @spec replace(MlirOperation.t(), [MlirValue.t()] | MlirValue.t()) :: OpReplacement.t()
+  @spec replace(MlirOperation.t(), [Value.t()] | Value.t()) :: OpReplacement.t()
   @doc """
   Replace a operation with a value
   """
-  def replace(%MlirOperation{} = op, %MlirValue{} = value) do
+  def replace(%MlirOperation{} = op, %Value{} = value) do
     with results <- results(op),
          1 <- Enum.count(results),
-         %CAPI.MlirValue{} = result = results[0] do
+         %Value{} = result = results[0] do
       for %Beaver.MLIR.CAPI.MlirOperand{} = operand <- uses(result) do
         op = CAPI.beaverOperandGetOwner(operand)
         pos = CAPI.beaverOperandGetNumber(operand)
@@ -491,7 +495,7 @@ alias Beaver.Walker
 defimpl Enumerable, for: Walker do
   @spec count(Walker.t()) :: {:ok, non_neg_integer()} | {:error, module()}
   def count(%Walker{container: container, get_num: get_num}) when is_function(get_num, 1) do
-    {:ok, get_num.(container) |> Exotic.Value.extract()}
+    {:ok, get_num.(container) |> MLIR.CAPI.to_term()}
   end
 
   def count(%Walker{container: %container_module{}}) do
@@ -505,7 +509,7 @@ defimpl Enumerable, for: Walker do
       )
       when is_function(element_equal, 2) do
     is_member =
-      Enum.any?(walker, fn member -> element_equal.(member, element) |> Exotic.Value.extract() end)
+      Enum.any?(walker, fn member -> element_equal.(member, element) |> MLIR.CAPI.to_term() end)
 
     {:ok, is_member}
   end
@@ -521,7 +525,7 @@ defimpl Enumerable, for: Walker do
         %element_module{} = element
       )
       when is_function(get_parent, 1) and is_function(parent_equal, 2) do
-    is_member = parent_equal.(container, get_parent.(element)) |> Exotic.Value.extract()
+    is_member = parent_equal.(container, get_parent.(element)) |> MLIR.CAPI.to_term()
     {:ok, is_member}
   end
 

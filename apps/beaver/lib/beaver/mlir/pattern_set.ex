@@ -1,13 +1,14 @@
 defmodule Beaver.MLIR.PatternSet do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
+  require Beaver.MLIR.CAPI
 
   def get(opts \\ []) do
     ctx = MLIR.Managed.Context.from_opts(opts)
     CAPI.beaverRewritePatternSetGet(ctx)
   end
 
-  def insert(pattern_set, %Beaver.MLIR.CAPI.MlirModule{} = module) do
+  def insert(pattern_set, %Beaver.MLIR.Module{} = module) do
     pattern_module = CAPI.beaverPDLPatternGet(module)
     insert(pattern_set, pattern_module)
   end
@@ -36,15 +37,20 @@ defmodule Beaver.MLIR.PatternSet do
     end
   end
 
-  def apply_(region = %CAPI.MlirRegion{}, pattern_set) do
+  def apply_(%CAPI.MlirRegion{} = region, pattern_set) do
     do_apply(region, pattern_set, &CAPI.beaverApplyOwnedPatternSetOnRegion/2)
   end
 
-  def apply_(operation = %CAPI.MlirOperation{}, pattern_set) do
+  def apply_(%CAPI.MlirOperation{} = operation, pattern_set) do
     do_apply(operation, pattern_set, &CAPI.beaverApplyOwnedPatternSetOnOperation/2)
   end
 
-  def apply_(module = %CAPI.MlirModule{}, pattern_set) do
-    MLIR.Operation.from_module(module) |> apply_(pattern_set)
+  def apply_(module = %MLIR.Module{}, pattern_set) do
+    with {:ok, %CAPI.MlirOperation{}} <- MLIR.Operation.from_module(module) |> apply_(pattern_set) do
+      {:ok, module}
+    else
+      _ ->
+        :error
+    end
   end
 end

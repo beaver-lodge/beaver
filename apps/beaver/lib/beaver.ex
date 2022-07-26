@@ -1,5 +1,6 @@
 defmodule Beaver do
   alias Beaver.MLIR
+  require Beaver.MLIR.CAPI
 
   @moduledoc """
   This module contains top level functions and macros for Beaver DSL for MLIR.
@@ -102,7 +103,7 @@ defmodule Beaver do
     alias Beaver.MLIR.Dialect
 
     for d <-
-          Dialect.Registry.dialects(query: true) do
+          Dialect.Registry.dialects() do
       module_name = d |> Dialect.Registry.normalize_dialect_name()
       module_name = Module.concat([Beaver.MLIR.Dialect, module_name])
 
@@ -251,9 +252,9 @@ defmodule Beaver do
   end
 
   @doc """
-  Extract a container could be traversed by walker from an Op prototype or a `Beaver.MLIR.CAPI.MlirModule`.
+  Extract a container could be traversed by walker from an Op prototype or a `Beaver.MLIR.Module`.
   """
-  def container(module = %MLIR.CAPI.MlirModule{}) do
+  def container(module = %MLIR.Module{}) do
     MLIR.Operation.from_module(module)
   end
 

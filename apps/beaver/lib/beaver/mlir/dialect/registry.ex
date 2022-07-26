@@ -2,6 +2,8 @@ defmodule Beaver.MLIR.Dialect.Registry do
   use GenServer
 
   require Beaver.MLIR.CAPI
+  alias Beaver.MLIR.CAPI
+  alias Beaver.MLIR
 
   def start_link([]) do
     GenServer.start_link(__MODULE__, [])
@@ -46,7 +48,7 @@ defmodule Beaver.MLIR.Dialect.Registry do
   end
 
   def normalize_dialect_name(to_upcase)
-      when to_upcase in ~w{tosa gpu nvgpu omp nvvm llvm cf pdl rocdl spv amx amdgpu scf acc},
+      when to_upcase in ~w{tosa gpu nvgpu omp nvvm llvm cf pdl rocdl spv amx amdgpu scf acc dlti},
       do: String.upcase(to_upcase)
 
   def normalize_dialect_name("memref"), do: "MemRef"
@@ -57,34 +59,24 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def normalize_dialect_name("pdl_interp"), do: "PDLInterp"
   def normalize_dialect_name(other), do: other |> Macro.camelize()
 
-  def ops(dialect, opts \\ [query: false]) do
-    if Keyword.get(opts, :query, false) do
-      for {^dialect, o} <- query_ops() do
-        o
-      end
-    else
-      :ets.match(__MODULE__, {dialect, :"$1"}) |> List.flatten()
-    end
+  def ops(dialect) do
+    CAPI.check!(CAPI.beaver_raw_registered_ops_of_dialect(MLIR.StringRef.create(dialect).ref))
+    |> Enum.map(&List.to_string/1)
   end
 
   @doc """
   Get dialects registered, if it is dev/test env with config key :skip_dialects of app :beaver configured,
   these dialects will not be returned (usually to speedup the compilation). Pass option dialects(full: true) to get all dialects anyway.
   """
-  def dialects(opts \\ [full: false, query: false]) do
-    query = Keyword.get(opts, :query, false)
-
+  def dialects(opts \\ [full: false]) do
     full = Keyword.get(opts, :full, false)
 
     all_dialects =
-      if query do
-        query_ops() |> Enum.map(fn {d, _o} -> d end)
-      else
-        for [dialect, _] <- :ets.match(__MODULE__, {:"$1", :"$2"}) do
-          dialect
-        end
-      end
+      CAPI.beaver_raw_registered_dialects()
+      |> Enum.map(&List.to_string/1)
+      |> CAPI.check!()
       |> Enum.uniq()
+      |> Enum.sort()
 
     if full do
       all_dialects
@@ -95,6 +87,8 @@ defmodule Beaver.MLIR.Dialect.Registry do
   end
 
   defp query_ops() do
-    Beaver.MLIR.NIF.registered_ops()
+    for {dialect, op} <- Beaver.MLIR.CAPI.beaver_raw_registered_ops() do
+      {List.to_string(dialect), List.to_string(op)}
+    end
   end
 end

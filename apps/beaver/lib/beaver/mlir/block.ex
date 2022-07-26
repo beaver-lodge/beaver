@@ -1,9 +1,8 @@
 defmodule Beaver.MLIR.Block do
   alias Beaver.MLIR
-
+  require Beaver.MLIR.CAPI
   # TODO: remote ctx in these funcs
 
-  # TODO: use the struct to replace the Exotic.Value here in pattern after Exotic gets updated with Protocol support
   def do_add_arg!(block, _ctx, {t = %Beaver.MLIR.CAPI.MlirType{}, loc}) do
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
@@ -26,7 +25,7 @@ defmodule Beaver.MLIR.Block do
   end
 
   def get_arg!(block, index) when not is_nil(block) do
-    MLIR.CAPI.mlirBlockGetArgument(block, index) |> Exotic.Value.transmit()
+    MLIR.CAPI.mlirBlockGetArgument(block, index)
   end
 
   def create(arg_loc_pairs) when is_list(arg_loc_pairs) do
@@ -45,19 +44,13 @@ defmodule Beaver.MLIR.Block do
     end
 
     len = length(args)
-    args = args |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
-    locs = locs |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
+    args = args |> MLIR.CAPI.array(MLIR.CAPI.MlirType)
+    locs = locs |> MLIR.CAPI.array(MLIR.CAPI.MlirLocation)
 
     MLIR.CAPI.mlirBlockCreate(
       len,
       args,
       locs
     )
-  end
-
-  def is_null(block = %MLIR.CAPI.MlirBlock{}) do
-    block
-    |> Exotic.Value.fetch(MLIR.CAPI.MlirBlock, :ptr)
-    |> Exotic.Value.extract() == 0
   end
 end

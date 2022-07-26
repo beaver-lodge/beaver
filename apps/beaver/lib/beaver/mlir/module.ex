@@ -5,14 +5,7 @@ defmodule Beaver.MLIR.Module do
   def create(str, opts \\ [])
 
   def create(str, opts) when is_binary(str) and is_list(opts) do
-    ctx =
-      with ctx = %Exotic.Value{} <- opts[:ctx] do
-        ctx
-      else
-        nil ->
-          MLIR.Managed.Context.get()
-      end
-
+    ctx = MLIR.Managed.Context.from_opts(opts)
     create(ctx, str)
   end
 
@@ -26,10 +19,12 @@ defmodule Beaver.MLIR.Module do
     module
   end
 
+  use Fizz.ResourceKind,
+    root_module: CAPI,
+    zig_t: "c.struct_MlirModule"
+
   def is_null(module) do
-    module
-    |> Exotic.Value.fetch(MLIR.CAPI.MlirModule, :ptr)
-    |> Exotic.Value.extract() == 0
+    CAPI.beaverModuleIsNull(module) |> CAPI.to_term()
   end
 
   defp not_null!(module) do

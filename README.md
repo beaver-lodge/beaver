@@ -85,12 +85,13 @@ Beaver is trying to adapt this design in Erlang/Elixir, which has great support 
 <!-- TODO: ask Jose for advise on selling this better -->
 
 - Powered by Elixir's composable modularity and meta-programming features, provide a simple, intuitive, and extensible interface for MLIR.
+- Edit-Build-Test-Debug Loop at seconds. Everything in Elixir and Zig are compiled in parallel.
 - Compile Elixir to native/WASM/GPU with the help from MLIR.
 - Revisit and reincarnate symbolic AI in the HW-accelerated world. Erlang/Elixir has [a Prolog root](https://www.erlang.org/blog/beam-compiler-history/#the-prolog-interpreter)!
 - Introduce a new stack to machine learning.
   - Higher-level: Elixir
   - Representation: MLIR
-  - Lower-level: Rust/Zig
+  - Lower-level: Zig
 
 ## Why is it called Beaver?
 
@@ -150,13 +151,13 @@ LLVM/MLIR is a giant project, and built around that Beaver have hundreds of Erla
   - Top level app ships the high level functionalities including IR generation and pattern definition.
   - MLIR CAPI wrappers built by parsing LLVM/MLIR CAPI C headers and some middle level helper functions to hide the C pointer related operations. This app will add the loaded MLIR C library and managed MLIR context to Erlang supervisor tree. Rust is also used in this app, but mainly for LLVM/MLIR CMake integration.
   - All the Ops defined in stock MLIR dialects, built by querying the registry. This app will ship MLIR Ops with Erlang idiomatic practices like behavior compliance.
-- `:exotic`: Elixir and Rust hybrid, ship the libffi functionality in Elixir. This app also handle the C library opening and provides functions and types to work with C data structures.
+- `:fizz`: Elixir and Zig hybrid, generating NIFs from MLIR C headers.
 
 ### Notes on consuming and development
 
-- Only `:beaver` and `:exotic` are designed to be used as stand-alone app being directly consumed by other apps.
+- Only `:beaver` and `:fizz` are designed to be used as stand-alone app being directly consumed by other apps.
 - `:beaver_nx` could only work with Nx.
-- Although `:exotic` is built for Beaver, any Erlang/Elixir app with interest bundling some C API could take advantage of it as well.
+- Although `:fizz` is built for Beaver, any Erlang/Elixir app with interest bundling some C API could take advantage of it as well.
 - The namespace `Beaver.MLIR` is for standard features are generally expected in any MLIR tools.
 - The namespace `Beaver` is for concepts and practice only exists in Beaver, which are mostly in a DSL provided as a set of macros (including `mlir/0`, `block/1`, `defpat/2`, etc). The implementations are usually under `Beaver.DSL` namespace.
 - In Beaver, there is no strict requirements on the consistency between the Erlang app name and Elixir module name. Two modules with same namespace prefix could locate in different Erlang apps (this happens a lot to the `Beaver.MLIR` namespace). Of course redefinition of Elixir modules with an identical name should be avoided.
@@ -204,7 +205,7 @@ One example:
 
 ### Transformation over builder
 
-It is very common to use builder pattern to construct IR, especially in a OO programming language like C++/Python.
+It is very common to use builder pattern to construct IR, especially in an OO programming language like C++/Python.
 One problem this approach has is that the compiler code looks very different from the code it is generating.
 Because Erlang/Elixir is SSA by its nature, in Beaver a MLIR Op's creation is very declarative and its container will transform it with the correct contextual information. By doing this, we could:
 
@@ -284,22 +285,6 @@ To name a few:
 
 Each of these sub-ecosystems starts with a seed project/library. Beaver should evolve to become a sub-ecosystem for compilers built with Elixir and MLIR.
 
-## Why Beaver uses C, C++ and Rust?
-
-Although this has the downside being confusing and overwhelming, mainly there are these considerations:
-
-- The most convenient way to ship a C/C++ library with a Elixir project is to use [the rustler project](https://github.com/rusterlium/rustler) to build a dynamic library.
-- The recommended way to build a non C++ binding to MLIR is to create an "aggregate" which is an achieve of all symbols of LLVM/MLIR APIs you want to use in one shared library.
-- Use libFFI to call functions dynamically whenever it is possible. Although this is less safe, it makes it possible to use macro to generate Elixir code from headers instead of writing hundreds (if not thousands) of NIFs for all LLVM/MLIR API.
-
-Here is the hierarchy of a typical function call in Beaver:
-
-- Higher level API in Elixir
-- libFFI in Elixir ([Exotic](/apps/exotic/README.md))
-- libFFI in Rust
-- default MLIR C API and some extensions, built as a dynamic library by Cargo and CMake
-- MLIR C++ API (wrap and unwrap following MLIR C API convention)
-
 ## How Beaver works with MLIR ODS definitions?
 
 PDL really opens a door to non C++ programming languages to build MLIR tools. Beaver will reuse PDL's implementations in LSP and C++ source codegen to generate Elixir code. The prominent part is that all ODS definitions will have their correspondent Elixir [Structs](https://elixir-lang.org/getting-started/structs.html) to be used in patterns and builders. Although this is actually a hack, it is kind of reliable considering PDL will always be part of the upstream LLVM mono-repo. We could update to its new APIs as PDL's implementation evolves. As long as it provides features like code completions and code generations, there will be some APIs in PDL's implementation we could reuse to collect and query ODS meta data.
@@ -311,7 +296,7 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 ## Development
 
 1. Install Elixir, https://elixir-lang.org/install.html
-2. Install Rust, https://rustup.rs/
+2. Install Zig, https://ziglang.org/learn/getting-started/#installing-zig
 3. Install LLVM/MLIR
 
 <!-- - Option #1,  -->
@@ -328,6 +313,7 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
     -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_ENABLE_OCAMLDOC=OFF \
     -DLLVM_ENABLE_BINDINGS=OFF \
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DCMAKE_INSTALL_PREFIX=${HOME}/llvm-install
   cmake --build build -t install
   export LLVM_CONFIG_PATH=$HOME/llvm-install/bin/llvm-config
@@ -359,5 +345,10 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
   ```bash
   mix deps.get
   mix test
-  mix test --exclude slow --exclude vulkan # use this to skip slow or vulkan tests
+  mix test --exclude vulkan # use this to skip vulkan tests
   ```
+
+5. debug
+
+- setting environment variable to control Erlang scheduler number, `ERL_AFLAGS="+S 10:5"`
+- run mix test under LLDB, `scripts/lldb-mix-test`

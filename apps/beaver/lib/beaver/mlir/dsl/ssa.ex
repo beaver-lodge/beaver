@@ -1,5 +1,6 @@
 defmodule Beaver.DSL.SSA do
   alias Beaver.MLIR
+  require Beaver.MLIR.CAPI
   defstruct arguments: [], results: [], filler: nil, block: nil
 
   def put_arguments(%__MODULE__{arguments: arguments} = ssa, additional_arguments)

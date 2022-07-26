@@ -23,6 +23,10 @@ jobs:
         with:
           elixir-version: "1.13.0" # Define the elixir version [required]
           otp-version: "24.1" # Define the OTP version [required]
+      - name: Set up Zig
+        uses: goto-bus-stop/setup-zig@v1
+        with:
+          version: 0.9.1
       - name: Restore dependencies cache
         uses: actions/cache@v3
         with:
@@ -34,7 +38,7 @@ jobs:
       - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Download pre-build LLVM
         run: |
-          wget https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-07-14-0254/llvm-install.zip
+          wget https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-07-19-0416/llvm-install.zip
           unzip llvm-install.zip -d $HOME/llvm-install
       - name: Run tests
         env:

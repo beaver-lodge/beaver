@@ -1,10 +1,10 @@
 defmodule Beaver.Application do
   use Application
+  require Logger
   @moduledoc false
   def start(_type, _args) do
     Supervisor.start_link(
       [
-        Beaver.MLIR.CAPI.Managed,
         Beaver.MLIR.Global.Context,
         Beaver.MLIR.Dialect.Registry,
         Beaver.MLIR.DSL.Op.Registry
@@ -15,11 +15,15 @@ defmodule Beaver.Application do
 
   def start_phase(:load_dialect_modules, :normal, []) do
     for dialect_module <- Beaver.MLIR.Dialect.dialects() do
-      for op_module <- apply(dialect_module, :ops, []) do
-        apply(op_module, :register_op_prototype, [])
-      end
+      Task.async(fn ->
+        for op_module <- apply(dialect_module, :ops, []) do
+          apply(op_module, :register_op_prototype, [])
+        end
+      end)
     end
+    |> Task.await_many()
 
+    Logger.debug("[Beaver] dialect modules loaded")
     :ok
   end
 end

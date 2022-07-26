@@ -1,6 +1,7 @@
 defmodule Beaver.MLIR.Global.Context do
   alias Beaver.MLIR
   use Agent
+  require Logger
 
   def start_link([]) do
     # TODO: read opts from app config
@@ -13,6 +14,7 @@ defmodule Beaver.MLIR.Global.Context do
           MLIR.CAPI.mlirRegisterAllPasses()
         end
 
+        Logger.debug("[Beaver] global MLIR context created")
         ctx
       end,
       name: __MODULE__
@@ -46,12 +48,6 @@ defmodule Beaver.MLIR.Managed.Context do
   end
 
   def from_opts(opts) when is_list(opts) do
-    ctx = opts[:ctx]
-
-    if ctx do
-      ctx
-    else
-      get()
-    end
+    Keyword.get(opts, :ctx, get())
   end
 end

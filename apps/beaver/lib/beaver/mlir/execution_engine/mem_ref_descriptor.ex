@@ -1,4 +1,6 @@
 defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
+  alias Beaver.MLIR.CAPI
+
   @moduledoc """
   Get a memref descriptor's fields for Exotic Struct definition. Shape and strides will be omitted if rank is 0.
   """
@@ -31,12 +33,9 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
     end
 
     aligned = allocated = ptr
-
     offset = 0
-
-    shape = shape |> Enum.map(&Exotic.Value.get(:i64, &1)) |> Exotic.Value.Array.get()
-
-    strides = strides |> Enum.map(&Exotic.Value.get(:i64, &1)) |> Exotic.Value.Array.get()
+    shape = shape |> CAPI.I64.array()
+    strides = strides |> CAPI.I64.array()
 
     Exotic.Value.Struct.get(
       __MODULE__.struct_fields(rank),
@@ -59,9 +58,9 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
       when is_list(elements) and is_list(shape) do
     arr_ptr =
       if elements == [] do
-        Exotic.Value.Ptr.null()
+        nil
       else
-        elements |> Exotic.Value.Array.get() |> Exotic.Value.get_ptr()
+        elements |> CAPI.I64.array()
       end
 
     create_from_ptr(arr_ptr, shape, strides)
@@ -102,7 +101,7 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
         :aligned
       )
 
-    if Exotic.Value.extract(ptr) == Exotic.Value.extract(Exotic.Value.Ptr.null()) do
+    if Exotic.Value.extract(ptr) == Exotic.Value.extract(nil) do
       raise "cannot read from memref of null pointer"
     end
 

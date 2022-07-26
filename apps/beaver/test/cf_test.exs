@@ -4,6 +4,7 @@ defmodule CfTest do
   alias Beaver.MLIR
   alias Beaver.MLIR.Type
   alias Beaver.MLIR.Attribute
+  alias Beaver.MLIR.Dialect.{CF, Arith}
 
   defmodule MutCompiler do
     use Beaver
@@ -38,7 +39,7 @@ defmodule CfTest do
            %Acc{block: block} = acc
          ) do
       # we expect it to be a MLIR Value
-      {arg = %MLIR.CAPI.MlirValue{}, acc} = gen_mlir(arg, acc)
+      {arg = %MLIR.Value{}, acc} = gen_mlir(arg, acc)
 
       mlir =
         mlir block: block do
@@ -76,7 +77,7 @@ defmodule CfTest do
       true_branch =
         mlir do
           block _true_branch() do
-            {%MLIR.CAPI.MlirValue{} = mlir, acc} = gen_mlir(do_block_ast, acc)
+            {%MLIR.Value{} = mlir, acc} = gen_mlir(do_block_ast, acc)
             %MLIR.CAPI.MlirBlock{} = Beaver.Env.mlir__BLOCK__()
             CF.br({bb_next, [mlir]}) >>> []
           end
@@ -85,7 +86,7 @@ defmodule CfTest do
       false_branch =
         mlir do
           block _false_branch() do
-            {%MLIR.CAPI.MlirValue{} = mlir, acc} = gen_mlir(else_block_ast, acc)
+            {%MLIR.Value{} = mlir, acc} = gen_mlir(else_block_ast, acc)
             CF.br({bb_next, [mlir]}) >>> []
           end
         end
@@ -117,8 +118,8 @@ defmodule CfTest do
 
     # in real world, this should be merged with the gen_mlir for :+
     defp gen_mlir({:<, _, [left, right]}, %Acc{block: block} = acc) do
-      {left = %MLIR.CAPI.MlirValue{}, acc} = gen_mlir(left, acc)
-      {right = %MLIR.CAPI.MlirValue{}, acc} = gen_mlir(right, acc)
+      {left = %MLIR.Value{}, acc} = gen_mlir(left, acc)
+      {right = %MLIR.Value{}, acc} = gen_mlir(right, acc)
 
       less =
         mlir block: block do
@@ -131,8 +132,8 @@ defmodule CfTest do
     # after adding this, you should see this kind of IR printed
     # %0 = arith.mulf %arg2, %arg1 : f32
     defp gen_mlir({:*, _line, [left, right]}, %Acc{block: block} = acc) do
-      {left = %MLIR.CAPI.MlirValue{}, acc} = gen_mlir(left, acc)
-      {right = %MLIR.CAPI.MlirValue{}, acc} = gen_mlir(right, acc)
+      {left = %MLIR.Value{}, acc} = gen_mlir(left, acc)
+      {right = %MLIR.Value{}, acc} = gen_mlir(right, acc)
       # we only work with float 32 for now
       add =
         mlir block: block do
@@ -144,7 +145,7 @@ defmodule CfTest do
 
     # at some point you should see logging of node not supported for MLIR CAPI Value,
     # let's add the match to disable this kind of logging
-    defp gen_mlir(%Beaver.MLIR.CAPI.MlirValue{} = mlir, acc) do
+    defp gen_mlir(%Beaver.MLIR.Value{} = mlir, acc) do
       {mlir, acc}
     end
 
@@ -199,7 +200,7 @@ defmodule CfTest do
     defmacro defnative(call, do: block) do
       mlir_asm =
         MutCompiler.gen_func(call, block)
-        |> MLIR.Operation.to_string()
+        |> MLIR.to_string()
 
       quote do
         alias MLIR.Dialect.Func

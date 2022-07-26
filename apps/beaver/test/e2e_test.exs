@@ -6,8 +6,8 @@ defmodule E2ETest do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}
 
-    arg = Exotic.Value.get(42)
-    return = Exotic.Value.get(-1)
+    arg = MLIR.CAPI.I32.make(42)
+    return = MLIR.CAPI.I32.make(-1)
 
     jit =
       ~m"""
@@ -27,16 +27,16 @@ defmodule E2ETest do
 
     return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
 
-    assert return |> Exotic.Value.extract() == 84
+    assert return |> MLIR.CAPI.to_term() == 84
 
     for i <- 0..100_0 do
       Task.async(fn ->
-        arg = Exotic.Value.get(i)
-        return = Exotic.Value.get(-1)
+        arg = MLIR.CAPI.I32.make(i)
+        return = MLIR.CAPI.I32.make(-1)
         return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
         # return here is a resource reference
         assert return == return
-        assert return |> Exotic.Value.extract() == i * 2
+        assert return |> MLIR.CAPI.to_term() == i * 2
       end)
     end
     |> Task.await_many()
