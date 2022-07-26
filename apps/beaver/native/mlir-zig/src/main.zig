@@ -64,7 +64,7 @@ fn get_all_registered_ops2(env: beam.env, dialect: c.struct_MlirStringRef) !beam
     }) {
         const registered_op_name = names[i];
         const op_name = c.beaverRegisteredOperationNameGetOpName(registered_op_name);
-        ret[@intCast(usize, i)] = beam.make_cstring_charlist(env, op_name.data);
+        ret[@intCast(usize, i)] = beam.make_c_string_charlist(env, op_name.data);
     }
     return beam.make_term_list(env, ret);
 }
@@ -89,7 +89,7 @@ fn get_registered_dialects(env: beam.env) !beam.term {
     while (i < num_dialects) : ({
         i += 1;
     }) {
-        ret[@intCast(usize, i)] = beam.make_cstring_charlist(env, names[i].data);
+        ret[@intCast(usize, i)] = beam.make_c_string_charlist(env, names[i].data);
     }
     return beam.make_term_list(env, ret);
 }
@@ -108,7 +108,7 @@ export fn beaver_raw_registered_dialects(env: beam.env, _: c_int, _: [*c]const b
     return get_registered_dialects(env) catch beam.make_error_binary(env, "launching nif");
 }
 
-export fn beaver_raw_resource_cstring_to_term_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+export fn beaver_raw_resource_c_string_to_term_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     const T = [*c]const u8;
     var arg0: T = undefined;
     if (beam.fetch_resource(T, env, fizz.U8.Array.resource.t, args[0])) |value| {
@@ -116,7 +116,7 @@ export fn beaver_raw_resource_cstring_to_term_charlist(env: beam.env, _: c_int, 
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource");
     }
-    return beam.make_cstring_charlist(env, arg0);
+    return beam.make_c_string_charlist(env, arg0);
 }
 
 export fn beaver_raw_resource_bool_to_term(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
@@ -127,22 +127,6 @@ export fn beaver_raw_resource_bool_to_term(env: beam.env, _: c_int, args: [*c]co
         return beam.make_error_binary(env, "fail to fetch resource");
     }
     return beam.make_bool(env, arg0);
-}
-
-export fn beaver_raw_get_resource_bool(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var ptr: ?*anyopaque = e.enif_alloc_resource(fizz.Bool.resource.t, @sizeOf(bool));
-    var obj: *bool = undefined;
-    if (ptr == null) {
-        unreachable();
-    } else {
-        obj = @ptrCast(*bool, @alignCast(@alignOf(*bool), ptr));
-    }
-    if (beam.get(bool, env, args[0])) |value| {
-        obj.* = value;
-        return e.enif_make_resource(env, ptr);
-    } else |_| {
-        return beam.make_error_binary(env, "launching nif");
-    }
 }
 
 // create a C string resource by copying given binary
@@ -416,7 +400,57 @@ fn MemRefDescriptor(comptime T: type, comptime N: usize) type {
     };
 }
 
-const beaver_memref_f32 = BeaverMemRef(fizz.F32);
+const MemRefDataType = enum {
+    F32,
+    F64,
+    I32,
+    I64,
+};
+
+fn dataTypeToResourceKind(self: MemRefDataType) type {
+    return switch (self) {
+        .F32 => fizz.F32,
+        .F64 => fizz.F64,
+        .I32 => fizz.I32,
+        .I64 => fizz.I64,
+    };
+}
+
+fn dataKindToDataType(comptime self: type) MemRefDataType {
+    return switch (self) {
+        fizz.F32 => MemRefDataType.F32,
+        fizz.F64 => MemRefDataType.F64,
+        fizz.I32 => MemRefDataType.I32,
+        fizz.I64 => MemRefDataType.I64,
+        else => unreachable(),
+    };
+}
+
+const memref_kinds = .{
+    BeaverMemRef(dataTypeToResourceKind(MemRefDataType.F32)),
+    BeaverMemRef(dataTypeToResourceKind(MemRefDataType.F64)),
+    BeaverMemRef(dataTypeToResourceKind(MemRefDataType.I32)),
+    BeaverMemRef(dataTypeToResourceKind(MemRefDataType.I64)),
+};
+
+fn dataKindToMemrefKind(comptime self: type) type {
+    const dt = dataKindToDataType(self);
+    const index = @enumToInt(dt);
+    return memref_kinds[index];
+}
+
+const MemRefRankType = enum {
+    DescriptorUnranked,
+    Descriptor1D,
+    Descriptor2D,
+    Descriptor3D,
+    Descriptor4D,
+    Descriptor5D,
+    Descriptor6D,
+    Descriptor7D,
+    Descriptor8D,
+    Descriptor9D,
+};
 
 fn BeaverMemRef(comptime ResourceKind: type) type {
     return struct {
@@ -434,46 +468,57 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
             if (sizes.len != strides.len) {
                 return beam.make_error_binary(env, "sizes and strides must have the same length");
             }
+            const kind: type = dataKindToMemrefKind(ResourceKind);
             switch (sizes.len) {
                 0 => {
+                    // unrank has different type, so put it in a dedicated arm
                     var des: UnrankMemRefDescriptor(ResourceKind.T) = .{
                         .allocated = allocated,
                         .aligned = aligned,
                         .offset = offset,
                     };
-                    print("UnrankMemRefDescriptor: {}\n", .{des});
-                    return beam.make_ok(env);
-                },
-                1 => {
-                    var des: MemRefDescriptor(ResourceKind.T, 1) = .{};
-                    des.populate(allocated, aligned, offset, sizes, strides);
-                    print("des populated: {}\n", .{des});
-                    return beaver_memref_f32.resource_kinds[1].resource.make(env, des) catch return beam.make_error_binary(env, "fail to make memref descriptor");
-                },
-                2 => {
-                    var des: MemRefDescriptor(ResourceKind.T, 2) = .{};
-                    des.populate(allocated, aligned, offset, sizes, strides);
-                    print("des populated: {}\n", .{des});
-                    return beam.make_ok(env);
+                    return kind.per_rank_resource_kinds[0].resource.make(env, des) catch return beam.make_error_binary(env, "fail to make unranked memref descriptor");
                 },
                 else => {
+                    comptime var rank = 1;
+                    inline while (rank < 10) : (rank += 1) {
+                        if (rank == sizes.len) {
+                            var des: MemRefDescriptor(ResourceKind.T, rank) = .{};
+                            if (rank < kind.per_rank_resource_kinds.len) {
+                                return kind.per_rank_resource_kinds[rank].resource.make(env, des) catch return beam.make_error_binary(env, "fail to make memref descriptor");
+                            } else {
+                                return beam.make_error_binary(env, "rank is too large");
+                            }
+                        }
+                    }
                     return beam.make_error_binary(env, "doen't support make memref descriptor for rank > 4");
                 },
             }
         }
-        const nif = e.ErlNifFunc{ .name = ResourceKind.module_name ++ ".create_memref", .arity = 5, .fptr = create_descriptor, .flags = 0 };
-        const root_module = "Elixir.Beaver.Data";
-        const resource_kinds = .{
-            beam.ResourceKind(UnrankMemRefDescriptor(ResourceKind.T), root_module ++ ".UnrankedMemRefDescriptor"),
-            beam.ResourceKind(MemRefDescriptor(ResourceKind.T, 1), root_module ++ ".MemRefDescriptor1D"),
-            beam.ResourceKind(MemRefDescriptor(ResourceKind.T, 2), root_module ++ ".MemRefDescriptor2D"),
-            beam.ResourceKind(MemRefDescriptor(ResourceKind.T, 3), root_module ++ ".MemRefDescriptor3D"),
+        const root_module = ResourceKind.module_name;
+        pub const nifs = .{
+            e.ErlNifFunc{ .name = root_module ++ ".memref_create", .arity = 5, .fptr = create_descriptor, .flags = 0 },
+            e.ErlNifFunc{ .name = root_module ++ ".memref_aligned", .arity = 1, .fptr = create_descriptor, .flags = 0 },
+        };
+        fn MemRefOfRank(comptime rank: u8) type {
+            if (rank == 0) {
+                return beam.ResourceKind(UnrankMemRefDescriptor(ResourceKind.T), root_module ++ ".MemRef" ++ @tagName(@intToEnum(MemRefRankType, 0)));
+            } else {
+                return beam.ResourceKind(MemRefDescriptor(ResourceKind.T, rank), root_module ++ ".MemRef" ++ @tagName(@intToEnum(MemRefRankType, rank)));
+            }
+        }
+        const per_rank_resource_kinds = .{
+            MemRefOfRank(0),
+            MemRefOfRank(1),
+            MemRefOfRank(2),
+            MemRefOfRank(3),
+            MemRefOfRank(4),
         };
         fn open(env: beam.env) void {
-            resource_kinds[0].open_all(env);
-            resource_kinds[1].open_all(env);
-            resource_kinds[2].open_all(env);
-            resource_kinds[3].open_all(env);
+            comptime var i = 0;
+            inline while (i < per_rank_resource_kinds.len) : (i += 1) {
+                per_rank_resource_kinds[i].open_all(env);
+            }
         }
     };
 }
@@ -485,16 +530,18 @@ pub export const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_registered_dialects", .arity = 0, .fptr = beaver_raw_registered_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_create_mlir_pass", .arity = 5, .fptr = beaver_raw_create_mlir_pass, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_pass_token_signal", .arity = 1, .fptr = PassToken.pass_token_signal, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_resource_cstring_to_term_charlist", .arity = 1, .fptr = beaver_raw_resource_cstring_to_term_charlist, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_resource_c_string_to_term_charlist", .arity = 1, .fptr = beaver_raw_resource_c_string_to_term_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_attribute_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_attribute_to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_type_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_type_to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_operation_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_operation_to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_resource_bool_to_term", .arity = 1, .fptr = beaver_raw_resource_bool_to_term, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_get_resource_bool", .arity = 1, .fptr = beaver_raw_get_resource_bool, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_get_resource_c_string", .arity = 1, .fptr = beaver_raw_get_resource_c_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_mlir_named_attribute_get", .arity = 2, .fptr = beaver_raw_mlir_named_attribute_get, .flags = 0 },
-    beaver_memref_f32.nif,
-};
+} ++
+    dataKindToMemrefKind(fizz.F32).nifs ++
+    dataKindToMemrefKind(fizz.F64).nifs ++
+    dataKindToMemrefKind(fizz.I32).nifs ++
+    dataKindToMemrefKind(fizz.I64).nifs;
 
 pub export const num_nifs = fizz.generated_nifs.len + handwritten_nifs.len;
 pub export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs ++ fizz.generated_nifs;
@@ -517,7 +564,10 @@ const entry = e.ErlNifEntry{
 
 export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     fizz.open_generated_resource_types(env);
-    beaver_memref_f32.open(env);
+    comptime var i = 0;
+    inline while (i < memref_kinds.len) : (i += 1) {
+        memref_kinds[i].open(env);
+    }
     beam.open_resource_wrapped(env, PassToken);
     return 0;
 }

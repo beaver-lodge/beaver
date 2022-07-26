@@ -27,7 +27,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def create(state) do
-    state |> CAPI.ptr() |> CAPI.bag(state) |> MLIR.CAPI.mlirOperationCreate()
+    state |> Beaver.Native.ptr() |> Beaver.Native.bag(state) |> MLIR.CAPI.mlirOperationCreate()
   end
 
   @doc """
@@ -80,7 +80,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def results(%MLIR.CAPI.MlirOperation{} = op) do
-    case CAPI.mlirOperationGetNumResults(op) |> CAPI.to_term() do
+    case CAPI.mlirOperationGetNumResults(op) |> Beaver.Native.to_term() do
       0 ->
         op
 
@@ -122,7 +122,7 @@ defmodule Beaver.MLIR.Operation do
   def verify(op, opts \\ @default_verify_opts) do
     dump = opts |> Keyword.get(:dump, false)
     dump_if_fail = opts |> Keyword.get(:dump_if_fail, false)
-    is_success = from_module(op) |> MLIR.CAPI.mlirOperationVerify() |> CAPI.to_term()
+    is_success = from_module(op) |> MLIR.CAPI.mlirOperationVerify() |> Beaver.Native.to_term()
 
     if dump do
       Logger.warning("Start dumping op not verified. This might crash.")

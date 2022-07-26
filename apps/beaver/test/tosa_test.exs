@@ -64,14 +64,14 @@ defmodule TosaTest do
 
     arg0 =
       MemRefDescriptor.create(
-        [1.1, 2.2, 3.3] |> MLIR.CAPI.F32.array(),
+        [1.1, 2.2, 3.3] |> Beaver.Native.F32.array(),
         [1, 3],
         [0, 0]
       )
 
     arg1 =
       MemRefDescriptor.create(
-        [1.1, 2.2] |> MLIR.CAPI.F32.array(),
+        [1.1, 2.2] |> Beaver.Native.F32.array(),
         [2, 1],
         [0, 0]
       )

@@ -12,11 +12,14 @@ defmodule Fizz do
 
   defp gen_kind_name_from_module_name(t), do: t
 
-  defp gen_nif_name_from_module_name(module_name, %NIF{name: name, nif_name: nil} = nif) do
-    %{nif | nif_name: Module.concat(module_name, name)}
+  defp gen_nif_name_from_module_name(
+         module_name,
+         %NIF{wrapper_name: wrapper_name, nif_name: nil} = nif
+       ) do
+    %{nif | nif_name: Module.concat(module_name, wrapper_name)}
   end
 
-  defp gen_nif_name_from_module_name(f), do: f
+  defp gen_nif_name_from_module_name(_module_name, f), do: f
 
   @doc """
   Generate Zig code from a header and build a Zig project to produce a NIF library
@@ -225,6 +228,7 @@ defmodule Fizz do
     nifs =
       Enum.map(functions, nif_gen)
       |> Enum.map(&gen_nif_name_from_module_name(root_module, &1))
+      |> Enum.concat(List.flatten(Enum.map(resource_kinds, &NIF.from_resource_kind/1)))
 
     source = """
     #{source}
@@ -336,83 +340,24 @@ defmodule Fizz do
     }
   end
 
-  @doc """
-  Get Elixir module name from a Zig type
-  """
-  def module_name(%Type{module_name: module_name}) do
-    module_name
-  end
-
-  def module_name("c.struct_" <> struct_name) do
-    struct_name |> String.to_atom()
-  end
-
-  def module_name("isize") do
-    :ISize
-  end
-
-  def module_name("usize") do
-    :USize
-  end
-
-  def module_name("c_int") do
-    :CInt
-  end
-
-  def module_name("c_uint") do
-    :CUInt
-  end
-
-  def module_name("[*c]const u8") do
-    :CString
-  end
-
-  def module_name("?*anyopaque") do
-    :OpaquePtr
-  end
-
-  def module_name("?*const anyopaque") do
-    :OpaqueArray
-  end
-
-  def module_name("?fn(" <> _ = fn_name) do
-    raise "need module name for function type: #{fn_name}"
-  end
-
-  def module_name(type) do
-    if String.contains?(type, "_") do
-      raise "need module name for type: #{type}"
-    else
-      type |> String.capitalize() |> String.to_atom()
-    end
-  end
-
-  def is_array(%Type{zig_t: type}) do
+  defp is_array(%Type{zig_t: type}) do
     is_array(type)
   end
 
-  def is_array("[*c]const " <> _type) do
+  defp is_array("[*c]const " <> _type) do
     true
   end
 
-  def is_array(type) when is_binary(type) do
+  defp is_array(type) when is_binary(type) do
     false
   end
 
-  def is_ptr("[*c]" <> _type) do
+  defp is_ptr("[*c]" <> _type) do
     true
   end
 
-  def is_ptr(type) when is_binary(type) do
+  defp is_ptr(type) when is_binary(type) do
     false
-  end
-
-  def element_type(%Type{zig_t: type}) do
-    element_type(type)
-  end
-
-  def element_type("[*c]const " <> type) do
-    type
   end
 
   def unwrap_ref(%{ref: ref}) do
@@ -447,26 +392,12 @@ defmodule Fizz do
     ]
   end
 
-  def is_primitive("void"), do: false
-
-  def is_primitive(type) when is_binary(type) do
-    type in primitive_types()
-  end
-
-  def is_primitive(%Type{zig_t: type}) do
-    is_primitive(type)
-  end
-
-  def is_function("?fn(" <> _), do: true
-
-  def is_function(_), do: false
-
-  def module_name(zig_t, root_module, zig_t_module_map) do
+  def module_name(zig_t, forward_module, zig_t_module_map) do
     if is_array(zig_t) do
-      root_module |> Module.concat("Array")
+      forward_module |> Module.concat("Array")
     else
       if is_ptr(zig_t) do
-        root_module |> Module.concat("Ptr")
+        forward_module |> Module.concat("Ptr")
       else
         zig_t_module_map |> Map.fetch!(zig_t)
       end

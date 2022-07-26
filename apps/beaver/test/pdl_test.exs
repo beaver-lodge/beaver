@@ -43,13 +43,13 @@ defmodule PDLTest do
       {:successor, %CAPI.MlirBlock{} = successor}, acc ->
         {{:successor, successor}, acc}
 
-      {:argument, %Value{}} = argument, acc ->
+      {:argument, %MLIR.Value{}} = argument, acc ->
         {argument, acc}
 
-      {:result, %Value{}} = result, acc ->
+      {:result, %MLIR.Value{}} = result, acc ->
         {result, acc}
 
-      {:operand, %Value{}} = operand, acc ->
+      {:operand, %MLIR.Value{}} = operand, acc ->
         {operand, acc}
 
       {name, %CAPI.MlirAttribute{} = attribute}, acc ->
@@ -117,7 +117,7 @@ defmodule PDLTest do
     assert mlir
            |> Beaver.container()
            |> MLIR.CAPI.mlirOperationEqual(MLIR.Operation.from_module(pattern_module))
-           |> MLIR.CAPI.to_term()
+           |> Beaver.Native.to_term()
 
     ir_module = MLIR.Module.create(ctx, @apply_rewrite_op_ir)
     MLIR.Operation.verify!(pattern_module)

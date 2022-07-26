@@ -21,10 +21,10 @@ defmodule Beaver.MLIR.Module do
 
   use Fizz.ResourceKind,
     root_module: CAPI,
-    zig_t: "c.struct_MlirModule"
+    forward_module: Beaver.Native
 
   def is_null(module) do
-    CAPI.beaverModuleIsNull(module) |> CAPI.to_term()
+    CAPI.beaverModuleIsNull(module) |> Beaver.Native.to_term()
   end
 
   defp not_null!(module) do

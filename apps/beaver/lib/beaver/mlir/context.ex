@@ -10,7 +10,7 @@ defmodule Beaver.MLIR.Context do
 
     MLIR.CAPI.mlirContextSetAllowUnregisteredDialects(
       ctx,
-      MLIR.CAPI.bool(allow_unregistered)
+      Beaver.Native.Bool.make(allow_unregistered)
     )
 
     ctx

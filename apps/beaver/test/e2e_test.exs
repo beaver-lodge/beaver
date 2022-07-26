@@ -1,13 +1,14 @@
 defmodule E2ETest do
   use ExUnit.Case
   alias Beaver.MLIR
+  @moduletag :smoke
 
   test "run mlir module defined by sigil" do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}
 
-    arg = MLIR.CAPI.I32.make(42)
-    return = MLIR.CAPI.I32.make(-1)
+    arg = Beaver.Native.I32.make(42)
+    return = Beaver.Native.I32.make(-1)
 
     jit =
       ~m"""
@@ -27,16 +28,16 @@ defmodule E2ETest do
 
     return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
 
-    assert return |> MLIR.CAPI.to_term() == 84
+    assert return |> Beaver.Native.to_term() == 84
 
     for i <- 0..100_0 do
       Task.async(fn ->
-        arg = MLIR.CAPI.I32.make(i)
-        return = MLIR.CAPI.I32.make(-1)
+        arg = Beaver.Native.I32.make(i)
+        return = Beaver.Native.I32.make(-1)
         return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
         # return here is a resource reference
         assert return == return
-        assert return |> MLIR.CAPI.to_term() == i * 2
+        assert return |> Beaver.Native.to_term() == i * 2
       end)
     end
     |> Task.await_many()

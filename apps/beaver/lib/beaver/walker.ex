@@ -260,7 +260,7 @@ defmodule Beaver.Walker do
       get_first: &CAPI.beaverValueGetFirstOperand/1,
       get_next: &CAPI.beaverOperandGetNext/1,
       get_parent: &CAPI.beaverOperandGetValue/1,
-      is_null: fn x -> CAPI.beaverOperandIsNull(x) |> MLIR.CAPI.to_term() end
+      is_null: fn x -> CAPI.beaverOperandIsNull(x) |> Beaver.Native.to_term() end
     )
   end
 
@@ -495,7 +495,7 @@ alias Beaver.Walker
 defimpl Enumerable, for: Walker do
   @spec count(Walker.t()) :: {:ok, non_neg_integer()} | {:error, module()}
   def count(%Walker{container: container, get_num: get_num}) when is_function(get_num, 1) do
-    {:ok, get_num.(container) |> MLIR.CAPI.to_term()}
+    {:ok, get_num.(container) |> Beaver.Native.to_term()}
   end
 
   def count(%Walker{container: %container_module{}}) do
@@ -509,7 +509,9 @@ defimpl Enumerable, for: Walker do
       )
       when is_function(element_equal, 2) do
     is_member =
-      Enum.any?(walker, fn member -> element_equal.(member, element) |> MLIR.CAPI.to_term() end)
+      Enum.any?(walker, fn member ->
+        element_equal.(member, element) |> Beaver.Native.to_term()
+      end)
 
     {:ok, is_member}
   end
@@ -525,7 +527,7 @@ defimpl Enumerable, for: Walker do
         %element_module{} = element
       )
       when is_function(get_parent, 1) and is_function(parent_equal, 2) do
-    is_member = parent_equal.(container, get_parent.(element)) |> MLIR.CAPI.to_term()
+    is_member = parent_equal.(container, get_parent.(element)) |> Beaver.Native.to_term()
     {:ok, is_member}
   end
 

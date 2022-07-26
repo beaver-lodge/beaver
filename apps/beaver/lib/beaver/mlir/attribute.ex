@@ -4,7 +4,7 @@ defmodule Beaver.MLIR.Attribute do
   alias Beaver.MLIR
 
   def is_null(a) do
-    CAPI.beaverAttributeIsNull(a) |> CAPI.to_term()
+    CAPI.beaverAttributeIsNull(a) |> Beaver.Native.to_term()
   end
 
   def get(attr_str) when is_binary(attr_str) do
@@ -20,7 +20,7 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   def equal?(%MLIR.CAPI.MlirAttribute{} = a, %MLIR.CAPI.MlirAttribute{} = b) do
-    CAPI.mlirAttributeEqual(a, b) |> CAPI.to_term()
+    CAPI.mlirAttributeEqual(a, b) |> Beaver.Native.to_term()
   end
 
   def float(type, value, opts \\ []) do

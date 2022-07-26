@@ -60,7 +60,9 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def normalize_dialect_name(other), do: other |> Macro.camelize()
 
   def ops(dialect) do
-    CAPI.check!(CAPI.beaver_raw_registered_ops_of_dialect(MLIR.StringRef.create(dialect).ref))
+    Beaver.Native.check!(
+      CAPI.beaver_raw_registered_ops_of_dialect(MLIR.StringRef.create(dialect).ref)
+    )
     |> Enum.map(&List.to_string/1)
   end
 
@@ -74,7 +76,7 @@ defmodule Beaver.MLIR.Dialect.Registry do
     all_dialects =
       CAPI.beaver_raw_registered_dialects()
       |> Enum.map(&List.to_string/1)
-      |> CAPI.check!()
+      |> Beaver.Native.check!()
       |> Enum.uniq()
       |> Enum.sort()
 

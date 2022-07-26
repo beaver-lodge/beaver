@@ -1,6 +1,6 @@
 defmodule StringRefTest do
   use ExUnit.Case, async: true
-
+  @moduletag :smoke
   alias Beaver.MLIR
 
   test "StringRef" do
