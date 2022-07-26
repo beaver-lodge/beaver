@@ -367,14 +367,6 @@ defmodule Fizz do
     :CString
   end
 
-  def module_name("[*c]const " <> type) do
-    "Array#{module_name(type)}" |> String.to_atom()
-  end
-
-  def module_name("[*c]" <> type) do
-    "Ptr#{module_name(type)}" |> String.to_atom()
-  end
-
   def module_name("?*anyopaque") do
     :OpaquePtr
   end
