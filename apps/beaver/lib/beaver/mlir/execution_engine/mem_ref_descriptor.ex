@@ -34,8 +34,8 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
 
     aligned = allocated = ptr
     offset = 0
-    shape = shape |> CAPI.I64.array()
-    strides = strides |> CAPI.I64.array()
+    shape = shape |> Beaver.Native.I64.array()
+    strides = strides |> Beaver.Native.I64.array()
 
     Exotic.Value.Struct.get(
       __MODULE__.struct_fields(rank),
@@ -60,7 +60,7 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
       if elements == [] do
         nil
       else
-        elements |> CAPI.I64.array()
+        elements |> Beaver.Native.I64.array()
       end
 
     create_from_ptr(arr_ptr, shape, strides)
@@ -70,26 +70,6 @@ defmodule Beaver.MLIR.ExecutionEngine.MemRefDescriptor do
     Exotic.Value.Struct.get(binary)
     |> Exotic.Value.get_ptr()
     |> create_from_ptr(shape, strides)
-  end
-
-  defp dense_stride(dims) when is_list(dims) and length(dims) > 0 do
-    dims |> Enum.reduce(&*/2)
-  end
-
-  defp dense_strides([_], strides) when is_list(strides) do
-    strides ++ [1]
-  end
-
-  defp dense_strides([_ | tail], strides) when is_list(strides) do
-    dense_strides(tail, strides ++ [dense_stride(tail)])
-  end
-
-  def dense_strides([]) do
-    []
-  end
-
-  def dense_strides(shape) when is_list(shape) do
-    dense_strides(shape, [])
   end
 
   def read_as_binary(memref, len) when is_integer(len) do

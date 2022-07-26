@@ -7,6 +7,6 @@ defmodule Beaver.MLIR.Trait do
   """
   def is_terminator?(op_name) do
     CAPI.beaverIsOpNameTerminator(MLIR.StringRef.create(op_name), MLIR.Managed.Context.get())
-    |> CAPI.to_term()
+    |> Beaver.Native.to_term()
   end
 end

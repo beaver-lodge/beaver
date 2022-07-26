@@ -29,23 +29,4 @@ defmodule Fizz.CodeGen.Resource do
     #{kind_name}.open_all(env);
     """
   end
-
-  defmacro gen_resource_functions(module_name) do
-    for {f, a} <- [
-          ptr: 1,
-          opaque_ptr: 1,
-          array: 1,
-          mut_array: 1,
-          primitive: 1,
-          make: 1,
-          create_memref: 5
-        ] do
-      quote bind_quoted: [f: f, a: a, module_name: module_name] do
-        name = Module.concat(module_name, f)
-        args = List.duplicate({:_, [if_undefined: :apply], Elixir}, a)
-        def unquote(name)(unquote_splicing(args)), do: raise("NIF not loaded")
-      end
-    end
-    |> List.flatten()
-  end
 end

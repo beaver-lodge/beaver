@@ -5,6 +5,7 @@ defmodule CfTest do
   alias Beaver.MLIR.Type
   alias Beaver.MLIR.Attribute
   alias Beaver.MLIR.Dialect.{CF, Arith}
+  @moduletag :smoke
 
   defmodule MutCompiler do
     use Beaver

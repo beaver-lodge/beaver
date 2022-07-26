@@ -7,7 +7,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
   def is_null(jit) do
     jit
     |> beaverMlirExecutionEngineIsNull()
-    |> to_term()
+    |> Beaver.Native.to_term()
   end
 
   @doc """
@@ -23,12 +23,12 @@ defmodule Beaver.MLIR.ExecutionEngine do
     shared_lib_paths_ptr =
       case shared_lib_paths do
         [] ->
-          MLIR.CAPI.array([], MLIR.CAPI.MlirStringRef)
+          Beaver.Native.array([], MLIR.CAPI.MlirStringRef)
 
         _ ->
           shared_lib_paths
           |> Enum.map(&MLIR.StringRef.create/1)
-          |> MLIR.CAPI.array(MLIR.CAPI.MlirStringRef)
+          |> Beaver.Native.array(MLIR.CAPI.MlirStringRef)
       end
 
     ctx =
@@ -60,7 +60,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
     mlirExecutionEngineInvokePacked(
       jit,
       MLIR.StringRef.create(symbol),
-      CAPI.OpaquePtr.array(arg_ptr_list, mut: true)
+      Beaver.Native.OpaquePtr.array(arg_ptr_list, mut: true)
     )
   end
 
@@ -68,8 +68,8 @@ defmodule Beaver.MLIR.ExecutionEngine do
   invoke a function by symbol name.
   """
   def invoke!(jit, symbol, args, return) when is_list(args) do
-    arg_ptr_list = args |> Enum.map(&CAPI.opaque_ptr/1)
-    return_ptr = return |> CAPI.opaque_ptr()
+    arg_ptr_list = args |> Enum.map(&Beaver.Native.opaque_ptr/1)
+    return_ptr = return |> Beaver.Native.opaque_ptr()
     result = do_invoke!(jit, symbol, arg_ptr_list ++ [return_ptr])
 
     if MLIR.LogicalResult.success?(result) do
@@ -83,7 +83,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
   invoke a void function by symbol name.
   """
   def invoke!(jit, symbol, args) when is_list(args) do
-    arg_ptr_list = args |> Enum.map(&CAPI.opaque_ptr/1)
+    arg_ptr_list = args |> Enum.map(&Beaver.Native.opaque_ptr/1)
     result = do_invoke!(jit, symbol, arg_ptr_list)
 
     if MLIR.LogicalResult.success?(result) do

@@ -4,6 +4,6 @@ defmodule Beaver.MLIR.LogicalResult do
   def success?(result) do
     result
     |> MLIR.CAPI.beaverLogicalResultIsSuccess()
-    |> MLIR.CAPI.to_term()
+    |> Beaver.Native.to_term()
   end
 end

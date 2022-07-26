@@ -4,6 +4,7 @@ defmodule MlirTest do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
+  @moduletag :smoke
   test "call wrapped apis" do
     ctx = MLIR.Context.create()
 
@@ -31,7 +32,9 @@ defmodule MlirTest do
     operation_state = %MLIR.Operation.State{name: "func.return", location: location}
 
     for _i <- 0..200 do
-      operation_state_ptr = operation_state |> MLIR.Operation.State.create() |> MLIR.CAPI.ptr()
+      operation_state_ptr =
+        operation_state |> MLIR.Operation.State.create() |> Beaver.Native.ptr()
+
       _ret_op = MLIR.CAPI.mlirOperationCreate(operation_state_ptr)
     end
 
@@ -64,7 +67,7 @@ defmodule MlirTest do
 
     name = MLIR.CAPI.beaverMlirOperationStateGetName(add_op_state)
 
-    assert 10 == MLIR.CAPI.beaverStringRefGetLength(name) |> CAPI.to_term()
+    assert 10 == MLIR.CAPI.beaverStringRefGetLength(name) |> Beaver.Native.to_term()
 
     location1 = add_op_state |> MLIR.CAPI.beaverMlirOperationStateGetLocation()
     nResults = add_op_state |> MLIR.CAPI.beaverMlirOperationStateGetNumResults()
@@ -72,10 +75,10 @@ defmodule MlirTest do
     nRegions = add_op_state |> MLIR.CAPI.beaverMlirOperationStateGetNumRegions()
     nAttributes = add_op_state |> MLIR.CAPI.beaverMlirOperationStateGetNumAttributes()
 
-    assert 0 == nRegions |> CAPI.to_term()
-    assert 1 == nResults |> CAPI.to_term()
-    assert 2 == nOperands |> CAPI.to_term()
-    assert 0 == nAttributes |> CAPI.to_term()
+    assert 0 == nRegions |> Beaver.Native.to_term()
+    assert 1 == nResults |> Beaver.Native.to_term()
+    assert 2 == nOperands |> Beaver.Native.to_term()
+    assert 0 == nAttributes |> Beaver.Native.to_term()
     add_op = add_op_state |> MLIR.Operation.create()
 
     _ctx = MLIR.CAPI.mlirLocationGetContext(location)
@@ -151,14 +154,14 @@ defmodule MlirTest do
     module = create_adder_module(ctx)
     module_op = module |> MLIR.CAPI.mlirModuleGetOperation()
 
-    assert MLIR.CAPI.mlirOperationVerify(module_op) |> CAPI.to_term()
+    assert MLIR.CAPI.mlirOperationVerify(module_op) |> Beaver.Native.to_term()
     pm = CAPI.mlirPassManagerCreate(ctx)
     CAPI.mlirPassManagerAddOwnedPass(pm, CAPI.mlirCreateTransformsCSE())
     success = CAPI.mlirPassManagerRun(pm, module)
 
     assert success
            |> CAPI.beaverLogicalResultIsSuccess()
-           |> CAPI.to_term()
+           |> Beaver.Native.to_term()
 
     CAPI.mlirPassManagerDestroy(pm)
     CAPI.mlirModuleDestroy(module)
@@ -290,26 +293,26 @@ defmodule MlirTest do
     MLIR.Operation.verify!(module)
     lower_to_llvm(ctx, module)
     jit = MLIR.ExecutionEngine.create!(module)
-    arg = CAPI.I32.make(42)
-    return = CAPI.I32.make(-1)
+    arg = Beaver.Native.I32.make(42)
+    return = Beaver.Native.I32.make(-1)
 
-    before_ptr = return |> CAPI.opaque_ptr() |> CAPI.to_term()
+    before_ptr = return |> Beaver.Native.opaque_ptr() |> Beaver.Native.to_term()
     return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg], return)
-    after_ptr = return |> CAPI.opaque_ptr() |> CAPI.to_term()
+    after_ptr = return |> Beaver.Native.opaque_ptr() |> Beaver.Native.to_term()
 
     assert before_ptr == after_ptr
 
-    return |> CAPI.opaque_ptr() |> CAPI.to_term()
-    assert return |> CAPI.to_term() == 84
+    return |> Beaver.Native.opaque_ptr() |> Beaver.Native.to_term()
+    assert return |> Beaver.Native.to_term() == 84
 
     for i <- 0..100_0 do
       Task.async(fn ->
-        arg = CAPI.I32.make(i)
-        return = CAPI.I32.make(-1)
+        arg = Beaver.Native.I32.make(i)
+        return = Beaver.Native.I32.make(-1)
         return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg], return)
         # return here is a resource reference
         assert return == return
-        assert return |> CAPI.to_term() == i * 2
+        assert return |> Beaver.Native.to_term() == i * 2
       end)
     end
     |> Task.await_many()

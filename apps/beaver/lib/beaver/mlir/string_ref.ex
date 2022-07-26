@@ -10,10 +10,10 @@ defmodule Beaver.MLIR.StringRef do
   end
 
   def create(value) when is_binary(value) do
-    c_string = CAPI.c_string(value)
+    c_string = Beaver.Native.c_string(value)
 
     CAPI.mlirStringRefCreateFromCString(c_string)
-    |> CAPI.bag(c_string)
+    |> Beaver.Native.bag(c_string)
   end
 
   def extract(%Beaver.MLIR.CAPI.MlirStringRef{} = string_ref) do
@@ -21,8 +21,8 @@ defmodule Beaver.MLIR.StringRef do
       string_ref
       |> CAPI.beaverStringRefGetData()
 
-    CAPI.beaver_raw_resource_cstring_to_term_charlist(ref)
-    |> CAPI.check!()
+    CAPI.beaver_raw_resource_c_string_to_term_charlist(ref)
+    |> Beaver.Native.check!()
     |> List.to_string()
   end
 end

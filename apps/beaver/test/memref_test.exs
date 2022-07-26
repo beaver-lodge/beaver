@@ -4,14 +4,15 @@ defmodule MemRefTest do
   alias Beaver.MLIR.ExecutionEngine.MemRefDescriptor
 
   test "creation" do
-    array = MLIR.CAPI.F32.array([1.1, 2.2, 3.3], mut: true)
-    :ok = MLIR.CAPI.F32.memref(array.ref, array.ref, 0, [1, 2], [0, 0])
+    assert %Beaver.Native.Memory{} =
+             Beaver.Native.Memory.new([1.1, 2.2, 3.3], type: Beaver.Native.F32, sizes: [3, 1])
 
-    assert true
+    assert %Beaver.Native.Memory{} =
+             Beaver.Native.Memory.new([1.1, 2.2, 3.3], type: Beaver.Native.F32, sizes: [])
   end
 
   test "strides" do
-    assert [6, 3, 1] = MemRefDescriptor.dense_strides([1, 2, 3])
+    assert [6, 3, 1] = Beaver.Native.Memory.dense_strides([1, 2, 3])
   end
 
   test "run mlir module defined by sigil" do
@@ -67,10 +68,10 @@ defmodule MemRefTest do
     shape = [1, 2, 3]
 
     arg0 =
-      MemRefDescriptor.create(
-        arr |> Enum.map(&Exotic.Value.get(:f32, &1)),
-        shape,
-        MemRefDescriptor.dense_strides(shape)
+      Beaver.Native.Memory.new(
+        arr,
+        sizes: shape,
+        type: Beaver.Native.F32
       )
 
     <<
@@ -82,11 +83,8 @@ defmodule MemRefTest do
       a5::little-float-32
     >> =
       arg0
-      |> Exotic.Value.fetch(
-        Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(3),
-        :allocated
-      )
-      |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8))
+      |> Beaver.Native.Memory.aligned()
+      |> Beaver.Native.OpaquePtr.read(Integer.floor_div(32 * 6, 8))
 
     assert [
              a0,

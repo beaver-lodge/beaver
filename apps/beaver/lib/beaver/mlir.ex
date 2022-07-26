@@ -70,23 +70,27 @@ defmodule Beaver.MLIR do
   end
 
   def is_null(%MlirAttribute{} = v) do
-    CAPI.beaverAttributeIsNull(v) |> CAPI.to_term()
+    CAPI.beaverAttributeIsNull(v) |> Beaver.Native.to_term()
   end
 
   def is_null(%MlirOperation{} = v) do
-    CAPI.beaverOperationIsNull(v) |> CAPI.to_term()
+    CAPI.beaverOperationIsNull(v) |> Beaver.Native.to_term()
   end
 
   def is_null(%MlirBlock{} = v) do
-    CAPI.beaverBlockIsNull(v) |> CAPI.to_term()
+    CAPI.beaverBlockIsNull(v) |> Beaver.Native.to_term()
   end
 
   def to_string(%MlirAttribute{ref: ref}) do
-    CAPI.beaver_raw_beaver_attribute_to_charlist(ref) |> CAPI.check!() |> List.to_string()
+    CAPI.beaver_raw_beaver_attribute_to_charlist(ref)
+    |> Beaver.Native.check!()
+    |> List.to_string()
   end
 
   def to_string(%MlirOperation{ref: ref}) do
-    CAPI.beaver_raw_beaver_operation_to_charlist(ref) |> CAPI.check!() |> List.to_string()
+    CAPI.beaver_raw_beaver_operation_to_charlist(ref)
+    |> Beaver.Native.check!()
+    |> List.to_string()
   end
 
   def to_string(%__MODULE__.Module{} = module) do
@@ -94,6 +98,6 @@ defmodule Beaver.MLIR do
   end
 
   def to_string(%MlirType{ref: ref}) do
-    CAPI.beaver_raw_beaver_type_to_charlist(ref) |> CAPI.check!() |> List.to_string()
+    CAPI.beaver_raw_beaver_type_to_charlist(ref) |> Beaver.Native.check!() |> List.to_string()
   end
 end

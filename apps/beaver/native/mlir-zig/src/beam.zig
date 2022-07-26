@@ -1092,7 +1092,7 @@ pub fn make_charlist(environment: env, val: []const u8) term {
 }
 
 /// converts a c string (`[*c]u8`) into a BEAM `t:charlist/0`.
-pub fn make_cstring_charlist(environment: env, val: [*c]const u8) term {
+pub fn make_c_string_charlist(environment: env, val: [*c]const u8) term {
     return e.enif_make_string(environment, val, __latin1);
 }
 

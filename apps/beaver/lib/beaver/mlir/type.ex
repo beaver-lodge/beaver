@@ -11,7 +11,7 @@ defmodule Beaver.MLIR.Type do
   end
 
   def equal?(a, b) do
-    CAPI.mlirTypeEqual(a, b) |> CAPI.to_term()
+    CAPI.mlirTypeEqual(a, b) |> Beaver.Native.to_term()
   end
 
   def function(inputs, results, opts \\ []) do
@@ -42,7 +42,7 @@ defmodule Beaver.MLIR.Type do
       when is_list(shape) do
     rank = length(shape)
 
-    shape = shape |> CAPI.I64.array()
+    shape = shape |> Beaver.Native.I64.array()
 
     CAPI.mlirAttributeGetNull()
     CAPI.mlirRankedTensorTypeGet(rank, shape, element_type, encoding)
@@ -64,7 +64,7 @@ defmodule Beaver.MLIR.Type do
       when is_list(shape) do
     rank = length(shape)
 
-    shape = shape |> CAPI.I64.array()
+    shape = shape |> Beaver.Native.I64.array()
 
     default_null = CAPI.mlirAttributeGetNull()
     layout = Keyword.get(opts, :layout) || default_null
@@ -75,13 +75,13 @@ defmodule Beaver.MLIR.Type do
 
   def vector(shape, element_type) when is_list(shape) do
     rank = length(shape)
-    shape = shape |> CAPI.I64.array()
+    shape = shape |> Beaver.Native.I64.array()
     CAPI.mlirVectorTypeGet(rank, shape, element_type)
   end
 
   def tuple(elements, opts \\ []) when is_list(elements) do
     num_elements = length(elements)
-    elements = elements |> CAPI.ISize.array()
+    elements = elements |> Beaver.Native.ISize.array()
     ctx = MLIR.Managed.Context.from_opts(opts)
     CAPI.mlirTupleTypeGet(ctx, num_elements, elements)
   end
