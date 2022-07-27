@@ -68,12 +68,19 @@ defmodule Beaver.MLIR.CAPI do
   # generate stubs for generated NIFs
   Logger.debug("[Beaver] generating NIF wrapper")
 
-  for nif <- nifs do
+  complex_nifs =
+    %Fizz.CodeGen.Type{
+      module_name: Beaver.Native.C64,
+      kind_functions: Beaver.MLIR.CAPI.CodeGen.memref_kind_functions()
+    }
+    |> Fizz.CodeGen.NIF.from_resource_kind()
+
+  for nif <- nifs ++ complex_nifs do
     args_ast = Macro.generate_unique_arguments(nif.arity, __MODULE__)
 
     %Fizz.CodeGen.NIF{wrapper_name: wrapper_name, nif_name: nif_name, ret: ret} = nif
     @doc false
-    def unquote(nif_name)(unquote_splicing(args_ast)), do: "failed to load NIF"
+    def unquote(nif_name)(unquote_splicing(args_ast)), do: raise("failed to load NIF")
 
     if wrapper_name do
       if ret == "void" do
@@ -113,13 +120,13 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_registered_ops(), do: raise("NIF not loaded")
   def beaver_raw_registered_ops_of_dialect(_), do: raise("NIF not loaded")
   def beaver_raw_registered_dialects(), do: raise("NIF not loaded")
-  def beaver_raw_resource_bool_to_term(_), do: raise("NIF not loaded")
   def beaver_raw_resource_c_string_to_term_charlist(_), do: raise("NIF not loaded")
   def beaver_raw_beaver_attribute_to_charlist(_), do: raise("NIF not loaded")
   def beaver_raw_beaver_type_to_charlist(_), do: raise("NIF not loaded")
   def beaver_raw_beaver_operation_to_charlist(_), do: raise("NIF not loaded")
   def beaver_raw_mlir_named_attribute_get(_, _), do: raise("NIF not loaded")
   def beaver_raw_get_resource_c_string(_), do: raise("NIF not loaded")
+  def beaver_raw_read_opaque_ptr(_, _), do: raise("NIF not loaded")
 
   # setup NIF loading
   @on_load :load_nifs

@@ -105,7 +105,20 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
         module_name
       end
 
-    {:ok, %{type | module_name: new_name, kind_functions: [memref_create: 5, memref_aligned: 1]}}
+    {:ok,
+     %{
+       type
+       | module_name: new_name,
+         kind_functions: memref_kind_functions()
+     }}
+  end
+
+  def memref_kind_functions() do
+    [
+      memref_create: 5,
+      memref_aligned: 1,
+      memref_opaque_ptr: 1
+    ]
   end
 
   def nif_gen(

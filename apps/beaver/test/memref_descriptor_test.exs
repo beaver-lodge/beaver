@@ -3,47 +3,19 @@ defmodule MemRefDescriptorTest do
 
   test "test memref descriptor" do
     t =
-      Beaver.MLIR.ExecutionEngine.MemRefDescriptor.create(
+      Beaver.Native.Memory.new(
         [1, 2, 3, 4],
-        [2, 2],
-        [0, 0]
+        sizes: [2, 2],
+        type: Beaver.Native.I32
       )
 
-    assert t
-           |> Exotic.Value.fetch(
-             Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(2),
-             :offset
-           )
-           |> Exotic.Value.extract() == 0
+    #  TODO: check offset
+    #  TODO: check shape
+    #  TODO: check strides
 
     assert t
-           |> Exotic.Value.fetch(
-             Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(2),
-             :shape
-           )
-           |> Exotic.Value.as_binary() == <<2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0>>
-
-    assert t
-           |> Exotic.Value.fetch(
-             Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(2),
-             :strides
-           )
-           |> Exotic.Value.as_binary() == <<0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0>>
-
-    assert t
-           |> Exotic.Value.fetch(
-             Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(2),
-             :aligned
-           )
-           |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 4, 8)) ==
-             <<1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0>>
-
-    assert t
-           |> Exotic.Value.fetch(
-             Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(2),
-             :allocated
-           )
-           |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 4, 8)) ==
+           |> Beaver.Native.Memory.aligned()
+           |> Beaver.Native.OpaquePtr.read(Integer.floor_div(32 * 4, 8)) ==
              <<1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0>>
   end
 end

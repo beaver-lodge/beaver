@@ -5,6 +5,8 @@ defmodule BeaverNxTest do
   use ExUnit.Case, async: true
   doctest Beaver.Nx
 
+  @moduletag :nx
+
   setup do
     Nx.default_backend(Beaver.Nx)
     :ok

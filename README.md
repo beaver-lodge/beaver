@@ -257,6 +257,12 @@ SomeDialect.some_op(
 )
 ```
 
+### Beaver DSL as higher level AST for MLIR
+
+There should be a 1:1 mapping between Beaver SSA DSL to MLIR SSA. This enables the support parsing MLIR text format and dump it to Beaver DSL which is Elixir AST essentially. This makes it possible to easily debug a piece of IR in a more programmable and readable way.
+
+In Beaver, working with MLIR should be in one format, no matter it is generating, transforming, debugging.
+
 ### High level API in Erlang/Elixir idiom
 
 - When possible, lower level C APIs should be wrapped as Elixir struct with support to common Elixir protocols.
@@ -336,7 +342,10 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
   ```bash
   mix deps.get
   mix test
+  # run tests with filters
   mix test --exclude vulkan # use this to skip vulkan tests
+  mix test --only smoke
+  mix test --only nx
   ```
 
 5. debug

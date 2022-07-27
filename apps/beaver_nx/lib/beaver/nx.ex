@@ -3,8 +3,6 @@ defmodule Beaver.Nx do
   `Beaver.Nx` is a MLIR backend for the `Nx`. It mainly targets TOSA dialect.
   """
 
-  alias Beaver.MLIR.ExecutionEngine.MemRefDescriptor
-
   @enforce_keys [:memref]
   defstruct [:memref]
 
@@ -20,14 +18,14 @@ defmodule Beaver.Nx do
   end
 
   @impl true
-  def from_binary(%T{shape: shape, type: _type} = tensor, binary, _backend_options) do
+  def from_binary(%T{shape: shape, type: type} = tensor, binary, _backend_options) do
     shape = Tuple.to_list(shape)
 
     memref =
-      MemRefDescriptor.create(
+      Beaver.Native.Memory.new(
         binary,
-        shape,
-        MemRefDescriptor.dense_strides(shape)
+        sizes: shape,
+        type: type
       )
 
     {memref} |> Beaver.Nx.MemrefAllocator.add()
@@ -36,7 +34,8 @@ defmodule Beaver.Nx do
 
   @impl true
   def to_binary(%T{shape: _shape, data: %B{memref: memref}} = tensor, limit) do
-    MemRefDescriptor.read_as_binary(memref, limit * div(element_size(tensor), 8))
+    Beaver.Native.Memory.aligned(memref)
+    |> Beaver.Native.OpaquePtr.read(limit * div(element_size(tensor), 8))
   end
 
   @impl true
@@ -65,7 +64,8 @@ defmodule Beaver.Nx do
 
     backend.from_binary(
       tensor,
-      MemRefDescriptor.read_as_binary(memref, binary_len),
+      Beaver.Native.Memory.aligned(memref)
+      |> Beaver.Native.OpaquePtr.read(binary_len),
       backend_options
     )
   end
@@ -113,11 +113,7 @@ defmodule Beaver.Nx do
   def tensor_of_null_memref(%T{shape: shape, type: _type} = tensor) do
     shape = Tuple.to_list(shape)
 
-    memref =
-      MemRefDescriptor.create(
-        shape,
-        MemRefDescriptor.dense_strides(shape)
-      )
+    memref = Beaver.Native.Memory.new([], sizes: shape, type: Beaver.Native.F32)
 
     # TODO: delete the allocated ptr when this kind of tensor is deallocated by Nx
     {memref} |> Beaver.Nx.MemrefAllocator.add()

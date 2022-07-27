@@ -16,8 +16,8 @@ defmodule Fizz.ResourceKind do
               bag: MapSet.t()
             }
 
-      def array(list, opts \\ []) when is_list(list) do
-        unquote(forward_module).array(list, __MODULE__, opts)
+      def array(data, opts \\ []) do
+        unquote(forward_module).array(data, __MODULE__, opts)
       end
 
       def make(value) do
