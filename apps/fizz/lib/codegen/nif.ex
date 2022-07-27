@@ -29,7 +29,8 @@ defmodule Fizz.CodeGen.NIF do
             array: 1,
             mut_array: 1,
             primitive: 1,
-            make: 1
+            make: 1,
+            array_as_opaque: 1
           ] ++ kind_functions do
       %__MODULE__{
         nif_name: Module.concat(module_name, f),

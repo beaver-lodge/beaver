@@ -27,30 +27,12 @@ for m <-
       root_module: CAPI,
       forward_module: Beaver.Native
 
-    if m in [F32, F64, I32, I64] do
-      def memref(
-            allocated,
-            aligned,
-            offset,
-            sizes,
-            strides
-          ) do
-        apply(
-          CAPI,
-          Module.concat([__MODULE__, "memref_create"]) |> Beaver.Native.check!(),
-          [allocated, aligned, offset, sizes, strides]
-        )
-      end
-
-      def aligned(descriptor_ref) do
-        ptr_ref =
-          apply(
-            CAPI,
-            Module.concat([__MODULE__, "memref_aligned"]) |> Beaver.Native.check!(),
-            [descriptor_ref]
-          )
-
-        %Beaver.Native.OpaquePtr{ref: ptr_ref}
+    if m == OpaquePtr do
+      @doc """
+      read the N bytes starting from the pointer and returns an Erlang binary
+      """
+      def read(%__MODULE__{ref: ref}, len) do
+        CAPI.beaver_raw_read_opaque_ptr(ref, len)
       end
     end
   end

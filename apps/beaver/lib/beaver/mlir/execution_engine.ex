@@ -1,7 +1,6 @@
 defmodule Beaver.MLIR.ExecutionEngine do
   alias Beaver.MLIR
   alias Beaver.MLIR.Pass.Composer
-  alias Beaver.MLIR.CAPI
   import Beaver.MLIR.CAPI
 
   def is_null(jit) do

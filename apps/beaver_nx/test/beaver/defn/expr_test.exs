@@ -7,6 +7,7 @@ defmodule Beaver.Defn.ExprTest do
   import Beaver.Nx.Assert
   require Assert
 
+  @moduletag :nx
   setup do
     Nx.Defn.default_options(compiler: Beaver.Nx.Compiler)
     :ok

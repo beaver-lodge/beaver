@@ -109,24 +109,8 @@ export fn beaver_raw_registered_dialects(env: beam.env, _: c_int, _: [*c]const b
 }
 
 export fn beaver_raw_resource_c_string_to_term_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    const T = [*c]const u8;
-    var arg0: T = undefined;
-    if (beam.fetch_resource(T, env, fizz.U8.Array.resource.t, args[0])) |value| {
-        arg0 = value;
-    } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource");
-    }
+    var arg0: fizz.U8.Array.T = beam.fetch_resource(fizz.U8.Array.T, env, fizz.U8.Array.resource.t, args[0]) catch return beam.make_error_binary(env, "fail to fetch resource of c string");
     return beam.make_c_string_charlist(env, arg0);
-}
-
-export fn beaver_raw_resource_bool_to_term(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var arg0: bool = undefined;
-    if (beam.fetch_resource(bool, env, fizz.Bool.resource.t, args[0])) |value| {
-        arg0 = value;
-    } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource");
-    }
-    return beam.make_bool(env, arg0);
 }
 
 // create a C string resource by copying given binary
@@ -146,7 +130,7 @@ export fn beaver_raw_get_resource_c_string(env: beam.env, _: c_int, args: [*c]co
     } else {
         obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
         real_binary = @ptrCast(RType, ptr);
-        real_binary += @alignOf(RType);
+        real_binary += @sizeOf(RType);
         real_binary[bin.size] = 0;
         obj.* = real_binary;
     }
@@ -318,6 +302,14 @@ const BeaverPass = struct {
     }
 };
 
+export fn beaver_raw_read_opaque_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+    var ptr: fizz.OpaquePtr.T = fizz.OpaquePtr.resource.fetch(env, args[0]) catch
+        return beam.make_error_binary(env, "fail to fetch resource for ptr, expected: " ++ @typeName(fizz.OpaquePtr.T));
+    var len = fizz.U64.resource.fetch(env, args[1]) catch return beam.make_error_binary(env, "fail to fetch resource length, expected a integer");
+    const slice = @ptrCast(fizz.U8.Array.T, ptr)[0..len];
+    return beam.make_slice(env, slice);
+}
+
 export fn beaver_raw_create_mlir_pass(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var name: c.struct_MlirStringRef = undefined;
     if (beam.fetch_resource(c.struct_MlirStringRef, env, fizz.MlirStringRef.resource.t, args[0])) |value| {
@@ -379,13 +371,13 @@ export fn beaver_raw_create_mlir_pass(env: beam.env, _: c_int, args: [*c]const b
 }
 
 fn UnrankMemRefDescriptor(comptime T: type) type {
-    return extern struct { allocated: *T = undefined, aligned: *T = undefined, offset: i64 = undefined };
+    return extern struct { allocated: ?*T = null, aligned: ?*T = null, offset: i64 = undefined };
 }
 
 fn MemRefDescriptor(comptime T: type, comptime N: usize) type {
     return extern struct {
-        allocated: *T = undefined,
-        aligned: *T = undefined,
+        allocated: ?*T = null,
+        aligned: ?*T = null,
         offset: i64 = undefined,
         sizes: [N]i64 = undefined,
         strides: [N]i64 = undefined,
@@ -397,10 +389,29 @@ fn MemRefDescriptor(comptime T: type, comptime N: usize) type {
             mem.copy(i64, self.sizes[0..rank], sizes[0..rank]);
             mem.copy(i64, self.strides[0..rank], strides[0..rank]);
         }
+        fn populate2(self: *@This(), offset: i64, sizes: []i64, strides: []i64) void {
+            self.offset = offset;
+            const rank = sizes.len;
+            mem.copy(i64, self.sizes[0..rank], sizes[0..rank]);
+            mem.copy(i64, self.strides[0..rank], strides[0..rank]);
+        }
     };
 }
 
+const forward_module = "Elixir.Beaver.Native.C64";
+const Complex = struct {
+    fn of(comptime ElementKind: type) type {
+        return extern struct {
+            i: ElementKind.T,
+            r: ElementKind.T,
+        };
+    }
+    const F32 = beam.ResourceKind(Complex.of(fizz.F32), forward_module);
+};
+
 const MemRefDataType = enum {
+    C64,
+    U8,
     F32,
     F64,
     I32,
@@ -409,6 +420,8 @@ const MemRefDataType = enum {
 
 fn dataTypeToResourceKind(self: MemRefDataType) type {
     return switch (self) {
+        .C64 => Complex.F32,
+        .U8 => fizz.U8,
         .F32 => fizz.F32,
         .F64 => fizz.F64,
         .I32 => fizz.I32,
@@ -418,6 +431,8 @@ fn dataTypeToResourceKind(self: MemRefDataType) type {
 
 fn dataKindToDataType(comptime self: type) MemRefDataType {
     return switch (self) {
+        Complex.F32 => MemRefDataType.C64,
+        fizz.U8 => MemRefDataType.U8,
         fizz.F32 => MemRefDataType.F32,
         fizz.F64 => MemRefDataType.F64,
         fizz.I32 => MemRefDataType.I32,
@@ -427,6 +442,8 @@ fn dataKindToDataType(comptime self: type) MemRefDataType {
 }
 
 const memref_kinds = .{
+    BeaverMemRef(dataTypeToResourceKind(MemRefDataType.C64)),
+    BeaverMemRef(dataTypeToResourceKind(MemRefDataType.U8)),
     BeaverMemRef(dataTypeToResourceKind(MemRefDataType.F32)),
     BeaverMemRef(dataTypeToResourceKind(MemRefDataType.F64)),
     BeaverMemRef(dataTypeToResourceKind(MemRefDataType.I32)),
@@ -461,9 +478,9 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
                 return beam.make_error_binary(env, "fail to fetch aligned. expected: " ++ @typeName(ResourceKind.Ptr.T));
             var offset: fizz.I64.T = fizz.I64.resource.fetch(env, args[2]) catch
                 return beam.make_error_binary(env, "fail to fetch offset");
-            const sizes = beam.get_slice_of(i64, env, args[3]) catch return beam.make_error_binary(env, "fail to sizes ");
+            const sizes = beam.get_slice_of(i64, env, args[3]) catch return beam.make_error_binary(env, "fail to get sizes as zig slice");
             defer beam.allocator.free(sizes);
-            const strides = beam.get_slice_of(i64, env, args[4]) catch return beam.make_error_binary(env, "fail to get strides ");
+            const strides = beam.get_slice_of(i64, env, args[4]) catch return beam.make_error_binary(env, "fail to get sizes as zig slice");
             defer beam.allocator.free(strides);
             if (sizes.len != strides.len) {
                 return beam.make_error_binary(env, "sizes and strides must have the same length");
@@ -472,33 +489,70 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
             switch (sizes.len) {
                 0 => {
                     // unrank has different type, so put it in a dedicated arm
-                    var des: UnrankMemRefDescriptor(ResourceKind.T) = .{
-                        .allocated = allocated,
-                        .aligned = aligned,
-                        .offset = offset,
-                    };
-                    return kind.per_rank_resource_kinds[0].resource.make(env, des) catch return beam.make_error_binary(env, "fail to make unranked memref descriptor");
+                    var descriptor: UnrankMemRefDescriptor(ResourceKind.T) = undefined;
+                    // TODO: figure out how to write this in a more elegant way
+                    if (allocated == null) {
+                        descriptor = .{
+                            .offset = offset,
+                        };
+                    } else {
+                        descriptor = .{
+                            .allocated = allocated,
+                            .aligned = aligned,
+                            .offset = offset,
+                        };
+                    }
+
+                    return kind.per_rank_resource_kinds[0].resource.make(env, descriptor) catch return beam.make_error_binary(env, "fail to make unranked memref descriptor");
                 },
                 else => {
                     comptime var rank = 1;
-                    inline while (rank < 10) : (rank += 1) {
+                    inline while (rank < kind.per_rank_resource_kinds.len) : (rank += 1) {
                         if (rank == sizes.len) {
-                            var des: MemRefDescriptor(ResourceKind.T, rank) = .{};
-                            if (rank < kind.per_rank_resource_kinds.len) {
-                                return kind.per_rank_resource_kinds[rank].resource.make(env, des) catch return beam.make_error_binary(env, "fail to make memref descriptor");
+                            var descriptor: MemRefDescriptor(ResourceKind.T, rank) = .{};
+                            if (allocated == null) {
+                                descriptor.populate2(offset, sizes, strides);
                             } else {
-                                return beam.make_error_binary(env, "rank is too large");
+                                descriptor.populate(allocated, aligned, offset, sizes, strides);
                             }
+                            return kind.per_rank_resource_kinds[rank].resource.make(env, descriptor) catch return beam.make_error_binary(env, "fail to make memref descriptor");
                         }
                     }
                     return beam.make_error_binary(env, "doen't support make memref descriptor for rank > 4");
                 },
             }
         }
+        fn aligned_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            const kind: type = dataKindToMemrefKind(ResourceKind);
+            comptime var rank = 0;
+            inline while (rank < kind.per_rank_resource_kinds.len) : (rank += 1) {
+                if (kind.per_rank_resource_kinds[rank].resource.fetch(env, args[0])) |descriptor| {
+                    var ret: fizz.OpaquePtr.T = @ptrCast(fizz.OpaquePtr.T, descriptor.aligned);
+                    return fizz.OpaquePtr.resource.make(env, ret) catch return beam.make_error_binary(env, "fail to make aligned ptr");
+                } else |_| {
+                    // do nothing
+                }
+            }
+            return beam.make_error_binary(env, "fail to get aligned ptr");
+        }
+        fn self_opaque_ptr(env: beam.env, num_args: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            const kind: type = dataKindToMemrefKind(ResourceKind);
+            comptime var rank = 0;
+            inline while (rank < kind.per_rank_resource_kinds.len) : (rank += 1) {
+                const per_rank_kind = kind.per_rank_resource_kinds[rank];
+                if (per_rank_kind.resource.fetch(env, args[0])) |_| {
+                    return per_rank_kind.opaque_ptr(env, num_args, args);
+                } else |_| {
+                    // do nothing
+                }
+            }
+            return beam.make_error_binary(env, "fail to get opaque ptr to memref descriptor");
+        }
         const root_module = ResourceKind.module_name;
         pub const nifs = .{
             e.ErlNifFunc{ .name = root_module ++ ".memref_create", .arity = 5, .fptr = create_descriptor, .flags = 0 },
-            e.ErlNifFunc{ .name = root_module ++ ".memref_aligned", .arity = 1, .fptr = create_descriptor, .flags = 0 },
+            e.ErlNifFunc{ .name = root_module ++ ".memref_aligned", .arity = 1, .fptr = aligned_ptr, .flags = 0 },
+            e.ErlNifFunc{ .name = root_module ++ ".memref_opaque_ptr", .arity = 1, .fptr = self_opaque_ptr, .flags = 0 },
         };
         fn MemRefOfRank(comptime rank: u8) type {
             if (rank == 0) {
@@ -534,10 +588,12 @@ pub export const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_beaver_attribute_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_attribute_to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_type_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_type_to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_operation_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_operation_to_charlist, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_resource_bool_to_term", .arity = 1, .fptr = beaver_raw_resource_bool_to_term, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_get_resource_c_string", .arity = 1, .fptr = beaver_raw_get_resource_c_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_mlir_named_attribute_get", .arity = 2, .fptr = beaver_raw_mlir_named_attribute_get, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_read_opaque_ptr", .arity = 2, .fptr = beaver_raw_read_opaque_ptr, .flags = 0 },
 } ++
+    dataKindToMemrefKind(Complex.F32).nifs ++
+    dataKindToMemrefKind(fizz.U8).nifs ++
     dataKindToMemrefKind(fizz.F32).nifs ++
     dataKindToMemrefKind(fizz.F64).nifs ++
     dataKindToMemrefKind(fizz.I32).nifs ++

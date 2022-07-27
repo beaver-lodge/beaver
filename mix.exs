@@ -39,8 +39,7 @@ defmodule Beaver.Umbrella.MixProject do
           Beaver.MLIR.Block
         ],
         JIT: [
-          Beaver.MLIR.ExecutionEngine,
-          Beaver.MLIR.ExecutionEngine.MemRefDescriptor
+          Beaver.MLIR.ExecutionEngine
         ],
         Pass: [
           Beaver.MLIR.Pass,

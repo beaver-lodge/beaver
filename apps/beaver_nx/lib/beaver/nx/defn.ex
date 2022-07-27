@@ -158,13 +158,11 @@ defmodule Beaver.Nx.Defn do
          } = t
        ) do
     mlir block: block do
-      raw_buffer = Exotic.Value.Struct.get(binary)
-
       tensor_attr =
         MLIR.CAPI.mlirDenseElementsAttrRawBufferGet(
           gen_type(t),
-          Exotic.Value.get(:isize, byte_size(binary)),
-          Exotic.Value.get_ptr(raw_buffer)
+          byte_size(binary),
+          Beaver.Native.c_string(binary) |> Beaver.Native.Array.as_opaque()
         )
 
       if MLIR.Attribute.is_null(tensor_attr), do: raise("fail to parse tensor dense elements")
@@ -429,7 +427,7 @@ defmodule Beaver.Nx.Defn do
     MLIR.ExecutionEngine.invoke!(
       jit,
       symbol,
-      Enum.map(jit_args, &Exotic.Value.get_ptr/1)
+      Enum.map(jit_args, &Beaver.Native.Memory.descriptor_ptr/1)
     )
 
     # unpack the C struct into tensor tuples
@@ -455,7 +453,7 @@ defmodule Beaver.Nx.Defn do
   end
 
   def memref_from_tensor(tuple) when is_tuple(tuple) do
-    raise "TODO"
+    raise "TODO: pack multiple memref into a single struct"
   end
 
   @doc """
@@ -468,7 +466,7 @@ defmodule Beaver.Nx.Defn do
 
   def populate_tensor_from_memref(tuple, nested_struct)
       when is_tuple(tuple) do
-    raise "TODO"
+    raise "TODO: extract memrefs from nested struct"
   end
 
   @doc """

@@ -237,6 +237,10 @@ defmodule Fizz do
     beam.InternalOpaquePtr.resource.t = OpaquePtr.resource.t;
     beam.InternalOpaquePtr.Ptr.resource.t = OpaquePtr.Ptr.resource.t;
     beam.InternalOpaquePtr.Array.resource.t = OpaquePtr.Array.resource.t;
+
+    beam.InternalOpaqueArray.resource.t = OpaqueArray.resource.t;
+    beam.InternalOpaqueArray.Ptr.resource.t = OpaqueArray.Ptr.resource.t;
+    beam.InternalOpaqueArray.Array.resource.t = OpaqueArray.Array.resource.t;
     }
     pub export const generated_nifs = .{
       #{nifs |> Enum.map(&Fizz.CodeGen.NIF.gen/1) |> Enum.join("  ")}

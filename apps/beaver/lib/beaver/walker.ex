@@ -53,14 +53,14 @@ defmodule Beaver.Walker do
   @type t :: %__MODULE__{
           container: container(),
           element_module: element_module(),
-          get_num: (container() -> Exotic.Value.t() | integer()) | nil,
-          get_element: (container(), integer() | Exotic.Value.t() -> element()) | nil,
-          element_equal: (element(), element() -> Exotic.Value.t() | integer()) | nil,
+          get_num: (container() -> Beaver.Native.I64.t() | integer()) | nil,
+          get_element: (container(), integer() -> element()) | nil,
+          element_equal: (element(), element() -> Beaver.Native.Bool.t() | bool()) | nil,
           get_first: (container() -> element()) | nil,
           get_next: (element() -> element()) | nil,
           get_parent: (element() -> container()) | nil,
-          parent_equal: (element(), element() -> Exotic.Value.t() | integer()) | nil,
-          is_null: (element() -> Exotic.Value.t() | bool()) | nil,
+          parent_equal: (element(), element() -> Beaver.Native.Bool.t() | bool()) | nil,
+          is_null: (element() -> Beaver.Native.Bool.t() | bool()) | nil,
           this: element() | non_neg_integer() | nil,
           num: non_neg_integer() | nil
         }

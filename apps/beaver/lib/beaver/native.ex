@@ -21,13 +21,28 @@ defmodule Beaver.Native do
     }
   end
 
-  def array(list, module, opts \\ [mut: false]) when is_list(list) do
+  def array(data, module, opts \\ [mut: false])
+
+  def array(data, module, opts) when is_binary(data) do
     mut = Keyword.get(opts, :mut) || false
     func = if mut, do: "mut_array", else: "array"
 
     ref =
       apply(CAPI, Module.concat([module, func]), [
-        Enum.map(list, &Fizz.unwrap_ref/1)
+        data
+      ])
+      |> check!()
+
+    %__MODULE__.Array{ref: ref, element_module: module}
+  end
+
+  def array(data, module, opts) when is_list(data) do
+    mut = Keyword.get(opts, :mut) || false
+    func = if mut, do: "mut_array", else: "array"
+
+    ref =
+      apply(CAPI, Module.concat([module, func]), [
+        Enum.map(data, &Fizz.unwrap_ref/1)
       ])
       |> check!()
 
@@ -72,5 +87,14 @@ defmodule Beaver.Native do
       ref ->
         ref
     end
+  end
+
+  def forward(
+        element_module,
+        kind_func_name,
+        args
+      ) do
+    apply(CAPI, Module.concat(element_module, kind_func_name), args)
+    |> check!()
   end
 end

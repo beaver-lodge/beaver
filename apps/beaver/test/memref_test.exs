@@ -1,8 +1,8 @@
 defmodule MemRefTest do
   use ExUnit.Case
   alias Beaver.MLIR
-  alias Beaver.MLIR.ExecutionEngine.MemRefDescriptor
 
+  @moduletag :smoke
   test "creation" do
     assert %Beaver.Native.Memory{} =
              Beaver.Native.Memory.new([1.1, 2.2, 3.3], type: Beaver.Native.F32, sizes: [3, 1])
@@ -102,10 +102,14 @@ defmodule MemRefTest do
              100.4000015258789
            ]
 
-    MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [Exotic.Value.get_ptr(arg0)])
+    MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [
+      Beaver.Native.Memory.descriptor_ptr(arg0)
+    ])
 
     for _i <- 1..1000 do
-      MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [Exotic.Value.get_ptr(arg0)])
+      MLIR.ExecutionEngine.invoke!(jit, "generic_without_inputs", [
+        Beaver.Native.Memory.descriptor_ptr(arg0)
+      ])
     end
 
     <<
@@ -117,11 +121,8 @@ defmodule MemRefTest do
       a5::little-float-32
     >> =
       arg0
-      |> Exotic.Value.fetch(
-        Beaver.MLIR.ExecutionEngine.MemRefDescriptor.struct_fields(3),
-        :allocated
-      )
-      |> Exotic.Value.Ptr.read_as_binary(Integer.floor_div(32 * 6, 8))
+      |> Beaver.Native.Memory.aligned()
+      |> Beaver.Native.OpaquePtr.read(Integer.floor_div(32 * 6, 8))
 
     assert [2.0, 2.0, 2.0, 2.0, 2.0, 2.0] ==
              [

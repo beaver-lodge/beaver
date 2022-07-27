@@ -1564,6 +1564,44 @@ pub fn get_resource_array_from_list(comptime ElementType: type, environment: env
     return e.enif_make_resource(environment, ptr);
 }
 
+const mem = @import("std").mem;
+
+pub fn get_resource_array_from_binary(environment: env, resource_type_array: resource_type, binary_term: term) !term {
+    const RType = [*c]u8;
+    var bin: binary = undefined;
+    if (0 == e.enif_inspect_binary(environment, binary_term, &bin)) {
+        return Error.FunctionClauseError;
+    }
+    var ptr: ?*anyopaque = e.enif_alloc_resource(resource_type_array, @sizeOf(RType) + bin.size);
+    var obj: *RType = undefined;
+    var real_binary: RType = undefined;
+    if (ptr == null) {
+        unreachable();
+    } else {
+        obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
+        real_binary = @ptrCast(RType, @alignCast(@alignOf(RType), ptr));
+        real_binary += @sizeOf(RType);
+        obj.* = real_binary;
+    }
+    mem.copy(u8, real_binary[0..bin.size], bin.data[0..bin.size]);
+    return e.enif_make_resource(environment, ptr);
+}
+
+// the term could be:
+// - list of element resource
+// - list of primitives
+// - binary
+pub fn get_resource_array(comptime ElementType: type, environment: env, resource_type_element: resource_type, resource_type_array: resource_type, data: term) !term {
+    if (get_resource_array_from_list(ElementType, environment, resource_type_element, resource_type_array, data)) |value| {
+        return value;
+    } else |_| {
+        if (get_resource_array_from_binary(environment, resource_type_array, data)) |value| {
+            return value;
+        } else |_| {
+            return Error.FunctionClauseError;
+        }
+    }
+}
 pub fn get_resource_ptr_from_term(comptime ElementType: type, environment: env, resource_type_element: resource_type, resource_type_ptr: resource_type, element: term) !term {
     const RType = [*c]ElementType;
     const ptr: ?*anyopaque = e.enif_alloc_resource(resource_type_ptr, @sizeOf(RType));
@@ -1604,6 +1642,7 @@ pub fn open_resource_wrapped(environment: env, comptime T: type) void {
 }
 
 pub const InternalOpaquePtr = ResourceKind(?*anyopaque, "Internal.OpaquePtr");
+pub const InternalOpaqueArray = ResourceKind(?*const anyopaque, "Internal.OpaqueArray");
 
 pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
     return struct {
@@ -1649,19 +1688,26 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
                     return fetch_resource(ArrayType, environment, t, arg);
                 }
             };
+            // get the array adress as a opaque array
+            pub fn as_opaque(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
+                var array_ptr: ArrayType = @This().resource.fetch(environment, args[0]) catch
+                    return make_error_binary(environment, "fail to fetch resource for array, expected: " ++ @typeName(ArrayType));
+                return InternalOpaqueArray.resource.make(environment, array_ptr) catch
+                    return make_error_binary(environment, "fail to make resource for opaque arra");
+            }
         };
         fn ptr(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
             return get_resource_ptr_from_term(T, environment, @This().resource.t, Ptr.resource.t, args[0]) catch return make_error_binary(environment, "fail to create ptr " ++ @typeName(T));
         }
-        fn opaque_ptr(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
+        pub fn opaque_ptr(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
             const ptr_to_resource_memory: Ptr.T = fetch_resource_ptr(T, environment, @This().resource.t, args[0]) catch return make_error_binary(environment, "fail to create ptr " ++ @typeName(T));
             return InternalOpaquePtr.resource.make(environment, ptr_to_resource_memory) catch return make_error_binary(environment, "fail to make resource for: " ++ @typeName(InternalOpaquePtr.T));
         }
         fn array(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
-            return get_resource_array_from_list(T, environment, @This().resource.t, Array.resource.t, args[0]) catch return make_error_binary(environment, "fail to create array " ++ @typeName(T));
+            return get_resource_array(T, environment, @This().resource.t, Array.resource.t, args[0]) catch return make_error_binary(environment, "fail to create array " ++ @typeName(T));
         }
         fn mut_array(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
-            return get_resource_array_from_list(T, environment, @This().resource.t, Ptr.resource.t, args[0]) catch return make_error_binary(environment, "fail to create mut array " ++ @typeName(T));
+            return get_resource_array(T, environment, @This().resource.t, Ptr.resource.t, args[0]) catch return make_error_binary(environment, "fail to create mut array " ++ @typeName(T));
         }
         fn primitive(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
             const v = resource.fetch(environment, args[0]) catch return make_error_binary(environment, "fail to extract pritimive from " ++ @typeName(T));
@@ -1678,6 +1724,7 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
             e.ErlNifFunc{ .name = module_name ++ ".mut_array", .arity = 1, .fptr = mut_array, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".primitive", .arity = 1, .fptr = primitive, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".make", .arity = 1, .fptr = make_, .flags = 0 },
+            e.ErlNifFunc{ .name = module_name ++ ".array_as_opaque", .arity = 1, .fptr = @This().Array.as_opaque, .flags = 0 },
         };
         pub fn open(environment: env) void {
             @This().resource.t = e.enif_open_resource_type(environment, null, @This().resource.name, destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
