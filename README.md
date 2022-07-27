@@ -259,7 +259,7 @@ SomeDialect.some_op(
 
 ### Beaver DSL as higher level AST for MLIR
 
-There should be a 1:1 mapping between Beaver SSA DSL to MLIR SSA. This enables the support parsing MLIR text format and dump it to Beaver DSL which is Elixir AST essentially. This makes it possible to easily debug a piece of IR in a more programmable and readable way.
+There should be a 1:1 mapping between Beaver SSA DSL to MLIR SSA. It is possible to do a roundtrip parsing MLIR text format and dump it to Beaver DSL which is Elixir AST essentially. This makes it possible to easily debug a piece of IR in a more programmable and readable way.
 
 In Beaver, working with MLIR should be in one format, no matter it is generating, transforming, debugging.
 
@@ -270,7 +270,7 @@ In Beaver, working with MLIR should be in one format, no matter it is generating
   This enable the possibility to use the rich collection of functions in Elixir standard libraries and Hex packages.
 - Erlang Modules to work with Ops in different MLIR dialects should implement behaviors like `Beaver.DSL.Op.Prototype`.
 
-## Is Beaver a compiler or binding to LLVM/MLIR or what?
+## Is Beaver a compiler or binding to LLVM/MLIR?
 
 Elixir is a programming language built for all purposes. There are multiple sub-ecosystems in the general Erlang/Elixir ecosystem.
 Each sub-ecosystem appears distinct/unrelated to each other, but they actually complement each other in the real world production.
@@ -307,7 +307,6 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
     -DLLVM_TARGETS_TO_BUILD="host" \
     -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
     -DLLVM_ENABLE_ASSERTIONS=ON \
-    -DCMAKE_BUILD_TYPE=Release \
     -DLLVM_ENABLE_OCAMLDOC=OFF \
     -DLLVM_ENABLE_BINDINGS=OFF \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
