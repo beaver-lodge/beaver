@@ -296,8 +296,6 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 2. Install Zig, https://ziglang.org/learn/getting-started/#installing-zig
 3. Install LLVM/MLIR
 
-<!-- - Option #1,  -->
-
 - build from source https://mlir.llvm.org/getting_started/
 
   Recommended install commands:

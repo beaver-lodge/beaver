@@ -25,11 +25,13 @@ defmodule Fizz.CodeGen.NIF do
     for {f, a} <-
           [
             ptr: 1,
+            ptr_to_opaque: 1,
             opaque_ptr: 1,
             array: 1,
             mut_array: 1,
             primitive: 1,
             make: 1,
+            make_from_opaque_ptr: 2,
             array_as_opaque: 1
           ] ++ kind_functions do
       %__MODULE__{

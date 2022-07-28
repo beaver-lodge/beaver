@@ -35,7 +35,7 @@ defmodule Beaver.Nx do
   @impl true
   def to_binary(%T{shape: _shape, data: %B{memref: memref}} = tensor, limit) do
     Beaver.Native.Memory.aligned(memref)
-    |> Beaver.Native.OpaquePtr.read(limit * div(element_size(tensor), 8))
+    |> Beaver.Native.OpaquePtr.to_binary(limit * div(element_size(tensor), 8))
   end
 
   @impl true
@@ -65,7 +65,7 @@ defmodule Beaver.Nx do
     backend.from_binary(
       tensor,
       Beaver.Native.Memory.aligned(memref)
-      |> Beaver.Native.OpaquePtr.read(binary_len),
+      |> Beaver.Native.OpaquePtr.to_binary(binary_len),
       backend_options
     )
   end

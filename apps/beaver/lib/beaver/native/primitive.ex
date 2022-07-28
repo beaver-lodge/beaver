@@ -1,6 +1,5 @@
 for m <-
       [
-        OpaquePtr,
         OpaqueArray,
         Bool,
         CInt,
@@ -26,14 +25,5 @@ for m <-
     use Fizz.ResourceKind,
       root_module: CAPI,
       forward_module: Beaver.Native
-
-    if m == OpaquePtr do
-      @doc """
-      read the N bytes starting from the pointer and returns an Erlang binary
-      """
-      def read(%__MODULE__{ref: ref}, len) do
-        CAPI.beaver_raw_read_opaque_ptr(ref, len)
-      end
-    end
   end
 end

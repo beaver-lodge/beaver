@@ -1641,8 +1641,11 @@ pub fn open_resource_wrapped(environment: env, comptime T: type) void {
     T.resource_type = e.enif_open_resource_type(environment, null, T.resource_name, destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
 }
 
-pub const InternalOpaquePtr = ResourceKind(?*anyopaque, "Internal.OpaquePtr");
-pub const InternalOpaqueArray = ResourceKind(?*const anyopaque, "Internal.OpaqueArray");
+pub const InternalOpaquePtr = ResourceKind(?*anyopaque, "Kinda.Internal.OpaquePtr");
+pub const InternalOpaqueArray = ResourceKind(?*const anyopaque, "Kinda.Internal.OpaqueArray");
+pub const InternalUSize = ResourceKind(usize, "Kinda.Internal.USize");
+const kinda = @import("beam.zig");
+pub const InternalStruct = ResourceKind(kinda.Struct, "Kinda.Internal.Struct");
 
 pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
     return struct {
@@ -1699,6 +1702,10 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
         fn ptr(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
             return get_resource_ptr_from_term(T, environment, @This().resource.t, Ptr.resource.t, args[0]) catch return make_error_binary(environment, "fail to create ptr " ++ @typeName(T));
         }
+        fn ptr_to_opaque(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
+            const typed_ptr: Ptr.T = Ptr.resource.fetch(environment, args[0]) catch return make_error_binary(environment, "fail to fetch resource for ptr, expected: " ++ @typeName(PtrType));
+            return InternalOpaquePtr.resource.make(environment, typed_ptr) catch return make_error_binary(environment, "fail to make resource for: " ++ @typeName(InternalOpaquePtr.T));
+        }
         pub fn opaque_ptr(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
             const ptr_to_resource_memory: Ptr.T = fetch_resource_ptr(T, environment, @This().resource.t, args[0]) catch return make_error_binary(environment, "fail to create ptr " ++ @typeName(T));
             return InternalOpaquePtr.resource.make(environment, ptr_to_resource_memory) catch return make_error_binary(environment, "fail to make resource for: " ++ @typeName(InternalOpaquePtr.T));
@@ -1713,17 +1720,36 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
             const v = resource.fetch(environment, args[0]) catch return make_error_binary(environment, "fail to extract pritimive from " ++ @typeName(T));
             return make(T, environment, v) catch return make_error_binary(environment, "fail to create primitive " ++ @typeName(T));
         }
+        fn append_to_struct(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
+            const v = resource.fetch(environment, args[0]) catch return make_error_binary(environment, "fail to extract pritimive from " ++ @typeName(T));
+            return make(T, environment, v) catch return make_error_binary(environment, "fail to create primitive " ++ @typeName(T));
+        }
         fn make_(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
             const v = get(T, environment, args[0]) catch return make_error_binary(environment, "fail to fetch " ++ @typeName(T));
             return resource.make(environment, v) catch return make_error_binary(environment, "fail to create " ++ @typeName(T));
         }
+        fn make_from_opaque_ptr(environment: env, _: c_int, args: [*c]const term) callconv(.C) term {
+            const ptr_to_read: InternalOpaquePtr.T = InternalOpaquePtr.resource.fetch(environment, args[0]) catch
+                return make_error_binary(environment, "fail to fetch resource opaque ptr to read, expect" ++ @typeName(InternalOpaquePtr.T));
+            const offset: InternalUSize.T = InternalUSize.resource.fetch(environment, args[1]) catch
+                return make_error_binary(environment, "fail to fetch resource for offset, expected: " ++ @typeName(InternalUSize.T));
+            const ptr_int = @ptrToInt(ptr_to_read) + offset;
+            const obj_ptr = @intToPtr(*ElementType, ptr_int);
+            var tuple_slice: []term = allocator.alloc(term, 2) catch return make_error_binary(environment, "fail to allocate memory for tuple slice");
+            defer allocator.free(tuple_slice);
+            tuple_slice[0] = resource.make(environment, obj_ptr.*) catch return make_error_binary(environment, "fail to create resource for extract object");
+            tuple_slice[1] = InternalUSize.resource.make(environment, @sizeOf(ElementType)) catch return make_error_binary(environment, "fail to create resource for size of object");
+            return make_tuple(environment, tuple_slice);
+        }
         pub const nifs = .{
             e.ErlNifFunc{ .name = module_name ++ ".ptr", .arity = 1, .fptr = ptr, .flags = 0 },
+            e.ErlNifFunc{ .name = module_name ++ ".ptr_to_opaque", .arity = 1, .fptr = ptr_to_opaque, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".opaque_ptr", .arity = 1, .fptr = opaque_ptr, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".array", .arity = 1, .fptr = array, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".mut_array", .arity = 1, .fptr = mut_array, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".primitive", .arity = 1, .fptr = primitive, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".make", .arity = 1, .fptr = make_, .flags = 0 },
+            e.ErlNifFunc{ .name = module_name ++ ".make_from_opaque_ptr", .arity = 2, .fptr = make_from_opaque_ptr, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".array_as_opaque", .arity = 1, .fptr = @This().Array.as_opaque, .flags = 0 },
         };
         pub fn open(environment: env) void {
@@ -1733,6 +1759,7 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
             @This().Ptr.resource.t = e.enif_open_resource_type(environment, null, @This().Ptr.resource.name, destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
         }
         pub fn open_array(environment: env) void {
+            // TODO: use a ArrayList to store the array and deinit it in destroy callback
             @This().Array.resource.t = e.enif_open_resource_type(environment, null, @This().Array.resource.name, destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
         }
         pub fn open_all(environment: env) void {

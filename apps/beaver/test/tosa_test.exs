@@ -83,7 +83,7 @@ defmodule TosaTest do
     >> =
       arg1
       |> Beaver.Native.Memory.aligned()
-      |> Beaver.Native.OpaquePtr.read(Integer.floor_div(32 * 2, 8))
+      |> Beaver.Native.OpaquePtr.to_binary(Integer.floor_div(32 * 2, 8))
 
     assert [a0, a1] == [1.100000023841858, 2.200000047683716]
 
@@ -105,7 +105,7 @@ defmodule TosaTest do
 
       arg0
       |> Beaver.Native.Memory.aligned()
-      |> Beaver.Native.OpaquePtr.read(Integer.floor_div(32 * 3, 8))
+      |> Beaver.Native.OpaquePtr.to_binary(Integer.floor_div(32 * 3, 8))
 
       <<
         a0::little-float-32,
@@ -113,7 +113,7 @@ defmodule TosaTest do
       >> =
         arg1
         |> Beaver.Native.Memory.aligned()
-        |> Beaver.Native.OpaquePtr.read(Integer.floor_div(32 * 2, 8))
+        |> Beaver.Native.OpaquePtr.to_binary(Integer.floor_div(32 * 2, 8))
 
       assert [a0, a1] == [1.100000023841858, 2.200000047683716]
 
@@ -128,7 +128,7 @@ defmodule TosaTest do
         return
         # must use aligned ptr if it is allocated by LLVM
         |> Beaver.Native.Memory.aligned()
-        |> Beaver.Native.OpaquePtr.read(Integer.floor_div(32 * 6, 8))
+        |> Beaver.Native.OpaquePtr.to_binary(Integer.floor_div(32 * 6, 8))
 
       assert [x0, x1, x2, x3, x4, x5] == [
                2.4200000762939453,

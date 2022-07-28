@@ -3,7 +3,17 @@ defmodule Beaver.Native.Memory do
   A piece of memory managed by BEAM and can by addressed by a generated native function as MLIR MemRef descriptor
   """
 
-  defstruct storage: nil, descriptor_ref: nil
+  @enforce_keys [:descriptor_ref, :descriptor_kind]
+  defstruct storage: nil, descriptor_ref: nil, descriptor_kind: nil
+
+  defp shape_to_descriptor_kind(type, []) do
+    Module.concat([type, MemRef.DescriptorUnranked])
+  end
+
+  defp shape_to_descriptor_kind(type, list) when is_list(list) do
+    rank = length(list)
+    Module.concat([type, MemRef, "Descriptor#{rank}D"])
+  end
 
   defp dim_product(dims) when is_list(dims) and length(dims) > 0 do
     dims |> Enum.reduce(&*/2)
@@ -55,11 +65,12 @@ defmodule Beaver.Native.Memory do
     %__MODULE__{
       storage: array,
       descriptor_ref:
-        Beaver.Native.forward(mod, "memref_create", [ref, ref, offset, sizes, strides])
+        Beaver.Native.forward(mod, "memref_create", [ref, ref, offset, sizes, strides]),
+      descriptor_kind: shape_to_descriptor_kind(mod, sizes)
     }
   end
 
-  def new(%Beaver.Native.Array{ref: ref, element_module: mod} = array, opts) do
+  def new(%Beaver.Native.Array{ref: ref, element_kind: mod} = array, opts) do
     offset = Keyword.get(opts, :offset, 0)
     sizes = Keyword.fetch!(opts, :sizes)
 
@@ -73,7 +84,8 @@ defmodule Beaver.Native.Memory do
     %__MODULE__{
       storage: array,
       descriptor_ref:
-        Beaver.Native.forward(mod, "memref_create", [ref, ref, offset, sizes, strides])
+        Beaver.Native.forward(mod, "memref_create", [ref, ref, offset, sizes, strides]),
+      descriptor_kind: shape_to_descriptor_kind(mod, sizes)
     }
   end
 
@@ -82,24 +94,52 @@ defmodule Beaver.Native.Memory do
   """
   def aligned(%__MODULE__{
         descriptor_ref: descriptor_ref,
-        storage: %{element_module: element_module} = array
+        descriptor_kind: descriptor_kind,
+        storage: storage
       }) do
-    struct!(Beaver.Native.OpaquePtr,
-      ref: Beaver.Native.forward(element_module, "memref_aligned", [descriptor_ref])
-    )
-    |> Beaver.Native.bag(array)
+    # TODO: attach memref_aligned to memref kind
+    ["Beaver", "Native", type, "MemRef", _DescriptorRankType] = descriptor_kind |> Module.split()
+
+    element_kind = Module.concat(Beaver.Native, type)
+
+    ptr =
+      struct!(Beaver.Native.OpaquePtr,
+        ref: Beaver.Native.forward(element_kind, "memref_aligned", [descriptor_ref])
+      )
+
+    if storage do
+      ptr |> Beaver.Native.bag(storage)
+    else
+      ptr
+    end
   end
 
   @doc """
   return a opaque pointer to the memory descriptor. Usually used in the invoking of a generated function.
+  If it is a array, will return the pointer of the array to mimic a struct of packed memory descriptors
   """
   def descriptor_ptr(%__MODULE__{
         descriptor_ref: descriptor_ref,
-        storage: %{element_module: element_module} = array
+        storage: %{element_kind: element_kind} = array
       }) do
     struct!(Beaver.Native.OpaquePtr,
-      ref: Beaver.Native.forward(element_module, "memref_opaque_ptr", [descriptor_ref])
+      ref: Beaver.Native.forward(element_kind, "memref_opaque_ptr", [descriptor_ref])
     )
     |> Beaver.Native.bag(array)
+  end
+
+  def descriptor_ptr(%Beaver.Native.Array{ref: ref, element_kind: element_kind} = array) do
+    ref = Beaver.Native.forward(element_kind, :ptr_to_opaque, [ref])
+    struct!(Beaver.Native.OpaquePtr, ref: ref) |> Beaver.Native.bag(array)
+  end
+
+  def descriptor_dump(
+        %__MODULE__{
+          descriptor_ref: descriptor_ref,
+          storage: %{element_kind: element_kind}
+        } = m
+      ) do
+    :ok = Beaver.Native.forward(element_kind, "memref_dump", [descriptor_ref])
+    m
   end
 end

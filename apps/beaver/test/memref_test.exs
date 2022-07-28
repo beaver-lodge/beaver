@@ -84,7 +84,7 @@ defmodule MemRefTest do
     >> =
       arg0
       |> Beaver.Native.Memory.aligned()
-      |> Beaver.Native.OpaquePtr.read(Integer.floor_div(32 * 6, 8))
+      |> Beaver.Native.OpaquePtr.to_binary(Integer.floor_div(32 * 6, 8))
 
     assert [
              a0,
@@ -122,7 +122,7 @@ defmodule MemRefTest do
     >> =
       arg0
       |> Beaver.Native.Memory.aligned()
-      |> Beaver.Native.OpaquePtr.read(Integer.floor_div(32 * 6, 8))
+      |> Beaver.Native.OpaquePtr.to_binary(Integer.floor_div(32 * 6, 8))
 
     assert [2.0, 2.0, 2.0, 2.0, 2.0, 2.0] ==
              [
