@@ -1,4 +1,5 @@
 defmodule Beaver.MLIR.Managed.Terminator do
+  # TODO: remove this module. Create a new Block if a terminator has successor block hasn't been created and add the created block to the Env as a non-hygienic variable.
   @moduledoc """
   Pending terminator creators
   """

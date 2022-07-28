@@ -421,13 +421,18 @@ defmodule Beaver.Nx.Defn do
 
   def invoke(return, args, jit, symbol) do
     # pack the tensor tuples into a C struct
-    jit_args = [return_struct | _] = [return | args] |> Enum.map(&memref_from_tensor/1)
+    jit_args =
+      [return_struct | _] =
+      [return | args]
+      |> Enum.map(&memref_from_tensor/1)
+      |> Enum.map(&Beaver.Native.Memory.descriptor_ptr/1)
+
     if List.improper?(jit_args), do: raise("jit arguments is not a proper list")
 
     MLIR.ExecutionEngine.invoke!(
       jit,
       symbol,
-      Enum.map(jit_args, &Beaver.Native.Memory.descriptor_ptr/1)
+      jit_args
     )
 
     # unpack the C struct into tensor tuples
@@ -453,7 +458,20 @@ defmodule Beaver.Nx.Defn do
   end
 
   def memref_from_tensor(tuple) when is_tuple(tuple) do
-    raise "TODO: pack multiple memref into a single struct"
+    refs =
+      Tuple.to_list(tuple)
+      |> Enum.map(&memref_from_tensor/1)
+      |> Enum.map(&Beaver.Native.Memory.descriptor_dump/1)
+      |> Enum.map(fn %Beaver.Native.Memory{descriptor_ref: ref} -> ref end)
+
+    # TODO: add a raw NIF beaver_raw_create_heterogeneous_array, using union maybe
+    mut_array =
+      Beaver.Native.forward(Beaver.Native.F32.MemRef.DescriptorUnranked, :mut_array, [refs])
+
+    struct!(Beaver.Native.Array,
+      element_kind: Beaver.Native.F32.MemRef.DescriptorUnranked,
+      ref: mut_array
+    )
   end
 
   @doc """
@@ -466,7 +484,24 @@ defmodule Beaver.Nx.Defn do
 
   def populate_tensor_from_memref(tuple, nested_struct)
       when is_tuple(tuple) do
-    raise "TODO: extract memrefs from nested struct"
+    {tensors, _offset} =
+      Enum.reduce(tuple |> Tuple.to_list(), {[], 0}, fn x, {acc, offset} ->
+        {ref, size} =
+          Beaver.Native.OpaquePtr.to_resource(
+            Beaver.Native.F32.MemRef.DescriptorUnranked,
+            nested_struct,
+            offset
+          )
+
+        mem = %Beaver.Native.Memory{
+          descriptor_ref: ref,
+          descriptor_kind: Beaver.Native.F32.MemRef.DescriptorUnranked
+        }
+
+        {acc ++ [populate_tensor_from_memref(x, mem)], offset + size}
+      end)
+
+    tensors |> List.to_tuple()
   end
 
   @doc """

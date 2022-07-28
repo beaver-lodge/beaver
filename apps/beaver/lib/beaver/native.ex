@@ -9,7 +9,7 @@ defmodule Beaver.Native do
   def ptr(%mod{ref: ref}) do
     %__MODULE__.Ptr{
       ref: apply(CAPI, Module.concat(mod, :ptr), [ref]) |> check!(),
-      element_module: mod
+      element_kind: mod
     }
   end
 
@@ -19,6 +19,11 @@ defmodule Beaver.Native do
     %__MODULE__.OpaquePtr{
       ref: apply(CAPI, maker, [ref]) |> check!()
     }
+  end
+
+  def opaque_ptr(%__MODULE__.Array{} = array) do
+    array
+    |> __MODULE__.Array.as_opaque()
   end
 
   def array(data, module, opts \\ [mut: false])
@@ -33,7 +38,7 @@ defmodule Beaver.Native do
       ])
       |> check!()
 
-    %__MODULE__.Array{ref: ref, element_module: module}
+    %__MODULE__.Array{ref: ref, element_kind: module}
   end
 
   def array(data, module, opts) when is_list(data) do
@@ -46,10 +51,10 @@ defmodule Beaver.Native do
       ])
       |> check!()
 
-    %__MODULE__.Array{ref: ref, element_module: module}
+    %__MODULE__.Array{ref: ref, element_kind: module}
   end
 
-  def to_term(%__MODULE__.Ptr{ref: ref, element_module: __MODULE__.OpaquePtr}) do
+  def to_term(%__MODULE__.Ptr{ref: ref, element_kind: __MODULE__.OpaquePtr}) do
     apply(
       CAPI,
       Module.concat([__MODULE__.OpaquePtr, :primitive]),
@@ -90,11 +95,11 @@ defmodule Beaver.Native do
   end
 
   def forward(
-        element_module,
+        element_kind,
         kind_func_name,
         args
       ) do
-    apply(CAPI, Module.concat(element_module, kind_func_name), args)
+    apply(CAPI, Module.concat(element_kind, kind_func_name), args)
     |> check!()
   end
 end

@@ -306,6 +306,9 @@ export fn beaver_raw_read_opaque_ptr(env: beam.env, _: c_int, args: [*c]const be
     var ptr: fizz.OpaquePtr.T = fizz.OpaquePtr.resource.fetch(env, args[0]) catch
         return beam.make_error_binary(env, "fail to fetch resource for ptr, expected: " ++ @typeName(fizz.OpaquePtr.T));
     var len = fizz.U64.resource.fetch(env, args[1]) catch return beam.make_error_binary(env, "fail to fetch resource length, expected a integer");
+    if (ptr == null) {
+        return beam.make_error_binary(env, "ptr is null");
+    }
     const slice = @ptrCast(fizz.U8.Array.T, ptr)[0..len];
     return beam.make_slice(env, slice);
 }
@@ -548,17 +551,37 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
             }
             return beam.make_error_binary(env, "fail to get opaque ptr to memref descriptor");
         }
+        fn memref_dump(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            const kind: type = dataKindToMemrefKind(ResourceKind);
+            comptime var rank = 0;
+            inline while (rank < kind.per_rank_resource_kinds.len) : (rank += 1) {
+                const per_rank_kind = kind.per_rank_resource_kinds[rank];
+                if (per_rank_kind.resource.fetch(env, args[0])) |v| {
+                    print("{}\n", .{v});
+                    return beam.make_ok(env);
+                } else |_| {
+                    // do nothing
+                }
+            }
+            return beam.make_error_binary(env, "fail to get opaque ptr to memref descriptor");
+        }
         const root_module = ResourceKind.module_name;
         pub const nifs = .{
             e.ErlNifFunc{ .name = root_module ++ ".memref_create", .arity = 5, .fptr = create_descriptor, .flags = 0 },
             e.ErlNifFunc{ .name = root_module ++ ".memref_aligned", .arity = 1, .fptr = aligned_ptr, .flags = 0 },
             e.ErlNifFunc{ .name = root_module ++ ".memref_opaque_ptr", .arity = 1, .fptr = self_opaque_ptr, .flags = 0 },
-        };
+            e.ErlNifFunc{ .name = root_module ++ ".memref_dump", .arity = 1, .fptr = memref_dump, .flags = 0 },
+        } ++
+            per_rank_resource_kinds[0].nifs ++
+            per_rank_resource_kinds[1].nifs ++
+            per_rank_resource_kinds[2].nifs ++
+            per_rank_resource_kinds[3].nifs ++
+            per_rank_resource_kinds[4].nifs;
         fn MemRefOfRank(comptime rank: u8) type {
             if (rank == 0) {
-                return beam.ResourceKind(UnrankMemRefDescriptor(ResourceKind.T), root_module ++ ".MemRef" ++ @tagName(@intToEnum(MemRefRankType, 0)));
+                return beam.ResourceKind(UnrankMemRefDescriptor(ResourceKind.T), root_module ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, 0)));
             } else {
-                return beam.ResourceKind(MemRefDescriptor(ResourceKind.T, rank), root_module ++ ".MemRef" ++ @tagName(@intToEnum(MemRefRankType, rank)));
+                return beam.ResourceKind(MemRefDescriptor(ResourceKind.T, rank), root_module ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, rank)));
             }
         }
         const per_rank_resource_kinds = .{

@@ -66,21 +66,45 @@ defmodule Beaver.MLIR.CAPI do
   end
 
   # generate stubs for generated NIFs
-  Logger.debug("[Beaver] generating NIF wrapper")
+  Logger.debug("[Beaver] generating NIF wrappers")
 
-  complex_nifs =
-    %Fizz.CodeGen.Type{
-      module_name: Beaver.Native.C64,
-      kind_functions: Beaver.MLIR.CAPI.CodeGen.memref_kind_functions()
-    }
-    |> Fizz.CodeGen.NIF.from_resource_kind()
+  mem_ref_descriptor_kinds =
+    for rank <- [
+          DescriptorUnranked,
+          Descriptor1D,
+          Descriptor2D,
+          Descriptor3D,
+          Descriptor4D,
+          Descriptor5D,
+          Descriptor6D,
+          Descriptor7D,
+          Descriptor8D,
+          Descriptor9D
+        ],
+        t <- [C64, U8, I32, I64, F32, F64] do
+      %Fizz.CodeGen.Type{
+        module_name: Module.concat([Beaver.Native, t, MemRef, rank]),
+        kind_functions: Beaver.MLIR.CAPI.CodeGen.memref_kind_functions()
+      }
+    end
 
-  for nif <- nifs ++ complex_nifs do
+  extra_kind_nifs =
+    ([
+       %Fizz.CodeGen.Type{
+         module_name: Beaver.Native.C64,
+         kind_functions: Beaver.MLIR.CAPI.CodeGen.memref_kind_functions()
+       }
+     ] ++ mem_ref_descriptor_kinds)
+    |> Enum.map(&Fizz.CodeGen.NIF.from_resource_kind/1)
+    |> List.flatten()
+
+  for nif <- nifs ++ extra_kind_nifs do
     args_ast = Macro.generate_unique_arguments(nif.arity, __MODULE__)
 
     %Fizz.CodeGen.NIF{wrapper_name: wrapper_name, nif_name: nif_name, ret: ret} = nif
     @doc false
-    def unquote(nif_name)(unquote_splicing(args_ast)), do: raise("failed to load NIF")
+    def unquote(nif_name)(unquote_splicing(args_ast)),
+      do: raise("failed to load NIF library, or NIF is not implemented")
 
     if wrapper_name do
       if ret == "void" do

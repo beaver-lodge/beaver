@@ -1,10 +1,10 @@
 defmodule Beaver.Native.Array do
   alias Beaver.MLIR.CAPI
-  defstruct ref: nil, element_module: nil, bag: MapSet.new()
+  defstruct ref: nil, element_kind: nil, bag: MapSet.new()
 
-  def as_opaque(%{ref: ref, element_module: element_module}) do
+  def as_opaque(%{ref: ref, element_kind: element_kind}) do
     ref =
-      apply(CAPI, Module.concat([element_module, "array_as_opaque"]), [
+      apply(CAPI, Module.concat([element_kind, "array_as_opaque"]), [
         ref
       ])
       |> Beaver.Native.check!()

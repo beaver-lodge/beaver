@@ -15,7 +15,7 @@ defmodule MemRefDescriptorTest do
 
     assert t
            |> Beaver.Native.Memory.aligned()
-           |> Beaver.Native.OpaquePtr.read(Integer.floor_div(32 * 4, 8)) ==
+           |> Beaver.Native.OpaquePtr.to_binary(Integer.floor_div(32 * 4, 8)) ==
              <<1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0>>
   end
 end
