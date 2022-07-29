@@ -24,7 +24,7 @@ With Kinda, NIFs generated and hand-rolled co-exist and complement each other.
   - there could be higher order `ResourceKind` to bundle one or more different `ResourceKind`s
 
 - `root_module`: the NIF module will load the C shared library
-- `forward_module`: module implement functions like `array/2`, `ptr/1` to forward functions to `root_module`
+- `forward_module`: module implement functions like `array/2`, `ptr/1` to forward functions to `root_module`. By implementing different callbacks, you might choose to use Elixir struct to wrap a resource or use it directly.
 - Recommended module mapping convention:
 
   - let's say you have a Elixir module to manage a C type. And the NIF module is `SomeLib.CAPI`

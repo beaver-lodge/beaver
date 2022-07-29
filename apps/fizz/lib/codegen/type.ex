@@ -65,7 +65,7 @@ defmodule Fizz.CodeGen.Type do
 
   def gen_resource_kind(%__MODULE__{module_name: module_name, zig_t: zig_t, kind_name: kind_name}) do
     """
-    pub const #{kind_name} = beam.ResourceKind(#{zig_t}, "#{module_name}");
+    pub const #{kind_name} = kinda.ResourceKind(#{zig_t}, "#{module_name}");
     """
   end
 end

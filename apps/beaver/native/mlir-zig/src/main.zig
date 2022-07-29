@@ -9,6 +9,7 @@ test "basic add functionality" {
     try testing.expect(add(3, 7) == 10);
 }
 const beam = @import("beam.zig");
+const kinda = @import("kinda.zig");
 const e = @import("erl_nif.zig");
 const fizz = @import("mlir.imp.zig");
 pub const c = fizz.c;
@@ -409,7 +410,7 @@ const Complex = struct {
             r: ElementKind.T,
         };
     }
-    const F32 = beam.ResourceKind(Complex.of(fizz.F32), forward_module);
+    const F32 = kinda.ResourceKind(Complex.of(fizz.F32), forward_module);
 };
 
 const MemRefDataType = enum {
@@ -579,9 +580,9 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
             per_rank_resource_kinds[4].nifs;
         fn MemRefOfRank(comptime rank: u8) type {
             if (rank == 0) {
-                return beam.ResourceKind(UnrankMemRefDescriptor(ResourceKind.T), root_module ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, 0)));
+                return kinda.ResourceKind(UnrankMemRefDescriptor(ResourceKind.T), root_module ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, 0)));
             } else {
-                return beam.ResourceKind(MemRefDescriptor(ResourceKind.T, rank), root_module ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, rank)));
+                return kinda.ResourceKind(MemRefDescriptor(ResourceKind.T, rank), root_module ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, rank)));
             }
         }
         const per_rank_resource_kinds = .{
@@ -648,6 +649,7 @@ export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
         memref_kinds[i].open(env);
     }
     beam.open_resource_wrapped(env, PassToken);
+    kinda.Internal.OpaqueStruct.open_all(env);
     return 0;
 }
 

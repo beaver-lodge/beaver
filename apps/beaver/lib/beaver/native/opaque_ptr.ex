@@ -18,7 +18,6 @@ defmodule Beaver.Native.OpaquePtr do
   def to_resource(mod, %Beaver.Native.OpaquePtr{ref: ptr_ref}, offset \\ 0) do
     {ref, size} = Beaver.Native.forward(mod, "make_from_opaque_ptr", [ptr_ref, offset])
     Beaver.Native.forward(Beaver.Native.F32, "memref_dump", [ref])
-    size = %Beaver.Native.USize{ref: size} |> Beaver.Native.to_term()
     {ref, size}
   end
 end
