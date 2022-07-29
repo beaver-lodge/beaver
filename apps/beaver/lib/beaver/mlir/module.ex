@@ -19,8 +19,8 @@ defmodule Beaver.MLIR.Module do
     module
   end
 
+  # TODO: add operations field to store a walker
   use Fizz.ResourceKind,
-    root_module: CAPI,
     forward_module: Beaver.Native
 
   def is_null(module) do

@@ -1,34 +1,34 @@
 defmodule Fizz.ResourceKind do
   defmacro __using__(opts) do
-    root_module = Keyword.fetch!(opts, :root_module)
-    forward_module = Keyword.get(opts, :forward_module, root_module)
+    forward_module = Keyword.fetch!(opts, :forward_module)
     fields = Keyword.get(opts, :fields) || []
+    generic = Keyword.get(opts, :generic) || false
 
     quote bind_quoted: [
-            root_module: root_module,
             forward_module: forward_module,
-            fields: fields
+            fields: fields,
+            generic: generic
           ] do
-      defstruct [ref: nil, bag: MapSet.new()] ++ fields
-
-      @type t :: %__MODULE__{
-              ref: reference(),
-              bag: MapSet.t()
-            }
+      kind = if generic, do: nil, else: __MODULE__
+      defstruct [ref: nil, bag: MapSet.new(), kind: kind] ++ fields
 
       def array(data, opts \\ []) do
         unquote(forward_module).array(data, __MODULE__, opts)
       end
 
-      def make(value) do
-        %__MODULE__{
-          ref:
-            apply(
-              unquote(root_module),
-              Module.concat([__MODULE__, "make"]) |> unquote(forward_module).check!(),
-              [value]
-            )
-        }
+      if generic do
+        def make(kind, args) when is_atom(kind) and is_list(args) do
+          %__MODULE__{
+            ref: unquote(forward_module).forward(kind, "make", args),
+            kind: kind
+          }
+        end
+      else
+        def make(value) do
+          %__MODULE__{
+            ref: unquote(forward_module).forward(__MODULE__, "make", [value])
+          }
+        end
       end
     end
   end

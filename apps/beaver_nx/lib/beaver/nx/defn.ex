@@ -425,14 +425,13 @@ defmodule Beaver.Nx.Defn do
       [return_struct | _] =
       [return | args]
       |> Enum.map(&memref_from_tensor/1)
-      |> Enum.map(&Beaver.Native.Memory.descriptor_ptr/1)
 
     if List.improper?(jit_args), do: raise("jit arguments is not a proper list")
 
     MLIR.ExecutionEngine.invoke!(
       jit,
       symbol,
-      jit_args
+      jit_args |> Enum.map(&Beaver.Native.Memory.descriptor_ptr/1)
     )
 
     # unpack the C struct into tensor tuples
@@ -458,18 +457,25 @@ defmodule Beaver.Nx.Defn do
   end
 
   def memref_from_tensor(tuple) when is_tuple(tuple) do
-    refs =
+    mems =
       Tuple.to_list(tuple)
       |> Enum.map(&memref_from_tensor/1)
       |> Enum.map(&Beaver.Native.Memory.descriptor_dump/1)
-      |> Enum.map(fn %Beaver.Native.Memory{descriptor_ref: ref} -> ref end)
+
+    first = mems |> List.first()
+    kind = first.descriptor.kind
+
+    refs =
+      mems
+      |> Enum.map(fn %Beaver.Native.Memory{descriptor: %Beaver.Native.Memory.Descriptor{ref: ref}} ->
+        ref
+      end)
 
     # TODO: add a raw NIF beaver_raw_create_heterogeneous_array, using union maybe
-    mut_array =
-      Beaver.Native.forward(Beaver.Native.F32.MemRef.DescriptorUnranked, :mut_array, [refs])
+    mut_array = Beaver.Native.forward(kind, :mut_array, [refs])
 
     struct!(Beaver.Native.Array,
-      element_kind: Beaver.Native.F32.MemRef.DescriptorUnranked,
+      element_kind: kind,
       ref: mut_array
     )
   end
@@ -482,20 +488,27 @@ defmodule Beaver.Nx.Defn do
     %{tensor | data: %Beaver.Nx{memref: memref}}
   end
 
-  def populate_tensor_from_memref(tuple, nested_struct)
+  def populate_tensor_from_memref(
+        tuple,
+        %Beaver.Native.Array{element_kind: element_kind} = nested_struct
+      )
       when is_tuple(tuple) do
+    nested_struct_ptr = nested_struct |> Beaver.Native.Memory.descriptor_ptr()
+
     {tensors, _offset} =
       Enum.reduce(tuple |> Tuple.to_list(), {[], 0}, fn x, {acc, offset} ->
         {ref, size} =
           Beaver.Native.OpaquePtr.to_resource(
-            Beaver.Native.F32.MemRef.DescriptorUnranked,
-            nested_struct,
+            element_kind,
+            nested_struct_ptr,
             offset
           )
 
         mem = %Beaver.Native.Memory{
-          descriptor_ref: ref,
-          descriptor_kind: Beaver.Native.F32.MemRef.DescriptorUnranked
+          descriptor: %Beaver.Native.Memory.Descriptor{
+            ref: ref,
+            kind: element_kind
+          }
         }
 
         {acc ++ [populate_tensor_from_memref(x, mem)], offset + size}

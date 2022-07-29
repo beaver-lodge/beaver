@@ -2,7 +2,6 @@ defmodule Beaver.MLIR.Value do
   alias Beaver.MLIR.CAPI
 
   use Fizz.ResourceKind,
-    root_module: CAPI,
     forward_module: Beaver.Native
 
   def dump(value) do

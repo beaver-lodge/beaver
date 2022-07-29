@@ -111,8 +111,8 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
             const v = resource.fetch(env, args[0]) catch return beam.make_error_binary(env, "fail to extract pritimive from " ++ @typeName(T));
             return beam.make(T, env, v) catch return beam.make_error_binary(env, "fail to create primitive " ++ @typeName(T));
         }
-        fn make_(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            const v = beam.get(T, env, args[0]) catch return beam.make_error_binary(env, "fail to fetch " ++ @typeName(T));
+        fn make(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            const v = beam.get(T, env, args[0]) catch return beam.make_error_binary(env, "Fail to fetch primitive to make a resource. Expected type: " ++ @typeName(T));
             return resource.make(env, v) catch return beam.make_error_binary(env, "fail to create " ++ @typeName(T));
         }
         fn make_from_opaque_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
@@ -128,9 +128,16 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
             tuple_slice[1] = beam.make(Internal.USize.T, env, @sizeOf(ElementType)) catch return beam.make_error_binary(env, "fail to create resource for size of object");
             return beam.make_tuple(env, tuple_slice);
         }
-        const ptr_maker = if (@typeInfo(ElementType) == .Struct and @hasDecl(ElementType, "ptr")) {
-            ElementType.ptr;
-        } else ptr;
+        const maker = if (@typeInfo(ElementType) == .Struct and @hasDecl(ElementType, "make"))
+            ElementType.maker
+        else .{ make, 1 };
+        const ptr_maker = if (@typeInfo(ElementType) == .Struct and @hasDecl(ElementType, "ptr"))
+            ElementType.ptr
+        else
+            ptr;
+        const extra_nifs = if (@typeInfo(ElementType) == .Struct and @hasDecl(ElementType, "nifs"))
+            ElementType.nifs
+        else .{};
         pub const nifs = .{
             e.ErlNifFunc{ .name = module_name ++ ".ptr", .arity = 1, .fptr = ptr_maker, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".ptr_to_opaque", .arity = 1, .fptr = ptr_to_opaque, .flags = 0 },
@@ -138,10 +145,10 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
             e.ErlNifFunc{ .name = module_name ++ ".array", .arity = 1, .fptr = array, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".mut_array", .arity = 1, .fptr = mut_array, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".primitive", .arity = 1, .fptr = primitive, .flags = 0 },
-            e.ErlNifFunc{ .name = module_name ++ ".make", .arity = 1, .fptr = make_, .flags = 0 },
+            e.ErlNifFunc{ .name = module_name ++ ".make", .arity = maker[1], .fptr = maker[0], .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".make_from_opaque_ptr", .arity = 2, .fptr = make_from_opaque_ptr, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".array_as_opaque", .arity = 1, .fptr = @This().Array.as_opaque, .flags = 0 },
-        };
+        } ++ extra_nifs;
         pub fn open(env: beam.env) void {
             @This().resource.t = e.enif_open_resource_type(env, null, @This().resource.name, beam.destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
         }

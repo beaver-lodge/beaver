@@ -3,7 +3,6 @@ defmodule Beaver.MLIR.Pass do
   alias MLIR.CAPI
 
   use Fizz.ResourceKind,
-    root_module: CAPI,
     fields: [handler: nil],
     forward_module: Beaver.Native
 
