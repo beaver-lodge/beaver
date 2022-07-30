@@ -151,13 +151,13 @@ LLVM/MLIR is a giant project, and built around that Beaver have hundreds of Erla
   - Top level app ships the high level functionalities including IR generation and pattern definition.
   - MLIR CAPI wrappers built by parsing LLVM/MLIR CAPI C headers and some middle level helper functions to hide the C pointer related operations. This app will add the loaded MLIR C library and managed MLIR context to Erlang supervisor tree. Rust is also used in this app, but mainly for LLVM/MLIR CMake integration.
   - All the Ops defined in stock MLIR dialects, built by querying the registry. This app will ship MLIR Ops with Erlang idiomatic practices like behavior compliance.
-- `:fizz`: Elixir and Zig hybrid, generating NIFs from MLIR C headers.
+- `:kinda`: Elixir and Zig hybrid, generating NIFs from MLIR C headers.
 
 ### Notes on consuming and development
 
-- Only `:beaver` and `:fizz` are designed to be used as stand-alone app being directly consumed by other apps.
+- Only `:beaver` and `:kinda` are designed to be used as stand-alone app being directly consumed by other apps.
 - `:beaver_nx` could only work with Nx.
-- Although `:fizz` is built for Beaver, any Erlang/Elixir app with interest bundling some C API could take advantage of it as well.
+- Although `:kinda` is built for Beaver, any Erlang/Elixir app with interest bundling some C API could take advantage of it as well.
 - The namespace `Beaver.MLIR` is for standard features are generally expected in any MLIR tools.
 - The namespace `Beaver` is for concepts and practice only exists in Beaver, which are mostly in a DSL provided as a set of macros (including `mlir/0`, `block/1`, `defpat/2`, etc). The implementations are usually under `Beaver.DSL` namespace.
 - In Beaver, there is no strict requirements on the consistency between the Erlang app name and Elixir module name. Two modules with same namespace prefix could locate in different Erlang apps (this happens a lot to the `Beaver.MLIR` namespace). Of course redefinition of Elixir modules with an identical name should be avoided.

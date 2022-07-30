@@ -1,7 +1,7 @@
 defmodule Beaver.Native.OpaquePtr do
   alias Beaver.MLIR.CAPI
 
-  use Fizz.ResourceKind,
+  use Kinda.ResourceKind,
     forward_module: Beaver.Native
 
   @doc """

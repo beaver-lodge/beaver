@@ -1,4 +1,4 @@
-defmodule Fizz.CodeGen.Function do
+defmodule Kinda.CodeGen.Function do
   @type t() :: %__MODULE__{
           name: String.t(),
           args: list(),
@@ -15,6 +15,6 @@ defmodule Fizz.CodeGen.Function do
   end
 
   def nif_func_name(func) do
-    "fizz_nif_#{func}"
+    "kinda_nif_#{func}"
   end
 end

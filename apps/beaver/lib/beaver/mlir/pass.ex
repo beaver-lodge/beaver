@@ -2,7 +2,7 @@ defmodule Beaver.MLIR.Pass do
   use Beaver
   alias MLIR.CAPI
 
-  use Fizz.ResourceKind,
+  use Kinda.ResourceKind,
     fields: [handler: nil],
     forward_module: Beaver.Native
 

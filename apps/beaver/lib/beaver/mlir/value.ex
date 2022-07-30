@@ -1,7 +1,7 @@
 defmodule Beaver.MLIR.Value do
   alias Beaver.MLIR.CAPI
 
-  use Fizz.ResourceKind,
+  use Kinda.ResourceKind,
     forward_module: Beaver.Native
 
   def argument?(%__MODULE__{} = value) do

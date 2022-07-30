@@ -11,8 +11,8 @@ test "basic add functionality" {
 const beam = @import("beam.zig");
 const kinda = @import("kinda.zig");
 const e = @import("erl_nif.zig");
-const fizz = @import("mlir.imp.zig");
-pub const c = fizz.c;
+const mlir_capi = @import("mlir.imp.zig");
+pub const c = mlir_capi.c;
 
 pub fn make_charlist_from_string_ref(environment: beam.env, val: c.struct_MlirStringRef) beam.term {
     return beam.make_charlist_len(environment, val.data, val.length);
@@ -97,7 +97,7 @@ fn get_registered_dialects(env: beam.env) !beam.term {
 
 export fn beaver_raw_registered_ops_of_dialect(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var dialect: c.struct_MlirStringRef = undefined;
-    if (beam.fetch_resource(c.struct_MlirStringRef, env, fizz.MlirStringRef.resource.t, args[0])) |value| {
+    if (beam.fetch_resource(c.struct_MlirStringRef, env, mlir_capi.MlirStringRef.resource.t, args[0])) |value| {
         dialect = value;
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource for dialect, expected: c.struct_MlirStringRef");
@@ -110,7 +110,7 @@ export fn beaver_raw_registered_dialects(env: beam.env, _: c_int, _: [*c]const b
 }
 
 export fn beaver_raw_resource_c_string_to_term_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var arg0: fizz.U8.Array.T = beam.fetch_resource(fizz.U8.Array.T, env, fizz.U8.Array.resource.t, args[0]) catch return beam.make_error_binary(env, "fail to fetch resource of c string");
+    var arg0: mlir_capi.U8.Array.T = beam.fetch_resource(mlir_capi.U8.Array.T, env, mlir_capi.U8.Array.resource.t, args[0]) catch return beam.make_error_binary(env, "fail to fetch resource of c string");
     return beam.make_c_string_charlist(env, arg0);
 }
 
@@ -123,7 +123,7 @@ export fn beaver_raw_get_resource_c_string(env: beam.env, _: c_int, args: [*c]co
     if (0 == e.enif_inspect_binary(env, args[0], &bin)) {
         return beam.make_error_binary(env, "not a binary");
     }
-    var ptr: ?*anyopaque = e.enif_alloc_resource(fizz.U8.Array.resource.t, @sizeOf(RType) + bin.size + 1);
+    var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.U8.Array.resource.t, @sizeOf(RType) + bin.size + 1);
     var obj: *RType = undefined;
     var real_binary: RType = undefined;
     if (ptr == null) {
@@ -141,19 +141,19 @@ export fn beaver_raw_get_resource_c_string(env: beam.env, _: c_int, args: [*c]co
 
 export fn beaver_raw_mlir_named_attribute_get(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var arg0: c.struct_MlirIdentifier = undefined;
-    if (beam.fetch_resource(c.struct_MlirIdentifier, env, fizz.MlirIdentifier.resource.t, args[0])) |value| {
+    if (beam.fetch_resource(c.struct_MlirIdentifier, env, mlir_capi.MlirIdentifier.resource.t, args[0])) |value| {
         arg0 = value;
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirIdentifier");
     }
     var arg1: c.struct_MlirAttribute = undefined;
-    if (beam.fetch_resource(c.struct_MlirAttribute, env, fizz.MlirAttribute.resource.t, args[1])) |value| {
+    if (beam.fetch_resource(c.struct_MlirAttribute, env, mlir_capi.MlirAttribute.resource.t, args[1])) |value| {
         arg1 = value;
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource for argument #2, expected: c.struct_MlirAttribute");
     }
 
-    var ptr: ?*anyopaque = e.enif_alloc_resource(fizz.MlirNamedAttribute.resource.t, @sizeOf(c.struct_MlirNamedAttribute));
+    var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.MlirNamedAttribute.resource.t, @sizeOf(c.struct_MlirNamedAttribute));
 
     const RType = c.struct_MlirNamedAttribute;
     var obj: *RType = undefined;
@@ -184,7 +184,7 @@ fn print_mlir(env: beam.env, element: anytype, printer: anytype) beam.term {
 
 export fn beaver_raw_beaver_attribute_to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var arg0: c.struct_MlirAttribute = undefined;
-    if (beam.fetch_resource(c.struct_MlirAttribute, env, fizz.MlirAttribute.resource.t, args[0])) |value| {
+    if (beam.fetch_resource(c.struct_MlirAttribute, env, mlir_capi.MlirAttribute.resource.t, args[0])) |value| {
         arg0 = value;
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirAttribute");
@@ -194,7 +194,7 @@ export fn beaver_raw_beaver_attribute_to_charlist(env: beam.env, _: c_int, args:
 
 export fn beaver_raw_beaver_type_to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var arg0: c.struct_MlirType = undefined;
-    if (beam.fetch_resource(c.struct_MlirType, env, fizz.MlirType.resource.t, args[0])) |value| {
+    if (beam.fetch_resource(c.struct_MlirType, env, mlir_capi.MlirType.resource.t, args[0])) |value| {
         arg0 = value;
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirType");
@@ -204,7 +204,7 @@ export fn beaver_raw_beaver_type_to_charlist(env: beam.env, _: c_int, args: [*c]
 
 export fn beaver_raw_beaver_operation_to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var arg0: c.struct_MlirOperation = undefined;
-    if (beam.fetch_resource(c.struct_MlirOperation, env, fizz.MlirOperation.resource.t, args[0])) |value| {
+    if (beam.fetch_resource(c.struct_MlirOperation, env, mlir_capi.MlirOperation.resource.t, args[0])) |value| {
         arg0 = value;
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirOperation");
@@ -213,7 +213,7 @@ export fn beaver_raw_beaver_operation_to_charlist(env: beam.env, _: c_int, args:
 }
 
 export fn beaver_raw_get_context_load_all_dialects(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
-    var ptr: ?*anyopaque = e.enif_alloc_resource(fizz.MlirContext.resource.t, @sizeOf(c.struct_MlirContext));
+    var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.MlirContext.resource.t, @sizeOf(c.struct_MlirContext));
     const RType = c.struct_MlirContext;
     var obj: *RType = undefined;
     if (ptr == null) {
@@ -283,11 +283,11 @@ const BeaverPass = struct {
         var tuple_slice: []beam.term = beam.allocator.alloc(beam.term, 4) catch unreachable;
         defer beam.allocator.free(tuple_slice);
         tuple_slice[0] = beam.make_atom(env, "run");
-        tuple_slice[1] = beam.make_resource(env, op, fizz.MlirOperation.resource.t) catch {
+        tuple_slice[1] = beam.make_resource(env, op, mlir_capi.MlirOperation.resource.t) catch {
             print("fail to make res: {}\n", .{@TypeOf(op)});
             unreachable;
         };
-        tuple_slice[2] = beam.make_resource(env, pass, fizz.MlirExternalPass.resource.t) catch {
+        tuple_slice[2] = beam.make_resource(env, pass, mlir_capi.MlirExternalPass.resource.t) catch {
             print("fail to make res: {}\n", .{@TypeOf(pass)});
             unreachable;
         };
@@ -304,37 +304,37 @@ const BeaverPass = struct {
 };
 
 export fn beaver_raw_read_opaque_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var ptr: fizz.OpaquePtr.T = fizz.OpaquePtr.resource.fetch(env, args[0]) catch
-        return beam.make_error_binary(env, "fail to fetch resource for ptr, expected: " ++ @typeName(fizz.OpaquePtr.T));
-    var len = fizz.U64.resource.fetch(env, args[1]) catch return beam.make_error_binary(env, "fail to fetch resource length, expected a integer");
+    var ptr: mlir_capi.OpaquePtr.T = mlir_capi.OpaquePtr.resource.fetch(env, args[0]) catch
+        return beam.make_error_binary(env, "fail to fetch resource for ptr, expected: " ++ @typeName(mlir_capi.OpaquePtr.T));
+    var len = mlir_capi.U64.resource.fetch(env, args[1]) catch return beam.make_error_binary(env, "fail to fetch resource length, expected a integer");
     if (ptr == null) {
         return beam.make_error_binary(env, "ptr is null");
     }
-    const slice = @ptrCast(fizz.U8.Array.T, ptr)[0..len];
+    const slice = @ptrCast(mlir_capi.U8.Array.T, ptr)[0..len];
     return beam.make_slice(env, slice);
 }
 
 export fn beaver_raw_create_mlir_pass(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var name: c.struct_MlirStringRef = undefined;
-    if (beam.fetch_resource(c.struct_MlirStringRef, env, fizz.MlirStringRef.resource.t, args[0])) |value| {
+    if (beam.fetch_resource(c.struct_MlirStringRef, env, mlir_capi.MlirStringRef.resource.t, args[0])) |value| {
         name = value;
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource for pass name, expected: c.struct_MlirStringRef");
     }
     var argument: c.struct_MlirStringRef = undefined;
-    if (beam.fetch_resource(c.struct_MlirStringRef, env, fizz.MlirStringRef.resource.t, args[1])) |value| {
+    if (beam.fetch_resource(c.struct_MlirStringRef, env, mlir_capi.MlirStringRef.resource.t, args[1])) |value| {
         argument = value;
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource for pass argument, expected: c.struct_MlirStringRef");
     }
     var description: c.struct_MlirStringRef = undefined;
-    if (beam.fetch_resource(c.struct_MlirStringRef, env, fizz.MlirStringRef.resource.t, args[2])) |value| {
+    if (beam.fetch_resource(c.struct_MlirStringRef, env, mlir_capi.MlirStringRef.resource.t, args[2])) |value| {
         description = value;
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource for pass description, expected: c.struct_MlirStringRef");
     }
     var op_name: c.struct_MlirStringRef = undefined;
-    if (beam.fetch_resource(c.struct_MlirStringRef, env, fizz.MlirStringRef.resource.t, args[3])) |value| {
+    if (beam.fetch_resource(c.struct_MlirStringRef, env, mlir_capi.MlirStringRef.resource.t, args[3])) |value| {
         op_name = value;
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource for pass op name, expected: c.struct_MlirStringRef");
@@ -349,7 +349,7 @@ export fn beaver_raw_create_mlir_pass(env: beam.env, _: c_int, args: [*c]const b
     var userData: *BeaverPass.UserData = beam.allocator.create(BeaverPass.UserData) catch return beam.make_error_binary(env, "fail to allocate for pass userdata");
     userData.*.handler = handler;
     const RType = c.struct_MlirPass;
-    var ptr: ?*anyopaque = e.enif_alloc_resource(fizz.Pass.resource.t, @sizeOf(RType));
+    var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.Pass.resource.t, @sizeOf(RType));
     var obj: *RType = undefined;
     if (ptr == null) {
         unreachable();
@@ -381,7 +381,7 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
                 return beam.make_error_binary(env, "fail to fetch allocated. expected: " ++ @typeName(ResourceKind.Ptr.T));
             var aligned: ResourceKind.Ptr.T = ResourceKind.Ptr.resource.fetch(env, args[1]) catch
                 return beam.make_error_binary(env, "fail to fetch aligned. expected: " ++ @typeName(ResourceKind.Ptr.T));
-            var offset: fizz.I64.T = fizz.I64.resource.fetch(env, args[2]) catch
+            var offset: mlir_capi.I64.T = mlir_capi.I64.resource.fetch(env, args[2]) catch
                 return beam.make_error_binary(env, "fail to fetch offset");
             const kind: type = dataKindToMemrefKind(ResourceKind);
 
@@ -437,7 +437,7 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
                 return beam.make_error_binary(env, "fail to fetch allocated. expected: " ++ @typeName(ResourceKind.Ptr.T));
             var aligned: ResourceKind.Ptr.T = ResourceKind.Ptr.resource.fetch(env, args[1]) catch
                 return beam.make_error_binary(env, "fail to fetch aligned. expected: " ++ @typeName(ResourceKind.Ptr.T));
-            var offset: fizz.I64.T = fizz.I64.resource.fetch(env, args[2]) catch
+            var offset: mlir_capi.I64.T = mlir_capi.I64.resource.fetch(env, args[2]) catch
                 return beam.make_error_binary(env, "fail to fetch offset");
             const sizes = beam.get_slice_of(i64, env, args[3]) catch return beam.make_error_binary(env, "fail to get sizes as zig slice");
             defer beam.allocator.free(sizes);
@@ -476,7 +476,7 @@ const Complex = struct {
             };
         };
     }
-    const F32 = kinda.ResourceKind(Complex.of(fizz.F32).T, forward_module);
+    const F32 = kinda.ResourceKind(Complex.of(mlir_capi.F32).T, forward_module);
 };
 
 const MemRefDataType = enum {
@@ -491,22 +491,22 @@ const MemRefDataType = enum {
 fn dataTypeToResourceKind(self: MemRefDataType) type {
     return switch (self) {
         .@"Complex.F32" => Complex.F32,
-        .U8 => fizz.U8,
-        .F32 => fizz.F32,
-        .F64 => fizz.F64,
-        .I32 => fizz.I32,
-        .I64 => fizz.I64,
+        .U8 => mlir_capi.U8,
+        .F32 => mlir_capi.F32,
+        .F64 => mlir_capi.F64,
+        .I32 => mlir_capi.I32,
+        .I64 => mlir_capi.I64,
     };
 }
 
 fn dataKindToDataType(comptime self: type) MemRefDataType {
     return switch (self) {
         Complex.F32 => MemRefDataType.@"Complex.F32",
-        fizz.U8 => MemRefDataType.U8,
-        fizz.F32 => MemRefDataType.F32,
-        fizz.F64 => MemRefDataType.F64,
-        fizz.I32 => MemRefDataType.I32,
-        fizz.I64 => MemRefDataType.I64,
+        mlir_capi.U8 => MemRefDataType.U8,
+        mlir_capi.F32 => MemRefDataType.F32,
+        mlir_capi.F64 => MemRefDataType.F64,
+        mlir_capi.I32 => MemRefDataType.I32,
+        mlir_capi.I64 => MemRefDataType.I64,
         else => unreachable(),
     };
 }
@@ -546,8 +546,8 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
             comptime var rank = 0;
             inline while (rank < kind.per_rank_resource_kinds.len) : (rank += 1) {
                 if (kind.per_rank_resource_kinds[rank].resource.fetch(env, args[0])) |descriptor| {
-                    var ret: fizz.OpaquePtr.T = @ptrCast(fizz.OpaquePtr.T, descriptor.aligned);
-                    return fizz.OpaquePtr.resource.make(env, ret) catch return beam.make_error_binary(env, "fail to make aligned ptr");
+                    var ret: mlir_capi.OpaquePtr.T = @ptrCast(mlir_capi.OpaquePtr.T, descriptor.aligned);
+                    return mlir_capi.OpaquePtr.resource.make(env, ret) catch return beam.make_error_binary(env, "fail to make aligned ptr");
                 } else |_| {
                     // do nothing
                 }
@@ -632,19 +632,19 @@ pub export const handwritten_nifs = .{
 } ++
     Complex.F32.nifs ++
     dataKindToMemrefKind(Complex.F32).nifs ++
-    dataKindToMemrefKind(fizz.U8).nifs ++
-    dataKindToMemrefKind(fizz.F32).nifs ++
-    dataKindToMemrefKind(fizz.F64).nifs ++
-    dataKindToMemrefKind(fizz.I32).nifs ++
-    dataKindToMemrefKind(fizz.I64).nifs;
+    dataKindToMemrefKind(mlir_capi.U8).nifs ++
+    dataKindToMemrefKind(mlir_capi.F32).nifs ++
+    dataKindToMemrefKind(mlir_capi.F64).nifs ++
+    dataKindToMemrefKind(mlir_capi.I32).nifs ++
+    dataKindToMemrefKind(mlir_capi.I64).nifs;
 
-pub export const num_nifs = fizz.generated_nifs.len + handwritten_nifs.len;
-pub export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs ++ fizz.generated_nifs;
+pub export const num_nifs = mlir_capi.generated_nifs.len + handwritten_nifs.len;
+pub export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs ++ mlir_capi.generated_nifs;
 
 const entry = e.ErlNifEntry{
     .major = 2,
     .minor = 16,
-    .name = fizz.root_module,
+    .name = mlir_capi.root_module,
     .num_of_funcs = num_nifs,
     .funcs = &(nifs[0]),
     .load = nif_load,
@@ -658,7 +658,7 @@ const entry = e.ErlNifEntry{
 };
 
 export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
-    fizz.open_generated_resource_types(env);
+    mlir_capi.open_generated_resource_types(env);
     comptime var i = 0;
     inline while (i < memref_kinds.len) : (i += 1) {
         memref_kinds[i].open(env);

@@ -92,12 +92,12 @@ defmodule Foo.Native do
 end
 
 defmodule Foo.BarKind do
-  use Fizz.ResourceKind,
+  use Kinda.ResourceKind,
     forward_module: Foo.Native
 end
 
 defmodule Foo.CAPI do
-  use Fizz.Library, kinds: [Foo.BarKind]
+  use Kinda.Library, kinds: [Foo.BarKind]
 end
 ```
 
