@@ -1,6 +1,7 @@
 const beam = @import("beam.zig");
 const e = @import("erl_nif.zig");
 const std = @import("std");
+const print = @import("std").debug.print;
 
 // a function to make a resource term from a u8 slice.
 const OpaqueMaker: type = fn (beam.env, []u8) beam.term;
@@ -107,6 +108,11 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
             const v = resource.fetch(env, args[0]) catch return beam.make_error_binary(env, "fail to extract pritimive from " ++ @typeName(T));
             return beam.make(T, env, v) catch return beam.make_error_binary(env, "fail to create primitive " ++ @typeName(T));
         }
+        fn dump(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            const v: T = resource.fetch(env, args[0]) catch return beam.make_error_binary(env, "fail to fetch " ++ @typeName(T));
+            print("{}", .{v});
+            return beam.make_ok(env);
+        }
         fn append_to_struct(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
             const v = resource.fetch(env, args[0]) catch return beam.make_error_binary(env, "fail to extract pritimive from " ++ @typeName(T));
             return beam.make(T, env, v) catch return beam.make_error_binary(env, "fail to create primitive " ++ @typeName(T));
@@ -146,6 +152,7 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
             e.ErlNifFunc{ .name = module_name ++ ".mut_array", .arity = 1, .fptr = mut_array, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".primitive", .arity = 1, .fptr = primitive, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".make", .arity = maker[1], .fptr = maker[0], .flags = 0 },
+            e.ErlNifFunc{ .name = module_name ++ ".dump", .arity = 1, .fptr = dump, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".make_from_opaque_ptr", .arity = 2, .fptr = make_from_opaque_ptr, .flags = 0 },
             e.ErlNifFunc{ .name = module_name ++ ".array_as_opaque", .arity = 1, .fptr = @This().Array.as_opaque, .flags = 0 },
         } ++ extra_nifs;

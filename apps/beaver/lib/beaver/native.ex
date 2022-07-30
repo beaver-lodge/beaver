@@ -92,4 +92,8 @@ defmodule Beaver.Native do
     apply(CAPI, Module.concat(element_kind, kind_func_name), args)
     |> check!()
   end
+
+  def dump(%{kind: kind, ref: ref}) do
+    Beaver.Native.forward(kind, "dump", [ref])
+  end
 end
