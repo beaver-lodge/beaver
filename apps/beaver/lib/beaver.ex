@@ -250,25 +250,4 @@ defmodule Beaver do
       regions: Beaver.Walker.regions(operation)
     })
   end
-
-  @doc """
-  Extract a container could be traversed by walker from an Op prototype or a `Beaver.MLIR.Module`.
-  """
-  def container(module = %MLIR.Module{}) do
-    MLIR.Operation.from_module(module)
-  end
-
-  def container(%{
-        operands: %Beaver.Walker{container: container},
-        attributes: %Beaver.Walker{container: container},
-        results: %Beaver.Walker{container: container},
-        successors: %Beaver.Walker{container: container},
-        regions: %Beaver.Walker{container: container}
-      }) do
-    container
-  end
-
-  def container(container) do
-    container
-  end
 end

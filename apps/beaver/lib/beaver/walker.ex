@@ -96,6 +96,27 @@ defmodule Beaver.Walker do
     raise "not a legal 2-level structure could be walked in MLIR: #{inspect(container_module)}(#{inspect(element_module)})"
   end
 
+  @doc """
+  Extract a container could be traversed by walker from an Op prototype or a `Beaver.MLIR.Module`.
+  """
+  def container(module = %MLIR.Module{}) do
+    MLIR.Operation.from_module(module)
+  end
+
+  def container(%{
+        operands: %Beaver.Walker{container: container},
+        attributes: %Beaver.Walker{container: container},
+        results: %Beaver.Walker{container: container},
+        successors: %Beaver.Walker{container: container},
+        regions: %Beaver.Walker{container: container}
+      }) do
+    container
+  end
+
+  def container(container) do
+    container
+  end
+
   def new(
         container,
         element_module,
@@ -106,7 +127,7 @@ defmodule Beaver.Walker do
       when is_function(get_num, 1) and
              is_function(get_element, 2) and
              is_function(element_equal, 2) do
-    container = %container_module{} = Beaver.container(container)
+    container = %container_module{} = container(container)
     verify_nesting!(container_module, element_module)
 
     %__MODULE__{
@@ -130,7 +151,7 @@ defmodule Beaver.Walker do
              is_function(get_next, 1) and
              is_function(get_parent, 1) and
              is_function(is_null, 1) do
-    container = %container_module{} = Beaver.container(container)
+    container = %container_module{} = container(container)
     verify_nesting!(container_module, element_module)
 
     %__MODULE__{
@@ -354,7 +375,7 @@ defmodule Beaver.Walker do
         ) ::
           {mlir(), any()}
   def traverse(mlir, acc, pre, post) when is_function(pre, 2) and is_function(post, 2) do
-    mlir = Beaver.container(mlir)
+    mlir = Beaver.Walker.container(mlir)
     do_traverse(mlir, acc, pre, post)
   end
 
