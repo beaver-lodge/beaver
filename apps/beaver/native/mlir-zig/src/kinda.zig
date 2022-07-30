@@ -110,7 +110,7 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
         }
         fn dump(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
             const v: T = resource.fetch(env, args[0]) catch return beam.make_error_binary(env, "fail to fetch " ++ @typeName(T));
-            print("{}", .{v});
+            print("{}\n", .{v});
             return beam.make_ok(env);
         }
         fn append_to_struct(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
