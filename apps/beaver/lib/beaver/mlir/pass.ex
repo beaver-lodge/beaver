@@ -11,7 +11,6 @@ defmodule Beaver.MLIR.Pass do
 
   defmacro __using__(opts) do
     require Beaver.MLIR.CAPI
-    use Beaver
     alias Beaver.MLIR.Pass.Composer
 
     quote do
