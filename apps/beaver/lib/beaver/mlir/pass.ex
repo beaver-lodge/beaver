@@ -1,5 +1,6 @@
 defmodule Beaver.MLIR.Pass do
-  use Beaver
+  require Beaver.MLIR.CAPI
+  alias Beaver.MLIR
   alias MLIR.CAPI
 
   use Kinda.ResourceKind,
@@ -8,13 +9,8 @@ defmodule Beaver.MLIR.Pass do
 
   @callback run(MLIR.CAPI.MlirOperation.t()) :: :ok | :error
 
-  def get_op_name(opts) do
-    op_module = Keyword.get(opts, :on, MLIR.Dialect.Func.Func)
-    Beaver.DSL.Op.Prototype.op_name!(op_module)
-  end
-
   defmacro __using__(opts) do
-    use Beaver
+    require Beaver.MLIR.CAPI
     alias Beaver.MLIR.Pass.Composer
 
     quote do
@@ -45,7 +41,12 @@ defmodule Beaver.MLIR.Pass do
     end
   end
 
-  def pipeline!(%CAPI.MlirOpPassManager{} = pm, pipeline_str) when is_binary(pipeline_str) do
+  def get_op_name(opts) do
+    op_module = Keyword.get(opts, :on, MLIR.Dialect.Func.Func)
+    Beaver.DSL.Op.Prototype.op_name!(op_module)
+  end
+
+  def pipeline!(%MLIR.CAPI.MlirOpPassManager{} = pm, pipeline_str) when is_binary(pipeline_str) do
     status = CAPI.mlirParsePassPipeline(pm, MLIR.StringRef.create(pipeline_str))
 
     if not MLIR.LogicalResult.success?(status) do
@@ -55,7 +56,7 @@ defmodule Beaver.MLIR.Pass do
     pm
   end
 
-  def pipeline!(%CAPI.MlirPassManager{} = pm, pipeline_str) when is_binary(pipeline_str) do
+  def pipeline!(%MLIR.CAPI.MlirPassManager{} = pm, pipeline_str) when is_binary(pipeline_str) do
     pm |> CAPI.mlirPassManagerGetAsOpPassManager() |> pipeline!(pipeline_str)
     pm
   end

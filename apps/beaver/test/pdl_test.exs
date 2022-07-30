@@ -115,7 +115,7 @@ defmodule PDLTest do
            ]
 
     assert mlir
-           |> Beaver.container()
+           |> Beaver.Walker.container()
            |> MLIR.CAPI.mlirOperationEqual(MLIR.Operation.from_module(pattern_module))
            |> Beaver.Native.to_term()
 

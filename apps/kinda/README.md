@@ -109,7 +109,7 @@ by adding `Kinda` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:kinded, "~> 0.1.0"}
+    {:kinda, "~> 0.1.0"}
   ]
 end
 ```
