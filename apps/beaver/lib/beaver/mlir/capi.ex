@@ -81,7 +81,7 @@ defmodule Beaver.MLIR.CAPI do
           Descriptor8D,
           Descriptor9D
         ],
-        t <- [C64, U8, I32, I64, F32, F64] do
+        t <- [Complex.F32, U8, I32, I64, F32, F64] do
       %Fizz.CodeGen.Type{
         module_name: Module.concat([Beaver.Native, t, MemRef, rank]),
         kind_functions: Beaver.MLIR.CAPI.CodeGen.memref_kind_functions()
@@ -91,7 +91,7 @@ defmodule Beaver.MLIR.CAPI do
   extra_kind_nifs =
     ([
        %Fizz.CodeGen.Type{
-         module_name: Beaver.Native.C64,
+         module_name: Beaver.Native.Complex.F32,
          kind_functions: Beaver.MLIR.CAPI.CodeGen.memref_kind_functions()
        }
      ] ++ mem_ref_descriptor_kinds)
@@ -104,7 +104,10 @@ defmodule Beaver.MLIR.CAPI do
     %Fizz.CodeGen.NIF{wrapper_name: wrapper_name, nif_name: nif_name, ret: ret} = nif
     @doc false
     def unquote(nif_name)(unquote_splicing(args_ast)),
-      do: raise("failed to load NIF library, or NIF is not implemented")
+      do:
+        raise(
+          "NIF for resource kind is not implemented, or failed to load NIF library. Function: :\"#{unquote(nif_name)}\"/#{unquote(nif.arity)}"
+        )
 
     if wrapper_name do
       if ret == "void" do

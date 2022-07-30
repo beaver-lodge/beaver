@@ -234,17 +234,11 @@ defmodule Fizz do
     #{source}
     pub fn open_generated_resource_types(env: beam.env) void {
     #{resource_kinds_str_open_str}
-    beam.InternalOpaquePtr.resource.t = OpaquePtr.resource.t;
-    beam.InternalOpaquePtr.Ptr.resource.t = OpaquePtr.Ptr.resource.t;
-    beam.InternalOpaquePtr.Array.resource.t = OpaquePtr.Array.resource.t;
 
-    beam.InternalOpaqueArray.resource.t = OpaqueArray.resource.t;
-    beam.InternalOpaqueArray.Ptr.resource.t = OpaqueArray.Ptr.resource.t;
-    beam.InternalOpaqueArray.Array.resource.t = OpaqueArray.Array.resource.t;
-
-    beam.InternalUSize.resource.t = USize.resource.t;
-    beam.InternalUSize.Ptr.resource.t = USize.Ptr.resource.t;
-    beam.InternalUSize.Array.resource.t = USize.Array.resource.t;
+    // TODO: reverse the alias here
+    kinda.aliasKind(kinda.Internal.USize, USize);
+    kinda.aliasKind(kinda.Internal.OpaquePtr, OpaquePtr);
+    kinda.aliasKind(kinda.Internal.OpaqueArray, OpaqueArray);
     }
     pub export const generated_nifs = .{
       #{nifs |> Enum.map(&Fizz.CodeGen.NIF.gen/1) |> Enum.join("  ")}
@@ -259,6 +253,7 @@ defmodule Fizz do
         @cInclude("#{wrapper}");
       });
       const beam = @import("beam.zig");
+      const kinda = @import("kinda.zig");
       const e = @import("erl_nif.zig");
       pub const root_module = "Elixir.Beaver.MLIR.CAPI";
       """ <> source

@@ -118,7 +118,8 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
       memref_create: 5,
       memref_aligned: 1,
       memref_opaque_ptr: 1,
-      memref_dump: 1
+      memref_dump: 1,
+      make: 5
     ]
   end
 

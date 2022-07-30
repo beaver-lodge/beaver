@@ -55,21 +55,11 @@ defmodule Beaver.Native do
   end
 
   def to_term(%__MODULE__.Ptr{ref: ref, element_kind: __MODULE__.OpaquePtr}) do
-    apply(
-      CAPI,
-      Module.concat([__MODULE__.OpaquePtr, :primitive]),
-      [ref]
-    )
-    |> check!()
+    forward(__MODULE__.OpaquePtr, :primitive, [ref])
   end
 
   def to_term(%mod{ref: ref}) do
-    apply(
-      CAPI,
-      Module.concat([mod, :primitive]),
-      [ref]
-    )
-    |> check!()
+    forward(mod, :primitive, [ref])
   end
 
   def bag(%{bag: bag} = v, list) when is_list(list) do
