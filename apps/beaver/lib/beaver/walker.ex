@@ -7,6 +7,7 @@ alias Beaver.MLIR.CAPI.{
   MlirRegion,
   MlirAttribute,
   MlirBlock,
+  MlirIdentifier,
   MlirNamedAttribute,
   MlirOperand
 }
@@ -75,7 +76,7 @@ defmodule Beaver.Walker do
   # operands, results, attributes of one operation
   defp verify_nesting!(MlirOperation, Value), do: :ok
   defp verify_nesting!(OpReplacement, Value), do: :ok
-  defp verify_nesting!(MlirOperation, MlirNamedAttribute), do: :ok
+  defp verify_nesting!(MlirOperation, {MlirIdentifier, MlirAttribute}), do: :ok
   defp verify_nesting!(OpReplacement, MlirNamedAttribute), do: :ok
   # regions of one operation
   defp verify_nesting!(MlirOperation, MlirRegion), do: :ok
@@ -210,9 +211,14 @@ defmodule Beaver.Walker do
   def attributes(op) do
     new(
       op,
-      MlirNamedAttribute,
+      {MlirIdentifier, MlirAttribute},
       get_num: &CAPI.mlirOperationGetNumAttributes/1,
-      get_element: &CAPI.mlirOperationGetAttribute/2,
+      get_element: fn o, i ->
+        {
+          CAPI.beaverOperationGetName(o, i),
+          CAPI.beaverOperationGetAttribute(o, i)
+        }
+      end,
       element_equal: &CAPI.mlirAttributeEqual/2
     )
   end
@@ -287,10 +293,28 @@ defmodule Beaver.Walker do
         end
       end)
 
-    raise "TODO: Zig ABI complicated struct"
-
     with %MlirNamedAttribute{} <- found do
       {:ok, MLIR.CAPI.beaverMlirNamedAttributeGetAttribute(found)}
+    else
+      :error -> :error
+    end
+  end
+
+  def fetch(%__MODULE{element_module: {MlirIdentifier, MlirAttribute}} = walker, key)
+      when is_binary(key) do
+    found =
+      walker
+      |> Enum.find(fn {name, _attribute} ->
+        with name_str <-
+               name
+               |> MLIR.CAPI.mlirIdentifierStr()
+               |> MLIR.StringRef.extract() do
+          name_str == key
+        end
+      end)
+
+    with {_, %MlirAttribute{} = attr} <- found do
+      {:ok, attr}
     else
       :error -> :error
     end
@@ -422,8 +446,6 @@ defmodule Beaver.Walker do
     name =
       %MLIR.CAPI.MlirIdentifier{} = named_attribute |> MLIR.CAPI.beaverMlirNamedAttributeGetName()
 
-    raise "TODO: Zig ABI complicated struct"
-
     attribute =
       %MLIR.CAPI.MlirAttribute{} =
       named_attribute |> MLIR.CAPI.beaverMlirNamedAttributeGetAttribute()
@@ -432,6 +454,16 @@ defmodule Beaver.Walker do
     {{name, attribute}, acc} = post.({name, attribute}, acc)
     named_attribute = MLIR.CAPI.mlirNamedAttributeGet(name, attribute)
     {named_attribute, acc}
+  end
+
+  defp do_traverse(
+         {%MLIR.CAPI.MlirIdentifier{} = name, %MLIR.CAPI.MlirAttribute{} = attribute},
+         acc,
+         pre,
+         post
+       ) do
+    {{name, attribute}, acc} = pre.({name, attribute}, acc)
+    post.({name, attribute}, acc)
   end
 
   @doc """
@@ -633,6 +665,17 @@ defimpl Enumerable, for: Walker do
   defp expect_element!(%module{} = element, element_module) do
     if element_module != module do
       raise "Expected element module #{element_module}, got #{module}"
+    else
+      element
+    end
+  end
+
+  defp expect_element!({%module_a{}, %module_b{}} = element, {module_a_, module_b_}) do
+    tuple_x = {module_a, module_b}
+    tuple_y = {module_a_, module_b_}
+
+    if tuple_x != tuple_y do
+      raise "Expected element module #{inspect(tuple_y)}, got #{inspect(tuple_x)}"
     else
       element
     end

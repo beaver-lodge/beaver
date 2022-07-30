@@ -128,14 +128,16 @@ MLIR_CAPI_EXPORTED MlirOperand beaverValueGetFirstOperand(MlirValue value) {
 }
 
 MLIR_CAPI_EXPORTED MlirOperand beaverOperandGetNext(MlirOperand operand) {
-  auto unwrapped = unwrap(operand);
-  unwrapped++;
-  return wrap(unwrapped);
+  auto iter = new mlir::Value::use_iterator();
+  auto value = unwrap(operand);
+  *iter = *value;
+  (*iter)++;
+  return wrap(iter);
 }
 
 MLIR_CAPI_EXPORTED bool beaverOperandIsNull(MlirOperand operand) {
   auto unwrapped = unwrap(operand);
-  return (*unwrapped) == nullptr ||
+  return operand.ptr == nullptr || (*unwrapped) == nullptr ||
          (*unwrapped) == (*unwrap(operand))->get().use_end();
 }
 
@@ -147,7 +149,7 @@ MLIR_CAPI_EXPORTED MlirOperation beaverOperandGetOwner(MlirOperand operand) {
   return wrap((*unwrap(operand))->getOwner());
 }
 
-MLIR_CAPI_EXPORTED uint32_t beaverOperandGetNumber(MlirOperand operand) {
+MLIR_CAPI_EXPORTED intptr_t beaverOperandGetNumber(MlirOperand operand) {
   return (*unwrap(operand))->getOperandNumber();
 }
 
@@ -233,6 +235,16 @@ MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultSuccess() {
 
 MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultFailure() {
   return mlirLogicalResultFailure();
+}
+
+MLIR_CAPI_EXPORTED MlirIdentifier beaverOperationGetName(MlirOperation op,
+                                                         intptr_t pos) {
+  return mlirOperationGetAttribute(op, pos).name;
+}
+
+MLIR_CAPI_EXPORTED MlirAttribute beaverOperationGetAttribute(MlirOperation op,
+                                                             intptr_t pos) {
+  return mlirOperationGetAttribute(op, pos).attribute;
 }
 
 MLIR_CAPI_EXPORTED

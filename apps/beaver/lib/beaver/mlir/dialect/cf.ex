@@ -31,7 +31,7 @@ defmodule Beaver.MLIR.Dialect.CF do
         blocks = [
           case dest do
             dest when is_atom(dest) ->
-              [successor: dest]
+              {:successor, dest}
 
             %MLIR.CAPI.MlirBlock{} ->
               dest
