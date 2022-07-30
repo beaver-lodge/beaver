@@ -4,10 +4,6 @@ defmodule Beaver.MLIR.Value do
   use Fizz.ResourceKind,
     forward_module: Beaver.Native
 
-  def dump(value) do
-    value |> CAPI.mlirValueDump()
-  end
-
   def argument?(%__MODULE__{} = value) do
     CAPI.mlirValueIsABlockArgument(value) |> Beaver.Native.to_term()
   end
