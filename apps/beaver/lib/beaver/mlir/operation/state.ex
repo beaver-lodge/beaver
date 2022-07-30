@@ -234,9 +234,6 @@ defmodule Beaver.MLIR.Operation.State do
   @doc """
   Add an ODS argument to state.
   """
-  def add_argument(%__MODULE__{attributes: attributes} = state, value) when is_integer(value) do
-    %{state | attributes: attributes ++ [value: value]}
-  end
 
   def add_argument(%__MODULE__{regions: regions} = state, %CAPI.MlirRegion{} = region) do
     %{state | regions: regions ++ [region]}
@@ -280,6 +277,10 @@ defmodule Beaver.MLIR.Operation.State do
         %MLIR.CAPI.MlirBlock{} = successor
       ) do
     %{state | successors: successors ++ [successor]}
+  end
+
+  def add_argument(%__MODULE__{attributes: attributes} = state, value) when is_integer(value) do
+    %{state | attributes: attributes ++ [value: value]}
   end
 
   def add_argument(

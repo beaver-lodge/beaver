@@ -50,7 +50,7 @@ MLIR_CAPI_EXPORTED MlirValue beaverOperandGetValue(MlirOperand operand);
 
 MLIR_CAPI_EXPORTED MlirOperation beaverOperandGetOwner(MlirOperand operand);
 
-MLIR_CAPI_EXPORTED uint32_t beaverOperandGetNumber(MlirOperand operand);
+MLIR_CAPI_EXPORTED intptr_t beaverOperandGetNumber(MlirOperand operand);
 
 MLIR_CAPI_EXPORTED const char *beaverStringRefGetData(MlirStringRef string_ref);
 MLIR_CAPI_EXPORTED size_t beaverStringRefGetLength(MlirStringRef string_ref);
@@ -88,6 +88,11 @@ MLIR_CAPI_EXPORTED bool beaverLogicalResultIsSuccess(MlirLogicalResult res);
 MLIR_CAPI_EXPORTED bool beaverLogicalResultIsFailure(MlirLogicalResult res);
 MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultSuccess();
 MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultFailure();
+
+MLIR_CAPI_EXPORTED MlirIdentifier beaverOperationGetName(MlirOperation op,
+                                                         intptr_t pos);
+MLIR_CAPI_EXPORTED MlirAttribute beaverOperationGetAttribute(MlirOperation op,
+                                                             intptr_t pos);
 
 MLIR_CAPI_EXPORTED
 MlirIdentifier beaverMlirNamedAttributeGetName(MlirNamedAttribute);

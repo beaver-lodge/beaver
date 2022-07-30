@@ -31,6 +31,7 @@ defmodule Fizz.CodeGen.NIF do
             mut_array: 1,
             primitive: 1,
             make: 1,
+            dump: 1,
             make_from_opaque_ptr: 2,
             array_as_opaque: 1
           ] ++ kind_functions do

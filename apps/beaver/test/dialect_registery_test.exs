@@ -35,7 +35,7 @@ defmodule DialectRegistryTest do
                {"linalg", "Linalg"},
                {"vector", "Vector"},
                {"cf", "CF"},
-               {"dlti", "Dlti"},
+               {"dlti", "DLTI"},
                {"transform", "Transform"},
                {"ml_program", "MLProgram"},
                {"tensor", "Tensor"},
