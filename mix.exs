@@ -17,7 +17,7 @@ defmodule Beaver.Umbrella.MixProject do
   defp docs() do
     [
       main: "Beaver",
-      ignore_apps: [:fizz],
+      ignore_apps: [:kinda],
       extras: [
         "README.md",
         "apps/beaver/guides/your-first-beaver-compiler.livemd"

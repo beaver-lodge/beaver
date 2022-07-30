@@ -1,6 +1,6 @@
-defmodule FizzTest do
+defmodule KindaTest do
   use ExUnit.Case, async: true
-  doctest Fizz
+  doctest Kinda
 
   test "greets the world" do
     assert true

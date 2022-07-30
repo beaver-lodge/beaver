@@ -12,7 +12,7 @@ defmodule Beaver.MLIR.CAPI do
           Path.wildcard("native/mlir-zig/src/**") ++
           Path.wildcard("capi/src") ++
           ["native/mlir-zig/#{Mix.env()}/build.zig"],
-      not String.contains?(path, "fizz.gen.zig") do
+      not String.contains?(path, "kinda.gen.zig") do
     if File.exists?(path) do
       Logger.debug("[Beaver] adding to elixir compiler external resource: #{path}")
       @external_resource path
@@ -28,7 +28,7 @@ defmodule Beaver.MLIR.CAPI do
     dest_dir: dest_dir,
     zig_t_module_map: zig_t_module_map
   } =
-    Fizz.gen(__MODULE__, Path.join(File.cwd!(), "native/wrapper.h"), "native/mlir-zig",
+    Kinda.gen(__MODULE__, Path.join(File.cwd!(), "native/wrapper.h"), "native/mlir-zig",
       include_paths: %{
         llvm_include: Beaver.LLVM.Config.include_dir(),
         beaver_include: Path.join(File.cwd!(), "native/mlir-c/include")
@@ -43,7 +43,7 @@ defmodule Beaver.MLIR.CAPI do
   root_module = __MODULE__
   forward_module = Beaver.Native
   # generate resource modules
-  for %Fizz.CodeGen.Type{
+  for %Kinda.CodeGen.Type{
         module_name: module_name,
         zig_t: zig_t,
         fields: fields
@@ -58,7 +58,7 @@ defmodule Beaver.MLIR.CAPI do
       #{zig_t}
       """
 
-      use Fizz.ResourceKind,
+      use Kinda.ResourceKind,
         root_module: root_module,
         fields: fields,
         forward_module: forward_module
@@ -82,7 +82,7 @@ defmodule Beaver.MLIR.CAPI do
           Descriptor9D
         ],
         t <- [Complex.F32, U8, I32, I64, F32, F64] do
-      %Fizz.CodeGen.Type{
+      %Kinda.CodeGen.Type{
         module_name: Module.concat([Beaver.Native, t, MemRef, rank]),
         kind_functions: Beaver.MLIR.CAPI.CodeGen.memref_kind_functions()
       }
@@ -90,18 +90,18 @@ defmodule Beaver.MLIR.CAPI do
 
   extra_kind_nifs =
     ([
-       %Fizz.CodeGen.Type{
+       %Kinda.CodeGen.Type{
          module_name: Beaver.Native.Complex.F32,
          kind_functions: Beaver.MLIR.CAPI.CodeGen.memref_kind_functions()
        }
      ] ++ mem_ref_descriptor_kinds)
-    |> Enum.map(&Fizz.CodeGen.NIF.from_resource_kind/1)
+    |> Enum.map(&Kinda.CodeGen.NIF.from_resource_kind/1)
     |> List.flatten()
 
   for nif <- nifs ++ extra_kind_nifs do
     args_ast = Macro.generate_unique_arguments(nif.arity, __MODULE__)
 
-    %Fizz.CodeGen.NIF{wrapper_name: wrapper_name, nif_name: nif_name, ret: ret} = nif
+    %Kinda.CodeGen.NIF{wrapper_name: wrapper_name, nif_name: nif_name, ret: ret} = nif
     @doc false
     def unquote(nif_name)(unquote_splicing(args_ast)),
       do:
@@ -112,15 +112,15 @@ defmodule Beaver.MLIR.CAPI do
     if wrapper_name do
       if ret == "void" do
         def unquote(String.to_atom(wrapper_name))(unquote_splicing(args_ast)) do
-          refs = Fizz.unwrap_ref([unquote_splicing(args_ast)])
+          refs = Kinda.unwrap_ref([unquote_splicing(args_ast)])
           ref = apply(__MODULE__, unquote(nif_name), refs)
           :ok = unquote(forward_module).check!(ref)
         end
       else
-        return_module = Fizz.module_name(ret, Beaver.Native, zig_t_module_map)
+        return_module = Kinda.module_name(ret, Beaver.Native, zig_t_module_map)
 
         def unquote(String.to_atom(wrapper_name))(unquote_splicing(args_ast)) do
-          refs = Fizz.unwrap_ref([unquote_splicing(args_ast)])
+          refs = Kinda.unwrap_ref([unquote_splicing(args_ast)])
           ref = apply(__MODULE__, unquote(nif_name), refs)
 
           struct!(unquote(return_module),

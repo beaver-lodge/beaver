@@ -1,5 +1,5 @@
-defmodule Fizz.CodeGen.NIF do
-  alias Fizz.CodeGen.{Function, Type}
+defmodule Kinda.CodeGen.NIF do
+  alias Kinda.CodeGen.{Function, Type}
   @type dirty() :: :io | :cpu | false
   @type t() :: %__MODULE__{
           wrapper_name: nil | String.t(),

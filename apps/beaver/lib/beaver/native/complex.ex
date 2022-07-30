@@ -5,7 +5,7 @@ for m <-
   full = Module.concat(Beaver.Native.Complex, m)
 
   defmodule full do
-    use Fizz.ResourceKind,
+    use Kinda.ResourceKind,
       forward_module: Beaver.Native
   end
 end

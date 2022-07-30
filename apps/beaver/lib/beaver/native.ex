@@ -47,7 +47,7 @@ defmodule Beaver.Native do
 
     ref =
       apply(CAPI, Module.concat([module, func]), [
-        Enum.map(data, &Fizz.unwrap_ref/1)
+        Enum.map(data, &Kinda.unwrap_ref/1)
       ])
       |> check!()
 

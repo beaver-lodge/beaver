@@ -1,5 +1,5 @@
-defmodule Fizz.CodeGen.Resource do
-  alias Fizz.CodeGen.Type
+defmodule Kinda.CodeGen.Resource do
+  alias Kinda.CodeGen.Type
 
   def resource_type_struct("[*c]const " <> type, %{} = resource_kind_map) do
     mod = Map.fetch!(resource_kind_map, type)

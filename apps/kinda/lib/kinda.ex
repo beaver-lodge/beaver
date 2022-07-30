@@ -1,9 +1,9 @@
-defmodule Fizz do
-  alias Fizz.CodeGen.{Function, Type, Resource, NIF}
+defmodule Kinda do
+  alias Kinda.CodeGen.{Function, Type, Resource, NIF}
   require Logger
 
   @moduledoc """
-  Documentation for `Fizz`.
+  Documentation for `Kinda`.
   """
 
   defp gen_kind_name_from_module_name(%Type{module_name: module_name, kind_name: nil} = t) do
@@ -34,7 +34,7 @@ defmodule Fizz do
     source_dir = Path.join(project_dir, "src")
     project_dir = Path.join(project_dir, Atom.to_string(Mix.env()))
     project_source_dir = Path.join(project_dir, "src")
-    Logger.debug("[Fizz] generating Zig code for wrapper: #{wrapper}")
+    Logger.debug("[Kinda] generating Zig code for wrapper: #{wrapper}")
     include_paths = Keyword.get(opts, :include_paths, %{})
     library_paths = Keyword.get(opts, :library_paths, %{})
     type_gen = Keyword.get(opts, :type_gen) || (&Type.default/2)
@@ -241,7 +241,7 @@ defmodule Fizz do
     kinda.aliasKind(kinda.Internal.OpaqueArray, OpaqueArray);
     }
     pub export const generated_nifs = .{
-      #{nifs |> Enum.map(&Fizz.CodeGen.NIF.gen/1) |> Enum.join("  ")}
+      #{nifs |> Enum.map(&Kinda.CodeGen.NIF.gen/1) |> Enum.join("  ")}
     }
     ++ #{Enum.map(resource_kinds, fn %{kind_name: kind_name} -> "#{kind_name}.nifs" end) |> Enum.join(" ++ \n")};
     """
@@ -260,7 +260,7 @@ defmodule Fizz do
 
     dst = Path.join(project_source_dir, "mlir.imp.zig")
     File.mkdir_p(project_source_dir)
-    Logger.debug("[Fizz] writing source import to: #{dst}")
+    Logger.debug("[Kinda] writing source import to: #{dst}")
     File.write!(dst, source)
 
     # generate build.inc.zig source
@@ -299,7 +299,7 @@ defmodule Fizz do
         """
 
     dst = Path.join(project_dir, "build.imp.zig")
-    Logger.debug("[Fizz] writing build import to: #{dst}")
+    Logger.debug("[Kinda] writing build import to: #{dst}")
     File.write!(dst, build_source)
 
     if Mix.env() in [:test, :dev] do
@@ -316,7 +316,7 @@ defmodule Fizz do
 
     for zig_source <- Path.wildcard(Path.join(source_dir, "*.zig")) do
       zig_source_link = Path.join(sym_src_dir, Path.basename(zig_source))
-      Logger.debug("[Fizz] sym linking source #{zig_source} => #{zig_source_link}")
+      Logger.debug("[Kinda] sym linking source #{zig_source} => #{zig_source_link}")
 
       if File.exists?(zig_source_link) do
         File.rm(zig_source_link)
@@ -325,10 +325,10 @@ defmodule Fizz do
       File.ln_s(zig_source, zig_source_link)
     end
 
-    Logger.debug("[Fizz] building Zig project in: #{project_dir}")
+    Logger.debug("[Kinda] building Zig project in: #{project_dir}")
 
     with {_, 0} <- System.cmd("zig", ["build", "--prefix", dest_dir], cd: project_dir) do
-      Logger.debug("[Fizz] Zig library installed to: #{dest_dir}")
+      Logger.debug("[Kinda] Zig library installed to: #{dest_dir}")
       :ok
     else
       {_error, ret_code} ->

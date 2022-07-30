@@ -1,4 +1,4 @@
-defmodule Fizz.ResourceKind do
+defmodule Kinda.ResourceKind do
   defmacro __using__(opts) do
     forward_module = Keyword.fetch!(opts, :forward_module)
     fields = Keyword.get(opts, :fields) || []

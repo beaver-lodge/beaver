@@ -1,4 +1,4 @@
-defmodule Beaver.MLIR.CAPI.FizzTest do
+defmodule Beaver.MLIR.CAPI.KindaTest do
   use ExUnit.Case
   alias Beaver.MLIR.CAPI
   @moduletag :smoke

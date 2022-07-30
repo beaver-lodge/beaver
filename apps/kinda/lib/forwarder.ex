@@ -1,4 +1,4 @@
-defmodule Fizz.Forwarder do
+defmodule Kinda.Forwarder do
   @callback forward() :: :ok | :error
   @callback check!() :: :ok | :error
   @callback array() :: :ok | :error

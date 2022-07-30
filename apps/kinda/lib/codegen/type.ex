@@ -1,4 +1,4 @@
-defmodule Fizz.CodeGen.Type do
+defmodule Kinda.CodeGen.Type do
   defstruct zig_t: nil,
             module_name: nil,
             kind_name: nil,

@@ -1,5 +1,5 @@
 defmodule Beaver.MLIR.CAPI.CodeGen do
-  alias Fizz.CodeGen.{Type, NIF, Function}
+  alias Kinda.CodeGen.{Type, NIF, Function}
 
   def type_gen(_root_module, "?fn(c.struct_MlirStringRef, ?*anyopaque) callconv(.C) void" = type) do
     {:ok, %Type{zig_t: type, module_name: Beaver.MLIR.String.Callback}}
