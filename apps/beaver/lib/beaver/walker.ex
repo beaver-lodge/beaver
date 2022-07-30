@@ -541,164 +541,165 @@ defmodule Beaver.Walker do
         raise "Operation being replace should have one and only result"
     end
   end
-end
 
-alias Beaver.Walker
-
-defimpl Enumerable, for: Walker do
-  @spec count(Walker.t()) :: {:ok, non_neg_integer()} | {:error, module()}
-  def count(%Walker{container: container, get_num: get_num}) when is_function(get_num, 1) do
-    {:ok, get_num.(container) |> Beaver.Native.to_term()}
-  end
-
-  def count(%Walker{container: %container_module{}}) do
-    {:error, container_module}
-  end
-
-  @spec member?(Walker.t(), Walker.element()) :: {:ok, boolean()} | {:error, module()}
-  def member?(
-        walker = %Walker{element_equal: element_equal, element_module: element_module},
-        %element_module{} = element
-      )
-      when is_function(element_equal, 2) do
-    is_member =
-      Enum.any?(walker, fn member ->
-        element_equal.(member, element) |> Beaver.Native.to_term()
-      end)
-
-    {:ok, is_member}
-  end
-
-  @spec member?(Walker.t(), Walker.element()) :: {:ok, boolean()} | {:error, module()}
-  def member?(
-        %Walker{
-          get_parent: get_parent,
-          parent_equal: parent_equal,
-          element_module: element_module,
-          container: container
-        },
-        %element_module{} = element
-      )
-      when is_function(get_parent, 1) and is_function(parent_equal, 2) do
-    is_member = parent_equal.(container, get_parent.(element)) |> Beaver.Native.to_term()
-    {:ok, is_member}
-  end
-
-  @spec slice(Walker.t()) ::
-          {:ok, size :: non_neg_integer(), Enumerable.slicing_fun()} | {:error, module()}
-  def slice(walker = %Walker{container: container, get_element: get_element})
-      when is_function(get_element, 2) do
-    with {:ok, count} <- count(walker) do
-      {:ok, count,
-       fn start, length ->
-         pos_range = start..(start + length - 1)
-
-         for pos <- pos_range do
-           get_element.(container, pos)
-         end
-       end}
-    else
-      error -> error
+  defimpl Enumerable do
+    @spec count(Beaver.Walker.t()) :: {:ok, non_neg_integer()} | {:error, module()}
+    def count(%Beaver.Walker{container: container, get_num: get_num})
+        when is_function(get_num, 1) do
+      {:ok, get_num.(container) |> Beaver.Native.to_term()}
     end
-  end
 
-  @spec reduce(Walker.t(), Enumerable.acc(), Enumerable.reducer()) :: Enumerable.result()
-
-  # Do nothing special receiving :halt or :suspend
-  def reduce(_walker, {:halt, acc}, _fun), do: {:halted, acc}
-
-  def reduce(walker, {:suspend, acc}, fun),
-    do: {:suspended, acc, &reduce(walker, &1, fun)}
-
-  # Reduce by index
-  def reduce(
-        %Walker{get_element: get_element, this: nil, num: nil} = walker,
-        {:cont, acc},
-        fun
-      )
-      when is_function(get_element, 2) do
-    with {:ok, count} <- count(walker) do
-      reduce(%Walker{walker | this: 0, num: count}, {:cont, acc}, fun)
-    else
-      error -> error
+    def count(%Beaver.Walker{container: %container_module{}}) do
+      {:error, container_module}
     end
-  end
 
-  def reduce(
-        %Walker{
-          container: container,
-          element_module: element_module,
-          get_element: get_element,
-          this: pos,
-          num: num
-        } = walker,
-        {:cont, acc},
-        fun
-      )
-      when is_function(get_element, 2) and
-             is_integer(pos) and pos >= 0 do
-    if pos < num do
-      value = get_element.(container, pos) |> expect_element!(element_module)
-      reduce(%Walker{walker | this: pos + 1}, fun.(value, acc), fun)
-    else
-      {:done, acc}
+    @spec member?(Beaver.Walker.t(), Beaver.Walker.element()) ::
+            {:ok, boolean()} | {:error, module()}
+    def member?(
+          walker = %Beaver.Walker{element_equal: element_equal, element_module: element_module},
+          %element_module{} = element
+        )
+        when is_function(element_equal, 2) do
+      is_member =
+        Enum.any?(walker, fn member ->
+          element_equal.(member, element) |> Beaver.Native.to_term()
+        end)
+
+      {:ok, is_member}
     end
-  end
 
-  # reduce by following the link
-  def reduce(
-        %Walker{
-          container: container,
-          element_module: element_module,
-          get_first: get_first,
-          get_next: get_next,
-          is_null: is_null,
-          this: nil
-        } = walker,
-        {:cont, acc},
-        fun
-      )
-      when is_function(get_first, 1) and is_function(get_next, 1) and is_function(is_null, 1) do
-    this = get_first.(container) |> expect_element!(element_module)
-    reduce(%Walker{walker | this: this}, {:cont, acc}, fun)
-  end
-
-  def reduce(
-        %Walker{
-          get_next: get_next,
-          is_null: is_null,
-          element_module: element_module,
-          this: %element_module{} = this
-        } = walker,
-        {:cont, acc},
-        fun
-      )
-      when is_function(get_next, 1) and is_function(is_null, 1) do
-    if is_null.(this) do
-      {:done, acc}
-    else
-      next = get_next.(this) |> expect_element!(element_module)
-      reduce(%Walker{walker | this: next}, fun.(this, acc), fun)
+    @spec member?(Beaver.Walker.t(), Beaver.Walker.element()) ::
+            {:ok, boolean()} | {:error, module()}
+    def member?(
+          %Beaver.Walker{
+            get_parent: get_parent,
+            parent_equal: parent_equal,
+            element_module: element_module,
+            container: container
+          },
+          %element_module{} = element
+        )
+        when is_function(get_parent, 1) and is_function(parent_equal, 2) do
+      is_member = parent_equal.(container, get_parent.(element)) |> Beaver.Native.to_term()
+      {:ok, is_member}
     end
-  end
 
-  # TODO: this could be a macro erased in :prod
-  defp expect_element!(%module{} = element, element_module) do
-    if element_module != module do
-      raise "Expected element module #{element_module}, got #{module}"
-    else
-      element
+    @spec slice(Beaver.Walker.t()) ::
+            {:ok, size :: non_neg_integer(), Enumerable.slicing_fun()} | {:error, module()}
+    def slice(walker = %Beaver.Walker{container: container, get_element: get_element})
+        when is_function(get_element, 2) do
+      with {:ok, count} <- count(walker) do
+        {:ok, count,
+         fn start, length ->
+           pos_range = start..(start + length - 1)
+
+           for pos <- pos_range do
+             get_element.(container, pos)
+           end
+         end}
+      else
+        error -> error
+      end
     end
-  end
 
-  defp expect_element!({%module_a{}, %module_b{}} = element, {module_a_, module_b_}) do
-    tuple_x = {module_a, module_b}
-    tuple_y = {module_a_, module_b_}
+    @spec reduce(Beaver.Walker.t(), Enumerable.acc(), Enumerable.reducer()) :: Enumerable.result()
 
-    if tuple_x != tuple_y do
-      raise "Expected element module #{inspect(tuple_y)}, got #{inspect(tuple_x)}"
-    else
-      element
+    # Do nothing special receiving :halt or :suspend
+    def reduce(_walker, {:halt, acc}, _fun), do: {:halted, acc}
+
+    def reduce(walker, {:suspend, acc}, fun),
+      do: {:suspended, acc, &reduce(walker, &1, fun)}
+
+    # Reduce by index
+    def reduce(
+          %Beaver.Walker{get_element: get_element, this: nil, num: nil} = walker,
+          {:cont, acc},
+          fun
+        )
+        when is_function(get_element, 2) do
+      with {:ok, count} <- count(walker) do
+        reduce(%Beaver.Walker{walker | this: 0, num: count}, {:cont, acc}, fun)
+      else
+        error -> error
+      end
+    end
+
+    def reduce(
+          %Beaver.Walker{
+            container: container,
+            element_module: element_module,
+            get_element: get_element,
+            this: pos,
+            num: num
+          } = walker,
+          {:cont, acc},
+          fun
+        )
+        when is_function(get_element, 2) and
+               is_integer(pos) and pos >= 0 do
+      if pos < num do
+        value = get_element.(container, pos) |> expect_element!(element_module)
+        reduce(%Beaver.Walker{walker | this: pos + 1}, fun.(value, acc), fun)
+      else
+        {:done, acc}
+      end
+    end
+
+    # reduce by following the link
+    def reduce(
+          %Beaver.Walker{
+            container: container,
+            element_module: element_module,
+            get_first: get_first,
+            get_next: get_next,
+            is_null: is_null,
+            this: nil
+          } = walker,
+          {:cont, acc},
+          fun
+        )
+        when is_function(get_first, 1) and is_function(get_next, 1) and is_function(is_null, 1) do
+      this = get_first.(container) |> expect_element!(element_module)
+      reduce(%Beaver.Walker{walker | this: this}, {:cont, acc}, fun)
+    end
+
+    def reduce(
+          %Beaver.Walker{
+            get_next: get_next,
+            is_null: is_null,
+            element_module: element_module,
+            this: %element_module{} = this
+          } = walker,
+          {:cont, acc},
+          fun
+        )
+        when is_function(get_next, 1) and is_function(is_null, 1) do
+      if is_null.(this) do
+        {:done, acc}
+      else
+        next = get_next.(this) |> expect_element!(element_module)
+        reduce(%Beaver.Walker{walker | this: next}, fun.(this, acc), fun)
+      end
+    end
+
+    # TODO: this could be a macro erased in :prod
+    defp expect_element!(%module{} = element, element_module) do
+      if element_module != module do
+        raise "Expected element module #{element_module}, got #{module}"
+      else
+        element
+      end
+    end
+
+    defp expect_element!({%module_a{}, %module_b{}} = element, {module_a_, module_b_}) do
+      tuple_x = {module_a, module_b}
+      tuple_y = {module_a_, module_b_}
+
+      if tuple_x != tuple_y do
+        raise "Expected element module #{inspect(tuple_y)}, got #{inspect(tuple_x)}"
+      else
+        element
+      end
     end
   end
 end
