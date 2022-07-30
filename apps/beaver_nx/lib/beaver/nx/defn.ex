@@ -462,6 +462,7 @@ defmodule Beaver.Nx.Defn do
       |> Enum.map(&memref_from_tensor/1)
       |> Enum.map(&Beaver.Native.Memory.descriptor_dump/1)
 
+    # TODO: support array of memref descriptor of different kinds
     first = mems |> List.first()
     kind = first.descriptor.kind
 

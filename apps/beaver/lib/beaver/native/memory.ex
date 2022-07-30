@@ -45,34 +45,16 @@ defmodule Beaver.Native.Memory do
         {:s, 64} ->
           Beaver.Native.I64
 
+        {:c, 64} ->
+          Beaver.Native.Complex.F32
+
         _ ->
           mod
       end
 
-    # TODO: if no sizes given, create a unranked memref
-    offset = Keyword.get(opts, :offset, 0)
-    sizes = Keyword.fetch!(opts, :sizes)
+    array = mod.array(data, mut: true)
 
-    strides =
-      Keyword.get(
-        opts,
-        :strides,
-        dense_strides(sizes)
-      )
-
-    array = %{ref: ref} = mod.array(data, mut: true)
-
-    %__MODULE__{
-      storage: array,
-      descriptor:
-        __MODULE__.Descriptor.make(shape_to_descriptor_kind(mod, sizes), [
-          ref,
-          ref,
-          offset,
-          sizes,
-          strides
-        ])
-    }
+    new(array, opts)
   end
 
   def new(%Beaver.Native.Array{ref: ref, element_kind: mod} = array, opts) do

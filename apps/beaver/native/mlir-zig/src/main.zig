@@ -466,7 +466,7 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
     };
 }
 
-const forward_module = "Elixir.Beaver.Native.C64";
+const forward_module = "Elixir.Beaver.Native.Complex.F32";
 const Complex = struct {
     fn of(comptime ElementKind: type) type {
         return struct {
@@ -480,7 +480,7 @@ const Complex = struct {
 };
 
 const MemRefDataType = enum {
-    C64,
+    @"Complex.F32",
     U8,
     F32,
     F64,
@@ -490,7 +490,7 @@ const MemRefDataType = enum {
 
 fn dataTypeToResourceKind(self: MemRefDataType) type {
     return switch (self) {
-        .C64 => Complex.F32,
+        .@"Complex.F32" => Complex.F32,
         .U8 => fizz.U8,
         .F32 => fizz.F32,
         .F64 => fizz.F64,
@@ -501,7 +501,7 @@ fn dataTypeToResourceKind(self: MemRefDataType) type {
 
 fn dataKindToDataType(comptime self: type) MemRefDataType {
     return switch (self) {
-        Complex.F32 => MemRefDataType.C64,
+        Complex.F32 => MemRefDataType.@"Complex.F32",
         fizz.U8 => MemRefDataType.U8,
         fizz.F32 => MemRefDataType.F32,
         fizz.F64 => MemRefDataType.F64,
@@ -512,7 +512,7 @@ fn dataKindToDataType(comptime self: type) MemRefDataType {
 }
 
 const memref_kinds = .{
-    BeaverMemRef(dataTypeToResourceKind(MemRefDataType.C64)),
+    BeaverMemRef(dataTypeToResourceKind(MemRefDataType.@"Complex.F32")),
     BeaverMemRef(dataTypeToResourceKind(MemRefDataType.U8)),
     BeaverMemRef(dataTypeToResourceKind(MemRefDataType.F32)),
     BeaverMemRef(dataTypeToResourceKind(MemRefDataType.F64)),
@@ -630,6 +630,7 @@ pub export const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_mlir_named_attribute_get", .arity = 2, .fptr = beaver_raw_mlir_named_attribute_get, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_read_opaque_ptr", .arity = 2, .fptr = beaver_raw_read_opaque_ptr, .flags = 0 },
 } ++
+    Complex.F32.nifs ++
     dataKindToMemrefKind(Complex.F32).nifs ++
     dataKindToMemrefKind(fizz.U8).nifs ++
     dataKindToMemrefKind(fizz.F32).nifs ++
@@ -662,6 +663,7 @@ export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     inline while (i < memref_kinds.len) : (i += 1) {
         memref_kinds[i].open(env);
     }
+    Complex.F32.open_all(env);
     beam.open_resource_wrapped(env, PassToken);
     kinda.Internal.OpaqueStruct.open_all(env);
     return 0;
