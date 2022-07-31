@@ -1,6 +1,8 @@
 defmodule Beaver.DSL.Pattern do
-  use Beaver
   alias Beaver.MLIR
+  import MLIR.Sigils
+  import Beaver
+  require Beaver.Env
 
   @doc """
   generate PDL ops for types and attributes
