@@ -54,7 +54,7 @@ defmodule Beaver.DSL.SSA do
         %Beaver.DSL.SSA{}
         |> Beaver.DSL.SSA.put_filler(fn -> unquote(ast_block) end)
         |> Beaver.DSL.SSA.put_arguments(args)
-        |> Beaver.DSL.SSA.put_block(Beaver.Env.mlir__BLOCK__())
+        |> Beaver.DSL.SSA.put_block(MLIR.__BLOCK__())
         |> Beaver.DSL.SSA.put_results(unquote(results))
         |> unquote(empty_call)
       end
@@ -76,7 +76,7 @@ defmodule Beaver.DSL.SSA do
 
       %Beaver.DSL.SSA{}
       |> Beaver.DSL.SSA.put_arguments(args)
-      |> Beaver.DSL.SSA.put_block(Beaver.Env.mlir__BLOCK__())
+      |> Beaver.DSL.SSA.put_block(MLIR.__BLOCK__())
       |> Beaver.DSL.SSA.put_results(unquote(results))
       |> unquote(empty_call)
     end

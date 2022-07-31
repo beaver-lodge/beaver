@@ -3,15 +3,15 @@ defmodule EnvTest do
   use Beaver
   alias Beaver.MLIR
 
-  test "mlir__BLOCK__" do
+  test "MLIR.__BLOCK__" do
     mlir do
       module do
         Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
           region do
-            %MLIR.CAPI.MlirRegion{} = Beaver.Env.mlir__REGION__()
+            %MLIR.CAPI.MlirRegion{} = MLIR.__REGION__()
 
             block bb_entry() do
-              %MLIR.CAPI.MlirBlock{} = Beaver.Env.mlir__BLOCK__()
+              %MLIR.CAPI.MlirBlock{} = MLIR.__BLOCK__()
             end
           end
         end

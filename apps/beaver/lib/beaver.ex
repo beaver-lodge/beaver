@@ -9,9 +9,9 @@ defmodule Beaver do
   defmacro __using__(_) do
     quote do
       import Beaver
-      import Beaver.Env
       alias Beaver.MLIR
       import MLIR.Sigils
+      require Beaver.MLIR
     end
   end
 
@@ -60,6 +60,7 @@ defmodule Beaver do
 
     quote do
       alias Beaver.MLIR
+      require Beaver.MLIR
       alias Beaver.MLIR.Type
       alias Beaver.MLIR.Attribute
       alias Beaver.MLIR.ODS
@@ -85,6 +86,7 @@ defmodule Beaver do
 
     quote do
       alias Beaver.MLIR
+      require Beaver.MLIR
       alias Beaver.MLIR.Type
       alias Beaver.MLIR.Attribute
       alias Beaver.MLIR.ODS
@@ -128,9 +130,9 @@ defmodule Beaver do
 
     region_insert_ast =
       quote do
-        if region = Beaver.Env.mlir__REGION__() do
+        if region = MLIR.__REGION__() do
           # insert the block to region
-          Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, Beaver.Env.mlir__BLOCK__())
+          Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, MLIR.__BLOCK__())
         end
       end
 

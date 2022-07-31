@@ -243,13 +243,13 @@ defmodule PDLTest do
              ) do
         types = [Type.ranked_tensor([2, 3], Type.f32())]
         a = %TOSA.Sub{operands: [a, b], results: types}
-        a = Pattern.result(Beaver.Env.mlir__BLOCK__(), a, 0)
+        a = Pattern.result(MLIR.__BLOCK__(), a, 0)
         a = %TOSA.Sub{operands: [a, b], results: types}
-        a = Pattern.result(Beaver.Env.mlir__BLOCK__(), a, 0)
+        a = Pattern.result(MLIR.__BLOCK__(), a, 0)
         a = %TOSA.Sub{operands: [a, b], results: types}
-        a = Pattern.result(Beaver.Env.mlir__BLOCK__(), a, 0)
+        a = Pattern.result(MLIR.__BLOCK__(), a, 0)
         a = %TOSA.Sub{operands: [a, b], results: types, attributes: [one: one]}
-        a = Pattern.result(Beaver.Env.mlir__BLOCK__(), a, 0)
+        a = Pattern.result(MLIR.__BLOCK__(), a, 0)
         %TOSA.Sub{operands: [a, b]}
       end
 
