@@ -18,17 +18,29 @@ defmodule Beaver.MLIR.Pass.Server do
     op = %MLIR.CAPI.MlirOperation{ref: op_ref}
     pass = %MLIR.CAPI.MlirExternalPass{ref: pass_ref}
 
-    with :ok <- apply(pass_module, :run, [op]) do
-      :ok
-    else
-      :error ->
+    try do
+      with :ok <- apply(pass_module, :run, [op]) do
+        :ok
+      else
+        :error ->
+          MLIR.CAPI.mlirExternalPassSignalFailure(pass)
+
+        other ->
+          MLIR.CAPI.mlirExternalPassSignalFailure(pass)
+
+          Logger.error(
+            "must return :ok or :error in run/1 of the pass #{__MODULE__}, get: #{inspect(other)}"
+          )
+      end
+    rescue
+      e ->
         MLIR.CAPI.mlirExternalPassSignalFailure(pass)
 
-      other ->
-        raise "must return :ok or :error in run/1 of the pass #{__MODULE__}, get: #{inspect(other)}"
+        Logger.error("fail to run pass, message: #{Exception.message(e)}")
+    after
+      :ok = MLIR.CAPI.beaver_raw_pass_token_signal(token_ref)
     end
 
-    :ok = MLIR.CAPI.beaver_raw_pass_token_signal(token_ref)
     {:noreply, state}
   end
 
