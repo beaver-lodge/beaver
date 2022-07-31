@@ -133,8 +133,23 @@ defmodule Beaver do
         if region = Beaver.Env.mlir__REGION__() do
           # insert the block to region
           Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, Beaver.Env.mlir__BLOCK__())
-          # put the block to managed terminator => block id (name in decomposed block call)
-          Beaver.MLIR.Managed.Terminator.put_block(unquote(block_id), Beaver.Env.mlir__BLOCK__())
+        end
+      end
+
+    {bb_name, _} = call |> Macro.decompose_call()
+
+    block_creation_ast =
+      if Macro.Env.has_var?(__CALLER__, {bb_name, nil}) do
+        quote do
+          _args =
+            Kernel.var!(unquote({bb_name, [], nil}))
+            |> Beaver.MLIR.Block.add_arg!(nil, Enum.zip(block_arg_types, block_arg_locs))
+
+          Kernel.var!(unquote({bb_name, [], nil}))
+        end
+      else
+        quote do
+          Beaver.MLIR.Block.create(block_arg_types, block_arg_locs)
         end
       end
 
@@ -146,8 +161,7 @@ defmodule Beaver do
 
         # can't put code here inside a function like Region.under, because we need to support uses across blocks
 
-        Kernel.var!(beaver_internal_env_block) =
-          Beaver.MLIR.Block.create(block_arg_types, block_arg_locs)
+        Kernel.var!(beaver_internal_env_block) = unquote(block_creation_ast)
 
         unquote(region_insert_ast)
 
