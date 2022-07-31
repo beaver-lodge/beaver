@@ -41,4 +41,10 @@ defmodule Beaver.MLIR.Module do
   def destroy(module) do
     CAPI.mlirModuleDestroy(module)
   end
+
+  defimpl Inspect do
+    def inspect(module, _opts) do
+      Beaver.MLIR.to_string(module)
+    end
+  end
 end

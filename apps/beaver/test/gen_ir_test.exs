@@ -49,6 +49,7 @@ defmodule CFTest do
           end
         end
       end
+      |> IO.inspect()
     end
     |> MLIR.Operation.verify!()
   end
