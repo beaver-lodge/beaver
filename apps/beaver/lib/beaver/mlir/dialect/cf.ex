@@ -2,6 +2,12 @@ defmodule Beaver.MLIR.Dialect.CF do
   alias Beaver.MLIR
   import Beaver.MLIR.Sigils
   require Beaver.MLIR.CAPI
+  alias Beaver.MLIR.Dialect
+
+  use Beaver.MLIR.Dialect,
+    dialect: "cf",
+    ops: Dialect.Registry.ops("cf"),
+    skips: ~w{cond_br}
 
   defp extract_args(block = %Beaver.MLIR.CAPI.MlirBlock{}) do
     {:ok, {block, []}}
@@ -37,6 +43,10 @@ defmodule Beaver.MLIR.Dialect.CF do
     end)
   end
 
+  defmodule Br do
+    use Beaver.DSL.Op.Prototype, op_name: "cf.br"
+  end
+
   @doc """
   Create cf.br op. It is a terminator, so this function doesn't returns the results
   """
@@ -49,6 +59,10 @@ defmodule Beaver.MLIR.Dialect.CF do
     )
 
     nil
+  end
+
+  defmodule CondBr do
+    use Beaver.DSL.Op.Prototype, op_name: "cf.cond_br"
   end
 
   @doc """
@@ -69,9 +83,5 @@ defmodule Beaver.MLIR.Dialect.CF do
       arguments ++ [operand_segment_sizes: operand_segment_sizes],
       block
     )
-  end
-
-  def ops() do
-    []
   end
 end

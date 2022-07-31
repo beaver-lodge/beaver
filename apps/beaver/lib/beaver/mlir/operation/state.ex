@@ -228,7 +228,8 @@ defmodule Beaver.MLIR.Operation.State do
           | {atom(), CAPI.MlirAttribute.t()}
           | {:regions, function()}
           | {:result_types, [CAPI.MlirType.t()]}
-          | {:successor, CAPI.MlirBlock.t()}
+          | {CAPI.MlirBlock.t(), [MLIR.Value.t()]}
+          | CAPI.MlirBlock.t()
   @spec add_argument(t(), argument()) :: CAPI.MlirOperationState.t()
 
   @doc """
@@ -258,10 +259,10 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   def add_argument(
-        %__MODULE__{successors: successors} = state,
-        {:successor, %Beaver.MLIR.CAPI.MlirBlock{} = successor_block}
+        %__MODULE__{successors: successors, operands: operands} = state,
+        {%Beaver.MLIR.CAPI.MlirBlock{} = successor_block, block_args}
       ) do
-    %{state | successors: successors ++ [successor_block]}
+    %{state | successors: successors ++ [successor_block], operands: operands ++ block_args}
   end
 
   def add_argument(

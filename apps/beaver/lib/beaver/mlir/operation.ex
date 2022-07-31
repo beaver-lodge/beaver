@@ -4,21 +4,6 @@ defmodule Beaver.MLIR.Operation do
   import Beaver.MLIR.CAPI
   require Logger
 
-  defp defer_if_terminator(arguments) do
-    arguments
-    |> Enum.reduce(
-      true,
-      fn
-        # if it is real block, don't defer the creation
-        {:successor, %Beaver.MLIR.CAPI.MlirBlock{}}, acc ->
-          false && acc
-
-        _, acc ->
-          acc
-      end
-    )
-  end
-
   @doc """
   Create a new operation from a operation state
   """
