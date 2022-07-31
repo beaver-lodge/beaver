@@ -43,24 +43,6 @@ defmodule Beaver.MLIR.Dialect.CF do
     end)
   end
 
-  defmodule Br do
-    use Beaver.DSL.Op.Prototype, op_name: "cf.br"
-  end
-
-  @doc """
-  Create cf.br op. It is a terminator, so this function doesn't returns the results
-  """
-  def br(%Beaver.DSL.SSA{arguments: arguments} = ssa) do
-    {arguments, _arg_size} = collect_arguments(arguments)
-
-    MLIR.Operation.create(
-      "cf.br",
-      %Beaver.DSL.SSA{ssa | arguments: arguments}
-    )
-
-    nil
-  end
-
   defmodule CondBr do
     use Beaver.DSL.Op.Prototype, op_name: "cf.cond_br"
   end
