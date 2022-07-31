@@ -34,7 +34,7 @@ defmodule Beaver.MLIR.Dialect.Func do
             fn {x, _} -> x end
           )
 
-        Beaver.MLIR.Operation.create("func.func", arguments, Beaver.Env.mlir__BLOCK__())
+        Beaver.MLIR.Operation.create("func.func", arguments, Beaver.MLIR.__BLOCK__())
       end
 
     func_ast

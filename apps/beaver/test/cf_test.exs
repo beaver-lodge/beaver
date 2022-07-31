@@ -9,6 +9,7 @@ defmodule CfTest do
 
   defmodule MutCompiler do
     use Beaver
+    require Beaver.MLIR
 
     defmodule Acc do
       @enforce_keys [:vars, :block, :region]
@@ -79,7 +80,7 @@ defmodule CfTest do
         mlir do
           block _true_branch() do
             {%MLIR.Value{} = mlir, acc} = gen_mlir(do_block_ast, acc)
-            %MLIR.CAPI.MlirBlock{} = Beaver.Env.mlir__BLOCK__()
+            %MLIR.CAPI.MlirBlock{} = Beaver.MLIR.__BLOCK__()
             CF.br({bb_next, [mlir]}) >>> []
           end
         end
@@ -178,8 +179,8 @@ defmodule CfTest do
 
                 acc = %Acc{
                   vars: vars,
-                  region: Beaver.Env.mlir__REGION__(),
-                  block: Beaver.Env.mlir__BLOCK__()
+                  region: Beaver.MLIR.__REGION__(),
+                  block: Beaver.MLIR.__BLOCK__()
                 }
 
                 # keep generating until we meet a terminator

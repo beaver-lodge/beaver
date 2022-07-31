@@ -2,7 +2,7 @@ defmodule Beaver.DSL.Pattern do
   alias Beaver.MLIR
   import MLIR.Sigils
   import Beaver
-  require Beaver.Env
+  require Beaver.MLIR
 
   @doc """
   generate PDL ops for types and attributes
@@ -142,8 +142,7 @@ defmodule Beaver.DSL.Pattern do
           case attribute do
             {:bound, bound} ->
               quote do
-                unquote(bound) =
-                  Beaver.DSL.Pattern.gen_pdl(Beaver.Env.mlir__BLOCK__(), unquote(bound))
+                unquote(bound) = Beaver.DSL.Pattern.gen_pdl(MLIR.__BLOCK__(), unquote(bound))
               end
 
             _ ->
@@ -165,7 +164,7 @@ defmodule Beaver.DSL.Pattern do
           case result do
             {:bound, bound} ->
               quote do
-                Beaver.DSL.Pattern.gen_pdl(Beaver.Env.mlir__BLOCK__(), unquote(bound))
+                Beaver.DSL.Pattern.gen_pdl(MLIR.__BLOCK__(), unquote(bound))
               end
 
             _ ->
@@ -215,7 +214,7 @@ defmodule Beaver.DSL.Pattern do
           Beaver.DSL.Op.Prototype.dispatch(
             unquote(struct_name),
             unquote(map_args),
-            [Beaver.Env.mlir__BLOCK__(), attribute_names],
+            [MLIR.__BLOCK__(), attribute_names],
             &Beaver.DSL.Pattern.create_operation/3
           )
 
@@ -247,7 +246,7 @@ defmodule Beaver.DSL.Pattern do
         Beaver.DSL.Op.Prototype.dispatch(
           unquote(struct_name),
           unquote(map_args),
-          [Beaver.Env.mlir__BLOCK__(), attribute_names],
+          [MLIR.__BLOCK__(), attribute_names],
           &Beaver.DSL.Pattern.create_operation/3
         )
       end

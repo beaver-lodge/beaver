@@ -6,7 +6,7 @@ defmodule Manx.Defn do
   alias Beaver.MLIR
   import MLIR.Sigils
   import Beaver, only: :macros
-  require Beaver.Env
+  require Beaver.MLIR
   alias MLIR.{Type, Attribute}
 
   defp gen_type({:s, size}), do: Type.i(size)
@@ -397,7 +397,7 @@ defmodule Manx.Defn do
                 end
               end
 
-              Beaver.Env.mlir__REGION__()
+              MLIR.__REGION__()
               |> Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(entry)
             end
           end
