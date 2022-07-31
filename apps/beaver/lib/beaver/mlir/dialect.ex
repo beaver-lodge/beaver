@@ -57,7 +57,7 @@ defmodule Beaver.MLIR.Dialect do
 
       @module_names module_names
 
-      def ops() do
+      def __ops__() do
         for module_name <- @module_names do
           module_name
         end

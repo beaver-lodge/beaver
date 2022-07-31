@@ -66,7 +66,6 @@ defmodule Beaver do
       import Beaver.MLIR.Sigils
       unquote(alias_dialects())
       import Builtin
-      import CF
 
       unquote(dsl_block_ast)
     end
@@ -92,7 +91,6 @@ defmodule Beaver do
       import Beaver.MLIR.Sigils
       unquote(alias_dialects())
       import Builtin
-      import CF
 
       unquote(block_ast)
       unquote(dsl_block_ast)
