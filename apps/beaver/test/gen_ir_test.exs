@@ -54,8 +54,13 @@ defmodule CFTest do
       end
       |> MLIR.Operation.verify!()
 
-    capture_io(fn ->
-      IO.inspect(ir)
-    end) =~ ~r"module {"
+    captured =
+      capture_io(fn ->
+        IO.inspect(ir)
+      end)
+
+    assert captured =~ ~r"module {"
+    assert captured =~ ~r"// pred.+bb0"
+    assert captured =~ ~r"// 2 preds.+bb0.+bb1"
   end
 end
