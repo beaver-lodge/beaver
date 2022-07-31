@@ -30,21 +30,15 @@ defmodule Beaver.MLIR.ExecutionEngine do
           |> Beaver.Native.array(MLIR.CAPI.MlirStringRef)
       end
 
-    ctx =
-      MLIR.CAPI.mlirModuleGetOperation(module)
-      |> MLIR.CAPI.mlirOperationGetContext()
-
     require MLIR.Context
 
-    MLIR.Context.allow_multi_thread ctx do
-      jit =
-        mlirExecutionEngineCreate(
-          module,
-          2,
-          length(shared_lib_paths),
-          shared_lib_paths_ptr
-        )
-    end
+    jit =
+      mlirExecutionEngineCreate(
+        module,
+        2,
+        length(shared_lib_paths),
+        shared_lib_paths_ptr
+      )
 
     is_null = is_null(jit)
 

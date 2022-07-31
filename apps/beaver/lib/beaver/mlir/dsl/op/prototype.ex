@@ -59,11 +59,11 @@ defmodule Beaver.DSL.Op.Prototype do
 
   @callback op_name() :: String.t()
 
-  def op_name!(op_module) do
+  def op_name!(op_module) when is_atom(op_module) do
     if is_compliant(op_module) do
       op_module.op_name()
     else
-      raise "required a registered op like Beaver.MLIR.Dialect.Func.Func"
+      raise "required a registered op module like Beaver.MLIR.Dialect.Func.Func. Instead we got: #{inspect(op_module)}"
     end
   end
 end
