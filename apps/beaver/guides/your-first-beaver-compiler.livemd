@@ -27,19 +27,17 @@ use Beaver
 ir =
   mlir do
     module do
-      Func.func some_func(function_type: Type.function([Type.i(32)], [Type.i(32)])) do
+      Func.func some_func(function_type: Type.function([Type.i32()], [Type.i32()])) do
         region do
-          block bb_entry(a >>> Type.i(32)) do
-            b = Arith.constant(value: Attribute.integer(Type.i(32), 1024)) >>> Type.i(32)
-            c = Arith.addi(a, b) >>> Type.i(32)
+          block bb_entry(a >>> Type.i32()) do
+            b = Arith.constant(value: Attribute.integer(Type.i32(), 1024)) >>> Type.i32()
+            c = Arith.addi(a, b) >>> Type.i32()
             Func.return(c) >>> []
           end
         end
       end
     end
   end
-
-MLIR.to_string(ir) |> IO.puts()
 ```
 
 <!-- livebook:{"output":true} -->
@@ -53,12 +51,6 @@ module {
   }
 }
 
-```
-
-<!-- livebook:{"output":true} -->
-
-```
-:ok
 ```
 
 As you can see, with MLIR we are not working with those low level LLVM instructions you might have seen somewhere else.
@@ -91,9 +83,6 @@ llvm_ir =
   end)
   |> convert_func_to_llvm
   |> MLIR.Pass.Composer.run!()
-
-MLIR.to_string(llvm_ir)
-|> IO.puts()
 ```
 
 <!-- livebook:{"output":true} -->
@@ -113,12 +102,6 @@ module attributes {llvm.data_layout = ""} {
 
 ```
 
-<!-- livebook:{"output":true} -->
-
-```
-:ok
-```
-
 Now you can see the IR seems to "grow" a little. It is called "lowering".
 What we just did is running two passes `convert_func_to_llvm` and `convert_arith_to_llvm` on our IR.
 So that the higher level abstraction like `Func` and `Arith` are lowered to LLVM IR,
@@ -130,7 +113,6 @@ Let's do it!
 ## Run it!
 
 ```elixir
-import MLIR.Transforms
 jit = MLIR.ExecutionEngine.create!(llvm_ir)
 
 return = Beaver.Native.I32.make(0)
