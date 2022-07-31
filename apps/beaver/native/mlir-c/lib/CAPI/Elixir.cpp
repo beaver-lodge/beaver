@@ -53,8 +53,8 @@ MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetDescription(MlirPass pass) {
 
 MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
                                                  MlirContext context) {
-  return OperationName(unwrap(op_name), unwrap(context))
-      .mightHaveTrait<OpTrait::IsTerminator>();
+  auto name = OperationName(unwrap(op_name), unwrap(context));
+  return name.isRegistered() && name.mightHaveTrait<OpTrait::IsTerminator>();
 }
 
 MLIR_CAPI_EXPORTED intptr_t

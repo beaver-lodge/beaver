@@ -3,8 +3,10 @@ defmodule Manx.Defn do
     defstruct block: nil
   end
 
-  use Beaver
   alias Beaver.MLIR
+  import MLIR.Sigils
+  import Beaver, only: :macros
+  require Beaver.Env
   alias MLIR.{Type, Attribute}
 
   defp gen_type({:s, size}), do: Type.i(size)

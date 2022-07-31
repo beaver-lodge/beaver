@@ -30,8 +30,6 @@ defmodule Beaver.MLIR.Dialect do
               use Beaver.DSL.Op.Prototype, op_name: unquote(full_name)
             end
 
-            require Beaver.Env
-
             def unquote(func_name)(%Beaver.DSL.SSA{} = ssa) do
               Beaver.MLIR.Operation.create(
                 unquote(full_name),

@@ -64,19 +64,9 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def create(op_name, arguments, %MLIR.CAPI.MlirBlock{} = block) when is_list(arguments) do
-    if MLIR.Trait.is_terminator?(op_name) && defer_if_terminator(arguments) do
-      Beaver.MLIR.Managed.Terminator.defer(fn ->
-        op = do_create(op_name, arguments)
-        Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(block, op)
-      end)
-
-      {:deferred, {op_name, arguments}}
-    else
-      op = do_create(op_name, arguments)
-      Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(block, op)
-
-      op
-    end
+    op = do_create(op_name, arguments)
+    Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(block, op)
+    op
   end
 
   def results(%MLIR.CAPI.MlirOperation{} = op) do

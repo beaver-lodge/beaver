@@ -7,14 +7,6 @@ defmodule Beaver.MLIR.Dialect.CF do
     {:ok, {block, []}}
   end
 
-  defp extract_args(dest) when is_atom(dest) do
-    {:ok, {dest, []}}
-  end
-
-  defp extract_args({dest, args}) when is_atom(dest) and is_list(args) do
-    {:ok, {dest, args}}
-  end
-
   defp extract_args({dest = %Beaver.MLIR.CAPI.MlirBlock{}, args}) when is_list(args) do
     {:ok, {dest, args}}
   end

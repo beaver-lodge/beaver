@@ -264,14 +264,6 @@ defmodule Beaver.MLIR.Operation.State do
     %{state | successors: successors ++ [successor_block]}
   end
 
-  def add_argument(%__MODULE__{successors: successors} = state, {:successor, successor})
-      when is_atom(successor) do
-    successor_block = MLIR.Managed.Terminator.get_block(successor)
-
-    if is_nil(successor_block), do: raise("successor block not found: #{successor}")
-    %{state | successors: successors ++ [successor_block]}
-  end
-
   def add_argument(
         %__MODULE__{successors: successors} = state,
         %MLIR.CAPI.MlirBlock{} = successor

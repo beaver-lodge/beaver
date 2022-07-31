@@ -44,6 +44,19 @@ defmodule Beaver.Env do
     end
   end
 
+  defmacro mlir__BLOCK__({var_name, _line, nil} = block_var) do
+    if Macro.Env.has_var?(__CALLER__, {var_name, nil}) do
+      quote do
+        %Beaver.MLIR.CAPI.MlirBlock{} = unquote(block_var)
+      end
+    else
+      quote do
+        Kernel.var!(unquote(block_var)) = Beaver.MLIR.Block.create([])
+        %Beaver.MLIR.CAPI.MlirBlock{} = Kernel.var!(unquote(block_var))
+      end
+    end
+  end
+
   defmacro mlir__LOCATION__() do
     Beaver.MLIR.Managed.Location.get()
   end

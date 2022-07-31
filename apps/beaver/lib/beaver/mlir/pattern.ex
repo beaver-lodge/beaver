@@ -1,6 +1,6 @@
 defmodule Beaver.MLIR.Pattern do
-  use Beaver
   alias Beaver.MLIR
+  import MLIR.Sigils
   alias Beaver.MLIR.CAPI
 
   @moduledoc """
