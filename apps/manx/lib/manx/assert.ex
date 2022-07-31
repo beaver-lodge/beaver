@@ -1,4 +1,4 @@
-defmodule Beaver.Nx.Assert do
+defmodule Manx.Assert do
   @moduledoc """
   Tensor assertions. Original implementation is from EXLA.
   """
@@ -6,8 +6,8 @@ defmodule Beaver.Nx.Assert do
   defmacro equal(left, right) do
     # Assert against binary backend tensors to show diff on failure
     quote do
-      assert unquote(left) |> Beaver.Nx.Assert.to_binary_backend() ==
-               unquote(right) |> Beaver.Nx.Assert.to_binary_backend()
+      assert unquote(left) |> Manx.Assert.to_binary_backend() ==
+               unquote(right) |> Manx.Assert.to_binary_backend()
     end
   end
 

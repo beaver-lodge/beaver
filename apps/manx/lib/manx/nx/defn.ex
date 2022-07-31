@@ -1,4 +1,4 @@
-defmodule Beaver.Nx.Defn do
+defmodule Manx.Defn do
   defmodule Env do
     defstruct block: nil
   end
@@ -372,7 +372,7 @@ defmodule Beaver.Nx.Defn do
               gen_root_types(tree)
             )
 
-          Func.func beaver_nx_main(
+          Func.func manx_main(
                       sym_name: "\"#{symbol}\"",
                       function_type: function_type
                     ) do
@@ -409,7 +409,7 @@ defmodule Beaver.Nx.Defn do
     # invoke jit and setting return for tree
     tree_return =
       tree
-      |> Beaver.Nx.tensor_of_null_memref()
+      |> Manx.tensor_of_null_memref()
       |> invoke(args, jit, symbol)
 
     [tree_return]
@@ -442,14 +442,14 @@ defmodule Beaver.Nx.Defn do
   - If it is a tensor, return a memref
   - If it is a tuple, recursively pack them into one struct.
   """
-  def memref_from_tensor(%Nx.Tensor{data: %Beaver.Nx{memref: memref}}), do: memref
+  def memref_from_tensor(%Nx.Tensor{data: %Manx{memref: memref}}), do: memref
 
   def memref_from_tensor(
         %Nx.Tensor{
           data: %Nx.BinaryBackend{state: binary}
         } = tensor
       ) do
-    Beaver.Nx.from_binary(tensor, binary, []) |> memref_from_tensor
+    Manx.from_binary(tensor, binary, []) |> memref_from_tensor
   end
 
   def memref_from_tensor({}) do
@@ -484,8 +484,8 @@ defmodule Beaver.Nx.Defn do
   - If it is a tensor, return a memref
   - If it is a tuple, recursively unpack each member from the nested struct.
   """
-  def populate_tensor_from_memref(%Nx.Tensor{data: %Beaver.Nx{}} = tensor, memref) do
-    %{tensor | data: %Beaver.Nx{memref: memref}}
+  def populate_tensor_from_memref(%Nx.Tensor{data: %Manx{}} = tensor, memref) do
+    %{tensor | data: %Manx{memref: memref}}
   end
 
   def populate_tensor_from_memref(

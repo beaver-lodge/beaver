@@ -1,6 +1,6 @@
-defmodule Beaver.Nx do
+defmodule Manx do
   @moduledoc """
-  `Beaver.Nx` is a MLIR backend for the `Nx`. It mainly targets TOSA dialect.
+  `Manx` is a MLIR backend for the `Nx`. It mainly targets TOSA dialect.
   """
 
   @enforce_keys [:memref]
@@ -28,7 +28,7 @@ defmodule Beaver.Nx do
         type: type
       )
 
-    {memref} |> Beaver.Nx.MemrefAllocator.add()
+    {memref} |> Manx.MemrefAllocator.add()
     put_in(tensor.data, %B{memref: memref})
   end
 
@@ -82,7 +82,7 @@ defmodule Beaver.Nx do
     else
       tensor = backend_copy(tensor, backend, backend_options)
 
-      with :ok <- Beaver.Nx.MemrefAllocator.delete(memref) do
+      with :ok <- Manx.MemrefAllocator.delete(memref) do
         tensor
       else
         :already_deallocated -> raise "called on deleted or donated buffer"
@@ -92,7 +92,7 @@ defmodule Beaver.Nx do
 
   @impl true
   def backend_deallocate(%T{data: %B{memref: memref}}) do
-    memref |> Beaver.Nx.MemrefAllocator.delete()
+    memref |> Manx.MemrefAllocator.delete()
   end
 
   @impl true
@@ -104,7 +104,7 @@ defmodule Beaver.Nx do
     end
 
     options = [force: true]
-    Nx.Defn.jit(expr_fun, [l, h], Keyword.put(options, :compiler, Beaver.Nx.Compiler))
+    Nx.Defn.jit(expr_fun, [l, h], Keyword.put(options, :compiler, Manx.Compiler))
   end
 
   @doc """
@@ -116,7 +116,7 @@ defmodule Beaver.Nx do
     memref = Beaver.Native.Memory.new([], sizes: shape, type: Beaver.Native.F32)
 
     # TODO: delete the allocated ptr when this kind of tensor is deallocated by Nx
-    {memref} |> Beaver.Nx.MemrefAllocator.add()
+    {memref} |> Manx.MemrefAllocator.add()
     put_in(tensor.data, %B{memref: memref})
   end
 
