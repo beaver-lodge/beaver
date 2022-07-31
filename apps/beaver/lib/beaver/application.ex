@@ -16,7 +16,7 @@ defmodule Beaver.Application do
   def start_phase(:load_dialect_modules, :normal, []) do
     for dialect_module <- Beaver.MLIR.Dialect.dialects() do
       Task.async(fn ->
-        for op_module <- apply(dialect_module, :ops, []) do
+        for op_module <- apply(dialect_module, :__ops__, []) do
           apply(op_module, :register_op_prototype, [])
         end
       end)
