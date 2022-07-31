@@ -146,7 +146,7 @@ be found at <https://hexdocs.pm/beaver>.
 
 LLVM/MLIR is a giant project, and built around that Beaver have hundreds of Erlang modules and thousands of functions. To properly ship LLVM/MLIR and streamline the development process, we need to carefully break the functionalities at different level into different Erlang apps under the same umbrella.
 
-- `:beaver_nx`: Pure Elixir, compiler backend for [Nx](https://github.com/elixir-nx/nx/tree/main/nx#readme).
+- `:manx`: Pure Elixir, compiler backend for [Nx](https://github.com/elixir-nx/nx/tree/main/nx#readme).
 - `:beaver`: Elixir and C/C++ hybrid.
   - Top level app ships the high level functionalities including IR generation and pattern definition.
   - MLIR CAPI wrappers built by parsing LLVM/MLIR CAPI C headers and some middle level helper functions to hide the C pointer related operations. This app will add the loaded MLIR C library and managed MLIR context to Erlang supervisor tree. Rust is also used in this app, but mainly for LLVM/MLIR CMake integration.
@@ -156,7 +156,7 @@ LLVM/MLIR is a giant project, and built around that Beaver have hundreds of Erla
 ### Notes on consuming and development
 
 - Only `:beaver` and `:kinda` are designed to be used as stand-alone app being directly consumed by other apps.
-- `:beaver_nx` could only work with Nx.
+- `:manx` could only work with Nx.
 - Although `:kinda` is built for Beaver, any Erlang/Elixir app with interest bundling some C API could take advantage of it as well.
 - The namespace `Beaver.MLIR` is for standard features are generally expected in any MLIR tools.
 - The namespace `Beaver` is for concepts and practice only exists in Beaver, which are mostly in a DSL provided as a set of macros (including `mlir/0`, `block/1`, `defpat/2`, etc). The implementations are usually under `Beaver.DSL` namespace.

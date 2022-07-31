@@ -1,9 +1,9 @@
-defmodule Beaver.Nx.MixProject do
+defmodule Manx.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :beaver_nx,
+      app: :manx,
       version: "0.1.0",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
@@ -18,7 +18,7 @@ defmodule Beaver.Nx.MixProject do
   def application do
     [
       extra_applications: [:logger],
-      mod: {Beaver.Nx.Application, []}
+      mod: {Manx.Application, []}
     ]
   end
 

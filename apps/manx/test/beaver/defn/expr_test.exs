@@ -3,13 +3,13 @@ defmodule Beaver.Defn.ExprTest do
   use ExUnit.Case, async: true
   # import Nx, only: :sigils
   import Nx.Defn
-  alias Beaver.Nx.Assert
-  import Beaver.Nx.Assert
+  alias Manx.Assert
+  import Manx.Assert
   require Assert
 
   @moduletag :nx
   setup do
-    Nx.Defn.default_options(compiler: Beaver.Nx.Compiler)
+    Nx.Defn.default_options(compiler: Manx.Compiler)
     :ok
   end
 

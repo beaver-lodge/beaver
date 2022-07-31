@@ -1,4 +1,4 @@
-defmodule Beaver.Nx.MemrefAllocator do
+defmodule Manx.MemrefAllocator do
   @moduledoc """
   MemrefAllocator is an Agent managing memrefs.
   """

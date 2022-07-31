@@ -49,10 +49,10 @@ defmodule Beaver.Umbrella.MixProject do
           Beaver.MLIR.CAPI
         ],
         Nx: [
-          Beaver.Nx.Backend,
-          Beaver.Nx.Compiler,
-          Beaver.Nx.Defn,
-          Beaver.Nx.MemrefAllocator
+          Manx.Backend,
+          Manx.Compiler,
+          Manx.Defn,
+          Manx.MemrefAllocator
         ]
       ]
     ]
