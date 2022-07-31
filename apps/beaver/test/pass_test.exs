@@ -1,5 +1,6 @@
 defmodule PassTest do
   use ExUnit.Case
+  import ExUnit.CaptureLog
   use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Type}
@@ -9,7 +10,7 @@ defmodule PassTest do
     defmodule PassRaisingException do
       use Beaver.MLIR.Pass, on: Func.Func
 
-      def run(func_) do
+      def run(_op) do
         raise "exception in pass run"
       end
     end
@@ -31,11 +32,13 @@ defmodule PassTest do
       |> MLIR.Operation.verify!()
 
     assert_raise RuntimeError, ~r"Unexpected failure running pass pipeline", fn ->
-      ir
-      |> MLIR.Pass.Composer.nested(Func.Func, [
-        PassRaisingException.create()
-      ])
-      |> MLIR.Pass.Composer.run!()
+      assert capture_log(fn ->
+               ir
+               |> MLIR.Pass.Composer.nested(Func.Func, [
+                 PassRaisingException.create()
+               ])
+               |> MLIR.Pass.Composer.run!()
+             end) =~ ~r"fail to run a pass"
     end
   end
 end
