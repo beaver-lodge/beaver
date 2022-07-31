@@ -63,7 +63,7 @@ defmodule Beaver.DSL.Op.Prototype do
     if is_compliant(op_module) do
       op_module.op_name()
     else
-      raise "required a registered op like Beaver.MLIR.Dialect.Func.Func"
+      raise "required a registered op like Beaver.MLIR.Dialect.Func.Func. Op name given: #{inspect(op_module)}"
     end
   end
 end

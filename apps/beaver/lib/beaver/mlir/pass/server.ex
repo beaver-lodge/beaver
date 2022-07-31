@@ -19,9 +19,10 @@ defmodule Beaver.MLIR.Pass.Server do
     pass = %MLIR.CAPI.MlirExternalPass{ref: pass_ref}
 
     try do
-      with :ok <- apply(pass_module, :run, [op]) do
-        :ok
-      else
+      case apply(pass_module, :run, [op]) do
+        :ok ->
+          :ok
+
         :error ->
           MLIR.CAPI.mlirExternalPassSignalFailure(pass)
 
@@ -33,10 +34,13 @@ defmodule Beaver.MLIR.Pass.Server do
           )
       end
     rescue
-      e ->
+      exception ->
         MLIR.CAPI.mlirExternalPassSignalFailure(pass)
 
-        Logger.error("fail to run pass, message: #{Exception.message(e)}")
+        Logger.error(
+          "fail to run a pass. " <>
+            Exception.format(:error, exception, __STACKTRACE__)
+        )
     after
       :ok = MLIR.CAPI.beaver_raw_pass_token_signal(token_ref)
     end
