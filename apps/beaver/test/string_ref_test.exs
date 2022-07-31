@@ -9,6 +9,7 @@ defmodule StringRefTest do
     for _ <- 1..1_000 do
       s = "hello world"
       r = MLIR.StringRef.create(s)
+      r |> Beaver.Native.dump()
       assert s == MLIR.StringRef.extract(r)
     end
   end
