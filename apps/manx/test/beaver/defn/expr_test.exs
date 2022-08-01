@@ -243,4 +243,164 @@ defmodule Beaver.Defn.ExprTest do
       assert add_two(left, right).names == [:ones, :tens]
     end
   end
+
+  describe "//2" do
+    defn divide_two(a, b), do: a / b
+
+    test "parameters" do
+      tensors = [
+        {1, 2},
+        {1, Nx.tensor([1.0, 2.0, 3.0])},
+        {Nx.tensor([1, 2, 3]), 1},
+        {Nx.tensor([[1], [2]]), Nx.tensor([[10, 20]])},
+        {Nx.tensor([[1], [2]], type: {:s, 8}), Nx.tensor([[10, 20]], type: {:s, 8})},
+        {Nx.tensor([[1], [2]], type: {:f, 32}), Nx.tensor([[10, 20]], type: {:f, 32})}
+      ]
+
+      for {left, right} <- tensors do
+        assert_all_close(divide_two(left, right), Nx.divide(left, right))
+        assert_all_close(divide_two(right, left), Nx.divide(right, left))
+      end
+    end
+
+    defn divide_two_int(t), do: t / 2
+    defn divide_two_float(t), do: t / 2.0
+
+    test "constants" do
+      tensors = [
+        Nx.tensor([1, 2], type: {:u, 8}),
+        Nx.tensor([1, 2], type: {:u, 16}),
+        Nx.tensor([1, 2], type: {:u, 32}),
+        Nx.tensor([1, 2], type: {:s, 8}),
+        Nx.tensor([1, 2], type: {:s, 32}),
+        Nx.tensor([1, 2], type: {:f, 32}),
+        # Nx.tensor([1, 2], type: {:f, 64})
+      ]
+
+      for t <- tensors do
+        assert_all_close(divide_two_int(t), Nx.divide(t, 2))
+        assert_all_close(divide_two_float(t), Nx.divide(t, 2.0))
+      end
+    end
+  end
+
+  describe "remainder" do
+    defn remainder(a, b), do: Nx.remainder(a, b)
+
+    test "integers" do
+      left = Nx.tensor([-1023, 1023])
+      right = Nx.tensor([[-4], [4]])
+      assert Nx.shape(remainder(left, right)) == {2, 2}
+      assert_all_close(remainder(left, right), Nx.remainder(left, right))
+    end
+
+    test "floats" do
+      left = Nx.tensor([-8.3, -8.4, -8.5, 8.3, 8.4, 8.5])
+      right = Nx.tensor([[-4.2], [-4.1], [-4.0], [4.0], [4.1], [4.2]])
+      assert Nx.shape(remainder(left, right)) == {6, 6}
+      assert_all_close(remainder(left, right), Nx.remainder(left, right))
+    end
+  end
+
+  describe "element-wise arith operators" do
+    @tensors [
+      {1, 2},
+      {1, Nx.tensor([1.0, 2.0, 3.0])},
+      {Nx.tensor([1, 2, 3]), 1},
+      {Nx.tensor([[1], [2]]), Nx.tensor([[10, 20]])},
+      {Nx.tensor([[1], [2]], type: {:s, 8}), Nx.tensor([[10, 20]], type: {:s, 8})},
+      {Nx.tensor([[1], [2]], type: {:f, 32}), Nx.tensor([[10, 20]], type: {:f, 32})}
+    ]
+
+    defn subtract_two(a, b), do: a - b
+
+    test "-" do
+      for {left, right} <- @tensors do
+        assert_all_close(subtract_two(left, right), Nx.subtract(left, right))
+        assert_all_close(subtract_two(right, left), Nx.subtract(right, left))
+      end
+    end
+
+    defn multiply_two(a, b), do: a * b
+
+    test "*" do
+      for {left, right} <- @tensors do
+        assert_all_close(multiply_two(left, right), Nx.multiply(left, right))
+        assert_all_close(multiply_two(right, left), Nx.multiply(right, left))
+      end
+    end
+
+    defn unary_minus(a), do: -a
+
+    test "negate" do
+      for t <- [
+            Nx.tensor([-1, 0, 1], type: {:u, 8}),
+            Nx.tensor([-1, 0, 1]),
+            Nx.tensor([-1.0, 1.0])
+          ] do
+        assert_equal(unary_minus(t), Nx.negate(t))
+      end
+    end
+
+    defn max_two(a, b), do: max(a, b)
+
+    test "max" do
+      for {left, right} <- @tensors do
+        assert_all_close(max_two(left, right), Nx.max(left, right))
+        assert_all_close(max_two(right, left), Nx.max(right, left))
+      end
+    end
+
+    defn min_two(a, b), do: min(a, b)
+
+    test "min" do
+      for {left, right} <- @tensors do
+        assert_all_close(min_two(left, right), Nx.min(left, right))
+        assert_all_close(min_two(right, left), Nx.min(right, left))
+      end
+    end
+
+    defn power_two(a, b), do: Nx.power(a, b)
+
+    test "power" do
+      for {left, right} <- @tensors do
+        case left do
+          %{type: {_, 8}} ->
+            nil
+          _ ->
+            assert_all_close(power_two(left, right), Nx.power(left, right))
+            assert_all_close(power_two(right, left), Nx.power(right, left))
+        end
+      end
+    end
+
+    # defn atan2_two(a, b), do: Nx.atan2(a, b)
+
+    # test "atan2" do
+    #   <<neg_zero::float>> = <<0x8000000000000000::64>>
+    #   left = Nx.tensor([-1.0, neg_zero, 0.0, 1.0])
+    #   right = Nx.tensor([[-1.0], [neg_zero], [0.0], [1.0]])
+
+    #   assert_all_close(atan2_two(left, right), Nx.atan2(left, right))
+    #   assert_all_close(atan2_two(right, left), Nx.atan2(right, left))
+    # end
+
+    # defn quotient_two(a, b), do: Nx.quotient(a, b)
+
+    # test "quotient" do
+    #   int_tensors = [
+    #     {1, 2},
+    #     {1, Nx.tensor([1, 2, 3])},
+    #     {Nx.tensor([1, 2, 3]), 1},
+    #     {Nx.tensor([[1], [2]]), Nx.tensor([[10, 20]])},
+    #     {Nx.tensor([[1], [2]], type: {:s, 8}), Nx.tensor([[10, 20]], type: {:s, 8})},
+    #     {Nx.tensor([[1], [2]], type: {:s, 8}), Nx.tensor([[10, 20]], type: {:s, 32})}
+    #   ]
+
+    #   for {left, right} <- int_tensors do
+    #     assert_all_close(quotient_two(left, right), Nx.quotient(left, right))
+    #     assert_all_close(quotient_two(right, left), Nx.quotient(right, left))
+    #   end
+    # end
+  end
 end

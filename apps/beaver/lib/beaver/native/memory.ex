@@ -57,6 +57,9 @@ defmodule Beaver.Native.Memory do
         {:s, 8} ->
           Beaver.Native.I8
 
+        {:s, 16} ->
+          Beaver.Native.I16
+
         {:s, 32} ->
           Beaver.Native.I32
 

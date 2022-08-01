@@ -25,10 +25,17 @@ defmodule Beaver.MLIR.Pass.Composer do
   # TODO: add keyword arguments
   def run!(
         %__MODULE__{passes: passes, op: %MLIR.Module{} = op},
-        opts \\ [dump: false, dump_if_fail: false]
+        opts \\ [dump: false, dump_if_fail: false, print: false]
       ) do
+    print = Keyword.get(opts, :print)
     ctx = MLIR.Managed.Context.get()
     pm = mlirPassManagerCreate(ctx)
+
+    if print do
+      mlirContextEnableMultithreading(ctx, false)
+      mlirPassManagerEnableIRPrinting(pm)
+      Logger.info("Enabled IR printing")
+    end
 
     for pass <- passes do
       case pass do
@@ -63,6 +70,10 @@ defmodule Beaver.MLIR.Pass.Composer do
 
     status = mlirPassManagerRun(pm, op)
 
+    if print do
+      mlirContextEnableMultithreading(ctx, true)
+    end
+
     if not MLIR.LogicalResult.success?(status) do
       if Keyword.get(opts, :dump_if_fail, false) do
         Logger.error("Failed to run pass, start dumping operation and this might crash")
@@ -74,6 +85,7 @@ defmodule Beaver.MLIR.Pass.Composer do
 
     if Keyword.get(opts, :dump, false), do: MLIR.Operation.dump(op)
     mlirPassManagerDestroy(pm)
+
     op
   end
 

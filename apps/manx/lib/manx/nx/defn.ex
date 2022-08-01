@@ -81,6 +81,16 @@ defmodule Manx.Defn do
     ~a{[affine_map<(d) -> (d)>, affine_map<(d) -> (d)>]}
   end
 
+  defp gen_indexing_maps({dim_a}, {dim_b, 1}, {dim_b, dim_a}) do
+    ~a{
+      [
+        affine_map<(d0, d1) -> (0, d1)>,
+        affine_map<(d0, d1) -> (d0, 0)>,
+        affine_map<(d0, d1) -> (d0, d1)>
+      ]
+    }
+  end
+
   defp gen_iterator_types({}, {}) do
     ~a{[]}
   end
@@ -89,9 +99,14 @@ defmodule Manx.Defn do
     ~a{["parallel"]}
   end
 
+  defp gen_iterator_types(_a, _b, _c) do
+    ~a{["parallel", "parallel"]}
+  end
+
   defp gen_cast(%Env{block: block}, value, result_type) do
     value_type = MLIR.CAPI.mlirValueGetType(value)
     is_same_type = MLIR.CAPI.mlirTypeEqual(value_type, result_type) |> Beaver.Native.to_term()
+
     if is_same_type do
       value
     else
@@ -214,38 +229,93 @@ defmodule Manx.Defn do
 
   def gen_op(
         %Env{block: block} = env,
-        %Nx.Tensor{data: %Nx.Defn.Expr{op: :multiply, args: [a, b]}} = t
+        %Nx.Tensor{data: %Nx.Defn.Expr{op: :abs, args: [input1]}} = t
       ) do
     mlir block: block do
-      a = gen_op(env, a)
-      b = gen_op(env, b)
-      TOSA.mul(a, b, shift: Attribute.integer(Type.i(32), 0)) >>> gen_type(t)
+      input1 = gen_op(env, input1)
+      TOSA.abs(input1) >>> gen_type(t)
+    end
+  end
+
+  def gen_op(
+        env,
+        %Nx.Tensor{shape: {}, data: %Nx.Defn.Expr{op: :all, args: [%{shape: {}} = input1, _]}}
+      ) do
+    gen_op(env, input1)
+  end
+
+  def gen_op(
+        %Env{block: block} = env,
+        %Nx.Tensor{
+          data: %Nx.Defn.Expr{
+            op: :all,
+            args: [%{shape: in_shape} = input1, [axes: axes, keep_axes: keep_axes]]
+          }
+        } = t
+      )
+      when is_list(axes) do
+    mlir block: block do
+      input1 = gen_op(env, input1)
+      input1 = TOSA.cast(input1) >>> gen_type(%{t | shape: in_shape, type: {:u, 1}})
+      {in_shape, mlir_value} =
+        Enum.reduce(
+          axes,
+          {Tuple.to_list(in_shape), input1},
+          fn axis, {in_shape, mlir_value} ->
+            out_shape = List.replace_at(in_shape, axis, 1)
+
+            reduced =
+              TOSA.reduce_all(mlir_value, axis: Attribute.integer(Type.i64(), axis)) >>>
+                gen_type(%{t | shape: List.to_tuple(out_shape), type: {:u, 1}})
+            {out_shape, reduced}
+          end
+        )
+
+        mlir_value = TOSA.cast(mlir_value) >>> gen_type(%{t | shape: List.to_tuple(in_shape)})
+        if keep_axes do
+          mlir_value
+        else
+          Tensor.collapse_shape(mlir_value, reassociation: ~a{[]}) >>> gen_type(t)
+        end
     end
   end
 
   def gen_op(
         %Env{block: block} = env,
-        %Nx.Tensor{data: %Nx.Defn.Expr{op: :add, args: [a, b]}} = t
+        %Nx.Tensor{
+          data:
+            %Nx.Defn.Expr{
+              op: :all,
+              args: [%{shape: in_shape} = input1, [axes: nil, keep_axes: keep_axes]]
+            } = expr
+        } = t
+      ) do
+    # if axes is nil, replace it with a list of every axis
+    mlir block: block do
+      rank = Tuple.to_list(in_shape) |> length()
+      axes = Range.new(0, rank - 1, 1) |> Enum.to_list()
+      expr = %{
+        expr
+        | args: [input1, [axes: axes, keep_axes: keep_axes]]
+      }
+
+      gen_op(env, %{t | data: expr})
+    end
+  end
+
+  def gen_op(
+        %Env{block: block} = env,
+        %Nx.Tensor{data: %Nx.Defn.Expr{op: :divide, args: [a, b]}} = t
       ) do
     mlir block: block do
-      a_t = gen_type(%{t| shape: a.shape})
-      b_t = gen_type(%{t| shape: b.shape})
+      a_t = gen_type(%{t | shape: a.shape})
+      b_t = gen_type(%{t | shape: b.shape})
       a = gen_op(env, a)
       b = gen_op(env, b)
       a = gen_cast(env, a, a_t)
       b = gen_cast(env, b, b_t)
-      TOSA.add(a, b) >>> gen_type(t)
-    end
-  end
-
-  def gen_op(
-        %Env{block: block} = env,
-        %Nx.Tensor{data: %Nx.Defn.Expr{op: :subtract, args: [a, b]}} = t
-      ) do
-    mlir block: block do
-      a = gen_op(env, a)
-      b = gen_op(env, b)
-      TOSA.sub(a, b) >>> gen_type(t)
+      b_r = TOSA.reciprocal(b) >>> b_t
+      TOSA.mul(a, b_r, shift: Attribute.integer(Type.i(32), 0)) >>> gen_type(t)
     end
   end
 
@@ -327,7 +397,7 @@ defmodule Manx.Defn do
           block inner(index >>> Type.index()) do
             complex_element = Tensor.extract(complex_tensor, index) >>> Type.complex(Type.f32())
             conjugate_element = Complex.conj(complex_element) >>> Type.complex(Type.f32())
-            MemRef.store([conjugate_element, conjugate_memref, index]) >>> []
+            MemRef.store(conjugate_element, conjugate_memref, index) >>> []
             SCF.yield() >>> []
           end
         end
@@ -369,6 +439,88 @@ defmodule Manx.Defn do
           end
         end
       end >>> gen_type(t)
+    end
+  end
+
+  def gen_op(
+        %Env{block: block} = env,
+        %Nx.Tensor{type: type, data: %Nx.Defn.Expr{op: :remainder, args: [a, b]}} = t
+      ) do
+    mlir block: block do
+      a_value = gen_op(env, a)
+      a_value = case {a.shape, b.shape} do
+        {{dim}, {dim, 1}} ->
+          Tensor.expand_shape(a_value, reassociation: ~a{[[0, 1]]}) >>> gen_type(%{b | shape: {1, dim}})
+        _ ->
+          a_value
+      end
+      b_value = gen_op(env, b)
+
+      out_tensor =
+        Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) >>>
+          gen_type(t)
+
+      Linalg.generic [
+        a_value,
+        b_value,
+        out_tensor,
+        operand_segment_sizes: ODS.operand_segment_sizes([2, 1]),
+        indexing_maps: gen_indexing_maps(a.shape, b.shape, t.shape),
+        iterator_types: gen_iterator_types(a.shape, b.shape, t.shape)
+      ] do
+        region do
+          block bb0(arg0 >>> gen_type(type), arg1 >>> gen_type(type), out >>> gen_type(type)) do
+            %MLIR.Value{} = out
+            remainder = case type do
+              {:f, _} ->
+                Arith.remf(arg0, arg1) >>> gen_type(type)
+              {:i, _} ->
+                Arith.remui(arg0, arg1) >>> gen_type(type)
+              {:s, _} ->
+                Arith.remsi(arg0, arg1) >>> gen_type(type)
+            end
+            Linalg.yield(remainder) >>> []
+          end
+        end
+      end >>> gen_type(t)
+    end
+  end
+
+  def gen_op(
+    %Env{block: block} = env,
+    %Nx.Tensor{data: %Nx.Defn.Expr{op: op, args: [a, b]}} = t
+  ) do
+    mlir block: block do
+      a_t = %{a | type: t.type} |> gen_type
+      b_t = %{b | type: t.type} |> gen_type
+      a_value = gen_op(env, a)
+      b_value = gen_op(env, b)
+      a_value = TOSA.cast(a_value) >>> a_t
+      b_value = TOSA.cast(b_value) >>> b_t
+      case op do
+        :subtract ->
+          TOSA.sub(a_value, b_value) >>> gen_type(t)
+        :less_equal ->
+          c = TOSA.greater_equal(b_value, a_value) >>> gen_type(%{t | type: {:u, 1}})
+          TOSA.cast(c) >>> gen_type(t)
+        :add ->
+          TOSA.add(a_value, b_value) >>> gen_type(t)
+        :max ->
+          TOSA.maximum(a_value, b_value) >>> gen_type(t)
+        :min ->
+          TOSA.minimum(a_value, b_value) >>> gen_type(t)
+        :multiply ->
+          TOSA.mul(a_value, b_value, shift: Attribute.integer(Type.i32, 0)) >>> gen_type(t)
+        :power ->
+          {_, width} = a.type
+          width = min(width, 32)
+          a_value = TOSA.cast(a_value) >>> gen_type(%{a | type: {:f, width}})
+          b_value = TOSA.cast(b_value) >>> gen_type(%{b | type: {:f, width}})
+          result = TOSA.pow(a_value, b_value) >>> gen_type(%{t | type: {:f, width}})
+          TOSA.cast(result) >>> gen_type(t)
+        _ ->
+          raise "Unsupported binary op: #{op}"
+      end
     end
   end
 

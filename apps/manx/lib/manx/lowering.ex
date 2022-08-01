@@ -27,6 +27,7 @@ defmodule Manx.Lowering do
       tosa_to_linalg(),
       linalg_fuse_elementwise_ops()
     ])
+    |> MLIR.Pass.Composer.run!(dump_if_fail: true)
     |> MLIR.Pass.Composer.nested("func.func", [
       linalg_bufferize(),
       convert_linalg_to_loops(),
@@ -44,7 +45,6 @@ defmodule Manx.Lowering do
     |> MLIR.Pass.Composer.nested("func.func", fn pm ->
       MLIR.Pass.pipeline!(pm, "llvm-request-c-wrappers")
     end)
-    |> MLIR.Pass.Composer.run!(dump_if_fail: true)
     |> convert_complex_to_standard()
     |> convert_vector_to_llvm
     |> convert_memref_to_llvm
