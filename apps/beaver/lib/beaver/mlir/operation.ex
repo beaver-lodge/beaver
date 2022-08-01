@@ -108,8 +108,8 @@ defmodule Beaver.MLIR.Operation do
       {:ok, op}
     else
       if dump_if_fail do
-        Logger.warning("Start dumping op failed to pass the verification. This might crash.")
-        dump(op)
+        Logger.info("Start printing op failed to pass the verification. This might crash.")
+        Logger.info(MLIR.to_string(op))
       end
 
       :fail
@@ -117,7 +117,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def dump(op) do
-    mlirOperationDump(op)
+    op |> from_module |> mlirOperationDump()
     op
   end
 

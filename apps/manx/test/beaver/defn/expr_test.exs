@@ -13,12 +13,12 @@ defmodule Beaver.Defn.ExprTest do
     :ok
   end
 
-  # defp evaluate(fun, args) do
-  #   fun |> Nx.Defn.jit(compiler: Nx.Defn.Evaluator) |> apply(args)
-  # end
+  defp evaluate(fun, args) do
+    Nx.Defn.jit(fun, args, compiler: Nx.Defn.Evaluator)
+  end
 
   describe "tuples" do
-    defn(add_subtract_tuple(a, b), do: {a + b, a - b})
+    defn add_subtract_tuple(a, b), do: {a + b, a - b}
 
     test "on results" do
       Assert.equal(add_subtract_tuple(2, 3), {Nx.tensor(5), Nx.tensor(-1)})
@@ -59,13 +59,13 @@ defmodule Beaver.Defn.ExprTest do
 
   describe "tensor constants" do
     @two 2
-    defn(constants, do: @two)
-    defn(add_two_attribute(t), do: t + @two)
+    defn constants, do: @two
+    defn add_two_attribute(t), do: t + @two
 
     @two_per_two Nx.tensor([[1, 2], [3, 4]])
-    defn(add_2x2_attribute(t), do: t + @two_per_two)
-    defn(add_2x2_constant(), do: @two_per_two + @two_per_two)
-    defn(add_2x2_constant(_), do: @two_per_two + @two_per_two)
+    defn add_2x2_attribute(t), do: t + @two_per_two
+    defn add_2x2_constant(), do: @two_per_two + @two_per_two
+    defn add_2x2_constant(_), do: @two_per_two + @two_per_two
 
     test "handles tensors as constants" do
       Assert.equal(constants(), Nx.tensor(2))
@@ -88,9 +88,9 @@ defmodule Beaver.Defn.ExprTest do
   end
 
   describe "non finite" do
-    defn(infinity, do: Nx.Constants.infinity())
-    defn(neg_infinity, do: Nx.Constants.neg_infinity())
-    defn(nan, do: Nx.Constants.nan())
+    defn infinity, do: Nx.Constants.infinity()
+    defn neg_infinity, do: Nx.Constants.neg_infinity()
+    defn nan, do: Nx.Constants.nan()
 
     test "handles non-finite constants correctly" do
       Assert.equal(infinity(), Nx.Constants.infinity())
@@ -98,8 +98,8 @@ defmodule Beaver.Defn.ExprTest do
       Assert.equal(nan(), Nx.Constants.nan())
     end
 
-    defn(negate_infinity, do: Nx.negate(Nx.Constants.infinity()))
-    defn(negate_neg_infinity, do: Nx.negate(Nx.Constants.infinity()))
+    defn negate_infinity, do: Nx.negate(Nx.Constants.infinity())
+    defn negate_neg_infinity, do: Nx.negate(Nx.Constants.infinity())
 
     test "sanity check constants" do
       Assert.equal(negate_infinity(), Nx.Constants.neg_infinity())
@@ -108,7 +108,7 @@ defmodule Beaver.Defn.ExprTest do
   end
 
   describe "float16" do
-    defn(return_float, do: Nx.tensor(1, type: {:f, 16}))
+    defn return_float, do: Nx.tensor(1, type: {:f, 16})
 
     test "supports float16 return types" do
       Assert.equal(return_float(), Nx.tensor(1, type: {:f, 16}))
@@ -116,8 +116,8 @@ defmodule Beaver.Defn.ExprTest do
   end
 
   describe "complex" do
-    defn(return_complex, do: Nx.complex(1, 2))
-    defn(return_complex_tensor, do: Nx.broadcast(Nx.complex(1, 2), {3, 3, 3}))
+    defn return_complex, do: Nx.complex(1, 2)
+    defn return_complex_tensor, do: Nx.broadcast(Nx.complex(1, 2), {3, 3, 3})
 
     test "supports complex return types" do
       Assert.equal(return_complex(), Nx.tensor(Complex.new(1, 2)))
@@ -126,7 +126,7 @@ defmodule Beaver.Defn.ExprTest do
   end
 
   describe "conjugate" do
-    defn(conjugate(x), do: Nx.conjugate(x))
+    defn conjugate(x), do: Nx.conjugate(x)
 
     test "correctly returns complex conjugate" do
       assert_equal(conjugate(Nx.tensor(Complex.new(1, 2))), Nx.tensor(Complex.new(1, -2)))
@@ -141,16 +141,106 @@ defmodule Beaver.Defn.ExprTest do
   end
 
   describe "imag" do
-    defn(imag(x), do: Nx.imag(x))
+    defn imag(x), do: Nx.imag(x)
 
     test "correctly returns imaginary part of complex" do
       assert_equal(imag(Nx.tensor(Complex.new(1, 2))), Nx.tensor(2.0))
       assert_equal(imag(Nx.tensor(1)), Nx.tensor(0.0))
 
-      # assert_equal(
-      #   imag(Nx.tensor([Complex.new(1, 2), Complex.new(2, -4)])),
-      #   Nx.tensor([2.0, -4.0])
-      # )
+      assert_equal(
+        imag(Nx.tensor([Complex.new(1, 2), Complex.new(2, -4)])),
+        Nx.tensor([2.0, -4.0])
+      )
+    end
+  end
+
+  describe "+/2" do
+    @describetag :plus
+    defn add_two(a, b), do: a + b
+
+    test "same shape and type" do
+      assert_equal(add_two(1.0, 2.0), Nx.tensor(3.0))
+      assert_equal(add_two(1, 2), Nx.tensor(3))
+
+      assert_equal(add_two(Nx.tensor([1, 2]), Nx.tensor([3, 4])), Nx.tensor([4, 6]))
+      assert_equal(add_two(Nx.tensor([1.0, 2.0]), Nx.tensor([3.0, 4.0])), Nx.tensor([4.0, 6.0]))
+    end
+
+    test "different types" do
+      tensors = [
+        {1, 2},
+        {1.0, 2},
+        {1.0, 3.0},
+        {Nx.tensor([1, 2], type: {:u, 8}), 3},
+        {Nx.tensor([1, 2], type: {:u, 8}), -3},
+        {Nx.tensor([1, 2], type: {:u, 8}), 3.0},
+        {Nx.tensor([1, 2], type: {:s, 8}), 3},
+        {Nx.tensor([1, 2], type: {:s, 8}), 3.0},
+        {Nx.tensor([1, 2], type: {:f, 32}), 3},
+        {Nx.tensor([1, 2], type: {:f, 32}), 3.0},
+        {Nx.tensor([1, 2], type: {:u, 8}), Nx.tensor(3, type: {:u, 16})},
+        {Nx.tensor([1, 2], type: {:u, 8}), Nx.tensor(-3, type: {:s, 16})},
+        {Nx.tensor([1, 2], type: {:u, 8}), Nx.tensor(3.0, type: {:f, 32})},
+        {Nx.tensor([1, 2], type: {:s, 8}), Nx.tensor(3, type: {:s, 16})},
+        {Nx.tensor([1, 2], type: {:s, 8}), Nx.tensor(3.0, type: {:f, 32})},
+        {Nx.tensor([1, 2], type: {:f, 32}), Nx.tensor(3, type: {:u, 16})},
+        {Nx.tensor([1, 2], type: {:f, 32}), Nx.tensor(3, type: {:s, 16})},
+        # {Nx.tensor([1, 2], type: {:f, 32}), Nx.tensor(3.0, type: {:f, 64})}
+      ]
+
+      for {left, right} <- tensors do
+        assert_all_close(add_two(left, right), evaluate(&add_two/2, [left, right]))
+        assert_all_close(add_two(right, left), evaluate(&add_two/2, [right, left]))
+      end
+    end
+
+    defn add_two_int(t), do: t + 2
+    defn add_two_float(t), do: t + 2.0
+
+    test "constants" do
+      tensors = [
+        Nx.tensor([1, 2], type: {:u, 8}),
+        Nx.tensor([1, 2], type: {:u, 16}),
+        Nx.tensor([1, 2], type: {:u, 32}),
+        Nx.tensor([1, 2], type: {:s, 8}),
+        Nx.tensor([1, 2], type: {:s, 32}),
+        Nx.tensor([1, 2], type: {:f, 32}),
+        # Nx.tensor([1, 2], type: {:f, 64})
+      ]
+
+      for t <- tensors do
+        assert_equal(add_two_int(t), Nx.add(t, 2))
+        assert_equal(add_two_float(t), Nx.add(t, 2.0))
+      end
+    end
+
+    test "broadcast" do
+      tensors = [
+        {Nx.tensor([1, 2]), Nx.tensor([[1, 2], [3, 4]])},
+        {Nx.tensor([1, 2]), Nx.tensor([[[1, 2], [3, 4]], [[4, 5], [6, 7]]])},
+        {Nx.tensor([[1], [2]]), Nx.tensor([[10, 20]])},
+        {Nx.tensor([[10, 20]]), Nx.tensor([[1], [2]])},
+        {Nx.tensor([[[10], [20]]]), Nx.tensor([[[1, 2]], [[3, 4]]])},
+        {Nx.tensor([[[100], [200], [300]]]),
+         Nx.tensor([[[1, 2, 3]], [[4, 5, 6]], [[7, 8, 9]], [[10, 11, 12]]])},
+        {Nx.tensor([[[[1]]]]), Nx.tensor([[1, 2], [3, 4]])},
+        {Nx.tensor([[[[1]]]]), Nx.tensor([1, 2])},
+        {Nx.tensor([[[10], [20]], [[30], [40]]]), Nx.tensor([[1, 2]])},
+        {Nx.tensor([[[[10], [20]], [[30], [40]]]]), Nx.tensor([[[1, 2]], [[3, 4]]])},
+        {Nx.tensor([[[[10], [20]], [[30], [40]]]]), Nx.tensor([[[[1, 2]]], [[[3, 4]]]])},
+        {Nx.tensor([[[10], [20]], [[30], [40]]]), Nx.tensor([[[1, 2]], [[3, 4]]])}
+      ]
+
+      for {left, right} <- tensors do
+        assert_all_close(add_two(left, right), evaluate(&add_two/2, [left, right]))
+        assert_all_close(add_two(right, left), evaluate(&add_two/2, [right, left]))
+      end
+    end
+
+    test "names" do
+      left = Nx.tensor([[10, 20]], names: [nil, :tens])
+      right = Nx.tensor([[1], [2]], names: [:ones, nil])
+      assert add_two(left, right).names == [:ones, :tens]
     end
   end
 end

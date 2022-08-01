@@ -42,13 +42,34 @@ defmodule Beaver.Native.Memory do
 
     mod =
       case mod do
+        {:u, 8} ->
+          Beaver.Native.U8
+
+        {:u, 16} ->
+          Beaver.Native.U16
+
+        {:u, 32} ->
+          Beaver.Native.U32
+
+        {:u, 64} ->
+          Beaver.Native.U64
+
+        {:s, 8} ->
+          Beaver.Native.I8
+
+        {:s, 32} ->
+          Beaver.Native.I32
+
         {:s, 64} ->
           Beaver.Native.I64
+
+        {:f, 32} ->
+          Beaver.Native.F32
 
         {:c, 64} ->
           Beaver.Native.Complex.F32
 
-        _ ->
+        mod when is_atom(mod) ->
           mod
       end
 
