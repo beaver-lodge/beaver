@@ -105,9 +105,15 @@ defmodule Beaver.MLIR.Type do
     apply(__MODULE__, String.to_atom("f#{bitwidth}"), [opts])
   end
 
-  def integer(bitwidth, opts \\ []) do
+  def integer(bitwidth, opts \\ [signed: false]) do
+    signed = Keyword.get(opts, :signed)
     ctx = MLIR.Managed.Context.from_opts(opts)
-    CAPI.mlirIntegerTypeGet(ctx, bitwidth)
+
+    if signed do
+      CAPI.mlirIntegerTypeSignedGet(ctx, bitwidth)
+    else
+      CAPI.mlirIntegerTypeGet(ctx, bitwidth)
+    end
   end
 
   def index(opts \\ []) do

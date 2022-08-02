@@ -81,7 +81,7 @@ defmodule Beaver.MLIR.CAPI do
           Descriptor8D,
           Descriptor9D
         ],
-        t <- [Complex.F32, U8, I32, I64, F32, F64] do
+        t <- [Complex.F32, U8, U16, U32, I8, I16, I32, I64, F32, F64] do
       %Kinda.CodeGen.Type{
         module_name: Module.concat([Beaver.Native, t, MemRef, rank]),
         kind_functions: Beaver.MLIR.CAPI.CodeGen.memref_kind_functions()

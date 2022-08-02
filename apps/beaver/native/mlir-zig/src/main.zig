@@ -482,8 +482,12 @@ const Complex = struct {
 const MemRefDataType = enum {
     @"Complex.F32",
     U8,
+    U16,
+    U32,
     F32,
     F64,
+    I8,
+    I16,
     I32,
     I64,
 };
@@ -492,8 +496,12 @@ fn dataTypeToResourceKind(self: MemRefDataType) type {
     return switch (self) {
         .@"Complex.F32" => Complex.F32,
         .U8 => mlir_capi.U8,
+        .U16 => mlir_capi.U16,
+        .U32 => mlir_capi.U32,
         .F32 => mlir_capi.F32,
         .F64 => mlir_capi.F64,
+        .I8 => mlir_capi.I8,
+        .I16 => mlir_capi.I16,
         .I32 => mlir_capi.I32,
         .I64 => mlir_capi.I64,
     };
@@ -503,8 +511,12 @@ fn dataKindToDataType(comptime self: type) MemRefDataType {
     return switch (self) {
         Complex.F32 => MemRefDataType.@"Complex.F32",
         mlir_capi.U8 => MemRefDataType.U8,
+        mlir_capi.U16 => MemRefDataType.U16,
+        mlir_capi.U32 => MemRefDataType.U32,
         mlir_capi.F32 => MemRefDataType.F32,
         mlir_capi.F64 => MemRefDataType.F64,
+        mlir_capi.I8 => MemRefDataType.I8,
+        mlir_capi.I16 => MemRefDataType.I16,
         mlir_capi.I32 => MemRefDataType.I32,
         mlir_capi.I64 => MemRefDataType.I64,
         else => unreachable(),
@@ -514,8 +526,12 @@ fn dataKindToDataType(comptime self: type) MemRefDataType {
 const memref_kinds = .{
     BeaverMemRef(dataTypeToResourceKind(MemRefDataType.@"Complex.F32")),
     BeaverMemRef(dataTypeToResourceKind(MemRefDataType.U8)),
+    BeaverMemRef(dataTypeToResourceKind(MemRefDataType.U16)),
+    BeaverMemRef(dataTypeToResourceKind(MemRefDataType.U32)),
     BeaverMemRef(dataTypeToResourceKind(MemRefDataType.F32)),
     BeaverMemRef(dataTypeToResourceKind(MemRefDataType.F64)),
+    BeaverMemRef(dataTypeToResourceKind(MemRefDataType.I8)),
+    BeaverMemRef(dataTypeToResourceKind(MemRefDataType.I16)),
     BeaverMemRef(dataTypeToResourceKind(MemRefDataType.I32)),
     BeaverMemRef(dataTypeToResourceKind(MemRefDataType.I64)),
 };
@@ -633,8 +649,12 @@ pub export const handwritten_nifs = .{
     Complex.F32.nifs ++
     dataKindToMemrefKind(Complex.F32).nifs ++
     dataKindToMemrefKind(mlir_capi.U8).nifs ++
+    dataKindToMemrefKind(mlir_capi.U16).nifs ++
+    dataKindToMemrefKind(mlir_capi.U32).nifs ++
     dataKindToMemrefKind(mlir_capi.F32).nifs ++
     dataKindToMemrefKind(mlir_capi.F64).nifs ++
+    dataKindToMemrefKind(mlir_capi.I8).nifs ++
+    dataKindToMemrefKind(mlir_capi.I16).nifs ++
     dataKindToMemrefKind(mlir_capi.I32).nifs ++
     dataKindToMemrefKind(mlir_capi.I64).nifs;
 
