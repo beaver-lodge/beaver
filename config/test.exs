@@ -16,7 +16,6 @@ config :beaver,
   amx
   arm_neon
   spv
-  math
   quant
   arm_sve
   rocdl
