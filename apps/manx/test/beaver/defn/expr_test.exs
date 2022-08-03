@@ -184,7 +184,7 @@ defmodule Beaver.Defn.ExprTest do
         {Nx.tensor([1, 2], type: {:s, 8}), Nx.tensor(3, type: {:s, 16})},
         {Nx.tensor([1, 2], type: {:s, 8}), Nx.tensor(3.0, type: {:f, 32})},
         {Nx.tensor([1, 2], type: {:f, 32}), Nx.tensor(3, type: {:u, 16})},
-        {Nx.tensor([1, 2], type: {:f, 32}), Nx.tensor(3, type: {:s, 16})},
+        {Nx.tensor([1, 2], type: {:f, 32}), Nx.tensor(3, type: {:s, 16})}
         # {Nx.tensor([1, 2], type: {:f, 32}), Nx.tensor(3.0, type: {:f, 64})}
       ]
 
@@ -204,7 +204,7 @@ defmodule Beaver.Defn.ExprTest do
         Nx.tensor([1, 2], type: {:u, 32}),
         Nx.tensor([1, 2], type: {:s, 8}),
         Nx.tensor([1, 2], type: {:s, 32}),
-        Nx.tensor([1, 2], type: {:f, 32}),
+        Nx.tensor([1, 2], type: {:f, 32})
         # Nx.tensor([1, 2], type: {:f, 64})
       ]
 
@@ -273,7 +273,7 @@ defmodule Beaver.Defn.ExprTest do
         Nx.tensor([1, 2], type: {:u, 32}),
         Nx.tensor([1, 2], type: {:s, 8}),
         Nx.tensor([1, 2], type: {:s, 32}),
-        Nx.tensor([1, 2], type: {:f, 32}),
+        Nx.tensor([1, 2], type: {:f, 32})
         # Nx.tensor([1, 2], type: {:f, 64})
       ]
 
@@ -367,6 +367,7 @@ defmodule Beaver.Defn.ExprTest do
         case left do
           %{type: {_, 8}} ->
             nil
+
           _ ->
             assert_all_close(power_two(left, right), Nx.power(left, right))
             assert_all_close(power_two(right, left), Nx.power(right, left))
@@ -374,33 +375,107 @@ defmodule Beaver.Defn.ExprTest do
       end
     end
 
-    # defn atan2_two(a, b), do: Nx.atan2(a, b)
+    defn atan2_two(a, b), do: Nx.atan2(a, b)
 
-    # test "atan2" do
-    #   <<neg_zero::float>> = <<0x8000000000000000::64>>
-    #   left = Nx.tensor([-1.0, neg_zero, 0.0, 1.0])
-    #   right = Nx.tensor([[-1.0], [neg_zero], [0.0], [1.0]])
+    test "atan2" do
+      <<neg_zero::float>> = <<0x8000000000000000::64>>
+      left = Nx.tensor([-1.0, neg_zero, 0.0, 1.0])
+      right = Nx.tensor([[-1.0], [neg_zero], [0.0], [1.0]])
 
-    #   assert_all_close(atan2_two(left, right), Nx.atan2(left, right))
-    #   assert_all_close(atan2_two(right, left), Nx.atan2(right, left))
-    # end
+      assert_all_close(atan2_two(left, right), Nx.atan2(left, right))
+      assert_all_close(atan2_two(right, left), Nx.atan2(right, left))
+    end
 
-    # defn quotient_two(a, b), do: Nx.quotient(a, b)
+    defn quotient_two(a, b), do: Nx.quotient(a, b)
 
-    # test "quotient" do
-    #   int_tensors = [
-    #     {1, 2},
-    #     {1, Nx.tensor([1, 2, 3])},
-    #     {Nx.tensor([1, 2, 3]), 1},
-    #     {Nx.tensor([[1], [2]]), Nx.tensor([[10, 20]])},
-    #     {Nx.tensor([[1], [2]], type: {:s, 8}), Nx.tensor([[10, 20]], type: {:s, 8})},
-    #     {Nx.tensor([[1], [2]], type: {:s, 8}), Nx.tensor([[10, 20]], type: {:s, 32})}
-    #   ]
+    test "quotient" do
+      int_tensors = [
+        {1, 2},
+        {1, Nx.tensor([1, 2, 3])},
+        {Nx.tensor([1, 2, 3]), 1},
+        {Nx.tensor([[1], [2]]), Nx.tensor([[10, 20]])},
+        {Nx.tensor([[1], [2]], type: {:s, 8}), Nx.tensor([[10, 20]], type: {:s, 8})},
+        {Nx.tensor([[1], [2]], type: {:s, 8}), Nx.tensor([[10, 20]], type: {:s, 32})}
+      ]
 
-    #   for {left, right} <- int_tensors do
-    #     assert_all_close(quotient_two(left, right), Nx.quotient(left, right))
-    #     assert_all_close(quotient_two(right, left), Nx.quotient(right, left))
-    #   end
-    # end
+      for {left, right} <- int_tensors do
+        assert_all_close(quotient_two(left, right), Nx.quotient(left, right))
+        assert_all_close(quotient_two(right, left), Nx.quotient(right, left))
+      end
+    end
+  end
+
+  describe "element-wise bitwise operators" do
+    @left Nx.tensor([-2, -1, 0, 1, 2])
+    @right Nx.tensor([[-2], [-1], [0], [1], [2]])
+
+    defn bitwise_and(a, b), do: a &&& b
+
+    test "bitwise_and" do
+      assert Nx.shape(bitwise_and(@left, @right)) == {5, 5}
+      assert_equal(bitwise_and(@left, @right), Nx.bitwise_and(@left, @right))
+    end
+
+    defn bitwise_or(a, b), do: a ||| b
+
+    test "bitwise_or" do
+      assert Nx.shape(bitwise_or(@left, @right)) == {5, 5}
+      assert_equal(bitwise_or(@left, @right), Nx.bitwise_or(@left, @right))
+    end
+
+    defn bitwise_not(a), do: ~~~a
+
+    test "bitwise_not" do
+      assert Nx.shape(bitwise_not(@left)) == {5}
+      assert_equal(bitwise_not(@left), Nx.bitwise_not(@left))
+    end
+
+    defn bitwise_pc(a), do: Nx.population_count(a)
+
+    test "population_count" do
+      assert Nx.shape(bitwise_pc(@left)) == {5}
+      assert_equal(bitwise_pc(@left), Nx.population_count(@left))
+    end
+
+    defn bitwise_clz(a), do: Nx.count_leading_zeros(a)
+
+    test "count_leading_zeros" do
+      assert Nx.shape(bitwise_clz(@left)) == {5}
+      assert_equal(bitwise_clz(@left), Nx.count_leading_zeros(@left))
+    end
+
+    @left Nx.tensor([-2, -1, 0, 1, 2])
+    @right Nx.tensor([[0], [1], [2], [3], [4]])
+
+    defn left_shift(a, b), do: a <<< b
+
+    test "left_shift" do
+      assert Nx.shape(left_shift(@left, @right)) == {5, 5}
+      assert_equal(left_shift(@left, @right), Nx.left_shift(@left, @right))
+    end
+
+    @left_signed Nx.tensor([-128, -127, -2, -1, 0, 1, 2, 126, 127], type: {:s, 8})
+    @right_signed Nx.tensor([[0], [1], [2], [3], [4], [5], [6], [7], [8]], type: {:s, 8})
+
+    @left_unsigned Nx.tensor([0, 1, 2, 253, 254, 255], type: {:u, 8})
+    @right_unsigned Nx.tensor([[0], [1], [2], [3], [4], [5]], type: {:u, 8})
+
+    defn right_shift(a, b), do: a >>> b
+
+    test "right_shift" do
+      assert Nx.shape(right_shift(@left_signed, @right_signed)) == {9, 9}
+
+      assert_equal(
+        right_shift(@left_signed, @right_signed),
+        Nx.right_shift(@left_signed, @right_signed)
+      )
+
+      assert Nx.shape(right_shift(@left_unsigned, @right_unsigned)) == {6, 6}
+
+      assert_equal(
+        right_shift(@left_unsigned, @right_unsigned),
+        Nx.right_shift(@left_unsigned, @right_unsigned)
+      )
+    end
   end
 end

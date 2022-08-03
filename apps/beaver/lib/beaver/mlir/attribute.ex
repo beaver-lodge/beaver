@@ -52,4 +52,16 @@ defmodule Beaver.MLIR.Attribute do
   def integer(%CAPI.MlirType{} = t, value) do
     CAPI.mlirIntegerAttrGet(t, value)
   end
+
+  def bool(value, opts \\ []) do
+    ctx = MLIR.Managed.Context.from_opts(opts)
+
+    value =
+      case value do
+        true -> 1
+        false -> 0
+      end
+
+    CAPI.mlirBoolAttrGet(ctx, value)
+  end
 end
