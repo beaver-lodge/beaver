@@ -212,6 +212,16 @@ export fn beaver_raw_beaver_operation_to_charlist(env: beam.env, _: c_int, args:
     return print_mlir(env, arg0, c.mlirOperationPrint);
 }
 
+export fn beaver_raw_beaver_value_to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+    var arg0: c.struct_MlirValue = undefined;
+    if (beam.fetch_resource(c.struct_MlirValue, env, mlir_capi.Value.resource.t, args[0])) |value| {
+        arg0 = value;
+    } else |_| {
+        return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirValue");
+    }
+    return print_mlir(env, arg0, c.mlirValuePrint);
+}
+
 export fn beaver_raw_get_context_load_all_dialects(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
     var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.MlirContext.resource.t, @sizeOf(c.struct_MlirContext));
     const RType = c.struct_MlirContext;
@@ -642,6 +652,7 @@ pub export const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_beaver_attribute_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_attribute_to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_type_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_type_to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_operation_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_operation_to_charlist, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_value_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_value_to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_get_resource_c_string", .arity = 1, .fptr = beaver_raw_get_resource_c_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_mlir_named_attribute_get", .arity = 2, .fptr = beaver_raw_mlir_named_attribute_get, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_read_opaque_ptr", .arity = 2, .fptr = beaver_raw_read_opaque_ptr, .flags = 0 },
