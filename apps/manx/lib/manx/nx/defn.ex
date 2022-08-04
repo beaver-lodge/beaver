@@ -301,7 +301,7 @@ defmodule Manx.Defn do
       ) do
     # if axes is nil, replace it with a list of every axis
     mlir block: block do
-      rank = Tuple.to_list(in_shape) |> length()
+      rank = tuple_size(in_shape)
       axes = Range.new(0, rank - 1, 1) |> Enum.to_list()
 
       expr = %{
@@ -691,7 +691,7 @@ defmodule Manx.Defn do
       pred_value = TOSA.cast(pred_value) >>> gen_type(%{pred | type: {:u, 1}})
 
       pred_value =
-        if length(Tuple.to_list(pred.shape)) == length(Tuple.to_list(t.shape)) do
+        if tuple_size(pred.shape) == tuple_size(t.shape) do
           pred_value
         else
           case {pred.shape, t.shape} do
