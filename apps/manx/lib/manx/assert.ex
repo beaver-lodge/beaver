@@ -3,7 +3,7 @@ defmodule Manx.Assert do
   Tensor assertions. Original implementation is from EXLA.
   """
 
-  defmacro equal(left, right) do
+  defmacro assert_equal(left, right) do
     # Assert against binary backend tensors to show diff on failure
     quote do
       assert unquote(left) |> Manx.Assert.to_binary_backend() ==
@@ -44,15 +44,6 @@ defmodule Manx.Assert do
             opts: opts
           ] do
       all_close(left, right, opts)
-    end
-  end
-
-  defmacro assert_equal(left, right) do
-    quote bind_quoted: [
-            left: left,
-            right: right
-          ] do
-      equal(left, right)
     end
   end
 end

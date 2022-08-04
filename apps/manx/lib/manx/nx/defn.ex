@@ -110,19 +110,6 @@ defmodule Manx.Defn do
     ~a{["parallel", "parallel"]}
   end
 
-  defp gen_cast(%Env{block: block}, value, result_type) do
-    value_type = MLIR.CAPI.mlirValueGetType(value)
-    is_same_type = MLIR.CAPI.mlirTypeEqual(value_type, result_type) |> Beaver.Native.to_term()
-
-    if is_same_type do
-      value
-    else
-      mlir block: block do
-        TOSA.cast(value) >>> result_type
-      end
-    end
-  end
-
   def gen_op(%Env{block: block}, %Nx.Tensor{
         data: %Nx.Defn.Expr{op: :parameter, args: [pos]}
       })
@@ -224,37 +211,34 @@ defmodule Manx.Defn do
     end
   end
 
-  def gen_op(
-        %Env{block: block} = env,
-        %Nx.Tensor{data: %Nx.Defn.Expr{op: :negate, args: [input1]}} = t
-      ) do
-    mlir block: block do
-      input1 = gen_op(env, input1)
-      TOSA.negate(input1) >>> gen_type(t)
-    end
-  end
-
-  def gen_op(
-        %Env{block: block} = env,
-        %Nx.Tensor{data: %Nx.Defn.Expr{op: :abs, args: [input1]}} = t
-      ) do
-    mlir block: block do
-      input1 = gen_op(env, input1)
-      TOSA.abs(input1) >>> gen_type(t)
-    end
-  end
-
+  # unary tosa
   def gen_op(
         %Env{block: block} = env,
         %Nx.Tensor{data: %Nx.Defn.Expr{op: op, args: [input1]}} = t
       )
-      when op in [:bitwise_not] do
+      when op in [:negate, :abs, :bitwise_not, :exp, :logical_not] do
     mlir block: block do
-      input1 = gen_op(env, input1)
+      input1_t = %{input1 | type: t.type} |> gen_type
+      input1_value = gen_op(env, input1)
+      input1_value = TOSA.cast(input1_value) >>> input1_t
 
       case op do
+        :negate ->
+          TOSA.negate(input1_value) >>> gen_type(t)
+
+        :abs ->
+          TOSA.abs(input1_value) >>> gen_type(t)
+
         :bitwise_not ->
-          TOSA.bitwise_not(input1) >>> gen_type(t)
+          TOSA.bitwise_not(input1_value) >>> gen_type(t)
+
+        :logical_not ->
+          input1_value = TOSA.cast(input1_value) >>> gen_type(%{t | type: {:u, 1}})
+          result = TOSA.logical_not(input1_value) >>> gen_type(%{t | type: {:u, 1}})
+          TOSA.cast(result) >>> gen_type(t)
+
+        :exp ->
+          TOSA.exp(input1_value) >>> gen_type(t)
       end
     end
   end
@@ -452,6 +436,7 @@ defmodule Manx.Defn do
     end
   end
 
+  # unary linalg
   def gen_op(
         %Env{block: block} = env,
         %Nx.Tensor{type: type, data: %Nx.Defn.Expr{op: op, args: [input]}} = t
@@ -491,6 +476,7 @@ defmodule Manx.Defn do
     end
   end
 
+  # binary linalg
   def gen_op(
         %Env{block: block} = env,
         %Nx.Tensor{type: type, data: %Nx.Defn.Expr{op: op, args: [a, b]}} = t
@@ -562,6 +548,11 @@ defmodule Manx.Defn do
     end
   end
 
+  def gen_op(env, %Nx.Tensor{data: %Nx.Defn.Expr{op: :optional, args: list}}) do
+    gen_op(env, List.first(list))
+  end
+
+  # binary tosa
   def gen_op(
         %Env{block: block} = env,
         %Nx.Tensor{data: %Nx.Defn.Expr{op: op, args: [a, b]}} = t
@@ -571,8 +562,29 @@ defmodule Manx.Defn do
       b_t = %{b | type: t.type} |> gen_type
       a_value = gen_op(env, a)
       b_value = gen_op(env, b)
-      a_value = TOSA.cast(a_value) >>> a_t
-      b_value = TOSA.cast(b_value) >>> b_t
+
+      {a_value, b_value} =
+        case op do
+          _ when op in [:equal] ->
+            b_value =
+              if a.type != b.type do
+                TOSA.cast(b_value) >>> gen_type(%{b | type: a.type})
+              else
+                b_value
+              end
+
+            {a_value, b_value}
+
+          _ when op in [:logical_or, :logical_xor, :logical_and] ->
+            a_value = TOSA.cast(a_value) >>> gen_type(%{a | type: {:u, 1}})
+            b_value = TOSA.cast(b_value) >>> gen_type(%{b | type: {:u, 1}})
+            {a_value, b_value}
+
+          _ ->
+            a_value = TOSA.cast(a_value) >>> a_t
+            b_value = TOSA.cast(b_value) >>> b_t
+            {a_value, b_value}
+        end
 
       case op do
         :subtract ->
@@ -580,6 +592,39 @@ defmodule Manx.Defn do
 
         :less_equal ->
           c = TOSA.greater_equal(b_value, a_value) >>> gen_type(%{t | type: {:u, 1}})
+          TOSA.cast(c) >>> gen_type(t)
+
+        :greater_equal ->
+          c = TOSA.greater_equal(a_value, b_value) >>> gen_type(%{t | type: {:u, 1}})
+          TOSA.cast(c) >>> gen_type(t)
+
+        :less ->
+          c = TOSA.greater(b_value, a_value) >>> gen_type(%{t | type: {:u, 1}})
+          TOSA.cast(c) >>> gen_type(t)
+
+        :greater ->
+          c = TOSA.greater(a_value, b_value) >>> gen_type(%{t | type: {:u, 1}})
+          TOSA.cast(c) >>> gen_type(t)
+
+        :equal ->
+          c = TOSA.equal(b_value, a_value) >>> gen_type(%{t | type: {:u, 1}})
+          TOSA.cast(c) >>> gen_type(t)
+
+        :not_equal ->
+          c = TOSA.equal(b_value, a_value) >>> gen_type(%{t | type: {:u, 1}})
+          c = TOSA.logical_not(c) >>> gen_type(%{t | type: {:u, 1}})
+          TOSA.cast(c) >>> gen_type(t)
+
+        :logical_and ->
+          c = TOSA.logical_and(a_value, b_value) >>> gen_type(%{t | type: {:u, 1}})
+          TOSA.cast(c) >>> gen_type(t)
+
+        :logical_or ->
+          c = TOSA.logical_or(a_value, b_value) >>> gen_type(%{t | type: {:u, 1}})
+          TOSA.cast(c) >>> gen_type(t)
+
+        :logical_xor ->
+          c = TOSA.logical_xor(a_value, b_value) >>> gen_type(%{t | type: {:u, 1}})
           TOSA.cast(c) >>> gen_type(t)
 
         :add ->
@@ -632,8 +677,21 @@ defmodule Manx.Defn do
           TOSA.cast(result) >>> gen_type(t)
 
         _ ->
-          raise "Unsupported binary op: #{op}"
+          raise "Unsupported binary op: #{inspect(t, structs: false, pretty: true)}"
       end
+    end
+  end
+
+  def gen_op(
+        %Env{block: block} = env,
+        %Nx.Tensor{data: %Nx.Defn.Expr{op: :select, args: [pred, on_true, on_false]}} = t
+      ) do
+    mlir block: block do
+      pred_value = gen_op(env, pred)
+      pred_value = TOSA.cast(pred_value) >>> gen_type(%{pred | type: {:u, 1}})
+      on_true_value = gen_op(env, on_true)
+      on_false_value = gen_op(env, on_false)
+      TOSA.select(pred_value, on_true_value, on_false_value) >>> gen_type(t)
     end
   end
 

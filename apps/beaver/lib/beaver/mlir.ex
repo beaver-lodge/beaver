@@ -91,6 +91,12 @@ defmodule Beaver.MLIR do
     |> List.to_string()
   end
 
+  def to_string(%Value{ref: ref}) do
+    CAPI.beaver_raw_beaver_value_to_charlist(ref)
+    |> Beaver.Native.check!()
+    |> List.to_string()
+  end
+
   def to_string(%MlirOperation{ref: ref}) do
     CAPI.beaver_raw_beaver_operation_to_charlist(ref)
     |> Beaver.Native.check!()

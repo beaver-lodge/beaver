@@ -34,7 +34,7 @@ defmodule Beaver.MLIR.Pass.Composer do
     if print do
       mlirContextEnableMultithreading(ctx, false)
       mlirPassManagerEnableIRPrinting(pm)
-      Logger.info("Enabled IR printing")
+      Logger.info("[Beaver] IR printing enabled")
     end
 
     for pass <- passes do

@@ -3,9 +3,7 @@ defmodule Beaver.Defn.ExprTest do
   use ExUnit.Case, async: true
   # import Nx, only: :sigils
   import Nx.Defn
-  alias Manx.Assert
   import Manx.Assert
-  require Assert
 
   @moduletag :nx
   setup do
@@ -21,14 +19,14 @@ defmodule Beaver.Defn.ExprTest do
     defn add_subtract_tuple(a, b), do: {a + b, a - b}
 
     test "on results" do
-      Assert.equal(add_subtract_tuple(2, 3), {Nx.tensor(5), Nx.tensor(-1)})
+      assert_equal(add_subtract_tuple(2, 3), {Nx.tensor(5), Nx.tensor(-1)})
 
-      Assert.equal(
+      assert_equal(
         add_subtract_tuple(Nx.tensor([-1, 0, 1]), Nx.tensor([10, 10, 10])),
         {Nx.tensor([9, 10, 11]), Nx.tensor([-11, -10, -9])}
       )
 
-      Assert.equal(
+      assert_equal(
         add_subtract_tuple(Nx.tensor([-1, 0, 1]), 10),
         {Nx.tensor([9, 10, 11]), Nx.tensor([-11, -10, -9])}
       )
@@ -37,9 +35,9 @@ defmodule Beaver.Defn.ExprTest do
     defn(pattern_tuple({a, b}), do: a + b)
 
     test "on patterns" do
-      Assert.equal(pattern_tuple({2, 3}), Nx.tensor(5))
+      assert_equal(pattern_tuple({2, 3}), Nx.tensor(5))
 
-      Assert.equal(
+      assert_equal(
         pattern_tuple({Nx.tensor([1, 2]), Nx.tensor([[3], [4]])}),
         Nx.tensor([[4, 5], [5, 6]])
       )
@@ -48,9 +46,9 @@ defmodule Beaver.Defn.ExprTest do
     defn(calls_pattern_tuple(a, b), do: pattern_tuple({a, b}))
 
     test "on inlined tuples" do
-      Assert.equal(calls_pattern_tuple(2, 3), Nx.tensor(5))
+      assert_equal(calls_pattern_tuple(2, 3), Nx.tensor(5))
 
-      Assert.equal(
+      assert_equal(
         calls_pattern_tuple(Nx.tensor([1, 2]), Nx.tensor([[3], [4]])),
         Nx.tensor([[4, 5], [5, 6]])
       )
@@ -68,22 +66,22 @@ defmodule Beaver.Defn.ExprTest do
     defn add_2x2_constant(_), do: @two_per_two + @two_per_two
 
     test "handles tensors as constants" do
-      Assert.equal(constants(), Nx.tensor(2))
+      assert_equal(constants(), Nx.tensor(2))
     end
 
     test "expands module attributes to scalars" do
-      Assert.equal(add_two_attribute(1), Nx.tensor(3))
-      Assert.equal(add_two_attribute(Nx.tensor([1, 2, 3])), Nx.tensor([3, 4, 5]))
+      assert_equal(add_two_attribute(1), Nx.tensor(3))
+      assert_equal(add_two_attribute(Nx.tensor([1, 2, 3])), Nx.tensor([3, 4, 5]))
     end
 
     test "expands module attributes to tensors" do
-      Assert.equal(add_2x2_attribute(1), Nx.tensor([[2, 3], [4, 5]]))
-      Assert.equal(add_2x2_attribute(Nx.tensor([1, 2])), Nx.tensor([[2, 4], [4, 6]]))
+      assert_equal(add_2x2_attribute(1), Nx.tensor([[2, 3], [4, 5]]))
+      assert_equal(add_2x2_attribute(Nx.tensor([1, 2])), Nx.tensor([[2, 4], [4, 6]]))
     end
 
     test "constants should be folded" do
-      Assert.equal(add_2x2_constant(), Nx.tensor([[2, 4], [6, 8]]))
-      Assert.equal(add_2x2_constant(1), Nx.tensor([[2, 4], [6, 8]]))
+      assert_equal(add_2x2_constant(), Nx.tensor([[2, 4], [6, 8]]))
+      assert_equal(add_2x2_constant(1), Nx.tensor([[2, 4], [6, 8]]))
     end
   end
 
@@ -93,17 +91,17 @@ defmodule Beaver.Defn.ExprTest do
     defn nan, do: Nx.Constants.nan()
 
     test "handles non-finite constants correctly" do
-      Assert.equal(infinity(), Nx.Constants.infinity())
-      Assert.equal(neg_infinity(), Nx.Constants.neg_infinity())
-      Assert.equal(nan(), Nx.Constants.nan())
+      assert_equal(infinity(), Nx.Constants.infinity())
+      assert_equal(neg_infinity(), Nx.Constants.neg_infinity())
+      assert_equal(nan(), Nx.Constants.nan())
     end
 
     defn negate_infinity, do: Nx.negate(Nx.Constants.infinity())
     defn negate_neg_infinity, do: Nx.negate(Nx.Constants.infinity())
 
     test "sanity check constants" do
-      Assert.equal(negate_infinity(), Nx.Constants.neg_infinity())
-      Assert.equal(infinity(), Nx.Constants.infinity())
+      assert_equal(negate_infinity(), Nx.Constants.neg_infinity())
+      assert_equal(infinity(), Nx.Constants.infinity())
     end
   end
 
@@ -111,7 +109,7 @@ defmodule Beaver.Defn.ExprTest do
     defn return_float, do: Nx.tensor(1, type: {:f, 16})
 
     test "supports float16 return types" do
-      Assert.equal(return_float(), Nx.tensor(1, type: {:f, 16}))
+      assert_equal(return_float(), Nx.tensor(1, type: {:f, 16}))
     end
   end
 
@@ -120,8 +118,8 @@ defmodule Beaver.Defn.ExprTest do
     defn return_complex_tensor, do: Nx.broadcast(Nx.complex(1, 2), {3, 3, 3})
 
     test "supports complex return types" do
-      Assert.equal(return_complex(), Nx.tensor(Complex.new(1, 2)))
-      Assert.equal(return_complex_tensor(), Nx.broadcast(Complex.new(1, 2), {3, 3, 3}))
+      assert_equal(return_complex(), Nx.tensor(Complex.new(1, 2)))
+      assert_equal(return_complex_tensor(), Nx.broadcast(Complex.new(1, 2), {3, 3, 3}))
     end
   end
 
@@ -475,6 +473,271 @@ defmodule Beaver.Defn.ExprTest do
       assert_equal(
         right_shift(@left_unsigned, @right_unsigned),
         Nx.right_shift(@left_unsigned, @right_unsigned)
+      )
+    end
+  end
+
+  describe "exp" do
+    defn exp(t), do: Nx.exp(t)
+
+    test "computes the exp across types" do
+      assert_all_close(
+        Nx.tensor([1, 2, 3]) |> exp(),
+        Nx.tensor([2.718281828459045, 7.38905609893065, 20.085536923187668])
+      )
+
+      assert_all_close(
+        Nx.tensor([1, 2, 3], type: {:s, 8}) |> exp(),
+        Nx.tensor([2.718281828459045, 7.38905609893065, 20.085536923187668], type: {:f, 32})
+      )
+
+      assert_all_close(
+        Nx.tensor([1, 2, 3], type: {:u, 8}) |> exp(),
+        Nx.tensor([2.718281828459045, 7.38905609893065, 20.085536923187668], type: {:f, 32})
+      )
+
+      assert_all_close(
+        Nx.tensor([1.0, 2.0, 3.0]) |> exp(),
+        Nx.tensor([2.718281828459045, 7.38905609893065, 20.085536923187668])
+      )
+
+      assert_all_close(
+        Nx.tensor([1.0, 2.0, 3.0], type: {:f, 32}) |> exp(),
+        Nx.tensor([2.718281828459045, 7.38905609893065, 20.085536923187668], type: {:f, 32})
+      )
+    end
+  end
+
+  describe "equal" do
+    defn equal(a, b), do: Nx.equal(a, b)
+
+    test "computes equality of scalars" do
+      assert_equal(equal(Nx.tensor(1), Nx.tensor(2)), Nx.tensor(0, type: {:u, 8}))
+    end
+
+    test "computes equality with broadcasting" do
+      assert_equal(
+        equal(Nx.tensor(1), Nx.tensor([1, 2, 3])),
+        Nx.tensor([1, 0, 0], type: {:u, 8})
+      )
+    end
+
+    test "computes equality with mixed types" do
+      assert_equal(
+        equal(Nx.tensor([1, 2, 3]), Nx.tensor([1.0, 2.0, 3.0])),
+        Nx.tensor([1, 1, 1], type: {:u, 8})
+      )
+    end
+
+    defn successive_compare(y_true, y_pred) do
+      y_pred
+      |> Nx.equal(y_pred)
+      |> Nx.equal(y_true)
+    end
+
+    test "computes successive comparisons" do
+      assert_equal(successive_compare(Nx.tensor(1), Nx.tensor(1)), Nx.tensor(1, type: {:u, 8}))
+    end
+  end
+
+  describe "not equal" do
+    defn not_equal(a, b), do: Nx.not_equal(a, b)
+
+    test "computes equality of scalars" do
+      assert_equal(not_equal(Nx.tensor(1), Nx.tensor(2)), Nx.tensor(1, type: {:u, 8}))
+    end
+
+    test "computes equality with broadcasting" do
+      assert_equal(
+        not_equal(Nx.tensor(1), Nx.tensor([1, 2, 3])),
+        Nx.tensor([0, 1, 1], type: {:u, 8})
+      )
+    end
+
+    test "computes equality with mixed types" do
+      assert_equal(
+        not_equal(Nx.tensor([1, 2, 3]), Nx.tensor([1.0, 2.0, 3.0])),
+        Nx.tensor([0, 0, 0], type: {:u, 8})
+      )
+    end
+  end
+
+  describe "less" do
+    defn less(a, b), do: Nx.less(a, b)
+
+    test "compares scalars" do
+      assert_equal(less(Nx.tensor(1), Nx.tensor(2)), Nx.tensor(1, type: {:u, 8}))
+    end
+
+    test "compares with broadcasting" do
+      assert_equal(less(Nx.tensor(1), Nx.tensor([1, 2, 3])), Nx.tensor([0, 1, 1], type: {:u, 8}))
+    end
+
+    test "compares with mixed types" do
+      assert_equal(
+        less(Nx.tensor([1, 2, 3]), Nx.tensor([1.0, 2.0, 3.0])),
+        Nx.tensor([0, 0, 0], type: {:u, 8})
+      )
+    end
+  end
+
+  describe "greater" do
+    defn greater(a, b), do: Nx.greater(a, b)
+
+    test "compares scalars" do
+      assert_equal(greater(Nx.tensor(1), Nx.tensor(2)), Nx.tensor(0, type: {:u, 8}))
+    end
+
+    test "compares with broadcasting" do
+      assert_equal(
+        greater(Nx.tensor(1), Nx.tensor([1, 2, 3])),
+        Nx.tensor([0, 0, 0], type: {:u, 8})
+      )
+    end
+
+    test "compares with mixed types" do
+      assert_equal(
+        greater(Nx.tensor([1, 2, 3]), Nx.tensor([1.0, 2.0, 3.0])),
+        Nx.tensor([0, 0, 0], type: {:u, 8})
+      )
+    end
+  end
+
+  describe "less equal" do
+    defn less_equal(a, b), do: Nx.less_equal(a, b)
+
+    test "compares scalars" do
+      assert_equal(less_equal(Nx.tensor(1), Nx.tensor(2)), Nx.tensor(1, type: {:u, 8}))
+    end
+
+    test "compares with broadcasting" do
+      assert_equal(
+        less_equal(Nx.tensor(1), Nx.tensor([1, 2, 3])),
+        Nx.tensor([1, 1, 1], type: {:u, 8})
+      )
+    end
+
+    test "compares with mixed types" do
+      assert_equal(
+        less_equal(Nx.tensor([1, 2, 3]), Nx.tensor([1.0, 2.0, 3.0])),
+        Nx.tensor([1, 1, 1], type: {:u, 8})
+      )
+    end
+  end
+
+  describe "greater equal" do
+    defn greater_equal(a, b), do: Nx.greater_equal(a, b)
+
+    test "compares scalars" do
+      assert_equal(greater_equal(Nx.tensor(1), Nx.tensor(2)), Nx.tensor(0, type: {:u, 8}))
+    end
+
+    test "compares with broadcasting" do
+      assert_equal(
+        greater_equal(Nx.tensor(1), Nx.tensor([1, 2, 3])),
+        Nx.tensor([1, 0, 0], type: {:u, 8})
+      )
+    end
+
+    test "compares with mixed types" do
+      assert_equal(
+        greater_equal(Nx.tensor([1, 2, 3]), Nx.tensor([1.0, 2.0, 3.0])),
+        Nx.tensor([1, 1, 1], type: {:u, 8})
+      )
+    end
+  end
+
+  describe "logical" do
+    defn logical_and(a, b), do: Nx.logical_and(a, b)
+
+    test "and" do
+      assert_equal(
+        logical_and(Nx.tensor([-1, 0, 1]), Nx.tensor([[-1], [0], [1]])),
+        Nx.tensor(
+          [
+            [1, 0, 1],
+            [0, 0, 0],
+            [1, 0, 1]
+          ],
+          type: {:u, 8}
+        )
+      )
+
+      assert_equal(
+        logical_and(Nx.tensor([-1.0, 0.0, 1.0]), Nx.tensor([[-1], [0], [1]])),
+        Nx.tensor(
+          [
+            [1, 0, 1],
+            [0, 0, 0],
+            [1, 0, 1]
+          ],
+          type: {:u, 8}
+        )
+      )
+    end
+
+    defn logical_or(a, b), do: Nx.logical_or(a, b)
+
+    test "or" do
+      assert_equal(
+        logical_or(Nx.tensor([-1, 0, 1]), Nx.tensor([[-1], [0], [1]])),
+        Nx.tensor(
+          [
+            [1, 1, 1],
+            [1, 0, 1],
+            [1, 1, 1]
+          ],
+          type: {:u, 8}
+        )
+      )
+
+      assert_equal(
+        logical_or(Nx.tensor([-1.0, 0.0, 1.0]), Nx.tensor([[-1], [0], [1]])),
+        Nx.tensor(
+          [
+            [1, 1, 1],
+            [1, 0, 1],
+            [1, 1, 1]
+          ],
+          type: {:u, 8}
+        )
+      )
+    end
+
+    defn logical_xor(a, b), do: Nx.logical_xor(a, b)
+
+    test "xor" do
+      assert_equal(
+        logical_xor(Nx.tensor([-1, 0, 1]), Nx.tensor([[-1], [0], [1]])),
+        Nx.tensor(
+          [
+            [0, 1, 0],
+            [1, 0, 1],
+            [0, 1, 0]
+          ],
+          type: {:u, 8}
+        )
+      )
+
+      assert_equal(
+        logical_xor(Nx.tensor([-1.0, 0.0, 1.0]), Nx.tensor([[-1], [0], [1]])),
+        Nx.tensor(
+          [
+            [0, 1, 0],
+            [1, 0, 1],
+            [0, 1, 0]
+          ],
+          type: {:u, 8}
+        )
+      )
+    end
+
+    defn logical_not(a), do: Nx.logical_not(a)
+
+    test "not" do
+      assert_equal(
+        logical_not(Nx.tensor([-2, -1, 0, 1, 2])),
+        Nx.tensor([0, 0, 1, 0, 0], type: {:u, 8})
       )
     end
   end
