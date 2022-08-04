@@ -741,4 +741,47 @@ defmodule Beaver.Defn.ExprTest do
       )
     end
   end
+
+  describe "select" do
+    defn select(pred, x, y), do: Nx.select(pred, x, y)
+
+    test "selects one or the other with a scalar" do
+      assert_equal(
+        select(Nx.tensor(1), Nx.tensor([1, 2, 3]), Nx.tensor([4, 5, 6])),
+        Nx.tensor([1, 2, 3])
+      )
+    end
+
+    test "selects with type" do
+      assert_equal(
+        select(
+          Nx.tensor(1),
+          Nx.tensor([1, 2, 3], type: {:u, 8}),
+          Nx.tensor([4, 5, 6], type: {:u, 8})
+        ),
+        Nx.tensor([1, 2, 3], type: {:u, 8})
+      )
+
+      assert_equal(
+        select(
+          Nx.tensor(1),
+          Nx.tensor([1, 2, 3], type: {:u, 8}),
+          Nx.tensor([4, 5, 6], type: {:f, 32})
+        ),
+        Nx.tensor([1, 2, 3], type: {:f, 32})
+      )
+    end
+
+    test "selects with broadcasting" do
+      assert_equal(
+        select(Nx.tensor([1, 0, 1, 0, 1]), Nx.tensor([10]), Nx.tensor([1, 2, 3, 4, 5])),
+        Nx.tensor([10, 2, 10, 4, 10])
+      )
+
+      assert_equal(
+        select(Nx.tensor([-2, -1, 0, 1, 2]), Nx.tensor([10]), Nx.tensor([1, 2, 3, 4, 5])),
+        Nx.tensor([10, 10, 3, 10, 10])
+      )
+    end
+  end
 end

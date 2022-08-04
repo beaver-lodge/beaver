@@ -689,8 +689,26 @@ defmodule Manx.Defn do
     mlir block: block do
       pred_value = gen_op(env, pred)
       pred_value = TOSA.cast(pred_value) >>> gen_type(%{pred | type: {:u, 1}})
+
+      pred_value =
+        if length(Tuple.to_list(pred.shape)) == length(Tuple.to_list(t.shape)) do
+          pred_value
+        else
+          case {pred.shape, t.shape} do
+            {{}, {_n}} ->
+              Tensor.expand_shape(pred_value, reassociation: ~a{[]}) >>>
+                gen_type(%{t | shape: {1}, type: {:u, 1}})
+
+            _ ->
+              Tensor.expand_shape(pred_value, reassociation: ~a{[[0, 1]]}) >>>
+                gen_type(%{t | shape: {1, 1}, type: {:u, 1}})
+          end
+        end
+
       on_true_value = gen_op(env, on_true)
       on_false_value = gen_op(env, on_false)
+      on_true_value = TOSA.cast(on_true_value) >>> gen_type(%{on_true | type: t.type})
+      on_false_value = TOSA.cast(on_false_value) >>> gen_type(%{on_false | type: t.type})
       TOSA.select(pred_value, on_true_value, on_false_value) >>> gen_type(t)
     end
   end
