@@ -111,6 +111,12 @@ defmodule Beaver.MLIR do
     CAPI.beaver_raw_beaver_type_to_charlist(ref) |> Beaver.Native.check!() |> List.to_string()
   end
 
+  def to_string(%MlirAffineMap{ref: ref}) do
+    CAPI.beaver_raw_beaver_affine_map_to_charlist(ref)
+    |> Beaver.Native.check!()
+    |> List.to_string()
+  end
+
   defmacro __CONTEXT__() do
     quote do
       Beaver.MLIR.Managed.Context.get()

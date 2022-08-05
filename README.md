@@ -349,3 +349,10 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 
 - setting environment variable to control Erlang scheduler number, `ERL_AFLAGS="+S 10:5"`
 - run mix test under LLDB, `scripts/lldb-mix-test`
+
+6. Livebook
+
+- To use Beaver in [Livebook](https://livebook.dev/), run this in the source directory:
+  ```bash
+  livebook server --name livebook@127.0.0.1 --home . --default-runtime mix
+  ```

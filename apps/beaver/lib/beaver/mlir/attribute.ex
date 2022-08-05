@@ -64,4 +64,8 @@ defmodule Beaver.MLIR.Attribute do
 
     CAPI.mlirBoolAttrGet(ctx, value)
   end
+
+  def affine_map(%CAPI.MlirAffineMap{} = map) do
+    MLIR.CAPI.mlirAffineMapAttrGet(map)
+  end
 end

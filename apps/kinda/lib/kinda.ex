@@ -186,7 +186,7 @@ defmodule Kinda do
             """
               var arg#{i}: #{Resource.resource_type_struct(arg, resource_kind_map)}.T = #{Resource.resource_type_resource_kind(arg, resource_kind_map)}.fetch(env, args[#{i}])
               catch
-              return beam.make_error_binary(env, "fail to fetch resource for argument ##{i + 1}, expected: " ++ @typeName(#{Resource.resource_type_struct(arg, resource_kind_map)}.T));
+              return beam.make_error_binary(env, "fail to fetch resource for argument ##{i}, expected: " ++ @typeName(#{Resource.resource_type_struct(arg, resource_kind_map)}.T));
             """
           end
 

@@ -144,13 +144,13 @@ export fn beaver_raw_mlir_named_attribute_get(env: beam.env, _: c_int, args: [*c
     if (beam.fetch_resource(c.struct_MlirIdentifier, env, mlir_capi.MlirIdentifier.resource.t, args[0])) |value| {
         arg0 = value;
     } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirIdentifier");
+        return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: c.struct_MlirIdentifier");
     }
     var arg1: c.struct_MlirAttribute = undefined;
     if (beam.fetch_resource(c.struct_MlirAttribute, env, mlir_capi.MlirAttribute.resource.t, args[1])) |value| {
         arg1 = value;
     } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for argument #2, expected: c.struct_MlirAttribute");
+        return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirAttribute");
     }
 
     var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.MlirNamedAttribute.resource.t, @sizeOf(c.struct_MlirNamedAttribute));
@@ -187,7 +187,7 @@ export fn beaver_raw_beaver_attribute_to_charlist(env: beam.env, _: c_int, args:
     if (beam.fetch_resource(c.struct_MlirAttribute, env, mlir_capi.MlirAttribute.resource.t, args[0])) |value| {
         arg0 = value;
     } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirAttribute");
+        return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(@TypeOf(arg0)));
     }
     return print_mlir(env, arg0, c.mlirAttributePrint);
 }
@@ -197,7 +197,7 @@ export fn beaver_raw_beaver_type_to_charlist(env: beam.env, _: c_int, args: [*c]
     if (beam.fetch_resource(c.struct_MlirType, env, mlir_capi.MlirType.resource.t, args[0])) |value| {
         arg0 = value;
     } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirType");
+        return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(@TypeOf(arg0)));
     }
     return print_mlir(env, arg0, c.mlirTypePrint);
 }
@@ -207,7 +207,7 @@ export fn beaver_raw_beaver_operation_to_charlist(env: beam.env, _: c_int, args:
     if (beam.fetch_resource(c.struct_MlirOperation, env, mlir_capi.MlirOperation.resource.t, args[0])) |value| {
         arg0 = value;
     } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirOperation");
+        return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(@TypeOf(arg0)));
     }
     return print_mlir(env, arg0, c.mlirOperationPrint);
 }
@@ -217,9 +217,19 @@ export fn beaver_raw_beaver_value_to_charlist(env: beam.env, _: c_int, args: [*c
     if (beam.fetch_resource(c.struct_MlirValue, env, mlir_capi.Value.resource.t, args[0])) |value| {
         arg0 = value;
     } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirValue");
+        return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(@TypeOf(arg0)));
     }
     return print_mlir(env, arg0, c.mlirValuePrint);
+}
+
+export fn beaver_raw_beaver_affine_map_to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+    var arg0: c.struct_MlirAffineMap = undefined;
+    if (beam.fetch_resource(c.struct_MlirAffineMap, env, mlir_capi.MlirAffineMap.resource.t, args[0])) |value| {
+        arg0 = value;
+    } else |_| {
+        return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(@TypeOf(arg0)));
+    }
+    return print_mlir(env, arg0, c.mlirAffineMapPrint);
 }
 
 export fn beaver_raw_get_context_load_all_dialects(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
@@ -653,6 +663,7 @@ pub export const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_beaver_type_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_type_to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_operation_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_operation_to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_value_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_value_to_charlist, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_affine_map_to_charlist", .arity = 1, .fptr = beaver_raw_beaver_affine_map_to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_get_resource_c_string", .arity = 1, .fptr = beaver_raw_get_resource_c_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_mlir_named_attribute_get", .arity = 2, .fptr = beaver_raw_mlir_named_attribute_get, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_read_opaque_ptr", .arity = 2, .fptr = beaver_raw_read_opaque_ptr, .flags = 0 },
