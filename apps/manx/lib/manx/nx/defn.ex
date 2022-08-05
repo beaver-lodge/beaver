@@ -23,7 +23,7 @@ defmodule Manx.Defn do
   end
 
   # In upstream MLIR, there is no lower-able Op packing multiple values into a tuple.
-  # If the Nx root type is a tuple, it should be converted to repeated results.
+  # If the Nx root type is a tuple, it should be converted to multi-results.
   # This function should always return a list of types
   def gen_root_types(tuple) when is_tuple(tuple) do
     Tuple.to_list(tuple)
@@ -32,82 +32,69 @@ defmodule Manx.Defn do
 
   def gen_root_types(type), do: [gen_type(type)]
 
-  defp get_type_name({:s, size}), do: "i#{size}"
+  defp gen_affine_map(shape) do
+    import MLIR.AffineMap
+    rank = tuple_size(shape)
 
-  defp get_type_name({:f, size}), do: "f#{size}"
+    exprs =
+      shape
+      |> Tuple.to_list()
+      |> Enum.with_index()
+      |> Enum.map(fn
+        {1, index} -> 0
+        {dim_size, index} when dim_size > 1 -> dim(index)
+      end)
 
-  defp get_type_name({:c, size}) do
-    "complex<f#{div(size, 2)}>"
+    MLIR.AffineMap.create(rank, 0, exprs)
   end
 
-  # TODO: stop using string interpolation because it is essentially a hack
-  def gen_type_str(%Nx.Tensor{shape: {}, type: type}) do
-    "tensor<#{get_type_name(type)}>"
+  defp expand_for_output(input_shape, output_shape)
+       when tuple_size(output_shape) >= tuple_size(input_shape) do
+    output_rank = tuple_size(output_shape)
+    rank = tuple_size(input_shape)
+    expanded = List.duplicate(1, output_rank - rank) ++ Tuple.to_list(input_shape)
+    List.to_tuple(expanded)
   end
 
-  def gen_type_str(%Nx.Tensor{shape: {dim0}, type: type}) do
-    "tensor<#{dim0}x#{get_type_name(type)}>"
+  defp gen_indexing_maps(input1_shape, out_shape) do
+    [
+      expand_for_output(input1_shape, out_shape) |> gen_affine_map(),
+      gen_affine_map(out_shape)
+    ]
+    |> Enum.map(&MLIR.Attribute.affine_map/1)
+    |> Attribute.array()
   end
 
-  def gen_type_str(%Nx.Tensor{shape: {dim0, dim1}, type: type}) do
-    "tensor<#{dim0}x#{dim1}x#{get_type_name(type)}>"
-  end
-
-  def gen_type_str(%Nx.Tensor{shape: {dim0, dim1, dim2}, type: type}) do
-    "tensor<#{dim0}x#{dim1}x#{dim2}x#{get_type_name(type)}>"
-  end
-
-  def gen_type_str(tuple) when is_tuple(tuple) do
-    joined =
-      Tuple.to_list(tuple)
-      |> Enum.map(&gen_type_str/1)
-      |> Enum.join(", ")
-
-    "(" <> joined <> ")"
-  end
-
-  def gen_type_str(t) do
-    raise "type unsupported: " <> inspect(t, structs: false, pretty: true)
-  end
-
-  defp gen_indexing_maps({}, {}) do
-    ~a{[affine_map<() -> ()>, affine_map<() -> ()>]}
-  end
-
-  defp gen_indexing_maps({dim}, {dim}) do
-    ~a{[affine_map<(d) -> (d)>, affine_map<(d) -> (d)>]}
-  end
-
-  defp gen_indexing_maps({dim_a, 1}, {dim_b}, {dim_b, dim_a}) do
-    ~a{
-      [
-        affine_map<(d0, d1) -> (d0, 0)>,
-        affine_map<(d0, d1) -> (0, d1)>,
-        affine_map<(d0, d1) -> (d0, d1)>
-      ]
-    }
-  end
-
-  defp gen_indexing_maps({dim_a}, {dim_b, 1}, {dim_b, dim_a}) do
-    ~a{
-      [
-        affine_map<(d0, d1) -> (0, d1)>,
-        affine_map<(d0, d1) -> (d0, 0)>,
-        affine_map<(d0, d1) -> (d0, d1)>
-      ]
-    }
+  defp gen_indexing_maps(
+         input1_shape,
+         input2_shape,
+         out_shape
+       ) do
+    [
+      expand_for_output(input1_shape, out_shape) |> gen_affine_map(),
+      expand_for_output(input2_shape, out_shape) |> gen_affine_map(),
+      gen_affine_map(out_shape)
+    ]
+    |> Enum.map(&MLIR.Attribute.affine_map/1)
+    |> Attribute.array()
   end
 
   defp gen_iterator_types({}, {}) do
     ~a{[]}
   end
 
-  defp gen_iterator_types({dim}, {dim}) do
+  defp gen_iterator_types({_}, {_}) do
     ~a{["parallel"]}
   end
 
-  defp gen_iterator_types(_a, _b, _c) do
+  defp gen_iterator_types(_input1, _input2, _output) do
     ~a{["parallel", "parallel"]}
+  end
+
+  defp gen_expand(%Env{block: block}, value, %{shape: shape} = t) do
+    mlir block: block do
+      Tensor.expand_shape(value, reassociation: Tensor.reassociation([[0, 1]])) >>> gen_type(t)
+    end
   end
 
   def gen_op(%Env{block: block}, %Nx.Tensor{
@@ -140,7 +127,7 @@ defmodule Manx.Defn do
       ) do
     mlir block: block do
       TOSA.const({:value, ~a{dense<0x7F800000> : tensor<f32>}}) >>>
-        ~t{#{gen_type_str(t)}}
+        gen_type(t)
     end
   end
 
@@ -163,15 +150,15 @@ defmodule Manx.Defn do
         %Env{block: block},
         %Nx.Tensor{
           data: %Nx.Defn.Expr{op: :constant, args: [value]},
-          shape: {},
-          type: type
+          shape: {}
         } = t
       )
       when is_integer(value) or is_float(value) do
     mlir block: block do
-      _r =
-        TOSA.const({:value, ~a{dense<#{value}> : tensor<#{get_type_name(type)}>}}) >>>
-          gen_type(t)
+      t_str = gen_type(t) |> MLIR.to_string()
+
+      TOSA.const({:value, ~a{dense<#{value}> : #{t_str}}}) >>>
+        gen_type(t)
     end
   end
 
@@ -183,8 +170,10 @@ defmodule Manx.Defn do
         } = t
       ) do
     mlir block: block do
-      Arith.constant({:value, ~a[dense<(#{re}, #{im})> : #{gen_type_str(t)}]}) >>>
-        ~t{#{gen_type_str(t)}}
+      t_str = gen_type(t) |> MLIR.to_string()
+
+      Arith.constant({:value, ~a[dense<(#{re}, #{im})> : #{t_str}]}) >>>
+        gen_type(t)
     end
   end
 
@@ -218,9 +207,8 @@ defmodule Manx.Defn do
       )
       when op in [:negate, :abs, :bitwise_not, :exp, :logical_not] do
     mlir block: block do
-      input1_t = %{input1 | type: t.type} |> gen_type
       input1_value = gen_op(env, input1)
-      input1_value = TOSA.cast(input1_value) >>> input1_t
+      input1_value = TOSA.cast(input1_value) >>> gen_type(%{input1 | type: t.type})
 
       case op do
         :negate ->
@@ -284,7 +272,7 @@ defmodule Manx.Defn do
       if keep_axes do
         mlir_value
       else
-        Tensor.collapse_shape(mlir_value, reassociation: ~a{[]}) >>> gen_type(t)
+        Tensor.collapse_shape(mlir_value, reassociation: Tensor.reassociation([])) >>> gen_type(t)
       end
     end
   end
@@ -488,7 +476,7 @@ defmodule Manx.Defn do
       a_value =
         case {a.shape, b.shape} do
           {{dim}, {dim, 1}} ->
-            Tensor.expand_shape(a_value, reassociation: ~a{[[0, 1]]}) >>>
+            Tensor.expand_shape(a_value, reassociation: Tensor.reassociation([[0, 1]])) >>>
               gen_type(%{b | shape: {1, dim}})
 
           _ ->
@@ -500,7 +488,9 @@ defmodule Manx.Defn do
       b_value =
         case {a.shape, b.shape} do
           {{dim, 1}, {dim}} ->
-            Tensor.expand_shape(b_value, reassociation: ~a{[[0, 1]]}) >>>
+            Tensor.expand_shape(b_value,
+              reassociation: MLIR.Dialect.Tensor.reassociation([[0, 1]])
+            ) >>>
               gen_type(%{b | shape: {1, dim}})
 
           _ ->
@@ -696,11 +686,11 @@ defmodule Manx.Defn do
         else
           case {pred.shape, t.shape} do
             {{}, {_n}} ->
-              Tensor.expand_shape(pred_value, reassociation: ~a{[]}) >>>
+              Tensor.expand_shape(pred_value, reassociation: Tensor.reassociation([])) >>>
                 gen_type(%{t | shape: {1}, type: {:u, 1}})
 
             _ ->
-              Tensor.expand_shape(pred_value, reassociation: ~a{[[0, 1]]}) >>>
+              Tensor.expand_shape(pred_value, reassociation: Tensor.reassociation([[0, 1]])) >>>
                 gen_type(%{t | shape: {1, 1}, type: {:u, 1}})
           end
         end

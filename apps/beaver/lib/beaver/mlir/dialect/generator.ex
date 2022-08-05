@@ -9,7 +9,8 @@ for d <-
     bufferization
     complex
     memref
-    affine} end) do
+    affine
+    tensor} end) do
   module_name = d |> Dialect.Registry.normalize_dialect_name()
   module_name = Module.concat([Beaver.MLIR.Dialect, module_name])
 

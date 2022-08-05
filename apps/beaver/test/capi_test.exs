@@ -321,4 +321,18 @@ defmodule MlirTest do
     MLIR.Module.destroy(module)
     CAPI.mlirContextDestroy(ctx)
   end
+
+  test "affine expr and map" do
+    ctx = MLIR.Managed.Context.get()
+    affineDimExpr = MLIR.CAPI.mlirAffineDimExprGet(ctx, 0)
+    affineSymbolExpr = MLIR.CAPI.mlirAffineSymbolExprGet(ctx, 1)
+    exprs = MLIR.CAPI.MlirAffineExpr.array([affineDimExpr, affineSymbolExpr], mut: true)
+    map = MLIR.CAPI.mlirAffineMapGet(ctx, 3, 3, 2, exprs)
+    txt = "(d0, d1, d2)[s0, s1, s2] -> (d0, s1)"
+    assert map |> MLIR.to_string() == txt
+    assert MLIR.Attribute.affine_map(map) |> MLIR.to_string() == "affine_map<#{txt}>"
+
+    assert MLIR.AffineMap.create(3, 3, [MLIR.AffineMap.dim(0), MLIR.AffineMap.symbol(1)])
+           |> MLIR.to_string() == txt
+  end
 end
