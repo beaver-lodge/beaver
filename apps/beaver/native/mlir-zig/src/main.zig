@@ -185,12 +185,8 @@ fn print_mlir(env: beam.env, element: anytype, printer: anytype) beam.term {
 fn Printer(comptime ResourceKind: type, print_fn: anytype) type {
     return struct {
         fn to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            var arg0: ResourceKind.T = undefined;
-            if (beam.fetch_resource(ResourceKind.T, env, ResourceKind.resource.t, args[0])) |value| {
-                arg0 = value;
-            } else |_| {
-                return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(@TypeOf(arg0)));
-            }
+            var arg0: ResourceKind.T = ResourceKind.resource.fetch(env, args[0]) catch
+                return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(ResourceKind.T));
             return print_mlir(env, arg0, print_fn);
         }
     };
