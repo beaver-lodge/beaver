@@ -104,19 +104,6 @@ defmodule Manx.Defn do
   defp gen_expand(
          %Env{block: block},
          value,
-         %{type: type, shape: {}} = input_t,
-         %{shape: out_shape} = _output_t
-       ) do
-    mlir block: block do
-      shape = List.duplicate(1, tuple_size(out_shape)) |> List.to_tuple()
-      t = %{input_t | type: type, shape: shape}
-      Tensor.expand_shape(value, reassociation: Tensor.reassociation([])) >>> gen_type(t)
-    end
-  end
-
-  defp gen_expand(
-         %Env{block: block},
-         value,
          %{type: type, shape: in_shape} = input_t,
          %{shape: out_shape} = _output_t
        ) do
