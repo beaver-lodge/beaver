@@ -290,8 +290,6 @@ defmodule Manx.Defn do
           TOSA.sigmoid(input1_value) >>> gen_type(t)
 
         :is_nan ->
-          # Arith.cmpf(input1_value, input1_value, predicate: Arith.cmp_f_predicate(:uno)) >>>
-          #   gen_type(t)
           c = TOSA.equal(input1_value, input1_value) >>> gen_type(%{t | type: {:u, 1}})
           c = TOSA.logical_not(c) >>> gen_type(%{t | type: {:u, 1}})
           TOSA.cast(c) >>> gen_type(t)
