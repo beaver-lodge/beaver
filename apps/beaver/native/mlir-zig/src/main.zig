@@ -250,9 +250,6 @@ const BeaverPass = struct {
         return new;
     }
     fn run(op: c.struct_MlirOperation, pass: c.struct_MlirExternalPass, userData: ?*anyopaque) callconv(.C) void {
-        if (1 > 2) {
-            c.mlirExternalPassSignalFailure(pass);
-        }
         const ud = @ptrCast(*UserData, @alignCast(@alignOf(UserData), userData));
         const env = e.enif_alloc_env() orelse {
             print("fail to creat env\n", .{});
