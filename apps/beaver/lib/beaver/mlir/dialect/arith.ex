@@ -21,4 +21,28 @@ defmodule Beaver.MLIR.Dialect.Arith do
     MLIR.Operation.create("arith.constant", ssa)
     |> MLIR.Operation.results()
   end
+
+  def cmp_f_predicate(type) do
+    i =
+      %{
+        false => 0,
+        :oeq => 1,
+        :ogt => 2,
+        :oge => 3,
+        :olt => 4,
+        :ole => 5,
+        :one => 6,
+        :ord => 7,
+        :ueq => 8,
+        :ugt => 9,
+        :uge => 10,
+        :ult => 11,
+        :ule => 12,
+        :une => 13,
+        :uno => 14,
+        true => 15
+      }[type]
+
+    MLIR.Attribute.integer(MLIR.Type.i64(), i)
+  end
 end

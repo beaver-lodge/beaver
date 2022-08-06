@@ -1,10 +1,13 @@
-# Manx
+# 🐱 Manx 🇮🇲 🐈
 
 **M**LIR-**A**ccelerated-**Nx**. Beaver compiler/backend for the [Nx](https://github.com/elixir-nx/nx/tree/main/nx#readme).
 
 ## Why do we need it?
 
 Instead of repurposing compilers built for Python, Manx is about building a Nx compiler in Elixir and tailored for Elixir.
+"Tensor compiler" is no longer a giant black box for us anymore. We can build passes and optimizations for Elixir and BEAM:
+
+- Generate LLVM instructions to allocate memory with Erlang's allocator.
 
 ## Installation
 
