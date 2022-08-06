@@ -41,7 +41,7 @@ defmodule Manx.Defn do
       |> Tuple.to_list()
       |> Enum.with_index()
       |> Enum.map(fn
-        {1, index} -> 0
+        {1, _index} -> 0
         {dim_size, index} when dim_size > 1 -> dim(index)
       end)
 
@@ -91,9 +91,45 @@ defmodule Manx.Defn do
     ~a{["parallel", "parallel"]}
   end
 
-  defp gen_expand(%Env{block: block}, value, %{shape: shape} = t) do
+  defp gen_expand(
+         _env,
+         value,
+         %{shape: in_shape},
+         %{shape: out_shape}
+       )
+       when tuple_size(in_shape) == tuple_size(out_shape) do
+    value
+  end
+
+  defp gen_expand(
+         %Env{block: block},
+         value,
+         %{type: type, shape: {}} = input_t,
+         %{shape: out_shape} = _output_t
+       ) do
     mlir block: block do
-      Tensor.expand_shape(value, reassociation: Tensor.reassociation([[0, 1]])) >>> gen_type(t)
+      shape = List.duplicate(1, tuple_size(out_shape)) |> List.to_tuple()
+      t = %{input_t | type: type, shape: shape}
+      Tensor.expand_shape(value, reassociation: Tensor.reassociation([])) >>> gen_type(t)
+    end
+  end
+
+  defp gen_expand(
+         %Env{block: block},
+         value,
+         %{type: type, shape: in_shape} = input_t,
+         %{shape: out_shape} = _output_t
+       ) do
+    mlir block: block do
+      shape = expand_for_output(in_shape, out_shape)
+      t = %{input_t | type: type, shape: shape}
+      rank_diff = tuple_size(out_shape) - tuple_size(in_shape)
+
+      pairs =
+        Range.new(0, tuple_size(in_shape) - 1, 1)
+        |> Enum.map(fn i -> [i, i + rank_diff] end)
+
+      Tensor.expand_shape(value, reassociation: Tensor.reassociation(pairs)) >>> gen_type(t)
     end
   end
 
@@ -472,30 +508,9 @@ defmodule Manx.Defn do
       when op in [:remainder, :atan2] do
     mlir block: block do
       a_value = gen_op(env, a)
-
-      a_value =
-        case {a.shape, b.shape} do
-          {{dim}, {dim, 1}} ->
-            Tensor.expand_shape(a_value, reassociation: Tensor.reassociation([[0, 1]])) >>>
-              gen_type(%{b | shape: {1, dim}})
-
-          _ ->
-            a_value
-        end
-
+      a_value = gen_expand(env, a_value, a, t)
       b_value = gen_op(env, b)
-
-      b_value =
-        case {a.shape, b.shape} do
-          {{dim, 1}, {dim}} ->
-            Tensor.expand_shape(b_value,
-              reassociation: MLIR.Dialect.Tensor.reassociation([[0, 1]])
-            ) >>>
-              gen_type(%{b | shape: {1, dim}})
-
-          _ ->
-            b_value
-        end
+      b_value = gen_expand(env, b_value, b, t)
 
       out_tensor =
         Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) >>>
@@ -678,23 +693,9 @@ defmodule Manx.Defn do
       ) do
     mlir block: block do
       pred_value = gen_op(env, pred)
-      pred_value = TOSA.cast(pred_value) >>> gen_type(%{pred | type: {:u, 1}})
-
-      pred_value =
-        if tuple_size(pred.shape) == tuple_size(t.shape) do
-          pred_value
-        else
-          case {pred.shape, t.shape} do
-            {{}, {_n}} ->
-              Tensor.expand_shape(pred_value, reassociation: Tensor.reassociation([])) >>>
-                gen_type(%{t | shape: {1}, type: {:u, 1}})
-
-            _ ->
-              Tensor.expand_shape(pred_value, reassociation: Tensor.reassociation([[0, 1]])) >>>
-                gen_type(%{t | shape: {1, 1}, type: {:u, 1}})
-          end
-        end
-
+      pred_t = %{pred | type: {:u, 1}}
+      pred_value = TOSA.cast(pred_value) >>> gen_type(pred_t)
+      pred_value = gen_expand(env, pred_value, pred_t, t)
       on_true_value = gen_op(env, on_true)
       on_false_value = gen_op(env, on_false)
       on_true_value = TOSA.cast(on_true_value) >>> gen_type(%{on_true | type: t.type})
