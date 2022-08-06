@@ -252,7 +252,8 @@ defmodule Manx.Defn do
              :tanh,
              :rsqrt,
              :is_nan,
-             :is_infinity
+             :is_infinity,
+             :sigmoid
            ] do
     mlir block: block do
       input1_value = gen_op(env, input1)
@@ -284,6 +285,9 @@ defmodule Manx.Defn do
 
         :rsqrt ->
           TOSA.rsqrt(input1_value) >>> gen_type(t)
+
+        :sigmoid ->
+          TOSA.sigmoid(input1_value) >>> gen_type(t)
 
         :is_nan ->
           # Arith.cmpf(input1_value, input1_value, predicate: Arith.cmp_f_predicate(:uno)) >>>

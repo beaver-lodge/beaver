@@ -785,28 +785,42 @@ defmodule Beaver.Defn.ExprTest do
     end
   end
 
-  # describe "unary float ops" do
-  #   @int_tensor Nx.tensor([1, 2, 3])
-  #   @float_tensor Nx.tensor([1.0, 2.0, 3.0])
+  describe "unary float ops" do
+    @int_tensor Nx.tensor([1, 2, 3])
+    @float_tensor Nx.tensor([1.0, 2.0, 3.0])
 
-  #   for fun <-
-  #         [:exp, :expm1, :log, :log1p, :sigmoid, :cos, :sin, :tanh, :sqrt, :rsqrt, :cbrt, :is_nan] ++
-  #           [:is_infinity, :tan, :acosh, :asinh, :cosh, :sinh, :erf, :erfc] do
-  #     defn_fun = :"unary_#{fun}"
-  #     defn_var = Macro.var(defn_fun, __MODULE__)
-  #     defn unquote(defn_fun)(t), do: Nx.unquote(fun)(t)
+    for fun <-
+          ([
+             :exp,
+             :expm1,
+             :log,
+             :log1p,
+             :sigmoid,
+             :cos,
+             :sin,
+             :tanh,
+             :sqrt,
+             :rsqrt,
+             :cbrt,
+             :is_nan
+           ] ++
+             [:is_infinity, :tan, :acosh, :asinh, :cosh, :sinh, :erf, :erfc])
+          |> Enum.reject(fn x -> x in [:erfc, :asinh, :sinh, :acosh, :cosh] end) do
+      defn_fun = :"unary_#{fun}"
+      defn_var = Macro.var(defn_fun, __MODULE__)
+      defn unquote(defn_fun)(t), do: Nx.unquote(fun)(t)
 
-  #     test "#{fun}" do
-  #       assert_all_close(
-  #         unquote(defn_fun)(@float_tensor),
-  #         evaluate(&(unquote(defn_var) / 1), [@float_tensor])
-  #       )
+      test "#{fun}" do
+        assert_all_close(
+          unquote(defn_fun)(@float_tensor),
+          evaluate(&(unquote(defn_var) / 1), [@float_tensor])
+        )
 
-  #       assert_all_close(
-  #         unquote(defn_fun)(@int_tensor),
-  #         evaluate(&(unquote(defn_var) / 1), [@int_tensor])
-  #       )
-  #     end
-  #   end
-  # end
+        assert_all_close(
+          unquote(defn_fun)(@int_tensor),
+          evaluate(&(unquote(defn_var) / 1), [@int_tensor])
+        )
+      end
+    end
+  end
 end
