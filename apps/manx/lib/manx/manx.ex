@@ -103,8 +103,7 @@ defmodule Manx do
       Nx.Defn.Expr.multiply(out, t1, t2)
     end
 
-    options = [force: true]
-    Nx.Defn.jit(expr_fun, [l, h], Keyword.put(options, :compiler, Manx.Compiler))
+    expr_fun |> Nx.Defn.jit(compiler: Manx.Compiler, force: true) |> apply([l, h])
   end
 
   @doc """
@@ -278,7 +277,7 @@ defmodule Manx do
   end
 
   def jit(function, args, options \\ []) do
-    Nx.Defn.jit_or_apply(function, args, Keyword.put(options, :compiler, __MODULE__))
+    Nx.Defn.jit_apply(function, args, Keyword.put(options, :compiler, __MODULE__))
   end
 
   @impl true
