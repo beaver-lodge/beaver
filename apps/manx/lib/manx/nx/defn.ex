@@ -22,9 +22,11 @@ defmodule Manx.Defn do
     |> Type.tuple()
   end
 
-  # In upstream MLIR, there is no lower-able Op packing multiple values into a tuple.
-  # If the Nx root type is a tuple, it should be converted to multi-results.
-  # This function should always return a list of types
+  @doc """
+  In upstream MLIR, there is no lower-able Op packing multiple values into a tuple.
+  If the Nx root type is a tuple, it should be converted to multi-results.
+  This function should always return a list of types
+  """
   def gen_root_types(tuple) when is_tuple(tuple) do
     Tuple.to_list(tuple)
     |> Enum.map(&gen_type/1)
@@ -124,7 +126,19 @@ defmodule Manx.Defn do
         data: %Nx.Defn.Expr{op: :parameter, args: [pos]}
       })
       when is_integer(pos) do
-    block |> Beaver.MLIR.Block.get_arg!(pos)
+    arg = block |> Beaver.MLIR.Block.get_arg!(pos)
+
+    arg_cnt = Beaver.Walker.arguments(block) |> Enum.count()
+
+    if pos >= arg_cnt do
+      raise "arg ##{pos} out of bound, arg_cnt: #{arg_cnt}"
+    end
+
+    if MLIR.is_null(arg) do
+      raise "arg ##{pos} not found"
+    end
+
+    arg
   end
 
   def gen_op(
@@ -228,7 +242,18 @@ defmodule Manx.Defn do
         %Env{block: block} = env,
         %Nx.Tensor{data: %Nx.Defn.Expr{op: op, args: [input1]}} = t
       )
-      when op in [:negate, :abs, :bitwise_not, :exp, :logical_not] do
+      when op in [
+             :negate,
+             :abs,
+             :bitwise_not,
+             :exp,
+             :logical_not,
+             :log,
+             :tanh,
+             :rsqrt,
+             :is_nan,
+             :is_infinity
+           ] do
     mlir block: block do
       input1_value = gen_op(env, input1)
       input1_value = TOSA.cast(input1_value) >>> gen_type(%{input1 | type: t.type})
@@ -250,6 +275,33 @@ defmodule Manx.Defn do
 
         :exp ->
           TOSA.exp(input1_value) >>> gen_type(t)
+
+        :log ->
+          TOSA.log(input1_value) >>> gen_type(t)
+
+        :tanh ->
+          TOSA.tanh(input1_value) >>> gen_type(t)
+
+        :rsqrt ->
+          TOSA.rsqrt(input1_value) >>> gen_type(t)
+
+        :is_nan ->
+          # Arith.cmpf(input1_value, input1_value, predicate: Arith.cmp_f_predicate(:uno)) >>>
+          #   gen_type(t)
+          c = TOSA.equal(input1_value, input1_value) >>> gen_type(%{t | type: {:u, 1}})
+          c = TOSA.logical_not(c) >>> gen_type(%{t | type: {:u, 1}})
+          TOSA.cast(c) >>> gen_type(t)
+
+        :is_infinity ->
+          input1_value = gen_op(env, input1)
+          input1_type_str = gen_type(input1) |> MLIR.to_string()
+
+          inf =
+            TOSA.const({:value, ~a{dense<0x7F800000> : #{input1_type_str}}}) >>> gen_type(input1)
+
+          abs = TOSA.abs(input1_value) >>> gen_type(input1)
+          equal = TOSA.equal(inf, abs) >>> gen_type(%{t | type: {:u, 1}})
+          TOSA.cast(equal) >>> gen_type(t)
       end
     end
   end
@@ -452,9 +504,21 @@ defmodule Manx.Defn do
         %Env{block: block} = env,
         %Nx.Tensor{type: type, data: %Nx.Defn.Expr{op: op, args: [input]}} = t
       )
-      when op in [:population_count, :count_leading_zeros] do
+      when op in [
+             :population_count,
+             :count_leading_zeros,
+             :cos,
+             :sin,
+             :sqrt,
+             :tan,
+             :erf,
+             :cbrt,
+             :expm1,
+             :log1p
+           ] do
     mlir block: block do
       input_value = gen_op(env, input)
+      input_value = TOSA.cast(input_value) >>> gen_type(t)
 
       out_tensor =
         Bufferization.alloc_tensor(operand_segment_sizes: ODS.operand_segment_sizes([0, 0])) >>>
@@ -478,6 +542,37 @@ defmodule Manx.Defn do
 
                 :count_leading_zeros ->
                   Math.ctlz(arg0) >>> gen_type(type)
+
+                :cos ->
+                  Math.cos(arg0) >>> gen_type(type)
+
+                :sin ->
+                  Math.sin(arg0) >>> gen_type(type)
+
+                :sqrt ->
+                  Math.sqrt(arg0) >>> gen_type(type)
+
+                :tan ->
+                  Math.tan(arg0) >>> gen_type(type)
+
+                :erf ->
+                  Math.erf(arg0) >>> gen_type(type)
+
+                :cbrt ->
+                  abs = Math.abs(arg0) >>> gen_type(type)
+
+                  third =
+                    Arith.constant(value: Attribute.float(gen_type(type), 0.333333343)) >>>
+                      gen_type(type)
+
+                  pow = Math.powf(abs, third) >>> gen_type(type)
+                  Math.copysign(pow, arg0) >>> gen_type(type)
+
+                :expm1 ->
+                  Math.expm1(arg0) >>> gen_type(type)
+
+                :log1p ->
+                  Math.log1p(arg0) >>> gen_type(type)
               end
 
             Linalg.yield(result) >>> []
@@ -540,7 +635,20 @@ defmodule Manx.Defn do
     end
   end
 
-  def gen_op(env, %Nx.Tensor{data: %Nx.Defn.Expr{op: :optional, args: list}}) do
+  def gen_op(env, %Nx.Tensor{
+        data: %Nx.Defn.Expr{
+          op: :optional,
+          args:
+            [
+              %{
+                data: %{op: :logical_not}
+              },
+              %{
+                data: %{op: :equal}
+              }
+            ] = list
+        }
+      }) do
     gen_op(env, List.first(list))
   end
 

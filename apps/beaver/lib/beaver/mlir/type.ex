@@ -81,7 +81,10 @@ defmodule Beaver.MLIR.Type do
 
   def tuple(elements, opts \\ []) when is_list(elements) do
     num_elements = length(elements)
-    elements = elements |> Beaver.Native.ISize.array()
+
+    elements = elements |> CAPI.MlirType.array()
+
+    # elements = elements |> Beaver.Native.ISize.array()
     ctx = MLIR.Managed.Context.from_opts(opts)
     CAPI.mlirTupleTypeGet(ctx, num_elements, elements)
   end

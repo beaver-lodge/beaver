@@ -12,7 +12,7 @@ defmodule Beaver.Defn.ExprTest do
   end
 
   defp evaluate(fun, args) do
-    Nx.Defn.jit(fun, args, compiler: Nx.Defn.Evaluator)
+    fun |> Nx.Defn.jit(compiler: Nx.Defn.Evaluator) |> apply(args)
   end
 
   describe "tuples" do
@@ -32,7 +32,7 @@ defmodule Beaver.Defn.ExprTest do
       )
     end
 
-    defn(pattern_tuple({a, b}), do: a + b)
+    defn pattern_tuple({a, b}), do: a + b
 
     test "on patterns" do
       assert_equal(pattern_tuple({2, 3}), Nx.tensor(5))
@@ -43,7 +43,7 @@ defmodule Beaver.Defn.ExprTest do
       )
     end
 
-    defn(calls_pattern_tuple(a, b), do: pattern_tuple({a, b}))
+    defn calls_pattern_tuple(a, b), do: pattern_tuple({a, b})
 
     test "on inlined tuples" do
       assert_equal(calls_pattern_tuple(2, 3), Nx.tensor(5))
@@ -784,4 +784,29 @@ defmodule Beaver.Defn.ExprTest do
       )
     end
   end
+
+  # describe "unary float ops" do
+  #   @int_tensor Nx.tensor([1, 2, 3])
+  #   @float_tensor Nx.tensor([1.0, 2.0, 3.0])
+
+  #   for fun <-
+  #         [:exp, :expm1, :log, :log1p, :sigmoid, :cos, :sin, :tanh, :sqrt, :rsqrt, :cbrt, :is_nan] ++
+  #           [:is_infinity, :tan, :acosh, :asinh, :cosh, :sinh, :erf, :erfc] do
+  #     defn_fun = :"unary_#{fun}"
+  #     defn_var = Macro.var(defn_fun, __MODULE__)
+  #     defn unquote(defn_fun)(t), do: Nx.unquote(fun)(t)
+
+  #     test "#{fun}" do
+  #       assert_all_close(
+  #         unquote(defn_fun)(@float_tensor),
+  #         evaluate(&(unquote(defn_var) / 1), [@float_tensor])
+  #       )
+
+  #       assert_all_close(
+  #         unquote(defn_fun)(@int_tensor),
+  #         evaluate(&(unquote(defn_var) / 1), [@int_tensor])
+  #       )
+  #     end
+  #   end
+  # end
 end

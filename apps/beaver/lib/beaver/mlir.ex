@@ -85,6 +85,10 @@ defmodule Beaver.MLIR do
     CAPI.beaverBlockIsNull(v) |> Beaver.Native.to_term()
   end
 
+  def is_null(%Value{} = v) do
+    CAPI.beaverValueIsNull(v) |> Beaver.Native.to_term()
+  end
+
   def to_string(%MlirAttribute{ref: ref}) do
     CAPI.beaver_raw_beaver_attribute_to_charlist(ref)
     |> Beaver.Native.check!()

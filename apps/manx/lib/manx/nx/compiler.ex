@@ -19,12 +19,21 @@ defmodule Manx.Compiler do
       |> Atom.to_string()
 
     # generate ir
+    entry_types =
+      Enum.reduce(vars, [], fn
+        tuple, acc when is_tuple(tuple) ->
+          acc ++ Enum.map(Tuple.to_list(tuple), &Manx.Defn.gen_type/1)
+
+        t, acc ->
+          acc ++ [Manx.Defn.gen_type(t)]
+      end)
+
     ir =
       mlir do
         module do
           function_type =
             Type.function(
-              Enum.map(vars, &Manx.Defn.gen_type/1),
+              entry_types,
               Manx.Defn.gen_root_types(tree)
             )
 
@@ -34,10 +43,10 @@ defmodule Manx.Compiler do
                     ) do
             region do
               entry =
-                for arg <- vars do
-                  {Manx.Defn.gen_type(arg), MLIR.Managed.Location.get()}
-                end
-                |> MLIR.Block.create()
+                MLIR.Block.create(
+                  entry_types,
+                  List.duplicate(MLIR.Managed.Location.get(), length(entry_types))
+                )
 
               root = Manx.Defn.gen_op(%Manx.Defn.Env{block: entry}, tree)
 
