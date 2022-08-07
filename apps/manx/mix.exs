@@ -24,7 +24,7 @@ defmodule Manx.MixProject do
 
   defp deps do
     [
-      {:nx, github: "elixir-nx/nx", subdir: "nx", branch: "jv-opt-all-close"},
+      {:nx, github: "elixir-nx/nx", subdir: "nx"},
       {:beaver, in_umbrella: true}
     ]
   end
