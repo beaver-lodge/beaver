@@ -657,7 +657,7 @@ defmodule Manx.Defn do
   # binary tosa
   def gen_op(
         %Env{block: block} = env,
-        %Nx.Tensor{data: %Nx.Defn.Expr{op: op, args: [a, b]}} = t
+        %Nx.Tensor{data: %Nx.Defn.Expr{op: op, args: [%Nx.Tensor{} = a, %Nx.Tensor{} = b]}} = t
       ) do
     mlir block: block do
       a_t = %{a | type: t.type} |> gen_type
