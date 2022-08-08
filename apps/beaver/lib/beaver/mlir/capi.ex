@@ -117,7 +117,7 @@ defmodule Beaver.MLIR.CAPI do
           :ok = unquote(forward_module).check!(ref)
         end
       else
-        return_module = Kinda.module_name(ret, Beaver.Native, zig_t_module_map)
+        return_module = Kinda.module_name(ret, forward_module, zig_t_module_map)
 
         def unquote(String.to_atom(wrapper_name))(unquote_splicing(args_ast)) do
           refs = Kinda.unwrap_ref([unquote_splicing(args_ast)])
