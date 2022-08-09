@@ -156,6 +156,7 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_mlir_named_attribute_get(_, _), do: raise("NIF not loaded")
   def beaver_raw_get_resource_c_string(_), do: raise("NIF not loaded")
   def beaver_raw_read_opaque_ptr(_, _), do: raise("NIF not loaded")
+  def beaver_raw_context_attach_diagnostic_handler(_), do: raise("NIF not loaded")
 
   # setup NIF loading
   @on_load :load_nifs

@@ -31,6 +31,8 @@ defmodule Beaver.MLIR.Pass.Composer do
     ctx = MLIR.Managed.Context.get()
     pm = mlirPassManagerCreate(ctx)
 
+    MLIR.CAPI.mlirPassManagerEnableVerifier(pm, true)
+
     if print do
       mlirContextEnableMultithreading(ctx, false)
       mlirPassManagerEnableIRPrinting(pm)

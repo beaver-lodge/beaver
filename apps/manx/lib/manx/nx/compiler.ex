@@ -68,8 +68,17 @@ defmodule Manx.Compiler do
       end
 
     # lower ir to llvm and create jit
-    llvm_ir = ir |> Manx.Lowering.tosa_cpu()
-    jit = MLIR.ExecutionEngine.create!(llvm_ir)
+    llvm_ir = ir |> Manx.Lowering.tosa_vulkan()
+    # jit = MLIR.ExecutionEngine.create!(llvm_ir)
+
+    jit =
+      llvm_ir
+      |> MLIR.ExecutionEngine.create!(
+        shared_lib_paths: [
+          Beaver.LLVM.Config.lib_dir() |> Path.join("libvulkan-runtime-wrappers.dylib"),
+          Beaver.LLVM.Config.lib_dir() |> Path.join("libmlir_runner_utils.dylib")
+        ]
+      )
 
     # invoke jit and setting return for tree
     tree_return =

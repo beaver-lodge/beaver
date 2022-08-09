@@ -74,7 +74,7 @@ defmodule VulkanRuntimeTest do
       |> convert_func_to_llvm
       |> reconcile_unrealized_casts
       |> launch_func_to_vulkan
-      |> MLIR.Pass.Composer.run!()
+      |> MLIR.Pass.Composer.run!(dump: true, print: true)
       |> MLIR.ExecutionEngine.create!(
         shared_lib_paths: [
           Beaver.LLVM.Config.lib_dir() |> Path.join("libvulkan-runtime-wrappers.dylib"),

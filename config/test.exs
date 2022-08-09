@@ -2,7 +2,6 @@ import Config
 
 config :beaver,
   skip_dialects: ~w{nvgpu
-  gpu
   x86vector
   vector
   omp
