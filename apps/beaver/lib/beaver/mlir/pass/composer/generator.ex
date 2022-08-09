@@ -4,12 +4,18 @@ defmodule Beaver.MLIR.Pass.Composer.Generator do
   alias Beaver.MLIR.CAPI
 
   def normalized_name(pass) do
-    pass
-    |> CAPI.beaverPassGetArgument()
-    |> MLIR.StringRef.extract()
-    |> String.replace("-", "_")
-    |> Macro.underscore()
-    |> String.to_atom()
+    original =
+      pass
+      |> CAPI.beaverPassGetArgument()
+      |> MLIR.StringRef.extract()
+
+    normalized =
+      original
+      |> String.replace("-", "_")
+      |> Macro.underscore()
+      |> String.to_atom()
+
+    {original, normalized}
   end
 
   defmacro __using__(prefix: prefix) do
@@ -26,11 +32,12 @@ defmodule Beaver.MLIR.Pass.Composer.Generator do
 
           if is_transform do
             pass = apply(CAPI, name, [])
-            pass_arg = MLIR.Pass.Composer.Generator.normalized_name(pass)
+            {original, pass_arg} = MLIR.Pass.Composer.Generator.normalized_name(pass)
 
             doc = pass |> CAPI.beaverPassGetDescription() |> MLIR.StringRef.extract()
 
             @doc """
+            `#{original}`
             #{doc}
             """
             def unquote(pass_arg)() do
