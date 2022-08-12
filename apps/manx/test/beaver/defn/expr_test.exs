@@ -805,9 +805,6 @@ defmodule Manx.ExprTest do
        ] ++
          [:is_infinity, :tan, :acosh, :asinh, :cosh, :sinh, :erf, :erfc])
       |> Enum.reject(fn x -> x in [:erfc, :asinh, :sinh, :acosh, :cosh] end)
-      |> Enum.reject(fn x -> x in [:erf, :tan] end)
-
-    # float_ops = [:exp]
 
     for fun <- float_ops do
       defn_fun = :"unary_#{fun}"
@@ -820,10 +817,10 @@ defmodule Manx.ExprTest do
           evaluate(&(unquote(defn_var) / 1), [@float_tensor])
         )
 
-        # assert_all_close(
-        #   unquote(defn_fun)(@int_tensor),
-        #   evaluate(&(unquote(defn_var) / 1), [@int_tensor])
-        # )
+        assert_all_close(
+          unquote(defn_fun)(@int_tensor),
+          evaluate(&(unquote(defn_var) / 1), [@int_tensor])
+        )
       end
     end
   end
