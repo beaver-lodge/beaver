@@ -59,7 +59,7 @@ defmodule CFTest do
         IO.inspect(ir)
       end)
 
-    assert captured =~ ~r"module {"
+    assert captured =~ ~r"module"
     assert captured =~ ~r"// pred.+bb0"
     assert captured =~ ~r"// 2 preds.+bb0.+bb1"
   end
