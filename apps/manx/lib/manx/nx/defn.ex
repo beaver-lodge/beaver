@@ -569,7 +569,14 @@ defmodule Manx.Defn do
                   Math.erf(arg0) >>> gen_type(type)
 
                 :cbrt ->
-                  abs = Math.abs(arg0) >>> gen_type(type)
+                  abs =
+                    case type do
+                      {i_type, _} when i_type in [:i, :s] ->
+                        Math.absi(arg0) >>> gen_type(type)
+
+                      {f_type, _} when f_type in [:f] ->
+                        Math.absf(arg0) >>> gen_type(type)
+                    end
 
                   third =
                     Arith.constant(value: Attribute.float(gen_type(type), 0.333333343)) >>>

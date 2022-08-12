@@ -3,19 +3,11 @@ defmodule Beaver.MLIR.Pass.Composer.Generator do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  def normalized_name(pass) do
-    original =
-      pass
-      |> CAPI.beaverPassGetArgument()
-      |> MLIR.StringRef.extract()
-
-    normalized =
-      original
-      |> String.replace("-", "_")
-      |> Macro.underscore()
-      |> String.to_atom()
-
-    {original, normalized}
+  def normalized_name(original) do
+    original
+    |> String.replace("-", "_")
+    |> Macro.underscore()
+    |> String.to_atom()
   end
 
   defmacro __using__(prefix: prefix) do
@@ -32,26 +24,40 @@ defmodule Beaver.MLIR.Pass.Composer.Generator do
 
           if is_transform do
             pass = apply(CAPI, name, [])
-            {original, pass_arg} = MLIR.Pass.Composer.Generator.normalized_name(pass)
+
+            arg_name =
+              pass
+              |> CAPI.beaverPassGetArgument()
+              |> MLIR.StringRef.extract()
+
+            pass_name =
+              pass
+              |> CAPI.beaverPassGetName()
+              |> MLIR.StringRef.extract()
+
+            normalized_name = MLIR.Pass.Composer.Generator.normalized_name(arg_name)
 
             doc = pass |> CAPI.beaverPassGetDescription() |> MLIR.StringRef.extract()
 
             @doc """
-            `#{original}`
             #{doc}
+            ### Argument name in MLIR CLI
+            `#{arg_name}`
+            ### Pass name in TableGen
+            `#{pass_name}`
             """
-            def unquote(pass_arg)() do
+            def unquote(normalized_name)() do
               CAPI.unquote(name)()
             end
 
-            def unquote(pass_arg)(composer_or_op = %Composer{}) do
+            def unquote(normalized_name)(composer_or_op = %Composer{}) do
               pass = CAPI.unquote(name)()
               Composer.add(composer_or_op, pass)
             end
 
-            def unquote(pass_arg)(composer_or_op) do
+            def unquote(normalized_name)(composer_or_op) do
               composer = %Composer{op: composer_or_op, passes: []}
-              unquote(pass_arg)(composer)
+              unquote(normalized_name)(composer)
             end
           end
         end
