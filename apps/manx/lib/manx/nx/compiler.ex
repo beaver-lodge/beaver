@@ -69,7 +69,7 @@ defmodule Manx.Compiler do
 
     # lower ir to llvm and create jit
     # llvm_ir = ir |> Manx.Lowering.tosa_vulkan()
-    llvm_ir = ir |> Manx.Lowering.tosa_cpu()
+    llvm_ir = ir |> Manx.Lowering.CPU.lower()
     # jit = MLIR.ExecutionEngine.create!(llvm_ir)
 
     jit =
