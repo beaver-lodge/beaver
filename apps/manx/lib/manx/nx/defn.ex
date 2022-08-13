@@ -89,8 +89,20 @@ defmodule Manx.Defn do
     ~a{["parallel"]}
   end
 
-  defp gen_iterator_types(_input1, _input2, _output) do
-    ~a{["parallel", "parallel"]}
+  defp gen_iterator_types({}, {}, _output) do
+    ~a{[]}
+  end
+
+  defp gen_iterator_types(input1, _input2, output) do
+    input1 = expand_for_output(input1, output)
+
+    case tuple_size(input1) do
+      1 ->
+        ~a{["parallel"]}
+
+      2 ->
+        ~a{["parallel", "parallel"]}
+    end
   end
 
   defp gen_expand(
@@ -604,7 +616,7 @@ defmodule Manx.Defn do
         %Env{block: block} = env,
         %Nx.Tensor{type: type, data: %Nx.Defn.Expr{op: op, args: [a, b]}} = t
       )
-      when op in [:remainder, :atan2] do
+      when op in [:remainder, :atan2, :power] do
     mlir block: block do
       a_value = gen_op(env, a)
       a_value = gen_expand(env, a_value, a, t)
@@ -639,6 +651,15 @@ defmodule Manx.Defn do
 
                     {:s, _} ->
                       Arith.remsi(arg0, arg1) >>> gen_type(type)
+                  end
+
+                :power ->
+                  case type do
+                    {:f, _} ->
+                      Math.powf(arg0, arg1) >>> gen_type(type)
+
+                    {inter_type, _} when inter_type in [:i, :s] ->
+                      Math.ipowi(arg0, arg1) >>> gen_type(type)
                   end
 
                 :atan2 ->
@@ -798,14 +819,6 @@ defmodule Manx.Defn do
           a_value = TOSA.cast(a_value) >>> gen_type(%{a | type: {:u, 32}})
           b_value = TOSA.cast(b_value) >>> gen_type(%{b | type: {:u, 32}})
           result = TOSA.div(a_value, b_value) >>> gen_type(%{t | type: {:u, 32}})
-          TOSA.cast(result) >>> gen_type(t)
-
-        :power ->
-          {_, width} = a.type
-          width = min(width, 32)
-          a_value = TOSA.cast(a_value) >>> gen_type(%{a | type: {:f, width}})
-          b_value = TOSA.cast(b_value) >>> gen_type(%{b | type: {:f, width}})
-          result = TOSA.pow(a_value, b_value) >>> gen_type(%{t | type: {:f, width}})
           TOSA.cast(result) >>> gen_type(t)
 
         _ ->

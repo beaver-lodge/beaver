@@ -366,6 +366,12 @@ defmodule Manx.ExprTest do
           %{type: {_, 8}} ->
             nil
 
+          i when is_integer(i) ->
+            nil
+
+          %{type: {:s, _}} ->
+            nil
+
           _ ->
             assert_all_close(power_two(left, right), Nx.power(left, right))
             assert_all_close(power_two(right, left), Nx.power(right, left))
