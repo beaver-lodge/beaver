@@ -49,4 +49,4 @@ jobs:
         env:
           LLVM_CONFIG_PATH: "/home/runner/llvm-install/bin/llvm-config"
         run: |
-          mix test --exclude vulkan
+          mix test --exclude vulkan --exclude todo
