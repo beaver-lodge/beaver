@@ -3,7 +3,7 @@ defmodule Manx.VulkanExprTest do
   use ExUnit.Case, async: true
   # import Nx, only: :sigils
   import Nx.Defn
-  import Manx.Assert
+  # import Manx.Assert
 
   @moduletag :nx
   @moduletag :vulkan
@@ -18,7 +18,7 @@ defmodule Manx.VulkanExprTest do
 
     test "sin" do
       # assert [0.8414709568023682, 0.9092974066734314, 0.14112000167369843] ==
-      for i <- 0..1 do
+      for _i <- 0..1 do
         r = unary_sin(@float_tensor)
         r |> Nx.to_flat_list() |> IO.inspect()
       end

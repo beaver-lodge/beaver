@@ -87,6 +87,8 @@ defmodule Manx.Lowering do
     op
     |> MLIR.Operation.verify!(dump_if_fail: true)
     |> canonicalize
+    # |> MLIR.Pass.Composer.run!(dump_if_fail: true, print: false)
+    # |> IO.inspect()
     |> MLIR.Pass.Composer.nested("func.func", fn pm ->
       MLIR.Pass.pipeline!(pm, "tosa-make-broadcastable")
     end)

@@ -682,7 +682,7 @@ defmodule Manx.Defn do
 
       {a_value, b_value} =
         case op do
-          _ when op in [:equal, :greater_equal, :less_equal, :less, :greater] ->
+          _ when op in [:equal, :greater_equal, :less_equal, :less, :greater, :not_equal] ->
             case {a.type, b.type} do
               {{int_type, _}, {:f, _}} when int_type in [:s, :u] ->
                 a_value = TOSA.cast(a_value) >>> gen_type(%{a | type: b.type})
@@ -692,13 +692,13 @@ defmodule Manx.Defn do
                 b_value = TOSA.cast(b_value) >>> gen_type(%{b | type: a.type})
                 {a_value, b_value}
 
-              {{int_type, width_a}, {int_type, width_b}}
-              when int_type in [:s, :u] and width_a > width_b ->
+              {{_, width_a}, {_, width_b}}
+              when width_a > width_b ->
                 b_value = TOSA.cast(b_value) >>> gen_type(%{b | type: a.type})
                 {a_value, b_value}
 
-              {{int_type, width_a}, {int_type, width_b}}
-              when int_type in [:s, :u] and width_a < width_b ->
+              {{_, width_a}, {_, width_b}}
+              when width_a < width_b ->
                 a_value = TOSA.cast(a_value) >>> gen_type(%{a | type: b.type})
                 {a_value, b_value}
 
