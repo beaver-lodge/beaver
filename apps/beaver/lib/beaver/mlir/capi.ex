@@ -117,7 +117,7 @@ defmodule Beaver.MLIR.CAPI do
           :ok = unquote(forward_module).check!(ref)
         end
       else
-        return_module = Kinda.module_name(ret, Beaver.Native, zig_t_module_map)
+        return_module = Kinda.module_name(ret, forward_module, zig_t_module_map)
 
         def unquote(String.to_atom(wrapper_name))(unquote_splicing(args_ast)) do
           refs = Kinda.unwrap_ref([unquote_splicing(args_ast)])
@@ -156,6 +156,7 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_mlir_named_attribute_get(_, _), do: raise("NIF not loaded")
   def beaver_raw_get_resource_c_string(_), do: raise("NIF not loaded")
   def beaver_raw_read_opaque_ptr(_, _), do: raise("NIF not loaded")
+  def beaver_raw_context_attach_diagnostic_handler(_), do: raise("NIF not loaded")
 
   # setup NIF loading
   @on_load :load_nifs

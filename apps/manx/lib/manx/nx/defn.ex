@@ -89,8 +89,20 @@ defmodule Manx.Defn do
     ~a{["parallel"]}
   end
 
-  defp gen_iterator_types(_input1, _input2, _output) do
-    ~a{["parallel", "parallel"]}
+  defp gen_iterator_types({}, {}, _output) do
+    ~a{[]}
+  end
+
+  defp gen_iterator_types(input1, _input2, output) do
+    input1 = expand_for_output(input1, output)
+
+    case tuple_size(input1) do
+      1 ->
+        ~a{["parallel"]}
+
+      2 ->
+        ~a{["parallel", "parallel"]}
+    end
   end
 
   defp gen_expand(
@@ -501,6 +513,14 @@ defmodule Manx.Defn do
     end
   end
 
+  def gen_op(
+        %Env{block: block} = env,
+        %Nx.Tensor{type: type, data: %Nx.Defn.Expr{op: fft, args: [input, args]}} = t
+      )
+      when fft in [:fft, :ifft] do
+    raise "todo"
+  end
+
   # unary linalg
   def gen_op(
         %Env{block: block} = env,
@@ -561,7 +581,14 @@ defmodule Manx.Defn do
                   Math.erf(arg0) >>> gen_type(type)
 
                 :cbrt ->
-                  abs = Math.abs(arg0) >>> gen_type(type)
+                  abs =
+                    case type do
+                      {i_type, _} when i_type in [:i, :s] ->
+                        Math.absi(arg0) >>> gen_type(type)
+
+                      {f_type, _} when f_type in [:f] ->
+                        Math.absf(arg0) >>> gen_type(type)
+                    end
 
                   third =
                     Arith.constant(value: Attribute.float(gen_type(type), 0.333333343)) >>>
@@ -589,7 +616,7 @@ defmodule Manx.Defn do
         %Env{block: block} = env,
         %Nx.Tensor{type: type, data: %Nx.Defn.Expr{op: op, args: [a, b]}} = t
       )
-      when op in [:remainder, :atan2] do
+      when op in [:remainder, :atan2, :power] do
     mlir block: block do
       a_value = gen_op(env, a)
       a_value = gen_expand(env, a_value, a, t)
@@ -626,6 +653,15 @@ defmodule Manx.Defn do
                       Arith.remsi(arg0, arg1) >>> gen_type(type)
                   end
 
+                :power ->
+                  case type do
+                    {:f, _} ->
+                      Math.powf(arg0, arg1) >>> gen_type(type)
+
+                    {inter_type, _} when inter_type in [:i, :s] ->
+                      Math.ipowi(arg0, arg1) >>> gen_type(type)
+                  end
+
                 :atan2 ->
                   Math.atan2(arg0, arg1) >>> gen_type(type)
               end
@@ -657,7 +693,7 @@ defmodule Manx.Defn do
   # binary tosa
   def gen_op(
         %Env{block: block} = env,
-        %Nx.Tensor{data: %Nx.Defn.Expr{op: op, args: [a, b]}} = t
+        %Nx.Tensor{data: %Nx.Defn.Expr{op: op, args: [%Nx.Tensor{} = a, %Nx.Tensor{} = b]}} = t
       ) do
     mlir block: block do
       a_t = %{a | type: t.type} |> gen_type
@@ -667,15 +703,30 @@ defmodule Manx.Defn do
 
       {a_value, b_value} =
         case op do
-          _ when op in [:equal] ->
-            b_value =
-              if a.type != b.type do
-                TOSA.cast(b_value) >>> gen_type(%{b | type: a.type})
-              else
-                b_value
-              end
+          _ when op in [:equal, :greater_equal, :less_equal, :less, :greater, :not_equal] ->
+            case {a.type, b.type} do
+              {{int_type, _}, {:f, _}} when int_type in [:s, :u] ->
+                a_value = TOSA.cast(a_value) >>> gen_type(%{a | type: b.type})
+                {a_value, b_value}
 
-            {a_value, b_value}
+              {{:f, _}, {int_type, _}} when int_type in [:s, :u] ->
+                b_value = TOSA.cast(b_value) >>> gen_type(%{b | type: a.type})
+                {a_value, b_value}
+
+              {{_, width_a}, {_, width_b}}
+              when width_a > width_b ->
+                b_value = TOSA.cast(b_value) >>> gen_type(%{b | type: a.type})
+                {a_value, b_value}
+
+              {{_, width_a}, {_, width_b}}
+              when width_a < width_b ->
+                a_value = TOSA.cast(a_value) >>> gen_type(%{a | type: b.type})
+                {a_value, b_value}
+
+              _ ->
+                b_value = TOSA.cast(b_value) >>> gen_type(%{b | type: a.type})
+                {a_value, b_value}
+            end
 
           _ when op in [:logical_or, :logical_xor, :logical_and] ->
             a_value = TOSA.cast(a_value) >>> gen_type(%{a | type: {:u, 1}})
@@ -768,14 +819,6 @@ defmodule Manx.Defn do
           a_value = TOSA.cast(a_value) >>> gen_type(%{a | type: {:u, 32}})
           b_value = TOSA.cast(b_value) >>> gen_type(%{b | type: {:u, 32}})
           result = TOSA.div(a_value, b_value) >>> gen_type(%{t | type: {:u, 32}})
-          TOSA.cast(result) >>> gen_type(t)
-
-        :power ->
-          {_, width} = a.type
-          width = min(width, 32)
-          a_value = TOSA.cast(a_value) >>> gen_type(%{a | type: {:f, width}})
-          b_value = TOSA.cast(b_value) >>> gen_type(%{b | type: {:f, width}})
-          result = TOSA.pow(a_value, b_value) >>> gen_type(%{t | type: {:f, width}})
           TOSA.cast(result) >>> gen_type(t)
 
         _ ->

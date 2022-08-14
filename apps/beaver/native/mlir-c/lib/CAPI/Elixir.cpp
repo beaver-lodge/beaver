@@ -47,6 +47,11 @@ MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetArgument(MlirPass pass) {
   return wrap(argument);
 }
 
+MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetName(MlirPass pass) {
+  auto argument = unwrap(pass)->getName();
+  return wrap(argument);
+}
+
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetDescription(MlirPass pass) {
   return wrap(unwrap(pass)->getDescription());
 }

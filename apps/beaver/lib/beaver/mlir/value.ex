@@ -26,4 +26,10 @@ defmodule Beaver.MLIR.Value do
       {:error, "not a result"}
     end
   end
+
+  defimpl Inspect do
+    def inspect(value, _opts) do
+      Beaver.MLIR.to_string(value)
+    end
+  end
 end

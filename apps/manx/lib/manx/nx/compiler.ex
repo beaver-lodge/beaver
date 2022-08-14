@@ -67,9 +67,35 @@ defmodule Manx.Compiler do
         end
       end
 
-    # lower ir to llvm and create jit
-    llvm_ir = ir |> Manx.Lowering.tosa_cpu()
-    jit = MLIR.ExecutionEngine.create!(llvm_ir)
+    arg0 = args |> List.first()
+
+    {llvm_ir, libs} =
+      if arg0 do
+        case arg0.data do
+          %Nx.BinaryBackend{} ->
+            {Manx.Lowering.CPU.lower(ir), []}
+
+          %Manx{device: device} ->
+            case device do
+              :host ->
+                {Manx.Lowering.CPU.lower(ir), []}
+
+              :vulkan ->
+                {Manx.Lowering.Vulkan.lower(ir),
+                 [
+                   Beaver.LLVM.Config.lib_dir() |> Path.join("libvulkan-runtime-wrappers.dylib"),
+                   Beaver.LLVM.Config.lib_dir() |> Path.join("libmlir_runner_utils.dylib")
+                 ]}
+            end
+        end
+      else
+        # If all args are materialized as constants, let's assume it's all cpu
+        {Manx.Lowering.CPU.lower(ir), []}
+      end
+
+    jit =
+      llvm_ir
+      |> MLIR.ExecutionEngine.create!(shared_lib_paths: libs)
 
     # invoke jit and setting return for tree
     tree_return =

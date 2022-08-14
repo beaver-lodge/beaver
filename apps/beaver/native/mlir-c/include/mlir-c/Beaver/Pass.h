@@ -8,6 +8,7 @@ extern "C" {
 #endif
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetArgument(MlirPass pass);
+MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetName(MlirPass pass);
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetDescription(MlirPass pass);
 
 #ifdef __cplusplus

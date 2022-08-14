@@ -49,6 +49,10 @@ defmodule Manx.Assert do
     end
   end
 
+  # def all_close(left, right, opts \\ []) do
+  #   true
+  # end
+
   def all_close(left, right, opts \\ []) do
     atol = Keyword.get(opts, :atol, 1.0e-4)
     rtol = Keyword.get(opts, :rtol, 1.0e-4)

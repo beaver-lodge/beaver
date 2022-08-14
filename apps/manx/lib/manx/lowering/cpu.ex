@@ -1,12 +1,11 @@
-defmodule Manx.Lowering do
+defmodule Manx.Lowering.CPU do
   alias Beaver.MLIR
+  import MLIR.{Transforms, Conversion}
 
   @doc """
   Run passes to compile IR generated from Nx expressions, mostly in TOSA and some LinAlg. The results should be in LLVM.
   """
-  def tosa_cpu(op) do
-    import MLIR.{Transforms, Conversion}
-
+  def lower(op) do
     op
     |> MLIR.Operation.verify!(dump_if_fail: true)
     |> canonicalize

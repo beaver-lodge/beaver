@@ -68,4 +68,9 @@ defmodule Beaver.MLIR.Attribute do
   def affine_map(%CAPI.MlirAffineMap{} = map) do
     MLIR.CAPI.mlirAffineMapAttrGet(map)
   end
+
+  def unit(opts \\ []) do
+    ctx = MLIR.Managed.Context.from_opts(opts)
+    CAPI.mlirUnitAttrGet(ctx)
+  end
 end

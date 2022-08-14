@@ -1,4 +1,6 @@
 const std = @import("std");
+const io = std.io;
+const stderr = io.getStdErr().writer();
 const testing = std.testing;
 
 export fn add(a: i32, b: i32) i32 {
@@ -387,6 +389,29 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
     };
 }
 
+const BeaverDiagnostic = struct {
+    pub fn printToStderr(str: c.struct_MlirStringRef, _: ?*anyopaque) callconv(.C) void {
+        stderr.print("{s}", .{str.data[0..str.length]}) catch unreachable;
+    }
+    pub fn deleteUserData(_: ?*anyopaque) callconv(.C) void {}
+    pub fn errorHandler(diagnostic: c.struct_MlirDiagnostic, _: ?*anyopaque) callconv(.C) c.struct_MlirLogicalResult {
+        stderr.print("{s}", .{"[Beaver] ["}) catch unreachable;
+        const loc = c.mlirDiagnosticGetLocation(diagnostic);
+        c.mlirLocationPrint(loc, printToStderr, null);
+        stderr.print("{s}", .{"] "}) catch unreachable;
+
+        c.mlirDiagnosticPrint(diagnostic, printToStderr, null);
+        stderr.print("{s}", .{"\n"}) catch unreachable;
+        return c.mlirLogicalResultSuccess();
+    }
+};
+
+export fn beaver_raw_context_attach_diagnostic_handler(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+    var arg0: mlir_capi.MlirContext.T = mlir_capi.MlirContext.resource.fetch(env, args[0]) catch
+        return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(mlir_capi.MlirContext.T));
+    return mlir_capi.U64.resource.make(env, c.mlirContextAttachDiagnosticHandler(arg0, BeaverDiagnostic.errorHandler, null, BeaverDiagnostic.deleteUserData)) catch return beam.make_error_binary(env, "fail to make resource for: " ++ @typeName(mlir_capi.U64.T));
+}
+
 fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
     return extern struct {
         const T = ResourceKind.T;
@@ -615,6 +640,7 @@ pub export const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_registered_dialects", .arity = 0, .fptr = beaver_raw_registered_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_create_mlir_pass", .arity = 5, .fptr = beaver_raw_create_mlir_pass, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_pass_token_signal", .arity = 1, .fptr = PassToken.pass_token_signal, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_context_attach_diagnostic_handler", .arity = 1, .fptr = beaver_raw_context_attach_diagnostic_handler, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_resource_c_string_to_term_charlist", .arity = 1, .fptr = beaver_raw_resource_c_string_to_term_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_attribute_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.MlirAttribute, c.mlirAttributePrint).to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_type_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.MlirType, c.mlirTypePrint).to_charlist, .flags = 0 },

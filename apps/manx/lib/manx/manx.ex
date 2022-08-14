@@ -4,7 +4,7 @@ defmodule Manx do
   """
 
   @enforce_keys [:memref]
-  defstruct [:memref]
+  defstruct memref: nil, device: :host
 
   @behaviour Nx.Backend
 
@@ -18,8 +18,9 @@ defmodule Manx do
   end
 
   @impl true
-  def from_binary(%T{shape: shape, type: type} = tensor, binary, _backend_options) do
+  def from_binary(%T{shape: shape, type: type} = tensor, binary, backend_options) do
     shape = Tuple.to_list(shape)
+    device = Keyword.get(backend_options, :device, :host)
 
     memref =
       Beaver.Native.Memory.new(
@@ -29,7 +30,7 @@ defmodule Manx do
       )
 
     {memref} |> Manx.MemrefAllocator.add()
-    put_in(tensor.data, %B{memref: memref})
+    put_in(tensor.data, %B{memref: memref, device: device})
   end
 
   @impl true
