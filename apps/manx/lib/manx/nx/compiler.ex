@@ -69,36 +69,35 @@ defmodule Manx.Compiler do
 
     arg0 = args |> List.first()
 
-    llvm_ir =
+    {llvm_ir, libs} =
       if arg0 do
         case arg0.data do
           %Nx.BinaryBackend{} ->
-            ir |> Manx.Lowering.CPU.lower()
+            {Manx.Lowering.CPU.lower(ir), []}
 
           %Manx{device: device} ->
             case device do
               :host ->
-                ir |> Manx.Lowering.CPU.lower()
+                {Manx.Lowering.CPU.lower(ir), []}
 
               :vulkan ->
-                ir |> Manx.Lowering.Vulkan.lower()
+                {Manx.Lowering.Vulkan.lower(ir),
+                 [
+                   Beaver.LLVM.Config.lib_dir() |> Path.join("libvulkan-runtime-wrappers.dylib"),
+                   Beaver.LLVM.Config.lib_dir() |> Path.join("libmlir_runner_utils.dylib")
+                 ]}
             end
         end
       else
         # If all args are materialized as constants, let's assume it's all cpu
-        ir |> Manx.Lowering.CPU.lower()
+        {Manx.Lowering.CPU.lower(ir), []}
       end
 
     # jit = MLIR.ExecutionEngine.create!(llvm_ir)
 
     jit =
       llvm_ir
-      |> MLIR.ExecutionEngine.create!(
-        shared_lib_paths: [
-          Beaver.LLVM.Config.lib_dir() |> Path.join("libvulkan-runtime-wrappers.dylib"),
-          Beaver.LLVM.Config.lib_dir() |> Path.join("libmlir_runner_utils.dylib")
-        ]
-      )
+      |> MLIR.ExecutionEngine.create!(shared_lib_paths: libs)
 
     # invoke jit and setting return for tree
     tree_return =
