@@ -38,7 +38,7 @@ jobs:
       - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Download pre-build LLVM
         run: |
-          wget https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-07-19-0416/llvm-install.zip
+          wget https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-08-10-0737/llvm-install.zip
           unzip llvm-install.zip -d $HOME/llvm-install
       - name: Run smoke tests
         env:
