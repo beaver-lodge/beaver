@@ -85,7 +85,7 @@ defmodule Manx.Compiler do
             end
         end
       else
-        # If all args are materialized as constants, let's assume its all cpu
+        # If all args are materialized as constants, let's assume it's all cpu
         ir |> Manx.Lowering.CPU.lower()
       end
 
