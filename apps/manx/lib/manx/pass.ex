@@ -1,4 +1,4 @@
-defmodule Manx.Lowering.PutSPVAttrPass do
+defmodule Manx.Lowering.Vulkan.PutSPVAttrPass do
   alias Beaver.MLIR
   import MLIR.Sigils
   alias Beaver.MLIR.Dialect.GPU

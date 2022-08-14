@@ -67,9 +67,28 @@ defmodule Manx.Compiler do
         end
       end
 
-    # lower ir to llvm and create jit
-    # llvm_ir = ir |> Manx.Lowering.tosa_vulkan()
-    llvm_ir = ir |> Manx.Lowering.CPU.lower()
+    arg0 = args |> List.first()
+
+    llvm_ir =
+      if arg0 do
+        case arg0.data do
+          %Nx.BinaryBackend{} ->
+            ir |> Manx.Lowering.CPU.lower()
+
+          %Manx{device: device} ->
+            case device do
+              :host ->
+                ir |> Manx.Lowering.CPU.lower()
+
+              :vulkan ->
+                ir |> Manx.Lowering.Vulkan.lower()
+            end
+        end
+      else
+        # If all args are materialized as constants, let's assume its all cpu
+        ir |> Manx.Lowering.CPU.lower()
+      end
+
     # jit = MLIR.ExecutionEngine.create!(llvm_ir)
 
     jit =

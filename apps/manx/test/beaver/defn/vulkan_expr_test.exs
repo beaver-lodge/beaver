@@ -8,7 +8,7 @@ defmodule Manx.VulkanExprTest do
   @moduletag :nx
   @moduletag :vulkan
   setup do
-    Nx.Defn.default_options(compiler: Manx.Compiler)
+    Nx.Defn.default_options(compiler: Manx.Compiler, default_backends: {Manx, device: :vulkan})
     :ok
   end
 
@@ -19,7 +19,7 @@ defmodule Manx.VulkanExprTest do
     test "sin" do
       # assert [0.8414709568023682, 0.9092974066734314, 0.14112000167369843] ==
       for _i <- 0..1 do
-        r = unary_sin(@float_tensor)
+        r = Nx.backend_transfer(@float_tensor, {Manx, device: :vulkan}) |> unary_sin()
         r |> Nx.to_flat_list() |> IO.inspect()
       end
     end

@@ -77,6 +77,6 @@ defmodule Manx.Lowering.Vulkan do
     |> convert_func_to_llvm
     |> reconcile_unrealized_casts
     |> launch_func_to_vulkan
-    |> MLIR.Pass.Composer.run!(dump_if_fail: false, print: true)
+    |> MLIR.Pass.Composer.run!(dump_if_fail: false, print: false)
   end
 end
