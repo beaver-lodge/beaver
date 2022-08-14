@@ -93,8 +93,6 @@ defmodule Manx.Compiler do
         {Manx.Lowering.CPU.lower(ir), []}
       end
 
-    # jit = MLIR.ExecutionEngine.create!(llvm_ir)
-
     jit =
       llvm_ir
       |> MLIR.ExecutionEngine.create!(shared_lib_paths: libs)
