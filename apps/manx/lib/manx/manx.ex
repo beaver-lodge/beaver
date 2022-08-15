@@ -1,6 +1,6 @@
 defmodule Manx do
   @moduledoc """
-  `Manx` is a MLIR backend for the `Nx`. It mainly targets TOSA dialect.
+  `Manx` is a MLIR backend for the `Nx`. It mainly targets TOSA/Linalg dialect and will generate LLVM/CUDA/Vulkan code for different configurations.
   """
 
   @enforce_keys [:memref]

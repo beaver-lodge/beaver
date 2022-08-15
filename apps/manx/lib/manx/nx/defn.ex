@@ -134,6 +134,15 @@ defmodule Manx.Defn do
     end
   end
 
+  def gen_print_tensor(%Env{block: block}, value) do
+    mlir block: block do
+      r_c = Bufferization.to_memref(value) >>> ~t{memref<3xi32>}
+      r_c = MemRef.cast(r_c) >>> ~t{memref<?xi32>}
+      r_c = MemRef.cast(r_c) >>> ~t{memref<*xi32>}
+      Func.call(r_c, callee: Attribute.flat_symbol_ref("printMemrefI32")) >>> []
+    end
+  end
+
   def gen_op(%Env{block: block}, %Nx.Tensor{
         data: %Nx.Defn.Expr{op: :parameter, args: [pos]}
       })
@@ -781,7 +790,11 @@ defmodule Manx.Defn do
           TOSA.cast(c) >>> gen_type(t)
 
         :add ->
-          TOSA.add(a_value, b_value) >>> gen_type(t)
+          r = TOSA.add(a_value, b_value) >>> gen_type(t)
+          gen_print_tensor(env, a_value)
+          gen_print_tensor(env, b_value)
+          gen_print_tensor(env, r)
+          r
 
         :max ->
           TOSA.maximum(a_value, b_value) >>> gen_type(t)
