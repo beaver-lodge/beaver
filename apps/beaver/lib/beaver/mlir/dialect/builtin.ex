@@ -29,16 +29,6 @@ defmodule Beaver.MLIR.Dialect.Builtin do
 
       module_body_block = Beaver.MLIR.CAPI.mlirModuleGetBody(module)
 
-      mlir block: module_body_block do
-        Beaver.MLIR.Dialect.Func.func printMemrefI32(
-                                        sym_visibility: Beaver.MLIR.Attribute.string("private"),
-                                        function_type: ~a"(memref<*xi32>) -> ()"
-                                      ) do
-          region do
-          end
-        end
-      end
-
       Kernel.var!(beaver_internal_env_block) = module_body_block
       %Beaver.MLIR.CAPI.MlirBlock{} = Kernel.var!(beaver_internal_env_block)
       unquote(block)

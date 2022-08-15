@@ -47,6 +47,14 @@ defmodule Manx.Compiler do
     ir =
       mlir do
         module(module_attrs) do
+          Func.func printMemrefI32(
+                      sym_visibility: Beaver.MLIR.Attribute.string("private"),
+                      function_type: ~a"(memref<*xi32>) -> ()"
+                    ) do
+            region do
+            end
+          end
+
           function_type =
             Type.function(
               entry_types,
