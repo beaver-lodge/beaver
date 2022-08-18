@@ -32,27 +32,20 @@ defmodule Beaver.Umbrella.MixProject do
       groups_for_modules: [
         DSL: [
           Beaver,
-          Beaver.MLIR
+          ~r"Beaver.DSL.*",
+          ~r"Beaver.Walker.*"
         ],
-        IR: [
-          Beaver.MLIR.Attribute,
-          Beaver.MLIR.Block
+        MLIR: [
+          ~r"Beaver.MLIR.*"
         ],
-        JIT: [
-          Beaver.MLIR.ExecutionEngine
-        ],
-        Pass: [
-          Beaver.MLIR.Pass,
-          Beaver.MLIR.Pass.Composer
+        Native: [
+          ~r"Beaver.Native.*"
         ],
         Bindings: [
           Beaver.MLIR.CAPI
         ],
-        Nx: [
-          Manx.Backend,
-          Manx.Compiler,
-          Manx.Defn,
-          Manx.MemrefAllocator
+        Manx: [
+          ~r"Manx.*"
         ]
       ]
     ]

@@ -20,7 +20,7 @@ defmodule Beaver.MLIR.Dialect.Func do
         # create function
 
         if not is_list(unquote_splicing(args)),
-          do: raise("augument of Func.func must be a keyword")
+          do: raise("argument of Func.func must be a keyword")
 
         arguments =
           Enum.uniq_by(
