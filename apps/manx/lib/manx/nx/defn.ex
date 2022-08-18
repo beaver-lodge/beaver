@@ -790,11 +790,7 @@ defmodule Manx.Defn do
           TOSA.cast(c) >>> gen_type(t)
 
         :add ->
-          r = TOSA.add(a_value, b_value) >>> gen_type(t)
-          gen_print_tensor(env, a_value)
-          gen_print_tensor(env, b_value)
-          gen_print_tensor(env, r)
-          r
+          TOSA.add(a_value, b_value) >>> gen_type(t)
 
         :max ->
           TOSA.maximum(a_value, b_value) >>> gen_type(t)
