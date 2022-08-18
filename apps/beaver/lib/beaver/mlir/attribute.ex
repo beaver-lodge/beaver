@@ -73,4 +73,10 @@ defmodule Beaver.MLIR.Attribute do
     ctx = MLIR.Managed.Context.from_opts(opts)
     CAPI.mlirUnitAttrGet(ctx)
   end
+
+  def flat_symbol_ref(symbol, opts \\ []) do
+    ctx = MLIR.Managed.Context.from_opts(opts)
+    symbol = MLIR.StringRef.create(symbol)
+    CAPI.mlirFlatSymbolRefAttrGet(ctx, symbol)
+  end
 end

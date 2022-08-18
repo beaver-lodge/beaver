@@ -10,27 +10,22 @@ defmodule Beaver.MLIR.Dialect.Builtin do
     use Beaver.DSL.Op.Prototype, op_name: "builtin.module"
   end
 
-  defmacro module(_call, do: _block) do
-    raise "TODO: support module with symbol"
-  end
-
   @doc """
   Macro to create a module and insert ops into its body. region/1 shouldn't be called because region of one block will be created.
   """
-  defmacro module(do: block) do
+  defmacro module(attrs \\ [], do: block) do
     quote do
       location = Beaver.MLIR.Managed.Location.get()
-      # module = Beaver.MLIR.CAPI.mlirModuleCreateEmpty(location)
       import Beaver.MLIR.Sigils
+      module = Beaver.MLIR.CAPI.mlirModuleCreateEmpty(location)
 
-      module = ~m"""
-        module attributes {
-          spv.target_env = #spv.target_env<
-            #spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, #spv.resource_limits<>>
-        } {
+      for {name, attr} <- unquote(attrs) do
+        name = name |> Beaver.MLIR.StringRef.create()
 
-        }
-      """
+        module
+        |> Beaver.MLIR.CAPI.mlirModuleGetOperation()
+        |> Beaver.MLIR.CAPI.mlirOperationSetAttributeByName(name, attr)
+      end
 
       module_body_block = Beaver.MLIR.CAPI.mlirModuleGetBody(module)
 

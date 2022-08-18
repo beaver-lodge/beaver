@@ -28,9 +28,25 @@ defmodule Manx.Compiler do
           acc ++ [Manx.Defn.gen_type(t)]
       end)
 
+    arg0 = args |> List.first()
+
+    module_attrs =
+      if arg0 do
+        with %Manx{device: :vulkan} <- arg0.data do
+          [
+            "spv.target_env":
+              ~a"#spv.target_env<#spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, #spv.resource_limits<>>"
+          ]
+        else
+          _ -> []
+        end
+      else
+        []
+      end
+
     ir =
       mlir do
-        module do
+        module(module_attrs) do
           function_type =
             Type.function(
               entry_types,
@@ -66,8 +82,6 @@ defmodule Manx.Compiler do
           end
         end
       end
-
-    arg0 = args |> List.first()
 
     {llvm_ir, libs} =
       if arg0 do
