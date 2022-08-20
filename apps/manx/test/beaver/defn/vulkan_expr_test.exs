@@ -1,9 +1,7 @@
 defmodule Manx.VulkanExprTest do
-  # TODO: running this in async will trigger multi-thread check in MLIR and crash
   use ExUnit.Case, async: true
-  # import Nx, only: :sigils
   import Nx.Defn
-  # import Manx.Assert
+  import Manx.Assert
 
   @moduletag :nx
   @moduletag :vulkan
@@ -19,9 +17,8 @@ defmodule Manx.VulkanExprTest do
     end
 
     test "sin" do
-      # assert [0.8414709568023682, 0.9092974066734314, 0.14112000167369843] ==
-      r = Nx.backend_transfer(@float_tensor, {Manx, device: :vulkan}) |> unary_sin()
-      r |> Nx.to_flat_list() |> IO.inspect()
+      t_vulkan = Nx.backend_transfer(@float_tensor, {Manx, device: :vulkan})
+      assert_all_close(unary_sin(t_vulkan), evaluate(&unary_sin/1, [@float_tensor]))
     end
 
     @int_tensor_a Nx.tensor([1, 2, 3], type: {:u, 32})
@@ -33,7 +30,16 @@ defmodule Manx.VulkanExprTest do
     test "add" do
       a = Nx.backend_transfer(@int_tensor_a, {Manx, device: :vulkan})
       b = Nx.backend_transfer(@int_tensor_b, {Manx, device: :vulkan})
-      binary_add(a, b)
+      assert [5, 7, 9] == binary_add(a, b) |> Nx.to_flat_list()
+    end
+
+    defn unary_add(a) do
+      Nx.add(a, @int_tensor_b)
+    end
+
+    test "add a constant" do
+      a = Nx.backend_transfer(@int_tensor_a, {Manx, device: :vulkan})
+      assert [5, 7, 9] == unary_add(a) |> Nx.to_flat_list()
     end
   end
 end

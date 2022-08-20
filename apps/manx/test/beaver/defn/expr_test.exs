@@ -1,7 +1,5 @@
 defmodule Manx.ExprTest do
-  # TODO: running this in async will trigger multi-thread check in MLIR and crash
   use ExUnit.Case, async: true
-  # import Nx, only: :sigils
   import Nx.Defn
   import Manx.Assert
 
@@ -9,10 +7,6 @@ defmodule Manx.ExprTest do
   setup do
     Nx.Defn.default_options(compiler: Manx.Compiler)
     :ok
-  end
-
-  defp evaluate(fun, args) do
-    fun |> Nx.Defn.jit(compiler: Nx.Defn.Evaluator) |> apply(args)
   end
 
   describe "tuples" do

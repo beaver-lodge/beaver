@@ -88,4 +88,8 @@ defmodule Manx.Assert do
       all_close(left, right, opts)
     end
   end
+
+  def evaluate(fun, args) do
+    fun |> Nx.Defn.jit(compiler: Nx.Defn.Evaluator) |> apply(args)
+  end
 end
