@@ -37,7 +37,7 @@
               blocks in (%cst8, %cst8, %cst8) threads in (%cst1, %cst1, %cst1)
               args(%arg0 : memref<8xi32>, %arg1 : memref<8x8xi32>, %arg2 : memref<8x8x8xi32>)
           %arg6 = memref.cast %arg5 : memref<?x?x?xi32> to memref<*xi32>
-          call @printMemrefI32(%arg6) : (memref<*xi32>) -> ()
+          // call @printMemrefI32(%arg6) : (memref<*xi32>) -> ()
           return
         }
         func.func private @fillResource1DInt(%0 : memref<?xi32>, %1 : i32)
