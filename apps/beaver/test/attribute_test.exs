@@ -98,12 +98,12 @@ defmodule AttributeTest do
 
       assert Attribute.equal?(
                MLIR.ODS.operand_segment_sizes([0, 0]),
-               ~a{dense<0> : vector<2xi32>}
+               ~a{array<i32: 0, 0>}
              )
 
       assert Attribute.equal?(
                MLIR.ODS.operand_segment_sizes([1, 0]),
-               ~a{dense<[1, 0]> : vector<2xi32>}
+               ~a{array<i32: 1, 0>}
              )
     end
 

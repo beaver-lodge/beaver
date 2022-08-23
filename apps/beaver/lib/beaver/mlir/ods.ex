@@ -4,18 +4,13 @@ defmodule Beaver.MLIR.ODS do
   """
 
   alias Beaver.MLIR
-  alias MLIR.{Type, Attribute}
+  alias MLIR.{Attribute}
 
   @doc """
   Generate attribute for operand_segment_sizes
   """
   def operand_segment_sizes(sizes) when is_list(sizes) do
-    sizes = Enum.map(sizes, fn s -> Attribute.integer(Type.i(32), s) end)
-
-    Attribute.dense_elements(
-      sizes,
-      Type.vector([length(sizes)], Type.i(32))
-    )
+    Attribute.dense_array(sizes)
   end
 
   defdelegate result_segment_sizes(sizes), to: __MODULE__, as: :operand_segment_sizes

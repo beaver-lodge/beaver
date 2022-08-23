@@ -40,6 +40,12 @@ defmodule Beaver.MLIR.Attribute do
     CAPI.mlirArrayAttrGet(ctx, num_elements, CAPI.MlirAttribute.array(elements))
   end
 
+  def dense_array(elements, opts \\ []) when is_list(elements) do
+    ctx = MLIR.Managed.Context.from_opts(opts)
+    num_elements = length(elements)
+    CAPI.mlirDenseI32ArrayGet(ctx, num_elements, Beaver.Native.I32.array(elements))
+  end
+
   def string(str, opts \\ []) when is_binary(str) do
     ctx = MLIR.Managed.Context.from_opts(opts)
     CAPI.mlirStringAttrGet(ctx, MLIR.StringRef.create(str))
