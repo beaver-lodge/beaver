@@ -48,6 +48,6 @@ defmodule Manx.Lowering.CPU do
     |> convert_complex_to_llvm()
     |> convert_func_to_llvm
     |> reconcile_unrealized_casts
-    |> MLIR.Pass.Composer.run!(dump_if_fail: true, print: false)
+    |> MLIR.Pass.Composer.run!(dump_if_fail: true, print: Manx.Flags.print_ir?())
   end
 end
