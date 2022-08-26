@@ -114,7 +114,7 @@ defmodule Beaver.Native.Memory do
       }) do
     ptr =
       struct!(Beaver.Native.OpaquePtr,
-        ref: Beaver.Native.forward(descriptor_kind, "aligned", [descriptor_ref])
+        ref: Beaver.Native.forward(descriptor_kind, :aligned, [descriptor_ref])
       )
 
     if storage do
