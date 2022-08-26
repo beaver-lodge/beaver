@@ -37,8 +37,8 @@ defmodule VulkanRuntimeTest do
         ]
       )
 
-    for _ <- 1..5 do
-      for _ <- 1..5 do
+    for _ <- 1..2 do
+      for _ <- 1..2 do
         Task.async(fn ->
           for _ <- 1..2 do
             MLIR.ExecutionEngine.invoke!(jit, "main", [])

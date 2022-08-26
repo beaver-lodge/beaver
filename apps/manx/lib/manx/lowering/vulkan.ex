@@ -3,8 +3,6 @@ defmodule Manx.Lowering.Vulkan do
   import MLIR.{Transforms, Conversion}
 
   def lower(op) do
-    print_ir = System.get_env("MANX_PRINT_IR") == "1"
-
     op
     |> MLIR.Operation.verify!(dump_if_fail: true)
     |> canonicalize
@@ -79,6 +77,6 @@ defmodule Manx.Lowering.Vulkan do
     |> convert_func_to_llvm
     |> reconcile_unrealized_casts
     |> launch_func_to_vulkan
-    |> MLIR.Pass.Composer.run!(dump_if_fail: false, print: print_ir)
+    |> MLIR.Pass.Composer.run!(dump_if_fail: false, print: Manx.Flags.print_ir?())
   end
 end
