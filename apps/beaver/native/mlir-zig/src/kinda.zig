@@ -158,6 +158,9 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
         } ++ extra_nifs;
         pub fn open(env: beam.env) void {
             @This().resource.t = e.enif_open_resource_type(env, null, @This().resource.name, beam.destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
+            if (@typeInfo(ElementType) == .Struct and @hasDecl(ElementType, "resource_type")) {
+                ElementType.resource_type = @This().resource.t;
+            }
         }
         pub fn open_ptr(env: beam.env) void {
             @This().Ptr.resource.t = e.enif_open_resource_type(env, null, @This().Ptr.resource.name, beam.destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
@@ -172,6 +175,10 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
             open_array(env);
         }
     };
+}
+
+pub fn ResourceKind2(comptime ElementType: type) type {
+    return ResourceKind(ElementType, ElementType.module_name);
 }
 
 pub fn aliasKind(comptime AliasKind: type, comptime Kind: type) void {
