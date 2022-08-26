@@ -353,6 +353,23 @@ export fn beaver_raw_create_mlir_pass(env: beam.env, _: c_int, args: [*c]const b
     return e.enif_make_resource(env, ptr);
 }
 
+fn MemRefDescriptorAcessor(comptime MemRefT: type) type {
+    return struct {
+        fn allocated_ptr(env: beam.env, term: beam.term) callconv(.C) beam.term {
+            var descriptor: MemRefT = beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term) catch
+                return beam.make_error_binary(env, "fail to fetch resource for descriptor, expected: " ++ @typeName(MemRefT));
+            var ret: mlir_capi.OpaquePtr.T = @ptrCast(mlir_capi.OpaquePtr.T, descriptor.allocated);
+            return mlir_capi.OpaquePtr.resource.make(env, ret) catch return beam.make_error_binary(env, "fail to make allocated ptr");
+        }
+        fn aligned_ptr(env: beam.env, term: beam.term) callconv(.C) beam.term {
+            var descriptor: MemRefT = beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term) catch
+                return beam.make_error_binary(env, "fail to fetch resource for descriptor, expected: " ++ @typeName(MemRefT));
+            var ret: mlir_capi.OpaquePtr.T = @ptrCast(mlir_capi.OpaquePtr.T, descriptor.aligned);
+            return mlir_capi.OpaquePtr.resource.make(env, ret) catch return beam.make_error_binary(env, "fail to make aligned ptr");
+        }
+    };
+}
+
 fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
     return extern struct {
         pub fn make(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
@@ -382,10 +399,19 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
             return kind.per_rank_resource_kinds[0].resource.make(env, descriptor) catch return beam.make_error_binary(env, "fail to make unranked memref descriptor");
         }
         pub const maker = .{ make, 5 };
+        pub const module_name = ResourceKind.module_name ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, 0));
         const T = ResourceKind.T;
         allocated: ?*T = null,
         aligned: ?*T = null,
         offset: i64 = undefined,
+        pub var resource_type: beam.resource_type = undefined;
+        fn allocated_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            return MemRefDescriptorAcessor(@This()).allocated_ptr(env, args[0]);
+        }
+        fn aligned_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            return MemRefDescriptorAcessor(@This()).aligned_ptr(env, args[0]);
+        }
+        pub const nifs = .{ e.ErlNifFunc{ .name = module_name ++ ".allocated", .arity = 1, .fptr = allocated_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".aligned", .arity = 1, .fptr = aligned_ptr, .flags = 1 } };
     };
 }
 
@@ -465,6 +491,15 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
             return kind.per_rank_resource_kinds[rank].resource.make(env, descriptor) catch return beam.make_error_binary(env, "fail to make memref descriptor");
         }
         pub const maker = .{ make, 5 };
+        pub const module_name = ResourceKind.module_name ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, N));
+        pub var resource_type: beam.resource_type = undefined;
+        fn allocated_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            return MemRefDescriptorAcessor(@This()).allocated_ptr(env, args[0]);
+        }
+        fn aligned_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            return MemRefDescriptorAcessor(@This()).aligned_ptr(env, args[0]);
+        }
+        pub const nifs = .{ e.ErlNifFunc{ .name = module_name ++ ".allocated", .arity = 1, .fptr = allocated_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".aligned", .arity = 1, .fptr = aligned_ptr, .flags = 1 } };
     };
 }
 
@@ -559,19 +594,6 @@ const MemRefRankType = enum {
 
 fn BeaverMemRef(comptime ResourceKind: type) type {
     return struct {
-        fn aligned_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            const kind: type = dataKindToMemrefKind(ResourceKind);
-            comptime var rank = 0;
-            inline while (rank < kind.per_rank_resource_kinds.len) : (rank += 1) {
-                if (kind.per_rank_resource_kinds[rank].resource.fetch(env, args[0])) |descriptor| {
-                    var ret: mlir_capi.OpaquePtr.T = @ptrCast(mlir_capi.OpaquePtr.T, descriptor.aligned);
-                    return mlir_capi.OpaquePtr.resource.make(env, ret) catch return beam.make_error_binary(env, "fail to make aligned ptr");
-                } else |_| {
-                    // do nothing
-                }
-            }
-            return beam.make_error_binary(env, "fail to get aligned ptr");
-        }
         fn self_opaque_ptr(env: beam.env, num_args: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
             const kind: type = dataKindToMemrefKind(ResourceKind);
             comptime var rank = 0;
@@ -601,7 +623,6 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
         }
         const data_kind_name = ResourceKind.module_name;
         pub const nifs = .{
-            e.ErlNifFunc{ .name = data_kind_name ++ ".memref_aligned", .arity = 1, .fptr = aligned_ptr, .flags = 0 },
             e.ErlNifFunc{ .name = data_kind_name ++ ".memref_opaque_ptr", .arity = 1, .fptr = self_opaque_ptr, .flags = 0 },
             e.ErlNifFunc{ .name = data_kind_name ++ ".memref_dump", .arity = 1, .fptr = memref_dump, .flags = 0 },
         } ++
@@ -612,9 +633,9 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
             per_rank_resource_kinds[4].nifs;
         fn MemRefOfRank(comptime rank: u8) type {
             if (rank == 0) {
-                return kinda.ResourceKind(UnrankMemRefDescriptor(ResourceKind), data_kind_name ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, 0)));
+                return kinda.ResourceKind2(UnrankMemRefDescriptor(ResourceKind));
             } else {
-                return kinda.ResourceKind(MemRefDescriptor(ResourceKind, rank), data_kind_name ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, rank)));
+                return kinda.ResourceKind2(MemRefDescriptor(ResourceKind, rank));
             }
         }
         const per_rank_resource_kinds = .{

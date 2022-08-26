@@ -112,14 +112,9 @@ defmodule Beaver.Native.Memory do
         descriptor: %__MODULE__.Descriptor{ref: descriptor_ref, kind: descriptor_kind},
         storage: storage
       }) do
-    # TODO: attach memref_aligned to memref kind
-    ["Beaver", "Native", type, "MemRef", _DescriptorRankType] = descriptor_kind |> Module.split()
-
-    element_kind = Module.concat(Beaver.Native, type)
-
     ptr =
       struct!(Beaver.Native.OpaquePtr,
-        ref: Beaver.Native.forward(element_kind, "memref_aligned", [descriptor_ref])
+        ref: Beaver.Native.forward(descriptor_kind, "aligned", [descriptor_ref])
       )
 
     if storage do
