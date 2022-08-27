@@ -185,6 +185,7 @@ defmodule Beaver.Native.Memory do
     |> Beaver.Native.bag(storage)
   end
 
+  # if this is an array, this should be packed memory descriptors for tuple
   def descriptor_ptr(%Beaver.Native.Array{ref: ref, element_kind: element_kind} = array) do
     ref = Beaver.Native.forward(element_kind, :ptr_to_opaque, [ref])
     struct!(Beaver.Native.OpaquePtr, ref: ref) |> Beaver.Native.bag(array)
