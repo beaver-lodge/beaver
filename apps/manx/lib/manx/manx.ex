@@ -3,8 +3,8 @@ defmodule Manx do
   `Manx` is a MLIR backend for the `Nx`. It mainly targets TOSA/Linalg dialect and will generate LLVM/CUDA/Vulkan code for different configurations.
   """
 
-  @enforce_keys [:memref]
-  defstruct memref: nil, device: :host
+  @enforce_keys [:memory]
+  defstruct memory: nil, device: :host
 
   @behaviour Nx.Backend
 
@@ -22,20 +22,20 @@ defmodule Manx do
     shape = Tuple.to_list(shape)
     device = Keyword.get(backend_options, :device, :host)
 
-    memref =
+    memory =
       Beaver.Native.Memory.new(
         binary,
         sizes: shape,
         type: type
       )
 
-    {memref} |> Manx.MemrefAllocator.add()
-    put_in(tensor.data, %B{memref: memref, device: device})
+    memory |> Manx.MemrefAllocator.add()
+    put_in(tensor.data, %B{memory: memory, device: device})
   end
 
   @impl true
-  def to_binary(%T{shape: _shape, data: %B{memref: memref}} = tensor, limit) do
-    Beaver.Native.Memory.aligned(memref)
+  def to_binary(%T{shape: _shape, data: %B{memory: memory}} = tensor, limit) do
+    Beaver.Native.Memory.aligned(memory)
     |> Beaver.Native.OpaquePtr.to_binary(limit * div(element_size(tensor), 8))
   end
 
@@ -57,7 +57,7 @@ defmodule Manx do
 
   # TODO: Support direct transfers without going through Elixir
   def backend_copy(
-        %T{shape: shape, data: %B{memref: memref}} = tensor,
+        %T{shape: shape, data: %B{memory: memory}} = tensor,
         backend,
         backend_options
       ) do
@@ -65,7 +65,7 @@ defmodule Manx do
 
     backend.from_binary(
       tensor,
-      Beaver.Native.Memory.aligned(memref)
+      Beaver.Native.Memory.aligned(memory)
       |> Beaver.Native.OpaquePtr.to_binary(binary_len),
       backend_options
     )
@@ -73,7 +73,7 @@ defmodule Manx do
 
   @impl true
   def backend_transfer(
-        %T{data: %B{memref: memref}} = tensor,
+        %T{data: %B{memory: memory}} = tensor,
         backend,
         backend_options
       ) do
@@ -83,7 +83,7 @@ defmodule Manx do
     else
       tensor = backend_copy(tensor, backend, backend_options)
 
-      with :ok <- Manx.MemrefAllocator.delete(memref) do
+      with :ok <- Manx.MemrefAllocator.delete(memory) do
         tensor
       else
         :already_deallocated -> raise "called on deleted or donated buffer"
@@ -92,8 +92,8 @@ defmodule Manx do
   end
 
   @impl true
-  def backend_deallocate(%T{data: %B{memref: memref}}) do
-    memref |> Manx.MemrefAllocator.delete()
+  def backend_deallocate(%T{data: %B{memory: memory}}) do
+    memory |> Manx.MemrefAllocator.delete()
   end
 
   @impl true
@@ -113,9 +113,9 @@ defmodule Manx do
   def tensor_of_null_memref(%T{shape: shape, type: _type} = tensor) do
     shape = Tuple.to_list(shape)
 
-    memref = Beaver.Native.Memory.new(nil, sizes: shape, type: Beaver.Native.F32)
+    memory = Beaver.Native.Memory.new(nil, sizes: shape, type: Beaver.Native.F32)
 
-    put_in(tensor.data, %B{memref: memref})
+    put_in(tensor.data, %B{memory: memory})
   end
 
   def tensor_of_null_memref(tuple) when is_tuple(tuple) do
@@ -129,15 +129,15 @@ defmodule Manx do
   @doc """
   Add returned memref to the allocator.
   """
-  def add_allocated_memref(%T{data: %B{memref: memref}} = tensor) do
-    memref = memref |> Beaver.Native.Memory.own_allocated()
-    {memref} |> Manx.MemrefAllocator.add()
-    put_in(tensor.data.memref, memref)
+  def add_allocated_memory(%T{data: %B{memory: memory}} = tensor) do
+    memory = memory |> Beaver.Native.Memory.own_allocated()
+    memory |> Manx.MemrefAllocator.add()
+    put_in(tensor.data.memory, memory)
   end
 
-  def add_allocated_memref(tuple) when is_tuple(tuple) do
+  def add_allocated_memory(tuple) when is_tuple(tuple) do
     for t <- Tuple.to_list(tuple) do
-      add_allocated_memref(t)
+      add_allocated_memory(t)
     end
     |> List.to_tuple()
   end

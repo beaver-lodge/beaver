@@ -23,7 +23,7 @@ defmodule BeaverNxTest do
     t = Nx.tensor([1, 2, 3, 4])
 
     et = Nx.backend_transfer(t, {Manx, device_id: 0})
-    assert %Manx{memref: %{}} = et.data
+    assert %Manx{memory: %{}} = et.data
 
     nt = Nx.backend_transfer(et)
     assert Nx.to_binary(nt) == <<1::64-native, 2::64-native, 3::64-native, 4::64-native>>
@@ -37,11 +37,11 @@ defmodule BeaverNxTest do
     t = Nx.tensor([1, 2, 3, 4])
 
     et = Nx.backend_transfer(t, Manx)
-    assert %Manx{memref: %{} = old_buffer} = et.data
+    assert %Manx{memory: %{} = old_buffer} = et.data
 
     # Copy to the same client/device_id still makes a copy
     et = Nx.backend_copy(t, Manx)
-    assert %Manx{memref: %{} = new_buffer} = et.data
+    assert %Manx{memory: %{} = new_buffer} = et.data
     assert old_buffer != new_buffer
 
     nt = Nx.backend_copy(et)
