@@ -91,6 +91,9 @@ defmodule Beaver.MLIR.CAPI do
   extra_kind_nifs =
     ([
        %Kinda.CodeGen.Type{
+         module_name: Beaver.Native.PtrOwner
+       },
+       %Kinda.CodeGen.Type{
          module_name: Beaver.Native.Complex.F32,
          kind_functions: Beaver.MLIR.CAPI.CodeGen.memref_kind_functions()
        }

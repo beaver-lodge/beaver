@@ -201,7 +201,7 @@ defmodule Beaver.Native.Memory do
     owner =
       m
       |> allocated
-      |> Beaver.Native.Owner.new()
+      |> Beaver.Native.PtrOwner.new()
 
     %{m | storage: owner}
   end

@@ -282,8 +282,8 @@ const BeaverPass = struct {
     }
 };
 
-const PtrOwner = struct {
-    pub const Kind = kinda.ResourceKind(@This(), "Elixir.Beaver.MLIR.CAPI.Native.PtrOwner");
+const PtrOwner = extern struct {
+    pub const Kind = kinda.ResourceKind(@This(), "Elixir.Beaver.Native.PtrOwner");
     ptr: mlir_capi.OpaquePtr.T,
     extern fn free(ptr: ?*anyopaque) void;
     pub fn destroy(_: beam.env, resource_ptr: ?*anyopaque) callconv(.C) void {
@@ -674,6 +674,7 @@ pub export const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_own_opaque_ptr", .arity = 1, .fptr = beaver_raw_own_opaque_ptr, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_read_opaque_ptr", .arity = 2, .fptr = beaver_raw_read_opaque_ptr, .flags = 0 },
 } ++
+    PtrOwner.Kind.nifs ++
     Complex.F32.nifs ++
     dataKindToMemrefKind(Complex.F32).nifs ++
     dataKindToMemrefKind(mlir_capi.U8).nifs ++
