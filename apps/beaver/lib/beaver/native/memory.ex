@@ -205,13 +205,4 @@ defmodule Beaver.Native.Memory do
 
     %{m | storage: owner}
   end
-
-  def descriptor_dump(
-        %__MODULE__{
-          descriptor: %__MODULE__.Descriptor{ref: descriptor_ref, kind: descriptor_kind}
-        } = m
-      ) do
-    :ok = Beaver.Native.forward(descriptor_kind, :dump, [descriptor_ref])
-    m
-  end
 end
