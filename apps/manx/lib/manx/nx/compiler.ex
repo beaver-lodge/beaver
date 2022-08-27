@@ -141,14 +141,14 @@ defmodule Manx.Compiler do
 
     # unpack the C struct into tensor tuples
     populate_tensor_from_memref(return, return_struct)
-    |> Manx.add_allocated_memref()
+    |> Manx.add_allocated_memory()
   end
 
   @doc """
   - If it is a tensor, return a memref
   - If it is a tuple, recursively pack them into one struct.
   """
-  def memref_from_tensor(%Nx.Tensor{data: %Manx{memref: memref}}), do: memref
+  def memref_from_tensor(%Nx.Tensor{data: %Manx{memory: memory}}), do: memory
 
   def memref_from_tensor(
         %Nx.Tensor{
@@ -190,8 +190,8 @@ defmodule Manx.Compiler do
   - If it is a tensor, return a memref
   - If it is a tuple, recursively unpack each member from the nested struct.
   """
-  def populate_tensor_from_memref(%Nx.Tensor{data: %Manx{}} = tensor, memref) do
-    %{tensor | data: %Manx{memref: memref}}
+  def populate_tensor_from_memref(%Nx.Tensor{data: %Manx{}} = tensor, memory) do
+    %{tensor | data: %Manx{memory: memory}}
   end
 
   def populate_tensor_from_memref(

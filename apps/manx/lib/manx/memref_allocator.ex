@@ -12,7 +12,7 @@ defmodule Manx.MemrefAllocator do
   end
 
   def add(memref) do
-    :ets.insert(__MODULE__, memref)
+    :ets.insert(__MODULE__, {memref})
   end
 
   def delete(memref) do
