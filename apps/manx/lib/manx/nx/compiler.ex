@@ -141,6 +141,7 @@ defmodule Manx.Compiler do
 
     # unpack the C struct into tensor tuples
     populate_tensor_from_memref(return, return_struct)
+    |> Manx.add_allocated_memref()
   end
 
   @doc """
