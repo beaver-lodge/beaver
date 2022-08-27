@@ -157,7 +157,11 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
             e.ErlNifFunc{ .name = module_name ++ ".array_as_opaque", .arity = 1, .fptr = @This().Array.as_opaque, .flags = 0 },
         } ++ extra_nifs;
         pub fn open(env: beam.env) void {
-            @This().resource.t = e.enif_open_resource_type(env, null, @This().resource.name, beam.destroy_do_nothing, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
+            const dtor = if (@typeInfo(ElementType) == .Struct and @hasDecl(ElementType, "destroy"))
+                ElementType.destroy
+            else
+                beam.destroy_do_nothing;
+            @This().resource.t = e.enif_open_resource_type(env, null, @This().resource.name, dtor, e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER, null);
             if (@typeInfo(ElementType) == .Struct and @hasDecl(ElementType, "resource_type")) {
                 ElementType.resource_type = @This().resource.t;
             }

@@ -113,7 +113,7 @@ defmodule Manx do
   def tensor_of_null_memref(%T{shape: shape, type: _type} = tensor) do
     shape = Tuple.to_list(shape)
 
-    memref = Beaver.Native.Memory.new([], sizes: shape, type: Beaver.Native.F32)
+    memref = Beaver.Native.Memory.new(nil, sizes: shape, type: Beaver.Native.F32)
 
     # TODO: delete the allocated ptr when this kind of tensor is deallocated by Nx
     {memref} |> Manx.MemrefAllocator.add()
