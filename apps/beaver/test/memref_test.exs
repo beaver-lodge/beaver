@@ -74,8 +74,6 @@ defmodule MemRefTest do
         type: Beaver.Native.F32
       )
 
-    arg0.descriptor |> Beaver.Native.dump()
-
     <<
       a0::little-float-32,
       a1::little-float-32,
