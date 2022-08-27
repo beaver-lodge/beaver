@@ -38,41 +38,40 @@ defmodule Beaver.Native.Memory do
   defp extract_mod_from_opts(opts) do
     mod = Keyword.fetch!(opts, :type)
 
-    mod =
-      case mod do
-        {:u, 8} ->
-          Beaver.Native.U8
+    case mod do
+      {:u, 8} ->
+        Beaver.Native.U8
 
-        {:u, 16} ->
-          Beaver.Native.U16
+      {:u, 16} ->
+        Beaver.Native.U16
 
-        {:u, 32} ->
-          Beaver.Native.U32
+      {:u, 32} ->
+        Beaver.Native.U32
 
-        {:u, 64} ->
-          Beaver.Native.U64
+      {:u, 64} ->
+        Beaver.Native.U64
 
-        {:s, 8} ->
-          Beaver.Native.I8
+      {:s, 8} ->
+        Beaver.Native.I8
 
-        {:s, 16} ->
-          Beaver.Native.I16
+      {:s, 16} ->
+        Beaver.Native.I16
 
-        {:s, 32} ->
-          Beaver.Native.I32
+      {:s, 32} ->
+        Beaver.Native.I32
 
-        {:s, 64} ->
-          Beaver.Native.I64
+      {:s, 64} ->
+        Beaver.Native.I64
 
-        {:f, 32} ->
-          Beaver.Native.F32
+      {:f, 32} ->
+        Beaver.Native.F32
 
-        {:c, 64} ->
-          Beaver.Native.Complex.F32
+      {:c, 64} ->
+        Beaver.Native.Complex.F32
 
-        mod when is_atom(mod) ->
-          mod
-      end
+      mod when is_atom(mod) ->
+        mod
+    end
   end
 
   def new(data, opts \\ [offset: 0])
