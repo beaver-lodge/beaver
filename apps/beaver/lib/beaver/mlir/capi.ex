@@ -91,6 +91,9 @@ defmodule Beaver.MLIR.CAPI do
   extra_kind_nifs =
     ([
        %Kinda.CodeGen.Type{
+         module_name: Beaver.Native.PtrOwner
+       },
+       %Kinda.CodeGen.Type{
          module_name: Beaver.Native.Complex.F32,
          kind_functions: Beaver.MLIR.CAPI.CodeGen.memref_kind_functions()
        }
@@ -156,6 +159,7 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_mlir_named_attribute_get(_, _), do: raise("NIF not loaded")
   def beaver_raw_get_resource_c_string(_), do: raise("NIF not loaded")
   def beaver_raw_read_opaque_ptr(_, _), do: raise("NIF not loaded")
+  def beaver_raw_own_opaque_ptr(_), do: raise("NIF not loaded")
   def beaver_raw_context_attach_diagnostic_handler(_), do: raise("NIF not loaded")
 
   # setup NIF loading

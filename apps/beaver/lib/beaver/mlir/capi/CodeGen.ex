@@ -115,9 +115,6 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
 
   def memref_kind_functions() do
     [
-      memref_create: 5,
-      memref_opaque_ptr: 1,
-      memref_dump: 1,
       make: 5,
       aligned: 1,
       allocated: 1

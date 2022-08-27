@@ -113,16 +113,31 @@ defmodule Manx do
   def tensor_of_null_memref(%T{shape: shape, type: _type} = tensor) do
     shape = Tuple.to_list(shape)
 
-    memref = Beaver.Native.Memory.new([], sizes: shape, type: Beaver.Native.F32)
+    memref = Beaver.Native.Memory.new(nil, sizes: shape, type: Beaver.Native.F32)
 
-    # TODO: delete the allocated ptr when this kind of tensor is deallocated by Nx
-    {memref} |> Manx.MemrefAllocator.add()
     put_in(tensor.data, %B{memref: memref})
   end
 
   def tensor_of_null_memref(tuple) when is_tuple(tuple) do
     for t <- tuple |> Tuple.to_list() do
       tensor_of_null_memref(t)
+    end
+    |> List.to_tuple()
+  end
+
+  # TODO: check if argument is returned by JIT function
+  @doc """
+  Add returned memref to the allocator.
+  """
+  def add_allocated_memref(%T{data: %B{memref: memref}} = tensor) do
+    memref = memref |> Beaver.Native.Memory.own_allocated()
+    {memref} |> Manx.MemrefAllocator.add()
+    put_in(tensor.data.memref, memref)
+  end
+
+  def add_allocated_memref(tuple) when is_tuple(tuple) do
+    for t <- Tuple.to_list(tuple) do
+      add_allocated_memref(t)
     end
     |> List.to_tuple()
   end

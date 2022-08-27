@@ -35,48 +35,54 @@ defmodule Beaver.Native.Memory do
     infer_dense_strides(shape, [])
   end
 
+  defp extract_mod_from_opts(opts) do
+    mod = Keyword.fetch!(opts, :type)
+
+    case mod do
+      {:u, 8} ->
+        Beaver.Native.U8
+
+      {:u, 16} ->
+        Beaver.Native.U16
+
+      {:u, 32} ->
+        Beaver.Native.U32
+
+      {:u, 64} ->
+        Beaver.Native.U64
+
+      {:s, 8} ->
+        Beaver.Native.I8
+
+      {:s, 16} ->
+        Beaver.Native.I16
+
+      {:s, 32} ->
+        Beaver.Native.I32
+
+      {:s, 64} ->
+        Beaver.Native.I64
+
+      {:f, 32} ->
+        Beaver.Native.F32
+
+      {:c, 64} ->
+        Beaver.Native.Complex.F32
+
+      mod when is_atom(mod) ->
+        mod
+    end
+  end
+
   def new(data, opts \\ [offset: 0])
 
   def new(data, opts) when is_list(data) or is_binary(data) do
-    mod = Keyword.fetch!(opts, :type)
+    mod = extract_mod_from_opts(opts)
 
-    mod =
-      case mod do
-        {:u, 8} ->
-          Beaver.Native.U8
-
-        {:u, 16} ->
-          Beaver.Native.U16
-
-        {:u, 32} ->
-          Beaver.Native.U32
-
-        {:u, 64} ->
-          Beaver.Native.U64
-
-        {:s, 8} ->
-          Beaver.Native.I8
-
-        {:s, 16} ->
-          Beaver.Native.I16
-
-        {:s, 32} ->
-          Beaver.Native.I32
-
-        {:s, 64} ->
-          Beaver.Native.I64
-
-        {:f, 32} ->
-          Beaver.Native.F32
-
-        {:c, 64} ->
-          Beaver.Native.Complex.F32
-
-        mod when is_atom(mod) ->
-          mod
+    array =
+      if data do
+        mod.array(data, mut: true)
       end
-
-    array = mod.array(data, mut: true)
 
     new(array, opts)
   end
@@ -105,6 +111,31 @@ defmodule Beaver.Native.Memory do
     }
   end
 
+  def new(nil = storage, opts) do
+    offset = Keyword.get(opts, :offset, 0)
+    sizes = Keyword.fetch!(opts, :sizes)
+    mod = extract_mod_from_opts(opts)
+
+    strides =
+      Keyword.get(
+        opts,
+        :strides,
+        dense_strides(sizes)
+      )
+
+    %__MODULE__{
+      storage: storage,
+      descriptor:
+        __MODULE__.Descriptor.make(shape_to_descriptor_kind(mod, sizes), [
+          nil,
+          nil,
+          offset,
+          sizes,
+          strides
+        ])
+    }
+  end
+
   @doc """
   return a opaque pointer to the memory
   """
@@ -124,32 +155,55 @@ defmodule Beaver.Native.Memory do
     end
   end
 
+  def allocated(%__MODULE__{
+        descriptor: %__MODULE__.Descriptor{ref: descriptor_ref, kind: descriptor_kind},
+        storage: storage
+      }) do
+    ptr =
+      struct!(Beaver.Native.OpaquePtr,
+        ref: Beaver.Native.forward(descriptor_kind, :allocated, [descriptor_ref])
+      )
+
+    if storage do
+      ptr |> Beaver.Native.bag(storage)
+    else
+      ptr
+    end
+  end
+
   @doc """
   return a opaque pointer to the memory descriptor. Usually used in the invoking of a generated function.
   If it is a array, will return the pointer of the array to mimic a struct of packed memory descriptors
   """
   def descriptor_ptr(%__MODULE__{
-        descriptor: %__MODULE__.Descriptor{ref: descriptor_ref},
-        storage: %{element_kind: element_kind} = array
+        descriptor: %__MODULE__.Descriptor{ref: descriptor_ref, kind: descriptor_kind},
+        storage: storage
       }) do
     struct!(Beaver.Native.OpaquePtr,
-      ref: Beaver.Native.forward(element_kind, "memref_opaque_ptr", [descriptor_ref])
+      ref: Beaver.Native.forward(descriptor_kind, :opaque_ptr, [descriptor_ref])
     )
-    |> Beaver.Native.bag(array)
+    |> Beaver.Native.bag(storage)
   end
 
+  # if this is an array, this should be packed memory descriptors for tuple
   def descriptor_ptr(%Beaver.Native.Array{ref: ref, element_kind: element_kind} = array) do
     ref = Beaver.Native.forward(element_kind, :ptr_to_opaque, [ref])
     struct!(Beaver.Native.OpaquePtr, ref: ref) |> Beaver.Native.bag(array)
   end
 
-  def descriptor_dump(
+  @doc """
+  take ownership of the memory the descriptor points to
+  """
+  def own_allocated(
         %__MODULE__{
-          descriptor: %__MODULE__.Descriptor{ref: descriptor_ref},
-          storage: %{element_kind: element_kind}
+          storage: nil
         } = m
       ) do
-    :ok = Beaver.Native.forward(element_kind, "memref_dump", [descriptor_ref])
-    m
+    owner =
+      m
+      |> allocated
+      |> Beaver.Native.PtrOwner.new()
+
+    %{m | storage: owner}
   end
 end
