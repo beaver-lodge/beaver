@@ -134,7 +134,7 @@ pub fn ResourceKind(comptime ElementType: type, module_name: anytype) type {
             tuple_slice[1] = beam.make(Internal.USize.T, env, @sizeOf(ElementType)) catch return beam.make_error_binary(env, "fail to create resource for size of object");
             return beam.make_tuple(env, tuple_slice);
         }
-        const maker = if (@typeInfo(ElementType) == .Struct and @hasDecl(ElementType, "make"))
+        const maker = if (@typeInfo(ElementType) == .Struct and @hasDecl(ElementType, "maker"))
             ElementType.maker
         else .{ make, 1 };
         const ptr_maker = if (@typeInfo(ElementType) == .Struct and @hasDecl(ElementType, "ptr"))
