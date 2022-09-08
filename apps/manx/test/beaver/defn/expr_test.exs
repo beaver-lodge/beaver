@@ -1052,4 +1052,100 @@ defmodule Manx.ExprTest do
       )
     end
   end
+
+  describe "dot product" do
+    defn dot(a, b), do: Nx.dot(a, b)
+
+    test "computes the dot product of scalars" do
+      assert_equal(dot(Nx.tensor(2), Nx.tensor(2)), Nx.tensor(4))
+      assert_equal(dot(Nx.tensor(2.0), Nx.tensor(2.0)), Nx.tensor(4.0))
+      assert_equal(dot(Nx.tensor(-2.0), Nx.tensor(-2)), Nx.tensor(4.0))
+    end
+
+    test "computes the dot product of vectors" do
+      assert_equal(
+        dot(Nx.tensor([1, 2, 3], type: {:s, 32}), Nx.tensor([4, 5, 6], type: {:s, 32})),
+        Nx.tensor(32, type: {:s, 32})
+      )
+
+      assert_equal(
+        dot(Nx.tensor([1.0, 2.0, 3.0], type: {:f, 32}), Nx.tensor([4, 5, 6])),
+        Nx.tensor(32.0)
+      )
+
+      assert_equal(dot(Nx.tensor([1.0, 2.0, 3.0]), Nx.tensor([4.0, 5.0, 6.0])), Nx.tensor(32.0))
+    end
+
+    test "computes the dot product of matrices" do
+      assert_equal(
+        dot(
+          Nx.tensor([[1, 2, 3], [4, 5, 6]], type: {:s, 32}),
+          Nx.tensor([[7, 8], [9, 10], [11, 12]], type: {:s, 32})
+        ),
+        Nx.tensor([[58, 64], [139, 154]], type: {:s, 32})
+      )
+
+      assert_equal(
+        dot(
+          Nx.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]),
+          Nx.tensor([[7.0, 8.0], [9.0, 10.0], [11.0, 12.0]])
+        ),
+        Nx.tensor([[58.0, 64.0], [139.0, 154.0]])
+      )
+
+      assert_equal(
+        dot(
+          Nx.tensor([[1.0, 2.0, 3.0], [4.0, 5.0, 6.0]]),
+          Nx.tensor([[7, 8], [9, 10], [11, 12]])
+        ),
+        Nx.tensor([[58.0, 64.0], [139.0, 154.0]])
+      )
+    end
+
+    test "computes the dot product of tensors" do
+      assert_equal(
+        dot(
+          Nx.tensor(
+            [[[1, 2, 3], [4, 5, 6], [7, 8, 9]], [[1, 2, 3], [4, 5, 6], [7, 8, 9]]],
+            type: {:s, 32},
+            names: [:a, :b, :c]
+          ),
+          Nx.tensor(
+            [[[1, 2, 3], [3, 4, 5], [5, 6, 7]]],
+            type: {:s, 32},
+            names: [:e, :f, :g]
+          )
+        ),
+        Nx.tensor(
+          [
+            [[[22, 28, 34]], [[49, 64, 79]], [[76, 100, 124]]],
+            [[[22, 28, 34]], [[49, 64, 79]], [[76, 100, 124]]]
+          ],
+          type: {:s, 32}
+        )
+      )
+    end
+
+    defn batched_dot(t1, t2), do: Nx.dot(t1, [1], [0], t2, [1], [0])
+
+    test "computes a batched dot product" do
+      assert_equal(
+        batched_dot(Nx.iota({3, 2, 3}, type: {:f, 32}), Nx.iota({3, 2, 2}, type: {:f, 32})),
+        Nx.tensor([
+          [[6.0, 9.0], [8.0, 13.0], [10.0, 17.0]],
+          [[78.0, 93.0], [88.0, 105.0], [98.0, 117.0]],
+          [[246.0, 273.0], [264.0, 293.0], [282.0, 313.0]]
+        ])
+      )
+    end
+
+    defn general_dot(t1, t2), do: Nx.dot(t1, [0, 1], [], t2, [1, 2], [])
+
+    test "computes a general dot product" do
+      assert_equal(
+        general_dot(Nx.iota({4, 5, 2}, type: {:f, 32}), Nx.iota({2, 4, 5}, type: {:f, 32})),
+        Nx.tensor([[4940.0, 12540.0], [5130.0, 13130.0]])
+      )
+    end
+  end
 end
