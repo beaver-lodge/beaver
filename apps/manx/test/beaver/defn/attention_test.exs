@@ -3,6 +3,7 @@ defmodule Manx.AttentionTest do
   import Nx.Defn
 
   @moduletag :nx
+  @moduletag :attention
   setup do
     Nx.Defn.default_options(compiler: Manx.Compiler)
     :ok
@@ -10,9 +11,9 @@ defmodule Manx.AttentionTest do
 
   # original implementation from: https://github.com/sooftware/attentions/blob/master/attentions.py
   describe "attention" do
-    defn softmax(t), do: Nx.exp(t) / Nx.sum(Nx.exp(t), axes: [-1], keep_axes: true)
+    defn(softmax(t), do: Nx.exp(t) / Nx.sum(Nx.exp(t), axes: [-1], keep_axes: true))
 
-    defn batched_dot(t1, t2), do: Nx.dot(t1, [1], [0], t2, [1], [0])
+    defn(batched_dot(t1, t2), do: Nx.dot(t1, [1], [0], t2, [1], [0]))
 
     @doc """
     dim is the dimension of each head
