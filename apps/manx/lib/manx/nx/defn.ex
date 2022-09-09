@@ -743,7 +743,6 @@ defmodule Manx.Defn do
       )
       when tuple_size(a_shape) == 3 or tuple_size(b_shape) == 3 do
     mlir block: block do
-      dbg(t)
       a_value = gen_op(env, a)
       b_value = gen_op(env, b)
 
