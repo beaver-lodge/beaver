@@ -3,6 +3,7 @@ defmodule Beaver.DSL.Pattern do
   import MLIR.Sigils
   import Beaver
   require Beaver.MLIR
+  require Beaver.MLIR.CAPI
 
   @doc """
   generate PDL ops for types and attributes

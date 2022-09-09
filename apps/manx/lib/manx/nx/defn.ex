@@ -318,15 +318,23 @@ defmodule Manx.Defn do
         %Env{block: block} = env,
         %Nx.Tensor{
           data: %Nx.Defn.Expr{
-            op: :all,
+            op: op,
             args: [%{shape: in_shape} = input1, [axes: axes, keep_axes: keep_axes]]
           }
         } = t
       )
-      when is_list(axes) do
+      when is_list(axes) and op in [:all, :sum] do
     mlir block: block do
       input1 = gen_op(env, input1)
-      input1 = TOSA.cast(input1) >>> gen_type(%{t | shape: in_shape, type: {:u, 1}})
+
+      input1 =
+        case op do
+          :all ->
+            TOSA.cast(input1) >>> gen_type(%{t | shape: in_shape, type: {:u, 1}})
+
+          :sum ->
+            input1
+        end
 
       {in_shape, mlir_value} =
         Enum.reduce(
@@ -336,8 +344,15 @@ defmodule Manx.Defn do
             out_shape = List.replace_at(in_shape, axis, 1)
 
             reduced =
-              TOSA.reduce_all(mlir_value, axis: Attribute.integer(Type.i64(), axis)) >>>
-                gen_type(%{t | shape: List.to_tuple(out_shape), type: {:u, 1}})
+              case op do
+                :all ->
+                  TOSA.reduce_all(mlir_value, axis: Attribute.integer(Type.i64(), axis)) >>>
+                    gen_type(%{t | shape: List.to_tuple(out_shape), type: {:u, 1}})
+
+                :sum ->
+                  TOSA.reduce_sum(mlir_value, axis: Attribute.integer(Type.i64(), axis)) >>>
+                    gen_type(%{t | shape: List.to_tuple(out_shape)})
+              end
 
             {out_shape, reduced}
           end
@@ -358,11 +373,12 @@ defmodule Manx.Defn do
         %Nx.Tensor{
           data:
             %Nx.Defn.Expr{
-              op: :all,
+              op: op,
               args: [%{shape: in_shape} = input1, [axes: nil, keep_axes: keep_axes]]
             } = expr
         } = t
-      ) do
+      )
+      when op in [:sum, :all] do
     # if axes is nil, replace it with a list of every axis
     mlir block: block do
       rank = tuple_size(in_shape)
@@ -708,75 +724,34 @@ defmodule Manx.Defn do
     end
   end
 
+  # standard batch matmul
   def gen_op(
         %Env{block: block} = env,
         %Nx.Tensor{
           data: %Nx.Defn.Expr{
             op: :dot,
-            args:
-              [
-                %Nx.Tensor{shape: a_shape} = a,
-                _contract_axes1,
-                [],
-                %Nx.Tensor{shape: b_shape} = b,
-                _contract_axes2,
-                []
-              ] = args
+            args: [
+              %Nx.Tensor{shape: a_shape} = a,
+              [1],
+              [],
+              %Nx.Tensor{shape: b_shape} = b,
+              [2],
+              []
+            ]
           }
         } = t
       )
-      when tuple_size(a_shape) in [2, 3] or tuple_size(b_shape) in [2, 3] do
-    dbg(t)
-
+      when tuple_size(a_shape) == 3 or tuple_size(b_shape) == 3 do
     mlir block: block do
+      dbg(t)
       a_value = gen_op(env, a)
       b_value = gen_op(env, b)
 
-      {batched_a, batched_b} = Manx.Nx.Batcher.from_args(args, a_value, b_value)
-
-      output_type = Manx.Nx.Batcher.gen_output_type(batched_a, batched_b, t)
-
-      out_tensor =
-        Linalg.init_tensor(
-          static_sizes:
-            Manx.Nx.Batcher.gen_output_static_sizes(batched_a, batched_b, t)
-            |> Enum.map(&MLIR.Attribute.integer(Type.i64(), &1))
-            |> Attribute.array()
-        ) >>> output_type
-
-      Linalg.generic [
-        a_value,
-        b_value,
-        out_tensor,
-        operand_segment_sizes: ODS.operand_segment_sizes([2, 1]),
-        indexing_maps: Manx.Nx.Batcher.gen_indexing_maps(batched_a, batched_b, t),
-        iterator_types: Manx.Nx.Batcher.gen_iterator_types(batched_a, batched_b)
-      ] do
-        region do
-          block bb0(
-                  left >>> gen_type(a.type),
-                  right >>> gen_type(b.type),
-                  sum >>> gen_type(t.type)
-                ) do
-            sum =
-              case a.type do
-                {:f, _} ->
-                  mul = Arith.mulf(left, right) >>> gen_type(b.type)
-                  Arith.addf(sum, mul) >>> gen_type(t.type)
-
-                _ ->
-                  mul = Arith.muli(left, right) >>> gen_type(b.type)
-                  Arith.addi(sum, mul) >>> gen_type(t.type)
-              end
-
-            Linalg.yield(sum) >>> []
-          end
-        end
-      end >>> output_type
+      TOSA.matmul(a_value, b_value) >>> gen_type(t)
     end
   end
 
-  # batch matmul
+  # generic dot product
   def gen_op(
         %Env{block: block} = env,
         %Nx.Tensor{
@@ -798,13 +773,71 @@ defmodule Manx.Defn do
     mlir block: block do
       a_value = gen_op(env, a)
       b_value = gen_op(env, b)
+      a_value = TOSA.cast(a_value) >>> gen_type(%{a | type: t.type})
+      b_value = TOSA.cast(b_value) >>> gen_type(%{b | type: t.type})
+      {batched_a, batched_b} = Manx.Nx.Batcher.from_args(args)
 
-      {batched_a, batched_b} = Manx.Nx.Batcher.from_args(args, a_value, b_value)
+      output_type = gen_type(t)
 
-      a_value = Manx.Nx.Batcher.gen_batched_transpose(env, batched_a)
-      b_value = Manx.Nx.Batcher.gen_batched_transpose(env, batched_b)
-      c_value = TOSA.matmul(a_value, b_value) >>> Manx.Nx.Batcher.get_batch_type(t)
-      Manx.Nx.Batcher.gen_batched_collapse(env, c_value, t)
+      out_tensor =
+        Linalg.init_tensor(
+          static_sizes:
+            Tuple.to_list(t.shape)
+            |> Enum.map(&MLIR.Attribute.integer(Type.i64(), &1))
+            |> Attribute.array()
+        ) >>> output_type
+
+      zero =
+        case t.type do
+          {:f, _} ->
+            Arith.constant(value: Attribute.float(gen_type(t.type), 0.0)) >>> gen_type(t.type)
+
+          _ ->
+            Arith.constant(value: Attribute.integer(gen_type(t.type), 0)) >>> gen_type(t.type)
+        end
+
+      out_tensor =
+        Linalg.fill [zero, out_tensor, operand_segment_sizes: ODS.operand_segment_sizes([1, 1])] do
+          region do
+            block bb0(
+                    arg >>> gen_type(t.type),
+                    res >>> gen_type(t.type)
+                  ) do
+              %MLIR.Value{} = res
+              Linalg.yield(arg) >>> []
+            end
+          end
+        end >>> output_type
+
+      Linalg.generic [
+        a_value,
+        b_value,
+        out_tensor,
+        operand_segment_sizes: ODS.operand_segment_sizes([2, 1]),
+        indexing_maps: Manx.Nx.Batcher.gen_indexing_maps(batched_a, batched_b, t),
+        iterator_types: Manx.Nx.Batcher.gen_iterator_types(batched_a, batched_b, t)
+      ] do
+        region do
+          block bb0(
+                  left >>> gen_type(t.type),
+                  right >>> gen_type(t.type),
+                  sum >>> gen_type(t.type)
+                ) do
+            sum =
+              case t.type do
+                {:f, _} ->
+                  mul = Arith.mulf(left, right) >>> gen_type(t.type)
+                  Arith.addf(sum, mul) >>> gen_type(t.type)
+
+                _ ->
+                  mul = Arith.muli(left, right) >>> gen_type(t.type)
+                  Arith.addi(sum, mul) >>> gen_type(t.type)
+              end
+
+            Linalg.yield(sum) >>> []
+          end
+        end
+      end >>> output_type
     end
   end
 
