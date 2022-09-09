@@ -56,6 +56,11 @@ MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetDescription(MlirPass pass) {
   return wrap(unwrap(pass)->getDescription());
 }
 
+MLIR_CAPI_EXPORTED MlirContext
+beaverPassManagerGetContext(MlirPassManager passManager) {
+  return wrap(unwrap(passManager)->getContext());
+}
+
 MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
                                                  MlirContext context) {
   auto name = OperationName(unwrap(op_name), unwrap(context));

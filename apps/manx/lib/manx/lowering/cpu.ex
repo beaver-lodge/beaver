@@ -21,10 +21,10 @@ defmodule Manx.Lowering.CPU do
     |> tosa_to_tensor()
     |> convert_tensor_to_linalg()
     |> MLIR.Pass.Composer.nested("func.func", [
+      tosa_to_linalg_named(),
       tosa_to_linalg(),
-      linalg_fuse_elementwise_ops()
-    ])
-    |> MLIR.Pass.Composer.nested("func.func", [
+      linalg_fuse_elementwise_ops(),
+      linalg_init_tensor_to_alloc_tensor(),
       linalg_bufferize(),
       convert_linalg_to_loops(),
       lower_affine(),

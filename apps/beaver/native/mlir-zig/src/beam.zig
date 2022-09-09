@@ -1557,7 +1557,12 @@ pub fn get_resource_array_from_list(comptime ElementType: type, environment: env
 
     while (idx < size) {
         head = try get_head_and_iter(environment, &movable_list);
-        data_ptr[idx] = try fetch_resource(ElementType, environment, resource_type_element, head);
+        if (fetch_resource(ElementType, environment, resource_type_element, head)) |value| {
+            data_ptr[idx] = value;
+        } else |err| {
+            print("[Beaver] fail to get element #{} in list, expect resource of type: {s}\n", .{ idx, @typeName(ElementType) });
+            return err;
+        }
         idx += 1;
     }
     return e.enif_make_resource(environment, ptr);

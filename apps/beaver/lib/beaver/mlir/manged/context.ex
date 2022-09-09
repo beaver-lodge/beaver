@@ -9,11 +9,7 @@ defmodule Beaver.MLIR.Global.Context do
       fn ->
         require Beaver.MLIR.Context
         ctx = MLIR.Context.create(allow_unregistered: true)
-
-        MLIR.Context.allow_multi_thread ctx do
-          MLIR.CAPI.mlirRegisterAllPasses()
-        end
-
+        MLIR.CAPI.mlirRegisterAllPasses()
         Logger.debug("[Beaver] global MLIR context created")
         ctx
       end,
