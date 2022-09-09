@@ -5,7 +5,7 @@ defmodule Manx.Defn do
   import Beaver, only: :macros
   require Beaver.MLIR
   alias MLIR.{Type, Attribute}
-  alias MLIR.Dialect.{TOSA, Linalg}
+  alias MLIR.Dialect.{TOSA, Linalg, Arith}
 
   defdelegate gen_type(tensor), to: Manx.Type
 
@@ -734,21 +734,23 @@ defmodule Manx.Defn do
 
       {batched_a, batched_b} = Manx.Nx.Batcher.from_args(args, a_value, b_value)
 
-      static_sizes =
-        t.shape
-        |> Tuple.to_list()
-        |> Enum.map(&MLIR.Attribute.integer(Type.i64(), &1))
-        |> Attribute.array()
+      output_type = Manx.Nx.Batcher.gen_output_type(batched_a, batched_b, t)
 
-      out_tensor = Linalg.init_tensor(static_sizes: static_sizes) >>> gen_type(t)
+      out_tensor =
+        Linalg.init_tensor(
+          static_sizes:
+            Manx.Nx.Batcher.gen_output_static_sizes(batched_a, batched_b, t)
+            |> Enum.map(&MLIR.Attribute.integer(Type.i64(), &1))
+            |> Attribute.array()
+        ) >>> output_type
 
       Linalg.generic [
         a_value,
         b_value,
         out_tensor,
         operand_segment_sizes: ODS.operand_segment_sizes([2, 1]),
-        indexing_maps: Manx.Nx.Batcher.gen_indexing_maps(batched_a, batched_b)
-        # iterator_types: Manx.Nx.Batcher.gen_iterator_types(batched_a, batched_b)
+        indexing_maps: Manx.Nx.Batcher.gen_indexing_maps(batched_a, batched_b, t),
+        iterator_types: Manx.Nx.Batcher.gen_iterator_types(batched_a, batched_b)
       ] do
         region do
           block bb0(
@@ -756,12 +758,21 @@ defmodule Manx.Defn do
                   right >>> gen_type(b.type),
                   sum >>> gen_type(t.type)
                 ) do
-            mul = Arith.mulf(left, right) >>> gen_type(b.type)
-            sum = Arith.addf(sum, mul) >>> gen_type(t.type)
+            sum =
+              case a.type do
+                {:f, _} ->
+                  mul = Arith.mulf(left, right) >>> gen_type(b.type)
+                  Arith.addf(sum, mul) >>> gen_type(t.type)
+
+                _ ->
+                  mul = Arith.muli(left, right) >>> gen_type(b.type)
+                  Arith.addi(sum, mul) >>> gen_type(t.type)
+              end
+
             Linalg.yield(sum) >>> []
           end
         end
-      end >>> gen_type(t)
+      end >>> output_type
     end
   end
 
