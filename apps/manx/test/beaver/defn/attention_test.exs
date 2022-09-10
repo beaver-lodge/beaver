@@ -13,7 +13,7 @@ defmodule Manx.AttentionTest do
   describe "attention" do
     defn(softmax(t), do: Nx.exp(t) / Nx.sum(Nx.exp(t), axes: [-1], keep_axes: true))
 
-    defn(batched_dot(t1, t2), do: Nx.dot(t1, [1], [0], t2, [1], [0]))
+    defn(batched_dot(t1, t2), do: Nx.dot(t1, [2], [0], t2, [1], [0]))
 
     @doc """
     dim is the dimension of each head
@@ -21,7 +21,7 @@ defmodule Manx.AttentionTest do
     defn scaled_dot_product_attention(dim, query, key, value) do
       score = Nx.dot(query, [2], [0], key, [2], [0]) / Nx.sqrt(dim)
       attn = softmax(score)
-      batched_dot(attn, value)
+      Nx.dot(attn, [2], [0], value, [1], [0])
     end
 
     test "dot product attention" do
@@ -29,7 +29,11 @@ defmodule Manx.AttentionTest do
       query = Nx.iota({4, 3, 2}, type: {:f, 32}) |> Nx.divide(10.0)
       key = Nx.iota({4, 3, 2}, type: {:f, 32}) |> Nx.divide(10.0)
       value = Nx.iota({4, 3, 2}, type: {:f, 32}) |> Nx.divide(10.0)
+
+      Nx.iota({4, 3, 2}, type: {:f, 32}) |> dbg
+
       scaled_dot_product_attention(1, query, key, value)
+      |> dbg
     end
   end
 end
