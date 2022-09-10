@@ -21,7 +21,7 @@ defmodule Beaver.Application do
         end
       end)
     end
-    |> Task.await_many()
+    |> Task.await_many(10_000)
 
     Logger.debug("[Beaver] dialect modules loaded")
     :ok
