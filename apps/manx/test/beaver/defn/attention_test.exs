@@ -1,6 +1,7 @@
 defmodule Manx.AttentionTest do
   use ExUnit.Case, async: true
   import Nx.Defn
+  import Manx.Assert
 
   @moduletag :nx
   @moduletag :attention
@@ -30,10 +31,15 @@ defmodule Manx.AttentionTest do
       key = Nx.iota({4, 3, 2}, type: {:f, 32}) |> Nx.divide(10.0)
       value = Nx.iota({4, 3, 2}, type: {:f, 32}) |> Nx.divide(10.0)
 
-      Nx.iota({4, 3, 2}, type: {:f, 32}) |> dbg
-
-      scaled_dot_product_attention(1, query, key, value)
-      |> dbg
+      assert_all_close(
+        scaled_dot_product_attention(12, query, key, value),
+        Nx.tensor([
+          [[0.2008, 0.3008], [0.2038, 0.3038], [0.2069, 0.3069]],
+          [[0.8100, 0.9100], [0.8131, 0.9131], [0.8161, 0.9161]],
+          [[1.4192, 1.5192], [1.4222, 1.5222], [1.4253, 1.5253]],
+          [[2.0283, 2.1283], [2.0313, 2.1313], [2.0343, 2.1343]]
+        ])
+      )
     end
   end
 end
