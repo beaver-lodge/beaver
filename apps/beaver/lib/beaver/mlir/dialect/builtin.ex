@@ -15,7 +15,8 @@ defmodule Beaver.MLIR.Dialect.Builtin do
   """
   defmacro module(attrs \\ [], do: block) do
     quote do
-      location = Beaver.MLIR.Managed.Location.get()
+      ctx = Beaver.MLIR.__CONTEXT__()
+      location = Beaver.MLIR.Managed.Location.get(ctx: ctx)
       import Beaver.MLIR.Sigils
       module = Beaver.MLIR.CAPI.mlirModuleCreateEmpty(location)
 
