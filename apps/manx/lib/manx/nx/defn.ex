@@ -732,16 +732,16 @@ defmodule Manx.Defn do
             op: :dot,
             args: [
               %Nx.Tensor{shape: a_shape} = a,
-              [1],
-              [],
-              %Nx.Tensor{shape: b_shape} = b,
               [2],
-              []
+              [0],
+              %Nx.Tensor{shape: b_shape} = b,
+              [1],
+              [0]
             ]
           }
         } = t
       )
-      when tuple_size(a_shape) == 3 or tuple_size(b_shape) == 3 do
+      when tuple_size(a_shape) == 3 and tuple_size(b_shape) == 3 do
     mlir block: block do
       a_value = gen_op(env, a)
       b_value = gen_op(env, b)
