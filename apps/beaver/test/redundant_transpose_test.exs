@@ -2,7 +2,7 @@ defmodule RedundantTransposeTest do
   use ExUnit.Case
 
   alias Beaver.MLIR
-  alias Beaver.MLIR.{Type}
+  alias Beaver.MLIR.{Type, Attribute}
   alias Beaver.MLIR.Dialect.{Func, TOSA}
 
   test "pass to optimize redundant transpose" do
