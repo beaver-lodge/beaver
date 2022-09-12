@@ -4,6 +4,10 @@ defmodule MlirTest do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
+  setup do
+    [ctx: MLIR.Context.create()]
+  end
+
   @moduletag :smoke
   test "call wrapped apis" do
     ctx = MLIR.Context.create()
@@ -322,8 +326,8 @@ defmodule MlirTest do
     CAPI.mlirContextDestroy(ctx)
   end
 
-  test "affine expr and map" do
-    ctx = MLIR.Managed.Context.get()
+  test "affine expr and map", context do
+    ctx = context[:ctx]
     affineDimExpr = MLIR.CAPI.mlirAffineDimExprGet(ctx, 0)
     affineSymbolExpr = MLIR.CAPI.mlirAffineSymbolExprGet(ctx, 1)
     exprs = MLIR.CAPI.MlirAffineExpr.array([affineDimExpr, affineSymbolExpr], mut: true)
@@ -332,7 +336,7 @@ defmodule MlirTest do
     assert map |> MLIR.to_string() == txt
     assert MLIR.Attribute.affine_map(map) |> MLIR.to_string() == "affine_map<#{txt}>"
 
-    assert MLIR.AffineMap.create(3, 3, [MLIR.AffineMap.dim(0), MLIR.AffineMap.symbol(1)])
+    assert MLIR.AffineMap.create(3, 3, [MLIR.AffineMap.dim(0), MLIR.AffineMap.symbol(1)]).(ctx)
            |> MLIR.to_string() == txt
   end
 end

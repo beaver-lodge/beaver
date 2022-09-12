@@ -3,12 +3,18 @@ defmodule E2ETest do
   alias Beaver.MLIR
   @moduletag :smoke
 
-  test "run mlir module defined by sigil" do
+  setup do
+    [ctx: MLIR.Context.create()]
+  end
+
+  test "run mlir module defined by sigil", context do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}
 
     arg = Beaver.Native.I32.make(42)
     return = Beaver.Native.I32.make(-1)
+
+    ctx = context[:ctx]
 
     jit =
       ~m"""
@@ -18,7 +24,7 @@ defmodule E2ETest do
           return %res : i32
         }
       }
-      """
+      """.(ctx)
       |> canonicalize
       |> cse
       |> convert_func_to_llvm

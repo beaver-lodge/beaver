@@ -2,6 +2,10 @@ defmodule MemRefTest do
   use ExUnit.Case
   alias Beaver.MLIR
 
+  setup do
+    [ctx: MLIR.Context.create()]
+  end
+
   @moduletag :smoke
   test "creation" do
     assert %Beaver.Native.Memory{} =
@@ -15,9 +19,10 @@ defmodule MemRefTest do
     assert [6, 3, 1] = Beaver.Native.Memory.dense_strides([1, 2, 3])
   end
 
-  test "run mlir module defined by sigil" do
+  test "run mlir module defined by sigil", context do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}
+    ctx = context[:ctx]
 
     jit =
       ~m"""
@@ -32,7 +37,7 @@ defmodule MemRefTest do
           }
         return
       }
-      """
+      """.(ctx)
       |> MLIR.Operation.verify!()
       |> canonicalize
       |> cse

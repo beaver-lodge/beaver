@@ -14,7 +14,7 @@ defmodule Beaver.MLIR.Sigils do
       ...> \""" |> MLIR.Operation.verify!()
   """
   def sigil_m(string, []) do
-    MLIR.Module.create(string)
+    &MLIR.Module.create(&1, string)
   end
 
   @doc """

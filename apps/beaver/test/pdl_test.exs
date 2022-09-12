@@ -34,8 +34,13 @@ defmodule PDLTest do
     "test.op"() { test_attr } : () -> ()
   }
   """
-  test "AreEqualOp" do
-    ctx = MLIR.Context.create()
+
+  setup do
+    [ctx: MLIR.Context.create()]
+  end
+
+  test "AreEqualOp", context do
+    ctx = context[:ctx]
     CAPI.mlirContextSetAllowUnregisteredDialects(ctx, true)
     pattern_module = MLIR.Module.create(ctx, @apply_rewrite_op_patterns)
 

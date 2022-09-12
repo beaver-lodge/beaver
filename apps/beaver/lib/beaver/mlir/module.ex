@@ -2,13 +2,6 @@ defmodule Beaver.MLIR.Module do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  def create(str, opts \\ [])
-
-  def create(str, opts) when is_binary(str) and is_list(opts) do
-    ctx = MLIR.Managed.Context.from_opts(opts)
-    create(ctx, str)
-  end
-
   def create(context, str) when is_binary(str) do
     CAPI.mlirModuleCreateParse(context, MLIR.StringRef.create(str))
   end
