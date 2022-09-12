@@ -121,7 +121,7 @@ defmodule Manx.Defn do
     end
   end
 
-  def gen_op(%Env{block: block, ctx: ctx}, %Nx.Tensor{
+  def gen_op(%Env{block: block}, %Nx.Tensor{
         data: %Nx.Defn.Expr{op: :parameter, args: [pos]}
       })
       when is_integer(pos) do
@@ -514,14 +514,6 @@ defmodule Manx.Defn do
         end
       end >>> gen_type(t)
     end
-  end
-
-  def gen_op(
-        %Env{block: block, ctx: ctx} = env,
-        %Nx.Tensor{type: type, data: %Nx.Defn.Expr{op: fft, args: [input, args]}} = t
-      )
-      when fft in [:fft, :ifft] do
-    raise "todo"
   end
 
   # unary linalg
