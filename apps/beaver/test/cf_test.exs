@@ -139,7 +139,6 @@ defmodule CfTest do
       # we only work with float 32 for now
       add =
         mlir block: block, ctx: ctx do
-          dbg(ctx)
           Arith.mulf(left, right) >>> Type.f32()
         end
 
