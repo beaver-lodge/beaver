@@ -60,7 +60,6 @@ defmodule AttributeTest do
 
     test "generate", context do
       ctx = context[:ctx]
-      opts = [ctx: ctx]
       assert Attribute.equal?(Attribute.type(Type.f32()).(ctx), Attribute.type(Type.f32()).(ctx))
 
       assert Attribute.integer(Type.i(32), 1) |> Beaver.Deferred.create(ctx) |> MLIR.to_string() ==
@@ -123,7 +122,6 @@ defmodule AttributeTest do
 
     test "iterator_types", context do
       ctx = context[:ctx]
-      opts = [ctx: ctx]
       parallel = Attribute.string("parallel")
       parallel2 = Attribute.array([parallel, parallel])
 
