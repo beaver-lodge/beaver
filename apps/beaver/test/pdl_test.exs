@@ -5,6 +5,11 @@ defmodule PDLTest do
   alias Beaver.MLIR.CAPI
   import Beaver.MLIR.Transforms
 
+  @moduletag :pdl
+  setup do
+    [ctx: MLIR.Context.create(allow_unregistered: true)]
+  end
+
   @apply_rewrite_op_patterns """
   module @patterns {
     pdl_interp.func @matcher(%root : !pdl.operation) {
@@ -34,10 +39,6 @@ defmodule PDLTest do
     "test.op"() { test_attr } : () -> ()
   }
   """
-
-  setup do
-    [ctx: MLIR.Context.create()]
-  end
 
   test "AreEqualOp", context do
     ctx = context[:ctx]
@@ -174,7 +175,7 @@ defmodule PDLTest do
     CAPI.mlirContextDestroy(ctx)
   end
 
-  test "load from string" do
+  test "load from string", context do
     %MLIR.CAPI.MlirPDLPatternModule{} =
       """
       module @erase {
@@ -186,13 +187,13 @@ defmodule PDLTest do
         }
       }
       """
-      |> MLIR.Pattern.from_string()
+      |> MLIR.Pattern.from_string(ctx: context[:ctx])
   end
 
-  test "replace tosa" do
+  test "replace tosa", context do
     defmodule TestTOSAPatterns do
-      def gen_ir_module() do
-        mlir do
+      def gen_ir_module(ctx) do
+        mlir ctx: ctx do
           module do
             Func.func test_multi_broadcast(
                         function_type:
@@ -318,6 +319,8 @@ defmodule PDLTest do
       end
     end
 
+    ctx = context[:ctx]
+
     for pattern <- [
           TestTOSAPatterns.replace_add_op(),
           TestTOSAPatterns.replace_multi_add_op(),
@@ -325,7 +328,7 @@ defmodule PDLTest do
           TestTOSAPatterns.replace_multi_add_op2(),
           TestTOSAPatterns.replace_multi_add_op3()
         ] do
-      ir_module = TestTOSAPatterns.gen_ir_module()
+      ir_module = TestTOSAPatterns.gen_ir_module(ctx)
       MLIR.Operation.verify!(ir_module)
       ir_string = MLIR.to_string(ir_module)
       assert not String.contains?(ir_string, "tosa.sub"), ir_string
@@ -343,8 +346,10 @@ defmodule PDLTest do
     end
   end
 
-  test "toy compiler with pass" do
+  test "toy compiler with pass", context do
     alias Beaver.MLIR.Dialect.Func
+
+    ctx = context[:ctx]
 
     defmodule ToyPass do
       use Beaver.MLIR.Pass, on: Func.Func
@@ -371,7 +376,7 @@ defmodule PDLTest do
           return %0 : tensor<2x3xf32>
         }
       }
-      """
+      """.(ctx)
       |> MLIR.Pass.Composer.nested(Func.Func, [
         ToyPass.create()
       ])
