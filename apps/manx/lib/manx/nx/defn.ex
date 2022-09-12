@@ -225,7 +225,7 @@ defmodule Manx.Defn do
     mlir block: block, ctx: ctx do
       tensor_attr =
         MLIR.CAPI.mlirDenseElementsAttrRawBufferGet(
-          gen_type(t),
+          gen_type(t) |> Beaver.Deferred.create(ctx),
           byte_size(binary),
           Beaver.Native.c_string(binary) |> Beaver.Native.Array.as_opaque()
         )

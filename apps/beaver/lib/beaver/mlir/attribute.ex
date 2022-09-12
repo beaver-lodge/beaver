@@ -32,10 +32,18 @@ defmodule Beaver.MLIR.Attribute do
     )
   end
 
-  def dense_elements(elements, shaped_type) when is_list(elements) do
-    num_elements = length(elements)
-    elements = elements |> CAPI.MlirAttribute.array()
-    CAPI.mlirDenseElementsAttrGet(shaped_type, num_elements, elements)
+  def dense_elements(elements, shaped_type, opts \\ []) when is_list(elements) do
+    Beaver.Deferred.from_opts(
+      opts,
+      fn ctx ->
+        num_elements = length(elements)
+
+        elements =
+          elements |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> CAPI.MlirAttribute.array()
+
+        CAPI.mlirDenseElementsAttrGet(shaped_type, num_elements, elements)
+      end
+    )
   end
 
   def array(elements, opts \\ []) when is_list(elements) do
@@ -65,6 +73,14 @@ defmodule Beaver.MLIR.Attribute do
     )
   end
 
+  def type(t)
+      when is_function(t, 1) do
+    Quark.Compose.compose(
+      &type/1,
+      t
+    )
+  end
+
   def type(%CAPI.MlirType{} = t) do
     CAPI.mlirTypeAttrGet(t)
   end
@@ -80,15 +96,18 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   def bool(value, opts \\ []) do
-    ctx = MLIR.Managed.Context.from_opts(opts)
+    Beaver.Deferred.from_opts(
+      opts,
+      fn ctx ->
+        value =
+          case value do
+            true -> 1
+            false -> 0
+          end
 
-    value =
-      case value do
-        true -> 1
-        false -> 0
+        CAPI.mlirBoolAttrGet(ctx, value)
       end
-
-    CAPI.mlirBoolAttrGet(ctx, value)
+    )
   end
 
   def affine_map(map) when is_function(map, 1) do
@@ -100,13 +119,18 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   def unit(opts \\ []) do
-    ctx = MLIR.Managed.Context.from_opts(opts)
-    CAPI.mlirUnitAttrGet(ctx)
+    Beaver.Deferred.from_opts(
+      opts,
+      &CAPI.mlirUnitAttrGet(&1)
+    )
   end
 
   def flat_symbol_ref(symbol, opts \\ []) do
-    ctx = MLIR.Managed.Context.from_opts(opts)
     symbol = MLIR.StringRef.create(symbol)
-    CAPI.mlirFlatSymbolRefAttrGet(ctx, symbol)
+
+    Beaver.Deferred.from_opts(
+      opts,
+      &CAPI.mlirFlatSymbolRefAttrGet(&1, symbol)
+    )
   end
 end

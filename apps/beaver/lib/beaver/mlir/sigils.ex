@@ -11,7 +11,7 @@ defmodule Beaver.MLIR.Sigils do
       ...>     return %res : i32
       ...>   }
       ...> }
-      ...> \""" |> MLIR.Operation.verify!()
+      ...> \""".(MLIR.Global.Context.get) |> MLIR.Operation.verify!()
   """
   def sigil_m(string, []) do
     &MLIR.Module.create(&1, string)
@@ -22,9 +22,9 @@ defmodule Beaver.MLIR.Sigils do
   You might add a modifier to it as a shortcut to annotate the type
   ## Examples
 
-      iex> Attribute.equal?(Attribute.float(Type.f(32), 0.0), ~a{0.0}f32)
+      iex> Attribute.equal?(Attribute.float(Type.f(32), 0.0).(MLIR.Global.Context.get), ~a{0.0}f32.(MLIR.Global.Context.get))
       true
-      iex> ~a{1 : i32} |> MLIR.to_string()
+      iex> ~a{1 : i32}.(MLIR.Global.Context.get) |> MLIR.to_string()
       "1 : i32"
   """
   def sigil_a(string, []), do: MLIR.Attribute.get(string)
@@ -39,9 +39,9 @@ defmodule Beaver.MLIR.Sigils do
   You might add a modifier to it as a shortcut to make it a higher order type.
   ## Examples
 
-      iex> Type.equal?(Type.unranked_tensor(Type.f32()), ~t{tensor<*xf32>})
+      iex> Type.equal?(Type.unranked_tensor(Type.f32()).(MLIR.Global.Context.get), ~t{tensor<*xf32>}.(MLIR.Global.Context.get))
       true
-      iex> Type.equal?(Type.complex(Type.f32()), ~t<f32>complex)
+      iex> Type.equal?(Type.complex(Type.f32()).(MLIR.Global.Context.get), ~t<f32>complex.(MLIR.Global.Context.get))
       true
   """
 

@@ -23,6 +23,8 @@ defmodule Beaver.MLIR.Dialect.Builtin do
       for {name, attr} <- unquote(attrs) do
         name = name |> Beaver.MLIR.StringRef.create()
 
+        attr = Beaver.Deferred.create(attr, ctx)
+
         module
         |> Beaver.MLIR.CAPI.mlirModuleGetOperation()
         |> Beaver.MLIR.CAPI.mlirOperationSetAttributeByName(name, attr)
