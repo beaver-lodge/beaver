@@ -2,11 +2,15 @@ defmodule TosaTest do
   use ExUnit.Case, async: true
   use Beaver
 
-  test "generate and run tosa" do
+  setup do
+    [ctx: MLIR.Context.create()]
+  end
+
+  test "generate and run tosa", context do
     import MLIR.{Transforms, Conversion}
 
     ir =
-      mlir do
+      mlir ctx: context[:ctx] do
         module do
           Func.func test_multi_broadcast(
                       function_type: ~a"(tensor<1x3xf32>, tensor<2x1xf32>) -> tensor<2x3xf32>"

@@ -27,6 +27,8 @@ defmodule Beaver.MLIR.Managed.Context do
   Getting and setting managed MLIR context
   """
   def get() do
+    raise "remove global usage"
+
     case Process.get(__MODULE__) do
       nil ->
         global = Beaver.MLIR.Global.Context.get()

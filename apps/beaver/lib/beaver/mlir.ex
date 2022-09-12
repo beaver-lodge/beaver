@@ -122,8 +122,12 @@ defmodule Beaver.MLIR do
   end
 
   defmacro __CONTEXT__() do
-    quote do
-      Beaver.MLIR.Managed.Context.get()
+    if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_ctx, nil}) do
+      quote do
+        Kernel.var!(beaver_internal_env_ctx)
+      end
+    else
+      raise "no MLIR context in environment, maybe you forgot to put the ssa form inside the 'mlir ctx: ctx, do: ....' ?"
     end
   end
 
@@ -175,6 +179,6 @@ defmodule Beaver.MLIR do
   end
 
   defmacro __LOCATION__() do
-    Beaver.MLIR.Managed.Location.get()
+    raise "TODO: create location from Elixir caller"
   end
 end

@@ -122,6 +122,7 @@ defmodule Beaver.MLIR.Operation.State do
 
     array =
       result_types
+      |> Enum.map(&Beaver.Deferred.create(&1, context))
       |> Enum.map(fn
         t when is_binary(t) ->
           CAPI.mlirTypeParseGet(context, MLIR.StringRef.create(t))
@@ -182,7 +183,7 @@ defmodule Beaver.MLIR.Operation.State do
            context: nil
          } = state
        )
-       when not is_nil(location) do
+       when not is_nil(location) and not is_function(location) do
     %{state | context: CAPI.mlirLocationGetContext(location)}
   end
 
@@ -194,6 +195,16 @@ defmodule Beaver.MLIR.Operation.State do
        )
        when not is_nil(context) do
     %{state | location: CAPI.mlirLocationUnknownGet(context)}
+  end
+
+  defp prepare(
+         %__MODULE__{
+           location: location,
+           context: context
+         } = state
+       )
+       when not is_nil(context) and is_function(location, 1) do
+    %{state | location: location.(context)}
   end
 
   @doc """
@@ -235,6 +246,15 @@ defmodule Beaver.MLIR.Operation.State do
   @doc """
   Add an ODS argument to state.
   """
+
+  def add_argument(%__MODULE__{context: context} = state, {tag, f})
+      when is_atom(tag) and is_function(f, 1) do
+    add_argument(state, {tag, f.(context)})
+  end
+
+  def add_argument(%__MODULE__{context: context} = state, f) when is_function(f, 1) do
+    add_argument(state, f.(context))
+  end
 
   def add_argument(%__MODULE__{regions: regions} = state, %CAPI.MlirRegion{} = region) do
     %{state | regions: regions ++ [region]}

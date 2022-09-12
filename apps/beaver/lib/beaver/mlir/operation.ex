@@ -23,7 +23,8 @@ defmodule Beaver.MLIR.Operation do
         block: %MLIR.CAPI.MlirBlock{} = block,
         arguments: arguments,
         results: results,
-        filler: filler
+        filler: filler,
+        ctx: ctx
       }) do
     filler =
       if is_function(filler, 0) do
@@ -32,7 +33,7 @@ defmodule Beaver.MLIR.Operation do
         []
       end
 
-    create(op_name, arguments ++ [result_types: results] ++ filler, block)
+    create_and_append(ctx, op_name, arguments ++ [result_types: results] ++ filler, block)
   end
 
   def create(op_name, %Beaver.DSL.Op.Prototype{
@@ -48,8 +49,14 @@ defmodule Beaver.MLIR.Operation do
     create(op_name, [op])
   end
 
-  def create(op_name, arguments, %MLIR.CAPI.MlirBlock{} = block) when is_list(arguments) do
-    op = do_create(op_name, arguments)
+  def create_and_append(
+        %MLIR.CAPI.MlirContext{} = ctx,
+        op_name,
+        arguments,
+        %MLIR.CAPI.MlirBlock{} = block
+      )
+      when is_list(arguments) do
+    op = do_create(ctx, op_name, arguments)
     Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(block, op)
     op
   end
@@ -73,10 +80,10 @@ defmodule Beaver.MLIR.Operation do
     deferred
   end
 
-  defp do_create(op_name, arguments) when is_binary(op_name) and is_list(arguments) do
+  defp do_create(ctx, op_name, arguments) when is_binary(op_name) and is_list(arguments) do
     location = MLIR.Managed.Location.get()
 
-    state = %MLIR.Operation.State{name: op_name, location: location}
+    state = %MLIR.Operation.State{name: op_name, location: location, context: ctx}
     state = Enum.reduce(arguments, state, &MLIR.Operation.State.add_argument(&2, &1))
 
     state

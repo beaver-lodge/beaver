@@ -1,11 +1,15 @@
 defmodule Beaver.DSL.SSA do
   alias Beaver.MLIR
   require Beaver.MLIR.CAPI
-  defstruct arguments: [], results: [], filler: nil, block: nil
+  defstruct arguments: [], results: [], filler: nil, block: nil, ctx: nil
 
   def put_arguments(%__MODULE__{arguments: arguments} = ssa, additional_arguments)
       when is_list(additional_arguments) do
     %__MODULE__{ssa | arguments: arguments ++ additional_arguments}
+  end
+
+  def put_results(%__MODULE__{results: results} = ssa, f) when is_function(f, 1) do
+    %__MODULE__{ssa | results: results ++ [f]}
   end
 
   def put_results(%__MODULE__{results: results} = ssa, %MLIR.CAPI.MlirType{} = single_result) do
@@ -23,6 +27,10 @@ defmodule Beaver.DSL.SSA do
 
   def put_block(%__MODULE__{} = ssa, block) do
     %__MODULE__{ssa | block: block}
+  end
+
+  def put_ctx(%__MODULE__{} = ssa, %MLIR.CAPI.MlirContext{} = ctx) do
+    %__MODULE__{ssa | ctx: ctx}
   end
 
   # block arguments
@@ -55,6 +63,7 @@ defmodule Beaver.DSL.SSA do
         |> Beaver.DSL.SSA.put_filler(fn -> unquote(ast_block) end)
         |> Beaver.DSL.SSA.put_arguments(args)
         |> Beaver.DSL.SSA.put_block(MLIR.__BLOCK__())
+        |> Beaver.DSL.SSA.put_ctx(MLIR.__CONTEXT__())
         |> Beaver.DSL.SSA.put_results(unquote(results))
         |> unquote(empty_call)
       end
@@ -77,6 +86,7 @@ defmodule Beaver.DSL.SSA do
       %Beaver.DSL.SSA{}
       |> Beaver.DSL.SSA.put_arguments(args)
       |> Beaver.DSL.SSA.put_block(MLIR.__BLOCK__())
+      |> Beaver.DSL.SSA.put_ctx(MLIR.__CONTEXT__())
       |> Beaver.DSL.SSA.put_results(unquote(results))
       |> unquote(empty_call)
     end

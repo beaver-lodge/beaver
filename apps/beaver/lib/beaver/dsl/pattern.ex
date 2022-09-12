@@ -5,23 +5,34 @@ defmodule Beaver.DSL.Pattern do
   require Beaver.MLIR
   require Beaver.MLIR.CAPI
 
+  defmodule Env do
+    defstruct ctx: nil, block: nil
+  end
+
   @doc """
   generate PDL ops for types and attributes
   """
-  def gen_pdl(block, %MLIR.CAPI.MlirType{} = type) do
-    mlir block: block do
+  def gen_pdl(%Env{} = env, %MLIR.CAPI.MlirType{} = type) do
+    mlir block: env.block, ctx: env.ctx do
       Beaver.MLIR.Dialect.PDL.type(type: type) >>> ~t{!pdl.type}
     end
   end
 
-  def gen_pdl(block, %Beaver.MLIR.CAPI.MlirAttribute{} = attribute) do
-    mlir block: block do
+  def gen_pdl(%Env{} = env, f) when is_function(f, 1) do
+    Quark.Compose.compose(
+      &gen_pdl(env, &1),
+      f
+    )
+  end
+
+  def gen_pdl(%Env{} = env, %Beaver.MLIR.CAPI.MlirAttribute{} = attribute) do
+    mlir block: env.block, ctx: env.ctx do
       Beaver.MLIR.Dialect.PDL.attribute(value: attribute) >>>
         ~t{!pdl.attribute}
     end
   end
 
-  def gen_pdl(_block, %MLIR.Value{} = value) do
+  def gen_pdl(_env, %MLIR.Value{} = value) do
     value
   end
 
@@ -33,12 +44,12 @@ defmodule Beaver.DSL.Pattern do
   def create_operation(
         op_name,
         %Beaver.DSL.Op.Prototype{operands: operands, attributes: attributes, results: results},
-        [%MLIR.CAPI.MlirBlock{} = block, attribute_names]
+        {%Env{} = env, attribute_names}
       )
       when is_list(attribute_names) do
-    mlir block: block do
-      results = results |> Enum.map(&gen_pdl(block, &1))
-      attributes = attributes |> Enum.map(&gen_pdl(block, &1))
+    mlir block: env.block, ctx: env.ctx do
+      results = results |> Enum.map(&gen_pdl(env, &1))
+      attributes = attributes |> Enum.map(&gen_pdl(env, &1))
 
       Beaver.MLIR.Dialect.PDL.operation(
         operands ++
@@ -143,7 +154,7 @@ defmodule Beaver.DSL.Pattern do
           case attribute do
             {:bound, bound} ->
               quote do
-                unquote(bound) = Beaver.DSL.Pattern.gen_pdl(MLIR.__BLOCK__(), unquote(bound))
+                unquote(bound) = Beaver.DSL.Pattern.gen_pdl(env, unquote(bound))
               end
 
             _ ->
@@ -165,7 +176,7 @@ defmodule Beaver.DSL.Pattern do
           case result do
             {:bound, bound} ->
               quote do
-                Beaver.DSL.Pattern.gen_pdl(MLIR.__BLOCK__(), unquote(bound))
+                Beaver.DSL.Pattern.gen_pdl(env, unquote(bound))
               end
 
             _ ->
@@ -205,6 +216,7 @@ defmodule Beaver.DSL.Pattern do
     # injecting all variables and dispatch the op creation
     ast =
       quote do
+        env = %Env{ctx: MLIR.__CONTEXT__(), block: MLIR.__BLOCK__()}
         unquote_splicing(operands)
         unquote_splicing(attributes_match)
         unquote_splicing(results_match)
@@ -215,7 +227,7 @@ defmodule Beaver.DSL.Pattern do
           Beaver.DSL.Op.Prototype.dispatch(
             unquote(struct_name),
             unquote(map_args),
-            [MLIR.__BLOCK__(), attribute_names],
+            {env, attribute_names},
             &Beaver.DSL.Pattern.create_operation/3
           )
 
@@ -242,12 +254,13 @@ defmodule Beaver.DSL.Pattern do
 
     ast =
       quote do
+        env = %Env{ctx: MLIR.__CONTEXT__(), block: MLIR.__BLOCK__()}
         attribute_names = Beaver.DSL.Pattern.gen_attribute_names(unquote(attributes_keys))
 
         Beaver.DSL.Op.Prototype.dispatch(
           unquote(struct_name),
           unquote(map_args),
-          [MLIR.__BLOCK__(), attribute_names],
+          {env, attribute_names},
           &Beaver.DSL.Pattern.create_operation/3
         )
       end
@@ -331,8 +344,8 @@ defmodule Beaver.DSL.Pattern do
   end
 
   # TODO: accepting block here is ugly, change it to %Beaver.Env{block: block}
-  def result(block, %Beaver.MLIR.Value{} = v, i) when is_integer(i) do
-    mlir block: block do
+  def result(%Env{} = env, %Beaver.MLIR.Value{} = v, i) when is_integer(i) do
+    mlir block: env.block, ctx: env.ctx do
       PDL.result(v, index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), i)) >>>
         ~t{!pdl.value}
     end

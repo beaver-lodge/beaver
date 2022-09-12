@@ -2,14 +2,19 @@ defmodule RedundantTransposeTest do
   use ExUnit.Case
 
   alias Beaver.MLIR
-  alias Beaver.MLIR.{Type, Attribute}
+  alias Beaver.MLIR.{Type}
   alias Beaver.MLIR.Dialect.{Func, TOSA}
 
-  test "pass to optimize redundant transpose" do
+  setup do
+    [ctx: MLIR.Context.create()]
+  end
+
+  test "pass to optimize redundant transpose", context do
     use Beaver
     import Beaver.MLIR.Transforms
 
     defmodule Helper do
+      alias Beaver.MLIR.Attribute
       def perm_t(), do: Type.ranked_tensor([2], Type.i32())
 
       defp perm_int_attrs() do
@@ -21,7 +26,7 @@ defmodule RedundantTransposeTest do
     end
 
     ir =
-      mlir do
+      mlir ctx: context[:ctx] do
         module do
           Func.func some_func(
                       function_type: Type.function([Helper.tensor_t()], [Helper.tensor_t()])

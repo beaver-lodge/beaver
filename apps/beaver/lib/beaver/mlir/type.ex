@@ -2,12 +2,12 @@ defmodule Beaver.MLIR.Type do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
   require Beaver.MLIR.CAPI
+  require Beaver.MLIR
 
   def get(string, opts \\ [])
 
   def get(string, opts) when is_binary(string) do
-    ctx = MLIR.Managed.Context.from_opts(opts)
-    CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create(string))
+    Beaver.Deferred.from_opts(opts, &CAPI.mlirTypeParseGet(&1, MLIR.StringRef.create(string)))
   end
 
   def equal?(a, b) do
@@ -17,13 +17,27 @@ defmodule Beaver.MLIR.Type do
   def function(inputs, results, opts \\ []) do
     num_inputs = length(inputs)
     num_results = length(results)
-    inputs = inputs |> CAPI.MlirType.array()
-    results = results |> CAPI.MlirType.array()
-    ctx = MLIR.Managed.Context.from_opts(opts)
-    CAPI.mlirFunctionTypeGet(ctx, num_inputs, inputs, num_results, results)
+
+    Beaver.Deferred.from_opts(opts, fn ctx ->
+      inputs = inputs |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> CAPI.MlirType.array()
+      results = results |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> CAPI.MlirType.array()
+      CAPI.mlirFunctionTypeGet(ctx, num_inputs, inputs, num_results, results)
+    end)
   end
 
   def ranked_tensor(shape, element_type, encoding \\ nil)
+
+  def ranked_tensor(
+        shape,
+        f,
+        encoding
+      )
+      when is_function(f, 1) do
+    Quark.Compose.compose(
+      &ranked_tensor(shape, &1, encoding),
+      f
+    )
+  end
 
   def ranked_tensor(
         shape,
@@ -48,8 +62,20 @@ defmodule Beaver.MLIR.Type do
     CAPI.mlirRankedTensorTypeGet(rank, shape, element_type, encoding)
   end
 
+  def unranked_tensor(element_type)
+      when is_function(element_type, 1) do
+    Quark.Compose.compose(
+      &unranked_tensor/1,
+      element_type
+    )
+  end
+
   def unranked_tensor(%MLIR.CAPI.MlirType{} = element_type) do
     CAPI.mlirUnrankedTensorTypeGet(element_type)
+  end
+
+  def complex(element_type) when is_function(element_type, 1) do
+    &complex(element_type.(&1))
   end
 
   def complex(%MLIR.CAPI.MlirType{} = element_type) do
@@ -58,8 +84,18 @@ defmodule Beaver.MLIR.Type do
 
   def memref(
         shape,
-        %MLIR.CAPI.MlirType{} = element_type,
+        element_type,
         opts \\ [layout: nil, memory_space: nil]
+      )
+
+  def memref(shape, element_type, opts) when is_function(element_type, 1) do
+    &memref(shape, element_type.(&1), opts)
+  end
+
+  def memref(
+        shape,
+        %MLIR.CAPI.MlirType{} = element_type,
+        opts
       )
       when is_list(shape) do
     rank = length(shape)
@@ -71,6 +107,13 @@ defmodule Beaver.MLIR.Type do
     memory_space = Keyword.get(opts, :memory_space) || default_null
 
     CAPI.mlirMemRefTypeGet(element_type, rank, shape, layout, memory_space)
+  end
+
+  def vector(shape, element_type) when is_function(element_type, 1) do
+    Quark.Compose.compose(
+      &vector(shape, &1),
+      element_type
+    )
   end
 
   def vector(shape, element_type) when is_list(shape) do
@@ -87,18 +130,15 @@ defmodule Beaver.MLIR.Type do
   end
 
   def f16(opts \\ []) do
-    ctx = MLIR.Managed.Context.from_opts(opts)
-    CAPI.mlirF16TypeGet(ctx)
+    Beaver.Deferred.from_opts(opts, &CAPI.mlirF16TypeGet/1)
   end
 
   def f32(opts \\ []) do
-    ctx = MLIR.Managed.Context.from_opts(opts)
-    CAPI.mlirF32TypeGet(ctx)
+    Beaver.Deferred.from_opts(opts, &CAPI.mlirF32TypeGet/1)
   end
 
   def f64(opts \\ []) do
-    ctx = MLIR.Managed.Context.from_opts(opts)
-    CAPI.mlirF64TypeGet(ctx)
+    Beaver.Deferred.from_opts(opts, &CAPI.mlirF64TypeGet/1)
   end
 
   def f(bitwidth, opts \\ []) when is_integer(bitwidth) do
@@ -107,18 +147,24 @@ defmodule Beaver.MLIR.Type do
 
   def integer(bitwidth, opts \\ [signed: false]) do
     signed = Keyword.get(opts, :signed)
-    ctx = MLIR.Managed.Context.from_opts(opts)
 
-    if signed do
-      CAPI.mlirIntegerTypeSignedGet(ctx, bitwidth)
-    else
-      CAPI.mlirIntegerTypeGet(ctx, bitwidth)
-    end
+    Beaver.Deferred.from_opts(
+      opts,
+      fn ctx ->
+        if signed do
+          CAPI.mlirIntegerTypeSignedGet(ctx, bitwidth)
+        else
+          CAPI.mlirIntegerTypeGet(ctx, bitwidth)
+        end
+      end
+    )
   end
 
   def index(opts \\ []) do
-    ctx = MLIR.Managed.Context.from_opts(opts)
-    CAPI.mlirIndexTypeGet(ctx)
+    Beaver.Deferred.from_opts(
+      opts,
+      &CAPI.mlirIndexTypeGet(&1)
+    )
   end
 
   defdelegate i(bitwidth, opts \\ []), to: __MODULE__, as: :integer
@@ -126,8 +172,8 @@ defmodule Beaver.MLIR.Type do
   for bitwidth <- [1, 8, 16, 32, 64, 128] do
     i_name = "i#{bitwidth}" |> String.to_atom()
 
-    def unquote(i_name)() do
-      apply(__MODULE__, :i, [unquote(bitwidth)])
+    def unquote(i_name)(opts \\ []) do
+      apply(__MODULE__, :i, [unquote(bitwidth), opts])
     end
   end
 end

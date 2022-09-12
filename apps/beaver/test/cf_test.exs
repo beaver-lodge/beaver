@@ -13,7 +13,7 @@ defmodule CfTest do
 
     defmodule Acc do
       @enforce_keys [:vars, :block, :region]
-      defstruct vars: %{}, block: nil, region: nil
+      defstruct vars: %{}, block: nil, region: nil, ctx: nil
     end
 
     # 3. use the var in acc
@@ -38,13 +38,13 @@ defmodule CfTest do
     # 1. starts with "root", the return expression
     defp gen_mlir(
            {:return, _line, [arg]},
-           %Acc{block: block} = acc
+           %Acc{block: block, ctx: ctx} = acc
          ) do
       # we expect it to be a MLIR Value
       {arg = %MLIR.Value{}, acc} = gen_mlir(arg, acc)
 
       mlir =
-        mlir block: block do
+        mlir block: block, ctx: ctx do
           Func.return(arg) >>> []
         end
 
@@ -66,18 +66,18 @@ defmodule CfTest do
     # For `:if` it is kind of tricky, we need to generate block for it
     defp gen_mlir(
            {:if, _, [cond_ast, [do: do_block_ast, else: else_block_ast]]},
-           %Acc{region: region, block: entry} = acc
+           %Acc{region: region, block: entry, ctx: ctx} = acc
          ) do
       {condition, acc} = gen_mlir(cond_ast, acc)
 
       bb_next =
-        mlir do
+        mlir ctx: ctx do
           block bb_next(arg >>> Type.f32()) do
           end
         end
 
       true_branch =
-        mlir do
+        mlir ctx: ctx do
           block _true_branch() do
             {%MLIR.Value{} = mlir, acc} = gen_mlir(do_block_ast, acc)
             %MLIR.CAPI.MlirBlock{} = Beaver.MLIR.__BLOCK__()
@@ -86,14 +86,14 @@ defmodule CfTest do
         end
 
       false_branch =
-        mlir do
+        mlir ctx: ctx do
           block _false_branch() do
             {%MLIR.Value{} = mlir, acc} = gen_mlir(else_block_ast, acc)
             CF.br({bb_next, [mlir]}) >>> []
           end
         end
 
-      mlir block: entry do
+      mlir block: entry, ctx: ctx do
         CF.cond_br(condition, true_branch, false_branch) >>> []
       end
 
@@ -119,12 +119,12 @@ defmodule CfTest do
     end
 
     # in real world, this should be merged with the gen_mlir for :+
-    defp gen_mlir({:<, _, [left, right]}, %Acc{block: block} = acc) do
+    defp gen_mlir({:<, _, [left, right]}, %Acc{block: block, ctx: ctx} = acc) do
       {left = %MLIR.Value{}, acc} = gen_mlir(left, acc)
       {right = %MLIR.Value{}, acc} = gen_mlir(right, acc)
 
       less =
-        mlir block: block do
+        mlir block: block, ctx: ctx do
           Arith.cmpf(left, right, predicate: Attribute.integer(Type.i64(), 0)) >>> Type.i1()
         end
 
@@ -133,12 +133,12 @@ defmodule CfTest do
 
     # after adding this, you should see this kind of IR printed
     # %0 = arith.mulf %arg2, %arg1 : f32
-    defp gen_mlir({:*, _line, [left, right]}, %Acc{block: block} = acc) do
+    defp gen_mlir({:*, _line, [left, right]}, %Acc{block: block, ctx: ctx} = acc) do
       {left = %MLIR.Value{}, acc} = gen_mlir(left, acc)
       {right = %MLIR.Value{}, acc} = gen_mlir(right, acc)
       # we only work with float 32 for now
       add =
-        mlir block: block do
+        mlir block: block, ctx: ctx do
           Arith.mulf(left, right) >>> Type.f32()
         end
 
@@ -161,7 +161,9 @@ defmodule CfTest do
       # TODO: generate the args
       {name, _args} = Macro.decompose_call(call)
 
-      mlir do
+      ctx = MLIR.Context.create()
+
+      mlir ctx: ctx do
         module do
           Func.func some_func(
                       sym_name: "\"#{name}\"",
@@ -180,7 +182,8 @@ defmodule CfTest do
                 acc = %Acc{
                   vars: vars,
                   region: Beaver.MLIR.__REGION__(),
-                  block: Beaver.MLIR.__BLOCK__()
+                  block: Beaver.MLIR.__BLOCK__(),
+                  ctx: Beaver.MLIR.__CONTEXT__()
                 }
 
                 # keep generating until we meet a terminator

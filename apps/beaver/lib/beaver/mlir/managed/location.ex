@@ -1,19 +1,12 @@
 defmodule Beaver.MLIR.Managed.Location do
   alias Beaver.MLIR.CAPI
+  alias Beaver.MLIR
 
   @moduledoc """
   Getting and setting managed MLIR location
   """
-  def get() do
-    case Process.get(__MODULE__) do
-      nil ->
-        ctx = Beaver.MLIR.Managed.Context.get()
-        location = CAPI.mlirLocationUnknownGet(ctx)
-        set(location)
-
-      managed ->
-        managed
-    end
+  def get(opts \\ []) do
+    Beaver.Deferred.from_opts(opts, &CAPI.mlirLocationUnknownGet/1)
   end
 
   def set(location) do

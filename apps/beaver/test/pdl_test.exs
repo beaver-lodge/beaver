@@ -5,6 +5,11 @@ defmodule PDLTest do
   alias Beaver.MLIR.CAPI
   import Beaver.MLIR.Transforms
 
+  @moduletag :pdl
+  setup do
+    [ctx: MLIR.Context.create(allow_unregistered: true)]
+  end
+
   @apply_rewrite_op_patterns """
   module @patterns {
     pdl_interp.func @matcher(%root : !pdl.operation) {
@@ -34,8 +39,9 @@ defmodule PDLTest do
     "test.op"() { test_attr } : () -> ()
   }
   """
-  test "AreEqualOp" do
-    ctx = MLIR.Context.create()
+
+  test "AreEqualOp", context do
+    ctx = context[:ctx]
     CAPI.mlirContextSetAllowUnregisteredDialects(ctx, true)
     pattern_module = MLIR.Module.create(ctx, @apply_rewrite_op_patterns)
 
@@ -169,7 +175,7 @@ defmodule PDLTest do
     CAPI.mlirContextDestroy(ctx)
   end
 
-  test "load from string" do
+  test "load from string", context do
     %MLIR.CAPI.MlirPDLPatternModule{} =
       """
       module @erase {
@@ -181,13 +187,13 @@ defmodule PDLTest do
         }
       }
       """
-      |> MLIR.Pattern.from_string()
+      |> MLIR.Pattern.from_string(ctx: context[:ctx])
   end
 
-  test "replace tosa" do
+  test "replace tosa", context do
     defmodule TestTOSAPatterns do
-      def gen_ir_module() do
-        mlir do
+      def gen_ir_module(ctx) do
+        mlir ctx: ctx do
           module do
             Func.func test_multi_broadcast(
                         function_type:
@@ -241,15 +247,17 @@ defmodule PDLTest do
                  results: [^ty]
                }
              ) do
+        alias Beaver.DSL.Pattern
         types = [Type.ranked_tensor([2, 3], Type.f32())]
+        env = %Pattern.Env{ctx: MLIR.__CONTEXT__(), block: MLIR.__BLOCK__()}
         a = %TOSA.Sub{operands: [a, b], results: types}
-        a = Pattern.result(MLIR.__BLOCK__(), a, 0)
+        a = Pattern.result(env, a, 0)
         a = %TOSA.Sub{operands: [a, b], results: types}
-        a = Pattern.result(MLIR.__BLOCK__(), a, 0)
+        a = Pattern.result(env, a, 0)
         a = %TOSA.Sub{operands: [a, b], results: types}
-        a = Pattern.result(MLIR.__BLOCK__(), a, 0)
+        a = Pattern.result(env, a, 0)
         a = %TOSA.Sub{operands: [a, b], results: types, attributes: [one: one]}
-        a = Pattern.result(MLIR.__BLOCK__(), a, 0)
+        a = Pattern.result(env, a, 0)
         %TOSA.Sub{operands: [a, b]}
       end
 
@@ -313,14 +321,17 @@ defmodule PDLTest do
       end
     end
 
+    ctx = context[:ctx]
+    opts = [ctx: ctx]
+
     for pattern <- [
-          TestTOSAPatterns.replace_add_op(),
-          TestTOSAPatterns.replace_multi_add_op(),
-          TestTOSAPatterns.replace_multi_add_op1(),
-          TestTOSAPatterns.replace_multi_add_op2(),
-          TestTOSAPatterns.replace_multi_add_op3()
+          TestTOSAPatterns.replace_add_op(opts),
+          TestTOSAPatterns.replace_multi_add_op(opts),
+          TestTOSAPatterns.replace_multi_add_op1(opts),
+          TestTOSAPatterns.replace_multi_add_op2(opts),
+          TestTOSAPatterns.replace_multi_add_op3(opts)
         ] do
-      ir_module = TestTOSAPatterns.gen_ir_module()
+      ir_module = TestTOSAPatterns.gen_ir_module(ctx)
       MLIR.Operation.verify!(ir_module)
       ir_string = MLIR.to_string(ir_module)
       assert not String.contains?(ir_string, "tosa.sub"), ir_string
@@ -338,8 +349,10 @@ defmodule PDLTest do
     end
   end
 
-  test "toy compiler with pass" do
+  test "toy compiler with pass", context do
     alias Beaver.MLIR.Dialect.Func
+
+    ctx = context[:ctx]
 
     defmodule ToyPass do
       use Beaver.MLIR.Pass, on: Func.Func
@@ -366,7 +379,7 @@ defmodule PDLTest do
           return %0 : tensor<2x3xf32>
         }
       }
-      """
+      """.(ctx)
       |> MLIR.Pass.Composer.nested(Func.Func, [
         ToyPass.create()
       ])

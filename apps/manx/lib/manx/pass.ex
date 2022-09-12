@@ -10,8 +10,10 @@ defmodule Manx.Lowering.Vulkan.PutSPVAttrPass do
       "spv.entry_point_abi":
         ~a{#spv.entry_point_abi<local_size = dense<[1, 1, 1]> : vector<3xi32>>}
     ]
-    |> Enum.each(fn {n, a} ->
-      MLIR.CAPI.mlirOperationSetAttributeByName(op, MLIR.StringRef.create(n), a)
+    |> Enum.each(fn {name, attr} ->
+      ctx = MLIR.CAPI.mlirOperationGetContext(op)
+      attr = Beaver.Deferred.create(attr, ctx)
+      MLIR.CAPI.mlirOperationSetAttributeByName(op, MLIR.StringRef.create(name), attr)
     end)
 
     :ok

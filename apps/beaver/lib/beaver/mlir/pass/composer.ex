@@ -28,7 +28,7 @@ defmodule Beaver.MLIR.Pass.Composer do
         opts \\ [dump: false, dump_if_fail: false, print: false]
       ) do
     print = Keyword.get(opts, :print)
-    ctx = MLIR.Managed.Context.get()
+    ctx = MLIR.CAPI.mlirOperationGetContext(MLIR.Operation.from_module(op))
     pm = mlirPassManagerCreate(ctx)
 
     MLIR.CAPI.mlirPassManagerEnableVerifier(pm, true)
