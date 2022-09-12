@@ -2,7 +2,7 @@ defmodule RedundantTransposeTest do
   use ExUnit.Case
 
   alias Beaver.MLIR
-  alias Beaver.MLIR.{Type, Attribute}
+  alias Beaver.MLIR.{Type}
   alias Beaver.MLIR.Dialect.{Func, TOSA}
 
   setup do
@@ -14,6 +14,7 @@ defmodule RedundantTransposeTest do
     import Beaver.MLIR.Transforms
 
     defmodule Helper do
+      alias Beaver.MLIR.Attribute
       def perm_t(), do: Type.ranked_tensor([2], Type.i32())
 
       defp perm_int_attrs() do

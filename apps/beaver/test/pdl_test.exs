@@ -247,15 +247,17 @@ defmodule PDLTest do
                  results: [^ty]
                }
              ) do
+        alias Beaver.DSL.Pattern
         types = [Type.ranked_tensor([2, 3], Type.f32())]
+        env = %Pattern.Env{ctx: MLIR.__CONTEXT__(), block: MLIR.__BLOCK__()}
         a = %TOSA.Sub{operands: [a, b], results: types}
-        a = Pattern.result(MLIR.__BLOCK__(), a, 0)
+        a = Pattern.result(env, a, 0)
         a = %TOSA.Sub{operands: [a, b], results: types}
-        a = Pattern.result(MLIR.__BLOCK__(), a, 0)
+        a = Pattern.result(env, a, 0)
         a = %TOSA.Sub{operands: [a, b], results: types}
-        a = Pattern.result(MLIR.__BLOCK__(), a, 0)
+        a = Pattern.result(env, a, 0)
         a = %TOSA.Sub{operands: [a, b], results: types, attributes: [one: one]}
-        a = Pattern.result(MLIR.__BLOCK__(), a, 0)
+        a = Pattern.result(env, a, 0)
         %TOSA.Sub{operands: [a, b]}
       end
 
@@ -320,13 +322,14 @@ defmodule PDLTest do
     end
 
     ctx = context[:ctx]
+    opts = [ctx: ctx]
 
     for pattern <- [
-          TestTOSAPatterns.replace_add_op(),
-          TestTOSAPatterns.replace_multi_add_op(),
-          TestTOSAPatterns.replace_multi_add_op1(),
-          TestTOSAPatterns.replace_multi_add_op2(),
-          TestTOSAPatterns.replace_multi_add_op3()
+          TestTOSAPatterns.replace_add_op(opts),
+          TestTOSAPatterns.replace_multi_add_op(opts),
+          TestTOSAPatterns.replace_multi_add_op1(opts),
+          TestTOSAPatterns.replace_multi_add_op2(opts),
+          TestTOSAPatterns.replace_multi_add_op3(opts)
         ] do
       ir_module = TestTOSAPatterns.gen_ir_module(ctx)
       MLIR.Operation.verify!(ir_module)
