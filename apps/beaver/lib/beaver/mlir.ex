@@ -179,6 +179,6 @@ defmodule Beaver.MLIR do
   end
 
   defmacro __LOCATION__() do
-    Beaver.MLIR.Managed.Location.get()
+    raise "TODO: create location from Elixir caller"
   end
 end
