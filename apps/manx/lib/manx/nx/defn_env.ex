@@ -1,3 +1,3 @@
 defmodule Manx.Defn.Env do
-  defstruct block: nil
+  defstruct block: nil, ctx: nil
 end

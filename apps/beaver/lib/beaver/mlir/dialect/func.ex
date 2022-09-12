@@ -14,9 +14,6 @@ defmodule Beaver.MLIR.Dialect.Func do
 
     func_ast =
       quote do
-        # TODO: support getting ctx from opts
-        ctx = Beaver.MLIR.Managed.Context.get()
-
         # create function
 
         if not is_list(unquote_splicing(args)),
@@ -34,7 +31,12 @@ defmodule Beaver.MLIR.Dialect.Func do
             fn {x, _} -> x end
           )
 
-        Beaver.MLIR.Operation.create("func.func", arguments, Beaver.MLIR.__BLOCK__())
+        Beaver.MLIR.Operation.create_and_append(
+          Beaver.MLIR.__CONTEXT__(),
+          "func.func",
+          arguments,
+          Beaver.MLIR.__BLOCK__()
+        )
       end
 
     func_ast

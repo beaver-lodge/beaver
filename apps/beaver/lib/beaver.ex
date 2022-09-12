@@ -55,25 +55,25 @@ defmodule Beaver do
   end >>> ~t{f32}
   ```
   """
-  defmacro mlir([do: dsl_block] = _dsl_block) do
-    dsl_block_ast = dsl_block |> Beaver.DSL.SSA.transform()
-
+  defmacro mlir(do: dsl_block) do
     quote do
-      alias Beaver.MLIR
-      require Beaver.MLIR
-      alias Beaver.MLIR.Type
-      alias Beaver.MLIR.Attribute
-      alias Beaver.MLIR.ODS
-      import Beaver.MLIR.Sigils
-      unquote(alias_dialects())
-      import Builtin
-
-      unquote(dsl_block_ast)
+      Beaver.mlir [] do
+        unquote(dsl_block)
+      end
     end
   end
 
-  defmacro mlir(opts, [do: dsl_block] = _dsl_block) do
+  defmacro mlir(opts, do: dsl_block) do
     dsl_block_ast = dsl_block |> Beaver.DSL.SSA.transform()
+
+    ctx_ast =
+      if Keyword.has_key?(opts, :ctx) do
+        quote do
+          ctx = Keyword.fetch!(unquote(opts), :ctx)
+          Kernel.var!(beaver_internal_env_ctx) = ctx
+          %MLIR.CAPI.MlirContext{} = Kernel.var!(beaver_internal_env_ctx)
+        end
+      end
 
     block_ast =
       if Keyword.has_key?(opts, :block) do
@@ -94,6 +94,7 @@ defmodule Beaver do
       unquote(alias_dialects())
       import Builtin
 
+      unquote(ctx_ast)
       unquote(block_ast)
       unquote(dsl_block_ast)
     end
@@ -149,7 +150,10 @@ defmodule Beaver do
         end
       else
         quote do
-          Beaver.MLIR.Block.create(block_arg_types, block_arg_locs)
+          Beaver.MLIR.Block.create(
+            block_arg_types |> Enum.map(&Beaver.Deferred.create(&1, MLIR.__CONTEXT__())),
+            block_arg_locs |> Enum.map(&Beaver.Deferred.create(&1, MLIR.__CONTEXT__()))
+          )
         end
       end
 
@@ -207,7 +211,7 @@ defmodule Beaver do
 
     pdl_pattern_module_op =
       quote do
-        mlir do
+        mlir ctx: Beaver.MLIR.Global.Context.get() do
           module do
             benefit = Keyword.get(opts, :benefit, 1)
 

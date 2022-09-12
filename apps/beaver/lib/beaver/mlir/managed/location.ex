@@ -6,9 +6,7 @@ defmodule Beaver.MLIR.Managed.Location do
   Getting and setting managed MLIR location
   """
   def get(opts \\ []) do
-    ctx = MLIR.Managed.Context.from_opts(opts)
-    location = CAPI.mlirLocationUnknownGet(ctx)
-    set(location)
+    Beaver.Deferred.from_opts(opts, &CAPI.mlirLocationUnknownGet/1)
   end
 
   def set(location) do

@@ -44,8 +44,10 @@ defmodule Manx.Compiler do
         []
       end
 
+    ctx = MLIR.Context.create()
+
     ir =
-      mlir do
+      mlir ctx: ctx do
         module(module_attrs) do
           function_type =
             Type.function(
@@ -58,13 +60,15 @@ defmodule Manx.Compiler do
                       function_type: function_type
                     ) do
             region do
+              locs = List.duplicate(MLIR.Managed.Location.get(), length(entry_types))
+
               entry =
                 MLIR.Block.create(
-                  entry_types,
-                  List.duplicate(MLIR.Managed.Location.get(), length(entry_types))
+                  entry_types |> Enum.map(&Beaver.Deferred.create(&1, MLIR.__CONTEXT__())),
+                  locs |> Enum.map(&Beaver.Deferred.create(&1, MLIR.__CONTEXT__()))
                 )
 
-              root = Manx.Defn.gen_op(%Manx.Defn.Env{block: entry}, tree)
+              root = Manx.Defn.gen_op(%Manx.Defn.Env{block: entry, ctx: ctx}, tree)
 
               mlir block: entry do
                 case root do

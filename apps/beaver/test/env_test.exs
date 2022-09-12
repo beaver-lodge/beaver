@@ -3,8 +3,12 @@ defmodule EnvTest do
   use Beaver
   alias Beaver.MLIR
 
-  test "MLIR.__BLOCK__" do
-    mlir do
+  setup do
+    [ctx: MLIR.Context.create()]
+  end
+
+  test "MLIR.__BLOCK__", context do
+    mlir ctx: context[:ctx] do
       module do
         Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
           region do

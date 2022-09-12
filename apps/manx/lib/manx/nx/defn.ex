@@ -103,12 +103,12 @@ defmodule Manx.Defn do
   end
 
   defp gen_expand(
-         %Env{block: block},
+         %Env{block: block, ctx: ctx},
          value,
          %{type: type, shape: in_shape} = input_t,
          %{shape: out_shape} = _output_t
        ) do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       shape = expand_for_output(in_shape, out_shape)
       t = %{input_t | type: type, shape: shape}
       rank_diff = tuple_size(out_shape) - tuple_size(in_shape)
@@ -121,7 +121,7 @@ defmodule Manx.Defn do
     end
   end
 
-  def gen_op(%Env{block: block}, %Nx.Tensor{
+  def gen_op(%Env{block: block, ctx: ctx}, %Nx.Tensor{
         data: %Nx.Defn.Expr{op: :parameter, args: [pos]}
       })
       when is_integer(pos) do
@@ -141,41 +141,41 @@ defmodule Manx.Defn do
   end
 
   def gen_op(
-        %Env{block: block},
+        %Env{block: block, ctx: ctx},
         %Nx.Tensor{
           data: %Nx.Defn.Expr{op: :constant, args: [:nan]},
           shape: {},
           type: {:f, 32}
         } = t
       ) do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       TOSA.const({:value, ~a{dense<0x7F800001> : tensor<f32>}}) >>> gen_type(t)
     end
   end
 
   def gen_op(
-        %Env{block: block},
+        %Env{block: block, ctx: ctx},
         %Nx.Tensor{
           data: %Nx.Defn.Expr{op: :constant, args: [:infinity]},
           shape: {},
           type: {:f, 32}
         } = t
       ) do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       TOSA.const({:value, ~a{dense<0x7F800000> : tensor<f32>}}) >>>
         gen_type(t)
     end
   end
 
   def gen_op(
-        %Env{block: block},
+        %Env{block: block, ctx: ctx},
         %Nx.Tensor{
           data: %Nx.Defn.Expr{op: :constant, args: [:neg_infinity]},
           shape: {},
           type: {:f, 32}
         } = t
       ) do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       _r =
         TOSA.const({:value, ~a{dense<0xFF800000> : tensor<f32>}}) >>>
           gen_type(t)
@@ -183,15 +183,15 @@ defmodule Manx.Defn do
   end
 
   def gen_op(
-        %Env{block: block},
+        %Env{block: block, ctx: ctx},
         %Nx.Tensor{
           data: %Nx.Defn.Expr{op: :constant, args: [value]},
           shape: {}
         } = t
       )
       when is_integer(value) or is_float(value) do
-    mlir block: block do
-      t_str = gen_type(t) |> MLIR.to_string()
+    mlir block: block, ctx: ctx do
+      t_str = gen_type(t) |> Beaver.Deferred.create(ctx) |> MLIR.to_string()
 
       TOSA.const({:value, ~a{dense<#{value}> : #{t_str}}}) >>>
         gen_type(t)
@@ -199,14 +199,14 @@ defmodule Manx.Defn do
   end
 
   def gen_op(
-        %Env{block: block},
+        %Env{block: block, ctx: ctx},
         %Nx.Tensor{
           data: %Nx.Defn.Expr{op: :constant, args: [%Complex{im: im, re: re}]},
           type: {:c, 64}
         } = t
       ) do
-    mlir block: block do
-      t_str = gen_type(t) |> MLIR.to_string()
+    mlir block: block, ctx: ctx do
+      t_str = gen_type(t) |> Beaver.Deferred.create(ctx) |> MLIR.to_string()
 
       Arith.constant({:value, ~a[dense<(#{re}, #{im})> : #{t_str}]}) >>>
         gen_type(t)
@@ -214,7 +214,7 @@ defmodule Manx.Defn do
   end
 
   def gen_op(
-        %Env{block: block},
+        %Env{block: block, ctx: ctx},
         %Nx.Tensor{
           data: %Nx.Defn.Expr{
             args: [%Nx.Tensor{data: %Nx.BinaryBackend{state: binary}}],
@@ -222,7 +222,7 @@ defmodule Manx.Defn do
           }
         } = t
       ) do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       tensor_attr =
         MLIR.CAPI.mlirDenseElementsAttrRawBufferGet(
           gen_type(t),
@@ -238,7 +238,7 @@ defmodule Manx.Defn do
 
   # unary tosa
   def gen_op(
-        %Env{block: block} = env,
+        %Env{block: block, ctx: ctx} = env,
         %Nx.Tensor{data: %Nx.Defn.Expr{op: op, args: [input1]}} = t
       )
       when op in [
@@ -254,7 +254,7 @@ defmodule Manx.Defn do
              :is_infinity,
              :sigmoid
            ] do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       input1_value = gen_op(env, input1)
       input1_value = TOSA.cast(input1_value) >>> gen_type(%{input1 | type: t.type})
 
@@ -295,7 +295,7 @@ defmodule Manx.Defn do
 
         :is_infinity ->
           input1_value = gen_op(env, input1)
-          input1_type_str = gen_type(input1) |> MLIR.to_string()
+          input1_type_str = gen_type(input1) |> Beaver.Deferred.create(ctx) |> MLIR.to_string()
 
           inf =
             TOSA.const({:value, ~a{dense<0x7F800000> : #{input1_type_str}}}) >>> gen_type(input1)
@@ -315,7 +315,7 @@ defmodule Manx.Defn do
   end
 
   def gen_op(
-        %Env{block: block} = env,
+        %Env{block: block, ctx: ctx} = env,
         %Nx.Tensor{
           data: %Nx.Defn.Expr{
             op: op,
@@ -324,7 +324,7 @@ defmodule Manx.Defn do
         } = t
       )
       when is_list(axes) and op in [:all, :sum] do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       input1 = gen_op(env, input1)
 
       input1 =
@@ -369,7 +369,7 @@ defmodule Manx.Defn do
   end
 
   def gen_op(
-        %Env{block: block} = env,
+        %Env{block: block, ctx: ctx} = env,
         %Nx.Tensor{
           data:
             %Nx.Defn.Expr{
@@ -380,7 +380,7 @@ defmodule Manx.Defn do
       )
       when op in [:sum, :all] do
     # if axes is nil, replace it with a list of every axis
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       rank = tuple_size(in_shape)
       axes = Range.new(0, rank - 1, 1) |> Enum.to_list()
 
@@ -394,7 +394,7 @@ defmodule Manx.Defn do
   end
 
   def gen_op(
-        %Env{block: block} = env,
+        %Env{block: block, ctx: ctx} = env,
         %Nx.Tensor{
           data: %Nx.Defn.Expr{
             op: :conjugate,
@@ -403,7 +403,7 @@ defmodule Manx.Defn do
           shape: {}
         } = t
       ) do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       complex_tensor = gen_op(env, complex_tensor)
       complex_element = Tensor.extract(complex_tensor) >>> Type.complex(Type.f32())
       conjugate_element = Complex.conj(complex_element) >>> Type.complex(Type.f32())
@@ -418,14 +418,14 @@ defmodule Manx.Defn do
   end
 
   def gen_op(
-        %Env{block: block} = env,
+        %Env{block: block, ctx: ctx} = env,
         %Nx.Tensor{
           data: %Nx.Defn.Expr{op: :conjugate, args: [%Nx.Tensor{} = real_tensor]},
           shape: {},
           type: complex_type = {:c, 64}
         } = t
       ) do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       real_tensor = gen_op(env, real_tensor)
       real_tensor = TOSA.cast(real_tensor) >>> Type.ranked_tensor([], Type.f32())
       real = Tensor.extract(real_tensor) >>> Type.f32()
@@ -445,13 +445,13 @@ defmodule Manx.Defn do
   end
 
   def gen_op(
-        %Env{block: block} = env,
+        %Env{block: block, ctx: ctx} = env,
         %Nx.Tensor{
           data: %Nx.Defn.Expr{op: :conjugate, args: [complex_tensor]},
           shape: shape
         } = t
       ) do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       element_cnt = Enum.reduce(Tuple.to_list(shape), 1, &*/2)
       complex_tensor = gen_op(env, complex_tensor)
       lower = Arith.constant(value: Attribute.integer(Type.index(), 0)) >>> Type.index()
@@ -482,7 +482,7 @@ defmodule Manx.Defn do
   end
 
   def gen_op(
-        %Env{block: block} = env,
+        %Env{block: block, ctx: ctx} = env,
         %Nx.Tensor{
           data: %Nx.Defn.Expr{
             op: :imag,
@@ -491,7 +491,7 @@ defmodule Manx.Defn do
           shape: out_shape
         } = t
       ) do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       in_tensor = gen_op(env, in_tensor)
 
       out_tensor =
@@ -517,7 +517,7 @@ defmodule Manx.Defn do
   end
 
   def gen_op(
-        %Env{block: block} = env,
+        %Env{block: block, ctx: ctx} = env,
         %Nx.Tensor{type: type, data: %Nx.Defn.Expr{op: fft, args: [input, args]}} = t
       )
       when fft in [:fft, :ifft] do
@@ -526,7 +526,7 @@ defmodule Manx.Defn do
 
   # unary linalg
   def gen_op(
-        %Env{block: block} = env,
+        %Env{block: block, ctx: ctx} = env,
         %Nx.Tensor{type: type, data: %Nx.Defn.Expr{op: op, args: [input]}} = t
       )
       when op in [
@@ -541,7 +541,7 @@ defmodule Manx.Defn do
              :expm1,
              :log1p
            ] do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       input_value = gen_op(env, input)
       input_value = TOSA.cast(input_value) >>> gen_type(t)
 
@@ -616,11 +616,11 @@ defmodule Manx.Defn do
 
   # binary linalg
   def gen_op(
-        %Env{block: block} = env,
+        %Env{block: block, ctx: ctx} = env,
         %Nx.Tensor{type: type, data: %Nx.Defn.Expr{op: op, args: [a, b]}} = t
       )
       when op in [:remainder, :atan2, :power] do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       a_value = gen_op(env, a)
       a_value = gen_expand(env, a_value, a, t)
       b_value = gen_op(env, b)
@@ -695,7 +695,7 @@ defmodule Manx.Defn do
 
   # dot product
   def gen_op(
-        %Env{block: block} = env,
+        %Env{block: block, ctx: ctx} = env,
         %Nx.Tensor{
           data: %Nx.Defn.Expr{
             op: :dot,
@@ -710,7 +710,7 @@ defmodule Manx.Defn do
           }
         } = t
       ) do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       a_value = gen_op(env, a)
       b_value = gen_op(env, b)
       a_value = TOSA.cast(a_value) >>> gen_type(%{a | type: t.type})
@@ -726,7 +726,7 @@ defmodule Manx.Defn do
 
   # standard batch matmul
   def gen_op(
-        %Env{block: block} = env,
+        %Env{block: block, ctx: ctx} = env,
         %Nx.Tensor{
           data: %Nx.Defn.Expr{
             op: :dot,
@@ -742,7 +742,7 @@ defmodule Manx.Defn do
         } = t
       )
       when tuple_size(a_shape) == 3 and tuple_size(b_shape) == 3 do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       a_value = gen_op(env, a)
       b_value = gen_op(env, b)
 
@@ -752,7 +752,7 @@ defmodule Manx.Defn do
 
   # generic dot product
   def gen_op(
-        %Env{block: block} = env,
+        %Env{block: block, ctx: ctx} = env,
         %Nx.Tensor{
           data: %Nx.Defn.Expr{
             op: :dot,
@@ -769,7 +769,7 @@ defmodule Manx.Defn do
         } = t
       )
       when tuple_size(a_shape) in [2, 3] or tuple_size(b_shape) in [2, 3] do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       a_value = gen_op(env, a)
       b_value = gen_op(env, b)
       a_value = TOSA.cast(a_value) >>> gen_type(%{a | type: t.type})
@@ -842,10 +842,10 @@ defmodule Manx.Defn do
 
   # binary tosa
   def gen_op(
-        %Env{block: block} = env,
+        %Env{block: block, ctx: ctx} = env,
         %Nx.Tensor{data: %Nx.Defn.Expr{op: op, args: [%Nx.Tensor{} = a, %Nx.Tensor{} = b]}} = t
       ) do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       a_t = %{a | type: t.type} |> gen_type
       b_t = %{b | type: t.type} |> gen_type
       a_value = gen_op(env, a)
@@ -978,10 +978,10 @@ defmodule Manx.Defn do
   end
 
   def gen_op(
-        %Env{block: block} = env,
+        %Env{block: block, ctx: ctx} = env,
         %Nx.Tensor{data: %Nx.Defn.Expr{op: :select, args: [pred, on_true, on_false]}} = t
       ) do
-    mlir block: block do
+    mlir block: block, ctx: ctx do
       pred_value = gen_op(env, pred)
       pred_t = %{pred | type: {:u, 1}}
       pred_value = TOSA.cast(pred_value) >>> gen_type(pred_t)

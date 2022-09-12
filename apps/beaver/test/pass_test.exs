@@ -6,7 +6,11 @@ defmodule PassTest do
   alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Dialect.Func
 
-  test "exception in run/1" do
+  setup do
+    [ctx: MLIR.Context.create()]
+  end
+
+  test "exception in run/1", context do
     defmodule PassRaisingException do
       use Beaver.MLIR.Pass, on: Func.Func
 
@@ -16,7 +20,7 @@ defmodule PassTest do
     end
 
     ir =
-      mlir do
+      mlir ctx: context[:ctx] do
         module do
           Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
             region do

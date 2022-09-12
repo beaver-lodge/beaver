@@ -5,9 +5,13 @@ defmodule CFTest do
   alias Beaver.MLIR.{Attribute, Type}
   import ExUnit.CaptureIO
 
-  test "generate mlir with function calls" do
+  setup do
+    [ctx: MLIR.Context.create()]
+  end
+
+  test "generate mlir with function calls", context do
     ir =
-      mlir do
+      mlir ctx: context[:ctx] do
         module do
           Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
             region do

@@ -2,12 +2,12 @@ defmodule Beaver.MLIR.Type do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
   require Beaver.MLIR.CAPI
+  require Beaver.MLIR
 
   def get(string, opts \\ [])
 
   def get(string, opts) when is_binary(string) do
-    ctx = MLIR.Managed.Context.from_opts(opts)
-    CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create(string))
+    Beaver.Deferred.from_opts(opts, &CAPI.mlirTypeParseGet(&1, MLIR.StringRef.create(string)))
   end
 
   def equal?(a, b) do
@@ -17,13 +17,27 @@ defmodule Beaver.MLIR.Type do
   def function(inputs, results, opts \\ []) do
     num_inputs = length(inputs)
     num_results = length(results)
-    inputs = inputs |> CAPI.MlirType.array()
-    results = results |> CAPI.MlirType.array()
-    ctx = MLIR.Managed.Context.from_opts(opts)
-    CAPI.mlirFunctionTypeGet(ctx, num_inputs, inputs, num_results, results)
+
+    Beaver.Deferred.from_opts(opts, fn ctx ->
+      inputs = inputs |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> CAPI.MlirType.array()
+      results = results |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> CAPI.MlirType.array()
+      CAPI.mlirFunctionTypeGet(ctx, num_inputs, inputs, num_results, results)
+    end)
   end
 
   def ranked_tensor(shape, element_type, encoding \\ nil)
+
+  def ranked_tensor(
+        shape,
+        f,
+        encoding
+      )
+      when is_function(f, 1) do
+    Quark.Compose.compose(
+      &ranked_tensor(shape, &1, encoding),
+      f
+    )
+  end
 
   def ranked_tensor(
         shape,
@@ -87,18 +101,15 @@ defmodule Beaver.MLIR.Type do
   end
 
   def f16(opts \\ []) do
-    ctx = MLIR.Managed.Context.from_opts(opts)
-    CAPI.mlirF16TypeGet(ctx)
+    Beaver.Deferred.from_opts(opts, &CAPI.mlirF16TypeGet/1)
   end
 
   def f32(opts \\ []) do
-    ctx = MLIR.Managed.Context.from_opts(opts)
-    CAPI.mlirF32TypeGet(ctx)
+    Beaver.Deferred.from_opts(opts, &CAPI.mlirF32TypeGet/1)
   end
 
   def f64(opts \\ []) do
-    ctx = MLIR.Managed.Context.from_opts(opts)
-    CAPI.mlirF64TypeGet(ctx)
+    Beaver.Deferred.from_opts(opts, &CAPI.mlirF64TypeGet/1)
   end
 
   def f(bitwidth, opts \\ []) when is_integer(bitwidth) do
@@ -107,13 +118,17 @@ defmodule Beaver.MLIR.Type do
 
   def integer(bitwidth, opts \\ [signed: false]) do
     signed = Keyword.get(opts, :signed)
-    ctx = MLIR.Managed.Context.from_opts(opts)
 
-    if signed do
-      CAPI.mlirIntegerTypeSignedGet(ctx, bitwidth)
-    else
-      CAPI.mlirIntegerTypeGet(ctx, bitwidth)
-    end
+    Beaver.Deferred.from_opts(
+      opts,
+      fn ctx ->
+        if signed do
+          CAPI.mlirIntegerTypeSignedGet(ctx, bitwidth)
+        else
+          CAPI.mlirIntegerTypeGet(ctx, bitwidth)
+        end
+      end
+    )
   end
 
   def index(opts \\ []) do
