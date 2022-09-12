@@ -144,7 +144,10 @@ defmodule Beaver do
         quote do
           _args =
             Kernel.var!(unquote({bb_name, [], nil}))
-            |> Beaver.MLIR.Block.add_arg!(nil, Enum.zip(block_arg_types, block_arg_locs))
+            |> Beaver.MLIR.Block.add_arg!(
+              MLIR.__CONTEXT__(),
+              Enum.zip(block_arg_types, block_arg_locs)
+            )
 
           Kernel.var!(unquote({bb_name, [], nil}))
         end

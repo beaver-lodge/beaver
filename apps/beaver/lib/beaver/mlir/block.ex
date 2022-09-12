@@ -3,7 +3,17 @@ defmodule Beaver.MLIR.Block do
   require Beaver.MLIR.CAPI
   # TODO: remote ctx in these funcs
 
+  def do_add_arg!(block, ctx, {t, loc}) when is_function(t, 1) or is_function(loc, 1) do
+    MLIR.CAPI.mlirBlockAddArgument(
+      block,
+      t |> Beaver.Deferred.create(ctx),
+      loc |> Beaver.Deferred.create(ctx)
+    )
+  end
+
   def do_add_arg!(block, _ctx, {t = %Beaver.MLIR.CAPI.MlirType{}, loc}) do
+    ctx = MLIR.CAPI.mlirTypeGetContext(t)
+    loc = loc |> Beaver.Deferred.create(ctx)
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 

@@ -2,16 +2,21 @@ defmodule VulkanRuntimeTest do
   use ExUnit.Case
   alias Beaver.MLIR
 
+  setup do
+    [ctx: MLIR.Context.create()]
+  end
+
   @tag timeout: :infinity, vulkan: true
   @vulkan_ir File.read!("test/vulkan.mlir")
-  test "run ir with vulkan" do
+  test "run ir with vulkan", context do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}
+    ctx = context[:ctx]
 
     jit =
       ~m"""
       #{@vulkan_ir}
-      """
+      """.(ctx)
       |> canonicalize
       |> cse
       |> gpu_kernel_outlining

@@ -41,7 +41,11 @@ defmodule Beaver.MLIR.Attribute do
         elements =
           elements |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> CAPI.MlirAttribute.array()
 
-        CAPI.mlirDenseElementsAttrGet(shaped_type, num_elements, elements)
+        CAPI.mlirDenseElementsAttrGet(
+          Beaver.Deferred.create(shaped_type, ctx),
+          num_elements,
+          elements
+        )
       end
     )
   end
