@@ -337,9 +337,9 @@ To use Vulkan:
 - Clone the repo
 - Make sure LLVM environment variable is set properly, otherwise it might fail to build
 
-```bash
-echo $LLVM_CONFIG_PATH
-```
+  ```bash
+  echo $LLVM_CONFIG_PATH
+  ```
 
 - Build and run Elixir tests
   ```bash
