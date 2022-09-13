@@ -376,23 +376,23 @@ defmodule Kinda do
   end
 
   def primitive_types do
-    [
-      "bool",
-      "c_int",
-      "c_uint",
-      "f32",
-      "f64",
-      "i16",
-      "i32",
-      "i64",
-      "i8",
-      "isize",
-      "u16",
-      "u32",
-      "u64",
-      "u8",
-      "usize"
-    ]
+    ~w{
+      bool
+      c_int
+      c_uint
+      f32
+      f64
+      i16
+      i32
+      i64
+      i8
+      isize
+      u16
+      u32
+      u64
+      u8
+      usize
+    }
   end
 
   def module_name(zig_t, forward_module, zig_t_module_map) do

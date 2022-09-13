@@ -1,23 +1,7 @@
 defmodule Beaver.MLIR.Dialect.Registry do
-  use GenServer
-
   require Beaver.MLIR.CAPI
   alias Beaver.MLIR.CAPI
   alias Beaver.MLIR
-
-  def start_link([]) do
-    GenServer.start_link(__MODULE__, [])
-  end
-
-  def init(init_arg) do
-    :ets.new(__MODULE__, [:bag, :named_table, read_concurrency: true])
-
-    for o <- query_ops() do
-      :ets.insert(__MODULE__, o)
-    end
-
-    {:ok, init_arg}
-  end
 
   defp pre_process(op_name) do
     case op_name do

@@ -1,12 +1,9 @@
 defmodule MlirTest do
-  use ExUnit.Case, async: true
+  use Beaver.Case, async: true
+
   use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
-
-  setup do
-    [ctx: MLIR.Context.create()]
-  end
 
   @moduletag :smoke
   test "call wrapped apis" do

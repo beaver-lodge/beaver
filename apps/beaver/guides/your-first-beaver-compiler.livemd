@@ -24,8 +24,10 @@ So we can start with something fun, generating the IR.
 ```elixir
 use Beaver
 
+ctx = MLIR.Context.create()
+
 ir =
-  mlir do
+  mlir ctx: ctx do
     module do
       Func.func some_func(function_type: Type.function([Type.i32()], [Type.i32()])) do
         region do

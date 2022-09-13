@@ -325,7 +325,7 @@ defmodule PDLTest do
     opts = [ctx: ctx]
 
     for pattern <- [
-          TestTOSAPatterns.replace_add_op(opts),
+          TestTOSAPatterns.replace_add_op(),
           TestTOSAPatterns.replace_multi_add_op(opts),
           TestTOSAPatterns.replace_multi_add_op1(opts),
           TestTOSAPatterns.replace_multi_add_op2(opts),

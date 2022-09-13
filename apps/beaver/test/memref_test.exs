@@ -1,10 +1,5 @@
 defmodule MemRefTest do
-  use ExUnit.Case
-  alias Beaver.MLIR
-
-  setup do
-    [ctx: MLIR.Context.create()]
-  end
+  use Beaver.Case, async: true
 
   @moduletag :smoke
   test "creation" do

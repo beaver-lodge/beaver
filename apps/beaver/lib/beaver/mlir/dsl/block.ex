@@ -27,7 +27,7 @@ defmodule Beaver.MLIR.DSL.Block do
     locations_var_ast =
       for _ <- args do
         quote do
-          Beaver.MLIR.Managed.Location.get()
+          Beaver.MLIR.Location.unknown()
         end
       end
 

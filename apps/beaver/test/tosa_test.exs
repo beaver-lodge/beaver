@@ -1,10 +1,6 @@
 defmodule TosaTest do
-  use ExUnit.Case, async: true
+  use Beaver.Case, async: true
   use Beaver
-
-  setup do
-    [ctx: MLIR.Context.create()]
-  end
 
   test "generate and run tosa", context do
     import MLIR.{Transforms, Conversion}

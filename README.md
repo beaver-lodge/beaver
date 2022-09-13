@@ -12,7 +12,7 @@ Here is an example to build and verify a piece of IR in Beaver:
 
 ```elixir
 mlir do
-  module do
+  module ctx: ctx do
     Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
       region do
         block bb_entry() do
@@ -68,7 +68,7 @@ module {
     return %0 : tensor<2x3xf32>
   }
 }
-"""
+""".(ctx)
 |> MLIR.Pass.Composer.nested(Func.Func, [
   ToyPass.create()
 ])
@@ -288,7 +288,11 @@ PDL really opens a door to non C++ programming languages to build MLIR tools. Be
 
 ## MLIR context management
 
-When calling higher-level APIs, it is ideal not to have MLIR context passing around everywhere. To achieve this, we borrow the practice from upstream [MLIR Python Bindings](https://mlir.llvm.org/docs/Bindings/Python/) in LLVM repo and adapt it following Erlang/Elixir idiom. The basic idea is that all higher-level APIs are backed by Erlang [`process`](https://www.erlang.org/doc/reference_manual/processes.html) and [`ets`](https://www.erlang.org/doc/man/ets.html) to keep track of the contexts involved at different level of MLIR elements. By default it uses the global MLIR context get initialized as Erlang [application](https://www.erlang.org/doc/man/application.html)s start, or you can register a MLIR context for `self()` process.
+When calling higher-level APIs, it is ideal not to have MLIR context passing around everywhere.
+If MLIR context is not provided, Attribute and types getters will return an anonymous function taking MLIR context as its argument.
+In Erlang, all values are copied, so it is very safe to pass around these anonymous functions.
+When creating a operation, these functions will be called with the MLIR context in operation state.
+This approach archives both the succinctness and modularity of not having a global MLIR context.
 
 ## Development
 
@@ -300,41 +304,43 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 
   Recommended install commands:
 
-  ```
-  cmake -B build -S llvm -G Ninja -DLLVM_ENABLE_PROJECTS=mlir \
-    -DLLVM_TARGETS_TO_BUILD="host" \
-    -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-    -DLLVM_ENABLE_ASSERTIONS=ON \
-    -DLLVM_ENABLE_OCAMLDOC=OFF \
-    -DLLVM_ENABLE_BINDINGS=OFF \
-    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-    -DCMAKE_INSTALL_PREFIX=${HOME}/llvm-install
+```bash
+cmake -B build -S llvm -G Ninja -DLLVM_ENABLE_PROJECTS=mlir \
+ -DLLVM_TARGETS_TO_BUILD="host" \
+ -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+ -DLLVM_ENABLE_ASSERTIONS=ON \
+ -DLLVM_ENABLE_OCAMLDOC=OFF \
+ -DLLVM_ENABLE_BINDINGS=OFF \
+ -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+ -DCMAKE_INSTALL_PREFIX=${HOME}/llvm-install
   cmake --build build -t install
   export LLVM_CONFIG_PATH=$HOME/llvm-install/bin/llvm-config
+```
+
+To use Vulkan:
+
+- Install Vulkan SDK (global installation is required), reference: https://vulkan.lunarg.com/sdk/home
+- Setting environment variable by adding commands these to your bash/zsh profile:
+
+  ```
+  # you might need to change the version here
+  cd $HOME/VulkanSDK/1.3.216.0/
+  source setup-env.sh
+  cd -
   ```
 
-  To use Vulkan:
-
-  - Install Vulkan SDK (global installation is required), reference: https://vulkan.lunarg.com/sdk/home
-  - Setting environment variable by adding commands these to your bash/zsh profile:
-
-    ```
-    # you might need to change the version here
-    cd $HOME/VulkanSDK/1.3.216.0/
-    source setup-env.sh
-    cd -
-    ```
-
-  - use `vulkaninfo` and `vkvia` to verify Vulkan is working
-  - Add `-DMLIR_ENABLE_VULKAN_RUNNER=ON` in LLVM CMake config command
+- use `vulkaninfo` and `vkvia` to verify Vulkan is working
+- Add `-DMLIR_ENABLE_VULKAN_RUNNER=ON` in LLVM CMake config command
 
 4. Run tests
 
 - Clone the repo
 - Make sure LLVM environment variable is set properly, otherwise it might fail to build
-  ```bash
-  echo $LLVM_CONFIG_PATH
-  ```
+
+```bash
+echo $LLVM_CONFIG_PATH
+```
+
 - Build and run Elixir tests
   ```bash
   mix deps.get

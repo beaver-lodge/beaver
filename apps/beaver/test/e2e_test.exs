@@ -1,11 +1,7 @@
 defmodule E2ETest do
-  use ExUnit.Case
+  use Beaver.Case, async: true
   alias Beaver.MLIR
   @moduletag :smoke
-
-  setup do
-    [ctx: MLIR.Context.create()]
-  end
 
   test "run mlir module defined by sigil", context do
     import Beaver.MLIR.Sigils

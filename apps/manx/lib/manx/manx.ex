@@ -96,17 +96,6 @@ defmodule Manx do
     memory |> Manx.MemrefAllocator.delete()
   end
 
-  @impl true
-  def multiply(out, l, h) do
-    out = Nx.to_template(out)
-
-    expr_fun = fn t1, t2 ->
-      Nx.Defn.Expr.multiply(out, t1, t2)
-    end
-
-    expr_fun |> Nx.Defn.jit(compiler: Manx.Compiler, force: true) |> apply([l, h])
-  end
-
   @doc """
   Create a new tensor of null ptr memref. This should be used as as the return tensor of JIT function.
   """
@@ -295,7 +284,4 @@ defmodule Manx do
   def jit(function, args, options \\ []) do
     Nx.Defn.jit_apply(function, args, Keyword.put(options, :compiler, __MODULE__))
   end
-
-  @impl true
-  defdelegate __jit__(key, vars, fun, args, opts), to: __MODULE__.Compiler
 end

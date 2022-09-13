@@ -2,8 +2,10 @@ defmodule Beaver.MLIR.Sigils do
   alias Beaver.MLIR
 
   @doc """
-  Create a module with global MLIR context or process MLIR context if registered.
+  Create an module creator.
   ## Examples
+
+      iex> ctx = MLIR.Context.create()
       iex> %MLIR.Module{} = ~m\"""
       ...> module {
       ...>   func.func @add(%arg0 : i32, %arg1 : i32) -> i32 attributes { llvm.emit_c_interface } {
@@ -11,21 +13,24 @@ defmodule Beaver.MLIR.Sigils do
       ...>     return %res : i32
       ...>   }
       ...> }
-      ...> \""".(MLIR.Global.Context.get) |> MLIR.Operation.verify!()
+      ...> \""".(ctx) |> MLIR.Operation.verify!()
+      iex> ctx |> MLIR.Context.destroy
   """
   def sigil_m(string, []) do
     &MLIR.Module.create(&1, string)
   end
 
   @doc """
-  Create an attribute with global MLIR context or process MLIR context if registered.
+  Create an attribute creator.
   You might add a modifier to it as a shortcut to annotate the type
   ## Examples
 
-      iex> Attribute.equal?(Attribute.float(Type.f(32), 0.0).(MLIR.Global.Context.get), ~a{0.0}f32.(MLIR.Global.Context.get))
+      iex> ctx = MLIR.Context.create()
+      iex> Attribute.equal?(Attribute.float(Type.f(32), 0.0).(ctx), ~a{0.0}f32.(ctx))
       true
-      iex> ~a{1 : i32}.(MLIR.Global.Context.get) |> MLIR.to_string()
+      iex> ~a{1 : i32}.(ctx) |> MLIR.to_string()
       "1 : i32"
+      iex> ctx |> MLIR.Context.destroy
   """
   def sigil_a(string, []), do: MLIR.Attribute.get(string)
 
@@ -35,14 +40,16 @@ defmodule Beaver.MLIR.Sigils do
   end
 
   @doc """
-  Create a type with global MLIR context or process MLIR context if registered.
+  Create an type creator.
   You might add a modifier to it as a shortcut to make it a higher order type.
   ## Examples
 
-      iex> Type.equal?(Type.unranked_tensor(Type.f32()).(MLIR.Global.Context.get), ~t{tensor<*xf32>}.(MLIR.Global.Context.get))
+      iex> ctx = MLIR.Context.create()
+      iex> Type.equal?(Type.unranked_tensor(Type.f32()).(ctx), ~t{tensor<*xf32>}.(ctx))
       true
-      iex> Type.equal?(Type.complex(Type.f32()).(MLIR.Global.Context.get), ~t<f32>complex.(MLIR.Global.Context.get))
+      iex> Type.equal?(Type.complex(Type.f32()).(ctx), ~t<f32>complex.(ctx))
       true
+      iex> ctx |> MLIR.Context.destroy
   """
 
   def sigil_t(string, []), do: MLIR.Type.get(string)

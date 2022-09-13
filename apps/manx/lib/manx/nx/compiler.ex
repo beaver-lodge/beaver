@@ -60,7 +60,7 @@ defmodule Manx.Compiler do
                       function_type: function_type
                     ) do
             region do
-              locs = List.duplicate(MLIR.Managed.Location.get(), length(entry_types))
+              locs = List.duplicate(MLIR.Location.unknown(), length(entry_types))
 
               entry =
                 MLIR.Block.create(
@@ -121,6 +121,7 @@ defmodule Manx.Compiler do
       |> Manx.tensor_of_null_memref()
       |> invoke(args, jit, symbol)
 
+    MLIR.CAPI.mlirContextDestroy(ctx)
     [tree_return]
   end
 

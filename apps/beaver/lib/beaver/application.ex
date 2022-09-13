@@ -5,8 +5,6 @@ defmodule Beaver.Application do
   def start(_type, _args) do
     Supervisor.start_link(
       [
-        Beaver.MLIR.Global.Context,
-        Beaver.MLIR.Dialect.Registry,
         Beaver.MLIR.DSL.Op.Registry
       ],
       strategy: :one_for_one
@@ -14,6 +12,8 @@ defmodule Beaver.Application do
   end
 
   def start_phase(:load_dialect_modules, :normal, []) do
+    Beaver.MLIR.CAPI.mlirRegisterAllPasses()
+
     for dialect_module <- Beaver.MLIR.Dialect.dialects() do
       Task.async(fn ->
         for op_module <- apply(dialect_module, :__ops__, []) do

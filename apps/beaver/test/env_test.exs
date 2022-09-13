@@ -1,11 +1,7 @@
 defmodule EnvTest do
-  use ExUnit.Case
+  use Beaver.Case, async: true
   use Beaver
   alias Beaver.MLIR
-
-  setup do
-    [ctx: MLIR.Context.create()]
-  end
 
   test "MLIR.__BLOCK__", context do
     mlir ctx: context[:ctx] do
