@@ -304,18 +304,18 @@ This approach archives both the succinctness and modularity of not having a glob
 
   Recommended install commands:
 
-```bash
-cmake -B build -S llvm -G Ninja -DLLVM_ENABLE_PROJECTS=mlir \
- -DLLVM_TARGETS_TO_BUILD="host" \
- -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
- -DLLVM_ENABLE_ASSERTIONS=ON \
- -DLLVM_ENABLE_OCAMLDOC=OFF \
- -DLLVM_ENABLE_BINDINGS=OFF \
- -DCMAKE_BUILD_TYPE=RelWithDebInfo \
- -DCMAKE_INSTALL_PREFIX=${HOME}/llvm-install
-  cmake --build build -t install
-  export LLVM_CONFIG_PATH=$HOME/llvm-install/bin/llvm-config
-```
+  ```bash
+  cmake -B build -S llvm -G Ninja -DLLVM_ENABLE_PROJECTS=mlir \
+  -DLLVM_TARGETS_TO_BUILD="host" \
+  -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+  -DLLVM_ENABLE_ASSERTIONS=ON \
+  -DLLVM_ENABLE_OCAMLDOC=OFF \
+  -DLLVM_ENABLE_BINDINGS=OFF \
+  -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+  -DCMAKE_INSTALL_PREFIX=${HOME}/llvm-install
+    cmake --build build -t install
+    export LLVM_CONFIG_PATH=$HOME/llvm-install/bin/llvm-config
+  ```
 
 To use Vulkan:
 
