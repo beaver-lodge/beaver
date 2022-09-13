@@ -2,7 +2,7 @@ defmodule Beaver.MLIR.Sigils do
   alias Beaver.MLIR
 
   @doc """
-  Create an module creator.
+  Create a module creator.
   ## Examples
 
       iex> ctx = MLIR.Context.create()
@@ -40,7 +40,7 @@ defmodule Beaver.MLIR.Sigils do
   end
 
   @doc """
-  Create an type creator.
+  Create a type creator.
   You might add a modifier to it as a shortcut to make it a higher order type.
   ## Examples
 
