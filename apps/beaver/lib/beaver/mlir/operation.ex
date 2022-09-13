@@ -81,7 +81,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   defp do_create(ctx, op_name, arguments) when is_binary(op_name) and is_list(arguments) do
-    location = MLIR.Managed.Location.get()
+    location = MLIR.Location.unknown()
 
     state = %MLIR.Operation.State{name: op_name, location: location, context: ctx}
     state = Enum.reduce(arguments, state, &MLIR.Operation.State.add_argument(&2, &1))

@@ -109,6 +109,16 @@ defmodule Beaver.MLIR.Type do
     CAPI.mlirMemRefTypeGet(element_type, rank, shape, layout, memory_space)
   end
 
+  @doc """
+  Get a vector type creator.
+
+  ## Examples
+      iex> ctx = MLIR.Context.create()
+      iex> MLIR.Type.vector([1, 2, 3], MLIR.Type.i32).(ctx) |> MLIR.to_string()
+      "vector<1x2x3xi32>"
+      iex> ctx |> MLIR.Context.destroy
+  """
+
   def vector(shape, element_type) when is_function(element_type, 1) do
     Quark.Compose.compose(
       &vector(shape, &1),
@@ -116,17 +126,27 @@ defmodule Beaver.MLIR.Type do
     )
   end
 
-  def vector(shape, element_type) when is_list(shape) do
+  def vector(shape, %MLIR.CAPI.MlirType{} = element_type) when is_list(shape) do
     rank = length(shape)
     shape = shape |> Beaver.Native.I64.array()
     CAPI.mlirVectorTypeGet(rank, shape, element_type)
   end
 
+  @doc """
+  Get a tuple type.
+
+  ## Examples
+      iex> ctx = MLIR.Context.create()
+      iex> MLIR.Type.tuple([MLIR.Type.i32, MLIR.Type.i32], ctx: ctx) |> MLIR.to_string()
+      "tuple<i32, i32>"
+      iex> ctx |> MLIR.Context.destroy
+  """
   def tuple(elements, opts \\ []) when is_list(elements) do
-    num_elements = length(elements)
-    elements = elements |> CAPI.MlirType.array()
-    ctx = MLIR.Managed.Context.from_opts(opts)
-    CAPI.mlirTupleTypeGet(ctx, num_elements, elements)
+    Beaver.Deferred.from_opts(opts, fn ctx ->
+      num_elements = length(elements)
+      elements = elements |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> CAPI.MlirType.array()
+      CAPI.mlirTupleTypeGet(ctx, num_elements, elements)
+    end)
   end
 
   def f16(opts \\ []) do

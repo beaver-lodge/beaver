@@ -1,13 +1,9 @@
 defmodule CFTest do
-  use ExUnit.Case
+  use Beaver.Case, async: true
   use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Type}
   import ExUnit.CaptureIO
-
-  setup do
-    [ctx: MLIR.Context.create()]
-  end
 
   test "generate mlir with function calls", context do
     ir =

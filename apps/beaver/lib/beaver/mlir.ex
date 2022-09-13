@@ -16,7 +16,8 @@ defmodule Beaver.MLIR do
     MlirAffineExpr,
     MlirAffineMap,
     MlirIntegerSet,
-    MlirType
+    MlirType,
+    MlirLocation
   }
 
   def dump(%__MODULE__.Module{} = mlir) do
@@ -117,6 +118,12 @@ defmodule Beaver.MLIR do
 
   def to_string(%MlirAffineMap{ref: ref}) do
     CAPI.beaver_raw_beaver_affine_map_to_charlist(ref)
+    |> Beaver.Native.check!()
+    |> List.to_string()
+  end
+
+  def to_string(%MlirLocation{ref: ref}) do
+    CAPI.beaver_raw_beaver_location_to_charlist(ref)
     |> Beaver.Native.check!()
     |> List.to_string()
   end

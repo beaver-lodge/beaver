@@ -12,7 +12,7 @@ Here is an example to build and verify a piece of IR in Beaver:
 
 ```elixir
 mlir do
-  module do
+  module ctx: ctx do
     Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
       region do
         block bb_entry() do
@@ -68,7 +68,7 @@ module {
     return %0 : tensor<2x3xf32>
   }
 }
-"""
+""".(ctx)
 |> MLIR.Pass.Composer.nested(Func.Func, [
   ToyPass.create()
 ])
@@ -288,7 +288,11 @@ PDL really opens a door to non C++ programming languages to build MLIR tools. Be
 
 ## MLIR context management
 
-When calling higher-level APIs, it is ideal not to have MLIR context passing around everywhere. To achieve this, we borrow the practice from upstream [MLIR Python Bindings](https://mlir.llvm.org/docs/Bindings/Python/) in LLVM repo and adapt it following Erlang/Elixir idiom. The basic idea is that all higher-level APIs are backed by Erlang [`process`](https://www.erlang.org/doc/reference_manual/processes.html) and [`ets`](https://www.erlang.org/doc/man/ets.html) to keep track of the contexts involved at different level of MLIR elements. By default it uses the global MLIR context get initialized as Erlang [application](https://www.erlang.org/doc/man/application.html)s start, or you can register a MLIR context for `self()` process.
+When calling higher-level APIs, it is ideal not to have MLIR context passing around everywhere.
+If no MLIR context provided, an attribute and type getter should return an anonymous function with MLIR context as argument.
+In Erlang, all values are copied, so it is very safe to pass around these anonymous functions.
+When creating an operation, these functions will be called with the MLIR context in an operation state.
+This approach archives both the succinctness and modularity of not having a global MLIR context.
 
 ## Development
 
@@ -300,7 +304,7 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 
   Recommended install commands:
 
-  ```
+  ```bash
   cmake -B build -S llvm -G Ninja -DLLVM_ENABLE_PROJECTS=mlir \
     -DLLVM_TARGETS_TO_BUILD="host" \
     -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
@@ -332,9 +336,11 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 
 - Clone the repo
 - Make sure LLVM environment variable is set properly, otherwise it might fail to build
+
   ```bash
   echo $LLVM_CONFIG_PATH
   ```
+
 - Build and run Elixir tests
   ```bash
   mix deps.get

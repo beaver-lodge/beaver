@@ -20,4 +20,6 @@ defmodule Beaver.MLIR.Context do
   def create() do
     create(allow_unregistered: false)
   end
+
+  defdelegate destroy(ctx), to: MLIR.CAPI, as: :mlirContextDestroy
 end

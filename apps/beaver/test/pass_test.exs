@@ -1,14 +1,10 @@
 defmodule PassTest do
-  use ExUnit.Case
+  use Beaver.Case, async: true
   import ExUnit.CaptureLog
   use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Dialect.Func
-
-  setup do
-    [ctx: MLIR.Context.create()]
-  end
 
   test "exception in run/1", context do
     defmodule PassRaisingException do

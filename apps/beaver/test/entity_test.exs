@@ -1,13 +1,14 @@
-defmodule AttributeTest do
-  use ExUnit.Case, async: true
+defmodule EntityTest do
+  @moduledoc """
+  Test the creation of MLIR entities including attributes, types and locations.
+  """
+  use Beaver.Case, async: true
   alias Beaver.MLIR
   alias MLIR.{Type, Attribute}
   import MLIR.Sigils
   doctest Beaver.MLIR.Sigils
-
-  setup do
-    [ctx: MLIR.Context.create()]
-  end
+  doctest Beaver.MLIR.Type
+  doctest Beaver.MLIR.Location
 
   describe "type apis" do
     test "generated", context do

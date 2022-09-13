@@ -1,13 +1,8 @@
 defmodule RedundantTransposeTest do
-  use ExUnit.Case
-
+  use Beaver.Case, async: true
   alias Beaver.MLIR
   alias Beaver.MLIR.{Type}
   alias Beaver.MLIR.Dialect.{Func, TOSA}
-
-  setup do
-    [ctx: MLIR.Context.create()]
-  end
 
   test "pass to optimize redundant transpose", context do
     use Beaver

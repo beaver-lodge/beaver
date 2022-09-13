@@ -1,10 +1,6 @@
 defmodule VulkanRuntimeTest do
-  use ExUnit.Case
+  use Beaver.Case, async: true
   alias Beaver.MLIR
-
-  setup do
-    [ctx: MLIR.Context.create()]
-  end
 
   @tag timeout: :infinity, vulkan: true
   @vulkan_ir File.read!("test/vulkan.mlir")
