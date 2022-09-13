@@ -289,7 +289,7 @@ PDL really opens a door to non C++ programming languages to build MLIR tools. Be
 ## MLIR context management
 
 When calling higher-level APIs, it is ideal not to have MLIR context passing around everywhere.
-If an MLIR context is not provided, an attribute and type getter should return an anonymous function with MLIR context as argument.
+If no MLIR context provided, an attribute and type getter should return an anonymous function with MLIR context as argument.
 In Erlang, all values are copied, so it is very safe to pass around these anonymous functions.
 When creating an operation, these functions will be called with the MLIR context in an operation state.
 This approach archives both the succinctness and modularity of not having a global MLIR context.
