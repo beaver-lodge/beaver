@@ -1,6 +1,6 @@
 defmodule EntityTest do
   @moduledoc """
-  Test the creation of MLIR entities like attributes, type and locations.
+  Test the creation of MLIR entities including attributes, types and locations.
   """
   use Beaver.Case, async: true
   alias Beaver.MLIR
