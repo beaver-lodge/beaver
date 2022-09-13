@@ -110,7 +110,7 @@ defmodule Beaver.MLIR.Type do
   end
 
   @doc """
-  Get an vector type creator.
+  Get a vector type creator.
 
   ## Examples
       iex> ctx = MLIR.Context.create()
@@ -133,7 +133,7 @@ defmodule Beaver.MLIR.Type do
   end
 
   @doc """
-  Get an tuple type.
+  Get a tuple type.
 
   ## Examples
       iex> ctx = MLIR.Context.create()
