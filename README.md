@@ -317,20 +317,20 @@ This approach archives both the succinctness and modularity of not having a glob
     export LLVM_CONFIG_PATH=$HOME/llvm-install/bin/llvm-config
   ```
 
-To use Vulkan:
+  To use Vulkan:
 
-- Install Vulkan SDK (global installation is required), reference: https://vulkan.lunarg.com/sdk/home
-- Setting environment variable by adding commands these to your bash/zsh profile:
+  - Install Vulkan SDK (global installation is required), reference: https://vulkan.lunarg.com/sdk/home
+  - Setting environment variable by adding commands these to your bash/zsh profile:
 
-  ```
-  # you might need to change the version here
-  cd $HOME/VulkanSDK/1.3.216.0/
-  source setup-env.sh
-  cd -
-  ```
+    ```
+    # you might need to change the version here
+    cd $HOME/VulkanSDK/1.3.216.0/
+    source setup-env.sh
+    cd -
+    ```
 
-- use `vulkaninfo` and `vkvia` to verify Vulkan is working
-- Add `-DMLIR_ENABLE_VULKAN_RUNNER=ON` in LLVM CMake config command
+  - use `vulkaninfo` and `vkvia` to verify Vulkan is working
+  - Add `-DMLIR_ENABLE_VULKAN_RUNNER=ON` in LLVM CMake config command
 
 4. Run tests
 
