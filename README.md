@@ -313,8 +313,8 @@ This approach archives both the succinctness and modularity of not having a glob
     -DLLVM_ENABLE_BINDINGS=OFF \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DCMAKE_INSTALL_PREFIX=${HOME}/llvm-install
-      cmake --build build -t install
-      export LLVM_CONFIG_PATH=$HOME/llvm-install/bin/llvm-config
+  cmake --build build -t install
+  export LLVM_CONFIG_PATH=$HOME/llvm-install/bin/llvm-config
   ```
 
   To use Vulkan:
