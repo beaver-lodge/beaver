@@ -26,9 +26,6 @@ defmodule Beaver.MLIR.Dialect.Registry do
     |> Enum.join("_")
     |> Macro.camelize()
     |> String.to_atom()
-
-    # |> Enum.map(&Macro.camelize/1)
-    # |> Module.concat()
   end
 
   def normalize_dialect_name(to_upcase)
