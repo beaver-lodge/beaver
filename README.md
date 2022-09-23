@@ -358,7 +358,25 @@ This approach archives both the succinctness and modularity of not having a glob
 
 6. Livebook
 
+- Please use Elixir 1.14 and install Livebook from source on GitHub:
+  ```bash
+  mix escript.install github livebook-dev/livebook
+  ```
 - To use Beaver in [Livebook](https://livebook.dev/), run this in the source directory:
   ```bash
-  livebook server --name livebook@127.0.0.1 --home . --default-runtime mix
+  livebook server --name livebook@127.0.0.1 --home .
+  ```
+- in the setup cell, replace the content with:
+
+  ```elixir
+  beaver_app_root = Path.join(__DIR__, "..")
+  umbrella_app_root = Path.join(__DIR__, "../../..")
+
+  Mix.install(
+    [
+      {:beaver, path: beaver_app_root, env: :dev}
+    ],
+    config_path: Path.join(umbrella_app_root, "config/config.exs"),
+    lockfile: Path.join(umbrella_app_root, "mix.lock")
+  )
   ```
