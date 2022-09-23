@@ -366,7 +366,7 @@ This approach archives both the succinctness and modularity of not having a glob
   ```bash
   livebook server --name livebook@127.0.0.1 --home .
   ```
-- in the setup cell, replace the content with:
+- In the setup cell, replace the content with:
 
   ```elixir
   beaver_app_root = Path.join(__DIR__, "..")
