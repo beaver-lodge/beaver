@@ -29,7 +29,7 @@ ENV PATH "/zig-install:${PATH}"
 # Install mix dependencies
 COPY mix.exs mix.lock ./
 COPY config config
-RUN mix do deps.get, deps.compile
-
 COPY apps apps
+
+RUN mix do deps.get, deps.compile
 RUN mix do compile, release beaver
