@@ -7,7 +7,6 @@ endif()
 
 set(CMAKE_INSTALL_MESSAGE LAZY CACHE STRING "" FORCE)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "" FORCE)
-set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL "" FORCE)
 
 set(BUILD_LLVM FALSE CACHE BOOL "")
 if(BUILD_LLVM)
@@ -21,6 +20,7 @@ message(STATUS "MLIR_INCLUDE_DIRS: ${MLIR_INCLUDE_DIRS}")
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_BINARY_DIR}/include)
 
+set(LLVM_ENABLE_TERMINFO OFF CACHE BOOL "" FORCE)
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(aggregate)
