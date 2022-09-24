@@ -16,7 +16,6 @@ defmodule VulkanRuntimeTest do
       |> canonicalize
       |> cse
       |> gpu_kernel_outlining
-      |> MLIR.Pass.Composer.pipeline("fold-memref-subview-ops")
       |> convert_gpu_to_spirv
       |> MLIR.Pass.Composer.nested("spv.module", fn pm ->
         MLIR.Pass.pipeline!(pm, "spirv-lower-abi-attrs")
