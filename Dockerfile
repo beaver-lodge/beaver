@@ -1,4 +1,11 @@
-FROM livebook/livebook:latest
+FROM hexpm/elixir:1.14.0-erlang-24.3.4.2-debian-bullseye-20210902-slim AS build
+
+RUN apt-get update && apt-get upgrade -y && \
+    apt-get install --no-install-recommends -y \
+    build-essential git unzip && \
+    apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \
+    apt-get clean -y && \
+    rm -rf /var/lib/apt/lists/*
 
 WORKDIR /beaver
 
