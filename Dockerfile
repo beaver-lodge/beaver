@@ -21,7 +21,8 @@ RUN wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/relea
     rm llvm-install.zip
 ENV LLVM_CONFIG_PATH="/llvm-install/bin/llvm-config"
 RUN wget --progress=bar:force:noscroll https://ziglang.org/download/0.9.1/zig-linux-x86_64-0.9.1.tar.xz -O zig-install.tar.xz && \
-    tar xvf zig-install.tar.xz -C /zig-install && \
+    mkdir /zig-install && \
+    tar xvf zig-install.tar.xz -C /zig-install --strip-components 1 && \
     rm zig-install.tar.xz
 ENV PATH "/zig-install:${PATH}"
 
