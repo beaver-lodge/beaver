@@ -42,7 +42,6 @@ jobs:
         uses: docker/build-push-action@v3
         with:
           load: true
-          push: true
           tags: |
             ${{ env.DOCKER_HUB_NAMESPACE }}/${{ env.DOCKER_REPO }}:${{ github.sha }}
           cache-from: type=registry,ref=${{ env.DOCKER_HUB_NAMESPACE }}/${{ env.DOCKER_REPO }}:latest
