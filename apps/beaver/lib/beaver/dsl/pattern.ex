@@ -14,7 +14,7 @@ defmodule Beaver.DSL.Pattern do
   """
   def gen_pdl(%Env{} = env, %MLIR.CAPI.MlirType{} = type) do
     mlir block: env.block, ctx: env.ctx do
-      Beaver.MLIR.Dialect.PDL.type(type: type) >>> ~t{!pdl.type}
+      Beaver.MLIR.Dialect.PDL.type(constantType: type) >>> ~t{!pdl.type}
     end
   end
 
@@ -56,8 +56,8 @@ defmodule Beaver.DSL.Pattern do
           attributes ++
           results ++
           [
-            name: Beaver.MLIR.Attribute.string(op_name),
-            attributeNames: Beaver.MLIR.Attribute.array(attribute_names),
+            opName: Beaver.MLIR.Attribute.string(op_name),
+            attributeValueNames: Beaver.MLIR.Attribute.array(attribute_names),
             operand_segment_sizes:
               Beaver.MLIR.ODS.operand_segment_sizes([
                 length(operands),
