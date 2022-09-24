@@ -16,7 +16,7 @@ RUN mix local.hex --force && \
 # Build for production
 ENV MIX_ENV=prod
 
-RUN wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-08-23-0233/llvm-install.zip && \
+RUN wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-09-24-0520/llvm-install.zip && \
     unzip llvm-install.zip -d /llvm-install && \
     rm llvm-install.zip
 ENV LLVM_CONFIG_PATH="/llvm-install/bin/llvm-config"
