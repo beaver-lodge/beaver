@@ -56,8 +56,8 @@ defmodule Beaver.DSL.Pattern do
           attributes ++
           results ++
           [
-            name: Beaver.MLIR.Attribute.string(op_name),
-            attributeNames: Beaver.MLIR.Attribute.array(attribute_names),
+            opName: Beaver.MLIR.Attribute.string(op_name),
+            attributeValueNames: Beaver.MLIR.Attribute.array(attribute_names),
             operand_segment_sizes:
               Beaver.MLIR.ODS.operand_segment_sizes([
                 length(operands),
