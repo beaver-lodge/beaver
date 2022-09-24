@@ -23,5 +23,5 @@ COPY mix.exs mix.lock ./
 COPY config config
 RUN mix do deps.get, deps.compile
 
-COPY lib lib
+COPY apps apps
 RUN mix do compile, release beaver
