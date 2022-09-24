@@ -14,7 +14,7 @@ defmodule Beaver.DSL.Pattern do
   """
   def gen_pdl(%Env{} = env, %MLIR.CAPI.MlirType{} = type) do
     mlir block: env.block, ctx: env.ctx do
-      Beaver.MLIR.Dialect.PDL.type(type: type) >>> ~t{!pdl.type}
+      Beaver.MLIR.Dialect.PDL.type(constantType: type) >>> ~t{!pdl.type}
     end
   end
 
