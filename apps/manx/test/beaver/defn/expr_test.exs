@@ -535,6 +535,8 @@ defmodule Manx.ExprTest do
       |> Nx.equal(y_true)
     end
 
+    @tag :todo
+    # TODO: track https://github.com/llvm/llvm-project/issues/57951
     test "computes successive comparisons" do
       assert_equal(successive_compare(Nx.tensor(1), Nx.tensor(1)), Nx.tensor(1, type: {:u, 8}))
     end
