@@ -458,6 +458,15 @@ const BeaverDiagnostic = struct {
 
         c.mlirDiagnosticPrint(diagnostic, printToStderr, null);
         stderr.print("{s}", .{"\n"}) catch unreachable;
+
+        const num_note = c.mlirDiagnosticGetNumNotes(diagnostic);
+        var i: isize = 0;
+        while (i < num_note) {
+            const note_d = c.mlirDiagnosticGetNote(diagnostic, i);
+            c.mlirDiagnosticPrint(note_d, printToStderr, null);
+            i += 1;
+        }
+        stderr.print("{s}", .{"\n"}) catch unreachable;
         return c.mlirLogicalResultSuccess();
     }
 };
