@@ -68,10 +68,4 @@ defmodule Beaver.MLIR.Dialect.Registry do
       all_dialects |> Enum.reject(fn x -> x in skip_dialects end)
     end
   end
-
-  defp query_ops() do
-    for {dialect, op} <- Beaver.MLIR.CAPI.beaver_raw_registered_ops() do
-      {List.to_string(dialect), List.to_string(op)}
-    end
-  end
 end
