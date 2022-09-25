@@ -43,9 +43,10 @@ jobs:
         with:
           load: true
           tags: |
-            ${{ env.DOCKER_HUB_NAMESPACE }}/${{ env.DOCKER_REPO }}:${{ github.sha }}
+            ${{ env.DOCKER_HUB_NAMESPACE }}/${{ env.DOCKER_REPO }}-test:${{ github.sha }}
           cache-from: type=registry,ref=${{ env.DOCKER_HUB_NAMESPACE }}/${{ env.DOCKER_REPO }}:latest
           cache-to: type=inline
+          target: test
 
       # Push docker image if on `main`
       - name: Push Docker image
