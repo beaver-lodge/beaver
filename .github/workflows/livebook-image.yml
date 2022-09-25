@@ -47,6 +47,7 @@ jobs:
           cache-from: type=registry,ref=${{ env.DOCKER_HUB_NAMESPACE }}/${{ env.DOCKER_REPO }}:latest
           cache-to: type=inline
           target: test
+          file: livebook.dockerfile
 
       # Push docker image if on `main`
       - name: Push Docker image
@@ -59,3 +60,4 @@ jobs:
             ${{ env.DOCKER_HUB_NAMESPACE }}/${{ env.DOCKER_REPO }}:${{ github.sha }}
           cache-from: type=registry,ref=${{ env.DOCKER_HUB_NAMESPACE }}/${{ env.DOCKER_REPO }}:latest
           cache-to: type=inline
+          file: livebook.dockerfile
