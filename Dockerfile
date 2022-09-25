@@ -1,4 +1,4 @@
-FROM livebook/livebook
+FROM livebook/livebook as base
 
 RUN --mount=type=cache,id=apt-dev,target=/var/cache/apt \
     apt-get update && apt-get upgrade -y && \
@@ -20,3 +20,25 @@ RUN wget --progress=bar:force:noscroll https://ziglang.org/download/0.9.1/zig-li
     tar xvf zig-install.tar.xz -C /zig-install --strip-components 1 && \
     rm zig-install.tar.xz
 ENV PATH "/zig-install:${PATH}"
+
+FROM base as test
+
+WORKDIR /beaver
+
+# Install hex and rebar
+RUN mix local.hex --force && \
+    mix local.rebar --force
+
+# Build for production
+ENV MIX_ENV=prod
+
+# Install mix dependencies
+COPY mix.exs mix.lock ./
+COPY config config
+COPY apps apps
+
+# Make sure it compiles in docker
+RUN mix do deps.get, deps.compile
+RUN mix do compile
+
+FROM base
