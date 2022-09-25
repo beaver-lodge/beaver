@@ -4,7 +4,7 @@ defmodule Beaver.MixProject do
   def project do
     [
       app: :beaver,
-      version: "0.1.0",
+      version: "0.2.2",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -14,6 +14,7 @@ defmodule Beaver.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
       description: description(),
+      docs: docs(),
       package: package(),
       compilers: [:cmake] ++ Mix.compilers(),
       aliases: aliases()
@@ -24,10 +25,45 @@ defmodule Beaver.MixProject do
     "Beaver, a MLIR Toolkit in Elixir"
   end
 
+  defp docs() do
+    [
+      main: "Beaver",
+      ignore_apps: [:kinda],
+      extras: [
+        "README.md",
+        "guides/your-first-beaver-compiler.livemd"
+      ],
+      filter_modules: fn m, _meta ->
+        name = Atom.to_string(m)
+
+        not (String.contains?(name, "Beaver.MLIR.Dialect.") ||
+               String.contains?(name, "Beaver.MLIR.CAPI."))
+      end,
+      api_reference: false,
+      groups_for_modules: [
+        DSL: [
+          Beaver,
+          ~r"Beaver.DSL.*",
+          ~r"Beaver.Walker.*"
+        ],
+        MLIR: [
+          ~r"Beaver.MLIR.*"
+        ],
+        Native: [
+          ~r"Beaver.Native.*"
+        ],
+        Bindings: [
+          Beaver.MLIR.CAPI
+        ]
+      ]
+    ]
+  end
+
   defp package() do
     [
       licenses: ["Apache-2.0", "MIT"],
-      links: %{"GitHub" => "https://github.com/beaver-project/beaver"}
+      links: %{"GitHub" => "https://github.com/beaver-project/beaver"},
+      files: ~w(lib priv .formatter.exs mix.exs README* native)
     ]
   end
 
@@ -43,8 +79,14 @@ defmodule Beaver.MixProject do
   defp elixirc_paths(_), do: ["lib"]
 
   defp deps do
+    kinda_ver =
+      case Code.ensure_compiled(Beaver.Umbrella.MixProject) do
+        {:module, _} -> [in_umbrella: true]
+        {:error, _} -> "~> 0.1"
+      end
+
     [
-      {:kinda, in_umbrella: true},
+      {:kinda, kinda_ver},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:quark, "~> 2.3"}
     ]
@@ -104,17 +146,21 @@ defmodule Beaver.MixProject do
     Logger.debug("[CMake] configuring...")
 
     {_, 0} =
-      System.cmd("cmake", [
-        "-S",
-        cmake_project,
-        "-B",
-        build,
-        "-G",
-        "Ninja",
-        "-DLLVM_DIR=#{LLVM.Config.lib_dir()}/cmake/llvm",
-        "-DMLIR_DIR=#{LLVM.Config.lib_dir()}/cmake/mlir",
-        "-DCMAKE_INSTALL_PREFIX=#{install}"
-      ])
+      System.cmd(
+        "cmake",
+        [
+          "-S",
+          cmake_project,
+          "-B",
+          build,
+          "-G",
+          "Ninja",
+          "-DLLVM_DIR=#{LLVM.Config.lib_dir()}/cmake/llvm",
+          "-DMLIR_DIR=#{LLVM.Config.lib_dir()}/cmake/mlir",
+          "-DCMAKE_INSTALL_PREFIX=#{install}"
+        ],
+        stderr_to_stdout: true
+      )
 
     Logger.debug("[CMake] building...")
 
