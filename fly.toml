@@ -1,4 +1,4 @@
-# fly.toml file generated for small-shadow-3473 on 2022-09-25T14:16:46+08:00
+# fly.toml file generated for beaver-live on 2022-09-25T14:30:10+08:00
 
 app = "beaver-live"
 kill_signal = "SIGINT"
