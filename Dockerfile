@@ -3,7 +3,7 @@ FROM livebook/livebook
 RUN --mount=type=cache,id=apt-dev,target=/var/cache/apt \
     apt-get update && apt-get upgrade -y && \
     apt-get install --no-install-recommends -y \
-    build-essential git unzip wget ninja-build ca-certificates cmake zlib1g-dev libzstd-dev ccache && \
+    build-essential git unzip wget ninja-build ca-certificates cmake ccache && \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \
     apt-get clean -y && \
     rm -rf /var/lib/apt/lists/*
