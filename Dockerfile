@@ -1,4 +1,4 @@
-FROM hexpm/elixir:1.14.0-erlang-24.3.4.2-debian-bullseye-20210902-slim AS build
+FROM livebook/livebook
 
 RUN apt-get update && apt-get upgrade -y && \
     apt-get install --no-install-recommends -y \
@@ -7,29 +7,15 @@ RUN apt-get update && apt-get upgrade -y && \
     apt-get clean -y && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /beaver
-
-# Install hex and rebar
-RUN mix local.hex --force && \
-    mix local.rebar --force
-
-# Build for production
-ENV MIX_ENV=prod
-
+# setup llvm
 RUN wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-09-24-1016/llvm-install.zip && \
     unzip llvm-install.zip -d /llvm-install && \
     rm llvm-install.zip
 ENV LLVM_CONFIG_PATH="/llvm-install/bin/llvm-config"
+
+# setup zig
 RUN wget --progress=bar:force:noscroll https://ziglang.org/download/0.9.1/zig-linux-x86_64-0.9.1.tar.xz -O zig-install.tar.xz && \
     mkdir /zig-install && \
     tar xvf zig-install.tar.xz -C /zig-install --strip-components 1 && \
     rm zig-install.tar.xz
 ENV PATH "/zig-install:${PATH}"
-
-# Install mix dependencies
-COPY mix.exs mix.lock ./
-COPY config config
-COPY apps apps
-
-RUN mix do deps.get, deps.compile
-RUN mix do compile, release beaver
