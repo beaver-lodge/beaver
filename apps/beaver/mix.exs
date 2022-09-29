@@ -4,7 +4,7 @@ defmodule Beaver.MixProject do
   def project do
     [
       app: :beaver,
-      version: "0.2.2",
+      version: "0.2.4",
       build_path: "../../_build",
       config_path: "../../config/config.exs",
       deps_path: "../../deps",
@@ -30,7 +30,7 @@ defmodule Beaver.MixProject do
       main: "Beaver",
       ignore_apps: [:kinda],
       extras: [
-        "README.md",
+        "guides/introducing-beaver.md",
         "guides/your-first-beaver-compiler.livemd"
       ],
       filter_modules: fn m, _meta ->
@@ -51,9 +51,6 @@ defmodule Beaver.MixProject do
         ],
         Native: [
           ~r"Beaver.Native.*"
-        ],
-        Bindings: [
-          Beaver.MLIR.CAPI
         ]
       ]
     ]
