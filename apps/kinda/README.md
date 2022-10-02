@@ -84,6 +84,20 @@ Kinda is also inspired by Rustler. Rustler really define what a ergonomic NIF li
 - Usually TableGen generates C/C++ source code. While in Kinda it is expected to generate Elixir AST and get compiled directly.
 - To generate Zig code, Kinda takes in C `.h` files instead of `.td` files.
 
+## Pre-built mode
+
+- Out of the box Kinda supports generating and loading pre-built NIF library.
+
+  ```elixir
+    use Kinda.Prebuilt,
+      otp_app: :beaver,
+      base_url: "[URL]",
+      version: "[VERSION]"
+  ```
+
+- It reuses code in [rustler_precompiled](https://github.com/philss/rustler_precompiled.git) to follow the same convention of checksum checks and OTP compatibility rules.
+- In Kinda, besides the main NIF library, there might be `header-*.exs.` for functions signatures and multiple shared libraries the main NIF library depends on. (Zig doesn't support static linking yet. [Related issue](https://github.com/ziglang/zig/issues/9053))
+
 ## Usage
 
 ```elixir

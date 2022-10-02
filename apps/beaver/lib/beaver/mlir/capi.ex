@@ -1,6 +1,11 @@
 defmodule Beaver.MLIR.CAPI do
   require Logger
 
+  use Kinda.Prebuilt,
+    otp_app: :beaver,
+    base_url: "https://github.com/philss/rustler_precompilation_example/releases/download",
+    version: "0.2.4"
+
   @moduledoc """
   This module calls C API of MLIR. These FFIs are generated from headers in LLVM repo and this repo's headers providing supplemental functions.
   """
@@ -37,7 +42,8 @@ defmodule Beaver.MLIR.CAPI do
         beaver_libdir: Path.join([Mix.Project.build_path(), "native-install", "lib"])
       },
       type_gen: &__MODULE__.CodeGen.type_gen/2,
-      nif_gen: &__MODULE__.CodeGen.nif_gen/1
+      nif_gen: &__MODULE__.CodeGen.nif_gen/1,
+      version: "0.2.4"
     )
 
   root_module = __MODULE__

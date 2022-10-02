@@ -27,7 +27,9 @@ defmodule Kinda.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+      {:rustler_precompiled, "~> 0.5"},
+      {:bypass, "~> 2.1", only: :test}
     ]
   end
 

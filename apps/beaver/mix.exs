@@ -60,7 +60,7 @@ defmodule Beaver.MixProject do
     [
       licenses: ["Apache-2.0", "MIT"],
       links: %{"GitHub" => "https://github.com/beaver-project/beaver"},
-      files: ~w(lib priv .formatter.exs mix.exs README* native)
+      files: ~w(lib priv .formatter.exs mix.exs README* native checksum-*.exs,)
     ]
   end
 
@@ -77,9 +77,10 @@ defmodule Beaver.MixProject do
 
   defp deps do
     kinda_ver =
-      case Code.ensure_compiled(Beaver.Umbrella.MixProject) do
-        {:module, _} -> [in_umbrella: true]
-        {:error, _} -> "~> 0.1"
+      if 1 do
+        [in_umbrella: true]
+      else
+        "~> 0.1"
       end
 
     [

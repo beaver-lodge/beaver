@@ -37,6 +37,7 @@ defmodule Kinda do
     Logger.debug("[Kinda] generating Zig code for wrapper: #{wrapper}")
     include_paths = Keyword.get(opts, :include_paths, %{})
     library_paths = Keyword.get(opts, :library_paths, %{})
+    version = Keyword.fetch!(opts, :version)
     type_gen = Keyword.get(opts, :type_gen) || (&Type.default/2)
     nif_gen = Keyword.get(opts, :nif_gen) || (&NIF.from_function/1)
     cache_root = Path.join([Mix.Project.build_path(), "mlir-zig-build", "zig-cache"])
@@ -291,11 +292,14 @@ defmodule Kinda do
         "include"
       ])
 
+    {:ok, target} = RustlerPrecompiled.target() |> dbg
+
     build_source =
       build_source <>
         """
         pub const cache_root = "#{cache_root}";
         pub const erts_include = "#{erts_include}";
+        pub const lib_suffix = "v#{version}-#{target}";
         """
 
     dst = Path.join(project_dir, "build.imp.zig")
