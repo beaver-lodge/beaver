@@ -60,7 +60,7 @@ defmodule Beaver.MixProject do
     [
       licenses: ["Apache-2.0", "MIT"],
       links: %{"GitHub" => "https://github.com/beaver-project/beaver"},
-      files: ~w(lib priv .formatter.exs mix.exs README* native checksum-*.exs,)
+      files: ~w(lib priv .formatter.exs mix.exs README* native checksum-*.exs)
     ]
   end
 
