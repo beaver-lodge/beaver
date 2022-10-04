@@ -1,10 +1,44 @@
 defmodule Beaver.MLIR.CAPI do
   require Logger
 
+  mem_ref_descriptor_kinds =
+    for rank <- [
+          DescriptorUnranked,
+          Descriptor1D,
+          Descriptor2D,
+          Descriptor3D,
+          Descriptor4D,
+          Descriptor5D,
+          Descriptor6D,
+          Descriptor7D,
+          Descriptor8D,
+          Descriptor9D
+        ],
+        t <- [Complex.F32, U8, U16, U32, I8, I16, I32, I64, F32, F64] do
+      %Kinda.CodeGen.Type{
+        module_name: Module.concat([Beaver.Native, t, MemRef, rank]),
+        kind_functions: Beaver.MLIR.CAPI.CodeGen.memref_kind_functions()
+      }
+    end
+
+  kinds =
+    [
+      %Kinda.CodeGen.Type{
+        module_name: Beaver.Native.PtrOwner
+      },
+      %Kinda.CodeGen.Type{
+        module_name: Beaver.Native.Complex.F32,
+        kind_functions: Beaver.MLIR.CAPI.CodeGen.memref_kind_functions()
+      }
+    ] ++ mem_ref_descriptor_kinds
+
+  dest_dir = Path.join([Mix.Project.build_path(), "native-install"])
+
   use Kinda.Prebuilt,
     otp_app: :beaver,
     lib_name: "beaver",
-    base_url: "https://github.com/philss/rustler_precompilation_example/releases/download",
+    # base_url: "https://github.com/philss/rustler_precompilation_example/releases/download",
+    base_url: "http://127.0.0.1:8000/",
     version: "0.2.4",
     wrapper: Path.join(File.cwd!(), "native/wrapper.h"),
     zig_src: "native/mlir-zig",
@@ -12,12 +46,19 @@ defmodule Beaver.MLIR.CAPI do
       llvm_include: Beaver.LLVM.Config.include_dir(),
       beaver_include: Path.join(File.cwd!(), "native/mlir-c/include")
     },
-    library_paths: %{
-      beaver_libdir: Path.join([Mix.Project.build_path(), "native-install", "lib"])
+    constants: %{
+      beaver_libdir: Path.join(dest_dir, "lib")
     },
+    dest_dir: dest_dir,
     type_gen: &__MODULE__.CodeGen.type_gen/2,
     nif_gen: &__MODULE__.CodeGen.nif_gen/1,
-    version: "0.2.4"
+    kinds: kinds,
+    forward_module: Beaver.Native,
+    func_filter: fn fns ->
+      fns
+      |> Enum.filter(fn x -> String.contains?(x, "mlir") || String.contains?(x, "beaver") end)
+      |> Enum.filter(fn x -> String.contains?(x, "pub extern fn") end)
+    end
 
   @moduledoc """
   This module calls C API of MLIR. These FFIs are generated from headers in LLVM repo and this repo's headers providing supplemental functions.
@@ -62,7 +103,4 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_read_opaque_ptr(_, _), do: raise("NIF not loaded")
   def beaver_raw_own_opaque_ptr(_), do: raise("NIF not loaded")
   def beaver_raw_context_attach_diagnostic_handler(_), do: raise("NIF not loaded")
-
-  # setup NIF loading
-  @on_load :kinda_on_load
 end

@@ -1,12 +1,7 @@
 defmodule Kinda.Prebuilt do
-  defmacro __using__(opts) do
-    force =
-      quote do
-        opts = unquote(opts)
-        contents = Kinda.Prebuilt.__using__(__MODULE__, opts)
-        Module.eval_quoted(__MODULE__, contents)
-      end
+  require Logger
 
+  defmacro __using__(opts) do
     quote do
       require Logger
 
@@ -22,13 +17,26 @@ defmodule Kinda.Prebuilt do
         )
 
       case RustlerPrecompiled.__using__(__MODULE__, opts) do
-        {:force_build, only_rustler_opts} ->
-          unquote(force)
+        {:force_build, _only_rustler_opts} ->
+          contents = Kinda.Prebuilt.__using__(__MODULE__, opts)
+          Module.eval_quoted(__MODULE__, contents)
 
         {:ok, config} ->
           @on_load :load_rustler_precompiled
           @rustler_precompiled_load_from config.load_from
           @rustler_precompiled_load_data config.load_data
+
+          {otp_app, path} = @rustler_precompiled_load_from
+          base_path = Path.basename(path)
+
+          {meta, _binding} =
+            Path.dirname(path)
+            |> Path.join("kinda-meta-#{base_path}.ex")
+            |> File.read!()
+            |> Code.eval_string()
+
+          contents = Kinda.Prebuilt.__using__(__MODULE__, Keyword.put(opts, :meta, meta))
+          Module.eval_quoted(__MODULE__, contents)
 
           @doc false
           def load_rustler_precompiled do
@@ -62,162 +70,149 @@ defmodule Kinda.Prebuilt do
     end
   end
 
-  def __using__(root_module, opts) do
-    require Logger
-
-    %{
-      nifs: nifs,
-      resource_kinds: resource_kinds,
-      dest_dir: dest_dir,
-      zig_t_module_map: zig_t_module_map,
-      lib_name: lib_name
-    } = gen(root_module, opts)
-
-    forward_module = Beaver.Native
-    # generate resource modules
-    kind_ast =
-      for %Kinda.CodeGen.Type{
-            module_name: module_name,
-            zig_t: zig_t,
-            fields: fields
-          } = type <-
-            resource_kinds,
-          Atom.to_string(module_name)
-          |> String.starts_with?(Atom.to_string(root_module)) do
-        Logger.debug("[Beaver] building resource kind #{module_name}")
-
-        quote bind_quoted: [
-                root_module: root_module,
-                module_name: module_name,
-                zig_t: zig_t,
-                fields: fields,
-                forward_module: forward_module
-              ] do
-          defmodule module_name do
-            @moduledoc """
-            #{zig_t}
-            """
-
-            use Kinda.ResourceKind,
-              root_module: root_module,
-              fields: fields,
-              forward_module: forward_module
-          end
-        end
-      end
-
+  defp nif_ast(kinds, nifs, forward_module, zig_t_module_map) do
     # generate stubs for generated NIFs
-    Logger.debug("[Beaver] generating NIF wrappers")
-
-    mem_ref_descriptor_kinds =
-      for rank <- [
-            DescriptorUnranked,
-            Descriptor1D,
-            Descriptor2D,
-            Descriptor3D,
-            Descriptor4D,
-            Descriptor5D,
-            Descriptor6D,
-            Descriptor7D,
-            Descriptor8D,
-            Descriptor9D
-          ],
-          t <- [Complex.F32, U8, U16, U32, I8, I16, I32, I64, F32, F64] do
-        %Kinda.CodeGen.Type{
-          module_name: Module.concat([Beaver.Native, t, MemRef, rank]),
-          kind_functions: Beaver.MLIR.CAPI.CodeGen.memref_kind_functions()
-        }
-      end
+    Logger.debug("[Kinda] generating NIF wrappers, forward_module: #{inspect(forward_module)}")
 
     extra_kind_nifs =
-      ([
-         %Kinda.CodeGen.Type{
-           module_name: Beaver.Native.PtrOwner
-         },
-         %Kinda.CodeGen.Type{
-           module_name: Beaver.Native.Complex.F32,
-           kind_functions: Beaver.MLIR.CAPI.CodeGen.memref_kind_functions()
-         }
-       ] ++ mem_ref_descriptor_kinds)
+      kinds
       |> Enum.map(&Kinda.CodeGen.NIF.from_resource_kind/1)
       |> List.flatten()
 
-    nif_ast =
-      for nif <- nifs ++ extra_kind_nifs do
-        args_ast = Macro.generate_unique_arguments(nif.arity, __MODULE__)
+    for nif <- nifs ++ extra_kind_nifs do
+      args_ast = Macro.generate_unique_arguments(nif.arity, __MODULE__)
 
-        %Kinda.CodeGen.NIF{wrapper_name: wrapper_name, nif_name: nif_name, ret: ret} = nif
+      %Kinda.CodeGen.NIF{wrapper_name: wrapper_name, nif_name: nif_name, ret: ret} = nif
 
-        stub_ast =
-          quote do
-            @doc false
-            def unquote(nif_name)(unquote_splicing(args_ast)),
-              do:
-                raise(
-                  "NIF for resource kind is not implemented, or failed to load NIF library. Function: :\"#{unquote(nif_name)}\"/#{unquote(nif.arity)}"
-                )
-          end
+      stub_ast =
+        quote do
+          @doc false
+          def unquote(nif_name)(unquote_splicing(args_ast)),
+            do:
+              raise(
+                "NIF for resource kind is not implemented, or failed to load NIF library. Function: :\"#{unquote(nif_name)}\"/#{unquote(nif.arity)}"
+              )
+        end
 
-        wrapper_ast =
-          if wrapper_name do
-            if ret == "void" do
-              quote do
-                def unquote(String.to_atom(wrapper_name))(unquote_splicing(args_ast)) do
-                  refs = Kinda.unwrap_ref([unquote_splicing(args_ast)])
-                  ref = apply(__MODULE__, unquote(nif_name), refs)
-                  :ok = unquote(forward_module).check!(ref)
-                end
+      wrapper_ast =
+        if wrapper_name do
+          if ret == "void" do
+            quote do
+              def unquote(String.to_atom(wrapper_name))(unquote_splicing(args_ast)) do
+                refs = Kinda.unwrap_ref([unquote_splicing(args_ast)])
+                ref = apply(__MODULE__, unquote(nif_name), refs)
+                :ok = unquote(forward_module).check!(ref)
               end
-            else
-              return_module = Kinda.module_name(ret, forward_module, zig_t_module_map)
+            end
+          else
+            return_module = Kinda.module_name(ret, forward_module, zig_t_module_map)
 
-              quote do
-                def unquote(String.to_atom(wrapper_name))(unquote_splicing(args_ast)) do
-                  refs = Kinda.unwrap_ref([unquote_splicing(args_ast)])
-                  ref = apply(__MODULE__, unquote(nif_name), refs)
+            quote do
+              def unquote(String.to_atom(wrapper_name))(unquote_splicing(args_ast)) do
+                refs = Kinda.unwrap_ref([unquote_splicing(args_ast)])
+                ref = apply(__MODULE__, unquote(nif_name), refs)
 
-                  struct!(unquote(return_module),
-                    ref: unquote(forward_module).check!(ref)
-                  )
-                end
+                struct!(unquote(return_module),
+                  ref: unquote(forward_module).check!(ref)
+                )
               end
             end
           end
+        end
 
-        [stub_ast, wrapper_ast]
-      end
-      |> List.flatten()
+      [stub_ast, wrapper_ast]
+    end
+    |> List.flatten()
+  end
 
-    load_ast =
-      quote do
-        @dest_dir unquote(dest_dir)
-        def kinda_on_load do
-          require Logger
-          nif_path = Path.join(@dest_dir, "lib/#{unquote(lib_name)}")
-          dylib = "#{nif_path}.dylib"
-          so = "#{nif_path}.so"
+  # generate resource modules
+  defp kind_ast(root_module, forward_module, resource_kinds) do
+    for %Kinda.CodeGen.Type{
+          module_name: module_name,
+          zig_t: zig_t,
+          fields: fields
+        } <-
+          resource_kinds,
+        Atom.to_string(module_name)
+        |> String.starts_with?(Atom.to_string(root_module)) do
+      Logger.debug("[Kinda] building resource kind #{module_name}")
 
-          if File.exists?(dylib) do
-            File.ln_s(dylib, so)
-          end
+      quote bind_quoted: [
+              root_module: root_module,
+              module_name: module_name,
+              zig_t: zig_t,
+              fields: fields,
+              forward_module: forward_module
+            ] do
+        defmodule module_name do
+          @moduledoc """
+          #{zig_t}
+          """
 
-          Logger.debug("[Beaver] loading NIF, path: #{nif_path}")
-
-          with :ok <- :erlang.load_nif(nif_path, 0) do
-            Logger.debug("[Beaver] NIF loaded, path: #{nif_path}")
-            :ok
-          else
-            error -> error
-          end
+          use Kinda.ResourceKind,
+            root_module: root_module,
+            fields: fields,
+            forward_module: forward_module
         end
       end
+    end
+  end
 
-    kind_ast ++ nif_ast ++ [load_ast]
+  defp load_ast(dest_dir, lib_name) do
+    quote do
+      # setup NIF loading
+      @on_load :kinda_on_load
+      @dest_dir unquote(dest_dir)
+      def kinda_on_load do
+        require Logger
+        nif_path = Path.join(@dest_dir, "lib/#{unquote(lib_name)}")
+        dylib = "#{nif_path}.dylib"
+        so = "#{nif_path}.so"
+
+        if File.exists?(dylib) do
+          File.ln_s(dylib, so)
+        end
+
+        Logger.debug("[Kinda] loading NIF, path: #{nif_path}")
+
+        with :ok <- :erlang.load_nif(nif_path, 0) do
+          Logger.debug("[Kinda] NIF loaded, path: #{nif_path}")
+          :ok
+        else
+          error -> error
+        end
+      end
+    end
+  end
+
+  defp ast_from_meta(
+         root_module,
+         forward_module,
+         kinds,
+         %Kinda.Prebuilt.Meta{
+           nifs: nifs,
+           resource_kinds: resource_kinds,
+           zig_t_module_map: zig_t_module_map
+         } = meta
+       ) do
+    kind_ast(root_module, forward_module, resource_kinds) ++
+      nif_ast(kinds, nifs, forward_module, zig_t_module_map)
+  end
+
+  def __using__(root_module, opts) do
+    kinds = Keyword.get(opts, :kinds) || []
+    forward_module = Keyword.fetch!(opts, :forward_module)
+
+    if opts[:force_build] do
+      {meta, %{dest_dir: dest_dir, lib_name: lib_name}} = gen_and_build_zig(root_module, opts)
+      ast_from_meta(root_module, forward_module, kinds, meta) ++ [load_ast(dest_dir, lib_name)]
+    else
+      meta = Keyword.fetch!(opts, :meta)
+      ast_from_meta(root_module, forward_module, kinds, meta)
+    end
   end
 
   alias Kinda.CodeGen.{Function, Type, Resource, NIF}
-
-  require Logger
 
   defp primitive_types do
     ~w{
@@ -254,15 +249,11 @@ defmodule Kinda.Prebuilt do
 
   defp gen_nif_name_from_module_name(_module_name, f), do: f
 
-  @doc """
-  Generate Zig code from a header and build a Zig project to produce a NIF library
-  """
-  defp gen(
-         root_module,
-         opts \\ [include_paths: %{}, library_paths: %{}, type_gen: nil, nif_gen: nil]
-       ) do
+  # Generate Zig code from a header and build a Zig project to produce a NIF library
+  defp gen_and_build_zig(root_module, opts) do
     wrapper = Keyword.fetch!(opts, :wrapper)
     lib_name = Keyword.fetch!(opts, :lib_name)
+    dest_dir = Keyword.fetch!(opts, :dest_dir)
     project_dir = Keyword.fetch!(opts, :zig_src)
     project_dir = Path.join(File.cwd!(), project_dir)
     source_dir = Path.join(project_dir, "src")
@@ -270,7 +261,8 @@ defmodule Kinda.Prebuilt do
     project_source_dir = Path.join(project_dir, "src")
     Logger.debug("[Kinda] generating Zig code for wrapper: #{wrapper}")
     include_paths = Keyword.get(opts, :include_paths, %{})
-    library_paths = Keyword.get(opts, :library_paths, %{})
+    constants = Keyword.get(opts, :constants, %{})
+    func_filter = Keyword.get(opts, :func_filter) || fn fns -> fns end
     version = Keyword.fetch!(opts, :version)
     type_gen = Keyword.get(opts, :type_gen) || (&Type.default/2)
     nif_gen = Keyword.get(opts, :nif_gen) || (&NIF.from_function/1)
@@ -280,8 +272,8 @@ defmodule Kinda.Prebuilt do
       raise "include_paths must be a map so that we could generate variables for build.zig. Got: #{inspect(include_paths)}"
     end
 
-    if not is_map(library_paths) do
-      raise "library_paths must be a map so that we could generate variables for build.zig. Got: #{inspect(library_paths)}"
+    if not is_map(constants) do
+      raise "constants must be a map so that we could generate variables for build.zig. Got: #{inspect(constants)}"
     end
 
     include_path_args =
@@ -304,8 +296,7 @@ defmodule Kinda.Prebuilt do
 
     functions =
       String.split(out, "\n")
-      |> Enum.filter(fn x -> String.contains?(x, "mlir") || String.contains?(x, "beaver") end)
-      |> Enum.filter(fn x -> String.contains?(x, "pub extern fn") end)
+      |> func_filter.()
 
     # collecting functions with zig translate
     prints =
@@ -378,8 +369,6 @@ defmodule Kinda.Prebuilt do
           [%{f | ret: Function.process_type(ret)} | tail]
       end)
 
-    File.write!("#{dst}.functions.ex", inspect(functions, pretty: true, limit: :infinity))
-
     types =
       Enum.map(functions, fn f -> [f.ret, f.args] end)
       |> List.flatten()
@@ -408,7 +397,7 @@ defmodule Kinda.Prebuilt do
       |> Enum.map(fn %{zig_t: zig_t, module_name: module_name} -> {zig_t, module_name} end)
       |> Map.new()
 
-    # generate wrapper.inc.zig source
+    # generate wrapper.imp.zig source
     source =
       for %Function{name: name, args: args, ret: ret} <- functions do
         proxy_arg_uses =
@@ -490,7 +479,7 @@ defmodule Kinda.Prebuilt do
       const beam = @import("beam.zig");
       const kinda = @import("kinda.zig");
       const e = @import("erl_nif.zig");
-      pub const root_module = "Elixir.Beaver.MLIR.CAPI";
+      pub const root_module = "#{root_module}";
       """ <> source
 
     dst = Path.join(project_source_dir, "mlir.imp.zig")
@@ -508,16 +497,13 @@ defmodule Kinda.Prebuilt do
       |> Enum.join()
 
     build_source =
-      for {name, path} <- library_paths do
+      for {name, path} <- constants do
         """
         pub const #{name} = "#{path}";
         """
       end
       |> Enum.join()
       |> Kernel.<>(build_source)
-
-    # TODO: make this a arg
-    dest_dir = "#{Path.join(Mix.Project.build_path(), "native-install")}"
 
     erts_include =
       Path.join([
@@ -577,12 +563,17 @@ defmodule Kinda.Prebuilt do
         raise "fail to run zig compiler, ret_code: #{ret_code}"
     end
 
-    %{
+    meta = %Kinda.Prebuilt.Meta{
       nifs: nifs,
       resource_kinds: resource_kinds,
-      dest_dir: dest_dir,
-      zig_t_module_map: zig_t_module_map,
-      lib_name: lib_name
+      zig_t_module_map: zig_t_module_map
     }
+
+    File.write!(
+      Path.join(dest_dir, "kinda-meta-#{lib_name}.ex"),
+      inspect(meta, pretty: true, limit: :infinity)
+    )
+
+    {meta, %{dest_dir: dest_dir, lib_name: lib_name}}
   end
 end
