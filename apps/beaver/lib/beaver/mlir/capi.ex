@@ -16,14 +16,9 @@ defmodule Beaver.MLIR.CAPI do
           Path.wildcard("native/mlir-c/**/*.h") ++
           Path.wildcard("native/mlir-c/**/*.cpp") ++
           Path.wildcard("native/mlir-zig/src/**") ++
-          Path.wildcard("capi/src") ++
           ["native/mlir-zig/#{Mix.env()}/build.zig"],
       not String.contains?(path, "kinda.gen.zig") do
-    if File.exists?(path) do
-      @external_resource path
-    else
-      raise "file not found: #{path}"
-    end
+    @external_resource path
   end
 
   # generate Zig and compile it as a NIF library
