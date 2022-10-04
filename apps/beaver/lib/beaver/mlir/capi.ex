@@ -3,6 +3,7 @@ defmodule Beaver.MLIR.CAPI do
 
   use Kinda.Prebuilt,
     otp_app: :beaver,
+    lib_name: "beaver",
     base_url: "https://github.com/philss/rustler_precompilation_example/releases/download",
     version: "0.2.4",
     wrapper: Path.join(File.cwd!(), "native/wrapper.h"),
