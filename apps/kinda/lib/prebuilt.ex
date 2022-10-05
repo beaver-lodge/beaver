@@ -200,6 +200,8 @@ defmodule Kinda.Prebuilt do
       nif_ast(kinds, nifs, forward_module, zig_t_module_map)
   end
 
+  # A helper function to extract the logic from __using__ macro.
+  @doc false
   def __using__(root_module, opts) do
     kinds = Keyword.get(opts, :kinds) || []
     forward_module = Keyword.fetch!(opts, :forward_module)

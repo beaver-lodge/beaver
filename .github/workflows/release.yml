@@ -75,8 +75,9 @@ jobs:
         working-directory: apps/beaver
         run: |
           # run mix to generate metadata of rustler_precompiled
-          mix || true
+          mix compile --force || true
           mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local --print
       - name: Run tests with prebuilt
         run: |
+          mix compile --force
           mix test
