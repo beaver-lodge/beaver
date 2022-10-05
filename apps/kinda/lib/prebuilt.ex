@@ -59,6 +59,7 @@ defmodule Kinda.Prebuilt do
           |> List.first()
           |> String.trim()
           |> Kernel.<>("""
+
           You can force the project to build from scratch with:
               config :kinda, :force_build, #{otp_app}: true
           """)
