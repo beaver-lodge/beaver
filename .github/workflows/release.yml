@@ -60,8 +60,3 @@ jobs:
           tar --dereference -cvzf ${LIB_FINAL_NAME}.tar.gz \
             -C _build/${{ env.MIX_ENV }}/native-install/lib . \
             -C $PWD/_build/${{ env.MIX_ENV }}/native-install $(cd $PWD/_build/${{ env.MIX_ENV }}/native-install && ls *.ex)
-      - uses: actions/upload-artifact@v3
-        name: Upload native libs to artifact
-        with:
-          name: native-libs
-          path: _build/${{ env.MIX_ENV }}/native-install/lib
