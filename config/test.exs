@@ -21,3 +21,5 @@ config :beaver,
   acc
   shape
   nvvm}
+
+config :kinda, :force_build, beaver: true

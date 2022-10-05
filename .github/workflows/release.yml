@@ -1,22 +1,32 @@
-name: Elixir CI
+name: Build precompiled NIFs
 
 on:
+  push:
+    branches:
+      - main
+    tags:
+      - "*"
   pull_request:
     branches: ["main"]
 
-permissions:
-  contents: read
-
 concurrency:
-  group: build-and-test-${{ github.ref }}
+  group: precompiled-${{ github.ref }}
   cancel-in-progress: true
 env:
   LLVM_CONFIG_PATH: "/home/runner/llvm-install/bin/llvm-config"
-jobs:
-  build:
-    name: Build and test
-    runs-on: ubuntu-latest
 
+jobs:
+  build_release:
+    name: NIF ${{ matrix.nif }} - ${{ matrix.job.target }} (${{ matrix.job.os }})
+    runs-on: ${{ matrix.job.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        nif: ["2.16", "2.15", "2.14"]
+        job:
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-20.04 }
+    env:
+      MIX_ENV: prod
     steps:
       - uses: actions/checkout@v3
       - name: Set up Elixir
@@ -41,9 +51,12 @@ jobs:
         run: |
           wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-09-25-0249/llvm-install.zip
           unzip llvm-install.zip -d $HOME/llvm-install
-      - name: Run smoke tests
+      - name: Compile
         run: |
-          mix test --only smoke
-      - name: Run tests
+          mix compile
+      - name: Tar native libraries
         run: |
-          mix test --exclude vulkan --exclude todo
+          LIB_FINAL_NAME=$(ls _build/${{ env.MIX_ENV }}/native-install/lib | grep -E "libbeaver.+so")
+          tar --dereference -cvzf ${LIB_FINAL_NAME}.tar.gz \
+            -C _build/${{ env.MIX_ENV }}/native-install/lib . \
+            -C $PWD/_build/${{ env.MIX_ENV }}/native-install $(cd $PWD/_build/${{ env.MIX_ENV }}/native-install && ls *.ex)

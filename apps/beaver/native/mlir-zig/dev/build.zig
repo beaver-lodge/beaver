@@ -6,7 +6,7 @@ pub fn build(b: *std.build.Builder) void {
     // Standard release options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const mode = b.standardReleaseOptions();
-    const lib = b.addSharedLibrary("BeaverNIF", "src/main.zig", b.version(0, 0, 1));
+    const lib = b.addSharedLibrary(kinda.lib_name, "src/main.zig", .unversioned);
     lib.setBuildMode(mode);
     lib.addSystemIncludeDir(kinda.erts_include);
     lib.addSystemIncludeDir(kinda.llvm_include);
