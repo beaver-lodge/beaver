@@ -563,6 +563,10 @@ defmodule Kinda.Prebuilt do
         raise "fail to run zig compiler, ret_code: #{ret_code}"
     end
 
+    for p <- dest_dir |> Path.join("**") |> Path.wildcard() do
+      Logger.debug("[Kinda] [installed] #{p}")
+    end
+
     meta = %Kinda.Prebuilt.Meta{
       nifs: nifs,
       resource_kinds: resource_kinds,
