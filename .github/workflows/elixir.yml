@@ -11,7 +11,6 @@ concurrency:
   group: build-and-test-${{ github.ref }}
   cancel-in-progress: true
 env:
-  MIX_ENV: prod
   LLVM_CONFIG_PATH: "/home/runner/llvm-install/bin/llvm-config"
 jobs:
   build:
@@ -48,41 +47,3 @@ jobs:
       - name: Run tests
         run: |
           mix test --exclude vulkan --exclude todo
-
-  prod:
-    name: Build production and upload to artifacts
-    runs-on: ubuntu-latest
-    env:
-      MIX_ENV: prod
-    steps:
-      - uses: actions/checkout@v3
-      - name: Set up Elixir
-        uses: erlef/setup-beam@988e02bfe678367a02564f65ca2e37726dc0268f
-        with:
-          elixir-version: "1.13.0" # Define the elixir version [required]
-          otp-version: "24.1" # Define the OTP version [required]
-      - name: Set up Zig
-        uses: goto-bus-stop/setup-zig@v1
-        with:
-          version: 0.9.1
-      - name: Restore dependencies cache
-        uses: actions/cache@v3
-        with:
-          path: deps
-          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
-          restore-keys: ${{ runner.os }}-mix-
-      - name: Install dependencies
-        run: mix deps.get
-      - uses: seanmiddleditch/gha-setup-ninja@master
-      - name: Download pre-build LLVM
-        run: |
-          wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-09-25-0249/llvm-install.zip
-          unzip llvm-install.zip -d $HOME/llvm-install
-      - name: Compile
-        run: |
-          mix compile
-      - uses: actions/upload-artifact@v3
-        name: Upload native libs to artifact
-        with:
-          name: native-libs
-          path: _build/${{ env.MIX_ENV }}/native-install/lib
