@@ -32,7 +32,7 @@ defmodule Kinda.Prebuilt do
           Path.dirname(path)
           |> Path.join("**")
           |> Path.wildcard()
-          |> dbg
+          |> IO.inspect()
 
           {meta, _binding} =
             Path.dirname(path)
