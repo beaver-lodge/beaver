@@ -68,6 +68,7 @@ jobs:
         run: |
           python3 -m http.server --directory . &> /dev/null &
       - name: Run download task
+        working-directory: apps/beaver
         run: |
           mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local
       - name: Replace test config
