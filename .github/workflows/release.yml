@@ -25,8 +25,6 @@ jobs:
         nif: ["2.16"]
         job:
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-20.04 }
-    env:
-      MIX_ENV: prod
     steps:
       - uses: actions/checkout@v3
       - name: Set up Elixir
@@ -52,9 +50,13 @@ jobs:
           wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-09-25-0249/llvm-install.zip
           unzip llvm-install.zip -d $HOME/llvm-install
       - name: Compile
+        env:
+          MIX_ENV: prod
         run: |
-          mix compile
+          mix compile --force
       - name: Tar native libraries
+        env:
+          MIX_ENV: prod
         run: |
           set -u
           LIB_FINAL_NAME=$(ls _build/${MIX_ENV}/native-install/lib | grep -E "libbeaver.+so")
@@ -65,12 +67,12 @@ jobs:
       - name: Start mock server
         run: |
           python3 -m http.server --directory . &> /dev/null &
-      - name: Tar native libraries
+      - name: Run download task
         run: |
           mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local
       - name: Replace test config
         run: |
           cp config/dev.exs config/test.exs
-      - name: Tar native libraries
+      - name: Run tests with prebuilt
         run: |
           mix test
