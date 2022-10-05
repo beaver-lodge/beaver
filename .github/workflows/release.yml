@@ -80,4 +80,4 @@ jobs:
       - name: Run tests with prebuilt
         run: |
           mix compile --force
-          mix test
+          mix test --exclude vulkan --exclude todo
