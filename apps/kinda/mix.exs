@@ -28,8 +28,7 @@ defmodule Kinda.MixProject do
   defp deps do
     [
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
-      {:rustler_precompiled, "~> 0.5"},
-      {:bypass, "~> 2.1", only: :test}
+      {:rustler_precompiled, "~> 0.5"}
     ]
   end
 
