@@ -53,7 +53,7 @@ jobs:
         env:
           MIX_ENV: prod
         run: |
-          mix compile --force
+          mix compile
       - name: Tar native libraries
         env:
           MIX_ENV: prod
@@ -67,13 +67,14 @@ jobs:
       - name: Start mock server
         run: |
           python3 -m http.server --directory . &> /dev/null &
-      - name: Run download task
-        working-directory: apps/beaver
-        run: |
-          mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local
       - name: Replace test config
         run: |
           cp config/dev.exs config/test.exs
+      - name: Run download task
+        working-directory: apps/beaver
+        run: |
+          mix compile --force
+          mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local
       - name: Run tests with prebuilt
         run: |
           mix test
