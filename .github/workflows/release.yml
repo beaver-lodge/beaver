@@ -64,7 +64,7 @@ jobs:
             -C $PWD/_build/${MIX_ENV}/native-install $(cd $PWD/_build/${MIX_ENV}/native-install && ls *.ex)
       - name: Start mock server
         run: |
-          nohup python3 -m http.server --directory .
+          python3 -m http.server --directory . &> /dev/null &
       - name: Tar native libraries
         run: |
           mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local
