@@ -96,7 +96,7 @@ Kinda is also inspired by Rustler. Rustler really define what a ergonomic NIF li
   ```
 
 - It reuses code in [rustler_precompiled](https://github.com/philss/rustler_precompiled.git) to follow the same convention of checksum checks and OTP compatibility rules.
-- In Kinda, besides the main NIF library, there might be `header-*.exs.` for functions signatures and multiple shared libraries the main NIF library depends on. (Zig doesn't support static linking yet. [Related issue](https://github.com/ziglang/zig/issues/9053))
+- In Kinda, besides the main NIF library, there might be `kinda-meta-*.ex` for functions signatures and multiple shared libraries the main NIF library depends on. (Zig doesn't support static linking yet. [Related issue](https://github.com/ziglang/zig/issues/9053))
 
 ## Usage
 
