@@ -9,6 +9,12 @@ on:
   pull_request:
     branches: ["main"]
 
+concurrency:
+  group: precompiled-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  LLVM_CONFIG_PATH: "/home/runner/llvm-install/bin/llvm-config"
+
 jobs:
   build_release:
     name: NIF ${{ matrix.nif }} - ${{ matrix.job.target }} (${{ matrix.job.os }})
