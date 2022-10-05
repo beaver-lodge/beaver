@@ -193,7 +193,7 @@ defmodule Kinda.Prebuilt do
            nifs: nifs,
            resource_kinds: resource_kinds,
            zig_t_module_map: zig_t_module_map
-         } = meta
+         }
        ) do
     kind_ast(root_module, forward_module, resource_kinds) ++
       nif_ast(kinds, nifs, forward_module, zig_t_module_map)
