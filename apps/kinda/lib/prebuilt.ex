@@ -27,16 +27,14 @@ defmodule Kinda.Prebuilt do
           @rustler_precompiled_load_data config.load_data
 
           {otp_app, path} = @rustler_precompiled_load_from
-          base_path = Path.basename(path)
 
-          Path.dirname(path)
-          |> Path.join("**")
-          |> Path.wildcard()
-          |> IO.inspect()
+          load_path =
+            otp_app
+            |> Application.app_dir(path)
 
           {meta, _binding} =
-            Path.dirname(path)
-            |> Path.join("kinda-meta-#{base_path}.ex")
+            Path.dirname(load_path)
+            |> Path.join("kinda-meta-#{Path.basename(load_path)}.ex")
             |> File.read!()
             |> Code.eval_string()
 
