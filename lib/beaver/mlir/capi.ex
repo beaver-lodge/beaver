@@ -37,8 +37,8 @@ defmodule Beaver.MLIR.CAPI do
   use Kinda.Prebuilt,
     otp_app: :beaver,
     lib_name: "beaver",
-    # base_url: "https://github.com/philss/rustler_precompilation_example/releases/download",
-    base_url: "http://127.0.0.1:8000/",
+    base_url:
+      "https://github.com/beaver-project/beaver-prebuilt/releases/download/2022-10-06-0707",
     version: "0.2.4",
     wrapper: Path.join(File.cwd!(), "native/wrapper.h"),
     zig_src: "native/mlir-zig",
