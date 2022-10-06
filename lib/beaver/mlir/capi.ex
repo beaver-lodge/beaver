@@ -48,8 +48,12 @@ defmodule Beaver.MLIR.CAPI do
     otp_app: :beaver,
     lib_name: "beaver",
     base_url:
-      "https://github.com/beaver-project/beaver-prebuilt/releases/download/2022-10-06-0707",
-    version: "0.2.4",
+      Application.compile_env(
+        :beaver,
+        :prebuilt_base_url,
+        "https://github.com/beaver-project/beaver-prebuilt/releases/download/2022-10-06-0707"
+      ),
+    version: "0.2.10",
     wrapper: Path.join(File.cwd!(), "native/wrapper.h"),
     zig_src: "native/mlir-zig",
     include_paths:

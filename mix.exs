@@ -4,7 +4,7 @@ defmodule Beaver.MixProject do
   def project do
     [
       app: :beaver,
-      version: "0.2.8",
+      version: "0.2.10",
       elixir: "~> 1.13",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -94,7 +94,7 @@ defmodule Beaver.MixProject do
     ["compile.cmake": &cmake/1]
   end
 
-  defmodule Beaver.LLVM.Config do
+  defmodule LLVM.Config do
     defp llvm_config_from_sys_env() do
       System.get_env("LLVM_CONFIG_PATH")
     end
@@ -166,9 +166,9 @@ defmodule Beaver.MixProject do
     end
   end
 
-  @build_cmake Application.compile_env(:beaver, :build_cmake)
+  @build_cmake Application.compile_env(:beaver, :build_cmake, false)
   defp cmake(args) do
-    if @build_cmake || "--force" in args do
+    if @build_cmake or "--force" in args do
       do_cmake()
     else
       :noop
