@@ -43,7 +43,7 @@ jobs:
           unzip llvm-install.zip -d $HOME/llvm-install
       - name: Run smoke tests
         run: |
-          mix test --only smoke
+          mix test --force --only smoke
       - name: Run tests
         run: |
           mix test --exclude vulkan --exclude todo

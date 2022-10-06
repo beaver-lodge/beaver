@@ -53,7 +53,7 @@ jobs:
         env:
           MIX_ENV: prod
         run: |
-          mix compile
+          mix compile --force
       - name: Tar native libraries
         env:
           MIX_ENV: prod
@@ -72,12 +72,11 @@ jobs:
         run: |
           cp config/dev.exs config/test.exs
       - name: Run download task
-        working-directory: apps/beaver
         run: |
           # run mix to generate metadata of rustler_precompiled
-          mix compile --force || true
+          mix compile || true
           mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local --print
       - name: Run tests with prebuilt
         run: |
-          mix compile --force
+          mix compile
           mix test --exclude vulkan --exclude todo
