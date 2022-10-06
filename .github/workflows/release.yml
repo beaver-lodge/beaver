@@ -24,7 +24,7 @@ jobs:
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output formatted_date=date::$(date +'%Y-%m-%d-%H%M')"
+        run: echo "::set-output name=formatted_date::$(date +'%Y-%m-%d-%H%M')"
 
   build_release:
     needs: [generate_id]
