@@ -4,7 +4,7 @@ defmodule Beaver.MixProject do
   def project do
     [
       app: :beaver,
-      version: "0.2.5",
+      version: "0.2.6",
       elixir: "~> 1.13",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -55,7 +55,19 @@ defmodule Beaver.MixProject do
     [
       licenses: ["Apache-2.0", "MIT"],
       links: %{"GitHub" => "https://github.com/beaver-project/beaver"},
-      files: ~w(lib priv .formatter.exs mix.exs README* native checksum-*.exs)
+      files: ~w{
+        lib .formatter.exs mix.exs README*
+        native/mlir-zig/src/*.zig
+        native/mlir-zig/prod/build.zig
+        native/mlir-zig/dev/build.zig
+        native/mlir-zig/test/build.zig
+        native/**/CMakeLists.txt
+        native/**/*.cmake
+        native/**/*.h
+        native/**/*.td
+        native/**/*.cpp
+        checksum-*.exs
+      }
     ]
   end
 
@@ -160,8 +172,9 @@ defmodule Beaver.MixProject do
     end
   end
 
+  @build_cmake Application.compile_env(:beaver, :build_cmake)
   defp cmake(args) do
-    if "--force" in args do
+    if @build_cmake || "--force" in args do
       do_cmake()
     else
       :noop
