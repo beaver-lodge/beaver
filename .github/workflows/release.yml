@@ -91,6 +91,9 @@ jobs:
           # run a force build to generate metadata of rustler_precompiled
           mix compile --force || true
           mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local --print
+      - name: Purge prod artifacts
+        run: |
+          rm -rf _build/prod
       - name: Run tests with prebuilt
         run: |
           mix test --exclude vulkan --exclude todo
@@ -106,5 +109,4 @@ jobs:
       - name: Test dev compile
         run: |
           echo 'config :beaver, :prebuilt_base_url, "https://github.com/beaver-project/beaver-prebuilt/releases/download/${{ needs.generate_id.outputs.formatted_date }}"' >> config/dev.exs
-          rm -rf _build/prod
           mix compile
