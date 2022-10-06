@@ -80,7 +80,7 @@ jobs:
           readelf -d _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
           ldd _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
 
-          patchelf --set-rpath '$ORIGIN' _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
+          patchelf --force-rpath --set-rpath '$ORIGIN' _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
 
           echo "after patchelf"
           readelf -d _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
