@@ -105,4 +105,5 @@ jobs:
       - name: Test dev compile
         run: |
           echo 'config :beaver, :prebuilt_base_url, "https://github.com/beaver-project/beaver-prebuilt/releases/download/${{ needs.generate_id.outputs.formatted_date }}"' >> config/dev.exs
+          rm -rf _build/prod
           mix compile
