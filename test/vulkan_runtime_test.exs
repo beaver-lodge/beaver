@@ -9,7 +9,7 @@ defmodule VulkanRuntimeTest do
     import MLIR.{Transforms, Conversion}
     ctx = context[:ctx]
 
-    {:ok, llvm_lib_dir} = Beaver.LLVM.Config.include_dir()
+    {:ok, llvm_lib_dir} = Beaver.LLVM.Config.lib_dir()
 
     jit =
       ~m"""
