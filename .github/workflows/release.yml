@@ -58,7 +58,7 @@ jobs:
       - name: Install apt deps
         if: ${{ startsWith(runner.os, 'Linux') }}
         run: |
-          apt install patchelf
+          sudo apt install patchelf
       - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Download pre-build LLVM
         run: |
