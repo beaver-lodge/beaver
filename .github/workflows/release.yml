@@ -19,10 +19,12 @@ jobs:
   generate_id:
     name: Generate ID of release
     runs-on: ubuntu-latest
+    outputs:
+      formatted_date: ${{ steps.date.outputs.formatted_date }}
     steps:
       - name: Get current date
         id: date
-        run: echo "::set-output name=date::$(date +'%Y-%m-%d-%H%M')"
+        run: echo "::set-output formatted_date=date::$(date +'%Y-%m-%d-%H%M')"
 
   build_release:
     needs: [generate_id]
@@ -64,6 +66,7 @@ jobs:
         run: |
           mix compile --force
       - name: Tar native libraries
+        id: tar
         env:
           MIX_ENV: prod
         run: |
@@ -93,6 +96,6 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ${{ steps.rename.outputs.LIB_FINAL_NAME }}
+            ${{ steps.tar.outputs.LIB_FINAL_NAME }}
           repository: beaver-project/beaver-prebuilt
-          tag_name: ${{ needs.generate_id.outputs.date }}
+          tag_name: ${{ needs.generate_id.outputs.formatted_date }}
