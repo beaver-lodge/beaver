@@ -9,6 +9,8 @@ defmodule VulkanRuntimeTest do
     import MLIR.{Transforms, Conversion}
     ctx = context[:ctx]
 
+    {:ok, llvm_lib_dir} = Beaver.LLVM.Config.lib_dir()
+
     jit =
       ~m"""
       #{@vulkan_ir}
@@ -32,8 +34,8 @@ defmodule VulkanRuntimeTest do
       |> MLIR.Pass.Composer.run!(print: false)
       |> MLIR.ExecutionEngine.create!(
         shared_lib_paths: [
-          Beaver.LLVM.Config.lib_dir() |> Path.join("libvulkan-runtime-wrappers.dylib"),
-          Beaver.LLVM.Config.lib_dir() |> Path.join("libmlir_runner_utils.dylib")
+          llvm_lib_dir |> Path.join("libvulkan-runtime-wrappers.dylib"),
+          llvm_lib_dir |> Path.join("libmlir_runner_utils.dylib")
         ]
       )
 

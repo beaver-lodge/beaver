@@ -4,7 +4,7 @@ defmodule Beaver.MixProject do
   def project do
     [
       app: :beaver,
-      version: "0.2.8",
+      version: "0.2.10",
       elixir: "~> 1.13",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -95,42 +95,31 @@ defmodule Beaver.MixProject do
   end
 
   defmodule LLVM.Config do
-    def include_dir() do
-      llvm_config = System.get_env("LLVM_CONFIG_PATH", "llvm-config")
+    defp llvm_config_from_sys_env() do
+      System.get_env("LLVM_CONFIG_PATH")
+    end
 
-      path =
-        with {path, 0} <- System.cmd(llvm_config, ["--includedir"]) do
-          path
+    defp run_llvm_config(sub_cmd) do
+      llvm_config = llvm_config_from_sys_env()
+
+      if llvm_config do
+        with {path, 0} <- System.cmd(llvm_config, [sub_cmd]) do
+          {:ok, String.trim(path)}
         else
           _ ->
-            with {path, 0} <- System.shell("llvm-config-15 --includedir") do
-              path
-            else
-              _ ->
-                raise "fail to run llvm-config"
-            end
+            {:error, "failed to run llvm-config"}
         end
+      else
+        {:error, "LLVM_CONFIG_PATH is not set"}
+      end
+    end
 
-      path |> String.trim()
+    def include_dir() do
+      run_llvm_config("--includedir")
     end
 
     def lib_dir() do
-      llvm_config = System.get_env("LLVM_CONFIG_PATH", "llvm-config")
-
-      path =
-        with {path, 0} <- System.cmd(llvm_config, ["--libdir"]) do
-          path
-        else
-          _ ->
-            with {path, 0} <- System.shell("llvm-config-15 --libdir") do
-              path
-            else
-              _ ->
-                raise "fail to run llvm-config"
-            end
-        end
-
-      path |> String.trim()
+      run_llvm_config("--libdir")
     end
   end
 
@@ -143,6 +132,11 @@ defmodule Beaver.MixProject do
 
     Logger.debug("[CMake] configuring...")
 
+    {:ok, llvm_lib_dir} = LLVM.Config.lib_dir()
+
+    llvm_cmake_dir = Path.join(llvm_lib_dir, "cmake/llvm")
+    mlir_cmake_dir = Path.join(llvm_lib_dir, "cmake/mlir")
+
     {_, 0} =
       System.cmd(
         "cmake",
@@ -153,8 +147,8 @@ defmodule Beaver.MixProject do
           build,
           "-G",
           "Ninja",
-          "-DLLVM_DIR=#{LLVM.Config.lib_dir()}/cmake/llvm",
-          "-DMLIR_DIR=#{LLVM.Config.lib_dir()}/cmake/mlir",
+          "-DLLVM_DIR=#{llvm_cmake_dir}",
+          "-DMLIR_DIR=#{mlir_cmake_dir}",
           "-DCMAKE_INSTALL_PREFIX=#{install}"
         ],
         stderr_to_stdout: true
@@ -172,9 +166,9 @@ defmodule Beaver.MixProject do
     end
   end
 
-  @build_cmake Application.compile_env(:beaver, :build_cmake)
+  @build_cmake Application.compile_env(:beaver, :build_cmake, false)
   defp cmake(args) do
-    if @build_cmake || "--force" in args do
+    if @build_cmake or "--force" in args do
       do_cmake()
     else
       :noop
