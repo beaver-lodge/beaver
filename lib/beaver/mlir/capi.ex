@@ -34,6 +34,16 @@ defmodule Beaver.MLIR.CAPI do
 
   dest_dir = Path.join([Mix.Project.build_path(), "native-install"])
 
+  llvm_constants =
+    with {:ok, include_dir} <- Beaver.LLVM.Config.include_dir() do
+      %{
+        llvm_include: include_dir
+      }
+    else
+      _ ->
+        %{}
+    end
+
   use Kinda.Prebuilt,
     otp_app: :beaver,
     lib_name: "beaver",
@@ -42,10 +52,11 @@ defmodule Beaver.MLIR.CAPI do
     version: "0.2.4",
     wrapper: Path.join(File.cwd!(), "native/wrapper.h"),
     zig_src: "native/mlir-zig",
-    include_paths: %{
-      llvm_include: Beaver.LLVM.Config.include_dir(),
-      beaver_include: Path.join(File.cwd!(), "native/mlir-c/include")
-    },
+    include_paths:
+      %{
+        beaver_include: Path.join(File.cwd!(), "native/mlir-c/include")
+      }
+      |> Map.merge(llvm_constants),
     constants: %{
       beaver_libdir: Path.join(dest_dir, "lib")
     },
@@ -64,9 +75,19 @@ defmodule Beaver.MLIR.CAPI do
   This module calls C API of MLIR. These FFIs are generated from headers in LLVM repo and this repo's headers providing supplemental functions.
   """
 
+  llvm_headers =
+    with {:ok, include_dir} <- Beaver.LLVM.Config.include_dir() do
+      include_dir
+      |> Path.join("*.h")
+      |> Path.wildcard()
+    else
+      _ ->
+        []
+    end
+
   # setting up elixir re-compilation triggered by changes in external files
   for path <-
-        Path.wildcard(Path.join(Beaver.LLVM.Config.include_dir(), "*.h")) ++
+        llvm_headers ++
           Path.wildcard("native/mlir-c/**/*.h") ++
           Path.wildcard("native/mlir-c/**/*.cpp") ++
           Path.wildcard("native/mlir-zig/src/**") ++
