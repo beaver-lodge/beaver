@@ -28,7 +28,6 @@ defmodule Beaver.MixProject do
   defp docs() do
     [
       main: "Beaver",
-      ignore_apps: [:kinda],
       extras: [
         "guides/introducing-beaver.md",
         "guides/your-first-beaver-compiler.livemd"
@@ -76,15 +75,8 @@ defmodule Beaver.MixProject do
   defp elixirc_paths(_), do: ["lib"]
 
   defp deps do
-    kinda_ver =
-      if 1 do
-        [in_umbrella: true]
-      else
-        "~> 0.1"
-      end
-
     [
-      {:kinda, kinda_ver},
+      {:kinda, "~> 0.2"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:quark, "~> 2.3"}
     ]
