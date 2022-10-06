@@ -32,3 +32,5 @@ priv/native/*.dylib
 priv/native/*.ex
 
 checksum-*.exs
+
+beaver-*.tar
