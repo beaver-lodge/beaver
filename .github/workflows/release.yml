@@ -15,6 +15,9 @@ concurrency:
 env:
   LLVM_CONFIG_PATH: "/home/runner/llvm-install/bin/llvm-config"
 
+permissions:
+  contents: write
+
 jobs:
   generate_id:
     name: Generate ID of release
@@ -94,8 +97,10 @@ jobs:
           mix test --exclude vulkan --exclude todo
       - name: Publish archives and packages
         uses: softprops/action-gh-release@v1
+        if: ${{ github.repository == 'beaver-project/beaver' }}
         with:
           files: |
             ${{ steps.tar.outputs.LIB_FINAL_NAME }}
           repository: beaver-project/beaver-prebuilt
+          token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
           tag_name: ${{ needs.generate_id.outputs.formatted_date }}
