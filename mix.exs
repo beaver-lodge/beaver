@@ -124,43 +124,47 @@ defmodule Beaver.MixProject do
 
   require Logger
 
-  if Application.compile_env(:kinda, [:force_build, :beaver]) do
-    defp cmake(_) do
-      cmake_project = "native/mlir-c"
-      build = Path.join(Mix.Project.build_path(), "mlir-c-build")
-      install = Path.join(Mix.Project.build_path(), "native-install")
+  defp do_cmake() do
+    cmake_project = "native/mlir-c"
+    build = Path.join(Mix.Project.build_path(), "mlir-c-build")
+    install = Path.join(Mix.Project.build_path(), "native-install")
 
-      Logger.debug("[CMake] configuring...")
+    Logger.debug("[CMake] configuring...")
 
-      {_, 0} =
-        System.cmd(
-          "cmake",
-          [
-            "-S",
-            cmake_project,
-            "-B",
-            build,
-            "-G",
-            "Ninja",
-            "-DLLVM_DIR=#{LLVM.Config.lib_dir()}/cmake/llvm",
-            "-DMLIR_DIR=#{LLVM.Config.lib_dir()}/cmake/mlir",
-            "-DCMAKE_INSTALL_PREFIX=#{install}"
-          ],
-          stderr_to_stdout: true
-        )
+    {_, 0} =
+      System.cmd(
+        "cmake",
+        [
+          "-S",
+          cmake_project,
+          "-B",
+          build,
+          "-G",
+          "Ninja",
+          "-DLLVM_DIR=#{LLVM.Config.lib_dir()}/cmake/llvm",
+          "-DMLIR_DIR=#{LLVM.Config.lib_dir()}/cmake/mlir",
+          "-DCMAKE_INSTALL_PREFIX=#{install}"
+        ],
+        stderr_to_stdout: true
+      )
 
-      Logger.debug("[CMake] building...")
+    Logger.debug("[CMake] building...")
 
-      with {_, 0} <- System.cmd("cmake", ["--build", build, "--target", "install"]) do
-        Logger.debug("[CMake] installed to #{install}")
-        :ok
-      else
-        {error, _} ->
-          Logger.error(error)
-          {:error, [error]}
-      end
+    with {_, 0} <- System.cmd("cmake", ["--build", build, "--target", "install"]) do
+      Logger.debug("[CMake] installed to #{install}")
+      :ok
+    else
+      {error, _} ->
+        Logger.error(error)
+        {:error, [error]}
     end
-  else
-    defp cmake(_), do: :noop
+  end
+
+  defp cmake(args) do
+    if "--force" in args do
+      do_cmake()
+    else
+      :noop
+    end
   end
 end
