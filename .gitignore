@@ -26,3 +26,9 @@ erl_crash.dump
 zig-cache
 
 *.so.tar.gz
+
+priv/native/*.so
+priv/native/*.dylib
+priv/native/*.ex
+
+checksum-*.exs

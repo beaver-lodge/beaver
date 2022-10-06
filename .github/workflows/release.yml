@@ -72,7 +72,6 @@ jobs:
         run: |
           cp config/dev.exs config/test.exs
       - name: Run download task
-        working-directory: apps/beaver
         run: |
           # run mix to generate metadata of rustler_precompiled
           mix compile --force || true
