@@ -55,10 +55,6 @@ jobs:
           restore-keys: ${{ runner.os }}-mix-
       - name: Install dependencies
         run: mix deps.get
-      - name: Install apt deps
-        if: ${{ startsWith(runner.os, 'Linux') }}
-        run: |
-          sudo apt install patchelf
       - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Download pre-build LLVM
         run: |
@@ -69,22 +65,6 @@ jobs:
           MIX_ENV: prod
         run: |
           mix compile --force
-      - name: Run patchelf
-        env:
-          MIX_ENV: prod
-        run: |
-          set -u
-          LIB_FINAL_SO=$(ls _build/${MIX_ENV}/native-install/lib | grep -E "libbeaver.+so")
-
-          echo "before patchelf"
-          readelf -d _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
-          ldd _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
-
-          patchelf --force-rpath --set-rpath '$ORIGIN' _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
-
-          echo "after patchelf"
-          readelf -d _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
-          ldd _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
       - name: Tar native libraries
         id: tar
         env:
