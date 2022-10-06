@@ -160,10 +160,12 @@ defmodule Beaver.MixProject do
     end
   end
 
-  defp cmake(args) do
-    if "--force" in args do
+  if Application.compile_env(:beaver, :build_cmake) do
+    defp cmake(args) do
       do_cmake()
-    else
+    end
+  else
+    defp cmake(_args) do
       :noop
     end
   end
