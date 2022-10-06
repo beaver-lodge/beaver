@@ -80,12 +80,11 @@ jobs:
           readelf -d _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
           ldd _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
 
-          # check if RPATH is set correctly
-          echo "after patchelf"
           patchelf --set-rpath '$ORIGIN' _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
+
+          echo "after patchelf"
           readelf -d _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
           ldd _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
-
       - name: Tar native libraries
         id: tar
         env:
