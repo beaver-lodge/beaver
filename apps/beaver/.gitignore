@@ -24,6 +24,9 @@ beaver-*.tar
 
 # Temporary files, for example, from tests.
 /tmp/
-priv/native/libmlir_nif.so
+
+priv/native/*.so
+priv/native/*.dylib
+priv/native/*.ex
 
 checksum-*.exs

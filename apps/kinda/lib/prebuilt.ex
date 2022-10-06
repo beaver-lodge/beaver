@@ -27,11 +27,14 @@ defmodule Kinda.Prebuilt do
           @rustler_precompiled_load_data config.load_data
 
           {otp_app, path} = @rustler_precompiled_load_from
-          base_path = Path.basename(path)
+
+          load_path =
+            otp_app
+            |> Application.app_dir(path)
 
           {meta, _binding} =
-            Path.dirname(path)
-            |> Path.join("kinda-meta-#{base_path}.ex")
+            Path.dirname(load_path)
+            |> Path.join("kinda-meta-#{Path.basename(load_path)}.ex")
             |> File.read!()
             |> Code.eval_string()
 
@@ -59,6 +62,7 @@ defmodule Kinda.Prebuilt do
           |> List.first()
           |> String.trim()
           |> Kernel.<>("""
+
           You can force the project to build from scratch with:
               config :kinda, :force_build, #{otp_app}: true
           """)
@@ -193,12 +197,14 @@ defmodule Kinda.Prebuilt do
            nifs: nifs,
            resource_kinds: resource_kinds,
            zig_t_module_map: zig_t_module_map
-         } = meta
+         }
        ) do
     kind_ast(root_module, forward_module, resource_kinds) ++
       nif_ast(kinds, nifs, forward_module, zig_t_module_map)
   end
 
+  # A helper function to extract the logic from __using__ macro.
+  @doc false
   def __using__(root_module, opts) do
     kinds = Keyword.get(opts, :kinds) || []
     forward_module = Keyword.fetch!(opts, :forward_module)

@@ -24,3 +24,5 @@ erl_crash.dump
 .DS_Store
 
 zig-cache
+
+*.so.tar.gz

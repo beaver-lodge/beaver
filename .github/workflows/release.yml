@@ -22,11 +22,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        nif: ["2.16", "2.15", "2.14"]
+        nif: ["2.16"]
         job:
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-20.04 }
-    env:
-      MIX_ENV: prod
     steps:
       - uses: actions/checkout@v3
       - name: Set up Elixir
@@ -52,11 +50,34 @@ jobs:
           wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-09-25-0249/llvm-install.zip
           unzip llvm-install.zip -d $HOME/llvm-install
       - name: Compile
+        env:
+          MIX_ENV: prod
         run: |
           mix compile
       - name: Tar native libraries
+        env:
+          MIX_ENV: prod
         run: |
-          LIB_FINAL_NAME=$(ls _build/${{ env.MIX_ENV }}/native-install/lib | grep -E "libbeaver.+so")
-          tar --dereference -cvzf ${LIB_FINAL_NAME}.tar.gz \
-            -C _build/${{ env.MIX_ENV }}/native-install/lib . \
-            -C $PWD/_build/${{ env.MIX_ENV }}/native-install $(cd $PWD/_build/${{ env.MIX_ENV }}/native-install && ls *.ex)
+          set -u
+          LIB_FINAL_NAME=$(ls _build/${MIX_ENV}/native-install/lib | grep -E "libbeaver.+so").tar.gz
+          tar --dereference -cvzf ${LIB_FINAL_NAME} \
+            -C $PWD/_build/${MIX_ENV}/native-install/lib $(cd $PWD/_build/${MIX_ENV}/native-install/lib && ls *.so) \
+            -C $PWD/_build/${MIX_ENV}/native-install/lib $(cd $PWD/_build/${MIX_ENV}/native-install/lib && ls libMLIRBeaver.*) \
+            -C $PWD/_build/${MIX_ENV}/native-install $(cd $PWD/_build/${MIX_ENV}/native-install && ls *.ex)
+          echo ::set-output name=LIB_FINAL_NAME::${LIB_FINAL_NAME}
+      - name: Start mock server
+        run: |
+          python3 -m http.server --directory . &> /dev/null &
+      - name: Replace test config
+        run: |
+          cp config/dev.exs config/test.exs
+      - name: Run download task
+        working-directory: apps/beaver
+        run: |
+          # run mix to generate metadata of rustler_precompiled
+          mix compile --force || true
+          mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local --print
+      - name: Run tests with prebuilt
+        run: |
+          mix compile --force
+          mix test --exclude vulkan --exclude todo
