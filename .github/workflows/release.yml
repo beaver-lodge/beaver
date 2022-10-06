@@ -74,9 +74,9 @@ jobs:
       - name: Run download task
         run: |
           # run mix to generate metadata of rustler_precompiled
-          mix compile --force || true
+          mix compile || true
           mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local --print
       - name: Run tests with prebuilt
         run: |
-          mix compile --force
+          mix compile
           mix test --exclude vulkan --exclude todo
