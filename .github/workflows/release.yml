@@ -55,6 +55,10 @@ jobs:
           restore-keys: ${{ runner.os }}-mix-
       - name: Install dependencies
         run: mix deps.get
+      - name: Install apt deps
+        if: ${{ startsWith(runner.os, 'Linux') }}
+        run: |
+          apt install patchelf
       - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Download pre-build LLVM
         run: |
@@ -71,7 +75,13 @@ jobs:
           MIX_ENV: prod
         run: |
           set -u
-          LIB_FINAL_NAME=$(ls _build/${MIX_ENV}/native-install/lib | grep -E "libbeaver.+so").tar.gz
+          LIB_FINAL_SO=$(ls _build/${MIX_ENV}/native-install/lib | grep -E "libbeaver.+so")
+          LIB_FINAL_NAME=${LIB_FINAL_SO}.tar.gz
+          patchelf --set-rpath '$ORIGIN' _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
+          # check if RPATH is set correctly
+          readelf -d _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
+          ldd _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
+          # create tarball
           tar --dereference -cvzf ${LIB_FINAL_NAME} \
             -C $PWD/_build/${MIX_ENV}/native-install/lib $(cd $PWD/_build/${MIX_ENV}/native-install/lib && ls *.so) \
             -C $PWD/_build/${MIX_ENV}/native-install/lib $(cd $PWD/_build/${MIX_ENV}/native-install/lib && ls libMLIRBeaver.*) \
