@@ -102,5 +102,4 @@ jobs:
           files: |
             ${{ steps.tar.outputs.LIB_FINAL_NAME }}
           repository: beaver-project/beaver-prebuilt
-          token: ${{ secrets.CUSTOM_GITHUB_TOKEN }}
           tag_name: ${{ needs.generate_id.outputs.formatted_date }}
