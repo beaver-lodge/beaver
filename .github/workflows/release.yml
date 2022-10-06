@@ -69,6 +69,23 @@ jobs:
           MIX_ENV: prod
         run: |
           mix compile --force
+      - name: Run patchelf
+        env:
+          MIX_ENV: prod
+        run: |
+          set -u
+          LIB_FINAL_SO=$(ls _build/${MIX_ENV}/native-install/lib | grep -E "libbeaver.+so")
+
+          echo "before patchelf"
+          readelf -d _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
+          ldd _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
+
+          # check if RPATH is set correctly
+          echo "after patchelf"
+          patchelf --set-rpath '$ORIGIN' _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
+          readelf -d _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
+          ldd _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
+
       - name: Tar native libraries
         id: tar
         env:
@@ -77,11 +94,6 @@ jobs:
           set -u
           LIB_FINAL_SO=$(ls _build/${MIX_ENV}/native-install/lib | grep -E "libbeaver.+so")
           LIB_FINAL_NAME=${LIB_FINAL_SO}.tar.gz
-          patchelf --set-rpath '$ORIGIN' _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
-          # check if RPATH is set correctly
-          readelf -d _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
-          ldd _build/${MIX_ENV}/native-install/lib/${LIB_FINAL_SO}
-          # create tarball
           tar --dereference -cvzf ${LIB_FINAL_NAME} \
             -C $PWD/_build/${MIX_ENV}/native-install/lib $(cd $PWD/_build/${MIX_ENV}/native-install/lib && ls *.so) \
             -C $PWD/_build/${MIX_ENV}/native-install/lib $(cd $PWD/_build/${MIX_ENV}/native-install/lib && ls libMLIRBeaver.*) \
