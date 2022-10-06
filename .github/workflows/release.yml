@@ -53,7 +53,7 @@ jobs:
         env:
           MIX_ENV: prod
         run: |
-          mix compile
+          mix compile --force
       - name: Tar native libraries
         env:
           MIX_ENV: prod

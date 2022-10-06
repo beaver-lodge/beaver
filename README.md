@@ -344,6 +344,8 @@ This approach archives both the succinctness and modularity of not having a glob
 - Build and run Elixir tests
   ```bash
   mix deps.get
+  # build Zig NIFs
+  mix compile --force
   mix test
   # run tests with filters
   mix test --exclude vulkan # use this to skip vulkan tests
