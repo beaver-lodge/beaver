@@ -55,4 +55,11 @@ defmodule DialectRegistryTest do
                {"scf", "SCF"}
              ])
   end
+
+  test "ops are unique" do
+    for d <- Dialect.Registry.dialects() do
+      ops = Dialect.Registry.ops(d)
+      assert Enum.uniq(ops) == ops
+    end
+  end
 end
