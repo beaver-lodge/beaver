@@ -18,7 +18,7 @@ env:
 jobs:
   generate_id:
     name: Generate ID of release
-    runs-on: ${{ matrix.job.os }}
+    runs-on: ubuntu-latest
     steps:
       - name: Get current date
         id: date
