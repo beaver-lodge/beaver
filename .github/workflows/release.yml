@@ -92,7 +92,6 @@ jobs:
           mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local --print
       - name: Run tests with prebuilt
         run: |
-          mix compile
           mix test --exclude vulkan --exclude todo
       - name: Publish archives and packages
         uses: softprops/action-gh-release@v1
@@ -103,3 +102,7 @@ jobs:
           repository: beaver-project/beaver-prebuilt
           token: ${{ secrets.PRE_BUILT_RELEASE_GITHUB_TOKEN }}
           tag_name: ${{ needs.generate_id.outputs.formatted_date }}
+      - name: Test dev compile
+        run: |
+          echo 'config :beaver, :prebuilt_base_url, "https://github.com/beaver-project/beaver-prebuilt/releases/download/${{ needs.generate_id.outputs.formatted_date }}"' >> config/dev.exs
+          mix compile
