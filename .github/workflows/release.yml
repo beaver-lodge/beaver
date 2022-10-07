@@ -65,6 +65,17 @@ jobs:
           MIX_ENV: prod
         run: |
           mix compile --force
+      - name: Run patchelf
+        env:
+          MIX_ENV: prod
+        run: |
+          set -u
+          find _build/${MIX_ENV}/native-install/lib -name "*.so*" -maxdepth 1 -type f | while read sofile; do
+            echo "Setting rpath of $sofile to " '$ORIGIN:$ORIGIN/lib:$ORIGIN/../../..'
+            patchelf --set-rpath '$ORIGIN:$ORIGIN/lib:$ORIGIN/../../..' --force-rpath \
+                    $sofile
+            patchelf --print-rpath $sofile
+          done
       - name: Tar native libraries
         id: tar
         env:
