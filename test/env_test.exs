@@ -2,6 +2,8 @@ defmodule EnvTest do
   use Beaver.Case, async: true
   use Beaver
   alias Beaver.MLIR
+  alias Beaver.MLIR.Dialect.Func
+  require Func
 
   test "MLIR.__BLOCK__", context do
     mlir ctx: context[:ctx] do

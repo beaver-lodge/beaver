@@ -12,7 +12,7 @@ defmodule Beaver.MLIR.Dialect do
       dialect_module_name = dialect |> Beaver.MLIR.Dialect.Registry.normalize_dialect_name()
 
       Logger.debug(
-        "[Beaver] building Elixir module for dialect #{dialect} => #{dialect_module_name}"
+        "[Beaver] building Elixir module for dialect #{dialect} => #{dialect_module_name} (#{length(ops)})"
       )
 
       op_module_names =

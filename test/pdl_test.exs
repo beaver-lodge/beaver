@@ -4,6 +4,8 @@ defmodule PDLTest do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
   import Beaver.MLIR.Transforms
+  alias Beaver.MLIR.Dialect.{Func, TOSA}
+  require Func
 
   @moduletag :pdl
   setup do
@@ -210,6 +212,8 @@ defmodule PDLTest do
                         a >>> Type.ranked_tensor([1, 3], Type.f32()),
                         b >>> Type.ranked_tensor([2, 1], Type.f32())
                       ) do
+                  alias Beaver.MLIR.Dialect.TOSA
+
                   res =
                     TOSA.add(a, b, one: MLIR.Attribute.integer(MLIR.Type.i32(), 1)) >>>
                       Type.ranked_tensor([2, 3], Type.f32())
@@ -357,7 +361,13 @@ defmodule PDLTest do
     defmodule ToyPass do
       use Beaver.MLIR.Pass, on: Func.Func
 
-      defpat replace_add_op(_t = %TOSA.Add{operands: [a, b], results: [res], attributes: []}) do
+      defpat replace_add_op(
+               _t = %TOSA.Add{
+                 operands: [a, b],
+                 results: [res],
+                 attributes: []
+               }
+             ) do
         %MLIR.Value{} = res
         %TOSA.Sub{operands: [a, b]}
       end
@@ -399,7 +409,11 @@ defmodule PDLTest do
                      use Beaver
 
                      defpat replace_add_op(
-                              _t = %TOSA.Add{operands: %{a: 1}, results: [_res], attributes: []}
+                              _t = %TOSA.Add{
+                                operands: %{a: 1},
+                                results: [_res],
+                                attributes: []
+                              }
                             ) do
                        %TOSA.Sub{operands: [a, b]}
                      end

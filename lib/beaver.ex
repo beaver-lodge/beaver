@@ -91,29 +91,12 @@ defmodule Beaver do
       alias Beaver.MLIR.Attribute
       alias Beaver.MLIR.ODS
       import Beaver.MLIR.Sigils
-      unquote(alias_dialects())
-      import Builtin
+      import Beaver.MLIR.Dialect.Builtin
 
       unquote(ctx_ast)
       unquote(block_ast)
       unquote(dsl_block_ast)
     end
-  end
-
-  defp alias_dialects do
-    alias Beaver.MLIR.Dialect
-
-    for d <-
-          Dialect.Registry.dialects() do
-      module_name = d |> Dialect.Registry.normalize_dialect_name()
-      module_name = Module.concat([Beaver.MLIR.Dialect, module_name])
-
-      quote do
-        alias unquote(module_name)
-        require unquote(module_name)
-      end
-    end
-    |> List.flatten()
   end
 
   defmacro block(call, do: block) do
@@ -206,8 +189,8 @@ defmodule Beaver do
   defmacro defpat(call, do: block) do
     {name, args} = Macro.decompose_call(call)
 
-    match = args |> Beaver.DSL.Pattern.transform_match()
-    replace = block |> Beaver.DSL.Pattern.transform_rewrite()
+    match = Beaver.DSL.Pattern.transform_match(__CALLER__, args)
+    replace = Beaver.DSL.Pattern.transform_rewrite(__CALLER__, block)
     alias Beaver.MLIR.Dialect.PDL
     alias Beaver.MLIR.Attribute
     alias Beaver.MLIR.Type

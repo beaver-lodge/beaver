@@ -4,6 +4,8 @@ defmodule CFTest do
   alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Type}
   import ExUnit.CaptureIO
+  alias Beaver.MLIR.Dialect.{Func, Arith, CF}
+  require Func
 
   test "generate mlir with function calls", context do
     ir =
