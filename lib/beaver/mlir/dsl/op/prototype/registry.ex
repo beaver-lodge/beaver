@@ -21,7 +21,7 @@ defmodule Beaver.MLIR.DSL.Op.Registry do
         op_module
 
       [] ->
-        raise "unknown op: #{op_name}"
+        raise "op not found in ets registry: #{op_name}"
     end
   end
 end

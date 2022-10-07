@@ -1,11 +1,10 @@
 defmodule Beaver.MLIR.Dialect.Func do
   use Beaver.MLIR.Dialect,
     dialect: "func",
-    ops: Beaver.MLIR.Dialect.Registry.ops("func"),
-    skips: ~w{func}
+    ops: Beaver.MLIR.Dialect.Registry.ops("func") |> Enum.reject(fn x -> x in ~w{func} end)
 
-  defmodule Func do
-    use Beaver.DSL.Op.Prototype, op_name: "func.func"
+  def op_module_names() do
+    [__MODULE__.Func]
   end
 
   defmacro func(call, do: block) do
@@ -42,3 +41,11 @@ defmodule Beaver.MLIR.Dialect.Func do
     func_ast
   end
 end
+
+require Beaver.MLIR.Dialect
+
+Beaver.MLIR.Dialect.define_op_modules(
+  Beaver.MLIR.Dialect.Func,
+  "func",
+  Beaver.MLIR.Dialect.Registry.ops("func")
+)

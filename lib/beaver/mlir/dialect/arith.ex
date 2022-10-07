@@ -46,3 +46,11 @@ defmodule Beaver.MLIR.Dialect.Arith do
     MLIR.Attribute.integer(MLIR.Type.i64(), i)
   end
 end
+
+require Beaver.MLIR.Dialect
+
+Beaver.MLIR.Dialect.define_op_modules(
+  Beaver.MLIR.Dialect.Arith,
+  "arith",
+  Beaver.MLIR.Dialect.Registry.ops("arith")
+)
