@@ -71,12 +71,15 @@ jobs:
         run: |
           set -u
           find _build/${MIX_ENV}/native-install/lib -name "*.so*" -maxdepth 1 -type f | while read sofile; do
-            echo "print needed $sofile"
+            echo "==> before replace needed"
             patchelf --print-needed $sofile
 
-            echo "Setting rpath of $sofile to " '$ORIGIN:$ORIGIN/lib:$ORIGIN/../../..'
+            patchelf --replace-needed libMLIRBeaver.so.16git libMLIRBeaver.so $sofile
 
-            echo "==> before"
+            echo "==> after"
+            patchelf --print-needed $sofile
+
+            echo "==> before set rpath"
             patchelf --print-rpath $sofile
 
             patchelf --set-rpath '$ORIGIN:$ORIGIN/lib:$ORIGIN/../../..' --force-rpath \
