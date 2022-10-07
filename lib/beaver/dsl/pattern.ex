@@ -269,6 +269,7 @@ defmodule Beaver.DSL.Pattern do
   end
 
   defp transform_struct_to_op_creation(
+         caller,
          {:%, _,
           [
             struct_name,
@@ -277,41 +278,46 @@ defmodule Beaver.DSL.Pattern do
          cb
        )
        when is_function(cb, 2) do
-    module =
-      case struct_name do
-        {:__aliases__, _line, op_name} when is_list(op_name) ->
-          Module.concat([Beaver.MLIR.Dialect | op_name])
+    case struct_name do
+      # TODO: this is a hack, need to find a better way to get the module name
+      {:__aliases__, _line, [dialect | tail] = op_name} when is_list(op_name) ->
+        module =
+          with {:ok, mod} <- Macro.Env.fetch_alias(caller, dialect) do
+            Module.concat([mod | tail])
+          else
+            _ -> Module.concat(op_name)
+          end
 
-        _ ->
-          raise "expect form like %TOSA.Add{operands: [a, b]}, found unsupported struct syntax: " <>
-                  inspect(struct_name)
-      end
+        if Beaver.DSL.Op.Prototype.is_compliant(module) do
+          apply(cb, [struct_name, map_args])
+        else
+          ast
+        end
 
-    if Beaver.DSL.Op.Prototype.is_compliant(module) do
-      apply(cb, [struct_name, map_args])
-    else
-      ast
+      _ ->
+        ast
     end
   end
 
-  defp transform_struct_to_op_creation(ast, _cb), do: ast
+  defp transform_struct_to_op_creation(_caller, ast, _cb), do: ast
 
-  defp do_transform_match({:^, _, [var]}) do
+  defp do_transform_match(_caller, {:^, _, [var]}) do
     {:bound, var}
   end
 
-  defp do_transform_match(ast), do: ast |> transform_struct_to_op_creation(&create_op_in_match/2)
+  defp do_transform_match(caller, ast),
+    do: transform_struct_to_op_creation(caller, ast, &create_op_in_match/2)
 
-  defp do_transform_rewrite(ast),
-    do: ast |> transform_struct_to_op_creation(&create_op_in_rewrite/2)
+  defp do_transform_rewrite(caller, ast),
+    do: transform_struct_to_op_creation(caller, ast, &create_op_in_rewrite/2)
 
   @doc """
   transform a macro's call to PDL operations to match operands, attributes, results.
   Every Prototype form within the block should be transformed to create a PDL operation.
   """
 
-  def transform_match(ast) do
-    Macro.postwalk(ast, &do_transform_match/1)
+  def transform_match(caller, ast) do
+    Macro.postwalk(ast, &do_transform_match(caller, &1))
   end
 
   @doc """
@@ -320,8 +326,8 @@ defmodule Beaver.DSL.Pattern do
   The last expression will be replaced by the root op in the match by default.
   TODO: wrap this function with a macro rewrite/1, so that it could be use in a independent function
   """
-  def transform_rewrite(ast) do
-    rewrite_block_ast = Macro.postwalk(ast, &do_transform_rewrite/1)
+  def transform_rewrite(caller, ast) do
+    rewrite_block_ast = Macro.postwalk(ast, &do_transform_rewrite(caller, &1))
 
     quote do
       Beaver.MLIR.Dialect.PDL.rewrite [
@@ -345,6 +351,8 @@ defmodule Beaver.DSL.Pattern do
 
   # TODO: accepting block here is ugly, change it to %Beaver.Env{block: block}
   def result(%Env{} = env, %Beaver.MLIR.Value{} = v, i) when is_integer(i) do
+    alias Beaver.MLIR.Dialect.PDL
+
     mlir block: env.block, ctx: env.ctx do
       PDL.result(v, index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), i)) >>>
         ~t{!pdl.value}

@@ -4,7 +4,8 @@ defmodule CfTest do
   alias Beaver.MLIR
   alias Beaver.MLIR.Type
   alias Beaver.MLIR.Attribute
-  alias Beaver.MLIR.Dialect.{CF, Arith}
+  alias Beaver.MLIR.Dialect.{Func, CF, Arith}
+  require Func
   @moduletag :smoke
 
   defmodule MutCompiler do

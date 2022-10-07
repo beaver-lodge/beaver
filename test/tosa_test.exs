@@ -1,6 +1,8 @@
 defmodule TosaTest do
   use Beaver.Case, async: true
   use Beaver
+  alias Beaver.MLIR.Dialect.{Func, TOSA}
+  require Func
 
   test "generate and run tosa", context do
     import MLIR.{Transforms, Conversion}

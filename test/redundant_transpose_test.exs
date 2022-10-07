@@ -3,6 +3,7 @@ defmodule RedundantTransposeTest do
   alias Beaver.MLIR
   alias Beaver.MLIR.{Type}
   alias Beaver.MLIR.Dialect.{Func, TOSA}
+  require Func
 
   test "pass to optimize redundant transpose", context do
     use Beaver

@@ -1,13 +1,10 @@
 defmodule Beaver.MLIR.Dialect.Builtin do
-  alias Beaver.MLIR.Dialect
-
   use Beaver.MLIR.Dialect,
     dialect: "builtin",
-    ops: Dialect.Registry.ops("builtin"),
-    skips: ~w{module}
+    ops: Beaver.MLIR.Dialect.Registry.ops("builtin") |> Enum.reject(fn x -> x in ~w{module} end)
 
-  defmodule Module do
-    use Beaver.DSL.Op.Prototype, op_name: "builtin.module"
+  def op_module_names() do
+    [__MODULE__.Module]
   end
 
   @doc """
@@ -40,3 +37,11 @@ defmodule Beaver.MLIR.Dialect.Builtin do
     end
   end
 end
+
+require Beaver.MLIR.Dialect
+
+Beaver.MLIR.Dialect.define_op_modules(
+  Beaver.MLIR.Dialect.Builtin,
+  "builtin",
+  Beaver.MLIR.Dialect.Registry.ops("builtin")
+)

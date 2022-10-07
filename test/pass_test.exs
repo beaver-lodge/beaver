@@ -4,7 +4,8 @@ defmodule PassTest do
   use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Type}
-  alias Beaver.MLIR.Dialect.Func
+  alias Beaver.MLIR.Dialect.{Func, Arith}
+  require Func
 
   test "exception in run/1", context do
     defmodule PassRaisingException do
