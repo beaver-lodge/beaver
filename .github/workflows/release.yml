@@ -75,11 +75,14 @@ jobs:
             patchelf --print-needed $sofile
 
             echo "Setting rpath of $sofile to " '$ORIGIN:$ORIGIN/lib:$ORIGIN/../../..'
+
             echo "==> before"
             patchelf --print-rpath $sofile
-            echo "==> after"
+
             patchelf --set-rpath '$ORIGIN:$ORIGIN/lib:$ORIGIN/../../..' --force-rpath \
                     $sofile
+
+            echo "==> after"
             patchelf --print-rpath $sofile
           done
       - name: Tar native libraries
