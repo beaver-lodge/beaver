@@ -76,6 +76,7 @@ defmodule Beaver.MLIR.CAPI do
     end
 
   @moduledoc """
+
   This module calls C API of MLIR. These FFIs are generated from headers in LLVM repo and this repo's headers providing supplemental functions.
   """
 
