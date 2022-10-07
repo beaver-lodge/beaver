@@ -65,16 +65,40 @@ jobs:
           MIX_ENV: prod
         run: |
           mix compile --force
+      - name: Run patchelf
+        env:
+          MIX_ENV: prod
+        run: |
+          set -u
+          find _build/${MIX_ENV}/native-install/lib -name "*.so*" -maxdepth 1 -type f | while read sofile; do
+            echo "==> before replace needed"
+            patchelf --print-needed $sofile
+
+            patchelf --replace-needed libMLIRBeaver.so.16git libMLIRBeaver.so $sofile
+
+            echo "==> after"
+            patchelf --print-needed $sofile
+
+            echo "==> before set rpath"
+            patchelf --print-rpath $sofile
+
+            patchelf --set-rpath '$ORIGIN:$ORIGIN/lib:$ORIGIN/../../..' --force-rpath \
+                    $sofile
+
+            echo "==> after"
+            patchelf --print-rpath $sofile
+          done
       - name: Tar native libraries
         id: tar
         env:
           MIX_ENV: prod
         run: |
           set -u
-          LIB_FINAL_NAME=$(ls _build/${MIX_ENV}/native-install/lib | grep -E "libbeaver.+so").tar.gz
+          LIB_FINAL_SO=$(ls _build/${MIX_ENV}/native-install/lib | grep -E "libbeaver.+so")
+          LIB_FINAL_NAME=${LIB_FINAL_SO}.tar.gz
           tar --dereference -cvzf ${LIB_FINAL_NAME} \
             -C $PWD/_build/${MIX_ENV}/native-install/lib $(cd $PWD/_build/${MIX_ENV}/native-install/lib && ls *.so) \
-            -C $PWD/_build/${MIX_ENV}/native-install/lib $(cd $PWD/_build/${MIX_ENV}/native-install/lib && ls libMLIRBeaver.*) \
+            -C $PWD/_build/${MIX_ENV}/native-install/lib $(cd $PWD/_build/${MIX_ENV}/native-install/lib && ls *.dylib) \
             -C $PWD/_build/${MIX_ENV}/native-install $(cd $PWD/_build/${MIX_ENV}/native-install && ls *.ex)
           echo ::set-output name=LIB_FINAL_NAME::${LIB_FINAL_NAME}
       - name: Start mock server
@@ -90,6 +114,9 @@ jobs:
           # run a force build to generate metadata of rustler_precompiled
           mix compile --force || true
           mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local --print
+      - name: Purge prod artifacts
+        run: |
+          rm -rf _build/prod
       - name: Run tests with prebuilt
         run: |
           mix test --exclude vulkan --exclude todo
