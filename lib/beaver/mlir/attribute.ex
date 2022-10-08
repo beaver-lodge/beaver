@@ -79,10 +79,7 @@ defmodule Beaver.MLIR.Attribute do
 
   def type(t)
       when is_function(t, 1) do
-    Quark.Compose.compose(
-      &type/1,
-      t
-    )
+    &type(t.(&1))
   end
 
   def type(%CAPI.MlirType{} = t) do

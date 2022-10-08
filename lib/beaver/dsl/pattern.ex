@@ -19,10 +19,7 @@ defmodule Beaver.DSL.Pattern do
   end
 
   def gen_pdl(%Env{} = env, f) when is_function(f, 1) do
-    Quark.Compose.compose(
-      &gen_pdl(env, &1),
-      f
-    )
+    &gen_pdl(env, f.(&1))
   end
 
   def gen_pdl(%Env{} = env, %Beaver.MLIR.CAPI.MlirAttribute{} = attribute) do

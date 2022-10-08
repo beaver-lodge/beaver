@@ -33,10 +33,7 @@ defmodule Beaver.MLIR.Type do
         encoding
       )
       when is_function(f, 1) do
-    Quark.Compose.compose(
-      &ranked_tensor(shape, &1, encoding),
-      f
-    )
+    &ranked_tensor(shape, f.(&1), encoding)
   end
 
   def ranked_tensor(
@@ -64,10 +61,7 @@ defmodule Beaver.MLIR.Type do
 
   def unranked_tensor(element_type)
       when is_function(element_type, 1) do
-    Quark.Compose.compose(
-      &unranked_tensor/1,
-      element_type
-    )
+    &unranked_tensor(element_type.(&1))
   end
 
   def unranked_tensor(%MLIR.CAPI.MlirType{} = element_type) do
@@ -120,10 +114,7 @@ defmodule Beaver.MLIR.Type do
   """
 
   def vector(shape, element_type) when is_function(element_type, 1) do
-    Quark.Compose.compose(
-      &vector(shape, &1),
-      element_type
-    )
+    &vector(shape, element_type.(&1))
   end
 
   def vector(shape, %MLIR.CAPI.MlirType{} = element_type) when is_list(shape) do
