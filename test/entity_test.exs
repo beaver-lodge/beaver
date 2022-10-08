@@ -49,12 +49,12 @@ defmodule EntityTest do
   end
 
   describe "attr apis" do
-    test "spv attributes", context do
+    test "spirv attributes", context do
       ctx = context[:ctx]
       import Beaver.MLIR.Sigils
-      ~a{#spv.entry_point_abi<local_size = dense<1> : vector<3xi32>>}.(ctx)
+      ~a{#spirv.entry_point_abi<local_size = dense<1> : vector<3xi32>>}.(ctx)
 
-      ~a{#spv.target_env<#spv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, #spv.resource_limits<>>}.(
+      ~a{#spirv.target_env<#spirv.vce<v1.0, [Shader], [SPIRV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<>>}.(
         ctx
       )
     end
