@@ -354,6 +354,8 @@ defmodule Beaver.DSL.Pattern do
     alias Beaver.MLIR.Dialect.PDL
 
     mlir block: env.block, ctx: env.ctx do
+      v = %{v | safe_to_print: false}
+
       PDL.result(v, index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), i)) >>>
         ~t{!pdl.value}
     end

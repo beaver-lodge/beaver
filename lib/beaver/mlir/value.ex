@@ -3,7 +3,8 @@ defmodule Beaver.MLIR.Value do
 
   @type t() :: any()
   use Kinda.ResourceKind,
-    forward_module: Beaver.Native
+    forward_module: Beaver.Native,
+    fields: [safe_to_print: true]
 
   def argument?(%__MODULE__{} = value) do
     CAPI.mlirValueIsABlockArgument(value) |> Beaver.Native.to_term()
@@ -28,8 +29,12 @@ defmodule Beaver.MLIR.Value do
   end
 
   defimpl Inspect do
-    def inspect(value, _opts) do
+    def inspect(%{safe_to_print: true} = value, _opts) do
       Beaver.MLIR.to_string(value)
+    end
+
+    def inspect(%{safe_to_print: false} = value, _opts) do
+      Kernel.inspect(value, structs: false)
     end
   end
 end
