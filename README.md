@@ -142,7 +142,7 @@ Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_do
 and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
 be found at <https://hexdocs.pm/beaver>.
 
-## Erlang apps under the Beaver umbrella project
+## Erlang apps related to the Beaver
 
 LLVM/MLIR is a giant project, and built around that Beaver have hundreds of Erlang modules and thousands of functions. To properly ship LLVM/MLIR and streamline the development process, we need to carefully break the functionalities at different level into different Erlang apps under the same umbrella.
 
@@ -151,7 +151,7 @@ LLVM/MLIR is a giant project, and built around that Beaver have hundreds of Erla
   - Top level app ships the high level functionalities including IR generation and pattern definition.
   - MLIR CAPI wrappers built by parsing LLVM/MLIR CAPI C headers and some middle level helper functions to hide the C pointer related operations. This app will add the loaded MLIR C library and managed MLIR context to Erlang supervisor tree. Rust is also used in this app, but mainly for LLVM/MLIR CMake integration.
   - All the Ops defined in stock MLIR dialects, built by querying the registry. This app will ship MLIR Ops with Erlang idiomatic practices like behavior compliance.
-- `:kinda`: Elixir and Zig hybrid, generating NIFs from MLIR C headers.
+- `:kinda`: Elixir and Zig hybrid, generating NIFs from MLIR C headers. Repo: https://github.com/beaver-project/kinda
 
 ### Notes on consuming and development
 
@@ -344,6 +344,8 @@ This approach archives both the succinctness and modularity of not having a glob
 - Build and run Elixir tests
   ```bash
   mix deps.get
+  # build Zig NIFs
+  mix compile --force
   mix test
   # run tests with filters
   mix test --exclude vulkan # use this to skip vulkan tests

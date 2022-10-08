@@ -24,3 +24,13 @@ erl_crash.dump
 .DS_Store
 
 zig-cache
+
+*.so.tar.gz
+
+priv/native/*.so
+priv/native/*.dylib
+priv/native/*.ex
+
+checksum-*.exs
+
+beaver-*.tar

@@ -35,7 +35,6 @@ ENV MIX_ENV=prod
 # Install mix dependencies
 COPY mix.exs mix.lock ./
 COPY config config
-COPY apps apps
 
 # Make sure it compiles in docker
 RUN mix do deps.get, deps.compile

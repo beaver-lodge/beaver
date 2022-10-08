@@ -10,7 +10,8 @@ permissions:
 concurrency:
   group: build-and-test-${{ github.ref }}
   cancel-in-progress: true
-
+env:
+  LLVM_CONFIG_PATH: "/home/runner/llvm-install/bin/llvm-config"
 jobs:
   build:
     name: Build and test
@@ -41,12 +42,8 @@ jobs:
           wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-10-02-0220/llvm-install.zip
           unzip llvm-install.zip -d $HOME/llvm-install
       - name: Run smoke tests
-        env:
-          LLVM_CONFIG_PATH: "/home/runner/llvm-install/bin/llvm-config"
         run: |
-          mix test --only smoke
+          mix test --force --only smoke
       - name: Run tests
-        env:
-          LLVM_CONFIG_PATH: "/home/runner/llvm-install/bin/llvm-config"
         run: |
           mix test --exclude vulkan --exclude todo

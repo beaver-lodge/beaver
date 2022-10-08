@@ -1,0 +1,135 @@
+name: Build precompiled NIFs
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "*"
+  pull_request:
+    branches: ["main"]
+
+concurrency:
+  group: precompiled-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  LLVM_CONFIG_PATH: "/home/runner/llvm-install/bin/llvm-config"
+
+jobs:
+  generate_id:
+    name: Generate ID of release
+    runs-on: ubuntu-latest
+    outputs:
+      formatted_date: ${{ steps.date.outputs.formatted_date }}
+    steps:
+      - name: Get current date
+        id: date
+        run: echo "::set-output name=formatted_date::$(date +'%Y-%m-%d-%H%M')"
+
+  build_release:
+    needs: [generate_id]
+    name: NIF ${{ matrix.nif }} - ${{ matrix.job.target }} (${{ matrix.job.os }})
+    runs-on: ${{ matrix.job.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        nif: ["2.16"]
+        job:
+          - { target: x86_64-unknown-linux-gnu, os: ubuntu-20.04 }
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Elixir
+        uses: erlef/setup-beam@988e02bfe678367a02564f65ca2e37726dc0268f
+        with:
+          elixir-version: "1.13.0" # Define the elixir version [required]
+          otp-version: "24.1" # Define the OTP version [required]
+      - name: Set up Zig
+        uses: goto-bus-stop/setup-zig@v1
+        with:
+          version: 0.9.1
+      - name: Restore dependencies cache
+        uses: actions/cache@v3
+        with:
+          path: deps
+          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+          restore-keys: ${{ runner.os }}-mix-
+      - name: Install dependencies
+        run: mix deps.get
+      - uses: seanmiddleditch/gha-setup-ninja@master
+      - name: Download pre-build LLVM
+        run: |
+          wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-09-25-0249/llvm-install.zip
+          unzip llvm-install.zip -d $HOME/llvm-install
+      - name: Compile
+        env:
+          MIX_ENV: prod
+        run: |
+          mix compile --force
+      - name: Run patchelf
+        env:
+          MIX_ENV: prod
+        run: |
+          set -u
+          find _build/${MIX_ENV}/native-install/lib -name "*.so*" -maxdepth 1 -type f | while read sofile; do
+            echo "==> before replace needed"
+            patchelf --print-needed $sofile
+
+            patchelf --replace-needed libMLIRBeaver.so.16git libMLIRBeaver.so $sofile
+
+            echo "==> after"
+            patchelf --print-needed $sofile
+
+            echo "==> before set rpath"
+            patchelf --print-rpath $sofile
+
+            patchelf --set-rpath '$ORIGIN:$ORIGIN/lib:$ORIGIN/../../..' --force-rpath \
+                    $sofile
+
+            echo "==> after"
+            patchelf --print-rpath $sofile
+          done
+      - name: Tar native libraries
+        id: tar
+        env:
+          MIX_ENV: prod
+        run: |
+          set -u
+          LIB_FINAL_SO=$(ls _build/${MIX_ENV}/native-install/lib | grep -E "libbeaver.+so")
+          LIB_FINAL_NAME=${LIB_FINAL_SO}.tar.gz
+          tar --dereference -cvzf ${LIB_FINAL_NAME} \
+            -C $PWD/_build/${MIX_ENV}/native-install/lib $(cd $PWD/_build/${MIX_ENV}/native-install/lib && ls *.so) \
+            -C $PWD/_build/${MIX_ENV}/native-install/lib $(cd $PWD/_build/${MIX_ENV}/native-install/lib && ls *.dylib) \
+            -C $PWD/_build/${MIX_ENV}/native-install $(cd $PWD/_build/${MIX_ENV}/native-install && ls *.ex)
+          echo ::set-output name=LIB_FINAL_NAME::${LIB_FINAL_NAME}
+      - name: Start mock server
+        run: |
+          python3 -m http.server --directory . &> /dev/null &
+      - name: Replace test config
+        run: |
+          cp config/release-test.exs config/test.exs
+      - name: Run download task
+        env:
+          MIX_ENV: test
+        run: |
+          # run a force build to generate metadata of rustler_precompiled
+          mix compile --force || true
+          mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local --print
+      - name: Purge prod artifacts
+        run: |
+          rm -rf _build/prod
+      - name: Run tests with prebuilt
+        run: |
+          mix test --exclude vulkan --exclude todo
+      - name: Publish archives and packages
+        uses: softprops/action-gh-release@v1
+        if: ${{ github.repository == 'beaver-project/beaver' }}
+        with:
+          files: |
+            ${{ steps.tar.outputs.LIB_FINAL_NAME }}
+          repository: beaver-project/beaver-prebuilt
+          token: ${{ secrets.PRE_BUILT_RELEASE_GITHUB_TOKEN }}
+          tag_name: ${{ needs.generate_id.outputs.formatted_date }}
+      - name: Test dev compile
+        run: |
+          echo 'config :beaver, :prebuilt_base_url, "https://github.com/beaver-project/beaver-prebuilt/releases/download/${{ needs.generate_id.outputs.formatted_date }}"' >> config/dev.exs
+          mix compile
