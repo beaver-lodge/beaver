@@ -8,6 +8,7 @@ defmodule Beaver.MLIR do
   require Beaver.MLIR.CAPI
 
   alias Beaver.MLIR.Value
+  alias Beaver.MLIR
 
   alias Beaver.MLIR.CAPI.{
     MlirOperation,
@@ -80,6 +81,10 @@ defmodule Beaver.MLIR do
 
   def is_null(%MlirOperation{} = v) do
     CAPI.beaverOperationIsNull(v) |> Beaver.Native.to_term()
+  end
+
+  def is_null(%MLIR.Module{} = m) do
+    CAPI.beaverModuleIsNull(m) |> Beaver.Native.to_term()
   end
 
   def is_null(%MlirBlock{} = v) do

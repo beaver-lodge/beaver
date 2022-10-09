@@ -97,29 +97,40 @@ defmodule Beaver.MLIR.Operation do
            verify(op, opts ++ [should_raise: true]) do
       op
     else
-      :fail -> raise "MLIR operation verification failed"
+      :null ->
+        raise "MLIR operation verification failed because the operation is null. Maybe it is parsed from an ill-formed text format?"
+
+      :fail ->
+        raise "MLIR operation verification failed"
     end
   end
 
   def verify(op, opts \\ @default_verify_opts) do
     dump = opts |> Keyword.get(:dump, false)
     dump_if_fail = opts |> Keyword.get(:dump_if_fail, false)
-    is_success = from_module(op) |> MLIR.CAPI.mlirOperationVerify() |> Beaver.Native.to_term()
 
-    if dump do
-      Logger.warning("Start dumping op not verified. This might crash.")
-      dump(op)
-    end
+    is_null = MLIR.is_null(op)
 
-    if is_success do
-      {:ok, op}
+    if is_null do
+      :null
     else
-      if dump_if_fail do
-        Logger.info("Start printing op failed to pass the verification. This might crash.")
-        Logger.info(MLIR.to_string(op))
+      is_success = from_module(op) |> MLIR.CAPI.mlirOperationVerify() |> Beaver.Native.to_term()
+
+      if dump do
+        Logger.warning("Start dumping op not verified. This might crash.")
+        dump(op)
       end
 
-      :fail
+      if is_success do
+        {:ok, op}
+      else
+        if dump_if_fail do
+          Logger.info("Start printing op failed to pass the verification. This might crash.")
+          Logger.info(MLIR.to_string(op))
+        end
+
+        :fail
+      end
     end
   end
 

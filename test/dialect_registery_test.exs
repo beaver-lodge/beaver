@@ -47,7 +47,7 @@ defmodule DialectRegistryTest do
                {"scf", "SCF"},
                {"shape", "Shape"},
                {"sparse_tensor", "SparseTensor"},
-               {"spirv", "Spirv"},
+               {"spirv", "SPIRV"},
                {"tensor", "Tensor"},
                {"tosa", "TOSA"},
                {"transform", "Transform"},

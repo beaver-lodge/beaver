@@ -54,7 +54,7 @@ defmodule EntityTest do
       import Beaver.MLIR.Sigils
       ~a{#spirv.entry_point_abi<local_size = dense<1> : vector<3xi32>>}.(ctx)
 
-      ~a{#spirv.target_env<#spirv.vce<v1.0, [Shader], [SPIRV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<>>}.(
+      ~a{#spirv.target_env<#spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<>>}.(
         ctx
       )
     end

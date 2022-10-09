@@ -15,6 +15,7 @@ defmodule VulkanRuntimeTest do
       ~m"""
       #{@vulkan_ir}
       """.(ctx)
+      |> MLIR.Operation.verify!()
       |> canonicalize
       |> cse
       |> gpu_kernel_outlining
