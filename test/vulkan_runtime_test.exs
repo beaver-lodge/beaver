@@ -15,11 +15,12 @@ defmodule VulkanRuntimeTest do
       ~m"""
       #{@vulkan_ir}
       """.(ctx)
+      |> MLIR.Operation.verify!()
       |> canonicalize
       |> cse
       |> gpu_kernel_outlining
       |> convert_gpu_to_spirv
-      |> MLIR.Pass.Composer.nested("spv.module", fn pm ->
+      |> MLIR.Pass.Composer.nested("spirv.module", fn pm ->
         MLIR.Pass.pipeline!(pm, "spirv-lower-abi-attrs")
         MLIR.Pass.pipeline!(pm, "spirv-update-vce")
       end)

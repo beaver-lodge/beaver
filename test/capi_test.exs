@@ -266,7 +266,7 @@ defmodule MlirTest do
 
     mlirOpPassManagerAddOwnedPass(
       opm,
-      mlirCreateConversionConvertArithmeticToLLVM()
+      mlirCreateTransformsPrintOpStats()
     )
 
     status = mlirPassManagerRun(pm, module)

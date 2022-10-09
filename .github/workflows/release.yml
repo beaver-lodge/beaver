@@ -58,7 +58,7 @@ jobs:
       - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Download pre-build LLVM
         run: |
-          wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-09-25-0249/llvm-install.zip
+          wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-10-08-1203/llvm-install-MinSizeRel.zip -O llvm-install.zip
           unzip llvm-install.zip -d $HOME/llvm-install
       - name: Compile
         env:

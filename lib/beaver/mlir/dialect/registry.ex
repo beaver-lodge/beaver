@@ -29,7 +29,7 @@ defmodule Beaver.MLIR.Dialect.Registry do
   end
 
   def normalize_dialect_name(to_upcase)
-      when to_upcase in ~w{tosa gpu nvgpu omp nvvm llvm cf pdl rocdl spv amx amdgpu scf acc dlti},
+      when to_upcase in ~w{tosa gpu nvgpu omp nvvm llvm cf pdl rocdl spirv amx amdgpu scf acc dlti},
       do: String.upcase(to_upcase)
 
   def normalize_dialect_name("memref"), do: "MemRef"
