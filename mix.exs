@@ -84,7 +84,7 @@ defmodule Beaver.MixProject do
 
   defp deps do
     [
-      {:kinda, "~> 0.2"},
+      {:kinda, "~> 0.2.2"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
