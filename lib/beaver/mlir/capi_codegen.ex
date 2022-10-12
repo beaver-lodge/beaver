@@ -1,6 +1,9 @@
 defmodule Beaver.MLIR.CAPI.CodeGen do
+  @moduledoc false
   alias Kinda.CodeGen.{Type, NIF, Function}
+  use Kinda.CodeGen
 
+  @impl true
   def type_gen(_root_module, "?fn(c.struct_MlirStringRef, ?*anyopaque) callconv(.C) void" = type) do
     {:ok, %Type{zig_t: type, module_name: Beaver.MLIR.String.Callback}}
   end
@@ -113,7 +116,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
      }}
   end
 
-  def memref_kind_functions() do
+  defp memref_kind_functions() do
     [
       make: 5,
       aligned: 1,
@@ -121,6 +124,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
     ]
   end
 
+  @impl true
   def nif_gen(
         %Function{
           name: "mlirPassManagerRun"
@@ -131,5 +135,45 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
 
   def nif_gen(f) do
     NIF.from_function(f)
+  end
+
+  @impl true
+  def func_filter(fns) do
+    fns
+    |> Enum.filter(fn x -> String.contains?(x, "mlir") || String.contains?(x, "beaver") end)
+    |> Enum.filter(fn x -> String.contains?(x, "pub extern fn") end)
+  end
+
+  @impl true
+  def kinds() do
+    mem_ref_descriptor_kinds =
+      for rank <- [
+            DescriptorUnranked,
+            Descriptor1D,
+            Descriptor2D,
+            Descriptor3D,
+            Descriptor4D,
+            Descriptor5D,
+            Descriptor6D,
+            Descriptor7D,
+            Descriptor8D,
+            Descriptor9D
+          ],
+          t <- [Complex.F32, U8, U16, U32, I8, I16, I32, I64, F32, F64] do
+        %Kinda.CodeGen.Type{
+          module_name: Module.concat([Beaver.Native, t, MemRef, rank]),
+          kind_functions: memref_kind_functions()
+        }
+      end
+
+    [
+      %Kinda.CodeGen.Type{
+        module_name: Beaver.Native.PtrOwner
+      },
+      %Kinda.CodeGen.Type{
+        module_name: Beaver.Native.Complex.F32,
+        kind_functions: memref_kind_functions()
+      }
+    ] ++ mem_ref_descriptor_kinds
   end
 end

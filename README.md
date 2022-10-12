@@ -372,13 +372,12 @@ This approach archives both the succinctness and modularity of not having a glob
 
   ```elixir
   beaver_app_root = Path.join(__DIR__, "..")
-  umbrella_app_root = Path.join(__DIR__, "../../..")
 
   Mix.install(
     [
-      {:beaver, path: beaver_app_root, env: :dev}
+      {:beaver, path: beaver_app_root, env: :test}
     ],
-    config_path: Path.join(umbrella_app_root, "config/config.exs"),
-    lockfile: Path.join(umbrella_app_root, "mix.lock")
+    config_path: Path.join(beaver_app_root, "config/config.exs"),
+    lockfile: Path.join(beaver_app_root, "mix.lock")
   )
   ```
