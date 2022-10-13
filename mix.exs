@@ -126,8 +126,8 @@ defmodule Beaver.MixProject do
 
   defp do_cmake() do
     cmake_project = "native/mlir-c"
-    build = Path.join(Mix.Project.build_path(), "mlir-c-build")
-    install = Path.join(Mix.Project.build_path(), "native-install")
+    build = Path.join(Mix.Project.app_path(), "mlir-c-build")
+    install = Path.join(Mix.Project.app_path(), "native-install")
 
     Logger.debug("[CMake] configuring...")
 
