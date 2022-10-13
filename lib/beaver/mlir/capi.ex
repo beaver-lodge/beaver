@@ -1,7 +1,7 @@
 defmodule Beaver.MLIR.CAPI do
   require Logger
 
-  dest_dir = Path.join([Mix.Project.build_path(), "native-install"])
+  dest_dir = Path.join([Mix.Project.app_path(), "native-install"])
 
   llvm_constants =
     with {:ok, include_dir} <- Beaver.LLVM.Config.include_dir() do
