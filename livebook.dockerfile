@@ -9,7 +9,7 @@ RUN --mount=type=cache,id=apt-dev,target=/var/cache/apt \
     rm -rf /var/lib/apt/lists/*
 
 # setup llvm
-RUN wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-10-08-1203/llvm-install-MinSizeRel.zip -O llvm-install.zip && \
+RUN wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/nightly-tag-2022-10-14-0015/llvm-install-MinSizeRel.zip -O llvm-install.zip && \
     unzip llvm-install.zip -d /llvm-install && \
     rm llvm-install.zip
 ENV LLVM_CONFIG_PATH="/llvm-install/bin/llvm-config"
