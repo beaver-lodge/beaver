@@ -22,7 +22,7 @@ defmodule Beaver.MLIR.CAPI do
         :prebuilt_base_url,
         "https://github.com/beaver-project/beaver-prebuilt/releases/download/2022-10-08-1051"
       ),
-    version: "0.2.11",
+    version: "0.2.12",
     wrapper: Path.join(File.cwd!(), "native/wrapper.h"),
     zig_src: "native/mlir-zig",
     include_paths:
