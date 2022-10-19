@@ -24,7 +24,8 @@ defmodule Beaver.MLIR.CAPI do
       ),
     version: "0.2.12",
     wrapper: Path.join(File.cwd!(), "native/wrapper.h"),
-    zig_src: "native/mlir-zig",
+    zig_src: "native/mlir-zig-src",
+    zig_proj: "native/mlir-zig-proj",
     include_paths:
       %{
         beaver_include: Path.join(File.cwd!(), "native/mlir-c/include")

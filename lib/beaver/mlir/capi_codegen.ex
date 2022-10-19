@@ -138,7 +138,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
   end
 
   @impl true
-  def func_filter(fns) do
+  def filter_functions(fns) do
     fns
     |> Enum.filter(fn x -> String.contains?(x, "mlir") || String.contains?(x, "beaver") end)
     |> Enum.filter(fn x -> String.contains?(x, "pub extern fn") end)

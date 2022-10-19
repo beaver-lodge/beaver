@@ -13,7 +13,7 @@ test "basic add functionality" {
 const beam = @import("beam.zig");
 const kinda = @import("kinda.zig");
 const e = @import("erl_nif.zig");
-const mlir_capi = @import("mlir.imp.zig");
+const mlir_capi = @import("beaver.imp.zig");
 pub const c = mlir_capi.c;
 
 pub fn make_charlist_from_string_ref(environment: beam.env, val: c.struct_MlirStringRef) beam.term {
