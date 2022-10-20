@@ -4,7 +4,7 @@ defmodule Beaver.MixProject do
   def project do
     [
       app: :beaver,
-      version: "0.2.12",
+      version: "0.2.13",
       elixir: "~> 1.13",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -84,7 +84,7 @@ defmodule Beaver.MixProject do
 
   defp deps do
     [
-      {:kinda, "~> 0.2.2"},
+      {:kinda, "~> 0.2.4"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end

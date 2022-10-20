@@ -24,7 +24,8 @@ defmodule Beaver.MLIR.CAPI do
       ),
     version: "0.2.12",
     wrapper: Path.join(File.cwd!(), "native/wrapper.h"),
-    zig_src: "native/mlir-zig",
+    zig_src: "native/mlir-zig-src",
+    zig_proj: "native/mlir-zig-proj",
     include_paths:
       %{
         beaver_include: Path.join(File.cwd!(), "native/mlir-c/include")
@@ -57,8 +58,8 @@ defmodule Beaver.MLIR.CAPI do
         llvm_headers ++
           Path.wildcard("native/mlir-c/**/*.h") ++
           Path.wildcard("native/mlir-c/**/*.cpp") ++
-          Path.wildcard("native/mlir-zig/src/**") ++
-          ["native/mlir-zig/#{Mix.env()}/build.zig"],
+          Path.wildcard("native/mlir-zig-src/**/*.zig") ++
+          ["native/mlir-zig-proj/#{Mix.env()}/build.zig"],
       not String.contains?(path, "kinda.gen.zig") do
     @external_resource path
   end
