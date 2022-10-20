@@ -717,6 +717,7 @@ const entry = e.ErlNifEntry{
 };
 
 export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
+    kinda.open_internal_resource_types(env);
     mlir_capi.open_generated_resource_types(env);
     comptime var i = 0;
     inline while (i < memref_kinds.len) : (i += 1) {
