@@ -32,6 +32,7 @@ defmodule DialectRegistryTest do
                {"emitc", "EmitC"},
                {"func", "Func"},
                {"gpu", "GPU"},
+               {"index", "Index"},
                {"linalg", "Linalg"},
                {"llvm", "LLVM"},
                {"math", "Math"},
