@@ -129,38 +129,36 @@ defmodule Beaver.MixProject do
     build = Path.join(Mix.Project.app_path(), "mlir-c-build")
     install = Path.join(Mix.Project.app_path(), "native-install")
 
-    Logger.debug("[CMake] configuring...")
+    Logger.debug("[CMake] running...")
 
     {:ok, llvm_lib_dir} = LLVM.Config.lib_dir()
 
     llvm_cmake_dir = Path.join(llvm_lib_dir, "cmake/llvm")
     mlir_cmake_dir = Path.join(llvm_lib_dir, "cmake/mlir")
 
-    {_, 0} =
-      System.cmd(
-        "cmake",
-        [
-          "-S",
-          cmake_project,
-          "-B",
-          build,
-          "-G",
-          "Ninja",
-          "-DLLVM_DIR=#{llvm_cmake_dir}",
-          "-DMLIR_DIR=#{mlir_cmake_dir}",
-          "-DCMAKE_INSTALL_PREFIX=#{install}"
-        ],
-        stderr_to_stdout: true
-      )
-
-    Logger.debug("[CMake] building...")
-
-    with {_, 0} <- System.cmd("cmake", ["--build", build, "--target", "install"]) do
+    with {_, 0} <-
+           System.cmd(
+             "cmake",
+             [
+               "-S",
+               cmake_project,
+               "-B",
+               build,
+               "-G",
+               "Ninja",
+               "-DLLVM_DIR=#{llvm_cmake_dir}",
+               "-DMLIR_DIR=#{mlir_cmake_dir}",
+               "-DCMAKE_INSTALL_PREFIX=#{install}"
+             ],
+             stderr_to_stdout: true
+           ),
+         {_, 0} <-
+           System.cmd("cmake", ["--build", build, "--target", "install"], stderr_to_stdout: true) do
       Logger.debug("[CMake] installed to #{install}")
       :ok
     else
       {error, _} ->
-        Logger.error(error)
+        Logger.info(error)
         {:error, [error]}
     end
   end

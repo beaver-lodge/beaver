@@ -37,7 +37,8 @@ defmodule Beaver.MLIR.ExecutionEngine do
         module,
         2,
         length(shared_lib_paths),
-        shared_lib_paths_ptr
+        shared_lib_paths_ptr,
+        false
       )
 
     is_null = is_null(jit)
