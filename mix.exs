@@ -25,7 +25,6 @@ defmodule Beaver.MixProject do
     [
       main: "Beaver",
       extras: [
-        "guides/introducing-beaver.md",
         "guides/your-first-beaver-compiler.livemd"
       ],
       filter_modules: fn m, _meta ->
