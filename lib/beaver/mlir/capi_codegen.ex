@@ -1,82 +1,255 @@
 defmodule Beaver.MLIR.CAPI.CodeGen do
   @moduledoc false
-  alias Kinda.CodeGen.{Type, NIF, Function}
+  alias Kinda.CodeGen.{KindDecl, NIFDecl}
   use Kinda.CodeGen
 
   @impl true
-  def type_gen(_root_module, "?fn(c.struct_MlirStringRef, ?*anyopaque) callconv(.C) void" = type) do
-    {:ok, %Type{zig_t: type, module_name: Beaver.MLIR.String.Callback}}
-  end
-
-  def type_gen(_root_module, "?fn(?*anyopaque) callconv(.C) void" = type) do
-    {:ok, %Type{zig_t: type, module_name: Beaver.MLIR.DiagnosticHandlerDeleteUserData}}
+  def type_gen(
+        _root_module,
+        {:optional_type,
+         {:ref,
+          [
+            :*,
+            :const,
+            {:fn,
+             %Zig.Parser.FnOptions{
+               position: nil,
+               doc_comment: nil,
+               block: nil,
+               align: nil,
+               linksection: nil,
+               callconv: {:enum_literal, :C},
+               extern: false,
+               export: false,
+               pub: false,
+               inline: :maybe
+             },
+             [
+               params: [
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{doc_comment: nil, noalias: false, comptime: false},
+                  {:optional_type, {:ref, [:*, :anyopaque]}}}
+               ],
+               type: :void
+             ]}
+          ]}} = type
+      ) do
+    {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.DiagnosticHandlerDeleteUserData}}
   end
 
   def type_gen(
         _root_module,
-        "?fn(?*anyopaque, isize, c.struct_MlirAffineMap) callconv(.C) void" = type
+        {:optional_type,
+         {:ref,
+          [
+            :*,
+            :const,
+            {:fn,
+             %Zig.Parser.FnOptions{
+               position: nil,
+               doc_comment: nil,
+               block: nil,
+               align: nil,
+               linksection: nil,
+               callconv: {:enum_literal, :C},
+               extern: false,
+               export: false,
+               pub: false,
+               inline: :maybe
+             },
+             [
+               params: [
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{
+                    doc_comment: nil,
+                    noalias: false,
+                    comptime: false
+                  }, {:optional_type, {:ref, [:*, :anyopaque]}}},
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{
+                    doc_comment: nil,
+                    noalias: false,
+                    comptime: false
+                  }, :isize},
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{
+                    doc_comment: nil,
+                    noalias: false,
+                    comptime: false
+                  }, :MlirAffineMap}
+               ],
+               type: :void
+             ]}
+          ]}} = type
       ) do
     {:ok,
-     %Type{zig_t: type, module_name: Beaver.MLIR.AffineMapCompressUnusedSymbolsPopulateResult}}
+     %KindDecl{zig_t: type, module_name: Beaver.MLIR.AffineMapCompressUnusedSymbolsPopulateResult}}
   end
 
   def type_gen(
         _root_module,
-        "?fn(c.struct_MlirDiagnostic, ?*anyopaque) callconv(.C) c.struct_MlirLogicalResult" = type
+        {:optional_type,
+         {:ref,
+          [
+            :*,
+            :const,
+            {:fn,
+             %Zig.Parser.FnOptions{
+               position: nil,
+               doc_comment: nil,
+               block: nil,
+               align: nil,
+               linksection: nil,
+               callconv: {:enum_literal, :C},
+               extern: false,
+               export: false,
+               pub: false,
+               inline: :maybe
+             },
+             [
+               params: [
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{
+                    doc_comment: nil,
+                    noalias: false,
+                    comptime: false
+                  }, {:optional_type, {:ref, [:*, :anyopaque]}}}
+               ],
+               type: {:optional_type, {:ref, [:*, :anyopaque]}}
+             ]}
+          ]}} = type
       ) do
-    {:ok, %Type{zig_t: type, module_name: Beaver.MLIR.DiagnosticHandler}}
+    {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.ExternalPassConstruct}}
   end
 
   def type_gen(
         _root_module,
-        "?fn(?*anyopaque) callconv(.C) ?*anyopaque" = type
+        {:optional_type,
+         {:ref,
+          [
+            :*,
+            :const,
+            {:fn,
+             %Zig.Parser.FnOptions{
+               position: nil,
+               doc_comment: nil,
+               block: nil,
+               align: nil,
+               linksection: nil,
+               callconv: {:enum_literal, :C},
+               extern: false,
+               export: false,
+               pub: false,
+               inline: :maybe
+             },
+             [
+               params: [
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{doc_comment: nil, noalias: false, comptime: false},
+                  :MlirOperation},
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{doc_comment: nil, noalias: false, comptime: false},
+                  :MlirExternalPass},
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{doc_comment: nil, noalias: false, comptime: false},
+                  {:optional_type, {:ref, [:*, :anyopaque]}}}
+               ],
+               type: :void
+             ]}
+          ]}} = type
       ) do
-    {:ok, %Type{zig_t: type, module_name: Beaver.MLIR.ExternalPassConstruct}}
+    {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.ExternalPassRun}}
   end
 
   def type_gen(
         _root_module,
-        "?fn(c.struct_MlirContext, ?*anyopaque) callconv(.C) c.struct_MlirLogicalResult" = type
+        {:optional_type,
+         {:ref,
+          [
+            :*,
+            :const,
+            {:fn,
+             %Zig.Parser.FnOptions{
+               position: nil,
+               doc_comment: nil,
+               block: nil,
+               align: nil,
+               linksection: nil,
+               callconv: {:enum_literal, :C},
+               extern: false,
+               export: false,
+               pub: false,
+               inline: :maybe
+             },
+             [
+               params: [
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{doc_comment: nil, noalias: false, comptime: false},
+                  :MlirOperation},
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{doc_comment: nil, noalias: false, comptime: false},
+                  :bool},
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{doc_comment: nil, noalias: false, comptime: false},
+                  {:optional_type, {:ref, [:*, :anyopaque]}}}
+               ],
+               type: :void
+             ]}
+          ]}} = type
       ) do
-    {:ok, %Type{zig_t: type, module_name: Beaver.MLIR.ExternalPassInitialize}}
+    {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.SymbolTableWalkSymbolTablesCallback}}
   end
 
   def type_gen(
         _root_module,
-        "?fn(c.struct_MlirOperation, c.struct_MlirExternalPass, ?*anyopaque) callconv(.C) void" =
-          type
+        {:optional_type,
+         {:ref,
+          [
+            :*,
+            :const,
+            {:fn,
+             %Zig.Parser.FnOptions{
+               position: nil,
+               doc_comment: nil,
+               block: nil,
+               align: nil,
+               linksection: nil,
+               callconv: {:enum_literal, :C},
+               extern: false,
+               export: false,
+               pub: false,
+               inline: :maybe
+             },
+             [
+               params: [
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{doc_comment: nil, noalias: false, comptime: false},
+                  :MlirContext},
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{doc_comment: nil, noalias: false, comptime: false},
+                  {:optional_type, {:ref, [:*, :anyopaque]}}}
+               ],
+               type: :MlirLogicalResult
+             ]}
+          ]}} = type
       ) do
-    {:ok, %Type{zig_t: type, module_name: Beaver.MLIR.ExternalPassRun}}
+    {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.GenericCallback}}
   end
 
-  def type_gen(
-        _root_module,
-        "?fn(c.struct_MlirOperation, bool, ?*anyopaque) callconv(.C) void" = type
-      ) do
-    {:ok, %Type{zig_t: type, module_name: Beaver.MLIR.SymbolTableWalkSymbolTablesCallback}}
+  def type_gen(_root_module, :MlirPass = type) do
+    {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.Pass}}
   end
 
-  def type_gen(
-        _root_module,
-        "?fn(isize, [*c]c.struct_MlirType, ?*anyopaque) callconv(.C) void" = type
-      ) do
-    {:ok, %Type{zig_t: type, module_name: Beaver.MLIR.TypesCallback}}
+  def type_gen(_root_module, :MlirValue = type) do
+    {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.Value}}
   end
 
-  def type_gen(_root_module, "c.struct_MlirPass" = type) do
-    {:ok, %Type{zig_t: type, module_name: Beaver.MLIR.Pass}}
-  end
-
-  def type_gen(_root_module, "c.struct_MlirValue" = type) do
-    {:ok, %Type{zig_t: type, module_name: Beaver.MLIR.Value}}
-  end
-
-  def type_gen(_root_module, "c.struct_MlirModule" = type) do
-    {:ok, %Type{zig_t: type, module_name: Beaver.MLIR.Module}}
+  def type_gen(_root_module, :MlirModule = type) do
+    {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.Module}}
   end
 
   def type_gen(root_module, type) do
-    Type.default(root_module, type) |> rewrite_module_name
+    KindDecl.default(root_module, type) |> rewrite_module_name
   end
 
   defp rewrite_module_name({:ok, %{module_name: module_name} = type}) do
@@ -125,23 +298,12 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
   end
 
   @impl true
-  def nif_gen(
-        %Function{
-          name: "mlirPassManagerRun"
-        } = f
-      ) do
-    %{NIF.from_function(f) | dirty: :cpu}
+  def nif_gen({:fn, _fn_opts, [name: :mlirPassManagerRun, params: _params, type: _ret]} = f) do
+    %{NIFDecl.from_function(f) | dirty: :cpu}
   end
 
   def nif_gen(f) do
-    NIF.from_function(f)
-  end
-
-  @impl true
-  def filter_functions(fns) do
-    fns
-    |> Enum.filter(fn x -> String.contains?(x, "mlir") || String.contains?(x, "beaver") end)
-    |> Enum.filter(fn x -> String.contains?(x, "pub extern fn") end)
+    NIFDecl.from_function(f)
   end
 
   @impl true
@@ -160,17 +322,17 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
             Descriptor9D
           ],
           t <- [Complex.F32, U8, U16, U32, I8, I16, I32, I64, F32, F64] do
-        %Kinda.CodeGen.Type{
+        %KindDecl{
           module_name: Module.concat([Beaver.Native, t, MemRef, rank]),
           kind_functions: memref_kind_functions()
         }
       end
 
     [
-      %Kinda.CodeGen.Type{
+      %KindDecl{
         module_name: Beaver.Native.PtrOwner
       },
-      %Kinda.CodeGen.Type{
+      %KindDecl{
         module_name: Beaver.Native.Complex.F32,
         kind_functions: memref_kind_functions()
       }

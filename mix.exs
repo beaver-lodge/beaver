@@ -25,7 +25,6 @@ defmodule Beaver.MixProject do
     [
       main: "Beaver",
       extras: [
-        "guides/introducing-beaver.md",
         "guides/your-first-beaver-compiler.livemd"
       ],
       filter_modules: fn m, _meta ->
@@ -84,7 +83,7 @@ defmodule Beaver.MixProject do
 
   defp deps do
     [
-      {:kinda, "~> 0.2.4"},
+      {:kinda, "~> 0.2.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
