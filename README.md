@@ -76,13 +76,7 @@ module {
 |> MLIR.Pass.Composer.run!()
 ```
 
-From a high-level perspective, we are going through some interesting changes of the way we utilize accelerated-computing. The most notable project in this trend could be PyTorch. Before PyTorch, one typical way to unleash the full power of GPU is to use a game engine, usually in the form of a library of fixed pipelines, iterations built with heavy weight languages like C++, and app developers use a more script-able language like Lua/C# to build the app/game as an extension to the engine. In ML world, TensorFlow 1 could be regarded as such as well. In contrast, the PyTorch approach puts the app developer in full command of control plane. They get to use Python to build the main loop themselves while having the full access to the accelerated-computing capability. This overturn significantly boosts the productivity and flexibility. As we can see, PyTorch already gets widespread adoption in ML and beyond.
-
-Beaver is trying to adapt this design in Erlang/Elixir, which has great support for concurrency and fault-tolerance. Considering Elixir being more compiler-friendly as a functional programming language, we can use MLIR to build a powerful and flexible compiler stack to offload the number crunching to accelerators while still keeping the distributed and fault-tolerant Erlang vibe. Hopefully, with Beaver we could build ML, 3D and new kinds of software not possible before.
-
 ## Goals
-
-<!-- TODO: ask Jose for advise on selling this better -->
 
 - Powered by Elixir's composable modularity and meta-programming features, provide a simple, intuitive, and extensible interface for MLIR.
 - Edit-Build-Test-Debug Loop at seconds. Everything in Elixir and Zig are compiled in parallel.

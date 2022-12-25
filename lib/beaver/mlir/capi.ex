@@ -1,4 +1,8 @@
 defmodule Beaver.MLIR.CAPI do
+  @moduledoc """
+  This module ships MLIR's C API. These NIFs are generated from headers in LLVM repo and this repo's headers providing supplemental functions.
+  """
+
   require Logger
 
   dest_dir = Path.join([Mix.Project.app_path(), "native-install"])
@@ -23,7 +27,7 @@ defmodule Beaver.MLIR.CAPI do
         "https://github.com/beaver-project/beaver-prebuilt/releases/download/2022-10-15-0706"
       ),
     version: "0.2.12",
-    wrapper: Path.join(File.cwd!(), "native/wrapper.h"),
+    wrapper: Path.join(File.cwd!(), "native/mlir-c/include/mlir-c/Beaver/wrapper.h"),
     zig_src: "native/mlir-zig-src",
     zig_proj: "native/mlir-zig-proj",
     include_paths:
@@ -36,12 +40,7 @@ defmodule Beaver.MLIR.CAPI do
     },
     dest_dir: dest_dir,
     forward_module: Beaver.Native,
-    codegen_module: Beaver.MLIR.CAPI.CodeGen
-
-  @moduledoc """
-
-  This module calls C API of MLIR. These FFIs are generated from headers in LLVM repo and this repo's headers providing supplemental functions.
-  """
+    code_gen_module: Beaver.MLIR.CAPI.CodeGen
 
   llvm_headers =
     with {:ok, include_dir} <- Beaver.LLVM.Config.include_dir() do

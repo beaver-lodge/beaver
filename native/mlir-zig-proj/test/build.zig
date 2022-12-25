@@ -10,10 +10,10 @@ pub fn build(b: *std.build.Builder) void {
     const mode = b.standardReleaseOptions();
     const lib = b.addSharedLibrary(kinda.lib_name, "src/main.zig", .unversioned);
     lib.setBuildMode(mode);
-    lib.addSystemIncludeDir(kinda.erts_include);
-    lib.addSystemIncludeDir(kinda.llvm_include);
-    lib.addSystemIncludeDir(kinda.beaver_include);
-    lib.addLibPath(kinda.beaver_libdir);
+    lib.addSystemIncludePath(kinda.erts_include);
+    lib.addSystemIncludePath(kinda.llvm_include);
+    lib.addSystemIncludePath(kinda.beaver_include);
+    lib.addLibraryPath(kinda.beaver_libdir);
     if (os == .linux) {
         lib.addRPath("$ORIGIN");
     }

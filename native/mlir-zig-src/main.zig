@@ -184,7 +184,7 @@ fn print_mlir(env: beam.env, element: anytype, printer: anytype) beam.term {
     return beam.make_term_list(env, collector.list.items);
 }
 
-fn Printer(comptime ResourceKind: type, print_fn: anytype) type {
+fn Printer(comptime ResourceKind: type, comptime print_fn: anytype) type {
     return struct {
         fn to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
             var arg0: ResourceKind.T = ResourceKind.resource.fetch(env, args[0]) catch
@@ -569,7 +569,7 @@ const MemRefDataType = enum {
     I64,
 };
 
-fn dataTypeToResourceKind(self: MemRefDataType) type {
+fn dataTypeToResourceKind(comptime self: MemRefDataType) type {
     return switch (self) {
         .@"Complex.F32" => Complex.F32,
         .U8 => mlir_capi.U8,
@@ -664,7 +664,7 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
     };
 }
 
-pub export const handwritten_nifs = .{
+const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_get_context_load_all_dialects", .arity = 0, .fptr = beaver_raw_get_context_load_all_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_ops", .arity = 0, .fptr = beaver_raw_registered_ops, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_ops_of_dialect", .arity = 1, .fptr = beaver_raw_registered_ops_of_dialect, .flags = 1 },
@@ -697,8 +697,22 @@ pub export const handwritten_nifs = .{
     dataKindToMemrefKind(mlir_capi.I32).nifs ++
     dataKindToMemrefKind(mlir_capi.I64).nifs;
 
-pub export const num_nifs = mlir_capi.generated_nifs.len + handwritten_nifs.len;
-pub export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs ++ mlir_capi.generated_nifs;
+const num_nifs = mlir_capi.generated_nifs.len + handwritten_nifs.len;
+export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs ++ mlir_capi.generated_nifs;
+
+export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
+    kinda.open_internal_resource_types(env);
+    mlir_capi.open_generated_resource_types(env);
+    comptime var i = 0;
+    inline while (i < memref_kinds.len) : (i += 1) {
+        memref_kinds[i].open(env);
+    }
+    Complex.F32.open_all(env);
+    beam.open_resource_wrapped(env, PassToken);
+    kinda.Internal.OpaqueStruct.open_all(env);
+    PtrOwner.Kind.open(env);
+    return 0;
+}
 
 const entry = e.ErlNifEntry{
     .major = 2,
@@ -715,20 +729,6 @@ const entry = e.ErlNifEntry{
     .sizeof_ErlNifResourceTypeInit = @sizeOf(e.ErlNifResourceTypeInit),
     .min_erts = "erts-13.0",
 };
-
-export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
-    kinda.open_internal_resource_types(env);
-    mlir_capi.open_generated_resource_types(env);
-    comptime var i = 0;
-    inline while (i < memref_kinds.len) : (i += 1) {
-        memref_kinds[i].open(env);
-    }
-    Complex.F32.open_all(env);
-    beam.open_resource_wrapped(env, PassToken);
-    kinda.Internal.OpaqueStruct.open_all(env);
-    PtrOwner.Kind.open(env);
-    return 0;
-}
 
 export fn nif_init() *const e.ErlNifEntry {
     return &entry;
