@@ -49,3 +49,8 @@ jobs:
       - name: Run tests
         run: |
           mix test --exclude vulkan --exclude todo
+      - uses: actions/upload-artifact@v3
+        if: failure()
+        with:
+          name: beaver-tmp-${{ github.run_number }}-${{ github.run_attempt }}
+          path: ./tmp/**/*.zig
