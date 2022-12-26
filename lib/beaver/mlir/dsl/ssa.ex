@@ -1,7 +1,7 @@
 defmodule Beaver.DSL.SSA do
   alias Beaver.MLIR
   require Beaver.MLIR.CAPI
-  defstruct arguments: [], results: [], filler: nil, block: nil, ctx: nil
+  defstruct arguments: [], results: [], filler: nil, block: nil, ctx: nil, loc: nil
 
   def put_arguments(%__MODULE__{arguments: arguments} = ssa, additional_arguments)
       when is_list(additional_arguments) do
@@ -19,6 +19,10 @@ defmodule Beaver.DSL.SSA do
   def put_results(%__MODULE__{results: results} = ssa, additional_results)
       when is_list(additional_results) do
     %__MODULE__{ssa | results: results ++ additional_results}
+  end
+
+  def put_location(%__MODULE__{} = ssa, %MLIR.CAPI.MlirLocation{} = loc) do
+    %__MODULE__{ssa | loc: loc}
   end
 
   def put_filler(%__MODULE__{} = ssa, filler) when is_function(filler) do
@@ -46,6 +50,7 @@ defmodule Beaver.DSL.SSA do
     end
   end
 
+  # with do block
   defp do_transform(
          {:>>>, _line,
           [
@@ -57,11 +62,19 @@ defmodule Beaver.DSL.SSA do
 
     ast =
       quote do
+        loc =
+          Beaver.MLIR.Location.file(
+            name: __ENV__.file,
+            line: Keyword.get(unquote(line), :line),
+            ctx: MLIR.__CONTEXT__()
+          )
+
         args = List.flatten([unquote_splicing(args)])
 
         %Beaver.DSL.SSA{}
         |> Beaver.DSL.SSA.put_filler(fn -> unquote(ast_block) end)
         |> Beaver.DSL.SSA.put_arguments(args)
+        |> Beaver.DSL.SSA.put_location(loc)
         |> Beaver.DSL.SSA.put_block(MLIR.__BLOCK__())
         |> Beaver.DSL.SSA.put_ctx(MLIR.__CONTEXT__())
         |> Beaver.DSL.SSA.put_results(unquote(results))
@@ -71,6 +84,7 @@ defmodule Beaver.DSL.SSA do
     ast
   end
 
+  # op creation
   defp do_transform(
          {:>>>, _line,
           [
@@ -81,10 +95,18 @@ defmodule Beaver.DSL.SSA do
     empty_call = {call, line, []}
 
     quote do
+      loc =
+        Beaver.MLIR.Location.file(
+          name: __ENV__.file,
+          line: Keyword.get(unquote(line), :line),
+          ctx: MLIR.__CONTEXT__()
+        )
+
       args = List.flatten([unquote_splicing(args)])
 
       %Beaver.DSL.SSA{}
       |> Beaver.DSL.SSA.put_arguments(args)
+      |> Beaver.DSL.SSA.put_location(loc)
       |> Beaver.DSL.SSA.put_block(MLIR.__BLOCK__())
       |> Beaver.DSL.SSA.put_ctx(MLIR.__CONTEXT__())
       |> Beaver.DSL.SSA.put_results(unquote(results))

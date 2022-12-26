@@ -213,7 +213,13 @@ Buildin.module do
   v2 = Arith.constant(1) >>> ~t<i32>
 end
 # Buildin.module is a macro, it will transformed the SSA `v2= Arith.constant..` to:
-v2 = Arith.constant(value: ~a{1}, return_type: ~t<i32>)
+v2 =
+ %Beaver.DSL.SSA{}
+  |> Beaver.DSL.SSA.put_arguments(value: ~a{1})
+  |> Beaver.DSL.SSA.put_block(MLIR.__BLOCK__())
+  |> Beaver.DSL.SSA.put_ctx(MLIR.__CONTEXT__())
+  |> Beaver.DSL.SSA.put_results(~t<i32>)
+  |> Arith.constant()
 ```
 
 Also, using the declarative way to construct IR, proper dominance and operand reference is formed naturally.
