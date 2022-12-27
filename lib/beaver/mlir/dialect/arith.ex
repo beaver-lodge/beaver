@@ -8,18 +8,15 @@ defmodule Beaver.MLIR.Dialect.Arith do
     ops: Dialect.Registry.ops("arith") |> Enum.reject(fn x -> x in ~w{constant} end)
 
   def constant(%Beaver.DSL.SSA{arguments: [true]} = ssa) do
-    MLIR.Operation.create("arith.constant", %{ssa | arguments: [value: ~a{true}]})
-    |> MLIR.Operation.results()
+    MLIR.Operation.eval_ssa("arith.constant", %{ssa | arguments: [value: ~a{true}]})
   end
 
   def constant(%Beaver.DSL.SSA{arguments: [false]} = ssa) do
-    MLIR.Operation.create("arith.constant", %{ssa | arguments: [value: ~a{false}]})
-    |> MLIR.Operation.results()
+    MLIR.Operation.eval_ssa("arith.constant", %{ssa | arguments: [value: ~a{false}]})
   end
 
   def constant(%Beaver.DSL.SSA{} = ssa) do
-    MLIR.Operation.create("arith.constant", ssa)
-    |> MLIR.Operation.results()
+    MLIR.Operation.eval_ssa("arith.constant", ssa)
   end
 
   def cmp_f_predicate(type) do

@@ -4,9 +4,8 @@ defmodule Beaver.MLIR.Operation do
   import Beaver.MLIR.CAPI
   require Logger
 
-  @doc """
-  Create a new operation from a operation state
-  """
+  @doc false
+
   def create(%MLIR.Operation.State{} = state) do
     state |> MLIR.Operation.State.create() |> create
   end
@@ -15,18 +14,14 @@ defmodule Beaver.MLIR.Operation do
     state |> Beaver.Native.ptr() |> Beaver.Native.bag(state) |> MLIR.CAPI.mlirOperationCreate()
   end
 
-  @doc """
-  Create a new operation from arguments and insert to managed insertion point
-  """
-
-  def create(op_name, %Beaver.DSL.SSA{
-        block: %MLIR.CAPI.MlirBlock{} = block,
-        arguments: arguments,
-        results: results,
-        filler: filler,
-        ctx: ctx,
-        loc: loc
-      }) do
+  defp create(op_name, %Beaver.DSL.SSA{
+         block: %MLIR.CAPI.MlirBlock{} = block,
+         arguments: arguments,
+         results: results,
+         filler: filler,
+         ctx: ctx,
+         loc: loc
+       }) do
     filler =
       if is_function(filler, 0) do
         [regions: filler]
@@ -37,16 +32,16 @@ defmodule Beaver.MLIR.Operation do
     create_and_append(ctx, op_name, arguments ++ [result_types: results] ++ filler, block, loc)
   end
 
-  def create(op_name, %Beaver.DSL.Op.Prototype{
-        operands: operands,
-        attributes: attributes,
-        results: results
-      }) do
+  defp create(op_name, %Beaver.DSL.Op.Prototype{
+         operands: operands,
+         attributes: attributes,
+         results: results
+       }) do
     create(op_name, operands ++ attributes ++ [result_types: results])
   end
 
   # one single value, usually a terminator
-  def create(op_name, %MLIR.Value{} = op) do
+  defp create(op_name, %MLIR.Value{} = op) do
     create(op_name, [op])
   end
 
@@ -91,7 +86,7 @@ defmodule Beaver.MLIR.Operation do
 
     state
     |> MLIR.Operation.State.create()
-    |> MLIR.Operation.create()
+    |> create()
   end
 
   @default_verify_opts [dump: false, dump_if_fail: false]
@@ -163,5 +158,10 @@ defmodule Beaver.MLIR.Operation do
 
   def from_module(%CAPI.MlirOperation{} = op) do
     op
+  end
+
+  @doc false
+  def eval_ssa(full_name, ssa) do
+    create(full_name, ssa) |> results()
   end
 end

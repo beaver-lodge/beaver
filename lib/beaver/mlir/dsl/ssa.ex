@@ -1,7 +1,15 @@
 defmodule Beaver.DSL.SSA do
+  @moduledoc false
   alias Beaver.MLIR
   require Beaver.MLIR.CAPI
-  defstruct arguments: [], results: [], filler: nil, block: nil, ctx: nil, loc: nil
+
+  defstruct arguments: [],
+            results: [],
+            filler: nil,
+            block: nil,
+            ctx: nil,
+            loc: nil,
+            evaluator: nil
 
   def put_arguments(%__MODULE__{arguments: arguments} = ssa, additional_arguments)
       when is_list(additional_arguments) do
@@ -43,7 +51,8 @@ defmodule Beaver.DSL.SSA do
           [
             var = {_var_name, _, nil},
             type
-          ]}
+          ]},
+         _evaluator
        ) do
     quote do
       {unquote(var), unquote(type)}
@@ -56,7 +65,8 @@ defmodule Beaver.DSL.SSA do
           [
             {call, line, [args, [do: ast_block]]},
             results
-          ]}
+          ]},
+         evaluator
        ) do
     empty_call = {call, line, []}
 
@@ -71,7 +81,7 @@ defmodule Beaver.DSL.SSA do
 
         args = List.flatten([unquote_splicing(args)])
 
-        %Beaver.DSL.SSA{}
+        %Beaver.DSL.SSA{evaluator: unquote(evaluator)}
         |> Beaver.DSL.SSA.put_filler(fn -> unquote(ast_block) end)
         |> Beaver.DSL.SSA.put_arguments(args)
         |> Beaver.DSL.SSA.put_location(loc)
@@ -90,7 +100,8 @@ defmodule Beaver.DSL.SSA do
           [
             {call, line, args},
             results
-          ]}
+          ]},
+         evaluator
        ) do
     empty_call = {call, line, []}
 
@@ -104,7 +115,7 @@ defmodule Beaver.DSL.SSA do
 
       args = List.flatten([unquote_splicing(args)])
 
-      %Beaver.DSL.SSA{}
+      %Beaver.DSL.SSA{evaluator: unquote(evaluator)}
       |> Beaver.DSL.SSA.put_arguments(args)
       |> Beaver.DSL.SSA.put_location(loc)
       |> Beaver.DSL.SSA.put_block(MLIR.__BLOCK__())
@@ -114,9 +125,13 @@ defmodule Beaver.DSL.SSA do
     end
   end
 
-  defp do_transform(ast), do: ast
+  defp do_transform(ast, _evaluator), do: ast
 
-  def transform(ast) do
-    Macro.prewalk(ast, &do_transform/1)
+  def prewalk(ast, evaluator) do
+    Macro.prewalk(ast, &do_transform(&1, evaluator))
+  end
+
+  def postwalk(ast, evaluator) do
+    Macro.postwalk(ast, &do_transform(&1, evaluator))
   end
 end
