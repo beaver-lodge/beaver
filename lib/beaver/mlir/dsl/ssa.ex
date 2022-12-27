@@ -45,66 +45,11 @@ defmodule Beaver.DSL.SSA do
     %__MODULE__{ssa | ctx: ctx}
   end
 
-  # block arguments
-  defp do_transform(
-         {:>>>, _,
-          [
-            var = {_var_name, _, nil},
-            type
-          ]},
-         _evaluator
-       ) do
-    quote do
-      {unquote(var), unquote(type)}
-    end
-  end
-
-  # with do block
-  defp do_transform(
-         {:>>>, _line,
-          [
-            {call, line, [args, [do: ast_block]]},
-            results
-          ]},
-         evaluator
-       ) do
-    empty_call = {call, line, []}
-
-    ast =
-      quote do
-        loc =
-          Beaver.MLIR.Location.file(
-            name: __ENV__.file,
-            line: Keyword.get(unquote(line), :line),
-            ctx: MLIR.__CONTEXT__()
-          )
-
-        args = List.flatten([unquote_splicing(args)])
-
-        %Beaver.DSL.SSA{evaluator: unquote(evaluator)}
-        |> Beaver.DSL.SSA.put_filler(fn -> unquote(ast_block) end)
-        |> Beaver.DSL.SSA.put_arguments(args)
-        |> Beaver.DSL.SSA.put_location(loc)
-        |> Beaver.DSL.SSA.put_block(MLIR.__BLOCK__())
-        |> Beaver.DSL.SSA.put_ctx(MLIR.__CONTEXT__())
-        |> Beaver.DSL.SSA.put_results(unquote(results))
-        |> unquote(empty_call)
-      end
-
-    ast
-  end
-
   # op creation
-  defp do_transform(
-         {:>>>, _line,
-          [
-            {call, line, args},
-            results
-          ]},
+  defp construct_ssa(
+         {:>>>, _line, [{_call, line, args}, results]},
          evaluator
        ) do
-    empty_call = {call, line, []}
-
     quote do
       loc =
         Beaver.MLIR.Location.file(
@@ -121,7 +66,44 @@ defmodule Beaver.DSL.SSA do
       |> Beaver.DSL.SSA.put_block(MLIR.__BLOCK__())
       |> Beaver.DSL.SSA.put_ctx(MLIR.__CONTEXT__())
       |> Beaver.DSL.SSA.put_results(unquote(results))
-      |> unquote(empty_call)
+    end
+  end
+
+  # block arguments
+  defp do_transform(
+         {:>>>, _, [var = {_var_name, _, nil}, type]},
+         _evaluator
+       ) do
+    quote do
+      {unquote(var), unquote(type)}
+    end
+  end
+
+  # with do block
+  defp do_transform(
+         {:>>>, line0, [{call, line, [args, [do: ast_block]]}, results]},
+         evaluator
+       ) do
+    quote do
+      unquote(
+        construct_ssa(
+          {:>>>, line0, [{call, line, args}, results]},
+          evaluator
+        )
+      )
+      |> Beaver.DSL.SSA.put_filler(fn -> unquote(ast_block) end)
+      |> unquote({call, line, []})
+    end
+  end
+
+  # op creation
+  defp do_transform(
+         {:>>>, _line, [{call, line, _args}, _results]} = ast,
+         evaluator
+       ) do
+    quote do
+      unquote(construct_ssa(ast, evaluator))
+      |> unquote({call, line, []})
     end
   end
 
