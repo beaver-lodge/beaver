@@ -22,24 +22,24 @@ defmodule Beaver.MLIR.Dialect.Arith do
 
   def cmp_f_predicate(type) do
     i =
-      %{
-        false => 0,
-        :oeq => 1,
-        :ogt => 2,
-        :oge => 3,
-        :olt => 4,
-        :ole => 5,
-        :one => 6,
-        :ord => 7,
-        :ueq => 8,
-        :ugt => 9,
-        :uge => 10,
-        :ult => 11,
-        :ule => 12,
-        :une => 13,
-        :uno => 14,
-        true => 15
-      }[type]
+      case type do
+        false -> 0
+        :oeq -> 1
+        :ogt -> 2
+        :oge -> 3
+        :olt -> 4
+        :ole -> 5
+        :one -> 6
+        :ord -> 7
+        :ueq -> 8
+        :ugt -> 9
+        :uge -> 1
+        :ult -> 1
+        :ule -> 1
+        :une -> 1
+        :uno -> 1
+        true -> 15
+      end
 
     MLIR.Attribute.integer(MLIR.Type.i64(), i)
   end
