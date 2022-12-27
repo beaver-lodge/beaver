@@ -45,7 +45,7 @@ defmodule Beaver.DSL.SSA do
     %__MODULE__{ssa | ctx: ctx}
   end
 
-  # op creation
+  # construct ssa by injecting MLIR context and block in the environment
   defp construct_ssa(
          {:>>>, _line, [{_call, line, args}, results]},
          evaluator
