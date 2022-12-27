@@ -33,7 +33,7 @@ defmodule Beaver.DSL.SSA do
     %__MODULE__{ssa | loc: loc}
   end
 
-  def put_filler(%__MODULE__{} = ssa, filler) when is_function(filler) do
+  def put_filler(%__MODULE__{} = ssa, filler) when is_function(filler, 0) do
     %__MODULE__{ssa | filler: filler}
   end
 
