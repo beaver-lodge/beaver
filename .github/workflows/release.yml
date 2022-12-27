@@ -41,7 +41,7 @@ jobs:
       - name: Set up Elixir
         uses: erlef/setup-beam@988e02bfe678367a02564f65ca2e37726dc0268f
         with:
-          elixir-version: "1.13.0" # Define the elixir version [required]
+          elixir-version: "1.14.0" # Define the elixir version [required]
           otp-version: "24.1" # Define the OTP version [required]
       - name: Set up Zig
         uses: goto-bus-stop/setup-zig@v1
@@ -131,5 +131,7 @@ jobs:
           tag_name: ${{ needs.generate_id.outputs.formatted_date }}
       - name: Test dev compile
         run: |
+          rm config/dev.exs
+          echo 'import Config' >> config/dev.exs
           echo 'config :beaver, :prebuilt_base_url, "https://github.com/beaver-project/beaver-prebuilt/releases/download/${{ needs.generate_id.outputs.formatted_date }}"' >> config/dev.exs
           mix compile

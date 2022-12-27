@@ -20,21 +20,9 @@ defmodule Beaver.MLIR.Dialect do
           func_name = Beaver.MLIR.Dialect.Registry.normalize_op_name(op)
           full_name = Enum.join([dialect, op], ".")
 
-          def unquote(func_name)(%Beaver.DSL.SSA{} = ssa) do
-            Beaver.MLIR.Operation.create(
-              unquote(full_name),
-              ssa
-            )
-            |> Beaver.MLIR.Operation.results()
-          end
-
-          # persistent the fullname so the caller module could access it
-          @full_name full_name
-          defmacro unquote(func_name)(%Beaver.DSL.SSA{} = ssa, do: ast_block) do
-            quote(bind_quoted: [ssa: ssa, full_name: @full_name, ast_block: ast_block]) do
-              Beaver.MLIR.Operation.create(full_name, ssa)
-              |> Beaver.MLIR.Operation.results()
-            end
+          def unquote(func_name)(%Beaver.DSL.SSA{evaluator: evaluator} = ssa)
+              when is_function(evaluator, 2) do
+            evaluator.(unquote(full_name), ssa)
           end
 
           Module.concat([

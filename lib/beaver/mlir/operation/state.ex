@@ -207,6 +207,14 @@ defmodule Beaver.MLIR.Operation.State do
     %{state | location: location.(context)}
   end
 
+  defp prepare(
+         %__MODULE__{
+           location: %Beaver.MLIR.CAPI.MlirLocation{} = location
+         } = state
+       ) do
+    %{state | location: location}
+  end
+
   @doc """
   Create a new operation state in MLIR CAPI.
   """

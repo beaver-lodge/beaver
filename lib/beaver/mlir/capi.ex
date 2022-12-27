@@ -40,7 +40,11 @@ defmodule Beaver.MLIR.CAPI do
     },
     dest_dir: dest_dir,
     forward_module: Beaver.Native,
-    code_gen_module: Beaver.MLIR.CAPI.CodeGen
+    code_gen_module: Beaver.MLIR.CAPI.CodeGen,
+    targets: ~w(
+      aarch64-apple-darwin
+      x86_64-unknown-linux-gnu
+    )
 
   llvm_headers =
     with {:ok, include_dir} <- Beaver.LLVM.Config.include_dir() do

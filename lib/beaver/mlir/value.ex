@@ -1,7 +1,6 @@
 defmodule Beaver.MLIR.Value do
   alias Beaver.MLIR.CAPI
 
-  @type t() :: any()
   use Kinda.ResourceKind,
     forward_module: Beaver.Native,
     fields: [safe_to_print: true]

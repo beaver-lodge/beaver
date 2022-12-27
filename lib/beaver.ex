@@ -64,7 +64,7 @@ defmodule Beaver do
   end
 
   defmacro mlir(opts, do: dsl_block) do
-    dsl_block_ast = dsl_block |> Beaver.DSL.SSA.transform()
+    dsl_block_ast = dsl_block |> Beaver.DSL.SSA.prewalk(&MLIR.Operation.eval_ssa/2)
 
     ctx_ast =
       if Keyword.has_key?(opts, :ctx) do
@@ -165,7 +165,6 @@ defmodule Beaver do
     block_ast
   end
 
-  # TODO: check sigil_t is from MLIR
   defmacro region(do: block) do
     quote do
       region = Beaver.MLIR.CAPI.mlirRegionCreate()
@@ -250,9 +249,10 @@ defmodule Beaver do
   Create a Op prototype of a concrete op type from `Beaver.MLIR.CAPI.MlirOperation`.
   """
   def concrete(%MLIR.CAPI.MlirOperation{} = operation) do
-    op_name = MLIR.Operation.name(operation)
-
-    struct!(MLIR.DSL.Op.Registry.lookup(op_name), %{
+    operation
+    |> MLIR.Operation.name()
+    |> MLIR.DSL.Op.Registry.lookup()
+    |> struct!(%{
       operands: Beaver.Walker.operands(operation),
       attributes: Beaver.Walker.attributes(operation),
       results: Beaver.Walker.results(operation),

@@ -7,41 +7,39 @@ defmodule Beaver.MLIR.Dialect.Arith do
     dialect: "arith",
     ops: Dialect.Registry.ops("arith") |> Enum.reject(fn x -> x in ~w{constant} end)
 
-  def constant(%Beaver.DSL.SSA{arguments: [true]} = ssa) do
-    MLIR.Operation.create("arith.constant", %{ssa | arguments: [value: ~a{true}]})
-    |> MLIR.Operation.results()
+  @constant "arith.constant"
+  def constant(%Beaver.DSL.SSA{arguments: [true], evaluator: evaluator} = ssa) do
+    evaluator.(@constant, %{ssa | arguments: [value: ~a{true}]})
   end
 
-  def constant(%Beaver.DSL.SSA{arguments: [false]} = ssa) do
-    MLIR.Operation.create("arith.constant", %{ssa | arguments: [value: ~a{false}]})
-    |> MLIR.Operation.results()
+  def constant(%Beaver.DSL.SSA{arguments: [false], evaluator: evaluator} = ssa) do
+    evaluator.(@constant, %{ssa | arguments: [value: ~a{false}]})
   end
 
-  def constant(%Beaver.DSL.SSA{} = ssa) do
-    MLIR.Operation.create("arith.constant", ssa)
-    |> MLIR.Operation.results()
+  def constant(%Beaver.DSL.SSA{evaluator: evaluator} = ssa) do
+    evaluator.(@constant, ssa)
   end
 
   def cmp_f_predicate(type) do
     i =
-      %{
-        false => 0,
-        :oeq => 1,
-        :ogt => 2,
-        :oge => 3,
-        :olt => 4,
-        :ole => 5,
-        :one => 6,
-        :ord => 7,
-        :ueq => 8,
-        :ugt => 9,
-        :uge => 10,
-        :ult => 11,
-        :ule => 12,
-        :une => 13,
-        :uno => 14,
-        true => 15
-      }[type]
+      case type do
+        false -> 0
+        :oeq -> 1
+        :ogt -> 2
+        :oge -> 3
+        :olt -> 4
+        :ole -> 5
+        :one -> 6
+        :ord -> 7
+        :ueq -> 8
+        :ugt -> 9
+        :uge -> 1
+        :ult -> 1
+        :ule -> 1
+        :une -> 1
+        :uno -> 1
+        true -> 15
+      end
 
     MLIR.Attribute.integer(MLIR.Type.i64(), i)
   end
