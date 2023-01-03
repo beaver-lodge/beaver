@@ -161,7 +161,25 @@ defmodule Beaver.MLIR.Operation do
   end
 
   @doc false
-  def eval_ssa(full_name, ssa) do
-    create(full_name, ssa) |> results()
+  def eval_ssa(full_name, %Beaver.DSL.SSA{results: result_types} = ssa) do
+    ssa =
+      case result_types do
+        [{:op, result_types}] ->
+          %Beaver.DSL.SSA{ssa | results: List.wrap(result_types)}
+
+        _ ->
+          ssa
+      end
+
+    op = create(full_name, ssa)
+    results = op |> results()
+
+    case result_types do
+      [{:op, _}] ->
+        {op, results}
+
+      _ ->
+        results
+    end
   end
 end

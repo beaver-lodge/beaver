@@ -29,6 +29,10 @@ defmodule Beaver.DSL.SSA do
     %__MODULE__{ssa | results: results ++ additional_results}
   end
 
+  def put_results(%__MODULE__{} = ssa, :infer = infer) do
+    %__MODULE__{ssa | results: infer}
+  end
+
   def put_location(%__MODULE__{} = ssa, %MLIR.CAPI.MlirLocation{} = loc) do
     %__MODULE__{ssa | loc: loc}
   end
@@ -51,21 +55,34 @@ defmodule Beaver.DSL.SSA do
          evaluator
        ) do
     quote do
-      loc =
-        Beaver.MLIR.Location.file(
-          name: __ENV__.file,
-          line: Keyword.get(unquote(line), :line),
-          ctx: MLIR.__CONTEXT__()
-        )
+      args = [unquote_splicing(args)] |> List.flatten()
+      results = unquote(results) |> List.wrap() |> List.flatten()
 
-      args = List.flatten([unquote_splicing(args)])
+      {loc, args} =
+        Enum.reduce(args, {nil, []}, fn arg, {loc, args} ->
+          case arg do
+            %MLIR.CAPI.MlirLocation{} = loc ->
+              {loc, args}
+
+            a ->
+              {loc, args ++ [a]}
+          end
+        end)
+
+      loc =
+        loc ||
+          Beaver.MLIR.Location.file(
+            name: __ENV__.file,
+            line: Keyword.get(unquote(line), :line),
+            ctx: MLIR.__CONTEXT__()
+          )
 
       %Beaver.DSL.SSA{evaluator: unquote(evaluator)}
-      |> Beaver.DSL.SSA.put_arguments(args)
       |> Beaver.DSL.SSA.put_location(loc)
+      |> Beaver.DSL.SSA.put_arguments(args)
+      |> Beaver.DSL.SSA.put_results(results)
       |> Beaver.DSL.SSA.put_block(MLIR.__BLOCK__())
       |> Beaver.DSL.SSA.put_ctx(MLIR.__CONTEXT__())
-      |> Beaver.DSL.SSA.put_results(unquote(results))
     end
   end
 
@@ -109,11 +126,11 @@ defmodule Beaver.DSL.SSA do
 
   defp do_transform(ast, _evaluator), do: ast
 
-  def prewalk(ast, evaluator) do
+  def prewalk(ast, evaluator) when is_function(evaluator, 2) do
     Macro.prewalk(ast, &do_transform(&1, evaluator))
   end
 
-  def postwalk(ast, evaluator) do
+  def postwalk(ast, evaluator) when is_function(evaluator, 2) do
     Macro.postwalk(ast, &do_transform(&1, evaluator))
   end
 end

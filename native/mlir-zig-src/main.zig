@@ -180,6 +180,9 @@ fn print_mlir(env: beam.env, element: anytype, printer: anytype) beam.term {
     var list = std.ArrayList(beam.term).init(beam.allocator);
     var collector = StringRefCollector{ .env = env, .list = list };
     defer list.deinit();
+    if (element.ptr == null) {
+        return beam.make_error_binary(env, "null pointer found: " ++ @typeName(@TypeOf(element)));
+    }
     printer(element, collect_string_ref, &collector);
     return beam.make_term_list(env, collector.list.items);
 }
