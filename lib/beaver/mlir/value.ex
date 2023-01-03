@@ -19,7 +19,7 @@ defmodule Beaver.MLIR.Value do
   @doc """
   Return the defining op of this value if this value is a result
   """
-  def owner(value) do
+  def owner(%__MODULE__{} = value) do
     if result?(value) do
       {:ok, CAPI.mlirOpResultGetOwner(value)}
     else

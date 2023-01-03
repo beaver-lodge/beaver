@@ -37,8 +37,10 @@ defmodule Beaver.MLIR.Pass.Server do
       exception ->
         MLIR.CAPI.mlirExternalPassSignalFailure(pass)
 
-        Logger.error("fail to run a pass. ")
-        inspect(exception, structs: false) |> Logger.error()
+        Logger.error(
+          "fail to run a pass. Safely inspecting: #{inspect(exception, structs: false)}"
+        )
+
         Logger.error(Exception.format(:error, exception, __STACKTRACE__))
     after
       :ok = MLIR.CAPI.beaver_raw_pass_token_signal(token_ref)
