@@ -11,7 +11,7 @@ defmodule Beaver.DSL.Pattern do
   require Beaver.MLIR.CAPI
 
   defmacro defpat(call, do: block) do
-    {name, args} = Macro.decompose_call(call)
+    {name, _args} = Macro.decompose_call(call)
     block_ast = block |> Beaver.DSL.SSA.prewalk(&__MODULE__.eval_rewrite/2)
 
     pdl_pattern_module_op =
@@ -233,9 +233,9 @@ defmodule Beaver.DSL.Pattern do
           ctx: ctx,
           block: block,
           loc: loc
-        } = ssa
+        }
       ) do
-    attributes = for {_k, other} = a <- arguments, do: a
+    attributes = for {_k, _a} = a <- arguments, do: a
     operands = for %MLIR.Value{} = o <- arguments, do: o
     env = %Env{ctx: ctx, block: block, loc: loc}
 
