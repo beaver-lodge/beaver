@@ -6,24 +6,14 @@ defmodule Beaver.DSL.Op.Prototype do
   """
 
   @type t() :: any()
-  defstruct operands: [],
-            attributes: [],
-            results: [],
-            successors: [],
-            regions: [],
-            result_types: []
+  defstruct operands: [], attributes: [], results: [], successors: [], regions: []
 
   defmacro __using__(opts) do
     op_name = Keyword.fetch!(opts, :op_name)
 
     quote do
       @behaviour Beaver.DSL.Op.Prototype
-      defstruct operands: [],
-                attributes: [],
-                results: [],
-                successors: [],
-                regions: [],
-                result_types: []
+      defstruct operands: [], attributes: [], results: [], successors: [], regions: []
 
       require Logger
       @impl true
