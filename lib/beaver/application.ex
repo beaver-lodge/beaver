@@ -5,7 +5,7 @@ defmodule Beaver.Application do
   def start(_type, _args) do
     Supervisor.start_link(
       [
-        Beaver.MLIR.DSL.Op.Registry
+        Beaver.DSL.Op.Registry
       ],
       strategy: :one_for_one
     )

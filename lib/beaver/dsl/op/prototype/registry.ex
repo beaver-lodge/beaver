@@ -1,4 +1,4 @@
-defmodule Beaver.MLIR.DSL.Op.Registry do
+defmodule Beaver.DSL.Op.Registry do
   use GenServer
 
   def start_link([]) do
