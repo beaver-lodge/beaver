@@ -22,7 +22,7 @@ defmodule Beaver.DSL.Op.Prototype do
       end
 
       def register_op_prototype do
-        Beaver.MLIR.DSL.Op.Registry.register(unquote(op_name), __MODULE__)
+        Beaver.DSL.Op.Registry.register(unquote(op_name), __MODULE__)
         :ok
       end
     end

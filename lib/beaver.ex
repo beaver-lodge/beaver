@@ -133,7 +133,7 @@ defmodule Beaver do
       args_var_ast,
       locations_var_ast,
       block_arg_var_ast
-    } = Beaver.MLIR.DSL.Block.transform_call(call)
+    } = Beaver.DSL.Block.transform_call(call)
 
     {block_id, _} = Macro.decompose_call(call)
     if not is_atom(block_id), do: raise("block name must be an atom")
@@ -217,7 +217,7 @@ defmodule Beaver do
   def concrete(%MLIR.CAPI.MlirOperation{} = operation) do
     operation
     |> MLIR.Operation.name()
-    |> MLIR.DSL.Op.Registry.lookup()
+    |> Beaver.DSL.Op.Registry.lookup()
     |> struct!(%{
       operands: Beaver.Walker.operands(operation),
       attributes: Beaver.Walker.attributes(operation),

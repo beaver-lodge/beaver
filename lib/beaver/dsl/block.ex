@@ -1,4 +1,4 @@
-defmodule Beaver.MLIR.DSL.Block do
+defmodule Beaver.DSL.Block do
   @moduledoc false
   # Transform the ast of a elixir call into a block creation and block args bindings
   def transform_call(call) do
