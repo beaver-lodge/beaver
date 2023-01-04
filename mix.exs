@@ -13,7 +13,10 @@ defmodule Beaver.MixProject do
       docs: docs(),
       package: package(),
       compilers: [:cmake] ++ Mix.compilers(),
-      aliases: aliases()
+      aliases: aliases(),
+      preferred_cli_env: [
+        "test.watch": :test
+      ]
     ]
   end
 

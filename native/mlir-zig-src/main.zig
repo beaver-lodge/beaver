@@ -2,14 +2,6 @@ const std = @import("std");
 const io = std.io;
 const stderr = io.getStdErr().writer();
 const testing = std.testing;
-
-export fn add(a: i32, b: i32) i32 {
-    return a + b;
-}
-
-test "basic add functionality" {
-    try testing.expect(add(3, 7) == 10);
-}
 const beam = @import("beam.zig");
 const kinda = @import("kinda.zig");
 const e = @import("erl_nif.zig");
