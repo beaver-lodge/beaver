@@ -22,7 +22,7 @@ defmodule Beaver.MLIR.Pass.Composer do
   # TODO: add keyword arguments
   def run!(
         %__MODULE__{passes: passes, op: %MLIR.Module{} = op},
-        opts \\ [dump: false, dump_if_fail: false, print: false]
+        opts \\ [dump: false, debug: false, print: false]
       ) do
     print = Keyword.get(opts, :print)
     ctx = MLIR.CAPI.mlirOperationGetContext(MLIR.Operation.from_module(op))
@@ -74,7 +74,7 @@ defmodule Beaver.MLIR.Pass.Composer do
     end
 
     if not MLIR.LogicalResult.success?(status) do
-      if Keyword.get(opts, :dump_if_fail, false) do
+      if Keyword.get(opts, :debug, false) do
         Logger.error("Failed to run pass, start dumping operation and this might crash")
         Logger.info(MLIR.to_string(op))
       end

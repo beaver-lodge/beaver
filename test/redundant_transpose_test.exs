@@ -42,7 +42,7 @@ defmodule RedundantTransposeTest do
             end
           end
         end
-        |> MLIR.Operation.verify!(dump_if_fail: true)
+        |> MLIR.Operation.verify!(debug: true)
       end
 
     defmodule DeduplicateTransposePass do

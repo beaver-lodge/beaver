@@ -34,10 +34,10 @@ mlir do
         end
       end
     end
-    |> MLIR.Operation.verify!(dump_if_fail: true)
+    |> MLIR.Operation.verify!(debug: true)
   end
 end
-|> MLIR.Operation.verify!(dump_if_fail: true)
+|> MLIR.Operation.verify!(debug: true)
 ```
 
 And a small example to showcase what it is like to define and run a pass in Beaver (with some monad magic):

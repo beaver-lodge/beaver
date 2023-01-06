@@ -81,7 +81,7 @@ defmodule Beaver.MLIR.Operation do
     |> create()
   end
 
-  @default_verify_opts [dump: false, dump_if_fail: false]
+  @default_verify_opts [debug: false]
   def verify!(op, opts \\ @default_verify_opts) do
     with {:ok, op} <-
            verify(op, opts ++ [should_raise: true]) do
@@ -96,8 +96,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def verify(op, opts \\ @default_verify_opts) do
-    dump = opts |> Keyword.get(:dump, false)
-    dump_if_fail = opts |> Keyword.get(:dump_if_fail, false)
+    debug = opts |> Keyword.get(:debug, false)
 
     is_null = MLIR.is_null(op)
 
@@ -106,15 +105,10 @@ defmodule Beaver.MLIR.Operation do
     else
       is_success = from_module(op) |> MLIR.CAPI.mlirOperationVerify() |> Beaver.Native.to_term()
 
-      if dump do
-        Logger.warning("Start dumping op not verified. This might crash.")
-        dump(op)
-      end
-
       if is_success do
         {:ok, op}
       else
-        if dump_if_fail do
+        if debug do
           Logger.info("Start printing op failed to pass the verification. This might crash.")
           Logger.info(MLIR.to_string(op))
         end

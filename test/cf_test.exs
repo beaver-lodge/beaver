@@ -198,7 +198,7 @@ defmodule CfTest do
         end
       end
       # we let MLIR verify the generated IR for us, so it gonna be legit!
-      |> MLIR.Operation.verify!(dump_if_fail: true)
+      |> MLIR.Operation.verify!(debug: true)
     end
 
     # In most of LLVM or other compiler guidance, it starts with ast parsing.
