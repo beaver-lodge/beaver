@@ -32,14 +32,6 @@ defmodule Beaver.MLIR.Operation do
     create_and_append(ctx, op_name, arguments ++ [result_types: results] ++ filler, block, loc)
   end
 
-  defp create(op_name, %Beaver.DSL.Op.Prototype{
-         operands: operands,
-         attributes: attributes,
-         results: results
-       }) do
-    create(op_name, operands ++ attributes ++ [result_types: results])
-  end
-
   # one single value, usually a terminator
   defp create(op_name, %MLIR.Value{} = op) do
     create(op_name, [op])

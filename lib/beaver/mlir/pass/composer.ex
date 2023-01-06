@@ -19,9 +19,6 @@ defmodule Beaver.MLIR.Pass.Composer do
 
   defp get_op_name(op_name) when is_binary(op_name), do: op_name
 
-  defp get_op_name(op_module) when is_atom(op_module),
-    do: Beaver.DSL.Op.Prototype.op_name!(op_module)
-
   # TODO: add keyword arguments
   def run!(
         %__MODULE__{passes: passes, op: %MLIR.Module{} = op},

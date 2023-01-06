@@ -4,10 +4,11 @@ defmodule PDLTest do
   alias Beaver.MLIR
   alias Beaver.MLIR.Type
   alias Beaver.MLIR.CAPI
-  import Beaver.MLIR.Transforms
   alias Beaver.MLIR.Dialect.{Func, TOSA}
+  import Beaver.MLIR.Transforms
   require Func
-  import Beaver.DSL.Pattern, only: :macros
+  require TOSA
+  require Type
 
   @moduletag :pdl
   setup do
@@ -65,9 +66,8 @@ defmodule PDLTest do
       {name, %CAPI.MlirAttribute{} = attribute}, acc ->
         {{name, attribute}, acc}
 
-      %CAPI.MlirOperation{} = mlir, acc ->
-        mlir = %op{} = mlir |> Beaver.concrete()
-        {mlir, [op | acc]}
+      %CAPI.MlirOperation{} = op, acc ->
+        {op, [Beaver.MLIR.Operation.name(op) | acc]}
 
       %element{} = mlir, acc ->
         {mlir, [element | acc]}
@@ -78,50 +78,50 @@ defmodule PDLTest do
       |> Beaver.Walker.traverse([], inspector, inspector)
 
     assert acc == [
-             Beaver.MLIR.Dialect.Builtin.Module,
+             "builtin.module",
              Beaver.MLIR.CAPI.MlirRegion,
              Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.Dialect.Builtin.Module,
+             "builtin.module",
              Beaver.MLIR.CAPI.MlirRegion,
              Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.Dialect.PDLInterp.Func,
+             "pdl_interp.func",
              Beaver.MLIR.CAPI.MlirRegion,
              Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.Dialect.PDLInterp.Finalize,
-             Beaver.MLIR.Dialect.PDLInterp.Finalize,
-             Beaver.MLIR.Dialect.PDLInterp.Erase,
-             Beaver.MLIR.Dialect.PDLInterp.Erase,
-             Beaver.MLIR.Dialect.PDLInterp.CreateOperation,
-             Beaver.MLIR.Dialect.PDLInterp.CreateOperation,
+             "pdl_interp.finalize",
+             "pdl_interp.finalize",
+             "pdl_interp.erase",
+             "pdl_interp.erase",
+             "pdl_interp.create_operation",
+             "pdl_interp.create_operation",
              Beaver.MLIR.CAPI.MlirBlock,
              Beaver.MLIR.CAPI.MlirRegion,
-             Beaver.MLIR.Dialect.PDLInterp.Func,
+             "pdl_interp.func",
              Beaver.MLIR.CAPI.MlirBlock,
              Beaver.MLIR.CAPI.MlirRegion,
-             Beaver.MLIR.Dialect.Builtin.Module,
-             Beaver.MLIR.Dialect.PDLInterp.Func,
+             "builtin.module",
+             "pdl_interp.func",
              Beaver.MLIR.CAPI.MlirRegion,
              Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.Dialect.PDLInterp.Finalize,
-             Beaver.MLIR.Dialect.PDLInterp.Finalize,
+             "pdl_interp.finalize",
+             "pdl_interp.finalize",
              Beaver.MLIR.CAPI.MlirBlock,
              Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.Dialect.PDLInterp.RecordMatch,
-             Beaver.MLIR.Dialect.PDLInterp.RecordMatch,
+             "pdl_interp.record_match",
+             "pdl_interp.record_match",
              Beaver.MLIR.CAPI.MlirBlock,
              Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.Dialect.PDLInterp.AreEqual,
-             Beaver.MLIR.Dialect.PDLInterp.AreEqual,
-             Beaver.MLIR.Dialect.PDLInterp.GetAttribute,
-             Beaver.MLIR.Dialect.PDLInterp.GetAttribute,
-             Beaver.MLIR.Dialect.PDLInterp.CreateAttribute,
-             Beaver.MLIR.Dialect.PDLInterp.CreateAttribute,
-             Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.CAPI.MlirRegion,
-             Beaver.MLIR.Dialect.PDLInterp.Func,
+             "pdl_interp.are_equal",
+             "pdl_interp.are_equal",
+             "pdl_interp.get_attribute",
+             "pdl_interp.get_attribute",
+             "pdl_interp.create_attribute",
+             "pdl_interp.create_attribute",
              Beaver.MLIR.CAPI.MlirBlock,
              Beaver.MLIR.CAPI.MlirRegion,
-             Beaver.MLIR.Dialect.Builtin.Module
+             "pdl_interp.func",
+             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.CAPI.MlirRegion,
+             "builtin.module"
            ]
 
     assert mlir
@@ -214,8 +214,6 @@ defmodule PDLTest do
                         a >>> Type.ranked_tensor([1, 3], Type.f32()),
                         b >>> Type.ranked_tensor([2, 1], Type.f32())
                       ) do
-                  alias Beaver.MLIR.Dialect.TOSA
-
                   res =
                     TOSA.add(a, b, one: MLIR.Attribute.integer(MLIR.Type.i32(), 1)) >>>
                       Type.ranked_tensor([2, 3], Type.f32())
@@ -228,6 +226,8 @@ defmodule PDLTest do
           end
         end
       end
+
+      import Beaver.DSL.Pattern
 
       defpat replace_add_op(benefit: 10) do
         a = value()
@@ -333,12 +333,11 @@ defmodule PDLTest do
   end
 
   test "toy compiler with pass", context do
-    alias Beaver.MLIR.Dialect.Func
-
     ctx = context[:ctx]
 
     defmodule ToyPass do
-      use Beaver.MLIR.Pass, on: Func.Func
+      use Beaver.MLIR.Pass, on: "func.func"
+      import Beaver.DSL.Pattern
 
       defpat replace_add_op() do
         a = value()
@@ -354,7 +353,8 @@ defmodule PDLTest do
       end
 
       def run(%MLIR.CAPI.MlirOperation{} = operation) do
-        with %Func.Func{attributes: attributes} <- Beaver.concrete(operation),
+        with "func.func" <- Beaver.MLIR.Operation.name(operation),
+             attributes <- Beaver.Walker.attributes(operation),
              2 <- Enum.count(attributes),
              {:ok, _} <- MLIR.Pattern.apply_(operation, [replace_add_op(benefit: 2)]) do
           :ok
@@ -371,7 +371,7 @@ defmodule PDLTest do
         }
       }
       """.(ctx)
-      |> MLIR.Pass.Composer.nested(Func.Func, [
+      |> MLIR.Pass.Composer.nested("func.func", [
         ToyPass.create()
       ])
       |> canonicalize

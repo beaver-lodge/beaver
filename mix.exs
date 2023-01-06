@@ -76,7 +76,7 @@ defmodule Beaver.MixProject do
   def application do
     [
       mod: {Beaver.Application, []},
-      start_phases: [load_dialect_modules: []],
+      start_phases: [mlir_register_all_passes: []],
       extra_applications: [:logger]
     ]
   end

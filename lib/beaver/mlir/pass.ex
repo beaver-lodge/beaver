@@ -18,9 +18,11 @@ defmodule Beaver.MLIR.Pass do
       @behaviour MLIR.Pass
 
       def create() do
+        op_name = Keyword.get(unquote(opts), :on, "builtin.module")
+
         MLIR.ExternalPass.create(
           __MODULE__,
-          Beaver.MLIR.Pass.get_op_name(unquote(opts))
+          op_name
         )
       end
 
@@ -39,11 +41,6 @@ defmodule Beaver.MLIR.Pass do
         delay(composer)
       end
     end
-  end
-
-  def get_op_name(opts) do
-    op_module = Keyword.get(opts, :on, MLIR.Dialect.Func.Func)
-    Beaver.DSL.Op.Prototype.op_name!(op_module)
   end
 
   def pipeline!(%MLIR.CAPI.MlirOpPassManager{} = pm, pipeline_str) when is_binary(pipeline_str) do

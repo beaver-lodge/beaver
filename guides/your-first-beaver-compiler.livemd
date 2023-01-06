@@ -12,9 +12,9 @@ Mix.install([
 
 Before start coding anything. Let's get some intuition about what a typical compiler is made of.
 
-* IR
-* Pass
-* CodeGen
+- IR
+- Pass
+- CodeGen
 
 ## A taste of MLIR
 
@@ -80,7 +80,7 @@ import MLIR.Conversion
 llvm_ir =
   ir
   |> convert_arith_to_llvm
-  |> MLIR.Pass.Composer.nested(Func.Func, fn pm ->
+  |> MLIR.Pass.Composer.nested("func.func", fn pm ->
     MLIR.Pass.pipeline!(pm, "llvm-request-c-wrappers")
   end)
   |> convert_func_to_llvm
@@ -135,15 +135,15 @@ MLIR.ExecutionEngine.invoke!(jit, "some_func", arguments, return)
 Congratulations! You have just built your first compiler with Beaver.
 There could be a lot to unpack and here is the summary:
 
-* First we generate some MLIR with the `mlir/1` macro.
-* Then we convert it to LLVM IR with `convert_func_to_llvm` and `convert_arith_to_llvm` passes.
-* Later we create a JIT engine from the generated LLVM IR with `MLIR.ExecutionEngine.create!` and run the native function.
+- First we generate some MLIR with the `mlir/1` macro.
+- Then we convert it to LLVM IR with `convert_func_to_llvm` and `convert_arith_to_llvm` passes.
+- Later we create a JIT engine from the generated LLVM IR with `MLIR.ExecutionEngine.create!` and run the native function.
 
 These three steps are corespondent to what makes a compiler
 
-* IR
-* Pass
-* CodeGen
+- IR
+- Pass
+- CodeGen
 
 In next tutorial we are taking a more programable approach to generate the IR, converting Elixir AST to MLIR.
 By doing it we will pick up concepts like region, block, operations appear here but didn't receive much attention for now.

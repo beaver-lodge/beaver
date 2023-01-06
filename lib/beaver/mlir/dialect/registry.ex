@@ -20,14 +20,6 @@ defmodule Beaver.MLIR.Dialect.Registry do
     pre_process(op_name) |> String.replace(".", "_") |> Macro.underscore() |> String.to_atom()
   end
 
-  def op_module_name(op_name) do
-    pre_process(op_name)
-    |> String.split(".")
-    |> Enum.join("_")
-    |> Macro.camelize()
-    |> String.to_atom()
-  end
-
   def normalize_dialect_name(to_upcase)
       when to_upcase in ~w{tosa gpu nvgpu omp nvvm llvm cf pdl rocdl spirv amx amdgpu scf acc dlti},
       do: String.upcase(to_upcase)

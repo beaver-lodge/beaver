@@ -1,11 +1,7 @@
 defmodule Beaver.MLIR.Dialect.Func do
   use Beaver.MLIR.Dialect,
     dialect: "func",
-    ops: Beaver.MLIR.Dialect.Registry.ops("func") |> Enum.reject(fn x -> x in ~w{func} end)
-
-  def op_module_names() do
-    [__MODULE__.Func]
-  end
+    ops: Beaver.MLIR.Dialect.Registry.ops("func")
 
   defmacro func(call, do: block) do
     {func_name, args} = call |> Macro.decompose_call()
@@ -30,6 +26,14 @@ defmodule Beaver.MLIR.Dialect.Func do
             fn {x, _} -> x end
           )
 
+        location =
+          Keyword.get(arguments, :loc) ||
+            Beaver.MLIR.Location.file(
+              name: __ENV__.file,
+              line: __ENV__.line,
+              ctx: Beaver.MLIR.__CONTEXT__()
+            )
+
         Beaver.MLIR.Operation.create_and_append(
           Beaver.MLIR.__CONTEXT__(),
           "func.func",
@@ -41,11 +45,3 @@ defmodule Beaver.MLIR.Dialect.Func do
     func_ast
   end
 end
-
-require Beaver.MLIR.Dialect
-
-Beaver.MLIR.Dialect.define_op_modules(
-  Beaver.MLIR.Dialect.Func,
-  "func",
-  Beaver.MLIR.Dialect.Registry.ops("func")
-)
