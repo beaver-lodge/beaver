@@ -26,43 +26,6 @@ defmodule Beaver.MLIR.Operation.State do
     state
   end
 
-  # defp add_attributes(%MLIR.CAPI.MlirOperationState{} = state, attr_kw)
-  #      when is_list(attr_kw) do
-  #   ctx = CAPI.beaverMlirOperationStateGetContext(state)
-
-  #   named_list =
-  #     for {k, v} <- attr_kw do
-  #       attr =
-  #         case v do
-  #           v when is_binary(v) ->
-  #             CAPI.mlirAttributeParseGet(ctx, MLIR.StringRef.create(v))
-
-  #           %Beaver.MLIR.CAPI.MlirType{} = type ->
-  #             Beaver.MLIR.Attribute.type(type)
-
-  #           %Beaver.MLIR.CAPI.MlirAttribute{} ->
-  #             v
-  #         end
-
-  #       if MLIR.is_null(attr) do
-  #         raise "attribute can't be null, #{inspect({k, v})}"
-  #       end
-
-  #       CAPI.mlirIdentifierGet(ctx, MLIR.StringRef.create(k))
-  #       |> CAPI.mlirNamedAttributeGet(attr)
-  #     end
-  #     |> CAPI.MlirNamedAttribute.array()
-
-  #   state
-  #   |> Beaver.Native.ptr()
-  #   |> CAPI.mlirOperationStateAddAttributes(
-  #     length(attr_kw),
-  #     named_list
-  #   )
-
-  #   state |> Beaver.Native.bag(named_list)
-  # end
-
   defp add_attributes(%MLIR.CAPI.MlirOperationState{} = state, attr_kw)
        when is_list(attr_kw) do
     ctx = CAPI.beaverMlirOperationStateGetContext(state)
@@ -266,6 +229,10 @@ defmodule Beaver.MLIR.Operation.State do
 
   def add_argument(%__MODULE__{regions: regions} = state, %CAPI.MlirRegion{} = region) do
     %{state | regions: regions ++ [region]}
+  end
+
+  def add_argument(%__MODULE__{} = state, {:loc, %Beaver.MLIR.CAPI.MlirLocation{} = location}) do
+    %{state | location: location}
   end
 
   def add_argument(%__MODULE__{regions: regions} = state, {:regions, region_filler})

@@ -1,8 +1,6 @@
 defmodule Beaver do
   alias Beaver.MLIR
   require Beaver.MLIR.CAPI
-  alias Beaver.MLIR.Attribute
-  alias Beaver.MLIR.Type
 
   @moduledoc """
   This module contains top level functions and macros for Beaver DSL for MLIR.
@@ -209,21 +207,5 @@ defmodule Beaver do
     raise(
       "`>>>` operator is expected to be transformed away. Maybe you forget to put the expression inside the Beaver.mlir/1 macro's do block?"
     )
-  end
-
-  @doc """
-  Create a Op prototype of a concrete op type from `Beaver.MLIR.CAPI.MlirOperation`.
-  """
-  def concrete(%MLIR.CAPI.MlirOperation{} = operation) do
-    operation
-    |> MLIR.Operation.name()
-    |> Beaver.DSL.Op.Registry.lookup()
-    |> struct!(%{
-      operands: Beaver.Walker.operands(operation),
-      attributes: Beaver.Walker.attributes(operation),
-      results: Beaver.Walker.results(operation),
-      successors: Beaver.Walker.successors(operation),
-      regions: Beaver.Walker.regions(operation)
-    })
   end
 end

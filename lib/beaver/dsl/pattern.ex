@@ -1,3 +1,7 @@
+defmodule Beaver.DSL.Pattern.Env do
+  defstruct ctx: nil, block: nil, loc: nil
+end
+
 defmodule Beaver.DSL.Pattern do
   @doc """
   PDL frontend
@@ -9,6 +13,7 @@ defmodule Beaver.DSL.Pattern do
   import Beaver
   require Beaver.MLIR
   require Beaver.MLIR.CAPI
+  alias Beaver.DSL.Pattern.Env
 
   defmacro defpat(call, do: block) do
     {name, _args} = Macro.decompose_call(call)
@@ -120,21 +125,21 @@ defmodule Beaver.DSL.Pattern do
 
         pdl_handler =
           with {:ok, owner} <- MLIR.Value.owner(repl) do
-            owner |> Beaver.concrete()
+            owner |> Beaver.MLIR.Operation.name()
           else
             _ ->
               raise "not a pdl handler"
           end
 
         case pdl_handler do
-          %PDL.Result{} ->
+          "pdl.result" ->
             Beaver.MLIR.Dialect.PDL.replace([
               unquote(root),
               repl,
               operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 0, 1])
             ]) >>> []
 
-          %PDL.Operation{} ->
+          "pdl.operation" ->
             Beaver.MLIR.Dialect.PDL.replace([
               unquote(root),
               repl,
@@ -143,10 +148,6 @@ defmodule Beaver.DSL.Pattern do
         end
       end
     end
-  end
-
-  defmodule Env do
-    defstruct ctx: nil, block: nil, loc: nil
   end
 
   @doc false

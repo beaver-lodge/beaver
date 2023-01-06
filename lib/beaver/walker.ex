@@ -14,19 +14,20 @@ alias Beaver.MLIR.CAPI.{
 
 require Beaver.MLIR.CAPI
 
+defmodule Beaver.OpReplacement do
+  @type t() :: %__MODULE__{
+          operands: Beaver.Walker.t() | list(),
+          attributes: Beaver.Walker.t() | list(),
+          results: Beaver.Walker.t() | list(),
+          successors: Beaver.Walker.t() | list(),
+          regions: Beaver.Walker.t() | list()
+        }
+  defstruct operands: [], attributes: [], results: [], successors: [], regions: []
+end
+
 defmodule Beaver.Walker do
   alias Beaver.MLIR.CAPI
-
-  defmodule OpReplacement do
-    @type t() :: %__MODULE__{
-            operands: Beaver.Walker.t() | list(),
-            attributes: Beaver.Walker.t() | list(),
-            results: Beaver.Walker.t() | list(),
-            successors: Beaver.Walker.t() | list(),
-            regions: Beaver.Walker.t() | list()
-          }
-    defstruct operands: [], attributes: [], results: [], successors: [], regions: []
-  end
+  alias Beaver.OpReplacement
 
   @moduledoc """
   Walker to traverse MLIR structures including operands, results, successors, attributes, regions.
@@ -358,9 +359,9 @@ defmodule Beaver.Walker do
   You might expect this function works like `Macro.traverse/4`.
   ### More on manipulating the IR
   During the traversal, there are generally two choices to manipulate the IR:
-  - Use `Beaver.concrete/1` to extract a op/attribute to a elixir structure, and generate a new `OpReplacement` with `replace/2`.
   - Use a pattern defined by macro `Beaver.defpat/2` to have the PDL interpreter transform the IR for you.
   You can use both if it is proper to do so.
+  - Use `Beaver.Walker.replace/2` to replace the operation and return a walker as placeholder if is replaced by value.
   It could be mind-boggling to think the IR is mutable but not an issue if your approach is very functional. Inappropriate mutation might cause crash or bugs if somewhere else is keeping a reference of the replace op.
   ### Some tips
   - If your matching is very complicated, using `with/1` in Elixir should cover it.

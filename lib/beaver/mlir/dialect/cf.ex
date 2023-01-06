@@ -5,7 +5,7 @@ defmodule Beaver.MLIR.Dialect.CF do
 
   use Beaver.MLIR.Dialect,
     dialect: "cf",
-    ops: Dialect.Registry.ops("cf") |> Enum.reject(fn x -> x in ~w{cond_br} end)
+    ops: Dialect.Registry.ops("cf")
 
   defp sizes_of_block_args(arguments) do
     Enum.reduce(arguments, [], fn x, sizes ->
@@ -43,11 +43,3 @@ defmodule Beaver.MLIR.Dialect.CF do
     )
   end
 end
-
-require Beaver.MLIR.Dialect
-
-Beaver.MLIR.Dialect.define_op_modules(
-  Beaver.MLIR.Dialect.CF,
-  "cf",
-  Beaver.MLIR.Dialect.Registry.ops("cf")
-)

@@ -2,7 +2,7 @@ defmodule Beaver.DSL.SSA do
   @moduledoc false
   alias Beaver.MLIR
   require Beaver.MLIR.CAPI
-
+  @type t() :: any()
   defstruct arguments: [],
             results: [],
             filler: nil,

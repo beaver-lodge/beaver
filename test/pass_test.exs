@@ -9,7 +9,7 @@ defmodule PassTest do
 
   test "exception in run/1", context do
     defmodule PassRaisingException do
-      use Beaver.MLIR.Pass, on: Func.Func
+      use Beaver.MLIR.Pass, on: "func.func"
 
       def run(_op) do
         raise "exception in pass run"
@@ -35,7 +35,7 @@ defmodule PassTest do
     assert_raise RuntimeError, ~r"Unexpected failure running pass pipeline", fn ->
       assert capture_log(fn ->
                ir
-               |> MLIR.Pass.Composer.nested(Func.Func, [
+               |> MLIR.Pass.Composer.nested("func.func", [
                  PassRaisingException.create()
                ])
                |> MLIR.Pass.Composer.run!()

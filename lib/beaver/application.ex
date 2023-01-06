@@ -4,26 +4,14 @@ defmodule Beaver.Application do
   @moduledoc false
   def start(_type, _args) do
     Supervisor.start_link(
-      [
-        Beaver.DSL.Op.Registry
-      ],
+      [],
       strategy: :one_for_one
     )
   end
 
-  def start_phase(:load_dialect_modules, :normal, []) do
+  def start_phase(:mlir_register_all_passes, :normal, []) do
     Beaver.MLIR.CAPI.mlirRegisterAllPasses()
-
-    for dialect_module <- Beaver.MLIR.Dialect.dialects() do
-      Task.async(fn ->
-        for op_module <- apply(dialect_module, :__ops__, []) do
-          apply(op_module, :register_op_prototype, [])
-        end
-      end)
-    end
-    |> Task.await_many(10_000)
-
-    Logger.debug("[Beaver] dialect modules loaded")
+    Logger.debug("[Beaver] all passes registered")
     :ok
   end
 end

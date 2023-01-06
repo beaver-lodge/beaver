@@ -14,11 +14,3 @@ defmodule Beaver.MLIR.Dialect.Tensor do
     |> Attribute.array()
   end
 end
-
-require Beaver.MLIR.Dialect
-
-Beaver.MLIR.Dialect.define_op_modules(
-  Beaver.MLIR.Dialect.Tensor,
-  "tensor",
-  Beaver.MLIR.Dialect.Registry.ops("tensor")
-)

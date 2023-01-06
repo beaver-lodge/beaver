@@ -46,7 +46,7 @@ And a small example to showcase what it is like to define and run a pass in Beav
 alias Beaver.MLIR.Dialect.Func
 
 defmodule ToyPass do
-  use Beaver.MLIR.Pass, on: Func.Func
+  use Beaver.MLIR.Pass, on: "func.func"
 
   defpat replace_add_op() do
     a = value()
@@ -61,7 +61,8 @@ defmodule ToyPass do
   end
 
   def run(%MLIR.CAPI.MlirOperation{} = operation) do
-    with %Func.Func{attributes: attributes} <- Beaver.concrete(operation),
+    with "func.func" <- Beaver.MLIR.Operation.name(operation),
+          attributes <- Beaver.Walker.attributes(operation),
           2 <- Enum.count(attributes),
           {:ok, _} <- MLIR.Pattern.apply_(operation, [replace_add_op(benefit: 2)]) do
       :ok
@@ -77,7 +78,7 @@ module {
   }
 }
 """.(ctx)
-|> MLIR.Pass.Composer.nested(Func.Func, [
+|> MLIR.Pass.Composer.nested("func.func", [
   ToyPass.create()
 ])
 |> canonicalize
@@ -118,6 +119,7 @@ Beaver is essentially LLVM/MLIR on Erlang/Elixir. It is kind of interesting to s
   - It gets compiled to Erlang and runs on BEAM (Erlang's VM). So it has all the fault-tolerance and concurrency features of Erlang.
   - As a Lisp, Elixir has all the good stuff of a Lisp-y language including hygienic macro, protocol-based polymorphism.
   - Elixir has a powerful [module system](https://elixir-lang.org/getting-started/module-attributes.html) to persist compile-time data and this allows library users to easily adjust runtime behavior.
+  - Minimum, very few keywords. Most of the language is built with itself.
 
 <!-- TODO: some rephrase -->
 

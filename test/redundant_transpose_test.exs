@@ -46,14 +46,15 @@ defmodule RedundantTransposeTest do
       end
 
     defmodule DeduplicateTransposePass do
-      use Beaver.MLIR.Pass, on: Func.Func
+      use Beaver.MLIR.Pass, on: "func.func"
 
-      def const_value(%TOSA.Transpose{operands: operands}) do
+      def const_value(op) do
+        operands = Beaver.Walker.operands(op)
+
         with true <- MLIR.Value.result?(operands[1]),
              const <- MLIR.CAPI.mlirOpResultGetOwner(operands[1]),
-             %TOSA.Const{attributes: const_attributes} <-
-               Beaver.concrete(const) do
-          {:ok, const_attributes["value"]}
+             "tosa.const" <- Beaver.MLIR.Operation.name(const) do
+          {:ok, Beaver.Walker.attributes(const)["value"]}
         end
       end
 
@@ -67,14 +68,14 @@ defmodule RedundantTransposeTest do
           # |> Beaver.Walker.postwalk(fn
           x ->
             with %MLIR.CAPI.MlirOperation{} <- x,
-                 %TOSA.Transpose{operands: operands} = transpose_op <- Beaver.concrete(x),
+                 "tosa.transpose" <- Beaver.MLIR.Operation.name(x),
+                 operands <- Beaver.Walker.operands(x),
                  {:ok, transpose_input_op} <- MLIR.Value.owner(operands[0]),
-                 %TOSA.Transpose{operands: input_op_operands} = transpose_input_op <-
-                   Beaver.concrete(transpose_input_op),
-                 {:ok, transpose_perm_attr} <- const_value(transpose_op),
+                 "tosa.transpose" <- Beaver.MLIR.Operation.name(transpose_input_op),
+                 {:ok, transpose_perm_attr} <- const_value(x),
                  {:ok, transpose_input_perm_attr} <- const_value(transpose_input_op),
                  true <- redundant?(transpose_perm_attr, transpose_input_perm_attr) do
-              Beaver.Walker.replace(x, input_op_operands[0])
+              Beaver.Walker.replace(x, Beaver.Walker.operands(transpose_input_op)[0])
             else
               _ -> x
             end
@@ -86,7 +87,7 @@ defmodule RedundantTransposeTest do
 
     ir_string =
       ir
-      |> MLIR.Pass.Composer.nested(Func.Func, [
+      |> MLIR.Pass.Composer.nested("func.func", [
         DeduplicateTransposePass.create()
       ])
       |> canonicalize
