@@ -48,7 +48,7 @@ defmodule Beaver.DSL.Pattern do
             pdl_pattern_module_op = unquote(pdl_pattern_module_op)
 
             with {:ok, op} <-
-                   Beaver.MLIR.Operation.verify(pdl_pattern_module_op, dump_if_fail: true) do
+                   Beaver.MLIR.Operation.verify(pdl_pattern_module_op, debug: true) do
               op
             else
               :fail ->

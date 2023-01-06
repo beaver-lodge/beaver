@@ -32,7 +32,7 @@ defmodule CFTest do
               end
             end
           end
-          |> MLIR.Operation.verify!(dump_if_fail: true)
+          |> MLIR.Operation.verify!(debug: true)
 
           Func.func some_func2(function_type: Type.function([], [Type.i(32)])) do
             region do

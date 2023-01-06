@@ -97,7 +97,7 @@ defmodule MlirTest do
     moduleBody = MLIR.CAPI.mlirModuleGetBody(module)
     MLIR.CAPI.mlirBlockInsertOwnedOperation(moduleBody, 0, func_op)
 
-    MLIR.Operation.verify!(module, dump_if_fail: true)
+    MLIR.Operation.verify!(module, debug: true)
 
     MLIR.CAPI.mlirContextDestroy(ctx)
   end

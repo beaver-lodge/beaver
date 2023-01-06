@@ -322,7 +322,7 @@ defmodule PDLTest do
       assert not String.contains?(ir_string, "tosa.sub"), ir_string
 
       MLIR.Pattern.apply!(ir_module, [pattern])
-      |> MLIR.Operation.verify!(dump_if_fail: true)
+      |> MLIR.Operation.verify!(debug: true)
       |> MLIR.Transforms.canonicalize()
       |> MLIR.Pass.Composer.run!()
 
