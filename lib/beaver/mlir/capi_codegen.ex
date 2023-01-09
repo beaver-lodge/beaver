@@ -244,6 +244,10 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
     {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.Value}}
   end
 
+  def type_gen(_root_module, :MlirOperation = type) do
+    {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.Operation}}
+  end
+
   def type_gen(_root_module, :MlirModule = type) do
     {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.Module}}
   end

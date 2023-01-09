@@ -1,9 +1,8 @@
 alias Beaver.MLIR
-alias Beaver.MLIR.Value
+alias Beaver.MLIR.{Value, Operation}
 
 alias Beaver.MLIR.CAPI.{
   Module,
-  MlirOperation,
   MlirRegion,
   MlirAttribute,
   MlirBlock,
@@ -36,7 +35,7 @@ defmodule Beaver.Walker do
 
   # TODO: traverse MlirNamedAttribute?
   @type operation() ::
-          Module.t() | MlirOperation.t() | OpReplacement.t() | Beaver.DSL.Op.Prototype.t()
+          Module.t() | Operation.t() | OpReplacement.t() | Beaver.DSL.Op.Prototype.t()
   @type container() ::
           operation()
           | MlirRegion.t()
@@ -50,7 +49,7 @@ defmodule Beaver.Walker do
           | Value.t()
           | MlirNamedAttribute.t()
 
-  @type element_module() :: MlirOperation | MlirRegion | MlirBlock | Value | MlirAttribute
+  @type element_module() :: Operation | MlirRegion | MlirBlock | Value | MlirAttribute
 
   @type t :: %__MODULE__{
           container: container(),
@@ -75,20 +74,20 @@ defmodule Beaver.Walker do
   defstruct container_keys ++ index_func_keys ++ iter_keys ++ iter_func_keys
 
   # operands, results, attributes of one operation
-  defp verify_nesting!(MlirOperation, Value), do: :ok
+  defp verify_nesting!(Operation, Value), do: :ok
   defp verify_nesting!(OpReplacement, Value), do: :ok
-  defp verify_nesting!(MlirOperation, {MlirIdentifier, MlirAttribute}), do: :ok
+  defp verify_nesting!(Operation, {MlirIdentifier, MlirAttribute}), do: :ok
   defp verify_nesting!(OpReplacement, MlirNamedAttribute), do: :ok
   # regions of one operation
-  defp verify_nesting!(MlirOperation, MlirRegion), do: :ok
+  defp verify_nesting!(Operation, MlirRegion), do: :ok
   defp verify_nesting!(OpReplacement, MlirRegion), do: :ok
   # successor blocks of one operation
-  defp verify_nesting!(MlirOperation, MlirBlock), do: :ok
+  defp verify_nesting!(Operation, MlirBlock), do: :ok
   defp verify_nesting!(OpReplacement, MlirBlock), do: :ok
   # blocks in a region
   defp verify_nesting!(MlirRegion, MlirBlock), do: :ok
   # operations in a block
-  defp verify_nesting!(MlirBlock, MlirOperation), do: :ok
+  defp verify_nesting!(MlirBlock, Operation), do: :ok
   # arguments of a block
   defp verify_nesting!(MlirBlock, Value), do: :ok
   defp verify_nesting!(Value, MlirOperand), do: :ok
@@ -101,7 +100,7 @@ defmodule Beaver.Walker do
   Extract a container could be traversed by walker from an Op prototype or a `Beaver.MLIR.Module`.
   """
   def container(module = %MLIR.Module{}) do
-    MLIR.Operation.from_module(module)
+    Operation.from_module(module)
   end
 
   def container(%{
@@ -260,7 +259,7 @@ defmodule Beaver.Walker do
   def operations(%MlirBlock{} = block) do
     new(
       block,
-      MlirOperation,
+      Operation,
       get_first: &CAPI.mlirBlockGetFirstOperation/1,
       get_next: &CAPI.mlirOperationGetNextInBlock/1,
       get_parent: &CAPI.mlirOperationGetBlock/1,
@@ -395,7 +394,7 @@ defmodule Beaver.Walker do
     )
   end
 
-  defp do_traverse(%MlirOperation{} = operation, acc, pre, post) do
+  defp do_traverse(%Operation{} = operation, acc, pre, post) do
     {operation, acc} = pre.(operation, acc)
 
     {_operands, acc} =
@@ -520,11 +519,11 @@ defmodule Beaver.Walker do
     traverse(ast, acc, fn x, a -> {x, a} end, fun)
   end
 
-  @spec replace(MlirOperation.t(), [Value.t()] | Value.t()) :: OpReplacement.t()
+  @spec replace(Operation.t(), [Value.t()] | Value.t()) :: OpReplacement.t()
   @doc """
   Replace a operation with a value
   """
-  def replace(%MlirOperation{} = op, %Value{} = value) do
+  def replace(%Operation{} = op, %Value{} = value) do
     with results <- results(op),
          1 <- Enum.count(results),
          %Value{} = result = results[0] do

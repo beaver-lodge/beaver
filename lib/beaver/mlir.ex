@@ -26,7 +26,7 @@ defmodule Beaver.MLIR do
     |> dump
   end
 
-  def dump(%MlirOperation{} = mlir) do
+  def dump(%__MODULE__.Operation{} = mlir) do
     CAPI.mlirOperationDump(mlir)
     :ok
   end
@@ -79,7 +79,7 @@ defmodule Beaver.MLIR do
     CAPI.beaverAttributeIsNull(v) |> Beaver.Native.to_term()
   end
 
-  def is_null(%MlirOperation{} = v) do
+  def is_null(%MLIR.Operation{} = v) do
     CAPI.beaverOperationIsNull(v) |> Beaver.Native.to_term()
   end
 
@@ -107,7 +107,7 @@ defmodule Beaver.MLIR do
     |> List.to_string()
   end
 
-  def to_string(%MlirOperation{ref: ref}) do
+  def to_string(%MLIR.Operation{ref: ref}) do
     CAPI.beaver_raw_beaver_operation_to_charlist(ref)
     |> Beaver.Native.check!()
     |> List.to_string()

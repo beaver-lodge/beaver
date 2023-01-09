@@ -4,6 +4,10 @@ defmodule Beaver.MLIR.Operation do
   import Beaver.MLIR.CAPI
   require Logger
 
+  use Kinda.ResourceKind,
+    forward_module: Beaver.Native,
+    fields: [safe_to_print: true]
+
   @doc false
 
   def create(%MLIR.Operation.State{} = state) do
@@ -51,7 +55,7 @@ defmodule Beaver.MLIR.Operation do
     op
   end
 
-  def results(%MLIR.CAPI.MlirOperation{} = op) do
+  def results(%MLIR.Operation{} = op) do
     case CAPI.mlirOperationGetNumResults(op) |> Beaver.Native.to_term() do
       0 ->
         op
@@ -126,13 +130,13 @@ defmodule Beaver.MLIR.Operation do
   @doc """
   Verify the op and dump it. It raises if the verification fails.
   """
-  def dump!(%MLIR.CAPI.MlirOperation{} = op) do
+  def dump!(%MLIR.Operation{} = op) do
     verify!(op)
     mlirOperationDump(op)
     op
   end
 
-  def name(%MLIR.CAPI.MlirOperation{} = operation) do
+  def name(%MLIR.Operation{} = operation) do
     MLIR.CAPI.mlirOperationGetName(operation)
     |> MLIR.CAPI.mlirIdentifierStr()
     |> MLIR.StringRef.extract()
@@ -142,7 +146,7 @@ defmodule Beaver.MLIR.Operation do
     CAPI.mlirModuleGetOperation(module)
   end
 
-  def from_module(%CAPI.MlirOperation{} = op) do
+  def from_module(%MLIR.Operation{} = op) do
     op
   end
 

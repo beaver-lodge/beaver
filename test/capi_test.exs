@@ -174,7 +174,7 @@ defmodule MlirTest do
   end
 
   defmodule TestPass do
-    def run(%Beaver.MLIR.CAPI.MlirOperation{} = op) do
+    def run(%Beaver.MLIR.Operation{} = op) do
       MLIR.Operation.verify!(op)
       :ok
     end

@@ -7,7 +7,7 @@ defmodule Beaver.MLIR.Pass do
     fields: [handler: nil],
     forward_module: Beaver.Native
 
-  @callback run(MLIR.CAPI.MlirOperation.t()) :: :ok | :error
+  @callback run(MLIR.Operation.t()) :: :ok | :error
 
   defmacro __using__(opts) do
     require Beaver.MLIR.CAPI
@@ -31,7 +31,7 @@ defmodule Beaver.MLIR.Pass do
         Composer.add(composer_or_op, external_pass)
       end
 
-      def delay(%Beaver.MLIR.CAPI.MlirOperation{} = composer_or_op) do
+      def delay(%Beaver.MLIR.Operation{} = composer_or_op) do
         composer = %Composer{op: composer_or_op, passes: []}
         delay(composer)
       end

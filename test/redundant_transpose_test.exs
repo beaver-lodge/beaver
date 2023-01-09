@@ -65,9 +65,8 @@ defmodule RedundantTransposeTest do
       def run(func) do
         func
         |> Beaver.Walker.prewalk(fn
-          # |> Beaver.Walker.postwalk(fn
           x ->
-            with %MLIR.CAPI.MlirOperation{} <- x,
+            with %MLIR.Operation{} <- x,
                  "tosa.transpose" <- Beaver.MLIR.Operation.name(x),
                  operands <- Beaver.Walker.operands(x),
                  {:ok, transpose_input_op} <- MLIR.Value.owner(operands[0]),

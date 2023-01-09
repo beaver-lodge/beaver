@@ -66,7 +66,7 @@ defmodule PDLTest do
       {name, %CAPI.MlirAttribute{} = attribute}, acc ->
         {{name, attribute}, acc}
 
-      %CAPI.MlirOperation{} = op, acc ->
+      %MLIR.Operation{} = op, acc ->
         {op, [Beaver.MLIR.Operation.name(op) | acc]}
 
       %element{} = mlir, acc ->
@@ -352,7 +352,7 @@ defmodule PDLTest do
         end
       end
 
-      def run(%MLIR.CAPI.MlirOperation{} = operation) do
+      def run(%MLIR.Operation{} = operation) do
         with "func.func" <- Beaver.MLIR.Operation.name(operation),
              attributes <- Beaver.Walker.attributes(operation),
              2 <- Enum.count(attributes),
