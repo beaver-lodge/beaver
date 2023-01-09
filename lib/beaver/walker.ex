@@ -1,8 +1,7 @@
 alias Beaver.MLIR
-alias Beaver.MLIR.{Value, Operation, Region}
+alias Beaver.MLIR.{Value, Operation, Region, Module}
 
 alias Beaver.MLIR.CAPI.{
-  Module,
   MlirAttribute,
   MlirBlock,
   MlirIdentifier,
@@ -98,7 +97,7 @@ defmodule Beaver.Walker do
   @doc """
   Extract a container could be traversed by walker from an Op prototype or a `Beaver.MLIR.Module`.
   """
-  def container(module = %MLIR.Module{}) do
+  def container(module = %Module{}) do
     Operation.from_module(module)
   end
 
