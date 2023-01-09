@@ -11,7 +11,6 @@ defmodule Beaver.MLIR do
   alias Beaver.MLIR
 
   alias Beaver.MLIR.CAPI.{
-    MlirOperation,
     MlirAttribute,
     MlirBlock,
     MlirAffineExpr,

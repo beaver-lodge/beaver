@@ -1,9 +1,7 @@
 alias Beaver.MLIR
-alias Beaver.MLIR.{Value, Operation}
+alias Beaver.MLIR.{Value, Operation, Region, Module}
 
 alias Beaver.MLIR.CAPI.{
-  Module,
-  MlirRegion,
   MlirAttribute,
   MlirBlock,
   MlirIdentifier,
@@ -38,18 +36,18 @@ defmodule Beaver.Walker do
           Module.t() | Operation.t() | OpReplacement.t() | Beaver.DSL.Op.Prototype.t()
   @type container() ::
           operation()
-          | MlirRegion.t()
+          | Region.t()
           | MlirBlock.t()
           | MlirNamedAttribute.t()
 
   @type element() ::
           operation()
-          | MlirRegion.t()
+          | Region.t()
           | MlirBlock.t()
           | Value.t()
           | MlirNamedAttribute.t()
 
-  @type element_module() :: Operation | MlirRegion | MlirBlock | Value | MlirAttribute
+  @type element_module() :: Operation | Region | MlirBlock | Value | MlirAttribute
 
   @type t :: %__MODULE__{
           container: container(),
@@ -79,13 +77,13 @@ defmodule Beaver.Walker do
   defp verify_nesting!(Operation, {MlirIdentifier, MlirAttribute}), do: :ok
   defp verify_nesting!(OpReplacement, MlirNamedAttribute), do: :ok
   # regions of one operation
-  defp verify_nesting!(Operation, MlirRegion), do: :ok
-  defp verify_nesting!(OpReplacement, MlirRegion), do: :ok
+  defp verify_nesting!(Operation, Region), do: :ok
+  defp verify_nesting!(OpReplacement, Region), do: :ok
   # successor blocks of one operation
   defp verify_nesting!(Operation, MlirBlock), do: :ok
   defp verify_nesting!(OpReplacement, MlirBlock), do: :ok
   # blocks in a region
-  defp verify_nesting!(MlirRegion, MlirBlock), do: :ok
+  defp verify_nesting!(Region, MlirBlock), do: :ok
   # operations in a block
   defp verify_nesting!(MlirBlock, Operation), do: :ok
   # arguments of a block
@@ -99,7 +97,7 @@ defmodule Beaver.Walker do
   @doc """
   Extract a container could be traversed by walker from an Op prototype or a `Beaver.MLIR.Module`.
   """
-  def container(module = %MLIR.Module{}) do
+  def container(module = %Module{}) do
     Operation.from_module(module)
   end
 
@@ -202,7 +200,7 @@ defmodule Beaver.Walker do
   def regions(op) do
     new(
       op,
-      MlirRegion,
+      Region,
       get_num: &CAPI.mlirOperationGetNumRegions/1,
       get_element: &CAPI.mlirOperationGetRegion/2,
       element_equal: &CAPI.mlirRegionEqual/2
@@ -267,8 +265,8 @@ defmodule Beaver.Walker do
     )
   end
 
-  @spec blocks(MlirRegion.t()) :: Enumerable.t()
-  def blocks(%MlirRegion{} = region) do
+  @spec blocks(Region.t()) :: Enumerable.t()
+  def blocks(%Region{} = region) do
     new(
       region,
       MlirBlock,
@@ -429,7 +427,7 @@ defmodule Beaver.Walker do
     post.(operation, acc)
   end
 
-  defp do_traverse(%MlirRegion{} = region, acc, pre, post) do
+  defp do_traverse(%Region{} = region, acc, pre, post) do
     {region, acc} = pre.(region, acc)
     {_blocks, acc} = blocks(region) |> do_traverse(acc, pre, post)
 

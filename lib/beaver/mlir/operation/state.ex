@@ -105,14 +105,14 @@ defmodule Beaver.MLIR.Operation.State do
 
   defp add_regions(%MLIR.CAPI.MlirOperationState{} = state, regions) when is_list(regions) do
     Enum.each(regions, fn
-      %CAPI.MlirRegion{} ->
+      %MLIR.Region{} ->
         :ok
 
       other ->
         raise "not a region: #{inspect(other)}"
     end)
 
-    array_ptr = regions |> CAPI.MlirRegion.array()
+    array_ptr = regions |> MLIR.Region.array()
 
     CAPI.mlirOperationStateAddOwnedRegions(
       Beaver.Native.ptr(state),
@@ -227,7 +227,7 @@ defmodule Beaver.MLIR.Operation.State do
     add_argument(state, f.(context))
   end
 
-  def add_argument(%__MODULE__{regions: regions} = state, %CAPI.MlirRegion{} = region) do
+  def add_argument(%__MODULE__{regions: regions} = state, %MLIR.Region{} = region) do
     %{state | regions: regions ++ [region]}
   end
 

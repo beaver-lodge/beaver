@@ -236,20 +236,11 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
     {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.GenericCallback}}
   end
 
-  def type_gen(_root_module, :MlirPass = type) do
-    {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.Pass}}
-  end
-
-  def type_gen(_root_module, :MlirValue = type) do
-    {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.Value}}
-  end
-
-  def type_gen(_root_module, :MlirOperation = type) do
-    {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.Operation}}
-  end
-
-  def type_gen(_root_module, :MlirModule = type) do
-    {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.Module}}
+  def type_gen(_root_module, type)
+      when type in [:MlirPass, :MlirValue, :MlirOperation, :MlirModule, :MlirRegion] do
+    "Mlir" <> module_name = Atom.to_string(type)
+    module_name = Module.concat(Beaver.MLIR, module_name)
+    {:ok, %KindDecl{zig_t: type, module_name: module_name}}
   end
 
   def type_gen(root_module, type) do
