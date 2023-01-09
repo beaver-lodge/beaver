@@ -195,7 +195,7 @@ defmodule Beaver do
 
       Beaver.MLIR.Region.under(region, fn ->
         Kernel.var!(beaver_env_region) = region
-        %Beaver.MLIR.CAPI.MlirRegion{} = Kernel.var!(beaver_env_region)
+        %Beaver.MLIR.Region{} = Kernel.var!(beaver_env_region)
         unquote(block)
       end)
 

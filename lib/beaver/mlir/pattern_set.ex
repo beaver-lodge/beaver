@@ -37,7 +37,7 @@ defmodule Beaver.MLIR.PatternSet do
     end
   end
 
-  def apply_(%CAPI.MlirRegion{} = region, pattern_set) do
+  def apply_(%MLIR.Region{} = region, pattern_set) do
     do_apply(region, pattern_set, &CAPI.beaverApplyOwnedPatternSetOnRegion/2)
   end
 
@@ -45,7 +45,7 @@ defmodule Beaver.MLIR.PatternSet do
     do_apply(operation, pattern_set, &CAPI.beaverApplyOwnedPatternSetOnOperation/2)
   end
 
-  def apply_(module = %MLIR.Module{}, pattern_set) do
+  def apply_(%MLIR.Module{} = module, pattern_set) do
     with {:ok, %MLIR.Operation{}} <- MLIR.Operation.from_module(module) |> apply_(pattern_set) do
       {:ok, module}
     else

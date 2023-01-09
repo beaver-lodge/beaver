@@ -237,7 +237,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
   end
 
   def type_gen(_root_module, type)
-      when type in [:MlirPass, :MlirValue, :MlirOperation, :MlirModule] do
+      when type in [:MlirPass, :MlirValue, :MlirOperation, :MlirModule, :MlirRegion] do
     "Mlir" <> module_name = Atom.to_string(type)
     module_name = Module.concat(Beaver.MLIR, module_name)
     {:ok, %KindDecl{zig_t: type, module_name: module_name}}
