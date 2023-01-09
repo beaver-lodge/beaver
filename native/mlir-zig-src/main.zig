@@ -246,7 +246,7 @@ const BeaverPass = struct {
         new.* = old.*;
         return new;
     }
-    fn run(op: c.struct_MlirOperation, pass: c.struct_MlirExternalPass, userData: ?*anyopaque) callconv(.C) void {
+    fn run(op: mlir_capi.Operation.T, pass: c.struct_MlirExternalPass, userData: ?*anyopaque) callconv(.C) void {
         const ud = @ptrCast(*UserData, @alignCast(@alignOf(UserData), userData));
         const env = e.enif_alloc_env() orelse {
             print("fail to creat env\n", .{});
@@ -257,7 +257,7 @@ const BeaverPass = struct {
         var tuple_slice: []beam.term = beam.allocator.alloc(beam.term, 4) catch unreachable;
         defer beam.allocator.free(tuple_slice);
         tuple_slice[0] = beam.make_atom(env, "run");
-        tuple_slice[1] = beam.make_resource(env, op, mlir_capi.MlirOperation.resource.t) catch {
+        tuple_slice[1] = beam.make_resource(env, op, mlir_capi.Operation.resource.t) catch {
             print("fail to make res: {}\n", .{@TypeOf(op)});
             unreachable;
         };
@@ -670,7 +670,7 @@ const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_resource_c_string_to_term_charlist", .arity = 1, .fptr = beaver_raw_resource_c_string_to_term_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_attribute_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.MlirAttribute, c.mlirAttributePrint).to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_type_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.MlirType, c.mlirTypePrint).to_charlist, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_beaver_operation_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.MlirOperation, c.mlirOperationPrint).to_charlist, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_operation_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Operation, c.mlirOperationPrint).to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_value_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Value, c.mlirValuePrint).to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_affine_map_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.MlirAffineMap, c.mlirAffineMapPrint).to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_location_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.MlirLocation, c.mlirLocationPrint).to_charlist, .flags = 0 },
