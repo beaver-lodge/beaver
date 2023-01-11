@@ -63,7 +63,7 @@ defmodule PDLTest do
       {:operand, %MLIR.Value{}} = operand, acc ->
         {operand, acc}
 
-      {name, %CAPI.MlirAttribute{} = attribute}, acc ->
+      {name, %MLIR.Attribute{} = attribute}, acc ->
         {{name, attribute}, acc}
 
       %MLIR.Operation{} = op, acc ->

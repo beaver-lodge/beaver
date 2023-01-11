@@ -20,15 +20,9 @@ defmodule Beaver.MLIR.ExecutionEngine do
     shared_lib_paths = Keyword.get(opts, :shared_lib_paths, [])
 
     shared_lib_paths_ptr =
-      case shared_lib_paths do
-        [] ->
-          Beaver.Native.array([], MLIR.CAPI.MlirStringRef)
-
-        _ ->
-          shared_lib_paths
-          |> Enum.map(&MLIR.StringRef.create/1)
-          |> Beaver.Native.array(MLIR.CAPI.MlirStringRef)
-      end
+      shared_lib_paths
+      |> Enum.map(&MLIR.StringRef.create/1)
+      |> Beaver.Native.array(MLIR.CAPI.MlirStringRef)
 
     require MLIR.Context
 
@@ -54,7 +48,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
     mlirExecutionEngineInvokePacked(
       jit,
       MLIR.StringRef.create(symbol),
-      Beaver.Native.OpaquePtr.array(arg_ptr_list, mut: true)
+      Beaver.Native.array(arg_ptr_list, Beaver.Native.OpaquePtr, mut: true)
     )
   end
 

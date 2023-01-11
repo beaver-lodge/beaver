@@ -327,7 +327,10 @@ defmodule MlirTest do
     ctx = context[:ctx]
     affineDimExpr = MLIR.CAPI.mlirAffineDimExprGet(ctx, 0)
     affineSymbolExpr = MLIR.CAPI.mlirAffineSymbolExprGet(ctx, 1)
-    exprs = MLIR.CAPI.MlirAffineExpr.array([affineDimExpr, affineSymbolExpr], mut: true)
+
+    exprs =
+      Beaver.Native.array([affineDimExpr, affineSymbolExpr], MLIR.CAPI.MlirAffineExpr, mut: true)
+
     map = MLIR.CAPI.mlirAffineMapGet(ctx, 3, 3, 2, exprs)
     txt = "(d0, d1, d2)[s0, s1, s2] -> (d0, s1)"
     assert map |> MLIR.to_string() == txt
