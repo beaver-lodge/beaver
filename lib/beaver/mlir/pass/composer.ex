@@ -9,9 +9,17 @@ defmodule Beaver.MLIR.Pass.Composer do
   import Beaver.MLIR.CAPI
   alias Beaver.MLIR
 
+  def new(%__MODULE__{} = composer) do
+    composer
+  end
+
+  def new(op) do
+    %__MODULE__{op: op}
+  end
+
   def append(%op_or_mod{} = composer_or_op, pass)
       when op_or_mod in [MLIR.Module, MLIR.Operation] do
-    %__MODULE__{op: composer_or_op}
+    new(composer_or_op)
     |> append(pass)
   end
 
@@ -22,6 +30,26 @@ defmodule Beaver.MLIR.Pass.Composer do
 
   def append(composer = %__MODULE__{passes: passes}, pass) do
     %__MODULE__{composer | passes: passes ++ [pass]}
+  end
+
+  def nested(composer_or_op, op_name, passes) when is_list(passes) do
+    new(composer_or_op)
+    |> append({op_name, passes})
+  end
+
+  def nested(composer_or_op, op_name, f) when is_function(f, 1) do
+    new(composer_or_op)
+    |> append({op_name, f})
+  end
+
+  def nested(composer_or_op, op_name, passes_or_f) do
+    new(composer_or_op)
+    |> nested(op_name, passes_or_f)
+  end
+
+  def pipeline(composer_or_op, pipeline_str) when is_binary(pipeline_str) do
+    new(composer_or_op)
+    |> append(pipeline_str)
   end
 
   defp get_op_name(op_name) when is_binary(op_name), do: op_name
@@ -93,27 +121,5 @@ defmodule Beaver.MLIR.Pass.Composer do
     mlirPassManagerDestroy(pm)
 
     op
-  end
-
-  def nested(composer_or_op = %__MODULE__{}, op_name, passes) when is_list(passes) do
-    append(composer_or_op, {op_name, passes})
-  end
-
-  def nested(composer_or_op, op_name, f) when is_function(f, 1) do
-    append(composer_or_op, {op_name, f})
-  end
-
-  def nested(composer_or_op, op_name, passes_or_f) do
-    composer = %__MODULE__{op: composer_or_op, passes: []}
-    nested(composer, op_name, passes_or_f)
-  end
-
-  def pipeline(composer_or_op = %__MODULE__{}, pipeline_str) when is_binary(pipeline_str) do
-    append(composer_or_op, pipeline_str)
-  end
-
-  def pipeline(composer_or_op, pipeline_str) when is_binary(pipeline_str) do
-    composer = %__MODULE__{op: composer_or_op, passes: []}
-    pipeline(composer, pipeline_str)
   end
 end
