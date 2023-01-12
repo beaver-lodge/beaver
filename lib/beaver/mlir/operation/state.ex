@@ -10,8 +10,8 @@ defmodule Beaver.MLIR.Operation.State do
           attributes: list(),
           name: String.t(),
           regions: list(),
-          location: MLIR.CAPI.MlirLocation.t(),
-          context: MLIR.CAPI.MlirContext.t()
+          location: MLIR.Location.t(),
+          context: MLIR.Context.t()
         }
   defstruct operands: [],
             results: [],
@@ -37,7 +37,7 @@ defmodule Beaver.MLIR.Operation.State do
             v when is_binary(v) ->
               CAPI.mlirAttributeParseGet(ctx, MLIR.StringRef.create(v))
 
-            %Beaver.MLIR.CAPI.MlirType{} = type ->
+            %Beaver.MLIR.Type{} = type ->
               Beaver.MLIR.Attribute.type(type)
 
             %Beaver.MLIR.Attribute{} ->
@@ -57,7 +57,7 @@ defmodule Beaver.MLIR.Operation.State do
       ctx,
       Beaver.Native.ptr(state),
       length(attr_kw),
-      Beaver.Native.array(name_list, CAPI.MlirStringRef),
+      Beaver.Native.array(name_list, MLIR.StringRef),
       Beaver.Native.array(attr_list, MLIR.Attribute)
     )
 
@@ -90,10 +90,10 @@ defmodule Beaver.MLIR.Operation.State do
         t when is_binary(t) ->
           CAPI.mlirTypeParseGet(context, MLIR.StringRef.create(t))
 
-        %CAPI.MlirType{} = t ->
+        %MLIR.Type{} = t ->
           t
       end)
-      |> Beaver.Native.array(CAPI.MlirType)
+      |> Beaver.Native.array(MLIR.Type)
 
     CAPI.mlirOperationStateAddResults(Beaver.Native.ptr(state), length(result_types), array)
     state
@@ -129,7 +129,7 @@ defmodule Beaver.MLIR.Operation.State do
 
   defp add_successors(%MLIR.CAPI.MlirOperationState{} = state, successors)
        when is_list(successors) do
-    array_ptr = successors |> Beaver.Native.array(CAPI.MlirBlock)
+    array_ptr = successors |> Beaver.Native.array(MLIR.Block)
 
     CAPI.mlirOperationStateAddSuccessors(
       Beaver.Native.ptr(state),
@@ -172,7 +172,7 @@ defmodule Beaver.MLIR.Operation.State do
 
   defp prepare(
          %__MODULE__{
-           location: %Beaver.MLIR.CAPI.MlirLocation{} = location
+           location: %Beaver.MLIR.Location{} = location
          } = state
        ) do
     %{state | location: location}
@@ -209,9 +209,9 @@ defmodule Beaver.MLIR.Operation.State do
           Value.t()
           | {atom(), CAPI.MlirAttribute.t()}
           | {:regions, function()}
-          | {:result_types, [CAPI.MlirType.t()]}
-          | {CAPI.MlirBlock.t(), [MLIR.Value.t()]}
-          | CAPI.MlirBlock.t()
+          | {:result_types, [MLIR.Type.t()]}
+          | {MLIR.Block.t(), [MLIR.Value.t()]}
+          | MLIR.Block.t()
   @spec add_argument(t(), argument()) :: CAPI.MlirOperationState.t()
 
   @doc """
@@ -231,7 +231,7 @@ defmodule Beaver.MLIR.Operation.State do
     %{state | regions: regions ++ [region]}
   end
 
-  def add_argument(%__MODULE__{} = state, {:loc, %Beaver.MLIR.CAPI.MlirLocation{} = location}) do
+  def add_argument(%__MODULE__{} = state, {:loc, %Beaver.MLIR.Location{} = location}) do
     %{state | location: location}
   end
 
@@ -249,20 +249,20 @@ defmodule Beaver.MLIR.Operation.State do
     %{state | results: results ++ result_types}
   end
 
-  def add_argument(%__MODULE__{results: results} = state, %MLIR.CAPI.MlirType{} = result_type) do
+  def add_argument(%__MODULE__{results: results} = state, %MLIR.Type{} = result_type) do
     %{state | results: results ++ [result_type]}
   end
 
   def add_argument(
         %__MODULE__{successors: successors, operands: operands} = state,
-        {%Beaver.MLIR.CAPI.MlirBlock{} = successor_block, block_args}
+        {%Beaver.MLIR.Block{} = successor_block, block_args}
       ) do
     %{state | successors: successors ++ [successor_block], operands: operands ++ block_args}
   end
 
   def add_argument(
         %__MODULE__{successors: successors} = state,
-        %MLIR.CAPI.MlirBlock{} = successor
+        %MLIR.Block{} = successor
       ) do
     %{state | successors: successors ++ [successor]}
   end
@@ -281,7 +281,7 @@ defmodule Beaver.MLIR.Operation.State do
 
   def add_argument(
         %__MODULE__{attributes: attributes} = state,
-        {name, %MLIR.CAPI.MlirType{} = type}
+        {name, %MLIR.Type{} = type}
       )
       when is_atom(name) do
     %{state | attributes: attributes ++ [{name, type}]}

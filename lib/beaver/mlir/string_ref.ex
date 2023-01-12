@@ -2,6 +2,9 @@ defmodule Beaver.MLIR.StringRef do
   require Beaver.MLIR.CAPI
   alias Beaver.MLIR.CAPI
 
+  use Kinda.ResourceKind,
+    forward_module: Beaver.Native
+
   @moduledoc """
   StringRef is very common in LLVM projects. It is a wrapper of a C string. This function will create a Elixir owned C string from a Elixir bitstring and create a StringRef from it. StringRef will keep a reference to the C string to prevent it from being garbage collected by BEAM.
   """
@@ -16,7 +19,7 @@ defmodule Beaver.MLIR.StringRef do
     |> Beaver.Native.bag(c_string)
   end
 
-  def extract(%Beaver.MLIR.CAPI.MlirStringRef{} = string_ref) do
+  def extract(%__MODULE__{} = string_ref) do
     %{ref: ref} =
       string_ref
       |> CAPI.beaverStringRefGetData()

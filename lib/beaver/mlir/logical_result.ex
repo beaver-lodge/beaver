@@ -1,6 +1,9 @@
 defmodule Beaver.MLIR.LogicalResult do
   alias Beaver.MLIR
 
+  use Kinda.ResourceKind,
+    forward_module: Beaver.Native
+
   def success?(result) do
     result
     |> MLIR.CAPI.beaverLogicalResultIsSuccess()

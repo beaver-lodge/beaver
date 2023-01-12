@@ -34,7 +34,7 @@ defmodule Beaver.MLIR.Dialect.Builtin do
       module_body_block = Beaver.MLIR.CAPI.mlirModuleGetBody(module)
 
       Kernel.var!(beaver_internal_env_block) = module_body_block
-      %Beaver.MLIR.CAPI.MlirBlock{} = Kernel.var!(beaver_internal_env_block)
+      %Beaver.MLIR.Block{} = Kernel.var!(beaver_internal_env_block)
       unquote(block)
 
       module

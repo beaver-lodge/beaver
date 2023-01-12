@@ -1,3 +1,8 @@
+defmodule Beaver.MLIR.NamedAttribute do
+  use Kinda.ResourceKind,
+    forward_module: Beaver.Native
+end
+
 defmodule Beaver.MLIR.Attribute do
   alias Beaver.MLIR.CAPI
   require Beaver.MLIR.CAPI
@@ -94,7 +99,7 @@ defmodule Beaver.MLIR.Attribute do
     &type(t.(&1))
   end
 
-  def type(%CAPI.MlirType{} = t) do
+  def type(%MLIR.Type{} = t) do
     CAPI.mlirTypeAttrGet(t)
   end
 
@@ -104,7 +109,7 @@ defmodule Beaver.MLIR.Attribute do
     end
   end
 
-  def integer(%CAPI.MlirType{} = t, value) do
+  def integer(%MLIR.Type{} = t, value) do
     CAPI.mlirIntegerAttrGet(t, value)
   end
 
@@ -127,7 +132,7 @@ defmodule Beaver.MLIR.Attribute do
     &affine_map(map.(&1))
   end
 
-  def affine_map(%CAPI.MlirAffineMap{} = map) do
+  def affine_map(%MLIR.AffineMap{} = map) do
     MLIR.CAPI.mlirAffineMapAttrGet(map)
   end
 

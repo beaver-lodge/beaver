@@ -22,7 +22,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
     shared_lib_paths_ptr =
       shared_lib_paths
       |> Enum.map(&MLIR.StringRef.create/1)
-      |> Beaver.Native.array(MLIR.CAPI.MlirStringRef)
+      |> Beaver.Native.array(MLIR.StringRef)
 
     require MLIR.Context
 

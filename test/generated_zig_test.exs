@@ -1,35 +1,36 @@
 defmodule Beaver.MLIR.CAPI.KindaTest do
   use ExUnit.Case
-  alias Beaver.MLIR.CAPI
+  alias Beaver.Native
+
   @moduletag :smoke
   test "bool" do
-    assert Beaver.Native.Bool.make(true) |> Beaver.Native.to_term()
-    assert not (Beaver.Native.Bool.make(false) |> Beaver.Native.to_term())
+    assert Native.Bool.make(true) |> Native.to_term()
+    assert not (Native.Bool.make(false) |> Native.to_term())
   end
 
   test "array i64" do
-    %Beaver.Native.Array{ref: ref} = Beaver.Native.array([1, 2, 3], Beaver.Native.I64)
+    %Native.Array{ref: ref} = Native.array([1, 2, 3], Native.I64)
     assert is_reference(ref)
   end
 
   test "array i32" do
-    %Beaver.Native.Array{ref: ref} = Beaver.Native.array([1, 2, 3], Beaver.Native.I32)
+    %Native.Array{ref: ref} = Native.array([1, 2, 3], Native.I32)
     assert is_reference(ref)
   end
 
   test "array f64" do
-    %Beaver.Native.Array{ref: ref} = Beaver.Native.array([1.0, 2.0, 3.0], Beaver.Native.F64)
+    %Native.Array{ref: ref} = Native.array([1.0, 2.0, 3.0], Native.F64)
 
     assert is_reference(ref)
   end
 
   test "empty array f64" do
-    %Beaver.Native.Array{ref: ref} = Beaver.Native.array([], Beaver.Native.F64)
+    %Native.Array{ref: ref} = Native.array([], Native.F64)
     assert is_reference(ref)
   end
 
   test "empty array mlir type" do
-    %Beaver.Native.Array{ref: ref} = Beaver.Native.array([], CAPI.MlirType)
+    %Native.Array{ref: ref} = Native.array([], Beaver.MLIR.Type)
 
     assert is_reference(ref)
   end

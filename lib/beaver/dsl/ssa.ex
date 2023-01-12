@@ -20,7 +20,7 @@ defmodule Beaver.DSL.SSA do
     %__MODULE__{ssa | results: results ++ [f]}
   end
 
-  def put_results(%__MODULE__{results: results} = ssa, %MLIR.CAPI.MlirType{} = single_result) do
+  def put_results(%__MODULE__{results: results} = ssa, %MLIR.Type{} = single_result) do
     %__MODULE__{ssa | results: results ++ [single_result]}
   end
 
@@ -33,7 +33,7 @@ defmodule Beaver.DSL.SSA do
     %__MODULE__{ssa | results: infer}
   end
 
-  def put_location(%__MODULE__{} = ssa, %MLIR.CAPI.MlirLocation{} = loc) do
+  def put_location(%__MODULE__{} = ssa, %MLIR.Location{} = loc) do
     %__MODULE__{ssa | loc: loc}
   end
 
@@ -45,7 +45,7 @@ defmodule Beaver.DSL.SSA do
     %__MODULE__{ssa | block: block}
   end
 
-  def put_ctx(%__MODULE__{} = ssa, %MLIR.CAPI.MlirContext{} = ctx) do
+  def put_ctx(%__MODULE__{} = ssa, %MLIR.Context{} = ctx) do
     %__MODULE__{ssa | ctx: ctx}
   end
 
@@ -61,7 +61,7 @@ defmodule Beaver.DSL.SSA do
       {loc, args} =
         Enum.reduce(args, {nil, []}, fn arg, {loc, args} ->
           case arg do
-            %MLIR.CAPI.MlirLocation{} = loc ->
+            %MLIR.Location{} = loc ->
               {loc, args}
 
             a ->
