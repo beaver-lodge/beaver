@@ -1,4 +1,5 @@
 defmodule Beaver.DSL.Pattern.Env do
+  @moduledoc false
   defstruct ctx: nil, block: nil, loc: nil
 end
 
