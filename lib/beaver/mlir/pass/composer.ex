@@ -42,11 +42,6 @@ defmodule Beaver.MLIR.Pass.Composer do
     |> append({op_name, f})
   end
 
-  def nested(composer_or_op, op_name, passes_or_f) do
-    new(composer_or_op)
-    |> nested(op_name, passes_or_f)
-  end
-
   def pipeline(composer_or_op, pipeline_str) when is_binary(pipeline_str) do
     new(composer_or_op)
     |> append(pipeline_str)
