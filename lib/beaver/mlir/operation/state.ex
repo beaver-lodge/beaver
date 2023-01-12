@@ -40,7 +40,7 @@ defmodule Beaver.MLIR.Operation.State do
             %Beaver.MLIR.CAPI.MlirType{} = type ->
               Beaver.MLIR.Attribute.type(type)
 
-            %Beaver.MLIR.CAPI.MlirAttribute{} ->
+            %Beaver.MLIR.Attribute{} ->
               v
           end
 
@@ -57,8 +57,8 @@ defmodule Beaver.MLIR.Operation.State do
       ctx,
       Beaver.Native.ptr(state),
       length(attr_kw),
-      CAPI.MlirStringRef.array(name_list),
-      CAPI.MlirAttribute.array(attr_list)
+      Beaver.Native.array(name_list, CAPI.MlirStringRef),
+      Beaver.Native.array(attr_list, MLIR.Attribute)
     )
 
     state
@@ -69,7 +69,7 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   defp add_operands(%MLIR.CAPI.MlirOperationState{} = state, operands) do
-    array = operands |> MLIR.Value.array()
+    array = operands |> Beaver.Native.array(MLIR.Value)
 
     CAPI.mlirOperationStateAddOperands(Beaver.Native.ptr(state), length(operands), array)
     state
@@ -93,7 +93,7 @@ defmodule Beaver.MLIR.Operation.State do
         %CAPI.MlirType{} = t ->
           t
       end)
-      |> CAPI.MlirType.array()
+      |> Beaver.Native.array(CAPI.MlirType)
 
     CAPI.mlirOperationStateAddResults(Beaver.Native.ptr(state), length(result_types), array)
     state
@@ -112,7 +112,7 @@ defmodule Beaver.MLIR.Operation.State do
         raise "not a region: #{inspect(other)}"
     end)
 
-    array_ptr = regions |> MLIR.Region.array()
+    array_ptr = regions |> Beaver.Native.array(MLIR.Region)
 
     CAPI.mlirOperationStateAddOwnedRegions(
       Beaver.Native.ptr(state),
@@ -129,7 +129,7 @@ defmodule Beaver.MLIR.Operation.State do
 
   defp add_successors(%MLIR.CAPI.MlirOperationState{} = state, successors)
        when is_list(successors) do
-    array_ptr = successors |> CAPI.MlirBlock.array()
+    array_ptr = successors |> Beaver.Native.array(CAPI.MlirBlock)
 
     CAPI.mlirOperationStateAddSuccessors(
       Beaver.Native.ptr(state),
@@ -273,7 +273,7 @@ defmodule Beaver.MLIR.Operation.State do
 
   def add_argument(
         %__MODULE__{attributes: attributes} = state,
-        {name, %MLIR.CAPI.MlirAttribute{} = attr}
+        {name, %MLIR.Attribute{} = attr}
       )
       when is_atom(name) do
     %{state | attributes: attributes ++ [{name, attr}]}

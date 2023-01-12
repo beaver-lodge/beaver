@@ -19,8 +19,14 @@ defmodule Beaver.MLIR.Type do
     num_results = length(results)
 
     Beaver.Deferred.from_opts(opts, fn ctx ->
-      inputs = inputs |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> CAPI.MlirType.array()
-      results = results |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> CAPI.MlirType.array()
+      inputs =
+        inputs |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> Beaver.Native.array(CAPI.MlirType)
+
+      results =
+        results
+        |> Enum.map(&Beaver.Deferred.create(&1, ctx))
+        |> Beaver.Native.array(CAPI.MlirType)
+
       CAPI.mlirFunctionTypeGet(ctx, num_inputs, inputs, num_results, results)
     end)
   end
@@ -53,7 +59,7 @@ defmodule Beaver.MLIR.Type do
       when is_list(shape) do
     rank = length(shape)
 
-    shape = shape |> Beaver.Native.I64.array()
+    shape = shape |> Beaver.Native.array(Beaver.Native.I64)
 
     CAPI.mlirAttributeGetNull()
     CAPI.mlirRankedTensorTypeGet(rank, shape, element_type, encoding)
@@ -94,7 +100,7 @@ defmodule Beaver.MLIR.Type do
       when is_list(shape) do
     rank = length(shape)
 
-    shape = shape |> Beaver.Native.I64.array()
+    shape = shape |> Beaver.Native.array(Beaver.Native.I64)
 
     default_null = CAPI.mlirAttributeGetNull()
     layout = Keyword.get(opts, :layout) || default_null
@@ -119,7 +125,7 @@ defmodule Beaver.MLIR.Type do
 
   def vector(shape, %MLIR.CAPI.MlirType{} = element_type) when is_list(shape) do
     rank = length(shape)
-    shape = shape |> Beaver.Native.I64.array()
+    shape = shape |> Beaver.Native.array(Beaver.Native.I64)
     CAPI.mlirVectorTypeGet(rank, shape, element_type)
   end
 
@@ -135,7 +141,12 @@ defmodule Beaver.MLIR.Type do
   def tuple(elements, opts \\ []) when is_list(elements) do
     Beaver.Deferred.from_opts(opts, fn ctx ->
       num_elements = length(elements)
-      elements = elements |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> CAPI.MlirType.array()
+
+      elements =
+        elements
+        |> Enum.map(&Beaver.Deferred.create(&1, ctx))
+        |> Beaver.Native.array(CAPI.MlirType)
+
       CAPI.mlirTupleTypeGet(ctx, num_elements, elements)
     end)
   end

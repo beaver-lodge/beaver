@@ -7,11 +7,10 @@ defmodule Beaver.MLIR do
   alias Beaver.MLIR.CAPI
   require Beaver.MLIR.CAPI
 
-  alias Beaver.MLIR.Value
+  alias Beaver.MLIR.{Value, Attribute}
   alias Beaver.MLIR
 
   alias Beaver.MLIR.CAPI.{
-    MlirAttribute,
     MlirBlock,
     MlirAffineExpr,
     MlirAffineMap,
@@ -30,7 +29,7 @@ defmodule Beaver.MLIR do
     :ok
   end
 
-  def dump(%MlirAttribute{} = mlir) do
+  def dump(%Attribute{} = mlir) do
     CAPI.mlirAttributeDump(mlir)
     :ok
   end
@@ -74,7 +73,7 @@ defmodule Beaver.MLIR do
     end
   end
 
-  def is_null(%MlirAttribute{} = v) do
+  def is_null(%MLIR.Attribute{} = v) do
     CAPI.beaverAttributeIsNull(v) |> Beaver.Native.to_term()
   end
 
@@ -94,7 +93,7 @@ defmodule Beaver.MLIR do
     CAPI.beaverValueIsNull(v) |> Beaver.Native.to_term()
   end
 
-  def to_string(%MlirAttribute{ref: ref}) do
+  def to_string(%Attribute{ref: ref}) do
     CAPI.beaver_raw_beaver_attribute_to_charlist(ref)
     |> Beaver.Native.check!()
     |> List.to_string()

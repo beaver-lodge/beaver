@@ -1,8 +1,7 @@
 alias Beaver.MLIR
-alias Beaver.MLIR.{Value, Operation, Region, Module}
+alias Beaver.MLIR.{Value, Operation, Region, Module, Attribute}
 
 alias Beaver.MLIR.CAPI.{
-  MlirAttribute,
   MlirBlock,
   MlirIdentifier,
   MlirNamedAttribute,
@@ -47,7 +46,7 @@ defmodule Beaver.Walker do
           | Value.t()
           | MlirNamedAttribute.t()
 
-  @type element_module() :: Operation | Region | MlirBlock | Value | MlirAttribute
+  @type element_module() :: Operation | Region | MlirBlock | Value | Attribute
 
   @type t :: %__MODULE__{
           container: container(),
@@ -74,7 +73,7 @@ defmodule Beaver.Walker do
   # operands, results, attributes of one operation
   defp verify_nesting!(Operation, Value), do: :ok
   defp verify_nesting!(OpReplacement, Value), do: :ok
-  defp verify_nesting!(Operation, {MlirIdentifier, MlirAttribute}), do: :ok
+  defp verify_nesting!(Operation, {MlirIdentifier, Attribute}), do: :ok
   defp verify_nesting!(OpReplacement, MlirNamedAttribute), do: :ok
   # regions of one operation
   defp verify_nesting!(Operation, Region), do: :ok
@@ -230,7 +229,7 @@ defmodule Beaver.Walker do
   def attributes(op) do
     new(
       op,
-      {MlirIdentifier, MlirAttribute},
+      {MlirIdentifier, Attribute},
       get_num: &CAPI.mlirOperationGetNumAttributes/1,
       get_element: fn o, i ->
         {
@@ -319,7 +318,7 @@ defmodule Beaver.Walker do
     end
   end
 
-  def fetch(%__MODULE{element_module: {MlirIdentifier, MlirAttribute}} = walker, key)
+  def fetch(%__MODULE{element_module: {MlirIdentifier, Attribute}} = walker, key)
       when is_binary(key) do
     found =
       walker
@@ -332,7 +331,7 @@ defmodule Beaver.Walker do
         end
       end)
 
-    with {_, %MlirAttribute{} = attr} <- found do
+    with {_, %Attribute{} = attr} <- found do
       {:ok, attr}
     else
       :error -> :error
@@ -465,9 +464,7 @@ defmodule Beaver.Walker do
     name =
       %MLIR.CAPI.MlirIdentifier{} = named_attribute |> MLIR.CAPI.beaverMlirNamedAttributeGetName()
 
-    attribute =
-      %MLIR.CAPI.MlirAttribute{} =
-      named_attribute |> MLIR.CAPI.beaverMlirNamedAttributeGetAttribute()
+    attribute = %Attribute{} = named_attribute |> MLIR.CAPI.beaverMlirNamedAttributeGetAttribute()
 
     {{name, attribute}, acc} = pre.({name, attribute}, acc)
     {{name, attribute}, acc} = post.({name, attribute}, acc)
@@ -476,7 +473,7 @@ defmodule Beaver.Walker do
   end
 
   defp do_traverse(
-         {%MLIR.CAPI.MlirIdentifier{} = name, %MLIR.CAPI.MlirAttribute{} = attribute},
+         {%MLIR.CAPI.MlirIdentifier{} = name, %Attribute{} = attribute},
          acc,
          pre,
          post

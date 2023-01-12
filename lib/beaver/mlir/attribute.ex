@@ -3,6 +3,10 @@ defmodule Beaver.MLIR.Attribute do
   require Beaver.MLIR.CAPI
   alias Beaver.MLIR
 
+  use Kinda.ResourceKind,
+    forward_module: Beaver.Native,
+    fields: [safe_to_print: true]
+
   def is_null(a) do
     CAPI.beaverAttributeIsNull(a) |> Beaver.Native.to_term()
   end
@@ -21,7 +25,7 @@ defmodule Beaver.MLIR.Attribute do
     end)
   end
 
-  def equal?(%MLIR.CAPI.MlirAttribute{} = a, %MLIR.CAPI.MlirAttribute{} = b) do
+  def equal?(%__MODULE__{} = a, %__MODULE__{} = b) do
     CAPI.mlirAttributeEqual(a, b) |> Beaver.Native.to_term()
   end
 
@@ -39,7 +43,9 @@ defmodule Beaver.MLIR.Attribute do
         num_elements = length(elements)
 
         elements =
-          elements |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> CAPI.MlirAttribute.array()
+          elements
+          |> Enum.map(&Beaver.Deferred.create(&1, ctx))
+          |> Beaver.Native.array(MLIR.Attribute)
 
         CAPI.mlirDenseElementsAttrGet(
           Beaver.Deferred.create(shaped_type, ctx),
@@ -57,7 +63,9 @@ defmodule Beaver.MLIR.Attribute do
         CAPI.mlirArrayAttrGet(
           ctx,
           length(elements),
-          elements |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> CAPI.MlirAttribute.array()
+          elements
+          |> Enum.map(&Beaver.Deferred.create(&1, ctx))
+          |> Beaver.Native.array(MLIR.Attribute)
         )
       end
     )
@@ -66,7 +74,11 @@ defmodule Beaver.MLIR.Attribute do
   def dense_array(elements, opts \\ []) when is_list(elements) do
     Beaver.Deferred.from_opts(
       opts,
-      &CAPI.mlirDenseI32ArrayGet(&1, length(elements), Beaver.Native.I32.array(elements))
+      &CAPI.mlirDenseI32ArrayGet(
+        &1,
+        length(elements),
+        Beaver.Native.array(elements, Beaver.Native.I32)
+      )
     )
   end
 

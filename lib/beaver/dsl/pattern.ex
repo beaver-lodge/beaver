@@ -157,7 +157,7 @@ defmodule Beaver.DSL.Pattern do
     end
   end
 
-  def gen_pdl(%Env{} = env, %Beaver.MLIR.CAPI.MlirAttribute{} = attribute) do
+  def gen_pdl(%Env{} = env, %MLIR.Attribute{} = attribute) do
     mlir block: env.block, ctx: env.ctx do
       Beaver.MLIR.Dialect.PDL.attribute(value: attribute) >>>
         ~t{!pdl.attribute}

@@ -81,7 +81,7 @@ defmodule Beaver.Native.Memory do
 
     array =
       if data do
-        mod.array(data, mut: true)
+        Beaver.Native.array(data, mod, mut: true)
       end
 
     new(array, opts)

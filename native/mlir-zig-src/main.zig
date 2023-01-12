@@ -140,11 +140,11 @@ export fn beaver_raw_mlir_named_attribute_get(env: beam.env, _: c_int, args: [*c
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: c.struct_MlirIdentifier");
     }
-    var arg1: c.struct_MlirAttribute = undefined;
-    if (beam.fetch_resource(c.struct_MlirAttribute, env, mlir_capi.MlirAttribute.resource.t, args[1])) |value| {
+    var arg1: c.MlirAttribute = undefined;
+    if (beam.fetch_resource(c.MlirAttribute, env, mlir_capi.Attribute.resource.t, args[1])) |value| {
         arg1 = value;
     } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.struct_MlirAttribute");
+        return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.MlirAttribute");
     }
 
     var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.MlirNamedAttribute.resource.t, @sizeOf(c.struct_MlirNamedAttribute));
@@ -668,7 +668,7 @@ const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_pass_token_signal", .arity = 1, .fptr = PassToken.pass_token_signal, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_context_attach_diagnostic_handler", .arity = 1, .fptr = beaver_raw_context_attach_diagnostic_handler, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_resource_c_string_to_term_charlist", .arity = 1, .fptr = beaver_raw_resource_c_string_to_term_charlist, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_beaver_attribute_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.MlirAttribute, c.mlirAttributePrint).to_charlist, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_attribute_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Attribute, c.mlirAttributePrint).to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_type_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.MlirType, c.mlirTypePrint).to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_operation_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Operation, c.mlirOperationPrint).to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_value_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Value, c.mlirValuePrint).to_charlist, .flags = 0 },
