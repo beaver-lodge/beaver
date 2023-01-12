@@ -34,12 +34,12 @@ defmodule Beaver.MLIR.Pass.Composer do
 
   def nested(composer_or_op, op_name, passes) when is_list(passes) do
     new(composer_or_op)
-    |> append({op_name, passes})
+    |> append({:nested, op_name, passes})
   end
 
   def nested(composer_or_op, op_name, f) when is_function(f, 1) do
     new(composer_or_op)
-    |> append({op_name, f})
+    |> append({:nested, op_name, f})
   end
 
   def pipeline(composer_or_op, pipeline_str) when is_binary(pipeline_str) do
@@ -69,13 +69,14 @@ defmodule Beaver.MLIR.Pass.Composer do
     for pass <- passes do
       case pass do
         # nested pm
-        {op_name, f} when (is_binary(op_name) or is_atom(op_name)) and is_function(f, 1) ->
+        {:nested, op_name, f} when (is_binary(op_name) or is_atom(op_name)) and is_function(f, 1) ->
           op_name = get_op_name(op_name)
           npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
           f.(npm)
 
         # nest pipeline
-        {op_name, passes} when (is_binary(op_name) or is_atom(op_name)) and is_list(passes) ->
+        {:nested, op_name, passes}
+        when (is_binary(op_name) or is_atom(op_name)) and is_list(passes) ->
           op_name = get_op_name(op_name)
           npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
 
