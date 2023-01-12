@@ -8,7 +8,6 @@ defmodule Beaver.MLIR do
   require Beaver.MLIR.CAPI
 
   alias Beaver.MLIR.{Value, Attribute, Type, Block, Location, Module, Operation, AffineMap}
-  alias Beaver.MLIR
 
   alias Beaver.MLIR.CAPI.{
     MlirAffineExpr,

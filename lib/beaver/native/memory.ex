@@ -101,13 +101,13 @@ defmodule Beaver.Native.Memory do
     %__MODULE__{
       storage: array,
       descriptor:
-        __MODULE__.Descriptor.make(shape_to_descriptor_kind(mod, sizes), [
+        __MODULE__.Descriptor.make(shape_to_descriptor_kind(mod, sizes), {
           ref,
           ref,
           offset,
           sizes,
           strides
-        ])
+        })
     }
   end
 
@@ -126,13 +126,13 @@ defmodule Beaver.Native.Memory do
     %__MODULE__{
       storage: storage,
       descriptor:
-        __MODULE__.Descriptor.make(shape_to_descriptor_kind(mod, sizes), [
+        __MODULE__.Descriptor.make(shape_to_descriptor_kind(mod, sizes), {
           nil,
           nil,
           offset,
           sizes,
           strides
-        ])
+        })
     }
   end
 
@@ -140,7 +140,7 @@ defmodule Beaver.Native.Memory do
   return a opaque pointer to the memory
   """
   def aligned(%__MODULE__{
-        descriptor: %__MODULE__.Descriptor{ref: descriptor_ref, kind: descriptor_kind},
+        descriptor: %__MODULE__.Descriptor{ref: descriptor_ref, descriptor_kind: descriptor_kind},
         storage: storage
       }) do
     ptr =
@@ -156,7 +156,7 @@ defmodule Beaver.Native.Memory do
   end
 
   def allocated(%__MODULE__{
-        descriptor: %__MODULE__.Descriptor{ref: descriptor_ref, kind: descriptor_kind},
+        descriptor: %__MODULE__.Descriptor{ref: descriptor_ref, descriptor_kind: descriptor_kind},
         storage: storage
       }) do
     ptr =
@@ -176,7 +176,7 @@ defmodule Beaver.Native.Memory do
   If it is a array, will return the pointer of the array to mimic a struct of packed memory descriptors
   """
   def descriptor_ptr(%__MODULE__{
-        descriptor: %__MODULE__.Descriptor{ref: descriptor_ref, kind: descriptor_kind},
+        descriptor: %__MODULE__.Descriptor{ref: descriptor_ref, descriptor_kind: descriptor_kind},
         storage: storage
       }) do
     struct!(Beaver.Native.OpaquePtr,
