@@ -2,6 +2,8 @@ defmodule Beaver.MLIR.Block do
   alias Beaver.MLIR
   require Beaver.MLIR.CAPI
   # TODO: remote ctx in these funcs
+  use Kinda.ResourceKind,
+    forward_module: Beaver.Native
 
   def do_add_arg!(block, ctx, {t, loc}) when is_function(t, 1) or is_function(loc, 1) do
     MLIR.CAPI.mlirBlockAddArgument(
@@ -11,7 +13,7 @@ defmodule Beaver.MLIR.Block do
     )
   end
 
-  def do_add_arg!(block, _ctx, {t = %Beaver.MLIR.CAPI.MlirType{}, loc}) do
+  def do_add_arg!(block, _ctx, {t = %Beaver.MLIR.Type{}, loc}) do
     ctx = MLIR.CAPI.mlirTypeGetContext(t)
     loc = loc |> Beaver.Deferred.create(ctx)
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
@@ -54,8 +56,8 @@ defmodule Beaver.MLIR.Block do
     end
 
     len = length(args)
-    args = args |> Beaver.Native.array(MLIR.CAPI.MlirType)
-    locs = locs |> Beaver.Native.array(MLIR.CAPI.MlirLocation)
+    args = args |> Beaver.Native.array(MLIR.Type)
+    locs = locs |> Beaver.Native.array(MLIR.Location)
 
     MLIR.CAPI.mlirBlockCreate(
       len,

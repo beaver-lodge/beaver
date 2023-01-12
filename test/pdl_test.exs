@@ -51,7 +51,7 @@ defmodule PDLTest do
     pattern_module = MLIR.Module.create(ctx, @apply_rewrite_op_patterns)
 
     inspector = fn
-      {:successor, %CAPI.MlirBlock{} = successor}, acc ->
+      {:successor, %MLIR.Block{} = successor}, acc ->
         {{:successor, successor}, acc}
 
       {:argument, %MLIR.Value{}} = argument, acc ->
@@ -80,46 +80,46 @@ defmodule PDLTest do
     assert acc == [
              "builtin.module",
              Beaver.MLIR.Region,
-             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Block,
              "builtin.module",
              Beaver.MLIR.Region,
-             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Block,
              "pdl_interp.func",
              Beaver.MLIR.Region,
-             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Block,
              "pdl_interp.finalize",
              "pdl_interp.finalize",
              "pdl_interp.erase",
              "pdl_interp.erase",
              "pdl_interp.create_operation",
              "pdl_interp.create_operation",
-             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Block,
              Beaver.MLIR.Region,
              "pdl_interp.func",
-             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Block,
              Beaver.MLIR.Region,
              "builtin.module",
              "pdl_interp.func",
              Beaver.MLIR.Region,
-             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Block,
              "pdl_interp.finalize",
              "pdl_interp.finalize",
-             Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Block,
+             Beaver.MLIR.Block,
              "pdl_interp.record_match",
              "pdl_interp.record_match",
-             Beaver.MLIR.CAPI.MlirBlock,
-             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Block,
+             Beaver.MLIR.Block,
              "pdl_interp.are_equal",
              "pdl_interp.are_equal",
              "pdl_interp.get_attribute",
              "pdl_interp.get_attribute",
              "pdl_interp.create_attribute",
              "pdl_interp.create_attribute",
-             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Block,
              Beaver.MLIR.Region,
              "pdl_interp.func",
-             Beaver.MLIR.CAPI.MlirBlock,
+             Beaver.MLIR.Block,
              Beaver.MLIR.Region,
              "builtin.module"
            ]

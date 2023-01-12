@@ -95,7 +95,7 @@ defmodule Beaver do
         quote do
           ctx = Keyword.fetch!(unquote(opts), :ctx)
           Kernel.var!(beaver_internal_env_ctx) = ctx
-          %MLIR.CAPI.MlirContext{} = Kernel.var!(beaver_internal_env_ctx)
+          %MLIR.Context{} = Kernel.var!(beaver_internal_env_ctx)
         end
       end
 
@@ -104,7 +104,7 @@ defmodule Beaver do
         quote do
           block = Keyword.fetch!(unquote(opts), :block)
           Kernel.var!(beaver_internal_env_block) = block
-          %MLIR.CAPI.MlirBlock{} = Kernel.var!(beaver_internal_env_block)
+          %MLIR.Block{} = Kernel.var!(beaver_internal_env_block)
         end
       end
 
@@ -179,7 +179,7 @@ defmodule Beaver do
 
         unquote(region_insert_ast)
 
-        %MLIR.CAPI.MlirBlock{} = Kernel.var!(beaver_internal_env_block)
+        %MLIR.Block{} = Kernel.var!(beaver_internal_env_block)
         unquote_splicing(block_arg_var_ast)
         unquote(block)
 

@@ -1,10 +1,7 @@
 alias Beaver.MLIR
-alias Beaver.MLIR.{Value, Operation, Region, Module, Attribute}
+alias Beaver.MLIR.{Value, Operation, Region, Module, Attribute, Block, NamedAttribute, Identifier}
 
 alias Beaver.MLIR.CAPI.{
-  MlirBlock,
-  MlirIdentifier,
-  MlirNamedAttribute,
   MlirOperand
 }
 
@@ -30,24 +27,11 @@ defmodule Beaver.Walker do
   It implements the `Enumerable` protocol and the `Access` behavior.
   """
 
-  # TODO: traverse MlirNamedAttribute?
-  @type operation() ::
-          Module.t() | Operation.t() | OpReplacement.t() | Beaver.DSL.Op.Prototype.t()
-  @type container() ::
-          operation()
-          | Region.t()
-          | MlirBlock.t()
-          | MlirNamedAttribute.t()
-
-  @type element() ::
-          operation()
-          | Region.t()
-          | MlirBlock.t()
-          | Value.t()
-          | MlirNamedAttribute.t()
-
-  @type element_module() :: Operation | Region | MlirBlock | Value | Attribute
-
+  # TODO: traverse NamedAttribute?
+  @type operation() :: Module.t() | Operation.t() | OpReplacement.t()
+  @type container() :: operation() | Region.t() | Block.t() | NamedAttribute.t()
+  @type element() :: operation() | Region.t() | Block.t() | Value.t() | NamedAttribute.t()
+  @type element_module() :: Operation | Region | Block | Value | Attribute
   @type t :: %__MODULE__{
           container: container(),
           element_module: element_module(),
@@ -73,20 +57,20 @@ defmodule Beaver.Walker do
   # operands, results, attributes of one operation
   defp verify_nesting!(Operation, Value), do: :ok
   defp verify_nesting!(OpReplacement, Value), do: :ok
-  defp verify_nesting!(Operation, {MlirIdentifier, Attribute}), do: :ok
-  defp verify_nesting!(OpReplacement, MlirNamedAttribute), do: :ok
+  defp verify_nesting!(Operation, {Identifier, Attribute}), do: :ok
+  defp verify_nesting!(OpReplacement, NamedAttribute), do: :ok
   # regions of one operation
   defp verify_nesting!(Operation, Region), do: :ok
   defp verify_nesting!(OpReplacement, Region), do: :ok
   # successor blocks of one operation
-  defp verify_nesting!(Operation, MlirBlock), do: :ok
-  defp verify_nesting!(OpReplacement, MlirBlock), do: :ok
+  defp verify_nesting!(Operation, Block), do: :ok
+  defp verify_nesting!(OpReplacement, Block), do: :ok
   # blocks in a region
-  defp verify_nesting!(Region, MlirBlock), do: :ok
+  defp verify_nesting!(Region, Block), do: :ok
   # operations in a block
-  defp verify_nesting!(MlirBlock, Operation), do: :ok
+  defp verify_nesting!(Block, Operation), do: :ok
   # arguments of a block
-  defp verify_nesting!(MlirBlock, Value), do: :ok
+  defp verify_nesting!(Block, Value), do: :ok
   defp verify_nesting!(Value, MlirOperand), do: :ok
 
   defp verify_nesting!(container_module, element_module) do
@@ -94,7 +78,7 @@ defmodule Beaver.Walker do
   end
 
   @doc """
-  Extract a container could be traversed by walker from an Op prototype or a `Beaver.MLIR.Module`.
+  Extract a container could be traversed by walker from an `Beaver.MLIR.Operation` or a `Beaver.MLIR.Module`.
   """
   def container(module = %Module{}) do
     Operation.from_module(module)
@@ -214,7 +198,7 @@ defmodule Beaver.Walker do
   def successors(op) do
     new(
       op,
-      MlirBlock,
+      Block,
       get_num: &CAPI.mlirOperationGetNumSuccessors/1,
       get_element: &CAPI.mlirOperationGetSuccessor/2,
       element_equal: &CAPI.mlirBlockEqual/2
@@ -229,7 +213,7 @@ defmodule Beaver.Walker do
   def attributes(op) do
     new(
       op,
-      {MlirIdentifier, Attribute},
+      {Identifier, Attribute},
       get_num: &CAPI.mlirOperationGetNumAttributes/1,
       get_element: fn o, i ->
         {
@@ -241,8 +225,8 @@ defmodule Beaver.Walker do
     )
   end
 
-  @spec arguments(MlirBlock.t()) :: Enumerable.t()
-  def arguments(%MlirBlock{} = block) do
+  @spec arguments(Block.t()) :: Enumerable.t()
+  def arguments(%Block{} = block) do
     new(
       block,
       Value,
@@ -252,8 +236,8 @@ defmodule Beaver.Walker do
     )
   end
 
-  @spec operations(MlirBlock.t()) :: Enumerable.t()
-  def operations(%MlirBlock{} = block) do
+  @spec operations(Block.t()) :: Enumerable.t()
+  def operations(%Block{} = block) do
     new(
       block,
       Operation,
@@ -268,7 +252,7 @@ defmodule Beaver.Walker do
   def blocks(%Region{} = region) do
     new(
       region,
-      MlirBlock,
+      Block,
       get_first: &CAPI.mlirRegionGetFirstBlock/1,
       get_next: &CAPI.mlirBlockGetNextInRegion/1,
       get_parent: &CAPI.mlirBlockGetParentRegion/1,
@@ -298,7 +282,7 @@ defmodule Beaver.Walker do
     end
   end
 
-  def fetch(%__MODULE{element_module: MlirNamedAttribute} = walker, key) when is_binary(key) do
+  def fetch(%__MODULE{element_module: NamedAttribute} = walker, key) when is_binary(key) do
     found =
       walker
       |> Enum.find(fn named_attribute ->
@@ -311,14 +295,14 @@ defmodule Beaver.Walker do
         end
       end)
 
-    with %MlirNamedAttribute{} <- found do
+    with %NamedAttribute{} <- found do
       {:ok, MLIR.CAPI.beaverMlirNamedAttributeGetAttribute(found)}
     else
       :error -> :error
     end
   end
 
-  def fetch(%__MODULE{element_module: {MlirIdentifier, Attribute}} = walker, key)
+  def fetch(%__MODULE{element_module: {Identifier, Attribute}} = walker, key)
       when is_binary(key) do
     found =
       walker
@@ -433,7 +417,7 @@ defmodule Beaver.Walker do
     post.(region, acc)
   end
 
-  defp do_traverse(%MlirBlock{} = block, acc, pre, post) do
+  defp do_traverse(%Block{} = block, acc, pre, post) do
     {block, acc} = pre.(block, acc)
 
     {_arguments, acc} =
@@ -449,7 +433,7 @@ defmodule Beaver.Walker do
     post.(block, acc)
   end
 
-  defp do_traverse({:successor, %MlirBlock{}} = successor, acc, pre, post) do
+  defp do_traverse({:successor, %Block{}} = successor, acc, pre, post) do
     {successor, acc} = pre.(successor, acc)
     post.(successor, acc)
   end
@@ -460,9 +444,8 @@ defmodule Beaver.Walker do
     post.(value, acc)
   end
 
-  defp do_traverse(%MlirNamedAttribute{} = named_attribute, acc, pre, post) do
-    name =
-      %MLIR.CAPI.MlirIdentifier{} = named_attribute |> MLIR.CAPI.beaverMlirNamedAttributeGetName()
+  defp do_traverse(%NamedAttribute{} = named_attribute, acc, pre, post) do
+    name = %Identifier{} = named_attribute |> MLIR.CAPI.beaverMlirNamedAttributeGetName()
 
     attribute = %Attribute{} = named_attribute |> MLIR.CAPI.beaverMlirNamedAttributeGetAttribute()
 
@@ -473,7 +456,7 @@ defmodule Beaver.Walker do
   end
 
   defp do_traverse(
-         {%MLIR.CAPI.MlirIdentifier{} = name, %Attribute{} = attribute},
+         {%Identifier{} = name, %Attribute{} = attribute},
          acc,
          pre,
          post

@@ -13,7 +13,7 @@ defmodule EnvTest do
             %MLIR.Region{} = MLIR.__REGION__()
 
             block bb_entry() do
-              %MLIR.CAPI.MlirBlock{} = MLIR.__BLOCK__()
+              %MLIR.Block{} = MLIR.__BLOCK__()
             end
           end
         end

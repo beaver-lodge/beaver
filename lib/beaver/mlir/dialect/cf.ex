@@ -10,10 +10,10 @@ defmodule Beaver.MLIR.Dialect.CF do
   defp sizes_of_block_args(arguments) do
     Enum.reduce(arguments, [], fn x, sizes ->
       case x do
-        {%MLIR.CAPI.MlirBlock{}, block_args} when is_list(block_args) ->
+        {%MLIR.Block{}, block_args} when is_list(block_args) ->
           sizes ++ [length(block_args)]
 
-        %MLIR.CAPI.MlirBlock{} ->
+        %MLIR.Block{} ->
           sizes ++ [0]
 
         _ ->

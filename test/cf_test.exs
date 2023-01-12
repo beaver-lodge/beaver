@@ -81,7 +81,7 @@ defmodule CfTest do
         mlir ctx: ctx do
           block _true_branch() do
             {%MLIR.Value{} = mlir, acc} = gen_mlir(do_block_ast, acc)
-            %MLIR.CAPI.MlirBlock{} = Beaver.MLIR.__BLOCK__()
+            %MLIR.Block{} = Beaver.MLIR.__BLOCK__()
             CF.br({bb_next, [mlir]}) >>> []
           end
         end

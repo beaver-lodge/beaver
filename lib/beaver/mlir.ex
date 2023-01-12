@@ -7,16 +7,12 @@ defmodule Beaver.MLIR do
   alias Beaver.MLIR.CAPI
   require Beaver.MLIR.CAPI
 
-  alias Beaver.MLIR.{Value, Attribute}
+  alias Beaver.MLIR.{Value, Attribute, Type, Block, Location, Module, Operation, AffineMap}
   alias Beaver.MLIR
 
   alias Beaver.MLIR.CAPI.{
-    MlirBlock,
     MlirAffineExpr,
-    MlirAffineMap,
-    MlirIntegerSet,
-    MlirType,
-    MlirLocation
+    MlirIntegerSet
   }
 
   def dump(%__MODULE__.Module{} = mlir) do
@@ -44,7 +40,7 @@ defmodule Beaver.MLIR do
     :ok
   end
 
-  def dump(%MlirAffineMap{} = mlir) do
+  def dump(%AffineMap{} = mlir) do
     CAPI.mlirAffineMapDump(mlir)
     :ok
   end
@@ -54,7 +50,7 @@ defmodule Beaver.MLIR do
     :ok
   end
 
-  def dump(%MlirType{} = mlir) do
+  def dump(%Type{} = mlir) do
     CAPI.mlirTypeDump(mlir)
     :ok
   end
@@ -73,19 +69,19 @@ defmodule Beaver.MLIR do
     end
   end
 
-  def is_null(%MLIR.Attribute{} = v) do
+  def is_null(%Attribute{} = v) do
     CAPI.beaverAttributeIsNull(v) |> Beaver.Native.to_term()
   end
 
-  def is_null(%MLIR.Operation{} = v) do
+  def is_null(%Operation{} = v) do
     CAPI.beaverOperationIsNull(v) |> Beaver.Native.to_term()
   end
 
-  def is_null(%MLIR.Module{} = m) do
+  def is_null(%Module{} = m) do
     CAPI.beaverModuleIsNull(m) |> Beaver.Native.to_term()
   end
 
-  def is_null(%MlirBlock{} = v) do
+  def is_null(%Block{} = v) do
     CAPI.beaverBlockIsNull(v) |> Beaver.Native.to_term()
   end
 
@@ -105,7 +101,7 @@ defmodule Beaver.MLIR do
     |> List.to_string()
   end
 
-  def to_string(%MLIR.Operation{ref: ref}) do
+  def to_string(%Operation{ref: ref}) do
     CAPI.beaver_raw_beaver_operation_to_charlist(ref)
     |> Beaver.Native.check!()
     |> List.to_string()
@@ -115,17 +111,17 @@ defmodule Beaver.MLIR do
     module |> __MODULE__.Operation.from_module() |> __MODULE__.to_string()
   end
 
-  def to_string(%MlirType{ref: ref}) do
+  def to_string(%Type{ref: ref}) do
     CAPI.beaver_raw_beaver_type_to_charlist(ref) |> Beaver.Native.check!() |> List.to_string()
   end
 
-  def to_string(%MlirAffineMap{ref: ref}) do
+  def to_string(%AffineMap{ref: ref}) do
     CAPI.beaver_raw_beaver_affine_map_to_charlist(ref)
     |> Beaver.Native.check!()
     |> List.to_string()
   end
 
-  def to_string(%MlirLocation{ref: ref}) do
+  def to_string(%Location{ref: ref}) do
     CAPI.beaver_raw_beaver_location_to_charlist(ref)
     |> Beaver.Native.check!()
     |> List.to_string()
@@ -178,12 +174,12 @@ defmodule Beaver.MLIR do
   defmacro __BLOCK__({var_name, _line, nil} = block_var) do
     if Macro.Env.has_var?(__CALLER__, {var_name, nil}) do
       quote do
-        %Beaver.MLIR.CAPI.MlirBlock{} = unquote(block_var)
+        %Beaver.MLIR.Block{} = unquote(block_var)
       end
     else
       quote do
         Kernel.var!(unquote(block_var)) = Beaver.MLIR.Block.create([])
-        %Beaver.MLIR.CAPI.MlirBlock{} = Kernel.var!(unquote(block_var))
+        %Beaver.MLIR.Block{} = Kernel.var!(unquote(block_var))
       end
     end
   end

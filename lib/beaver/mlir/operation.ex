@@ -19,7 +19,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   defp create(op_name, %Beaver.DSL.SSA{
-         block: %MLIR.CAPI.MlirBlock{} = block,
+         block: %MLIR.Block{} = block,
          arguments: arguments,
          results: results,
          filler: filler,
@@ -43,10 +43,10 @@ defmodule Beaver.MLIR.Operation do
 
   @doc false
   def create_and_append(
-        %MLIR.CAPI.MlirContext{} = ctx,
+        %MLIR.Context{} = ctx,
         op_name,
         arguments,
-        %MLIR.CAPI.MlirBlock{} = block,
+        %MLIR.Block{} = block,
         loc \\ nil
       )
       when is_list(arguments) do
