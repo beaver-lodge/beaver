@@ -3,7 +3,6 @@ defmodule CFTest do
   use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Type}
-  import ExUnit.CaptureIO
   alias Beaver.MLIR.Dialect.{Func, Arith, CF}
   require Func
 
@@ -56,13 +55,10 @@ defmodule CFTest do
       end
       |> MLIR.Operation.verify!()
 
-    captured =
-      capture_io(fn ->
-        IO.inspect(ir)
-      end)
+    text = ir |> MLIR.to_string()
 
-    assert captured =~ ~r"module"
-    assert captured =~ ~r"// pred.+bb0"
-    assert captured =~ ~r"// 2 preds.+bb0.+bb1"
+    assert text =~ ~r"module"
+    assert text =~ ~r"// pred.+bb0"
+    assert text =~ ~r"// 2 preds.+bb0.+bb1"
   end
 end

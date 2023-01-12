@@ -4,8 +4,7 @@ defmodule Beaver.MLIR.Type do
   require Beaver.MLIR.CAPI
 
   use Kinda.ResourceKind,
-    forward_module: Beaver.Native,
-    fields: [safe_to_print: true]
+    forward_module: Beaver.Native
 
   def get(string, opts \\ [])
 

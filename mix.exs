@@ -40,7 +40,9 @@ defmodule Beaver.MixProject do
       groups_for_modules: [
         DSL: [
           Beaver,
-          ~r"Beaver.DSL.*",
+          ~r"Beaver.DSL.*"
+        ],
+        Walker: [
           ~r"Beaver.Walker.*"
         ],
         MLIR: [

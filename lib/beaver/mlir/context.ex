@@ -3,8 +3,7 @@ defmodule Beaver.MLIR.Context do
   require MLIR.CAPI
 
   use Kinda.ResourceKind,
-    forward_module: Beaver.Native,
-    fields: [safe_to_print: true]
+    forward_module: Beaver.Native
 
   @doc """
   create a MLIR context and register all dialects

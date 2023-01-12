@@ -9,8 +9,7 @@ defmodule Beaver.MLIR.Attribute do
   alias Beaver.MLIR
 
   use Kinda.ResourceKind,
-    forward_module: Beaver.Native,
-    fields: [safe_to_print: true]
+    forward_module: Beaver.Native
 
   def is_null(a) do
     CAPI.beaverAttributeIsNull(a) |> Beaver.Native.to_term()

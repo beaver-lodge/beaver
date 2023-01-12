@@ -4,17 +4,47 @@ defmodule Beaver.MLIR.Pass.Composer do
   @moduledoc """
   This module provide functions to compose passes.
   """
-  @enforce_keys [:passes, :op]
+  @enforce_keys [:op]
   defstruct passes: [], op: nil
   import Beaver.MLIR.CAPI
   alias Beaver.MLIR
 
-  def add(%Beaver.MLIR.Module{} = composer_or_op, {name, f}) when is_function(f) do
-    %__MODULE__{op: composer_or_op, passes: [{name, f}]}
+  def new(%__MODULE__{} = composer) do
+    composer
   end
 
-  def add(composer = %__MODULE__{passes: passes}, pass) do
+  def new(op) do
+    %__MODULE__{op: op}
+  end
+
+  def append(%op_or_mod{} = composer_or_op, pass)
+      when op_or_mod in [MLIR.Module, MLIR.Operation] do
+    new(composer_or_op)
+    |> append(pass)
+  end
+
+  def append(composer = %__MODULE__{passes: passes}, {name, f})
+      when is_function(f) do
+    %__MODULE__{composer | passes: passes ++ [{name, f}]}
+  end
+
+  def append(composer = %__MODULE__{passes: passes}, pass) do
     %__MODULE__{composer | passes: passes ++ [pass]}
+  end
+
+  def nested(composer_or_op, op_name, passes) when is_list(passes) do
+    new(composer_or_op)
+    |> append({:nested, op_name, passes})
+  end
+
+  def nested(composer_or_op, op_name, f) when is_function(f, 1) do
+    new(composer_or_op)
+    |> append({:nested, op_name, f})
+  end
+
+  def pipeline(composer_or_op, pipeline_str) when is_binary(pipeline_str) do
+    new(composer_or_op)
+    |> append(pipeline_str)
   end
 
   defp get_op_name(op_name) when is_binary(op_name), do: op_name
@@ -39,13 +69,14 @@ defmodule Beaver.MLIR.Pass.Composer do
     for pass <- passes do
       case pass do
         # nested pm
-        {op_name, f} when (is_binary(op_name) or is_atom(op_name)) and is_function(f, 1) ->
+        {:nested, op_name, f} when (is_binary(op_name) or is_atom(op_name)) and is_function(f, 1) ->
           op_name = get_op_name(op_name)
           npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
           f.(npm)
 
         # nest pipeline
-        {op_name, passes} when (is_binary(op_name) or is_atom(op_name)) and is_list(passes) ->
+        {:nested, op_name, passes}
+        when (is_binary(op_name) or is_atom(op_name)) and is_list(passes) ->
           op_name = get_op_name(op_name)
           npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
 
@@ -86,27 +117,5 @@ defmodule Beaver.MLIR.Pass.Composer do
     mlirPassManagerDestroy(pm)
 
     op
-  end
-
-  def nested(composer_or_op = %__MODULE__{}, op_name, passes) when is_list(passes) do
-    __MODULE__.add(composer_or_op, {op_name, passes})
-  end
-
-  def nested(composer_or_op, op_name, f) when is_function(f, 1) do
-    __MODULE__.add(composer_or_op, {op_name, f})
-  end
-
-  def nested(composer_or_op, op_name, passes_or_f) do
-    composer = %__MODULE__{op: composer_or_op, passes: []}
-    nested(composer, op_name, passes_or_f)
-  end
-
-  def pipeline(composer_or_op = %__MODULE__{}, pipeline_str) when is_binary(pipeline_str) do
-    __MODULE__.add(composer_or_op, pipeline_str)
-  end
-
-  def pipeline(composer_or_op, pipeline_str) when is_binary(pipeline_str) do
-    composer = %__MODULE__{op: composer_or_op, passes: []}
-    pipeline(composer, pipeline_str)
   end
 end

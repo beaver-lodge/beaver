@@ -1,8 +1,16 @@
 defmodule Beaver.DSL.SSA do
-  @moduledoc false
   alias Beaver.MLIR
   require Beaver.MLIR.CAPI
-  @type t() :: any()
+
+  @type t() :: %__MODULE__{
+          arguments: any(),
+          results: any(),
+          filler: any(),
+          block: nil,
+          ctx: any(),
+          loc: any(),
+          evaluator: function()
+        }
   defstruct arguments: [],
             results: [],
             filler: nil,

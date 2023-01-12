@@ -1,4 +1,5 @@
 defmodule Beaver.DSL.Pattern.Env do
+  @moduledoc false
   defstruct ctx: nil, block: nil, loc: nil
 end
 
@@ -257,8 +258,6 @@ defmodule Beaver.DSL.Pattern do
         result_types_unwrap
       )
 
-    op = %{op | safe_to_print: false}
-
     results =
       result_types_unwrap |> Enum.with_index() |> Enum.map(fn {_, i} -> result(env, op, i) end)
 
@@ -276,13 +275,8 @@ defmodule Beaver.DSL.Pattern do
   defp result(%Env{block: block, ctx: ctx}, %Beaver.MLIR.Value{} = v, i)
        when is_integer(i) do
     mlir block: block, ctx: ctx do
-      v = %{v | safe_to_print: false}
-
-      r =
-        PDL.result(v, index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), i)) >>>
-          ~t{!pdl.value}
-
-      %{r | safe_to_print: false}
+      PDL.result(v, index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), i)) >>>
+        ~t{!pdl.value}
     end
   end
 end

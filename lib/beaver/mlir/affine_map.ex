@@ -2,8 +2,7 @@ defmodule Beaver.MLIR.AffineMap do
   alias Beaver.MLIR
 
   use Kinda.ResourceKind,
-    forward_module: Beaver.Native,
-    fields: [safe_to_print: true]
+    forward_module: Beaver.Native
 
   def create(dim_cnt, symbol_cnt, exprs, opts \\ []) do
     Beaver.Deferred.from_opts(
