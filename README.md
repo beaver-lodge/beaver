@@ -275,10 +275,9 @@ In Beaver, working with MLIR should be in one format, no matter it is generating
 
 ### High level API in Erlang/Elixir idiom
 
-- When possible, lower level C APIs should be wrapped as Elixir struct with support to common Elixir protocols.
-  For instance the iteration over one MLIR operation's operands, results, successors, attributes, regions should be implemented in Elixir's Enumerable protocol.
-  This enable the possibility to use the rich collection of functions in Elixir standard libraries and Hex packages.
-- Erlang Modules to work with Ops in different MLIR dialects should implement behaviors like `Beaver.DSL.Op.Prototype`.
+When possible, lower level C APIs should be wrapped as Elixir struct with support to common Elixir protocols.
+For instance the iteration over one MLIR operation's operands, results, successors, attributes, regions should be implemented in Elixir's Enumerable protocol.
+This enable the possibility to use the rich collection of functions in Elixir standard libraries and Hex packages.
 
 ## Is Beaver a compiler or binding to LLVM/MLIR?
 
