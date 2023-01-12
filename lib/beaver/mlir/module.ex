@@ -13,8 +13,7 @@ defmodule Beaver.MLIR.Module do
   end
 
   # TODO: add operations field to store a walker
-  use Kinda.ResourceKind,
-    forward_module: Beaver.Native
+  use Kinda.ResourceKind, forward_module: Beaver.Native
 
   def is_null(module) do
     CAPI.beaverModuleIsNull(module) |> Beaver.Native.to_term()
@@ -33,11 +32,5 @@ defmodule Beaver.MLIR.Module do
 
   def destroy(module) do
     CAPI.mlirModuleDestroy(module)
-  end
-
-  defimpl Inspect do
-    def inspect(module, _opts) do
-      Beaver.MLIR.to_string(module)
-    end
   end
 end

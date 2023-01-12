@@ -4,16 +4,23 @@ defmodule Beaver.MLIR.Pass.Composer do
   @moduledoc """
   This module provide functions to compose passes.
   """
-  @enforce_keys [:passes, :op]
+  @enforce_keys [:op]
   defstruct passes: [], op: nil
   import Beaver.MLIR.CAPI
   alias Beaver.MLIR
 
-  def add(%Beaver.MLIR.Module{} = composer_or_op, {name, f}) when is_function(f) do
-    %__MODULE__{op: composer_or_op, passes: [{name, f}]}
+  def append(%op_or_mod{} = composer_or_op, pass)
+      when op_or_mod in [MLIR.Module, MLIR.Operation] do
+    %__MODULE__{op: composer_or_op}
+    |> append(pass)
   end
 
-  def add(composer = %__MODULE__{passes: passes}, pass) do
+  def append(composer = %__MODULE__{passes: passes}, {name, f})
+      when is_function(f) do
+    %__MODULE__{composer | passes: passes ++ [{name, f}]}
+  end
+
+  def append(composer = %__MODULE__{passes: passes}, pass) do
     %__MODULE__{composer | passes: passes ++ [pass]}
   end
 
@@ -89,11 +96,11 @@ defmodule Beaver.MLIR.Pass.Composer do
   end
 
   def nested(composer_or_op = %__MODULE__{}, op_name, passes) when is_list(passes) do
-    __MODULE__.add(composer_or_op, {op_name, passes})
+    append(composer_or_op, {op_name, passes})
   end
 
   def nested(composer_or_op, op_name, f) when is_function(f, 1) do
-    __MODULE__.add(composer_or_op, {op_name, f})
+    append(composer_or_op, {op_name, f})
   end
 
   def nested(composer_or_op, op_name, passes_or_f) do
@@ -102,7 +109,7 @@ defmodule Beaver.MLIR.Pass.Composer do
   end
 
   def pipeline(composer_or_op = %__MODULE__{}, pipeline_str) when is_binary(pipeline_str) do
-    __MODULE__.add(composer_or_op, pipeline_str)
+    append(composer_or_op, pipeline_str)
   end
 
   def pipeline(composer_or_op, pipeline_str) when is_binary(pipeline_str) do

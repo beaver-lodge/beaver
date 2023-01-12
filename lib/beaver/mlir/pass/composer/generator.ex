@@ -50,14 +50,9 @@ defmodule Beaver.MLIR.Pass.Composer.Generator do
               CAPI.unquote(name)()
             end
 
-            def unquote(normalized_name)(composer_or_op = %Composer{}) do
-              pass = CAPI.unquote(name)()
-              Composer.add(composer_or_op, pass)
-            end
-
             def unquote(normalized_name)(composer_or_op) do
-              composer = %Composer{op: composer_or_op, passes: []}
-              unquote(normalized_name)(composer)
+              pass = CAPI.unquote(name)()
+              Composer.append(composer_or_op, pass)
             end
           end
         end
