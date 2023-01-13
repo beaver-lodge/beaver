@@ -60,7 +60,7 @@ defmodule ToyPass do
     end
   end
 
-  def run(%MLIR.CAPI.MlirOperation{} = operation) do
+  def run(%MLIR.Operation{} = operation) do
     with "func.func" <- Beaver.MLIR.Operation.name(operation),
           attributes <- Beaver.Walker.attributes(operation),
           2 <- Enum.count(attributes),
