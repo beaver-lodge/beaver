@@ -88,6 +88,7 @@ defmodule Beaver.MixProject do
 
   defp deps do
     [
+      {:llvm_config, "~> 0.1.0"},
       {:kinda, "~> 0.2.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test]},
@@ -99,35 +100,6 @@ defmodule Beaver.MixProject do
     ["compile.cmake": &cmake/1]
   end
 
-  defmodule LLVM.Config do
-    defp llvm_config_from_sys_env() do
-      System.get_env("LLVM_CONFIG_PATH")
-    end
-
-    defp run_llvm_config(sub_cmd) do
-      llvm_config = llvm_config_from_sys_env()
-
-      if llvm_config do
-        with {path, 0} <- System.cmd(llvm_config, [sub_cmd]) do
-          {:ok, String.trim(path)}
-        else
-          _ ->
-            {:error, "failed to run llvm-config"}
-        end
-      else
-        {:error, "LLVM_CONFIG_PATH is not set"}
-      end
-    end
-
-    def include_dir() do
-      run_llvm_config("--includedir")
-    end
-
-    def lib_dir() do
-      run_llvm_config("--libdir")
-    end
-  end
-
   require Logger
 
   defp do_cmake() do
@@ -137,7 +109,7 @@ defmodule Beaver.MixProject do
 
     Logger.debug("[CMake] running...")
 
-    {:ok, llvm_lib_dir} = LLVM.Config.lib_dir()
+    {:ok, llvm_lib_dir} = LLVMConfig.lib_dir()
 
     llvm_cmake_dir = Path.join(llvm_lib_dir, "cmake/llvm")
     mlir_cmake_dir = Path.join(llvm_lib_dir, "cmake/mlir")

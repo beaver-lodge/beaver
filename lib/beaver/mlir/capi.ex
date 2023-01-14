@@ -8,7 +8,7 @@ defmodule Beaver.MLIR.CAPI do
   dest_dir = Path.join([Mix.Project.app_path(), "native-install"])
 
   llvm_constants =
-    case Beaver.LLVM.Config.include_dir() do
+    case LLVMConfig.include_dir() do
       {:ok, include_dir} ->
         %{
           llvm_include: include_dir
@@ -48,7 +48,7 @@ defmodule Beaver.MLIR.CAPI do
     )
 
   llvm_headers =
-    case Beaver.LLVM.Config.include_dir() do
+    case LLVMConfig.include_dir() do
       {:ok, include_dir} ->
         include_dir
         |> Path.join("*.h")
