@@ -7,9 +7,10 @@ defmodule Beaver.LLVM.Config do
     llvm_config = llvm_config_from_sys_env()
 
     if llvm_config do
-      with {path, 0} <- System.cmd(llvm_config, [sub_cmd]) do
-        {:ok, String.trim(path)}
-      else
+      case System.cmd(llvm_config, [sub_cmd]) do
+        {path, 0} ->
+          {:ok, String.trim(path)}
+
         _ ->
           {:error, "failed to run llvm-config"}
       end

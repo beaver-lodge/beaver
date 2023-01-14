@@ -26,7 +26,7 @@ defmodule Beaver.MLIR.Pass do
         )
       end
 
-      def delay(composer_or_op = %Composer{}) do
+      def delay(%Composer{} = composer_or_op) do
         external_pass = create()
         Composer.add(composer_or_op, external_pass)
       end

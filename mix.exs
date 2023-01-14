@@ -90,7 +90,8 @@ defmodule Beaver.MixProject do
     [
       {:kinda, "~> 0.2.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
-      {:mix_test_watch, "~> 1.0", only: [:dev, :test]}
+      {:mix_test_watch, "~> 1.0", only: [:dev, :test]},
+      {:credo, "~> 1.6", only: [:dev, :test], runtime: false}
     ]
   end
 

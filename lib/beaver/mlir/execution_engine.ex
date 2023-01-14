@@ -12,7 +12,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
   @doc """
   Create a MLIR JIT engine for a module and check if successful. Usually this module should be of LLVM dialect.
   """
-  def create!(composer_or_op = %Composer{}) do
+  def create!(%Composer{} = composer_or_op) do
     Composer.run!(composer_or_op) |> create!()
   end
 

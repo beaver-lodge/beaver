@@ -10,6 +10,7 @@ defmodule RedundantTransposeTest do
     import Beaver.MLIR.Transforms
 
     defmodule Helper do
+      @moduledoc false
       alias Beaver.MLIR.Attribute
       def perm_t(), do: Type.ranked_tensor([2], Type.i32())
 
@@ -17,7 +18,7 @@ defmodule RedundantTransposeTest do
         for perm <- 0..1, do: Attribute.integer(Type.i32(), perm)
       end
 
-      def perms_T_attr(), do: Attribute.dense_elements(Enum.reverse(perm_int_attrs()), perm_t())
+      def perms_t_attr(), do: Attribute.dense_elements(Enum.reverse(perm_int_attrs()), perm_t())
       def tensor_t(), do: Type.unranked_tensor(Type.f32())
     end
 
@@ -29,14 +30,14 @@ defmodule RedundantTransposeTest do
                     ) do
             region do
               block bb_entry(arg0 >>> Type.unranked_tensor(Type.f32())) do
-                permsT =
-                  TOSA.const(value: Helper.perms_T_attr()) >>>
+                perms_type =
+                  TOSA.const(value: Helper.perms_t_attr()) >>>
                     Helper.perm_t()
 
-                t = TOSA.transpose(arg0, permsT) >>> Helper.tensor_t()
-                t = TOSA.transpose(t, permsT) >>> Helper.tensor_t()
-                t = TOSA.transpose(t, permsT) >>> Helper.tensor_t()
-                t = TOSA.transpose(t, permsT) >>> Helper.tensor_t()
+                t = TOSA.transpose(arg0, perms_type) >>> Helper.tensor_t()
+                t = TOSA.transpose(t, perms_type) >>> Helper.tensor_t()
+                t = TOSA.transpose(t, perms_type) >>> Helper.tensor_t()
+                t = TOSA.transpose(t, perms_type) >>> Helper.tensor_t()
                 Func.return(t) >>> []
               end
             end

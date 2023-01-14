@@ -2,10 +2,10 @@ defmodule PDLTest do
   use ExUnit.Case
   use Beaver
   alias Beaver.MLIR
-  alias Beaver.MLIR.Type
-  alias Beaver.MLIR.CAPI
-  alias Beaver.MLIR.Dialect.{Func, TOSA}
-  import Beaver.MLIR.Transforms
+  alias MLIR.Type
+  alias MLIR.CAPI
+  alias MLIR.Dialect.{Func, TOSA}
+  import MLIR.Transforms
   require Func
   require TOSA
   require Type
@@ -67,7 +67,7 @@ defmodule PDLTest do
         {{name, attribute}, acc}
 
       %MLIR.Operation{} = op, acc ->
-        {op, [Beaver.MLIR.Operation.name(op) | acc]}
+        {op, [MLIR.Operation.name(op) | acc]}
 
       %element{} = mlir, acc ->
         {mlir, [element | acc]}
@@ -79,53 +79,52 @@ defmodule PDLTest do
 
     assert acc == [
              "builtin.module",
-             Beaver.MLIR.Region,
-             Beaver.MLIR.Block,
+             MLIR.Region,
+             MLIR.Block,
              "builtin.module",
-             Beaver.MLIR.Region,
-             Beaver.MLIR.Block,
+             MLIR.Region,
+             MLIR.Block,
              "pdl_interp.func",
-             Beaver.MLIR.Region,
-             Beaver.MLIR.Block,
+             MLIR.Region,
+             MLIR.Block,
              "pdl_interp.finalize",
              "pdl_interp.finalize",
              "pdl_interp.erase",
              "pdl_interp.erase",
              "pdl_interp.create_operation",
              "pdl_interp.create_operation",
-             Beaver.MLIR.Block,
-             Beaver.MLIR.Region,
+             MLIR.Block,
+             MLIR.Region,
              "pdl_interp.func",
-             Beaver.MLIR.Block,
-             Beaver.MLIR.Region,
+             MLIR.Block,
+             MLIR.Region,
              "builtin.module",
              "pdl_interp.func",
-             Beaver.MLIR.Region,
-             Beaver.MLIR.Block,
+             MLIR.Region,
+             MLIR.Block,
              "pdl_interp.finalize",
              "pdl_interp.finalize",
-             Beaver.MLIR.Block,
-             Beaver.MLIR.Block,
+             MLIR.Block,
+             MLIR.Block,
              "pdl_interp.record_match",
              "pdl_interp.record_match",
-             Beaver.MLIR.Block,
-             Beaver.MLIR.Block,
+             MLIR.Block,
+             MLIR.Block,
              "pdl_interp.are_equal",
              "pdl_interp.are_equal",
              "pdl_interp.get_attribute",
              "pdl_interp.get_attribute",
              "pdl_interp.create_attribute",
              "pdl_interp.create_attribute",
-             Beaver.MLIR.Block,
-             Beaver.MLIR.Region,
+             MLIR.Block,
+             MLIR.Region,
              "pdl_interp.func",
-             Beaver.MLIR.Block,
-             Beaver.MLIR.Region,
+             MLIR.Block,
+             MLIR.Region,
              "builtin.module"
            ]
 
     assert mlir
-           |> Beaver.Walker.container()
            |> MLIR.CAPI.mlirOperationEqual(MLIR.Operation.from_module(pattern_module))
            |> Beaver.Native.to_term()
 
@@ -143,7 +142,7 @@ defmodule PDLTest do
 
     result = CAPI.beaverApplyOwnedPatternSetOnRegion(region, pattern_set)
 
-    assert Beaver.MLIR.LogicalResult.success?(result)
+    assert MLIR.LogicalResult.success?(result)
 
     ir_string = MLIR.to_string(ir_module)
     assert not String.contains?(ir_string, "test.op")
@@ -336,7 +335,7 @@ defmodule PDLTest do
     ctx = context[:ctx]
 
     defmodule ToyPass do
-      use Beaver.MLIR.Pass, on: "func.func"
+      use MLIR.Pass, on: "func.func"
       import Beaver.DSL.Pattern
 
       defpat replace_add_op() do
@@ -353,7 +352,7 @@ defmodule PDLTest do
       end
 
       def run(%MLIR.Operation{} = operation) do
-        with "func.func" <- Beaver.MLIR.Operation.name(operation),
+        with "func.func" <- MLIR.Operation.name(operation),
              attributes <- Beaver.Walker.attributes(operation),
              2 <- Enum.count(attributes),
              {:ok, _} <- MLIR.Pattern.apply_(operation, [replace_add_op(benefit: 2)]) do

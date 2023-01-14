@@ -190,8 +190,20 @@ defmodule Beaver do
   end
 
   defmacro region(do: block) do
+    regions =
+      if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_regions, nil}) do
+        quote do
+          Kernel.var!(beaver_internal_env_regions)
+        end
+      else
+        quote do
+          Kernel.var!(beaver_internal_env_regions) = []
+        end
+      end
+
     quote do
       region = Beaver.MLIR.CAPI.mlirRegionCreate()
+      unquote(regions)
 
       Beaver.MLIR.Region.under(region, fn ->
         Kernel.var!(beaver_env_region) = region
@@ -199,7 +211,11 @@ defmodule Beaver do
         unquote(block)
       end)
 
-      [region]
+      Kernel.var!(beaver_internal_env_regions) =
+        Kernel.var!(beaver_internal_env_regions) ++
+          [region]
+
+      Kernel.var!(beaver_internal_env_regions)
     end
   end
 

@@ -38,7 +38,6 @@ defmodule E2ETest do
         return = Beaver.Native.I32.make(-1)
         return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
         # return here is a resource reference
-        assert return == return
         assert return |> Beaver.Native.to_term() == i * 2
       end)
     end
