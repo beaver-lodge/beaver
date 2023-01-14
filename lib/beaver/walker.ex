@@ -300,9 +300,8 @@ defmodule Beaver.Walker do
   @behaviour Access
   @impl true
   def fetch(%__MODULE__{element_module: Value} = walker, key) when is_integer(key) do
-    with %Value{} = value <- Enum.at(walker, key) do
-      {:ok, value}
-    else
+    case Enum.at(walker, key) do
+      %Value{} = value -> {:ok, value}
       nil -> :error
     end
   end
@@ -320,9 +319,8 @@ defmodule Beaver.Walker do
         end
       end)
 
-    with %NamedAttribute{} <- found do
-      {:ok, MLIR.CAPI.beaverMlirNamedAttributeGetAttribute(found)}
-    else
+    case found do
+      %NamedAttribute{} -> {:ok, MLIR.CAPI.beaverMlirNamedAttributeGetAttribute(found)}
       :error -> :error
     end
   end
@@ -340,9 +338,8 @@ defmodule Beaver.Walker do
         end
       end)
 
-    with {_, %Attribute{} = attr} <- found do
-      {:ok, attr}
-    else
+    case found do
+      {_, %Attribute{} = attr} -> {:ok, attr}
       :error -> :error
     end
   end
@@ -591,17 +588,19 @@ defmodule Beaver.Walker do
             {:ok, size :: non_neg_integer(), Enumerable.slicing_fun()} | {:error, module()}
     def slice(walker = %Beaver.Walker{container: container, get_element: get_element})
         when is_function(get_element, 2) do
-      with {:ok, count} <- count(walker) do
-        {:ok, count,
-         fn start, length ->
-           pos_range = start..(start + length - 1)
+      case count(walker) do
+        {:ok, count} ->
+          {:ok, count,
+           fn start, length ->
+             pos_range = start..(start + length - 1)
 
-           for pos <- pos_range do
-             get_element.(container, pos)
-           end
-         end}
-      else
-        error -> error
+             for pos <- pos_range do
+               get_element.(container, pos)
+             end
+           end}
+
+        error ->
+          error
       end
     end
 
@@ -620,10 +619,12 @@ defmodule Beaver.Walker do
           fun
         )
         when is_function(get_element, 2) do
-      with {:ok, count} <- count(walker) do
-        reduce(%Beaver.Walker{walker | this: 0, num: count}, {:cont, acc}, fun)
-      else
-        error -> error
+      case count(walker) do
+        {:ok, count} ->
+          reduce(%Beaver.Walker{walker | this: 0, num: count}, {:cont, acc}, fun)
+
+        error ->
+          error
       end
     end
 

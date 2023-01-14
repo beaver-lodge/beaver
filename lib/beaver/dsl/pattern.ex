@@ -48,10 +48,10 @@ defmodule Beaver.DSL.Pattern do
             alias Beaver.DSL.Pattern
             pdl_pattern_module_op = unquote(pdl_pattern_module_op)
 
-            with {:ok, op} <-
-                   Beaver.MLIR.Operation.verify(pdl_pattern_module_op, debug: true) do
-              op
-            else
+            case Beaver.MLIR.Operation.verify(pdl_pattern_module_op, debug: true) do
+              {:ok, op} ->
+                op
+
               :fail ->
                 require Logger
 
@@ -125,9 +125,10 @@ defmodule Beaver.DSL.Pattern do
         repl = opts |> Keyword.fetch!(:with)
 
         pdl_handler =
-          with {:ok, owner} <- MLIR.Value.owner(repl) do
-            owner |> Beaver.MLIR.Operation.name()
-          else
+          case MLIR.Value.owner(repl) do
+            {:ok, owner} ->
+              owner |> Beaver.MLIR.Operation.name()
+
             _ ->
               raise "not a pdl handler"
           end

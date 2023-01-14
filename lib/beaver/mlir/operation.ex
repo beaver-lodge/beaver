@@ -86,10 +86,10 @@ defmodule Beaver.MLIR.Operation do
 
   @default_verify_opts [debug: false]
   def verify!(op, opts \\ @default_verify_opts) do
-    with {:ok, op} <-
-           verify(op, opts ++ [should_raise: true]) do
-      op
-    else
+    case verify(op, opts ++ [should_raise: true]) do
+      {:ok, op} ->
+        op
+
       :null ->
         raise "MLIR operation verification failed because the operation is null. Maybe it is parsed from an ill-formed text format?"
 

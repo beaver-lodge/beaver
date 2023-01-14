@@ -19,9 +19,10 @@ defmodule Beaver.MLIR.PatternSet do
   end
 
   def apply!(container, pattern_set) do
-    with {:ok, container} <- apply_(container, pattern_set) do
-      container
-    else
+    case apply_(container, pattern_set) do
+      {:ok, container} ->
+        container
+
       _ ->
         raise "failed to apply pattern set"
     end
@@ -46,9 +47,10 @@ defmodule Beaver.MLIR.PatternSet do
   end
 
   def apply_(%MLIR.Module{} = module, pattern_set) do
-    with {:ok, %MLIR.Operation{}} <- MLIR.Operation.from_module(module) |> apply_(pattern_set) do
-      {:ok, module}
-    else
+    case MLIR.Operation.from_module(module) |> apply_(pattern_set) do
+      {:ok, %MLIR.Operation{}} ->
+        {:ok, module}
+
       _ ->
         :error
     end
