@@ -169,11 +169,8 @@ defmodule MlirTest do
     CAPI.mlirContextDestroy(ctx)
   end
 
-  defmodule TransposeOp do
-    defstruct a: nil, b: nil
-  end
-
   defmodule TestPass do
+    @moduledoc false
     def run(%Beaver.MLIR.Operation{} = op) do
       MLIR.Operation.verify!(op)
       :ok
@@ -184,63 +181,45 @@ defmodule MlirTest do
     ctx = MLIR.Context.create()
     module = create_adder_module(ctx)
     assert not MLIR.Module.is_null(module)
-    # TODO: create a supervisor to manage a TypeIDAllocator by mlir application
     type_id_allocator = CAPI.mlirTypeIDAllocatorCreate()
-
     external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestPass, "")
-
     pm = CAPI.mlirPassManagerCreate(ctx)
     CAPI.mlirPassManagerAddOwnedPass(pm, external)
     CAPI.mlirPassManagerAddOwnedPass(pm, CAPI.mlirCreateTransformsCSE())
     success = CAPI.mlirPassManagerRun(pm, module)
-
     assert Beaver.MLIR.LogicalResult.success?(success)
-
     CAPI.mlirPassManagerDestroy(pm)
     CAPI.mlirModuleDestroy(module)
     CAPI.mlirTypeIDAllocatorDestroy(type_id_allocator)
     CAPI.mlirContextDestroy(ctx)
-    # TODO: values above could be moved to setup
   end
 
-  test "Run a func operation pass" do
-    ctx = MLIR.Context.create()
+  test "Run a func operation pass", context do
+    ctx = context[:ctx]
     module = create_adder_module(ctx)
     assert not MLIR.Module.is_null(module)
-    # TODO: create a supervisor to manage a TypeIDAllocator by mlir application
-
     external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestPass, "func.func")
-
     pm = CAPI.mlirPassManagerCreate(ctx)
     npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
     CAPI.mlirOpPassManagerAddOwnedPass(npm, external)
     success = CAPI.mlirPassManagerRun(pm, module)
-
-    # equivalent to mlirLogicalResultIsSuccess
     assert Beaver.MLIR.LogicalResult.success?(success)
-
     CAPI.mlirPassManagerDestroy(pm)
     CAPI.mlirModuleDestroy(module)
-    CAPI.mlirContextDestroy(ctx)
-    # TODO: values above could be moved to setup
   end
 
-  test "Run pass with patterns" do
-    ctx = MLIR.Context.create()
+  test "Run pass with patterns", context do
+    ctx = context[:ctx]
     module = create_redundant_transpose_module(ctx)
     assert not MLIR.Module.is_null(module)
     external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestPass, "func.func")
-
     pm = CAPI.mlirPassManagerCreate(ctx)
     npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
     CAPI.mlirOpPassManagerAddOwnedPass(npm, external)
     success = CAPI.mlirPassManagerRun(pm, module)
     assert Beaver.MLIR.LogicalResult.success?(success)
-
     CAPI.mlirPassManagerDestroy(pm)
     CAPI.mlirModuleDestroy(module)
-    CAPI.mlirContextDestroy(ctx)
-    # TODO: values above could be moved to setup
   end
 
   defmacro some_constrain(_t) do

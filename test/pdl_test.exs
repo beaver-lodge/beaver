@@ -150,7 +150,6 @@ defmodule PDLTest do
     CAPI.mlirContextDestroy(ctx)
   end
 
-  # TODO: figure out why custom asm format of pdl doesn't work
   @are_equal_op_pdl Path.join(__DIR__, "pdl_erase_and_create.mlir") |> File.read!()
 
   test "AreEqualOp pdl version" do
@@ -335,6 +334,7 @@ defmodule PDLTest do
     ctx = context[:ctx]
 
     defmodule ToyPass do
+      @moduledoc false
       use MLIR.Pass, on: "func.func"
       import Beaver.DSL.Pattern
 

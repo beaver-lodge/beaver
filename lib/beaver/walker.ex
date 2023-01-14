@@ -27,7 +27,6 @@ defmodule Beaver.Walker do
   It implements the `Enumerable` protocol and the `Access` behavior.
   """
 
-  # TODO: traverse NamedAttribute?
   @type operation() :: Module.t() | Operation.t() | OpReplacement.t()
   @type container() :: operation() | Region.t() | Block.t() | NamedAttribute.t()
   @type element() :: operation() | Region.t() | Block.t() | Value.t() | NamedAttribute.t()
@@ -686,7 +685,6 @@ defmodule Beaver.Walker do
       end
     end
 
-    # TODO: this could be a macro erased in :prod
     defp expect_element!(%module{} = element, element_module) do
       if element_module != module do
         raise "Expected element module #{element_module}, got #{module}"

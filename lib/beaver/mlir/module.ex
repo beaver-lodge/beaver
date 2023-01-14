@@ -12,7 +12,6 @@ defmodule Beaver.MLIR.Module do
     module
   end
 
-  # TODO: add operations field to store a walker
   use Kinda.ResourceKind, forward_module: Beaver.Native
 
   def is_null(module) do

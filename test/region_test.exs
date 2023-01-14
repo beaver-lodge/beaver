@@ -1,14 +1,11 @@
 defmodule RegionTest do
-  use ExUnit.Case
+  use Beaver.Case
   use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Dialect.{Func, Arith, CF}
   require Func
   @moduletag :pdl
-  setup do
-    [ctx: MLIR.Context.create(allow_unregistered: true)]
-  end
 
   test "multiple regions", context do
     op =

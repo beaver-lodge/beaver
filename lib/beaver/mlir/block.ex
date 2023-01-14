@@ -1,11 +1,14 @@
 defmodule Beaver.MLIR.Block do
+  @moduledoc """
+  This module defines functions to work with block and block arguments.
+  """
   alias Beaver.MLIR
   require Beaver.MLIR.CAPI
-  # TODO: remote ctx in these funcs
+
   use Kinda.ResourceKind,
     forward_module: Beaver.Native
 
-  def do_add_arg!(block, ctx, {t, loc}) when is_function(t, 1) or is_function(loc, 1) do
+  defp do_add_arg!(block, ctx, {t, loc}) when is_function(t, 1) or is_function(loc, 1) do
     MLIR.CAPI.mlirBlockAddArgument(
       block,
       t |> Beaver.Deferred.create(ctx),
@@ -13,18 +16,18 @@ defmodule Beaver.MLIR.Block do
     )
   end
 
-  def do_add_arg!(block, _ctx, {t = %Beaver.MLIR.Type{}, loc}) do
+  defp do_add_arg!(block, _ctx, {t = %Beaver.MLIR.Type{}, loc}) do
     ctx = MLIR.CAPI.mlirTypeGetContext(t)
     loc = loc |> Beaver.Deferred.create(ctx)
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
-  def do_add_arg!(block, ctx, {t, loc}) do
+  defp do_add_arg!(block, ctx, {t, loc}) do
     t = MLIR.CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create(t))
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
-  def do_add_arg!(block, ctx, t) do
+  defp do_add_arg!(block, ctx, t) do
     loc = MLIR.CAPI.mlirLocationUnknownGet(ctx)
     t = MLIR.CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create(t))
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
@@ -50,7 +53,6 @@ defmodule Beaver.MLIR.Block do
   end
 
   def create(args, locs) when is_list(args) and is_list(locs) do
-    # TODO: improve this
     if length(args) != length(locs) do
       raise "Different length of block args and types. Make sure the block/1 macro in call within mlir/1 macro"
     end
