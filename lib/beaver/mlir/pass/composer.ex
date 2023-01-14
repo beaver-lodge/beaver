@@ -49,6 +49,35 @@ defmodule Beaver.MLIR.Pass.Composer do
 
   defp get_op_name(op_name) when is_binary(op_name), do: op_name
 
+  # nested pm
+  defp add_pass(pm, {:nested, op_name, f})
+       when (is_binary(op_name) or is_atom(op_name)) and is_function(f, 1) do
+    op_name = get_op_name(op_name)
+    npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
+    f.(npm)
+  end
+
+  # nest pipeline
+  defp add_pass(pm, {:nested, op_name, passes})
+       when (is_binary(op_name) or is_atom(op_name)) and is_list(passes) do
+    op_name = get_op_name(op_name)
+    npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
+
+    for pass <- passes do
+      case pass do
+        p when is_binary(p) ->
+          MLIR.Pass.pipeline!(npm, p)
+
+        _ ->
+          mlirOpPassManagerAddOwnedPass(npm, pass)
+      end
+    end
+  end
+
+  defp add_pass(pm, pipeline_str) when is_binary(pipeline_str),
+    do: MLIR.Pass.pipeline!(pm, pipeline_str)
+
+  defp add_pass(pm, pass), do: mlirPassManagerAddOwnedPass(pm, pass)
   # TODO: add keyword arguments
   def run!(
         %__MODULE__{passes: passes, op: %MLIR.Module{} = op},
@@ -66,37 +95,7 @@ defmodule Beaver.MLIR.Pass.Composer do
       Logger.info("[Beaver] IR printing enabled")
     end
 
-    for pass <- passes do
-      case pass do
-        # nested pm
-        {:nested, op_name, f} when (is_binary(op_name) or is_atom(op_name)) and is_function(f, 1) ->
-          op_name = get_op_name(op_name)
-          npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
-          f.(npm)
-
-        # nest pipeline
-        {:nested, op_name, passes}
-        when (is_binary(op_name) or is_atom(op_name)) and is_list(passes) ->
-          op_name = get_op_name(op_name)
-          npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
-
-          for pass <- passes do
-            case pass do
-              p when is_binary(p) ->
-                MLIR.Pass.pipeline!(npm, p)
-
-              _ ->
-                mlirOpPassManagerAddOwnedPass(npm, pass)
-            end
-          end
-
-        pipeline_str when is_binary(pipeline_str) ->
-          MLIR.Pass.pipeline!(pm, pipeline_str)
-
-        _ ->
-          mlirPassManagerAddOwnedPass(pm, pass)
-      end
-    end
+    for pass <- passes, do: add_pass(pm, pass)
 
     status = mlirPassManagerRun(pm, op)
 
