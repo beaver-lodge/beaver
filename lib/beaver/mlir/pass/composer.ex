@@ -47,12 +47,9 @@ defmodule Beaver.MLIR.Pass.Composer do
     |> append(pipeline_str)
   end
 
-  defp get_op_name(op_name) when is_binary(op_name), do: op_name
-
   # nested pm
   defp add_pass(pm, {:nested, op_name, f})
        when (is_binary(op_name) or is_atom(op_name)) and is_function(f, 1) do
-    op_name = get_op_name(op_name)
     npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
     f.(npm)
   end
@@ -60,22 +57,15 @@ defmodule Beaver.MLIR.Pass.Composer do
   # nest pipeline
   defp add_pass(pm, {:nested, op_name, passes})
        when (is_binary(op_name) or is_atom(op_name)) and is_list(passes) do
-    op_name = get_op_name(op_name)
     npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
-
-    for pass <- passes do
-      case pass do
-        p when is_binary(p) ->
-          MLIR.Pass.pipeline!(npm, p)
-
-        _ ->
-          mlirOpPassManagerAddOwnedPass(npm, pass)
-      end
-    end
+    for pass <- passes, do: add_pass(npm, pass)
   end
 
   defp add_pass(pm, pipeline_str) when is_binary(pipeline_str),
     do: MLIR.Pass.pipeline!(pm, pipeline_str)
+
+  defp add_pass(%MLIR.CAPI.MlirOpPassManager{} = pm, pass),
+    do: mlirOpPassManagerAddOwnedPass(pm, pass)
 
   defp add_pass(pm, pass), do: mlirPassManagerAddOwnedPass(pm, pass)
   # TODO: add keyword arguments
