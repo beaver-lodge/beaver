@@ -59,9 +59,10 @@ defmodule Beaver.MLIR do
   end
 
   def dump!(mlir) do
-    with :ok <- dump(mlir) do
-      mlir
-    else
+    case dump(mlir) do
+      :ok ->
+        mlir
+
       :error ->
         error_msg = "can't dump #{inspect(mlir)}"
         raise error_msg

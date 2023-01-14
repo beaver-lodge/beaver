@@ -55,9 +55,10 @@ defmodule CfTest do
     # found {:base_lr, [line: 89], nil} unmatched, so we add this match to extract MLIR Value
     defp gen_mlir({_var_name, _line, nil} = ast, acc) do
       # {ast, acc}
-      with {:ok, found} <- fetch_var(acc, ast) do
-        {found, acc}
-      else
+      case fetch_var(acc, ast) do
+        {:ok, found} ->
+          {found, acc}
+
         :not_found ->
           raise "block arg not found, #{inspect(ast)}"
           {gen_mlir(ast, acc), acc}

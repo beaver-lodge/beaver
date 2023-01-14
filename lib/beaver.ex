@@ -32,10 +32,10 @@ defmodule Beaver do
 
   defmacro __using__(_) do
     quote do
+      require Beaver.MLIR.CAPI
       import Beaver
       alias Beaver.MLIR
       import MLIR.Sigils
-      require Beaver.MLIR
     end
   end
 
