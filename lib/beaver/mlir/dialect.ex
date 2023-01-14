@@ -1,4 +1,7 @@
 defmodule Beaver.MLIR.Dialect do
+  @moduledoc """
+  This module defines macro to generate code for an MLIR dialect.
+  """
   alias Beaver.MLIR.Dialect
 
   require Logger

@@ -4,8 +4,8 @@ defmodule Beaver.DSL.Pattern.Env do
 end
 
 defmodule Beaver.DSL.Pattern do
-  @doc """
-  PDL frontend
+  @moduledoc """
+  Beaver pattern DSL for MLIR, a PDL frontend in Elixir.
   """
   alias Beaver.MLIR
   alias Beaver.MLIR.Dialect.PDL

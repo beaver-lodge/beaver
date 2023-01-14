@@ -1,4 +1,7 @@
 defmodule Beaver.DSL.SSA do
+  @moduledoc """
+  Beaver's DSL for MLIR IR structure. Macros like `Beaver.mlir/1` will generate SSA structs defined by this module.
+  """
   alias Beaver.MLIR
   require Beaver.MLIR.CAPI
 

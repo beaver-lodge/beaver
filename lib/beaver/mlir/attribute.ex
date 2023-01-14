@@ -1,9 +1,15 @@
 defmodule Beaver.MLIR.NamedAttribute do
+  @moduledoc """
+  This module defines a wrapper struct of NamedAttribute in MLIR
+  """
   use Kinda.ResourceKind,
     forward_module: Beaver.Native
 end
 
 defmodule Beaver.MLIR.Attribute do
+  @moduledoc """
+  This module defines functions parsing and creating attributes in MLIR.
+  """
   alias Beaver.MLIR.CAPI
   require Beaver.MLIR.CAPI
   alias Beaver.MLIR

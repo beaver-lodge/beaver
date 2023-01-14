@@ -1,4 +1,7 @@
 defmodule Beaver.MLIR.Context do
+  @moduledoc """
+  This module defines functions creating or destroying MLIR context.
+  """
   alias Beaver.MLIR
   require MLIR.CAPI
 

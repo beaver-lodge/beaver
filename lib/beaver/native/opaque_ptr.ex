@@ -1,4 +1,7 @@
 defmodule Beaver.Native.OpaquePtr do
+  @moduledoc """
+  This module defines functions working with opaque pointer, usually a `void*` in C.
+  """
   alias Beaver.MLIR.CAPI
 
   use Kinda.ResourceKind,

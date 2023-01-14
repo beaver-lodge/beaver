@@ -1,4 +1,7 @@
 defmodule Beaver.Native.Array do
+  @moduledoc """
+  This module defines functions working with C array.
+  """
   alias Beaver.MLIR.CAPI
   defstruct ref: nil, element_kind: nil, bag: MapSet.new()
 
