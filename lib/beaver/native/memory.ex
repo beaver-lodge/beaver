@@ -35,43 +35,21 @@ defmodule Beaver.Native.Memory do
     infer_dense_strides(shape, [])
   end
 
+  defp pair_to_mod({:u, 8}), do: Beaver.Native.U8
+  defp pair_to_mod({:u, 16}), do: Beaver.Native.U16
+  defp pair_to_mod({:u, 32}), do: Beaver.Native.U32
+  defp pair_to_mod({:u, 64}), do: Beaver.Native.U64
+  defp pair_to_mod({:s, 8}), do: Beaver.Native.I8
+  defp pair_to_mod({:s, 16}), do: Beaver.Native.I16
+  defp pair_to_mod({:s, 32}), do: Beaver.Native.I32
+  defp pair_to_mod({:s, 64}), do: Beaver.Native.I64
+  defp pair_to_mod({:f, 32}), do: Beaver.Native.F32
+  defp pair_to_mod({:c, 64}), do: Beaver.Native.Complex.F32
+  defp pair_to_mod(mod) when is_atom(mod), do: mod
+
   defp extract_mod_from_opts(opts) do
-    mod = Keyword.fetch!(opts, :type)
-
-    case mod do
-      {:u, 8} ->
-        Beaver.Native.U8
-
-      {:u, 16} ->
-        Beaver.Native.U16
-
-      {:u, 32} ->
-        Beaver.Native.U32
-
-      {:u, 64} ->
-        Beaver.Native.U64
-
-      {:s, 8} ->
-        Beaver.Native.I8
-
-      {:s, 16} ->
-        Beaver.Native.I16
-
-      {:s, 32} ->
-        Beaver.Native.I32
-
-      {:s, 64} ->
-        Beaver.Native.I64
-
-      {:f, 32} ->
-        Beaver.Native.F32
-
-      {:c, 64} ->
-        Beaver.Native.Complex.F32
-
-      mod when is_atom(mod) ->
-        mod
-    end
+    Keyword.fetch!(opts, :type)
+    |> pair_to_mod()
   end
 
   def new(data, opts \\ [offset: 0])
