@@ -68,7 +68,7 @@ defmodule Beaver.MLIR.Pass.Composer do
     do: mlirOpPassManagerAddOwnedPass(pm, pass)
 
   defp add_pass(pm, pass), do: mlirPassManagerAddOwnedPass(pm, pass)
-  # TODO: add keyword arguments
+
   def run!(
         %__MODULE__{passes: passes, op: %MLIR.Module{} = op},
         opts \\ [dump: false, debug: false, print: false]
