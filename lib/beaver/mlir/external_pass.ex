@@ -1,4 +1,5 @@
 defmodule Beaver.MLIR.ExternalPass do
+  @moduledoc false
   @doc """
   Lower level API to work with MLIR's external pass (pass defined in C). Use Beaver.MLIR.Pass for idiomatic Erlang behavior.
   """

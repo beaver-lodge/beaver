@@ -1,4 +1,7 @@
 defmodule Beaver.MLIR.ExecutionEngine do
+  @moduledoc """
+  This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
+  """
   alias Beaver.MLIR
   alias Beaver.MLIR.Pass.Composer
   import Beaver.MLIR.CAPI

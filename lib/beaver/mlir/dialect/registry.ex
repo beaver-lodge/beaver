@@ -1,4 +1,7 @@
 defmodule Beaver.MLIR.Dialect.Registry do
+  @moduledoc """
+  This module defines functions to query MLIR dialect registry.
+  """
   require Beaver.MLIR.CAPI
   alias Beaver.MLIR.CAPI
   alias Beaver.MLIR

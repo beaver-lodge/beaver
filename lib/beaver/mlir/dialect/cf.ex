@@ -3,6 +3,10 @@ defmodule Beaver.MLIR.Dialect.CF do
   require Beaver.MLIR.CAPI
   alias Beaver.MLIR.Dialect
 
+  @moduledoc """
+  This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect.
+  """
+
   use Beaver.MLIR.Dialect,
     dialect: "cf",
     ops: Dialect.Registry.ops("cf")

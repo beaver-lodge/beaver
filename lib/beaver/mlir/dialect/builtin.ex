@@ -1,4 +1,7 @@
 defmodule Beaver.MLIR.Dialect.Builtin do
+  @moduledoc """
+  This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect.
+  """
   use Beaver.MLIR.Dialect,
     dialect: "builtin",
     ops: Beaver.MLIR.Dialect.Registry.ops("builtin") |> Enum.reject(fn x -> x in ~w{module} end)

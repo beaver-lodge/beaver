@@ -1,4 +1,7 @@
 defmodule Beaver.MLIR.Sigils do
+  @moduledoc """
+  Sigils return a function to create MLIR elements by parsing the content.
+  """
   alias Beaver.MLIR
 
   @doc """

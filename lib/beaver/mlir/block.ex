@@ -1,6 +1,6 @@
 defmodule Beaver.MLIR.Block do
   @moduledoc """
-  This module defines functions to work with block and block arguments.
+  This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
   """
   alias Beaver.MLIR
   require Beaver.MLIR.CAPI

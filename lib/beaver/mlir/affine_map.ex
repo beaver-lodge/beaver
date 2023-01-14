@@ -1,4 +1,7 @@
 defmodule Beaver.MLIR.AffineMap do
+  @moduledoc """
+  This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
+  """
   alias Beaver.MLIR
 
   use Kinda.ResourceKind,

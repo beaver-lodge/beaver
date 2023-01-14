@@ -1,4 +1,7 @@
 defmodule Beaver.MLIR.Operation do
+  @moduledoc """
+  This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
+  """
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
   import Beaver.MLIR.CAPI

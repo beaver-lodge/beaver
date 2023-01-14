@@ -1,4 +1,7 @@
 defmodule Beaver.MLIR.Pass do
+  @moduledoc """
+  This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
+  """
   require Beaver.MLIR.CAPI
   alias Beaver.MLIR
   alias MLIR.CAPI

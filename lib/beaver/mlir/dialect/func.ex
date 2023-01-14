@@ -1,4 +1,7 @@
 defmodule Beaver.MLIR.Dialect.Func do
+  @moduledoc """
+  This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect.
+  """
   use Beaver.MLIR.Dialect,
     dialect: "func",
     ops: Beaver.MLIR.Dialect.Registry.ops("func")

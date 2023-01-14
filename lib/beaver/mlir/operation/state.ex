@@ -1,4 +1,5 @@
 defmodule Beaver.MLIR.Operation.State do
+  @moduledoc false
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
   require Beaver.MLIR.CAPI
