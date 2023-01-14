@@ -20,27 +20,25 @@ defmodule Beaver.MLIR.Dialect.Arith do
     evaluator.(@constant, ssa)
   end
 
-  def cmp_f_predicate(type) do
-    i =
-      case type do
-        false -> 0
-        :oeq -> 1
-        :ogt -> 2
-        :oge -> 3
-        :olt -> 4
-        :ole -> 5
-        :one -> 6
-        :ord -> 7
-        :ueq -> 8
-        :ugt -> 9
-        :uge -> 1
-        :ult -> 1
-        :ule -> 1
-        :une -> 1
-        :uno -> 1
-        true -> 15
-      end
+  defp type_to_magic_num(false), do: 0
+  defp type_to_magic_num(:oeq), do: 1
+  defp type_to_magic_num(:ogt), do: 2
+  defp type_to_magic_num(:oge), do: 3
+  defp type_to_magic_num(:olt), do: 4
+  defp type_to_magic_num(:ole), do: 5
+  defp type_to_magic_num(:one), do: 6
+  defp type_to_magic_num(:ord), do: 7
+  defp type_to_magic_num(:ueq), do: 8
+  defp type_to_magic_num(:ugt), do: 9
+  defp type_to_magic_num(:uge), do: 10
+  defp type_to_magic_num(:ult), do: 11
+  defp type_to_magic_num(:ule), do: 12
+  defp type_to_magic_num(:une), do: 13
+  defp type_to_magic_num(:uno), do: 14
+  defp type_to_magic_num(true), do: 15
 
+  def cmp_f_predicate(type) do
+    i = type_to_magic_num(type)
     MLIR.Attribute.integer(MLIR.Type.i64(), i)
   end
 end
