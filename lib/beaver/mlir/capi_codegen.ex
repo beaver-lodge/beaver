@@ -265,27 +265,25 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
 
   defp rewrite_module_name({:ok, %{module_name: module_name} = type}) do
     new_name =
-      if(
-        module_name in [
-          Beaver.MLIR.CAPI.OpaquePtr,
-          Beaver.MLIR.CAPI.OpaqueArray,
-          Beaver.MLIR.CAPI.Bool,
-          Beaver.MLIR.CAPI.CInt,
-          Beaver.MLIR.CAPI.CUInt,
-          Beaver.MLIR.CAPI.F32,
-          Beaver.MLIR.CAPI.F64,
-          Beaver.MLIR.CAPI.I16,
-          Beaver.MLIR.CAPI.I32,
-          Beaver.MLIR.CAPI.I64,
-          Beaver.MLIR.CAPI.I8,
-          Beaver.MLIR.CAPI.ISize,
-          Beaver.MLIR.CAPI.U16,
-          Beaver.MLIR.CAPI.U32,
-          Beaver.MLIR.CAPI.U64,
-          Beaver.MLIR.CAPI.U8,
-          Beaver.MLIR.CAPI.USize
-        ]
-      ) do
+      if module_name in [
+           Beaver.MLIR.CAPI.OpaquePtr,
+           Beaver.MLIR.CAPI.OpaqueArray,
+           Beaver.MLIR.CAPI.Bool,
+           Beaver.MLIR.CAPI.CInt,
+           Beaver.MLIR.CAPI.CUInt,
+           Beaver.MLIR.CAPI.F32,
+           Beaver.MLIR.CAPI.F64,
+           Beaver.MLIR.CAPI.I16,
+           Beaver.MLIR.CAPI.I32,
+           Beaver.MLIR.CAPI.I64,
+           Beaver.MLIR.CAPI.I8,
+           Beaver.MLIR.CAPI.ISize,
+           Beaver.MLIR.CAPI.U16,
+           Beaver.MLIR.CAPI.U32,
+           Beaver.MLIR.CAPI.U64,
+           Beaver.MLIR.CAPI.U8,
+           Beaver.MLIR.CAPI.USize
+         ] do
         base = module_name |> Module.split() |> List.last()
         Module.concat(Beaver.Native, base)
       else

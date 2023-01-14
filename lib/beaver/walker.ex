@@ -77,38 +77,36 @@ defmodule Beaver.Walker do
     raise "not a legal 2-level structure could be walked in MLIR: #{inspect(container_module)}(#{inspect(element_module)})"
   end
 
-  @doc """
-  Extract a container could be traversed by walker from an `Beaver.MLIR.Operation` or a `Beaver.MLIR.Module`.
-  """
-  def container(module = %Module{}) do
+  # Extract a container could be traversed by walker from an `Beaver.MLIR.Operation` or a `Beaver.MLIR.Module`.
+  defp extract_container(%Module{} = module) do
     Operation.from_module(module)
   end
 
-  def container(%{
-        operands: %Beaver.Walker{container: container},
-        attributes: %Beaver.Walker{container: container},
-        results: %Beaver.Walker{container: container},
-        successors: %Beaver.Walker{container: container},
-        regions: %Beaver.Walker{container: container}
-      }) do
+  defp extract_container(%{
+         operands: %Beaver.Walker{container: container},
+         attributes: %Beaver.Walker{container: container},
+         results: %Beaver.Walker{container: container},
+         successors: %Beaver.Walker{container: container},
+         regions: %Beaver.Walker{container: container}
+       }) do
     container
   end
 
-  def container(container) do
+  defp extract_container(container) do
     container
   end
 
-  def new(
-        container,
-        element_module,
-        get_num: get_num,
-        get_element: get_element,
-        element_equal: element_equal
-      )
-      when is_function(get_num, 1) and
-             is_function(get_element, 2) and
-             is_function(element_equal, 2) do
-    container = %container_module{} = container(container)
+  defp new(
+         container,
+         element_module,
+         get_num: get_num,
+         get_element: get_element,
+         element_equal: element_equal
+       )
+       when is_function(get_num, 1) and
+              is_function(get_element, 2) and
+              is_function(element_equal, 2) do
+    container = %container_module{} = extract_container(container)
     verify_nesting!(container_module, element_module)
 
     %__MODULE__{
@@ -120,19 +118,19 @@ defmodule Beaver.Walker do
     }
   end
 
-  def new(
-        container,
-        element_module,
-        get_first: get_first,
-        get_next: get_next,
-        get_parent: get_parent,
-        is_null: is_null
-      )
-      when is_function(get_first, 1) and
-             is_function(get_next, 1) and
-             is_function(get_parent, 1) and
-             is_function(is_null, 1) do
-    container = %container_module{} = container(container)
+  defp new(
+         container,
+         element_module,
+         get_first: get_first,
+         get_next: get_next,
+         get_parent: get_parent,
+         is_null: is_null
+       )
+       when is_function(get_first, 1) and
+              is_function(get_next, 1) and
+              is_function(get_parent, 1) and
+              is_function(is_null, 1) do
+    container = %container_module{} = extract_container(container)
     verify_nesting!(container_module, element_module)
 
     %__MODULE__{
@@ -146,6 +144,9 @@ defmodule Beaver.Walker do
   end
 
   @spec operands(operation()) :: Enumerable.t()
+  @doc """
+  Returns an enumerable of the operands of an `operation()`.
+  """
   def operands(%OpReplacement{operands: operands}) do
     operands
   end
@@ -161,6 +162,9 @@ defmodule Beaver.Walker do
   end
 
   @spec results(operation()) :: Enumerable.t()
+  @doc """
+  Returns an enumerable of the results of an `operation()`.
+  """
   def results(%OpReplacement{results: results}) do
     results
   end
@@ -176,6 +180,9 @@ defmodule Beaver.Walker do
   end
 
   @spec regions(operation()) :: Enumerable.t()
+  @doc """
+  Returns an enumerable of the regions of an `operation()`.
+  """
   def regions(%OpReplacement{regions: regions}) do
     regions
   end
@@ -191,6 +198,9 @@ defmodule Beaver.Walker do
   end
 
   @spec successors(operation()) :: Enumerable.t()
+  @doc """
+  Returns an enumerable of the successor blocks of an `operation()`.
+  """
   def successors(%OpReplacement{successors: successors}) do
     successors
   end
@@ -206,6 +216,9 @@ defmodule Beaver.Walker do
   end
 
   @spec attributes(operation()) :: Enumerable.t()
+  @doc """
+  Returns an enumerable of the attributes of an `operation()`.
+  """
   def attributes(%OpReplacement{attributes: attributes}) do
     attributes
   end
@@ -225,6 +238,9 @@ defmodule Beaver.Walker do
     )
   end
 
+  @doc """
+  Returns an enumerable of the arguments of an `Block.t()`
+  """
   @spec arguments(Block.t()) :: Enumerable.t()
   def arguments(%Block{} = block) do
     new(
@@ -237,6 +253,9 @@ defmodule Beaver.Walker do
   end
 
   @spec operations(Block.t()) :: Enumerable.t()
+  @doc """
+  Returns an enumerable of the operations of an `Block.t()`
+  """
   def operations(%Block{} = block) do
     new(
       block,
@@ -249,6 +268,9 @@ defmodule Beaver.Walker do
   end
 
   @spec blocks(Region.t()) :: Enumerable.t()
+  @doc """
+  Returns an enumerable of the blocks of an `Region.t()`
+  """
   def blocks(%Region{} = region) do
     new(
       region,
@@ -261,6 +283,9 @@ defmodule Beaver.Walker do
   end
 
   @spec uses(Value.t()) :: Enumerable.t()
+  @doc """
+  Returns an enumerable of the uses of an `Value.t()`
+  """
   def uses(%Value{} = value) do
     new(
       value,
@@ -274,7 +299,7 @@ defmodule Beaver.Walker do
 
   @behaviour Access
   @impl true
-  def fetch(%__MODULE{element_module: Value} = walker, key) when is_integer(key) do
+  def fetch(%__MODULE__{element_module: Value} = walker, key) when is_integer(key) do
     with %Value{} = value <- Enum.at(walker, key) do
       {:ok, value}
     else
@@ -282,7 +307,7 @@ defmodule Beaver.Walker do
     end
   end
 
-  def fetch(%__MODULE{element_module: NamedAttribute} = walker, key) when is_binary(key) do
+  def fetch(%__MODULE__{element_module: NamedAttribute} = walker, key) when is_binary(key) do
     found =
       walker
       |> Enum.find(fn named_attribute ->
@@ -290,7 +315,7 @@ defmodule Beaver.Walker do
                named_attribute
                |> MLIR.CAPI.beaverMlirNamedAttributeGetName()
                |> MLIR.CAPI.mlirIdentifierStr()
-               |> MLIR.StringRef.extract() do
+               |> MLIR.StringRef.to_string() do
           name == key
         end
       end)
@@ -302,7 +327,7 @@ defmodule Beaver.Walker do
     end
   end
 
-  def fetch(%__MODULE{element_module: {Identifier, Attribute}} = walker, key)
+  def fetch(%__MODULE__{element_module: {Identifier, Attribute}} = walker, key)
       when is_binary(key) do
     found =
       walker
@@ -310,7 +335,7 @@ defmodule Beaver.Walker do
         with name_str <-
                name
                |> MLIR.CAPI.mlirIdentifierStr()
-               |> MLIR.StringRef.extract() do
+               |> MLIR.StringRef.to_string() do
           name_str == key
         end
       end)
@@ -339,7 +364,7 @@ defmodule Beaver.Walker do
   You might expect this function works like `Macro.traverse/4`.
   ### More on manipulating the IR
   During the traversal, there are generally two choices to manipulate the IR:
-  - Use a pattern defined by macro `Beaver.Pattern.defpat/2` to have the PDL interpreter transform the IR for you.
+  - Use a pattern defined by macro `Beaver.DSL.Pattern.defpat/2` to have the PDL interpreter transform the IR for you.
   You can use both if it is proper to do so.
   - Use `Beaver.Walker.replace/2` to replace the operation and return a walker as placeholder if is replaced by value.
   It could be mind-boggling to think the IR is mutable but not an issue if your approach is very functional. Inappropriate mutation might cause crash or bugs if somewhere else is keeping a reference of the replace op.
@@ -356,7 +381,7 @@ defmodule Beaver.Walker do
         ) ::
           {mlir(), any()}
   def traverse(mlir, acc, pre, post) when is_function(pre, 2) and is_function(post, 2) do
-    mlir = Beaver.Walker.container(mlir)
+    mlir = extract_container(mlir)
     do_traverse(mlir, acc, pre, post)
   end
 
@@ -504,7 +529,7 @@ defmodule Beaver.Walker do
   def replace(%Operation{} = op, %Value{} = value) do
     with results <- results(op),
          1 <- Enum.count(results),
-         %Value{} = result = results[0] do
+         result = %Value{} <- results[0] do
       for %Beaver.MLIR.CAPI.MlirOperand{} = operand <- uses(result) do
         op = CAPI.beaverOperandGetOwner(operand)
         pos = CAPI.beaverOperandGetNumber(operand)

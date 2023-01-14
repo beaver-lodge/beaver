@@ -28,16 +28,16 @@ defmodule Beaver.MLIR.Pass.Composer.Generator do
             arg_name =
               pass
               |> CAPI.beaverPassGetArgument()
-              |> MLIR.StringRef.extract()
+              |> MLIR.StringRef.to_string()
 
             pass_name =
               pass
               |> CAPI.beaverPassGetName()
-              |> MLIR.StringRef.extract()
+              |> MLIR.StringRef.to_string()
 
             normalized_name = MLIR.Pass.Composer.Generator.normalized_name(arg_name)
 
-            doc = pass |> CAPI.beaverPassGetDescription() |> MLIR.StringRef.extract()
+            doc = pass |> CAPI.beaverPassGetDescription() |> MLIR.StringRef.to_string()
 
             @doc """
             #{doc}

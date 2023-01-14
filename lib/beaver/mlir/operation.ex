@@ -138,10 +138,10 @@ defmodule Beaver.MLIR.Operation do
   def name(%MLIR.Operation{} = operation) do
     MLIR.CAPI.mlirOperationGetName(operation)
     |> MLIR.CAPI.mlirIdentifierStr()
-    |> MLIR.StringRef.extract()
+    |> MLIR.StringRef.to_string()
   end
 
-  def from_module(module = %MLIR.Module{}) do
+  def from_module(%MLIR.Module{} = module) do
     CAPI.mlirModuleGetOperation(module)
   end
 

@@ -23,12 +23,12 @@ defmodule Beaver.MLIR.Pass.Composer do
     |> append(pass)
   end
 
-  def append(composer = %__MODULE__{passes: passes}, {name, f})
+  def append(%__MODULE__{passes: passes} = composer, {name, f})
       when is_function(f) do
     %__MODULE__{composer | passes: passes ++ [{name, f}]}
   end
 
-  def append(composer = %__MODULE__{passes: passes}, pass) do
+  def append(%__MODULE__{passes: passes} = composer, pass) do
     %__MODULE__{composer | passes: passes ++ [pass]}
   end
 
