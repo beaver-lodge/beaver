@@ -227,7 +227,6 @@ defmodule Beaver.DSL.Pattern do
   @doc """
   Evaluate SSA as ops in a rewrite block. Note that function is only public so that it could be used in a AST.
   """
-  # TODO: change it to result types
   def eval_rewrite(
         op_name,
         %Beaver.DSL.SSA{

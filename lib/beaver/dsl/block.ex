@@ -23,11 +23,23 @@ defmodule Beaver.DSL.Block do
       end
 
     # to be spliced into a list, and then as argument for Beaver.MLIR.Block.create/2
-    # TODO: use arg's location
+
     locations_var_ast =
-      for _ <- args do
-        quote do
-          Beaver.MLIR.Location.unknown()
+      for a <- args do
+        case a do
+          {{_, [line: _] = line, _}, _type} ->
+            quote do
+              Beaver.MLIR.Location.file(
+                name: __ENV__.file,
+                line: Keyword.get(unquote(line), :line),
+                ctx: Beaver.MLIR.__CONTEXT__()
+              )
+            end
+
+          _ ->
+            quote do
+              Beaver.MLIR.Location.unknown()
+            end
         end
       end
 
