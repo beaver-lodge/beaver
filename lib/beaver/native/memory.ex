@@ -1,4 +1,6 @@
 defmodule Beaver.Native.Memory do
+  alias Beaver.Native
+
   @moduledoc """
   A piece of memory managed by BEAM and can by addressed by a generated native function as MLIR MemRef descriptor
   """
@@ -35,16 +37,16 @@ defmodule Beaver.Native.Memory do
     infer_dense_strides(shape, [])
   end
 
-  defp pair_to_mod({:u, 8}), do: Beaver.Native.U8
-  defp pair_to_mod({:u, 16}), do: Beaver.Native.U16
-  defp pair_to_mod({:u, 32}), do: Beaver.Native.U32
-  defp pair_to_mod({:u, 64}), do: Beaver.Native.U64
-  defp pair_to_mod({:s, 8}), do: Beaver.Native.I8
-  defp pair_to_mod({:s, 16}), do: Beaver.Native.I16
-  defp pair_to_mod({:s, 32}), do: Beaver.Native.I32
-  defp pair_to_mod({:s, 64}), do: Beaver.Native.I64
-  defp pair_to_mod({:f, 32}), do: Beaver.Native.F32
-  defp pair_to_mod({:c, 64}), do: Beaver.Native.Complex.F32
+  defp pair_to_mod({:u, 8}), do: Native.U8
+  defp pair_to_mod({:u, 16}), do: Native.U16
+  defp pair_to_mod({:u, 32}), do: Native.U32
+  defp pair_to_mod({:u, 64}), do: Native.U64
+  defp pair_to_mod({:s, 8}), do: Native.I8
+  defp pair_to_mod({:s, 16}), do: Native.I16
+  defp pair_to_mod({:s, 32}), do: Native.I32
+  defp pair_to_mod({:s, 64}), do: Native.I64
+  defp pair_to_mod({:f, 32}), do: Native.F32
+  defp pair_to_mod({:c, 64}), do: Native.Complex.F32
   defp pair_to_mod(mod) when is_atom(mod), do: mod
 
   defp extract_mod_from_opts(opts) do
@@ -59,13 +61,13 @@ defmodule Beaver.Native.Memory do
 
     array =
       if data do
-        Beaver.Native.array(data, mod, mut: true)
+        Native.array(data, mod, mut: true)
       end
 
     new(array, opts)
   end
 
-  def new(%Beaver.Native.Array{ref: ref, element_kind: mod} = array, opts) do
+  def new(%Native.Array{ref: ref, element_kind: mod} = array, opts) do
     offset = Keyword.get(opts, :offset, 0)
     sizes = Keyword.fetch!(opts, :sizes)
 
@@ -122,12 +124,12 @@ defmodule Beaver.Native.Memory do
         storage: storage
       }) do
     ptr =
-      struct!(Beaver.Native.OpaquePtr,
-        ref: Beaver.Native.forward(descriptor_kind, :aligned, [descriptor_ref])
+      struct!(Native.OpaquePtr,
+        ref: Native.forward(descriptor_kind, :aligned, [descriptor_ref])
       )
 
     if storage do
-      ptr |> Beaver.Native.bag(storage)
+      ptr |> Native.bag(storage)
     else
       ptr
     end
@@ -138,12 +140,12 @@ defmodule Beaver.Native.Memory do
         storage: storage
       }) do
     ptr =
-      struct!(Beaver.Native.OpaquePtr,
-        ref: Beaver.Native.forward(descriptor_kind, :allocated, [descriptor_ref])
+      struct!(Native.OpaquePtr,
+        ref: Native.forward(descriptor_kind, :allocated, [descriptor_ref])
       )
 
     if storage do
-      ptr |> Beaver.Native.bag(storage)
+      ptr |> Native.bag(storage)
     else
       ptr
     end
@@ -157,16 +159,16 @@ defmodule Beaver.Native.Memory do
         descriptor: %__MODULE__.Descriptor{ref: descriptor_ref, descriptor_kind: descriptor_kind},
         storage: storage
       }) do
-    struct!(Beaver.Native.OpaquePtr,
-      ref: Beaver.Native.forward(descriptor_kind, :opaque_ptr, [descriptor_ref])
+    struct!(Native.OpaquePtr,
+      ref: Native.forward(descriptor_kind, :opaque_ptr, [descriptor_ref])
     )
-    |> Beaver.Native.bag(storage)
+    |> Native.bag(storage)
   end
 
   # if this is an array, this should be packed memory descriptors for tuple
-  def descriptor_ptr(%Beaver.Native.Array{ref: ref, element_kind: element_kind} = array) do
-    ref = Beaver.Native.forward(element_kind, :ptr_to_opaque, [ref])
-    struct!(Beaver.Native.OpaquePtr, ref: ref) |> Beaver.Native.bag(array)
+  def descriptor_ptr(%Native.Array{ref: ref, element_kind: element_kind} = array) do
+    ref = Native.forward(element_kind, :ptr_to_opaque, [ref])
+    struct!(Native.OpaquePtr, ref: ref) |> Native.bag(array)
   end
 
   @doc """
@@ -180,7 +182,7 @@ defmodule Beaver.Native.Memory do
     owner =
       m
       |> allocated
-      |> Beaver.Native.PtrOwner.new()
+      |> Native.PtrOwner.new()
 
     %{m | storage: owner}
   end
