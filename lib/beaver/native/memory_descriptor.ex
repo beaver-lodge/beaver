@@ -17,21 +17,21 @@ defmodule Beaver.Native.Memory.Descriptor do
     }
   end
 
-  def aligned(%__MODULE__{ref: ref, descriptor_kind: descriptor_kind}) do
+  defp call_ptr_func(%__MODULE__{ref: ref, descriptor_kind: k}, func) do
     struct!(Native.OpaquePtr,
-      ref: Native.forward(descriptor_kind, :aligned, [ref])
+      ref: Native.forward(k, func, [ref])
     )
   end
 
-  def allocated(%__MODULE__{ref: ref, descriptor_kind: descriptor_kind}) do
-    struct!(Native.OpaquePtr,
-      ref: Native.forward(descriptor_kind, :allocated, [ref])
-    )
+  def aligned(d) do
+    call_ptr_func(d, :aligned)
   end
 
-  def opaque_ptr(%__MODULE__{ref: ref, descriptor_kind: descriptor_kind}) do
-    struct!(Native.OpaquePtr,
-      ref: Native.forward(descriptor_kind, :opaque_ptr, [ref])
-    )
+  def allocated(d) do
+    call_ptr_func(d, :allocated)
+  end
+
+  def opaque_ptr(d) do
+    call_ptr_func(d, :opaque_ptr)
   end
 end
