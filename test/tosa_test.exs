@@ -145,6 +145,7 @@ defmodule TosaTest do
       #  TODO: deallocate with the memref descriptor returned
     end
 
+    return.descriptor |> Beaver.Native.Memory.Descriptor.dump()
     Beaver.Native.Memory.descriptor_ptr(return) |> Beaver.Native.dump()
   end
 end

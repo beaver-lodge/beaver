@@ -34,4 +34,8 @@ defmodule Beaver.Native.Memory.Descriptor do
   def opaque_ptr(d) do
     call_ptr_func(d, :opaque_ptr)
   end
+
+  def dump(%__MODULE__{ref: ref, descriptor_kind: k}) do
+    Native.forward(k, :dump, [ref])
+  end
 end
