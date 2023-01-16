@@ -14,38 +14,17 @@ defmodule Beaver.MLIR.Pass do
 
   defmacro __using__(opts) do
     require Beaver.MLIR.CAPI
-    alias Beaver.MLIR.Pass.Composer
 
     quote do
-      require Logger
       @behaviour MLIR.Pass
-
-      def create() do
-        op_name = Keyword.get(unquote(opts), :on, "builtin.module")
-
-        MLIR.ExternalPass.create(
-          __MODULE__,
-          op_name
-        )
-      end
-
-      def delay(%Composer{} = composer_or_op) do
-        external_pass = create()
-        Composer.add(composer_or_op, external_pass)
-      end
-
-      def delay(%Beaver.MLIR.Operation{} = composer_or_op) do
-        composer = %Composer{op: composer_or_op, passes: []}
-        delay(composer)
-      end
-
-      def delay(%Beaver.MLIR.Module{} = composer_or_op) do
-        composer = %Composer{op: composer_or_op, passes: []}
-        delay(composer)
-      end
+      Module.register_attribute(__MODULE__, :root_op, persist: true, accumulate: false)
+      @root_op Keyword.get(unquote(opts), :on, "builtin.module")
     end
   end
 
+  @doc """
+  Parse the string as pass pipeline and add to pass manager
+  """
   def pipeline!(%MLIR.CAPI.MlirOpPassManager{} = pm, pipeline_str) when is_binary(pipeline_str) do
     status = CAPI.mlirParsePassPipeline(pm, MLIR.StringRef.create(pipeline_str))
 

@@ -88,7 +88,7 @@ defmodule RedundantTransposeTest do
     ir_string =
       ir
       |> MLIR.Pass.Composer.nested("func.func", [
-        DeduplicateTransposePass.create()
+        DeduplicateTransposePass
       ])
       |> canonicalize
       |> MLIR.Pass.Composer.run!()

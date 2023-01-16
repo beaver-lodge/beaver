@@ -371,7 +371,7 @@ defmodule PDLTest do
       }
       """.(ctx)
       |> MLIR.Pass.Composer.nested("func.func", [
-        ToyPass.create()
+        ToyPass
       ])
       |> canonicalize
       |> MLIR.Pass.Composer.run!()

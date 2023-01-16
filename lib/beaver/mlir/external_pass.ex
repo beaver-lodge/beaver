@@ -1,25 +1,23 @@
 defmodule Beaver.MLIR.ExternalPass do
   @moduledoc false
-  @doc """
-  Lower level API to work with MLIR's external pass (pass defined in C). Use Beaver.MLIR.Pass for idiomatic Erlang behavior.
-  """
+  # Lower level API to work with MLIR's external pass (pass defined in C). Use Beaver.MLIR.Pass for idiomatic Erlang behavior.
   defstruct external: nil
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
   require Beaver.MLIR.CAPI
 
-  @doc """
-  Create a pass by passing a callback module
-  """
-  def create(pass_module, op_name \\ "") do
-    description = MLIR.StringRef.create("beaver generated pass of #{pass_module}")
-    op_name = op_name |> MLIR.StringRef.create()
-    name = Atom.to_string(pass_module) |> MLIR.StringRef.create()
+  defp op_name_from_persistent_attributes(pass_module) do
+    op_name = pass_module.__info__(:attributes)[:root_op] || []
+    op_name = op_name |> List.first()
+    op_name || "builtin.module"
+  end
 
-    argument =
-      Module.split(pass_module) |> List.last() |> Macro.underscore() |> MLIR.StringRef.create()
-
-    {:ok, pid} = GenServer.start_link(MLIR.Pass.Server, pass_module: pass_module)
+  defp do_create(name, description, op, run) do
+    {:ok, pid} = GenServer.start_link(MLIR.Pass.Server, run: run)
+    description = description |> MLIR.StringRef.create()
+    op_name = op |> MLIR.StringRef.create()
+    name = name |> MLIR.StringRef.create()
+    argument = name
 
     ref =
       CAPI.beaver_raw_create_mlir_pass(
@@ -32,5 +30,21 @@ defmodule Beaver.MLIR.ExternalPass do
       |> Beaver.Native.check!()
 
     %MLIR.Pass{ref: ref, handler: pid}
+  end
+
+  @doc """
+  Create a pass by passing a callback module
+  """
+
+  def create({name, op, run}) when is_bitstring(op) and is_function(run) do
+    description = "beaver generated pass of #{Function.info(run) |> inspect}"
+    do_create(name, description, op, run)
+  end
+
+  def create(pass_module) when is_atom(pass_module) do
+    description = "beaver generated pass of #{pass_module}"
+    op_name = op_name_from_persistent_attributes(pass_module)
+    name = Atom.to_string(pass_module)
+    do_create(name, description, op_name, &pass_module.run/1)
   end
 end
