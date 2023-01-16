@@ -52,4 +52,14 @@ defmodule Beaver.Native.Memory.Descriptor do
         Native.forward(k, :sizes, [ref])
     end
   end
+
+  def strides(%__MODULE__{ref: ref, descriptor_kind: k}) do
+    case Module.split(k) |> List.last() do
+      "DescriptorUnranked" ->
+        nil
+
+      _ ->
+        Native.forward(k, :strides, [ref])
+    end
+  end
 end

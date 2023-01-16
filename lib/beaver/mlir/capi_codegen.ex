@@ -312,7 +312,8 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
       aligned: 1,
       allocated: 1,
       offset: 1,
-      sizes: 1
+      sizes: 1,
+      strides: 1
     ]
   end
 

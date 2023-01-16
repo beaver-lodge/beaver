@@ -14,7 +14,7 @@ defmodule MemRefDescriptorTest do
 
     assert t.descriptor |> Native.Memory.Descriptor.offset() == 0
     assert t.descriptor |> Native.Memory.Descriptor.sizes() == sizes
-    #  TODO: check strides
+    assert t.descriptor |> Native.Memory.Descriptor.strides() == [2, 1]
 
     assert t
            |> Native.Memory.aligned()
