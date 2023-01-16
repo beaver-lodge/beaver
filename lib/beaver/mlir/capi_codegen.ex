@@ -293,17 +293,27 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
     {:ok,
      %{
        type
-       | module_name: new_name,
-         kind_functions: memref_kind_functions()
+       | module_name: new_name
      }}
   end
 
-  defp memref_kind_functions() do
+  defp memref_kind_functions(DescriptorUnranked) do
     [
       make: 5,
       aligned: 1,
       allocated: 1,
       offset: 1
+    ]
+  end
+
+  defp memref_kind_functions(_) do
+    [
+      make: 5,
+      aligned: 1,
+      allocated: 1,
+      offset: 1,
+      sizes: 1,
+      strides: 1
     ]
   end
 
@@ -334,7 +344,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
           t <- [Complex.F32, U8, U16, U32, I8, I16, I32, I64, F32, F64] do
         %KindDecl{
           module_name: Module.concat([Beaver.Native, t, MemRef, rank]),
-          kind_functions: memref_kind_functions()
+          kind_functions: memref_kind_functions(rank)
         }
       end
 
@@ -343,8 +353,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
         module_name: Beaver.Native.PtrOwner
       },
       %KindDecl{
-        module_name: Beaver.Native.Complex.F32,
-        kind_functions: memref_kind_functions()
+        module_name: Beaver.Native.Complex.F32
       }
     ] ++ mem_ref_descriptor_kinds
   end
