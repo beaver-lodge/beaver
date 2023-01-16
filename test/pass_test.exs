@@ -46,7 +46,7 @@ defmodule PassTest do
     end
   end
 
-  test "print IR in run/1", context do
+  test "pass of anonymous function", context do
     ir = example_ir(context)
 
     ir
