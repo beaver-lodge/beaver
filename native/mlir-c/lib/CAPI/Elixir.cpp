@@ -267,26 +267,6 @@ MlirAttribute beaverMlirNamedAttributeGetAttribute(MlirNamedAttribute na) {
   return na.attribute;
 }
 
-MLIR_CAPI_EXPORTED
-void beaverOperationStateAddAttributes(MlirContext context,
-                                       MlirOperationState *state, intptr_t n,
-                                       MlirStringRef const *names,
-                                       MlirAttribute const *attributes) {
-  if (state->nAttributes != 0 || state->attributes != nullptr) {
-    llvm::errs() << "attributes already set/n";
-    exit(1);
-  }
-
-  MlirNamedAttribute na_arr[n];
-  for (intptr_t i = 0; i < n; ++i) {
-    auto attr = unwrap(attributes[i]);
-    auto name = mlirIdentifierGet(context, names[i]);
-    auto na = MlirNamedAttribute{name, wrap(attr)};
-    na_arr[i] = na;
-  }
-  mlirOperationStateAddAttributes(state, n, na_arr);
-}
-
 MLIR_CAPI_EXPORTED MlirPass beaverCreateExternalPass(
     void (*construct)(void *userData), MlirTypeID passID, MlirStringRef name,
     MlirStringRef argument, MlirStringRef description, MlirStringRef opName,
