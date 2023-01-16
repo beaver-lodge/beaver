@@ -545,7 +545,22 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
         fn get_offset(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
             return MemRefDescriptorAccessor(@This()).offset(env, args[0]);
         }
-        pub const nifs = .{ e.ErlNifFunc{ .name = module_name ++ ".allocated", .arity = 1, .fptr = allocated_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".aligned", .arity = 1, .fptr = aligned_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".offset", .arity = 1, .fptr = get_offset, .flags = 1 } };
+        fn get_sizes(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            comptime var rank = N;
+            var descriptor: @This() = beam.fetch_resource(@This(), env, @This().resource_type, args[0]) catch
+                return beam.make_error_binary(env, "fail to fetch resource for descriptor, expected: " ++ @typeName(@This()));
+            var ret: []beam.term = beam.allocator.alloc(beam.term, @intCast(usize, rank)) catch
+                return beam.make_error_binary(env, "fail to allocate");
+            defer beam.allocator.free(ret);
+            var i: usize = 0;
+            while (i < rank) : ({
+                i += 1;
+            }) {
+                ret[@intCast(usize, i)] = beam.make_i64(env, descriptor.sizes[i]);
+            }
+            return beam.make_term_list(env, ret);
+        }
+        pub const nifs = .{ e.ErlNifFunc{ .name = module_name ++ ".allocated", .arity = 1, .fptr = allocated_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".aligned", .arity = 1, .fptr = aligned_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".offset", .arity = 1, .fptr = get_offset, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".sizes", .arity = 1, .fptr = get_sizes, .flags = 1 } };
     };
 }
 

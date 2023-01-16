@@ -1,21 +1,24 @@
 defmodule MemRefDescriptorTest do
   use ExUnit.Case
+  alias Beaver.Native
 
   test "test memref descriptor" do
+    sizes = [2, 2]
+
     t =
-      Beaver.Native.Memory.new(
+      Native.Memory.new(
         [1, 2, 3, 4],
-        sizes: [2, 2],
-        type: Beaver.Native.I32
+        sizes: sizes,
+        type: Native.I32
       )
 
-    #  TODO: check offset
-    #  TODO: check shape
+    assert t.descriptor |> Native.Memory.Descriptor.offset() == 0
+    assert t.descriptor |> Native.Memory.Descriptor.sizes() == sizes
     #  TODO: check strides
 
     assert t
-           |> Beaver.Native.Memory.aligned()
-           |> Beaver.Native.OpaquePtr.to_binary(Integer.floor_div(32 * 4, 8)) ==
+           |> Native.Memory.aligned()
+           |> Native.OpaquePtr.to_binary(Integer.floor_div(32 * 4, 8)) ==
              <<1, 0, 0, 0, 2, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0>>
   end
 end

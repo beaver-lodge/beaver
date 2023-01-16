@@ -42,4 +42,14 @@ defmodule Beaver.Native.Memory.Descriptor do
   def offset(%__MODULE__{ref: ref, descriptor_kind: k}) do
     Native.forward(k, :offset, [ref])
   end
+
+  def sizes(%__MODULE__{ref: ref, descriptor_kind: k}) do
+    case Module.split(k) |> List.last() do
+      "DescriptorUnranked" ->
+        nil
+
+      _ ->
+        Native.forward(k, :sizes, [ref])
+    end
+  end
 end
