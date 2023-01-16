@@ -52,17 +52,19 @@ defmodule Beaver.MLIR.Operation.State do
           raise "attribute can't be null, #{inspect({k, v})}"
         end
 
-        attr
+        CAPI.mlirNamedAttributeGet(
+          CAPI.mlirIdentifierGet(
+            ctx,
+            MLIR.StringRef.create(Atom.to_string(k))
+          ),
+          attr
+        )
       end
 
-    name_list = Enum.map(attr_kw, fn {k, _} -> Atom.to_string(k) |> MLIR.StringRef.create() end)
-
-    CAPI.beaverOperationStateAddAttributes(
-      ctx,
+    CAPI.mlirOperationStateAddAttributes(
       Beaver.Native.ptr(state),
-      length(attr_kw),
-      Beaver.Native.array(name_list, MLIR.StringRef),
-      Beaver.Native.array(attr_list, MLIR.Attribute)
+      length(attr_list),
+      Beaver.Native.array(attr_list, MLIR.NamedAttribute)
     )
 
     state
