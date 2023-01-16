@@ -144,8 +144,6 @@ defmodule TosaTest do
                9.680000305175781,
                12.100000381469727
              ]
-
-      #  TODO: deallocate with the memref descriptor returned
     end
 
     return.descriptor |> Native.Memory.Descriptor.dump()
