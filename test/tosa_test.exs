@@ -3,6 +3,7 @@ defmodule TosaTest do
   use Beaver
   alias Beaver.MLIR.Dialect.{Func, TOSA}
   require Func
+  alias Beaver.Native
 
   test "generate and run tosa", context do
     import MLIR.{Transforms, Conversion}
@@ -64,17 +65,17 @@ defmodule TosaTest do
     jit = ir |> MLIR.ExecutionEngine.create!()
 
     arg0 =
-      Beaver.Native.Memory.new(
+      Native.Memory.new(
         [1.1, 2.2, 3.3],
-        type: Beaver.Native.F32,
+        type: Native.F32,
         sizes: [1, 3],
         strides: [0, 0]
       )
 
     arg1 =
-      Beaver.Native.Memory.new(
+      Native.Memory.new(
         [1.1, 2.2],
-        type: Beaver.Native.F32,
+        type: Native.F32,
         sizes: [2, 1],
         strides: [0, 0]
       )
@@ -84,41 +85,41 @@ defmodule TosaTest do
       a1::little-float-32
     >> =
       arg1
-      |> Beaver.Native.Memory.aligned()
-      |> Beaver.Native.OpaquePtr.to_binary(Integer.floor_div(32 * 2, 8))
+      |> Native.Memory.aligned()
+      |> Native.OpaquePtr.to_binary(Integer.floor_div(32 * 2, 8))
 
     assert [a0, a1] == [1.100000023841858, 2.200000047683716]
 
     return =
-      Beaver.Native.Memory.new(
+      Native.Memory.new(
         nil,
-        type: Beaver.Native.F32,
+        type: Native.F32,
         sizes: [1, 1],
         strides: [1, 1]
       )
 
-    return.descriptor |> Beaver.Native.Memory.Descriptor.dump()
-    Beaver.Native.Memory.descriptor_ptr(return) |> Beaver.Native.dump()
+    return.descriptor |> Native.Memory.Descriptor.dump()
+    Native.Memory.descriptor_ptr(return) |> Native.dump()
 
     for _i <- 0..100 do
       # if return is a struct, it becomes first arg
       MLIR.ExecutionEngine.invoke!(
         jit,
         "test_multi_broadcast",
-        Enum.map([return, arg0, arg1], &Beaver.Native.Memory.descriptor_ptr/1)
+        Enum.map([return, arg0, arg1], &Native.Memory.descriptor_ptr/1)
       )
 
       arg0
-      |> Beaver.Native.Memory.aligned()
-      |> Beaver.Native.OpaquePtr.to_binary(Integer.floor_div(32 * 3, 8))
+      |> Native.Memory.aligned()
+      |> Native.OpaquePtr.to_binary(Integer.floor_div(32 * 3, 8))
 
       <<
         a0::little-float-32,
         a1::little-float-32
       >> =
         arg1
-        |> Beaver.Native.Memory.aligned()
-        |> Beaver.Native.OpaquePtr.to_binary(Integer.floor_div(32 * 2, 8))
+        |> Native.Memory.aligned()
+        |> Native.OpaquePtr.to_binary(Integer.floor_div(32 * 2, 8))
 
       assert [a0, a1] == [1.100000023841858, 2.200000047683716]
 
@@ -132,8 +133,8 @@ defmodule TosaTest do
       >> =
         return
         # must use aligned ptr if it is allocated by LLVM
-        |> Beaver.Native.Memory.aligned()
-        |> Beaver.Native.OpaquePtr.to_binary(Integer.floor_div(32 * 6, 8))
+        |> Native.Memory.aligned()
+        |> Native.OpaquePtr.to_binary(Integer.floor_div(32 * 6, 8))
 
       assert [x0, x1, x2, x3, x4, x5] == [
                2.4200000762939453,
@@ -147,9 +148,9 @@ defmodule TosaTest do
       #  TODO: deallocate with the memref descriptor returned
     end
 
-    return.descriptor |> Beaver.Native.Memory.Descriptor.dump()
-    Beaver.Native.Memory.descriptor_ptr(return) |> Beaver.Native.dump()
-    assert return.descriptor |> Beaver.Native.Memory.Descriptor.offset() == 0
-    Beaver.Native.Memory.own_allocated(return)
+    return.descriptor |> Native.Memory.Descriptor.dump()
+    Native.Memory.descriptor_ptr(return) |> Native.dump()
+    assert return.descriptor |> Native.Memory.Descriptor.offset() == 0
+    Native.Memory.own_allocated(return)
   end
 end
