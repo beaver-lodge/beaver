@@ -91,11 +91,14 @@ defmodule TosaTest do
 
     return =
       Beaver.Native.Memory.new(
-        [1.1, 2.2],
+        nil,
         type: Beaver.Native.F32,
-        sizes: [2, 3],
-        strides: [0, 0]
+        sizes: [1, 1],
+        strides: [1, 1]
       )
+
+    return.descriptor |> Beaver.Native.Memory.Descriptor.dump()
+    Beaver.Native.Memory.descriptor_ptr(return) |> Beaver.Native.dump()
 
     for _i <- 0..100 do
       # if return is a struct, it becomes first arg
@@ -145,7 +148,8 @@ defmodule TosaTest do
     end
 
     return.descriptor |> Beaver.Native.Memory.Descriptor.dump()
-    assert return.descriptor |> Beaver.Native.Memory.Descriptor.offset() == 0
     Beaver.Native.Memory.descriptor_ptr(return) |> Beaver.Native.dump()
+    assert return.descriptor |> Beaver.Native.Memory.Descriptor.offset() == 0
+    Beaver.Native.Memory.own_allocated(return)
   end
 end
