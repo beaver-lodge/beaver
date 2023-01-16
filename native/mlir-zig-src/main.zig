@@ -391,6 +391,11 @@ fn MemRefDescriptorAccessor(comptime MemRefT: type) type {
                 }
             }
         }
+        fn offset(env: beam.env, term: beam.term) callconv(.C) beam.term {
+            var descriptor: MemRefT = beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term) catch
+                return beam.make_error_binary(env, "fail to fetch resource for descriptor, expected: " ++ @typeName(MemRefT));
+            return beam.make_i64(env, descriptor.offset);
+        }
     };
 }
 
@@ -436,7 +441,10 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
         fn aligned_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
             return MemRefDescriptorAccessor(@This()).aligned_ptr(env, args[0]);
         }
-        pub const nifs = .{ e.ErlNifFunc{ .name = module_name ++ ".allocated", .arity = 1, .fptr = allocated_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".aligned", .arity = 1, .fptr = aligned_ptr, .flags = 1 } };
+        fn get_offset(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            return MemRefDescriptorAccessor(@This()).offset(env, args[0]);
+        }
+        pub const nifs = .{ e.ErlNifFunc{ .name = module_name ++ ".allocated", .arity = 1, .fptr = allocated_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".aligned", .arity = 1, .fptr = aligned_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".offset", .arity = 1, .fptr = get_offset, .flags = 1 } };
     };
 }
 
@@ -534,7 +542,10 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
         fn aligned_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
             return MemRefDescriptorAccessor(@This()).aligned_ptr(env, args[0]);
         }
-        pub const nifs = .{ e.ErlNifFunc{ .name = module_name ++ ".allocated", .arity = 1, .fptr = allocated_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".aligned", .arity = 1, .fptr = aligned_ptr, .flags = 1 } };
+        fn get_offset(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            return MemRefDescriptorAccessor(@This()).offset(env, args[0]);
+        }
+        pub const nifs = .{ e.ErlNifFunc{ .name = module_name ++ ".allocated", .arity = 1, .fptr = allocated_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".aligned", .arity = 1, .fptr = aligned_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".offset", .arity = 1, .fptr = get_offset, .flags = 1 } };
     };
 }
 

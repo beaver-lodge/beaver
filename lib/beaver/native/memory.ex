@@ -164,7 +164,7 @@ defmodule Beaver.Native.Memory do
   end
 
   @doc """
-  take ownership of the memory the descriptor points to
+  take ownership of the memory the descriptor's `allocated` field points to
   """
   def own_allocated(
         %__MODULE__{

@@ -302,7 +302,8 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
     [
       make: 5,
       aligned: 1,
-      allocated: 1
+      allocated: 1,
+      offset: 1
     ]
   end
 
