@@ -47,6 +47,18 @@ defmodule Beaver.MLIR.Pass.Composer do
     |> append(pipeline_str)
   end
 
+  defp create_pass(pass_module) when is_atom(pass_module) do
+    MLIR.ExternalPass.create(pass_module)
+  end
+
+  defp create_pass(%MLIR.Pass{} = pass) do
+    pass
+  end
+
+  defp create_pass({argument, op, run}) when is_bitstring(op) and is_function(run) do
+    MLIR.ExternalPass.create({argument, op, run})
+  end
+
   # nested pm
   defp add_pass(pm, {:nested, op_name, f})
        when (is_binary(op_name) or is_atom(op_name)) and is_function(f, 1) do
@@ -65,9 +77,9 @@ defmodule Beaver.MLIR.Pass.Composer do
     do: MLIR.Pass.pipeline!(pm, pipeline_str)
 
   defp add_pass(%MLIR.CAPI.MlirOpPassManager{} = pm, pass),
-    do: mlirOpPassManagerAddOwnedPass(pm, pass)
+    do: mlirOpPassManagerAddOwnedPass(pm, create_pass(pass))
 
-  defp add_pass(pm, pass), do: mlirPassManagerAddOwnedPass(pm, pass)
+  defp add_pass(pm, pass), do: mlirPassManagerAddOwnedPass(pm, create_pass(pass))
 
   def run!(
         %__MODULE__{passes: passes, op: %MLIR.Module{} = op},

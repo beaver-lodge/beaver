@@ -171,6 +171,17 @@ defmodule MlirTest do
 
   defmodule TestPass do
     @moduledoc false
+
+    def run(%Beaver.MLIR.Operation{} = op) do
+      MLIR.Operation.verify!(op)
+      :ok
+    end
+  end
+
+  defmodule TestFuncPass do
+    @moduledoc false
+    use MLIR.Pass, on: "func.func"
+
     def run(%Beaver.MLIR.Operation{} = op) do
       MLIR.Operation.verify!(op)
       :ok
@@ -182,7 +193,7 @@ defmodule MlirTest do
     module = create_adder_module(ctx)
     assert not MLIR.Module.is_null(module)
     type_id_allocator = CAPI.mlirTypeIDAllocatorCreate()
-    external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestPass, "")
+    external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestPass)
     pm = CAPI.mlirPassManagerCreate(ctx)
     CAPI.mlirPassManagerAddOwnedPass(pm, external)
     CAPI.mlirPassManagerAddOwnedPass(pm, CAPI.mlirCreateTransformsCSE())
@@ -198,7 +209,7 @@ defmodule MlirTest do
     ctx = context[:ctx]
     module = create_adder_module(ctx)
     assert not MLIR.Module.is_null(module)
-    external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestPass, "func.func")
+    external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestFuncPass)
     pm = CAPI.mlirPassManagerCreate(ctx)
     npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
     CAPI.mlirOpPassManagerAddOwnedPass(npm, external)
@@ -212,7 +223,7 @@ defmodule MlirTest do
     ctx = context[:ctx]
     module = create_redundant_transpose_module(ctx)
     assert not MLIR.Module.is_null(module)
-    external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestPass, "func.func")
+    external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestFuncPass)
     pm = CAPI.mlirPassManagerCreate(ctx)
     npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
     CAPI.mlirOpPassManagerAddOwnedPass(npm, external)

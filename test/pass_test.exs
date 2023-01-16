@@ -7,39 +7,56 @@ defmodule PassTest do
   alias Beaver.MLIR.Dialect.{Func, Arith}
   require Func
 
-  test "exception in run/1", context do
-    defmodule PassRaisingException do
-      use Beaver.MLIR.Pass, on: "func.func"
+  defmodule PassRaisingException do
+    use Beaver.MLIR.Pass, on: "func.func"
 
-      def run(_op) do
-        raise "exception in pass run"
-      end
+    def run(_op) do
+      raise "exception in pass run"
     end
+  end
 
-    ir =
-      mlir ctx: context[:ctx] do
-        module do
-          Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
-            region do
-              block bb_entry() do
-                v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-                Func.return(v0) >>> []
-              end
+  defp example_ir(context) do
+    mlir ctx: context[:ctx] do
+      module do
+        Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+          region do
+            block bb_entry() do
+              v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+              Func.return(v0) >>> []
             end
           end
-          |> MLIR.Operation.verify!(debug: true)
         end
+        |> MLIR.Operation.verify!(debug: true)
       end
-      |> MLIR.Operation.verify!()
+    end
+    |> MLIR.Operation.verify!()
+  end
+
+  test "exception in run/1", context do
+    ir = example_ir(context)
 
     assert_raise RuntimeError, ~r"Unexpected failure running pass pipeline", fn ->
       assert capture_log(fn ->
                ir
                |> MLIR.Pass.Composer.nested("func.func", [
-                 PassRaisingException.create()
+                 PassRaisingException
                ])
                |> MLIR.Pass.Composer.run!()
              end) =~ ~r"fail to run a pass"
     end
+  end
+
+  test "pass of anonymous function", context do
+    ir = example_ir(context)
+
+    ir
+    |> MLIR.Pass.Composer.append(
+      {"test-pass", "builtin.module",
+       fn op ->
+         assert MLIR.to_string(op) =~ ~r"func.func @some_func"
+         :ok
+       end}
+    )
+    |> MLIR.Pass.Composer.run!()
   end
 end
