@@ -1,9 +1,8 @@
 defmodule CfTest do
-  use ExUnit.Case
+  use Beaver.Case
   use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.Type
-  alias Beaver.MLIR.Attribute
   alias Beaver.MLIR.Dialect.{Func, CF, Arith}
   require Func
   @moduletag :smoke
@@ -81,7 +80,9 @@ defmodule CfTest do
       true_branch =
         mlir ctx: ctx do
           block _true_branch() do
-            {%MLIR.Value{} = mlir, acc} = gen_mlir(do_block_ast, acc)
+            {%MLIR.Value{} = mlir, acc} =
+              gen_mlir(do_block_ast, update_block(acc, MLIR.__BLOCK__()))
+
             %MLIR.Block{} = Beaver.MLIR.__BLOCK__()
             CF.br({bb_next, [mlir]}) >>> []
           end
@@ -90,7 +91,9 @@ defmodule CfTest do
       false_branch =
         mlir ctx: ctx do
           block _false_branch() do
-            {%MLIR.Value{} = mlir, acc} = gen_mlir(else_block_ast, acc)
+            {%MLIR.Value{} = mlir, acc} =
+              gen_mlir(else_block_ast, update_block(acc, MLIR.__BLOCK__()))
+
             CF.br({bb_next, [mlir]}) >>> []
           end
         end
@@ -127,7 +130,7 @@ defmodule CfTest do
 
       less =
         mlir block: block, ctx: ctx do
-          Arith.cmpf(left, right, predicate: Attribute.integer(Type.i64(), 0)) >>> Type.i1()
+          Arith.cmpf(left, right, predicate: Arith.cmp_f_predicate(:ugt)) >>> Type.i1()
         end
 
       {less, acc}
@@ -160,7 +163,6 @@ defmodule CfTest do
     end
 
     def gen_func(call, block) do
-      # TODO: generate the args
       {name, _args} = Macro.decompose_call(call)
 
       ctx = MLIR.Context.create()
@@ -212,13 +214,48 @@ defmodule CfTest do
       quote do
         alias MLIR.Dialect.Func
         unquote(Macro.escape(mlir_asm))
-        # TODO: return a function capturing the JIT
-        # TODO: show how to canonicalize the IR and fold some computation to constants
+      end
+    end
+
+    defp lower(ir) do
+      import MLIR.{Transforms, Conversion}
+
+      ir
+      |> convert_arith_to_llvm
+      |> MLIR.Pass.Composer.nested("func.func", fn pm ->
+        MLIR.Pass.pipeline!(pm, "llvm-request-c-wrappers")
+      end)
+      |> MLIR.Pass.Composer.nested("func.func", {"DoNothing0", "func.func", fn _ -> :ok end})
+      |> convert_func_to_llvm
+      |> canonicalize
+      |> MLIR.Pass.Composer.append({"DoNothing1", "builtin.module", fn _ -> :ok end})
+      |> MLIR.Pass.Composer.run!(timing: true)
+    end
+
+    def get_func(ir) do
+      llvm_ir = lower(ir)
+
+      jit = MLIR.ExecutionEngine.create!(llvm_ir)
+
+      fn total_iters, factor, base_lr, step ->
+        return = Beaver.Native.F32.make(0.9999)
+
+        arguments =
+          [
+            total_iters,
+            factor,
+            base_lr,
+            step
+          ]
+          |> Enum.map(&Beaver.Native.F32.make/1)
+
+        MLIR.ExecutionEngine.invoke!(jit, "get_lr_with_ctrl_flow", arguments, return)
+        |> Beaver.Native.to_term()
       end
     end
   end
 
-  test "cf with mutation" do
+  test "cf with mutation", context do
     import MutCompiler
 
     mlir =
@@ -241,6 +278,14 @@ defmodule CfTest do
 
         return(base_lr)
       end
+
+    ctx = context[:ctx]
+    ir = ~m{#{mlir}}.(ctx)
+
+    f = get_func(ir)
+
+    assert f.(1000.0, 0.5, 0.002, 200.0) /
+             f.(1000.0, 0.5, 0.002, 2000.0) == 2
 
     assert mlir =~ "%1 = arith.mulf %arg2, %arg1 : f32", mlir
     assert mlir =~ "return %2 : f32", mlir

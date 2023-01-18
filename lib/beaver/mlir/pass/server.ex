@@ -37,9 +37,7 @@ defmodule Beaver.MLIR.Pass.Server do
       exception ->
         MLIR.CAPI.mlirExternalPassSignalFailure(pass)
 
-        Logger.error(
-          "fail to run a pass. Safely inspecting: #{inspect(exception, structs: false)}"
-        )
+        Logger.error("fail to run a pass.")
 
         Logger.error(Exception.format(:error, exception, __STACKTRACE__))
     after

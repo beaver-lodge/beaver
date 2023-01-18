@@ -61,6 +61,11 @@ beaverPassManagerGetContext(MlirPassManager passManager) {
   return wrap(unwrap(passManager)->getContext());
 }
 
+MLIR_CAPI_EXPORTED void
+beaverPassManagerEnableTiming(MlirPassManager passManager) {
+  unwrap(passManager)->enableTiming();
+}
+
 MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
                                                  MlirContext context) {
   auto name = OperationName(unwrap(op_name), unwrap(context));

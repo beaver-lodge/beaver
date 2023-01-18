@@ -37,7 +37,7 @@ defmodule Beaver.MLIR.Pass.Composer do
     |> append({:nested, op_name, passes})
   end
 
-  def nested(composer_or_op, op_name, f) when is_function(f, 1) do
+  def nested(composer_or_op, op_name, f) do
     new(composer_or_op)
     |> append({:nested, op_name, f})
   end
@@ -73,6 +73,10 @@ defmodule Beaver.MLIR.Pass.Composer do
     for pass <- passes, do: add_pass(npm, pass)
   end
 
+  defp add_pass(pm, {:nested, op_name, pass}) do
+    add_pass(pm, {:nested, op_name, [pass]})
+  end
+
   defp add_pass(pm, pipeline_str) when is_binary(pipeline_str),
     do: MLIR.Pass.pipeline!(pm, pipeline_str)
 
@@ -83,11 +87,16 @@ defmodule Beaver.MLIR.Pass.Composer do
 
   def run!(
         %__MODULE__{passes: passes, op: %MLIR.Module{} = op},
-        opts \\ [dump: false, debug: false, print: false]
+        opts \\ [dump: false, debug: false, print: false, timing: false]
       ) do
     print = Keyword.get(opts, :print)
+    timing = Keyword.get(opts, :timing)
     ctx = MLIR.CAPI.mlirOperationGetContext(MLIR.Operation.from_module(op))
     pm = mlirPassManagerCreate(ctx)
+
+    if timing do
+      pm |> beaverPassManagerEnableTiming()
+    end
 
     MLIR.CAPI.mlirPassManagerEnableVerifier(pm, true)
 
