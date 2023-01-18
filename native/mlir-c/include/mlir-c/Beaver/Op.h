@@ -98,6 +98,9 @@ MLIR_CAPI_EXPORTED
 MlirIdentifier beaverMlirNamedAttributeGetName(MlirNamedAttribute);
 MLIR_CAPI_EXPORTED
 
+MLIR_CAPI_EXPORTED
+MlirAttribute beaverMlirNamedAttributeGetAttribute(MlirNamedAttribute na);
+
 MLIR_CAPI_EXPORTED MlirPass beaverCreateExternalPass(
     void (*construct)(void *userData), MlirTypeID passID, MlirStringRef name,
     MlirStringRef argument, MlirStringRef description, MlirStringRef opName,

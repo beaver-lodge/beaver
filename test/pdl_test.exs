@@ -1,5 +1,5 @@
 defmodule PDLTest do
-  use ExUnit.Case
+  use Beaver.Case
   use Beaver
   alias Beaver.MLIR
   alias MLIR.Type
@@ -11,9 +11,6 @@ defmodule PDLTest do
   require Type
 
   @moduletag :pdl
-  setup do
-    [ctx: MLIR.Context.create(allow_unregistered: true)]
-  end
 
   @apply_rewrite_op_patterns """
   module @patterns {
@@ -147,7 +144,6 @@ defmodule PDLTest do
     ir_string = MLIR.to_string(ir_module)
     assert not String.contains?(ir_string, "test.op")
     assert String.contains?(ir_string, "test.success")
-    CAPI.mlirContextDestroy(ctx)
   end
 
   @are_equal_op_pdl Path.join(__DIR__, "pdl_erase_and_create.mlir") |> File.read!()
