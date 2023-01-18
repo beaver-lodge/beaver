@@ -232,7 +232,7 @@ defmodule CfTest do
       |> MLIR.Pass.Composer.run!(timing: true)
     end
 
-    def get_func(ir) do
+    def get_func(ir, func) do
       llvm_ir = lower(ir)
 
       jit = MLIR.ExecutionEngine.create!(llvm_ir)
@@ -249,7 +249,7 @@ defmodule CfTest do
           ]
           |> Enum.map(&Beaver.Native.F32.make/1)
 
-        MLIR.ExecutionEngine.invoke!(jit, "get_lr_with_ctrl_flow", arguments, return)
+        MLIR.ExecutionEngine.invoke!(jit, func, arguments, return)
         |> Beaver.Native.to_term()
       end
     end
@@ -282,7 +282,7 @@ defmodule CfTest do
     ctx = context[:ctx]
     ir = ~m{#{mlir}}.(ctx)
 
-    f = get_func(ir)
+    f = get_func(ir, "get_lr_with_ctrl_flow")
 
     assert f.(1000.0, 0.5, 0.002, 200.0) /
              f.(1000.0, 0.5, 0.002, 2000.0) == 2
