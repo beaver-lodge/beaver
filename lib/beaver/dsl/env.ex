@@ -4,7 +4,7 @@ defmodule Beaver.Env do
   """
 
   @doc """
-  return context in the DSL environment
+  Return context in the DSL environment
   """
   defmacro context() do
     if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_ctx, nil}) do
@@ -17,7 +17,7 @@ defmodule Beaver.Env do
   end
 
   @doc """
-  return region in the DSL environment
+  Return region in the DSL environment
   """
   defmacro region() do
     if Macro.Env.has_var?(__CALLER__, {:beaver_env_region, nil}) do
@@ -32,7 +32,7 @@ defmodule Beaver.Env do
   end
 
   @doc """
-  return block in the DSL environment
+  Return block in the DSL environment
   """
   defmacro block() do
     if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_block, nil}) do
@@ -45,7 +45,7 @@ defmodule Beaver.Env do
   end
 
   @doc """
-  return block with a given name in the DSL environment
+  Return block with a given name in the DSL environment
   """
   defmacro block({var_name, _line, nil} = block_var) do
     if Macro.Env.has_var?(__CALLER__, {var_name, nil}) do
