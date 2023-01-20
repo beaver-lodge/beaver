@@ -42,8 +42,8 @@ defmodule PDLTest do
   }
   """
 
-  test "AreEqualOp", context do
-    ctx = context[:ctx]
+  test "AreEqualOp", test_context do
+    ctx = test_context[:ctx]
     CAPI.mlirContextSetAllowUnregisteredDialects(ctx, true)
     pattern_module = MLIR.Module.create(ctx, @apply_rewrite_op_patterns)
 
@@ -173,7 +173,7 @@ defmodule PDLTest do
     CAPI.mlirContextDestroy(ctx)
   end
 
-  test "load from string", context do
+  test "load from string", test_context do
     %MLIR.CAPI.MlirPDLPatternModule{} =
       """
       module @erase {
@@ -185,10 +185,10 @@ defmodule PDLTest do
         }
       }
       """
-      |> MLIR.Pattern.from_string(ctx: context[:ctx])
+      |> MLIR.Pattern.from_string(ctx: test_context[:ctx])
   end
 
-  test "replace tosa", context do
+  test "replace tosa", test_context do
     defmodule TestTOSAPatterns do
       def gen_ir_module(ctx) do
         mlir ctx: ctx do
@@ -221,7 +221,7 @@ defmodule PDLTest do
         end
       end
 
-      import Beaver.DSL.Pattern
+      import Beaver.Pattern
 
       defpat replace_add_op(benefit: 10) do
         a = value()
@@ -300,7 +300,7 @@ defmodule PDLTest do
       end
     end
 
-    ctx = context[:ctx]
+    ctx = test_context[:ctx]
     opts = [ctx: ctx]
 
     for pattern <- [
@@ -326,13 +326,13 @@ defmodule PDLTest do
     end
   end
 
-  test "toy compiler with pass", context do
-    ctx = context[:ctx]
+  test "toy compiler with pass", test_context do
+    ctx = test_context[:ctx]
 
     defmodule ToyPass do
       @moduledoc false
       use MLIR.Pass, on: "func.func"
-      import Beaver.DSL.Pattern
+      import Beaver.Pattern
 
       defpat replace_add_op() do
         a = value()
@@ -340,7 +340,6 @@ defmodule PDLTest do
         res = type()
         {op, _t} = TOSA.add(a, b) >>> {:op, [res]}
 
-        # TODO: support single replace without rewrite
         rewrite op do
           {r, _} = TOSA.sub(a, b) >>> {:op, [res]}
           replace(op, with: r)

@@ -81,9 +81,9 @@ defmodule CfTest do
         mlir ctx: ctx do
           block _true_branch() do
             {%MLIR.Value{} = mlir, acc} =
-              gen_mlir(do_block_ast, update_block(acc, MLIR.__BLOCK__()))
+              gen_mlir(do_block_ast, update_block(acc, Beaver.Env.block()))
 
-            %MLIR.Block{} = Beaver.MLIR.__BLOCK__()
+            %MLIR.Block{} = Beaver.Env.block()
             CF.br({bb_next, [mlir]}) >>> []
           end
         end
@@ -92,7 +92,7 @@ defmodule CfTest do
         mlir ctx: ctx do
           block _false_branch() do
             {%MLIR.Value{} = mlir, acc} =
-              gen_mlir(else_block_ast, update_block(acc, MLIR.__BLOCK__()))
+              gen_mlir(else_block_ast, update_block(acc, Beaver.Env.block()))
 
             CF.br({bb_next, [mlir]}) >>> []
           end
@@ -185,9 +185,9 @@ defmodule CfTest do
 
                 acc = %Acc{
                   vars: vars,
-                  region: Beaver.MLIR.__REGION__(),
-                  block: Beaver.MLIR.__BLOCK__(),
-                  ctx: Beaver.MLIR.__CONTEXT__()
+                  region: Beaver.Env.region(),
+                  block: Beaver.Env.block(),
+                  ctx: Beaver.Env.context()
                 }
 
                 # keep generating until we meet a terminator
@@ -255,7 +255,7 @@ defmodule CfTest do
     end
   end
 
-  test "cf with mutation", context do
+  test "cf with mutation", test_context do
     import MutCompiler
 
     mlir =
@@ -279,7 +279,7 @@ defmodule CfTest do
         return(base_lr)
       end
 
-    ctx = context[:ctx]
+    ctx = test_context[:ctx]
     ir = ~m{#{mlir}}.(ctx)
 
     f = get_func(ir, "get_lr_with_ctrl_flow")

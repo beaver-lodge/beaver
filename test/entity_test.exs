@@ -11,8 +11,8 @@ defmodule EntityTest do
   doctest Beaver.MLIR.Location
 
   describe "type apis" do
-    test "generated", context do
-      ctx = context[:ctx]
+    test "generated", test_context do
+      ctx = test_context[:ctx]
       opts = [ctx: ctx]
       assert Type.equal?(Type.f16(opts), Type.get("f16", opts))
       assert Type.equal?(Type.f(16, opts), Type.get("f16", opts))
@@ -49,8 +49,8 @@ defmodule EntityTest do
   end
 
   describe "attr apis" do
-    test "spirv attributes", context do
-      ctx = context[:ctx]
+    test "spirv attributes", test_context do
+      ctx = test_context[:ctx]
       import Beaver.MLIR.Sigils
       ~a{#spirv.entry_point_abi<local_size = dense<1> : vector<3xi32>>}.(ctx)
 
@@ -59,8 +59,8 @@ defmodule EntityTest do
       )
     end
 
-    test "generate", context do
-      ctx = context[:ctx]
+    test "generate", test_context do
+      ctx = test_context[:ctx]
       assert Attribute.equal?(Attribute.type(Type.f32()).(ctx), Attribute.type(Type.f32()).(ctx))
 
       assert Attribute.integer(Type.i(32), 1) |> Beaver.Deferred.create(ctx) |> MLIR.to_string() ==
@@ -121,8 +121,8 @@ defmodule EntityTest do
              )
     end
 
-    test "iterator_types", context do
-      ctx = context[:ctx]
+    test "iterator_types", test_context do
+      ctx = test_context[:ctx]
       parallel = Attribute.string("parallel")
       parallel2 = Attribute.array([parallel, parallel])
 

@@ -205,8 +205,8 @@ defmodule MlirTest do
     CAPI.mlirContextDestroy(ctx)
   end
 
-  test "Run a func operation pass", context do
-    ctx = context[:ctx]
+  test "Run a func operation pass", test_context do
+    ctx = test_context[:ctx]
     module = create_adder_module(ctx)
     assert not MLIR.Module.is_null(module)
     external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestFuncPass)
@@ -219,8 +219,8 @@ defmodule MlirTest do
     CAPI.mlirModuleDestroy(module)
   end
 
-  test "Run pass with patterns", context do
-    ctx = context[:ctx]
+  test "Run pass with patterns", test_context do
+    ctx = test_context[:ctx]
     module = create_redundant_transpose_module(ctx)
     assert not MLIR.Module.is_null(module)
     external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestFuncPass)
@@ -312,8 +312,8 @@ defmodule MlirTest do
     CAPI.mlirContextDestroy(ctx)
   end
 
-  test "affine expr and map", context do
-    ctx = context[:ctx]
+  test "affine expr and map", test_context do
+    ctx = test_context[:ctx]
     affine_dim_expr = MLIR.CAPI.mlirAffineDimExprGet(ctx, 0)
     affine_symbol_expr = MLIR.CAPI.mlirAffineSymbolExprGet(ctx, 1)
 

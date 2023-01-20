@@ -11,7 +11,7 @@ defmodule Beaver.MLIR.Dialect.Builtin do
   """
   defmacro module(attrs \\ [], do: block) do
     quote do
-      ctx = Beaver.MLIR.__CONTEXT__()
+      ctx = Beaver.Env.context()
 
       location =
         Keyword.get(unquote(attrs), :loc) ||

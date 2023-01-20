@@ -5,11 +5,11 @@ defmodule TosaTest do
   require Func
   alias Beaver.Native
 
-  test "generate and run tosa", context do
+  test "generate and run tosa", test_context do
     import MLIR.{Transforms, Conversion}
 
     ir =
-      mlir ctx: context[:ctx] do
+      mlir ctx: test_context[:ctx] do
         module do
           Func.func test_multi_broadcast(
                       function_type: ~a"(tensor<1x3xf32>, tensor<2x1xf32>) -> tensor<2x3xf32>"

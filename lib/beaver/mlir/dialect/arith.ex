@@ -11,15 +11,15 @@ defmodule Beaver.MLIR.Dialect.Arith do
     ops: Dialect.Registry.ops("arith")
 
   @constant "arith.constant"
-  def constant(%Beaver.DSL.SSA{arguments: [true], evaluator: evaluator} = ssa) do
+  def constant(%Beaver.SSA{arguments: [true], evaluator: evaluator} = ssa) do
     evaluator.(@constant, %{ssa | arguments: [value: ~a{true}]})
   end
 
-  def constant(%Beaver.DSL.SSA{arguments: [false], evaluator: evaluator} = ssa) do
+  def constant(%Beaver.SSA{arguments: [false], evaluator: evaluator} = ssa) do
     evaluator.(@constant, %{ssa | arguments: [value: ~a{false}]})
   end
 
-  def constant(%Beaver.DSL.SSA{evaluator: evaluator} = ssa) do
+  def constant(%Beaver.SSA{evaluator: evaluator} = ssa) do
     evaluator.(@constant, ssa)
   end
 
