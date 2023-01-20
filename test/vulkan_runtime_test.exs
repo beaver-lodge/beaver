@@ -4,10 +4,10 @@ defmodule VulkanRuntimeTest do
 
   @tag timeout: :infinity, vulkan: true
   @vulkan_ir File.read!("test/vulkan.mlir")
-  test "run ir with vulkan", context do
+  test "run ir with vulkan", test_context do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}
-    ctx = context[:ctx]
+    ctx = test_context[:ctx]
 
     {:ok, llvm_lib_dir} = LLVMConfig.lib_dir()
 

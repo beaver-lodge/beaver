@@ -34,14 +34,14 @@ defmodule Beaver.MLIR.Dialect.Func do
             Beaver.MLIR.Location.file(
               name: __ENV__.file,
               line: __ENV__.line,
-              ctx: Beaver.MLIR.__CONTEXT__()
+              ctx: Beaver.Env.context()
             )
 
         Beaver.MLIR.Operation.create_and_append(
-          Beaver.MLIR.__CONTEXT__(),
+          Beaver.Env.context(),
           "func.func",
           arguments,
-          Beaver.MLIR.__BLOCK__()
+          Beaver.Env.block()
         )
       end
 

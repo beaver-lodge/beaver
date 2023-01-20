@@ -18,13 +18,13 @@ mlir do
         block bb_entry() do
           v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
           cond0 = Arith.constant(true) >>> Type.i(1)
-          CF.cond_br(cond0, MLIR.__BLOCK__(bb1), {MLIR.__BLOCK__(bb2), [v0]}) >>> []
+          CF.cond_br(cond0, Beaver.Env.block(bb1), {Beaver.Env.block(bb2), [v0]}) >>> []
         end
 
         block bb1() do
           v1 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
           _add = Arith.addi(v0, v0) >>> Type.i(32)
-          CF.br({MLIR.__BLOCK__(bb2), [v1]}) >>> []
+          CF.br({Beaver.Env.block(bb2), [v1]}) >>> []
         end
 
         block bb2(arg >>> Type.i(32)) do
@@ -224,11 +224,11 @@ Buildin.module do
 end
 # Buildin.module is a macro, it will transformed the SSA `v2= Arith.constant..` to:
 v2 =
- %Beaver.DSL.SSA{}
-  |> Beaver.DSL.SSA.put_arguments(value: ~a{1})
-  |> Beaver.DSL.SSA.put_block(MLIR.__BLOCK__())
-  |> Beaver.DSL.SSA.put_ctx(MLIR.__CONTEXT__())
-  |> Beaver.DSL.SSA.put_results(~t<i32>)
+ %Beaver.SSA{}
+  |> Beaver.SSA.put_arguments(value: ~a{1})
+  |> Beaver.SSA.put_block(Beaver.Env.block())
+  |> Beaver.SSA.put_ctx(Beaver.Env.context())
+  |> Beaver.SSA.put_results(~t<i32>)
   |> Arith.constant()
 ```
 
@@ -255,13 +255,13 @@ end
 
 SomeDialect.some_op(
   regions: fn -> do
-    region = MLIR.__REGION__() # first region created
-    block = MLIR.__BLOCK__()
+    region = Beaver.Env.region() # first region created
+    block = Beaver.Env.block()
     x = Arith.constant(...)
     y = Arith.constant(...)
 
-    region = MLIR.__REGION__() # second region created
-    block = MLIR.__BLOCK__()
+    region = Beaver.Env.region() # second region created
+    block = Beaver.Env.block()
     z = Arith.addi([x, y, ...]) # x and y dominate z
   end
 )

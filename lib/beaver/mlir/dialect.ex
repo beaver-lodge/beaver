@@ -6,7 +6,7 @@ defmodule Beaver.MLIR.Dialect do
 
   require Logger
 
-  @callback eval_ssa(String.t(), Beaver.DSL.SSA.t()) :: any()
+  @callback eval_ssa(String.t(), Beaver.SSA.t()) :: any()
   defmacro __using__(opts) do
     dialect = Keyword.fetch!(opts, :dialect)
     ops = Keyword.fetch!(opts, :ops)
@@ -14,7 +14,7 @@ defmodule Beaver.MLIR.Dialect do
     quote(bind_quoted: [dialect: dialect, ops: ops]) do
       @behaviour Beaver.MLIR.Dialect
 
-      def eval_ssa(full_name, %Beaver.DSL.SSA{evaluator: evaluator} = ssa)
+      def eval_ssa(full_name, %Beaver.SSA{evaluator: evaluator} = ssa)
           when is_function(evaluator, 2) do
         evaluator.(full_name, ssa)
       end

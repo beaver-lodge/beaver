@@ -5,7 +5,7 @@ defmodule RedundantTransposeTest do
   alias Beaver.MLIR.Dialect.{Func, TOSA}
   require Func
 
-  test "pass to optimize redundant transpose", context do
+  test "pass to optimize redundant transpose", test_context do
     use Beaver
     import Beaver.MLIR.Transforms
 
@@ -23,7 +23,7 @@ defmodule RedundantTransposeTest do
     end
 
     ir =
-      mlir ctx: context[:ctx] do
+      mlir ctx: test_context[:ctx] do
         module do
           Func.func some_func(
                       function_type: Type.function([Helper.tensor_t()], [Helper.tensor_t()])

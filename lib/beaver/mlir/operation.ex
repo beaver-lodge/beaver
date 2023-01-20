@@ -20,7 +20,7 @@ defmodule Beaver.MLIR.Operation do
     state |> Beaver.Native.ptr() |> Beaver.Native.bag(state) |> MLIR.CAPI.mlirOperationCreate()
   end
 
-  defp create(op_name, %Beaver.DSL.SSA{
+  defp create(op_name, %Beaver.SSA{
          block: %MLIR.Block{} = block,
          arguments: arguments,
          results: results,
@@ -153,11 +153,11 @@ defmodule Beaver.MLIR.Operation do
   end
 
   @doc false
-  def eval_ssa(full_name, %Beaver.DSL.SSA{results: result_types} = ssa) do
+  def eval_ssa(full_name, %Beaver.SSA{results: result_types} = ssa) do
     ssa =
       case result_types do
         [{:op, result_types}] ->
-          %Beaver.DSL.SSA{ssa | results: List.wrap(result_types)}
+          %Beaver.SSA{ssa | results: List.wrap(result_types)}
 
         _ ->
           ssa

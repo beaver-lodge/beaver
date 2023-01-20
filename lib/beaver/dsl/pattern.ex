@@ -1,9 +1,9 @@
-defmodule Beaver.DSL.Pattern.Env do
+defmodule Beaver.Pattern.Env do
   @moduledoc false
   defstruct ctx: nil, block: nil, loc: nil
 end
 
-defmodule Beaver.DSL.Pattern do
+defmodule Beaver.Pattern do
   @moduledoc """
   Beaver pattern DSL for MLIR, a PDL frontend in Elixir.
   """
@@ -13,12 +13,13 @@ defmodule Beaver.DSL.Pattern do
   import MLIR.Sigils
   import Beaver
   require Beaver.MLIR
+  require Beaver.Env
   require Beaver.MLIR.CAPI
-  alias Beaver.DSL.Pattern.Env
+  alias Beaver.Pattern.Env
 
   defmacro defpat(call, do: block) do
     {name, _args} = Macro.decompose_call(call)
-    block_ast = block |> Beaver.DSL.SSA.prewalk(&__MODULE__.eval_rewrite/2)
+    block_ast = block |> Beaver.SSA.prewalk(&__MODULE__.eval_rewrite/2)
 
     pdl_pattern_module_op =
       quote do
@@ -45,7 +46,7 @@ defmodule Beaver.DSL.Pattern do
         Beaver.Deferred.from_opts(
           opts,
           fn ctx ->
-            alias Beaver.DSL.Pattern
+            alias Beaver.Pattern
             pdl_pattern_module_op = unquote(pdl_pattern_module_op)
 
             case Beaver.MLIR.Operation.verify(pdl_pattern_module_op, debug: true) do
@@ -100,7 +101,7 @@ defmodule Beaver.DSL.Pattern do
   end
 
   defmacro rewrite(root, do: block) do
-    rewrite_block_ast = block |> Beaver.DSL.SSA.prewalk(&__MODULE__.eval_rewrite/2)
+    rewrite_block_ast = block |> Beaver.SSA.prewalk(&__MODULE__.eval_rewrite/2)
 
     quote do
       mlir do
@@ -229,7 +230,7 @@ defmodule Beaver.DSL.Pattern do
   """
   def eval_rewrite(
         op_name,
-        %Beaver.DSL.SSA{
+        %Beaver.SSA{
           arguments: arguments,
           results: result_types,
           ctx: ctx,

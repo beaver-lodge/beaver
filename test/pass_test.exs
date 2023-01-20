@@ -15,8 +15,8 @@ defmodule PassTest do
     end
   end
 
-  defp example_ir(context) do
-    mlir ctx: context[:ctx] do
+  defp example_ir(test_context) do
+    mlir ctx: test_context[:ctx] do
       module do
         Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
           region do
@@ -32,8 +32,8 @@ defmodule PassTest do
     |> MLIR.Operation.verify!()
   end
 
-  test "exception in run/1", context do
-    ir = example_ir(context)
+  test "exception in run/1", test_context do
+    ir = example_ir(test_context)
 
     assert_raise RuntimeError, ~r"Unexpected failure running pass pipeline", fn ->
       assert capture_log(fn ->
@@ -46,8 +46,8 @@ defmodule PassTest do
     end
   end
 
-  test "pass of anonymous function", context do
-    ir = example_ir(context)
+  test "pass of anonymous function", test_context do
+    ir = example_ir(test_context)
 
     ir
     |> MLIR.Pass.Composer.append(

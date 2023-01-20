@@ -363,7 +363,7 @@ defmodule Beaver.Walker do
   You might expect this function works like `Macro.traverse/4`.
   ### More on manipulating the IR
   During the traversal, there are generally two choices to manipulate the IR:
-  - Use a pattern defined by macro `Beaver.DSL.Pattern.defpat/2` to have the PDL interpreter transform the IR for you.
+  - Use a pattern defined by macro `Beaver.Pattern.defpat/2` to have the PDL interpreter transform the IR for you.
   You can use both if it is proper to do so.
   - Use `Beaver.Walker.replace/2` to replace the operation and return a walker as placeholder if is replaced by value.
   It could be mind-boggling to think the IR is mutable but not an issue if your approach is very functional. Inappropriate mutation might cause crash or bugs if somewhere else is keeping a reference of the replace op.

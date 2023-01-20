@@ -1,4 +1,4 @@
-defmodule Beaver.DSL.Block do
+defmodule Beaver.BlockDSL do
   @moduledoc false
   # Transform the ast of a elixir call into a block creation and block args bindings
   def transform_call(call) do
@@ -32,7 +32,7 @@ defmodule Beaver.DSL.Block do
               Beaver.MLIR.Location.file(
                 name: __ENV__.file,
                 line: Keyword.get(unquote(line), :line),
-                ctx: Beaver.MLIR.__CONTEXT__()
+                ctx: Beaver.Env.context()
               )
             end
 
@@ -48,7 +48,7 @@ defmodule Beaver.DSL.Block do
       for {{var, _}, index} <- Enum.with_index(args) do
         quote do
           unquote(var) =
-            Beaver.MLIR.__BLOCK__()
+            Beaver.Env.block()
             |> Beaver.MLIR.Block.get_arg!(unquote(index))
         end
       end

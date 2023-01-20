@@ -3,14 +3,14 @@ defmodule E2ETest do
   alias Beaver.MLIR
   @moduletag :smoke
 
-  test "run mlir module defined by sigil", context do
+  test "run mlir module defined by sigil", test_context do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}
 
     arg = Beaver.Native.I32.make(42)
     return = Beaver.Native.I32.make(-1)
 
-    ctx = context[:ctx]
+    ctx = test_context[:ctx]
 
     jit =
       ~m"""

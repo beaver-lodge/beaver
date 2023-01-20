@@ -1,6 +1,6 @@
-defmodule Beaver.DSL.SSA do
+defmodule Beaver.SSA do
   @moduledoc """
-  Beaver's DSL for MLIR IR structure. Macros like `Beaver.mlir/1` will generate SSA structs defined by this module.
+  Storing MLIR IR structure with a Elixir struct. Macros like `Beaver.mlir/1` will generate SSA structs defined by this module.
   """
   alias Beaver.MLIR
   require Beaver.MLIR.CAPI
@@ -85,15 +85,15 @@ defmodule Beaver.DSL.SSA do
           Beaver.MLIR.Location.file(
             name: __ENV__.file,
             line: Keyword.get(unquote(line), :line),
-            ctx: MLIR.__CONTEXT__()
+            ctx: Beaver.Env.context()
           )
 
-      %Beaver.DSL.SSA{evaluator: unquote(evaluator)}
-      |> Beaver.DSL.SSA.put_location(loc)
-      |> Beaver.DSL.SSA.put_arguments(args)
-      |> Beaver.DSL.SSA.put_results(results)
-      |> Beaver.DSL.SSA.put_block(MLIR.__BLOCK__())
-      |> Beaver.DSL.SSA.put_ctx(MLIR.__CONTEXT__())
+      %Beaver.SSA{evaluator: unquote(evaluator)}
+      |> Beaver.SSA.put_location(loc)
+      |> Beaver.SSA.put_arguments(args)
+      |> Beaver.SSA.put_results(results)
+      |> Beaver.SSA.put_block(Beaver.Env.block())
+      |> Beaver.SSA.put_ctx(Beaver.Env.context())
     end
   end
 
@@ -119,7 +119,7 @@ defmodule Beaver.DSL.SSA do
           evaluator
         )
       )
-      |> Beaver.DSL.SSA.put_filler(fn -> unquote(ast_block) end)
+      |> Beaver.SSA.put_filler(fn -> unquote(ast_block) end)
       |> unquote({call, line, []})
     end
   end

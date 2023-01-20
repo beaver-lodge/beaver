@@ -33,6 +33,7 @@ defmodule Beaver do
   defmacro __using__(_) do
     quote do
       require Beaver.MLIR.CAPI
+      require Beaver.Env
       import Beaver
       alias Beaver.MLIR
       import MLIR.Sigils
@@ -88,7 +89,7 @@ defmodule Beaver do
   end
 
   defmacro mlir(opts, do: dsl_block) do
-    dsl_block_ast = dsl_block |> Beaver.DSL.SSA.prewalk(&MLIR.Operation.eval_ssa/2)
+    dsl_block_ast = dsl_block |> Beaver.SSA.prewalk(&MLIR.Operation.eval_ssa/2)
 
     ctx_ast =
       if Keyword.has_key?(opts, :ctx) do
@@ -131,16 +132,16 @@ defmodule Beaver do
       args_var_ast,
       locations_var_ast,
       block_arg_var_ast
-    } = Beaver.DSL.Block.transform_call(call)
+    } = Beaver.BlockDSL.transform_call(call)
 
     {block_id, _} = Macro.decompose_call(call)
     if not is_atom(block_id), do: raise("block name must be an atom")
 
     region_insert_ast =
       quote do
-        if region = MLIR.__REGION__() do
+        if region = Beaver.Env.region() do
           # insert the block to region
-          Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, MLIR.__BLOCK__())
+          Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, Beaver.Env.block())
         end
       end
 
@@ -152,7 +153,7 @@ defmodule Beaver do
           _args =
             Kernel.var!(unquote({bb_name, [], nil}))
             |> Beaver.MLIR.Block.add_arg!(
-              MLIR.__CONTEXT__(),
+              Beaver.Env.context(),
               Enum.zip(block_arg_types, block_arg_locs)
             )
 
@@ -161,8 +162,8 @@ defmodule Beaver do
       else
         quote do
           Beaver.MLIR.Block.create(
-            block_arg_types |> Enum.map(&Beaver.Deferred.create(&1, MLIR.__CONTEXT__())),
-            block_arg_locs |> Enum.map(&Beaver.Deferred.create(&1, MLIR.__CONTEXT__()))
+            block_arg_types |> Enum.map(&Beaver.Deferred.create(&1, Beaver.Env.context())),
+            block_arg_locs |> Enum.map(&Beaver.Deferred.create(&1, Beaver.Env.context()))
           )
         end
       end
