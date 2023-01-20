@@ -1,6 +1,6 @@
 defmodule Beaver.Env do
   @moduledoc """
-  This module defines macros to getting MLIR context, region, block within the do block of mlir/1
+  This module defines macros to getting MLIR context, region, block within the do block of mlir/1. It works like __MODULE__/0, __CALLER__/0 of Elixir special forms.
   """
 
   @doc """
@@ -16,6 +16,9 @@ defmodule Beaver.Env do
     end
   end
 
+  @doc """
+  return region in the DSL environment
+  """
   defmacro region() do
     if Macro.Env.has_var?(__CALLER__, {:beaver_env_region, nil}) do
       quote do
@@ -28,6 +31,9 @@ defmodule Beaver.Env do
     end
   end
 
+  @doc """
+  return block in the DSL environment
+  """
   defmacro block() do
     if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_block, nil}) do
       quote do
@@ -38,6 +44,9 @@ defmodule Beaver.Env do
     end
   end
 
+  @doc """
+  return block with a given name in the DSL environment
+  """
   defmacro block({var_name, _line, nil} = block_var) do
     if Macro.Env.has_var?(__CALLER__, {var_name, nil}) do
       quote do
@@ -51,7 +60,19 @@ defmodule Beaver.Env do
     end
   end
 
+  @doc """
+  Create location from caller in the Elixir source
+  """
   defmacro location() do
-    raise "TODO: create location from Elixir caller"
+    file = __CALLER__.file
+    line = __CALLER__.line
+
+    quote do
+      Beaver.MLIR.Location.file(
+        name: unquote(file),
+        line: unquote(line),
+        ctx: Beaver.Env.context()
+      )
+    end
   end
 end
