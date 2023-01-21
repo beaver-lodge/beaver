@@ -222,9 +222,7 @@ defmodule CfTest do
 
       ir
       |> convert_arith_to_llvm
-      |> MLIR.Pass.Composer.nested("func.func", fn pm ->
-        MLIR.Pass.pipeline!(pm, "llvm-request-c-wrappers")
-      end)
+      |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
       |> MLIR.Pass.Composer.nested("func.func", {"DoNothing0", "func.func", fn _ -> :ok end})
       |> convert_func_to_llvm
       |> canonicalize

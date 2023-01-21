@@ -49,16 +49,6 @@ defmodule EntityTest do
   end
 
   describe "attr apis" do
-    test "spirv attributes", test_context do
-      ctx = test_context[:ctx]
-      import Beaver.MLIR.Sigils
-      ~a{#spirv.entry_point_abi<local_size = dense<1> : vector<3xi32>>}.(ctx)
-
-      ~a{#spirv.target_env<#spirv.vce<v1.0, [Shader], [SPV_KHR_storage_buffer_storage_class]>, #spirv.resource_limits<>>}.(
-        ctx
-      )
-    end
-
     test "generate", test_context do
       ctx = test_context[:ctx]
       assert Attribute.equal?(Attribute.type(Type.f32()).(ctx), Attribute.type(Type.f32()).(ctx))

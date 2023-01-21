@@ -22,6 +22,9 @@ jobs:
         elixir: ["1.14.0"]
     steps:
       - uses: actions/checkout@v3
+      - name: Setting LLVM_COMMIT
+        run: |
+          echo "LLVM_COMMIT=$(cat LLVM_COMMIT)" >> $GITHUB_ENV
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp}}
@@ -41,7 +44,7 @@ jobs:
       - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Download pre-build LLVM
         run: |
-          wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/llvm-commit-1d31ea68c0cbc24d690a58c296b50b61595b6127-2022-10-25-0120/llvm-install-x86_64-unknown-linux-gnu-MinSizeRel.zip -O llvm-install.zip
+          wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/llvm-commit-${LLVM_COMMIT}/llvm-install-x86_64-unknown-linux-gnu-MinSizeRel.zip -O llvm-install.zip
           unzip llvm-install.zip -d $HOME/llvm-install
       - name: Run smoke tests
         run: |

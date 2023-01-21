@@ -22,7 +22,7 @@ defmodule TosaTest do
                 v0 = TOSA.add(arg0, arg1) >>> Type.ranked_tensor([2, 3], Type.f32())
 
                 v0 =
-                  TOSA.mul(v0, arg1, {:shift, ~a{0 : i32}}) >>>
+                  TOSA.mul(v0, arg1, shift: ~a{0 : i32}) >>>
                     Type.ranked_tensor([2, 3], Type.f32())
 
                 Func.return(v0) >>> []
@@ -32,6 +32,7 @@ defmodule TosaTest do
         end
       end
       |> MLIR.Operation.verify!()
+      |> MLIR.Pass.Composer.append({"printInEx", "builtin.module", &MLIR.dump/1})
       |> canonicalize
       |> cse
       |> tosa_to_scf
@@ -44,23 +45,25 @@ defmodule TosaTest do
         linalg_bufferize(),
         convert_linalg_to_loops(),
         lower_affine(),
-        convert_math_to_llvm(),
-        convert_scf_to_cf(),
-        "arith-expand",
-        "memref-expand"
+        convert_math_to_llvm()
       ])
-      |> MLIR.Pass.Composer.nested("func.func", fn pm ->
-        MLIR.Pass.pipeline!(pm, "tensor-bufferize")
-      end)
-      |> MLIR.Pass.Composer.pipeline("func-bufferize")
-      |> MLIR.Pass.Composer.nested("func.func", fn pm ->
-        MLIR.Pass.pipeline!(pm, "llvm-request-c-wrappers")
-      end)
-      |> convert_vector_to_llvm
+      |> convert_scf_to_cf
+      |> convert_tensor_to_linalg
+      |> MLIR.Pass.Composer.append("builtin.module(func-bufferize)")
+      |> MLIR.Pass.Composer.append("builtin.module(arith-bufferize)")
+      |> MLIR.Pass.Composer.nested("func.func", "func.func(tensor-bufferize)")
+      |> MLIR.Pass.Composer.append("builtin.module(fold-memref-alias-ops)")
+      |> MLIR.Pass.Composer.nested("func.func", "func.func(linalg-bufferize)")
+      |> MLIR.Pass.Composer.append({"printInEx", "builtin.module", &MLIR.dump/1})
+      |> MLIR.Pass.Composer.nested(
+        "func.func",
+        "func.func(finalizing-bufferize,buffer-deallocation,convert-linalg-to-loops)"
+      )
+      |> convert_linalg_to_llvm()
       |> convert_memref_to_llvm
       |> convert_func_to_llvm
       |> reconcile_unrealized_casts
-      |> MLIR.Pass.Composer.run!()
+      |> MLIR.Pass.Composer.run!(debug: true, print: false)
 
     jit = ir |> MLIR.ExecutionEngine.create!()
 

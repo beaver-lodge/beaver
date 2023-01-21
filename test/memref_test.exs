@@ -36,27 +36,16 @@ defmodule MemRefTest do
       |> MLIR.Operation.verify!()
       |> canonicalize
       |> cse
-      |> tosa_to_scf
-      |> tosa_to_arith
-      |> tosa_to_tensor()
-      |> convert_tensor_to_linalg()
-      |> MLIR.Pass.Composer.nested("func.func", [
-        tosa_to_linalg(),
-        linalg_fuse_elementwise_ops(),
-        linalg_bufferize(),
-        convert_linalg_to_loops(),
-        lower_affine(),
-        convert_math_to_llvm(),
-        convert_scf_to_cf(),
-        "arith-expand",
-        "memref-expand"
-      ])
-      |> MLIR.Pass.Composer.nested("func.func", fn pm ->
-        MLIR.Pass.pipeline!(pm, "tensor-bufferize")
-      end)
-      |> MLIR.Pass.Composer.pipeline("func-bufferize")
-      |> MLIR.Pass.Composer.run!()
-      |> convert_vector_to_llvm
+      |> MLIR.Pass.Composer.nested("func.func", convert_linalg_to_loops())
+      |> convert_scf_to_cf
+      |> MLIR.Pass.Composer.append("builtin.module(arith-bufferize)")
+      |> MLIR.Pass.Composer.append("builtin.module(func.func(linalg-bufferize))")
+      |> MLIR.Pass.Composer.append("builtin.module(func-bufferize)")
+      |> MLIR.Pass.Composer.nested(
+        "func.func",
+        "func.func(finalizing-bufferize,buffer-deallocation,convert-linalg-to-loops)"
+      )
+      |> convert_linalg_to_llvm()
       |> convert_memref_to_llvm
       |> convert_func_to_llvm
       |> reconcile_unrealized_casts

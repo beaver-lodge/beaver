@@ -35,7 +35,7 @@ defmodule PassTest do
   test "exception in run/1", test_context do
     ir = example_ir(test_context)
 
-    assert_raise RuntimeError, ~r"Unexpected failure running pass pipeline", fn ->
+    assert_raise RuntimeError, ~r"Unexpected failure running passes", fn ->
       assert capture_log(fn ->
                ir
                |> MLIR.Pass.Composer.nested("func.func", [
