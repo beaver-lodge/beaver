@@ -37,19 +37,19 @@ defmodule MemRefTest do
       |> canonicalize
       |> cse
       |> MLIR.Pass.Composer.nested("func.func", convert_linalg_to_loops())
-      |> convert_scf_to_cf
       |> MLIR.Pass.Composer.append("arith-bufferize")
       |> MLIR.Pass.Composer.nested("func.func", "linalg-bufferize")
       |> MLIR.Pass.Composer.append("func-bufferize")
       |> MLIR.Pass.Composer.nested(
         "func.func",
-        ~w{finalizing-bufferize convert-linalg-to-loops}
+        ~w{finalizing-bufferize buffer-deallocation convert-linalg-to-loops}
       )
+      |> convert_scf_to_cf
       |> convert_linalg_to_llvm()
       |> convert_memref_to_llvm
       |> convert_func_to_llvm
       |> reconcile_unrealized_casts
-      |> MLIR.Pass.Composer.run!(debug: true)
+      |> MLIR.Pass.Composer.run!()
       |> MLIR.ExecutionEngine.create!()
 
     arr = [0.112122112, 0.2123213, 10_020.9, 213_120.0, 0.2, 100.4]
