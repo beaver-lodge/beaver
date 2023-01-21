@@ -154,7 +154,7 @@ LLVM/MLIR is a giant project, and built around that Beaver have thousands of fun
   - Top level app ships the high level functionalities including IR generation and pattern definition.
   - MLIR CAPI wrappers built by parsing LLVM/MLIR CAPI C headers and some middle level helper functions to hide the C pointer related operations. This app will add the loaded MLIR C library and managed MLIR context to Erlang supervisor tree. Rust is also used in this app, but mainly for LLVM/MLIR CMake integration.
   - All the Ops defined in stock MLIR dialects, built by querying the registry. This app will ship MLIR Ops with Erlang idiomatic practices like behavior compliance.
-- `:kinda`: Elixir and Zig hybrid, generating NIFs from MLIR C headers. Repo: https://github.com/beaver-project/kinda
+- `:kinda`: Elixir and Zig hybrid, generating NIFs from MLIR C headers. Repo: https://github.com/beaver-lodge/kinda
 - `:manx`: Pure Elixir, compiler backend for [Nx](https://github.com/elixir-nx/nx/tree/main/nx#readme).
 
 ### Notes on consuming and development

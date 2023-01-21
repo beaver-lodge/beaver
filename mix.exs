@@ -59,7 +59,7 @@ defmodule Beaver.MixProject do
   defp package() do
     [
       licenses: ["Apache-2.0", "MIT"],
-      links: %{"GitHub" => "https://github.com/beaver-project/beaver"},
+      links: %{"GitHub" => "https://github.com/beaver-lodge/beaver"},
       files: ~w{
         lib .formatter.exs mix.exs README*
         native/mlir-zig/src/*.zig
