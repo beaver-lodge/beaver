@@ -18,8 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        otp: ["25.0"]
-        elixir: ["1.14.0"]
+        otp: ["24.2", "25.0"]
+        elixir: ["1.13.0", "1.14.0"]
     steps:
       - uses: actions/checkout@v3
       - name: Setting LLVM_COMMIT

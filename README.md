@@ -154,7 +154,7 @@ LLVM/MLIR is a giant project, and built around that Beaver have thousands of fun
   - Top level app ships the high level functionalities including IR generation and pattern definition.
   - MLIR CAPI wrappers built by parsing LLVM/MLIR CAPI C headers and some middle level helper functions to hide the C pointer related operations. This app will add the loaded MLIR C library and managed MLIR context to Erlang supervisor tree. Rust is also used in this app, but mainly for LLVM/MLIR CMake integration.
   - All the Ops defined in stock MLIR dialects, built by querying the registry. This app will ship MLIR Ops with Erlang idiomatic practices like behavior compliance.
-- `:kinda`: Elixir and Zig hybrid, generating NIFs from MLIR C headers. Repo: https://github.com/beaver-project/kinda
+- `:kinda`: Elixir and Zig hybrid, generating NIFs from MLIR C headers. Repo: https://github.com/beaver-lodge/kinda
 - `:manx`: Pure Elixir, compiler backend for [Nx](https://github.com/elixir-nx/nx/tree/main/nx#readme).
 
 ### Notes on consuming and development
@@ -391,3 +391,21 @@ This approach archives both the succinctness and modularity of not having a glob
     lockfile: Path.join(beaver_app_root, "mix.lock")
   )
   ```
+
+## Release a new version
+
+### Linux
+
+- Bump versions in `lib/beaver/mlir/capi.ex` and `mix.exs`
+- Run CI, which generates the new GitHub release.
+- Update release url in `lib/beaver/mlir/capi.ex`
+
+### Mac
+
+- Run macOS build with `bash scripts/build-for-publish.sh`
+- Upload the `libbeaver-[xxx]-nif-2.16-aarch64-apple-darwin.so.tar.gz` file to release
+
+### Generate `checksum-xxx.exs`
+
+- `mix rustler_precompiled.download Beaver.MLIR.CAPI --all --ignore-unavailable --print`
+- `mix hex.publish`

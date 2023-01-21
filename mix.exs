@@ -4,7 +4,7 @@ defmodule Beaver.MixProject do
   def project do
     [
       app: :beaver,
-      version: "0.2.13",
+      version: "0.2.14",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -59,13 +59,13 @@ defmodule Beaver.MixProject do
   defp package() do
     [
       licenses: ["Apache-2.0", "MIT"],
-      links: %{"GitHub" => "https://github.com/beaver-project/beaver"},
+      links: %{"GitHub" => "https://github.com/beaver-lodge/beaver"},
       files: ~w{
         lib .formatter.exs mix.exs README*
-        native/mlir-zig/src/*.zig
-        native/mlir-zig/prod/build.zig
-        native/mlir-zig/dev/build.zig
-        native/mlir-zig/test/build.zig
+        native/mlir-zig-src/*.zig
+        native/mlir-zig-proj/prod/build.zig
+        native/mlir-zig-proj/dev/build.zig
+        native/mlir-zig-proj/test/build.zig
         native/**/CMakeLists.txt
         native/**/*.cmake
         native/**/*.h
