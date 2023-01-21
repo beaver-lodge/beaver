@@ -43,13 +43,13 @@ defmodule MemRefTest do
       |> MLIR.Pass.Composer.append("func-bufferize")
       |> MLIR.Pass.Composer.nested(
         "func.func",
-        "func.func(finalizing-bufferize,buffer-deallocation,convert-linalg-to-loops)"
+        ~w{finalizing-bufferize convert-linalg-to-loops}
       )
       |> convert_linalg_to_llvm()
       |> convert_memref_to_llvm
       |> convert_func_to_llvm
       |> reconcile_unrealized_casts
-      |> MLIR.Pass.Composer.run!()
+      |> MLIR.Pass.Composer.run!(debug: true)
       |> MLIR.ExecutionEngine.create!()
 
     arr = [0.112122112, 0.2123213, 10_020.9, 213_120.0, 0.2, 100.4]
