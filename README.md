@@ -177,34 +177,6 @@ To implement a MLIR toolkit, we at least need these group of APIs:
 We implement the IR API and Pass API with the help of the [MLIR C API](https://mlir.llvm.org/docs/CAPI/). There are both lower level APIs generated from the C headers and higher level APIs that are more idiomatic in Elixir.
 The Pattern API is implemented with the help from the [PDL dialect](https://mlir.llvm.org/docs/Dialects/PDLOps/). We are using the lower level IR APIs to compile your Elixir code to PDL. Another way to look at this is that Elixir/Erlang pattern matching is serving as a frontend alternative to [PDLL](https://mlir.llvm.org/docs/PDLL/).
 
-One example:
-
-- Elixir code:
-
-  ```elixir
-  def fold_transpose(t = %TransposeOp{a: %TransposeOp{}}) do
-    replace(t, with: t.a)
-  end
-  ```
-
-<!-- TODO: figure out if what we really need is pdl interp -->
-
-- will be compiled to:
-
-  ```mlir
-  pdl.pattern : benefit(1) {
-    %resultType = pdl.type
-    %inputOperand = pdl.operand
-    %root = pdl.operation "tosa.transpose"(%inputOperand) -> %resultType
-    %val0 = pdl.result 0 of %root
-    %resultType1 = pdl.type
-    %inner = pdl.operation "tosa.transpose"(%val0) -> %resultType1
-    pdl.rewrite %root {
-      pdl.replace %root with (%inputOperand)
-    }
-  }
-  ```
-
 ## Design principles
 
 ### Transformation over builder
