@@ -62,10 +62,10 @@ defmodule Beaver.MixProject do
       links: %{"GitHub" => "https://github.com/beaver-lodge/beaver"},
       files: ~w{
         lib .formatter.exs mix.exs README*
-        native/mlir-zig/src/*.zig
-        native/mlir-zig/prod/build.zig
-        native/mlir-zig/dev/build.zig
-        native/mlir-zig/test/build.zig
+        native/mlir-zig-src/*.zig
+        native/mlir-zig-proj/prod/build.zig
+        native/mlir-zig-proj/dev/build.zig
+        native/mlir-zig-proj/test/build.zig
         native/**/CMakeLists.txt
         native/**/*.cmake
         native/**/*.h

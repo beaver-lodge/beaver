@@ -391,3 +391,21 @@ This approach archives both the succinctness and modularity of not having a glob
     lockfile: Path.join(beaver_app_root, "mix.lock")
   )
   ```
+
+## Release a new version
+
+### Linux
+
+- Bump versions in `lib/beaver/mlir/capi.ex` and `mix.exs`
+- Run CI, which generates the new GitHub release.
+- Update release url in `lib/beaver/mlir/capi.ex`
+
+### Mac
+
+- Run macOS build with `bash scripts/build-for-publish.sh`
+- Upload the `libbeaver-[xxx]-nif-2.16-aarch64-apple-darwin.so.tar.gz` file to release
+
+### Generate `checksum-xxx.exs`
+
+- `mix rustler_precompiled.download Beaver.MLIR.CAPI --all --ignore-unavailable --print`
+- `mix hex.publish`
