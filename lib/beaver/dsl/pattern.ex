@@ -176,8 +176,6 @@ defmodule Beaver.Pattern do
   end
 
   def gen_pdl(env, element) do
-    dbg(env)
-    dbg(element, structs: false)
     raise "not supported"
   end
 
