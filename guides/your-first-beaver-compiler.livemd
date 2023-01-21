@@ -81,7 +81,7 @@ llvm_ir =
   ir
   |> convert_arith_to_llvm
   |> MLIR.Pass.Composer.nested("func.func", fn pm ->
-    MLIR.Pass.pipeline!(pm, "llvm-request-c-wrappers")
+    MLIR.Pass.pipeline!(pm, "func.func(llvm-request-c-wrappers)")
   end)
   |> convert_func_to_llvm
   |> MLIR.Pass.Composer.run!()

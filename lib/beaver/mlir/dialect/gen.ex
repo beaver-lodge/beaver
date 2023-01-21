@@ -1,3 +1,4 @@
+require Beaver.MLIR.CAPI
 require Beaver.MLIR.Dialect
 
 for d <-

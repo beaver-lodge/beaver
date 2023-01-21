@@ -12,6 +12,7 @@ defmodule Beaver.MLIR.Pass.Composer.Generator do
 
   defmacro __using__(prefix: prefix) do
     quote bind_quoted: [prefix: prefix] do
+      require Beaver.MLIR.CAPI
       alias Beaver.MLIR
       alias Beaver.MLIR.CAPI
       alias Beaver.MLIR.Pass.Composer

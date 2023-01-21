@@ -98,7 +98,7 @@ module {
 
 ## Why is it called Beaver?
 
-If it has to be an abbreviation. It could be **BEA**M **Ve**rsatile **R**epresentation. Beaver is an umbrella species increase biodiversity. We hope this project could enable other compilers and applications in the way a beaver pond becomes the habitat of many other creatures. Many Elixir projects also use animal names as their package names and it is often about raising awareness of endangered species. To read more about why beavers are important to our planet, check out [this National Geographic article](https://www.nationalgeographic.com/animals/article/beavers-climate-change-conservation-news).
+Beaver is an umbrella species increase biodiversity. We hope this project could enable other compilers and applications in the way a beaver pond becomes the habitat of many other creatures. Many Elixir projects also use animal names as their package names and it is often about raising awareness of endangered species. To read more about why beavers are important to our planet, check out [this National Geographic article](https://www.nationalgeographic.com/animals/article/beavers-climate-change-conservation-news).
 
 ## Quick introduction
 
@@ -219,10 +219,10 @@ Because Erlang/Elixir is SSA by its nature, in Beaver a MLIR Op's creation is ve
 One example:
 
 ```elixir
-Buildin.module do
+module do
   v2 = Arith.constant(1) >>> ~t<i32>
 end
-# Buildin.module is a macro, it will transformed the SSA `v2= Arith.constant..` to:
+# module/1 is a macro, it will transformed the SSA `v2= Arith.constant..` to:
 v2 =
  %Beaver.SSA{}
   |> Beaver.SSA.put_arguments(value: ~a{1})
@@ -309,6 +309,7 @@ This approach archives both the succinctness and modularity of not having a glob
 2. Install Zig, https://ziglang.org/learn/getting-started/#installing-zig
 3. Install LLVM/MLIR
 
+- (optional) the LLVM commit used to test Beaver is in this file: [LLVM_COMMIT](LLVM_COMMIT)
 - build from source https://mlir.llvm.org/getting_started/
 
   Recommended install commands:

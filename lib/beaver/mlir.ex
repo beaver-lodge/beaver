@@ -11,7 +11,9 @@ defmodule Beaver.MLIR do
 
   alias Beaver.MLIR.CAPI.{
     MlirAffineExpr,
-    MlirIntegerSet
+    MlirIntegerSet,
+    MlirOpPassManager,
+    MlirPassManager
   }
 
   def dump(%__MODULE__.Module{} = mlir) do
@@ -125,5 +127,15 @@ defmodule Beaver.MLIR do
     CAPI.beaver_raw_beaver_location_to_charlist(ref)
     |> Beaver.Native.check!()
     |> List.to_string()
+  end
+
+  def to_string(%MlirOpPassManager{ref: ref}) do
+    CAPI.beaver_raw_beaver_pm_to_charlist(ref)
+    |> Beaver.Native.check!()
+    |> List.to_string()
+  end
+
+  def to_string(%MlirPassManager{} = pm) do
+    pm |> CAPI.mlirPassManagerGetAsOpPassManager() |> __MODULE__.to_string()
   end
 end

@@ -49,7 +49,7 @@ fn get_all_registered_ops2(env: beam.env, dialect: mlir_capi.StringRef.T) !beam.
     defer c.mlirContextDestroy(ctx);
     var num_op: usize = 0;
     // TODO: refactor this dirty trick
-    var names: [300]c.struct_MlirRegisteredOperationName = undefined;
+    var names: [300]c.MlirRegisteredOperationName = undefined;
     c.beaverRegisteredOperationsOfDialect(ctx, dialect, &names, &num_op);
     var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(usize, num_op));
     defer beam.allocator.free(ret);
@@ -246,7 +246,7 @@ const BeaverPass = struct {
         new.* = old.*;
         return new;
     }
-    fn run(op: mlir_capi.Operation.T, pass: c.struct_MlirExternalPass, userData: ?*anyopaque) callconv(.C) void {
+    fn run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) callconv(.C) void {
         const ud = @ptrCast(*UserData, @alignCast(@alignOf(UserData), userData));
         const env = e.enif_alloc_env() orelse {
             print("fail to creat env\n", .{});
@@ -450,17 +450,17 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
 
 const BeaverDiagnostic = struct {
     pub fn printToStderr(str: mlir_capi.StringRef.T, _: ?*anyopaque) callconv(.C) void {
-        stderr.print("{s}", .{str.data[0..str.length]}) catch unreachable;
+        stderr.print("{s}", .{str.data[0..str.length]}) catch return;
     }
     pub fn deleteUserData(_: ?*anyopaque) callconv(.C) void {}
-    pub fn errorHandler(diagnostic: c.struct_MlirDiagnostic, _: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
-        stderr.print("{s}", .{"[Beaver] ["}) catch unreachable;
+    pub fn errorHandler(diagnostic: c.MlirDiagnostic, _: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
+        stderr.print("{s}", .{"[Beaver] [Diagnostic] ["}) catch return c.mlirLogicalResultFailure();
         const loc = c.mlirDiagnosticGetLocation(diagnostic);
         c.mlirLocationPrint(loc, printToStderr, null);
-        stderr.print("{s}", .{"] "}) catch unreachable;
+        stderr.print("{s}", .{"] "}) catch return c.mlirLogicalResultFailure();
 
         c.mlirDiagnosticPrint(diagnostic, printToStderr, null);
-        stderr.print("{s}", .{"\n"}) catch unreachable;
+        stderr.print("{s}", .{"\n"}) catch return c.mlirLogicalResultFailure();
 
         const num_note = c.mlirDiagnosticGetNumNotes(diagnostic);
         var i: isize = 0;
@@ -469,7 +469,7 @@ const BeaverDiagnostic = struct {
             c.mlirDiagnosticPrint(note_d, printToStderr, null);
             i += 1;
         }
-        stderr.print("{s}", .{"\n"}) catch unreachable;
+        stderr.print("{s}", .{"\n"}) catch return c.mlirLogicalResultFailure();
         return c.mlirLogicalResultSuccess();
     }
 };
@@ -478,6 +478,14 @@ export fn beaver_raw_context_attach_diagnostic_handler(env: beam.env, _: c_int, 
     var arg0: mlir_capi.Context.T = mlir_capi.Context.resource.fetch(env, args[0]) catch
         return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(mlir_capi.Context.T));
     return mlir_capi.U64.resource.make(env, c.mlirContextAttachDiagnosticHandler(arg0, BeaverDiagnostic.errorHandler, null, BeaverDiagnostic.deleteUserData)) catch return beam.make_error_binary(env, "fail to make resource for: " ++ @typeName(mlir_capi.U64.T));
+}
+
+fn beaver_raw_parse_pass_pipeline(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+    var passManager: mlir_capi.MlirOpPassManager.T = mlir_capi.MlirOpPassManager.resource.fetch(env, args[0]) catch
+        return beam.make_error_binary(env, "when calling C function mlirParsePassPipeline, fail to fetch resource for passManager, expected: " ++ @typeName(mlir_capi.MlirOpPassManager.T));
+    var pipeline: mlir_capi.StringRef.T = mlir_capi.StringRef.resource.fetch(env, args[1]) catch
+        return beam.make_error_binary(env, "when calling C function mlirParsePassPipeline, fail to fetch resource for pipeline, expected: " ++ @typeName(mlir_capi.StringRef.T));
+    return mlir_capi.LogicalResult.resource.make(env, c.mlirOpPassManagerAddPipeline(passManager, pipeline, BeaverDiagnostic.printToStderr, null)) catch return beam.make_error_binary(env, "when calling C function mlirParsePassPipeline, fail to make resource for: " ++ @typeName(mlir_capi.LogicalResult.T));
 }
 
 fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
@@ -713,12 +721,14 @@ const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_beaver_type_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Type, c.mlirTypePrint).to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_operation_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Operation, c.mlirOperationPrint).to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_value_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Value, c.mlirValuePrint).to_charlist, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_pm_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.MlirOpPassManager, c.mlirPrintPassPipeline).to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_affine_map_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.AffineMap, c.mlirAffineMapPrint).to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_location_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Location, c.mlirLocationPrint).to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_get_resource_c_string", .arity = 1, .fptr = beaver_raw_get_resource_c_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_mlir_named_attribute_get", .arity = 2, .fptr = beaver_raw_mlir_named_attribute_get, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_own_opaque_ptr", .arity = 1, .fptr = beaver_raw_own_opaque_ptr, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_read_opaque_ptr", .arity = 2, .fptr = beaver_raw_read_opaque_ptr, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_parse_pass_pipeline", .arity = 2, .fptr = beaver_raw_parse_pass_pipeline, .flags = 0 },
 } ++
     PtrOwner.Kind.nifs ++
     Complex.F32.nifs ++

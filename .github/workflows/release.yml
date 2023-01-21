@@ -38,6 +38,9 @@ jobs:
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-20.04 }
     steps:
       - uses: actions/checkout@v3
+      - name: Setting LLVM_COMMIT
+        run: |
+          echo "LLVM_COMMIT=$(cat LLVM_COMMIT)" >> $GITHUB_ENV
       - name: Set up Elixir
         uses: erlef/setup-beam@988e02bfe678367a02564f65ca2e37726dc0268f
         with:
@@ -58,7 +61,7 @@ jobs:
       - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Download pre-build LLVM
         run: |
-          wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/llvm-commit-1d31ea68c0cbc24d690a58c296b50b61595b6127-2022-10-25-0120/llvm-install-x86_64-unknown-linux-gnu-MinSizeRel.zip -O llvm-install.zip
+          wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/llvm-commit-${LLVM_COMMIT}/llvm-install-x86_64-unknown-linux-gnu-MinSizeRel.zip -O llvm-install.zip
           unzip llvm-install.zip -d $HOME/llvm-install
       - name: Compile
         env:

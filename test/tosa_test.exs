@@ -49,13 +49,9 @@ defmodule TosaTest do
         "arith-expand",
         "memref-expand"
       ])
-      |> MLIR.Pass.Composer.nested("func.func", fn pm ->
-        MLIR.Pass.pipeline!(pm, "tensor-bufferize")
-      end)
-      |> MLIR.Pass.Composer.pipeline("func-bufferize")
-      |> MLIR.Pass.Composer.nested("func.func", fn pm ->
-        MLIR.Pass.pipeline!(pm, "llvm-request-c-wrappers")
-      end)
+      |> MLIR.Pass.Composer.nested("func.func", "tensor-bufferize")
+      |> MLIR.Pass.Composer.append("func-bufferize")
+      |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
       |> convert_vector_to_llvm
       |> convert_memref_to_llvm
       |> convert_func_to_llvm
