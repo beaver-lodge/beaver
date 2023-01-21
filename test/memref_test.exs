@@ -38,9 +38,9 @@ defmodule MemRefTest do
       |> cse
       |> MLIR.Pass.Composer.nested("func.func", convert_linalg_to_loops())
       |> convert_scf_to_cf
-      |> MLIR.Pass.Composer.append("builtin.module(arith-bufferize)")
-      |> MLIR.Pass.Composer.append("builtin.module(func.func(linalg-bufferize))")
-      |> MLIR.Pass.Composer.append("builtin.module(func-bufferize)")
+      |> MLIR.Pass.Composer.append("arith-bufferize")
+      |> MLIR.Pass.Composer.nested("func.func", "linalg-bufferize")
+      |> MLIR.Pass.Composer.append("func-bufferize")
       |> MLIR.Pass.Composer.nested(
         "func.func",
         "func.func(finalizing-bufferize,buffer-deallocation,convert-linalg-to-loops)"

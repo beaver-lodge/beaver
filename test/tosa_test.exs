@@ -56,7 +56,7 @@ defmodule TosaTest do
       |> convert_memref_to_llvm
       |> convert_func_to_llvm
       |> reconcile_unrealized_casts
-      |> MLIR.Pass.Composer.run!(debug: true)
+      |> MLIR.Pass.Composer.run!()
 
     jit = ir |> MLIR.ExecutionEngine.create!()
 
