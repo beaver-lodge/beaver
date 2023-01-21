@@ -309,7 +309,7 @@ This approach archives both the succinctness and modularity of not having a glob
 2. Install Zig, https://ziglang.org/learn/getting-started/#installing-zig
 3. Install LLVM/MLIR
 
-- (optional) the LLVM commit used to test Beaver is in this [file](LLVM_COMMIT)
+- (optional) the LLVM commit used to test Beaver is in this file: [LLVM_COMMIT](LLVM_COMMIT)
 - build from source https://mlir.llvm.org/getting_started/
 
   Recommended install commands:

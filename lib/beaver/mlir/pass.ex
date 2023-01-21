@@ -4,7 +4,6 @@ defmodule Beaver.MLIR.Pass do
   """
   require Beaver.MLIR.CAPI
   alias Beaver.MLIR
-  alias MLIR.CAPI
 
   use Kinda.ResourceKind,
     fields: [handler: nil],
