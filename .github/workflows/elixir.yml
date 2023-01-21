@@ -19,7 +19,10 @@ jobs:
     strategy:
       matrix:
         otp: ["24.0", "25.0"]
-        elixir: ["1.9.0", "1.13.0"]
+        elixir: ["1.13.0", "1.14.0"]
+        include:
+          - otp: "23.0"
+            elixir: "1.9.0"
     steps:
       - uses: actions/checkout@v3
       - name: Setting LLVM_COMMIT
