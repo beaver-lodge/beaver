@@ -175,8 +175,8 @@ defmodule Beaver.Pattern do
     gen_pdl(env, f.(ctx))
   end
 
-  def gen_pdl(env, element) do
-    raise "not supported"
+  def gen_pdl(_env, element) do
+    raise "fail to generate pdl handle for element: #{inspect(element)}"
   end
 
   @doc """
