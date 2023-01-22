@@ -1,5 +1,7 @@
 # Beaver 🦫
 
+[![Package](https://img.shields.io/badge/-Package-important)](https://hex.pm/packages/beaver) [![Documentation](https://img.shields.io/badge/-Documentation-blueviolet)](https://hexdocs.pm/beaver)
+
 **Boost the almighty blue-silver dragon with some magical elixir!** 🧙🧙‍♀️🧙‍♂️
 
 ## Motivation
@@ -126,6 +128,8 @@ Beaver is essentially LLVM/MLIR on Erlang/Elixir. It is kind of interesting to s
 - Check out [the official guide](https://elixir-lang.org/getting-started/introduction.html) of Elixir.
 
 ## Getting started
+
+- Tutorial: [Your first compiler with Beaver!](https://hexdocs.pm/beaver/your-first-beaver-compiler.html)
 
 <!-- TODO: single .exs example -->
 
