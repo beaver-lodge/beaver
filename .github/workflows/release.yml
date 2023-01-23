@@ -8,6 +8,10 @@ on:
       - "*"
   pull_request:
     branches: ["main"]
+    paths-ignore:
+      - "*.md"
+      - "**/*.md"
+      - "LICENSE*"
 
 concurrency:
   group: precompiled-${{ github.ref }}

@@ -5,6 +5,10 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "*.md"
+      - "**/*.md"
+      - "LICENSE*"
 
 concurrency:
   group: build-livebook-image-${{ github.ref }}
