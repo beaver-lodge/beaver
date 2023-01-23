@@ -6,7 +6,7 @@ defmodule Beaver.MLIR.Pattern do
   @moduledoc """
   Although this module is `MLIR.Pattern`, at this point it is a synonym of PDL patterns.
   Pattern-matching is done by MLIR which works in a different way from Erlang pattern-matching.
-  The major difference is that MLIR pattern-matching will greedily match the patterns and maximize the benifit.
+  The major difference is that MLIR pattern-matching will greedily match the patterns and maximize the benefit.
   Compiled patterns will be saved as module attributes in MLIR assembly format.
   """
 
