@@ -110,6 +110,7 @@ defmodule Beaver do
       end
 
     quote do
+      require Beaver.Env
       alias Beaver.MLIR
       require Beaver.MLIR
       alias Beaver.MLIR.Type
@@ -170,6 +171,7 @@ defmodule Beaver do
 
     block_ast =
       quote do
+        require Beaver.Env
         unquote_splicing(args_type_ast)
         block_arg_types = [unquote_splicing(args_var_ast)]
         block_arg_locs = [unquote_splicing(locations_var_ast)]
@@ -203,6 +205,7 @@ defmodule Beaver do
       end
 
     quote do
+      require Beaver.Env
       region = Beaver.MLIR.CAPI.mlirRegionCreate()
       unquote(regions)
 
