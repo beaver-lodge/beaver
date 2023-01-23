@@ -247,7 +247,7 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   def add_argument(_state, {:regions, _}) do
-    raise "the function to create regions shuold have a arity of 0"
+    raise "the function to create regions should have a arity of 0"
   end
 
   def add_argument(%__MODULE__{results: results} = state, {:result_types, result_types})

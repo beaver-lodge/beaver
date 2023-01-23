@@ -145,6 +145,6 @@ These three steps are corespondent to what makes a compiler
 - Pass
 - CodeGen
 
-In next tutorial we are taking a more programable approach to generate the IR, converting Elixir AST to MLIR.
+In next tutorial we are taking a more programmable approach to generate the IR, converting Elixir AST to MLIR.
 By doing it we will pick up concepts like region, block, operations appear here but didn't receive much attention for now.
 You might want to look at the full list of MLIR dialects [here](https://mlir.llvm.org/docs/Dialects/).
