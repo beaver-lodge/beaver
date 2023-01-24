@@ -381,10 +381,23 @@ This approach archives both the succinctness and modularity of not having a glob
 
 ### Mac
 
-- Run macOS build with `bash scripts/build-for-publish.sh`
+- Run macOS build with:
+
+  ```bash
+  rm -rf _build/prod
+  bash scripts/build-for-publish.sh
+  ```
+
 - Upload the `libbeaver-[xxx]-nif-2.16-aarch64-apple-darwin.so.tar.gz` file to release
 
 ### Generate `checksum-xxx.exs`
 
-- `mix rustler_precompiled.download Beaver.MLIR.CAPI --all --ignore-unavailable --print`
-- `mix hex.publish`
+```
+mix rustler_precompiled.download Beaver.MLIR.CAPI --all --ignore-unavailable --print
+```
+
+### Publish to Hex
+
+```
+mix hex.publish
+```
