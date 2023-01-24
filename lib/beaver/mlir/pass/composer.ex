@@ -64,8 +64,24 @@ defmodule Beaver.MLIR.Pass.Composer do
   # nested pm
 
   defp add_pass(pm, {:nested, op_name, passes}) when is_binary(op_name) and is_list(passes) do
-    npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
-    for pass <- passes, do: add_pass(npm, pass)
+    for pass <- passes do
+      npm =
+        case pm do
+          %MLIR.CAPI.MlirPassManager{} ->
+            mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
+
+          %MLIR.CAPI.MlirOpPassManager{} ->
+            mlirOpPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
+        end
+
+      case pass do
+        {:nested, op_name, passes} ->
+          add_pass(npm, {:nested, op_name, passes})
+
+        _ ->
+          add_pass(npm, pass)
+      end
+    end
   end
 
   defp add_pass(pm, pipeline_str) when is_binary(pipeline_str),
