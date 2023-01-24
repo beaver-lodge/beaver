@@ -64,8 +64,18 @@ defmodule Beaver.MLIR.Pass.Composer do
   # nested pm
 
   defp add_pass(pm, {:nested, op_name, passes}) when is_binary(op_name) and is_list(passes) do
-    npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
-    for pass <- passes, do: add_pass(npm, pass)
+    npm =
+      case pm do
+        %MLIR.CAPI.MlirPassManager{} ->
+          mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
+
+        %MLIR.CAPI.MlirOpPassManager{} ->
+          mlirOpPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
+      end
+
+    for pass <- passes do
+      add_pass(npm, pass)
+    end
   end
 
   defp add_pass(pm, pipeline_str) when is_binary(pipeline_str),
@@ -77,15 +87,35 @@ defmodule Beaver.MLIR.Pass.Composer do
   defp add_pass(%MLIR.CAPI.MlirPassManager{} = pm, pass),
     do: mlirPassManagerAddOwnedPass(pm, create_pass(pass))
 
+  defp to_pm(%__MODULE__{passes: passes, op: %MLIR.Module{} = op}) do
+    ctx = MLIR.CAPI.mlirOperationGetContext(MLIR.Operation.from_module(op))
+
+    pm = mlirPassManagerCreate(ctx)
+
+    for pass <- passes do
+      add_pass(pm, pass)
+    end
+
+    pm
+  end
+
+  def to_pipeline(composer) do
+    pm = composer |> to_pm()
+    txt = pm |> MLIR.to_string()
+    mlirPassManagerDestroy(pm)
+    txt
+  end
+
   def run!(
-        %__MODULE__{passes: passes, op: %MLIR.Module{} = op},
+        %__MODULE__{op: %MLIR.Module{} = op} = composer,
         opts \\ [dump: false, debug: false, print: false, timing: false]
       ) do
     print = Keyword.get(opts, :print)
     timing = Keyword.get(opts, :timing)
     debug = Keyword.get(opts, :debug)
     ctx = MLIR.CAPI.mlirOperationGetContext(MLIR.Operation.from_module(op))
-    pm = mlirPassManagerCreate(ctx)
+
+    pm = to_pm(composer)
 
     if timing do
       pm |> beaverPassManagerEnableTiming()
@@ -97,10 +127,6 @@ defmodule Beaver.MLIR.Pass.Composer do
       mlirContextEnableMultithreading(ctx, false)
       mlirPassManagerEnableIRPrinting(pm)
       Logger.info("[Beaver] IR printing enabled")
-    end
-
-    for pass <- passes do
-      add_pass(pm, pass)
     end
 
     if debug do

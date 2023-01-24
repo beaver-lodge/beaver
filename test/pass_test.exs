@@ -6,8 +6,10 @@ defmodule PassTest do
   alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Dialect.{Func, Arith}
   require Func
+  import MLIR.{Transforms}
 
   defmodule PassRaisingException do
+    @moduledoc false
     use Beaver.MLIR.Pass, on: "func.func"
 
     def run(_op) do
@@ -58,5 +60,28 @@ defmodule PassTest do
        end}
     )
     |> MLIR.Pass.Composer.run!()
+  end
+
+  test "multi level nested", test_context do
+    ir = example_ir(test_context)
+
+    assert ir
+           |> canonicalize()
+           |> MLIR.Pass.Composer.nested(
+             "func.func1",
+             [
+               canonicalize(),
+               {:nested, "func.func2",
+                [
+                  canonicalize(),
+                  {:nested, "func.func3",
+                   [
+                     canonicalize()
+                   ]}
+                ]}
+             ]
+           )
+           |> MLIR.Pass.Composer.to_pipeline() =~
+             ~r/func1.+func2.+func.func3\(canonicalize/
   end
 end
