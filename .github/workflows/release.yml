@@ -18,6 +18,7 @@ concurrency:
   cancel-in-progress: true
 env:
   LLVM_CONFIG_PATH: "/home/runner/llvm-install/bin/llvm-config"
+  PRE_BUILT_RELEASE_GITHUB_TOKEN: ${{ secrets.PRE_BUILT_RELEASE_GITHUB_TOKEN }}
 
 jobs:
   generate_id:
@@ -129,7 +130,7 @@ jobs:
           mix test --exclude vulkan --exclude todo
       - name: Publish archives and packages
         uses: softprops/action-gh-release@v1
-        if: ${{ github.repository == 'beaver-lodge/beaver' }}
+        if: ${{ github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != null }}
         with:
           files: |
             ${{ steps.tar.outputs.LIB_FINAL_NAME }}

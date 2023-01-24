@@ -14,8 +14,12 @@ concurrency:
   group: build-livebook-image-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  PRE_BUILT_RELEASE_GITHUB_TOKEN: ${{ secrets.PRE_BUILT_RELEASE_GITHUB_TOKEN }}
+
 jobs:
   build-and-deploy:
+    if: ${{ github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != null }}
     runs-on: ubuntu-20.04
 
     env:
