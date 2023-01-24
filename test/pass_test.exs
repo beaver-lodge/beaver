@@ -65,11 +65,23 @@ defmodule PassTest do
   test "multi level nested", test_context do
     ir = example_ir(test_context)
 
-    ir
-    |> MLIR.Pass.Composer.nested("func.func", [
-      canonicalize(),
-      {:nested, "func.func", [canonicalize(), {:nested, "func.func", [canonicalize()]}]}
-    ])
-    |> MLIR.Pass.Composer.run!(debug: true)
+    assert ir
+           |> canonicalize()
+           |> MLIR.Pass.Composer.nested(
+             "func.func1",
+             [
+               canonicalize(),
+               {:nested, "func.func2",
+                [
+                  canonicalize(),
+                  {:nested, "func.func3",
+                   [
+                     canonicalize()
+                   ]}
+                ]}
+             ]
+           )
+           |> MLIR.Pass.Composer.to_pipeline() =~
+             ~r/func1.+func2.+func.func3\(canonicalize/
   end
 end
