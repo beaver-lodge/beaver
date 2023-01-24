@@ -370,9 +370,12 @@ This approach archives both the succinctness and modularity of not having a glob
 
 ## Release a new version
 
-### Linux
+### Update Elixir source
 
 - Bump versions in `lib/beaver/mlir/capi.ex` and `mix.exs`
+
+### Linux
+
 - Run CI, which generates the new GitHub release.
 - Update release url in `lib/beaver/mlir/capi.ex`
 
