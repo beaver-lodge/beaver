@@ -106,9 +106,24 @@ defmodule Beaver.MLIR.Pass.Composer do
     txt
   end
 
+  @run_default_opts [debug: false, print: false, timing: false]
+
   def run!(
+        composer,
+        opts \\ @run_default_opts
+      ) do
+    case run(composer, opts) do
+      {:ok, op} ->
+        op
+
+      {:error, msg} ->
+        raise msg
+    end
+  end
+
+  def run(
         %__MODULE__{op: %MLIR.Module{} = op} = composer,
-        opts \\ [dump: false, debug: false, print: false, timing: false]
+        opts \\ @run_default_opts
       ) do
     print = Keyword.get(opts, :print)
     timing = Keyword.get(opts, :timing)
@@ -143,12 +158,10 @@ defmodule Beaver.MLIR.Pass.Composer do
 
     mlirPassManagerDestroy(pm)
 
-    if not MLIR.LogicalResult.success?(status) do
-      raise "Unexpected failure running passes"
+    if MLIR.LogicalResult.success?(status) do
+      {:ok, op}
+    else
+      {:error, "Unexpected failure running passes"}
     end
-
-    if Keyword.get(opts, :dump, false), do: MLIR.Operation.dump(op)
-
-    op
   end
 end
