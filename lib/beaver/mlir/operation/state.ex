@@ -46,6 +46,9 @@ defmodule Beaver.MLIR.Operation.State do
 
             %Beaver.MLIR.Attribute{} ->
               v
+
+            _ ->
+              raise "not supported kv for attribute: #{inspect({k, v})}"
           end
 
         if MLIR.is_null(attr) do
