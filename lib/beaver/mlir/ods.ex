@@ -10,7 +10,7 @@ defmodule Beaver.MLIR.ODS do
   Generate attribute for operand_segment_sizes
   """
   def operand_segment_sizes(sizes) when is_list(sizes) do
-    Attribute.dense_array(sizes)
+    Attribute.dense_array(sizes, Beaver.Native.I32)
   end
 
   defdelegate result_segment_sizes(sizes), to: __MODULE__, as: :operand_segment_sizes

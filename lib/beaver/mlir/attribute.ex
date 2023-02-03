@@ -81,14 +81,25 @@ defmodule Beaver.MLIR.Attribute do
     )
   end
 
-  def dense_array(elements, opts \\ []) when is_list(elements) do
+  def dense_array(elements, type, opts \\ []) when is_list(elements) do
+    getter =
+      case type do
+        Beaver.Native.I32 ->
+          &CAPI.mlirDenseI32ArrayGet/3
+
+        Beaver.Native.I64 ->
+          &CAPI.mlirDenseI64ArrayGet/3
+      end
+
     Beaver.Deferred.from_opts(
       opts,
-      &CAPI.mlirDenseI32ArrayGet(
-        &1,
-        length(elements),
-        Beaver.Native.array(elements, Beaver.Native.I32)
-      )
+      fn ctx ->
+        getter.(
+          ctx,
+          length(elements),
+          Beaver.Native.array(elements, type)
+        )
+      end
     )
   end
 
