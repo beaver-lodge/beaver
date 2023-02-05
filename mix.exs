@@ -93,7 +93,9 @@ defmodule Beaver.MixProject do
       {:kinda, "~> 0.2.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test]},
-      {:credo, "~> 1.6", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
+      {:gradient, github: "esl/gradient", only: [:dev], runtime: false},
+      {:doctor, "~> 0.21.0", only: :dev}
     ]
   end
 
