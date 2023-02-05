@@ -401,3 +401,11 @@ mix rustler_precompiled.download Beaver.MLIR.CAPI --all --ignore-unavailable --p
 ```
 mix hex.publish
 ```
+
+## Run linters/static analysis
+
+```
+mix doctor
+mix credo --all
+mix gradient
+```
