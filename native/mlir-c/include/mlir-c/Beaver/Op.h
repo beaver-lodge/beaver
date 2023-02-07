@@ -111,6 +111,9 @@ MLIR_CAPI_EXPORTED MlirPass beaverCreateExternalPass(
     void (*run)(MlirOperation op, MlirExternalPass pass, void *userData),
     void *userData);
 
+MLIR_CAPI_EXPORTED MlirAttribute beaverGetReassociationIndicesForReshape(
+    MlirType sourceType, MlirType targetType);
+
 #include "mlir-c/ExecutionEngine.h"
 
 MLIR_CAPI_EXPORTED bool beaverMlirExecutionEngineIsNull(MlirExecutionEngine w);
