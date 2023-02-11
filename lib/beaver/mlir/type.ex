@@ -63,10 +63,7 @@ defmodule Beaver.MLIR.Type do
       )
       when is_list(shape) do
     rank = length(shape)
-
     shape = shape |> Beaver.Native.array(Beaver.Native.I64)
-
-    CAPI.mlirAttributeGetNull()
     CAPI.mlirRankedTensorTypeGet(rank, shape, element_type, encoding)
   end
 

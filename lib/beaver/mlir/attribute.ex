@@ -13,6 +13,7 @@ defmodule Beaver.MLIR.Attribute do
   alias Beaver.MLIR.CAPI
   require Beaver.MLIR.CAPI
   alias Beaver.MLIR
+  import MLIR.Sigils
 
   use Kinda.ResourceKind,
     forward_module: Beaver.Native
@@ -166,5 +167,16 @@ defmodule Beaver.MLIR.Attribute do
       opts,
       &CAPI.mlirFlatSymbolRefAttrGet(&1, symbol)
     )
+  end
+
+  def index(value, opts \\ []) when is_integer(value) do
+    Beaver.Deferred.from_opts(
+      opts,
+      fn ctx -> ~a{#{value} : index}.(ctx) end
+    )
+  end
+
+  def null() do
+    CAPI.mlirAttributeGetNull()
   end
 end
