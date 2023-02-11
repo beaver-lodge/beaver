@@ -16,4 +16,8 @@ defmodule Beaver.MLIR.Dialect.Tensor do
     end
     |> Attribute.array()
   end
+
+  def reassociation_for_reshape(src, target) do
+    Beaver.MLIR.CAPI.beaverGetReassociationIndicesForReshape(src, target)
+  end
 end

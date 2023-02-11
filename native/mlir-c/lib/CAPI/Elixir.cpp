@@ -9,6 +9,7 @@ MLIR_DEFINE_CAPI_DIALECT_REGISTRATION(Elixir, elixir,
 
 // TODO: move these to another file
 #include "mlir/CAPI/Beaver.h"
+#include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
@@ -286,4 +287,15 @@ MLIR_CAPI_EXPORTED MlirPass beaverCreateExternalPass(
       dependentDialects,
       MlirExternalPassCallbacks{construct, destruct, initialize, clone, run},
       userData);
+}
+
+MLIR_CAPI_EXPORTED MlirAttribute beaverGetReassociationIndicesForReshape(
+    MlirType sourceType, MlirType targetType) {
+  auto indices = mlir::getReassociationIndicesForReshape(unwrap(sourceType),
+                                                         unwrap(targetType));
+  OpBuilder b{unwrap(sourceType).getContext()};
+  if (!indices) {
+    return wrap(Attribute{});
+  }
+  return wrap(getReassociationIndicesAttribute(b, *indices));
 }

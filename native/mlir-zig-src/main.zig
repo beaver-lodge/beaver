@@ -684,7 +684,8 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
             per_rank_resource_kinds[1].nifs ++
             per_rank_resource_kinds[2].nifs ++
             per_rank_resource_kinds[3].nifs ++
-            per_rank_resource_kinds[4].nifs;
+            per_rank_resource_kinds[4].nifs ++
+            per_rank_resource_kinds[5].nifs;
         fn MemRefOfRank(comptime rank: u8) type {
             if (rank == 0) {
                 return kinda.ResourceKind2(UnrankMemRefDescriptor(ResourceKind));
@@ -698,6 +699,7 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
             MemRefOfRank(2),
             MemRefOfRank(3),
             MemRefOfRank(4),
+            MemRefOfRank(5),
         };
         fn open(env: beam.env) void {
             comptime var i = 0;
