@@ -47,6 +47,10 @@ defmodule Beaver.MLIR.Type do
     &ranked_tensor(shape, f.(&1), encoding)
   end
 
+  defp escape_dynamic(:dynamic), do: MLIR.CAPI.mlirShapedTypeGetDynamicStrideOrOffset()
+
+  defp escape_dynamic(dim), do: dim
+
   def ranked_tensor(
         shape,
         %MLIR.Type{} = element_type,
@@ -63,7 +67,12 @@ defmodule Beaver.MLIR.Type do
       )
       when is_list(shape) do
     rank = length(shape)
-    shape = shape |> Beaver.Native.array(Beaver.Native.I64)
+
+    shape =
+      shape
+      |> Enum.map(&escape_dynamic/1)
+      |> Beaver.Native.array(Beaver.Native.I64)
+
     CAPI.mlirRankedTensorTypeGet(rank, shape, element_type, encoding)
   end
 

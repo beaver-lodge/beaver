@@ -16,48 +16,49 @@ defmodule Beaver.MLIR do
     MlirPassManager
   }
 
+  defp dump_if_not_null(ir, dumper) do
+    if is_null(ir) do
+      {:error, "can't dump null"}
+    else
+      dumper.(ir)
+    end
+  end
+
   def dump(%__MODULE__.Module{} = mlir) do
     CAPI.mlirModuleGetOperation(mlir)
     |> dump
   end
 
   def dump(%__MODULE__.Operation{} = mlir) do
-    CAPI.mlirOperationDump(mlir)
-    :ok
+    dump_if_not_null(mlir, &CAPI.mlirOperationDump/1)
   end
 
   def dump(%Attribute{} = mlir) do
-    CAPI.mlirAttributeDump(mlir)
-    :ok
+    dump_if_not_null(mlir, &CAPI.mlirAttributeDump/1)
   end
 
   def dump(%Value{} = mlir) do
-    CAPI.mlirValueDump(mlir)
-    :ok
+    dump_if_not_null(mlir, &CAPI.mlirValueDump/1)
   end
 
   def dump(%MlirAffineExpr{} = mlir) do
-    CAPI.mlirAffineExprDump(mlir)
-    :ok
+    dump_if_not_null(mlir, &CAPI.mlirAffineExprDump/1)
   end
 
   def dump(%AffineMap{} = mlir) do
-    CAPI.mlirAffineMapDump(mlir)
-    :ok
+    dump_if_not_null(mlir, &CAPI.mlirAffineMapDump/1)
   end
 
   def dump(%MlirIntegerSet{} = mlir) do
-    CAPI.mlirIntegerSetDump(mlir)
-    :ok
+    dump_if_not_null(mlir, &CAPI.mlirIntegerSetDump/1)
   end
 
   def dump(%Type{} = mlir) do
-    CAPI.mlirTypeDump(mlir)
-    :ok
+    dump_if_not_null(mlir, &CAPI.mlirTypeDump/1)
   end
 
   def dump(_) do
-    :error
+    {:error, "not a mlir element can be dumped"}
   end
 
   def dump!(mlir) do
@@ -65,9 +66,8 @@ defmodule Beaver.MLIR do
       :ok ->
         mlir
 
-      :error ->
-        error_msg = "can't dump #{inspect(mlir)}"
-        raise error_msg
+      {:error, msg} ->
+        raise msg
     end
   end
 

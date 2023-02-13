@@ -42,6 +42,14 @@ defmodule EntityTest do
              |> MLIR.to_string() ==
                "tensor<f32>"
 
+      assert Type.ranked_tensor([1, 2], Type.f32()).(ctx)
+             |> MLIR.to_string() ==
+               "tensor<1x2xf32>"
+
+      assert Type.ranked_tensor([1, :dynamic, 2], Type.f32()).(ctx)
+             |> MLIR.to_string() ==
+               "tensor<1x?x2xf32>"
+
       assert Type.memref([], Type.f32()).(ctx)
              |> MLIR.to_string() ==
                "memref<f32>"
@@ -126,6 +134,14 @@ defmodule EntityTest do
       empty = Attribute.array([])
 
       assert empty
+    end
+
+    test "null" do
+      null = Attribute.null()
+
+      assert_raise RuntimeError, ~r"can't dump null", fn ->
+        null |> MLIR.dump!()
+      end
     end
   end
 end
