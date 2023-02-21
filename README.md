@@ -330,8 +330,8 @@ This approach archives both the succinctness and modularity of not having a glob
 - Build and run Elixir tests
   ```bash
   mix deps.get
-  # build Zig NIFs
-  mix compile --force
+  # build the shared library used in Zig NIFs
+  MIX_ENV=test mix beaver.cmake
   mix test
   # run tests with filters
   mix test --exclude vulkan # use this to skip vulkan tests
