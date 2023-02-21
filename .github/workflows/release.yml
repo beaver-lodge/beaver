@@ -72,7 +72,8 @@ jobs:
         env:
           MIX_ENV: prod
         run: |
-          mix compile --force
+          mix beaver.cmake
+          mix compile
       - name: Run patchelf
         env:
           MIX_ENV: prod
