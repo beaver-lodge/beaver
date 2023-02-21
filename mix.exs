@@ -108,7 +108,7 @@ defmodule Beaver.MixProject do
 
   require Logger
 
-  defp do_cmake() do
+  defp do_cmake(opts \\ [verbose: false]) do
     cmake_project = "native/mlir-c"
     build = Path.join(Mix.Project.app_path(), "mlir-c-build")
     install = Path.join(Mix.Project.app_path(), "native-install")
@@ -120,7 +120,7 @@ defmodule Beaver.MixProject do
     llvm_cmake_dir = Path.join(llvm_lib_dir, "cmake/llvm")
     mlir_cmake_dir = Path.join(llvm_lib_dir, "cmake/mlir")
 
-    with {_, 0} <-
+    with {config_out, 0} <-
            System.cmd(
              "cmake",
              [
@@ -136,8 +136,13 @@ defmodule Beaver.MixProject do
              ],
              stderr_to_stdout: true
            ),
-         {_, 0} <-
+         {install_out, 0} <-
            System.cmd("cmake", ["--build", build, "--target", "install"], stderr_to_stdout: true) do
+      if opts[:verbose] do
+        IO.puts(config_out)
+        IO.puts(install_out)
+      end
+
       Logger.debug("[CMake] installed to #{install}")
       :ok
     else
@@ -160,6 +165,6 @@ defmodule Beaver.MixProject do
     Mix.Tasks.Deps.Compile.run(args)
     :ok = Application.ensure_started(:llvm_config)
     Code.ensure_compiled!(LLVMConfig)
-    do_cmake()
+    do_cmake(verbose: "--verbose" in args)
   end
 end
