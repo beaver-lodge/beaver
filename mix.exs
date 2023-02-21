@@ -156,9 +156,10 @@ defmodule Beaver.MixProject do
     end
   end
 
-  defp beaver_cmake(_args) do
-    Application.ensure_started(:llvm_config)
-    Code.ensure_compiled(LLVMConfig)
+  defp beaver_cmake(args) do
+    Mix.Tasks.Deps.Compile.run(args)
+    :ok = Application.ensure_started(:llvm_config)
+    Code.ensure_compiled!(LLVMConfig)
     do_cmake()
   end
 end
