@@ -396,9 +396,12 @@ This approach archives both the succinctness and modularity of not having a glob
 mix rustler_precompiled.download Beaver.MLIR.CAPI --all --ignore-unavailable --print
 ```
 
+Check the version in the output is correct.
+
 ### Publish to Hex
 
 ```
+MIX_ENV=dev mix beaver.cmake
 mix hex.publish
 ```
 
