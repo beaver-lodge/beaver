@@ -100,7 +100,10 @@ defmodule Beaver.MixProject do
   end
 
   defp aliases do
-    ["compile.cmake": &cmake/1]
+    [
+      "compile.cmake": &compile_cmake/1,
+      "beaver.cmake": &beaver_cmake/1
+    ]
   end
 
   require Logger
@@ -145,11 +148,17 @@ defmodule Beaver.MixProject do
   end
 
   @build_cmake Application.compile_env(:beaver, :build_cmake, false)
-  defp cmake(args) do
+  defp compile_cmake(args) do
     if @build_cmake or "--force" in args do
       do_cmake()
     else
       :noop
     end
+  end
+
+  defp beaver_cmake(_args) do
+    Application.ensure_started(:llvm_config)
+    Code.ensure_compiled(LLVMConfig)
+    do_cmake()
   end
 end
