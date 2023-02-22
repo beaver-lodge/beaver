@@ -285,8 +285,8 @@ This approach archives both the succinctness and modularity of not having a glob
 2. Install Zig, https://ziglang.org/learn/getting-started/#installing-zig
 3. Install LLVM/MLIR
 
-- (optional) the LLVM commit used to test Beaver is in this file: [LLVM_COMMIT](LLVM_COMMIT)
-- build from source https://mlir.llvm.org/getting_started/
+- (Recommended) the LLVM commit used to test Beaver is in this file: [LLVM_COMMIT](LLVM_COMMIT)
+- Build from source https://mlir.llvm.org/getting_started/
 
   Recommended install commands:
 
@@ -303,7 +303,7 @@ This approach archives both the succinctness and modularity of not having a glob
   export LLVM_CONFIG_PATH=$HOME/llvm-install/bin/llvm-config
   ```
 
-  To use Vulkan:
+  (Optional) To use Vulkan:
 
   - Install Vulkan SDK (global installation is required), reference: https://vulkan.lunarg.com/sdk/home
   - Setting environment variable by adding commands these to your bash/zsh profile:
@@ -315,7 +315,7 @@ This approach archives both the succinctness and modularity of not having a glob
     cd -
     ```
 
-  - use `vulkaninfo` and `vkvia` to verify Vulkan is working
+  - Use `vulkaninfo` and `vkvia` to verify Vulkan is working
   - Add `-DMLIR_ENABLE_VULKAN_RUNNER=ON` in LLVM CMake config command
 
 4. Run tests
