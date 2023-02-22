@@ -2,6 +2,10 @@ name: Build Livebook image
 
 on:
   pull_request:
+    paths-ignore:
+      - "*.md"
+      - "**/*.md"
+      - "LICENSE*"
   push:
     branches:
       - main
