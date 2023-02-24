@@ -120,8 +120,6 @@ jobs:
         env:
           MIX_ENV: test
         run: |
-          # run a force build to generate metadata of rustler_precompiled
-          mix compile --force || true
           mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local --print
       - name: Purge prod artifacts
         run: |
