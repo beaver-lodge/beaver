@@ -14,7 +14,7 @@ defmodule Beaver.MLIR.Location do
   ## Examples
       iex> ctx = MLIR.Context.create()
       iex> MLIR.Location.file(name: "filename", line: 1, column: 1, ctx: ctx) |> MLIR.to_string()
-      ~s{loc("filename":1:1)}
+      ~s{filename:1:1}
       iex> ctx |> MLIR.Context.destroy
   """
 
