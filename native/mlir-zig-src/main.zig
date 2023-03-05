@@ -456,7 +456,7 @@ const BeaverDiagnostic = struct {
     pub fn errorHandler(diagnostic: c.MlirDiagnostic, _: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
         stderr.print("{s}", .{"[Beaver] [Diagnostic] ["}) catch return c.mlirLogicalResultFailure();
         const loc = c.mlirDiagnosticGetLocation(diagnostic);
-        c.mlirLocationPrint(loc, printToStderr, null);
+        c.beaverLocationPrint(loc, printToStderr, null);
         stderr.print("{s}", .{"] "}) catch return c.mlirLogicalResultFailure();
 
         c.mlirDiagnosticPrint(diagnostic, printToStderr, null);
