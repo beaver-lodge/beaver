@@ -137,6 +137,7 @@ jobs:
           token: ${{ secrets.PRE_BUILT_RELEASE_GITHUB_TOKEN }}
           tag_name: ${{ needs.generate_id.outputs.formatted_date }}
       - name: Test dev compile
+        if: ${{ github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != null }}
         run: |
           rm config/dev.exs
           echo 'import Config' >> config/dev.exs
