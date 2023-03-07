@@ -119,9 +119,16 @@ jobs:
       - name: Replace test config
         run: |
           cp config/release-test.exs config/test.exs
+      - name: Run download task
+        env:
+          MIX_ENV: test
+        run: |
+          # run a force build to generate metadata of rustler_precompiled
+          mix compile --force || true
+          mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local --print
       - name: Run tests with prebuilt
         run: |
-          mix test vulkan --exclude todo
+          mix test --exclude vulkan --exclude todo
       - name: Publish archives and packages
         uses: softprops/action-gh-release@v1
         if: ${{ github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != null }}
