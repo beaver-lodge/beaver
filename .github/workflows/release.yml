@@ -128,7 +128,7 @@ jobs:
           mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local --print
       - name: Run tests with prebuilt
         run: |
-          mix test --force --exclude vulkan --exclude todo
+          mix test --exclude vulkan --exclude todo
       - name: Publish archives and packages
         uses: softprops/action-gh-release@v1
         if: ${{ github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != null }}
