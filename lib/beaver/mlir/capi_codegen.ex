@@ -318,7 +318,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
   end
 
   @impl true
-  def nif_gen({:fn, _fn_opts, [name: :mlirPassManagerRun, params: _params, type: _ret]} = f) do
+  def nif_gen({:fn, _fn_opts, [name: :mlirPassManagerRunOnOp, params: _params, type: _ret]} = f) do
     %{NIFDecl.from_function(f) | dirty: :cpu}
   end
 

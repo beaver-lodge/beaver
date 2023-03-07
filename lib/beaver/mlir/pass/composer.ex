@@ -6,7 +6,9 @@ defmodule Beaver.MLIR.Pass.Composer do
   """
   @enforce_keys [:op]
   defstruct passes: [], op: nil
+  @type t :: %__MODULE__{passes: list(any()), op: MLIR.Module.t() | MLIR.Operation.t()}
   import Beaver.MLIR.CAPI
+  alias Beaver.Native.Bool
   alias Beaver.MLIR
 
   def new(%__MODULE__{} = composer), do: composer
@@ -87,7 +89,7 @@ defmodule Beaver.MLIR.Pass.Composer do
   defp add_pass(%MLIR.CAPI.MlirPassManager{} = pm, pass),
     do: mlirPassManagerAddOwnedPass(pm, create_pass(pass))
 
-  defp to_pm(%__MODULE__{passes: passes, op: %MLIR.Module{} = op}) do
+  defp to_pm(%__MODULE__{passes: passes, op: op}) do
     ctx = MLIR.CAPI.mlirOperationGetContext(MLIR.Operation.from_module(op))
 
     pm = mlirPassManagerCreate(ctx)
@@ -108,6 +110,12 @@ defmodule Beaver.MLIR.Pass.Composer do
 
   @run_default_opts [debug: false, print: false, timing: false]
 
+  @type run_option :: {:debug, Bool.t()} | {:print, Bool.t()} | {:timing, Bool.t()}
+  @type run_result :: {:ok, any()} | {:error, String.t()}
+  @type composer :: __MODULE__.t() | MLIR.Module.t() | MLIR.Operation.t()
+  @spec run!(composer, [run_option]) :: MLIR.Module.t() | MLIR.Operation.t()
+  @spec run(composer, [run_option]) :: run_result
+
   def run!(
         composer,
         opts \\ @run_default_opts
@@ -122,7 +130,7 @@ defmodule Beaver.MLIR.Pass.Composer do
   end
 
   def run(
-        %__MODULE__{op: %MLIR.Module{} = op} = composer,
+        %__MODULE__{op: op} = composer,
         opts \\ @run_default_opts
       ) do
     print = Keyword.get(opts, :print)
@@ -150,7 +158,7 @@ defmodule Beaver.MLIR.Pass.Composer do
       txt |> Logger.info()
     end
 
-    status = mlirPassManagerRun(pm, op)
+    status = mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(op))
 
     if print do
       mlirContextEnableMultithreading(ctx, true)

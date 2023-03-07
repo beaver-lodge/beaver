@@ -31,32 +31,36 @@ defmodule TosaTest do
           end
         end
       end
-      |> MLIR.Operation.verify!()
-      |> canonicalize
-      |> cse
-      |> tosa_to_scf
-      |> tosa_to_arith
-      |> tosa_to_tensor()
-      |> convert_tensor_to_linalg()
-      |> MLIR.Pass.Composer.nested("func.func", [
-        tosa_to_linalg(),
-        linalg_fuse_elementwise_ops(),
-        linalg_bufferize(),
-        convert_linalg_to_loops(),
-        lower_affine(),
-        convert_math_to_llvm(),
-        convert_scf_to_cf(),
-        "arith-expand",
-        "memref-expand"
-      ])
-      |> MLIR.Pass.Composer.nested("func.func", "tensor-bufferize")
-      |> MLIR.Pass.Composer.append("func-bufferize")
-      |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
-      |> convert_vector_to_llvm
-      |> convert_memref_to_llvm
-      |> convert_func_to_llvm
-      |> reconcile_unrealized_casts
-      |> MLIR.Pass.Composer.run!()
+
+    ir
+    |> MLIR.Operation.from_module()
+    |> MLIR.Operation.verify!()
+    |> canonicalize
+    |> cse
+    |> tosa_to_scf
+    |> tosa_to_arith
+    |> tosa_to_tensor()
+    |> convert_tensor_to_linalg()
+    |> MLIR.Pass.Composer.nested("func.func", [
+      tosa_to_linalg(),
+      linalg_fuse_elementwise_ops(),
+      linalg_bufferize(),
+      convert_linalg_to_loops(),
+      lower_affine(),
+      convert_math_to_llvm(),
+      convert_scf_to_cf(),
+      "arith-expand",
+      "memref-expand"
+    ])
+    |> MLIR.Pass.Composer.nested("func.func", "tensor-bufferize")
+    |> MLIR.Pass.Composer.append("func-bufferize")
+    |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
+    |> convert_vector_to_llvm
+    |> convert_func_to_llvm
+    |> MLIR.Pass.Composer.append("expand-strided-metadata")
+    |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
+    |> reconcile_unrealized_casts
+    |> MLIR.Pass.Composer.run!()
 
     jit = ir |> MLIR.ExecutionEngine.create!()
 

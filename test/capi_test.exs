@@ -158,7 +158,7 @@ defmodule MlirTest do
     assert MLIR.CAPI.mlirOperationVerify(module_op) |> Beaver.Native.to_term()
     pm = CAPI.mlirPassManagerCreate(ctx)
     CAPI.mlirPassManagerAddOwnedPass(pm, CAPI.mlirCreateTransformsCSE())
-    success = CAPI.mlirPassManagerRun(pm, module)
+    success = CAPI.mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(module))
 
     assert success
            |> CAPI.beaverLogicalResultIsSuccess()
@@ -197,7 +197,7 @@ defmodule MlirTest do
     pm = CAPI.mlirPassManagerCreate(ctx)
     CAPI.mlirPassManagerAddOwnedPass(pm, external)
     CAPI.mlirPassManagerAddOwnedPass(pm, CAPI.mlirCreateTransformsCSE())
-    success = CAPI.mlirPassManagerRun(pm, module)
+    success = CAPI.mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(module))
     assert Beaver.MLIR.LogicalResult.success?(success)
     CAPI.mlirPassManagerDestroy(pm)
     CAPI.mlirModuleDestroy(module)
@@ -213,7 +213,7 @@ defmodule MlirTest do
     pm = CAPI.mlirPassManagerCreate(ctx)
     npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
     CAPI.mlirOpPassManagerAddOwnedPass(npm, external)
-    success = CAPI.mlirPassManagerRun(pm, module)
+    success = CAPI.mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(module))
     assert Beaver.MLIR.LogicalResult.success?(success)
     CAPI.mlirPassManagerDestroy(pm)
     CAPI.mlirModuleDestroy(module)
@@ -227,7 +227,7 @@ defmodule MlirTest do
     pm = CAPI.mlirPassManagerCreate(ctx)
     npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
     CAPI.mlirOpPassManagerAddOwnedPass(npm, external)
-    success = CAPI.mlirPassManagerRun(pm, module)
+    success = CAPI.mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(module))
     assert Beaver.MLIR.LogicalResult.success?(success)
     CAPI.mlirPassManagerDestroy(pm)
     CAPI.mlirModuleDestroy(module)
@@ -252,14 +252,14 @@ defmodule MlirTest do
         MLIR.StringRef.create("func.func")
       )
 
-    mlirPassManagerAddOwnedPass(pm, mlirCreateConversionConvertFuncToLLVM())
+    mlirPassManagerAddOwnedPass(pm, mlirCreateConversionConvertFuncToLLVMPass())
 
     mlirOpPassManagerAddOwnedPass(
       opm,
       mlirCreateTransformsPrintOpStats()
     )
 
-    status = mlirPassManagerRun(pm, module)
+    status = mlirPassManagerRunOnOp(pm, module)
 
     if not MLIR.LogicalResult.success?(status) do
       raise "Unexpected failure running pass pipeline"
@@ -282,7 +282,7 @@ defmodule MlirTest do
     ctx = MLIR.Context.create()
     module = MLIR.Module.create(ctx, module_str)
     MLIR.Operation.verify!(module)
-    lower_to_llvm(ctx, module)
+    lower_to_llvm(ctx, MLIR.Operation.from_module(module))
     jit = MLIR.ExecutionEngine.create!(module)
     arg = Beaver.Native.I32.make(42)
     return = Beaver.Native.I32.make(-1)
