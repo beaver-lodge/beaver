@@ -83,7 +83,7 @@ jobs:
             echo "==> before replace needed"
             patchelf --print-needed $sofile
 
-            patchelf --replace-needed libMLIRBeaver.so.16git libMLIRBeaver.so $sofile
+            patchelf --replace-needed libMLIRBeaver.so.17git libMLIRBeaver.so $sofile
 
             echo "==> after"
             patchelf --print-needed $sofile
@@ -108,7 +108,6 @@ jobs:
           LIB_FINAL_NAME=${LIB_FINAL_SO}.tar.gz
           tar --dereference -cvzf ${LIB_FINAL_NAME} \
             -C $PWD/_build/${MIX_ENV}/lib/beaver/native-install/lib $(cd $PWD/_build/${MIX_ENV}/lib/beaver/native-install/lib && ls *.so) \
-            -C $PWD/_build/${MIX_ENV}/lib/beaver/native-install/lib $(cd $PWD/_build/${MIX_ENV}/lib/beaver/native-install/lib && ls *.so.*) \
             -C $PWD/_build/${MIX_ENV}/lib/beaver/native-install/lib $(cd $PWD/_build/${MIX_ENV}/lib/beaver/native-install/lib && ls *.dylib) \
             -C $PWD/_build/${MIX_ENV}/lib/beaver/native-install $(cd $PWD/_build/${MIX_ENV}/lib/beaver/native-install && ls *.ex)
           echo "LIB_FINAL_NAME=${LIB_FINAL_NAME}" >> $GITHUB_OUTPUT
