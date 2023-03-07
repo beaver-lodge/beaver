@@ -1,10 +1,3 @@
-base_url =
-  Application.compile_env(
-    :beaver,
-    :prebuilt_base_url,
-    "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-02-21-1141"
-  )
-
 defmodule Beaver.MLIR.CAPI do
   @moduledoc """
   This module ships MLIR's C API. These NIFs are generated from headers in LLVM repo and this repo's headers providing supplemental functions.
@@ -28,7 +21,12 @@ defmodule Beaver.MLIR.CAPI do
   use Kinda.Prebuilt,
     otp_app: :beaver,
     lib_name: "beaver",
-    base_url: base_url,
+    base_url:
+      Application.compile_env(
+        :beaver,
+        :prebuilt_base_url,
+        "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-02-21-1141"
+      ),
     version: "0.2.18",
     wrapper: Path.join(File.cwd!(), "native/mlir-c/include/mlir-c/Beaver/wrapper.h"),
     zig_src: "native/mlir-zig-src",
