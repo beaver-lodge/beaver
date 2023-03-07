@@ -18,15 +18,17 @@ defmodule Beaver.MLIR.CAPI do
         %{}
     end
 
+  base_url =
+    Application.compile_env(
+      :beaver,
+      :prebuilt_base_url,
+      "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-02-21-1141"
+    )
+
   use Kinda.Prebuilt,
     otp_app: :beaver,
     lib_name: "beaver",
-    base_url:
-      Application.compile_env(
-        :beaver,
-        :prebuilt_base_url,
-        "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-02-21-1141"
-      ),
+    base_url: base_url,
     version: "0.2.18",
     wrapper: Path.join(File.cwd!(), "native/mlir-c/include/mlir-c/Beaver/wrapper.h"),
     zig_src: "native/mlir-zig-src",
