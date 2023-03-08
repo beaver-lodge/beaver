@@ -68,7 +68,7 @@ jobs:
         run: |
           wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/llvm-commit-${LLVM_COMMIT}/llvm-install-x86_64-unknown-linux-gnu-MinSizeRel.zip -O llvm-install.zip
           unzip llvm-install.zip -d $HOME/llvm-install
-      - name: Compile
+      - name: Production compile
         env:
           MIX_ENV: prod
         run: |
@@ -83,7 +83,7 @@ jobs:
             echo "==> before replace needed"
             patchelf --print-needed $sofile
 
-            patchelf --replace-needed libMLIRBeaver.so.16git libMLIRBeaver.so $sofile
+            patchelf --replace-needed libMLIRBeaver.so.17git libMLIRBeaver.so $sofile
 
             echo "==> after"
             patchelf --print-needed $sofile
@@ -97,12 +97,13 @@ jobs:
             echo "==> after"
             patchelf --print-rpath $sofile
           done
-      - name: Tar native libraries
+      - name: Tar production native libraries
         id: tar
         env:
           MIX_ENV: prod
         run: |
           set -u
+          ls _build/${MIX_ENV}/lib/beaver/native-install/lib
           LIB_FINAL_SO=$(ls _build/${MIX_ENV}/lib/beaver/native-install/lib | grep -E "libbeaver.+so")
           LIB_FINAL_NAME=${LIB_FINAL_SO}.tar.gz
           tar --dereference -cvzf ${LIB_FINAL_NAME} \
@@ -110,10 +111,10 @@ jobs:
             -C $PWD/_build/${MIX_ENV}/lib/beaver/native-install/lib $(cd $PWD/_build/${MIX_ENV}/lib/beaver/native-install/lib && ls *.dylib) \
             -C $PWD/_build/${MIX_ENV}/lib/beaver/native-install $(cd $PWD/_build/${MIX_ENV}/lib/beaver/native-install && ls *.ex)
           echo "LIB_FINAL_NAME=${LIB_FINAL_NAME}" >> $GITHUB_OUTPUT
-      - name: Purge prod artifacts
+      - name: Purge artifacts
         run: |
           mix clean
-      - name: Start mock server
+      - name: Start mock server in the background
         run: |
           python3 -m http.server --directory . &> /dev/null &
       - name: Replace test config
@@ -128,6 +129,7 @@ jobs:
           mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local --print
       - name: Run tests with prebuilt
         run: |
+          mix clean
           mix test --exclude vulkan --exclude todo
       - name: Publish archives and packages
         uses: softprops/action-gh-release@v1
