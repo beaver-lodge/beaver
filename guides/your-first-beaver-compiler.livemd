@@ -8,13 +8,214 @@ Mix.install([
 ])
 ```
 
+<!-- livebook:{"output":true} -->
+
+```
+Resolving Hex dependencies...
+Resolution completed in 1.262s
+New:
+  beaver 0.2.19
+  castore 1.0.3
+  kinda 0.2.13
+  llvm_config 0.1.0
+  nimble_parsec 1.3.1
+  pegasus 0.2.2
+  rustler_precompiled 0.6.1
+  zig_parser 0.1.6
+* Getting beaver (Hex package)
+* Getting kinda (Hex package)
+* Getting llvm_config (Hex package)
+* Getting rustler_precompiled (Hex package)
+* Getting zig_parser (Hex package)
+* Getting pegasus (Hex package)
+* Getting nimble_parsec (Hex package)
+* Getting castore (Hex package)
+==> nimble_parsec
+Compiling 4 files (.ex)
+Generated nimble_parsec app
+==> pegasus
+Compiling 11 files (.ex)
+Generated pegasus app
+==> zig_parser
+Compiling 21 files (.ex)
+Generated zig_parser app
+==> llvm_config
+Compiling 1 file (.ex)
+Generated llvm_config app
+==> castore
+Compiling 1 file (.ex)
+Generated castore app
+==> rustler_precompiled
+Compiling 4 files (.ex)
+Generated rustler_precompiled app
+==> kinda
+Compiling 11 files (.ex)
+Generated kinda app
+==> beaver
+Compiling 64 files (.ex)
+
+10:56:36.203 [debug] Downloading NIF from https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-03-07-2326/libbeaver-v0.2.19-nif-2.16-aarch64-apple-darwin.so.tar.gz
+Compiling lib/beaver/mlir/capi.ex (it's taking more than 10s)
+
+10:57:23.171 [debug] NIF cached at /Users/tsai/Library/Caches/rustler_precompiled/precompiled_nifs/libbeaver-v0.2.19-nif-2.16-aarch64-apple-darwin.so.tar.gz and extracted to /Users/tsai/Library/Caches/mix/installs/elixir-1.14.5-erts-13.2.2/583d31ccacc76ee276c33b74af1a17e0/_build/dev/lib/beaver/priv/native/libbeaver-v0.2.19-nif-2.16-aarch64-apple-darwin.so
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirTypesCallback
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirTypeID
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirIntegerSet
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirAffineExpr
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirStringCallback
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirDialectHandle
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.Enum_MlirSparseTensorDimLevelType
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirDialectRegistry
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirDiagnosticHandlerID
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirDiagnosticHandler
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirDiagnostic
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirDiagnosticSeverity
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirPassManager
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirRewritePatternSet
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirPDLPatternModule
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirExecutionEngine
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirOperationState
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirSymbolTable
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirDialect
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirOperand
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirRegisteredOperationName
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirExternalPass
+
+10:57:23.217 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirExternalPassCallbacks
+
+10:57:23.218 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirOpPassManager
+
+10:57:23.218 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.Struct_MlirAffineMap
+
+10:57:23.218 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirOpOperand
+
+10:57:23.218 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirOpPrintingFlags
+
+10:57:23.218 [debug] [Kinda] building resource kind Elixir.Beaver.MLIR.CAPI.MlirTypeIDAllocator
+
+10:57:23.218 [debug] [Kinda] generating NIF wrappers, forward_module: Beaver.Native
+
+10:57:29.040 [debug] [Beaver] building Elixir module for dialect spirv => SPIRV (238)
+
+10:57:29.040 [debug] [Beaver] building Elixir module for dialect vector => Vector (41)
+
+10:57:29.040 [debug] [Beaver] building Elixir module for dialect shape => Shape (40)
+
+10:57:29.041 [debug] [Beaver] building Elixir module for dialect tosa => TOSA (70)
+
+10:57:29.074 [debug] [Beaver] building Elixir module for dialect tensor => Tensor (21)
+
+10:57:29.075 [debug] [Beaver] building Elixir module for dialect rocdl => ROCDL (60)
+
+10:57:29.078 [debug] [Beaver] building Elixir module for dialect pdl_interp => PDLInterp (39)
+
+10:57:29.081 [debug] [Beaver] building Elixir module for dialect llvm => LLVM (217)
+
+10:57:29.086 [debug] [Beaver] building Elixir module for dialect linalg => Linalg (63)
+
+10:57:29.100 [debug] [Beaver] building Elixir module for dialect acc => ACC (11)
+
+10:57:29.105 [debug] [Beaver] building Elixir module for dialect arith => Arith (47)
+
+10:57:29.116 [debug] [Beaver] building Elixir module for dialect cf => CF (4)
+
+10:57:29.120 [debug] [Beaver] building Elixir module for dialect builtin => Builtin (1)
+
+10:57:29.136 [debug] [Beaver] building Elixir module for dialect func => Func (5)
+
+10:57:29.137 [debug] [Beaver] building Elixir module for dialect affine => Affine (15)
+
+10:57:29.176 [debug] [Beaver] building Elixir module for dialect amdgpu => AMDGPU (8)
+
+10:57:29.189 [debug] [Beaver] building Elixir module for dialect amx => AMX (13)
+
+10:57:29.202 [debug] [Beaver] building Elixir module for dialect arm_neon => ArmNeon (3)
+
+10:57:29.215 [debug] [Beaver] building Elixir module for dialect arm_sve => ArmSVE (26)
+
+10:57:29.231 [debug] [Beaver] building Elixir module for dialect async => Async (29)
+
+10:57:29.246 [debug] [Beaver] building Elixir module for dialect bufferization => Bufferization (5)
+
+10:57:29.257 [debug] [Beaver] building Elixir module for dialect complex => Complex (27)
+
+10:57:29.272 [debug] [Beaver] building Elixir module for dialect dlti => DLTI (0)
+
+10:57:29.280 [debug] [Beaver] building Elixir module for dialect emitc => EmitC (6)
+
+10:57:29.290 [debug] [Beaver] building Elixir module for dialect gpu => GPU (34)
+
+10:57:29.305 [debug] [Beaver] building Elixir module for dialect index => Index (26)
+
+10:57:29.317 [debug] [Beaver] building Elixir module for dialect math => Math (32)
+
+10:57:29.330 [debug] [Beaver] building Elixir module for dialect memref => MemRef (32)
+
+10:57:29.342 [debug] [Beaver] building Elixir module for dialect ml_program => MLProgram (11)
+
+10:57:29.355 [debug] [Beaver] building Elixir module for dialect nvgpu => NVGPU (6)
+
+10:57:29.365 [debug] [Beaver] building Elixir module for dialect nvvm => NVVM (28)
+
+10:57:29.376 [debug] [Beaver] building Elixir module for dialect omp => OMP (33)
+
+10:57:29.390 [debug] [Beaver] building Elixir module for dialect pdl => PDL (15)
+
+10:57:29.401 [debug] [Beaver] building Elixir module for dialect quant => Quant (3)
+
+10:57:29.410 [debug] [Beaver] building Elixir module for dialect scf => SCF (12)
+
+10:57:29.420 [debug] [Beaver] building Elixir module for dialect sparse_tensor => SparseTensor (29)
+
+10:57:29.433 [debug] [Beaver] building Elixir module for dialect transform => Transform (60)
+
+10:57:29.447 [debug] [Beaver] building Elixir module for dialect x86vector => X86Vector (15)
+Generated beaver app
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+
+10:57:29.783 [debug] [Beaver] all passes registered
+
+```
+
 ## What makes a compiler
 
 Before start coding anything. Let's get some intuition about what a typical compiler is made of.
 
-- IR
-- Pass
-- CodeGen
+* IR
+* Pass
+* CodeGen
 
 ## A taste of MLIR
 
@@ -23,7 +224,9 @@ So we can start with something fun, generating the IR.
 
 ```elixir
 use Beaver
-
+alias Beaver.MLIR.Dialect.Func
+alias Beaver.MLIR.Dialect.Arith
+require Func
 ctx = MLIR.Context.create()
 
 ir =
@@ -40,6 +243,8 @@ ir =
       end
     end
   end
+
+ir |> Beaver.MLIR.to_string() |> IO.puts()
 ```
 
 <!-- livebook:{"output":true} -->
@@ -53,6 +258,12 @@ module {
   }
 }
 
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
 ```
 
 As you can see, with MLIR we are not working with those low level LLVM instructions you might have seen somewhere else.
@@ -80,11 +291,11 @@ import MLIR.Conversion
 llvm_ir =
   ir
   |> convert_arith_to_llvm
-  |> MLIR.Pass.Composer.nested("func.func", fn pm ->
-    MLIR.Pass.pipeline!(pm, "func.func(llvm-request-c-wrappers)")
-  end)
+  |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
   |> convert_func_to_llvm
   |> MLIR.Pass.Composer.run!()
+
+llvm_ir |> Beaver.MLIR.to_string() |> IO.puts()
 ```
 
 <!-- livebook:{"output":true} -->
@@ -102,6 +313,12 @@ module attributes {llvm.data_layout = ""} {
   }
 }
 
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+:ok
 ```
 
 Now you can see the IR seems to "grow" a little. It is called "lowering".
@@ -135,15 +352,15 @@ MLIR.ExecutionEngine.invoke!(jit, "some_func", arguments, return)
 Congratulations! You have just built your first compiler with Beaver.
 There could be a lot to unpack and here is the summary:
 
-- First we generate some MLIR with the `mlir/1` macro.
-- Then we convert it to LLVM IR with `convert_func_to_llvm` and `convert_arith_to_llvm` passes.
-- Later we create a JIT engine from the generated LLVM IR with `MLIR.ExecutionEngine.create!` and run the native function.
+* First we generate some MLIR with the `mlir/1` macro.
+* Then we convert it to LLVM IR with `convert_func_to_llvm` and `convert_arith_to_llvm` passes.
+* Later we create a JIT engine from the generated LLVM IR with `MLIR.ExecutionEngine.create!` and run the native function.
 
 These three steps are corespondent to what makes a compiler
 
-- IR
-- Pass
-- CodeGen
+* IR
+* Pass
+* CodeGen
 
 In next tutorial we are taking a more programmable approach to generate the IR, converting Elixir AST to MLIR.
 By doing it we will pick up concepts like region, block, operations appear here but didn't receive much attention for now.
