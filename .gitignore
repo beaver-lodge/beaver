@@ -36,3 +36,4 @@ checksum-*.exs
 beaver-*.tar
 
 .elixir_ls
+*.precodegen

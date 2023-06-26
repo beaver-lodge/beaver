@@ -100,6 +100,16 @@ defmodule Beaver.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
+  defp deps(:charm) do
+    [
+      {:intermediator, "~> 0.1.0",
+       if((path = System.get_env("BEAVER_INTERMEDIATOR_SRC_PATH")) && Mix.env() == :test,
+         do: [path: path],
+         else: []
+       )}
+    ]
+  end
+
   defp deps do
     [
       {:elixir_make, "~> 0.4", runtime: false},
@@ -110,6 +120,6 @@ defmodule Beaver.MixProject do
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
       {:gradient, github: "esl/gradient", only: [:dev], runtime: false},
       {:doctor, "~> 0.21.0", only: :dev}
-    ]
+    ] ++ deps(:charm)
   end
 end
