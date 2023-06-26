@@ -1,4 +1,5 @@
 add_mlir_dialect_library(MLIRElixir
+        DISABLE_INSTALL
         ElixirDialect.cpp
         ElixirOps.cpp
 

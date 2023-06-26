@@ -1,7 +1,15 @@
 defmodule Beaver.MixProject do
   use Mix.Project
+  @build_cmake Application.compile_env(:beaver, :build_cmake, false)
 
   def project do
+    make_compilers =
+      if @build_cmake do
+        [:elixir_make]
+      else
+        []
+      end
+
     [
       app: :beaver,
       version: "0.2.19",
@@ -12,8 +20,7 @@ defmodule Beaver.MixProject do
       description: description(),
       docs: docs(),
       package: package(),
-      compilers: [:cmake] ++ Mix.compilers(),
-      aliases: aliases(),
+      compilers: make_compilers ++ Mix.compilers(),
       preferred_cli_env: [
         "test.watch": :test
       ]
@@ -72,6 +79,7 @@ defmodule Beaver.MixProject do
         native/**/*.td
         native/**/*.cpp
         checksum-*.exs
+        Makefile
       }
     ]
   end
@@ -89,6 +97,7 @@ defmodule Beaver.MixProject do
 
   defp deps do
     [
+      {:elixir_make, "~> 0.4", runtime: false},
       {:llvm_config, "~> 0.1.0"},
       {:kinda, "~> 0.2.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
@@ -97,74 +106,5 @@ defmodule Beaver.MixProject do
       {:gradient, github: "esl/gradient", only: [:dev], runtime: false},
       {:doctor, "~> 0.21.0", only: :dev}
     ]
-  end
-
-  defp aliases do
-    [
-      "compile.cmake": &compile_cmake/1,
-      "beaver.cmake": &beaver_cmake/1
-    ]
-  end
-
-  require Logger
-
-  defp do_cmake(opts \\ [verbose: false]) do
-    cmake_project = "native/mlir-c"
-    build = Path.join(Mix.Project.app_path(), "mlir-c-build")
-    install = Path.join(Mix.Project.app_path(), "native-install")
-
-    Logger.debug("[CMake] running...")
-
-    {:ok, llvm_lib_dir} = LLVMConfig.lib_dir()
-
-    llvm_cmake_dir = Path.join(llvm_lib_dir, "cmake/llvm")
-    mlir_cmake_dir = Path.join(llvm_lib_dir, "cmake/mlir")
-
-    with {config_out, 0} <-
-           System.cmd(
-             "cmake",
-             [
-               "-S",
-               cmake_project,
-               "-B",
-               build,
-               "-G",
-               "Ninja",
-               "-DLLVM_DIR=#{llvm_cmake_dir}",
-               "-DMLIR_DIR=#{mlir_cmake_dir}",
-               "-DCMAKE_INSTALL_PREFIX=#{install}"
-             ],
-             stderr_to_stdout: true
-           ),
-         {install_out, 0} <-
-           System.cmd("cmake", ["--build", build, "--target", "install"], stderr_to_stdout: true) do
-      if opts[:verbose] do
-        IO.puts(config_out)
-        IO.puts(install_out)
-      end
-
-      Logger.debug("[CMake] installed to #{install}")
-      :ok
-    else
-      {error, _} ->
-        Logger.info(error)
-        {:error, [error]}
-    end
-  end
-
-  @build_cmake Application.compile_env(:beaver, :build_cmake, false)
-  defp compile_cmake(args) do
-    if @build_cmake or "--force" in args do
-      do_cmake()
-    else
-      :noop
-    end
-  end
-
-  defp beaver_cmake(args) do
-    Mix.Tasks.Deps.Compile.run(args)
-    :ok = Application.ensure_started(:llvm_config)
-    Code.ensure_compiled!(LLVMConfig)
-    do_cmake(verbose: "--verbose" in args)
   end
 end
