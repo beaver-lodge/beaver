@@ -5,9 +5,13 @@ Following the evolvement of Mojo (here)[https://docs.modular.com/mojo/changelog.
 
 ## Why do we need it?
 
-- In the world of "accelerated compute", programming languages should support targeting hardware.
-  The common practice is usually a C/C++ library wrapped as a Python package.
-  We believe a more promising (more on this on the section [How is Mojo/Charm's approach is different from other ML libraries?]())
+This question could be restated as "What is the purpose of low level programming in Erlang and Elixir?"
+Previously, Erlang were primarily utilized for higher-level programming.
+The [Chisel](https://www.chisel-lang.org) project.
+the correctness and conciseness of FP.
+The widely popular ML library PyTorch and TF demonstrate the effectiveness of a computation graph API could be.
+
+- When it comes to "accelerated compute", programming languages ought to have the ability to target hardware. Typically, a C/C++ library is enclosed in a Python package as the prevailing method. However, we feel that a more encouraging approach exists, which will be explored further in the section titled [How is Mojo/Charm's approach different from other ML libraries?].
 - An accelerator has many "magical number". One way you can hardcoded optimization for them (different cache sizes, etc),
   or the programming language could ship an auto-tuner to automate the parameter search and according code generation.
 
