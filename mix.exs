@@ -1,6 +1,11 @@
 defmodule Beaver.MixProject do
   use Mix.Project
-  @build_cmake Application.compile_env(:beaver, :build_cmake, false)
+
+  @build_cmake Application.compile_env(
+                 :beaver,
+                 :build_cmake,
+                 System.get_env("BEAVER_BUILD_CMAKE") in ["1", "true"]
+               )
 
   def project do
     make_compilers =

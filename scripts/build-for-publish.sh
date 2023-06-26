@@ -1,7 +1,6 @@
 set -e
 export MIX_ENV=prod
-mix compile.elixir_make
-mix compile
+BEAVER_BUILD_CMAKE=1 mix compile
 LIB_FINAL_SO=$(ls _build/${MIX_ENV}/lib/beaver/native_install/lib | grep -E "libbeaver.+so")
 LIB_FINAL_NAME=${LIB_FINAL_SO}.tar.gz
 tar --dereference -cvzf ${LIB_FINAL_NAME} \
