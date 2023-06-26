@@ -399,6 +399,10 @@ fn MemRefDescriptorAccessor(comptime MemRefT: type) type {
     };
 }
 
+fn memref_module_name(comptime resource_kind: type, comptime rank: i32) []const u8 {
+     return resource_kind.module_name ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, rank));
+}
+
 fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
     return extern struct {
         pub fn make(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
@@ -409,10 +413,7 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
             var offset: mlir_capi.I64.T = mlir_capi.I64.resource.fetch(env, args[2]) catch
                 return beam.make_error_binary(env, "fail to fetch offset");
             const kind: type = dataKindToMemrefKind(ResourceKind);
-
-            // unrank has different type, so put it in a dedicated arm
             var descriptor: UnrankMemRefDescriptor(ResourceKind) = undefined;
-            // TODO: figure out how to write this in a more elegant way
             if (allocated == null) {
                 descriptor = .{
                     .offset = offset,
@@ -424,11 +425,10 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
                     .offset = offset,
                 };
             }
-
             return kind.per_rank_resource_kinds[0].resource.make(env, descriptor) catch return beam.make_error_binary(env, "fail to make unranked memref descriptor");
         }
         pub const maker = .{ make, 5 };
-        pub const module_name = ResourceKind.module_name ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, 0));
+        pub const module_name = memref_module_name(ResourceKind, 0);
         const ElementResourceKind = ResourceKind;
         const T = ResourceKind.T;
         allocated: ?*T = null,
@@ -542,7 +542,7 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
         }
         pub const maker = .{ make, 5 };
         pub const ElementResourceKind = ResourceKind;
-        pub const module_name = ResourceKind.module_name ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, N));
+        pub const module_name = memref_module_name(ResourceKind, N);
         pub var resource_type: beam.resource_type = undefined;
         fn allocated_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
             return MemRefDescriptorAccessor(@This()).allocated_ptr(env, args[0]);
@@ -587,7 +587,7 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
     };
 }
 
-const forward_module = "Elixir.Beaver.Native.Complex.F32";
+
 const Complex = struct {
     fn of(comptime ElementKind: type) type {
         return struct {
@@ -597,7 +597,7 @@ const Complex = struct {
             };
         };
     }
-    const F32 = kinda.ResourceKind(Complex.of(mlir_capi.F32).T, forward_module);
+    const F32 = kinda.ResourceKind(Complex.of(mlir_capi.F32).T, "Elixir.Beaver.Native.Complex.F32");
 };
 
 const MemRefDataType = enum {
