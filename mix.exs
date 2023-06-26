@@ -1,7 +1,15 @@
 defmodule Beaver.MixProject do
   use Mix.Project
+  @build_cmake Application.compile_env(:beaver, :build_cmake, false)
 
   def project do
+    make_compilers =
+      if @build_cmake do
+        [:elixir_make]
+      else
+        []
+      end
+
     [
       app: :beaver,
       version: "0.2.19",
@@ -12,7 +20,7 @@ defmodule Beaver.MixProject do
       description: description(),
       docs: docs(),
       package: package(),
-      compilers: [:elixir_make] ++ Mix.compilers(),
+      compilers: make_compilers ++ Mix.compilers(),
       preferred_cli_env: [
         "test.watch": :test
       ]
