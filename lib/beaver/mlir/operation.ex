@@ -111,14 +111,14 @@ defmodule Beaver.MLIR.Operation do
     else
       is_success = from_module(op) |> MLIR.CAPI.mlirOperationVerify() |> Beaver.Native.to_term()
 
+      if not is_success and debug do
+        Logger.info("Start printing op failed to pass the verification. This might crash.")
+        Logger.info(MLIR.to_string(op))
+      end
+
       if is_success do
         {:ok, op}
       else
-        if debug do
-          Logger.info("Start printing op failed to pass the verification. This might crash.")
-          Logger.info(MLIR.to_string(op))
-        end
-
         :fail
       end
     end

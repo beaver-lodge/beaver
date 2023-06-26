@@ -1,4 +1,6 @@
 defmodule Beaver.MLIR.Pass.Composer do
+  import Beaver.MLIR.CAPI
+  alias Beaver.MLIR
   require Logger
 
   @moduledoc """
@@ -6,10 +8,8 @@ defmodule Beaver.MLIR.Pass.Composer do
   """
   @enforce_keys [:op]
   defstruct passes: [], op: nil
-  @type t :: %__MODULE__{passes: list(any()), op: MLIR.Module.t() | MLIR.Operation.t()}
-  import Beaver.MLIR.CAPI
-  alias Beaver.Native.Bool
-  alias Beaver.MLIR
+  @type operation :: MLIR.Module.t() | MLIR.Operation.t()
+  @type t :: %__MODULE__{passes: list(any()), op: operation}
 
   def new(%__MODULE__{} = composer), do: composer
 
@@ -110,11 +110,11 @@ defmodule Beaver.MLIR.Pass.Composer do
 
   @run_default_opts [debug: false, print: false, timing: false]
 
-  @type run_option :: {:debug, Bool.t()} | {:print, Bool.t()} | {:timing, Bool.t()}
+  @type run_option :: {:debug, boolean()} | {:print, boolean()} | {:timing, boolean()}
   @type run_result :: {:ok, any()} | {:error, String.t()}
-  @type composer :: __MODULE__.t() | MLIR.Module.t() | MLIR.Operation.t()
-  @spec run!(composer, [run_option]) :: MLIR.Module.t() | MLIR.Operation.t()
-  @spec run(composer, [run_option]) :: run_result
+  @type composer :: __MODULE__.t()
+  @spec run!(composer) :: operation
+  @spec run!(composer, [run_option]) :: operation
 
   def run!(
         composer,
@@ -128,6 +128,9 @@ defmodule Beaver.MLIR.Pass.Composer do
         raise msg
     end
   end
+
+  @spec run(composer) :: run_result
+  @spec run(composer, [run_option]) :: run_result
 
   def run(
         %__MODULE__{op: op} = composer,

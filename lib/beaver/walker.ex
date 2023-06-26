@@ -373,10 +373,10 @@ defmodule Beaver.Walker do
   - You can run traversals in a MLIR pass by calling them in `run/1` so that it joins the general MLIR pass manager's orchestration and will be run in parallel when possible.
   """
   @spec traverse(
-          container(),
+          mlir(),
           any(),
-          (container() | element(), any() -> {mlir(), any()}),
-          (container() | element(), any() -> {mlir(), any()})
+          (mlir(), any() -> {mlir(), any()}),
+          (mlir(), any() -> {mlir(), any()})
         ) ::
           {mlir(), any()}
   def traverse(mlir, acc, pre, post) when is_function(pre, 2) and is_function(post, 2) do
@@ -492,7 +492,7 @@ defmodule Beaver.Walker do
   @doc """
   Performs a depth-first, pre-order traversal of a MLIR structure.
   """
-  @spec prewalk(t, (t -> t)) :: t
+  @spec prewalk(mlir(), (mlir() -> mlir())) :: mlir()
   def prewalk(ast, fun) when is_function(fun, 1) do
     elem(prewalk(ast, nil, fn x, nil -> {fun.(x), nil} end), 0)
   end
@@ -500,7 +500,7 @@ defmodule Beaver.Walker do
   @doc """
   Performs a depth-first, pre-order traversal of a MLIR structure using an accumulator.
   """
-  @spec prewalk(t, any, (t, any -> {t, any})) :: {t, any}
+  @spec prewalk(mlir(), any, (mlir(), any -> {mlir(), any})) :: {mlir(), any}
   def prewalk(ast, acc, fun) when is_function(fun, 2) do
     traverse(ast, acc, fun, fn x, a -> {x, a} end)
   end

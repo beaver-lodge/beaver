@@ -156,7 +156,7 @@ defmodule Beaver.MLIR.Operation.State do
          } = state
        )
        when not is_nil(location) and not is_function(location) do
-    %{state | context: CAPI.mlirLocationGetContext(location)}
+    %__MODULE__{state | context: CAPI.mlirLocationGetContext(location)}
   end
 
   defp prepare(
@@ -166,7 +166,7 @@ defmodule Beaver.MLIR.Operation.State do
          } = state
        )
        when not is_nil(context) do
-    %{state | location: CAPI.mlirLocationUnknownGet(context)}
+    %__MODULE__{state | location: CAPI.mlirLocationUnknownGet(context)}
   end
 
   defp prepare(
@@ -176,7 +176,7 @@ defmodule Beaver.MLIR.Operation.State do
          } = state
        )
        when not is_nil(context) and is_function(location, 1) do
-    %{state | location: location.(context)}
+    %__MODULE__{state | location: location.(context)}
   end
 
   defp prepare(
@@ -184,7 +184,7 @@ defmodule Beaver.MLIR.Operation.State do
            location: %Beaver.MLIR.Location{} = location
          } = state
        ) do
-    %{state | location: location}
+    %__MODULE__{state | location: location}
   end
 
   @doc """
@@ -214,14 +214,22 @@ defmodule Beaver.MLIR.Operation.State do
     |> add_results(results)
   end
 
-  @type argument() ::
-          Value.t()
+  @type attr_tag ::
+          {atom(), MLIR.Type.t()}
           | {atom(), MLIR.Attribute.t()}
+  @type argument() ::
+          MLIR.Value.t()
+          | MLIR.Block.t()
+          | MLIR.Region.t()
+          | attr_tag
+          | [attr_tag]
           | {:regions, function()}
           | {:result_types, [MLIR.Type.t()]}
+          | MLIR.Type.t()
+          | {:loc, Beaver.MLIR.Location.t()}
           | {MLIR.Block.t(), [MLIR.Value.t()]}
-          | MLIR.Block.t()
-  @spec add_argument(t(), argument()) :: CAPI.MlirOperationState.t()
+          | fun()
+  @spec add_argument(t(), argument()) :: t()
 
   @doc """
   Add an ODS argument to state.
@@ -237,16 +245,16 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   def add_argument(%__MODULE__{regions: regions} = state, %MLIR.Region{} = region) do
-    %{state | regions: regions ++ [region]}
+    %__MODULE__{state | regions: regions ++ [region]}
   end
 
   def add_argument(%__MODULE__{} = state, {:loc, %Beaver.MLIR.Location{} = location}) do
-    %{state | location: location}
+    %__MODULE__{state | location: location}
   end
 
   def add_argument(%__MODULE__{regions: regions} = state, {:regions, region_filler})
       when is_function(region_filler, 0) do
-    %{state | regions: regions ++ region_filler.()}
+    %__MODULE__{state | regions: regions ++ region_filler.()}
   end
 
   def add_argument(_state, {:regions, _}) do
@@ -255,29 +263,33 @@ defmodule Beaver.MLIR.Operation.State do
 
   def add_argument(%__MODULE__{results: results} = state, {:result_types, result_types})
       when is_list(result_types) do
-    %{state | results: results ++ result_types}
+    %__MODULE__{state | results: results ++ result_types}
   end
 
   def add_argument(%__MODULE__{results: results} = state, %MLIR.Type{} = result_type) do
-    %{state | results: results ++ [result_type]}
+    %__MODULE__{state | results: results ++ [result_type]}
   end
 
   def add_argument(
         %__MODULE__{successors: successors, operands: operands} = state,
         {%Beaver.MLIR.Block{} = successor_block, block_args}
       ) do
-    %{state | successors: successors ++ [successor_block], operands: operands ++ block_args}
+    %__MODULE__{
+      state
+      | successors: successors ++ [successor_block],
+        operands: operands ++ block_args
+    }
   end
 
   def add_argument(
         %__MODULE__{successors: successors} = state,
         %MLIR.Block{} = successor
       ) do
-    %{state | successors: successors ++ [successor]}
+    %__MODULE__{state | successors: successors ++ [successor]}
   end
 
   def add_argument(%__MODULE__{attributes: attributes} = state, value) when is_integer(value) do
-    %{state | attributes: attributes ++ [value: value]}
+    %__MODULE__{state | attributes: attributes ++ [value: value]}
   end
 
   def add_argument(
@@ -285,7 +297,7 @@ defmodule Beaver.MLIR.Operation.State do
         {name, %MLIR.Attribute{} = attr}
       )
       when is_atom(name) do
-    %{state | attributes: attributes ++ [{name, attr}]}
+    %__MODULE__{state | attributes: attributes ++ [{name, attr}]}
   end
 
   def add_argument(
@@ -293,7 +305,7 @@ defmodule Beaver.MLIR.Operation.State do
         {name, %MLIR.Type{} = type}
       )
       when is_atom(name) do
-    %{state | attributes: attributes ++ [{name, type}]}
+    %__MODULE__{state | attributes: attributes ++ [{name, type}]}
   end
 
   def add_argument(
@@ -301,7 +313,7 @@ defmodule Beaver.MLIR.Operation.State do
         {name, attr}
       )
       when is_atom(name) and is_binary(attr) do
-    %{state | attributes: attributes ++ [{name, attr}]}
+    %__MODULE__{state | attributes: attributes ++ [{name, attr}]}
   end
 
   def add_argument(
@@ -309,13 +321,13 @@ defmodule Beaver.MLIR.Operation.State do
         [{name, _attr} | _tail] = attrs
       )
       when is_atom(name) do
-    %{state | attributes: attributes ++ attrs}
+    %__MODULE__{state | attributes: attributes ++ attrs}
   end
 
   def add_argument(
         %__MODULE__{operands: operands} = state,
         %Beaver.MLIR.Value{} = operand
       ) do
-    %{state | operands: operands ++ [operand]}
+    %__MODULE__{state | operands: operands ++ [operand]}
   end
 end
