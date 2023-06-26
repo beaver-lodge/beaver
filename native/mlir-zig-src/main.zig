@@ -399,6 +399,10 @@ fn MemRefDescriptorAccessor(comptime MemRefT: type) type {
     };
 }
 
+fn memref_module_name(comptime resource_kind: type, comptime rank: i32) []const u8 {
+     return resource_kind.module_name ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, rank));
+}
+
 fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
     return extern struct {
         pub fn make(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
@@ -421,11 +425,10 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
                     .offset = offset,
                 };
             }
-
             return kind.per_rank_resource_kinds[0].resource.make(env, descriptor) catch return beam.make_error_binary(env, "fail to make unranked memref descriptor");
         }
         pub const maker = .{ make, 5 };
-        pub const module_name = ResourceKind.module_name ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, 0));
+        pub const module_name = memref_module_name(ResourceKind, 0);
         const ElementResourceKind = ResourceKind;
         const T = ResourceKind.T;
         allocated: ?*T = null,
@@ -539,7 +542,7 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
         }
         pub const maker = .{ make, 5 };
         pub const ElementResourceKind = ResourceKind;
-        pub const module_name = ResourceKind.module_name ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, N));
+        pub const module_name = memref_module_name(ResourceKind, N);
         pub var resource_type: beam.resource_type = undefined;
         fn allocated_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
             return MemRefDescriptorAccessor(@This()).allocated_ptr(env, args[0]);
