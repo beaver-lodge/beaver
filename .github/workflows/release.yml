@@ -72,8 +72,7 @@ jobs:
         env:
           MIX_ENV: prod
         run: |
-          mix compile.elixir_make --verbose
-          mix compile
+          BEAVER_BUILD_CMAKE=1 mix compile
       - name: Run patchelf
         env:
           MIX_ENV: prod

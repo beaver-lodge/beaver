@@ -330,9 +330,7 @@ This approach archives both the succinctness and modularity of not having a glob
 - Build and run Elixir tests
   ```bash
   mix deps.get
-  # build the shared library used in Zig NIFs
-  MIX_ENV=test mix compile.elixir_make
-  mix test
+  BEAVER_BUILD_CMAKE=1 mix test
   # run tests with filters
   mix test --exclude vulkan # use this to skip vulkan tests
   mix test --only smoke
@@ -401,8 +399,7 @@ Check the version in the output is correct.
 ### Publish to Hex
 
 ```
-MIX_ENV=dev mix compile.elixir_make
-mix hex.publish
+BEAVER_BUILD_CMAKE=1 mix hex.publish
 ```
 
 ## Run linters/static analysis
