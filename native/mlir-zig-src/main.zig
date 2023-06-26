@@ -409,10 +409,7 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
             var offset: mlir_capi.I64.T = mlir_capi.I64.resource.fetch(env, args[2]) catch
                 return beam.make_error_binary(env, "fail to fetch offset");
             const kind: type = dataKindToMemrefKind(ResourceKind);
-
-            // unrank has different type, so put it in a dedicated arm
             var descriptor: UnrankMemRefDescriptor(ResourceKind) = undefined;
-            // TODO: figure out how to write this in a more elegant way
             if (allocated == null) {
                 descriptor = .{
                     .offset = offset,
