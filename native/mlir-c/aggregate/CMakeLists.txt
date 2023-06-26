@@ -4,8 +4,8 @@ include(FetchContent)
 list(APPEND CMAKE_MODULE_PATH ${LLVM_MAIN_SRC_DIR}/cmake/modules)
 include(HandleLLVMOptions)
 
-# will want to build module by we don't want to build LLVM plugin
-# LLVM will set proper CMAKE_MODULE_LINKER_FLAGS
+# will want to build module by we don't want to build LLVM plugin LLVM will set
+# proper CMAKE_MODULE_LINKER_FLAGS
 set(CMAKE_SHARED_LINKER_FLAGS ${CMAKE_MODULE_LINKER_FLAGS})
 
 include_directories(${LLVM_INCLUDE_DIRS})

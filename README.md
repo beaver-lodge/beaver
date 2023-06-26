@@ -412,3 +412,11 @@ mix doctor
 mix credo --all
 mix gradient
 ```
+
+## (Optional) Format CMake files
+
+```bash
+python3 -m pip install cmake-format
+cmake-format -i native/**/*.cmake
+cmake-format -i native/**/CMakeLists.txt
+```
