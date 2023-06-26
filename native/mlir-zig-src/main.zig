@@ -587,7 +587,7 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
     };
 }
 
-const forward_module = "Elixir.Beaver.Native.Complex.F32";
+
 const Complex = struct {
     fn of(comptime ElementKind: type) type {
         return struct {
@@ -597,7 +597,7 @@ const Complex = struct {
             };
         };
     }
-    const F32 = kinda.ResourceKind(Complex.of(mlir_capi.F32).T, forward_module);
+    const F32 = kinda.ResourceKind(Complex.of(mlir_capi.F32).T, "Elixir.Beaver.Native.Complex.F32");
 };
 
 const MemRefDataType = enum {
