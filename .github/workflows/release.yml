@@ -72,7 +72,7 @@ jobs:
         env:
           MIX_ENV: prod
         run: |
-          mix beaver.cmake --verbose
+          mix compile.elixir_make --verbose
           mix compile
       - name: Run patchelf
         env:
