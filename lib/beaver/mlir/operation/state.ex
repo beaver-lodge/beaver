@@ -215,7 +215,7 @@ defmodule Beaver.MLIR.Operation.State do
   end
 
   @type argument() ::
-          Value.t()
+          MLIR.Value.t()
           | {atom(), MLIR.Attribute.t()}
           | {:regions, function()}
           | {:result_types, [MLIR.Type.t()]}
