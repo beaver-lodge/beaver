@@ -688,23 +688,16 @@ defmodule Beaver.Walker do
       end
     end
 
-    defp expect_element!(%module{} = element, element_module) do
-      if element_module != module do
-        raise "Expected element module #{element_module}, got #{module}"
-      else
-        element
-      end
+    defp expect_element!(%module{} = element, module), do: element
+
+    defp expect_element!(%module{}, expected) do
+      raise "Expected element module #{expected}, got #{module}"
     end
 
-    defp expect_element!({%module_a{}, %module_b{}} = element, {module_a_, module_b_}) do
-      tuple_x = {module_a, module_b}
-      tuple_y = {module_a_, module_b_}
+    defp expect_element!({%module_a{}, %module_b{}} = element, {module_a, module_b}), do: element
 
-      if tuple_x != tuple_y do
-        raise "Expected element module #{inspect(tuple_y)}, got #{inspect(tuple_x)}"
-      else
-        element
-      end
+    defp expect_element!({%module_a{}, %module_b{}}, expected) do
+      raise "Expected element module #{inspect(expected)}, got #{inspect({module_a, module_b})}"
     end
   end
 end
