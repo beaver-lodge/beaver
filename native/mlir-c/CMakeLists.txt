@@ -13,14 +13,7 @@ set(CMAKE_INSTALL_MESSAGE
 set(CMAKE_EXPORT_COMPILE_COMMANDS
     ON
     CACHE BOOL "" FORCE)
-set(BUILD_LLVM
-    FALSE
-    CACHE BOOL "")
-if(BUILD_LLVM)
-  add_subdirectory(llvm-project)
-else()
-  include(pre-built-llvm.cmake)
-endif(BUILD_LLVM)
+include(pre-built-llvm.cmake)
 message(STATUS "LLVM_INCLUDE_DIRS: ${LLVM_INCLUDE_DIRS}")
 message(STATUS "MLIR_INCLUDE_DIRS: ${MLIR_INCLUDE_DIRS}")
 
@@ -36,6 +29,7 @@ add_custom_command(
   TARGET symlink_compile_commands_json
   COMMAND
     ${CMAKE_COMMAND} -E create_symlink
-    "${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json"
-    ${PROJECT_SOURCE_DIR}/compile_commands.json DEPENDS compile_commands.json
+    ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
+    ${PROJECT_SOURCE_DIR}/compile_commands.json DEPENDS
+    ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
   VERBATIM ON)
