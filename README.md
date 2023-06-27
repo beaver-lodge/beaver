@@ -414,6 +414,5 @@ mix gradient
 
 ```bash
 python3 -m pip install cmake-format
-cmake-format -i native/**/*.cmake
-cmake-format -i native/**/CMakeLists.txt
+cmake-format -i native/**/CMakeLists.txt native/**/*.cmake
 ```
