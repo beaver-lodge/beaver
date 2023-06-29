@@ -97,13 +97,13 @@ defmodule Beaver.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(:test), do: ["lib", "test/support", "test/charm"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp deps(:charm) do
     [
       {:intermediator, "~> 0.1.0",
-       if((path = System.get_env("BEAVER_INTERMEDIATOR_SRC_PATH")) && Mix.env() == :test,
+       if((path = System.get_env("BEAVER_INTERMEDIATOR_SRC_PATH")) && Mix.env() in [:dev, :test],
          do: [path: path],
          else: []
        )}
