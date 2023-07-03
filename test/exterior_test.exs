@@ -22,7 +22,7 @@ defmodule ExteriorTest do
         end
       end
 
-    text = ir |> MLIR.to_string() |> dbg
+    text = ir |> MLIR.to_string()
     assert text =~ "elixir.add"
   end
 end
