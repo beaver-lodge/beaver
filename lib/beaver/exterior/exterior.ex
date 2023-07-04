@@ -15,14 +15,4 @@ defmodule Beaver.Exterior do
       :ok = dialect.register_dialect(ctx)
     end
   end
-
-  defmacro __using__(opts) do
-    dialect = opts |> Keyword.fetch!(:dialect)
-
-    quote do
-      use Beaver.MLIR.Dialect,
-        dialect: unquote(dialect),
-        ops: Beaver.MLIR.Dialect.Registry.ops(d)
-    end
-  end
 end
