@@ -16,10 +16,12 @@ defmodule ExteriorTest do
               block bb_entry() do
                 v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
                 _ = Ex.add(v0, v0) >>> Type.i(32)
+                Func.return(v0) >>> []
               end
             end
           end
         end
+        |> MLIR.Operation.verify!()
       end
 
     text = ir |> MLIR.to_string()
