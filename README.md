@@ -277,7 +277,7 @@ When calling higher-level APIs, it is ideal not to have MLIR context passing aro
 If no MLIR context provided, an attribute and type getter should return an anonymous function with MLIR context as argument.
 In Erlang, all values are copied, so it is very safe to pass around these anonymous functions.
 When creating an operation, these functions will be called with the MLIR context in an operation state.
-With this approach we archive both succinctness and modularity, not having a global MLIR context.
+With this approach we achieve both succinctness and modularity, not having a global MLIR context.
 
 ## Development
 
