@@ -14,6 +14,9 @@ defmodule Beaver.MLIR.Context do
   def create(allow_unregistered: allow_unregistered) do
     ctx = %__MODULE__{ref: MLIR.CAPI.beaver_raw_get_context_load_all_dialects()}
     MLIR.CAPI.beaver_raw_context_attach_diagnostic_handler(ctx.ref) |> Beaver.Native.check!()
+    Beaver.Exterior.register_all(ctx)
+    # TODO: do not load dialects twice
+    MLIR.CAPI.mlirContextLoadAllAvailableDialects(ctx)
 
     MLIR.CAPI.mlirContextSetAllowUnregisteredDialects(
       ctx,
