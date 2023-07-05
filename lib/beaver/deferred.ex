@@ -4,9 +4,7 @@ defmodule Beaver.Deferred do
   @moduledoc false
 
   def from_opts(opts, f) do
-    ctx = Keyword.get(opts, :ctx)
-
-    if ctx do
+    if ctx = Keyword.get(opts, :ctx) do
       f.(ctx)
     else
       f
