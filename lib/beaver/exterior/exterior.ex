@@ -10,7 +10,7 @@ defmodule Beaver.Exterior do
   @callback register_dialect(MLIR.Context.t()) :: :ok | {:error, String.t()}
 
   def register_all(ctx) do
-    # TODO: get it from app config
+    # TODO: get it from app config or other mechanism
     for dialect <- [Beaver.Exterior.Elixir] do
       :ok = dialect.register_dialect(ctx)
     end
