@@ -25,9 +25,6 @@ jobs:
         elixir: ["1.13.0", "1.14.0", "1.15.0"]
     steps:
       - uses: actions/checkout@v3
-      - name: Setting LLVM_COMMIT
-        run: |
-          echo "LLVM_COMMIT=$(cat LLVM_COMMIT)" >> $GITHUB_ENV
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp}}
