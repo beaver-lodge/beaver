@@ -291,8 +291,9 @@ MLIR_CAPI_EXPORTED MlirPass beaverCreateExternalPass(
 
 MLIR_CAPI_EXPORTED MlirAttribute beaverGetReassociationIndicesForReshape(
     MlirType sourceType, MlirType targetType) {
-  auto indices = mlir::getReassociationIndicesForReshape(unwrap(sourceType),
-                                                         unwrap(targetType));
+  auto indices = mlir::getReassociationIndicesForReshape(
+      unwrap(sourceType).cast<RankedTensorType>(),
+      unwrap(targetType).cast<RankedTensorType>());
   OpBuilder b{unwrap(sourceType).getContext()};
   if (!indices) {
     return wrap(Attribute{});
