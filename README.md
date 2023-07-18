@@ -288,7 +288,7 @@ With this approach we achieve both succinctness and modularity, not having a glo
 - Option 1: Install with pip
 
   ```bash
-  python3 -m pip install mlir -f https://github.com/makslevental/mlir-wheels/releases/expanded_assets/latest
+  python3 -m pip install -r dev-requirements.txt
   echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
   ```
 
