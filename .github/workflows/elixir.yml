@@ -19,6 +19,7 @@ jobs:
     name: Test OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}}
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         otp: ["24.2", "25.0"]
         elixir: ["1.13.0", "1.14.0", "1.15.0"]
