@@ -39,8 +39,9 @@ MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyOwnedPatternSetOnRegion(
 
 MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyOwnedPatternSetOnOperation(
     MlirOperation op, MlirRewritePatternSet patternList) {
-  return wrap(applyPatternsAndFoldGreedily(unwrap(op),
-                                           std::move(*unwrap(patternList))));
+  Operation *op_ = unwrap(op);
+  RewritePatternSet *patterns = unwrap(patternList);
+  return wrap(applyPatternsAndFoldGreedily(op_, std::move(*patterns)));
 }
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetArgument(MlirPass pass) {
