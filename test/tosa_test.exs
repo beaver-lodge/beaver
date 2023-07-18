@@ -39,10 +39,10 @@ defmodule TosaTest do
     |> cse
     |> tosa_to_scf
     |> tosa_to_arith
-    |> tosa_to_tensor()
     |> convert_tensor_to_linalg()
     |> MLIR.Pass.Composer.nested("func.func", [
       tosa_to_linalg(),
+      tosa_to_tensor(),
       linalg_fuse_elementwise_ops(),
       linalg_bufferize(),
       convert_linalg_to_loops(),
