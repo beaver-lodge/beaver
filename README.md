@@ -285,9 +285,14 @@ With this approach we achieve both succinctness and modularity, not having a glo
 2. Install Zig, https://ziglang.org/learn/getting-started/#installing-zig
 3. Install LLVM/MLIR
 
-- (Recommended) the LLVM commit used to test Beaver is in this file: [LLVM_COMMIT](LLVM_COMMIT)
-- Build from source https://mlir.llvm.org/getting_started/
+- Option 1: Install with pip
 
+  ```bash
+  python3 -m pip install -r dev-requirements.txt
+  echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
+  ```
+
+- Option 2: Build from source https://mlir.llvm.org/getting_started/
   Recommended install commands:
 
   ```bash

@@ -14,21 +14,17 @@ permissions:
 concurrency:
   group: build-and-test-${{ github.ref }}
   cancel-in-progress: true
-env:
-  LLVM_CONFIG_PATH: "/home/runner/llvm-install/bin/llvm-config"
 jobs:
   build:
     name: Test OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}}
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         otp: ["24.2", "25.0"]
         elixir: ["1.13.0", "1.14.0", "1.15.0"]
     steps:
       - uses: actions/checkout@v3
-      - name: Setting LLVM_COMMIT
-        run: |
-          echo "LLVM_COMMIT=$(cat LLVM_COMMIT)" >> $GITHUB_ENV
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp}}
@@ -37,6 +33,11 @@ jobs:
         uses: goto-bus-stop/setup-zig@v1
         with:
           version: 0.10.0
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+          cache-dependency-path: |
+            dev-requirements.txt
       - name: Restore dependencies cache
         uses: actions/cache@v3
         with:
@@ -46,10 +47,10 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
       - uses: seanmiddleditch/gha-setup-ninja@master
-      - name: Download pre-build LLVM
+      - name: Install pre-build LLVM
         run: |
-          wget --progress=bar:force:noscroll https://github.com/MLIR-China/stage/releases/download/llvm-commit-${LLVM_COMMIT}/llvm-install-x86_64-unknown-linux-gnu-MinSizeRel.zip -O llvm-install.zip
-          unzip llvm-install.zip -d $HOME/llvm-install
+          python3 -m pip install -r dev-requirements.txt
+          echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
       - name: Build cmake
         run: |
           MIX_ENV=test mix compile.elixir_make

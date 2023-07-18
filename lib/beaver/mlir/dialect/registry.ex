@@ -30,9 +30,11 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def normalize_dialect_name("memref"), do: "MemRef"
   def normalize_dialect_name("emitc"), do: "EmitC"
   def normalize_dialect_name("arm_sve"), do: "ArmSVE"
+  def normalize_dialect_name("arm_sme"), do: "ArmSME"
   def normalize_dialect_name("x86vector"), do: "X86Vector"
   def normalize_dialect_name("ml_program"), do: "MLProgram"
   def normalize_dialect_name("pdl_interp"), do: "PDLInterp"
+  def normalize_dialect_name("irdl"), do: "IRDL"
   def normalize_dialect_name(other), do: other |> Macro.camelize()
 
   def ops(dialect) do
