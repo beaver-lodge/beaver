@@ -3,6 +3,8 @@
 
 #include "mlir/CAPI/Beaver.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
+// include otherwise on linux it can't find the symbol
+#include "mlir/Rewrite/FrozenRewritePatternSet.h"
 
 using namespace mlir;
 
@@ -14,7 +16,7 @@ MLIR_CAPI_EXPORTED MlirPDLPatternModule beaverPDLPatternGet(MlirModule module) {
 
 MLIR_CAPI_EXPORTED MlirRewritePatternSet
 beaverRewritePatternSetGet(MlirContext context) {
-  return wrap(new mlir::RewritePatternSet(unwrap(context)));
+  return wrap(new RewritePatternSet(unwrap(context)));
 }
 
 MLIR_CAPI_EXPORTED MlirRewritePatternSet beaverPatternSetAddOwnedPDLPattern(
