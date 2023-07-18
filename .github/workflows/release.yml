@@ -78,7 +78,12 @@ jobs:
         run: |
           set -u
           find _build/${MIX_ENV}/lib/beaver/native_install/lib -name "*.so*" -maxdepth 1 -type f | while read sofile; do
-            echo "==> needed"
+            echo "==> before replace needed"
+            patchelf --print-needed $sofile
+
+            patchelf --replace-needed libMLIRBeaver.so.17 libMLIRBeaver.so $sofile
+
+            echo "==> after"
             patchelf --print-needed $sofile
 
             echo "==> before set rpath"
