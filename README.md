@@ -295,6 +295,7 @@ With this approach we achieve both succinctness and modularity, not having a glo
 
 - Option 2: Build from source https://mlir.llvm.org/getting_started/
   Recommended install commands:
+
   ```bash
   cmake -B build -S llvm -G Ninja -DLLVM_ENABLE_PROJECTS=mlir \
     -DLLVM_TARGETS_TO_BUILD="host" \
@@ -308,20 +309,20 @@ With this approach we achieve both succinctness and modularity, not having a glo
   export LLVM_CONFIG_PATH=$HOME/llvm-install/bin/llvm-config
   ```
 
-(Optional) To use Vulkan:
+  (Optional) To use Vulkan:
 
-- Install Vulkan SDK (global installation is required), reference: https://vulkan.lunarg.com/sdk/home
-- Setting environment variable by adding commands these to your bash/zsh profile:
+  - Install Vulkan SDK (global installation is required), reference: https://vulkan.lunarg.com/sdk/home
+  - Setting environment variable by adding commands these to your bash/zsh profile:
 
-  ```
-  # you might need to change the version here
-  cd $HOME/VulkanSDK/1.3.216.0/
-  source setup-env.sh
-  cd -
-  ```
+    ```
+    # you might need to change the version here
+    cd $HOME/VulkanSDK/1.3.216.0/
+    source setup-env.sh
+    cd -
+    ```
 
-- Use `vulkaninfo` and `vkvia` to verify Vulkan is working
-- Add `-DMLIR_ENABLE_VULKAN_RUNNER=ON` in LLVM CMake config command
+  - Use `vulkaninfo` and `vkvia` to verify Vulkan is working
+  - Add `-DMLIR_ENABLE_VULKAN_RUNNER=ON` in LLVM CMake config command
 
 4. Run tests
 
