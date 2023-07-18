@@ -1,10 +1,10 @@
+// include otherwise on linux it can't find the symbol
+#define _GLIBCXX_USE_CXX11_ABI 0
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
 
 #include "mlir/CAPI/Beaver.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
-// include otherwise on linux it can't find the symbol
-#define _GLIBCXX_USE_CXX11_ABI 0
 
 using namespace mlir;
 
