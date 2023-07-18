@@ -3,7 +3,6 @@
 
 #include "mlir/CAPI/Beaver.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
-#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
 
