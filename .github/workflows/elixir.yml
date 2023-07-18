@@ -39,6 +39,8 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
+          cache-dependency-path: |
+            dev-requirements.txt
       - name: Restore dependencies cache
         uses: actions/cache@v3
         with:
@@ -50,7 +52,7 @@ jobs:
       - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Install pre-build LLVM
         run: |
-          python3 -m pip install mlir==17.0.0+ffbca7e9 -f https://github.com/makslevental/mlir-wheels/releases/expanded_assets/latest
+          python3 -m pip install -r dev-requirements.txt
           echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
       - name: Build cmake
         run: |
