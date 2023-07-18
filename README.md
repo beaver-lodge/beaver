@@ -289,7 +289,7 @@ With this approach we achieve both succinctness and modularity, not having a glo
 
   ```bash
   python3 -m pip install -r dev-requirements.txt
-  echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
+  export LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config
   ```
 
 - Option 2: Build from source https://mlir.llvm.org/getting_started/
