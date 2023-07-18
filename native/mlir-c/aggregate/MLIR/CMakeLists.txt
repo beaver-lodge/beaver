@@ -45,6 +45,7 @@ add_mlir_aggregate(
   MLIRBeaver
   SHARED
   EMBED_LIBS
+  MLIRRewrite
   MLIRCAPIInterfaces
   MLIRCAPIAsync
   MLIRCAPIControlFlow
