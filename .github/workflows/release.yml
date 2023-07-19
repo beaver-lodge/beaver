@@ -111,7 +111,7 @@ jobs:
           echo "LIB_FINAL_NAME=${LIB_FINAL_NAME}" >> $GITHUB_OUTPUT
       - name: Purge artifacts
         run: |
-          python3 -m pip uninstall mlir
+          python3 -m pip uninstall -y mlir
           mix clean
       - name: Start mock server in the background
         run: |
