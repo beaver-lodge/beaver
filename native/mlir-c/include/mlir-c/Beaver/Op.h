@@ -118,6 +118,8 @@ MLIR_CAPI_EXPORTED void beaverLocationPrint(MlirLocation location,
                                             MlirStringCallback callback,
                                             void *userData);
 
+MLIR_CAPI_EXPORTED void beaverOperationDumpGeneric(MlirOperation op);
+
 #include "mlir-c/ExecutionEngine.h"
 
 MLIR_CAPI_EXPORTED bool beaverMlirExecutionEngineIsNull(MlirExecutionEngine w);

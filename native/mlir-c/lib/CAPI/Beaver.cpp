@@ -295,8 +295,9 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverGetReassociationIndicesForReshape(
   return wrap(getReassociationIndicesAttribute(b, *indices));
 }
 
-void beaverLocationPrint(MlirLocation location, MlirStringCallback callback,
-                         void *userData) {
+MLIR_CAPI_EXPORTED void beaverLocationPrint(MlirLocation location,
+                                            MlirStringCallback callback,
+                                            void *userData) {
   if (auto loc = unwrap(location)->dyn_cast<FileLineColLoc>()) {
     std::string s = loc.getFilename().str() + ":" +
                     std::to_string(loc.getLine()) + ":" +
@@ -305,4 +306,10 @@ void beaverLocationPrint(MlirLocation location, MlirStringCallback callback,
   } else {
     mlirLocationPrint(location, callback, userData);
   }
+}
+
+MLIR_CAPI_EXPORTED void beaverOperationDumpGeneric(MlirOperation op) {
+  unwrap(op)->print(llvm::errs(),
+                    OpPrintingFlags().useLocalScope().printGenericOpForm());
+  llvm::errs() << "\n";
 }

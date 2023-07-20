@@ -24,45 +24,53 @@ defmodule Beaver.MLIR do
     end
   end
 
-  def dump(%__MODULE__.Module{} = mlir) do
+  def dump(mlir, opts \\ [])
+
+  def dump(%__MODULE__.Module{} = mlir, opts) do
     CAPI.mlirModuleGetOperation(mlir)
-    |> dump
+    |> dump(opts)
   end
 
-  def dump(%__MODULE__.Operation{} = mlir) do
-    dump_if_not_null(mlir, &CAPI.mlirOperationDump/1)
+  def dump(%__MODULE__.Operation{} = mlir, opts) do
+    if opts[:generic] do
+      dump_if_not_null(mlir, &CAPI.beaverOperationDumpGeneric/1)
+    else
+      dump_if_not_null(mlir, &CAPI.mlirOperationDump/1)
+    end
   end
 
-  def dump(%Attribute{} = mlir) do
+  def dump(%Attribute{} = mlir, _opts) do
     dump_if_not_null(mlir, &CAPI.mlirAttributeDump/1)
   end
 
-  def dump(%Value{} = mlir) do
+  def dump(%Value{} = mlir, _opts) do
     dump_if_not_null(mlir, &CAPI.mlirValueDump/1)
   end
 
-  def dump(%MlirAffineExpr{} = mlir) do
+  def dump(%MlirAffineExpr{} = mlir, _opts) do
     dump_if_not_null(mlir, &CAPI.mlirAffineExprDump/1)
   end
 
-  def dump(%AffineMap{} = mlir) do
+  def dump(%AffineMap{} = mlir, _opts) do
     dump_if_not_null(mlir, &CAPI.mlirAffineMapDump/1)
   end
 
-  def dump(%MlirIntegerSet{} = mlir) do
+  def dump(%MlirIntegerSet{} = mlir, _opts) do
     dump_if_not_null(mlir, &CAPI.mlirIntegerSetDump/1)
   end
 
-  def dump(%Type{} = mlir) do
+  def dump(%Type{} = mlir, _opts) do
     dump_if_not_null(mlir, &CAPI.mlirTypeDump/1)
   end
 
-  def dump(_) do
+  def dump(_, _) do
     {:error, "not a mlir element can be dumped"}
   end
 
-  def dump!(mlir) do
-    case dump(mlir) do
+  def dump!(mlir, opts \\ [])
+
+  def dump!(mlir, opts) do
+    case dump(mlir, opts) do
       :ok ->
         mlir
 
