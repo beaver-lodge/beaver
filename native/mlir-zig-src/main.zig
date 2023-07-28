@@ -29,7 +29,7 @@ fn get_all_registered_ops(env: beam.env) !beam.term {
         defer beam.allocator.free(tuple_slice);
         tuple_slice[0] = make_charlist_from_string_ref(env, dialect_name);
         tuple_slice[1] = make_charlist_from_string_ref(env, op_name);
-        ret[@intCast( i)] = beam.make_tuple(env, tuple_slice);
+        ret[@intCast(i)] = beam.make_tuple(env, tuple_slice);
     }
     return beam.make_term_list(env, ret);
 }
@@ -51,7 +51,7 @@ fn get_all_registered_ops2(env: beam.env, dialect: mlir_capi.StringRef.T) !beam.
     // TODO: refactor this dirty trick
     var names: [300]c.MlirRegisteredOperationName = undefined;
     c.beaverRegisteredOperationsOfDialect(ctx, dialect, &names, &num_op);
-    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast( num_op));
+    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(num_op));
     defer beam.allocator.free(ret);
     var i: usize = 0;
     while (i < num_op) : ({
@@ -59,7 +59,7 @@ fn get_all_registered_ops2(env: beam.env, dialect: mlir_capi.StringRef.T) !beam.
     }) {
         const registered_op_name = names[i];
         const op_name = c.beaverRegisteredOperationNameGetOpName(registered_op_name);
-        ret[@intCast( i)] = beam.make_c_string_charlist(env, op_name.data);
+        ret[@intCast(i)] = beam.make_c_string_charlist(env, op_name.data);
     }
     return beam.make_term_list(env, ret);
 }
@@ -78,13 +78,13 @@ fn get_registered_dialects(env: beam.env) !beam.term {
     if (num_dialects == 0) {
         return beam.make_error_binary(env, "no dialects found");
     }
-    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast( num_dialects));
+    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(num_dialects));
     defer beam.allocator.free(ret);
     var i: usize = 0;
     while (i < num_dialects) : ({
         i += 1;
     }) {
-        ret[@intCast( i)] = beam.make_c_string_charlist(env, names[i].data);
+        ret[@intCast(i)] = beam.make_c_string_charlist(env, names[i].data);
     }
     return beam.make_term_list(env, ret);
 }
@@ -400,7 +400,7 @@ fn MemRefDescriptorAccessor(comptime MemRefT: type) type {
 }
 
 fn memref_module_name(comptime resource_kind: type, comptime rank: i32) []const u8 {
-     return resource_kind.module_name ++ ".MemRef." ++ @tagName(@as(MemRefRankType, @enumFromInt(rank)));
+    return resource_kind.module_name ++ ".MemRef." ++ @tagName(@as(MemRefRankType, @enumFromInt(rank)));
 }
 
 fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
@@ -557,14 +557,14 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
             comptime var rank = N;
             var descriptor: @This() = beam.fetch_resource(@This(), env, @This().resource_type, args[0]) catch
                 return beam.make_error_binary(env, "fail to fetch resource for descriptor, expected: " ++ @typeName(@This()));
-            var ret: []beam.term = beam.allocator.alloc(beam.term, @intCast( rank)) catch
+            var ret: []beam.term = beam.allocator.alloc(beam.term, @intCast(rank)) catch
                 return beam.make_error_binary(env, "fail to allocate");
             defer beam.allocator.free(ret);
             var i: usize = 0;
             while (i < rank) : ({
                 i += 1;
             }) {
-                ret[@intCast( i)] = beam.make_i64(env, descriptor.sizes[i]);
+                ret[@intCast(i)] = beam.make_i64(env, descriptor.sizes[i]);
             }
             return beam.make_term_list(env, ret);
         }
@@ -572,21 +572,20 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
             comptime var rank = N;
             var descriptor: @This() = beam.fetch_resource(@This(), env, @This().resource_type, args[0]) catch
                 return beam.make_error_binary(env, "fail to fetch resource for descriptor, expected: " ++ @typeName(@This()));
-            var ret: []beam.term = beam.allocator.alloc(beam.term, @intCast( rank)) catch
+            var ret: []beam.term = beam.allocator.alloc(beam.term, @intCast(rank)) catch
                 return beam.make_error_binary(env, "fail to allocate");
             defer beam.allocator.free(ret);
             var i: usize = 0;
             while (i < rank) : ({
                 i += 1;
             }) {
-                ret[@intCast( i)] = beam.make_i64(env, descriptor.strides[i]);
+                ret[@intCast(i)] = beam.make_i64(env, descriptor.strides[i]);
             }
             return beam.make_term_list(env, ret);
         }
         pub const nifs = .{ e.ErlNifFunc{ .name = module_name ++ ".allocated", .arity = 1, .fptr = allocated_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".aligned", .arity = 1, .fptr = aligned_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".offset", .arity = 1, .fptr = get_offset, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".sizes", .arity = 1, .fptr = get_sizes, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".strides", .arity = 1, .fptr = get_strides, .flags = 1 } };
     };
 }
-
 
 const Complex = struct {
     fn of(comptime ElementKind: type) type {
