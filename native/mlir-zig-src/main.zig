@@ -17,7 +17,7 @@ fn get_all_registered_ops(env: beam.env) !beam.term {
     defer c.mlirContextDestroy(ctx);
     const num_op: isize = c.beaverGetNumRegisteredOperations(ctx);
     var i: isize = 0;
-    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(usize, num_op));
+    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(num_op));
     defer beam.allocator.free(ret);
     while (i < num_op) : ({
         i += 1;
@@ -29,7 +29,7 @@ fn get_all_registered_ops(env: beam.env) !beam.term {
         defer beam.allocator.free(tuple_slice);
         tuple_slice[0] = make_charlist_from_string_ref(env, dialect_name);
         tuple_slice[1] = make_charlist_from_string_ref(env, op_name);
-        ret[@intCast(usize, i)] = beam.make_tuple(env, tuple_slice);
+        ret[@intCast( i)] = beam.make_tuple(env, tuple_slice);
     }
     return beam.make_term_list(env, ret);
 }
@@ -51,7 +51,7 @@ fn get_all_registered_ops2(env: beam.env, dialect: mlir_capi.StringRef.T) !beam.
     // TODO: refactor this dirty trick
     var names: [300]c.MlirRegisteredOperationName = undefined;
     c.beaverRegisteredOperationsOfDialect(ctx, dialect, &names, &num_op);
-    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(usize, num_op));
+    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast( num_op));
     defer beam.allocator.free(ret);
     var i: usize = 0;
     while (i < num_op) : ({
@@ -59,7 +59,7 @@ fn get_all_registered_ops2(env: beam.env, dialect: mlir_capi.StringRef.T) !beam.
     }) {
         const registered_op_name = names[i];
         const op_name = c.beaverRegisteredOperationNameGetOpName(registered_op_name);
-        ret[@intCast(usize, i)] = beam.make_c_string_charlist(env, op_name.data);
+        ret[@intCast( i)] = beam.make_c_string_charlist(env, op_name.data);
     }
     return beam.make_term_list(env, ret);
 }
@@ -78,13 +78,13 @@ fn get_registered_dialects(env: beam.env) !beam.term {
     if (num_dialects == 0) {
         return beam.make_error_binary(env, "no dialects found");
     }
-    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(usize, num_dialects));
+    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast( num_dialects));
     defer beam.allocator.free(ret);
     var i: usize = 0;
     while (i < num_dialects) : ({
         i += 1;
     }) {
-        ret[@intCast(usize, i)] = beam.make_c_string_charlist(env, names[i].data);
+        ret[@intCast( i)] = beam.make_c_string_charlist(env, names[i].data);
     }
     return beam.make_term_list(env, ret);
 }
@@ -123,8 +123,8 @@ export fn beaver_raw_get_resource_c_string(env: beam.env, _: c_int, args: [*c]co
     if (ptr == null) {
         unreachable();
     } else {
-        obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
-        real_binary = @ptrCast(RType, ptr);
+        obj = @ptrCast(@alignCast(ptr));
+        real_binary = @ptrCast(ptr);
         real_binary += @sizeOf(RType);
         real_binary[bin.size] = 0;
         obj.* = real_binary;
@@ -155,7 +155,7 @@ export fn beaver_raw_mlir_named_attribute_get(env: beam.env, _: c_int, args: [*c
     if (ptr == null) {
         unreachable();
     } else {
-        obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
+        obj = @ptrCast(@alignCast(ptr));
         obj.* = mlir_capi.NamedAttribute.T{ .name = arg0, .attribute = arg1 };
     }
     return e.enif_make_resource(env, ptr);
@@ -164,7 +164,7 @@ export fn beaver_raw_mlir_named_attribute_get(env: beam.env, _: c_int, args: [*c
 const StringRefCollector = struct { env: beam.env, list: std.ArrayList(beam.term) };
 
 fn collect_string_ref(string_ref: mlir_capi.StringRef.T, collector: ?*anyopaque) callconv(.C) void {
-    var collector_ptr = @ptrCast(*StringRefCollector, @alignCast(@alignOf(*StringRefCollector), collector));
+    var collector_ptr: *StringRefCollector = @ptrCast(@alignCast(collector));
     collector_ptr.*.list.append(make_charlist_from_string_ref(collector_ptr.*.env, string_ref)) catch unreachable;
 }
 
@@ -196,7 +196,7 @@ export fn beaver_raw_get_context_load_all_dialects(env: beam.env, _: c_int, _: [
     if (ptr == null) {
         unreachable();
     } else {
-        obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
+        obj = @ptrCast(@alignCast(ptr));
         obj.* = get_context_load_all_dialects();
     }
     return e.enif_make_resource(env, ptr);
@@ -234,20 +234,20 @@ const BeaverPass = struct {
     fn construct(_: ?*anyopaque) callconv(.C) void {}
 
     fn destruct(userData: ?*anyopaque) callconv(.C) void {
-        const ptr = @ptrCast(*UserData, @alignCast(@alignOf(UserData), userData));
+        const ptr: *UserData = @ptrCast(@alignCast(userData));
         beam.allocator.destroy(ptr);
     }
     fn initialize(_: mlir_capi.Context.T, _: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
         return mlir_capi.LogicalResult.T{ .value = 1 };
     }
     fn clone(userData: ?*anyopaque) callconv(.C) ?*anyopaque {
-        const old = @ptrCast(*UserData, @alignCast(@alignOf(*UserData), userData));
+        const old: *UserData = @ptrCast(@alignCast(userData));
         var new = beam.allocator.create(UserData) catch unreachable;
         new.* = old.*;
         return new;
     }
     fn run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) callconv(.C) void {
-        const ud = @ptrCast(*UserData, @alignCast(@alignOf(UserData), userData));
+        const ud: *UserData = @ptrCast(@alignCast(userData));
         const env = e.enif_alloc_env() orelse {
             print("fail to creat env\n", .{});
             return c.mlirExternalPassSignalFailure(pass);
@@ -282,7 +282,7 @@ const PtrOwner = extern struct {
     ptr: mlir_capi.OpaquePtr.T,
     extern fn free(ptr: ?*anyopaque) void;
     pub fn destroy(_: beam.env, resource_ptr: ?*anyopaque) callconv(.C) void {
-        const this_ptr = @ptrCast(*@This(), @alignCast(@alignOf(@This()), resource_ptr));
+        const this_ptr: *@This() = @ptrCast(@alignCast(resource_ptr));
         print("destroy {}.\n", .{this_ptr});
         free(this_ptr.*.ptr);
     }
@@ -302,7 +302,7 @@ export fn beaver_raw_read_opaque_ptr(env: beam.env, _: c_int, args: [*c]const be
     if (ptr == null) {
         return beam.make_error_binary(env, "ptr is null");
     }
-    const slice = @ptrCast(mlir_capi.U8.Array.T, ptr)[0..len];
+    const slice = @as(mlir_capi.U8.Array.T, @ptrCast(ptr))[0..len];
     return beam.make_slice(env, slice);
 }
 
@@ -346,7 +346,7 @@ export fn beaver_raw_create_mlir_pass(env: beam.env, _: c_int, args: [*c]const b
     if (ptr == null) {
         unreachable();
     } else {
-        obj = @ptrCast(*RType, @alignCast(@alignOf(*RType), ptr));
+        obj = @ptrCast(@alignCast(ptr));
         obj.* = c.beaverCreateExternalPass(
             BeaverPass.construct, // move it first to prevent calling wrong function
             passID,
@@ -371,13 +371,13 @@ fn MemRefDescriptorAccessor(comptime MemRefT: type) type {
         fn allocated_ptr(env: beam.env, term: beam.term) callconv(.C) beam.term {
             var descriptor: MemRefT = beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term) catch
                 return beam.make_error_binary(env, "fail to fetch resource for descriptor, expected: " ++ @typeName(MemRefT));
-            var ret: mlir_capi.OpaquePtr.T = @ptrCast(mlir_capi.OpaquePtr.T, descriptor.allocated);
+            var ret: mlir_capi.OpaquePtr.T = @ptrCast(descriptor.allocated);
             return mlir_capi.OpaquePtr.resource.make(env, ret) catch return beam.make_error_binary(env, "fail to make allocated ptr");
         }
         fn aligned_ptr(env: beam.env, term: beam.term) callconv(.C) beam.term {
             var descriptor: MemRefT = beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term) catch
                 return beam.make_error_binary(env, "fail to fetch resource for descriptor, expected: " ++ @typeName(MemRefT));
-            var ret: mlir_capi.OpaquePtr.T = @ptrCast(mlir_capi.OpaquePtr.T, descriptor.aligned);
+            var ret: mlir_capi.OpaquePtr.T = @ptrCast(descriptor.aligned);
             return mlir_capi.OpaquePtr.resource.make(env, ret) catch return beam.make_error_binary(env, "fail to make aligned ptr");
         }
         fn fetch_ptr_or_nil(env: beam.env, ptr_term: beam.term) !MemRefT.ElementResourceKind.Ptr.T {
@@ -400,7 +400,7 @@ fn MemRefDescriptorAccessor(comptime MemRefT: type) type {
 }
 
 fn memref_module_name(comptime resource_kind: type, comptime rank: i32) []const u8 {
-     return resource_kind.module_name ++ ".MemRef." ++ @tagName(@intToEnum(MemRefRankType, rank));
+     return resource_kind.module_name ++ ".MemRef." ++ @tagName(@as(MemRefRankType, @enumFromInt(rank)));
 }
 
 fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
@@ -557,14 +557,14 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
             comptime var rank = N;
             var descriptor: @This() = beam.fetch_resource(@This(), env, @This().resource_type, args[0]) catch
                 return beam.make_error_binary(env, "fail to fetch resource for descriptor, expected: " ++ @typeName(@This()));
-            var ret: []beam.term = beam.allocator.alloc(beam.term, @intCast(usize, rank)) catch
+            var ret: []beam.term = beam.allocator.alloc(beam.term, @intCast( rank)) catch
                 return beam.make_error_binary(env, "fail to allocate");
             defer beam.allocator.free(ret);
             var i: usize = 0;
             while (i < rank) : ({
                 i += 1;
             }) {
-                ret[@intCast(usize, i)] = beam.make_i64(env, descriptor.sizes[i]);
+                ret[@intCast( i)] = beam.make_i64(env, descriptor.sizes[i]);
             }
             return beam.make_term_list(env, ret);
         }
@@ -572,14 +572,14 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
             comptime var rank = N;
             var descriptor: @This() = beam.fetch_resource(@This(), env, @This().resource_type, args[0]) catch
                 return beam.make_error_binary(env, "fail to fetch resource for descriptor, expected: " ++ @typeName(@This()));
-            var ret: []beam.term = beam.allocator.alloc(beam.term, @intCast(usize, rank)) catch
+            var ret: []beam.term = beam.allocator.alloc(beam.term, @intCast( rank)) catch
                 return beam.make_error_binary(env, "fail to allocate");
             defer beam.allocator.free(ret);
             var i: usize = 0;
             while (i < rank) : ({
                 i += 1;
             }) {
-                ret[@intCast(usize, i)] = beam.make_i64(env, descriptor.strides[i]);
+                ret[@intCast( i)] = beam.make_i64(env, descriptor.strides[i]);
             }
             return beam.make_term_list(env, ret);
         }
@@ -659,7 +659,7 @@ const memref_kinds = .{
 
 fn dataKindToMemrefKind(comptime self: type) type {
     const dt = dataKindToDataType(self);
-    const index = @enumToInt(dt);
+    const index = @intFromEnum(dt);
     return memref_kinds[index];
 }
 

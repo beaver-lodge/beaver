@@ -4,12 +4,15 @@ const builtin = @import("builtin");
 const os = builtin.os.tag;
 
 pub fn build(b: *std.build.Builder) void {
-    b.cache_root = kinda.cache_root;
     // Standard release options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
-    const mode = b.standardReleaseOptions();
-    const lib = b.addSharedLibrary(kinda.lib_name, "src/main.zig", .unversioned);
-    lib.setBuildMode(mode);
+    const target: std.zig.CrossTarget = .{};
+    const lib = b.addSharedLibrary(.{
+        .name = kinda.lib_name,
+        .root_source_file = .{ .path = "src/main.zig" },
+        .optimize = .ReleaseSafe,
+        .target = target,
+    });
     lib.addSystemIncludePath(kinda.erts_include);
     lib.addSystemIncludePath(kinda.llvm_include);
     lib.addSystemIncludePath(kinda.beaver_include);
@@ -22,5 +25,5 @@ pub fn build(b: *std.build.Builder) void {
     }
     lib.linkSystemLibrary("MLIRBeaver");
     lib.linker_allow_shlib_undefined = true;
-    lib.install();
+    b.installArtifact(lib);
 }
