@@ -13,10 +13,6 @@ pub fn build(b: *std.build.Builder) void {
         .optimize = .Debug,
         .target = target,
     });
-    lib.addSystemIncludePath(kinda.erts_include);
-    lib.addSystemIncludePath(kinda.llvm_include);
-    lib.addSystemIncludePath(kinda.beaver_include);
-    lib.addLibraryPath(kinda.beaver_libdir);
     if (os == .linux) {
         lib.addRPath("$ORIGIN");
     }
