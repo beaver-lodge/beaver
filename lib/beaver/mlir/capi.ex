@@ -16,6 +16,8 @@ defmodule Beaver.MLIR.CAPI do
         []
     end
 
+  mlir_c_path = Path.join(File.cwd!(), "native/mlir-c")
+
   use Kinda.Prebuilt,
     otp_app: :beaver,
     lib_name: "beaver",
@@ -26,13 +28,13 @@ defmodule Beaver.MLIR.CAPI do
         "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-07-18-0903"
       ),
     version: "0.2.20",
-    wrapper: Path.join(File.cwd!(), "native/mlir-c/include/mlir-c/Beaver/wrapper.h"),
+    wrapper: Path.join(mlir_c_path, "include/mlir-c/Beaver/wrapper.h"),
     zig_src: "native/mlir-zig-src",
     zig_proj: "native/mlir-zig-proj",
     translate_args:
       List.flatten(
         for p <-
-              [Path.join(File.cwd!(), "native/mlir-c/include")] ++
+              [Path.join(mlir_c_path, "include")] ++
                 llvm_paths do
           ["-I", p]
         end
@@ -40,7 +42,7 @@ defmodule Beaver.MLIR.CAPI do
     build_args:
       List.flatten(
         for p <-
-              [dest_dir, Path.join(File.cwd!(), "native/mlir-c")] ++
+              [dest_dir, mlir_c_path] ++
                 Enum.map(llvm_paths, &Path.dirname/1) do
           ["--search-prefix", p]
         end
