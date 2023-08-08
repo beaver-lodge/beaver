@@ -2,9 +2,9 @@ const std = @import("std");
 const io = std.io;
 const stderr = io.getStdErr().writer();
 const testing = std.testing;
-const beam = @import("beam.zig");
-const kinda = @import("kinda.zig");
-const e = @import("erl_nif.zig");
+const beam = @import("beam");
+const kinda = @import("kinda");
+const e = @import("erl_nif");
 const mlir_capi = @import("beaver.imp.zig");
 pub const c = mlir_capi.c;
 

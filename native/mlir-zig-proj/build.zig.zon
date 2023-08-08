@@ -1,0 +1,12 @@
+.{
+    .name = "beaver",
+    .version = "0.0.1",
+
+    .dependencies = .{
+        .kinda = .{
+            // note: you may need to change this url commit hash
+            .url = "https://github.com/beaver-lodge/kinda/archive/updates4zig0.11.tar.gz",
+            .hash = "122047bc947d814fc5dc696650f72f3ffba94508e2a42b3dd315a599a831e44db564",
+        },
+    },
+}

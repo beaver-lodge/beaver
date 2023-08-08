@@ -29,7 +29,6 @@ defmodule Beaver.MLIR.CAPI do
       ),
     version: "0.2.20",
     wrapper: Path.join(mlir_c_path, "include/mlir-c/Beaver/wrapper.h"),
-    zig_src: "native/mlir-zig-src",
     zig_proj: "native/mlir-zig-proj",
     translate_args:
       List.flatten(
