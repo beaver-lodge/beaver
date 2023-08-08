@@ -375,7 +375,7 @@ With this approach we achieve both succinctness and modularity, not having a glo
 
 ### Update Elixir source
 
-- Bump versions in `lib/beaver/mlir/capi.ex` and `mix.exs`
+- Bump versions in [`capi.ex`](/lib/beaver/mlir/capi.ex) and [`mix.exs`](/mix.exs)
 
 ### Linux
 
