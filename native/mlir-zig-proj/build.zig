@@ -23,10 +23,10 @@ pub fn build(b: *std.build.Builder) void {
     lib.addModule("erl_nif", kinda.module("erl_nif"));
     lib.addModule("beam", kinda.module("beam"));
     if (os == .linux) {
-        lib.addRPath(.{ .path = "@loader_path" });
+        lib.addRPath(.{ .path = ":$ORIGIN" });
     }
     if (os == .macos) {
-        lib.addRPath(.{ .path = ":$ORIGIN" });
+        lib.addRPath(.{ .path = "@loader_path" });
     }
     lib.linkSystemLibrary("MLIRBeaver");
     lib.linker_allow_shlib_undefined = true;
