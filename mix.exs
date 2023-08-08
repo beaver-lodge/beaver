@@ -104,7 +104,7 @@ defmodule Beaver.MixProject do
     [
       {:elixir_make, "~> 0.4", runtime: false},
       {:llvm_config, "~> 0.1.0"},
-      {:kinda, "~> 0.2.0"},
+      {:kinda, "~> 0.3.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test]},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
