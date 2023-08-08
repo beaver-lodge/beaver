@@ -6,7 +6,7 @@
         .kinda = .{
             // note: you may need to change this url commit hash
             .url = "https://github.com/beaver-lodge/kinda/archive/eec3a3d0c10a042f02e6fb3c60aee3575f7877a7.tar.gz",
-            .hash = "122047bc947d814fc5dc696650f72f3ffba94508e2a42b3dd315a599a831e44db564",
+            .hash = "12203c30822f6dc1cfd9fb812b569c4817948dcf8f2e8fd6815ae33e00923183ae8e",
         },
     },
 }
