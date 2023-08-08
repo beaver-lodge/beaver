@@ -375,12 +375,12 @@ With this approach we achieve both succinctness and modularity, not having a glo
 
 ### Update Elixir source
 
-- Bump versions in `lib/beaver/mlir/capi.ex` and `mix.exs`
+- Bump versions in [`capi.ex`](/lib/beaver/mlir/capi.ex) and [`mix.exs`](/mix.exs)
 
 ### Linux
 
 - Run CI, which generates the new GitHub release uploaded to https://github.com/beaver-lodge/beaver-prebuilt/releases.
-- Update release url in `lib/beaver/mlir/capi.ex`
+- Update release url in [`capi.ex`](/lib/beaver/mlir/capi.ex)
 
 ### Mac
 

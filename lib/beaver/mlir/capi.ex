@@ -7,16 +7,16 @@ defmodule Beaver.MLIR.CAPI do
 
   dest_dir = Path.join([Mix.Project.app_path(), "native_install"])
 
-  llvm_constants =
+  llvm_paths =
     case LLVMConfig.include_dir() do
       {:ok, include_dir} ->
-        %{
-          llvm_include: include_dir
-        }
+        [include_dir]
 
       _ ->
-        %{}
+        []
     end
+
+  mlir_c_path = Path.join(File.cwd!(), "native/mlir-c")
 
   use Kinda.Prebuilt,
     otp_app: :beaver,
@@ -25,20 +25,27 @@ defmodule Beaver.MLIR.CAPI do
       Application.compile_env(
         :beaver,
         :prebuilt_base_url,
-        "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-07-18-0903"
+        "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-08-08-0309"
       ),
-    version: "0.2.20",
-    wrapper: Path.join(File.cwd!(), "native/mlir-c/include/mlir-c/Beaver/wrapper.h"),
-    zig_src: "native/mlir-zig-src",
+    version: "0.3.0",
+    wrapper: Path.join(mlir_c_path, "include/mlir-c/Beaver/wrapper.h"),
     zig_proj: "native/mlir-zig-proj",
-    include_paths:
-      %{
-        beaver_include: Path.join(File.cwd!(), "native/mlir-c/include")
-      }
-      |> Map.merge(llvm_constants),
-    constants: %{
-      beaver_libdir: Path.join(dest_dir, "lib")
-    },
+    translate_args:
+      List.flatten(
+        for p <-
+              [Path.join(mlir_c_path, "include")] ++
+                llvm_paths do
+          ["-I", p]
+        end
+      ),
+    build_args:
+      List.flatten(
+        for p <-
+              [dest_dir, mlir_c_path] ++
+                Enum.map(llvm_paths, &Path.dirname/1) do
+          ["--search-prefix", p]
+        end
+      ),
     dest_dir: dest_dir,
     forward_module: Beaver.Native,
     code_gen_module: Beaver.MLIR.CAPI.CodeGen,
@@ -63,8 +70,8 @@ defmodule Beaver.MLIR.CAPI do
         llvm_headers ++
           Path.wildcard("native/mlir-c/**/*.h") ++
           Path.wildcard("native/mlir-c/**/*.cpp") ++
-          Path.wildcard("native/mlir-zig-src/**/*.zig") ++
-          ["native/mlir-zig-proj/#{Mix.env()}/build.zig"],
+          Path.wildcard("native/mlir-zig-proj/**/*.zig") ++
+          Path.wildcard("native/mlir-zig-proj/**/*.zon"),
       not String.contains?(path, "kinda.gen.zig") do
     @external_resource path
   end
