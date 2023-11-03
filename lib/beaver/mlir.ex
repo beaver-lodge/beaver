@@ -24,6 +24,9 @@ defmodule Beaver.MLIR do
     end
   end
 
+  @type dump_opts :: [generic: boolean()]
+  @spec dump(any(), dump_opts()) :: :ok
+  @spec dump!(any(), dump_opts()) :: any()
   def dump(mlir, opts \\ [])
 
   def dump(%__MODULE__.Module{} = mlir, opts) do

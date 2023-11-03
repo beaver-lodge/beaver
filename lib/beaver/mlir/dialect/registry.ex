@@ -37,11 +37,23 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def normalize_dialect_name("irdl"), do: "IRDL"
   def normalize_dialect_name(other), do: other |> Macro.camelize()
 
-  def ops(dialect) do
+  defp do_ops(dialect, ctx_ref) do
     Beaver.Native.check!(
-      CAPI.beaver_raw_registered_ops_of_dialect(MLIR.StringRef.create(dialect).ref)
+      CAPI.beaver_raw_registered_ops_of_dialect(ctx_ref, MLIR.StringRef.create(dialect).ref)
     )
     |> Enum.map(&List.to_string/1)
+  end
+
+  def ops(dialect, opts \\ []) do
+    if ctx = opts[:ctx] do
+      %MLIR.Context{ref: ctx_ref} = ctx
+      do_ops(dialect, ctx_ref)
+    else
+      ctx = MLIR.Context.create()
+      ret = ops(dialect, Keyword.put(opts, :ctx, ctx))
+      MLIR.Context.destroy(ctx)
+      ret
+    end
   end
 
   @doc """

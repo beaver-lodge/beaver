@@ -7,6 +7,7 @@ defmodule CfTest do
   require Func
   @moduletag :smoke
 
+  # TODO: move MutCompiler to an independent file, so it would be clear for new users
   defmodule MutCompiler do
     use Beaver
     require Beaver.MLIR

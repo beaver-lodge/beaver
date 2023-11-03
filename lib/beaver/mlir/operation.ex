@@ -94,7 +94,7 @@ defmodule Beaver.MLIR.Operation do
         op
 
       :null ->
-        raise "MLIR operation verification failed because the operation is null. Maybe it is parsed from an ill-formed text format?"
+        raise "MLIR operation verification failed because the operation is null. Maybe it is parsed from an ill-formed text format? Please have a look at the diagnostic output above by MLIR C++"
 
       :fail ->
         raise "MLIR operation verification failed"

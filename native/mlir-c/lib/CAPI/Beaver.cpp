@@ -4,6 +4,7 @@
 #include "mlir/CAPI/Registration.h"
 
 #include "mlir/CAPI/Beaver.h"
+#include "mlir/Dialect/IRDL/IRDLLoading.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 
 using namespace mlir;
@@ -312,4 +313,8 @@ MLIR_CAPI_EXPORTED void beaverOperationDumpGeneric(MlirOperation op) {
   unwrap(op)->print(llvm::errs(),
                     OpPrintingFlags().useLocalScope().printGenericOpForm());
   llvm::errs() << "\n";
+}
+
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverLoadIRDLDialects(MlirModule module) {
+  return wrap(irdl::loadDialects(unwrap(module)));
 }

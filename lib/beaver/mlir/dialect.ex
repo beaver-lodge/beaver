@@ -1,6 +1,7 @@
 defmodule Beaver.MLIR.Dialect do
   @moduledoc """
   This module defines macro to generate code for an MLIR dialect.
+  You might override `eval_ssa/2` function to introduce your custom op generation
   """
   alias Beaver.MLIR.Dialect
 
