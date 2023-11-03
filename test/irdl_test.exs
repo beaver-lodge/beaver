@@ -49,8 +49,7 @@ defmodule IRDLTest do
         any_of([Type.f32(), Type.f64()])
       end
 
-      deftype complex(t = ^any_f) do
-      end
+      deftype complex(t = ^any_f)
 
       defalias any_complex, do: complex(any())
 
