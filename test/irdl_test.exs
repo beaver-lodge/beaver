@@ -56,9 +56,9 @@ defmodule IRDLTest do
         complex(any())
       end
 
-      defalias any_complex2 do
-        complex(^any_f)
-      end
+      defalias any_complex, do: complex(any())
+
+      defalias any_complex2, do: complex(^any_f)
 
       defop norm(t = ^any_complex) do
         any()
