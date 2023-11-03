@@ -52,10 +52,6 @@ defmodule IRDLTest do
       deftype complex(t = ^any_f) do
       end
 
-      defalias any_complex do
-        complex(any())
-      end
-
       defalias any_complex, do: complex(any())
 
       defalias any_complex2, do: complex(^any_f)

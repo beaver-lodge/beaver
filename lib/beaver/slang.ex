@@ -33,7 +33,7 @@ defmodule Beaver.Slang do
 
   @doc false
   # transform pin to alias function call
-  defp transform_defop_pins(ast = {:^, _line1, [{name, _line2, nil}]}) do
+  defp transform_defop_pins({:^, _line1, [{name, _line2, nil}]}) do
     alias_name = get_alias_name(name)
 
     quote do
@@ -95,7 +95,6 @@ defmodule Beaver.Slang do
 
     name = Atom.to_string(name)
     creator = String.to_atom("create_" <> name)
-    op_mf = Module.concat(Beaver.MLIR.Dialect.IRDL, op)
 
     attr_name = String.to_atom("__slang__" <> "#{op}" <> "__")
 
