@@ -36,7 +36,6 @@ defmodule Beaver.Slang do
 
     quote do
       mlir do
-        require Beaver.Env
         opts = [ctx: Beaver.Env.context(), block: Beaver.Env.block()]
         unquote(alias_name)(opts)
       end
@@ -44,21 +43,6 @@ defmodule Beaver.Slang do
   end
 
   defp transform_defop_pins(ast), do: ast
-
-  defp transform_defop_param({:=, _line0, [var, right]}) do
-    quote do
-      Kernel.var!(unquote(var)) =
-        unquote(right)
-        |> Beaver.Slang.create_parametric(
-          ctx: Beaver.Env.context(),
-          block: Beaver.Env.block()
-        )
-    end
-  end
-
-  defp transform_defop_param(ast) do
-    ast
-  end
 
   defp get_args_as_vars(args) do
     for v <- args do
@@ -76,18 +60,8 @@ defmodule Beaver.Slang do
   defp def_symbol_op(op, args_op, call, block, return_op \\ nil) do
     {name, args} = call |> Macro.decompose_call()
 
-    args_var_ast =
-      for var <- get_args_as_vars(args) do
-        quote do
-          unquote(var)
-        end
-      end
-
-    args =
-      args
-      |> Enum.map(&transform_defop_param/1)
-      |> Macro.postwalk(&transform_defop_pins/1)
-
+    args_var_ast = get_args_as_vars(args)
+    args = args |> Macro.postwalk(&transform_defop_pins/1)
     name = Atom.to_string(name)
     creator = String.to_atom("create_" <> name)
 
@@ -130,7 +104,6 @@ defmodule Beaver.Slang do
         )
       end
     end
-    |> tap(fn ast -> ast |> Macro.to_string() |> IO.puts() end)
   end
 
   defmacro deftype(call, block \\ nil) do
@@ -173,6 +146,10 @@ defmodule Beaver.Slang do
 
         mlir ctx: opts[:ctx], block: opts[:block] do
           unquote(block[:do])
+          |> Beaver.Slang.create_parametric(
+            ctx: Beaver.Env.context(),
+            block: Beaver.Env.block()
+          )
         end
       end
     end
