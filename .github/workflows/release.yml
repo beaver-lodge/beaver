@@ -22,7 +22,7 @@ env:
 jobs:
   generate_id:
     name: Generate ID of release
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     outputs:
       formatted_date: ${{ steps.date.outputs.formatted_date }}
     steps:
