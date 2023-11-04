@@ -75,7 +75,6 @@ defmodule Beaver.Slang do
       for var <- get_args_as_vars(args) do
         quote do
           require Beaver.Env
-          require Beaver.Env
 
           Kernel.var!(unquote(var)) =
             unquote(var)
@@ -133,6 +132,7 @@ defmodule Beaver.Slang do
         )
       end
     end
+    |> tap(fn ast -> ast |> Macro.to_string() |> IO.puts() end)
   end
 
   defmacro deftype(call, block \\ nil) do
