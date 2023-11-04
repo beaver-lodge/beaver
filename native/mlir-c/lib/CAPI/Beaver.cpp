@@ -8,20 +8,14 @@
 
 using namespace mlir;
 
-MLIR_CAPI_EXPORTED MlirPDLPatternModule beaverPDLPatternGet(MlirModule module) {
-  // should this module be removed from parent?
-  auto *pdlPattern = new PDLPatternModule(unwrap(module));
-  return wrap(pdlPattern);
-}
-
 MLIR_CAPI_EXPORTED MlirRewritePatternSet
 beaverRewritePatternSetGet(MlirContext context) {
   return wrap(new RewritePatternSet(unwrap(context)));
 }
 
 MLIR_CAPI_EXPORTED MlirRewritePatternSet beaverPatternSetAddOwnedPDLPattern(
-    MlirRewritePatternSet patternList, MlirPDLPatternModule pdlPattern) {
-  auto &set = unwrap(patternList)->add(std::move(*(unwrap(pdlPattern))));
+    MlirRewritePatternSet patternList, MlirModule module) {
+  auto &set = unwrap(patternList)->add(PDLPatternModule(unwrap(module)));
   return wrap(&set);
 }
 

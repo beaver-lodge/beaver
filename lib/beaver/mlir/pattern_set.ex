@@ -8,12 +8,7 @@ defmodule Beaver.MLIR.PatternSet do
     CAPI.beaverRewritePatternSetGet(ctx)
   end
 
-  def insert(pattern_set, %Beaver.MLIR.Module{} = module) do
-    pattern_module = CAPI.beaverPDLPatternGet(module)
-    insert(pattern_set, pattern_module)
-  end
-
-  def insert(pattern_set, %Beaver.MLIR.CAPI.MlirPDLPatternModule{} = pattern_module) do
+  def insert(pattern_set, %Beaver.MLIR.Module{} = pattern_module) do
     CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pattern_module)
     pattern_set
   end
