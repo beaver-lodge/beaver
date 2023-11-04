@@ -23,7 +23,7 @@ jobs:
       matrix:
         runs-on: ["ubuntu-20.04", "ubuntu-latest"]
         otp: ["24.2", "25.0"]
-        elixir: ["1.13.0", "1.14.0", "1.15.0"]
+        elixir: ["1.13.0", "1.15.0"]
     steps:
       - uses: actions/checkout@v3
       - uses: erlef/setup-beam@v1
