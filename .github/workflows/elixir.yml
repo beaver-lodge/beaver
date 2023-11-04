@@ -16,11 +16,12 @@ concurrency:
   cancel-in-progress: true
 jobs:
   build:
-    name: Test OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}}
-    runs-on: ubuntu-20.04
+    name: OTP ${{matrix.otp}} / Elixir ${{matrix.elixir}} / ${{matrix.runs-on}}
+    runs-on: ${{matrix.runs-on}}
     strategy:
       fail-fast: false
       matrix:
+        runs-on: ["ubuntu-20.04", "ubuntu-latest"]
         otp: ["24.2", "25.0"]
         elixir: ["1.13.0", "1.14.0", "1.15.0"]
     steps:
