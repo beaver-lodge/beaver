@@ -9,8 +9,6 @@ defmodule Beaver.Slang do
     quote do
       @behaviour Beaver.Slang
       @before_compile Beaver.Slang
-      import Beaver
-      alias Beaver.MLIR
       import Beaver.Slang
       @__slang_dialect_name__ unquote(name)
       Module.register_attribute(__MODULE__, :__slang__operation__, accumulate: true)
@@ -207,9 +205,6 @@ defmodule Beaver.Slang do
     end
   end
 
-  require Beaver.Env
-  require Beaver.Env
-  alias Beaver.MLIR.Dialect.IRDL
   alias Beaver.MLIR.Dialect.IRDL
   use Beaver
 
