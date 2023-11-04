@@ -47,7 +47,12 @@ defmodule Beaver.Slang do
 
   defp transform_defop_param({:=, _line0, [var, right]}) do
     quote do
-      Kernel.var!(unquote(var)) = unquote(right)
+      Kernel.var!(unquote(var)) =
+        unquote(right)
+        |> Beaver.Slang.create_parametric(
+          ctx: Beaver.Env.context(),
+          block: Beaver.Env.block()
+        )
     end
   end
 
@@ -74,14 +79,7 @@ defmodule Beaver.Slang do
     args_var_ast =
       for var <- get_args_as_vars(args) do
         quote do
-          require Beaver.Env
-
-          Kernel.var!(unquote(var)) =
-            unquote(var)
-            |> Beaver.Slang.create_parametric(
-              ctx: Beaver.Env.context(),
-              block: Beaver.Env.block()
-            )
+          unquote(var)
         end
       end
 
