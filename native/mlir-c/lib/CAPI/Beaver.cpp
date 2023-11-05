@@ -1,6 +1,7 @@
 #include "mlir/CAPI/Beaver.h"
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
+#include "mlir/Dialect/IRDL/IRDLLoading.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 
 using namespace mlir;
