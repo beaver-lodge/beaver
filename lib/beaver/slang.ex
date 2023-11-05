@@ -56,8 +56,15 @@ defmodule Beaver.Slang do
     end
   end
 
+  def get_variadicity_array(size) do
+    use Beaver
+    ~a{#irdl<variadicity_array[#{List.duplicate("single", size) |> Enum.join(",")}]>}
+  end
+
   # define a IRDL op of symbol, like `irdl.operation`, `irdl.type`
-  defp def_symbol_op(op, args_op, call, block, return_op \\ nil) do
+  defp def_symbol_op(op, args_op, call, block, opts \\ []) do
+    return_op = opts[:return_op]
+    variadicity = opts[:variadicity]
     {name, args} = call |> Macro.decompose_call()
 
     args_var_ast = get_args_as_vars(args)
@@ -72,7 +79,10 @@ defmodule Beaver.Slang do
         quote do
           import Beaver.MLIR.Dialect.IRDL, only: [{unquote(return_op), 1}]
           ret = unquote(block[:do])
-          unquote(return_op)(ret) >>> []
+
+          unquote(return_op)(ret,
+            variadicity: Beaver.Slang.get_variadicity_array(List.wrap(ret) |> length)
+          ) >>> []
         end
       else
         []
@@ -94,7 +104,13 @@ defmodule Beaver.Slang do
                 region do
                   block b_op() do
                     (unquote_splicing(args))
-                    unquote(args_op)(unquote_splicing(args_var_ast)) >>> []
+
+                    args = [unquote_splicing(args_var_ast)]
+
+                    unquote(args_op)(args,
+                      variadicity: Beaver.Slang.get_variadicity_array(args |> length)
+                    ) >>> []
+
                     unquote(return_op_ast)
                   end
                 end
@@ -111,7 +127,7 @@ defmodule Beaver.Slang do
       call
       |> Macro.decompose_call()
 
-    op_ast = def_symbol_op(:type, :parameters, call, block)
+    op_ast = def_symbol_op(:type, :parameters, call, block, variadicity: false)
 
     quote do
       import Beaver
@@ -124,7 +140,7 @@ defmodule Beaver.Slang do
   end
 
   defmacro defop(call, block \\ nil) do
-    def_symbol_op(:operation, :operands, call, block, :results)
+    def_symbol_op(:operation, :operands, call, block, return_op: :results, variadicity: true)
   end
 
   defp get_alias_name(def_name) do
