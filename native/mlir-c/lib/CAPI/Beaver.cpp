@@ -1,18 +1,9 @@
-// include otherwise on linux it can't find the symbol
+#include "mlir/CAPI/Beaver.h"
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
-
-#include "mlir/CAPI/Beaver.h"
-#include "mlir/Dialect/IRDL/IRDLLoading.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 
 using namespace mlir;
-
-MLIR_CAPI_EXPORTED MlirPDLPatternModule beaverPDLPatternGet(MlirModule module) {
-  // should this module be removed from parent?
-  auto *pdlPattern = new PDLPatternModule(unwrap(module));
-  return wrap(pdlPattern);
-}
 
 MLIR_CAPI_EXPORTED MlirRewritePatternSet
 beaverRewritePatternSetGet(MlirContext context) {
@@ -20,8 +11,8 @@ beaverRewritePatternSetGet(MlirContext context) {
 }
 
 MLIR_CAPI_EXPORTED MlirRewritePatternSet beaverPatternSetAddOwnedPDLPattern(
-    MlirRewritePatternSet patternList, MlirPDLPatternModule pdlPattern) {
-  auto &set = unwrap(patternList)->add(std::move(*(unwrap(pdlPattern))));
+    MlirRewritePatternSet patternList, MlirModule module) {
+  auto &set = unwrap(patternList)->add(PDLPatternModule(unwrap(module)));
   return wrap(&set);
 }
 

@@ -14,18 +14,15 @@ extern "C" {
   };                                                                           \
   typedef struct name name
 
-DEFINE_C_API_STRUCT(MlirPDLPatternModule, void);
 DEFINE_C_API_STRUCT(MlirRewritePatternSet, void);
 
 #undef DEFINE_C_API_STRUCT
-
-MLIR_CAPI_EXPORTED MlirPDLPatternModule beaverPDLPatternGet(MlirModule module);
 
 MLIR_CAPI_EXPORTED MlirRewritePatternSet
 beaverRewritePatternSetGet(MlirContext context);
 
 MLIR_CAPI_EXPORTED MlirRewritePatternSet beaverPatternSetAddOwnedPDLPattern(
-    MlirRewritePatternSet patternList, MlirPDLPatternModule pdlPattern);
+    MlirRewritePatternSet patternList, MlirModule module);
 
 MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyOwnedPatternSetOnRegion(
     MlirRegion region, MlirRewritePatternSet patternList);

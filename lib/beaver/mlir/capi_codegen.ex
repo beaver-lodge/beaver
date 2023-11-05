@@ -236,6 +236,65 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
     {:ok, %KindDecl{zig_t: type, module_name: Beaver.MLIR.GenericCallback}}
   end
 
+  def type_gen(
+        _root_module,
+        {:optional_type,
+         {:ref,
+          [
+            :*,
+            :const,
+            {:fn,
+             %Zig.Parser.FnOptions{
+               position: nil,
+               doc_comment: nil,
+               block: nil,
+               align: nil,
+               linksection: nil,
+               callconv: {:enum_literal, :C},
+               extern: false,
+               export: false,
+               pub: false,
+               inline: :maybe
+             },
+             [
+               params: [
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{
+                    doc_comment: nil,
+                    noalias: false,
+                    comptime: false
+                  }, {:optional_type, {:ref, [:*, :anyopaque]}}},
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{
+                    doc_comment: nil,
+                    noalias: false,
+                    comptime: false
+                  }, {:optional_type, {:ref, [:*, :const, :anyopaque]}}},
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{
+                    doc_comment: nil,
+                    noalias: false,
+                    comptime: false
+                  }, :usize},
+                 {:_,
+                  %Zig.Parser.ParamDeclOption{
+                    doc_comment: nil,
+                    noalias: false,
+                    comptime: false
+                  }, :usize}
+               ],
+               type: :void
+             ]}
+          ]}} =
+          type
+      ) do
+    {:ok,
+     %KindDecl{
+       zig_t: type,
+       module_name: Beaver.MLIR.UnmanagedDenseResourceElementsAttrGetDeleteCallback
+     }}
+  end
+
   def type_gen(_root_module, type)
       when type in [
              :MlirPass,
