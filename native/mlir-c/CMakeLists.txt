@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.13.4)
 set(CMAKE_BUILD_TYPE
-    RelWithDebInfo
+    Release
     CACHE STRING "")
 project(mlir-beaver)
 if(POLICY CMP0116)
