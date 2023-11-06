@@ -38,8 +38,6 @@ set(LIBS
     MLIRSupport
     MLIRIR)
 
-message(STATUS "MLIR libs: ${LIBS}")
-
 # This lib is for dlopen or being linked by Zig/Rust
 add_mlir_aggregate(
   MLIRBeaver
