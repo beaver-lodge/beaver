@@ -1,4 +1,7 @@
 defmodule Beaver.Slang do
+  use Beaver
+  alias Beaver.MLIR.Dialect.IRDL
+
   @callback load_dialect(ctx :: Beaver.MLIR.Context.t()) :: :ok | {:error, String.t()}
   @moduledoc """
   Defining a MLIR dialect with macros in Elixir. Internally expressions are compiled to [IRDL](https://mlir.llvm.org/docs/Dialects/IRDL/)
@@ -74,8 +77,10 @@ defmodule Beaver.Slang do
   end
 
   @doc false
-  def creator_outer(name, op, args_op, return_op, constrain_f, opts) do
+  def run_creator(name, op, args_op, constrain_f, opts) do
     use Beaver
+    return_op = opts[:return_op]
+    need_variadicity = opts[:need_variadicity]
 
     Beaver.Deferred.from_opts(
       opts,
@@ -88,14 +93,23 @@ defmodule Beaver.Slang do
 
                 Beaver.Slang.op_applier(
                   args,
-                  slang_target_op: args_op,
-                  variadicity: Beaver.Slang.get_variadicity_array(args |> length)
+                  if(need_variadicity,
+                    do: [variadicity: Beaver.Slang.get_variadicity_array(args |> length)],
+                    else: []
+                  ),
+                  slang_target_op: args_op
                 ) >>> []
 
                 if return_op do
-                  Beaver.Slang.op_applier(ret,
-                    slang_target_op: return_op,
-                    variadicity: Beaver.Slang.get_variadicity_array(List.wrap(ret) |> length)
+                  Beaver.Slang.op_applier(
+                    ret,
+                    if(need_variadicity,
+                      do: [
+                        variadicity: Beaver.Slang.get_variadicity_array(List.wrap(ret) |> length)
+                      ],
+                      else: []
+                    ),
+                    slang_target_op: return_op
                   ) >>> []
                 else
                   []
@@ -108,10 +122,8 @@ defmodule Beaver.Slang do
     )
   end
 
-  # define a IRDL op of symbol, like `irdl.operation`, `irdl.type`
-  defp def_creator(op, args_op, call, block, opts \\ []) do
-    return_op = opts[:return_op]
-    variadicity = opts[:variadicity]
+  # generate AST for creator for a IRDL op of symbol, like `irdl.operation`, `irdl.type`
+  defp gen_creator(op, args_op, call, block, opts \\ []) do
     {name, args} = call |> Macro.decompose_call()
     args_var_ast = get_args_as_vars(args)
     args = args |> Macro.postwalk(&transform_defop_pins/1)
@@ -123,20 +135,19 @@ defmodule Beaver.Slang do
       Module.put_attribute(__MODULE__, unquote(attr_name), unquote(name))
       @__slang__creator__ {unquote(op), __MODULE__, unquote(creator)}
       def unquote(creator)(opts) do
-        constrain_f = fn opts ->
-          mlir block: opts[:block], ctx: opts[:ctx] do
-            unquote_splicing(args)
-            {[unquote_splicing(args_var_ast)], unquote(block[:do])}
-          end
-        end
-
-        Beaver.Slang.creator_outer(
+        Beaver.Slang.run_creator(
           unquote(name),
           unquote(op),
           unquote(args_op),
-          unquote(return_op),
-          constrain_f,
-          opts
+          fn opts ->
+            use Beaver
+
+            mlir block: opts[:block], ctx: opts[:ctx] do
+              unquote_splicing(args)
+              {[unquote_splicing(args_var_ast)], unquote(block[:do])}
+            end
+          end,
+          opts ++ unquote(opts)
         )
       end
     end
@@ -147,11 +158,8 @@ defmodule Beaver.Slang do
       call
       |> Macro.decompose_call()
 
-    op_ast = def_creator(:type, :parameters, call, block, variadicity: false)
-
     quote do
-      import Beaver
-      unquote(op_ast)
+      unquote(gen_creator(:type, :parameters, call, block, need_variadicity: false))
 
       def unquote(name)(unquote_splicing(get_args_as_vars(args))) do
         {:parametric, unquote(name), [unquote_splicing(get_args_as_vars(args))]}
@@ -160,7 +168,7 @@ defmodule Beaver.Slang do
   end
 
   defmacro defop(call, block \\ nil) do
-    def_creator(:operation, :operands, call, block, return_op: :results, variadicity: true)
+    gen_creator(:operation, :operands, call, block, return_op: :results, need_variadicity: true)
   end
 
   defp get_alias_name(def_name) do
@@ -215,10 +223,6 @@ defmodule Beaver.Slang do
       end
     end
   end
-
-  alias Beaver.Slang
-  alias Beaver.MLIR.Dialect.IRDL
-  use Beaver
 
   def create_parametric({:parametric, symbol, values}, opts) do
     Beaver.Deferred.from_opts(
