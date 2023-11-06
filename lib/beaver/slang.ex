@@ -24,6 +24,7 @@ defmodule Beaver.Slang do
     quote do
       def load_dialect(ctx) do
         create_dialect(@__slang_dialect_name__, Enum.reverse(@__slang__creator__), ctx: ctx)
+        |> Beaver.MLIR.CAPI.beaverLoadIRDLDialects()
       end
 
       use Beaver.MLIR.Dialect,
@@ -271,7 +272,9 @@ defmodule Beaver.Slang do
         |> MLIR.Pass.Composer.run!()
       end
     )
+  end
 
-    :ok
+  def load_dialect(ctx, mod) when is_atom(mod) do
+    apply(mod, :load_dialect, [ctx])
   end
 end

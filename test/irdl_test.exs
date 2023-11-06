@@ -47,8 +47,7 @@ defmodule IRDLTest do
     alias Beaver.MLIR.Dialect.Func
     require Func
 
-    MLIR.CAPI.mlirContextSetAllowUnregisteredDialects(test_context[:ctx], true)
-    MLIR.Context.load_dialect(test_context[:ctx], CMath)
+    Beaver.Slang.load_dialect(test_context[:ctx], CMath)
 
     # original: https://github.com/llvm/llvm-project/blob/main/mlir/test/Dialect/IRDL/test-cmath.mlir
     ~m"""

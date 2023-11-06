@@ -31,8 +31,4 @@ defmodule Beaver.MLIR.Context do
   end
 
   defdelegate destroy(ctx), to: MLIR.CAPI, as: :mlirContextDestroy
-
-  def load_dialect(ctx, mod) when is_atom(mod) do
-    apply(mod, :load_dialect, [ctx])
-  end
 end
