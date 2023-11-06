@@ -61,62 +61,82 @@ defmodule Beaver.Slang do
     ~a{#irdl<variadicity_array[#{List.duplicate("single", size) |> Enum.join(",")}]>}
   end
 
+  @doc false
+  def op_applier(ssa) do
+    i =
+      Enum.find_index(ssa.arguments, fn
+        {:slang_target_op, _} -> true
+        _ -> false
+      end)
+
+    {{:slang_target_op, op}, arguments} = List.pop_at(ssa.arguments, i)
+    apply(Beaver.MLIR.Dialect.IRDL, op, [%{ssa | arguments: arguments}])
+  end
+
+  @doc false
+  def creator_outer(name, op, args_op, return_op, constrain_f, opts) do
+    use Beaver
+
+    Beaver.Deferred.from_opts(
+      opts,
+      fn ctx ->
+        mlir block: opts[:block], ctx: ctx do
+          Beaver.Slang.op_applier slang_target_op: op, sym_name: "\"#{name}\"" do
+            region do
+              block b_op() do
+                {args, ret} = constrain_f.(block: Beaver.Env.block(), ctx: ctx)
+
+                Beaver.Slang.op_applier(
+                  args,
+                  slang_target_op: args_op,
+                  variadicity: Beaver.Slang.get_variadicity_array(args |> length)
+                ) >>> []
+
+                if return_op do
+                  Beaver.Slang.op_applier(ret,
+                    slang_target_op: return_op,
+                    variadicity: Beaver.Slang.get_variadicity_array(List.wrap(ret) |> length)
+                  ) >>> []
+                else
+                  []
+                end
+              end
+            end
+          end >>> []
+        end
+      end
+    )
+  end
+
   # define a IRDL op of symbol, like `irdl.operation`, `irdl.type`
   defp def_creator(op, args_op, call, block, opts \\ []) do
     return_op = opts[:return_op]
     variadicity = opts[:variadicity]
     {name, args} = call |> Macro.decompose_call()
-
     args_var_ast = get_args_as_vars(args)
     args = args |> Macro.postwalk(&transform_defop_pins/1)
     name = Atom.to_string(name)
     creator = String.to_atom("create_" <> name)
-
     attr_name = String.to_atom("__slang__" <> "#{op}" <> "__")
-
-    return_op_ast =
-      if return_op do
-        quote do
-          import Beaver.MLIR.Dialect.IRDL, only: [{unquote(return_op), 1}]
-          ret = unquote(block[:do])
-
-          unquote(return_op)(ret,
-            variadicity: Beaver.Slang.get_variadicity_array(List.wrap(ret) |> length)
-          ) >>> []
-        end
-      else
-        []
-      end
 
     quote do
       Module.put_attribute(__MODULE__, unquote(attr_name), unquote(name))
       @__slang__creator__ {unquote(op), __MODULE__, unquote(creator)}
       def unquote(creator)(opts) do
-        use Beaver
-
-        Beaver.Deferred.from_opts(
-          opts,
-          fn ctx ->
-            mlir block: opts[:block], ctx: ctx do
-              import Beaver.MLIR.Dialect.IRDL, only: [{unquote(op), 1}, {unquote(args_op), 1}]
-
-              unquote(op)(sym_name: "\"#{unquote(name)}\"") do
-                region do
-                  block b_op() do
-                    (unquote_splicing(args))
-
-                    args = [unquote_splicing(args_var_ast)]
-
-                    unquote(args_op)(args,
-                      variadicity: Beaver.Slang.get_variadicity_array(args |> length)
-                    ) >>> []
-
-                    unquote(return_op_ast)
-                  end
-                end
-              end >>> []
-            end
+        constrain_f = fn opts ->
+          mlir block: opts[:block], ctx: opts[:ctx] do
+            unquote_splicing(args)
+            {[unquote_splicing(args_var_ast)], unquote(block[:do])}
           end
+        end
+
+        Beaver.Slang.creator_outer(
+          unquote(name),
+          unquote(op),
+          unquote(args_op),
+          unquote(return_op),
+          constrain_f,
+          opts
         )
       end
     end
@@ -196,6 +216,7 @@ defmodule Beaver.Slang do
     end
   end
 
+  alias Beaver.Slang
   alias Beaver.MLIR.Dialect.IRDL
   use Beaver
 
