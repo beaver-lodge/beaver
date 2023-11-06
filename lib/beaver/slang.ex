@@ -2,7 +2,7 @@ defmodule Beaver.Slang do
   use Beaver
   alias Beaver.MLIR.Dialect.IRDL
 
-  @callback load_dialect(ctx :: Beaver.MLIR.Context.t()) :: :ok | {:error, String.t()}
+  @callback __slang_dialect__(ctx :: Beaver.MLIR.Context.t()) :: :ok | {:error, String.t()}
   @moduledoc """
   Defining a MLIR dialect with macros in Elixir. Internally expressions are compiled to [IRDL](https://mlir.llvm.org/docs/Dialects/IRDL/)
   """
@@ -22,9 +22,8 @@ defmodule Beaver.Slang do
 
   defmacro __before_compile__(_env) do
     quote do
-      def load_dialect(ctx) do
+      def __slang_dialect__(ctx) do
         create_dialect(@__slang_dialect_name__, Enum.reverse(@__slang__creator__), ctx: ctx)
-        |> Beaver.MLIR.CAPI.beaverLoadIRDLDialects()
       end
 
       use Beaver.MLIR.Dialect,
@@ -60,13 +59,8 @@ defmodule Beaver.Slang do
     end
   end
 
-  def get_variadicity_array(size) do
-    use Beaver
-    ~a{#irdl<variadicity_array[#{List.duplicate("single", size) |> Enum.join(",")}]>}
-  end
-
   @doc false
-  def op_applier(ssa) do
+  defp op_applier(ssa) do
     i =
       Enum.find_index(ssa.arguments, fn
         {:slang_target_op, _} -> true
@@ -78,9 +72,14 @@ defmodule Beaver.Slang do
   end
 
   defp get_variadicity(values, opts) do
+    use Beaver
+
     if opts[:need_variadicity] do
+      size = List.wrap(values) |> length
+
       [
-        variadicity: Beaver.Slang.get_variadicity_array(List.wrap(values) |> length)
+        variadicity:
+          ~a{#irdl<variadicity_array[#{List.duplicate("single", size) |> Enum.join(",")}]>}
       ]
     else
       []
@@ -96,19 +95,19 @@ defmodule Beaver.Slang do
       opts,
       fn ctx ->
         mlir block: opts[:block], ctx: ctx do
-          Beaver.Slang.op_applier slang_target_op: op, sym_name: "\"#{name}\"" do
+          op_applier slang_target_op: op, sym_name: "\"#{name}\"" do
             region do
               block b_op() do
                 {args, ret} = constrain_f.(block: Beaver.Env.block(), ctx: ctx)
 
-                Beaver.Slang.op_applier(
+                op_applier(
                   args,
                   get_variadicity(args, opts),
                   slang_target_op: args_op
                 ) >>> []
 
                 if return_op do
-                  Beaver.Slang.op_applier(
+                  op_applier(
                     ret,
                     get_variadicity(ret, opts),
                     slang_target_op: return_op
@@ -274,7 +273,8 @@ defmodule Beaver.Slang do
     )
   end
 
-  def load_dialect(ctx, mod) when is_atom(mod) do
-    apply(mod, :load_dialect, [ctx])
+  def load(ctx, mod) when is_atom(mod) do
+    apply(mod, :__slang_dialect__, [ctx])
+    |> Beaver.MLIR.CAPI.beaverLoadIRDLDialects()
   end
 end
