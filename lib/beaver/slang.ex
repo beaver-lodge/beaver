@@ -62,7 +62,7 @@ defmodule Beaver.Slang do
   end
 
   # define a IRDL op of symbol, like `irdl.operation`, `irdl.type`
-  defp def_symbol_op(op, args_op, call, block, opts \\ []) do
+  defp def_creator(op, args_op, call, block, opts \\ []) do
     return_op = opts[:return_op]
     variadicity = opts[:variadicity]
     {name, args} = call |> Macro.decompose_call()
@@ -127,7 +127,7 @@ defmodule Beaver.Slang do
       call
       |> Macro.decompose_call()
 
-    op_ast = def_symbol_op(:type, :parameters, call, block, variadicity: false)
+    op_ast = def_creator(:type, :parameters, call, block, variadicity: false)
 
     quote do
       import Beaver
@@ -140,7 +140,7 @@ defmodule Beaver.Slang do
   end
 
   defmacro defop(call, block \\ nil) do
-    def_symbol_op(:operation, :operands, call, block, return_op: :results, variadicity: true)
+    def_creator(:operation, :operands, call, block, return_op: :results, variadicity: true)
   end
 
   defp get_alias_name(def_name) do
