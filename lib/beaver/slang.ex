@@ -126,7 +126,16 @@ defmodule Beaver.Slang do
   defp gen_creator(op, args_op, call, block, opts \\ []) do
     {name, args} = call |> Macro.decompose_call()
     args_var_ast = get_args_as_vars(args)
-    args = args |> Macro.postwalk(&transform_defop_pins/1)
+
+    input_constrains =
+      args
+      |> Macro.postwalk(&transform_defop_pins/1)
+      |> Enum.reject(fn
+        # reject hanging vars to suppress warning
+        {_empty_var, _line, nil} -> true
+        _ -> false
+      end)
+
     name = Atom.to_string(name)
     creator = String.to_atom("create_" <> name)
     attr_name = String.to_atom("__slang__" <> "#{op}" <> "__")
@@ -143,7 +152,7 @@ defmodule Beaver.Slang do
             use Beaver
 
             mlir block: opts[:block], ctx: opts[:ctx] do
-              unquote_splicing(args)
+              unquote_splicing(input_constrains)
               {[unquote_splicing(args_var_ast)], unquote(block[:do])}
             end
           end,
