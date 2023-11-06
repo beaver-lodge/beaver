@@ -267,10 +267,8 @@ defmodule Beaver.Slang do
             end >>> []
           end
         end
-        |> MLIR.dump!()
         |> Beaver.MLIR.Transforms.canonicalize()
         |> MLIR.Pass.Composer.run!()
-        |> MLIR.dump!()
       end
     )
 
