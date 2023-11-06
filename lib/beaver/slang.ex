@@ -76,11 +76,20 @@ defmodule Beaver.Slang do
     apply(Beaver.MLIR.Dialect.IRDL, op, [%{ssa | arguments: arguments}])
   end
 
+  defp get_variadicity(values, opts) do
+    if opts[:need_variadicity] do
+      [
+        variadicity: Beaver.Slang.get_variadicity_array(List.wrap(values) |> length)
+      ]
+    else
+      []
+    end
+  end
+
   @doc false
   def run_creator(name, op, args_op, constrain_f, opts) do
     use Beaver
     return_op = opts[:return_op]
-    need_variadicity = opts[:need_variadicity]
 
     Beaver.Deferred.from_opts(
       opts,
@@ -93,22 +102,14 @@ defmodule Beaver.Slang do
 
                 Beaver.Slang.op_applier(
                   args,
-                  if(need_variadicity,
-                    do: [variadicity: Beaver.Slang.get_variadicity_array(args |> length)],
-                    else: []
-                  ),
+                  get_variadicity(args, opts),
                   slang_target_op: args_op
                 ) >>> []
 
                 if return_op do
                   Beaver.Slang.op_applier(
                     ret,
-                    if(need_variadicity,
-                      do: [
-                        variadicity: Beaver.Slang.get_variadicity_array(List.wrap(ret) |> length)
-                      ],
-                      else: []
-                    ),
+                    get_variadicity(ret, opts),
                     slang_target_op: return_op
                   ) >>> []
                 else

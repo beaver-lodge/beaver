@@ -1,4 +1,5 @@
 defmodule CMath do
+  @moduledoc "An example to showcase the cmath dialect in IRDL test. Original MLIR file: https://github.com/llvm/llvm-project/blob/main/mlir/test/Dialect/IRDL/cmath.irdl.mlir"
   use Beaver.Slang, name: "cmath"
 
   defalias any_f do
