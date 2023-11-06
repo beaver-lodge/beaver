@@ -12,7 +12,7 @@ defmodule Beaver.Slang do
     quote do
       @behaviour Beaver.Slang
       @before_compile Beaver.Slang
-      import Beaver.Slang
+      import Beaver.Slang, only: :macros
       @__slang_dialect_name__ unquote(name)
       Module.register_attribute(__MODULE__, :__slang__operation__, accumulate: true)
       Module.register_attribute(__MODULE__, :__slang__creator__, accumulate: true)
@@ -24,7 +24,9 @@ defmodule Beaver.Slang do
     quote do
       @doc false
       def __slang_dialect__(ctx) do
-        create_dialect(@__slang_dialect_name__, Enum.reverse(@__slang__creator__), ctx: ctx)
+        Beaver.Slang.create_dialect(@__slang_dialect_name__, Enum.reverse(@__slang__creator__),
+          ctx: ctx
+        )
       end
 
       use Beaver.MLIR.Dialect,
@@ -235,6 +237,7 @@ defmodule Beaver.Slang do
     end
   end
 
+  @doc false
   def create_parametric({:parametric, symbol, values}, opts) do
     Beaver.Deferred.from_opts(
       opts,
@@ -248,8 +251,10 @@ defmodule Beaver.Slang do
     )
   end
 
+  @doc false
   def create_parametric(v, _opts), do: v
 
+  @doc false
   def create_dialect(name, creators, opts) do
     Beaver.Deferred.from_opts(
       opts,
