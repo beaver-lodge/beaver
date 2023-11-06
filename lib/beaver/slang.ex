@@ -22,6 +22,7 @@ defmodule Beaver.Slang do
 
   defmacro __before_compile__(_env) do
     quote do
+      @doc false
       def __slang_dialect__(ctx) do
         create_dialect(@__slang_dialect_name__, Enum.reverse(@__slang__creator__), ctx: ctx)
       end
@@ -267,14 +268,15 @@ defmodule Beaver.Slang do
             end >>> []
           end
         end
-        |> Beaver.MLIR.Transforms.canonicalize()
-        |> MLIR.Pass.Composer.run!()
       end
     )
   end
 
   def load(ctx, mod) when is_atom(mod) do
     apply(mod, :__slang_dialect__, [ctx])
+    |> Beaver.MLIR.Transforms.canonicalize()
+    |> MLIR.Pass.Composer.run!()
+    |> MLIR.Operation.verify!()
     |> Beaver.MLIR.CAPI.beaverLoadIRDLDialects()
   end
 end
