@@ -3,8 +3,13 @@ defmodule TestVariadic do
   use Beaver.Slang, name: "testvar"
 
   defop single_operand(i = {:single, Type.i32()}), do: []
-
   defop var_operand(a = Type.i16(), b = {:variadic, Type.i32()}, c = Type.i64()), do: []
   defop var_operand_alt(a = Type.i16(), b = {:variadic, a}, Type.i64()), do: []
   defop var_operand_alt1(a = Type.i16(), c = b = {:variadic, a}, b, Type.i64()), do: c
+  defop opt_operand(a = Type.i16(), b = {:optional, Type.i32()}, c = Type.i64()), do: []
+  defop var_and_opt_operand({:variadic, Type.i16()}, {:optional, Type.i32()}, Type.i64()), do: []
+  defop single_result(), do: [{:single, Type.i32()}]
+  defop var_result(), do: [{:variadic, Type.i32()}]
+  defop opt_result(), do: [{:optional, Type.i32()}]
+  defop var_and_opt_result(), do: [{:variadic, Type.i16()}, {:optional, Type.i32()}, Type.i64()]
 end

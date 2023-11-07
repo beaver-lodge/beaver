@@ -139,20 +139,29 @@ defmodule Beaver.Slang do
               block b_op() do
                 {args, ret} = constrain_f.(block: Beaver.Env.block(), ctx: ctx)
 
-                op_applier(
-                  strip_variadicity(args),
-                  get_variadicity(args, opts),
-                  slang_target_op: args_op
-                ) >>> []
+                case strip_variadicity(args) do
+                  [] ->
+                    []
 
-                if return_op do
-                  op_applier(
-                    strip_variadicity(ret),
-                    get_variadicity(ret, opts),
-                    slang_target_op: return_op
-                  ) >>> []
-                else
-                  []
+                  args ->
+                    op_applier(
+                      args,
+                      get_variadicity(args, opts),
+                      slang_target_op: args_op
+                    ) >>> []
+                end
+
+                case {return_op, strip_variadicity(ret)} do
+                  {_, []} ->
+                    []
+
+                  {return_op, ret} when not is_nil(return_op) ->
+                    op_applier(
+                      ret
+                      |> Enum.map(&create_constrain(&1, block: Beaver.Env.block(), ctx: ctx)),
+                      get_variadicity(ret, opts),
+                      slang_target_op: return_op
+                    ) >>> []
                 end
               end
             end
