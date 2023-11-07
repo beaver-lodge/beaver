@@ -53,11 +53,14 @@ defmodule Beaver.Slang do
   defp get_args_as_vars(args) do
     for v <- args do
       case v do
-        var = {_name, _line0, nil} ->
-          var
+        {_name, _line0, nil} ->
+          v
 
         {:=, _line0, [var, _right]} ->
           var
+
+        {variadic_tag, {_name, _line0, nil}} when variadic_tag in [:variadic, :optional] ->
+          v
       end
     end
   end
@@ -78,15 +81,42 @@ defmodule Beaver.Slang do
     use Beaver
 
     if opts[:need_variadicity] do
-      size = List.wrap(values) |> length
+      tags =
+        values
+        |> List.wrap()
+        |> Enum.map(fn
+          {:optional, _} ->
+            "optional"
+
+          {:variadic, _} ->
+            "variadic"
+
+          _ ->
+            "single"
+        end)
+        |> Enum.join(",")
 
       [
-        variadicity:
-          ~a{#irdl<variadicity_array[#{List.duplicate("single", size) |> Enum.join(",")}]>}
+        variadicity: ~a{#irdl<variadicity_array[#{tags}]>}
       ]
     else
       []
     end
+  end
+
+  defp strip_variadicity(values) do
+    values
+    |> List.wrap()
+    |> Enum.map(fn
+      {:optional, v} ->
+        v
+
+      {:variadic, v} ->
+        v
+
+      v ->
+        v
+    end)
   end
 
   @doc false
@@ -104,14 +134,14 @@ defmodule Beaver.Slang do
                 {args, ret} = constrain_f.(block: Beaver.Env.block(), ctx: ctx)
 
                 op_applier(
-                  args,
+                  strip_variadicity(args),
                   get_variadicity(args, opts),
                   slang_target_op: args_op
                 ) >>> []
 
                 if return_op do
                   op_applier(
-                    ret,
+                    strip_variadicity(ret),
                     get_variadicity(ret, opts),
                     slang_target_op: return_op
                   ) >>> []
