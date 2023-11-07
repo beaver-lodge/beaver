@@ -1,12 +1,11 @@
 defmodule CMath.IRExample do
   use Beaver
-  alias Beaver.MLIR.Dialect.Func
+  alias Beaver.MLIR.Dialect.{Func, Arith}
   require Func
 
   def gen(ctx) do
     mlir ctx: ctx do
       module do
-        alias Beaver.MLIR.Dialect.Arith
         cf32 = ~t{!cmath.complex<f32>}
         f32 = Type.f(32)
 
