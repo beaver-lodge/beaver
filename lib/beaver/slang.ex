@@ -320,6 +320,17 @@ defmodule Beaver.Slang do
     end
   end
 
+  defmacro is(type) do
+    quote do
+      use Beaver
+
+      mlir do
+        Beaver.MLIR.Dialect.IRDL.is(expected: unquote(type)) >>>
+          ~t{!irdl.attribute}
+      end
+    end
+  end
+
   defmacro any() do
     quote do
       use Beaver

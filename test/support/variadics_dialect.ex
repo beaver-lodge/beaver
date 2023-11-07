@@ -12,4 +12,11 @@ defmodule TestVariadic do
   defop var_result(), do: [{:variadic, Type.i32()}]
   defop opt_result(), do: [{:optional, Type.i32()}]
   defop var_and_opt_result(), do: [{:variadic, Type.i16()}, {:optional, Type.i32()}, Type.i64()]
+
+  defop var_and_opt_result_alt(x = is(Type.i16())) do
+    a = is(Type.i16())
+    b = is(Type.i32())
+    c = is(Type.i64())
+    [{:variadic, a}, {:optional, b}, c, c, x]
+  end
 end
