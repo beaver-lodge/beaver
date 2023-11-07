@@ -49,7 +49,7 @@ defmodule Beaver.Slang do
   end
 
   defp transform_defop_pins({:=, _line0, [_var, {:=, _line1, _right2}]} = ast), do: ast
-  # only leaf assign should be transform
+  # only leaf assignment should be transformed
   defp transform_defop_pins({:=, _line0, [var, right]}) do
     quote do
       unquote(var) =
