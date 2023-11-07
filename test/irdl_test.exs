@@ -41,13 +41,13 @@ defmodule IRDLTest do
     assert ["mul", "norm"] == MLIR.Dialect.Registry.ops("cmath", ctx: ctx)
   end
 
-  test "define dialect",
+  test "cmath dialect",
        test_context do
     use Beaver
     alias Beaver.MLIR.Dialect.Func
     require Func
 
-    CMath.__slang_dialect__(test_context[:ctx]) |> MLIR.dump!()
+    CMath.__slang_dialect__(test_context[:ctx]) |> MLIR.Operation.verify!()
     Beaver.Slang.load(test_context[:ctx], CMath)
 
     # original: https://github.com/llvm/llvm-project/blob/main/mlir/test/Dialect/IRDL/test-cmath.mlir
@@ -69,5 +69,11 @@ defmodule IRDLTest do
     |> MLIR.Operation.verify!()
 
     CMath.IRExample.gen(test_context[:ctx])
+  end
+
+  test "var dialect",
+       test_context do
+    use Beaver
+    TestVariadic.__slang_dialect__(test_context[:ctx]) |> MLIR.dump!() |> MLIR.Operation.verify!()
   end
 end

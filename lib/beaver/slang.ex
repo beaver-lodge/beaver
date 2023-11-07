@@ -1,7 +1,7 @@
 defmodule Beaver.Slang do
   use Beaver
   alias Beaver.MLIR.Dialect.IRDL
-
+  @variadic_tags [:variadic, :optional, :single]
   @callback __slang_dialect__(ctx :: Beaver.MLIR.Context.t()) :: :ok | {:error, String.t()}
   @moduledoc """
   Defining a MLIR dialect with macros in Elixir. Internally expressions are compiled to [IRDL](https://mlir.llvm.org/docs/Dialects/IRDL/)
@@ -48,20 +48,32 @@ defmodule Beaver.Slang do
     end
   end
 
+  defp transform_defop_pins({:=, _line0, [_var, {:=, _line1, _right2}]} = ast), do: ast
+  # only leaf assign should be transform
+  defp transform_defop_pins({:=, _line0, [var, right]}) do
+    quote do
+      unquote(var) =
+        Beaver.Slang.create_constrain(unquote(right),
+          block: Beaver.Env.block(),
+          ctx: Beaver.Env.context()
+        )
+    end
+  end
+
   defp transform_defop_pins(ast), do: ast
 
-  defp get_args_as_vars(args) do
-    for v <- args do
-      case v do
-        {_name, _line0, nil} ->
-          v
+  @doc false
+  def create_constrain({variadic_tag, v}, opts) when variadic_tag in @variadic_tags do
+    {variadic_tag, create_constrain(v, opts)}
+  end
 
-        {:=, _line0, [var, _right]} ->
-          var
+  def create_constrain(%MLIR.Value{} = v, _opts), do: v
 
-        {variadic_tag, {_name, _line0, nil}} when variadic_tag in [:variadic, :optional] ->
-          v
-      end
+  def create_constrain(t, opts) do
+    use Beaver
+
+    mlir ctx: opts[:ctx], block: opts[:block] do
+      Beaver.MLIR.Dialect.IRDL.is(expected: t) >>> ~t{!irdl.attribute}
     end
   end
 
@@ -85,11 +97,8 @@ defmodule Beaver.Slang do
         values
         |> List.wrap()
         |> Enum.map(fn
-          {:optional, _} ->
-            "optional"
-
-          {:variadic, _} ->
-            "variadic"
+          {variadic_tag, _} when variadic_tag in @variadic_tags ->
+            variadic_tag |> Atom.to_string()
 
           _ ->
             "single"
@@ -108,10 +117,7 @@ defmodule Beaver.Slang do
     values
     |> List.wrap()
     |> Enum.map(fn
-      {:optional, v} ->
-        v
-
-      {:variadic, v} ->
+      {variadic_tag, v} when variadic_tag in @variadic_tags ->
         v
 
       v ->
@@ -156,23 +162,71 @@ defmodule Beaver.Slang do
     )
   end
 
+  defp get_slang_arg_ast(i) do
+    {"slang_internal_arg#{i}" |> String.to_atom(), [], nil}
+  end
+
+  defp transform_arg(ast, i, usage) when usage in [:constrain, :variable] do
+    case ast do
+      {_name, _line0, nil} ->
+        case usage do
+          # erase hanging vars to suppress warning
+          :constrain ->
+            nil
+
+          :variable ->
+            ast
+        end
+
+      {:=, _line0, [var, _right]} ->
+        case usage do
+          :constrain ->
+            ast
+
+          :variable ->
+            var
+        end
+
+      {variadic_tag, {_name, _line0, nil}}
+      when variadic_tag in @variadic_tags ->
+        ast
+
+      _ ->
+        case usage do
+          :constrain ->
+            quote do
+              unquote(get_slang_arg_ast(i)) =
+                Beaver.Slang.create_constrain(unquote(ast),
+                  block: Beaver.Env.block(),
+                  ctx: Beaver.Env.context()
+                )
+            end
+
+          :variable ->
+            get_slang_arg_ast(i)
+        end
+    end
+  end
+
+  defp get_args_as_vars(args) do
+    for {v, i} <- Enum.with_index(args), do: transform_arg(v, i, :variable)
+  end
+
   # generate AST for creator for a IRDL op of symbol, like `irdl.operation`, `irdl.type`
   defp gen_creator(op, args_op, call, block, opts \\ []) do
     {name, args} = call |> Macro.decompose_call()
+    name = Atom.to_string(name)
+    creator = String.to_atom("create_" <> name)
+    attr_name = String.to_atom("__slang__" <> "#{op}" <> "__")
     args_var_ast = get_args_as_vars(args)
 
     input_constrains =
       args
       |> Macro.postwalk(&transform_defop_pins/1)
-      |> Enum.reject(fn
-        # reject hanging vars to suppress warning
-        {_empty_var, _line, nil} -> true
-        _ -> false
+      |> Enum.with_index()
+      |> Enum.map(fn {ast, i} ->
+        transform_arg(ast, i, :constrain)
       end)
-
-    name = Atom.to_string(name)
-    creator = String.to_atom("create_" <> name)
-    attr_name = String.to_atom("__slang__" <> "#{op}" <> "__")
 
     quote do
       Module.put_attribute(__MODULE__, unquote(attr_name), unquote(name))
