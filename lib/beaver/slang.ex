@@ -6,6 +6,10 @@ defmodule Beaver.Slang do
   @moduledoc """
   Defining a MLIR dialect with macros in Elixir. Internally expressions are compiled to [IRDL](https://mlir.llvm.org/docs/Dialects/IRDL/)
   """
+
+  @doc """
+  This macro is invoked when the module is used. It sets up the module by registering attributes and importing macros from `Beaver.Slang`.
+  """
   defmacro __using__(opts) do
     name = opts |> Keyword.fetch!(:name)
 
@@ -20,6 +24,9 @@ defmodule Beaver.Slang do
     end
   end
 
+  @doc """
+  This macro is invoked before the module is compiled. Internally it defines a function which creates the MLIR dialect. It also uses the Beaver.MLIR.Dialect macro to define the MLIR dialect and its operations.
+  """
   defmacro __before_compile__(_env) do
     quote do
       @doc false
@@ -36,7 +43,7 @@ defmodule Beaver.Slang do
   end
 
   @doc false
-  # transform pin to alias function call
+  # This function transforms the `^argument`s of a defop macro call. It handles different cases based on the structure of the pins and returns the transformed AST.
   defp transform_defop_pins({:^, _line1, [{name, _line2, nil}]}) do
     alias_name = get_alias_name(name)
 
@@ -63,6 +70,7 @@ defmodule Beaver.Slang do
   defp transform_defop_pins(ast), do: ast
 
   @doc false
+  # This function creates a `irdl.is` op for a given value. It uses the mlir macro to generate the MLIR code for the constrain attribute.
   def create_constrain({variadic_tag, v}, opts) when variadic_tag in @variadic_tags do
     {variadic_tag, create_constrain(v, opts)}
   end
@@ -78,6 +86,7 @@ defmodule Beaver.Slang do
   end
 
   @doc false
+  # This function applies the target op to the given SSA (Static Single Assignment) form.
   defp op_applier(ssa) do
     i =
       Enum.find_index(ssa.arguments, fn
@@ -89,6 +98,7 @@ defmodule Beaver.Slang do
     apply(Beaver.MLIR.Dialect.IRDL, op, [%{ssa | arguments: arguments}])
   end
 
+  # This function determines the variadicity of the given values based on the provided options. It generates the variadicity attribute for the values if needed.
   defp get_variadicity(values, opts) do
     use Beaver
 
@@ -113,6 +123,7 @@ defmodule Beaver.Slang do
     end
   end
 
+  # This function removes the variadicity tags from the given values.
   defp strip_variadicity(values) do
     values
     |> List.wrap()
@@ -126,6 +137,7 @@ defmodule Beaver.Slang do
   end
 
   @doc false
+  # This function runs the creator function for a given operation. It generates the MLIR code for the operation and its arguments, applies the operation using op_applier/1, and returns the result.
   def run_creator(name, op, args_op, constrain_f, opts) do
     use Beaver
     return_op = opts[:return_op]
@@ -171,10 +183,12 @@ defmodule Beaver.Slang do
     )
   end
 
+  # This function generates the AST for an argument based on the given index.
   defp get_slang_arg_ast(i) do
     {"slang_internal_arg#{i}" |> String.to_atom(), [], nil}
   end
 
+  # This function transforms the given argument AST based on the provided usage (if it is using as variable or constrain declaration). It handles different cases based on the structure of the argument and returns the transformed AST.
   defp transform_arg(ast, i, usage) when usage in [:constrain, :variable] do
     case ast do
       {_name, _line0, nil} ->
@@ -217,11 +231,12 @@ defmodule Beaver.Slang do
     end
   end
 
+  # This function generates the AST for the arguments of a creator function as variables.
   defp get_args_as_vars(args) do
     for {v, i} <- Enum.with_index(args), do: transform_arg(v, i, :variable)
   end
 
-  # generate AST for creator for a IRDL op of symbol, like `irdl.operation`, `irdl.type`
+  # This function generates the AST for a creator function for an IRDL operation (like `irdl.operation`, `irdl.type`). It uses the transform_defop_pins/1 function to transform the pins, generates the MLIR code for the operation and its arguments, and applies the operation using op_applier/1.
   defp gen_creator(op, args_op, call, block, opts \\ []) do
     {name, args} = call |> Macro.decompose_call()
     name = Atom.to_string(name)
@@ -259,6 +274,9 @@ defmodule Beaver.Slang do
     end
   end
 
+  @doc """
+  This macro defines a type in the dialect. It generates the AST for the creator function and the definition function for the type.
+  """
   defmacro deftype(call, block \\ nil) do
     {name, args} =
       call
@@ -273,6 +291,9 @@ defmodule Beaver.Slang do
     end
   end
 
+  @doc """
+  This macro defines an operation in the dialect. It generates the AST for the creator function for the operation.
+  """
   defmacro defop(call, block \\ nil) do
     gen_creator(:operation, :operands, call, block, return_op: :results, need_variadicity: true)
   end
@@ -282,7 +303,7 @@ defmodule Beaver.Slang do
   end
 
   @doc """
-  define an alias abbreviates lengthy types.
+  This macro defines an alias for a lengthy type. It generates the AST for the alias function.
   """
   defmacro defalias(call, block) do
     {name, _args} = call |> Macro.decompose_call()
@@ -305,6 +326,9 @@ defmodule Beaver.Slang do
     end
   end
 
+  @doc """
+  This macro generates the AST for the any_of attribute in the dialect.
+  """
   defmacro any_of(types) do
     quote do
       use Beaver
@@ -320,6 +344,9 @@ defmodule Beaver.Slang do
     end
   end
 
+  @doc """
+  This macro generates the AST for `irdl.is` op, usually used to create a constrain on type
+  """
   defmacro is(type) do
     quote do
       use Beaver
@@ -331,6 +358,9 @@ defmodule Beaver.Slang do
     end
   end
 
+  @doc """
+  This macro generates the AST for the `irdl.any` op.
+  """
   defmacro any() do
     quote do
       use Beaver
@@ -342,6 +372,7 @@ defmodule Beaver.Slang do
   end
 
   @doc false
+  # This function creates a parametric attribute for a given value. It generates the code for `irdl.parametric` op.
   def create_parametric({:parametric, symbol, values}, opts) do
     Beaver.Deferred.from_opts(
       opts,
@@ -359,6 +390,7 @@ defmodule Beaver.Slang do
   def create_parametric(v, _opts), do: v
 
   @doc false
+  # This function creates the MLIR dialect using the provided name and creators. It generates the MLIR code for the dialect and call all the generated creators.
   def create_dialect(name, creators, opts) do
     Beaver.Deferred.from_opts(
       opts,
@@ -381,6 +413,9 @@ defmodule Beaver.Slang do
     )
   end
 
+  @doc """
+  This function loads the MLIR dialect into the MLIR context. It invokes the internal function of the provided module to create the dialect module and performs additional MLIR transformations and verification.
+  """
   def load(ctx, mod) when is_atom(mod) do
     apply(mod, :__slang_dialect__, [ctx])
     |> Beaver.MLIR.Transforms.canonicalize()
