@@ -25,7 +25,7 @@ defmodule Beaver.Slang do
   end
 
   @doc """
-  This macro is invoked before the module is compiled. Internally it defines a function which creates the MLIR dialect. It also uses the Beaver.MLIR.Dialect macro to define the MLIR dialect and its operations.
+  This macro is invoked before the module is compiled. Internally it defines a function which creates the MLIR dialect's IRDL module. It also uses the `Beaver.MLIR.Dialect` module to define the dialect's operations.
   """
   defmacro __before_compile__(_env) do
     quote do
@@ -414,7 +414,7 @@ defmodule Beaver.Slang do
   end
 
   @doc """
-  This function loads the MLIR dialect into the MLIR context. It invokes the internal function of the provided module to create the dialect module and performs additional MLIR transformations and verification.
+  This function loads the MLIR dialect into the MLIR context. It invokes the internal function of the provided module to create the dialect's IRDL module and performs additional MLIR transformations and verification.
   """
   def load(ctx, mod) when is_atom(mod) do
     apply(mod, :__slang_dialect__, [ctx])
