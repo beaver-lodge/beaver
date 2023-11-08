@@ -274,6 +274,22 @@ defmodule Beaver.Slang do
     end
   end
 
+  defp create_element(element, dialect, name, params, opts \\ [])
+       when element in [:type, :attr] do
+    params = %MLIR.Attribute{} = MLIR.Attribute.array(params, opts)
+
+    cb =
+      case element do
+        :attr ->
+          &MLIR.CAPI.beaverGetIRDLDefinedAttr/3
+
+        :type ->
+          &MLIR.CAPI.beaverGetIRDLDefinedType/3
+      end
+
+    cb.(dialect, name, params)
+  end
+
   @doc """
   This macro defines a type in the dialect. It generates the AST for the creator function and the definition function for the type.
   """

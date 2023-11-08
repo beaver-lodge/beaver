@@ -3,6 +3,7 @@
 #include "mlir/CAPI/Registration.h"
 #include "mlir/Dialect/IRDL/IRDLLoading.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
+#include "mlir/IR/ExtensibleDialect.h"
 
 using namespace mlir;
 
@@ -308,4 +309,40 @@ MLIR_CAPI_EXPORTED void beaverOperationDumpGeneric(MlirOperation op) {
 
 MLIR_CAPI_EXPORTED MlirLogicalResult beaverLoadIRDLDialects(MlirModule module) {
   return wrap(irdl::loadDialects(unwrap(module)));
+}
+
+template <typename T, typename EntityLookup, typename EntityGetter>
+T getIRDLDefinedEntity(MlirStringRef dialect, MlirStringRef name,
+                       MlirAttribute attrArr, EntityLookup lookup,
+                       EntityGetter getter) {
+  if (auto d =
+          unwrap(attrArr).getContext()->getOrLoadDialect(unwrap(dialect))) {
+    if (auto e = llvm::dyn_cast<ExtensibleDialect>(d)) {
+      if (auto definition = lookup(e, unwrap(name))) {
+        if (auto arr = unwrap(attrArr).dyn_cast<ArrayAttr>()) {
+          return getter(definition, arr.getValue());
+        }
+      }
+    }
+  }
+  return {};
+}
+
+MLIR_CAPI_EXPORTED MlirType beaverGetIRDLDefinedType(MlirStringRef dialect,
+                                                     MlirStringRef type,
+                                                     MlirAttribute params) {
+
+  return wrap(getIRDLDefinedEntity<Type>(
+      dialect, type, params,
+      [](auto d, auto name) { return d->lookupTypeDefinition(name); },
+      DynamicType::get));
+}
+
+MLIR_CAPI_EXPORTED MlirAttribute beaverGetIRDLDefinedAttr(
+    MlirStringRef dialect, MlirStringRef attr, MlirAttribute params) {
+
+  return wrap(getIRDLDefinedEntity<Attribute>(
+      dialect, attr, params,
+      [](auto d, auto name) { return d->lookupAttrDefinition(name); },
+      DynamicAttr::get));
 }

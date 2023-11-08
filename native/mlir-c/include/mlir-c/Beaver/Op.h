@@ -120,7 +120,12 @@ MLIR_CAPI_EXPORTED void beaverLocationPrint(MlirLocation location,
 
 MLIR_CAPI_EXPORTED void beaverOperationDumpGeneric(MlirOperation op);
 MLIR_CAPI_EXPORTED MlirLogicalResult beaverLoadIRDLDialects(MlirModule op);
-
+MLIR_CAPI_EXPORTED MlirType beaverGetIRDLDefinedType(MlirStringRef dialect,
+                                                     MlirStringRef type,
+                                                     MlirAttribute params);
+MLIR_CAPI_EXPORTED MlirAttribute beaverGetIRDLDefinedAttr(MlirStringRef dialect,
+                                                          MlirStringRef attr,
+                                                          MlirAttribute params);
 #include "mlir-c/ExecutionEngine.h"
 
 MLIR_CAPI_EXPORTED bool beaverMlirExecutionEngineIsNull(MlirExecutionEngine w);
