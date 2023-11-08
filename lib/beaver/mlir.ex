@@ -7,7 +7,17 @@ defmodule Beaver.MLIR do
   alias Beaver.MLIR.CAPI
   require Beaver.MLIR.CAPI
 
-  alias Beaver.MLIR.{Value, Attribute, Type, Block, Location, Module, Operation, AffineMap}
+  alias Beaver.MLIR.{
+    Value,
+    Attribute,
+    Type,
+    Block,
+    Location,
+    Module,
+    Operation,
+    AffineMap,
+    Dialect
+  }
 
   alias Beaver.MLIR.CAPI.{
     MlirAffineExpr,
@@ -100,6 +110,10 @@ defmodule Beaver.MLIR do
 
   def is_null(%Value{} = v) do
     CAPI.beaverValueIsNull(v) |> Beaver.Native.to_term()
+  end
+
+  def is_null(%Dialect{} = v) do
+    CAPI.beaverDialectIsNull(v) |> Beaver.Native.to_term()
   end
 
   def to_string(%Attribute{ref: ref}) do

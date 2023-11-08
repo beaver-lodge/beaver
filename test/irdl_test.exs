@@ -69,6 +69,12 @@ defmodule IRDLTest do
     |> MLIR.Operation.verify!()
 
     CMath.IRExample.gen(test_context[:ctx])
+
+    assert not (MLIR.CAPI.mlirContextGetOrLoadDialect(
+                  test_context[:ctx],
+                  MLIR.StringRef.create("cmath")
+                )
+                |> MLIR.is_null())
   end
 
   test "var dialect",

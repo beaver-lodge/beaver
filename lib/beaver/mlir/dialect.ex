@@ -3,9 +3,11 @@ defmodule Beaver.MLIR.Dialect do
   This module defines macro to generate code for an MLIR dialect.
   You might override `eval_ssa/2` function to introduce your custom op generation
   """
-  alias Beaver.MLIR.Dialect
 
   require Logger
+
+  use Kinda.ResourceKind,
+    forward_module: Beaver.Native
 
   @callback eval_ssa(String.t(), Beaver.SSA.t()) :: any()
   defmacro __using__(opts) do
