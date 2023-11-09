@@ -278,16 +278,17 @@ defmodule Beaver.Slang do
        when element in [:type, :attr] do
     params = %MLIR.Attribute{} = MLIR.Attribute.array(params, opts)
 
-    cb =
+    apply(
+      MLIR.CAPI,
       case element do
         :attr ->
-          &MLIR.CAPI.beaverGetIRDLDefinedAttr/3
+          :beaverGetIRDLDefinedAttr
 
         :type ->
-          &MLIR.CAPI.beaverGetIRDLDefinedType/3
-      end
-
-    cb.(dialect, name, params)
+          :beaverGetIRDLDefinedType
+      end,
+      [dialect, name, params]
+    )
   end
 
   @doc """
