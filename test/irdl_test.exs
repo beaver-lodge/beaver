@@ -50,24 +50,7 @@ defmodule IRDLTest do
     CMath.__slang_dialect__(test_context[:ctx]) |> MLIR.Operation.verify!()
     Beaver.Slang.load(test_context[:ctx], CMath)
 
-    # original: https://github.com/llvm/llvm-project/blob/main/mlir/test/Dialect/IRDL/test-cmath.mlir
-    ~m"""
-    func.func @conorm(%p: !cmath.complex<f32>, %q: !cmath.complex<f32>) -> f32 {
-      %norm_p = "cmath.norm"(%p) : (!cmath.complex<f32>) -> f32
-      %norm_q = "cmath.norm"(%q) : (!cmath.complex<f32>) -> f32
-      %pq = arith.mulf %norm_p, %norm_q : f32
-      return %pq : f32
-    }
-
-
-    func.func @conorm2(%p: !cmath.complex<f32>, %q: !cmath.complex<f32>) -> f32 {
-      %pq = "cmath.mul"(%p, %q) : (!cmath.complex<f32>, !cmath.complex<f32>) -> !cmath.complex<f32>
-      %conorm = "cmath.norm"(%pq) : (!cmath.complex<f32>) -> f32
-      return %conorm : f32
-    }
-    """.(test_context[:ctx])
-    |> MLIR.Operation.verify!()
-
+    CMath.IRExample.get(test_context[:ctx])
     CMath.IRExample.gen(test_context[:ctx])
 
     assert not (MLIR.CAPI.mlirContextGetOrLoadDialect(
@@ -80,6 +63,6 @@ defmodule IRDLTest do
   test "var dialect",
        test_context do
     use Beaver
-    TestVariadic.__slang_dialect__(test_context[:ctx]) |> MLIR.dump!() |> MLIR.Operation.verify!()
+    TestVariadic.__slang_dialect__(test_context[:ctx]) |> MLIR.Operation.verify!()
   end
 end

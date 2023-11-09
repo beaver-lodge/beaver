@@ -274,21 +274,30 @@ defmodule Beaver.Slang do
     end
   end
 
-  defp create_element(element, dialect, name, params, opts \\ [])
-       when element in [:type, :attr] do
-    params = %MLIR.Attribute{} = MLIR.Attribute.array(params, opts)
+  def create_element(element, dialect, name, params, opts \\ [])
+      when element in [:type, :attr] do
+    Beaver.Deferred.from_opts(opts, fn ctx ->
+      params =
+        params
+        |> Enum.map(&Beaver.Deferred.create(&1, ctx))
+        |> Enum.map(fn
+          %MLIR.Type{} = t -> MLIR.Attribute.type(t)
+          %MLIR.Attribute{} = a -> a
+        end)
+        |> MLIR.Attribute.array(ctx: ctx)
 
-    apply(
-      MLIR.CAPI,
-      case element do
-        :attr ->
-          :beaverGetIRDLDefinedAttr
+      apply(
+        MLIR.CAPI,
+        case element do
+          :attr ->
+            :beaverGetIRDLDefinedAttr
 
-        :type ->
-          :beaverGetIRDLDefinedType
-      end,
-      [dialect, name, params]
-    )
+          :type ->
+            :beaverGetIRDLDefinedType
+        end,
+        [MLIR.StringRef.create(dialect), MLIR.StringRef.create(name), params]
+      )
+    end)
   end
 
   @doc """
@@ -302,8 +311,24 @@ defmodule Beaver.Slang do
     quote do
       unquote(gen_creator(:type, :parameters, call, block, need_variadicity: false))
 
-      def unquote(name)(unquote_splicing(get_args_as_vars(args))) do
-        {:parametric, unquote(name), [unquote_splicing(get_args_as_vars(args))]}
+      def unquote(name)(unquote_splicing(get_args_as_vars(args)), opts \\ []) do
+        f =
+          Beaver.Deferred.from_opts(
+            opts,
+            fn ctx ->
+              [unquote_splicing(get_args_as_vars(args))]
+
+              Beaver.Slang.create_element(
+                :type,
+                @__slang_dialect_name__,
+                "#{unquote(name)}",
+                [unquote_splicing(get_args_as_vars(args))],
+                ctx: ctx
+              )
+            end
+          )
+
+        {:parametric, unquote(name), [unquote_splicing(get_args_as_vars(args))], f}
       end
     end
   end
@@ -390,7 +415,7 @@ defmodule Beaver.Slang do
 
   @doc false
   # This function creates a parametric attribute for a given value. It generates the code for `irdl.parametric` op.
-  def create_parametric({:parametric, symbol, values}, opts) do
+  def create_parametric({:parametric, symbol, values, _}, opts) do
     Beaver.Deferred.from_opts(
       opts,
       fn ctx ->
