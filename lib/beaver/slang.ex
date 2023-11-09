@@ -274,7 +274,7 @@ defmodule Beaver.Slang do
     end
   end
 
-  def create_element(element, dialect, name, params, opts \\ [])
+  def create_constrained_element(element, dialect, name, params, opts \\ [])
       when element in [:type, :attr] do
     Beaver.Deferred.from_opts(opts, fn ctx ->
       params =
@@ -300,6 +300,21 @@ defmodule Beaver.Slang do
     end)
   end
 
+  defp gen_create_element_creator(element, name, args) do
+    quote do
+      def unquote(name)(unquote_splicing(get_args_as_vars(args)), opts \\ []) do
+        {:parametric, unquote(name), [unquote_splicing(get_args_as_vars(args))],
+         Beaver.Slang.create_constrained_element(
+           unquote(element),
+           @__slang_dialect_name__,
+           "#{unquote(name)}",
+           [unquote_splicing(get_args_as_vars(args))],
+           opts
+         )}
+      end
+    end
+  end
+
   @doc """
   This macro defines a type in the dialect. It generates the AST for the creator function and the definition function for the type.
   """
@@ -310,26 +325,18 @@ defmodule Beaver.Slang do
 
     quote do
       unquote(gen_creator(:type, :parameters, call, block, need_variadicity: false))
+      unquote(gen_create_element_creator(:type, name, args))
+    end
+  end
 
-      def unquote(name)(unquote_splicing(get_args_as_vars(args)), opts \\ []) do
-        f =
-          Beaver.Deferred.from_opts(
-            opts,
-            fn ctx ->
-              [unquote_splicing(get_args_as_vars(args))]
+  defmacro defattr(call, block \\ nil) do
+    {name, args} =
+      call
+      |> Macro.decompose_call()
 
-              Beaver.Slang.create_element(
-                :type,
-                @__slang_dialect_name__,
-                "#{unquote(name)}",
-                [unquote_splicing(get_args_as_vars(args))],
-                ctx: ctx
-              )
-            end
-          )
-
-        {:parametric, unquote(name), [unquote_splicing(get_args_as_vars(args))], f}
-      end
+    quote do
+      unquote(gen_creator(:attribute, :parameters, call, block, need_variadicity: false))
+      unquote(gen_create_element_creator(:attr, name, args))
     end
   end
 

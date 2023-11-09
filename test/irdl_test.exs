@@ -45,6 +45,7 @@ defmodule IRDLTest do
        test_context do
     use Beaver
     alias Beaver.MLIR.Dialect.Func
+    alias Beaver.MLIR.Type
     require Func
 
     CMath.__slang_dialect__(test_context[:ctx]) |> MLIR.Operation.verify!()
@@ -52,6 +53,10 @@ defmodule IRDLTest do
 
     CMath.IRExample.get(test_context[:ctx])
     CMath.IRExample.gen(test_context[:ctx])
+
+    assert not (CMath.some_attr(Type.f32())
+                |> Beaver.Deferred.create(test_context[:ctx])
+                |> MLIR.is_null())
 
     assert not (MLIR.CAPI.mlirContextGetOrLoadDialect(
                   test_context[:ctx],

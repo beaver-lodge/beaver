@@ -7,6 +7,7 @@ defmodule CMath do
   end
 
   deftype complex(t = ^any_f)
+  defattr some_attr(t = ^any_f)
 
   defalias any_complex, do: complex(any())
 
