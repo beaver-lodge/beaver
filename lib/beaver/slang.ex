@@ -237,7 +237,7 @@ defmodule Beaver.Slang do
   end
 
   # This function generates the AST for a creator function for an IRDL operation (like `irdl.operation`, `irdl.type`). It uses the transform_defop_pins/1 function to transform the pins, generates the MLIR code for the operation and its arguments, and applies the operation using op_applier/1.
-  defp gen_creator(op, args_op, call, block, opts \\ []) do
+  defp gen_creator(op, args_op, call, do_block, opts \\ []) do
     {name, args} = call |> Macro.decompose_call()
     name = Atom.to_string(name)
     creator = String.to_atom("create_" <> name)
@@ -265,7 +265,7 @@ defmodule Beaver.Slang do
 
             mlir block: opts[:block], ctx: opts[:ctx] do
               unquote_splicing(input_constrains)
-              {[unquote_splicing(args_var_ast)], unquote(block[:do])}
+              {[unquote_splicing(args_var_ast)], unquote(do_block)}
             end
           end,
           opts ++ unquote(opts)
@@ -274,8 +274,7 @@ defmodule Beaver.Slang do
     end
   end
 
-  def create_constrained_element(element, dialect, name, params, opts \\ [])
-      when element in [:type, :attr] do
+  def create_constrained_element(element, dialect, name, params, opts \\ []) do
     Beaver.Deferred.from_opts(opts, fn ctx ->
       params =
         params
@@ -289,7 +288,7 @@ defmodule Beaver.Slang do
       apply(
         MLIR.CAPI,
         case element do
-          :attr ->
+          :attribute ->
             :beaverGetIRDLDefinedAttr
 
           :type ->
@@ -300,54 +299,50 @@ defmodule Beaver.Slang do
     end)
   end
 
-  defp gen_create_element_creator(element, name, args) do
-    quote do
-      def unquote(name)(unquote_splicing(get_args_as_vars(args)), opts \\ []) do
-        {:parametric, unquote(name), [unquote_splicing(get_args_as_vars(args))],
-         Beaver.Slang.create_constrained_element(
-           unquote(element),
-           @__slang_dialect_name__,
-           "#{unquote(name)}",
-           [unquote_splicing(get_args_as_vars(args))],
-           opts
-         )}
+  defp gen_create_element_creator(element, call) do
+    {name, args} =
+      call
+      |> Macro.decompose_call()
+
+    [
+      gen_creator(element, :parameters, call, nil, need_variadicity: false),
+      quote do
+        def unquote(name)(unquote_splicing(get_args_as_vars(args)), opts \\ []) do
+          {:parametric, unquote(name), [unquote_splicing(get_args_as_vars(args))],
+           Beaver.Slang.create_constrained_element(
+             unquote(element),
+             @__slang_dialect_name__,
+             "#{unquote(name)}",
+             [unquote_splicing(get_args_as_vars(args))],
+             opts
+           )}
+        end
       end
-    end
+    ]
   end
 
   @doc """
   This macro defines a type in the dialect.
   """
-  defmacro deftype(call, block \\ nil) do
-    {name, args} =
-      call
-      |> Macro.decompose_call()
-
-    quote do
-      unquote(gen_creator(:type, :parameters, call, block, need_variadicity: false))
-      unquote(gen_create_element_creator(:type, name, args))
-    end
+  defmacro deftype(call) do
+    gen_create_element_creator(:type, call)
   end
 
   @doc """
   This macro defines a attribute in the dialect.
   """
-  defmacro defattr(call, block \\ nil) do
-    {name, args} =
-      call
-      |> Macro.decompose_call()
-
-    quote do
-      unquote(gen_creator(:attribute, :parameters, call, block, need_variadicity: false))
-      unquote(gen_create_element_creator(:attr, name, args))
-    end
+  defmacro defattr(call) do
+    gen_create_element_creator(:attribute, call)
   end
 
   @doc """
   This macro defines an operation in the dialect. It generates the AST for the creator function for the operation.
   """
   defmacro defop(call, block \\ nil) do
-    gen_creator(:operation, :operands, call, block, return_op: :results, need_variadicity: true)
+    gen_creator(:operation, :operands, call, block[:do],
+      return_op: :results,
+      need_variadicity: true
+    )
   end
 
   defp get_alias_name(def_name) do
