@@ -24,9 +24,8 @@ defmodule Beaver.Slang do
     end
   end
 
-  @doc """
-  This macro is invoked before the module is compiled. Internally it defines a function which creates the MLIR dialect's IRDL module. It also uses the `Beaver.MLIR.Dialect` module to define the dialect's operations.
-  """
+  @doc false
+  # This macro is invoked before the module is compiled. Internally it defines a function which creates the MLIR dialect's IRDL module. It also uses the `Beaver.MLIR.Dialect` module to define the dialect's operations.
   defmacro __before_compile__(_env) do
     quote do
       @doc false
@@ -274,6 +273,7 @@ defmodule Beaver.Slang do
     end
   end
 
+  @doc false
   def create_constrained_element(element, dialect, name, params, opts \\ []) do
     Beaver.Deferred.from_opts(opts, fn ctx ->
       params =

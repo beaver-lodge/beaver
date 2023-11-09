@@ -53,7 +53,8 @@ defmodule Beaver.MixProject do
         DSL: [
           Beaver,
           Beaver.Env,
-          Beaver.Pattern
+          Beaver.Pattern,
+          Beaver.Slang
         ],
         Walker: [
           ~r"Beaver.Walker.*"
