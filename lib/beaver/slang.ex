@@ -316,7 +316,7 @@ defmodule Beaver.Slang do
   end
 
   @doc """
-  This macro defines a type in the dialect. It generates the AST for the creator function and the definition function for the type.
+  This macro defines a type in the dialect.
   """
   defmacro deftype(call, block \\ nil) do
     {name, args} =
@@ -329,6 +329,9 @@ defmodule Beaver.Slang do
     end
   end
 
+  @doc """
+  This macro defines a attribute in the dialect.
+  """
   defmacro defattr(call, block \\ nil) do
     {name, args} =
       call
