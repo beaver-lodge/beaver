@@ -1,10 +1,13 @@
 defmodule Beaver.MLIR.Dialect do
   @moduledoc """
   This module defines macro to generate code for an MLIR dialect.
+  You might override `eval_ssa/2` function to introduce your custom op generation
   """
-  alias Beaver.MLIR.Dialect
 
   require Logger
+
+  use Kinda.ResourceKind,
+    forward_module: Beaver.Native
 
   @callback eval_ssa(String.t(), Beaver.SSA.t()) :: any()
   defmacro __using__(opts) do
@@ -45,13 +48,6 @@ defmodule Beaver.MLIR.Dialect do
       if length(func_names) != MapSet.size(MapSet.new(func_names)) do
         raise "duplicate op name found in dialect: #{dialect}"
       end
-    end
-  end
-
-  def dialects() do
-    for d <- Dialect.Registry.dialects() do
-      module_name = d |> Dialect.Registry.normalize_dialect_name()
-      Module.concat([__MODULE__, module_name])
     end
   end
 

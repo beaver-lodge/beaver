@@ -278,6 +278,7 @@ If no MLIR context provided, an attribute and type getter should return an anony
 In Erlang, all values are copied, so it is very safe to pass around these anonymous functions.
 When creating an operation, these functions will be called with the MLIR context in an operation state.
 With this approach we achieve both succinctness and modularity, not having a global MLIR context.
+Usually a function accepting a MLIR context to create an operation or type is called a "creator" in Beaver.
 
 ## Development
 

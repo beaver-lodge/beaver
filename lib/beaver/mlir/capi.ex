@@ -90,7 +90,7 @@ defmodule Beaver.MLIR.CAPI do
 
   def beaver_raw_pass_token_signal(_), do: raise("NIF not loaded")
   def beaver_raw_registered_ops(), do: raise("NIF not loaded")
-  def beaver_raw_registered_ops_of_dialect(_), do: raise("NIF not loaded")
+  def beaver_raw_registered_ops_of_dialect(_ctx, _name), do: raise("NIF not loaded")
   def beaver_raw_registered_dialects(), do: raise("NIF not loaded")
   def beaver_raw_resource_c_string_to_term_charlist(_), do: raise("NIF not loaded")
   def beaver_raw_beaver_attribute_to_charlist(_), do: raise("NIF not loaded")

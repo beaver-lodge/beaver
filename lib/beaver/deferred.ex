@@ -11,6 +11,14 @@ defmodule Beaver.Deferred do
     end
   end
 
+  def create({:parametric, _, _, f}, ctx) when is_function(f) and not is_nil(ctx) do
+    f.(ctx)
+  end
+
+  def create({:parametric, _, _, entity}, _ctx) do
+    entity
+  end
+
   def create(f, ctx) when is_function(f) do
     f.(ctx)
   end

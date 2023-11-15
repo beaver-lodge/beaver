@@ -44,9 +44,7 @@ fn get_context_load_all_dialects() mlir_capi.Context.T {
     return ctx;
 }
 
-fn get_all_registered_ops2(env: beam.env, dialect: mlir_capi.StringRef.T) !beam.term {
-    const ctx = get_context_load_all_dialects();
-    defer c.mlirContextDestroy(ctx);
+fn get_all_registered_ops2(env: beam.env, ctx: mlir_capi.Context.T, dialect: mlir_capi.StringRef.T) !beam.term {
     var num_op: usize = 0;
     // TODO: refactor this dirty trick
     var names: [300]c.MlirRegisteredOperationName = undefined;
@@ -91,12 +89,18 @@ fn get_registered_dialects(env: beam.env) !beam.term {
 
 export fn beaver_raw_registered_ops_of_dialect(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var dialect: mlir_capi.StringRef.T = undefined;
-    if (beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[0])) |value| {
+    var ctx: mlir_capi.Context.T = undefined;
+    if (beam.fetch_resource(mlir_capi.Context.T, env, mlir_capi.Context.resource.t, args[0])) |value| {
+        ctx = value;
+    } else |_| {
+        return beam.make_error_binary(env, "fail to fetch resource for context, expected: mlir_capi.Context.T");
+    }
+    if (beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[1])) |value| {
         dialect = value;
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource for dialect, expected: mlir_capi.StringRef.T");
     }
-    return get_all_registered_ops2(env, dialect) catch beam.make_error_binary(env, "launching nif");
+    return get_all_registered_ops2(env, ctx, dialect) catch beam.make_error_binary(env, "launching nif");
 }
 
 export fn beaver_raw_registered_dialects(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
@@ -712,7 +716,7 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
 const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_get_context_load_all_dialects", .arity = 0, .fptr = beaver_raw_get_context_load_all_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_ops", .arity = 0, .fptr = beaver_raw_registered_ops, .flags = 1 },
-    e.ErlNifFunc{ .name = "beaver_raw_registered_ops_of_dialect", .arity = 1, .fptr = beaver_raw_registered_ops_of_dialect, .flags = 1 },
+    e.ErlNifFunc{ .name = "beaver_raw_registered_ops_of_dialect", .arity = 2, .fptr = beaver_raw_registered_ops_of_dialect, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_dialects", .arity = 0, .fptr = beaver_raw_registered_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_create_mlir_pass", .arity = 5, .fptr = beaver_raw_create_mlir_pass, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_pass_token_signal", .arity = 1, .fptr = PassToken.pass_token_signal, .flags = 0 },
