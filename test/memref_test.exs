@@ -45,7 +45,6 @@ defmodule MemRefTest do
         ~w{finalizing-bufferize buffer-deallocation convert-linalg-to-loops}
       )
       |> convert_scf_to_cf
-      |> convert_linalg_to_llvm()
       |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
       |> convert_func_to_llvm
       |> reconcile_unrealized_casts

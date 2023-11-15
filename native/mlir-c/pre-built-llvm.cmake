@@ -1,9 +1,4 @@
 set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
-
-set(CMAKE_CXX_STANDARD
-    17
-    CACHE STRING "C++ standard to conform to")
-
 find_package(MLIR REQUIRED CONFIG)
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")

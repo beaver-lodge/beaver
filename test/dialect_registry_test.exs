@@ -22,8 +22,8 @@ defmodule DialectRegistryTest do
                {"amx", "AMX"},
                {"arith", "Arith"},
                {"arm_neon", "ArmNeon"},
-               {"arm_sve", "ArmSVE"},
                {"arm_sme", "ArmSME"},
+               {"arm_sve", "ArmSVE"},
                {"async", "Async"},
                {"bufferization", "Bufferization"},
                {"builtin", "Builtin"},
@@ -39,6 +39,7 @@ defmodule DialectRegistryTest do
                {"llvm", "LLVM"},
                {"math", "Math"},
                {"memref", "MemRef"},
+               {"mesh", "Mesh"},
                {"ml_program", "MLProgram"},
                {"nvgpu", "NVGPU"},
                {"nvvm", "NVVM"},
@@ -52,8 +53,10 @@ defmodule DialectRegistryTest do
                {"sparse_tensor", "SparseTensor"},
                {"spirv", "SPIRV"},
                {"tensor", "Tensor"},
+               {"test_dyn", "TestDyn"},
                {"tosa", "TOSA"},
                {"transform", "Transform"},
+               {"ub", "Ub"},
                {"vector", "Vector"},
                {"x86vector", "X86Vector"}
              ])

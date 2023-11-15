@@ -9,7 +9,6 @@
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
-DEFINE_C_API_PTR_METHODS(MlirPDLPatternModule, mlir::PDLPatternModule)
 DEFINE_C_API_PTR_METHODS(MlirRewritePatternSet, mlir::RewritePatternSet)
 DEFINE_C_API_PTR_METHODS(MlirOperand, mlir::Value::use_iterator)
 DEFINE_C_API_METHODS(MlirRegisteredOperationName, mlir::RegisteredOperationName)

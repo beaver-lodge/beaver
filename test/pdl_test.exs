@@ -128,9 +128,8 @@ defmodule PDLTest do
     ir_module = MLIR.Module.create(ctx, @apply_rewrite_op_ir)
     MLIR.Operation.verify!(pattern_module)
     MLIR.Operation.verify!(ir_module)
-    pdl_pattern = CAPI.beaverPDLPatternGet(pattern_module)
     pattern_set = CAPI.beaverRewritePatternSetGet(ctx)
-    pattern_set = CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pdl_pattern)
+    pattern_set = CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pattern_module)
 
     region =
       ir_module
@@ -159,9 +158,8 @@ defmodule PDLTest do
     pattern_string = MLIR.to_string(pattern_module)
     assert String.contains?(pattern_string, "test.op")
     assert String.contains?(pattern_string, "test.success2")
-    pdl_pattern = CAPI.beaverPDLPatternGet(pattern_module)
     pattern_set = CAPI.beaverRewritePatternSetGet(ctx)
-    pattern_set = CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pdl_pattern)
+    pattern_set = CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pattern_module)
     region = ir_module |> MLIR.Operation.from_module() |> CAPI.mlirOperationGetFirstRegion()
     result = CAPI.beaverApplyOwnedPatternSetOnRegion(region, pattern_set)
 
@@ -171,21 +169,6 @@ defmodule PDLTest do
     assert not String.contains?(ir_string, "test.op")
     assert String.contains?(ir_string, "test.success2")
     CAPI.mlirContextDestroy(ctx)
-  end
-
-  test "load from string", test_context do
-    %MLIR.CAPI.MlirPDLPatternModule{} =
-      """
-      module @erase {
-        pdl.pattern : benefit(1) {
-          %root = operation "foo.op"
-          rewrite %root {
-            erase %root
-          }
-        }
-      }
-      """
-      |> MLIR.Pattern.from_string(ctx: test_context[:ctx])
   end
 
   test "replace tosa", test_context do
