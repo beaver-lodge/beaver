@@ -24,10 +24,6 @@ jobs:
         runs-on: ["ubuntu-latest", "ubuntu-20.04"]
         otp: ["24.2", "25.0"]
         elixir: ["1.13.0", "1.15.0"]
-        gcc: ["12"]
-    env:
-      CC: gcc-${{ matrix.gcc }}
-      CXX: g++-${{ matrix.gcc }}
     steps:
       - uses: actions/checkout@v3
       - uses: erlef/setup-beam@v1
