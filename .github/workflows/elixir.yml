@@ -29,6 +29,8 @@ jobs:
       CC: gcc-${{ matrix.gcc }}
       CXX: g++-${{ matrix.gcc }}
     steps:
+      - run: sudo apt install -y gcc-12 g++-12
+        if: matrix.runs-on == 'ubuntu-20.04'
       - uses: actions/checkout@v3
       - uses: erlef/setup-beam@v1
         with:
