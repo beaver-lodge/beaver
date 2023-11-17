@@ -8,9 +8,8 @@ on:
       - "LICENSE*"
 
   schedule:
-    # beijing: 2 am.
-    # utc: 6 pm.
-    - cron: "0 18 * * *"
+    # At minute 0 past hour 1. (see https://crontab.guru)
+    - cron: "00 01 * * *"
 
 permissions:
   contents: read
