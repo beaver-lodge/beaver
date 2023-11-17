@@ -54,7 +54,7 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
       - uses: seanmiddleditch/gha-setup-ninja@master
-      - name: Install MLIR ("${{ inputs.mlir_wheel_version }}")
+      - name: Install MLIR (${{ inputs.mlir_wheel_version }})
         if: github.event_name == 'workflow_dispatch' && '${{ inputs.mlir_wheel_version }}' != ''
         run: |
           python3 -m pip install mlir=="${{ inputs.mlir_wheel_version }}" -f https://makslevental.github.io/wheels -U
