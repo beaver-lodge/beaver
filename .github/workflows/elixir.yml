@@ -20,8 +20,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: build-and-test-${{ github.ref }}
+  group: build-and-test-${{ github.ref }}-${{ inputs.mlir_wheel_version }}
   cancel-in-progress: true
+
 jobs:
   build:
     name: otp${{matrix.otp}}-ex${{matrix.elixir}} / ${{matrix.runs-on}}
