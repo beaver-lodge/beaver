@@ -52,7 +52,7 @@ jobs:
       - name: Install MLIR (latest)
         if: github.event_name == 'schedule' || contains(github.event.pull_request.labels.*.name, 'use-latest-mlir')
         run: |
-          python3 -m pip install "mlir==18.0.0.$(date +"%Y%m%d")01" -f https://makslevental.github.io/wheels -U
+          python3 -m pip install "mlir==$(date +"%Y%m%d")01" -f https://makslevental.github.io/wheels -U
           echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
       - name: Install MLIR
         if: github.event_name != 'schedule' && !contains(github.event.pull_request.labels.*.name, 'use-latest-mlir')
