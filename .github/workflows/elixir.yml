@@ -8,8 +8,7 @@ on:
       - "LICENSE*"
 
   schedule:
-    # At minute 0 past hour 1. (see https://crontab.guru)
-    - cron: "00 01 * * *"
+    - cron: "00 05 * * *"
 
 permissions:
   contents: read
