@@ -24,5 +24,3 @@ add_mlir_aggregate(
   MLIRCAPITensor
   MLIRCAPITransforms
   MLIRCAPIElixir)
-
-set_target_properties(MLIRBeaver PROPERTIES NO_SONAME ON BUILD_WITH_INSTALL_RPATH ON)
