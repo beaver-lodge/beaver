@@ -72,16 +72,21 @@ jobs:
           MIX_ENV: prod
         run: |
           BEAVER_BUILD_CMAKE=1 mix compile
+      - env:
+          MIX_ENV: prod
+        run: tree _build/${MIX_ENV}/lib/beaver/native_install
       - name: Run patchelf
         env:
           MIX_ENV: prod
         run: |
           set -u
           find _build/${MIX_ENV}/lib/beaver/native_install/lib -name "*.so*" -maxdepth 1 -type f | while read sofile; do
+            echo "==> working on: $sofile"
+
             echo "==> before replace needed"
             patchelf --print-needed $sofile
 
-            patchelf --replace-needed libMLIRBeaver.so.18 libMLIRBeaver.so $sofile
+            patchelf --replace-needed /home/runner/work/beaver/beaver/_build/prod/lib/beaver/native_install/lib/libMLIRBeaver.so libMLIRBeaver.so $sofile
 
             echo "==> after"
             patchelf --print-needed $sofile
