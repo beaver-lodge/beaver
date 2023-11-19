@@ -25,4 +25,4 @@ add_mlir_aggregate(
   MLIRCAPITransforms
   MLIRCAPIElixir)
 
-# set_target_properties(MLIRBeaver PROPERTIES NO_SONAME ON BUILD_WITH_INSTALL_RPATH ON)
+set_target_properties(MLIRBeaver PROPERTIES NO_SONAME ON BUILD_WITH_INSTALL_RPATH ON)
