@@ -72,6 +72,8 @@ jobs:
           MIX_ENV: prod
         run: |
           BEAVER_BUILD_CMAKE=1 mix compile
+      - name: List files in native_install
+        run: tree _build/prod/lib/beaver/native_install
       - name: Run patchelf
         env:
           MIX_ENV: prod
