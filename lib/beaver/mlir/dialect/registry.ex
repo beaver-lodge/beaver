@@ -51,18 +51,6 @@ defmodule Beaver.MLIR.Dialect.Registry do
     end
   end
 
-  def ops(dialect, opts \\ []) do
-    if ctx = opts[:ctx] do
-      %MLIR.Context{ref: ctx_ref} = ctx
-      do_ops(dialect, ctx_ref)
-    else
-      ctx = MLIR.Context.create()
-      ret = ops(dialect, Keyword.put(opts, :ctx, ctx))
-      MLIR.Context.destroy(ctx)
-      ret
-    end
-  end
-
   @doc """
   Get dialects registered, if it is dev/test env with config key :skip_dialects of app :beaver configured,
   these dialects will not be returned (usually to speedup the compilation). Pass option dialects(full: true) to get all dialects anyway.
