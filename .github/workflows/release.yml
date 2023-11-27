@@ -46,9 +46,9 @@ jobs:
         uses: erlef/setup-beam@v1
         with:
           elixir-version: "1.14.0" # Define the elixir version [required]
-          otp-version: "25.0" # Define the OTP version [required]
+          otp-version: "24.2" # Define the OTP version [required]
       - name: Set up Zig
-        uses: goto-bus-stop/setup-zig@v1
+        uses: goto-bus-stop/setup-zig@v2
         with:
           version: 0.11.0
       - uses: actions/setup-python@v4
@@ -72,16 +72,21 @@ jobs:
           MIX_ENV: prod
         run: |
           BEAVER_BUILD_CMAKE=1 mix compile
+      - env:
+          MIX_ENV: prod
+        run: tree _build/${MIX_ENV}/lib/beaver/native_install
       - name: Run patchelf
         env:
           MIX_ENV: prod
         run: |
           set -u
           find _build/${MIX_ENV}/lib/beaver/native_install/lib -name "*.so*" -maxdepth 1 -type f | while read sofile; do
+            echo "==> working on: $sofile"
+
             echo "==> before replace needed"
             patchelf --print-needed $sofile
 
-            patchelf --replace-needed libMLIRBeaver.so.17 libMLIRBeaver.so $sofile
+            patchelf --replace-needed libMLIRBeaver.so.18 libMLIRBeaver.so $sofile
 
             echo "==> after"
             patchelf --print-needed $sofile

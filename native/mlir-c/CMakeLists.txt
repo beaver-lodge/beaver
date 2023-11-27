@@ -3,6 +3,10 @@ set(CMAKE_BUILD_TYPE
     Release
     CACHE STRING "")
 project(mlir-beaver)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED YES)
+
 if(POLICY CMP0116)
   cmake_policy(SET CMP0116 OLD)
 endif()
