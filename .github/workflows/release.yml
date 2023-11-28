@@ -48,6 +48,10 @@ jobs:
         with:
           elixir-version: "1.14.0" # Define the elixir version [required]
           otp-version: "24.2" # Define the OTP version [required]
+      - name: Build with cibuildwheel
+        run: |
+          pip install cibuildwheel
+          cibuildwheel --output-dir wheelhouse
       - name: Set up Zig
         uses: goto-bus-stop/setup-zig@v2
         with:
