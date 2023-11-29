@@ -45,10 +45,12 @@ jobs:
       - uses: actions/checkout@v3
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
+        if: contains(matrix.job.os, 'ubuntu')
         with:
           elixir-version: "1.14.0" # Define the elixir version [required]
           otp-version: "24.2" # Define the OTP version [required]
       - name: Build with cibuildwheel
+        working-directory: native/py_proj
         run: |
           pip install cibuildwheel
           cibuildwheel --output-dir wheelhouse
