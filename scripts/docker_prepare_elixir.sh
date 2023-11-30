@@ -7,7 +7,7 @@ if [[ -f "/etc/centos-release" ]]; then
   yum makecache --refresh
   # sometimes the epel server is down. retry 5 times
   for i in $(seq 1 5); do
-    yum install -y elixir zig && s=0 && break || s=$? && sleep 15
+    dnf install -y elixir zig && s=0 && break || s=$? && sleep 15
   done
 
 elif [[ -f "/etc/alpine-release" ]]; then
