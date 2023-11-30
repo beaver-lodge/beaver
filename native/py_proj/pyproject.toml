@@ -6,4 +6,7 @@ manylinux-aarch64-image = "manylinux_2_28"
 manylinux-x86_64-image = "manylinux_2_28"
 
 [tool.cibuildwheel.linux]
-before-build = ["{project}/scripts/docker_prepare_elixir.sh"]
+before-build = ["{project}/native/py_proj/scripts/docker_prepare_elixir.sh"]
+
+[tool.cibuildwheel.macos]
+before-build = ["brew install zig elixir"]
