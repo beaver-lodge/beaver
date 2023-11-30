@@ -51,8 +51,6 @@ jobs:
           otp-version: "24.2" # Define the OTP version [required]
       - name: Build with cibuildwheel
         working-directory: native/py_proj
-        env:
-          CIBW_BUILD_VERBOSITY: 1
         run: |
           pip install cibuildwheel
           cibuildwheel --output-dir wheelhouse
