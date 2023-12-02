@@ -102,7 +102,6 @@ defmodule Beaver.MixProject do
 
   defp deps do
     [
-      {:beam_file, "~> 0.5.3", runtime: false},
       {:elixir_make, "~> 0.4", runtime: false},
       {:llvm_config, "~> 0.1.0"},
       {:kinda, "~> 0.3.0"},
