@@ -26,5 +26,6 @@ defmodule ELXDialectTest do
       end
     end
     |> ElixirAST.from_ast()
+    |> MLIR.dump!()
   end
 end
