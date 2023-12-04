@@ -1,8 +1,6 @@
 defmodule ElixirAST do
   @moduledoc "An example to showcase the Elixir AST dialect in IRDL test."
   use Beaver.Slang, name: "ex"
-  alias Beaver.MLIR.Attribute
-
   defop defmodule(), do: []
 
   defp gen_mlir(
@@ -10,7 +8,7 @@ defmodule ElixirAST do
           [
             {:__aliases__, [alias: false], [name]},
             [
-              do: do_body
+              do: _do_body
             ]
           ]} = ast
        ) do
