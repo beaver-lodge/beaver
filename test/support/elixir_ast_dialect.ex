@@ -20,7 +20,13 @@ defmodule ElixirAST do
 
     mlir ctx: ctx do
       module do
-        ElixirAST.defmodule(name: "\"#{name}\"") >>> []
+        ElixirAST.defmodule name: "\"#{name}\"" do
+          region do
+            block functions do
+            end
+          end
+        end >>>
+          []
       end
       |> MLIR.dump!()
     end
