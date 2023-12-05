@@ -1,6 +1,6 @@
 defmodule ElixirAST do
   require Logger
-  @moduledoc "An example to showcase the Elixir AST dialect in IRDL test."
+  @moduledoc "Prototype the Elixir AST dialect."
   use Beaver.Slang, name: "ex"
   deftype dyn
   deftype bound
