@@ -129,8 +129,7 @@ defmodule ElixirAST do
 
         mlir ctx: ctx do
           module do
-            ast
-            |> Macro.prewalk(&gen_mlir(&1, ctx, Beaver.Env.block()))
+            ast |> Macro.prewalk(&gen_mlir(&1, ctx, Beaver.Env.block()))
           end
         end
       end
