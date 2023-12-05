@@ -9,8 +9,8 @@ on:
         description: "mlir wheel version to install"
         required: false
   push:
-    branches: |
-      add-check-upstream-workflow
+    branches:
+      - add-check-upstream-workflow
 
 concurrency:
   group: check-upstream-${{ github.ref }}-${{ inputs.mlir_wheel_version }}
