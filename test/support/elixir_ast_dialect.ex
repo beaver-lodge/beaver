@@ -121,15 +121,19 @@ defmodule ElixirAST do
     ast
   end
 
-  def from_ast(ast) do
-    ctx = MLIR.Context.create()
-    Beaver.Slang.load(ctx, __MODULE__)
+  def from_ast(ast, opts) do
+    Beaver.Deferred.from_opts(
+      opts,
+      fn ctx ->
+        Beaver.Slang.load(ctx, __MODULE__)
 
-    mlir ctx: ctx do
-      module do
-        ast
-        |> Macro.prewalk(&gen_mlir(&1, ctx, Beaver.Env.block()))
+        mlir ctx: ctx do
+          module do
+            ast
+            |> Macro.prewalk(&gen_mlir(&1, ctx, Beaver.Env.block()))
+          end
+        end
       end
-    end
+    )
   end
 end

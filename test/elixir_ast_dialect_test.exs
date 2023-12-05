@@ -3,7 +3,7 @@ defmodule ELXDialectTest do
   alias Beaver.MLIR
   @moduletag :smoke
 
-  test "gen elx from ast", _test_context do
+  test "gen elx from ast", test_context do
     quote do
       defmodule TwoFuncMod do
         def add_two_literal() do
@@ -25,7 +25,7 @@ defmodule ELXDialectTest do
         end
       end
     end
-    |> ElixirAST.from_ast()
+    |> ElixirAST.from_ast(ctx: test_context[:ctx])
     |> MLIR.dump!()
   end
 end
