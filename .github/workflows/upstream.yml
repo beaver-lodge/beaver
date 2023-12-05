@@ -24,4 +24,4 @@ jobs:
       pull-requests: write
     uses: ./.github/workflows/elixir.yml
     with:
-      mlir_wheel_version: ${{ inputs.mlir_wheel_version }}
+      mlir_wheel_version: ${{ inputs.mlir_wheel_version || 'latest' }}
