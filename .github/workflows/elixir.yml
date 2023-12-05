@@ -7,13 +7,17 @@ on:
       - "**/*.md"
       - "LICENSE*"
 
-  schedule:
-    - cron: "00 05 * * *"
-
   workflow_dispatch:
     inputs:
       mlir_wheel_version:
         description: "mlir wheel version to install"
+        required: false
+
+  workflow_call:
+    inputs:
+      mlir_wheel_version:
+        description: "mlir wheel version to install"
+        type: string
         required: false
 
 permissions:
@@ -61,7 +65,7 @@ jobs:
           python3 -m pip install mlir=="${{ inputs.mlir_wheel_version }}" -f https://makslevental.github.io/wheels -U
           echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
       - name: Install MLIR (latest)
-        if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.mlir_wheel_version == '') || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'use-latest-mlir'))
+        if: inputs.mlir_wheel_version == 'latest' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'use-latest-mlir'))
         run: |
           python3 -m pip install mlir -f https://makslevental.github.io/wheels -U
           echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"

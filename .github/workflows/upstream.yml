@@ -1,0 +1,27 @@
+name: Check Upstream
+
+on:
+  schedule:
+    - cron: "00 05 * * *"
+  workflow_dispatch:
+    inputs:
+      mlir_wheel_version:
+        description: "mlir wheel version to install"
+        required: false
+  push:
+    branches:
+      - "upstream/*"
+
+concurrency:
+  group: check-upstream-${{ github.ref }}-${{ inputs.mlir_wheel_version }}
+  cancel-in-progress: true
+
+jobs:
+  mlir:
+    name: Latest MLIR
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/elixir.yml
+    with:
+      mlir_wheel_version: ${{ inputs.mlir_wheel_version || 'latest' }}
