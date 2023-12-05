@@ -7,13 +7,17 @@ on:
       - "**/*.md"
       - "LICENSE*"
 
-  schedule:
-    - cron: "00 05 * * *"
-
   workflow_dispatch:
     inputs:
       mlir_wheel_version:
         description: "mlir wheel version to install"
+        required: false
+
+  workflow_call:
+    inputs:
+      mlir_wheel_version:
+        description: "mlir wheel version to install"
+        type: string
         required: false
 
 permissions:
