@@ -1,4 +1,5 @@
 defmodule ElixirAST do
+  require Logger
   @moduledoc "An example to showcase the Elixir AST dialect in IRDL test."
   use Beaver.Slang, name: "ex"
   deftype dyn
@@ -115,7 +116,8 @@ defmodule ElixirAST do
   end
 
   defp gen_mlir(ast, _, _) do
-    ast |> dbg
+    ast = inspect(ast, pretty: true)
+    Logger.info("AST ignored:\n#{ast}")
     ast
   end
 
