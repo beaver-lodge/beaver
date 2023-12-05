@@ -72,7 +72,7 @@ defmodule ElixirAST do
          block
        ) do
     mlir ctx: ctx, block: block do
-      bound = Macro.prewalk(bound, &gen_mlir(&1, ctx, Beaver.Env.block()))
+      bound = Macro.prewalk(bound, &gen_mlir(&1, ctx, block))
       var = __MODULE__.var(name: "\"#{name}\"") >>> __MODULE__.unbound()
       __MODULE__.bind(var, bound) >>> __MODULE__.bound()
     end
@@ -86,7 +86,7 @@ defmodule ElixirAST do
     mlir ctx: ctx, block: block do
       [left, right] =
         for i <- [left, right] do
-          Macro.prewalk(i, &gen_mlir(&1, ctx, Beaver.Env.block()))
+          Macro.prewalk(i, &gen_mlir(&1, ctx, block))
         end
 
       __MODULE__.add(left, right) >>> __MODULE__.dyn()
