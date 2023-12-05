@@ -10,7 +10,7 @@ on:
         required: false
   push:
     branches:
-      - add-check-upstream-workflow
+      - "upstream/*"
 
 concurrency:
   group: check-upstream-${{ github.ref }}-${{ inputs.mlir_wheel_version }}
