@@ -235,6 +235,13 @@ defmodule Beaver.Slang do
     for {v, i} <- Enum.with_index(args), do: transform_arg(v, i, :variable)
   end
 
+  @doc false
+  def gen_region(:any, block, ctx) do
+    mlir ctx: ctx, block: block do
+      IRDL.region() >>> ~t{!irdl.region}
+    end
+  end
+
   # This function generates the AST for a creator function for an IRDL operation (like `irdl.operation`, `irdl.type`). It uses the transform_defop_pins/1 function to transform the pins, generates the MLIR code for the operation and its arguments, and applies the operation using op_applier/1.
   defp gen_creator(op, args_op, call, do_block, opts \\ []) do
     {name, args} = call |> Macro.decompose_call()
@@ -264,6 +271,13 @@ defmodule Beaver.Slang do
 
             mlir block: opts[:block], ctx: opts[:ctx] do
               unquote_splicing(input_constrains)
+
+              if unquote(opts[:regions_block]) do
+                unquote(opts[:regions_block])
+                |> List.wrap()
+                |> Enum.map(&Beaver.Slang.gen_region(&1, opts[:block], opts[:ctx]))
+              end
+
               {[unquote_splicing(args_var_ast)], unquote(do_block)}
             end
           end,
@@ -341,7 +355,8 @@ defmodule Beaver.Slang do
   defmacro defop(call, block \\ nil) do
     gen_creator(:operation, :operands, call, block[:do],
       return_op: :results,
-      need_variadicity: true
+      need_variadicity: true,
+      regions_block: block[:regions]
     )
   end
 

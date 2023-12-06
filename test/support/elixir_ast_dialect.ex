@@ -5,13 +5,13 @@ defmodule ElixirAST do
   deftype dyn
   deftype bound
   deftype unbound
-  defop mod(), do: []
-  defop func(), do: []
+  defop mod(), do: [], regions: [:any]
+  defop func(), do: [], regions: [:any]
   defop lit_int(), do: [Type.i64()]
-  defop var(), do: []
-  defop bind(), do: []
+  defop var(), do: [any()]
+  defop bind(any(), any()), do: [any()]
   defop call(), do: []
-  defop add(), do: []
+  defop add(any(), any()), do: [any()]
   alias Beaver.MLIR.Type
   alias Beaver.MLIR.Attribute
   use Beaver
