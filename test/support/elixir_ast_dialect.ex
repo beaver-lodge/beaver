@@ -5,8 +5,6 @@ defmodule ElixirAST do
   deftype dyn
   deftype bound
   deftype unbound
-  defop mod(), do: [], regions: [:any]
-  defop func(), do: [], regions: [:any]
   defop lit_int(), do: [Type.i64()]
   defop var(), do: [any()]
   defop bind(any(), any()), do: [any()]
@@ -29,7 +27,7 @@ defmodule ElixirAST do
        ) do
     mlir ctx: ctx, block: block do
       m =
-        module do
+        module sym_name: ~a{"#{name}"} do
           Macro.prewalk(do_body, &gen_mlir(&1, ctx, Beaver.Env.block()))
         end
 
@@ -51,10 +49,11 @@ defmodule ElixirAST do
     mlir ctx: ctx, block: block do
       alias Beaver.MLIR.Dialect.Func
 
-      Func.func sym_name: "\"#{name}\"", function_type: Type.function([], []) do
+      Func.func sym_name: "\"#{name}\"", function_type: Type.function([], [dyn()]) do
         region do
           block func_body do
-            ret_value =
+            %MLIR.Value{} =
+              ret_value =
               case Macro.prewalk(do_body, &gen_mlir(&1, ctx, Beaver.Env.block())) do
                 {:__block__, [], values} ->
                   values |> List.last()
@@ -63,7 +62,7 @@ defmodule ElixirAST do
                   v
               end
 
-            Func.return() >>> []
+            Func.return(ret_value) >>> []
           end
         end
       end >>>
