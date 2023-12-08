@@ -8,10 +8,10 @@ defmodule ElixirAST do
   defop lit_int(), do: [Type.i64()]
   defop var(), do: [any()]
   defop bind(any(), any()), do: [any()]
-  defop call(), do: [any()]
   defop add(any(), any()), do: [any()]
   alias Beaver.MLIR.Type
   alias Beaver.MLIR.Attribute
+  alias Beaver.MLIR.Dialect.Func
   use Beaver
 
   defp gen_mlir(
@@ -47,8 +47,6 @@ defmodule ElixirAST do
          block
        ) do
     mlir ctx: ctx, block: block do
-      alias Beaver.MLIR.Dialect.Func
-
       Func.func sym_name: "\"#{name}\"", function_type: Type.function([], [dyn()]) do
         region do
           block func_body do
@@ -109,7 +107,8 @@ defmodule ElixirAST do
 
   defp gen_mlir({name, [], [] = args}, ctx, block) when is_atom(name) do
     mlir ctx: ctx, block: block do
-      __MODULE__.call(args, name: "\"#{name}\"") >>> __MODULE__.dyn()
+      Func.call(args, callee: MLIR.Attribute.flat_symbol_ref("#{name}", ctx: ctx)) >>>
+        __MODULE__.dyn()
     end
   end
 
