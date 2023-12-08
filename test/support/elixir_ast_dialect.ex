@@ -5,13 +5,11 @@ defmodule ElixirAST do
   deftype dyn
   deftype bound
   deftype unbound
-  defop mod(), do: []
-  defop func(), do: []
   defop lit_int(), do: [Type.i64()]
-  defop var(), do: []
-  defop bind(), do: []
-  defop call(), do: []
-  defop add(), do: []
+  defop var(), do: [any()]
+  defop bind(any(), any()), do: [any()]
+  defop call(), do: [any()]
+  defop add(any(), any()), do: [any()]
   alias Beaver.MLIR.Type
   alias Beaver.MLIR.Attribute
   use Beaver
@@ -28,14 +26,12 @@ defmodule ElixirAST do
          block
        ) do
     mlir ctx: ctx, block: block do
-      __MODULE__.mod name: "\"#{name}\"" do
-        region do
-          block functions do
-            Macro.prewalk(do_body, &gen_mlir(&1, ctx, Beaver.Env.block()))
-          end
+      m =
+        module sym_name: ~a{"#{name}"} do
+          Macro.prewalk(do_body, &gen_mlir(&1, ctx, Beaver.Env.block()))
         end
-      end >>>
-        []
+
+      MLIR.CAPI.mlirBlockAppendOwnedOperation(block, MLIR.Operation.from_module(m))
     end
   end
 
@@ -51,10 +47,22 @@ defmodule ElixirAST do
          block
        ) do
     mlir ctx: ctx, block: block do
-      __MODULE__.func name: "\"#{name}\"" do
+      alias Beaver.MLIR.Dialect.Func
+
+      Func.func sym_name: "\"#{name}\"", function_type: Type.function([], [dyn()]) do
         region do
           block func_body do
-            Macro.prewalk(do_body, &gen_mlir(&1, ctx, Beaver.Env.block()))
+            %MLIR.Value{} =
+              ret_value =
+              case Macro.prewalk(do_body, &gen_mlir(&1, ctx, Beaver.Env.block())) do
+                {:__block__, [], values} ->
+                  values |> List.last()
+
+                %Beaver.MLIR.Value{} = v ->
+                  v
+              end
+
+            Func.return(ret_value) >>> []
           end
         end
       end >>>
