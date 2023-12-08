@@ -27,5 +27,6 @@ defmodule ELXDialectTest do
     end
     |> ElixirAST.from_ast(ctx: test_context[:ctx])
     |> MLIR.dump!()
+    |> MLIR.Operation.verify!()
   end
 end
