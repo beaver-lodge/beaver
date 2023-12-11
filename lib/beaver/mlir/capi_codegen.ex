@@ -312,7 +312,8 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
              :MlirAffineMap,
              :MlirNamedAttribute,
              :MlirIdentifier,
-             :MlirDialect
+             :MlirDialect,
+             :MlirOpOperand
            ] do
     "Mlir" <> module_name = Atom.to_string(type)
     module_name = Module.concat(Beaver.MLIR, module_name)

@@ -27,6 +27,17 @@ defmodule ELXDialectTest do
     end
     |> ElixirAST.from_ast(ctx: test_context[:ctx])
     |> MLIR.dump!()
+    |> MLIR.Pass.Composer.nested(
+      "builtin.module",
+      [
+        {:nested, "func.func",
+         [
+           ElixirAST.MaterializeBoundVariables
+         ]}
+      ]
+    )
+    |> MLIR.Pass.Composer.run!()
     |> MLIR.Operation.verify!()
+    |> MLIR.dump!()
   end
 end
