@@ -142,4 +142,38 @@ defmodule ElixirAST do
       end
     )
   end
+
+  defmodule UseBoundVariables do
+    @moduledoc false
+    use Beaver.MLIR.Pass, on: "func.func"
+
+    def run(op) do
+      op
+      |> Beaver.Walker.postwalk(%{}, fn
+        op = %MLIR.Operation{}, acc ->
+          case MLIR.Operation.name(op) do
+            "ex.bind" ->
+              MLIR.dump(op)
+
+              var = Beaver.Walker.operands(op)[1]
+              Beaver.Walker.uses(var) |> Enum.to_list() |> Enum.map(&dbg/1)
+              {Beaver.Walker.replace(op, var), acc}
+
+            "ex.var" ->
+              MLIR.dump(op)
+              {op, acc}
+
+            _ ->
+              {op, acc}
+          end
+
+          {op, acc}
+
+        mlir, acc ->
+          {mlir, acc}
+      end)
+
+      :ok
+    end
+  end
 end
