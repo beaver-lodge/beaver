@@ -155,6 +155,7 @@ defmodule ElixirAST do
             "ex.bind" ->
               var = Beaver.Walker.operands(op)[1]
               1 = Beaver.Walker.uses(var) |> Enum.to_list() |> Enum.count()
+
               {Beaver.Walker.replace(op, var), acc}
 
             "ex.var" ->
