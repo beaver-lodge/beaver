@@ -123,8 +123,8 @@ MLIR_CAPI_EXPORTED void beaverExitMultiThreadedExecution(MlirContext context) {
   unwrap(context)->exitMultiThreadedExecution();
 }
 
-MLIR_CAPI_EXPORTED MlirValue beaverOperandGetValue(MlirOpOperand operand) {
-  return wrap((*unwrap(operand)).get());
+MLIR_CAPI_EXPORTED MlirValue beaverOperandGetValue(MlirOpOperand opOperand) {
+  return wrap(unwrap(opOperand)->get());
 }
 
 MLIR_CAPI_EXPORTED const char *
