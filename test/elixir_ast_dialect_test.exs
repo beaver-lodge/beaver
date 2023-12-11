@@ -32,7 +32,7 @@ defmodule ELXDialectTest do
       [
         {:nested, "func.func",
          [
-           ElixirAST.UseBoundVariables
+           ElixirAST.MaterializeBoundVariables
          ]}
       ]
     )
