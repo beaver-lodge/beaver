@@ -11,7 +11,7 @@ defmodule TranslateMLIR do
   require Func
 
   defp gen_mlir(
-         {:some_llvm_add_mlir_operation, _, [left, right]} = ast,
+         {:some_llvm_add_mlir_operation, _, [left, right]},
          acc,
          ctx,
          block
@@ -33,8 +33,8 @@ defmodule TranslateMLIR do
   defp gen_mlir(
          {name, [line: _], nil},
          acc,
-         ctx,
-         block
+         _ctx,
+         _block
        ) do
     {acc.variables[name], acc}
   end
@@ -42,8 +42,8 @@ defmodule TranslateMLIR do
   defp gen_mlir(
          ast,
          acc,
-         ctx,
-         block
+         _ctx,
+         _block
        ) do
     {ast, acc}
   end
@@ -105,7 +105,7 @@ defmodule TranslateMLIR do
 
   defmacro defm(call, expr \\ nil) do
     {name, args} = Macro.decompose_call(call)
-    args = for {:"::", _, [arg, type]} <- args, do: arg
+    args = for {:"::", _, [arg, _type]} <- args, do: arg
     ctx = MLIR.Context.create()
 
     ir =
@@ -114,7 +114,7 @@ defmodule TranslateMLIR do
       |> MLIR.Operation.verify!()
       |> MLIR.to_string()
 
-    ctx = MLIR.Context.destroy(ctx)
+    MLIR.Context.destroy(ctx)
 
     quote do
       @ir unquote(ir)
