@@ -11,6 +11,6 @@ defmodule DefineMLIRTest do
       end
     end
 
-    AddTwoInt.llvm_add(1, 2)
+    assert 3 == AddTwoInt.llvm_add(1, 2)
   end
 end
