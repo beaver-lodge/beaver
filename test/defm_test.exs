@@ -2,7 +2,7 @@ defmodule DefineMLIRTest do
   use Beaver.Case, async: true
 
   @moduletag :smoke
-  test "cf with mutation", test_context do
+  test "add two integers", test_context do
     defmodule AddTwoInt do
       use TranslateMLIR
 
