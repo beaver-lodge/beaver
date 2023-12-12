@@ -1,5 +1,5 @@
 defmodule DefineMLIRTest do
-  use Beaver.Case
+  use Beaver.Case, async: true
 
   @moduletag :smoke
   test "cf with mutation", test_context do
