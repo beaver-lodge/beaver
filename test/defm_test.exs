@@ -10,5 +10,7 @@ defmodule DefineMLIRTest do
         some_llvm_add_mlir_operation(a, b)
       end
     end
+
+    AddTwoInt.llvm_add(1, 2)
   end
 end
