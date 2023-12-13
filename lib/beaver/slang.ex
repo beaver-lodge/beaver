@@ -148,7 +148,7 @@ defmodule Beaver.Slang do
           op_applier slang_target_op: op, sym_name: "\"#{name}\"" do
             region do
               block b_op() do
-                {args, ret} = constrain_f.(block: Beaver.Env.block(), ctx: ctx)
+                {args, ret} = constrain_f.(Beaver.Env.block(), ctx)
 
                 case strip_variadicity(args) do
                   [] ->
@@ -273,16 +273,16 @@ defmodule Beaver.Slang do
           unquote(name),
           unquote(op),
           unquote(args_op),
-          fn opts ->
+          fn block, ctx ->
             use Beaver
 
-            mlir block: opts[:block], ctx: opts[:ctx] do
+            mlir block: block, ctx: ctx do
               unquote_splicing(input_constrains)
 
               if unquote(opts[:regions_block]) do
                 unquote(opts[:regions_block])
                 |> List.wrap()
-                |> Enum.map(&Beaver.Slang.gen_region(&1, opts[:block], opts[:ctx]))
+                |> Enum.map(&Beaver.Slang.gen_region(&1, block, ctx))
               end
 
               {[unquote_splicing(args_var_ast)], unquote(do_block)}
