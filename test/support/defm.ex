@@ -119,8 +119,13 @@ defmodule TranslateMLIR do
       |> MLIR.dump!()
       |> MLIR.ExecutionEngine.create!()
 
-    MLIR.ExecutionEngine.invoke!(jit, "#{function}", arguments, return)
-    |> Beaver.Native.to_term()
+    ret =
+      MLIR.ExecutionEngine.invoke!(jit, "#{function}", arguments, return)
+      |> Beaver.Native.to_term()
+
+    MLIR.ExecutionEngine.destroy(jit)
+    MLIR.Context.destroy(ctx)
+    ret
   end
 
   defmacro defm(call, expr \\ nil) do
