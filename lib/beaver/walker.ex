@@ -301,7 +301,7 @@ defmodule Beaver.Walker do
       OpOperand,
       get_first: &CAPI.mlirValueGetFirstUse/1,
       get_next: &CAPI.mlirOpOperandGetNextUse/1,
-      get_parent: &CAPI.beaverOperandGetValue/1,
+      get_parent: &CAPI.mlirOpOperandGetValue/1,
       is_null: fn x -> CAPI.mlirOpOperandIsNull(x) |> Beaver.Native.to_term() end
     )
   end

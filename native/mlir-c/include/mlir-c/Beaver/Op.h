@@ -40,8 +40,6 @@ beaverRegisteredOperationsOfDialect(MlirContext context, MlirStringRef dialect,
 MLIR_CAPI_EXPORTED void
 beaverRegisteredDialects(MlirContext context, MlirStringRef *ret, size_t *num);
 
-MLIR_CAPI_EXPORTED MlirValue beaverOperandGetValue(MlirOpOperand operand);
-
 MLIR_CAPI_EXPORTED const char *beaverStringRefGetData(MlirStringRef string_ref);
 MLIR_CAPI_EXPORTED size_t beaverStringRefGetLength(MlirStringRef string_ref);
 
