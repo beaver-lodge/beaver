@@ -48,48 +48,84 @@ defmodule TranslateMLIR do
     {ast, acc}
   end
 
-  def compile_defm(call, expr, ctx) do
+  defp compile_args(args, ctx) do
+    arg_type_pairs =
+      for {:"::", _, [{a, _, nil}, type]} <- args do
+        t =
+          case type do
+            {:i64, _line, nil} ->
+              Type.i64(ctx: ctx)
+          end
+
+        {a, t}
+      end
+
+    arg_types = Enum.map(arg_type_pairs, &elem(&1, 1))
+    entry_block = MLIR.Block.create([])
+    args = Beaver.MLIR.Block.add_arg!(entry_block, ctx, arg_types)
+
+    {entry_block, arg_types, args}
+  end
+
+  defp compile_body(ctx, block, expr, acc_init) do
+    mlir ctx: ctx, block: block do
+      {ret, _acc} =
+        Macro.prewalk(expr, acc_init, &gen_mlir(&1, &2, ctx, Beaver.Env.block()))
+
+      ret[:do]
+    end
+  end
+
+  defp compile_defm(call, expr, ctx) do
     {name, args} = Macro.decompose_call(call)
 
+    arg_names =
+      for {:"::", _, [{a, _, nil}, _type]} <- args do
+        a
+      end
+
+    {entry_block, arg_types, args} = compile_args(args, ctx)
+
+    ret_val =
+      compile_body(ctx, entry_block, expr, %{variables: Map.new(Enum.zip(arg_names, args))})
+
+    mlir ctx: ctx, block: entry_block do
+      Func.return(ret_val) >>> []
+    end
+
     mlir ctx: ctx do
-      arg_type_pairs =
-        for {:"::", _, [{a, _, nil}, type]} <- args do
-          t =
-            case type do
-              {:i64, _line, nil} ->
-                Type.i64(ctx: ctx)
-            end
-
-          {a, t}
-        end
-
-      arg_types = Enum.map(arg_type_pairs, &elem(&1, 1))
-      body_block = MLIR.Block.create([])
-      args = Beaver.MLIR.Block.add_arg!(body_block, ctx, arg_types)
-      arg_names = Enum.map(arg_type_pairs, &elem(&1, 0))
-      acc_init = %{variables: Map.new(Enum.zip(arg_names, args))}
-
-      ret_type =
-        mlir ctx: ctx, block: body_block do
-          {ret, _acc} =
-            Macro.prewalk(expr, acc_init, &gen_mlir(&1, &2, ctx, Beaver.Env.block()))
-
-          ret_val = ret[:do]
-          Func.return(ret_val) >>> []
-          MLIR.CAPI.mlirValueGetType(ret_val)
-        end
-
       module do
         Func.func main(
                     sym_name: "\"#{name}\"",
-                    function_type: Type.function(arg_types, [ret_type])
+                    function_type: Type.function(arg_types, [MLIR.CAPI.mlirValueGetType(ret_val)])
                   ) do
           region do
-            MLIR.CAPI.mlirRegionAppendOwnedBlock(Beaver.Env.region(), body_block)
+            MLIR.CAPI.mlirRegionAppendOwnedBlock(Beaver.Env.region(), entry_block)
           end
         end
       end
     end
+  end
+
+  def compile_and_invoke(ir, function, arguments, return) when is_bitstring(ir) do
+    ctx = MLIR.Context.create()
+
+    jit =
+      ~m{#{ir}}.(ctx)
+      |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
+      |> MLIR.Conversion.convert_arith_to_llvm()
+      |> MLIR.Conversion.convert_func_to_llvm()
+      |> MLIR.Pass.Composer.run!()
+      |> MLIR.dump!()
+      |> MLIR.ExecutionEngine.create!()
+
+    ret =
+      MLIR.ExecutionEngine.invoke!(jit, "#{function}", arguments, return)
+      |> Beaver.Native.to_term()
+
+    MLIR.ExecutionEngine.destroy(jit)
+    MLIR.Context.destroy(ctx)
+    ret
   end
 
   defmacro defm(call, expr \\ nil) do
@@ -108,22 +144,9 @@ defmodule TranslateMLIR do
     quote do
       @ir unquote(ir)
       def unquote(name)(unquote_splicing(args)) do
-        ctx = MLIR.Context.create()
-
         arguments = [unquote_splicing(args)] |> Enum.map(&Beaver.Native.I64.make/1)
         return = Beaver.Native.I64.make(0)
-
-        jit =
-          ~m{#{@ir}}.(ctx)
-          |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
-          |> MLIR.Conversion.convert_arith_to_llvm()
-          |> MLIR.Conversion.convert_func_to_llvm()
-          |> MLIR.Pass.Composer.run!()
-          |> MLIR.dump!()
-          |> MLIR.ExecutionEngine.create!()
-
-        MLIR.ExecutionEngine.invoke!(jit, "#{unquote(name)}", arguments, return)
-        |> Beaver.Native.to_term()
+        TranslateMLIR.compile_and_invoke(@ir, unquote(name), arguments, return)
       end
     end
   end
