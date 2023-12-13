@@ -64,24 +64,13 @@ defmodule TranslateMLIR do
         end
 
       arg_types = Enum.map(arg_type_pairs, &elem(&1, 1))
-
       body_block = MLIR.Block.create([])
+      args = Beaver.MLIR.Block.add_arg!(body_block, ctx, arg_types)
+      arg_names = Enum.map(arg_type_pairs, &elem(&1, 0))
+      acc_init = %{variables: Map.new(Enum.zip(arg_names, args))}
 
       ret_type =
         mlir ctx: ctx, block: body_block do
-          Beaver.MLIR.Block.add_arg!(
-            Beaver.Env.block(),
-            Beaver.Env.context(),
-            arg_types
-          )
-
-          variables =
-            for {{k, _}, i} <- Enum.with_index(arg_type_pairs) do
-              {k, Beaver.MLIR.Block.get_arg!(Beaver.Env.block(), i)}
-            end
-
-          acc_init = %{variables: Map.new(variables)}
-
           {ret, _acc} =
             Macro.prewalk(expr, acc_init, &gen_mlir(&1, &2, ctx, Beaver.Env.block()))
 
