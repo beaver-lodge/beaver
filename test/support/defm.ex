@@ -107,6 +107,22 @@ defmodule TranslateMLIR do
     end
   end
 
+  def compile_and_invoke(ir, function, arguments, return) when is_bitstring(ir) do
+    ctx = MLIR.Context.create()
+
+    jit =
+      ~m{#{ir}}.(ctx)
+      |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
+      |> MLIR.Conversion.convert_arith_to_llvm()
+      |> MLIR.Conversion.convert_func_to_llvm()
+      |> MLIR.Pass.Composer.run!()
+      |> MLIR.dump!()
+      |> MLIR.ExecutionEngine.create!()
+
+    MLIR.ExecutionEngine.invoke!(jit, "#{function}", arguments, return)
+    |> Beaver.Native.to_term()
+  end
+
   defmacro defm(call, expr \\ nil) do
     {name, args} = Macro.decompose_call(call)
     args = for {:"::", _, [arg, _type]} <- args, do: arg
@@ -123,22 +139,9 @@ defmodule TranslateMLIR do
     quote do
       @ir unquote(ir)
       def unquote(name)(unquote_splicing(args)) do
-        ctx = MLIR.Context.create()
-
         arguments = [unquote_splicing(args)] |> Enum.map(&Beaver.Native.I64.make/1)
         return = Beaver.Native.I64.make(0)
-
-        jit =
-          ~m{#{@ir}}.(ctx)
-          |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
-          |> MLIR.Conversion.convert_arith_to_llvm()
-          |> MLIR.Conversion.convert_func_to_llvm()
-          |> MLIR.Pass.Composer.run!()
-          |> MLIR.dump!()
-          |> MLIR.ExecutionEngine.create!()
-
-        MLIR.ExecutionEngine.invoke!(jit, "#{unquote(name)}", arguments, return)
-        |> Beaver.Native.to_term()
+        TranslateMLIR.compile_and_invoke(@ir, unquote(name), arguments, return)
       end
     end
   end
