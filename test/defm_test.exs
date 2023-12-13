@@ -1,0 +1,16 @@
+defmodule DefineMLIRTest do
+  use Beaver.Case, async: true
+
+  @moduletag :smoke
+  test "add two integers", test_context do
+    defmodule AddTwoInt do
+      use TranslateMLIR
+
+      defm llvm_add(a :: i64, b :: i64) do
+        some_llvm_add_mlir_operation(a, b)
+      end
+    end
+
+    assert 3 == AddTwoInt.llvm_add(1, 2)
+  end
+end
