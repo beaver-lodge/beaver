@@ -265,15 +265,6 @@ defmodule Beaver.Slang do
         transform_arg(ast, i, :constrain)
       end)
 
-    region_constrains =
-      if opts[:regions_block] do
-        quote do
-          unquote(opts[:regions_block])
-          |> List.wrap()
-          |> Enum.map(&Beaver.Slang.gen_region(&1, opts[:block], opts[:ctx]))
-        end
-      end
-
     quote do
       Module.put_attribute(__MODULE__, unquote(attr_name), unquote(name))
       @__slang__creator__ {unquote(op), __MODULE__, unquote(creator)}
@@ -287,7 +278,13 @@ defmodule Beaver.Slang do
 
             mlir block: opts[:block], ctx: opts[:ctx] do
               unquote_splicing(input_constrains)
-              unquote(region_constrains)
+
+              if unquote(opts[:regions_block]) do
+                unquote(opts[:regions_block])
+                |> List.wrap()
+                |> Enum.map(&Beaver.Slang.gen_region(&1, opts[:block], opts[:ctx]))
+              end
+
               {[unquote_splicing(args_var_ast)], unquote(do_block)}
             end
           end,
