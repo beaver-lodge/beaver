@@ -14,7 +14,6 @@ extern "C" {
   typedef struct name name
 
 DEFINE_C_API_STRUCT(MlirRegisteredOperationName, void);
-DEFINE_C_API_STRUCT(MlirOperand, void);
 
 #undef DEFINE_C_API_STRUCT
 
@@ -40,17 +39,8 @@ beaverRegisteredOperationsOfDialect(MlirContext context, MlirStringRef dialect,
 
 MLIR_CAPI_EXPORTED void
 beaverRegisteredDialects(MlirContext context, MlirStringRef *ret, size_t *num);
-MLIR_CAPI_EXPORTED MlirOperand beaverValueGetFirstOperand(MlirValue value);
 
-MLIR_CAPI_EXPORTED MlirOperand beaverOperandGetNext(MlirOperand operand);
-
-MLIR_CAPI_EXPORTED bool beaverOperandIsNull(MlirOperand operand);
-
-MLIR_CAPI_EXPORTED MlirValue beaverOperandGetValue(MlirOperand operand);
-
-MLIR_CAPI_EXPORTED MlirOperation beaverOperandGetOwner(MlirOperand operand);
-
-MLIR_CAPI_EXPORTED intptr_t beaverOperandGetNumber(MlirOperand operand);
+MLIR_CAPI_EXPORTED MlirValue beaverOperandGetValue(MlirOpOperand operand);
 
 MLIR_CAPI_EXPORTED const char *beaverStringRefGetData(MlirStringRef string_ref);
 MLIR_CAPI_EXPORTED size_t beaverStringRefGetLength(MlirStringRef string_ref);

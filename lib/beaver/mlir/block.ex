@@ -22,6 +22,11 @@ defmodule Beaver.MLIR.Block do
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
+  defp do_add_arg!(block, ctx, t = %Beaver.MLIR.Type{}) do
+    loc = MLIR.CAPI.mlirLocationUnknownGet(ctx)
+    do_add_arg!(block, ctx, {t, loc})
+  end
+
   defp do_add_arg!(block, ctx, {t, loc}) do
     t = MLIR.CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create(t))
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)

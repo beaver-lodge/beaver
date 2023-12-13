@@ -123,37 +123,8 @@ MLIR_CAPI_EXPORTED void beaverExitMultiThreadedExecution(MlirContext context) {
   unwrap(context)->exitMultiThreadedExecution();
 }
 
-MLIR_CAPI_EXPORTED MlirOperand beaverValueGetFirstOperand(MlirValue value) {
-  // TODO: fix the leakage here
-  auto *iter = new mlir::Value::use_iterator();
-  *iter = unwrap(value).use_begin();
-  return wrap(iter);
-}
-
-MLIR_CAPI_EXPORTED MlirOperand beaverOperandGetNext(MlirOperand operand) {
-  auto iter = new mlir::Value::use_iterator();
-  auto value = unwrap(operand);
-  *iter = *value;
-  (*iter)++;
-  return wrap(iter);
-}
-
-MLIR_CAPI_EXPORTED bool beaverOperandIsNull(MlirOperand operand) {
-  auto unwrapped = unwrap(operand);
-  return operand.ptr == nullptr || (*unwrapped) == nullptr ||
-         (*unwrapped) == (*unwrap(operand))->get().use_end();
-}
-
-MLIR_CAPI_EXPORTED MlirValue beaverOperandGetValue(MlirOperand operand) {
-  return wrap((*unwrap(operand))->get());
-}
-
-MLIR_CAPI_EXPORTED MlirOperation beaverOperandGetOwner(MlirOperand operand) {
-  return wrap((*unwrap(operand))->getOwner());
-}
-
-MLIR_CAPI_EXPORTED intptr_t beaverOperandGetNumber(MlirOperand operand) {
-  return (*unwrap(operand))->getOperandNumber();
+MLIR_CAPI_EXPORTED MlirValue beaverOperandGetValue(MlirOpOperand opOperand) {
+  return wrap(unwrap(opOperand)->get());
 }
 
 MLIR_CAPI_EXPORTED const char *

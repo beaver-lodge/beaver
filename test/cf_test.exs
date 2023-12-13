@@ -1,5 +1,5 @@
 defmodule CfTest do
-  use Beaver.Case
+  use Beaver.Case, async: true
   use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.Type

@@ -1,8 +1,15 @@
 alias Beaver.MLIR
-alias Beaver.MLIR.{Value, Operation, Region, Module, Attribute, Block, NamedAttribute, Identifier}
 
-alias Beaver.MLIR.CAPI.{
-  MlirOperand
+alias Beaver.MLIR.{
+  Value,
+  Operation,
+  OpOperand,
+  Region,
+  Module,
+  Attribute,
+  Block,
+  NamedAttribute,
+  Identifier
 }
 
 require Beaver.MLIR.CAPI
@@ -73,7 +80,7 @@ defmodule Beaver.Walker do
   defp verify_nesting!(Block, Operation), do: :ok
   # arguments of a block
   defp verify_nesting!(Block, Value), do: :ok
-  defp verify_nesting!(Value, MlirOperand), do: :ok
+  defp verify_nesting!(Value, OpOperand), do: :ok
 
   defp verify_nesting!(container_module, element_module) do
     raise "not a legal 2-level structure could be walked in MLIR: #{inspect(container_module)}(#{inspect(element_module)})"
@@ -291,11 +298,11 @@ defmodule Beaver.Walker do
   def uses(%Value{} = value) do
     new(
       value,
-      MlirOperand,
-      get_first: &CAPI.beaverValueGetFirstOperand/1,
-      get_next: &CAPI.beaverOperandGetNext/1,
+      OpOperand,
+      get_first: &CAPI.mlirValueGetFirstUse/1,
+      get_next: &CAPI.mlirOpOperandGetNextUse/1,
       get_parent: &CAPI.beaverOperandGetValue/1,
-      is_null: fn x -> CAPI.beaverOperandIsNull(x) |> Beaver.Native.to_term() end
+      is_null: fn x -> CAPI.mlirOpOperandIsNull(x) |> Beaver.Native.to_term() end
     )
   end
 
@@ -525,14 +532,14 @@ defmodule Beaver.Walker do
   @doc """
   Replace a operation with a value
   """
-  def replace(%Operation{} = op, %Value{} = value) do
+  def replace(%Operation{} = op, %Value{} = value, opts \\ [destroy: true]) do
     with results <- results(op),
          1 <- Enum.count(results),
          result = %Value{} <- results[0] do
-      for %Beaver.MLIR.CAPI.MlirOperand{} = operand <- uses(result) do
-        op = CAPI.beaverOperandGetOwner(operand)
-        pos = CAPI.beaverOperandGetNumber(operand)
-        CAPI.mlirOperationSetOperand(op, pos, value)
+      CAPI.mlirValueReplaceAllUsesOfWith(result, value)
+
+      if opts[:destroy] do
+        CAPI.mlirOperationDestroy(op)
       end
 
       %OpReplacement{

@@ -142,4 +142,60 @@ defmodule ElixirAST do
       end
     )
   end
+
+  defmodule MaterializeBoundVariables do
+    @moduledoc """
+    erase `ex.var` and `ex.bind` ops, build usages in MLIR
+    """
+    use Beaver.MLIR.Pass, on: "func.func"
+
+    defp extract_var_name(var_op) do
+      Beaver.Walker.attributes(var_op)["name"]
+      |> MLIR.CAPI.mlirStringAttrGetValue()
+      |> MLIR.StringRef.to_string()
+    end
+
+    def run(func) do
+      func
+      |> Beaver.Walker.postwalk(%{variables: %{}}, fn
+        %MLIR.Operation{} = op, acc ->
+          case MLIR.Operation.name(op) do
+            "ex.bind" ->
+              val = Beaver.Walker.operands(op)[1]
+              1 = Beaver.Walker.uses(val) |> Enum.to_list() |> Enum.count()
+
+              var =
+                Beaver.Walker.operands(op)[0]
+                |> MLIR.CAPI.mlirOpResultGetOwner()
+
+              acc = put_in(acc, [:variables, extract_var_name(var)], val)
+              r = Beaver.Walker.replace(op, val)
+              MLIR.CAPI.mlirOperationDestroy(var)
+              {r, acc}
+
+            "ex.var" ->
+              [val] =
+                Beaver.Walker.results(op)[0]
+                |> Beaver.Walker.uses()
+                |> Enum.to_list()
+
+              case val |> MLIR.CAPI.mlirOpOperandGetOwner() |> MLIR.Operation.name() do
+                "ex.bind" ->
+                  {op, acc}
+
+                _ ->
+                  {Beaver.Walker.replace(op, acc.variables[extract_var_name(op)]), acc}
+              end
+
+            _ ->
+              {op, acc}
+          end
+
+        mlir, acc ->
+          {mlir, acc}
+      end)
+
+      :ok
+    end
+  end
 end

@@ -4,29 +4,51 @@ defmodule ELXDialectTest do
   @moduletag :smoke
 
   test "gen elx from ast", test_context do
-    quote do
-      defmodule TwoFuncMod do
-        def add_two_literal() do
-          a = 1 + 2
-          b = a + 3
-          b
+    ast =
+      quote do
+        defmodule TwoFuncMod do
+          def add_two_literal() do
+            a = 1 + 2
+            b = a + 3
+            b
+          end
+
+          def main() do
+            add_two_literal()
+          end
         end
 
-        def main() do
-          add_two_literal()
+        defmodule OneFuncMod do
+          def add_two_literal() do
+            a = 1 + 2
+            b = a + 3
+            b
+          end
         end
       end
 
-      defmodule OneFuncMod do
-        def add_two_literal() do
-          a = 1 + 2
-          b = a + 3
-          b
-        end
-      end
-    end
-    |> ElixirAST.from_ast(ctx: test_context[:ctx])
-    |> MLIR.dump!()
-    |> MLIR.Operation.verify!()
+    mlir_module =
+      ast
+      |> ElixirAST.from_ast(ctx: test_context[:ctx])
+      |> MLIR.Pass.Composer.nested(
+        "builtin.module",
+        [
+          {:nested, "func.func",
+           [
+             ElixirAST.MaterializeBoundVariables
+           ]}
+        ]
+      )
+      |> MLIR.Pass.Composer.run!()
+      |> MLIR.Operation.verify!()
+
+    {_, op_names} =
+      mlir_module
+      |> Beaver.Walker.postwalk([], fn
+        %MLIR.Operation{} = op, acc -> {op, [MLIR.Operation.name(op) | acc]}
+        mlir, acc -> {mlir, acc}
+      end)
+
+    op_names |> Enum.map(fn n -> assert n not in ["ex.bind", "ex.var"] end)
   end
 end
