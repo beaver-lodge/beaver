@@ -242,6 +242,13 @@ defmodule Beaver.Slang do
     end
   end
 
+  def gen_region({:sized, size}, block, ctx) when is_integer(size) do
+    mlir ctx: ctx, block: block do
+      IRDL.region(numberOfBlocks: MLIR.Attribute.integer(MLIR.Type.i32(), size)) >>>
+        ~t{!irdl.region}
+    end
+  end
+
   # This function generates the AST for a creator function for an IRDL operation (like `irdl.operation`, `irdl.type`). It uses the transform_defop_pins/1 function to transform the pins, generates the MLIR code for the operation and its arguments, and applies the operation using op_applier/1.
   defp gen_creator(op, args_op, call, do_block, opts \\ []) do
     {name, args} = call |> Macro.decompose_call()
