@@ -22,8 +22,10 @@ defmodule DefineMLIRTest do
       end
     end
 
+    {:ok, _pid} = AddTwoInt.init_jit()
     assert 3 == AddTwoInt.llvm_add(1, 2)
     assert 5 == AddTwoInt.llvm_add1(2, 2)
     assert 7 == AddTwoInt.llvm_add_multi_lines(1, 1)
+    :ok = AddTwoInt.destroy_jit()
   end
 end

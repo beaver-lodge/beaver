@@ -139,26 +139,6 @@ defmodule TranslateMLIR do
     end
   end
 
-  def compile_and_invoke(ir, function, arguments, return) when is_bitstring(ir) do
-    ctx = MLIR.Context.create()
-
-    jit =
-      ~m{#{ir}}.(ctx)
-      |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
-      |> MLIR.Conversion.convert_arith_to_llvm()
-      |> MLIR.Conversion.convert_func_to_llvm()
-      |> MLIR.Pass.Composer.run!()
-      |> MLIR.ExecutionEngine.create!()
-
-    ret =
-      MLIR.ExecutionEngine.invoke!(jit, "#{function}", arguments, return)
-      |> Beaver.Native.to_term()
-
-    MLIR.ExecutionEngine.destroy(jit)
-    MLIR.Context.destroy(ctx)
-    ret
-  end
-
   defmacro defm(call, expr \\ nil) do
     {name, args} = Macro.decompose_call(call)
     args = for {:"::", _, [arg, _type]} <- args, do: arg
@@ -168,13 +148,12 @@ defmodule TranslateMLIR do
       def unquote(name)(unquote_splicing(args)) do
         arguments = [unquote_splicing(args)] |> Enum.map(&Beaver.Native.I64.make/1)
         return = Beaver.Native.I64.make(0)
-        TranslateMLIR.compile_and_invoke(ir(), unquote(name), arguments, return)
+        Defm.JIT.invoke(__MODULE__, unquote(name), arguments, return)
       end
     end
   end
 
   @doc false
-
   defmacro __before_compile__(_env) do
     quote do
       ctx = MLIR.Context.create()
@@ -185,7 +164,6 @@ defmodule TranslateMLIR do
             for {call, expr} <- @__defm__ do
               {name, args} = Macro.decompose_call(call)
               args = for {:"::", _, [arg, _type]} <- args, do: arg
-
               TranslateMLIR.compile_defm(call, expr, Beaver.Env.block(), ctx)
             end
           end
@@ -194,11 +172,50 @@ defmodule TranslateMLIR do
         |> MLIR.to_string()
 
       MLIR.Context.destroy(ctx)
+
       @__ir__ ir
-      @doc false
-      def ir do
-        @__ir__
+      def init_jit do
+        Defm.JIT.start_link(@__ir__, __MODULE__)
+      end
+
+      def destroy_jit do
+        Defm.JIT.stop(__MODULE__)
       end
     end
+  end
+end
+
+defmodule Defm.JIT do
+  use Agent
+  use Beaver
+  require Logger
+
+  def start_link(ir, name) when is_atom(name) do
+    Logger.debug("[Beaver] defm jit initialized for: #{name}")
+    ctx = MLIR.Context.create()
+
+    jit =
+      ~m{#{ir}}.(ctx)
+      |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
+      |> MLIR.Conversion.convert_arith_to_llvm()
+      |> MLIR.Conversion.convert_func_to_llvm()
+      |> MLIR.Pass.Composer.run!()
+      |> MLIR.ExecutionEngine.create!()
+
+    Agent.start_link(fn -> %{ctx: ctx, jit: jit} end, name: name)
+  end
+
+  def invoke(name, function, arguments, return) do
+    %{jit: jit} = Agent.get(name, & &1)
+
+    MLIR.ExecutionEngine.invoke!(jit, "#{function}", arguments, return)
+    |> Beaver.Native.to_term()
+  end
+
+  def stop(name) do
+    %{ctx: ctx, jit: jit} = Agent.get(name, & &1)
+    MLIR.ExecutionEngine.destroy(jit)
+    MLIR.Context.destroy(ctx)
+    Agent.stop(name)
   end
 end
