@@ -7,10 +7,23 @@ defmodule DefineMLIRTest do
       use TranslateMLIR
 
       defm llvm_add(a :: i64, b :: i64) do
-        some_llvm_add_mlir_operation(a, b)
+        a + b
+      end
+
+      defm llvm_add1(a :: i64, b :: i64) do
+        a + b + 1
+      end
+
+      defm llvm_add_multi_lines(a :: i64, b :: i64) do
+        c = a
+        c = c + b + 1
+        a = 2 + c + b + 1
+        a
       end
     end
 
     assert 3 == AddTwoInt.llvm_add(1, 2)
+    assert 5 == AddTwoInt.llvm_add1(2, 2)
+    assert 7 == AddTwoInt.llvm_add_multi_lines(1, 1)
   end
 end

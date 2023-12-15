@@ -11,7 +11,25 @@ defmodule TranslateMLIR do
   require Func
 
   defp gen_mlir(
-         {:some_llvm_add_mlir_operation, _, [left, right]},
+         {:=, _,
+          [
+            {name, _, nil},
+            bound
+          ]},
+         acc,
+         ctx,
+         block
+       ) do
+    {value, acc} =
+      mlir ctx: ctx, block: block do
+        Macro.prewalk(bound, acc, &gen_mlir(&1, &2, ctx, Beaver.Env.block()))
+      end
+
+    {value, put_in(acc.variables[name], value)}
+  end
+
+  defp gen_mlir(
+         {:+, _, [left, right]},
          acc,
          ctx,
          block
@@ -24,7 +42,7 @@ defmodule TranslateMLIR do
             {ops ++ [r], acc}
           end)
 
-        Arith.addi(left, right) >>> Type.i64()
+        Arith.addi(left, right) >>> MLIR.CAPI.mlirValueGetType(left)
       end
 
     {value, acc}
@@ -37,6 +55,15 @@ defmodule TranslateMLIR do
          _block
        ) do
     {acc.variables[name], acc}
+  end
+
+  defp gen_mlir(i, acc, ctx, block) when is_integer(i) do
+    value =
+      mlir ctx: ctx, block: block do
+        Arith.constant(value: Attribute.integer(Type.i64(), i)) >>> Type.i64()
+      end
+
+    {value, acc}
   end
 
   defp gen_mlir(
@@ -87,7 +114,10 @@ defmodule TranslateMLIR do
     {entry_block, arg_types, args} = compile_args(args, ctx)
 
     ret_val =
-      compile_body(ctx, entry_block, expr, %{variables: Map.new(Enum.zip(arg_names, args))})
+      case compile_body(ctx, entry_block, expr, %{variables: Map.new(Enum.zip(arg_names, args))}) do
+        {:__block__, [], values} when is_list(values) -> List.last(values)
+        %MLIR.Value{} = v -> v
+      end
 
     mlir ctx: ctx, block: entry_block do
       Func.return(ret_val) >>> []
@@ -116,7 +146,6 @@ defmodule TranslateMLIR do
       |> MLIR.Conversion.convert_arith_to_llvm()
       |> MLIR.Conversion.convert_func_to_llvm()
       |> MLIR.Pass.Composer.run!()
-      |> MLIR.dump!()
       |> MLIR.ExecutionEngine.create!()
 
     ret =
@@ -135,7 +164,6 @@ defmodule TranslateMLIR do
 
     ir =
       compile_defm(call, expr, ctx)
-      |> MLIR.dump!()
       |> MLIR.Operation.verify!()
       |> MLIR.to_string()
 
