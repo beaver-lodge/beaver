@@ -59,7 +59,7 @@ defmodule Beaver.Slang do
   defp transform_defop_pins({:=, _line0, [var, right]}) do
     quote do
       unquote(var) =
-        Beaver.Slang.create_constrain(unquote(right),
+        Beaver.Slang.create_constraint(unquote(right),
           block: Beaver.Env.block(),
           ctx: Beaver.Env.context()
         )
@@ -69,14 +69,14 @@ defmodule Beaver.Slang do
   defp transform_defop_pins(ast), do: ast
 
   @doc false
-  # This function creates a `irdl.is` op for a given value. It uses the mlir macro to generate the MLIR code for the constrain attribute.
-  def create_constrain({variadic_tag, v}, opts) when variadic_tag in @variadic_tags do
-    {variadic_tag, create_constrain(v, opts)}
+  # This function creates a `irdl.is` op for a given value. It uses the mlir macro to generate the MLIR code for the constraint attribute.
+  def create_constraint({variadic_tag, v}, opts) when variadic_tag in @variadic_tags do
+    {variadic_tag, create_constraint(v, opts)}
   end
 
-  def create_constrain(%MLIR.Value{} = v, _opts), do: v
+  def create_constraint(%MLIR.Value{} = v, _opts), do: v
 
-  def create_constrain(t, opts) do
+  def create_constraint(t, opts) do
     use Beaver
 
     mlir ctx: opts[:ctx], block: opts[:block] do
@@ -169,7 +169,7 @@ defmodule Beaver.Slang do
                   {return_op, ret} when not is_nil(return_op) ->
                     op_applier(
                       ret
-                      |> Enum.map(&create_constrain(&1, block: Beaver.Env.block(), ctx: ctx)),
+                      |> Enum.map(&create_constraint(&1, block: Beaver.Env.block(), ctx: ctx)),
                       get_variadicity(ret, opts),
                       slang_target_op: return_op
                     ) >>> []
@@ -187,13 +187,13 @@ defmodule Beaver.Slang do
     {"slang_internal_arg#{i}" |> String.to_atom(), [], nil}
   end
 
-  # This function transforms the given argument AST based on the provided usage (if it is using as variable or constrain declaration). It handles different cases based on the structure of the argument and returns the transformed AST.
-  defp transform_arg(ast, i, usage) when usage in [:constrain, :variable] do
+  # This function transforms the given argument AST based on the provided usage (if it is using as variable or constraint declaration). It handles different cases based on the structure of the argument and returns the transformed AST.
+  defp transform_arg(ast, i, usage) when usage in [:constraint, :variable] do
     case ast do
       {_name, _line0, nil} ->
         case usage do
           # erase hanging vars to suppress warning
-          :constrain ->
+          :constraint ->
             nil
 
           :variable ->
@@ -202,7 +202,7 @@ defmodule Beaver.Slang do
 
       {:=, _line0, [var, _right]} ->
         case usage do
-          :constrain ->
+          :constraint ->
             ast
 
           :variable ->
@@ -215,10 +215,10 @@ defmodule Beaver.Slang do
 
       _ ->
         case usage do
-          :constrain ->
+          :constraint ->
             quote do
               unquote(get_slang_arg_ast(i)) =
-                Beaver.Slang.create_constrain(unquote(ast),
+                Beaver.Slang.create_constraint(unquote(ast),
                   block: Beaver.Env.block(),
                   ctx: Beaver.Env.context()
                 )
@@ -248,7 +248,7 @@ defmodule Beaver.Slang do
       |> Macro.postwalk(&transform_defop_pins/1)
       |> Enum.with_index()
       |> Enum.map(fn {ast, i} ->
-        transform_arg(ast, i, :constrain)
+        transform_arg(ast, i, :constraint)
       end)
 
     quote do
@@ -392,7 +392,7 @@ defmodule Beaver.Slang do
   end
 
   @doc """
-  This macro generates the AST for `irdl.is` op, usually used to create a constrain on type
+  This macro generates the AST for `irdl.is` op, usually used to create a constraint on type
   """
   defmacro is(type) do
     quote do
