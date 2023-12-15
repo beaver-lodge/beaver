@@ -1,7 +1,10 @@
 defmodule TranslateMLIR do
   defmacro __using__(_) do
     quote do
+      @before_compile TranslateMLIR
       import TranslateMLIR
+      Module.register_attribute(__MODULE__, :__defm__, accumulate: true)
+      Module.register_attribute(__MODULE__, :__ir__, accumulate: false)
     end
   end
 
@@ -103,7 +106,8 @@ defmodule TranslateMLIR do
     end
   end
 
-  defp compile_defm(call, expr, ctx) do
+  @doc false
+  def compile_defm(call, expr, block, ctx) do
     {name, args} = Macro.decompose_call(call)
 
     arg_names =
@@ -123,15 +127,13 @@ defmodule TranslateMLIR do
       Func.return(ret_val) >>> []
     end
 
-    mlir ctx: ctx do
-      module do
-        Func.func main(
-                    sym_name: "\"#{name}\"",
-                    function_type: Type.function(arg_types, [MLIR.CAPI.mlirValueGetType(ret_val)])
-                  ) do
-          region do
-            MLIR.CAPI.mlirRegionAppendOwnedBlock(Beaver.Env.region(), entry_block)
-          end
+    mlir block: block, ctx: ctx do
+      Func.func main(
+                  sym_name: "\"#{name}\"",
+                  function_type: Type.function(arg_types, [MLIR.CAPI.mlirValueGetType(ret_val)])
+                ) do
+        region do
+          MLIR.CAPI.mlirRegionAppendOwnedBlock(Beaver.Env.region(), entry_block)
         end
       end
     end
@@ -160,21 +162,42 @@ defmodule TranslateMLIR do
   defmacro defm(call, expr \\ nil) do
     {name, args} = Macro.decompose_call(call)
     args = for {:"::", _, [arg, _type]} <- args, do: arg
-    ctx = MLIR.Context.create()
-
-    ir =
-      compile_defm(call, expr, ctx)
-      |> MLIR.Operation.verify!()
-      |> MLIR.to_string()
-
-    MLIR.Context.destroy(ctx)
 
     quote do
-      @ir unquote(ir)
+      @__defm__ {unquote(Macro.escape(call)), unquote(Macro.escape(expr))}
       def unquote(name)(unquote_splicing(args)) do
         arguments = [unquote_splicing(args)] |> Enum.map(&Beaver.Native.I64.make/1)
         return = Beaver.Native.I64.make(0)
-        TranslateMLIR.compile_and_invoke(@ir, unquote(name), arguments, return)
+        TranslateMLIR.compile_and_invoke(ir(), unquote(name), arguments, return)
+      end
+    end
+  end
+
+  @doc false
+
+  defmacro __before_compile__(_env) do
+    quote do
+      ctx = MLIR.Context.create()
+
+      ir =
+        mlir ctx: ctx do
+          module do
+            for {call, expr} <- @__defm__ do
+              {name, args} = Macro.decompose_call(call)
+              args = for {:"::", _, [arg, _type]} <- args, do: arg
+
+              TranslateMLIR.compile_defm(call, expr, Beaver.Env.block(), ctx)
+            end
+          end
+        end
+        |> MLIR.Operation.verify!()
+        |> MLIR.to_string()
+
+      MLIR.Context.destroy(ctx)
+      @__ir__ ir
+      @doc false
+      def ir do
+        @__ir__
       end
     end
   end
