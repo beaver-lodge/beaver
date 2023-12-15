@@ -114,8 +114,10 @@ defmodule TranslateMLIR do
     {entry_block, arg_types, args} = compile_args(args, ctx)
 
     ret_val =
-      compile_body(ctx, entry_block, expr, %{variables: Map.new(Enum.zip(arg_names, args))})
-      |> dbg
+      case compile_body(ctx, entry_block, expr, %{variables: Map.new(Enum.zip(arg_names, args))}) do
+        {:__block__, [], values} when is_list(values) -> List.last(values)
+        %MLIR.Value{} = v -> v
+      end
 
     mlir ctx: ctx, block: entry_block do
       Func.return(ret_val) >>> []
@@ -144,7 +146,6 @@ defmodule TranslateMLIR do
       |> MLIR.Conversion.convert_arith_to_llvm()
       |> MLIR.Conversion.convert_func_to_llvm()
       |> MLIR.Pass.Composer.run!()
-      |> MLIR.dump!()
       |> MLIR.ExecutionEngine.create!()
 
     ret =
@@ -163,7 +164,6 @@ defmodule TranslateMLIR do
 
     ir =
       compile_defm(call, expr, ctx)
-      |> MLIR.dump!()
       |> MLIR.Operation.verify!()
       |> MLIR.to_string()
 
