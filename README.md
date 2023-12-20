@@ -267,10 +267,6 @@ To name a few:
 
 Each of these sub-ecosystems starts with a seed project/library. Beaver should evolve to become a sub-ecosystem for compilers built with Elixir and MLIR.
 
-## How Beaver works with MLIR ODS definitions?
-
-PDL really opens a door to non C++ programming languages to build MLIR tools. Beaver will reuse PDL's implementations in LSP and C++ source codegen to generate Elixir code. The prominent part is that all ODS definitions will have their correspondent Elixir [Structs](https://elixir-lang.org/getting-started/structs.html) to be used in patterns and builders. Although this is actually a hack, it is kind of reliable considering PDL will always be part of the upstream LLVM mono-repo. We could update to its new APIs as PDL's implementation evolves. As long as it provides features like code completions and code generations, there will be some APIs in PDL's implementation we could reuse to collect and query ODS meta data.
-
 ## MLIR context management
 
 When calling higher-level APIs, it is ideal not to have MLIR context passing around everywhere.
