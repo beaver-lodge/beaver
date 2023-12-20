@@ -6,9 +6,62 @@ defmodule TranslateMLIR do
   end
 
   use Beaver
-  alias Beaver.MLIR.Dialect.{Func, Arith}
+  alias Beaver.MLIR.Dialect.{Func, Arith, MemRef, Index, SCF}
   alias Beaver.MLIR.Type
   require Func
+
+  defp gen_mlir(
+         {:for, _,
+          [
+            {:<-, _, [{loop_arg, _, nil}, list]},
+            [
+              do: do_block
+            ]
+          ]},
+         acc,
+         ctx,
+         block
+       )
+       when is_list(list) do
+    if list |> Enum.all?(&is_integer/1) do
+      {values, acc} = Macro.prewalk(list, acc, &gen_mlir(&1, &2, ctx, block))
+
+      mlir ctx: ctx, block: block do
+        # generate list literal
+        memref = MemRef.alloc() >>> MLIR.Type.memref([length(list)], MLIR.Type.i64())
+        result = MemRef.alloc() >>> MLIR.Type.memref([length(list)], MLIR.Type.i64())
+
+        for {v, i} <- Enum.with_index(values) do
+          indices = Index.constant(value: Attribute.index(i)) >>> Type.index()
+          MemRef.store(v, memref, indices) >>> []
+        end
+
+        # generate for loop
+        lower_bound = Index.constant(value: Attribute.index(0)) >>> Type.index()
+        upper_bound = Index.constant(value: Attribute.index(length(list))) >>> Type.index()
+        step = Index.constant(value: Attribute.index(1)) >>> Type.index()
+
+        SCF.for [lower_bound, upper_bound, step] do
+          region do
+            block body(indices >>> Type.index()) do
+              arg = MemRef.load(memref, indices) >>> MLIR.Type.i64()
+              acc = put_in(acc.variables[loop_arg], arg)
+
+              {ret, _acc} =
+                Macro.prewalk(do_block, acc, &gen_mlir(&1, &2, ctx, Beaver.Env.block()))
+
+              MemRef.store(ret, result, indices) >>> []
+              SCF.yield() >>> []
+            end
+          end
+        end >>> []
+      end
+
+      {result, acc}
+    else
+      raise "can only compile list of int literal"
+    end
+  end
 
   defp gen_mlir(
          {:=, _,
@@ -54,7 +107,7 @@ defmodule TranslateMLIR do
          _ctx,
          _block
        ) do
-    {acc.variables[name], acc}
+    {Map.fetch!(acc.variables, name), acc}
   end
 
   defp gen_mlir(i, acc, ctx, block) when is_integer(i) do
@@ -134,6 +187,7 @@ defmodule TranslateMLIR do
           end
         end
       end
+      |> MLIR.dump!()
     end
   end
 
