@@ -157,6 +157,25 @@ defmodule TranslateMLIR do
     end
   end
 
+  def memref_descriptor_ptr() do
+    Beaver.Native.Memory.new(nil, sizes: [-1], type: {:s, 64})
+  end
+
+  def parse_integers(return) do
+    [len] = return.descriptor |> Beaver.Native.Memory.Descriptor.sizes()
+
+    return.descriptor
+    |> Beaver.Native.Memory.Descriptor.aligned()
+    |> Beaver.Native.OpaquePtr.to_binary(8 * len)
+    |> do_parse_integers([])
+  end
+
+  defp do_parse_integers(<<>>, integers), do: Enum.reverse(integers)
+
+  defp do_parse_integers(<<int::little-integer-size(64), rest::binary>>, integers) do
+    do_parse_integers(rest, [int | integers])
+  end
+
   defp compile_defm(call, expr, ctx) do
     {name, args} = Macro.decompose_call(call)
 
@@ -177,24 +196,46 @@ defmodule TranslateMLIR do
       Func.return(ret_val) >>> []
     end
 
-    mlir ctx: ctx do
-      module do
-        Func.func main(
-                    sym_name: "\"#{name}\"",
-                    function_type: Type.function(arg_types, [MLIR.CAPI.mlirValueGetType(ret_val)])
-                  ) do
-          region do
-            MLIR.CAPI.mlirRegionAppendOwnedBlock(Beaver.Env.region(), entry_block)
-          end
+    ret_t = MLIR.CAPI.mlirValueGetType(ret_val)
+
+    return_maker =
+      if MLIR.CAPI.mlirTypeIsAInteger(ret_t) |> Beaver.Native.to_term() do
+        %{mode: :value, maker: {Beaver.Native.I64, :make, [0]}}
+      else
+        if MLIR.CAPI.mlirTypeIsAMemRef(ret_t) |> Beaver.Native.to_term() do
+          %{
+            mode: :mutation,
+            maker: {__MODULE__, :memref_descriptor_ptr, []},
+            preparer: {Beaver.Native.Memory, :descriptor_ptr},
+            postprocesser: {__MODULE__, :parse_integers}
+          }
+        else
+          raise "ret type not supported"
         end
       end
-      |> MLIR.dump!()
-    end
+
+    ir =
+      mlir ctx: ctx do
+        module do
+          Func.func main(
+                      sym_name: "\"#{name}\"",
+                      function_type:
+                        Type.function(arg_types, [MLIR.CAPI.mlirValueGetType(ret_val)])
+                    ) do
+            region do
+              MLIR.CAPI.mlirRegionAppendOwnedBlock(Beaver.Env.region(), entry_block)
+            end
+          end
+        end
+        |> MLIR.dump!()
+      end
+
+    {ir, return_maker}
   end
 
-  def compile_and_invoke(ir, function, arguments, return) when is_bitstring(ir) do
+  def compile_and_invoke(ir, function, arguments, return \\ nil) when is_bitstring(ir) do
     ctx = MLIR.Context.create()
-    import MLIR.{Transforms, Conversion}
+    import MLIR.Conversion
 
     jit =
       ~m{#{ir}}.(ctx)
@@ -210,7 +251,6 @@ defmodule TranslateMLIR do
 
     ret =
       MLIR.ExecutionEngine.invoke!(jit, "#{function}", arguments, return)
-      |> Beaver.Native.to_term()
 
     MLIR.ExecutionEngine.destroy(jit)
     MLIR.Context.destroy(ctx)
@@ -222,10 +262,10 @@ defmodule TranslateMLIR do
     args = for {:"::", _, [arg, _type]} <- args, do: arg
     ctx = MLIR.Context.create()
 
-    ir =
+    {ir, ret_maker} =
       compile_defm(call, expr, ctx)
-      |> MLIR.Operation.verify!()
-      |> MLIR.to_string()
+
+    ir = ir |> MLIR.Operation.verify!() |> MLIR.to_string()
 
     MLIR.Context.destroy(ctx)
 
@@ -233,8 +273,36 @@ defmodule TranslateMLIR do
       @ir unquote(ir)
       def unquote(name)(unquote_splicing(args)) do
         arguments = [unquote_splicing(args)] |> Enum.map(&Beaver.Native.I64.make/1)
-        return = Beaver.Native.I64.make(0)
-        TranslateMLIR.compile_and_invoke(@ir, unquote(name), arguments, return)
+
+        %{mode: return_mode, maker: {mod, func, args}} =
+          maker =
+          unquote(Macro.escape(ret_maker))
+
+        return = apply(mod, func, args)
+
+        return_arg =
+          if preparer = maker[:preparer] do
+            {mod, func} = preparer
+            apply(mod, func, [return])
+          else
+            return
+          end
+
+        case return_mode do
+          :value ->
+            TranslateMLIR.compile_and_invoke(@ir, unquote(name), arguments, return_arg)
+            |> Beaver.Native.to_term()
+
+          :mutation ->
+            TranslateMLIR.compile_and_invoke(@ir, unquote(name), [return_arg | arguments])
+
+            if postprocesser = maker[:postprocesser] do
+              {mod, func} = postprocesser
+              apply(mod, func, [return])
+            else
+              return
+            end
+        end
       end
     end
   end
