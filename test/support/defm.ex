@@ -27,9 +27,10 @@ defmodule TranslateMLIR do
       {values, acc} = Macro.prewalk(list, acc, &gen_mlir(&1, &2, ctx, block))
 
       mlir ctx: ctx, block: block do
+        # generate result to write to
+        result = MemRef.alloc() >>> MLIR.Type.memref([length(list)], MLIR.Type.i64())
         # generate list literal
         memref = MemRef.alloc() >>> MLIR.Type.memref([length(list)], MLIR.Type.i64())
-        result = MemRef.alloc() >>> MLIR.Type.memref([length(list)], MLIR.Type.i64())
 
         for {v, i} <- Enum.with_index(values) do
           indices = Index.constant(value: Attribute.index(i)) >>> Type.index()
