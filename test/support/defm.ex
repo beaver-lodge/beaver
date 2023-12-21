@@ -30,7 +30,7 @@ defmodule TranslateMLIR do
         # generate result to write to
         result = MemRef.alloc() >>> MLIR.Type.memref([length(list)], MLIR.Type.i64())
         # generate list literal
-        memref = MemRef.alloc() >>> MLIR.Type.memref([length(list)], MLIR.Type.i64())
+        memref = MemRef.alloca() >>> MLIR.Type.memref([length(list)], MLIR.Type.i64())
 
         for {v, i} <- Enum.with_index(values) do
           indices = Index.constant(value: Attribute.index(i)) >>> Type.index()
@@ -194,12 +194,17 @@ defmodule TranslateMLIR do
 
   def compile_and_invoke(ir, function, arguments, return) when is_bitstring(ir) do
     ctx = MLIR.Context.create()
+    import MLIR.{Transforms, Conversion}
 
     jit =
       ~m{#{ir}}.(ctx)
       |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
-      |> MLIR.Conversion.convert_arith_to_llvm()
-      |> MLIR.Conversion.convert_func_to_llvm()
+      |> convert_scf_to_cf
+      |> convert_arith_to_llvm()
+      |> convert_index_to_llvm()
+      |> convert_func_to_llvm()
+      |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
+      |> reconcile_unrealized_casts
       |> MLIR.Pass.Composer.run!()
       |> MLIR.ExecutionEngine.create!()
 
