@@ -246,7 +246,7 @@ defmodule TranslateMLIR do
       |> convert_func_to_llvm()
       |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
       |> reconcile_unrealized_casts
-      |> MLIR.Pass.Composer.run!()
+      |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR"))
       |> MLIR.ExecutionEngine.create!()
 
     ret =
