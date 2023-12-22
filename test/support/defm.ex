@@ -294,7 +294,7 @@ defmodule TranslateMLIR do
     {ir, return_convention}
   end
 
-  def compile_and_invoke(ir, function, arguments, return_config) when is_bitstring(ir) do
+  def compile_and_invoke(ir, function, arguments, return_convention) when is_bitstring(ir) do
     ctx = MLIR.Context.create()
     import MLIR.Conversion
 
@@ -311,12 +311,12 @@ defmodule TranslateMLIR do
       |> MLIR.ExecutionEngine.create!()
 
     %{mode: return_mode, maker: {mod, func, args}} =
-      return_config
+      return_convention
 
     return = apply(mod, func, args)
 
     return_arg =
-      if preparer = return_config[:preparer] do
+      if preparer = return_convention[:preparer] do
         {mod, func} = preparer
         apply(mod, func, [return])
       else
@@ -332,7 +332,7 @@ defmodule TranslateMLIR do
     end
 
     ret =
-      if postprocesser = return_config[:postprocesser] do
+      if postprocesser = return_convention[:postprocesser] do
         {mod, func} = postprocesser
         apply(mod, func, [return])
       else
@@ -349,7 +349,7 @@ defmodule TranslateMLIR do
     args = for {:"::", _, [arg, _type]} <- args, do: arg
     ctx = MLIR.Context.create()
 
-    {ir, return_config} =
+    {ir, return_convention} =
       compile_defm(call, expr, ctx)
 
     ir = ir |> MLIR.Operation.verify!() |> MLIR.to_string()
@@ -369,7 +369,7 @@ defmodule TranslateMLIR do
           @ir,
           unquote(name),
           arguments,
-          unquote(Macro.escape(return_config))
+          unquote(Macro.escape(return_convention))
         )
       end
     end
