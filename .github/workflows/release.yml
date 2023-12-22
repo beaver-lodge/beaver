@@ -40,13 +40,19 @@ jobs:
         nif: ["2.16"]
         job:
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04 }
+          - { target: aarch64-apple-darwin, os: macos-11 }
     steps:
       - uses: actions/checkout@v3
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
+        if: contains(matrix.job.os, 'ubuntu')
         with:
           elixir-version: "1.14.0" # Define the elixir version [required]
           otp-version: "24.2" # Define the OTP version [required]
+      - name: Build with cibuildwheel
+        run: |
+          pip install cibuildwheel
+          cibuildwheel --output-dir wheelhouse
       - name: Set up Zig
         uses: goto-bus-stop/setup-zig@v2
         with:
