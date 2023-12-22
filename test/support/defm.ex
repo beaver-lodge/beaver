@@ -24,18 +24,11 @@ defmodule TranslateMLIR do
        )
        when is_list(list) do
     if list |> Enum.all?(&is_integer/1) do
-      {values, acc} = Macro.prewalk(list, acc, &gen_mlir(&1, &2, ctx, block))
+      {memref, acc} = Macro.prewalk(list, acc, &gen_mlir(&1, &2, ctx, block))
 
       mlir ctx: ctx, block: block do
         # generate result to write to
         result = MemRef.alloc() >>> MLIR.Type.memref([length(list)], MLIR.Type.i64())
-        # generate list literal
-        memref = MemRef.alloca() >>> MLIR.Type.memref([length(list)], MLIR.Type.i64())
-
-        for {v, i} <- Enum.with_index(values) do
-          indices = Index.constant(value: Attribute.index(i)) >>> Type.index()
-          MemRef.store(v, memref, indices) >>> []
-        end
 
         # generate for loop
         lower_bound = Index.constant(value: Attribute.index(0)) >>> Type.index()
@@ -100,6 +93,35 @@ defmodule TranslateMLIR do
       end
 
     {value, acc}
+  end
+
+  defp gen_mlir(
+         [head | _tail] = list,
+         acc,
+         ctx,
+         block
+       )
+       when is_list(list) and is_integer(head) do
+    if list |> Enum.all?(&is_integer/1) do
+      {values, acc} =
+        Enum.reduce(list, {[], acc}, fn i, {ops, acc} ->
+          {r, acc} = Macro.prewalk(i, acc, &gen_mlir(&1, &2, ctx, block))
+          {ops ++ [r], acc}
+        end)
+
+      mlir ctx: ctx, block: block do
+        memref = MemRef.alloca() >>> MLIR.Type.memref([length(list)], MLIR.Type.i64())
+
+        for {v, i} <- Enum.with_index(values) do
+          indices = Index.constant(value: Attribute.index(i)) >>> Type.index()
+          MemRef.store(v, memref, indices) >>> []
+        end
+      end
+
+      {memref, acc}
+    else
+      raise "can only compile list of int literal. got: \n#{inspect(list, pretty: true)}"
+    end
   end
 
   defp gen_mlir(
