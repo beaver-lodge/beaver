@@ -349,7 +349,7 @@ defmodule TranslateMLIR do
     args = for {:"::", _, [arg, _type]} <- args, do: arg
     ctx = MLIR.Context.create()
 
-    {ir, ret_maker} =
+    {ir, return_config} =
       compile_defm(call, expr, ctx)
 
     ir = ir |> MLIR.Operation.verify!() |> MLIR.to_string()
@@ -369,7 +369,7 @@ defmodule TranslateMLIR do
           @ir,
           unquote(name),
           arguments,
-          unquote(Macro.escape(ret_maker))
+          unquote(Macro.escape(return_config))
         )
       end
     end
