@@ -80,7 +80,6 @@ defmodule TranslateMLIR do
             sum
         end)
 
-      # generate result to write to
       result =
         MemRef.alloc(size, operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 0])) >>>
           MLIR.Type.memref([:dynamic], MLIR.Type.i64())
