@@ -27,12 +27,16 @@ defmodule TranslateMLIR do
       {memref, acc} = Macro.prewalk(list, acc, &gen_mlir(&1, &2, ctx, block))
 
       mlir ctx: ctx, block: block do
+        zero = Index.constant(value: Attribute.index(0)) >>> Type.index()
+        size = MemRef.dim(memref, zero) >>> Type.index()
         # generate result to write to
-        result = MemRef.alloc() >>> MLIR.Type.memref([length(list)], MLIR.Type.i64())
+        result =
+          MemRef.alloc(size, operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 0])) >>>
+            MLIR.Type.memref([:dynamic], MLIR.Type.i64())
 
         # generate for loop
         lower_bound = Index.constant(value: Attribute.index(0)) >>> Type.index()
-        upper_bound = Index.constant(value: Attribute.index(length(list))) >>> Type.index()
+        upper_bound = size
         step = Index.constant(value: Attribute.index(1)) >>> Type.index()
 
         SCF.for [lower_bound, upper_bound, step] do
