@@ -111,7 +111,7 @@ defmodule Beaver.MLIR.Type do
       when is_list(shape) do
     rank = length(shape)
 
-    shape = shape |> Beaver.Native.array(Beaver.Native.I64)
+    shape = shape |> Enum.map(&escape_dynamic/1) |> Beaver.Native.array(Beaver.Native.I64)
 
     default_null = CAPI.mlirAttributeGetNull()
     layout = Keyword.get(opts, :layout) || default_null
