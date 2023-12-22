@@ -14,7 +14,7 @@ defmodule TranslateMLIR do
     mlir ctx: ctx, block: block do
       {ret, acc} = Macro.prewalk(do_block, acc, &gen_mlir(&1, &2, ctx, block))
       MemRef.store(ret, result, write_index) >>> []
-      {ret, acc}
+      {nil, acc}
     end
   end
 
