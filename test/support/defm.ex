@@ -256,7 +256,7 @@ defmodule TranslateMLIR do
         %{
           mode: :value,
           maker: {Beaver.Native.I64, :make, [0]},
-          postprocesser: {Beaver.Native, :to_term}
+          post_processor: {Beaver.Native, :to_term}
         }
       else
         if MLIR.CAPI.mlirTypeIsAMemRef(ret_t) |> Beaver.Native.to_term() do
@@ -264,7 +264,7 @@ defmodule TranslateMLIR do
             mode: :mutation,
             maker: {__MODULE__, :memref_descriptor_ptr, []},
             preparer: {Beaver.Native.Memory, :descriptor_ptr},
-            postprocesser: {__MODULE__, :parse_integers}
+            post_processor: {__MODULE__, :parse_integers}
           }
         else
           raise "ret type not supported"
@@ -332,8 +332,8 @@ defmodule TranslateMLIR do
     end
 
     ret =
-      if postprocesser = return_convention[:postprocesser] do
-        {mod, func} = postprocesser
+      if post_processor = return_convention[:post_processor] do
+        {mod, func} = post_processor
         apply(mod, func, [return])
       else
         return
