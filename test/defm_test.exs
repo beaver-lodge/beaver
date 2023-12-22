@@ -26,6 +26,17 @@ defmodule DefineMLIRTest do
           i + a + b
         end
       end
+
+      defm llvm_for_loop2(a :: i64, b :: i64) do
+        l =
+          for i <- [1, 2, 3, 4, 5] do
+            i + a + b
+          end
+
+        for i <- l do
+          i + a + b
+        end
+      end
     end
 
     assert 3 == AddTwoInt.llvm_add(1, 2)
