@@ -10,31 +10,26 @@ defmodule TranslateMLIR do
   alias Beaver.MLIR.Type
   require Func
 
-  defp gen_mlir(
-         {:for, _,
-          [
-            {:<-, _, [{loop_arg, _, nil}, enum]},
-            [
-              do: do_block
-            ]
-          ]},
+  defp compile_for_loop(result, write_index, [[do: do_block]], acc, ctx, block) do
+    mlir ctx: ctx, block: block do
+      {ret, acc} = Macro.prewalk(do_block, acc, &gen_mlir(&1, &2, ctx, block))
+      MemRef.store(ret, result, write_index) >>> []
+      {ret, acc}
+    end
+  end
+
+  defp compile_for_loop(
+         result,
+         write_index,
+         [{:<-, _, [{loop_arg, _, nil}, memref]} | tail],
          acc,
          ctx,
          block
        ) do
-    {memref, acc} = Macro.prewalk(enum, acc, &gen_mlir(&1, &2, ctx, block))
-
     mlir ctx: ctx, block: block do
       zero = Index.constant(value: Attribute.index(0)) >>> Type.index()
-      size = MemRef.dim(memref, zero) >>> Type.index()
-      # generate result to write to
-      result =
-        MemRef.alloc(size, operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 0])) >>>
-          MLIR.Type.memref([:dynamic], MLIR.Type.i64())
-
-      # generate for loop
       lower_bound = Index.constant(value: Attribute.index(0)) >>> Type.index()
-      upper_bound = size
+      upper_bound = MemRef.dim(memref, zero) >>> Type.index()
       step = Index.constant(value: Attribute.index(1)) >>> Type.index()
 
       SCF.for [lower_bound, upper_bound, step] do
@@ -42,11 +37,9 @@ defmodule TranslateMLIR do
           block body(indices >>> Type.index()) do
             arg = MemRef.load(memref, indices) >>> MLIR.Type.i64()
             acc = put_in(acc.variables[loop_arg], arg)
-
-            {ret, _acc} =
-              Macro.prewalk(do_block, acc, &gen_mlir(&1, &2, ctx, Beaver.Env.block()))
-
-            MemRef.store(ret, result, indices) >>> []
+            write_index = Index.mul(write_index, upper_bound) >>> Type.index()
+            write_index = Index.add(write_index, indices) >>> Type.index()
+            compile_for_loop(result, write_index, tail, acc, ctx, Beaver.Env.block())
             SCF.yield() >>> []
           end
         end
@@ -54,6 +47,46 @@ defmodule TranslateMLIR do
     end
 
     {result, acc}
+  end
+
+  defp gen_mlir(
+         {:for, _, expressions},
+         acc,
+         ctx,
+         block
+       ) do
+    mlir ctx: ctx, block: block do
+      {expressions, acc} =
+        expressions
+        |> Enum.reduce({[], acc}, fn
+          {:<-, line1, [{loop_arg, line2, nil}, enum]}, {new_expressions, acc} ->
+            {memref, acc} = Macro.prewalk(enum, acc, &gen_mlir(&1, &2, ctx, block))
+            {new_expressions ++ [{:<-, line1, [{loop_arg, line2, nil}, memref]}], acc}
+
+          expr, {new_expressions, acc} ->
+            {new_expressions ++ [expr], acc}
+        end)
+
+      zero = Index.constant(value: Attribute.index(0)) >>> Type.index()
+      one = Index.constant(value: Attribute.index(1)) >>> Type.index()
+
+      size =
+        Enum.reduce(expressions, one, fn
+          {:<-, _line1, [{_loop_arg, _line2, nil}, memref]}, sum ->
+            size = MemRef.dim(memref, zero) >>> Type.index()
+            Index.mul(size, sum) >>> Type.index()
+
+          _, sum ->
+            sum
+        end)
+
+      # generate result to write to
+      result =
+        MemRef.alloc(size, operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 0])) >>>
+          MLIR.Type.memref([:dynamic], MLIR.Type.i64())
+
+      compile_for_loop(result, zero, expressions, acc, ctx, block)
+    end
   end
 
   defp gen_mlir(
@@ -292,6 +325,10 @@ defmodule TranslateMLIR do
 
     quote do
       @ir unquote(ir)
+      def unquote(String.to_atom("__original__#{name}"))(unquote_splicing(args)) do
+        unquote(expr[:do])
+      end
+
       def unquote(name)(unquote_splicing(args)) do
         arguments = [unquote_splicing(args)] |> Enum.map(&Beaver.Native.I64.make/1)
 
