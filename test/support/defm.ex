@@ -281,7 +281,11 @@ defmodule TranslateMLIR do
             end
           end
         end
-        |> MLIR.dump!()
+        |> tap(fn ir ->
+          if System.get_env("DEFM_DUMP_IR") == "1" do
+            MLIR.dump!(ir)
+          end
+        end)
       end
 
     {ir, return_maker}
@@ -300,7 +304,7 @@ defmodule TranslateMLIR do
       |> convert_func_to_llvm()
       |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
       |> reconcile_unrealized_casts
-      |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR"))
+      |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR") == "1")
       |> MLIR.ExecutionEngine.create!()
 
     ret =
