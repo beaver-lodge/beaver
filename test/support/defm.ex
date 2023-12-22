@@ -251,7 +251,7 @@ defmodule TranslateMLIR do
 
     ret_t = MLIR.CAPI.mlirValueGetType(ret_val)
 
-    return_maker =
+    return_convention =
       if MLIR.CAPI.mlirTypeIsAInteger(ret_t) |> Beaver.Native.to_term() do
         %{
           mode: :value,
@@ -291,7 +291,7 @@ defmodule TranslateMLIR do
         end)
       end
 
-    {ir, return_maker}
+    {ir, return_convention}
   end
 
   def compile_and_invoke(ir, function, arguments, return_config) when is_bitstring(ir) do
