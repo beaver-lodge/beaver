@@ -17,7 +17,7 @@ defmodule Beaver.MixProject do
 
     [
       app: :beaver,
-      version: "0.3.0",
+      version: "0.3.1",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -104,7 +104,7 @@ defmodule Beaver.MixProject do
     [
       {:elixir_make, "~> 0.4", runtime: false},
       {:llvm_config, "~> 0.1.0"},
-      {:kinda, "~> 0.3.0"},
+      {:kinda, "~> 0.3.1"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:mix_test_watch, "~> 1.0", only: [:dev, :test]},
       {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
