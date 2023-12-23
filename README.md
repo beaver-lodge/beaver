@@ -141,7 +141,7 @@ by adding `beaver` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:beaver, "~> 0.3.1"}
+    {:beaver, "~> 0.3.2"}
   ]
 end
 ```
