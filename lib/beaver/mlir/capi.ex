@@ -52,6 +52,9 @@ defmodule Beaver.MLIR.CAPI do
     targets: ~w(
       aarch64-apple-darwin
       x86_64-unknown-linux-gnu
+    ),
+    nif_versions: ~w(
+      2.16
     )
 
   llvm_headers =
