@@ -393,6 +393,9 @@ Usually a function accepting a MLIR context to create an operation or type is ca
 ### Generate `checksum-xxx.exs`
 
 ```
+rm checksum-Elixir.Beaver.MLIR.CAPI.exs
+mix clean
+mix
 mix rustler_precompiled.download Beaver.MLIR.CAPI --all --ignore-unavailable --print
 ```
 
