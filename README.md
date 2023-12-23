@@ -141,7 +141,7 @@ by adding `beaver` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:beaver, "~> 0.3.1"}
+    {:beaver, "~> 0.3.2"}
   ]
 end
 ```
@@ -393,6 +393,9 @@ Usually a function accepting a MLIR context to create an operation or type is ca
 ### Generate `checksum-xxx.exs`
 
 ```
+rm checksum-Elixir.Beaver.MLIR.CAPI.exs
+mix clean
+mix
 mix rustler_precompiled.download Beaver.MLIR.CAPI --all --ignore-unavailable --print
 ```
 
