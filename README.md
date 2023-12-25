@@ -135,7 +135,7 @@ Beaver is essentially LLVM/MLIR on Erlang/Elixir. It is kind of interesting to s
 
 ### Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
+The package can be installed
 by adding `beaver` to your list of dependencies in `mix.exs`:
 
 ```elixir
