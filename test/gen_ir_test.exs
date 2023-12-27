@@ -72,20 +72,23 @@ defmodule CFTest do
 
     quote do
       # single-block region
-      MLIR."builtin.module" do
-        var = MLIR."dialect.op1"()[attribute_name: 42 :: i32] :: {i1, i16, i32, i64}
+      mast do
+        MLIR."builtin.module" do
+          var = MLIR."dialect.op1"()[attribute_name: 42 :: i32] :: {i1, i16, i32, i64}
 
-        MLIR."dialect.op2" "other attribute": 42 :: i64 do
-          # unnamed block
-          _ ->
-            MLIR."dialect.innerop2"() :: {}
-            MLIR."dialect.innerop3"(var._0, var._2, var._3) :: {}
+          MLIR."dialect.op2" "other attribute": 42 :: i64 do
+            # unnamed block
+            _ ->
+              MLIR."dialect.innerop2"() :: {}
+              MLIR."dialect.innerop3"(var._0, var._2, var._3) :: {}
+              bb1(var._0)
 
-          bb1(arg :: i32) ->
-            MLIR."dialect.innerop4"() :: {}
+            bb1(arg :: i32) ->
+              MLIR."dialect.innerop4"() :: {}
 
-          bb2(arg :: i64) ->
-            MLIR."dialect.innerop4"() :: {}
+            bb2(arg :: i64) ->
+              MLIR."dialect.innerop4"() :: {}
+          end
         end
       end
     end
