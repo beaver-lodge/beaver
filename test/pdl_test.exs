@@ -192,7 +192,7 @@ defmodule PDLTest do
                         b >>> Type.ranked_tensor([2, 1], Type.f32())
                       ) do
                   res =
-                    TOSA.add(a, b, one: MLIR.Attribute.integer(Type.i32(), 1)) >>>
+                    TOSA.add(a, b, one: Attribute.integer(Type.i32(), 1)) >>>
                       Type.ranked_tensor([2, 3], Type.f32())
 
                   res1 = TOSA.add(res, b) >>> Type.ranked_tensor([2, 3], Type.f32())
