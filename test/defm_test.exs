@@ -42,16 +42,19 @@ defmodule DefineMLIRTest do
           i + j + k + a + b
         end
       end
+
+      def compare_with_original(func, args) do
+        assert apply(__MODULE__, func, args) ==
+                 apply(__MODULE__, String.to_atom("__original__#{func}"), args)
+      end
     end
 
     assert 3 == AddTwoInt.llvm_add(1, 2)
     assert 5 == AddTwoInt.llvm_add1(2, 2)
     assert 7 == AddTwoInt.llvm_add_multi_lines(1, 1)
-
-    assert AddTwoInt.__original__llvm_add_multi_lines(111, 111) ==
-             AddTwoInt.llvm_add_multi_lines(111, 111)
-
-    assert [0, 1, 2, 3, 4] == AddTwoInt.llvm_for_loop(-2, 1)
-    assert AddTwoInt.__original__llvm_for_loop2(2, 3) == AddTwoInt.llvm_for_loop2(2, 3)
+    AddTwoInt.compare_with_original(:llvm_for_loop, [111, 111])
+    AddTwoInt.compare_with_original(:llvm_add_multi_lines, [-300, 1])
+    AddTwoInt.compare_with_original(:llvm_for_loop2, [2, 3])
+    AddTwoInt.compare_with_original(:llvm_for_loop2, [2, -777])
   end
 end
