@@ -107,7 +107,7 @@ defmodule ElixirAST do
 
   defp gen_mlir({name, [], [] = args}, ctx, block) when is_atom(name) do
     mlir ctx: ctx, block: block do
-      Func.call(args, callee: MLIR.Attribute.flat_symbol_ref("#{name}", ctx: ctx)) >>>
+      Func.call(args, callee: Attribute.flat_symbol_ref("#{name}", ctx: ctx)) >>>
         __MODULE__.dyn()
     end
   end

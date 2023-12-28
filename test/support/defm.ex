@@ -35,7 +35,7 @@ defmodule TranslateMLIR do
       SCF.for [lower_bound, upper_bound, step] do
         region do
           block body(indices >>> Type.index()) do
-            arg = MemRef.load(memref, indices) >>> MLIR.Type.i64()
+            arg = MemRef.load(memref, indices) >>> Type.i64()
             acc = put_in(acc.variables[loop_arg], arg)
             write_index = Index.mul(write_index, upper_bound) >>> Type.index()
             write_index = Index.add(write_index, indices) >>> Type.index()
@@ -82,7 +82,7 @@ defmodule TranslateMLIR do
 
       result =
         MemRef.alloc(size, operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 0])) >>>
-          MLIR.Type.memref([:dynamic], MLIR.Type.i64())
+          Type.memref([:dynamic], Type.i64())
 
       compile_for_loop(result, zero, expressions, acc, ctx, block)
     end
@@ -141,7 +141,7 @@ defmodule TranslateMLIR do
         end)
 
       mlir ctx: ctx, block: block do
-        memref = MemRef.alloca() >>> MLIR.Type.memref([length(list)], MLIR.Type.i64())
+        memref = MemRef.alloca() >>> Type.memref([length(list)], Type.i64())
 
         for {v, i} <- Enum.with_index(values) do
           indices = Index.constant(value: Attribute.index(i)) >>> Type.index()
