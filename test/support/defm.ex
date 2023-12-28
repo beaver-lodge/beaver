@@ -225,7 +225,7 @@ defmodule TranslateMLIR do
 
   defp do_parse_integers(<<>>, integers), do: Enum.reverse(integers)
 
-  defp do_parse_integers(<<int::little-integer-size(64), rest::binary>>, integers) do
+  defp do_parse_integers(<<int::little-signed-size(64), rest::binary>>, integers) do
     do_parse_integers(rest, [int | integers])
   end
 
