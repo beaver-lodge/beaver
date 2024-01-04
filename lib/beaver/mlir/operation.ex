@@ -20,14 +20,14 @@ defmodule Beaver.MLIR.Operation do
     state |> Beaver.Native.ptr() |> Beaver.Native.bag(state) |> MLIR.CAPI.mlirOperationCreate()
   end
 
-  defp create(op_name, %Beaver.SSA{
-         block: %MLIR.Block{} = block,
-         arguments: arguments,
-         results: results,
-         filler: filler,
-         ctx: ctx,
-         loc: loc
-       }) do
+  def create(op_name, %Beaver.SSA{
+        block: %MLIR.Block{} = block,
+        arguments: arguments,
+        results: results,
+        filler: filler,
+        ctx: ctx,
+        loc: loc
+      }) do
     filler =
       if is_function(filler, 0) do
         [regions: filler]
@@ -39,7 +39,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   # one single value, usually a terminator
-  defp create(op_name, %MLIR.Value{} = op) do
+  def create(op_name, %MLIR.Value{} = op) do
     create(op_name, [op])
   end
 

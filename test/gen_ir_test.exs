@@ -70,28 +70,28 @@ defmodule CFTest do
       ast -> ast
     end)
 
-    quote do
+    import Beaver.MLIR.AST
+
+    defm do
       # single-block region
-      mast do
-        MLIR."builtin.module" do
-          var = MLIR."dialect.op1"()[attribute_name: 42 :: i32] :: {i1, i16, i32, i64}
+      var = MLIR."dialect.op1"()[attribute_name: 42 :: i32] :: {i1, i16, i32, i64}
 
-          MLIR."dialect.op2" "other attribute": 42 :: i64 do
-            # unnamed block
-            _ ->
-              MLIR."dialect.innerop2"() :: {}
-              MLIR."dialect.innerop3"(var._0, var._2, var._3) :: {}
-              bb1(var._0)
+      MLIR."dialect.op2"()["other attribute": 42 :: i64] ::
+        i64 do
+          # unnamed block
+          _ ->
+            MLIR."dialect.innerop2"() :: {}
+            MLIR."dialect.innerop3"(var._0, var._2, var._3) :: {}
+            bb1(var._0)
 
-            bb1(arg :: i32) ->
-              MLIR."dialect.innerop4"() :: {}
+          bb1(arg :: i32) ->
+            MLIR."dialect.innerop4"() :: {}
+            MLIR."dialect.innerop4-1"() :: {}
 
-            bb2(arg :: i64) ->
-              MLIR."dialect.innerop4"() :: {}
-          end
+          bb2(arg :: i64) ->
+            MLIR."dialect.innerop4"() :: {}
         end
-      end
     end
-    |> dbg
+    |> MLIR.dump!()
   end
 end
