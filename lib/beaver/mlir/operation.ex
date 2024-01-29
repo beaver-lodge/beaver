@@ -10,24 +10,15 @@ defmodule Beaver.MLIR.Operation do
   use Kinda.ResourceKind,
     forward_module: Beaver.Native
 
-  @doc false
-
-  def create(%MLIR.Operation.State{} = state) do
-    state |> MLIR.Operation.State.create() |> create
-  end
-
-  def create(state) do
-    state |> Beaver.Native.ptr() |> Beaver.Native.bag(state) |> MLIR.CAPI.mlirOperationCreate()
-  end
-
-  defp create(op_name, %Beaver.SSA{
-         block: %MLIR.Block{} = block,
-         arguments: arguments,
-         results: results,
-         filler: filler,
-         ctx: ctx,
-         loc: loc
-       }) do
+  def create(%Beaver.SSA{
+        op: op_name,
+        block: %MLIR.Block{} = block,
+        arguments: arguments,
+        results: results,
+        filler: filler,
+        ctx: ctx,
+        loc: loc
+      }) do
     filler =
       if is_function(filler, 0) do
         [regions: filler]
@@ -38,9 +29,12 @@ defmodule Beaver.MLIR.Operation do
     create_and_append(ctx, op_name, arguments ++ [result_types: results] ++ filler, block, loc)
   end
 
-  # one single value, usually a terminator
-  defp create(op_name, %MLIR.Value{} = op) do
-    create(op_name, [op])
+  def create(%MLIR.Operation.State{} = state) do
+    state |> MLIR.Operation.State.create() |> create
+  end
+
+  def create(%MLIR.CAPI.MlirOperationState{} = state) do
+    state |> Beaver.Native.ptr() |> Beaver.Native.bag(state) |> MLIR.CAPI.mlirOperationCreate()
   end
 
   @doc false
@@ -153,7 +147,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   @doc false
-  def eval_ssa(full_name, %Beaver.SSA{results: result_types} = ssa) do
+  def eval_ssa(%Beaver.SSA{results: result_types} = ssa) do
     ssa =
       case result_types do
         [{:op, result_types}] ->
@@ -163,7 +157,7 @@ defmodule Beaver.MLIR.Operation do
           ssa
       end
 
-    op = create(full_name, ssa)
+    op = create(ssa)
     results = op |> results()
 
     case result_types do
