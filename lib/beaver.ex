@@ -89,7 +89,7 @@ defmodule Beaver do
   end
 
   defmacro mlir(opts, do: dsl_block) do
-    dsl_block_ast = dsl_block |> Beaver.SSA.prewalk(&MLIR.Operation.eval_ssa/2)
+    dsl_block_ast = dsl_block |> Beaver.SSA.prewalk(&MLIR.Operation.eval_ssa/1)
 
     ctx_ast =
       if Keyword.has_key?(opts, :ctx) do

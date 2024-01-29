@@ -6,6 +6,7 @@ defmodule Beaver.SSA do
   require Beaver.MLIR.CAPI
 
   @type t() :: %__MODULE__{
+          op: String.t(),
           arguments: any(),
           results: any(),
           filler: any(),
@@ -14,7 +15,8 @@ defmodule Beaver.SSA do
           loc: any(),
           evaluator: function()
         }
-  defstruct arguments: [],
+  defstruct op: nil,
+            arguments: [],
             results: [],
             filler: nil,
             block: nil,
@@ -137,11 +139,11 @@ defmodule Beaver.SSA do
 
   defp do_transform(ast, _evaluator), do: ast
 
-  def prewalk(ast, evaluator) when is_function(evaluator, 2) do
+  def prewalk(ast, evaluator) when is_function(evaluator, 1) do
     Macro.prewalk(ast, &do_transform(&1, evaluator))
   end
 
-  def postwalk(ast, evaluator) when is_function(evaluator, 2) do
+  def postwalk(ast, evaluator) when is_function(evaluator, 1) do
     Macro.postwalk(ast, &do_transform(&1, evaluator))
   end
 end
