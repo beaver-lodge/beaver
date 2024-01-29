@@ -19,7 +19,7 @@ defmodule Beaver.Pattern do
 
   defmacro defpat(call, do: block) do
     {name, _args} = Macro.decompose_call(call)
-    block_ast = block |> Beaver.SSA.prewalk(&__MODULE__.eval_rewrite/2)
+    block_ast = block |> Beaver.SSA.prewalk(&__MODULE__.eval_rewrite/1)
 
     pdl_pattern_module_op =
       quote do
@@ -101,7 +101,7 @@ defmodule Beaver.Pattern do
   end
 
   defmacro rewrite(root, do: block) do
-    rewrite_block_ast = block |> Beaver.SSA.prewalk(&__MODULE__.eval_rewrite/2)
+    rewrite_block_ast = block |> Beaver.SSA.prewalk(&__MODULE__.eval_rewrite/1)
 
     quote do
       mlir do
@@ -226,16 +226,14 @@ defmodule Beaver.Pattern do
   @doc """
   Evaluate SSA as ops in a rewrite block. Note that function is only public so that it could be used in a AST.
   """
-  def eval_rewrite(
-        op_name,
-        %Beaver.SSA{
-          arguments: arguments,
-          results: result_types,
-          ctx: ctx,
-          block: block,
-          loc: loc
-        }
-      ) do
+  def eval_rewrite(%Beaver.SSA{
+        op: op_name,
+        arguments: arguments,
+        results: result_types,
+        ctx: ctx,
+        block: block,
+        loc: loc
+      }) do
     attributes = for {_k, _a} = a <- arguments, do: a
     operands = for %MLIR.Value{} = o <- arguments, do: o
     env = %Env{ctx: ctx, block: block, loc: loc}

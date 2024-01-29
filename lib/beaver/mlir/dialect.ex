@@ -1,7 +1,7 @@
 defmodule Beaver.MLIR.Dialect do
   @moduledoc """
   This module defines macro to generate code for an MLIR dialect.
-  You might override `eval_ssa/2` function to introduce your custom op generation
+  You might override `eval_ssa/1` function to introduce your custom op generation
   """
 
   require Logger
@@ -9,7 +9,7 @@ defmodule Beaver.MLIR.Dialect do
   use Kinda.ResourceKind,
     forward_module: Beaver.Native
 
-  @callback eval_ssa(String.t(), Beaver.SSA.t()) :: any()
+  @callback eval_ssa(Beaver.SSA.t()) :: any()
   defmacro __using__(opts) do
     dialect = Keyword.fetch!(opts, :dialect)
     ops = Keyword.fetch!(opts, :ops)
@@ -17,12 +17,11 @@ defmodule Beaver.MLIR.Dialect do
     quote(bind_quoted: [dialect: dialect, ops: ops]) do
       @behaviour Beaver.MLIR.Dialect
 
-      def eval_ssa(full_name, %Beaver.SSA{evaluator: evaluator} = ssa)
-          when is_function(evaluator, 2) do
-        evaluator.(full_name, ssa)
+      def eval_ssa(%Beaver.SSA{evaluator: evaluator} = ssa) do
+        evaluator.(ssa)
       end
 
-      defoverridable eval_ssa: 2
+      defoverridable eval_ssa: 1
       require Logger
 
       dialect_module_name = dialect |> Beaver.MLIR.Dialect.Registry.normalize_dialect_name()
@@ -37,7 +36,7 @@ defmodule Beaver.MLIR.Dialect do
           full_name = Enum.join([dialect, op], ".")
 
           def unquote(func_name)(ssa) do
-            eval_ssa(unquote(full_name), ssa)
+            eval_ssa(%{ssa | op: unquote(full_name)})
           end
 
           defoverridable [{func_name, 1}]

@@ -12,15 +12,15 @@ defmodule Beaver.MLIR.Dialect.Arith do
 
   @constant "arith.constant"
   def constant(%Beaver.SSA{arguments: [true], evaluator: evaluator} = ssa) do
-    evaluator.(@constant, %{ssa | arguments: [value: ~a{true}]})
+    evaluator.(%{ssa | op: @constant, arguments: [value: ~a{true}]})
   end
 
   def constant(%Beaver.SSA{arguments: [false], evaluator: evaluator} = ssa) do
-    evaluator.(@constant, %{ssa | arguments: [value: ~a{false}]})
+    evaluator.(%{ssa | op: @constant, arguments: [value: ~a{false}]})
   end
 
   def constant(%Beaver.SSA{evaluator: evaluator} = ssa) do
-    evaluator.(@constant, ssa)
+    evaluator.(%{ssa | op: @constant})
   end
 
   defp type_to_magic_num(false), do: 0
