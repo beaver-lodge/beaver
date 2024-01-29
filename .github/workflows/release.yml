@@ -86,7 +86,7 @@ jobs:
             echo "==> before replace needed"
             patchelf --print-needed $sofile
 
-            patchelf --replace-needed libMLIRBeaver.so.18 libMLIRBeaver.so $sofile
+            patchelf --replace-needed libMLIRBeaver.so.19 libMLIRBeaver.so $sofile
 
             echo "==> after"
             patchelf --print-needed $sofile

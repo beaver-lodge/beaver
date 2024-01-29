@@ -135,13 +135,13 @@ Beaver is essentially LLVM/MLIR on Erlang/Elixir. It is kind of interesting to s
 
 ### Installation
 
-If [available in Hex](https://hex.pm/docs/publish), the package can be installed
+The package can be installed
 by adding `beaver` to your list of dependencies in `mix.exs`:
 
 ```elixir
 def deps do
   [
-    {:beaver, "~> 0.2.0"}
+    {:beaver, "~> 0.3.2"}
   ]
 end
 ```
@@ -266,10 +266,6 @@ To name a few:
 - [Nx](https://github.com/elixir-nx/nx) for tensor and numerical
 
 Each of these sub-ecosystems starts with a seed project/library. Beaver should evolve to become a sub-ecosystem for compilers built with Elixir and MLIR.
-
-## How Beaver works with MLIR ODS definitions?
-
-PDL really opens a door to non C++ programming languages to build MLIR tools. Beaver will reuse PDL's implementations in LSP and C++ source codegen to generate Elixir code. The prominent part is that all ODS definitions will have their correspondent Elixir [Structs](https://elixir-lang.org/getting-started/structs.html) to be used in patterns and builders. Although this is actually a hack, it is kind of reliable considering PDL will always be part of the upstream LLVM mono-repo. We could update to its new APIs as PDL's implementation evolves. As long as it provides features like code completions and code generations, there will be some APIs in PDL's implementation we could reuse to collect and query ODS meta data.
 
 ## MLIR context management
 
@@ -397,6 +393,9 @@ Usually a function accepting a MLIR context to create an operation or type is ca
 ### Generate `checksum-xxx.exs`
 
 ```
+rm checksum-Elixir.Beaver.MLIR.CAPI.exs
+mix clean
+mix
 mix rustler_precompiled.download Beaver.MLIR.CAPI --all --ignore-unavailable --print
 ```
 

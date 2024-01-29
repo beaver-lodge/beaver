@@ -192,7 +192,7 @@ defmodule PDLTest do
                         b >>> Type.ranked_tensor([2, 1], Type.f32())
                       ) do
                   res =
-                    TOSA.add(a, b, one: MLIR.Attribute.integer(MLIR.Type.i32(), 1)) >>>
+                    TOSA.add(a, b, one: Attribute.integer(Type.i32(), 1)) >>>
                       Type.ranked_tensor([2, 3], Type.f32())
 
                   res1 = TOSA.add(res, b) >>> Type.ranked_tensor([2, 3], Type.f32())
@@ -219,7 +219,7 @@ defmodule PDLTest do
       end
 
       defpat replace_multi_add_op() do
-        one = Attribute.integer(MLIR.Type.i32(), 1)
+        one = Attribute.integer(Type.i32(), 1)
         _x = %Range{first: 1, last: 10, step: 2}
         ty = Type.ranked_tensor([2, 3], Type.f32())
         a = value()
@@ -239,7 +239,7 @@ defmodule PDLTest do
       end
 
       defpat replace_multi_add_op1() do
-        one = Attribute.integer(MLIR.Type.i32(), 1)
+        one = Attribute.integer(Type.i32(), 1)
         ty = Type.ranked_tensor([2, 3], Type.f32())
         a = value()
         b = value()
@@ -253,7 +253,7 @@ defmodule PDLTest do
       end
 
       defpat replace_multi_add_op2() do
-        one = Attribute.integer(MLIR.Type.i32(), 1)
+        one = Attribute.integer(Type.i32(), 1)
         types = [Type.ranked_tensor([2, 3], Type.f32())]
         a = value()
         b = value()
@@ -269,7 +269,7 @@ defmodule PDLTest do
       end
 
       defpat replace_multi_add_op3() do
-        one = Attribute.integer(MLIR.Type.i32(), 1)
+        one = Attribute.integer(Type.i32(), 1)
         types = [Type.ranked_tensor([2, 3], Type.f32())]
         a = value()
         b = value()

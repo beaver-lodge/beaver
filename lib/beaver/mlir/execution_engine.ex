@@ -58,27 +58,21 @@ defmodule Beaver.MLIR.ExecutionEngine do
   @doc """
   invoke a function by symbol name.
   """
-  def invoke!(jit, symbol, args, return) when is_list(args) do
+  def invoke!(jit, symbol, args, return \\ nil) when is_list(args) do
     arg_ptr_list = args |> Enum.map(&Beaver.Native.opaque_ptr/1)
-    return_ptr = return |> Beaver.Native.opaque_ptr()
-    result = do_invoke!(jit, symbol, arg_ptr_list ++ [return_ptr])
+
+    return_ptr =
+      if return do
+        return |> Beaver.Native.opaque_ptr()
+      else
+        []
+      end
+      |> List.wrap()
+
+    result = do_invoke!(jit, symbol, arg_ptr_list ++ return_ptr)
 
     if MLIR.LogicalResult.success?(result) do
-      return
-    else
-      raise "Execution engine invoke failed"
-    end
-  end
-
-  @doc """
-  invoke a void function by symbol name.
-  """
-  def invoke!(jit, symbol, args) when is_list(args) do
-    arg_ptr_list = args |> Enum.map(&Beaver.Native.opaque_ptr/1)
-    result = do_invoke!(jit, symbol, arg_ptr_list)
-
-    if MLIR.LogicalResult.success?(result) do
-      :ok
+      return || :ok
     else
       raise "Execution engine invoke failed"
     end
