@@ -36,7 +36,7 @@ defmodule Beaver.MLIR.Dialect do
           full_name = Enum.join([dialect, op], ".")
 
           def unquote(func_name)(ssa) do
-            eval_ssa(%{ssa | op: unquote(full_name)})
+            eval_ssa(%Beaver.SSA{ssa | op: unquote(full_name)})
           end
 
           defoverridable [{func_name, 1}]
