@@ -64,7 +64,7 @@ defmodule Beaver.MLIR.AST do
         end
       }
       |> SSA.put_results([unquote_splicing(ast_result_types)])
-      |> then(&MLIR.Operation.create(unquote("#{op}"), &1))
+      |> then(&MLIR.Operation.create(%Beaver.SSA{&1 | op: unquote("#{op}")}))
     end
   end
 
