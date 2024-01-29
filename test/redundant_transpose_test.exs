@@ -59,8 +59,8 @@ defmodule RedundantTransposeTest do
         end
       end
 
-      def redundant?(%MLIR.Attribute{} = attr1, %MLIR.Attribute{} = attr2) do
-        MLIR.Attribute.equal?(attr1, attr2)
+      def redundant?(%Attribute{} = attr1, %Attribute{} = attr2) do
+        Attribute.equal?(attr1, attr2)
       end
 
       def run(func) do
