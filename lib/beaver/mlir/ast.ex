@@ -76,7 +76,7 @@ defmodule Beaver.MLIR.AST do
           ]},
          ast_result_types
        ) do
-    do_build_ssa(args, ast_result_types, op)
+    do_build_ssa(args ++ attributes, ast_result_types, op)
   end
 
   defp build_ssa(
@@ -97,7 +97,7 @@ defmodule Beaver.MLIR.AST do
 
   # compile a clause to a block
 
-  defp blk_jump({block_name, _line0, args} = expr)
+  defp blk_jump({block_name, _line0, args})
        when is_atom(block_name) and :"::" != block_name do
     args = args |> Enum.map(&argument/1)
 
@@ -134,34 +134,28 @@ defmodule Beaver.MLIR.AST do
     end
   end
 
-  defp blk(
-         [
-           [{:_, _line0, nil}],
-           {:__block__, _line1, expressions}
-         ] = clause
-       ) do
+  defp blk([
+         [{:_, _line0, nil}],
+         {:__block__, _line1, expressions}
+       ]) do
     do_blk([], expressions)
   end
 
-  defp blk(
-         [
-           args,
-           {:__block__, _line0, expressions}
-         ] = clause
-       ) do
+  defp blk([
+         args,
+         {:__block__, _line0, expressions}
+       ]) do
     do_blk(args, expressions)
   end
 
-  defp blk(
-         [
-           args,
-           {:"::", _line0, _} = expr
-         ] = clause
-       ) do
+  defp blk([
+         args,
+         {:"::", _line0, _} = expr
+       ]) do
     do_blk(args, [expr])
   end
 
-  defp to_ssa({:"::", line0, [{:=, line1, [var | [bind]]} | [{:{}, _, result_types}]]}) do
+  defp to_ssa({:"::", _line0, [{:=, line1, [var | [bind]]} | [{:{}, _, result_types}]]}) do
     bind =
       quote do
         unquote(build_ssa(bind, result_types))
@@ -170,25 +164,9 @@ defmodule Beaver.MLIR.AST do
     {:=, line1, [var | [bind]]}
   end
 
-  defp to_ssa({:"::", _line0, [expr | [{:{}, _, result_types}]]} = ast) do
+  defp to_ssa({:"::", _line0, [expr | [{:{}, _, result_types}]]}) do
     quote do
       unquote(build_ssa(expr, result_types))
-    end
-  end
-
-  defp to_ssa(
-         {expr = {:., _line0, [{:__aliases__, _line1, [:MLIR]}, op]}, line2,
-          [
-            attributes,
-            [
-              do: do_block
-            ]
-          ]}
-       ) do
-    result_types = []
-
-    quote do
-      unquote(build_ssa({expr, line2, attributes}, result_types))
     end
   end
 
@@ -212,7 +190,8 @@ defmodule Beaver.MLIR.AST do
                ]
              ]}
           ]}
-       ) do
+       )
+       when is_atom(op) do
     result_types = [result_type]
 
     clauses =
