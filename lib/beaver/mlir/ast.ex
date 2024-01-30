@@ -36,6 +36,10 @@ defmodule Beaver.MLIR.AST do
     end
   end
 
+  defp argument({arg, _line, nil} = ast) when is_atom(arg) do
+    ast
+  end
+
   defp do_build_ssa(args, ast_result_types, op, clauses \\ []) do
     ast_result_types = Enum.map(ast_result_types, &type/1)
     arguments = Enum.map(args, &argument/1)
@@ -127,8 +131,22 @@ defmodule Beaver.MLIR.AST do
           {:__anonymous__, []}
       end
 
+    types =
+      for {:"::", _line0, [{_arg, _line1, nil}, t]} <- args do
+        type(t)
+      end
+
+    vars_of_blk_args =
+      for {{:"::", _line0, [var, _t]}, index} <- Enum.with_index(args) do
+        quote do
+          Kernel.var!(unquote(var)) = MLIR.Block.get_arg!(Beaver.Env.block(), unquote(index))
+        end
+      end
+
     quote do
       block unquote(block_name)() do
+        MLIR.Block.add_arg!(Beaver.Env.block(), Beaver.Env.context(), [unquote_splicing(types)])
+        unquote_splicing(vars_of_blk_args)
         (unquote_splicing(expressions))
       end
     end

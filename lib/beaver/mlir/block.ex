@@ -27,6 +27,10 @@ defmodule Beaver.MLIR.Block do
     do_add_arg!(block, ctx, {t, loc})
   end
 
+  defp do_add_arg!(block, ctx, f) when is_function(f, 1) do
+    do_add_arg!(block, ctx, Beaver.Deferred.from_opts([ctx: ctx], f))
+  end
+
   defp do_add_arg!(block, ctx, {t, loc}) do
     t = MLIR.CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create(t))
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)

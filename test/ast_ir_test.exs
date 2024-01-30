@@ -19,11 +19,12 @@ defmodule ASTIRTest do
             bb1(var._0)
 
           bb1(arg :: i32) ->
-            MLIR."dialect.innerop4"() :: {}
+            MLIR."dialect.innerop4"(arg) :: {}
             MLIR."dialect.innerop4-1"() :: {}
 
-          bb2(arg :: i64) ->
-            MLIR."dialect.innerop4"() :: {}
+          bb2(arg2 :: i64) ->
+            MLIR."dialect.innerop5"() :: {}
+            MLIR."dialect.innerop5-1"(arg2) :: {}
         end
     end
     |> MLIR.dump!()
