@@ -5,10 +5,6 @@ defmodule Beaver.MLIR.AST do
 
   use Beaver
 
-  defp normalize(ast) do
-    ast
-  end
-
   defp type(t) when is_atom(t) do
     quote do
       MLIR.Type.get(unquote("#{t}"))
@@ -59,7 +55,8 @@ defmodule Beaver.MLIR.AST do
       end
 
     quote do
-      %SSA{
+      %Beaver.SSA{
+        op: unquote("#{op}"),
         arguments: unquote(arguments),
         ctx: Beaver.Env.context(),
         block: Beaver.Env.block(),
@@ -67,59 +64,14 @@ defmodule Beaver.MLIR.AST do
           unquote(regions)
         end
       }
-      |> SSA.put_results([unquote_splicing(ast_result_types)])
-      |> then(&MLIR.Operation.create(%Beaver.SSA{&1 | op: unquote("#{op}")}))
+      |> Beaver.SSA.put_results([unquote_splicing(ast_result_types)])
+      |> MLIR.Operation.create()
     end
-  end
-
-  defp build_ssa(
-         {{:., _line0, [Access, :get]}, _line1,
-          [
-            {{:., _line2, [{:__aliases__, _line3, [:MLIR]}, op]}, _line4, args},
-            attributes
-          ]},
-         ast_result_types
-       ) do
-    do_build_ssa(args ++ attributes, ast_result_types, op)
-  end
-
-  defp build_ssa(
-         {{:., _line0, [{:__aliases__, _line1, [:MLIR]}, op]}, _line2, args},
-         ast_result_types
-       ) do
-    do_build_ssa(args, ast_result_types, op)
-  end
-
-  defp build_ssa(
-         {{{:., _line0, [{:__aliases__, _line1, [:MLIR]}, op]}, _line2, args}, _line3,
-          attributes},
-         ast_result_types,
-         clauses \\ []
-       ) do
-    do_build_ssa(args ++ attributes, ast_result_types, op, clauses)
   end
 
   # compile a clause to a block
 
-  defp blk_jump({block_name, _line0, args})
-       when is_atom(block_name) and :"::" != block_name do
-    args = args |> Enum.map(&argument/1)
-
-    quote do
-      MLIR.Dialect.CF.br(
-        {Beaver.Env.block(unquote(Macro.var(block_name, nil))), [unquote_splicing(args)]}
-      ) >>>
-        []
-    end
-  end
-
-  defp blk_jump(expr) do
-    expr
-  end
-
   defp do_blk(args, expressions) do
-    expressions = expressions |> Enum.map(&blk_jump/1)
-
     {block_name, args} =
       case args do
         [
@@ -160,6 +112,13 @@ defmodule Beaver.MLIR.AST do
   end
 
   defp blk([
+         [{:_, _line0, nil}],
+         expressions
+       ]) do
+    do_blk([], List.wrap(expressions))
+  end
+
+  defp blk([
          args,
          {:__block__, _line0, expressions}
        ]) do
@@ -173,66 +132,17 @@ defmodule Beaver.MLIR.AST do
     do_blk(args, [expr])
   end
 
-  defp to_ssa({:"::", _line0, [{:=, line1, [var | [bind]]} | [{:{}, _, result_types}]]}) do
-    bind =
-      quote do
-        unquote(build_ssa(bind, result_types))
-      end
-
-    {:=, line1, [var | [bind]]}
-  end
-
-  defp to_ssa({:"::", _line0, [expr | [{:{}, _, result_types}]]}) do
-    quote do
-      unquote(build_ssa(expr, result_types))
-    end
-  end
-
-  defp to_ssa(
-         {:"::", _line0,
-          [
-            {{:., _line6, [Access, :get]}, _line5,
-             [
-               expr =
-                 {{:., _line1,
-                   [
-                     {:__aliases__, line2, [:MLIR]},
-                     op
-                   ]}, _line3, []},
-               attributes
-             ]},
-            {result_type, _line4,
-             [
-               [
-                 do: do_block
-               ]
-             ]}
-          ]}
-       )
-       when is_atom(op) do
-    result_types = [result_type]
-
-    clauses =
-      for {:->, _line, clause} <- do_block do
-        blk(clause)
-      end
-
-    quote do
-      unquote(build_ssa({expr, line2, attributes}, result_types, clauses))
-    end
-  end
-
-  defp to_ssa(ast) do
-    ast
+  defp blk(ast) do
+    raise """
+    can't process clause body:
+    #{Macro.to_string(ast)}
+    ast:
+    #{inspect(ast, pretty: true)}
+    """
   end
 
   defmacro defm(ast) do
-    ast =
-      ast[:do]
-      |> normalize
-      |> Macro.prewalk(&to_ssa/1)
-
-    ast |> Macro.to_string() |> IO.puts()
+    # ast[:do] |> Macro.postwalk(&Macro.expand(&1, __CALLER__)) |> Macro.to_string() |> IO.puts()
 
     quote do
       use Beaver
@@ -240,10 +150,73 @@ defmodule Beaver.MLIR.AST do
       ctx = MLIR.Context.create(allow_unregistered: true)
 
       mlir ctx: ctx do
-        module do
-          unquote(ast)
-        end
+        module(unquote(ast))
       end
     end
+  end
+
+  defmacro jump(call) do
+    {block_name, args} = Macro.decompose_call(call)
+    args = args |> Enum.map(&argument/1)
+
+    quote do
+      mlir do
+        MLIR.Dialect.CF.br(
+          {Beaver.Env.block(unquote(Macro.var(block_name, nil))), [unquote_splicing(args)]}
+        ) >>>
+          []
+      end
+    end
+  end
+
+  defmacro op(ast, block \\ [])
+
+  defmacro op(
+             {:"::", _,
+              [
+                call,
+                types
+              ]},
+             block
+           ) do
+    {call, attributes} =
+      case call do
+        {{:., _, [Access, :get]}, _, [call, attributes]} ->
+          {call, attributes}
+
+        _ ->
+          {call, []}
+      end
+
+    {{dialect, _, nil}, op, operands} = Macro.decompose_call(call)
+    name = "#{dialect}.#{op}"
+
+    quote do
+      op(unquote(name), unquote(operands), unquote(attributes), unquote(types), unquote(block))
+    end
+  end
+
+  defmacro op(name, operands, attributes, types, block \\ []) do
+    types =
+      case types do
+        {val, _, nil} = t when is_atom(val) ->
+          List.wrap(t)
+
+        {:{}, _, types} ->
+          types
+
+        _ ->
+          Tuple.to_list(types)
+      end
+
+    clauses =
+      for do_block <- block[:do] || [] do
+        case do_block do
+          {:->, _line, clause} ->
+            blk(clause)
+        end
+      end
+
+    do_build_ssa(operands ++ attributes, types, name, clauses)
   end
 end
