@@ -141,16 +141,17 @@ defmodule Beaver.MLIR.AST do
     """
   end
 
-  defmacro defm(ast) do
-    # ast[:do] |> Macro.postwalk(&Macro.expand(&1, __CALLER__)) |> Macro.to_string() |> IO.puts()
+  defmacro defm(call, ast) do
+    {name, _args} = Macro.decompose_call(call)
 
     quote do
-      use Beaver
-      alias Beaver.SSA
-      ctx = MLIR.Context.create(allow_unregistered: true)
+      def unquote(name)(ctx) do
+        use Beaver
+        alias Beaver.SSA
 
-      mlir ctx: ctx do
-        module(unquote(ast))
+        mlir ctx: ctx do
+          module(unquote(ast))
+        end
       end
     end
   end
