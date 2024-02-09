@@ -4,9 +4,9 @@ defmodule ASTIRTest do
   alias Beaver.MLIR
 
   test "expander", test_context do
-    import Beaver.MLIR.AST
-
     defmodule ASTExample do
+      import Beaver.MLIR.AST
+
       defm gen_ir() do
         unquote(File.read!("test/ast_ir.exs") |> Code.string_to_quoted!())
       end
