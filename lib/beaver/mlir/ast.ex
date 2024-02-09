@@ -155,7 +155,7 @@ defmodule Beaver.MLIR.AST do
     end
   end
 
-  defmacro jump(call) do
+  defmacro br(call) do
     {block_name, args} = Macro.decompose_call(call)
     args = args |> Enum.map(&argument/1)
 
