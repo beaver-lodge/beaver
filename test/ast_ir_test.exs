@@ -6,6 +6,7 @@ defmodule ASTIRTest do
   test "expander", test_context do
     defmodule ASTExample do
       import Beaver.MLIR.AST
+      @file "test/ast_ir.exs"
 
       defm gen_ir() do
         unquote(File.read!("test/ast_ir.exs") |> Code.string_to_quoted!())
@@ -14,6 +15,7 @@ defmodule ASTIRTest do
 
     ctx = test_context[:ctx]
     MLIR.CAPI.mlirContextSetAllowUnregisteredDialects(ctx, true)
-    ASTExample.gen_ir(ctx) |> MLIR.dump!()
+    m = ASTExample.gen_ir(ctx) |> MLIR.dump!()
+    m |> MLIR.Operation.verify()
   end
 end
