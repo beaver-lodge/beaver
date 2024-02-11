@@ -147,6 +147,7 @@ defmodule Beaver do
       end
 
     {bb_name, _} = call |> Macro.decompose_call()
+    block_var = {bb_name, [], nil}
 
     block_creation_ast =
       if Macro.Env.has_var?(__CALLER__, {bb_name, nil}) do
@@ -179,6 +180,8 @@ defmodule Beaver do
         # can't put code here inside a function like Region.under, because we need to support uses across blocks
 
         Kernel.var!(beaver_internal_env_block) = unquote(block_creation_ast)
+        Kernel.var!(unquote(block_var)) = Kernel.var!(beaver_internal_env_block)
+        %Beaver.MLIR.Block{} = Kernel.var!(unquote(block_var))
 
         unquote(region_insert_ast)
 
