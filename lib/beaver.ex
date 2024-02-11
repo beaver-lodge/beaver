@@ -1,4 +1,5 @@
 defmodule Beaver do
+  require Beaver.Env
   alias Beaver.MLIR
   require Beaver.MLIR.CAPI
 
@@ -150,24 +151,16 @@ defmodule Beaver do
     block_var = {bb_name, [], nil}
 
     block_creation_ast =
-      if Macro.Env.has_var?(__CALLER__, {bb_name, nil}) do
-        quote do
-          _args =
-            Kernel.var!(unquote({bb_name, [], nil}))
-            |> Beaver.MLIR.Block.add_arg!(
-              Beaver.Env.context(),
-              Enum.zip(block_arg_types, block_arg_locs)
-            )
+      quote do
+        b = Beaver.Env.block(unquote(block_var))
 
-          Kernel.var!(unquote({bb_name, [], nil}))
-        end
-      else
-        quote do
-          Beaver.MLIR.Block.create(
-            block_arg_types |> Enum.map(&Beaver.Deferred.create(&1, Beaver.Env.context())),
-            block_arg_locs |> Enum.map(&Beaver.Deferred.create(&1, Beaver.Env.context()))
-          )
-        end
+        b
+        |> Beaver.MLIR.Block.add_arg!(
+          Beaver.Env.context(),
+          Enum.zip(block_arg_types, block_arg_locs)
+        )
+
+        b
       end
 
     block_ast =
@@ -180,19 +173,9 @@ defmodule Beaver do
         # can't put code here inside a function like Region.under, because we need to support uses across blocks
 
         Kernel.var!(beaver_internal_env_block) = unquote(block_creation_ast)
-        Kernel.var!(unquote(block_var)) = Kernel.var!(beaver_internal_env_block)
-
-        unquote(
-          unless String.starts_with?("#{bb_name}", "_") do
-            quote do
-              %Beaver.MLIR.Block{} = Kernel.var!(unquote(block_var))
-            end
-          end
-        )
+        %MLIR.Block{} = Kernel.var!(beaver_internal_env_block)
 
         unquote(region_insert_ast)
-
-        %MLIR.Block{} = Kernel.var!(beaver_internal_env_block)
         unquote_splicing(block_arg_var_ast)
         unquote(block)
 
