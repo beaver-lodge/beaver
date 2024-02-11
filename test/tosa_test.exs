@@ -15,7 +15,7 @@ defmodule TosaTest do
                       function_type: ~a"(tensor<1x3xf32>, tensor<2x1xf32>) -> tensor<2x3xf32>"
                     ) do
             region do
-              block entry(
+              block _entry(
                       arg0 >>> Type.ranked_tensor([1, 3], Type.f32()),
                       arg1 >>> Type.ranked_tensor([2, 1], Type.f32())
                     ) do

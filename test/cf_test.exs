@@ -74,7 +74,7 @@ defmodule CfTest do
 
       bb_next =
         mlir ctx: ctx do
-          block bb_next(arg >>> Type.f32()) do
+          block _bb_next(arg >>> Type.f32()) do
           end
         end
 
@@ -175,7 +175,7 @@ defmodule CfTest do
                       function_type: Type.function(List.duplicate(Type.f(32), 4), [Type.f(32)])
                     ) do
             region do
-              block bb_entry(
+              block _bb_entry(
                       total_iters >>> Type.f32(),
                       factor >>> Type.f(32),
                       base_lr >>> Type.f(32),

@@ -34,7 +34,7 @@ defmodule TranslateMLIR do
 
       SCF.for [lower_bound, upper_bound, step] do
         region do
-          block body(indices >>> Type.index()) do
+          block _body(indices >>> Type.index()) do
             arg = MemRef.load(memref, indices) >>> Type.i64()
             acc = put_in(acc.variables[loop_arg], arg)
             write_index = Index.mul(write_index, upper_bound) >>> Type.index()
