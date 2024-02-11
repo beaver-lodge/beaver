@@ -152,15 +152,14 @@ defmodule Beaver do
 
     block_creation_ast =
       quote do
-        b = Beaver.Env.block(unquote(block_var))
-
-        b
-        |> Beaver.MLIR.Block.add_arg!(
-          Beaver.Env.context(),
-          Enum.zip(block_arg_types, block_arg_locs)
+        Beaver.Env.block(unquote(block_var))
+        |> tap(
+          &Beaver.MLIR.Block.add_arg!(
+            &1,
+            Beaver.Env.context(),
+            Enum.zip(block_arg_types, block_arg_locs)
+          )
         )
-
-        b
       end
 
     block_ast =
