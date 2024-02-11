@@ -173,7 +173,6 @@ defmodule Beaver do
         # can't put code here inside a function like Region.under, because we need to support uses across blocks
 
         Kernel.var!(beaver_internal_env_block) = unquote(block_creation_ast)
-        %MLIR.Block{} = Kernel.var!(beaver_internal_env_block)
 
         unquote(region_insert_ast)
         unquote_splicing(block_arg_var_ast)
