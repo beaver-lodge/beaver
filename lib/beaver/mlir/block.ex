@@ -22,9 +22,9 @@ defmodule Beaver.MLIR.Block do
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
-  defp do_add_arg!(block, ctx, t = %Beaver.MLIR.Type{}) do
-    loc = MLIR.CAPI.mlirLocationUnknownGet(ctx)
-    do_add_arg!(block, ctx, {t, loc})
+  defp do_add_arg!(block, ctx, {t = {:parametric, _, _, _f}, loc}) do
+    t = Beaver.Deferred.create(t, ctx)
+    MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
   defp do_add_arg!(block, ctx, {t, loc}) do
@@ -34,8 +34,7 @@ defmodule Beaver.MLIR.Block do
 
   defp do_add_arg!(block, ctx, t) do
     loc = MLIR.CAPI.mlirLocationUnknownGet(ctx)
-    t = MLIR.CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create(t))
-    MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
+    do_add_arg!(block, ctx, {t, loc})
   end
 
   def add_arg!(block, ctx, args) do
