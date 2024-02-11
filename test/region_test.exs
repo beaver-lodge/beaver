@@ -87,6 +87,5 @@ defmodule RegionTest do
       end
     end
     |> MLIR.Operation.verify!()
-    |> MLIR.dump!()
   end
 end
