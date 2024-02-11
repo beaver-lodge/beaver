@@ -5,7 +5,7 @@ defmodule RegionTest do
   alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Dialect.{Func, Arith, CF}
   require Func
-  @moduletag :pdl
+  @moduletag :smoke
 
   test "multiple regions", test_context do
     op =
@@ -57,5 +57,35 @@ defmodule RegionTest do
       end)
 
     assert region_num == 2
+  end
+
+  test "block usage after defining", test_context do
+    mlir ctx: test_context[:ctx] do
+      module do
+        Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+          region do
+            block bb_entry() do
+              v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+              CF.br({Beaver.Env.block(bb1), [v0]}) >>> []
+            end
+
+            block bb_a(arg >>> Type.i(32)) do
+              Func.return(arg) >>> []
+            end
+
+            block bb_b(arg >>> Type.i(32)) do
+              CF.br({Beaver.Env.block(bb_a), [arg]}) >>> []
+            end
+
+            block bb1(arg >>> Type.i(32)) do
+              v2 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+              add = Arith.addi(arg, v2) >>> Type.i(32)
+              Func.return(add) >>> []
+            end
+          end
+        end
+      end
+    end
+    |> MLIR.Operation.verify!()
   end
 end
