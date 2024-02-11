@@ -187,7 +187,7 @@ defmodule PDLTest do
                           )
                       ) do
               region do
-                block entry(
+                block _entry(
                         a >>> Type.ranked_tensor([1, 3], Type.f32()),
                         b >>> Type.ranked_tensor([2, 1], Type.f32())
                       ) do

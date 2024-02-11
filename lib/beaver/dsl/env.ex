@@ -60,7 +60,6 @@ defmodule Beaver.Env do
           else
             quote do
               Kernel.var!(unquote(block_var)) = Beaver.MLIR.Block.create([])
-              %Beaver.MLIR.Block{} = Kernel.var!(unquote(block_var))
             end
           end
         )

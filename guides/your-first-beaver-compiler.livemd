@@ -46,7 +46,7 @@ ir =
     module do
       Func.func some_func(function_type: Type.function([Type.i32()], [Type.i32()])) do
         region do
-          block bb_entry(a >>> Type.i32()) do
+          block _bb_entry(a >>> Type.i32()) do
             b = Arith.constant(value: Attribute.integer(Type.i32(), 1024)) >>> Type.i32()
             c = Arith.addi(a, b) >>> Type.i32()
             Func.return(c) >>> []

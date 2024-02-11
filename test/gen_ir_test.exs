@@ -12,7 +12,7 @@ defmodule CFTest do
         module do
           Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
             region do
-              block bb_entry() do
+              block _bb_entry() do
                 v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
                 cond0 = Arith.constant(true) >>> Type.i(1)
                 CF.cond_br(cond0, Beaver.Env.block(bb1), {Beaver.Env.block(bb2), [v0]}) >>> []
@@ -35,7 +35,7 @@ defmodule CFTest do
 
           Func.func some_func2(function_type: Type.function([], [Type.i(32)])) do
             region do
-              block bb_entry() do
+              block _bb_entry() do
                 v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
                 _add = Arith.addi(v0, v0) >>> Type.i(32)
                 CF.br({Beaver.Env.block(bb1), [v0]}) >>> []
