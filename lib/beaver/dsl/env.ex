@@ -49,9 +49,7 @@ defmodule Beaver.Env do
   """
   defmacro block({var_name, _line, nil} = block_var) do
     if Macro.Env.has_var?(__CALLER__, {var_name, nil}) do
-      quote do
-        unquote(block_var)
-      end
+      block_var
     else
       quote do
         b = Beaver.MLIR.Block.create([])
