@@ -52,18 +52,18 @@ defmodule Beaver.Env do
       block_var
     else
       quote do
-        b = Beaver.MLIR.Block.create([])
-        Kernel.var!(unquote(block_var)) = b
-
         unquote(
-          unless String.starts_with?("#{var_name}", "_") do
+          if String.starts_with?("#{var_name}", "_") do
             quote do
+              Beaver.MLIR.Block.create([])
+            end
+          else
+            quote do
+              Kernel.var!(unquote(block_var)) = Beaver.MLIR.Block.create([])
               %Beaver.MLIR.Block{} = Kernel.var!(unquote(block_var))
             end
           end
         )
-
-        b
       end
     end
   end
