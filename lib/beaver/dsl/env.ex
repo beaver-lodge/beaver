@@ -49,13 +49,21 @@ defmodule Beaver.Env do
   """
   defmacro block({var_name, _line, nil} = block_var) do
     if Macro.Env.has_var?(__CALLER__, {var_name, nil}) do
-      quote do
-        %Beaver.MLIR.Block{} = unquote(block_var)
-      end
+      block_var
     else
       quote do
-        Kernel.var!(unquote(block_var)) = Beaver.MLIR.Block.create([])
-        %Beaver.MLIR.Block{} = Kernel.var!(unquote(block_var))
+        unquote(
+          if String.starts_with?("#{var_name}", "_") do
+            quote do
+              Beaver.MLIR.Block.create([])
+            end
+          else
+            quote do
+              Kernel.var!(unquote(block_var)) = Beaver.MLIR.Block.create([])
+              %Beaver.MLIR.Block{} = Kernel.var!(unquote(block_var))
+            end
+          end
+        )
       end
     end
   end
