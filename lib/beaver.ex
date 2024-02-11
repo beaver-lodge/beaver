@@ -181,7 +181,14 @@ defmodule Beaver do
 
         Kernel.var!(beaver_internal_env_block) = unquote(block_creation_ast)
         Kernel.var!(unquote(block_var)) = Kernel.var!(beaver_internal_env_block)
-        %Beaver.MLIR.Block{} = Kernel.var!(unquote(block_var))
+
+        unquote(
+          unless String.starts_with?("#{bb_name}", "_") do
+            quote do
+              %Beaver.MLIR.Block{} = Kernel.var!(unquote(block_var))
+            end
+          end
+        )
 
         unquote(region_insert_ast)
 
