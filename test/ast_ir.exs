@@ -17,7 +17,7 @@ op dialect.op2()["other attribute": 42 :: i64] ::
     op dialect.inner_op4(arg)[attribute_name2: 42 :: i32] :: {}
     op "dialect.inner_op4-1", [], [], {}
 
-  bb2(arg2 :: i64) ->
+  bb2(arg2 :: i1) ->
     op dialect.inner_op5(arg2) :: {}
     op "dialect.inner_op5-1", [], [], {}
     br bb1(var._0)
