@@ -29,7 +29,7 @@ defmodule RedundantTransposeTest do
                       function_type: Type.function([Helper.tensor_t()], [Helper.tensor_t()])
                     ) do
             region do
-              block bb_entry(arg0 >>> Type.unranked_tensor(Type.f32())) do
+              block _bb_entry(arg0 >>> Type.unranked_tensor(Type.f32())) do
                 perms_type =
                   TOSA.const(value: Helper.perms_t_attr()) >>>
                     Helper.perm_t()

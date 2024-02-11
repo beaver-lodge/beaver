@@ -147,7 +147,7 @@ defmodule Beaver.Slang do
         mlir block: opts[:block], ctx: ctx do
           op_applier slang_target_op: op, sym_name: "\"#{name}\"" do
             region do
-              block b_op() do
+              block _op() do
                 {args, ret} = constrain_f.(block: Beaver.Env.block(), ctx: ctx)
 
                 case strip_variadicity(args) do
@@ -446,7 +446,7 @@ defmodule Beaver.Slang do
           module do
             IRDL.dialect sym_name: "\"#{name}\"" do
               region do
-                block b_dialect() do
+                block _dialect() do
                   for {_type, m, f} <- creators do
                     opts = [ctx: Beaver.Env.context(), block: Beaver.Env.block()]
                     apply(m, f, [opts])

@@ -49,7 +49,7 @@ defmodule ElixirAST do
     mlir ctx: ctx, block: block do
       Func.func sym_name: "\"#{name}\"", function_type: Type.function([], [dyn()]) do
         region do
-          block func_body do
+          block _func_body do
             %MLIR.Value{} =
               ret_value =
               case Macro.prewalk(do_body, &gen_mlir(&1, ctx, Beaver.Env.block())) do
