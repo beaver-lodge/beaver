@@ -5,7 +5,7 @@ defmodule RegionTest do
   alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Dialect.{Func, Arith, CF}
   require Func
-  @moduletag :pdl
+  @moduletag :smoke
 
   test "multiple regions", test_context do
     op =
