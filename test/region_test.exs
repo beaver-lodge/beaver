@@ -70,8 +70,7 @@ defmodule RegionTest do
             end
 
             block bb_a(arg >>> Type.i(32)) do
-              v1 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-              Func.return(v1) >>> []
+              Func.return(arg) >>> []
             end
 
             block bb_b(arg >>> Type.i(32)) do
