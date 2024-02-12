@@ -21,4 +21,9 @@ op dialect.op2()["other attribute": 42 :: i64] ::
     op dialect.inner_op5(arg2) :: {}
     op "dialect.inner_op5-1", [], [], {}
     op cf.br(bb1, var._2) :: {}
+
+  bb_self(arg2 :: i1) ->
+    op dialect.inner_op5(arg2) :: {}
+    op "dialect.inner_op5-1", [], [], {}
+    op cf.br(bb_self, var._0) :: {}
 end
