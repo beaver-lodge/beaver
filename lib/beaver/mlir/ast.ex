@@ -39,7 +39,6 @@ defmodule Beaver.MLIR.AST do
   defp do_build_ssa(args, ast_result_types, op, clauses \\ []) do
     ast_result_types = Enum.map(ast_result_types, &type/1)
     arguments = Enum.map(args, &argument/1)
-    clauses = clauses
 
     regions =
       case clauses do
