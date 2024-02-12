@@ -30,9 +30,11 @@ defmodule Beaver.MLIR.AST do
     end
   end
 
-  # referencing a block argument
+  # referencing a block argument, or create a block doesn't exist yet
   defp argument({arg, _line, nil} = ast) when is_atom(arg) do
-    ast
+    quote do
+      Beaver.Env.block(unquote(ast))
+    end
   end
 
   defp do_build_ssa(args, ast_result_types, op, clauses \\ []) do
@@ -143,20 +145,6 @@ defmodule Beaver.MLIR.AST do
         mlir ctx: ctx do
           module(unquote(ast))
         end
-      end
-    end
-  end
-
-  defmacro br(call) do
-    {block_name, args} = Macro.decompose_call(call)
-    args = args |> Enum.map(&argument/1)
-
-    quote do
-      mlir do
-        MLIR.Dialect.CF.br(
-          {Beaver.Env.block(unquote(Macro.var(block_name, nil))), [unquote_splicing(args)]}
-        ) >>>
-          []
       end
     end
   end
