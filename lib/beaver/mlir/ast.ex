@@ -70,9 +70,9 @@ defmodule Beaver.MLIR.AST do
 
   # compile a clause to a block
 
-  defp do_blk(args, expressions) do
+  defp do_blk(call, expressions) do
     {block_name, args} =
-      case args do
+      case call do
         [
           {block_name, _line0, args}
         ] ->
@@ -98,37 +98,30 @@ defmodule Beaver.MLIR.AST do
       block unquote(block_name)() do
         MLIR.Block.add_arg!(Beaver.Env.block(), Beaver.Env.context(), [unquote_splicing(types)])
         unquote_splicing(vars_of_blk_args)
-        (unquote_splicing(expressions))
+        (unquote_splicing(List.wrap(expressions)))
       end
     end
   end
 
   defp blk([
          [{:_, _line0, nil}],
-         {:__block__, _line1, expressions}
+         expressions
        ]) do
     do_blk([], expressions)
   end
 
   defp blk([
-         [{:_, _line0, nil}],
-         expressions
-       ]) do
-    do_blk([], List.wrap(expressions))
-  end
-
-  defp blk([
-         args,
+         call,
          {:__block__, _line0, expressions}
        ]) do
-    do_blk(args, expressions)
+    do_blk(call, expressions)
   end
 
   defp blk([
-         args,
+         call,
          {:"::", _line0, _} = expr
        ]) do
-    do_blk(args, [expr])
+    do_blk(call, expr)
   end
 
   defp blk(ast) do
