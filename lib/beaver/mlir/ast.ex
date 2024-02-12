@@ -211,11 +211,8 @@ defmodule Beaver.MLIR.AST do
       end
 
     clauses =
-      for do_block <- block[:do] || [] do
-        case do_block do
-          {:->, _line, clause} ->
-            blk(clause)
-        end
+      for {:->, _line, clause} <- block[:do] || [] do
+        blk(clause)
       end
 
     do_build_ssa(operands ++ attributes, types, name, clauses)
