@@ -170,15 +170,13 @@ defmodule Beaver.MLIR.AST do
     end
   end
 
-  defmacro op(ast, block \\ [])
-
   defmacro op(
              {:"::", _,
               [
                 call,
                 types
               ]},
-             block
+             block \\ []
            ) do
     {call, attributes} =
       case call do
