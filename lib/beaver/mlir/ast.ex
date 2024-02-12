@@ -5,13 +5,9 @@ defmodule Beaver.MLIR.AST do
 
   use Beaver
 
-  defp type(t) when is_atom(t) do
-    quote do
-      MLIR.Type.get(unquote("#{t}"))
-    end
-  end
+  defp type({t, _line, nil}), do: type(t)
 
-  defp type({t, _line, nil}) do
+  defp type(t) when is_atom(t) do
     quote do
       MLIR.Type.get(unquote("#{t}"))
     end
