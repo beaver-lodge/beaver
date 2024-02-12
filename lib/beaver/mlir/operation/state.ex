@@ -272,7 +272,7 @@ defmodule Beaver.MLIR.Operation.State do
 
   def add_argument(
         %__MODULE__{successors: successors, operands: operands} = state,
-        {%Beaver.MLIR.Block{} = successor_block, block_args}
+        {%MLIR.Block{} = successor_block, block_args}
       ) do
     %__MODULE__{
       state

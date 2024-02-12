@@ -47,7 +47,7 @@ defmodule Beaver.MLIR.Block do
     MLIR.CAPI.mlirBlockGetArgument(block, index)
   end
 
-  def create(arg_loc_pairs) when is_list(arg_loc_pairs) do
+  def create(arg_loc_pairs \\ []) when is_list(arg_loc_pairs) do
     {args, locs} =
       Enum.reduce(arg_loc_pairs, {[], []}, fn {arg, loc}, {args, locs} ->
         {args ++ [arg], locs ++ [loc]}
