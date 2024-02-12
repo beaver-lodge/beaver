@@ -17,12 +17,14 @@ defmodule Beaver.MLIR.AST do
     end
   end
 
+  # getting an attribute
   defp argument({k, {:"::", _line0, [v, {t, _line1, nil}]}}) do
     quote do
       {unquote(k), MLIR.Attribute.get(unquote("#{v}: #{t}"))}
     end
   end
 
+  # using a value
   defp argument({{:., _line0, [owner, underlined_n]}, _line1, []}) do
     "_" <> n = underlined_n |> Atom.to_string()
     {i, ""} = Integer.parse(n)
@@ -32,6 +34,7 @@ defmodule Beaver.MLIR.AST do
     end
   end
 
+  # referencing a block argument
   defp argument({arg, _line, nil} = ast) when is_atom(arg) do
     ast
   end
