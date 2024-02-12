@@ -195,7 +195,7 @@ defmodule TranslateMLIR do
       end
 
     arg_types = Enum.map(arg_type_pairs, &elem(&1, 1))
-    entry_block = MLIR.Block.create([])
+    entry_block = MLIR.Block.create()
     args = Beaver.MLIR.Block.add_arg!(entry_block, ctx, arg_types)
 
     {entry_block, arg_types, args}
