@@ -72,16 +72,8 @@ defmodule Beaver.MLIR.AST do
   # compile a clause to a block
 
   defp do_blk(call, expressions) do
-    {block_name, args} =
-      case call do
-        [
-          {block_name, _line0, args}
-        ] ->
-          {block_name, args}
-
-        [] ->
-          {:__anonymous__, []}
-      end
+    # only support clause with one match call
+    [{block_name, _line0, args}] = call
 
     types =
       for {:"::", _line0, [{_arg, _line1, nil}, t]} <- args do
@@ -105,10 +97,19 @@ defmodule Beaver.MLIR.AST do
   end
 
   defp blk([
+         [],
+         expressions
+       ]) do
+    "#Reference<" <> txt = make_ref() |> inspect()
+    name = "_#{Base.encode64(txt, padding: false)}" |> String.to_atom()
+    do_blk([quote(do: unquote(name)())], expressions)
+  end
+
+  defp blk([
          [{:_, _line0, nil}],
          expressions
        ]) do
-    do_blk([], expressions)
+    blk([[], expressions])
   end
 
   defp blk([
