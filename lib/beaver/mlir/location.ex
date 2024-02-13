@@ -32,9 +32,9 @@ defmodule Beaver.MLIR.Location do
   @doc """
   Create an MLIR location from `Macro.Env`
   """
-  def from_env(env, opts) do
+  def from_env(env, opts \\ []) do
     loc = Macro.Env.location(env)
-    file(opts ++ [name: loc[:file], line: loc[:line]])
+    file([name: loc[:file], line: loc[:line]] ++ opts)
   end
 
   def unknown(opts \\ []) do
