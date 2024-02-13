@@ -23,7 +23,7 @@ defmodule EnvTest do
 
   test "location", test_context do
     mlir ctx: test_context[:ctx] do
-      loc = %MLIR.Location{} = Beaver.Env.location()
+      loc = %MLIR.Location{} = MLIR.Location.from_env(__ENV__, ctx: Beaver.Env.context())
       assert loc |> MLIR.to_string() =~ ~r{env_test.exs:\d+:\d+}
     end
   end
