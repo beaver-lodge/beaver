@@ -143,7 +143,6 @@ defmodule Beaver.MLIR.AST do
     quote do
       def unquote(name)(ctx) do
         use Beaver
-        alias Beaver.SSA
 
         mlir ctx: ctx do
           module(unquote(ast))
