@@ -100,9 +100,7 @@ defmodule Beaver.MLIR.AST do
          [],
          expressions
        ]) do
-    "#Reference<" <> txt = make_ref() |> inspect()
-    name = "_#{Base.encode64(txt, padding: false)}" |> String.to_atom()
-    do_blk([quote(do: unquote(name)())], expressions)
+    do_blk([quote(do: _())], expressions)
   end
 
   defp blk([
