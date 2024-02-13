@@ -137,6 +137,10 @@ defmodule Beaver.MLIR.AST do
   defmacro defm(call, ast) do
     {name, _args} = Macro.decompose_call(call)
 
+    if System.get_env("AST_IR_DEBUG") == "1" do
+      ast |> Macro.postwalk(&Macro.expand(&1, __CALLER__)) |> Macro.to_string() |> IO.puts()
+    end
+
     quote do
       def unquote(name)(ctx) do
         use Beaver

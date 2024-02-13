@@ -17,7 +17,7 @@ defmodule ASTIRTest do
     MLIR.CAPI.mlirContextSetAllowUnregisteredDialects(ctx, true)
 
     ASTExample.gen_ir(ctx)
-    |> MLIR.dump!()
+    |> tap(fn ir -> if System.get_env("AST_IR_DEBUG") == "1", do: MLIR.dump!(ir) end)
     |> MLIR.Operation.verify!()
   end
 end
