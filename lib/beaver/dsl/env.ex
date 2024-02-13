@@ -61,13 +61,9 @@ defmodule Beaver.Env do
   Create location from caller in the Elixir source
   """
   defmacro location() do
-    file = __CALLER__.file
-    line = __CALLER__.line
-
     quote do
-      Beaver.MLIR.Location.file(
-        name: unquote(file),
-        line: unquote(line),
+      Beaver.MLIR.Location.from_env(
+        __ENV__,
         ctx: Beaver.Env.context()
       )
     end
