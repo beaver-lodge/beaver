@@ -60,7 +60,7 @@ defmodule Beaver.MLIR.AST do
         arguments: unquote(arguments),
         ctx: Beaver.Env.context(),
         block: Beaver.Env.block(),
-        loc: MLIR.Location.from_env(__ENV__),
+        loc: Beaver.Env.location(),
         filler: fn ->
           unquote(regions)
         end
