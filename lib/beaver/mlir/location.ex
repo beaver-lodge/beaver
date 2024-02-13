@@ -29,6 +29,11 @@ defmodule Beaver.MLIR.Location do
     )
   end
 
+  def from_env(env) do
+    loc = Macro.Env.location(env)
+    file(name: loc[:file], line: loc[:line])
+  end
+
   def unknown(opts \\ []) do
     Beaver.Deferred.from_opts(opts, &CAPI.mlirLocationUnknownGet/1)
   end
