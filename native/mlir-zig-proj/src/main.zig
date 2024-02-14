@@ -163,10 +163,10 @@ export fn beaver_raw_mlir_named_attribute_get(env: beam.env, _: c_int, args: [*c
 
 fn Printer(comptime ResourceKind: type, comptime print_fn: anytype) type {
     return struct {
-        list: std.ArrayList(u8),
-        fn collect_string_ref(string_ref: mlir_capi.StringRef.T, collector: ?*anyopaque) callconv(.C) void {
-            var collector_ptr: *@This() = @ptrCast(@alignCast(collector));
-            collector_ptr.*.list.appendSlice(string_ref.data[0..string_ref.length]) catch unreachable;
+        buffer: std.ArrayList(u8),
+        fn collect_string_ref(string_ref: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
+            var printer: *@This() = @ptrCast(@alignCast(userData));
+            printer.*.buffer.appendSlice(string_ref.data[0..string_ref.length]) catch unreachable;
         }
         fn print(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
             var entity: ResourceKind.T = ResourceKind.resource.fetch(env, args[0]) catch
@@ -174,10 +174,10 @@ fn Printer(comptime ResourceKind: type, comptime print_fn: anytype) type {
             if (entity.ptr == null) {
                 return beam.make_error_binary(env, "null pointer found: " ++ @typeName(@TypeOf(entity)));
             }
-            var collector = @This(){ .list = std.ArrayList(u8).init(beam.allocator) };
-            defer collector.list.deinit();
-            print_fn(entity, collect_string_ref, &collector);
-            return beam.make_slice(env, collector.list.items);
+            var printer = @This(){ .buffer = std.ArrayList(u8).init(beam.allocator) };
+            defer printer.buffer.deinit();
+            print_fn(entity, collect_string_ref, &printer);
+            return beam.make_slice(env, printer.buffer.items);
         }
     };
 }
