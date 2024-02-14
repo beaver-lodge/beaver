@@ -453,6 +453,10 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
 }
 
 const BeaverDiagnostic = struct {
+    pub fn printToMsg(env: beam.env, pid: beam.pid, str: mlir_capi.StringRef.T, _: ?*anyopaque) callconv(.C) void {
+        const msg = beam.make_slice(env, str.data[0..str.length]);
+        beam.send(env, pid, msg);
+    }
     pub fn printToStderr(str: mlir_capi.StringRef.T, _: ?*anyopaque) callconv(.C) void {
         stderr.print("{s}", .{str.data[0..str.length]}) catch return;
     }
@@ -481,6 +485,8 @@ const BeaverDiagnostic = struct {
 export fn beaver_raw_context_attach_diagnostic_handler(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var arg0: mlir_capi.Context.T = mlir_capi.Context.resource.fetch(env, args[0]) catch
         return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(mlir_capi.Context.T));
+    var handler: ?beam.pid = undefined;
+    handler = beam.get_pid(env, args[1]) catch null;
     return mlir_capi.U64.resource.make(env, c.mlirContextAttachDiagnosticHandler(arg0, BeaverDiagnostic.errorHandler, null, BeaverDiagnostic.deleteUserData)) catch return beam.make_error_binary(env, "fail to make resource for: " ++ @typeName(mlir_capi.U64.T));
 }
 
@@ -720,7 +726,7 @@ const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_registered_dialects", .arity = 0, .fptr = beaver_raw_registered_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_create_mlir_pass", .arity = 5, .fptr = beaver_raw_create_mlir_pass, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_pass_token_signal", .arity = 1, .fptr = PassToken.pass_token_signal, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_context_attach_diagnostic_handler", .arity = 1, .fptr = beaver_raw_context_attach_diagnostic_handler, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_context_attach_diagnostic_handler", .arity = 2, .fptr = beaver_raw_context_attach_diagnostic_handler, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_resource_c_string_to_term_charlist", .arity = 1, .fptr = beaver_raw_resource_c_string_to_term_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_attribute_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Attribute, c.mlirAttributePrint).to_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_type_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Type, c.mlirTypePrint).to_charlist, .flags = 0 },

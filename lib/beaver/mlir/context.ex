@@ -11,9 +11,15 @@ defmodule Beaver.MLIR.Context do
   @doc """
   create a MLIR context and register all dialects
   """
-  def create(allow_unregistered: allow_unregistered) do
+  @type context_option :: {:allow_unregistered, boolean()} | {:diagnostic_server, pid()}
+  def create(opts) do
+    allow_unregistered = opts[:allow_unregistered] || false
+    diagnostic_server = opts[:diagnostic_server] || nil
     ctx = %__MODULE__{ref: MLIR.CAPI.beaver_raw_get_context_load_all_dialects()}
-    MLIR.CAPI.beaver_raw_context_attach_diagnostic_handler(ctx.ref) |> Beaver.Native.check!()
+
+    MLIR.CAPI.beaver_raw_context_attach_diagnostic_handler(ctx.ref, diagnostic_server)
+    |> Beaver.Native.check!()
+
     Beaver.Exterior.register_all(ctx)
     # TODO: do not load dialects twice
     MLIR.CAPI.mlirContextLoadAllAvailableDialects(ctx)
