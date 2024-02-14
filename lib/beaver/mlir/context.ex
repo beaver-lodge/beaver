@@ -11,6 +11,8 @@ defmodule Beaver.MLIR.Context do
 
   @doc """
   create a MLIR context and register all dialects
+
+  when `diagnostic_server` is :default, a process of `Beaver.Diagnostic.Server` will be spawned and managed by the lifecycle of a `Beaver.MLIR.Context`. You might use any process as the server by passing the pid as well.
   """
   @type context_option ::
           {:allow_unregistered, boolean()} | {:diagnostic_server, pid() | :default | nil}

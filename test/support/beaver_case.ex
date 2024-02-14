@@ -6,12 +6,13 @@ defmodule Beaver.Case do
 
   use ExUnit.CaseTemplate
 
-  using do
+  using options do
     quote do
       alias Beaver.MLIR
 
       setup do
-        ctx = MLIR.Context.create(diagnostic_server: :default)
+        diagnostic_server = unquote(options)[:diagnostic_server]
+        ctx = MLIR.Context.create(diagnostic_server: diagnostic_server)
         require Logger
 
         on_exit(fn ->
