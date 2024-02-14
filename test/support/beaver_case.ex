@@ -11,8 +11,7 @@ defmodule Beaver.Case do
       alias Beaver.MLIR
 
       setup do
-        diagnostic_server = unquote(options)[:diagnostic_server]
-        ctx = MLIR.Context.create(diagnostic_server: diagnostic_server)
+        ctx = MLIR.Context.create(diagnostic: unquote(options)[:diagnostic])
         require Logger
 
         on_exit(fn ->

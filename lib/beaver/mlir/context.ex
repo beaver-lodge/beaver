@@ -12,30 +12,35 @@ defmodule Beaver.MLIR.Context do
   @doc """
   create a MLIR context and register all dialects
 
-  when `diagnostic_server` is :default, a process of `Beaver.Diagnostic.Server` will be spawned and managed by the lifecycle of a `Beaver.MLIR.Context`. You might use any process as the server by passing the pid as well.
+  when `diagnostic` is :server, a process of `Beaver.Diagnostic.Server` will be spawned and managed by the lifecycle of a `Beaver.MLIR.Context`. You might use any process as the server by passing the pid as well.
   """
   @type context_option ::
-          {:allow_unregistered, boolean()} | {:diagnostic_server, pid() | :default | nil}
+          {:allow_unregistered, boolean()} | {:diagnostic, pid() | :server | :stderr}
   @spec create(context_option()) :: MLIR.Context.t()
-  def create(opts) do
-    allow_unregistered = opts[:allow_unregistered] || false
+  @default_context_option [allow_unregistered: false, diagnostic: :stderr]
+  def create(opts \\ @default_context_option) do
+    allow_unregistered = opts[:allow_unregistered] || @default_context_option[:allow_unregistered]
+    diagnostic = opts[:diagnostic] || @default_context_option[:diagnostic]
 
     diagnostic_server =
-      case opts[:diagnostic_server] do
-        :default ->
+      case diagnostic do
+        :server ->
           {:ok, pid} = GenServer.start(Beaver.Diagnostic.Server, [])
           pid
 
         pid when is_pid(pid) ->
           pid
 
-        _ ->
+        :stderr ->
           nil
+
+        _ ->
+          raise "option diagnostic must be :stderr or :server, or a pid"
       end
 
     ctx = %__MODULE__{
       ref: MLIR.CAPI.beaver_raw_get_context_load_all_dialects(),
-      __diagnostic_server__: if(opts[:diagnostic_server] == :default, do: diagnostic_server)
+      __diagnostic_server__: if(diagnostic == :server, do: diagnostic_server)
     }
 
     MLIR.CAPI.beaver_raw_context_attach_diagnostic_handler(ctx.ref, diagnostic_server)
@@ -51,10 +56,6 @@ defmodule Beaver.MLIR.Context do
     )
 
     ctx
-  end
-
-  def create() do
-    create(allow_unregistered: false)
   end
 
   def destroy(%__MODULE__{__diagnostic_server__: diagnostic_server} = ctx) do

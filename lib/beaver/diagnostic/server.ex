@@ -17,6 +17,10 @@ defmodule Beaver.Diagnostic.Server do
     GenServer.call(pid, :flush)
   end
 
+  def flush(_) do
+    raise "To flush diagnostics, you need to create the MLIR context with a diagnostic server. To use the built-in one: 'MLIR.Context.create(diagnostic: :server)'"
+  end
+
   def handle_call(:flush, _from, state) do
     reply = state
     new_state = ""

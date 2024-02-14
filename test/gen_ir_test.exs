@@ -1,5 +1,5 @@
 defmodule CFTest do
-  use Beaver.Case, async: true, diagnostic_server: :default
+  use Beaver.Case, async: true, diagnostic: :server
   use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Type}
