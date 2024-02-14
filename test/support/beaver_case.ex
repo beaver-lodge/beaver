@@ -14,15 +14,11 @@ defmodule Beaver.Case do
         ctx = MLIR.Context.create(unquote(options))
 
         {server, handler_id} =
-          case unquote(options)[:diagnostic] do
-            :server ->
-              {:ok, pid} = GenServer.start(Beaver.Diagnostic.Server, [])
-              id = Beaver.Diagnostic.attach(ctx, pid)
-              {pid, id}
-
-            _ ->
-              id = Beaver.Diagnostic.attach(ctx, :stderr)
-              {nil, id}
+          if unquote(options)[:diagnostic] == :server do
+            {:ok, pid} = GenServer.start(Beaver.Diagnostic.Server, [])
+            {pid, Beaver.Diagnostic.attach(ctx, pid)}
+          else
+            {nil, Beaver.Diagnostic.attach(ctx)}
           end
 
         on_exit(fn ->
