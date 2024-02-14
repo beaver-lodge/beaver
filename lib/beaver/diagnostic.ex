@@ -1,9 +1,9 @@
 defmodule Beaver.Diagnostic do
   alias Beaver.MLIR
 
-  def attach(%MLIR.Context{} = ctx, handler \\ :stderr)
+  def attach(%MLIR.Context{ref: ref} = ctx, handler \\ :stderr)
       when is_pid(handler) or handler == :stderr do
-    MLIR.CAPI.beaver_raw_context_attach_diagnostic_handler(ctx.ref, handler)
+    MLIR.CAPI.beaver_raw_context_attach_diagnostic_handler(ref, handler)
     |> Beaver.Native.check!()
   end
 
