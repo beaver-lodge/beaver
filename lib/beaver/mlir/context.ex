@@ -43,5 +43,11 @@ defmodule Beaver.MLIR.Context do
     create(allow_unregistered: false)
   end
 
-  defdelegate destroy(ctx), to: MLIR.CAPI, as: :mlirContextDestroy
+  def destroy(%__MODULE__{diagnostic_server: diagnostic_server} = ctx) do
+    if diagnostic_server do
+      GenServer.stop(diagnostic_server)
+    end
+
+    MLIR.CAPI.mlirContextDestroy(ctx)
+  end
 end
