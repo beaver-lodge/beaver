@@ -12,6 +12,7 @@ defmodule Beaver.MLIR.Context do
   create a MLIR context and register all dialects
   """
   @type context_option :: {:allow_unregistered, boolean()} | {:diagnostic_server, pid()}
+  @spec create(context_option()) :: MLIR.Context.t()
   def create(opts) do
     allow_unregistered = opts[:allow_unregistered] || false
     diagnostic_server = opts[:diagnostic_server] || nil
