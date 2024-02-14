@@ -25,7 +25,7 @@ defmodule CFTest do
                 add = Arith.addi(arg, v2) >>> Type.i(32)
                 _sub = Arith.subi(arg, v2) >>> Type.i(32)
                 _mul = Arith.muli(arg, v2) >>> Type.i(32)
-                _div = Arith.divsi(arg, v2) >>> Type.i(32)
+                _div = Arith.divsi(arg, v2) >>> Type.i(1)
                 Func.return(add) >>> []
               end
             end
