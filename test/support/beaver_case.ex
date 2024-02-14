@@ -11,13 +11,11 @@ defmodule Beaver.Case do
       alias Beaver.MLIR
 
       setup do
-        {:ok, pid} = GenServer.start_link(Beaver.Diagnostic.Server, [])
-        # pid = nil
-        ctx = MLIR.Context.create(diagnostic_server: pid)
+        ctx = MLIR.Context.create(diagnostic_server: :default)
         require Logger
 
         on_exit(fn ->
-          MLIR.CAPI.mlirContextDestroy(ctx)
+          MLIR.Context.destroy(ctx)
         end)
 
         [ctx: ctx]

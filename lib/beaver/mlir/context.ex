@@ -17,7 +17,19 @@ defmodule Beaver.MLIR.Context do
   @spec create(context_option()) :: MLIR.Context.t()
   def create(opts) do
     allow_unregistered = opts[:allow_unregistered] || false
-    diagnostic_server = opts[:diagnostic_server] || nil
+
+    diagnostic_server =
+      case opts[:diagnostic_server] do
+        :default ->
+          {:ok, pid} = GenServer.start(Beaver.Diagnostic.Server, [])
+          pid
+
+        pid when is_pid(pid) ->
+          pid
+
+        _ ->
+          nil
+      end
 
     ctx = %__MODULE__{
       ref: MLIR.CAPI.beaver_raw_get_context_load_all_dialects(),
