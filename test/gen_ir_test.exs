@@ -1,5 +1,5 @@
 defmodule CFTest do
-  use Beaver.Case, async: true, diagnostic: :server
+  use Beaver.Case, async: true
   use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Type}
@@ -25,21 +25,19 @@ defmodule CFTest do
                 add = Arith.addi(arg, v2) >>> Type.i(32)
                 _sub = Arith.subi(arg, v2) >>> Type.i(32)
                 _mul = Arith.muli(arg, v2) >>> Type.i(32)
-                _div = Arith.divsi(arg, v2) >>> Type.i(1)
+                _div = Arith.divsi(arg, v2) >>> Type.i(32)
                 Func.return(add) >>> []
               end
             end
           end
         end
       end
-      |> MLIR.Operation.verify()
+      |> MLIR.Operation.verify!()
 
-    require Logger
-    Beaver.Diagnostic.Server.flush(test_context[:ctx]) |> Logger.error()
-    # text = ir |> MLIR.to_string()
+    text = ir |> MLIR.to_string()
 
-    # assert text =~ ~r"module"
-    # assert text =~ ~r"// pred.+bb0"
-    # assert text =~ ~r"// 2 preds.+bb0.+bb1"
+    assert text =~ ~r"module"
+    assert text =~ ~r"// pred.+bb0"
+    assert text =~ ~r"// 2 preds.+bb0.+bb1"
   end
 end
