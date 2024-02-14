@@ -117,21 +117,16 @@ defmodule Beaver.MLIR do
   end
 
   def to_string(%Attribute{ref: ref}) do
-    CAPI.beaver_raw_beaver_attribute_to_charlist(ref)
-    |> Beaver.Native.check!()
-    |> List.to_string()
+    CAPI.beaver_raw_beaver_attribute_print(ref) |> Beaver.Native.check!()
   end
 
   def to_string(%Value{ref: ref}) do
-    CAPI.beaver_raw_beaver_value_to_charlist(ref)
-    |> Beaver.Native.check!()
-    |> List.to_string()
+    CAPI.beaver_raw_beaver_value_print(ref) |> Beaver.Native.check!()
   end
 
   def to_string(%Operation{ref: ref}) do
-    CAPI.beaver_raw_beaver_operation_to_charlist(ref)
+    CAPI.beaver_raw_beaver_operation_print(ref)
     |> Beaver.Native.check!()
-    |> List.to_string()
   end
 
   def to_string(%__MODULE__.Module{} = module) do
@@ -139,25 +134,19 @@ defmodule Beaver.MLIR do
   end
 
   def to_string(%Type{ref: ref}) do
-    CAPI.beaver_raw_beaver_type_to_charlist(ref) |> Beaver.Native.check!() |> List.to_string()
+    CAPI.beaver_raw_beaver_type_print(ref) |> Beaver.Native.check!()
   end
 
   def to_string(%AffineMap{ref: ref}) do
-    CAPI.beaver_raw_beaver_affine_map_to_charlist(ref)
-    |> Beaver.Native.check!()
-    |> List.to_string()
+    CAPI.beaver_raw_beaver_affine_map_print(ref) |> Beaver.Native.check!()
   end
 
   def to_string(%Location{ref: ref}) do
-    CAPI.beaver_raw_beaver_location_to_charlist(ref)
-    |> Beaver.Native.check!()
-    |> List.to_string()
+    CAPI.beaver_raw_beaver_location_print(ref) |> Beaver.Native.check!()
   end
 
   def to_string(%MlirOpPassManager{ref: ref}) do
-    CAPI.beaver_raw_beaver_pm_to_charlist(ref)
-    |> Beaver.Native.check!()
-    |> List.to_string()
+    CAPI.beaver_raw_beaver_pm_print(ref) |> Beaver.Native.check!()
   end
 
   def to_string(%MlirPassManager{} = pm) do

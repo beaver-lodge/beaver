@@ -46,8 +46,7 @@ defmodule EntityTest do
              |> MLIR.to_string() ==
                "tensor<1x2xf32>"
 
-      assert Type.ranked_tensor([1, :dynamic, 2], Type.f32()).(ctx)
-             |> MLIR.to_string() ==
+      assert Type.ranked_tensor([1, :dynamic, 2], Type.f32()).(ctx) |> MLIR.to_string() ==
                "tensor<1x?x2xf32>"
 
       assert Type.memref([], Type.f32()).(ctx)
