@@ -4,17 +4,14 @@ defmodule Beaver.MLIR.Context do
   """
   alias Beaver.MLIR
   require MLIR.CAPI
+  use Kinda.ResourceKind, forward_module: Beaver.Native
 
-  use Kinda.ResourceKind,
-    forward_module: Beaver.Native,
-    fields: [__diagnostic_server__: nil]
-
+  @type context_option :: {:allow_unregistered, boolean()}
+  @spec create(context_option()) :: __MODULE__.t()
+  @default_context_option [allow_unregistered: false]
   @doc """
   create a MLIR context and register all dialects
   """
-  @type context_option :: {:allow_unregistered, boolean()}
-  @spec create(context_option()) :: MLIR.Context.t()
-  @default_context_option [allow_unregistered: false]
   def create(opts \\ @default_context_option) do
     allow_unregistered = opts[:allow_unregistered] || @default_context_option[:allow_unregistered]
     ctx = %__MODULE__{ref: MLIR.CAPI.beaver_raw_get_context_load_all_dialects()}
