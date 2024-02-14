@@ -453,10 +453,12 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
 }
 
 const BeaverDiagnostic = struct {
-    const UserData = struct { handler: beam.pid, env: beam.env };
+    const UserData = struct { handler: beam.pid };
     fn printToMsg(str: mlir_capi.StringRef.T, userData: ?*UserData) callconv(.C) void {
-        const msg = beam.make_slice(userData.?.*.env, str.data[0..str.length]);
-        _ = beam.send(userData.?.*.env, userData.?.*.handler, msg);
+        const env = e.enif_alloc_env() orelse unreachable;
+        defer e.enif_clear_env(env);
+        const msg = beam.make_slice(env, str.data[0..str.length]);
+        _ = beam.send(env, userData.?.*.handler, msg);
     }
     pub fn printToStderr(str: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
         const ud: ?*UserData = @ptrCast(@alignCast(userData));
@@ -498,10 +500,7 @@ export fn beaver_raw_context_attach_diagnostic_handler(env: beam.env, _: c_int, 
     var userData: ?*BeaverDiagnostic.UserData = null;
     if (handler) |h| {
         userData = beam.allocator.create(BeaverDiagnostic.UserData) catch return beam.make_error_binary(env, "fail to allocate for diagnostic user data");
-        if (userData) |ptr| {
-            ptr.handler = h;
-            ptr.env = env;
-        }
+        userData.?.handler = h;
     }
     return mlir_capi.U64.resource.make(env, c.mlirContextAttachDiagnosticHandler(arg0, BeaverDiagnostic.errorHandler, userData, BeaverDiagnostic.deleteUserData)) catch return beam.make_error_binary(env, "fail to make resource for: " ++ @typeName(mlir_capi.U64.T));
 }
