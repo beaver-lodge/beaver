@@ -104,7 +104,7 @@ defmodule RegionTest do
     end
     |> MLIR.Operation.verify()
 
-    assert Beaver.Diagnostic.Server.flush(test_context[:ctx]) =~
+    assert Beaver.Diagnostic.Server.flush(test_context[:diagnostic_server]) =~
              "reference to block defined in another region"
   end
 
@@ -126,7 +126,7 @@ defmodule RegionTest do
     end
     |> MLIR.Operation.verify()
 
-    assert Beaver.Diagnostic.Server.flush(test_context[:ctx]) =~
+    assert Beaver.Diagnostic.Server.flush(test_context[:diagnostic_server]) =~
              "branch has 1 operands for successor"
   end
 end

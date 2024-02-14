@@ -9,10 +9,6 @@ defmodule Beaver.Diagnostic.Server do
     {:ok, ""}
   end
 
-  def flush(%Beaver.MLIR.Context{__diagnostic_server__: pid}) when is_pid(pid) do
-    flush(pid)
-  end
-
   def flush(pid) when is_pid(pid) do
     GenServer.call(pid, :flush)
   end

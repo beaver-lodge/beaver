@@ -508,7 +508,8 @@ export fn beaver_raw_context_attach_diagnostic_handler(env: beam.env, _: c_int, 
         userData = beam.allocator.create(BeaverDiagnostic) catch return beam.make_error_binary(env, "fail to allocate for diagnostic user data");
         userData.?.handler = h;
     }
-    return mlir_capi.U64.resource.make(env, c.mlirContextAttachDiagnosticHandler(arg0, BeaverDiagnostic.errorHandler, userData, BeaverDiagnostic.deleteUserData)) catch return beam.make_error_binary(env, "fail to make resource for: " ++ @typeName(mlir_capi.U64.T));
+    const id = c.mlirContextAttachDiagnosticHandler(arg0, BeaverDiagnostic.errorHandler, userData, BeaverDiagnostic.deleteUserData);
+    return mlir_capi.MlirDiagnosticHandlerID.resource.make(env, id) catch return beam.make_error_binary(env, "when calling C function mlirContextAttachDiagnosticHandler, fail to make resource for: " ++ @typeName(mlir_capi.MlirDiagnosticHandlerID.T));
 }
 
 fn beaver_raw_parse_pass_pipeline(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
