@@ -5,13 +5,21 @@ defmodule Beaver.Diagnostic.Server do
   use GenServer
   require Logger
 
-  def init(init_arg) do
-    {:ok, init_arg}
+  def init(_) do
+    {:ok, ""}
+  end
+
+  def flush(pid) do
+    GenServer.call(pid, :flush)
+  end
+
+  def handle_call(:flush, _from, state) do
+    reply = state
+    new_state = ""
+    {:reply, reply, new_state}
   end
 
   def handle_info(msg, state) do
-    IO.write(msg)
-    Logger.error(msg)
-    {:noreply, state}
+    {:noreply, state <> msg}
   end
 end
