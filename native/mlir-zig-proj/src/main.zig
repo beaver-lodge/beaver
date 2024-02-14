@@ -161,20 +161,19 @@ export fn beaver_raw_mlir_named_attribute_get(env: beam.env, _: c_int, args: [*c
     return e.enif_make_resource(env, ptr);
 }
 
-const StringRefCollector = struct { env: beam.env, list: std.ArrayList(u8) };
-
+const StringRefCollector = struct { list: std.ArrayList(u8) };
 fn collect_string_ref(string_ref: mlir_capi.StringRef.T, collector: ?*anyopaque) callconv(.C) void {
     var collector_ptr: *StringRefCollector = @ptrCast(@alignCast(collector));
     collector_ptr.*.list.appendSlice(string_ref.data[0..string_ref.length]) catch unreachable;
 }
 
-fn print_mlir(env: beam.env, element: anytype, printer: anytype) beam.term {
-    var list = std.ArrayList(u8).init(beam.allocator);
-    var collector = StringRefCollector{ .env = env, .list = list };
-    defer list.deinit();
+fn print_mlir_entity(env: beam.env, element: anytype, printer: anytype) beam.term {
     if (element.ptr == null) {
         return beam.make_error_binary(env, "null pointer found: " ++ @typeName(@TypeOf(element)));
     }
+    var list = std.ArrayList(u8).init(beam.allocator);
+    defer list.deinit();
+    var collector = StringRefCollector{ .list = list };
     printer(element, collect_string_ref, &collector);
     return beam.make_slice(env, collector.list.items);
 }
@@ -184,7 +183,7 @@ fn Printer(comptime ResourceKind: type, comptime print_fn: anytype) type {
         fn to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
             var arg0: ResourceKind.T = ResourceKind.resource.fetch(env, args[0]) catch
                 return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(ResourceKind.T));
-            return print_mlir(env, arg0, print_fn);
+            return print_mlir_entity(env, arg0, print_fn);
         }
     };
 }
