@@ -1,4 +1,5 @@
 defmodule RegionTest do
+  use Beaver.Case
   use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Type}
