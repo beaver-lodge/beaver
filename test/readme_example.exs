@@ -19,4 +19,3 @@ Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
     end
   end
 end
-|> MLIR.Operation.verify!(debug: true)

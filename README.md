@@ -34,7 +34,6 @@ Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
     end
   end
 end
-|> MLIR.Operation.verify!(debug: true)
 ```
 
 And a small example to showcase what it is like to define and run a pass in Beaver (with some monad magic):
