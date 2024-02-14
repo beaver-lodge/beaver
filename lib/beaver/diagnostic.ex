@@ -7,7 +7,5 @@ defmodule Beaver.Diagnostic do
     |> Beaver.Native.check!()
   end
 
-  def detach(%MLIR.Context{} = ctx, handler_id) do
-    MLIR.CAPI.mlirContextDetachDiagnosticHandler(ctx, handler_id)
-  end
+  defdelegate detach(ctx, handler_id), to: MLIR.CAPI, as: :mlirContextDetachDiagnosticHandler
 end
