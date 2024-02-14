@@ -453,15 +453,15 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
 }
 
 const BeaverDiagnostic = struct {
-    const UserData = struct { handler: beam.pid };
-    fn printToMsg(str: anytype, userData: *UserData) void {
+    handler: beam.pid,
+    fn printToMsg(str: anytype, userData: *@This()) void {
         const env = e.enif_alloc_env() orelse unreachable;
         defer e.enif_clear_env(env);
         const msg = beam.make_slice(env, str);
         _ = beam.send(env, userData.*.handler, msg);
     }
     fn printSlice(str: anytype, userData: ?*anyopaque) void {
-        const ud: ?*UserData = @ptrCast(@alignCast(userData));
+        const ud: ?*@This() = @ptrCast(@alignCast(userData));
         if (ud) |ptr| {
             printToMsg(str, ptr);
         } else {
@@ -472,7 +472,7 @@ const BeaverDiagnostic = struct {
         printSlice(str.data[0..str.length], userData);
     }
     pub fn deleteUserData(userData: ?*anyopaque) callconv(.C) void {
-        const ud: ?*UserData = @ptrCast(@alignCast(userData));
+        const ud: ?*@This() = @ptrCast(@alignCast(userData));
         if (ud) |ptr| {
             beam.allocator.destroy(ptr);
         }
@@ -503,9 +503,9 @@ export fn beaver_raw_context_attach_diagnostic_handler(env: beam.env, _: c_int, 
         return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(mlir_capi.Context.T));
     var handler: ?beam.pid = undefined;
     handler = beam.get_pid(env, args[1]) catch null;
-    var userData: ?*BeaverDiagnostic.UserData = null;
+    var userData: ?*BeaverDiagnostic = null;
     if (handler) |h| {
-        userData = beam.allocator.create(BeaverDiagnostic.UserData) catch return beam.make_error_binary(env, "fail to allocate for diagnostic user data");
+        userData = beam.allocator.create(BeaverDiagnostic) catch return beam.make_error_binary(env, "fail to allocate for diagnostic user data");
         userData.?.handler = h;
     }
     return mlir_capi.U64.resource.make(env, c.mlirContextAttachDiagnosticHandler(arg0, BeaverDiagnostic.errorHandler, userData, BeaverDiagnostic.deleteUserData)) catch return beam.make_error_binary(env, "fail to make resource for: " ++ @typeName(mlir_capi.U64.T));
