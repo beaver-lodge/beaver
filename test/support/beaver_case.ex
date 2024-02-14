@@ -5,18 +5,31 @@ defmodule Beaver.Case do
 
   use ExUnit.CaseTemplate
 
-  using do
+  using options do
     quote do
       alias Beaver.MLIR
 
       setup do
-        ctx = MLIR.Context.create()
+        ctx = MLIR.Context.create(unquote(options))
+
+        {server, handler_id} =
+          if unquote(options)[:diagnostic] == :server do
+            {:ok, pid} = GenServer.start(Beaver.Diagnostic.Server, [])
+            {pid, Beaver.Diagnostic.attach(ctx, pid)}
+          else
+            {nil, Beaver.Diagnostic.attach(ctx)}
+          end
 
         on_exit(fn ->
-          MLIR.CAPI.mlirContextDestroy(ctx)
+          if server do
+            :ok = GenServer.stop(server)
+          end
+
+          Beaver.Diagnostic.detach(ctx, handler_id)
+          MLIR.Context.destroy(ctx)
         end)
 
-        [ctx: ctx]
+        [ctx: ctx, diagnostic_server: server]
       end
     end
   end
