@@ -3,7 +3,6 @@ defmodule Beaver.Diagnostic.Server do
   server to collect diagnostic printing from MLIR
   """
   use GenServer
-  require Logger
 
   def init(_) do
     {:ok, ""}
