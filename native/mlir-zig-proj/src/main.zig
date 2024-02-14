@@ -163,7 +163,8 @@ export fn beaver_raw_mlir_named_attribute_get(env: beam.env, _: c_int, args: [*c
 
 fn Printer(comptime ResourceKind: type, comptime print_fn: anytype) type {
     return struct {
-        buffer: std.ArrayList(u8),
+        const Buffer = std.ArrayList(u8);
+        buffer: Buffer,
         fn collect_string_ref(string_ref: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
             var printer: *@This() = @ptrCast(@alignCast(userData));
             printer.*.buffer.appendSlice(string_ref.data[0..string_ref.length]) catch unreachable;
@@ -174,7 +175,7 @@ fn Printer(comptime ResourceKind: type, comptime print_fn: anytype) type {
             if (entity.ptr == null) {
                 return beam.make_error_binary(env, "null pointer found: " ++ @typeName(@TypeOf(entity)));
             }
-            var printer = @This(){ .buffer = std.ArrayList(u8).init(beam.allocator) };
+            var printer = @This(){ .buffer = Buffer.init(beam.allocator) };
             defer printer.buffer.deinit();
             print_fn(entity, collect_string_ref, &printer);
             return beam.make_slice(env, printer.buffer.items);
