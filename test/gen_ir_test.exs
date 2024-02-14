@@ -35,7 +35,7 @@ defmodule CFTest do
       |> MLIR.Operation.verify()
 
     require Logger
-    Beaver.Diagnostic.Server.flush(test_context[:ctx].diagnostic_server) |> Logger.error()
+    Beaver.Diagnostic.Server.flush(test_context[:ctx]) |> Logger.error()
     # text = ir |> MLIR.to_string()
 
     # assert text =~ ~r"module"

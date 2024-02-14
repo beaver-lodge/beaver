@@ -7,7 +7,7 @@ defmodule Beaver.MLIR.Context do
 
   use Kinda.ResourceKind,
     forward_module: Beaver.Native,
-    fields: [diagnostic_server: nil]
+    fields: [__diagnostic_server__: nil]
 
   @doc """
   create a MLIR context and register all dialects
@@ -35,7 +35,7 @@ defmodule Beaver.MLIR.Context do
 
     ctx = %__MODULE__{
       ref: MLIR.CAPI.beaver_raw_get_context_load_all_dialects(),
-      diagnostic_server: diagnostic_server
+      __diagnostic_server__: if(opts[:diagnostic_server] == :default, do: diagnostic_server)
     }
 
     MLIR.CAPI.beaver_raw_context_attach_diagnostic_handler(ctx.ref, diagnostic_server)
@@ -57,7 +57,7 @@ defmodule Beaver.MLIR.Context do
     create(allow_unregistered: false)
   end
 
-  def destroy(%__MODULE__{diagnostic_server: diagnostic_server} = ctx) do
+  def destroy(%__MODULE__{__diagnostic_server__: diagnostic_server} = ctx) do
     if diagnostic_server do
       GenServer.stop(diagnostic_server)
     end
