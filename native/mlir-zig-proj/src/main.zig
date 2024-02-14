@@ -454,25 +454,28 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
 
 const BeaverDiagnostic = struct {
     const UserData = struct { handler: beam.pid };
-    fn printToMsg(str: anytype, userData: ?*UserData) void {
+    fn printToMsg(str: anytype, userData: *UserData) void {
         const env = e.enif_alloc_env() orelse unreachable;
         defer e.enif_clear_env(env);
         const msg = beam.make_slice(env, str);
-        _ = beam.send(env, userData.?.*.handler, msg);
+        _ = beam.send(env, userData.*.handler, msg);
     }
     fn printSlice(str: anytype, userData: ?*anyopaque) void {
         const ud: ?*UserData = @ptrCast(@alignCast(userData));
-        if (ud == null) {
-            stderr.print("{s}", .{str}) catch return;
+        if (ud) |ptr| {
+            printToMsg(str, ptr);
         } else {
-            printToMsg(str, ud);
+            stderr.print("{s}", .{str}) catch return;
         }
     }
     pub fn printDiagnostic(str: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
         printSlice(str.data[0..str.length], userData);
     }
-    pub fn deleteUserData(_: ?*anyopaque) callconv(.C) void {
-        // TODO: GC the user data struct
+    pub fn deleteUserData(userData: ?*anyopaque) callconv(.C) void {
+        const ud: ?*UserData = @ptrCast(@alignCast(userData));
+        if (ud) |ptr| {
+            beam.allocator.destroy(ptr);
+        }
     }
     pub fn errorHandler(diagnostic: c.MlirDiagnostic, userData: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
         printSlice("[Beaver] [Diagnostic] [", userData);
