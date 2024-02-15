@@ -10,7 +10,7 @@ In the de-facto way of using MLIR, we need to work with C/C++, TableGen, CMake a
 
 Elixir could actually be a good fit as a MLIR front end. Elixir has SSA, pattern-matching, pipe-operator. We can use these language features to define MLIR patterns and pass pipeline in a natural and uniformed way. Elixir is strong-typed but not static-typed which makes it a great choice for quickly building prototypes to validate and explore new ideas.
 
-Here is an example to build and verify a piece of IR in Beaver:
+To build a piece of IR in Beaver:
 
 ```elixir
 Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
