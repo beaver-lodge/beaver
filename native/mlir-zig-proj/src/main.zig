@@ -5,9 +5,8 @@ const testing = std.testing;
 const beam = @import("beam");
 const kinda = @import("kinda");
 const e = @import("erl_nif");
-const mlir_capi = @import("beaver.imp.zig");
-pub const c = mlir_capi.c;
-
+const mlir_capi = @import("mlir_capi.zig");
+pub const c = @import("prelude.zig");
 fn get_all_registered_ops(env: beam.env) !beam.term {
     const ctx = get_context_load_all_dialects();
     defer c.mlirContextDestroy(ctx);
@@ -731,7 +730,13 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
     };
 }
 
-const handwritten_nifs = .{
+const ResourceKindItem = struct {
+    key: []const u8,
+    value: type,
+};
+
+const kindaLib = @import("kinda_library.zig").KindaLibrary(mlir_capi.allKinds, @import("wrapper.zig").nifs_decls);
+const handwritten_nifs = kindaLib.entries ++ .{
     e.ErlNifFunc{ .name = "beaver_raw_get_context_load_all_dialects", .arity = 0, .fptr = beaver_raw_get_context_load_all_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_ops", .arity = 0, .fptr = beaver_raw_registered_ops, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_ops_of_dialect", .arity = 2, .fptr = beaver_raw_registered_ops_of_dialect, .flags = 1 },
@@ -766,8 +771,8 @@ const handwritten_nifs = .{
     dataKindToMemrefKind(mlir_capi.I32).nifs ++
     dataKindToMemrefKind(mlir_capi.I64).nifs;
 
-const num_nifs = mlir_capi.generated_nifs.len + handwritten_nifs.len;
-export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs ++ mlir_capi.generated_nifs;
+const num_nifs = handwritten_nifs.len;
+export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs;
 
 export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     kinda.open_internal_resource_types(env);
