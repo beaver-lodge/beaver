@@ -8,10 +8,6 @@ const e = @import("erl_nif");
 const mlir_capi = @import("beaver.imp.zig");
 pub const c = mlir_capi.c;
 
-pub fn make_charlist_from_string_ref(environment: beam.env, val: mlir_capi.StringRef.T) beam.term {
-    return beam.make_charlist_len(environment, val.data, val.length);
-}
-
 fn get_all_registered_ops(env: beam.env) !beam.term {
     const ctx = get_context_load_all_dialects();
     defer c.mlirContextDestroy(ctx);
@@ -27,8 +23,8 @@ fn get_all_registered_ops(env: beam.env) !beam.term {
         const op_name = c.beaverRegisteredOperationNameGetOpName(registered_op_name);
         var tuple_slice: []beam.term = try beam.allocator.alloc(beam.term, 2);
         defer beam.allocator.free(tuple_slice);
-        tuple_slice[0] = make_charlist_from_string_ref(env, dialect_name);
-        tuple_slice[1] = make_charlist_from_string_ref(env, op_name);
+        tuple_slice[0] = beam.make_slice(env, dialect_name.data[0..dialect_name.length]);
+        tuple_slice[1] = beam.make_slice(env, op_name.data[0..op_name.length]);
         ret[@intCast(i)] = beam.make_tuple(env, tuple_slice);
     }
     return beam.make_term_list(env, ret);
@@ -165,30 +161,24 @@ export fn beaver_raw_mlir_named_attribute_get(env: beam.env, _: c_int, args: [*c
     return e.enif_make_resource(env, ptr);
 }
 
-const StringRefCollector = struct { env: beam.env, list: std.ArrayList(beam.term) };
-
-fn collect_string_ref(string_ref: mlir_capi.StringRef.T, collector: ?*anyopaque) callconv(.C) void {
-    var collector_ptr: *StringRefCollector = @ptrCast(@alignCast(collector));
-    collector_ptr.*.list.append(make_charlist_from_string_ref(collector_ptr.*.env, string_ref)) catch unreachable;
-}
-
-fn print_mlir(env: beam.env, element: anytype, printer: anytype) beam.term {
-    var list = std.ArrayList(beam.term).init(beam.allocator);
-    var collector = StringRefCollector{ .env = env, .list = list };
-    defer list.deinit();
-    if (element.ptr == null) {
-        return beam.make_error_binary(env, "null pointer found: " ++ @typeName(@TypeOf(element)));
-    }
-    printer(element, collect_string_ref, &collector);
-    return beam.make_term_list(env, collector.list.items);
-}
-
 fn Printer(comptime ResourceKind: type, comptime print_fn: anytype) type {
     return struct {
-        fn to_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            var arg0: ResourceKind.T = ResourceKind.resource.fetch(env, args[0]) catch
-                return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(ResourceKind.T));
-            return print_mlir(env, arg0, print_fn);
+        const Buffer = std.ArrayList(u8);
+        buffer: Buffer,
+        fn collect_string_ref(string_ref: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
+            var printer: *@This() = @ptrCast(@alignCast(userData));
+            printer.*.buffer.appendSlice(string_ref.data[0..string_ref.length]) catch unreachable;
+        }
+        fn print(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            var entity: ResourceKind.T = ResourceKind.resource.fetch(env, args[0]) catch
+                return beam.make_error_binary(env, "fail to fetch resource for MLIR entity to print, expected: " ++ @typeName(ResourceKind.T));
+            if (entity.ptr == null) {
+                return beam.make_error_binary(env, "null pointer found: " ++ @typeName(@TypeOf(entity)));
+            }
+            var printer = @This(){ .buffer = Buffer.init(beam.allocator) };
+            defer printer.buffer.deinit();
+            print_fn(entity, collect_string_ref, &printer);
+            return beam.make_slice(env, printer.buffer.items);
         }
     };
 }
@@ -750,13 +740,13 @@ const handwritten_nifs = .{
     e.ErlNifFunc{ .name = "beaver_raw_pass_token_signal", .arity = 1, .fptr = PassToken.pass_token_signal, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_context_attach_diagnostic_handler", .arity = 2, .fptr = beaver_raw_context_attach_diagnostic_handler, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_resource_c_string_to_term_charlist", .arity = 1, .fptr = beaver_raw_resource_c_string_to_term_charlist, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_beaver_attribute_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Attribute, c.mlirAttributePrint).to_charlist, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_beaver_type_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Type, c.mlirTypePrint).to_charlist, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_beaver_operation_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Operation, c.mlirOperationPrint).to_charlist, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_beaver_value_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Value, c.mlirValuePrint).to_charlist, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_beaver_pm_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.MlirOpPassManager, c.mlirPrintPassPipeline).to_charlist, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_beaver_affine_map_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.AffineMap, c.mlirAffineMapPrint).to_charlist, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_beaver_location_to_charlist", .arity = 1, .fptr = Printer(mlir_capi.Location, c.beaverLocationPrint).to_charlist, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_attribute_print", .arity = 1, .fptr = Printer(mlir_capi.Attribute, c.mlirAttributePrint).print, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_type_print", .arity = 1, .fptr = Printer(mlir_capi.Type, c.mlirTypePrint).print, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_operation_print", .arity = 1, .fptr = Printer(mlir_capi.Operation, c.mlirOperationPrint).print, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_value_print", .arity = 1, .fptr = Printer(mlir_capi.Value, c.mlirValuePrint).print, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_pm_print", .arity = 1, .fptr = Printer(mlir_capi.MlirOpPassManager, c.mlirPrintPassPipeline).print, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_affine_map_print", .arity = 1, .fptr = Printer(mlir_capi.AffineMap, c.mlirAffineMapPrint).print, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_location_print", .arity = 1, .fptr = Printer(mlir_capi.Location, c.beaverLocationPrint).print, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_get_resource_c_string", .arity = 1, .fptr = beaver_raw_get_resource_c_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_mlir_named_attribute_get", .arity = 2, .fptr = beaver_raw_mlir_named_attribute_get, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_own_opaque_ptr", .arity = 1, .fptr = beaver_raw_own_opaque_ptr, .flags = 0 },
