@@ -151,4 +151,7 @@ pub fn open_generated_resource_types(env: beam.env) void {
     inline for (allKinds) |k| {
         k.open_all(env);
     }
+    kinda.aliasKind(OpaquePtr, kinda.Internal.OpaquePtr);
+    kinda.aliasKind(OpaqueArray, kinda.Internal.OpaqueArray);
+    kinda.aliasKind(USize, kinda.Internal.USize);
 }
