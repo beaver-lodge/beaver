@@ -4,16 +4,24 @@ const e = @import("erl_nif");
 pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
     return struct {
         fn getKind(comptime t: type) type {
-            for (Kinds) |kind| {
-                if (t == kind.T) {
-                    return kind;
-                }
-                if (t == kind.Ptr.T) {
-                    return kind.Ptr;
-                }
-                if (t == kind.Array.T) {
-                    return kind.Array;
-                }
+            switch (@typeInfo(t)) {
+                .Pointer => {
+                    for (Kinds) |kind| {
+                        if (t == kind.Ptr.T) {
+                            return kind.Ptr;
+                        }
+                        if (t == kind.Array.T) {
+                            return kind.Array;
+                        }
+                    }
+                },
+                else => {
+                    for (Kinds) |kind| {
+                        if (t == kind.T) {
+                            return kind;
+                        }
+                    }
+                },
             }
             @compileError("resouce kind not found " ++ @typeName(t));
         }
