@@ -75,9 +75,9 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                 }
                 fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
                     var c_args: VariadicArgs() = undefined;
-                    inline for (0..FTI.params.len) |i| {
-                        const ArgKind = getKind(FTI.params[i].type.?);
-                        c_args[i] = ArgKind.resource.fetch(env, args[i]) catch {
+                    inline for (FTI.params, args, 0..) |p, arg, i| {
+                        const ArgKind = getKind(p.type.?);
+                        c_args[i] = ArgKind.resource.fetch(env, arg) catch {
                             var buffer: [20]u8 = undefined;
                             const s = std.fmt.bufPrint(&buffer, "fail to fetch resource for arg #{}", .{i}) catch unreachable;
                             return beam.make_error_binary(env, s);
