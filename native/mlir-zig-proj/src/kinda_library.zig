@@ -46,9 +46,7 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                         12 => struct { P[0].type.?, P[1].type.?, P[2].type.?, P[3].type.?, P[4].type.?, P[5].type.?, P[6].type.?, P[7].type.?, P[8].type.?, P[9].type.?, P[10].type.?, P[11].type.? },
                         13 => struct { P[0].type.?, P[1].type.?, P[2].type.?, P[3].type.?, P[4].type.?, P[5].type.?, P[6].type.?, P[7].type.?, P[8].type.?, P[9].type.?, P[10].type.?, P[11].type.?, P[12].type.? },
                         else => {
-                            var buffer: [20]u8 = undefined;
-                            const s = std.fmt.bufPrint(&buffer, "{}", .{P.len}) catch unreachable;
-                            @compileError("too many args " ++ s ++ ", fn: " ++ @typeName(@TypeOf(cfunction)));
+                            @compileError("too many args");
                         },
                     };
                 }
