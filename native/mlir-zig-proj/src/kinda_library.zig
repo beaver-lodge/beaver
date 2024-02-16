@@ -77,11 +77,7 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                     var c_args: VariadicArgs() = undefined;
                     inline for (FTI.params, args, 0..) |p, arg, i| {
                         const ArgKind = getKind(p.type.?);
-                        c_args[i] = ArgKind.resource.fetch(env, arg) catch {
-                            var buffer: [20]u8 = undefined;
-                            const s = std.fmt.bufPrint(&buffer, "fail to fetch resource for arg #{}", .{i}) catch unreachable;
-                            return beam.make_error_binary(env, s);
-                        };
+                        c_args[i] = ArgKind.resource.fetch(env, arg) catch return beam.make_error_binary(env, "fail to fetch arg resource");
                     }
                     const rt = FTI.return_type.?;
                     if (rt == void) {
