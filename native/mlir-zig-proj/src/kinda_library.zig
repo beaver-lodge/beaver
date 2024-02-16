@@ -26,7 +26,7 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
             @compileError("resouce kind not found " ++ @typeName(t));
         }
 
-        fn KindaNIF(comptime cfunction: anytype, comptime nif_name: [*c]const u8, comptime flags: c_uint) type {
+        fn KindaNIF(comptime cfunction: anytype) type {
             return struct {
                 const FTI = @typeInfo(@TypeOf(cfunction)).Fn;
                 inline fn VariadicArgs() type {
@@ -88,7 +88,6 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                         return RetKind.resource.make(env, variadic_call(c_args)) catch return beam.make_error_binary(env, "fail to make resource for return type");
                     }
                 }
-                const entry = e.ErlNifFunc{ .name = nif_name, .arity = FTI.params.len, .fptr = nif, .flags = flags };
             };
         }
         const numOfNIFsPerKind = 10;
@@ -101,7 +100,9 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                 if (NIFs[i].len > 2) {
                     flags = NIFs[i][2].flags;
                 }
-                ret[i] = KindaNIF(NIFs[i][0], NIFs[i][1], flags).entry;
+                const FTI = @typeInfo(@TypeOf(NIFs[i][0])).Fn;
+                const entry = e.ErlNifFunc{ .name = NIFs[i][1], .arity = FTI.params.len, .fptr = KindaNIF(NIFs[i][0]).nif, .flags = flags };
+                ret[i] = entry;
             }
             for (Kinds, 0..) |k, i| {
                 for (0..numOfNIFsPerKind) |j| {
