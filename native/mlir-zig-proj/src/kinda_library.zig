@@ -101,7 +101,8 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                 }
                 const FTI = @typeInfo(@TypeOf(NIFs[i][0])).Fn;
                 const cfunction = NIFs[i][0];
-                const entry = e.ErlNifFunc{ .name = NIFs[i][1], .arity = FTI.params.len, .fptr = KindaNIF(cfunction, @typeInfo(@TypeOf(cfunction)).Fn).nif, .flags = flags };
+                const nif = KindaNIF(cfunction, @typeInfo(@TypeOf(cfunction)).Fn).nif;
+                const entry = e.ErlNifFunc{ .name = NIFs[i][1], .arity = FTI.params.len, .fptr = nif, .flags = flags };
                 ret[i] = entry;
             }
             for (Kinds, 0..) |k, i| {
