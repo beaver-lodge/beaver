@@ -82,15 +82,17 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                 fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
                     var c_args: VariadicArgs() = undefined;
                     inline for (0..FT.params.len) |i| {
-                        c_args[i] = fetch_arg(getKind(FT.params[i].type.?), env, args, i) catch
-                            return fetch_arg_error(getKind(FT.params[i].type.?), env);
+                        const ArgKind = getKind(FT.params[i].type.?);
+                        c_args[i] = fetch_arg(ArgKind, env, args, i) catch
+                            return fetch_arg_error(ArgKind, env);
                     }
                     const rt = FT.return_type.?;
                     if (rt == void) {
                         variadic_call(c_args);
                         return beam.make_ok(env);
                     } else {
-                        return getKind(rt).resource.make(env, variadic_call(c_args)) catch return fetch_arg_error(getKind(rt), env);
+                        const RetKind = getKind(rt);
+                        return RetKind.resource.make(env, variadic_call(c_args)) catch return fetch_arg_error(RetKind, env);
                     }
                 }
                 const entry = e.ErlNifFunc{ .name = nif_name, .arity = FT.params.len, .fptr = nif, .flags = flags };
