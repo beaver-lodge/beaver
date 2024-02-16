@@ -28,9 +28,9 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
 
         fn KindaNIF(comptime cfunction: anytype, comptime nif_name: [*c]const u8, comptime flags: c_uint) type {
             return struct {
-                const FT = @typeInfo(@TypeOf(cfunction)).Fn;
+                const FTI = @typeInfo(@TypeOf(cfunction)).Fn;
                 inline fn VariadicArgs() type {
-                    const P = FT.params;
+                    const P = FTI.params;
                     switch (P.len) {
                         0 => return struct {},
                         1 => return struct { P[0].type.? },
@@ -53,9 +53,9 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                         },
                     }
                 }
-                inline fn variadic_call(args: anytype) FT.return_type.? {
+                inline fn variadic_call(args: anytype) FTI.return_type.? {
                     const f = cfunction;
-                    switch (FT.params.len) {
+                    switch (FTI.params.len) {
                         0 => return f(),
                         1 => return f(args[0]),
                         2 => return f(args[0], args[1]),
@@ -75,12 +75,12 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                 }
                 fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
                     var c_args: VariadicArgs() = undefined;
-                    inline for (0..FT.params.len) |i| {
-                        const ArgKind = getKind(FT.params[i].type.?);
+                    inline for (0..FTI.params.len) |i| {
+                        const ArgKind = getKind(FTI.params[i].type.?);
                         c_args[i] = ArgKind.resource.fetch(env, args[i]) catch
                             return beam.make_error_binary(env, "fail to fetch resource, expected: " ++ @typeName(ArgKind.T));
                     }
-                    const rt = FT.return_type.?;
+                    const rt = FTI.return_type.?;
                     if (rt == void) {
                         variadic_call(c_args);
                         return beam.make_ok(env);
@@ -89,7 +89,7 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                         return RetKind.resource.make(env, variadic_call(c_args)) catch return beam.make_error_binary(env, "fail to make resource, type: " ++ @typeName(RetKind.T));
                     }
                 }
-                const entry = e.ErlNifFunc{ .name = nif_name, .arity = FT.params.len, .fptr = nif, .flags = flags };
+                const entry = e.ErlNifFunc{ .name = nif_name, .arity = FTI.params.len, .fptr = nif, .flags = flags };
             };
         }
         const numOfNIFsPerKind = 10;
