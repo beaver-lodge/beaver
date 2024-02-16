@@ -28,14 +28,14 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
 
         fn KindaNIF(comptime cfunction: anytype, comptime nif_name: [*c]const u8, comptime flags: c_uint) type {
             return struct {
-                fn fetch_arg(comptime K: type, env: beam.env, args: [*c]const beam.term, i: c_uint) !K.T {
+                const FT = @typeInfo(@TypeOf(cfunction)).Fn;
+                inline fn fetch_arg(comptime K: type, env: beam.env, args: [*c]const beam.term, i: c_uint) !K.T {
                     return K.resource.fetch(env, args[i]);
                 }
-                fn fetch_arg_error(comptime K: type, env: beam.env) beam.term {
+                inline fn fetch_arg_error(comptime K: type, env: beam.env) beam.term {
                     return beam.make_error_binary(env, "fail to fetch/create resource, expected: " ++ @typeName(K));
                 }
-                const FT = @typeInfo(@TypeOf(cfunction)).Fn;
-                fn VariadicArgs() type {
+                inline fn VariadicArgs() type {
                     const P = FT.params;
                     switch (P.len) {
                         0 => return struct {},
@@ -59,8 +59,7 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                         },
                     }
                 }
-
-                fn variadic_call(args: anytype) FT.return_type.? {
+                inline fn variadic_call(args: anytype) FT.return_type.? {
                     const f = cfunction;
                     switch (FT.params.len) {
                         0 => return f(),
@@ -80,7 +79,6 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                         else => @compileError("too many args"),
                     }
                 }
-
                 fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
                     var c_args: VariadicArgs() = undefined;
                     inline for (0..FT.params.len) |i| {
