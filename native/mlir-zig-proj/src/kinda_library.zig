@@ -29,9 +29,6 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
         fn KindaNIF(comptime cfunction: anytype, comptime nif_name: [*c]const u8, comptime flags: c_uint) type {
             return struct {
                 const FT = @typeInfo(@TypeOf(cfunction)).Fn;
-                inline fn fetch_arg(comptime K: type, env: beam.env, args: [*c]const beam.term, comptime i: comptime_int) !K.T {
-                    return K.resource.fetch(env, args[i]);
-                }
                 inline fn fetch_arg_error(comptime K: type, env: beam.env) beam.term {
                     return beam.make_error_binary(env, "fail to fetch/create resource, expected: " ++ @typeName(K));
                 }
@@ -83,7 +80,7 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                     var c_args: VariadicArgs() = undefined;
                     inline for (0..FT.params.len) |i| {
                         const ArgKind = getKind(FT.params[i].type.?);
-                        c_args[i] = fetch_arg(ArgKind, env, args, i) catch
+                        c_args[i] = ArgKind.resource.fetch(env, args[i]) catch
                             return fetch_arg_error(ArgKind, env);
                     }
                     const rt = FT.return_type.?;
