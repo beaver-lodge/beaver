@@ -26,9 +26,8 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
             @compileError("resouce kind not found " ++ @typeName(t));
         }
 
-        fn KindaNIF(comptime cfunction: anytype) type {
+        fn KindaNIF(comptime cfunction: anytype, comptime FTI: anytype) type {
             return struct {
-                const FTI = @typeInfo(@TypeOf(cfunction)).Fn;
                 inline fn VariadicArgs() type {
                     const P = FTI.params;
                     return switch (P.len) {
@@ -101,7 +100,8 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                     flags = NIFs[i][2].flags;
                 }
                 const FTI = @typeInfo(@TypeOf(NIFs[i][0])).Fn;
-                const entry = e.ErlNifFunc{ .name = NIFs[i][1], .arity = FTI.params.len, .fptr = KindaNIF(NIFs[i][0]).nif, .flags = flags };
+                const cfunction = NIFs[i][0];
+                const entry = e.ErlNifFunc{ .name = NIFs[i][1], .arity = FTI.params.len, .fptr = KindaNIF(cfunction, @typeInfo(@TypeOf(cfunction)).Fn).nif, .flags = flags };
                 ret[i] = entry;
             }
             for (Kinds, 0..) |k, i| {
