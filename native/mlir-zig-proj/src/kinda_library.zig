@@ -29,7 +29,7 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                 const FT = @typeInfo(@TypeOf(cfunction)).Fn;
                 fn VariadicArgs() type {
                     const P = FT.params;
-                    _ = switch (P.len) {
+                    switch (P.len) {
                         0 => return struct {},
                         1 => return struct { P[0].type.? },
                         2 => return struct { P[0].type.?, P[1].type.? },
@@ -49,12 +49,12 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                             const s = std.fmt.bufPrint(&buffer, "{}", .{P.len}) catch unreachable;
                             @compileError("too many args " ++ s ++ ", fn: " ++ @typeName(@TypeOf(cfunction)));
                         },
-                    };
+                    }
                 }
 
                 fn variadic_call(args: anytype) FT.return_type.? {
                     const f = cfunction;
-                    _ = switch (FT.params.len) {
+                    switch (FT.params.len) {
                         0 => return f(),
                         1 => return f(args[0]),
                         2 => return f(args[0], args[1]),
@@ -70,7 +70,7 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                         12 => return f(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11]),
                         13 => return f(args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7], args[8], args[9], args[10], args[11], args[12]),
                         else => @compileError("too many args"),
-                    };
+                    }
                 }
 
                 fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
