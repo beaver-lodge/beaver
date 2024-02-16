@@ -29,7 +29,7 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
         fn KindaNIF(comptime cfunction: anytype, comptime nif_name: [*c]const u8, comptime flags: c_uint) type {
             return struct {
                 const FT = @typeInfo(@TypeOf(cfunction)).Fn;
-                inline fn fetch_arg(comptime K: type, env: beam.env, args: [*c]const beam.term, i: c_uint) !K.T {
+                inline fn fetch_arg(comptime K: type, env: beam.env, args: [*c]const beam.term, comptime i: comptime_int) !K.T {
                     return K.resource.fetch(env, args[i]);
                 }
                 inline fn fetch_arg_error(comptime K: type, env: beam.env) beam.term {
