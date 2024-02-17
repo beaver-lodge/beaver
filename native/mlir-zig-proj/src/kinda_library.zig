@@ -1,8 +1,13 @@
 const std = @import("std");
 const beam = @import("beam");
 const e = @import("erl_nif");
-pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
-    return struct {
+const NIFAttrs = struct { flags: u32 = 0, overwrite: ?[*c]const u8 = null };
+pub fn KindaNIF(comptime Kinds: anytype, c: anytype, comptime name: anytype, attrs: NIFAttrs) e.ErlNifFunc {
+    @setEvalBranchQuota(2000);
+    const cfunction = @field(c, name);
+    const FTI = @typeInfo(@TypeOf(cfunction)).Fn;
+    const flags = attrs.flags;
+    return (struct {
         fn getKind(comptime t: type) type {
             switch (@typeInfo(t)) {
                 .Pointer => {
@@ -25,7 +30,7 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
             }
             @compileError("resouce kind not found " ++ @typeName(t));
         }
-        inline fn VariadicArgs(comptime FTI: anytype) type {
+        inline fn VariadicArgs() type {
             const P = FTI.params;
             return switch (P.len) {
                 0 => struct {},
@@ -45,7 +50,7 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                 else => @compileError("too many args"),
             };
         }
-        inline fn variadic_call(cfunction: anytype, args: anytype, FTI: anytype) FTI.return_type.? {
+        inline fn variadic_call(args: anytype) FTI.return_type.? {
             const f = cfunction;
             return switch (FTI.params.len) {
                 0 => f(),
@@ -68,48 +73,25 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
         fn ok_nif(env: beam.env, _: c_int, _: [*c]const beam.term) callconv(.C) beam.term {
             return beam.make_ok(env);
         }
-        fn KindaNIF(comptime cfunction: anytype, comptime FTI: anytype) @TypeOf(ok_nif) {
-            return (struct {
-                fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-                    var c_args: VariadicArgs(FTI) = undefined;
-                    inline for (FTI.params, args, 0..) |p, arg, i| {
-                        const ArgKind = getKind(p.type.?);
-                        c_args[i] = ArgKind.resource.fetch(env, arg) catch return beam.make_error_binary(env, "fail to fetch arg resource");
-                    }
-                    const rt = FTI.return_type.?;
-                    if (rt == void) {
-                        variadic_call(cfunction, c_args, FTI);
-                        return beam.make_ok(env);
-                    } else {
-                        const RetKind = getKind(rt);
-                        return RetKind.resource.make(env, variadic_call(cfunction, c_args, FTI)) catch return beam.make_error_binary(env, "fail to make resource for return type");
-                    }
-                }
-            }).nif;
-        }
         const numOfNIFsPerKind = 10;
-        const Entries = [NIFs.len + Kinds.len * numOfNIFsPerKind]e.ErlNifFunc;
-        fn getEntries() Entries {
-            var ret: Entries = undefined;
-            @setEvalBranchQuota(8000);
-            for (0..NIFs.len) |i| {
-                var flags = 0;
-                if (NIFs[i].len > 2) {
-                    flags = NIFs[i][2].flags;
-                }
-                const cfunction = NIFs[i][0];
-                const FTI = @typeInfo(@TypeOf(cfunction)).Fn;
-                const nif = KindaNIF(cfunction, FTI);
-                const entry = e.ErlNifFunc{ .name = NIFs[i][1], .arity = FTI.params.len, .fptr = nif, .flags = flags };
-                ret[i] = entry;
+        fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            var c_args: VariadicArgs() = undefined;
+            inline for (FTI.params, args, 0..) |p, arg, i| {
+                const ArgKind = getKind(p.type.?);
+                c_args[i] = ArgKind.resource.fetch(env, arg) catch return beam.make_error_binary(env, "fail to fetch arg resource, expect: " ++ @typeName(ArgKind.T));
             }
-            for (Kinds, 0..) |k, i| {
-                for (0..numOfNIFsPerKind) |j| {
-                    ret[NIFs.len + i * numOfNIFsPerKind + j] = k.nifs[j];
-                }
+            const rt = FTI.return_type.?;
+            if (rt == void) {
+                variadic_call(c_args);
+                return beam.make_ok(env);
+            } else {
+                const RetKind = getKind(rt);
+                return RetKind.resource.make(env, variadic_call(c_args)) catch return beam.make_error_binary(env, "fail to make resource for return type: " ++ @typeName(RetKind.T));
             }
-            return ret;
         }
-        pub const entries = getEntries();
-    };
+        const entry = e.ErlNifFunc{ .name = attrs.overwrite orelse name, .arity = FTI.params.len, .fptr = nif, .flags = flags };
+    }).entry;
+}
+pub fn SimpleNIF(comptime Kinds: anytype, c: anytype, comptime name: anytype) e.ErlNifFunc {
+    return KindaNIF(Kinds, c, name, NIFAttrs{});
 }

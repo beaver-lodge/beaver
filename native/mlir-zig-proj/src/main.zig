@@ -735,8 +735,7 @@ const ResourceKindItem = struct {
     value: type,
 };
 
-const kindaLib = @import("kinda_library.zig").KindaLibrary(mlir_capi.allKinds, @import("wrapper.zig").nifs_decls);
-const handwritten_nifs = kindaLib.entries ++ .{
+const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.EntriesOfKinds ++ .{
     e.ErlNifFunc{ .name = "beaver_raw_get_context_load_all_dialects", .arity = 0, .fptr = beaver_raw_get_context_load_all_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_ops", .arity = 0, .fptr = beaver_raw_registered_ops, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_ops_of_dialect", .arity = 2, .fptr = beaver_raw_registered_ops_of_dialect, .flags = 1 },
