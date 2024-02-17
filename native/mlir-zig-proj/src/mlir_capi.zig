@@ -54,40 +54,40 @@ pub const OpOperand = MLIRKind(c.MlirOpOperand, "OpOperand");
 pub const AffineMapCompressUnusedSymbolsPopulateResult = MLIRKind(c.AffineMapCompressUnusedSymbolsPopulateResult, "AffineMapCompressUnusedSymbolsPopulateResult");
 pub const UnmanagedDenseResourceElementsAttrGetDeleteCallback = MLIRKind(c.UnmanagedDenseResourceElementsAttrGetDeleteCallback, "UnmanagedDenseResourceElementsAttrGetDeleteCallback");
 
-fn MLIRCAPIKind(comptime t: type, comptime n: [*]const u8) type {
-    return kinda.ResourceKind(t, root_module ++ "." ++ n);
+pub const Enum_MlirSparseTensorLevelType = kinda.ResourceKind(c.enum_MlirSparseTensorLevelType, root_module ++ "." ++ "Enum_MlirSparseTensorLevelType");
+
+fn MLIRCAPIKind(comptime n: []const u8) type {
+    return kinda.ResourceKind(@field(c, n), root_module ++ "." ++ n);
 }
 
-pub const MlirShapedTypeComponentsCallback = MLIRCAPIKind(c.MlirShapedTypeComponentsCallback, "MlirShapedTypeComponentsCallback");
-pub const MlirTypeID = MLIRCAPIKind(c.MlirTypeID, "MlirTypeID");
-pub const MlirTypesCallback = MLIRCAPIKind(c.MlirTypesCallback, "MlirTypesCallback");
-pub const MlirIntegerSet = MLIRCAPIKind(c.MlirIntegerSet, "MlirIntegerSet");
-pub const MlirAffineExpr = MLIRCAPIKind(c.MlirAffineExpr, "MlirAffineExpr");
-pub const MlirStringCallback = MLIRCAPIKind(c.MlirStringCallback, "MlirStringCallback");
-pub const MlirDialectHandle = MLIRCAPIKind(c.MlirDialectHandle, "MlirDialectHandle");
-pub const Enum_MlirSparseTensorLevelType = MLIRCAPIKind(c.enum_MlirSparseTensorLevelType, "Enum_MlirSparseTensorLevelType");
-pub const MlirDialectRegistry = MLIRCAPIKind(c.MlirDialectRegistry, "MlirDialectRegistry");
-pub const MlirDiagnosticHandlerID = MLIRCAPIKind(c.MlirDiagnosticHandlerID, "MlirDiagnosticHandlerID");
-pub const MlirDiagnosticHandler = MLIRCAPIKind(c.MlirDiagnosticHandler, "MlirDiagnosticHandler");
-pub const MlirDiagnostic = MLIRCAPIKind(c.MlirDiagnostic, "MlirDiagnostic");
-pub const MlirDiagnosticSeverity = MLIRCAPIKind(c.MlirDiagnosticSeverity, "MlirDiagnosticSeverity");
-pub const MlirPassManager = MLIRCAPIKind(c.MlirPassManager, "MlirPassManager");
-pub const MlirRewritePatternSet = MLIRCAPIKind(c.MlirRewritePatternSet, "MlirRewritePatternSet");
-pub const MlirExecutionEngine = MLIRCAPIKind(c.MlirExecutionEngine, "MlirExecutionEngine");
-pub const MlirOperationState = MLIRCAPIKind(c.MlirOperationState, "MlirOperationState");
-pub const MlirSymbolTable = MLIRCAPIKind(c.MlirSymbolTable, "MlirSymbolTable");
-pub const MlirRegisteredOperationName = MLIRCAPIKind(c.MlirRegisteredOperationName, "MlirRegisteredOperationName");
-pub const MlirExternalPass = MLIRCAPIKind(c.MlirExternalPass, "MlirExternalPass");
-pub const MlirExternalPassCallbacks = MLIRCAPIKind(c.MlirExternalPassCallbacks, "MlirExternalPassCallbacks");
-pub const MlirOpPassManager = MLIRCAPIKind(c.MlirOpPassManager, "MlirOpPassManager");
-pub const Struct_MlirAffineMap = MLIRCAPIKind(c.struct_MlirAffineMap, "Struct_MlirAffineMap");
-pub const MlirAsmState = MLIRCAPIKind(c.MlirAsmState, "MlirAsmState");
-pub const MlirOperationWalkCallback = MLIRCAPIKind(c.MlirOperationWalkCallback, "MlirOperationWalkCallback");
-pub const MlirWalkOrder = MLIRCAPIKind(c.MlirWalkOrder, "MlirWalkOrder");
-pub const MlirBytecodeWriterConfig = MLIRCAPIKind(c.MlirBytecodeWriterConfig, "MlirBytecodeWriterConfig");
-pub const MlirOpPrintingFlags = MLIRCAPIKind(c.MlirOpPrintingFlags, "MlirOpPrintingFlags");
-pub const MlirLlvmThreadPool = MLIRCAPIKind(c.MlirLlvmThreadPool, "MlirLlvmThreadPool");
-pub const MlirTypeIDAllocator = MLIRCAPIKind(c.MlirTypeIDAllocator, "MlirTypeIDAllocator");
+pub const MlirShapedTypeComponentsCallback = MLIRCAPIKind("MlirShapedTypeComponentsCallback");
+pub const MlirTypeID = MLIRCAPIKind("MlirTypeID");
+pub const MlirTypesCallback = MLIRCAPIKind("MlirTypesCallback");
+pub const MlirIntegerSet = MLIRCAPIKind("MlirIntegerSet");
+pub const MlirAffineExpr = MLIRCAPIKind("MlirAffineExpr");
+pub const MlirStringCallback = MLIRCAPIKind("MlirStringCallback");
+pub const MlirDialectHandle = MLIRCAPIKind("MlirDialectHandle");
+pub const MlirDialectRegistry = MLIRCAPIKind("MlirDialectRegistry");
+pub const MlirDiagnosticHandlerID = MLIRCAPIKind("MlirDiagnosticHandlerID");
+pub const MlirDiagnosticHandler = MLIRCAPIKind("MlirDiagnosticHandler");
+pub const MlirDiagnostic = MLIRCAPIKind("MlirDiagnostic");
+pub const MlirDiagnosticSeverity = MLIRCAPIKind("MlirDiagnosticSeverity");
+pub const MlirPassManager = MLIRCAPIKind("MlirPassManager");
+pub const MlirRewritePatternSet = MLIRCAPIKind("MlirRewritePatternSet");
+pub const MlirExecutionEngine = MLIRCAPIKind("MlirExecutionEngine");
+pub const MlirOperationState = MLIRCAPIKind("MlirOperationState");
+pub const MlirSymbolTable = MLIRCAPIKind("MlirSymbolTable");
+pub const MlirRegisteredOperationName = MLIRCAPIKind("MlirRegisteredOperationName");
+pub const MlirExternalPass = MLIRCAPIKind("MlirExternalPass");
+pub const MlirExternalPassCallbacks = MLIRCAPIKind("MlirExternalPassCallbacks");
+pub const MlirOpPassManager = MLIRCAPIKind("MlirOpPassManager");
+pub const MlirAsmState = MLIRCAPIKind("MlirAsmState");
+pub const MlirOperationWalkCallback = MLIRCAPIKind("MlirOperationWalkCallback");
+pub const MlirWalkOrder = MLIRCAPIKind("MlirWalkOrder");
+pub const MlirBytecodeWriterConfig = MLIRCAPIKind("MlirBytecodeWriterConfig");
+pub const MlirOpPrintingFlags = MLIRCAPIKind("MlirOpPrintingFlags");
+pub const MlirLlvmThreadPool = MLIRCAPIKind("MlirLlvmThreadPool");
+pub const MlirTypeIDAllocator = MLIRCAPIKind("MlirTypeIDAllocator");
 
 pub const allKinds = .{
     Pass,
@@ -151,7 +151,6 @@ pub const allKinds = .{
     MlirExternalPassCallbacks,
     MlirOpPassManager,
     AffineMapCompressUnusedSymbolsPopulateResult,
-    Struct_MlirAffineMap,
     SymbolTableWalkSymbolTablesCallback,
     OpOperand,
     MlirAsmState,
