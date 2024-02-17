@@ -69,20 +69,33 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
             return beam.make_ok(env);
         }
         fn KindaNIF(comptime cfunction: anytype, comptime FTI: anytype) @TypeOf(ok_nif) {
+            const Helper = struct {
+                const ArgKinds: [FTI.params.len]type = GetArgKinds();
+                fn GetArgKinds() [FTI.params.len]type {
+                    var ret: [FTI.params.len]type = undefined;
+                    inline for (FTI.params, 0..) |p, i| {
+                        ret[i] = getKind(p.type.?);
+                    }
+                    return ret;
+                }
+                const RetKind: type = GetRetKind();
+                fn GetRetKind() type {
+                    const rt = FTI.return_type.?;
+                    return getKind(rt);
+                }
+            };
             return (struct {
                 fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
                     var c_args: VariadicArgs(FTI) = undefined;
-                    inline for (FTI.params, args, 0..) |p, arg, i| {
-                        const ArgKind = getKind(p.type.?);
-                        c_args[i] = ArgKind.resource.fetch(env, arg) catch return beam.make_error_binary(env, "fail to fetch arg resource");
+                    inline for (0..FTI.params.len) |i| {
+                        c_args[i] = Helper.ArgKinds[i].resource.fetch(env, args[i]) catch return beam.make_error_binary(env, "fail to fetch arg resource");
                     }
                     const rt = FTI.return_type.?;
                     if (rt == void) {
                         variadic_call(cfunction, c_args, FTI);
                         return beam.make_ok(env);
                     } else {
-                        const RetKind = getKind(rt);
-                        return RetKind.resource.make(env, variadic_call(cfunction, c_args, FTI)) catch return beam.make_error_binary(env, "fail to make resource for return type");
+                        return Helper.RetKind.resource.make(env, variadic_call(cfunction, c_args, FTI)) catch return beam.make_error_binary(env, "fail to make resource for return type");
                     }
                 }
             }).nif;
