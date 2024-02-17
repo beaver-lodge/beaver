@@ -9,7 +9,13 @@ defmodule Updater do
 
     zig_ast =
       Zig.Parser.parse(translate_out).code
-      |> dbg
+
+    for {:fn, %Zig.Parser.FnOptions{extern: true, inline: inline}, parts} = f <-
+          zig_ast,
+        inline != true do
+      {parts[:name], parts[:type], parts[:params] |> length()}
+    end
+    |> dbg
   end
 end
 
