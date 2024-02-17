@@ -1,6 +1,7 @@
 const beam = @import("beam");
 const kinda = @import("kinda");
 pub const c = @import("prelude.zig");
+const e = @import("erl_nif");
 pub const root_module = "Elixir.Beaver.MLIR.CAPI";
 fn NativeKind(comptime t: type, comptime n: [*]const u8) type {
     const nativeModPrefix = "Elixir.Beaver.Native.";
@@ -168,4 +169,19 @@ pub fn open_generated_resource_types(env: beam.env) void {
     kinda.aliasKind(OpaquePtr, kinda.Internal.OpaquePtr);
     kinda.aliasKind(OpaqueArray, kinda.Internal.OpaqueArray);
     kinda.aliasKind(USize, kinda.Internal.USize);
+}
+
+const numOfNIFsPerKind = 10;
+const EntriesT = [allKinds.len * numOfNIFsPerKind]e.ErlNifFunc;
+pub const EntriesOfKinds = getEntries();
+fn getEntries() EntriesT {
+    var ret: EntriesT = undefined;
+    @setEvalBranchQuota(8000);
+    const Kinds = allKinds;
+    for (Kinds, 0..) |k, i| {
+        for (0..numOfNIFsPerKind) |j| {
+            ret[i * numOfNIFsPerKind + j] = k.nifs[j];
+        }
+    }
+    return ret;
 }
