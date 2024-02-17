@@ -7,7 +7,11 @@ NATIVE_INSTALL_DIR = ${MIX_APP_PATH}/native_install
 MLIR_INCLUDE_DIR = ${LLVM_LIB_DIR}/../include
 BEAVER_INCLUDE_DIR = native/mlir-c/include
 ZIG_CACHE_DIR = ${MIX_APP_PATH}/zig_cache
-zig_build:
+.PHONY: all zig_build cmake_build
+
+all: zig_build
+
+zig_build: cmake_build
 	zig translate-c ${BEAVER_INCLUDE_DIR}/mlir-c/Beaver/wrapper.h --cache-dir ${ZIG_CACHE_DIR} \
 		-I ${BEAVER_INCLUDE_DIR} \
 		-I ${MLIR_INCLUDE_DIR}
