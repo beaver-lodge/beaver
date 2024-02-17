@@ -25,34 +25,34 @@ pub const U8 = NativeKind(u8, "U8");
 pub const USize = NativeKind(usize, "USize");
 pub const OpaqueArray = NativeKind(?*const anyopaque, "OpaqueArray");
 
-fn MLIRKind(comptime t: type, comptime n: [*]const u8) type {
+fn MLIRKind(comptime n: [*]const u8) type {
     const nsPrefix = "Elixir.Beaver.MLIR.";
-    return kinda.ResourceKind(t, nsPrefix ++ n);
+    return kinda.ResourceKind(@field(c, "Mlir" ++ n), nsPrefix ++ n);
 }
-pub const Type = MLIRKind(c.MlirType, "Type");
-pub const Pass = MLIRKind(c.MlirPass, "Pass");
-pub const LogicalResult = MLIRKind(c.MlirLogicalResult, "LogicalResult");
-pub const StringRef = MLIRKind(c.MlirStringRef, "StringRef");
-pub const Context = MLIRKind(c.MlirContext, "Context");
-pub const Location = MLIRKind(c.MlirLocation, "Location");
-pub const Attribute = MLIRKind(c.MlirAttribute, "Attribute");
-pub const Operation = MLIRKind(c.MlirOperation, "Operation");
-pub const AffineMap = MLIRKind(c.MlirAffineMap, "AffineMap");
-pub const DiagnosticHandlerDeleteUserData = MLIRKind(c.DiagnosticHandlerDeleteUserData, "DiagnosticHandlerDeleteUserData");
-pub const NamedAttribute = MLIRKind(c.MlirNamedAttribute, "NamedAttribute");
-pub const Region = MLIRKind(c.MlirRegion, "Region");
-pub const Module = MLIRKind(c.MlirModule, "Module");
-pub const GenericCallback = MLIRKind(c.GenericCallback, "GenericCallback");
-pub const ExternalPassConstruct = MLIRKind(c.ExternalPassConstruct, "ExternalPassConstruct");
-pub const ExternalPassRun = MLIRKind(c.ExternalPassRun, "ExternalPassRun");
-pub const Identifier = MLIRKind(c.MlirIdentifier, "Identifier");
-pub const Value = MLIRKind(c.MlirValue, "Value");
-pub const Block = MLIRKind(c.MlirBlock, "Block");
-pub const Dialect = MLIRKind(c.MlirDialect, "Dialect");
-pub const SymbolTableWalkSymbolTablesCallback = MLIRKind(c.SymbolTableWalkSymbolTablesCallback, "SymbolTableWalkSymbolTablesCallback");
-pub const OpOperand = MLIRKind(c.MlirOpOperand, "OpOperand");
-pub const AffineMapCompressUnusedSymbolsPopulateResult = MLIRKind(c.AffineMapCompressUnusedSymbolsPopulateResult, "AffineMapCompressUnusedSymbolsPopulateResult");
-pub const UnmanagedDenseResourceElementsAttrGetDeleteCallback = MLIRKind(c.UnmanagedDenseResourceElementsAttrGetDeleteCallback, "UnmanagedDenseResourceElementsAttrGetDeleteCallback");
+pub const Type = MLIRKind("Type");
+pub const Pass = MLIRKind("Pass");
+pub const LogicalResult = MLIRKind("LogicalResult");
+pub const StringRef = MLIRKind("StringRef");
+pub const Context = MLIRKind("Context");
+pub const Location = MLIRKind("Location");
+pub const Attribute = MLIRKind("Attribute");
+pub const Operation = MLIRKind("Operation");
+pub const AffineMap = MLIRKind("AffineMap");
+pub const DiagnosticHandlerDeleteUserData = MLIRKind("DiagnosticHandlerDeleteUserData");
+pub const NamedAttribute = MLIRKind("NamedAttribute");
+pub const Region = MLIRKind("Region");
+pub const Module = MLIRKind("Module");
+pub const GenericCallback = MLIRKind("GenericCallback");
+pub const ExternalPassConstruct = MLIRKind("ExternalPassConstruct");
+pub const ExternalPassRun = MLIRKind("ExternalPassRun");
+pub const Identifier = MLIRKind("Identifier");
+pub const Value = MLIRKind("Value");
+pub const Block = MLIRKind("Block");
+pub const Dialect = MLIRKind("Dialect");
+pub const SymbolTableWalkSymbolTablesCallback = MLIRKind("SymbolTableWalkSymbolTablesCallback");
+pub const OpOperand = MLIRKind("OpOperand");
+pub const AffineMapCompressUnusedSymbolsPopulateResult = MLIRKind("AffineMapCompressUnusedSymbolsPopulateResult");
+pub const UnmanagedDenseResourceElementsAttrGetDeleteCallback = MLIRKind("UnmanagedDenseResourceElementsAttrGetDeleteCallback");
 
 pub const Enum_MlirSparseTensorLevelType = kinda.ResourceKind(c.MlirSparseTensorLevelType, root_module ++ "." ++ "Enum_MlirSparseTensorLevelType");
 
