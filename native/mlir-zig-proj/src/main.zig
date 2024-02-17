@@ -805,5 +805,6 @@ const entry = e.ErlNifEntry{
 };
 
 export fn nif_init() *const e.ErlNifEntry {
+    kindaLib.initFunctionMap();
     return &entry;
 }

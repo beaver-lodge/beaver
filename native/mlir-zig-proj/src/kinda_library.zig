@@ -68,9 +68,18 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
         fn ok_nif(env: beam.env, _: c_int, _: [*c]const beam.term) callconv(.C) beam.term {
             return beam.make_ok(env);
         }
-        fn KindaNIF(comptime cfunction: anytype, comptime FTI: anytype) @TypeOf(ok_nif) {
+        fn wrapper_nif(env: beam.env, n: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            const cfunction = ok_nif;
+            return cfunction(env, n, args);
+        }
+        const ZigConvNIF = fn (beam.env, c_int, [*c]const beam.term) beam.term;
+        const CConvNIF = @TypeOf(ok_nif);
+        const HashMap = std.StringHashMap;
+        var functionMap = HashMap(*const ZigConvNIF).init(beam.allocator);
+        // defer functionMap.deinit();
+        fn KindaNIF(comptime cfunction: anytype, comptime FTI: anytype) ZigConvNIF {
             return (struct {
-                fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+                fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
                     var c_args: VariadicArgs(FTI) = undefined;
                     inline for (FTI.params, args, 0..) |p, arg, i| {
                         const ArgKind = getKind(p.type.?);
@@ -89,6 +98,15 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
         }
         const numOfNIFsPerKind = 10;
         const Entries = [NIFs.len + Kinds.len * numOfNIFsPerKind]e.ErlNifFunc;
+        pub fn initFunctionMap() void {
+            @setEvalBranchQuota(8000);
+            inline for (0..NIFs.len) |i| {
+                const cfunction = NIFs[i][0];
+                const FTI = @typeInfo(@TypeOf(cfunction)).Fn;
+                const zf = KindaNIF(cfunction, FTI);
+                functionMap.put(NIFs[i][1], zf) catch unreachable;
+            }
+        }
         fn getEntries() Entries {
             var ret: Entries = undefined;
             @setEvalBranchQuota(8000);
@@ -99,7 +117,7 @@ pub fn KindaLibrary(comptime Kinds: anytype, comptime NIFs: anytype) type {
                 }
                 const cfunction = NIFs[i][0];
                 const FTI = @typeInfo(@TypeOf(cfunction)).Fn;
-                const nif = KindaNIF(cfunction, FTI);
+                const nif = wrapper_nif;
                 const entry = e.ErlNifFunc{ .name = NIFs[i][1], .arity = FTI.params.len, .fptr = nif, .flags = flags };
                 ret[i] = entry;
             }
