@@ -54,7 +54,7 @@ pub const OpOperand = MLIRKind(c.MlirOpOperand, "OpOperand");
 pub const AffineMapCompressUnusedSymbolsPopulateResult = MLIRKind(c.AffineMapCompressUnusedSymbolsPopulateResult, "AffineMapCompressUnusedSymbolsPopulateResult");
 pub const UnmanagedDenseResourceElementsAttrGetDeleteCallback = MLIRKind(c.UnmanagedDenseResourceElementsAttrGetDeleteCallback, "UnmanagedDenseResourceElementsAttrGetDeleteCallback");
 
-pub const Enum_MlirSparseTensorLevelType = kinda.ResourceKind(c.enum_MlirSparseTensorLevelType, root_module ++ "." ++ "Enum_MlirSparseTensorLevelType");
+pub const Enum_MlirSparseTensorLevelType = kinda.ResourceKind(c.MlirSparseTensorLevelType, root_module ++ "." ++ "Enum_MlirSparseTensorLevelType");
 
 fn MLIRCAPIKind(comptime n: []const u8) type {
     return kinda.ResourceKind(@field(c, n), root_module ++ "." ++ n);
