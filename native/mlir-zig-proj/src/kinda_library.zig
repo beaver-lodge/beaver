@@ -86,7 +86,13 @@ pub fn KindaNIF(comptime Kinds: anytype, c: anytype, comptime name: anytype, att
                 return beam.make_ok(env);
             } else {
                 const RetKind = getKind(rt);
-                return RetKind.resource.make(env, variadic_call(c_args)) catch return beam.make_error_binary(env, "fail to make resource for return type: " ++ @typeName(RetKind.T));
+                var tuple_slice: []beam.term = beam.allocator.alloc(beam.term, 3) catch return beam.make_error_binary(env, "fail to allocate memory for tuple slice");
+                defer beam.allocator.free(tuple_slice);
+                tuple_slice[0] = beam.make_atom(env, "kind");
+                tuple_slice[1] = beam.make_atom(env, RetKind.module_name);
+                const ret = RetKind.resource.make(env, variadic_call(c_args)) catch return beam.make_error_binary(env, "fail to make resource for return type: " ++ @typeName(RetKind.T));
+                tuple_slice[2] = ret;
+                return beam.make_tuple(env, tuple_slice);
             }
         }
         const entry = e.ErlNifFunc{ .name = attrs.overwrite orelse name, .arity = FTI.params.len, .fptr = nif, .flags = flags };
