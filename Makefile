@@ -14,7 +14,7 @@ all: zig_build
 zig_build: cmake_build
 	zig translate-c ${BEAVER_INCLUDE_DIR}/mlir-c/Beaver/wrapper.h --cache-dir ${ZIG_CACHE_DIR} \
 		-I ${BEAVER_INCLUDE_DIR} \
-		-I ${MLIR_INCLUDE_DIR}
+		-I ${MLIR_INCLUDE_DIR} | elixir scripts/update_generated.exs
 	cd native/mlir-zig-proj && zig build --cache-dir ${ZIG_CACHE_DIR} \
 	  --prefix ${NATIVE_INSTALL_DIR} \
 		--search-prefix ../mlir-c \
