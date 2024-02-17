@@ -254,7 +254,7 @@ const BeaverPass = struct {
             print("fail to make res: {}\n", .{@TypeOf(op)});
             unreachable;
         };
-        tuple_slice[2] = beam.make_resource(env, pass, mlir_capi.MlirExternalPass.resource.t) catch {
+        tuple_slice[2] = beam.make_resource(env, pass, mlir_capi.ExternalPass.resource.t) catch {
             print("fail to make res: {}\n", .{@TypeOf(pass)});
             unreachable;
         };
@@ -498,12 +498,12 @@ export fn beaver_raw_context_attach_diagnostic_handler(env: beam.env, _: c_int, 
         userData.?.handler = h;
     }
     const id = c.mlirContextAttachDiagnosticHandler(arg0, BeaverDiagnostic.errorHandler, userData, BeaverDiagnostic.deleteUserData);
-    return mlir_capi.MlirDiagnosticHandlerID.resource.make(env, id) catch return beam.make_error_binary(env, "when calling C function mlirContextAttachDiagnosticHandler, fail to make resource for: " ++ @typeName(mlir_capi.MlirDiagnosticHandlerID.T));
+    return mlir_capi.DiagnosticHandlerID.resource.make(env, id) catch return beam.make_error_binary(env, "when calling C function mlirContextAttachDiagnosticHandler, fail to make resource for: " ++ @typeName(mlir_capi.DiagnosticHandlerID.T));
 }
 
 fn beaver_raw_parse_pass_pipeline(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-    var passManager: mlir_capi.MlirOpPassManager.T = mlir_capi.MlirOpPassManager.resource.fetch(env, args[0]) catch
-        return beam.make_error_binary(env, "when calling C function mlirParsePassPipeline, fail to fetch resource for passManager, expected: " ++ @typeName(mlir_capi.MlirOpPassManager.T));
+    var passManager: mlir_capi.OpPassManager.T = mlir_capi.OpPassManager.resource.fetch(env, args[0]) catch
+        return beam.make_error_binary(env, "when calling C function mlirParsePassPipeline, fail to fetch resource for passManager, expected: " ++ @typeName(mlir_capi.OpPassManager.T));
     var pipeline: mlir_capi.StringRef.T = mlir_capi.StringRef.resource.fetch(env, args[1]) catch
         return beam.make_error_binary(env, "when calling C function mlirParsePassPipeline, fail to fetch resource for pipeline, expected: " ++ @typeName(mlir_capi.StringRef.T));
     return mlir_capi.LogicalResult.resource.make(env, c.mlirOpPassManagerAddPipeline(passManager, pipeline, BeaverDiagnostic.printDiagnostic, null)) catch return beam.make_error_binary(env, "when calling C function mlirParsePassPipeline, fail to make resource for: " ++ @typeName(mlir_capi.LogicalResult.T));
@@ -748,7 +748,7 @@ const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.Entries
     e.ErlNifFunc{ .name = "beaver_raw_beaver_type_print", .arity = 1, .fptr = Printer(mlir_capi.Type, c.mlirTypePrint).print, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_operation_print", .arity = 1, .fptr = Printer(mlir_capi.Operation, c.mlirOperationPrint).print, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_value_print", .arity = 1, .fptr = Printer(mlir_capi.Value, c.mlirValuePrint).print, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_beaver_pm_print", .arity = 1, .fptr = Printer(mlir_capi.MlirOpPassManager, c.mlirPrintPassPipeline).print, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_beaver_pm_print", .arity = 1, .fptr = Printer(mlir_capi.OpPassManager, c.mlirPrintPassPipeline).print, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_affine_map_print", .arity = 1, .fptr = Printer(mlir_capi.AffineMap, c.mlirAffineMapPrint).print, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_beaver_location_print", .arity = 1, .fptr = Printer(mlir_capi.Location, c.beaverLocationPrint).print, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_get_resource_c_string", .arity = 1, .fptr = beaver_raw_get_resource_c_string, .flags = 0 },
