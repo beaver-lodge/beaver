@@ -18,44 +18,75 @@ defmodule Beaver.MLIR.CAPI do
 
   mlir_c_path = Path.join(File.cwd!(), "native/mlir-c")
 
-  use Kinda.Prebuilt,
-    otp_app: :beaver,
-    lib_name: "beaver",
-    base_url:
-      Application.compile_env(
-        :beaver,
-        :prebuilt_base_url,
-        "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-12-23-1442"
-      ),
-    version: "0.3.2",
-    wrapper: Path.join(mlir_c_path, "include/mlir-c/Beaver/wrapper.h"),
-    zig_proj: "native/mlir-zig-proj",
-    translate_args:
-      List.flatten(
-        for p <-
-              [Path.join(mlir_c_path, "include")] ++
-                llvm_paths do
-          ["-I", p]
-        end
-      ),
-    build_args:
-      List.flatten(
-        for p <-
-              [dest_dir, mlir_c_path] ++
-                Enum.map(llvm_paths, &Path.dirname/1) do
-          ["--search-prefix", p]
-        end
-      ),
-    dest_dir: dest_dir,
-    forward_module: Beaver.Native,
-    code_gen_module: Beaver.MLIR.CAPI.CodeGen,
-    targets: ~w(
-      aarch64-apple-darwin
-      x86_64-unknown-linux-gnu
-    ),
-    nif_versions: ~w(
-      2.16
-    )
+  @on_load :kinda_on_load
+  @dest_dir Path.join(Mix.Project.app_path(), "native_install")
+  def kinda_on_load do
+    require Logger
+    nif_path = Path.join(@dest_dir, "lib/libbeaver-v0.3.2-nif-2.16-aarch64-apple-darwin")
+    dylib = "#{nif_path}.dylib"
+    so = "#{nif_path}.so"
+
+    if File.exists?(dylib) do
+      File.ln_s(dylib, so)
+    end
+
+    Logger.debug("[Kinda] loading NIF, path: #{nif_path}")
+
+    with :ok <- :erlang.load_nif(nif_path, 0) do
+      Logger.debug("[Kinda] NIF loaded, path: #{nif_path}")
+      :ok
+    else
+      {:error, {:load_failed, msg}} when is_list(msg) ->
+        Logger.error("[Kinda] NIF failed to load, path: #{nif_path}")
+        Logger.error("[Kinda] #{msg}")
+
+        :abort
+
+      error ->
+        Logger.error("[Kinda] NIF failed to load, path: #{nif_path}, error: #{inspect(error)}")
+
+        :abort
+    end
+  end
+
+  # use Kinda.Prebuilt,
+  #   otp_app: :beaver,
+  #   lib_name: "beaver",
+  #   base_url:
+  #     Application.compile_env(
+  #       :beaver,
+  #       :prebuilt_base_url,
+  #       "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-12-23-1442"
+  #     ),
+  #   version: "0.3.2",
+  #   wrapper: Path.join(mlir_c_path, "include/mlir-c/Beaver/wrapper.h"),
+  #   zig_proj: "native/mlir-zig-proj",
+  #   translate_args:
+  #     List.flatten(
+  #       for p <-
+  #             [Path.join(mlir_c_path, "include")] ++
+  #               llvm_paths do
+  #         ["-I", p]
+  #       end
+  #     ),
+  #   build_args:
+  #     List.flatten(
+  #       for p <-
+  #             [dest_dir, mlir_c_path] ++
+  #               Enum.map(llvm_paths, &Path.dirname/1) do
+  #         ["--search-prefix", p]
+  #       end
+  #     ),
+  #   dest_dir: dest_dir,
+  #   forward_module: Beaver.Native,
+  #   code_gen_module: Beaver.MLIR.CAPI.CodeGen,
+  #   targets: ~w(
+  #     aarch64-apple-darwin
+  #     x86_64-unknown-linux-gnu
+  #   ),
+  #   nif_versions: ~w(
+  #     2.16
+  #   )
 
   llvm_headers =
     case LLVMConfig.include_dir() do
