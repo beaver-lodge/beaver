@@ -7,17 +7,6 @@ defmodule Beaver.MLIR.CAPI do
 
   dest_dir = Path.join([Mix.Project.app_path(), "native_install"])
 
-  llvm_paths =
-    case LLVMConfig.include_dir() do
-      {:ok, include_dir} ->
-        [include_dir]
-
-      _ ->
-        []
-    end
-
-  mlir_c_path = Path.join(File.cwd!(), "native/mlir-c")
-
   use Kinda.Prebuilt,
     otp_app: :beaver,
     lib_name: "beaver",
@@ -28,24 +17,6 @@ defmodule Beaver.MLIR.CAPI do
         "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-12-23-1442"
       ),
     version: "0.3.2",
-    wrapper: Path.join(mlir_c_path, "include/mlir-c/Beaver/wrapper.h"),
-    zig_proj: "native/mlir-zig-proj",
-    translate_args:
-      List.flatten(
-        for p <-
-              [Path.join(mlir_c_path, "include")] ++
-                llvm_paths do
-          ["-I", p]
-        end
-      ),
-    build_args:
-      List.flatten(
-        for p <-
-              [dest_dir, mlir_c_path] ++
-                Enum.map(llvm_paths, &Path.dirname/1) do
-          ["--search-prefix", p]
-        end
-      ),
     dest_dir: dest_dir,
     forward_module: Beaver.Native,
     code_gen_module: Beaver.MLIR.CAPI.CodeGen,

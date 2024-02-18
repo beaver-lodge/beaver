@@ -4,6 +4,12 @@ defmodule Updater do
   def gen(functions, :elixir) do
     manifest = inspect(functions, pretty: true, limit: :infinity)
     File.write!("lib/beaver/mlir/capi_functions.exs", manifest)
+
+    if mix_app_path = System.get_env("MIX_APP_PATH") do
+      lib_name = System.get_env("KINDA_LIB_NAME")
+      File.write!("#{mix_app_path}/native_install/kinda-meta-#{lib_name}", manifest)
+    end
+
     functions
   end
 
