@@ -22,14 +22,14 @@ defmodule Updater do
 
     txt = """
     pub const c = @import("prelude.zig");
-    const kl = @import("kinda_library.zig");
+    const kinda = @import("kinda");
     const e = @import("erl_nif");
     const nifPrefix = "Elixir.Beaver.MLIR.CAPI.";
     pub fn N(comptime Kinds: anytype, c_: anytype, comptime name: anytype) e.ErlNifFunc {
-    return kl.KindaNIF(Kinds, c_, name, .{ .overwrite = nifPrefix ++ name });
+    return kinda.NIFFunc(Kinds, c_, name, .{ .nif_name = nifPrefix ++ name });
     }
     pub fn L(comptime Kinds: anytype, c_: anytype, comptime name: anytype) e.ErlNifFunc {
-    return kl.KindaNIF(Kinds, c_, name, .{ .flags = 1, .overwrite = nifPrefix ++ name });
+    return kinda.NIFFunc(Kinds, c_, name, .{ .flags = 1, .nif_name = nifPrefix ++ name });
     }
     const mlir_capi = @import("mlir_capi.zig");
     const K = mlir_capi.allKinds;
