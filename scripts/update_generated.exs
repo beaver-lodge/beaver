@@ -1,23 +1,13 @@
 Mix.install([{:zig_parser, "~> 0.1.0"}])
 
 defmodule Updater do
-  def run do
-    translate_out =
-      IO.stream(:stdio, :line)
-      |> Stream.map(&String.trim/1)
-      |> Enum.join()
+  def gen(functions, :elixir) do
+    manifest = inspect(functions, pretty: true, limit: :infinity)
+    File.write!("lib/beaver/mlir/capi_functions.exs", manifest)
+    functions
+  end
 
-    zig_ast =
-      Zig.Parser.parse(translate_out).code
-
-    functions =
-      for {:fn, %Zig.Parser.FnOptions{extern: true, inline: inline}, parts} <-
-            zig_ast,
-          inline != true do
-        {parts[:name], parts[:params] |> Enum.reject(&(&1 == :...)) |> length()}
-      end
-      |> Enum.sort()
-
+  def gen(functions, :zig) do
     entries =
       for {name, _arity} <- functions do
         lazy_fns = ~w{mlirPassManagerRunOnOp} |> Enum.map(&String.to_atom/1)
@@ -49,11 +39,25 @@ defmodule Updater do
     """
 
     dst = "native/mlir-zig-proj/src/wrapper.zig"
-    File.write(dst, txt)
+    File.write!(dst, txt)
     {_, 0} = System.cmd("zig", ["fmt", dst])
+    functions
+  end
 
-    manifest = inspect(functions, pretty: true, limit: :infinity)
-    File.write("lib/beaver/mlir/capi_functions.exs", manifest)
+  def run do
+    %{code: zig_ast} =
+      IO.stream(:stdio, :line)
+      |> Stream.map(&String.trim/1)
+      |> Enum.join()
+      |> Zig.Parser.parse()
+
+    for {:fn, %Zig.Parser.FnOptions{extern: true, inline: inline}, parts} <- zig_ast,
+        inline != true do
+      {parts[:name], parts[:params] |> Enum.reject(&(&1 == :...)) |> length()}
+    end
+    |> Enum.sort()
+    |> gen(:elixir)
+    |> gen(:zig)
   end
 end
 
