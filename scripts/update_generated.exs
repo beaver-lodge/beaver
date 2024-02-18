@@ -14,12 +14,12 @@ defmodule Updater do
       for {:fn, %Zig.Parser.FnOptions{extern: true, inline: inline}, parts} <-
             zig_ast,
           inline != true do
-        {parts[:name], parts[:type], parts[:params] |> length()}
+        {parts[:name], parts[:params] |> length()}
       end
       |> Enum.sort()
 
-    functions =
-      for {name, _ret, _arity} <- functions do
+    entries =
+      for {name, arity} <- functions do
         lazy_fns = ~w{mlirPassManagerRunOnOp} |> Enum.map(&String.to_atom/1)
 
         if name in lazy_fns do
@@ -44,13 +44,16 @@ defmodule Updater do
     const mlir_capi = @import("mlir_capi.zig");
     const K = mlir_capi.allKinds;
     pub const nif_entries = .{
-    #{functions}
+    #{entries}
     };
     """
 
     dst = "native/mlir-zig-proj/src/wrapper.zig"
     File.write(dst, txt)
     {_, 0} = System.cmd("zig", ["fmt", dst])
+
+    manifest = inspect(functions, pretty: true, limit: :infinity)
+    File.write("lib/beaver/mlir/capi_functions.exs", manifest)
   end
 end
 
