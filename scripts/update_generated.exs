@@ -19,7 +19,7 @@ defmodule Updater do
       |> Enum.sort()
 
     entries =
-      for {name, arity} <- functions do
+      for {name, _arity} <- functions do
         lazy_fns = ~w{mlirPassManagerRunOnOp} |> Enum.map(&String.to_atom/1)
 
         if name in lazy_fns do
