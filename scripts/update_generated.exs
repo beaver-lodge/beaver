@@ -7,7 +7,7 @@ defmodule Updater do
 
     if mix_app_path = System.get_env("MIX_APP_PATH") do
       lib_name = System.get_env("KINDA_LIB_NAME")
-      File.write!("#{mix_app_path}/native_install/kinda-meta-#{lib_name}.ex", manifest)
+      File.write!("#{mix_app_path}/native_install/libkinda-meta-#{lib_name}.ex", manifest)
     end
 
     functions
