@@ -55,7 +55,12 @@ defmodule Beaver.MLIR.CAPI do
     ),
     nif_versions: ~w(
       2.16
-    )
+    ),
+    nifs:
+      "lib/beaver/mlir/capi_functions.exs"
+      |> File.read!()
+      |> Code.eval_string()
+      |> elem(0)
 
   llvm_headers =
     case LLVMConfig.include_dir() do

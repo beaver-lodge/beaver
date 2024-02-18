@@ -14,7 +14,7 @@ defmodule Updater do
       for {:fn, %Zig.Parser.FnOptions{extern: true, inline: inline}, parts} <-
             zig_ast,
           inline != true do
-        {parts[:name], parts[:params] |> length()}
+        {parts[:name], parts[:params] |> Enum.reject(&(&1 == :...)) |> length()}
       end
       |> Enum.sort()
 
