@@ -36,5 +36,5 @@ checksum-*.exs
 beaver-*.tar
 
 .elixir_ls
-scripts/update_generated.exs
+lib/beaver/mlir/capi_functions.exs
 native/mlir-zig-proj/src/wrapper.zig
