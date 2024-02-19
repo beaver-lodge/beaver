@@ -23,16 +23,15 @@ libs =
 
 flags =
   for l <- lines do
-    parts =
-      case l |> String.split() do
-        ["FLAGS", "=" | tail] ->
-          tail
-          |> Enum.reject(&(&1 in ~w{-fno-lifetime-dse}))
-          |> Enum.reject(&String.contains?(&1, "-std="))
+    case l |> String.split() do
+      ["FLAGS", "=" | tail] ->
+        tail
+        |> Enum.reject(&(&1 in ~w{-fno-lifetime-dse}))
+        |> Enum.reject(&String.contains?(&1, "-std="))
 
-        _ ->
-          nil
-      end
+      _ ->
+        nil
+    end
   end
   |> Enum.filter(& &1)
   |> List.first()
