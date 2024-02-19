@@ -8,11 +8,11 @@ NATIVE_INSTALL_DIR = ${MIX_APP_PATH}/priv
 MLIR_INCLUDE_DIR = ${LLVM_LIB_DIR}/../include
 BEAVER_INCLUDE_DIR = native/mlir-zig-proj/mlir-c/include
 ZIG_CACHE_DIR = ${MIX_APP_PATH}/zig_cache
-.PHONY: all zig_build cmake_build
+.PHONY: all cmake_config zig_build cmake_build
 
-all: zig_build cmake_build
+all: cmake_config zig_build cmake_build
 
-zig_build:
+zig_build: cmake_config
 	mkdir -p ${NATIVE_INSTALL_DIR}
 	zig translate-c ${BEAVER_INCLUDE_DIR}/mlir-c/Beaver/wrapper.h --cache-dir ${ZIG_CACHE_DIR} \
 		-I ${BEAVER_INCLUDE_DIR} \
@@ -29,8 +29,9 @@ zig_build:
 		--search-prefix ${ERTS_INCLUDE_DIR}/.. \
 		-freference-trace \
 		-DKINDA_LIB_NAME=${KINDA_LIB_NAME}
-cmake_build:
+cmake_config:
 	cmake -G Ninja -S native/mlir-zig-proj/mlir-c -B ${CMAKE_BUILD_DIR} -DLLVM_DIR=${LLVM_CMAKE_DIR} -DMLIR_DIR=${MLIR_CMAKE_DIR} -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_DIR}
+cmake_build: cmake_config
 	cmake --build ${CMAKE_BUILD_DIR} --target install
 
 clean:
