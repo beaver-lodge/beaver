@@ -5,7 +5,7 @@ defmodule Beaver.MLIR.CAPI do
 
   require Logger
 
-  dest_dir = Path.join([Mix.Project.app_path(), "native_install"])
+  dest_dir = Path.join([Mix.Project.app_path(), "priv"])
 
   use Kinda.Prebuilt,
     otp_app: :beaver,

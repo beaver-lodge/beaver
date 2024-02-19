@@ -38,3 +38,4 @@ beaver-*.tar
 .elixir_ls
 lib/beaver/mlir/capi_functions.exs
 native/mlir-zig-proj/src/wrapper.zig
+checksum.exs

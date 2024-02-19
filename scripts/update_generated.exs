@@ -1,13 +1,15 @@
 Mix.install([{:zig_parser, "~> 0.1.0"}])
 
 defmodule Updater do
+  def args() do
+    System.argv() |> Enum.chunk_every(2)
+  end
+
   def gen(functions, :elixir) do
     manifest = inspect(functions, pretty: true, limit: :infinity)
-    File.write!("lib/beaver/mlir/capi_functions.exs", manifest)
 
-    if mix_app_path = System.get_env("MIX_APP_PATH") do
-      lib_name = System.get_env("KINDA_LIB_NAME")
-      File.write!("#{mix_app_path}/native_install/kinda-meta-lib#{lib_name}.ex", manifest)
+    for ["--elixir", dst] <- args() do
+      File.write!(dst, manifest)
     end
 
     functions
@@ -44,9 +46,11 @@ defmodule Updater do
     };
     """
 
-    dst = "native/mlir-zig-proj/src/wrapper.zig"
-    File.write!(dst, txt)
-    {_, 0} = System.cmd("zig", ["fmt", dst])
+    for ["--zig", dst] <- args() do
+      File.write!(dst, txt)
+      {_, 0} = System.cmd("zig", ["fmt", dst])
+    end
+
     functions
   end
 
