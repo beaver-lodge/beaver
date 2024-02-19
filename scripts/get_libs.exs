@@ -26,7 +26,9 @@ flags =
     parts =
       case l |> String.split() do
         ["FLAGS", "=" | tail] ->
-          tail |> Enum.reject(&(&1 in ~w{-fno-lifetime-dse}))
+          tail
+          |> Enum.reject(&(&1 in ~w{-fno-lifetime-dse}))
+          |> Enum.reject(&String.contains?(&1, "-std="))
 
         _ ->
           nil

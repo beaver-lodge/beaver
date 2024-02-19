@@ -19,7 +19,7 @@ pub fn build(b: *std.build.Builder) void {
         .optimize = .ReleaseSmall,
         .target = target,
     });
-    const cflags = [_][]const u8{ "-std=gnu++17", "-fno-sanitize=undefined" } ++ libs.flags;
+    const cflags = [_][]const u8{ "-std=gnu++20", "-fno-sanitize=undefined" } ++ libs.flags;
     lib.linkLibCpp();
     const cppFiles = .{"mlir-c/lib/CAPI/Beaver.cpp"};
     inline for (cppFiles) |f| {
