@@ -35,7 +35,7 @@ pub fn build(b: *std.build.Builder) void {
         lib.addRPath(.{ .path = "@loader_path" });
     }
     const libs = @import("libs.zig");
-    const mlirLibs = libs.mlirCAPILibs ++ libs.mlirLibs;
+    const mlirLibs = libs.mlirLibs;
     inline for (mlirLibs) |l| {
         lib.linkSystemLibrary(l);
     }

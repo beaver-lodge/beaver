@@ -8,6 +8,11 @@ libs =
     if String.ends_with?(p, ".a") and not String.contains?(p, "Elixir") do
       "lib" <> lib = Path.basename(p)
       lib |> Path.basename(".a")
+    else
+      if String.ends_with?(p, ".o") and not String.contains?(p, "Elixir") do
+        "obj." <> lib = p |> Path.dirname() |> Path.basename()
+        lib
+      end
     end
   end
   |> Enum.uniq()
