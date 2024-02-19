@@ -15,9 +15,15 @@ pub fn build(b: *std.build.Builder) void {
     const lib = b.addSharedLibrary(.{
         .name = lib_name,
         .root_source_file = .{ .path = "src/main.zig" },
-        .optimize = .Debug,
+        .optimize = .ReleaseSmall,
         .target = target,
     });
+    const cflags = [_][]const u8{ "-std=c++17", "-fno-sanitize=undefined" };
+    lib.linkLibCpp();
+    const cppFiles = .{"mlir-c/lib/CAPI/Beaver.cpp"};
+    inline for (cppFiles) |f| {
+        lib.addCSourceFile(.{ .file = std.Build.FileSource.relative(f), .flags = &cflags });
+    }
     const kinda = b.dependency("kinda", .{});
     lib.addModule("kinda", kinda.module("kinda"));
     lib.addModule("erl_nif", kinda.module("erl_nif"));
@@ -28,7 +34,11 @@ pub fn build(b: *std.build.Builder) void {
     if (os == .macos) {
         lib.addRPath(.{ .path = "@loader_path" });
     }
-    lib.linkSystemLibrary("MLIRBeaver");
+    const libs = @import("libs.zig");
+    const mlirLibs = libs.mlirCAPILibs ++ libs.mlirLibs;
+    inline for (mlirLibs) |l| {
+        lib.linkSystemLibrary(l);
+    }
     lib.linker_allow_shlib_undefined = true;
     b.installArtifact(lib);
 }

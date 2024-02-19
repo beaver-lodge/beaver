@@ -102,30 +102,6 @@ defmodule MlirTest do
     MLIR.CAPI.mlirContextDestroy(ctx)
   end
 
-  test "elixir dialect" do
-    require MLIR.Context
-
-    ctx = MLIR.Context.create()
-
-    # This api might trigger NDEBUG assert, so run it more
-    for _ <- 1..200 do
-      Task.async(fn ->
-        :ok =
-          MLIR.CAPI.mlirDialectHandleRegisterDialect(
-            MLIR.CAPI.mlirGetDialectHandle__elixir__(),
-            ctx
-          )
-      end)
-    end
-    |> Task.await_many()
-
-    MLIR.CAPI.mlirContextLoadAllAvailableDialects(ctx)
-
-    _add_op =
-      %MLIR.Operation.State{name: "elixir.add", context: ctx}
-      |> MLIR.Operation.create()
-  end
-
   alias Beaver.MLIR.CAPI
 
   def create_adder_module(ctx) do

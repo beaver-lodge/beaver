@@ -11,7 +11,7 @@ defmodule Beaver.Exterior do
 
   def register_all(ctx) do
     # TODO: get it from app config or other mechanism
-    for dialect <- [Beaver.Exterior.Elixir] do
+    for dialect <- [] do
       :ok = dialect.register_dialect(ctx)
     end
   end
