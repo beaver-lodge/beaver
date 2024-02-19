@@ -1,6 +1,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const os = builtin.os.tag;
+const libs = @import("libs.zig");
 
 pub fn build(b: *std.build.Builder) void {
     var lib_name: []const u8 = undefined;
@@ -18,7 +19,7 @@ pub fn build(b: *std.build.Builder) void {
         .optimize = .ReleaseSmall,
         .target = target,
     });
-    const cflags = [_][]const u8{ "-std=gnu++17", "-fno-sanitize=undefined" };
+    const cflags = [_][]const u8{ "-std=gnu++17", "-fno-sanitize=undefined" } ++ libs.flags;
     lib.linkLibCpp();
     const cppFiles = .{"mlir-c/lib/CAPI/Beaver.cpp"};
     inline for (cppFiles) |f| {
@@ -34,7 +35,6 @@ pub fn build(b: *std.build.Builder) void {
     if (os == .macos) {
         lib.addRPath(.{ .path = "@loader_path" });
     }
-    const libs = @import("libs.zig");
     const mlirLibs = libs.mlirLibs;
     inline for (mlirLibs) |l| {
         lib.linkSystemLibrary(l);
