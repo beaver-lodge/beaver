@@ -26,7 +26,6 @@ flags =
     parts = l |> String.split()
 
     if "FLAGS" in parts do
-      dbg(l)
       ["FLAGS", "=" | tail] = parts
       tail
     end
