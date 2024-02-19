@@ -23,12 +23,14 @@ libs =
 
 flags =
   for l <- lines do
-    parts = l |> String.split()
+    parts =
+      case l |> String.split() do
+        ["FLAGS", "=" | tail] ->
+          tail
 
-    if "FLAGS" in parts do
-      ["FLAGS", "=" | tail] = parts
-      tail
-    end
+        _ ->
+          nil
+      end
   end
   |> Enum.filter(& &1)
   |> List.first()
