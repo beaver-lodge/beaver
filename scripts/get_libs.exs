@@ -1,5 +1,5 @@
 parts =
-  "_build/test/lib/beaver/cmake_build/build.ninja"
+  "_build/#{System.get_env("MIX_ENV")}/lib/beaver/cmake_build/build.ninja"
   |> File.read!()
   |> String.split()
 
