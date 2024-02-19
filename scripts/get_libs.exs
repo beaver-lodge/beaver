@@ -19,4 +19,10 @@ libs =
   |> Enum.sort()
   |> Enum.filter(& &1)
 
-libs |> Enum.map(&("\"" <> &1 <> "\"")) |> Enum.join(", ") |> IO.puts()
+txt = libs |> Enum.map(&("\"" <> &1 <> "\"")) |> Enum.join(", ")
+
+txt = """
+pub const mlirLibs = .{ #{txt} };
+"""
+
+File.write!("native/mlir-zig-proj/libs.zig", txt)

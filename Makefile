@@ -31,6 +31,7 @@ zig_build: cmake_config
 		-DKINDA_LIB_NAME=${KINDA_LIB_NAME}
 cmake_config:
 	cmake -G Ninja -S native/mlir-zig-proj/mlir-c -B ${CMAKE_BUILD_DIR} -DLLVM_DIR=${LLVM_CMAKE_DIR} -DMLIR_DIR=${MLIR_CMAKE_DIR} -DCMAKE_INSTALL_PREFIX=${CMAKE_INSTALL_DIR}
+	elixir scripts/get_libs.exs
 cmake_build: cmake_config
 	cmake --build ${CMAKE_BUILD_DIR} --target install
 
