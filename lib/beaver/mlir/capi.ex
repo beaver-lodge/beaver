@@ -3,10 +3,6 @@ defmodule Beaver.MLIR.CAPI do
   This module ships MLIR's C API. These NIFs are generated from headers in LLVM repo and this repo's headers providing supplemental functions.
   """
 
-  require Logger
-
-  dest_dir = Path.join([Mix.Project.app_path(), "priv"])
-
   use Kinda.Prebuilt,
     otp_app: :beaver,
     lib_name: "beaver",
@@ -17,7 +13,7 @@ defmodule Beaver.MLIR.CAPI do
         "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-12-23-1442"
       ),
     version: "0.3.2",
-    dest_dir: dest_dir,
+    dest_dir: "priv",
     forward_module: Beaver.Native,
     code_gen_module: Beaver.MLIR.CAPI.CodeGen,
     targets: ~w(
