@@ -50,6 +50,8 @@ jobs:
           repository: beaver-lodge/kinda
           path: kinda_local
           ref: remove-meta
+      - run: echo "BEAVER_KINDA_PATH=${PWD}/kinda_local" >> $GITHUB_ENV
+        if: contains(github.event.pull_request.labels.*.name, 'checkout_kinda')
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
         with:
