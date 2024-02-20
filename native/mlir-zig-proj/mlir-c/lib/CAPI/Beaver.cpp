@@ -1,10 +1,14 @@
-#define _GLIBCXX_USE_CXX11_ABI = 1;
+#define _GLIBCXX_USE_CXX11_ABI 1
 #include "mlir/CAPI/Beaver.h"
+#include "mlir-c/Beaver/Context.h"
+#include "mlir-c/Beaver/Pass.h"
+#include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Pass.h"
-#include "mlir/CAPI/Registration.h"
+#include "mlir/CAPI/Support.h"
 #include "mlir/Dialect/IRDL/IRDLLoading.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/ExtensibleDialect.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 
 using namespace mlir;
 
