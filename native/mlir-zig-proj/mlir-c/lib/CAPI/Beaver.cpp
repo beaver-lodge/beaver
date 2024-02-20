@@ -1,6 +1,6 @@
+#define _GLIBCXX_USE_CXX11_ABI = 1;
 #include "mlir/CAPI/Beaver.h"
 #include "mlir/CAPI/Pass.h"
-#include "mlir/CAPI/Registration.h"
 #include "mlir/Dialect/IRDL/IRDLLoading.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/ExtensibleDialect.h"
