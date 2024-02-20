@@ -23,11 +23,13 @@ defmodule Beaver.MLIR.CAPI do
     nif_versions: ~w(
       2.16
     ),
-    nifs:
-      "lib/beaver/mlir/capi_functions.exs"
+    nifs: fn ->
+      Application.app_dir(:beaver)
+      |> Path.join("priv/capi_functions.ex")
       |> File.read!()
       |> Code.eval_string()
       |> elem(0)
+    end
 
   llvm_headers =
     case LLVMConfig.include_dir() do

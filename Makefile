@@ -15,8 +15,7 @@ zig_build: cmake_build
 	zig translate-c ${BEAVER_INCLUDE_DIR}/mlir-c/Beaver/wrapper.h --cache-dir ${ZIG_CACHE_DIR} \
 		-I ${BEAVER_INCLUDE_DIR} \
 		-I ${MLIR_INCLUDE_DIR} | elixir scripts/update_generated.exs \
-			--elixir ${NATIVE_INSTALL_DIR}/kinda-meta-lib${KINDA_LIB_NAME}.ex \
-			--elixir lib/beaver/mlir/capi_functions.exs \
+			--elixir ${NATIVE_INSTALL_DIR}/capi_functions.ex \
 			--zig native/mlir-zig-proj/src/wrapper.zig
 	cd native/mlir-zig-proj && zig build --cache-dir ${ZIG_CACHE_DIR} \
 	  --prefix ${NATIVE_INSTALL_DIR} \
