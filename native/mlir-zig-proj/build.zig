@@ -13,18 +13,26 @@ pub fn build(b: *std.build.Builder) void {
     // Standard release options allow the person running `zig build` to select
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const target: std.zig.CrossTarget = .{};
+    const s = b.addStaticLibrary(.{
+        .name = lib_name,
+        .root_source_file = .{ .path = "mlir-c/lib/CAPI/Beaver.cpp" },
+        .optimize = .Debug,
+        .target = target,
+    });
     const lib = b.addSharedLibrary(.{
         .name = lib_name,
         .root_source_file = .{ .path = "src/main.zig" },
-        .optimize = .ReleaseSmall,
+        .optimize = .Debug,
         .target = target,
     });
     const cflags = [_][]const u8{ "-std=gnu++17", "-fno-sanitize=undefined", "-D_GLIBCXX_USE_CXX11_ABI=1" } ++ libs.flags;
     lib.linkLibCpp();
-    const cppFiles = .{"mlir-c/lib/CAPI/Beaver.cpp"};
+    s.linkLibCpp();
+    const cppFiles = .{};
     inline for (cppFiles) |f| {
-        lib.addCSourceFile(.{ .file = std.Build.FileSource.relative(f), .flags = &cflags });
+        s.addCSourceFile(.{ .file = std.Build.FileSource.relative(f), .flags = &cflags });
     }
+    lib.linkLibrary(s);
     const kinda = b.dependency("kinda", .{});
     lib.addModule("kinda", kinda.module("kinda"));
     lib.addModule("erl_nif", kinda.module("erl_nif"));
