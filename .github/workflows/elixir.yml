@@ -87,4 +87,6 @@ jobs:
         if: failure()
         with:
           name: beaver-tmp-${{ github.run_number }}-${{ github.run_attempt }}
-          path: ./tmp/**/*.zig
+          path: |
+            _build/*/lib/beaver/cmake_build/build.ninja
+            native/mlir-zig-proj/libs.zig
