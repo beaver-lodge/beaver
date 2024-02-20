@@ -42,6 +42,14 @@ jobs:
           - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04 }
     steps:
       - uses: actions/checkout@v3
+        name: Check-out beaver
+      - uses: actions/checkout@v3
+        name: Check-out Kinda
+        if: contains(github.event.pull_request.labels.*.name, 'checkout_kinda')
+        with:
+          repository: beaver-lodge/kinda
+          path: kinda_local
+          ref: remove-meta
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
         with:

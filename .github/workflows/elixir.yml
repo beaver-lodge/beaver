@@ -39,7 +39,9 @@ jobs:
         elixir: ["1.13.0", "1.15.0"]
     steps:
       - uses: actions/checkout@v3
+        name: Check-out beaver
       - uses: actions/checkout@v3
+        name: Check-out Kinda
         if: contains(github.event.pull_request.labels.*.name, 'checkout_kinda')
         with:
           repository: beaver-lodge/kinda
