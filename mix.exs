@@ -32,6 +32,7 @@ defmodule Beaver.MixProject do
     ] ++
       [
         make_precompiler: {:nif, Kinda.Precompiler},
+        make_precompiler_priv_paths: ["lib"],
         make_precompiler_url:
           "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-12-23-1442"
       ]

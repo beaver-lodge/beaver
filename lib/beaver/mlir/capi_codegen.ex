@@ -1,8 +1,7 @@
 defmodule Beaver.MLIR.CAPI.CodeGen do
   @moduledoc false
   alias Kinda.CodeGen.{KindDecl}
-  use Kinda.CodeGen
-
+  @behaviour Kinda.CodeGen
   defp memref_kind_functions(DescriptorUnranked) do
     [
       make: 5,
@@ -136,5 +135,13 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
         ],
         &%KindDecl{module_name: Module.concat(Beaver.Native, &1)}
       )
+  end
+
+  def nifs() do
+    Application.app_dir(:beaver)
+    |> Path.join("priv/capi_functions.ex")
+    |> File.read!()
+    |> Code.eval_string()
+    |> elem(0)
   end
 end

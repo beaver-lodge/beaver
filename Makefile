@@ -23,8 +23,7 @@ zig_build: cmake_build
 		--search-prefix ${NATIVE_INSTALL_DIR} \
 		--search-prefix ${LLVM_LIB_DIR}/.. \
 		--search-prefix ${ERTS_INCLUDE_DIR}/.. \
-		-freference-trace \
-		-DKINDA_LIB_NAME=${KINDA_LIB_NAME}
+		-freference-trace
 cmake_build:
 	cmake -G Ninja -S native/mlir-c -B ${CMAKE_BUILD_DIR} -DLLVM_DIR=${LLVM_CMAKE_DIR} -DMLIR_DIR=${MLIR_CMAKE_DIR} -DCMAKE_INSTALL_PREFIX=${NATIVE_INSTALL_DIR}
 	cmake --build ${CMAKE_BUILD_DIR} --target install

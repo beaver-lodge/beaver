@@ -2,34 +2,23 @@ defmodule Beaver.MLIR.CAPI do
   @moduledoc """
   This module ships MLIR's C API. These NIFs are generated from headers in LLVM repo and this repo's headers providing supplemental functions.
   """
+  use Kinda.CodeGen, with: Beaver.MLIR.CAPI.CodeGen
 
-  use Kinda.Prebuilt,
-    otp_app: :beaver,
-    lib_name: "beaver",
-    base_url:
-      Application.compile_env(
-        :beaver,
-        :prebuilt_base_url,
-        "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-12-23-1442"
-      ),
-    version: "0.3.2",
-    dest_dir: "priv",
-    forward_module: Beaver.Native,
-    code_gen_module: Beaver.MLIR.CAPI.CodeGen,
-    targets: ~w(
-      aarch64-apple-darwin
-      x86_64-unknown-linux-gnu
-    ),
-    nif_versions: ~w(
-      2.16
-    ),
-    nifs: fn ->
-      Application.app_dir(:beaver)
-      |> Path.join("priv/capi_functions.ex")
-      |> File.read!()
-      |> Code.eval_string()
-      |> elem(0)
+  @on_load :load_nif
+
+  def load_nif do
+    nif_file = ~c"#{:code.priv_dir(:beaver)}/lib/libBeaverNIF"
+
+    if File.exists?(dylib = "#{nif_file}.dylib") do
+      File.ln_s(dylib, "#{nif_file}.so")
     end
+
+    case :erlang.load_nif(nif_file, 0) do
+      :ok -> :ok
+      {:error, {:reload, _}} -> :ok
+      {:error, reason} -> IO.puts("Failed to load nif: #{inspect(reason)}")
+    end
+  end
 
   llvm_headers =
     case LLVMConfig.include_dir() do
