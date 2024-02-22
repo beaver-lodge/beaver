@@ -1,20 +1,7 @@
 defmodule Beaver.MixProject do
   use Mix.Project
 
-  @build_cmake Application.compile_env(
-                 :beaver,
-                 :build_cmake,
-                 System.get_env("BEAVER_BUILD_CMAKE") in ["1", "true"]
-               )
-
   def project do
-    make_compilers =
-      if @build_cmake do
-        [:elixir_make]
-      else
-        []
-      end
-
     [
       app: :beaver,
       version: "0.3.2",
@@ -25,14 +12,14 @@ defmodule Beaver.MixProject do
       description: description(),
       docs: docs(),
       package: package(),
-      compilers: make_compilers ++ Mix.compilers(),
+      compilers: [:elixir_make] ++ Mix.compilers(),
       preferred_cli_env: [
         "test.watch": :test
       ]
     ] ++
       [
         make_precompiler: {:nif, Kinda.Precompiler},
-        make_precompiler_priv_paths: ["lib"],
+        make_force_build: System.get_env("BEAVER_BUILD_CMAKE") in ["1", "true"],
         make_precompiler_url:
           "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-12-23-1442"
       ]
