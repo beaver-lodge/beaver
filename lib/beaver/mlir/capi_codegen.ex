@@ -22,7 +22,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
     ]
   end
 
-  @impl true
+  @impl Kinda.CodeGen
   def kinds() do
     for rank <- [
           DescriptorUnranked,
@@ -137,6 +137,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
       )
   end
 
+  @impl Kinda.CodeGen
   def nifs() do
     Application.app_dir(:beaver)
     |> Path.join("priv/capi_functions.ex")

@@ -2,7 +2,7 @@ defmodule Beaver.MLIR.CAPI do
   @moduledoc """
   This module ships MLIR's C API. These NIFs are generated from headers in LLVM repo and this repo's headers providing supplemental functions.
   """
-  use Kinda.CodeGen, with: Beaver.MLIR.CAPI.CodeGen
+  use Kinda.CodeGen, with: Beaver.MLIR.CAPI.CodeGen, root: __MODULE__, forward: Beaver.Native
 
   @on_load :load_nif
 
