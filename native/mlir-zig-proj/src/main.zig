@@ -730,11 +730,6 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
     };
 }
 
-const ResourceKindItem = struct {
-    key: []const u8,
-    value: type,
-};
-
 const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.EntriesOfKinds ++ .{
     e.ErlNifFunc{ .name = "beaver_raw_get_context_load_all_dialects", .arity = 0, .fptr = beaver_raw_get_context_load_all_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_ops", .arity = 0, .fptr = beaver_raw_registered_ops, .flags = 1 },
