@@ -129,7 +129,7 @@ jobs:
       - run: curl http://127.0.0.1:8000/
       - name: Run tests with prebuilt
         env:
-          BEAVER_ARTEFACT_URL: http://127.0.0.1:8000/
+          BEAVER_ARTEFACT_URL: http://127.0.0.1:8000/@{artefact_filename}
         run: |
           MIX_ENV=prod mix elixir_make.checksum --all --ignore-unavailable --only-local --print
           mix clean
@@ -146,6 +146,6 @@ jobs:
       - name: Test dev compile
         if: ${{ github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != null }}
         env:
-          BEAVER_ARTEFACT_URL: "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/${{ needs.generate_id.outputs.formatted_date }}"
+          BEAVER_ARTEFACT_URL: "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/${{ needs.generate_id.outputs.formatted_date }}/@{artefact_filename}"
         run: |
           mix compile
