@@ -131,6 +131,7 @@ jobs:
         env:
           BEAVER_ARTEFACT_URL: http://127.0.0.1:8000/
         run: |
+          MIX_ENV=prod mix elixir_make.checksum --all --ignore-unavailable --only-local --print
           mix clean
           mix test --exclude vulkan --exclude todo
       - name: Publish archives and packages
