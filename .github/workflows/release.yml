@@ -127,9 +127,6 @@ jobs:
           sleep 3
           ps aux
       - run: curl http://127.0.0.1:8000/
-      - name: Replace test config
-        run: |
-          cp config/release-test.exs config/test.exs
       - name: Run tests with prebuilt
         env:
           BEAVER_ARTEFACT_URL: http://127.0.0.1:8000/
