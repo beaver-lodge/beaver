@@ -77,41 +77,7 @@ jobs:
         run: |
           python3 -m pip install -r dev-requirements.txt
           echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
-      - name: Production compile
-        env:
-          MIX_ENV: prod
-        run: |
-          BEAVER_BUILD_CMAKE=1 mix compile
-      - env:
-          MIX_ENV: prod
-        run: tree _build/${MIX_ENV}/lib/beaver/priv
-      - name: Run patchelf
-        env:
-          MIX_ENV: prod
-        run: |
-          set -u
-          find _build/${MIX_ENV}/lib/beaver/priv/lib -name "*.so*" -maxdepth 1 -type f | while read sofile; do
-            echo "==> working on: $sofile"
-
-            echo "==> before replace needed"
-            patchelf --print-needed $sofile
-
-            patchelf --replace-needed libMLIRBeaver.so.19 libMLIRBeaver.so $sofile
-
-            echo "==> after"
-            patchelf --print-needed $sofile
-
-            echo "==> before set rpath"
-            patchelf --print-rpath $sofile
-
-            patchelf --set-rpath '$ORIGIN:$ORIGIN/lib:$ORIGIN/../../..' --force-rpath \
-                    $sofile
-
-            echo "==> after"
-            patchelf --print-rpath $sofile
-          done
-      - name: Tar production native libraries
-        id: tar
+      - name: Production build
         env:
           MIX_ENV: prod
           ELIXIR_MAKE_CACHE_DIR: .
