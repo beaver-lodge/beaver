@@ -114,6 +114,7 @@ jobs:
         id: tar
         env:
           MIX_ENV: prod
+          ELIXIR_MAKE_CACHE_DIR: .
         run: |
           mix elixir_make.precompile
       - name: Purge artifacts
@@ -142,7 +143,7 @@ jobs:
         if: ${{ github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != null }}
         with:
           files: |
-            ${{ steps.tar.outputs.LIB_FINAL_NAME }}
+            *.tar.gz
           repository: beaver-lodge/beaver-prebuilt
           token: ${{ secrets.PRE_BUILT_RELEASE_GITHUB_TOKEN }}
           tag_name: ${{ needs.generate_id.outputs.formatted_date }}
