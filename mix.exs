@@ -21,7 +21,8 @@ defmodule Beaver.MixProject do
         make_precompiler: {:nif, Kinda.Precompiler},
         make_force_build: System.get_env("BEAVER_BUILD_CMAKE") in ["1", "true"],
         make_precompiler_url:
-          "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-12-23-1442"
+          System.get_env("BEAVER_ARTEFACT_URL") ||
+            "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-12-23-1442"
       ]
   end
 
