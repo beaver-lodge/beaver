@@ -124,6 +124,7 @@ jobs:
       - name: Start mock server in the background
         run: |
           python3 -m http.server --directory . &> /dev/null &
+      - run: curl http://127.0.0.1:8000/
       - name: Replace test config
         run: |
           cp config/release-test.exs config/test.exs
