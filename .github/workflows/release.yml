@@ -127,13 +127,6 @@ jobs:
       - name: Replace test config
         run: |
           cp config/release-test.exs config/test.exs
-      - name: Run download task
-        env:
-          MIX_ENV: test
-        run: |
-          # run a force build to generate metadata of rustler_precompiled
-          mix compile --force || true
-          mix rustler_precompiled.download Beaver.MLIR.CAPI --only-local --print
       - name: Run tests with prebuilt
         run: |
           mix clean
