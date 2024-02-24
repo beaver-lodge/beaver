@@ -100,7 +100,7 @@ defmodule Beaver.MixProject do
       {:llvm_config, "~> 0.1.0"},
       if(p = System.get_env("BEAVER_KINDA_PATH"),
         do: {:kinda, path: p},
-        else: {:kinda, "~> 0.6.0"}
+        else: {:kinda, "~> 0.7.0"}
       ),
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
