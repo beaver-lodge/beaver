@@ -10,7 +10,9 @@ defmodule Beaver.MLIR.CAPI do
     nif_file = ~c"#{:code.priv_dir(:beaver)}/lib/libBeaverNIF"
 
     if File.exists?(dylib = "#{nif_file}.dylib") do
-      File.ln_s(dylib, "#{nif_file}.so")
+      nif_dir = Path.dirname("#{nif_file}.so")
+      relative_dylib_path = Path.relative_to(dylib, nif_dir) |> dbg
+      File.ln_s(relative_dylib_path, "#{nif_file}.so")
     end
 
     case :erlang.load_nif(nif_file, 0) do
