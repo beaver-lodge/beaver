@@ -140,9 +140,10 @@ def deps do
 end
 ```
 
-Documentation can be generated with [ExDoc](https://github.com/elixir-lang/ex_doc)
-and published on [HexDocs](https://hexdocs.pm). Once published, the docs can
-be found at <https://hexdocs.pm/beaver>.
+Add this to your `.formatter.exs` will have the formatter properly transform the macros introduced by `beaver`
+```elixir
+import_deps: [:beaver],
+```
 
 ## Erlang apps related to the Beaver
 
