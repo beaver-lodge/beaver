@@ -77,7 +77,7 @@ defmodule Beaver.MixProject do
         native/**/*.h
         native/**/*.td
         native/**/*.cpp
-        checksum-*.exs
+        checksum.exs
         Makefile
       }
     ]
