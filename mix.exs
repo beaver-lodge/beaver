@@ -22,8 +22,20 @@ defmodule Beaver.MixProject do
         make_force_build: System.get_env("BEAVER_BUILD_CMAKE") in ["1", "true"],
         make_precompiler_url:
           System.get_env("BEAVER_ARTEFACT_URL") ||
-            "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2024-02-24-0638/@{artefact_filename}"
+            "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2024-02-24-0729/@{artefact_filename}",
+        make_precompiler_nif_versions: [
+          versions: ["2.16", "2.17"],
+          availability: &target_available_for_nif_version?/2
+        ]
       ]
+  end
+
+  defp target_available_for_nif_version?(target, nif_version) do
+    if String.contains?(target, "darwin") do
+      nif_version == "2.17"
+    else
+      true
+    end
   end
 
   defp description() do
