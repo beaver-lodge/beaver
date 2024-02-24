@@ -41,6 +41,7 @@ defmodule DialectRegistryTest do
         {"memref", "MemRef"},
         {"mesh", "Mesh"},
         {"ml_program", "MLProgram"},
+        {"mpi", "MPI"},
         {"nvgpu", "NVGPU"},
         {"nvvm", "NVVM"},
         {"omp", "OMP"},
