@@ -11,7 +11,5 @@ defmodule Beaver.Application do
 
   def start_phase(:mlir_register_all_passes, :normal, []) do
     Beaver.MLIR.CAPI.mlirRegisterAllPasses()
-    Logger.debug("[Beaver] all passes registered")
-    :ok
   end
 end

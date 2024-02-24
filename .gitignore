@@ -27,12 +27,10 @@ zig-cache
 
 *.so.tar.gz
 
-priv/native/*.so
-priv/native/*.dylib
-priv/native/*.ex
-
 checksum-*.exs
+checksum.exs
 
 beaver-*.tar
+beaver-*.tar.gz
 
 .elixir_ls

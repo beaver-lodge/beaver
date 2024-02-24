@@ -39,6 +39,16 @@ jobs:
         elixir: ["1.13.0", "1.15.0"]
     steps:
       - uses: actions/checkout@v3
+        name: Check-out beaver
+      - uses: actions/checkout@v3
+        name: Check-out Kinda
+        if: contains(github.event.pull_request.labels.*.name, 'checkout_kinda')
+        with:
+          repository: beaver-lodge/kinda
+          path: kinda_local
+          ref: remove-meta
+      - run: echo "BEAVER_KINDA_PATH=${PWD}/kinda_local" >> $GITHUB_ENV
+        if: contains(github.event.pull_request.labels.*.name, 'checkout_kinda')
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp}}
@@ -74,7 +84,7 @@ jobs:
         run: |
           python3 -m pip install -r dev-requirements.txt
           echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
-      - name: Build CMake
+      - name: Build native library
         run: |
           MIX_ENV=test mix compile.elixir_make
       - name: Run smoke tests

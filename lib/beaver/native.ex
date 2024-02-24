@@ -78,13 +78,19 @@ defmodule Beaver.Native do
     %__MODULE__.C.String{ref: check!(CAPI.beaver_raw_get_resource_c_string(value))}
   end
 
-  def check!(ref) do
-    case ref do
+  def check!(ret) do
+    case ret do
+      {:kind, Beaver.Native.U8.Array, ref} when is_reference(ref) ->
+        struct!(Beaver.Native.C.String, %{ref: ref})
+
+      {:kind, mod, ref} when is_atom(mod) and is_reference(ref) ->
+        struct!(mod, %{ref: ref})
+
       {:error, e} ->
         raise e
 
-      ref ->
-        ref
+      _ ->
+        ret
     end
   end
 

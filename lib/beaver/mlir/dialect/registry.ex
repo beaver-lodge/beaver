@@ -35,6 +35,7 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def normalize_dialect_name("ml_program"), do: "MLProgram"
   def normalize_dialect_name("pdl_interp"), do: "PDLInterp"
   def normalize_dialect_name("irdl"), do: "IRDL"
+  def normalize_dialect_name("mpi"), do: "MPI"
   def normalize_dialect_name(other), do: other |> Macro.camelize()
 
   def ops(dialect, opts \\ []) do

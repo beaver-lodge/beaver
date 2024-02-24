@@ -4,8 +4,6 @@ defmodule Beaver.MLIR.Dialect do
   You might override `eval_ssa/1` function to introduce your custom op generation
   """
 
-  require Logger
-
   use Kinda.ResourceKind,
     forward_module: Beaver.Native
 
@@ -22,13 +20,8 @@ defmodule Beaver.MLIR.Dialect do
       end
 
       defoverridable eval_ssa: 1
-      require Logger
 
       dialect_module_name = dialect |> Beaver.MLIR.Dialect.Registry.normalize_dialect_name()
-
-      Logger.debug(
-        "[Beaver] building Elixir module for dialect #{dialect} => #{dialect_module_name} (#{length(ops)})"
-      )
 
       func_names =
         for op <- ops do

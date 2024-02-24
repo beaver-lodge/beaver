@@ -10,7 +10,7 @@ In the de-facto way of using MLIR, we need to work with C/C++, TableGen, CMake a
 
 Elixir could actually be a good fit as a MLIR front end. Elixir has SSA, pattern-matching, pipe-operator. We can use these language features to define MLIR patterns and pass pipeline in a natural and uniformed way. Elixir is strong-typed but not static-typed which makes it a great choice for quickly building prototypes to validate and explore new ideas.
 
-Here is an example to build and verify a piece of IR in Beaver:
+To build a piece of IR in Beaver:
 
 ```elixir
 Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
@@ -135,7 +135,7 @@ by adding `beaver` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:beaver, "~> 0.3.2"}
+    {:beaver, "~> 0.3.4"}
   ]
 end
 ```
@@ -366,12 +366,12 @@ Usually a function accepting a MLIR context to create an operation or type is ca
 
 ### Update Elixir source
 
-- Bump versions in [`capi.ex`](/lib/beaver/mlir/capi.ex) and [`mix.exs`](/mix.exs)
+- Bump versions in [`README.md`](README.md) and [`mix.exs`](/mix.exs)
 
 ### Linux
 
 - Run CI, which generates the new GitHub release uploaded to https://github.com/beaver-lodge/beaver-prebuilt/releases.
-- Update release url in [`capi.ex`](/lib/beaver/mlir/capi.ex)
+- Update release url in [`mix.exs`](/mix.exs)
 
 ### Mac
 
@@ -382,15 +382,15 @@ Usually a function accepting a MLIR context to create an operation or type is ca
   bash scripts/build-for-publish.sh
   ```
 
-- Upload the `libbeaver-[xxx]-nif-2.16-aarch64-apple-darwin.so.tar.gz` file to release
+- Upload the `beaver-nif-[xxx].tar.gz` file to release
 
-### Generate `checksum-xxx.exs`
+### Generate `checksum.exs`
 
 ```
-rm checksum-Elixir.Beaver.MLIR.CAPI.exs
+rm checksum.exs
 mix clean
 mix
-mix rustler_precompiled.download Beaver.MLIR.CAPI --all --ignore-unavailable --print
+mix elixir_make.checksum --all --ignore-unavailable --print
 ```
 
 Check the version in the output is correct.
@@ -399,14 +399,6 @@ Check the version in the output is correct.
 
 ```
 BEAVER_BUILD_CMAKE=1 mix hex.publish
-```
-
-## Run linters/static analysis
-
-```
-mix doctor
-mix credo --all
-mix gradient
 ```
 
 ## (Optional) Format CMake files
