@@ -4,7 +4,7 @@ defmodule Beaver.MixProject do
   def project do
     [
       app: :beaver,
-      version: "0.3.3",
+      version: "0.3.4",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -12,10 +12,7 @@ defmodule Beaver.MixProject do
       description: description(),
       docs: docs(),
       package: package(),
-      compilers: [:elixir_make] ++ Mix.compilers(),
-      preferred_cli_env: [
-        "test.watch": :test
-      ]
+      compilers: [:elixir_make] ++ Mix.compilers()
     ] ++
       [
         make_precompiler: {:nif, Kinda.Precompiler},
@@ -81,6 +78,7 @@ defmodule Beaver.MixProject do
       links: %{"GitHub" => "https://github.com/beaver-lodge/beaver"},
       files: ~w{
         lib .formatter.exs mix.exs README*
+        scripts/*.exs
         native/mlir-zig-proj/src/*.zig
         native/mlir-zig-proj/build.zig
         native/mlir-zig-proj/build.zig.zon
