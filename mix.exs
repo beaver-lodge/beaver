@@ -1,20 +1,7 @@
 defmodule Beaver.MixProject do
   use Mix.Project
 
-  @build_cmake Application.compile_env(
-                 :beaver,
-                 :build_cmake,
-                 System.get_env("BEAVER_BUILD_CMAKE") in ["1", "true"]
-               )
-
   def project do
-    make_compilers =
-      if @build_cmake do
-        [:elixir_make]
-      else
-        []
-      end
-
     [
       app: :beaver,
       version: "0.3.2",
@@ -25,11 +12,18 @@ defmodule Beaver.MixProject do
       description: description(),
       docs: docs(),
       package: package(),
-      compilers: make_compilers ++ Mix.compilers(),
+      compilers: [:elixir_make] ++ Mix.compilers(),
       preferred_cli_env: [
         "test.watch": :test
       ]
-    ]
+    ] ++
+      [
+        make_precompiler: {:nif, Kinda.Precompiler},
+        make_force_build: System.get_env("BEAVER_BUILD_CMAKE") in ["1", "true"],
+        make_precompiler_url:
+          System.get_env("BEAVER_ARTEFACT_URL") ||
+            "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2023-12-23-1442"
+      ]
   end
 
   defp description() do
@@ -83,7 +77,7 @@ defmodule Beaver.MixProject do
         native/**/*.h
         native/**/*.td
         native/**/*.cpp
-        checksum-*.exs
+        checksum.exs
         Makefile
       }
     ]
@@ -104,12 +98,11 @@ defmodule Beaver.MixProject do
     [
       {:elixir_make, "~> 0.4", runtime: false},
       {:llvm_config, "~> 0.1.0"},
-      {:kinda, "~> 0.3.0"},
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
-      {:mix_test_watch, "~> 1.0", only: [:dev, :test]},
-      {:credo, "~> 1.6", only: [:dev, :test], runtime: false},
-      {:gradient, github: "esl/gradient", only: [:dev], runtime: false},
-      {:doctor, "~> 0.21.0", only: :dev}
+      if(p = System.get_env("BEAVER_KINDA_PATH"),
+        do: {:kinda, path: p},
+        else: {:kinda, "~> 0.7.1"}
+      ),
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
 end

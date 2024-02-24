@@ -3,3 +3,6 @@ zig-cache
 test/src
 prod/src
 dev/src
+.cache
+compile_commands.json
+src/wrapper.zig
