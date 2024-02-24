@@ -39,7 +39,7 @@ jobs:
       matrix:
         job:
           - { otp: 24.2, os: ubuntu-22.04, elixir: 1.14 }
-          - { otp: 25, os: ubuntu-22.04, elixir: 1.15 }
+          - { otp: 26, os: ubuntu-22.04, elixir: 1.15 }
     steps:
       - uses: actions/checkout@v3
         name: Check-out beaver
