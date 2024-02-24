@@ -41,7 +41,6 @@ jobs:
           - { otp: 24.2, os: ubuntu-22.04, elixir: 1.14 }
           - { otp: 25, os: ubuntu-22.04, elixir: 1.15 }
     steps:
-      - run: elixir --eval ":erlang.system_info(:nif_version) |> IO.puts"
       - uses: actions/checkout@v3
         name: Check-out beaver
       - uses: actions/checkout@v3
@@ -58,6 +57,7 @@ jobs:
         with:
           elixir-version: ${{ matrix.job.elixir }} # Define the elixir version [required]
           otp-version: ${{ matrix.job.otp }} # Define the OTP version [required]
+      - run: elixir --eval ":erlang.system_info(:nif_version) |> IO.puts"
       - name: Set up Zig
         uses: goto-bus-stop/setup-zig@v2
         with:
