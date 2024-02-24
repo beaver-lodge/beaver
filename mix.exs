@@ -19,7 +19,7 @@ defmodule Beaver.MixProject do
         make_force_build: System.get_env("BEAVER_BUILD_CMAKE") in ["1", "true"],
         make_precompiler_url:
           System.get_env("BEAVER_ARTEFACT_URL") ||
-            "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2024-02-24-0729/@{artefact_filename}",
+            "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2024-02-24-0916/@{artefact_filename}",
         make_precompiler_nif_versions: [
           versions: ["2.16", "2.17"],
           availability: &target_available_for_nif_version?/2
