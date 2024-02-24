@@ -5,8 +5,8 @@
     .dependencies = .{
         .kinda = .{
             // note: you may need to change this url commit hash
-            .url = "https://github.com/beaver-lodge/kinda/archive/87947770b8d1338fdc09bd181c5ec37e8511d46f.tar.gz",
-            .hash = "12209d2774b97ec5ecaf1521afb4ce362a4119a801491fcaaa626b9f4bf2f2b7231e",
+            .url = "https://github.com/beaver-lodge/kinda/archive/4e01c425e7c4f543179f36478e094371dbae0ca7.tar.gz",
+            .hash = "12209bc96ca8097385b47095b89b8129e0e58da3ca32d7eefa814df7149ba4f4c003",
         },
     },
 }

@@ -168,6 +168,8 @@ pub fn open_generated_resource_types(env: beam.env) void {
     kinda.aliasKind(OpaquePtr, kinda.Internal.OpaquePtr);
     kinda.aliasKind(OpaqueArray, kinda.Internal.OpaqueArray);
     kinda.aliasKind(USize, kinda.Internal.USize);
+    kinda.aliasKind(DiagnosticHandlerID, U64);
+    kinda.aliasKind(Enum_MlirSparseTensorLevelType, U64);
 }
 
 const numOfNIFsPerKind = 10;
