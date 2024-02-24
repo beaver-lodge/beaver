@@ -4,7 +4,7 @@ defmodule Beaver.MixProject do
   def project do
     [
       app: :beaver,
-      version: "0.3.3",
+      version: "0.3.4",
       elixir: "~> 1.9",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -12,17 +12,14 @@ defmodule Beaver.MixProject do
       description: description(),
       docs: docs(),
       package: package(),
-      compilers: [:elixir_make] ++ Mix.compilers(),
-      preferred_cli_env: [
-        "test.watch": :test
-      ]
+      compilers: [:elixir_make] ++ Mix.compilers()
     ] ++
       [
         make_precompiler: {:nif, Kinda.Precompiler},
         make_force_build: System.get_env("BEAVER_BUILD_CMAKE") in ["1", "true"],
         make_precompiler_url:
           System.get_env("BEAVER_ARTEFACT_URL") ||
-            "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2024-02-24-0729/@{artefact_filename}",
+            "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2024-02-24-0916/@{artefact_filename}",
         make_precompiler_nif_versions: [
           versions: ["2.16", "2.17"],
           availability: &target_available_for_nif_version?/2
@@ -81,6 +78,7 @@ defmodule Beaver.MixProject do
       links: %{"GitHub" => "https://github.com/beaver-lodge/beaver"},
       files: ~w{
         lib .formatter.exs mix.exs README*
+        scripts/*.exs
         native/mlir-zig-proj/src/*.zig
         native/mlir-zig-proj/build.zig
         native/mlir-zig-proj/build.zig.zon
