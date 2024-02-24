@@ -32,14 +32,14 @@ jobs:
 
   build_release:
     needs: [generate_id]
-    name: NIF ${{ matrix.nif }} - ${{ matrix.job.target }} (${{ matrix.job.os }})
+    name: NIF ${{ matrix.job.otp }} (${{ matrix.job.elixir }})
     runs-on: ${{ matrix.job.os }}
     strategy:
       fail-fast: false
       matrix:
-        nif: ["2.16"]
         job:
-          - { target: x86_64-unknown-linux-gnu, os: ubuntu-22.04 }
+          - { otp: 24.2, os: ubuntu-22.04, elixir: 1.14 }
+          - { otp: 25, os: ubuntu-22.04, elixir: 1.15 }
     steps:
       - uses: actions/checkout@v3
         name: Check-out beaver
@@ -55,8 +55,8 @@ jobs:
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
         with:
-          elixir-version: "1.14.0" # Define the elixir version [required]
-          otp-version: "24.2" # Define the OTP version [required]
+          elixir-version: ${{ matrix.job.elixir }} # Define the elixir version [required]
+          otp-version: ${{ matrix.job.otp }} # Define the OTP version [required]
       - name: Set up Zig
         uses: goto-bus-stop/setup-zig@v2
         with:
