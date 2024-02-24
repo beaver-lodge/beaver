@@ -11,7 +11,7 @@ defmodule Beaver.MLIR.CAPI do
 
     if File.exists?(dylib = "#{nif_file}.dylib") do
       nif_dir = Path.dirname("#{nif_file}.so")
-      relative_dylib_path = Path.relative_to(dylib, nif_dir) |> dbg
+      relative_dylib_path = Path.relative_to(dylib, nif_dir)
       File.ln_s(relative_dylib_path, "#{nif_file}.so")
     end
 
