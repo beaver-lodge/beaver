@@ -84,7 +84,7 @@ jobs:
         run: |
           python3 -m pip install -r dev-requirements.txt
           echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
-      - name: Build CMake
+      - name: Build native library
         run: |
           MIX_ENV=test mix compile.elixir_make
       - name: Run smoke tests
