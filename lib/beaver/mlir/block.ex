@@ -36,6 +36,12 @@ defmodule Beaver.MLIR.Block do
     do_add_args!(block, ctx, {t, loc})
   end
 
+  @type arg_type :: MLIR.Type.t() | String.t()
+  @type arg :: {arg_type(), MLIR.Location.t()} | {arg_type(), MLIR.Location.t()} | arg_type()
+  @spec add_args!(__MODULE__.t(), list(arg), Keyword.t()) :: any()
+  @doc """
+  add arguments to a block
+  """
   def add_args!(block, args, opts \\ []) when is_list(args) do
     ctx =
       opts[:ctx] ||
