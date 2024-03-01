@@ -16,8 +16,7 @@ defmodule Beaver.MLIR.Block do
     )
   end
 
-  defp do_add_args!(block, _ctx, {t = %Beaver.MLIR.Type{}, loc}) do
-    ctx = MLIR.CAPI.mlirTypeGetContext(t)
+  defp do_add_args!(block, ctx, {t = %Beaver.MLIR.Type{}, loc}) do
     loc = loc |> Beaver.Deferred.create(ctx)
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
@@ -37,7 +36,18 @@ defmodule Beaver.MLIR.Block do
     do_add_args!(block, ctx, {t, loc})
   end
 
-  def add_args!(block, ctx, args) do
+  def add_args!(block, args, opts \\ []) when is_list(args) do
+    ctx =
+      opts[:ctx] ||
+        Enum.find_value(args, fn
+          t = %Beaver.MLIR.Type{} -> MLIR.CAPI.mlirTypeGetContext(t)
+          _ -> nil
+        end)
+
+    unless ctx do
+      raise "requires a MLIR Context to add args, or types already being created so the the context could be extracted from them"
+    end
+
     for arg <- args do
       do_add_args!(block, ctx, arg)
     end

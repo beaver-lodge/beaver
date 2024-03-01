@@ -196,7 +196,7 @@ defmodule TranslateMLIR do
 
     arg_types = Enum.map(arg_type_pairs, &elem(&1, 1))
     entry_block = MLIR.Block.create()
-    args = MLIR.Block.add_args!(entry_block, ctx, arg_types)
+    args = MLIR.Block.add_args!(entry_block, arg_types, ctx: ctx)
 
     {entry_block, arg_types, args}
   end

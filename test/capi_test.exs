@@ -45,7 +45,7 @@ defmodule MlirTest do
     func_body_arg_locs = [location]
     func_body_region = MLIR.CAPI.mlirRegionCreate()
     func_body = MLIR.Block.create(func_body_arg_types, func_body_arg_locs)
-    [arg1] = func_body |> MLIR.Block.add_args!(ctx, ["i64"])
+    [arg1] = func_body |> MLIR.Block.add_args!(["i64"], ctx: ctx)
     # append block to region
     MLIR.CAPI.mlirRegionAppendOwnedBlock(func_body_region, func_body)
     # create func

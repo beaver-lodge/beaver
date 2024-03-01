@@ -156,8 +156,8 @@ defmodule Beaver do
         |> tap(
           &Beaver.MLIR.Block.add_args!(
             &1,
-            Beaver.Env.context(),
-            Enum.zip(block_arg_types, block_arg_locs)
+            Enum.zip(block_arg_types, block_arg_locs),
+            ctx: Beaver.Env.context()
           )
         )
       end
