@@ -3,7 +3,6 @@ defmodule Beaver.MLIR.Block do
   This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
   """
   alias Beaver.MLIR
-  require Beaver.MLIR.CAPI
 
   use Kinda.ResourceKind,
     forward_module: Beaver.Native
@@ -46,9 +45,9 @@ defmodule Beaver.MLIR.Block do
     ctx =
       opts[:ctx] ||
         Enum.find_value(args, fn
-          t = %Beaver.MLIR.Type{} -> MLIR.CAPI.mlirTypeGetContext(t)
-          {t = %Beaver.MLIR.Type{}, _} -> MLIR.CAPI.mlirTypeGetContext(t)
-          {_, l = %Beaver.MLIR.Location{}} -> MLIR.CAPI.mlirLocationGetContext(l)
+          t = %MLIR.Type{} -> MLIR.CAPI.mlirTypeGetContext(t)
+          {t = %MLIR.Type{}, _} -> MLIR.CAPI.mlirTypeGetContext(t)
+          {_, l = %MLIR.Location{}} -> MLIR.CAPI.mlirLocationGetContext(l)
           _ -> nil
         end)
 
