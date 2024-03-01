@@ -124,6 +124,69 @@ defmodule Beaver do
     end
   end
 
+  # Transform the ast of a elixir call into a block creation and block args bindings
+  defp transform_call(call) do
+    {bb_name, args} = call |> Macro.decompose_call()
+    if not is_atom(bb_name), do: raise("block name must be an atom")
+
+    opts = List.last(args)
+    # transform {arg, type} into arg = type
+    args_type_ast =
+      for {var, type} <- args do
+        quote do
+          unquote(var) = unquote(type)
+        end
+      end
+
+    # to be spliced into a list, and then as argument for Beaver.MLIR.Block.create/2
+    args_var_ast =
+      for {var, _type} <- args do
+        quote do
+          unquote(var)
+        end
+      end
+
+    # to be spliced into a list, and then as argument for Beaver.MLIR.Block.create/2
+
+    locations_var_ast =
+      for a <- args do
+        case a do
+          {{_, [line: _] = line, _}, _type} ->
+            quote do
+              Beaver.MLIR.Location.file(
+                name: __ENV__.file,
+                line: Keyword.get(unquote(line), :line),
+                ctx: Beaver.Env.context()
+              )
+            end
+
+          _ ->
+            quote do
+              Beaver.MLIR.Location.unknown()
+            end
+        end
+      end
+
+    # generate `var = mlir block arg` bindings for the uses in the do block
+    block_arg_var_ast =
+      for {{var, _}, index} <- Enum.with_index(args) do
+        quote do
+          unquote(var) =
+            Beaver.Env.block()
+            |> Beaver.MLIR.Block.get_arg!(unquote(index))
+        end
+      end
+
+    {
+      args,
+      opts,
+      args_type_ast,
+      args_var_ast,
+      locations_var_ast,
+      block_arg_var_ast
+    }
+  end
+
   defmacro block(call, do: block) do
     {
       _block_args,
@@ -132,7 +195,7 @@ defmodule Beaver do
       args_var_ast,
       locations_var_ast,
       block_arg_var_ast
-    } = Beaver.BlockDSL.transform_call(call)
+    } = transform_call(call)
 
     {block_id, _} = Macro.decompose_call(call)
     if not is_atom(block_id), do: raise("block name must be an atom")
