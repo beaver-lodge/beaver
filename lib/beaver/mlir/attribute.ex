@@ -11,7 +11,7 @@ defmodule Beaver.MLIR.Attribute do
   This module defines functions parsing and creating attributes in MLIR.
   """
   alias Beaver.MLIR.CAPI
-  require Beaver.MLIR.CAPI
+
   alias Beaver.MLIR
   import MLIR.Sigils
 

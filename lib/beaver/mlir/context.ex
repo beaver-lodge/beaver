@@ -3,7 +3,7 @@ defmodule Beaver.MLIR.Context do
   This module defines functions creating or destroying MLIR context.
   """
   alias Beaver.MLIR
-  require MLIR.CAPI
+
   use Kinda.ResourceKind, forward_module: Beaver.Native
 
   @type context_option :: {:allow_unregistered, boolean()}

@@ -2,7 +2,6 @@ defmodule Beaver.MLIR.PatternSet do
   @moduledoc false
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
-  require Beaver.MLIR.CAPI
 
   def get(ctx) do
     CAPI.beaverRewritePatternSetGet(ctx)

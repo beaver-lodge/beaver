@@ -3,7 +3,6 @@ defmodule Beaver.SSA do
   Storing MLIR IR structure with a Elixir struct. Macros like `Beaver.mlir/1` will generate SSA structs defined by this module.
   """
   alias Beaver.MLIR
-  require Beaver.MLIR.CAPI
 
   @type t() :: %__MODULE__{
           op: String.t(),
