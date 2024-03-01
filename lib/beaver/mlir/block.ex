@@ -52,7 +52,7 @@ defmodule Beaver.MLIR.Block do
         end)
 
     unless ctx do
-      raise "requires a MLIR Context to add arguments, or types or locations already created so the context could be extracted from them"
+      raise "Requires MLIR Context to add arguments. Otherwise, use types or locations already created."
     end
 
     for arg <- args do
