@@ -47,11 +47,13 @@ defmodule Beaver.MLIR.Block do
       opts[:ctx] ||
         Enum.find_value(args, fn
           t = %Beaver.MLIR.Type{} -> MLIR.CAPI.mlirTypeGetContext(t)
+          {t = %Beaver.MLIR.Type{}, _} -> MLIR.CAPI.mlirTypeGetContext(t)
+          {_, l = %Beaver.MLIR.Location{}} -> MLIR.CAPI.mlirLocationGetContext(l)
           _ -> nil
         end)
 
     unless ctx do
-      raise "requires a MLIR Context to add args, or types already being created so the the context could be extracted from them"
+      raise "requires a MLIR Context to add args, or types or locations already being created so the the context could be extracted from them"
     end
 
     for arg <- args do
