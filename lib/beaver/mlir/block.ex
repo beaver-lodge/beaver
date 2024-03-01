@@ -37,7 +37,7 @@ defmodule Beaver.MLIR.Block do
   end
 
   @type arg_type :: MLIR.Type.t() | String.t()
-  @type arg :: {arg_type(), MLIR.Location.t()} | {arg_type(), MLIR.Location.t()} | arg_type()
+  @type arg :: {arg_type(), MLIR.Location.t()} | arg_type()
   @spec add_args!(__MODULE__.t(), list(arg), Keyword.t()) :: any()
   @doc """
   add arguments to a block
