@@ -8,7 +8,7 @@ defmodule Beaver.MLIR.Block do
   use Kinda.ResourceKind,
     forward_module: Beaver.Native
 
-  defp do_add_arg!(block, ctx, {t, loc}) when is_function(t, 1) or is_function(loc, 1) do
+  defp do_add_args!(block, ctx, {t, loc}) when is_function(t, 1) or is_function(loc, 1) do
     MLIR.CAPI.mlirBlockAddArgument(
       block,
       t |> Beaver.Deferred.create(ctx),
@@ -16,30 +16,30 @@ defmodule Beaver.MLIR.Block do
     )
   end
 
-  defp do_add_arg!(block, _ctx, {t = %Beaver.MLIR.Type{}, loc}) do
+  defp do_add_args!(block, _ctx, {t = %Beaver.MLIR.Type{}, loc}) do
     ctx = MLIR.CAPI.mlirTypeGetContext(t)
     loc = loc |> Beaver.Deferred.create(ctx)
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
-  defp do_add_arg!(block, ctx, {t = {:parametric, _, _, _f}, loc}) do
+  defp do_add_args!(block, ctx, {t = {:parametric, _, _, _f}, loc}) do
     t = Beaver.Deferred.create(t, ctx)
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
-  defp do_add_arg!(block, ctx, {t, loc}) do
+  defp do_add_args!(block, ctx, {t, loc}) do
     t = MLIR.CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create(t))
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
-  defp do_add_arg!(block, ctx, t) do
+  defp do_add_args!(block, ctx, t) do
     loc = MLIR.CAPI.mlirLocationUnknownGet(ctx)
-    do_add_arg!(block, ctx, {t, loc})
+    do_add_args!(block, ctx, {t, loc})
   end
 
-  def add_arg!(block, ctx, args) do
+  def add_args!(block, ctx, args) do
     for arg <- args do
-      do_add_arg!(block, ctx, arg)
+      do_add_args!(block, ctx, arg)
     end
   end
 
