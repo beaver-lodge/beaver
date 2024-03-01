@@ -1,6 +1,6 @@
 defmodule Beaver.MLIR.Pass.Server do
   alias Beaver.MLIR
-  require MLIR.CAPI
+
   require Logger
 
   @moduledoc """

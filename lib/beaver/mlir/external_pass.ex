@@ -4,7 +4,6 @@ defmodule Beaver.MLIR.ExternalPass do
   defstruct external: nil
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
-  require Beaver.MLIR.CAPI
 
   defp op_name_from_persistent_attributes(pass_module) do
     op_name = pass_module.__info__(:attributes)[:root_op] || []

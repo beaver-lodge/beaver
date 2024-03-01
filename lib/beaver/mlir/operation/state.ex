@@ -2,7 +2,6 @@ defmodule Beaver.MLIR.Operation.State do
   @moduledoc false
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
-  require Beaver.MLIR.CAPI
 
   @doc """
   State of entities to create an operation. Note that the C version of operation state will only get created before creating the operation.

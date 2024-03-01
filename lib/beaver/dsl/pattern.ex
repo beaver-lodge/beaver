@@ -14,7 +14,7 @@ defmodule Beaver.Pattern do
   import Beaver
   require Beaver.MLIR
   require Beaver.Env
-  require Beaver.MLIR.CAPI
+
   alias Beaver.Pattern.Env
 
   defmacro defpat(call, do: block) do

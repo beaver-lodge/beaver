@@ -1,7 +1,6 @@
 defmodule Beaver do
   require Beaver.Env
   alias Beaver.MLIR
-  require Beaver.MLIR.CAPI
 
   @moduledoc """
   This module contains top level functions and macros for Beaver DSL for MLIR.
@@ -33,7 +32,6 @@ defmodule Beaver do
 
   defmacro __using__(_) do
     quote do
-      require Beaver.MLIR.CAPI
       require Beaver.Env
       import Beaver
       alias Beaver.MLIR

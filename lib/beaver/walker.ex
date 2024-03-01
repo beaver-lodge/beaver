@@ -12,7 +12,7 @@ alias Beaver.MLIR.{
   Identifier
 }
 
-require Beaver.MLIR.CAPI
+
 
 defmodule Beaver.Walker.OpReplacement do
   @moduledoc """

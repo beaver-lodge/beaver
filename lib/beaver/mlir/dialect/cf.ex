@@ -1,6 +1,5 @@
 defmodule Beaver.MLIR.Dialect.CF do
   alias Beaver.MLIR
-  require Beaver.MLIR.CAPI
   alias Beaver.MLIR.Dialect
 
   @moduledoc """
