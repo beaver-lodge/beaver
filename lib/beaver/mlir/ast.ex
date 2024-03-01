@@ -71,28 +71,22 @@ defmodule Beaver.MLIR.AST do
   end
 
   # compile a clause to a block
-
-  defp do_blk(call, expressions) do
-    # only support clause with one match call
-    [{block_name, _line0, args}] = call
-
-    types =
-      for {:"::", _line0, [{_arg, _line1, nil}, t]} <- args do
-        type(t)
+  # only support clause with one match call
+  defp do_blk([{block_name, _line0, args}], expressions) do
+    {types, vars_of_blk_args} =
+      for {{:"::", _line0, [{_arg, _line1, nil} = var, t]}, index} <- Enum.with_index(args) do
+        {type(t),
+         quote do
+           Kernel.var!(unquote(var)) = MLIR.Block.get_arg!(Beaver.Env.block(), unquote(index))
+         end}
       end
-
-    vars_of_blk_args =
-      for {{:"::", _line0, [var, _t]}, index} <- Enum.with_index(args) do
-        quote do
-          Kernel.var!(unquote(var)) = MLIR.Block.get_arg!(Beaver.Env.block(), unquote(index))
-        end
-      end
+      |> Enum.unzip()
 
     quote do
       block unquote(block_name)() do
         MLIR.Block.add_arg!(Beaver.Env.block(), Beaver.Env.context(), [unquote_splicing(types)])
         unquote_splicing(vars_of_blk_args)
-        (unquote_splicing(List.wrap(expressions)))
+        unquote_splicing(List.wrap(expressions))
       end
     end
   end
