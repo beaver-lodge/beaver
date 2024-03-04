@@ -139,23 +139,8 @@ defmodule Beaver do
     {bb_name, args} = call |> Macro.decompose_call()
 
     arg_loc_pairs =
-      for {_var, type} = a <- args do
-        loc =
-          case a do
-            {{_, [line: _] = line, _}, _type} ->
-              quote do
-                Beaver.MLIR.Location.file(
-                  name: __ENV__.file,
-                  line: Keyword.get(unquote(line), :line),
-                  ctx: Beaver.Env.context()
-                )
-              end
-
-            _ ->
-              quote(do: Beaver.MLIR.Location.unknown())
-          end
-
-        {type, loc}
+      for {_var, type} <- args do
+        {type, quote(do: MLIR.Location.from_env(__ENV__, ctx: Beaver.Env.context()))}
       end
 
     quote do
