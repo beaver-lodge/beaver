@@ -111,10 +111,7 @@ defmodule Beaver do
     quote do
       require Beaver.Env
       alias Beaver.MLIR
-      require Beaver.MLIR
-      alias Beaver.MLIR.Type
-      alias Beaver.MLIR.Attribute
-      alias Beaver.MLIR.ODS
+      alias Beaver.MLIR.{Type, Attribute, ODS}
       import Beaver.MLIR.Sigils
       import Beaver.MLIR.Dialect.Builtin
 
