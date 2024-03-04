@@ -135,33 +135,24 @@ defmodule Beaver do
         end
       end
 
-    # to be spliced into a list, and then as argument for Beaver.MLIR.Block.create/2
-    args_var_ast =
-      for {var, _type} <- args do
-        quote do
-          unquote(var)
-        end
-      end
+    arg_loc_pairs =
+      for {var, _type} = a <- args do
+        loc =
+          case a do
+            {{_, [line: _] = line, _}, _type} ->
+              quote do
+                Beaver.MLIR.Location.file(
+                  name: __ENV__.file,
+                  line: Keyword.get(unquote(line), :line),
+                  ctx: Beaver.Env.context()
+                )
+              end
 
-    # to be spliced into a list, and then as argument for Beaver.MLIR.Block.create/2
+            _ ->
+              quote(do: Beaver.MLIR.Location.unknown())
+          end
 
-    locations_var_ast =
-      for a <- args do
-        case a do
-          {{_, [line: _] = line, _}, _type} ->
-            quote do
-              Beaver.MLIR.Location.file(
-                name: __ENV__.file,
-                line: Keyword.get(unquote(line), :line),
-                ctx: Beaver.Env.context()
-              )
-            end
-
-          _ ->
-            quote do
-              Beaver.MLIR.Location.unknown()
-            end
-        end
+        {var, loc}
       end
 
     # generate `var = mlir block arg` bindings for the uses in the do block
@@ -178,8 +169,7 @@ defmodule Beaver do
       args,
       opts,
       args_type_ast,
-      args_var_ast,
-      locations_var_ast,
+      arg_loc_pairs,
       block_arg_var_ast
     }
   end
@@ -189,8 +179,7 @@ defmodule Beaver do
       _block_args,
       _block_opts,
       args_type_ast,
-      args_var_ast,
-      locations_var_ast,
+      arg_loc_pairs,
       block_arg_var_ast
     } = transform_call(call)
 
@@ -214,7 +203,7 @@ defmodule Beaver do
         |> tap(
           &Beaver.MLIR.Block.add_args!(
             &1,
-            Enum.zip(block_arg_types, block_arg_locs),
+            unquote(arg_loc_pairs),
             ctx: Beaver.Env.context()
           )
         )
@@ -224,8 +213,6 @@ defmodule Beaver do
       quote do
         require Beaver.Env
         unquote_splicing(args_type_ast)
-        block_arg_types = [unquote_splicing(args_var_ast)]
-        block_arg_locs = [unquote_splicing(locations_var_ast)]
 
         # can't put code here inside a function like Region.under, because we need to support uses across blocks
 
