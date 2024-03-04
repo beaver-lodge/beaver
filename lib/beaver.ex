@@ -121,7 +121,7 @@ defmodule Beaver do
     end
   end
 
-  # Transform the ast of a elixir call into a block creation and block args bindings
+  # transform ast of a call into block argument bindings to variables
   defp variable_declarations(call) do
     {_bb_name, args} = call |> Macro.decompose_call()
 
@@ -134,6 +134,7 @@ defmodule Beaver do
     end
   end
 
+  # transform ast of a call into MLIR block creation
   defp block_creation(call) do
     {bb_name, args} = call |> Macro.decompose_call()
 
