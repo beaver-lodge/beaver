@@ -122,19 +122,23 @@ defmodule Beaver do
   end
 
   # Transform the ast of a elixir call into a block creation and block args bindings
-  defp transform_call(call) do
-    {bb_name, args} = call |> Macro.decompose_call()
-    if not is_atom(bb_name), do: raise("block name must be an atom")
-    # transform {arg, type} into arg = type
-    args_type_ast =
-      for {var, type} <- args do
-        quote do
-          unquote(var) = unquote(type)
-        end
+  defp variable_declarations(call) do
+    {_bb_name, args} = call |> Macro.decompose_call()
+
+    for {{var, _}, index} <- Enum.with_index(args) do
+      quote do
+        unquote(var) =
+          Beaver.Env.block()
+          |> Beaver.MLIR.Block.get_arg!(unquote(index))
       end
+    end
+  end
+
+  defp block_creation(call) do
+    {bb_name, args} = call |> Macro.decompose_call()
 
     arg_loc_pairs =
-      for {var, _type} = a <- args do
+      for {_var, type} = a <- args do
         loc =
           case a do
             {{_, [line: _] = line, _}, _type} ->
@@ -150,33 +154,22 @@ defmodule Beaver do
               quote(do: Beaver.MLIR.Location.unknown())
           end
 
-        {var, loc}
+        {type, loc}
       end
 
-    # generate `var = mlir block arg` bindings for the uses in the do block
-    block_arg_var_ast =
-      for {{var, _}, index} <- Enum.with_index(args) do
-        quote do
-          unquote(var) =
-            Beaver.Env.block()
-            |> Beaver.MLIR.Block.get_arg!(unquote(index))
-        end
-      end
-
-    {
-      args_type_ast,
-      arg_loc_pairs,
-      block_arg_var_ast
-    }
+    quote do
+      Beaver.Env.block(unquote({bb_name, [], nil}))
+      |> tap(
+        &Beaver.MLIR.Block.add_args!(
+          &1,
+          unquote(arg_loc_pairs),
+          ctx: Beaver.Env.context()
+        )
+      )
+    end
   end
 
   defmacro block(call, do: block) do
-    {
-      args_type_ast,
-      arg_loc_pairs,
-      block_arg_var_ast
-    } = transform_call(call)
-
     {block_id, _} = Macro.decompose_call(call)
     if not is_atom(block_id), do: raise("block name must be an atom")
 
@@ -188,29 +181,13 @@ defmodule Beaver do
         end
       end
 
-    {bb_name, _} = call |> Macro.decompose_call()
-    block_var = {bb_name, [], nil}
-
-    block_creation_ast =
-      quote do
-        Beaver.Env.block(unquote(block_var))
-        |> tap(
-          &Beaver.MLIR.Block.add_args!(
-            &1,
-            unquote(arg_loc_pairs),
-            ctx: Beaver.Env.context()
-          )
-        )
-      end
-
     quote do
       require Beaver.Env
-      unquote_splicing(args_type_ast)
 
       # can't put code here inside a function like Region.under, because we need to support uses across blocks
-      Kernel.var!(beaver_internal_env_block) = unquote(block_creation_ast)
+      Kernel.var!(beaver_internal_env_block) = unquote(block_creation(call))
       unquote(region_insert_ast)
-      unquote_splicing(block_arg_var_ast)
+      unquote_splicing(variable_declarations(call))
       unquote(block)
       Kernel.var!(beaver_internal_env_block)
     end
