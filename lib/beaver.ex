@@ -203,23 +203,17 @@ defmodule Beaver do
         )
       end
 
-    block_ast =
-      quote do
-        require Beaver.Env
-        unquote_splicing(args_type_ast)
+    quote do
+      require Beaver.Env
+      unquote_splicing(args_type_ast)
 
-        # can't put code here inside a function like Region.under, because we need to support uses across blocks
-
-        Kernel.var!(beaver_internal_env_block) = unquote(block_creation_ast)
-
-        unquote(region_insert_ast)
-        unquote_splicing(block_arg_var_ast)
-        unquote(block)
-
-        Kernel.var!(beaver_internal_env_block)
-      end
-
-    block_ast
+      # can't put code here inside a function like Region.under, because we need to support uses across blocks
+      Kernel.var!(beaver_internal_env_block) = unquote(block_creation_ast)
+      unquote(region_insert_ast)
+      unquote_splicing(block_arg_var_ast)
+      unquote(block)
+      Kernel.var!(beaver_internal_env_block)
+    end
   end
 
   defmacro region(do: block) do
