@@ -91,19 +91,17 @@ defmodule Beaver do
     dsl_block_ast = dsl_block |> Beaver.SSA.prewalk(&MLIR.Operation.eval_ssa/1)
 
     ctx_ast =
-      if Keyword.has_key?(opts, :ctx) do
+      if ctx = opts[:ctx] do
         quote do
-          ctx = Keyword.fetch!(unquote(opts), :ctx)
-          Kernel.var!(beaver_internal_env_ctx) = ctx
+          Kernel.var!(beaver_internal_env_ctx) = unquote(ctx)
           %MLIR.Context{} = Kernel.var!(beaver_internal_env_ctx)
         end
       end
 
     block_ast =
-      if Keyword.has_key?(opts, :block) do
+      if block = opts[:block] do
         quote do
-          block = Keyword.fetch!(unquote(opts), :block)
-          Kernel.var!(beaver_internal_env_block) = block
+          Kernel.var!(beaver_internal_env_block) = unquote(block)
           %MLIR.Block{} = Kernel.var!(beaver_internal_env_block)
         end
       end
@@ -127,9 +125,7 @@ defmodule Beaver do
 
     for {{var, _}, index} <- Enum.with_index(args) do
       quote do
-        unquote(var) =
-          Beaver.Env.block()
-          |> Beaver.MLIR.Block.get_arg!(unquote(index))
+        unquote(var) = Beaver.Env.block() |> Beaver.MLIR.Block.get_arg!(unquote(index))
       end
     end
   end
