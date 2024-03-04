@@ -125,8 +125,6 @@ defmodule Beaver do
   defp transform_call(call) do
     {bb_name, args} = call |> Macro.decompose_call()
     if not is_atom(bb_name), do: raise("block name must be an atom")
-
-    opts = List.last(args)
     # transform {arg, type} into arg = type
     args_type_ast =
       for {var, type} <- args do
@@ -166,8 +164,6 @@ defmodule Beaver do
       end
 
     {
-      args,
-      opts,
       args_type_ast,
       arg_loc_pairs,
       block_arg_var_ast
@@ -176,8 +172,6 @@ defmodule Beaver do
 
   defmacro block(call, do: block) do
     {
-      _block_args,
-      _block_opts,
       args_type_ast,
       arg_loc_pairs,
       block_arg_var_ast
