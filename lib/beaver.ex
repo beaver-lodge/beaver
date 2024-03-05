@@ -1,5 +1,4 @@
 defmodule Beaver do
-  require Beaver.Env
   alias Beaver.MLIR
 
   @moduledoc """
@@ -32,7 +31,6 @@ defmodule Beaver do
 
   defmacro __using__(_) do
     quote do
-      require Beaver.Env
       import Beaver
       alias Beaver.MLIR
       import MLIR.Sigils
@@ -151,8 +149,6 @@ defmodule Beaver do
     if not is_atom(b_name), do: raise("block name must be an atom or underscore")
 
     quote do
-      require Beaver.Env
-
       Kernel.var!(beaver_internal_env_block) =
         Beaver.Env.block(unquote({b_name, [], nil})) |> unquote(add_arguments(args))
 
@@ -182,7 +178,6 @@ defmodule Beaver do
       end
 
     quote do
-      require Beaver.Env
       region = Beaver.MLIR.CAPI.mlirRegionCreate()
       unquote(regions)
 

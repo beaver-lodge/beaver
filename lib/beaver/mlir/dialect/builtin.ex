@@ -11,7 +11,6 @@ defmodule Beaver.MLIR.Dialect.Builtin do
   """
   defmacro module(attrs \\ [], do: block) do
     quote do
-      require Beaver.Env
       ctx = Beaver.Env.context()
 
       location =
