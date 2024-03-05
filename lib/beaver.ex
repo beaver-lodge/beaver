@@ -121,7 +121,7 @@ defmodule Beaver do
 
   # transform ast of a call into block argument bindings to variables
   defp arguments_variables(args) do
-    for {{var, _}, index} <- Enum.with_index(args) do
+    for {{var, _type}, index} <- Enum.with_index(args) do
       quote do
         unquote(var) = Beaver.Env.block() |> Beaver.MLIR.Block.get_arg!(unquote(index))
       end
