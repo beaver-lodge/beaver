@@ -121,7 +121,7 @@ defmodule Beaver do
 
   # transform ast of a call into block argument bindings to variables
   defp variable_declarations(call) do
-    {_bb_name, args} = call |> Macro.decompose_call()
+    {_, args} = call |> Macro.decompose_call()
 
     for {{var, _}, index} <- Enum.with_index(args) do
       quote do
@@ -132,7 +132,7 @@ defmodule Beaver do
 
   # transform ast of a call into MLIR block creation
   defp block_creation(call) do
-    {bb_name, args} = call |> Macro.decompose_call()
+    {b_name, args} = call |> Macro.decompose_call()
 
     arg_loc_pairs =
       for {_var, type} <- args do
@@ -140,7 +140,7 @@ defmodule Beaver do
       end
 
     quote do
-      Beaver.Env.block(unquote({bb_name, [], nil}))
+      Beaver.Env.block(unquote({b_name, [], nil}))
       |> tap(
         &Beaver.MLIR.Block.add_args!(
           &1,
@@ -152,8 +152,8 @@ defmodule Beaver do
   end
 
   defmacro block(call, do: block) do
-    {block_id, _} = Macro.decompose_call(call)
-    if not is_atom(block_id), do: raise("block name must be an atom or underscore")
+    {b_name, _} = Macro.decompose_call(call)
+    if not is_atom(b_name), do: raise("block name must be an atom or underscore")
 
     quote do
       require Beaver.Env
