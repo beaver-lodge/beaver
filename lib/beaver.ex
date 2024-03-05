@@ -166,7 +166,7 @@ defmodule Beaver do
     quote do
       require Beaver.Env
 
-      # can't put code here inside a function like Region.under, because we need to support uses across blocks
+      # op uses are across blocks, so op within a block can't use an API like Region.under
       Kernel.var!(beaver_internal_env_block) = unquote(block_creation(call))
       unquote(region_insert_ast)
       unquote_splicing(variable_declarations(call))
