@@ -1,7 +1,5 @@
 defmodule Beaver do
-  require Beaver.Env
   alias Beaver.MLIR
-  require Beaver.MLIR.CAPI
 
   @moduledoc """
   This module contains top level functions and macros for Beaver DSL for MLIR.
@@ -33,8 +31,6 @@ defmodule Beaver do
 
   defmacro __using__(_) do
     quote do
-      require Beaver.MLIR.CAPI
-      require Beaver.Env
       import Beaver
       alias Beaver.MLIR
       import MLIR.Sigils
@@ -93,19 +89,17 @@ defmodule Beaver do
     dsl_block_ast = dsl_block |> Beaver.SSA.prewalk(&MLIR.Operation.eval_ssa/1)
 
     ctx_ast =
-      if Keyword.has_key?(opts, :ctx) do
+      if ctx = opts[:ctx] do
         quote do
-          ctx = Keyword.fetch!(unquote(opts), :ctx)
-          Kernel.var!(beaver_internal_env_ctx) = ctx
+          Kernel.var!(beaver_internal_env_ctx) = unquote(ctx)
           %MLIR.Context{} = Kernel.var!(beaver_internal_env_ctx)
         end
       end
 
     block_ast =
-      if Keyword.has_key?(opts, :block) do
+      if block = opts[:block] do
         quote do
-          block = Keyword.fetch!(unquote(opts), :block)
-          Kernel.var!(beaver_internal_env_block) = block
+          Kernel.var!(beaver_internal_env_block) = unquote(block)
           %MLIR.Block{} = Kernel.var!(beaver_internal_env_block)
         end
       end
@@ -113,10 +107,7 @@ defmodule Beaver do
     quote do
       require Beaver.Env
       alias Beaver.MLIR
-      require Beaver.MLIR
-      alias Beaver.MLIR.Type
-      alias Beaver.MLIR.Attribute
-      alias Beaver.MLIR.ODS
+      alias Beaver.MLIR.{Type, Attribute, ODS}
       import Beaver.MLIR.Sigils
       import Beaver.MLIR.Dialect.Builtin
 
@@ -126,61 +117,52 @@ defmodule Beaver do
     end
   end
 
-  defmacro block(call, do: block) do
-    {
-      _block_args,
-      _block_opts,
-      args_type_ast,
-      args_var_ast,
-      locations_var_ast,
-      block_arg_var_ast
-    } = Beaver.BlockDSL.transform_call(call)
-
-    {block_id, _} = Macro.decompose_call(call)
-    if not is_atom(block_id), do: raise("block name must be an atom")
-
-    region_insert_ast =
+  # transform ast of a call into block argument bindings to variables
+  defp arguments_variables(args) do
+    for {{var, _type}, index} <- Enum.with_index(args) do
       quote do
-        if region = Beaver.Env.region() do
-          # insert the block to region
-          Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, Beaver.Env.block())
-        end
+        unquote(var) = Beaver.Env.block() |> Beaver.MLIR.Block.get_arg!(unquote(index))
+      end
+    end
+  end
+
+  # transform ast of a call into MLIR block creation
+  defp add_arguments(args) do
+    arg_loc_pairs =
+      for {_var, type} <- args do
+        {type, quote(do: MLIR.Location.from_env(__ENV__, ctx: Beaver.Env.context()))}
       end
 
-    {bb_name, _} = call |> Macro.decompose_call()
-    block_var = {bb_name, [], nil}
-
-    block_creation_ast =
-      quote do
-        Beaver.Env.block(unquote(block_var))
-        |> tap(
-          &Beaver.MLIR.Block.add_arg!(
-            &1,
-            Beaver.Env.context(),
-            Enum.zip(block_arg_types, block_arg_locs)
-          )
+    quote do
+      tap(
+        &Beaver.MLIR.Block.add_args!(
+          &1,
+          unquote(arg_loc_pairs),
+          ctx: Beaver.Env.context()
         )
+      )
+    end
+  end
+
+  defmacro block(call, do: block) do
+    {b_name, args} = Macro.decompose_call(call)
+    if not is_atom(b_name), do: raise("block name must be an atom or underscore")
+
+    quote do
+      Kernel.var!(beaver_internal_env_block) =
+        Beaver.Env.block(unquote({b_name, [], nil})) |> unquote(add_arguments(args))
+
+      if region = Beaver.Env.region() do
+        # append the block after creation, because there might be nested ones
+        Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, Beaver.Env.block())
       end
 
-    block_ast =
-      quote do
-        require Beaver.Env
-        unquote_splicing(args_type_ast)
-        block_arg_types = [unquote_splicing(args_var_ast)]
-        block_arg_locs = [unquote_splicing(locations_var_ast)]
+      unquote_splicing(arguments_variables(args))
+      unquote(block)
+      # op uses are across blocks, so op within a block can't use an API like Region.under
 
-        # can't put code here inside a function like Region.under, because we need to support uses across blocks
-
-        Kernel.var!(beaver_internal_env_block) = unquote(block_creation_ast)
-
-        unquote(region_insert_ast)
-        unquote_splicing(block_arg_var_ast)
-        unquote(block)
-
-        Kernel.var!(beaver_internal_env_block)
-      end
-
-    block_ast
+      Kernel.var!(beaver_internal_env_block)
+    end
   end
 
   defmacro region(do: block) do
@@ -196,7 +178,6 @@ defmodule Beaver do
       end
 
     quote do
-      require Beaver.Env
       region = Beaver.MLIR.CAPI.mlirRegionCreate()
       unquote(regions)
 

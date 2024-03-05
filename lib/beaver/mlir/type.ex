@@ -4,7 +4,6 @@ defmodule Beaver.MLIR.Type do
   """
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
-  require Beaver.MLIR.CAPI
 
   use Kinda.ResourceKind,
     forward_module: Beaver.Native

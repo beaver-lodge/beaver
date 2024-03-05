@@ -12,8 +12,6 @@ alias Beaver.MLIR.{
   Identifier
 }
 
-require Beaver.MLIR.CAPI
-
 defmodule Beaver.Walker.OpReplacement do
   @moduledoc """
   A placeholder when an operation is replaced by value.
