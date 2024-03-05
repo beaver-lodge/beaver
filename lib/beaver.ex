@@ -153,24 +153,21 @@ defmodule Beaver do
 
   defmacro block(call, do: block) do
     {block_id, _} = Macro.decompose_call(call)
-    if not is_atom(block_id), do: raise("block name must be an atom")
-
-    region_insert_ast =
-      quote do
-        if region = Beaver.Env.region() do
-          # insert the block to region
-          Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, Beaver.Env.block())
-        end
-      end
+    if not is_atom(block_id), do: raise("block name must be an atom or underscore")
 
     quote do
       require Beaver.Env
-
-      # op uses are across blocks, so op within a block can't use an API like Region.under
       Kernel.var!(beaver_internal_env_block) = unquote(block_creation(call))
-      unquote(region_insert_ast)
+
+      if region = Beaver.Env.region() do
+        # append the block after creation, because there might be nested ones
+        Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, Beaver.Env.block())
+      end
+
       unquote_splicing(variable_declarations(call))
       unquote(block)
+      # op uses are across blocks, so op within a block can't use an API like Region.under
+
       Kernel.var!(beaver_internal_env_block)
     end
   end
