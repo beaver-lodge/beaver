@@ -2,11 +2,9 @@ defmodule PassTest do
   use Beaver.Case, async: true
   import ExUnit.CaptureLog
   use Beaver
-  alias Beaver.MLIR
-  alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Dialect.{Func, Arith}
   require Func
-  import MLIR.{Transforms}
+  import MLIR.Transforms
 
   defmodule PassRaisingException do
     @moduledoc false

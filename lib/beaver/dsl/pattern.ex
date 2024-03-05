@@ -7,13 +7,9 @@ defmodule Beaver.Pattern do
   @moduledoc """
   Beaver pattern DSL for MLIR, a PDL frontend in Elixir.
   """
-  alias Beaver.MLIR
+  use Beaver
   alias Beaver.MLIR.Dialect.PDL
   alias Beaver.MLIR.{Attribute, Type}
-  import MLIR.Sigils
-  import Beaver
-  require Beaver.MLIR
-  require Beaver.Env
 
   alias Beaver.Pattern.Env
 
