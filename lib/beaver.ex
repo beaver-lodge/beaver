@@ -120,9 +120,7 @@ defmodule Beaver do
   end
 
   # transform ast of a call into block argument bindings to variables
-  defp variable_declarations(call) do
-    {_, args} = call |> Macro.decompose_call()
-
+  defp arguments_variables(args) do
     for {{var, _}, index} <- Enum.with_index(args) do
       quote do
         unquote(var) = Beaver.Env.block() |> Beaver.MLIR.Block.get_arg!(unquote(index))
@@ -131,17 +129,14 @@ defmodule Beaver do
   end
 
   # transform ast of a call into MLIR block creation
-  defp block_creation(call) do
-    {b_name, args} = call |> Macro.decompose_call()
-
+  defp add_arguments(args) do
     arg_loc_pairs =
       for {_var, type} <- args do
         {type, quote(do: MLIR.Location.from_env(__ENV__, ctx: Beaver.Env.context()))}
       end
 
     quote do
-      Beaver.Env.block(unquote({b_name, [], nil}))
-      |> tap(
+      tap(
         &Beaver.MLIR.Block.add_args!(
           &1,
           unquote(arg_loc_pairs),
@@ -152,19 +147,21 @@ defmodule Beaver do
   end
 
   defmacro block(call, do: block) do
-    {b_name, _} = Macro.decompose_call(call)
+    {b_name, args} = Macro.decompose_call(call)
     if not is_atom(b_name), do: raise("block name must be an atom or underscore")
 
     quote do
       require Beaver.Env
-      Kernel.var!(beaver_internal_env_block) = unquote(block_creation(call))
+
+      Kernel.var!(beaver_internal_env_block) =
+        Beaver.Env.block(unquote({b_name, [], nil})) |> unquote(add_arguments(args))
 
       if region = Beaver.Env.region() do
         # append the block after creation, because there might be nested ones
         Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, Beaver.Env.block())
       end
 
-      unquote_splicing(variable_declarations(call))
+      unquote_splicing(arguments_variables(args))
       unquote(block)
       # op uses are across blocks, so op within a block can't use an API like Region.under
 
