@@ -84,7 +84,10 @@ defmodule Beaver.MLIR.AST do
 
     quote do
       block unquote(block_name)() do
-        MLIR.Block.add_arg!(Beaver.Env.block(), Beaver.Env.context(), [unquote_splicing(types)])
+        MLIR.Block.add_args!(Beaver.Env.block(), [unquote_splicing(types)],
+          ctx: Beaver.Env.context()
+        )
+
         unquote_splicing(vars_of_blk_args)
         unquote_splicing(List.wrap(expressions))
       end
