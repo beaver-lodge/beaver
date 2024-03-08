@@ -1,4 +1,4 @@
-locals_without_parens = [deftype: 1, defattr: 1, defop: 2, defalias: 2]
+locals_without_parens = [deftype: 1, defattr: 1, defop: 2, defalias: 2, op: 1]
 # Used by "mix format"
 [
   locals_without_parens: locals_without_parens,
