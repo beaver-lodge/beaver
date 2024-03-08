@@ -509,6 +509,69 @@ fn beaver_raw_parse_pass_pipeline(env: beam.env, _: c_int, args: [*c]const beam.
     return mlir_capi.LogicalResult.resource.make(env, c.mlirOpPassManagerAddPipeline(passManager, pipeline, BeaverDiagnostic.printDiagnostic, null)) catch return beam.make_error_binary(env, "when calling C function mlirParsePassPipeline, fail to make resource for: " ++ @typeName(mlir_capi.LogicalResult.T));
 }
 
+const Invocation = struct {
+    arg_terms: []beam.term = undefined,
+    res_term: beam.term = undefined,
+    packed_args: []?*anyopaque = undefined, // [arg0, arg1... result]
+    pub fn init(self: *@This(), environment: beam.env, list: beam.term) !void {
+        const size = try beam.get_list_length(environment, list);
+        var idx: usize = 0;
+        var head: beam.term = undefined;
+        self.arg_terms = try beam.allocator.alloc(beam.term, size);
+        self.packed_args = try beam.allocator.alloc(?*anyopaque, size + 1);
+        var movable_list = list;
+        while (idx < size) {
+            head = try beam.get_head_and_iter(environment, &movable_list);
+            self.arg_terms[idx] = head;
+            self.packed_args[idx] = &self.arg_terms[idx];
+            idx += 1;
+        }
+        self.packed_args[size] = &self.res_term;
+        errdefer beam.allocator.free(self.arg_terms);
+        errdefer beam.allocator.free(self.packed_args);
+    }
+    pub fn deinit(self: *@This()) void {
+        beam.allocator.free(self.arg_terms);
+        beam.allocator.free(self.packed_args);
+    }
+    pub fn invoke(self: *@This(), jit: mlir_capi.ExecutionEngine.T, name: beam.binary) !beam.term {
+        const res = c.mlirExecutionEngineInvokePacked(jit, c.MlirStringRef{ .data = name.data, .length = name.size }, &self.packed_args[0]);
+        if (c.mlirLogicalResultIsFailure(res)) {
+            return error.JitFunctionCallFailed;
+        } else {
+            return self.res_term;
+        }
+    }
+};
+
+fn mif_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+    var jit: mlir_capi.ExecutionEngine.T = mlir_capi.ExecutionEngine.resource.fetch(env, args[0]) catch
+        return beam.make_error_binary(env, "fail to fetch resource for ExecutionEngine, expected: " ++ @typeName(mlir_capi.ExecutionEngine.T));
+    var name: beam.binary = beam.get_binary(env, args[1]) catch
+        return beam.make_error_binary(env, "fail to get binary for jit func name");
+    var invocation = Invocation{};
+    invocation.init(env, args[2]) catch return beam.make_error_binary(env, "fail to init jit invocation");
+    defer invocation.deinit();
+    const res_term = invocation.invoke(jit, name) catch |err| switch (err) {
+        error.JitFunctionCallFailed => return beam.make_error_binary(env, "fail to call jit function"),
+    };
+    return beam.make_ok_term(env, res_term);
+}
+
+fn mif_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+    var jit: mlir_capi.ExecutionEngine.T = mlir_capi.ExecutionEngine.resource.fetch(env, args[0]) catch
+        return beam.make_error_binary(env, "fail to fetch resource for ExecutionEngine, expected: " ++ @typeName(mlir_capi.ExecutionEngine.T));
+    const names = .{ "enif_make_int", "enif_get_int" };
+    for (names) |name| {
+        const name_str_ref = c.MlirStringRef{
+            .data = name.ptr,
+            .length = name.len,
+        };
+        c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @field(e, name));
+    }
+    return beam.make_ok(env);
+}
+
 fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
     return extern struct {
         const T = ResourceKind.T;
@@ -751,6 +814,8 @@ const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.Entries
     e.ErlNifFunc{ .name = "beaver_raw_own_opaque_ptr", .arity = 1, .fptr = beaver_raw_own_opaque_ptr, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_read_opaque_ptr", .arity = 2, .fptr = beaver_raw_read_opaque_ptr, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_parse_pass_pipeline", .arity = 2, .fptr = beaver_raw_parse_pass_pipeline, .flags = 0 },
+    e.ErlNifFunc{ .name = "mif_raw_jit_invoke_with_terms", .arity = 3, .fptr = mif_raw_jit_invoke_with_terms, .flags = 0 },
+    e.ErlNifFunc{ .name = "mif_raw_jit_register_enif", .arity = 1, .fptr = mif_raw_jit_invoke_with_terms, .flags = 0 },
 } ++
     PtrOwner.Kind.nifs ++
     Complex.F32.nifs ++

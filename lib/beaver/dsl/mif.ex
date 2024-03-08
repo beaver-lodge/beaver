@@ -13,7 +13,7 @@ defmodule Beaver.MIF do
     end
   end
 
-  defmacro __before_compile__(env) do
+  defmacro __before_compile__(_env) do
     quote do
       {ir_str, _} = @defm |> Beaver.MIF.compile_definitions(__ENV__) |> Code.eval_quoted()
       @ir ir_str
@@ -23,25 +23,37 @@ defmodule Beaver.MIF do
     end
   end
 
-  defp transform_type_operator({:"::", _, [var, t]}) do
-    {var, t}
-  end
-
   def compile_definitions(definitions, env) do
     functions =
       for {call, expr} <- definitions do
         {name, args} = Macro.decompose_call(call)
-        expr = Macro.postwalk(expr, &Macro.expand(&1, env)) |> dbg
+
+        expr = Macro.postwalk(expr, &Macro.expand(&1, env))[:do] |> List.wrap()
+
+        {types, vars_of_blk_args} =
+          for {{:"::", _line0, [{_arg, _line1, nil} = var, t]}, index} <- Enum.with_index(args) do
+            {t,
+             quote do
+               Kernel.var!(unquote(var)) = MLIR.Block.get_arg!(Beaver.Env.block(), unquote(index))
+             end}
+          end
+          |> Enum.unzip()
 
         quote do
           Beaver.MLIR.Dialect.Func.func unquote(name)(
-                                          function_type: Type.function([Type.i32()], [Type.i32()])
+                                          function_type:
+                                            Type.function(unquote(types), [Type.i64()])
                                         ) do
-            # unquote(compile_args(call))
-            # unquote(expr)
             region do
               block _() do
-                Beaver.MLIR.Dialect.Func.return() >>> []
+                MLIR.Block.add_args!(Beaver.Env.block(), [unquote_splicing(types)],
+                  ctx: Beaver.Env.context()
+                )
+
+                unquote_splicing(vars_of_blk_args)
+                last_op = unquote_splicing(expr)
+                ret = last_op |> Beaver.Walker.results() |> Enum.at(0)
+                Beaver.MLIR.Dialect.Func.return(ret) >>> []
               end
             end
           end
@@ -56,6 +68,7 @@ defmodule Beaver.MIF do
           module do
             require Beaver.MLIR.Dialect.Func
             alias MLIR.Type
+            import Beaver.MLIR.Type
             (unquote_splicing(functions))
           end
         end
@@ -64,7 +77,8 @@ defmodule Beaver.MIF do
       MLIR.Context.destroy(ctx)
       m
     end
-    |> tap(&IO.puts(Macro.to_string(&1)))
+
+    # |> tap(&IO.puts(Macro.to_string(&1)))
   end
 
   defmacro op(
@@ -73,9 +87,25 @@ defmodule Beaver.MIF do
                 call,
                 types
               ]},
-             block \\ []
+             _ \\ []
            ) do
-    "??"
+    {{:., _, [{dialect, _, nil}, op]}, _, args} = call
+    op = "#{dialect}.#{op}"
+
+    quote do
+      %Beaver.SSA{
+        op: unquote("#{op}"),
+        arguments: unquote(args),
+        ctx: Beaver.Env.context(),
+        block: Beaver.Env.block(),
+        loc: Beaver.MLIR.Location.from_env(__ENV__),
+        filler: fn ->
+          []
+        end
+      }
+      |> Beaver.SSA.put_results([unquote_splicing(List.wrap(types))])
+      |> MLIR.Operation.create()
+    end
   end
 
   defmacro defm(call, expr \\ []) do
@@ -85,7 +115,7 @@ defmodule Beaver.MIF do
     quote do
       @defm unquote(Macro.escape({call, expr}))
       def unquote(name)(unquote_splicing(args)) do
-        arguments = [unquote_splicing(args)] |> Enum.map(&Beaver.Native.I64.make/1)
+        arguments = [unquote_splicing(args)]
         __ir__()
       end
     end

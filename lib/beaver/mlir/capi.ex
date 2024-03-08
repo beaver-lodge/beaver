@@ -74,4 +74,6 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_own_opaque_ptr(_), do: raise("NIF not loaded")
   def beaver_raw_context_attach_diagnostic_handler(_, _), do: raise("NIF not loaded")
   def beaver_raw_parse_pass_pipeline(_, _), do: raise("NIF not loaded")
+  def mif_raw_jit_invoke_with_terms(_jit, _name, _args), do: raise("NIF not loaded")
+  def mif_raw_jit_register_enif(_jit), do: raise("NIF not loaded")
 end
