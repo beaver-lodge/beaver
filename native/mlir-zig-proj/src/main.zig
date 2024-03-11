@@ -561,9 +561,10 @@ fn mif_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term)
         return beam.make_error_binary(env, "fail to fetch resource for ExecutionEngine, expected: " ++ @typeName(mlir_capi.ExecutionEngine.T));
     const names = .{ "enif_make_int", "enif_get_int" };
     inline for (names) |name| {
+        const prefixed_name = "_mlir_ciface_" ++ name;
         const name_str_ref = c.MlirStringRef{
-            .data = name.ptr,
-            .length = name.len,
+            .data = prefixed_name.ptr,
+            .length = prefixed_name.len,
         };
         c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @ptrCast(@constCast(&@field(e, name))));
     }

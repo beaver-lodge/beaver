@@ -67,8 +67,18 @@ defmodule Beaver.MIF do
         mlir ctx: ctx do
           module do
             require Beaver.MLIR.Dialect.Func
+            alias Beaver.MLIR.Dialect.Func
             alias MLIR.Type
             import Beaver.MLIR.Type
+
+            Func.func enif_get_int(
+                        sym_visibility: MLIR.Attribute.string("private"),
+                        function_type: Type.function([Type.i64()], [Type.i64()])
+                      ) do
+              region do
+              end
+            end
+
             (unquote_splicing(functions))
           end
         end
@@ -129,10 +139,10 @@ defmodule Beaver.MIF do
           |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
           |> reconcile_unrealized_casts
           |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR") == "1")
-          # |> MLIR.dump!()
+          |> MLIR.dump!()
           |> MLIR.ExecutionEngine.create!()
 
-        Beaver.MLIR.CAPI.mif_raw_jit_register_enif(jit.ref)
+        :ok = Beaver.MLIR.CAPI.mif_raw_jit_register_enif(jit.ref)
 
         Beaver.MLIR.CAPI.mif_raw_jit_invoke_with_terms(
           jit.ref,
