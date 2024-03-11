@@ -115,8 +115,30 @@ defmodule Beaver.MIF do
     quote do
       @defm unquote(Macro.escape({call, expr}))
       def unquote(name)(unquote_splicing(args)) do
+        import Beaver.MLIR.Conversion
         arguments = [unquote_splicing(args)]
-        __ir__()
+        ctx = MLIR.Context.create()
+
+        jit =
+          ~m{#{__ir__()}}.(ctx)
+          |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
+          |> convert_scf_to_cf
+          |> convert_arith_to_llvm()
+          |> convert_index_to_llvm()
+          |> convert_func_to_llvm()
+          |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
+          |> reconcile_unrealized_casts
+          |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR") == "1")
+          # |> MLIR.dump!()
+          |> MLIR.ExecutionEngine.create!()
+
+        Beaver.MLIR.CAPI.mif_raw_jit_register_enif(jit.ref)
+
+        Beaver.MLIR.CAPI.mif_raw_jit_invoke_with_terms(
+          jit.ref,
+          to_string(unquote(name)),
+          arguments
+        )
       end
     end
   end

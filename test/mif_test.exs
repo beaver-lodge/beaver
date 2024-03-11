@@ -11,10 +11,10 @@ defmodule MIFTest do
       end
 
       defm subtract(a :: i64(), b :: i64()) do
-        op llvm.subtract(a, b) :: i64()
+        op llvm.sub(a, b) :: i64()
       end
     end
 
-    AddTwoInt.add(1, 2) |> IO.puts()
+    assert AddTwoInt.add(1, 2) == AddTwoInt.add(1, 2)
   end
 end

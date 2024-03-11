@@ -534,13 +534,9 @@ const Invocation = struct {
         beam.allocator.free(self.arg_terms);
         beam.allocator.free(self.packed_args);
     }
-    pub fn invoke(self: *@This(), jit: mlir_capi.ExecutionEngine.T, name: beam.binary) !beam.term {
-        const res = c.mlirExecutionEngineInvokePacked(jit, c.MlirStringRef{ .data = name.data, .length = name.size }, &self.packed_args[0]);
-        if (c.mlirLogicalResultIsFailure(res)) {
-            return error.JitFunctionCallFailed;
-        } else {
-            return self.res_term;
-        }
+    pub fn invoke(self: *@This(), _: beam.env, jit: mlir_capi.ExecutionEngine.T, name: beam.binary) callconv(.C) mlir_capi.LogicalResult.T {
+        print("{any}\n", .{self.arg_terms});
+        return c.mlirExecutionEngineInvokePacked(jit, c.MlirStringRef{ .data = name.data, .length = name.size }, &self.packed_args[0]);
     }
 };
 
@@ -552,10 +548,12 @@ fn mif_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const beam.t
     var invocation = Invocation{};
     invocation.init(env, args[2]) catch return beam.make_error_binary(env, "fail to init jit invocation");
     defer invocation.deinit();
-    const res_term = invocation.invoke(jit, name) catch |err| switch (err) {
-        error.JitFunctionCallFailed => return beam.make_error_binary(env, "fail to call jit function"),
-    };
-    return beam.make_ok_term(env, res_term);
+    _ = invocation.invoke(env, jit, name);
+    // if (c.mlirLogicalResultIsFailure(invocation.invoke(env, jit, name))) {
+    //     return beam.make_error_binary(env, "fail to call jit function");
+    // }
+    return beam.make(usize, env, invocation.res_term) catch return beam.make_error_binary(env, "fail to make res");
+    // return beam.make_ok_term(env, res_term);
 }
 
 fn mif_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
