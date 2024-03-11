@@ -562,12 +562,12 @@ fn mif_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term)
     var jit: mlir_capi.ExecutionEngine.T = mlir_capi.ExecutionEngine.resource.fetch(env, args[0]) catch
         return beam.make_error_binary(env, "fail to fetch resource for ExecutionEngine, expected: " ++ @typeName(mlir_capi.ExecutionEngine.T));
     const names = .{ "enif_make_int", "enif_get_int" };
-    for (names) |name| {
+    inline for (names) |name| {
         const name_str_ref = c.MlirStringRef{
             .data = name.ptr,
             .length = name.len,
         };
-        c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @field(e, name));
+        c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @ptrCast(@constCast(&@field(e, name))));
     }
     return beam.make_ok(env);
 }
@@ -815,7 +815,7 @@ const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.Entries
     e.ErlNifFunc{ .name = "beaver_raw_read_opaque_ptr", .arity = 2, .fptr = beaver_raw_read_opaque_ptr, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_parse_pass_pipeline", .arity = 2, .fptr = beaver_raw_parse_pass_pipeline, .flags = 0 },
     e.ErlNifFunc{ .name = "mif_raw_jit_invoke_with_terms", .arity = 3, .fptr = mif_raw_jit_invoke_with_terms, .flags = 0 },
-    e.ErlNifFunc{ .name = "mif_raw_jit_register_enif", .arity = 1, .fptr = mif_raw_jit_invoke_with_terms, .flags = 0 },
+    e.ErlNifFunc{ .name = "mif_raw_jit_register_enif", .arity = 1, .fptr = mif_raw_jit_register_enif, .flags = 0 },
 } ++
     PtrOwner.Kind.nifs ++
     Complex.F32.nifs ++
