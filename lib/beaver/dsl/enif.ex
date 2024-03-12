@@ -4,28 +4,8 @@ defmodule Beaver.ENIF do
   alias Beaver.MLIR.Dialect.Func
   alias MLIR.Type
 
-  defp mlir_t({"c_int", size}) do
-    Type.i(size * 8)
-  end
-
-  defp mlir_t({"c_ulong", size}) do
-    Type.i(size * 8)
-  end
-
-  defp mlir_t({"c_long", size}) do
-    Type.i(size * 8)
-  end
-
-  defp mlir_t({"[*c]" <> _, _}) do
-    ~t{!llvm.ptr}
-  end
-
-  defp mlir_t({zig_t, size}) do
-    if String.ends_with?(zig_t, "enif_environment_t") do
-      Type.i(size * 8)
-    else
-      raise "unsupported Zig type #{zig_t}"
-    end
+  defp mlir_t({ref, _size}) when is_reference(ref) do
+    %MLIR.Type{ref: ref}
   end
 
   @doc """
@@ -33,7 +13,7 @@ defmodule Beaver.ENIF do
   """
   def external_functions(ctx, block) do
     mlir ctx: ctx, block: block do
-      for {name, arg_types, ret_type} <- MLIR.CAPI.mif_raw_enif_signatures() do
+      for {name, arg_types, ret_type} <- MLIR.CAPI.mif_raw_enif_signatures(ctx.ref) do
         Func.func _(
                     sym_name: "\"#{name}\"",
                     sym_visibility: MLIR.Attribute.string("private"),
