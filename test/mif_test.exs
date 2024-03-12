@@ -15,6 +15,6 @@ defmodule MIFTest do
       end
     end
 
-    assert AddTwoInt.add(1, 2) == AddTwoInt.add(1, 2)
+    assert AddTwoInt.add(1, 2) == 3
   end
 end
