@@ -42,4 +42,12 @@ defmodule Beaver.ENIF do
       end
     end
   end
+
+  defmodule ErlNifEnv do
+    def mlir_t(opts), do: Type.i64(opts)
+  end
+
+  defmodule ERL_NIF_TERM do
+    def mlir_t(opts), do: Type.i64(opts)
+  end
 end
