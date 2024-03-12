@@ -11,7 +11,7 @@ defmodule Beaver.ENIF do
   @doc """
   insert external functions of ENIF into current MLIR block
   """
-  def external_functions(ctx, block) do
+  def populate_external_functions(ctx, block) do
     mlir ctx: ctx, block: block do
       for {name, arg_types, ret_type} <- MLIR.CAPI.mif_raw_enif_signatures(ctx.ref) do
         Func.func _(
