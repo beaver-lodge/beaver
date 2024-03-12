@@ -12,7 +12,11 @@ defmodule Beaver.ENIF do
     Type.i(size * 8)
   end
 
-  defp mlir_t({"[*c]c_int", _}) do
+  defp mlir_t({"c_long", size}) do
+    Type.i(size * 8)
+  end
+
+  defp mlir_t({"[*c]" <> _, _}) do
     ~t{!llvm.ptr}
   end
 
@@ -44,10 +48,10 @@ defmodule Beaver.ENIF do
   end
 
   defmodule ErlNifEnv do
-    def mlir_t(opts), do: Type.i64(opts)
+    def mlir_t(opts \\ []), do: Type.i64(opts)
   end
 
   defmodule ERL_NIF_TERM do
-    def mlir_t(opts), do: Type.i64(opts)
+    def mlir_t(opts \\ []), do: Type.i64(opts)
   end
 end

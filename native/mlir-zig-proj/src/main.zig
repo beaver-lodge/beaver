@@ -518,7 +518,7 @@ const Invocation = struct {
         var idx: usize = 0;
         var head: beam.term = undefined;
         self.arg_terms = try beam.allocator.alloc(beam.term, size);
-        self.packed_args = try beam.allocator.alloc(?*anyopaque, size + 1);
+        self.packed_args = try beam.allocator.alloc(?*anyopaque, size + 2);
         var movable_list = list;
         while (idx < size) {
             head = try beam.get_head_and_iter(environment, &movable_list);
@@ -526,7 +526,9 @@ const Invocation = struct {
             self.packed_args[idx] = &self.arg_terms[idx];
             idx += 1;
         }
+        // self.packed_args[size] = @ptrCast(@constCast(&environment));
         self.packed_args[size] = &self.res_term;
+        self.packed_args[size + 1] = &self.res_term;
         errdefer beam.allocator.free(self.arg_terms);
         errdefer beam.allocator.free(self.packed_args);
     }
@@ -552,11 +554,15 @@ fn mif_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const beam.t
     // if (c.mlirLogicalResultIsFailure(invocation.invoke(env, jit, name))) {
     //     return beam.make_error_binary(env, "fail to call jit function");
     // }
-    return beam.make(usize, env, invocation.res_term) catch return beam.make_error_binary(env, "fail to make res");
-    // return beam.make_ok_term(env, res_term);
+    return invocation.res_term;
 }
 
-const enif_function_names = .{ "enif_make_int", "enif_get_int" };
+const enif_function_names = .{
+    "enif_make_int",
+    "enif_make_int64",
+    "enif_get_int",
+    "enif_get_int64",
+};
 fn mif_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
     var jit: mlir_capi.ExecutionEngine.T = mlir_capi.ExecutionEngine.resource.fetch(env, args[0]) catch
         return beam.make_error_binary(env, "fail to fetch resource for ExecutionEngine, expected: " ++ @typeName(mlir_capi.ExecutionEngine.T));

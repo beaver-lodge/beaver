@@ -32,7 +32,9 @@ defmodule Beaver.MIF do
 
         {types, vars_of_blk_args} =
           for {{:"::", _line0, [{_arg, _line1, nil} = var, t]}, index} <- Enum.with_index(args) do
-            {t,
+            {quote do
+               Beaver.ENIF.ERL_NIF_TERM.mlir_t()
+             end,
              quote do
                Kernel.var!(unquote(var)) = MLIR.Block.get_arg!(Beaver.Env.block(), unquote(index))
              end}
@@ -40,20 +42,29 @@ defmodule Beaver.MIF do
           |> Enum.unzip()
 
         quote do
+          arg_types = [
+            unquote_splicing(types),
+            Beaver.ENIF.ErlNifEnv.mlir_t()
+          ]
+
+          ret_types = [Beaver.ENIF.ERL_NIF_TERM.mlir_t()]
+
           Beaver.MLIR.Dialect.Func.func unquote(name)(
-                                          function_type:
-                                            Type.function(unquote(types), [Type.i64()])
+                                          function_type: Type.function(arg_types, ret_types)
                                         ) do
             region do
               block _() do
-                MLIR.Block.add_args!(Beaver.Env.block(), [unquote_splicing(types)],
-                  ctx: Beaver.Env.context()
-                )
-
+                MLIR.Block.add_args!(Beaver.Env.block(), arg_types, ctx: Beaver.Env.context())
+                env = MLIR.Block.get_arg!(Beaver.Env.block(), length(arg_types) - 1)
                 unquote_splicing(vars_of_blk_args)
                 last_op = unquote_splicing(expr)
                 ret = last_op |> Beaver.Walker.results() |> Enum.at(0)
-                Beaver.MLIR.Dialect.Func.return(ret) >>> []
+
+                ret_term =
+                  Func.call([env, ret], callee: Attribute.flat_symbol_ref("enif_make_int64")) >>>
+                    Beaver.ENIF.ERL_NIF_TERM.mlir_t()
+
+                Beaver.MLIR.Dialect.Func.return(ret_term) >>> []
               end
             end
           end
@@ -68,7 +79,7 @@ defmodule Beaver.MIF do
           module do
             require Beaver.MLIR.Dialect.Func
             alias Beaver.MLIR.Dialect.Func
-            alias MLIR.Type
+            alias MLIR.{Type, Attribute}
             import Beaver.MLIR.Type
             Beaver.ENIF.external_functions(ctx, Beaver.Env.block())
 
