@@ -1,4 +1,4 @@
-defmodule DefineMLIRTest do
+defmodule TranslateMLIRTest do
   use Beaver.Case, async: true
 
   @moduletag :smoke
@@ -6,28 +6,28 @@ defmodule DefineMLIRTest do
     defmodule AddTwoInt do
       use TranslateMLIR
 
-      defm llvm_add(a :: i64, b :: i64) do
+      mlir_func llvm_add(a :: i64, b :: i64) do
         a + b
       end
 
-      defm llvm_add1(a :: i64, b :: i64) do
+      mlir_func llvm_add1(a :: i64, b :: i64) do
         a + b + 1
       end
 
-      defm llvm_add_multi_lines(a :: i64, b :: i64) do
+      mlir_func llvm_add_multi_lines(a :: i64, b :: i64) do
         c = a
         c = c + b + 1
         a = 2 + c + b + 1
         a
       end
 
-      defm llvm_for_loop(a :: i64, b :: i64) do
+      mlir_func llvm_for_loop(a :: i64, b :: i64) do
         for i <- [1, 2, 3, 4, 5] do
           i + a + b
         end
       end
 
-      defm llvm_for_loop2(a :: i64, b :: i64) do
+      mlir_func llvm_for_loop2(a :: i64, b :: i64) do
         l =
           for i <- [1, 2, 3] do
             i + a + b
