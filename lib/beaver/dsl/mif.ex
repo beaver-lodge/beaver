@@ -121,6 +121,7 @@ defmodule Beaver.MIF do
         import Beaver.MLIR.Conversion
         arguments = [unquote_splicing(args)]
         ctx = MLIR.Context.create()
+        Beaver.Diagnostic.attach(ctx)
 
         jit =
           ~m{#{__ir__()}}.(ctx)
@@ -132,7 +133,6 @@ defmodule Beaver.MIF do
           |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
           |> reconcile_unrealized_casts
           |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR") == "1")
-          |> MLIR.dump!()
           |> MLIR.ExecutionEngine.create!()
 
         :ok = Beaver.MLIR.CAPI.mif_raw_jit_register_enif(jit.ref)
