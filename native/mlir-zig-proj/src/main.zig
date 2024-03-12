@@ -556,11 +556,11 @@ fn mif_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const beam.t
     // return beam.make_ok_term(env, res_term);
 }
 
+const enif_function_names = .{ "enif_make_int", "enif_get_int" };
 fn mif_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
     var jit: mlir_capi.ExecutionEngine.T = mlir_capi.ExecutionEngine.resource.fetch(env, args[0]) catch
         return beam.make_error_binary(env, "fail to fetch resource for ExecutionEngine, expected: " ++ @typeName(mlir_capi.ExecutionEngine.T));
-    const names = .{ "enif_make_int", "enif_get_int" };
-    inline for (names) |name| {
+    inline for (enif_function_names) |name| {
         const prefixed_name = "_mlir_ciface_" ++ name;
         const name_str_ref = c.MlirStringRef{
             .data = prefixed_name.ptr,
@@ -569,6 +569,39 @@ fn mif_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term)
         c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @ptrCast(@constCast(&@field(e, name))));
     }
     return beam.make_ok(env);
+}
+
+fn dump_type_info(env: beam.env, comptime t: type) !beam.term {
+    var type_info_slice: []beam.term = try beam.allocator.alloc(beam.term, 2);
+    type_info_slice[0] = beam.make_slice(env, @typeName(t));
+    type_info_slice[1] = try beam.make(i64, env, @sizeOf(t));
+    defer beam.allocator.free(type_info_slice);
+    return beam.make_tuple(env, type_info_slice);
+}
+
+fn mif_raw_enif_signatures(env: beam.env, _: c_int, _: [*c]const beam.term) callconv(.C) beam.term {
+    var signatures: []beam.term = beam.allocator.alloc(beam.term, enif_function_names.len) catch
+        return beam.make_error_binary(env, "fail to allocate");
+    inline for (enif_function_names, 0..) |name, i| {
+        const FTI = @typeInfo(@TypeOf(@field(e, name))).Fn;
+        var signature_slice: []beam.term = beam.allocator.alloc(beam.term, 3) catch
+            return beam.make_error_binary(env, "fail to allocate");
+        defer beam.allocator.free(signature_slice);
+        var arg_type_slice: []beam.term = beam.allocator.alloc(beam.term, FTI.params.len) catch
+            return beam.make_error_binary(env, "fail to allocate");
+        defer beam.allocator.free(arg_type_slice);
+        inline for (FTI.params, 0..) |p, arg_i| {
+            arg_type_slice[arg_i] = dump_type_info(env, p.type.?) catch
+                return beam.make_error_binary(env, "fail to allocate");
+        }
+        // {name, [arg_types...], ret_type}
+        signature_slice[0] = beam.make_slice(env, name);
+        signature_slice[1] = beam.make_term_list(env, arg_type_slice);
+        signature_slice[2] = dump_type_info(env, FTI.return_type.?) catch
+            return beam.make_error_binary(env, "fail to allocate");
+        signatures[i] = beam.make_tuple(env, signature_slice);
+    }
+    return beam.make_term_list(env, signatures);
 }
 
 fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
@@ -815,6 +848,7 @@ const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.Entries
     e.ErlNifFunc{ .name = "beaver_raw_parse_pass_pipeline", .arity = 2, .fptr = beaver_raw_parse_pass_pipeline, .flags = 0 },
     e.ErlNifFunc{ .name = "mif_raw_jit_invoke_with_terms", .arity = 3, .fptr = mif_raw_jit_invoke_with_terms, .flags = 0 },
     e.ErlNifFunc{ .name = "mif_raw_jit_register_enif", .arity = 1, .fptr = mif_raw_jit_register_enif, .flags = 0 },
+    e.ErlNifFunc{ .name = "mif_raw_enif_signatures", .arity = 0, .fptr = mif_raw_enif_signatures, .flags = 0 },
 } ++
     PtrOwner.Kind.nifs ++
     Complex.F32.nifs ++

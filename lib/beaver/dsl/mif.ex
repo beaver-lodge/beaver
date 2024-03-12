@@ -70,14 +70,7 @@ defmodule Beaver.MIF do
             alias Beaver.MLIR.Dialect.Func
             alias MLIR.Type
             import Beaver.MLIR.Type
-
-            Func.func enif_get_int(
-                        sym_visibility: MLIR.Attribute.string("private"),
-                        function_type: Type.function([Type.i64()], [Type.i64()])
-                      ) do
-              region do
-              end
-            end
+            Beaver.ENIF.external_functions(ctx, Beaver.Env.block())
 
             (unquote_splicing(functions))
           end
