@@ -344,7 +344,7 @@ defmodule TranslateMLIR do
     ret
   end
 
-  defmacro defm(call, expr \\ nil) do
+  defmacro mlir_func(call, expr \\ nil) do
     {name, args} = Macro.decompose_call(call)
     args = for {:"::", _, [arg, _type]} <- args, do: arg
     ctx = MLIR.Context.create()
