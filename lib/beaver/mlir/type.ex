@@ -14,7 +14,17 @@ defmodule Beaver.MLIR.Type do
     Beaver.Deferred.from_opts(opts, &CAPI.mlirTypeParseGet(&1, MLIR.StringRef.create(string)))
   end
 
-  def equal?(a, b) do
+  def equal?(a, b = %MLIR.Type{}) when is_function(a, 1) do
+    ctx = MLIR.CAPI.mlirTypeGetContext(b)
+    equal?(Beaver.Deferred.create(a, ctx), b)
+  end
+
+  def equal?(a = %MLIR.Type{}, b) when is_function(b, 1) do
+    ctx = MLIR.CAPI.mlirTypeGetContext(a)
+    equal?(a, Beaver.Deferred.create(b, ctx))
+  end
+
+  def equal?(a = %MLIR.Type{}, b = %MLIR.Type{}) do
     CAPI.mlirTypeEqual(a, b) |> Beaver.Native.to_term()
   end
 
