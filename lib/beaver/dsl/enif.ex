@@ -28,10 +28,24 @@ defmodule Beaver.ENIF do
   end
 
   defmodule ErlNifEnv do
-    def mlir_t(opts \\ []), do: Type.i64(opts)
+    def mlir_t(opts \\ []) do
+      Beaver.Deferred.from_opts(
+        opts,
+        fn %MLIR.Context{ref: ref} ->
+          %MLIR.Type{ref: MLIR.CAPI.mif_raw_mlir_type_ErlNifEnv(ref)}
+        end
+      )
+    end
   end
 
   defmodule ERL_NIF_TERM do
-    def mlir_t(opts \\ []), do: Type.i64(opts)
+    def mlir_t(opts \\ []) do
+      Beaver.Deferred.from_opts(
+        opts,
+        fn %MLIR.Context{ref: ref} ->
+          %MLIR.Type{ref: MLIR.CAPI.mif_raw_mlir_type_ERL_NIF_TERM(ref)}
+        end
+      )
+    end
   end
 end

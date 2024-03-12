@@ -576,28 +576,30 @@ fn mif_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term)
     return beam.make_ok(env);
 }
 
-fn dump_type_info(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
-    var type_info_slice: []beam.term = try beam.allocator.alloc(beam.term, 2);
-    type_info_slice[0] = beam.make_slice(env, @typeName(t));
-    type_info_slice[1] = try beam.make(i64, env, @sizeOf(t));
+fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
     switch (@typeInfo(t)) {
         .Pointer => {
             const llvm_ptr = "!llvm.ptr";
-            type_info_slice[0] = try mlir_capi.Type.resource.make(env, c.mlirTypeParseGet(ctx, c.MlirStringRef{
+            return try mlir_capi.Type.resource.make(env, c.mlirTypeParseGet(ctx, c.MlirStringRef{
                 .data = llvm_ptr.ptr,
                 .length = llvm_ptr.len,
             }));
         },
         else => {
             if (t == c_int or t == c_ulong or t == c_long or t == beam.env) {
-                type_info_slice[0] = try mlir_capi.Type.resource.make(env, c.mlirIntegerTypeGet(ctx, @bitSizeOf(t)));
+                return try mlir_capi.Type.resource.make(env, c.mlirIntegerTypeGet(ctx, @bitSizeOf(t)));
             } else {
                 print("not supported type in enif signature, {any}\n", .{t});
                 unreachable();
             }
         },
     }
+}
 
+fn dump_type_info(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
+    var type_info_slice: []beam.term = try beam.allocator.alloc(beam.term, 2);
+    type_info_slice[0] = try enif_mlir_type(env, ctx, t);
+    type_info_slice[1] = try beam.make(i64, env, @sizeOf(t));
     defer beam.allocator.free(type_info_slice);
     return beam.make_tuple(env, type_info_slice);
 }
@@ -627,6 +629,16 @@ fn mif_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.term) c
         signatures[i] = beam.make_tuple(env, signature_slice);
     }
     return beam.make_term_list(env, signatures);
+}
+
+fn mlirTypeQueryNIF(comptime t: type) type {
+    return struct {
+        fn f(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            const ctx = mlir_capi.Context.resource.fetch(env, args[0]) catch
+                return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(mlir_capi.Context.T));
+            return enif_mlir_type(env, ctx, t) catch return beam.make_error_binary(env, "fail to get mlir type");
+        }
+    };
 }
 
 fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
@@ -874,6 +886,8 @@ const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.Entries
     e.ErlNifFunc{ .name = "mif_raw_jit_invoke_with_terms", .arity = 3, .fptr = mif_raw_jit_invoke_with_terms, .flags = 0 },
     e.ErlNifFunc{ .name = "mif_raw_jit_register_enif", .arity = 1, .fptr = mif_raw_jit_register_enif, .flags = 0 },
     e.ErlNifFunc{ .name = "mif_raw_enif_signatures", .arity = 1, .fptr = mif_raw_enif_signatures, .flags = 0 },
+    e.ErlNifFunc{ .name = "mif_raw_mlir_type_ErlNifEnv", .arity = 1, .fptr = mlirTypeQueryNIF(beam.env).f, .flags = 0 },
+    e.ErlNifFunc{ .name = "mif_raw_mlir_type_ERL_NIF_TERM", .arity = 1, .fptr = mlirTypeQueryNIF(beam.term).f, .flags = 0 },
 } ++
     PtrOwner.Kind.nifs ++
     Complex.F32.nifs ++
