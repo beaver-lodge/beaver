@@ -537,7 +537,6 @@ const Invocation = struct {
         beam.allocator.free(self.packed_args);
     }
     pub fn invoke(self: *@This(), _: beam.env, jit: mlir_capi.ExecutionEngine.T, name: beam.binary) callconv(.C) mlir_capi.LogicalResult.T {
-        print("{any}\n", .{self.arg_terms});
         return c.mlirExecutionEngineInvokePacked(jit, c.MlirStringRef{ .data = name.data, .length = name.size }, &self.packed_args[0]);
     }
 };
