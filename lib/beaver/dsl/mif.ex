@@ -155,31 +155,43 @@ defmodule Beaver.MIF do
     quote do
       @defm unquote(Macro.escape({call, expr}))
       def unquote(name)(unquote_splicing(args)) do
-        import Beaver.MLIR.Conversion
-        arguments = [unquote_splicing(args)]
-        ctx = MLIR.Context.create()
-        Beaver.Diagnostic.attach(ctx)
-
-        jit =
-          ~m{#{__ir__()}}.(ctx)
-          |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
-          |> convert_scf_to_cf
-          |> convert_arith_to_llvm()
-          |> convert_index_to_llvm()
-          |> convert_func_to_llvm()
-          |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
-          |> reconcile_unrealized_casts
-          |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR") == "1")
-          |> MLIR.ExecutionEngine.create!()
-
-        :ok = Beaver.MLIR.CAPI.mif_raw_jit_register_enif(jit.ref)
+        %{jit: jit} = Agent.get(__MODULE__, & &1)
 
         Beaver.MLIR.CAPI.mif_raw_jit_invoke_with_terms(
           jit.ref,
           to_string(unquote(name)),
-          arguments
+          unquote(args)
         )
       end
     end
+  end
+
+  def init_jit(module) do
+    import Beaver.MLIR.Conversion
+    ctx = MLIR.Context.create()
+    Beaver.Diagnostic.attach(ctx)
+
+    jit =
+      ~m{#{module.__ir__()}}.(ctx)
+      |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
+      |> convert_scf_to_cf
+      |> convert_arith_to_llvm()
+      |> convert_index_to_llvm()
+      |> convert_func_to_llvm()
+      |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
+      |> reconcile_unrealized_casts
+      |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR") == "1")
+      |> MLIR.ExecutionEngine.create!()
+
+    :ok = Beaver.MLIR.CAPI.mif_raw_jit_register_enif(jit.ref)
+
+    Agent.start_link(fn -> %{ctx: ctx, jit: jit} end, name: module)
+  end
+
+  def destroy_jit(module) do
+    %{ctx: ctx, jit: jit} = Agent.get(module, & &1)
+    MLIR.ExecutionEngine.destroy(jit)
+    MLIR.Context.destroy(ctx)
+    Agent.stop(module)
   end
 end

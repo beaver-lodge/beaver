@@ -15,7 +15,9 @@ defmodule MIFTest do
       end
     end
 
+    Beaver.MIF.init_jit(AddTwoInt)
     assert AddTwoInt.add(1, 2) == 3
     assert AddTwoInt.subtract(30, 20) == 10
+    Beaver.MIF.destroy_jit(AddTwoInt)
   end
 end
