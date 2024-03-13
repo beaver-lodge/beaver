@@ -14,17 +14,17 @@ defmodule Beaver.MLIR.Type do
     Beaver.Deferred.from_opts(opts, &CAPI.mlirTypeParseGet(&1, MLIR.StringRef.create(string)))
   end
 
-  def equal?(a, b = %MLIR.Type{}) when is_function(a, 1) do
+  def equal?(a, b = %__MODULE__{}) when is_function(a, 1) do
     ctx = MLIR.CAPI.mlirTypeGetContext(b)
     equal?(Beaver.Deferred.create(a, ctx), b)
   end
 
-  def equal?(a = %MLIR.Type{}, b) when is_function(b, 1) do
+  def equal?(a = %__MODULE__{}, b) when is_function(b, 1) do
     ctx = MLIR.CAPI.mlirTypeGetContext(a)
     equal?(a, Beaver.Deferred.create(b, ctx))
   end
 
-  def equal?(a = %MLIR.Type{}, b = %MLIR.Type{}) do
+  def equal?(a = %__MODULE__{}, b = %__MODULE__{}) do
     CAPI.mlirTypeEqual(a, b) |> Beaver.Native.to_term()
   end
 
@@ -34,12 +34,12 @@ defmodule Beaver.MLIR.Type do
 
     Beaver.Deferred.from_opts(opts, fn ctx ->
       inputs =
-        inputs |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> Beaver.Native.array(MLIR.Type)
+        inputs |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> Beaver.Native.array(__MODULE__)
 
       results =
         results
         |> Enum.map(&Beaver.Deferred.create(&1, ctx))
-        |> Beaver.Native.array(MLIR.Type)
+        |> Beaver.Native.array(__MODULE__)
 
       CAPI.mlirFunctionTypeGet(ctx, num_inputs, inputs, num_results, results)
     end)
@@ -62,7 +62,7 @@ defmodule Beaver.MLIR.Type do
 
   def ranked_tensor(
         shape,
-        %MLIR.Type{} = element_type,
+        %__MODULE__{} = element_type,
         nil
       )
       when is_list(shape) do
@@ -71,7 +71,7 @@ defmodule Beaver.MLIR.Type do
 
   def ranked_tensor(
         shape,
-        %MLIR.Type{} = element_type,
+        %__MODULE__{} = element_type,
         encoding
       )
       when is_list(shape) do
@@ -90,7 +90,7 @@ defmodule Beaver.MLIR.Type do
     &unranked_tensor(element_type.(&1))
   end
 
-  def unranked_tensor(%MLIR.Type{} = element_type) do
+  def unranked_tensor(%__MODULE__{} = element_type) do
     CAPI.mlirUnrankedTensorTypeGet(element_type)
   end
 
@@ -98,7 +98,7 @@ defmodule Beaver.MLIR.Type do
     &complex(element_type.(&1))
   end
 
-  def complex(%MLIR.Type{} = element_type) do
+  def complex(%__MODULE__{} = element_type) do
     CAPI.mlirComplexTypeGet(element_type)
   end
 
@@ -114,7 +114,7 @@ defmodule Beaver.MLIR.Type do
 
   def memref(
         shape,
-        %MLIR.Type{} = element_type,
+        %__MODULE__{} = element_type,
         opts
       )
       when is_list(shape) do
@@ -143,7 +143,7 @@ defmodule Beaver.MLIR.Type do
     &vector(shape, element_type.(&1))
   end
 
-  def vector(shape, %MLIR.Type{} = element_type) when is_list(shape) do
+  def vector(shape, %__MODULE__{} = element_type) when is_list(shape) do
     rank = length(shape)
     shape = shape |> Beaver.Native.array(Beaver.Native.I64)
     CAPI.mlirVectorTypeGet(rank, shape, element_type)
@@ -165,7 +165,7 @@ defmodule Beaver.MLIR.Type do
       elements =
         elements
         |> Enum.map(&Beaver.Deferred.create(&1, ctx))
-        |> Beaver.Native.array(MLIR.Type)
+        |> Beaver.Native.array(__MODULE__)
 
       CAPI.mlirTupleTypeGet(ctx, num_elements, elements)
     end)

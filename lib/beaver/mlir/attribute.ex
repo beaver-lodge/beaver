@@ -36,6 +36,16 @@ defmodule Beaver.MLIR.Attribute do
     end)
   end
 
+  def equal?(a, b = %__MODULE__{}) when is_function(a, 1) do
+    ctx = MLIR.CAPI.mlirAttributeGetContext(b)
+    equal?(Beaver.Deferred.create(a, ctx), b)
+  end
+
+  def equal?(a = %__MODULE__{}, b) when is_function(b, 1) do
+    ctx = MLIR.CAPI.mlirAttributeGetContext(a)
+    equal?(a, Beaver.Deferred.create(b, ctx))
+  end
+
   def equal?(%__MODULE__{} = a, %__MODULE__{} = b) do
     CAPI.mlirAttributeEqual(a, b) |> Beaver.Native.to_term()
   end
