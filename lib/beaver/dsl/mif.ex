@@ -37,7 +37,7 @@ defmodule Beaver.MIF do
     cond do
       Type.equal?(t, Type.i32(ctx: ctx)) -> "enif_make_int"
       Type.equal?(t, Type.i64(ctx: ctx)) -> "enif_make_int64"
-      true -> raise "maker symbol found"
+      true -> raise "maker symbol not found"
     end
     |> Attribute.flat_symbol_ref()
   end
