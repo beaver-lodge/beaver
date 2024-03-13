@@ -562,6 +562,7 @@ const enif_function_names = .{
     "enif_get_int",
     "enif_get_int64",
 };
+
 fn mif_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
     var jit: mlir_capi.ExecutionEngine.T = mlir_capi.ExecutionEngine.resource.fetch(env, args[0]) catch
         return beam.make_error_binary(env, "fail to fetch resource for ExecutionEngine, expected: " ++ @typeName(mlir_capi.ExecutionEngine.T));
@@ -631,14 +632,18 @@ fn mif_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.term) c
     return beam.make_term_list(env, signatures);
 }
 
-fn mlirTypeQueryNIF(comptime t: type) type {
-    return struct {
-        fn f(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            const ctx = mlir_capi.Context.resource.fetch(env, args[0]) catch
-                return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(mlir_capi.Context.T));
+fn mif_raw_mlir_type_of_enif_obj(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+    const ctx = mlir_capi.Context.resource.fetch(env, args[0]) catch
+        return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(mlir_capi.Context.T));
+    var name = beam.get_atom_slice(env, args[1]) catch
+        return beam.make_error_binary(env, "fail to get name");
+    inline for (.{ "term", "env" }) |obj| {
+        if (std.mem.eql(u8, name, obj)) {
+            const t = @field(beam, obj);
             return enif_mlir_type(env, ctx, t) catch return beam.make_error_binary(env, "fail to get mlir type");
         }
-    };
+    }
+    return beam.make_error_binary(env, "mlir type not found for enif obj");
 }
 
 fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
@@ -886,8 +891,7 @@ const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.Entries
     e.ErlNifFunc{ .name = "mif_raw_jit_invoke_with_terms", .arity = 3, .fptr = mif_raw_jit_invoke_with_terms, .flags = 0 },
     e.ErlNifFunc{ .name = "mif_raw_jit_register_enif", .arity = 1, .fptr = mif_raw_jit_register_enif, .flags = 0 },
     e.ErlNifFunc{ .name = "mif_raw_enif_signatures", .arity = 1, .fptr = mif_raw_enif_signatures, .flags = 0 },
-    e.ErlNifFunc{ .name = "mif_raw_mlir_type_ErlNifEnv", .arity = 1, .fptr = mlirTypeQueryNIF(beam.env).f, .flags = 0 },
-    e.ErlNifFunc{ .name = "mif_raw_mlir_type_ERL_NIF_TERM", .arity = 1, .fptr = mlirTypeQueryNIF(beam.term).f, .flags = 0 },
+    e.ErlNifFunc{ .name = "mif_raw_mlir_type_of_enif_obj", .arity = 2, .fptr = mif_raw_mlir_type_of_enif_obj, .flags = 0 },
 } ++
     PtrOwner.Kind.nifs ++
     Complex.F32.nifs ++

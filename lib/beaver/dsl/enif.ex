@@ -4,8 +4,20 @@ defmodule Beaver.ENIF do
   alias Beaver.MLIR.Dialect.Func
   alias MLIR.Type
 
-  defp mlir_t({ref, _size}) when is_reference(ref) do
+  defp wrap_mlir_t({ref, _size}) when is_reference(ref) do
     %MLIR.Type{ref: ref}
+  end
+
+  @type opts() :: [ctx: MLIR.Context.t()]
+  @type obj() :: :term | :env
+  @spec mlir_t(obj(), opts()) :: MLIR.Type.t()
+  def mlir_t(obj, opts \\ []) do
+    Beaver.Deferred.from_opts(
+      opts,
+      fn %MLIR.Context{ref: ref} ->
+        %MLIR.Type{ref: MLIR.CAPI.mif_raw_mlir_type_of_enif_obj(ref, obj)}
+      end
+    )
   end
 
   @doc """
@@ -18,34 +30,12 @@ defmodule Beaver.ENIF do
                     sym_name: "\"#{name}\"",
                     sym_visibility: MLIR.Attribute.string("private"),
                     function_type:
-                      Type.function(Enum.map(arg_types, &mlir_t/1), [mlir_t(ret_type)])
+                      Type.function(Enum.map(arg_types, &wrap_mlir_t/1), [wrap_mlir_t(ret_type)])
                   ) do
           region do
           end
         end
       end
-    end
-  end
-
-  defmodule ErlNifEnv do
-    def mlir_t(opts \\ []) do
-      Beaver.Deferred.from_opts(
-        opts,
-        fn %MLIR.Context{ref: ref} ->
-          %MLIR.Type{ref: MLIR.CAPI.mif_raw_mlir_type_ErlNifEnv(ref)}
-        end
-      )
-    end
-  end
-
-  defmodule ERL_NIF_TERM do
-    def mlir_t(opts \\ []) do
-      Beaver.Deferred.from_opts(
-        opts,
-        fn %MLIR.Context{ref: ref} ->
-          %MLIR.Type{ref: MLIR.CAPI.mif_raw_mlir_type_ERL_NIF_TERM(ref)}
-        end
-      )
     end
   end
 end

@@ -55,7 +55,7 @@ defmodule Beaver.MIF do
   def value_to_term(ctx, block, env, value) do
     mlir ctx: ctx, block: block do
       Func.call([env, value], callee: maker_symbol(ctx, MLIR.CAPI.mlirValueGetType(value))) >>>
-        Beaver.ENIF.ERL_NIF_TERM.mlir_t()
+        Beaver.ENIF.mlir_t(:term)
     end
   end
 
@@ -65,12 +65,10 @@ defmodule Beaver.MIF do
 
     quote do
       arg_types =
-        List.duplicate(Beaver.ENIF.ERL_NIF_TERM.mlir_t(), unquote(length(args))) ++
-          [
-            Beaver.ENIF.ErlNifEnv.mlir_t()
-          ]
+        List.duplicate(Beaver.ENIF.mlir_t(:term), unquote(length(args))) ++
+          [Beaver.ENIF.mlir_t(:env)]
 
-      ret_types = [Beaver.ENIF.ERL_NIF_TERM.mlir_t()]
+      ret_types = [Beaver.ENIF.mlir_t(:term)]
 
       Beaver.MLIR.Dialect.Func.func unquote(name)(
                                       function_type: Type.function(arg_types, ret_types)
