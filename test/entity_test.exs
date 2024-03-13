@@ -60,6 +60,8 @@ defmodule EntityTest do
     test "generate", test_context do
       ctx = test_context[:ctx]
       assert Attribute.equal?(Attribute.type(Type.f32()).(ctx), Attribute.type(Type.f32()).(ctx))
+      assert Attribute.equal?(Attribute.type(Type.f32()), Attribute.type(Type.f32()).(ctx))
+      assert Attribute.equal?(Attribute.type(Type.f32()).(ctx), Attribute.type(Type.f32()))
 
       assert Attribute.integer(Type.i(32), 1) |> Beaver.Deferred.create(ctx) |> MLIR.to_string() ==
                "1 : i32"
