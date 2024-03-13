@@ -18,6 +18,8 @@ defmodule Beaver.MLIR.Location do
       iex> ctx |> MLIR.Context.destroy
   """
 
+  @type file_opts() :: [name: String.t(), line: integer(), column: integer()]
+  @spec file(file_opts()) :: MLIR.Location.t() | function()
   def file(opts) do
     name = opts |> Keyword.fetch!(:name)
     line = opts |> Keyword.fetch!(:line)
