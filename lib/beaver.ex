@@ -153,6 +153,11 @@ defmodule Beaver do
   end
 
   @doc false
+  def not_found(env) do
+    {:not_found, [file: env.file, line: env.line]}
+  end
+
+  @doc false
   def parent_scope_block_caching(caller) do
     if Macro.Env.has_var?(caller, {:beaver_internal_env_block, nil}) do
       {quote do
@@ -165,8 +170,8 @@ defmodule Beaver do
     else
       {nil,
        quote do
-         Kernel.var!(beaver_internal_env_block) =
-           {:not_found, [file: __ENV__.file, line: __ENV__.line]}
+         # erase the block in the environment to prevent unintended accessing
+         Kernel.var!(beaver_internal_env_block) = Beaver.not_found(__ENV__)
 
          _ = Kernel.var!(beaver_internal_env_block)
        end}
@@ -185,8 +190,7 @@ defmodule Beaver do
         beaver_internal_current_block =
         Beaver.Env.block(unquote({b_name, [], nil})) |> unquote(add_arguments(args))
 
-      if region = Beaver.Env.region() do
-        # append the block after creation, because there might be nested ones
+      with region = %Beaver.MLIR.Region{} <- Beaver.Env.region() do
         Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, Beaver.Env.block())
       end
 
