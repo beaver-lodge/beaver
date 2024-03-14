@@ -144,14 +144,6 @@ defmodule Beaver do
     end
   end
 
-  defmacro block(do: block) do
-    quote do
-      block _() do
-        unquote(block)
-      end
-    end
-  end
-
   @doc false
   def not_found(env) do
     {:not_found, [file: env.file, line: env.line]}
@@ -175,6 +167,14 @@ defmodule Beaver do
 
          _ = Kernel.var!(beaver_internal_env_block)
        end}
+    end
+  end
+
+  defmacro block(do: block) do
+    quote do
+      block _() do
+        unquote(block)
+      end
     end
   end
 
