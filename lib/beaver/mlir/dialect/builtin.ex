@@ -23,7 +23,6 @@ defmodule Beaver.MLIR.Dialect.Builtin do
             ctx: ctx
           )
 
-      import Beaver.MLIR.Sigils
       module = Beaver.MLIR.CAPI.mlirModuleCreateEmpty(location)
 
       for {name, attr} <- unquote(attrs) do
@@ -37,7 +36,6 @@ defmodule Beaver.MLIR.Dialect.Builtin do
       end
 
       module_body_block = Beaver.MLIR.CAPI.mlirModuleGetBody(module)
-
       unquote(block_cache)
       Kernel.var!(beaver_internal_env_block) = module_body_block
       %Beaver.MLIR.Block{} = Kernel.var!(beaver_internal_env_block)
