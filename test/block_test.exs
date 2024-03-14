@@ -82,7 +82,7 @@ defmodule BlockTest do
   test "nested block creation", test_context do
     mlir ctx: test_context[:ctx] do
       module do
-        parent_scope_block = Beaver.Env.block()
+        top_level_block = Beaver.Env.block()
 
         Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
           region do
@@ -99,13 +99,13 @@ defmodule BlockTest do
                 %Beaver.MLIR.Block{} =
                   block do
                     refute Beaver.Env.block() == block_1
-                    refute Beaver.Env.block() == parent_scope_block
+                    refute Beaver.Env.block() == top_level_block
                   end
 
                 assert Beaver.Env.block() == block_1
               end
 
-            assert Beaver.Env.block() == parent_scope_block
+            assert Beaver.Env.block() == top_level_block
           end
         end
       end
