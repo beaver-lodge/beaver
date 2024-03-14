@@ -86,21 +86,24 @@ defmodule BlockTest do
 
         Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
           region do
-            block _bb_entry() do
-              v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-              CF.br({Beaver.Env.block(bb1), [v0]}) >>> []
-            end
-
-            block bb1() do
-              block_1 = Beaver.Env.block()
-
-              block bb2() do
-                refute Beaver.Env.block() == block_1
-                refute Beaver.Env.block() == parent_scope_block
+            %Beaver.MLIR.Block{} =
+              block _bb_entry() do
+                v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+                CF.br({Beaver.Env.block(bb1), [v0]}) >>> []
               end
 
-              assert Beaver.Env.block() == block_1
-            end
+            %Beaver.MLIR.Block{} =
+              block bb1() do
+                block_1 = Beaver.Env.block()
+
+                %Beaver.MLIR.Block{} =
+                  block do
+                    refute Beaver.Env.block() == block_1
+                    refute Beaver.Env.block() == parent_scope_block
+                  end
+
+                assert Beaver.Env.block() == block_1
+              end
 
             assert Beaver.Env.block() == parent_scope_block
           end

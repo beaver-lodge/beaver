@@ -144,12 +144,36 @@ defmodule Beaver do
     end
   end
 
+  defmacro block(do: block) do
+    quote do
+      block _() do
+        unquote(block)
+      end
+    end
+  end
+
   defmacro block(call, do: block) do
     {b_name, args} = Macro.decompose_call(call)
     if not is_atom(b_name), do: raise("block name must be an atom or underscore")
 
+    {parent_scope_block_cache, parent_scope_block_restore} =
+      if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_block, nil}) do
+        {quote do
+           beaver_internal_parent_scope_block = Kernel.var!(beaver_internal_env_block)
+         end,
+         quote do
+           Kernel.var!(beaver_internal_env_block) = beaver_internal_parent_scope_block
+           %Beaver.MLIR.Block{} = Kernel.var!(beaver_internal_env_block)
+         end}
+      else
+        {nil, nil}
+      end
+
     quote do
+      unquote(parent_scope_block_cache)
+
       Kernel.var!(beaver_internal_env_block) =
+        beaver_internal_current_block =
         Beaver.Env.block(unquote({b_name, [], nil})) |> unquote(add_arguments(args))
 
       if region = Beaver.Env.region() do
@@ -160,8 +184,8 @@ defmodule Beaver do
       unquote_splicing(arguments_variables(args))
       unquote(block)
       # op uses are across blocks, so op within a block can't use an API like Region.under
-
-      Kernel.var!(beaver_internal_env_block)
+      unquote(parent_scope_block_restore)
+      beaver_internal_current_block
     end
   end
 
