@@ -1,4 +1,5 @@
 defmodule BlockTest do
+  require Beaver.Env
   use Beaver.Case, async: true, diagnostic: :server
   use Beaver
   alias Beaver.MLIR
@@ -68,6 +69,40 @@ defmodule BlockTest do
 
             block bb1() do
             end
+          end
+        end
+      end
+    end
+    |> MLIR.Operation.verify()
+
+    assert Beaver.Diagnostic.Server.flush(test_context[:diagnostic_server]) =~
+             "branch has 1 operands for successor"
+  end
+
+  test "nested block creation", test_context do
+    mlir ctx: test_context[:ctx] do
+      module do
+        parent_scope_block = Beaver.Env.block()
+
+        Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+          region do
+            block _bb_entry() do
+              v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+              CF.br({Beaver.Env.block(bb1), [v0]}) >>> []
+            end
+
+            block bb1() do
+              block_1 = Beaver.Env.block()
+
+              block bb2() do
+                refute Beaver.Env.block() == block_1
+                refute Beaver.Env.block() == parent_scope_block
+              end
+
+              assert Beaver.Env.block() == block_1
+            end
+
+            assert Beaver.Env.block() == parent_scope_block
           end
         end
       end
