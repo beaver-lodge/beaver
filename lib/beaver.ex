@@ -145,7 +145,7 @@ defmodule Beaver do
   end
 
   @doc false
-  def not_found(env) do
+  def not_found(%Macro.Env{} = env) do
     {:not_found, [file: env.file, line: env.line]}
   end
 
