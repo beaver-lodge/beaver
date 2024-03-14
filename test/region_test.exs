@@ -62,7 +62,7 @@ defmodule RegionTest do
   test "module region not accessible by env macro", test_context do
     mlir ctx: test_context[:ctx] do
       module do
-        assert Beaver.Env.region() == {:not_found, [file: __ENV__.file, line: 65]}
+        assert {:not_found, [file: __ENV__.file, line: 65]} == Beaver.Env.region()
 
         Func.func some_func(function_type: Type.function([], [])) do
           region do

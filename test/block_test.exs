@@ -1,5 +1,4 @@
 defmodule BlockTest do
-  require Beaver.Env
   use Beaver.Case, async: true, diagnostic: :server
   use Beaver
   alias Beaver.MLIR
@@ -155,7 +154,7 @@ defmodule BlockTest do
       end
       |> MLIR.Operation.verify!()
 
-      assert {:not_found, [file: __ENV__.file, line: 146]} == Beaver.Env.block()
+      assert {:not_found, [file: __ENV__.file, line: 145]} == Beaver.Env.block()
     end
   end
 end
