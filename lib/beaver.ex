@@ -151,21 +151,22 @@ defmodule Beaver do
 
   @doc false
   def parent_scope_block_caching(caller) do
+    suppress_warning = quote(do: _ = Kernel.var!(beaver_internal_env_block))
+
     if Macro.Env.has_var?(caller, {:beaver_internal_env_block, nil}) do
       {quote do
          beaver_internal_parent_scope_block = Kernel.var!(beaver_internal_env_block)
        end,
        quote do
          Kernel.var!(beaver_internal_env_block) = beaver_internal_parent_scope_block
-         _ = Kernel.var!(beaver_internal_env_block)
+         unquote(suppress_warning)
        end}
     else
       {nil,
        quote do
          # erase the block in the environment to prevent unintended accessing
          Kernel.var!(beaver_internal_env_block) = Beaver.not_found(__ENV__)
-
-         _ = Kernel.var!(beaver_internal_env_block)
+         unquote(suppress_warning)
        end}
     end
   end
