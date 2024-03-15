@@ -74,25 +74,23 @@ defmodule CfTest do
 
       bb_next =
         mlir ctx: ctx do
-          block _bb_next(arg >>> Type.f32()) do
+          block _(arg >>> Type.f32()) do
           end
         end
 
       true_branch =
         mlir ctx: ctx do
-          block _true_branch() do
-            {%MLIR.Value{} = mlir, acc} =
-              gen_mlir(do_block_ast, update_block(acc, Beaver.Env.block()))
+          block do
+            {mlir, acc} = gen_mlir(do_block_ast, update_block(acc, Beaver.Env.block()))
 
-            %MLIR.Block{} = Beaver.Env.block()
             CF.br({bb_next, [mlir]}) >>> []
           end
         end
 
       false_branch =
         mlir ctx: ctx do
-          block _false_branch() do
-            {%MLIR.Value{} = mlir, acc} =
+          block do
+            {mlir, acc} =
               gen_mlir(else_block_ast, update_block(acc, Beaver.Env.block()))
 
             CF.br({bb_next, [mlir]}) >>> []

@@ -13,7 +13,7 @@ defmodule RegionTest do
         module do
           Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
             region do
-              block _bb_entry() do
+              block do
                 v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
                 cond0 = Arith.constant(true) >>> Type.i(1)
                 CF.cond_br(cond0, Beaver.Env.block(bb1), {Beaver.Env.block(bb2), [v0]}) >>> []
@@ -57,5 +57,22 @@ defmodule RegionTest do
       end)
 
     assert region_num == 2
+  end
+
+  test "module region not accessible by env macro", test_context do
+    mlir ctx: test_context[:ctx] do
+      module do
+        assert {:not_found, [file: __ENV__.file, line: 65]} == Beaver.Env.region()
+
+        Func.func some_func(function_type: Type.function([], [])) do
+          region do
+            block do
+              Func.return() >>> []
+            end
+          end
+        end
+      end
+    end
+    |> MLIR.Operation.verify()
   end
 end
