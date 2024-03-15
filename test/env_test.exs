@@ -12,7 +12,7 @@ defmodule EnvTest do
           region do
             %MLIR.Region{} = Beaver.Env.region()
 
-            block _bb_entry() do
+            block do
               %MLIR.Block{} = Beaver.Env.block()
             end
           end

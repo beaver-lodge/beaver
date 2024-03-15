@@ -6,7 +6,7 @@ defmodule Beaver.MLIR.Dialect.Func do
     dialect: "func",
     ops: Beaver.MLIR.Dialect.Registry.ops("func")
 
-  defmacro func(call, do: block) do
+  defmacro func(call, do: body) do
     {func_name, args} = call |> Macro.decompose_call()
     if not is_atom(func_name), do: raise("func name must be an atom")
 
@@ -23,7 +23,7 @@ defmodule Beaver.MLIR.Dialect.Func do
               [
                 sym_name: "\"#{unquote(func_name)}\"",
                 regions: fn ->
-                  unquote(block)
+                  unquote(body)
                 end
               ],
             fn {x, _} -> x end

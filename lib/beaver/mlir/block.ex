@@ -60,7 +60,7 @@ defmodule Beaver.MLIR.Block do
     end
   end
 
-  def get_arg!(block, index) when not is_nil(block) do
+  def get_arg!(%__MODULE__{} = block, index) do
     MLIR.CAPI.mlirBlockGetArgument(block, index)
   end
 

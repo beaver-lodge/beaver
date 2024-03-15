@@ -26,7 +26,7 @@ defmodule Beaver.Env do
       end
     else
       quote do
-        nil
+        Beaver.not_found(__ENV__)
       end
     end
   end

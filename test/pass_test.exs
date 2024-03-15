@@ -20,7 +20,7 @@ defmodule PassTest do
       module do
         Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
           region do
-            block _bb_entry() do
+            block do
               v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
               Func.return(v0) >>> []
             end

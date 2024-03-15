@@ -144,28 +144,66 @@ defmodule Beaver do
     end
   end
 
-  defmacro block(call, do: block) do
+  @doc false
+  def not_found(%Macro.Env{} = env) do
+    {:not_found, [file: env.file, line: env.line]}
+  end
+
+  @doc false
+  def parent_scope_block_caching(caller) do
+    suppress_warning = quote(do: _ = Kernel.var!(beaver_internal_env_block))
+
+    if Macro.Env.has_var?(caller, {:beaver_internal_env_block, nil}) do
+      {quote do
+         beaver_internal_parent_scope_block = Kernel.var!(beaver_internal_env_block)
+       end,
+       quote do
+         Kernel.var!(beaver_internal_env_block) = beaver_internal_parent_scope_block
+         unquote(suppress_warning)
+       end}
+    else
+      {nil,
+       quote do
+         # erase the block in the environment to prevent unintended accessing
+         Kernel.var!(beaver_internal_env_block) = Beaver.not_found(__ENV__)
+         unquote(suppress_warning)
+       end}
+    end
+  end
+
+  defmacro block(do: body) do
+    quote do
+      block _() do
+        unquote(body)
+      end
+    end
+  end
+
+  defmacro block(call, do: body) do
     {b_name, args} = Macro.decompose_call(call)
     if not is_atom(b_name), do: raise("block name must be an atom or underscore")
+    {block_cache, block_restore} = parent_scope_block_caching(__CALLER__)
 
     quote do
+      unquote(block_cache)
+
       Kernel.var!(beaver_internal_env_block) =
+        beaver_internal_current_block =
         Beaver.Env.block(unquote({b_name, [], nil})) |> unquote(add_arguments(args))
 
-      if region = Beaver.Env.region() do
-        # append the block after creation, because there might be nested ones
+      with region = %Beaver.MLIR.Region{} <- Beaver.Env.region() do
         Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, Beaver.Env.block())
       end
 
       unquote_splicing(arguments_variables(args))
-      unquote(block)
+      unquote(body)
       # op uses are across blocks, so op within a block can't use an API like Region.under
-
-      Kernel.var!(beaver_internal_env_block)
+      unquote(block_restore)
+      beaver_internal_current_block
     end
   end
 
-  defmacro region(do: block) do
+  defmacro region(do: body) do
     regions =
       if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_regions, nil}) do
         quote do
@@ -184,7 +222,7 @@ defmodule Beaver do
       Beaver.MLIR.Region.under(region, fn ->
         Kernel.var!(beaver_env_region) = region
         %Beaver.MLIR.Region{} = Kernel.var!(beaver_env_region)
-        unquote(block)
+        unquote(body)
       end)
 
       Kernel.var!(beaver_internal_env_regions) =
