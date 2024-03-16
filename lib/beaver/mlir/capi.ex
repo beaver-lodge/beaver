@@ -77,5 +77,6 @@ defmodule Beaver.MLIR.CAPI do
   def mif_raw_jit_invoke_with_terms(_jit, _name, _args), do: raise("NIF not loaded")
   def mif_raw_jit_register_enif(_jit), do: raise("NIF not loaded")
   def mif_raw_enif_signatures(_ctx), do: raise("NIF not loaded")
+  def mif_raw_enif_functions(), do: raise("NIF not loaded")
   def mif_raw_mlir_type_of_enif_obj(_ctx, _obj), do: raise("NIF not loaded")
 end
