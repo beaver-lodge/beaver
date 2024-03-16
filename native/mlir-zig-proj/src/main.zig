@@ -561,6 +561,9 @@ const enif_function_names = .{
     "enif_make_int64",
     "enif_get_int",
     "enif_get_int64",
+    "enif_make_atom",
+    "enif_make_atom_len",
+    "enif_make_badarg",
 };
 
 fn mif_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
@@ -587,11 +590,10 @@ fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !be
             }));
         },
         else => {
-            if (t == c_int or t == c_ulong or t == c_long or t == beam.env) {
+            if (t == c_int or t == c_ulong or t == c_long or t == beam.env or t == usize) {
                 return try mlir_capi.Type.resource.make(env, c.mlirIntegerTypeGet(ctx, @bitSizeOf(t)));
             } else {
-                print("not supported type in enif signature, {any}\n", .{t});
-                unreachable();
+                @compileError("not supported type in enif signature: " ++ @typeName(t));
             }
         },
     }
@@ -630,6 +632,15 @@ fn mif_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.term) c
         signatures[i] = beam.make_tuple(env, signature_slice);
     }
     return beam.make_term_list(env, signatures);
+}
+
+fn mif_raw_enif_functions(env: beam.env, _: c_int, _: [*c]const beam.term) callconv(.C) beam.term {
+    var names: []beam.term = beam.allocator.alloc(beam.term, enif_function_names.len) catch
+        return beam.make_error_binary(env, "fail to allocate");
+    inline for (enif_function_names, 0..) |name, i| {
+        names[i] = beam.make_atom(env, name);
+    }
+    return beam.make_term_list(env, names);
 }
 
 fn mif_raw_mlir_type_of_enif_obj(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
@@ -891,6 +902,7 @@ const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.Entries
     e.ErlNifFunc{ .name = "mif_raw_jit_invoke_with_terms", .arity = 3, .fptr = mif_raw_jit_invoke_with_terms, .flags = 0 },
     e.ErlNifFunc{ .name = "mif_raw_jit_register_enif", .arity = 1, .fptr = mif_raw_jit_register_enif, .flags = 0 },
     e.ErlNifFunc{ .name = "mif_raw_enif_signatures", .arity = 1, .fptr = mif_raw_enif_signatures, .flags = 0 },
+    e.ErlNifFunc{ .name = "mif_raw_enif_functions", .arity = 0, .fptr = mif_raw_enif_functions, .flags = 0 },
     e.ErlNifFunc{ .name = "mif_raw_mlir_type_of_enif_obj", .arity = 2, .fptr = mif_raw_mlir_type_of_enif_obj, .flags = 0 },
 } ++
     PtrOwner.Kind.nifs ++

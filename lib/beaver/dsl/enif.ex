@@ -26,7 +26,7 @@ defmodule Beaver.ENIF do
   """
   def populate_external_functions(ctx, block) do
     mlir ctx: ctx, block: block do
-      for {name, arg_types, ret_type} <- MLIR.CAPI.mif_raw_enif_signatures(ctx.ref) do
+      for {name, arg_types, ret_type} <- signatures(ctx) do
         Func.func _(
                     sym_name: "\"#{name}\"",
                     sym_visibility: MLIR.Attribute.string("private"),
@@ -39,4 +39,10 @@ defmodule Beaver.ENIF do
       end
     end
   end
+
+  def signatures(%MLIR.Context{} = ctx) do
+    MLIR.CAPI.mif_raw_enif_signatures(ctx.ref)
+  end
+
+  defdelegate functions(), to: MLIR.CAPI, as: :mif_raw_enif_functions
 end

@@ -10,6 +10,13 @@ defmodule Beaver.MIF do
   defmacro __using__(_opts) do
     quote do
       import Beaver.MIF
+      use Beaver
+      require Beaver.MIF.{BEAM, Pointer}
+      require Beaver.MLIR.Dialect.Func
+      alias Beaver.MLIR.Dialect.{Func, Arith, LLVM, CF}
+      alias MLIR.{Type, Attribute}
+      import Beaver.MLIR.Type
+
       @before_compile Beaver.MIF
       Module.register_attribute(__MODULE__, :defm, accumulate: true)
     end
@@ -17,52 +24,10 @@ defmodule Beaver.MIF do
 
   defmacro __before_compile__(_env) do
     quote do
-      @ir @defm |> Enum.reverse() |> Beaver.MIF.compile_definitions(__ENV__)
+      @ir @defm |> Enum.reverse() |> Beaver.MIF.compile_definitions()
       def __ir__ do
         @ir
       end
-    end
-  end
-
-  defp getter_symbol(ctx, t) do
-    cond do
-      Type.equal?(t, Type.i32(ctx: ctx)) -> "enif_get_int"
-      Type.equal?(t, Type.i64(ctx: ctx)) -> "enif_get_int64"
-      true -> raise "getter symbol not found"
-    end
-    |> Attribute.flat_symbol_ref()
-  end
-
-  defp maker_symbol(ctx, t) do
-    cond do
-      Type.equal?(t, Type.i32(ctx: ctx)) -> "enif_make_int"
-      Type.equal?(t, Type.i64(ctx: ctx)) -> "enif_make_int64"
-      true -> raise "maker symbol not found"
-    end
-    |> Attribute.flat_symbol_ref()
-  end
-
-  def arg_from_term(ctx, current, terms, successor, arg_err_block, env, type, index) do
-    mlir ctx: ctx, block: current do
-      one = Arith.constant(value: Attribute.integer(Type.i(32), 1)) >>> ~t<i32>
-      zero = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> ~t<i32>
-      ptr = LLVM.alloca(one, elem_type: type) >>> ~t{!llvm.ptr}
-      term = terms |> Enum.at(index)
-      condition = Func.call([env, term, ptr], callee: getter_symbol(ctx, type)) >>> Type.i32()
-
-      condition =
-        Arith.cmpi(condition, zero, predicate: Arith.cmp_i_predicate(:ne)) >>> Type.i1()
-
-      value = LLVM.load(ptr) >>> type
-      CF.cond_br(condition, successor, arg_err_block) >>> []
-      value
-    end
-  end
-
-  def value_to_term(ctx, block, env, value) do
-    mlir ctx: ctx, block: block do
-      Func.call([env, value], callee: maker_symbol(ctx, MLIR.CAPI.mlirValueGetType(value))) >>>
-        Beaver.ENIF.mlir_t(:term)
     end
   end
 
@@ -75,116 +40,104 @@ defmodule Beaver.MIF do
     {Type.function(arg_types, [term_t]), arg_types, arg_num}
   end
 
-  defp definition_to_func({call, expr}, env) do
+  defp inject_mlir_opts({:^, _, [{_, _, _} = var]}) do
+    quote do
+      CF.br({unquote(var), []}) >>> []
+    end
+  end
+
+  @intrinsics Beaver.ENIF.functions() ++
+                [
+                  :result_at,
+                  :!=
+                ]
+
+  defp inject_mlir_opts({f, _, args}) when f in @intrinsics do
+    quote do
+      Beaver.MIF.handle_intrinsic(unquote(f), [unquote_splicing(args)],
+        ctx: Beaver.Env.context(),
+        block: Beaver.Env.block()
+      )
+    end
+  end
+
+  defp inject_mlir_opts(ast) do
+    with {{:__aliases__, _, _} = m, f, args} <- Macro.decompose_call(ast) do
+      quote do
+        unquote(m).handle_intrinsic(unquote(f), [unquote_splicing(args)],
+          ctx: Beaver.Env.context(),
+          block: Beaver.Env.block()
+        )
+      end
+    else
+      :error ->
+        ast
+
+      _ ->
+        ast
+    end
+  end
+
+  defp definition_to_func({_env, call, body}) do
     {name, args} = Macro.decompose_call(call)
-    expr = Macro.postwalk(expr[:do], &Macro.expand(&1, env)) |> List.wrap()
+
+    body =
+      body[:do]
+      |> Macro.postwalk(&inject_mlir_opts(&1))
+      |> List.wrap()
 
     quote do
-      args_num = unquote(length(args))
-      {function_type, arg_types, env_index} = Beaver.MIF.mif_type(args_num)
+      mlir ctx: var!(ctx), block: var!(block) do
+        args_num = unquote(length(args))
+        {function_type, arg_types, env_index} = Beaver.MIF.mif_type(args_num)
 
-      Beaver.MLIR.Dialect.Func.func unquote(name)(function_type: function_type) do
-        region do
-          casting_blk_0 = MLIR.Block.create()
+        Beaver.MLIR.Dialect.Func.func unquote(name)(function_type: function_type) do
+          region do
+            block _entry() do
+              MLIR.Block.add_args!(Beaver.Env.block(), arg_types, ctx: Beaver.Env.context())
+              var!(mif_internal_beam_env) = MLIR.Block.get_arg!(Beaver.Env.block(), env_index)
 
-          block _() do
-            MLIR.Block.add_args!(Beaver.Env.block(), arg_types, ctx: Beaver.Env.context())
-            env = MLIR.Block.get_arg!(Beaver.Env.block(), env_index)
-
-            terms =
-              Range.new(0, args_num - 1) |> Enum.map(&MLIR.Block.get_arg!(Beaver.Env.block(), &1))
-
-            CF.br({casting_blk_0, []}) >>> []
-          end
-
-          arg_types = [
-            unquote_splicing(
-              for {:"::", _, [{_, _, nil}, t]} <- args do
-                quote do
-                  unquote(t)
-                end
-              end
-            )
-          ]
-
-          MLIR.CAPI.mlirRegionAppendOwnedBlock(Beaver.Env.region(), casting_blk_0)
-
-          arg_err = MLIR.Block.create()
-
-          {exit_blk,
-           [
-             unquote_splicing(
-               for {:"::", _line0, [{_arg, _line1, nil} = var, _]} <- args do
-                 quote do
-                   Kernel.var!(unquote(var))
-                 end
-               end
-             )
-           ]} =
-            arg_types
-            |> Enum.with_index()
-            |> Enum.reduce({casting_blk_0, []}, fn {type, index}, {current, values} ->
-              successor = MLIR.Block.create()
-              MLIR.CAPI.mlirRegionAppendOwnedBlock(Beaver.Env.region(), successor)
-
-              v =
-                Beaver.MIF.arg_from_term(
-                  ctx,
-                  current,
-                  terms,
-                  successor,
-                  arg_err,
-                  env,
-                  type,
-                  index
+              [
+                unquote_splicing(
+                  for arg <- args do
+                    quote do
+                      Kernel.var!(unquote(arg))
+                    end
+                  end
                 )
+              ] =
+                Range.new(0, args_num - 1)
+                |> Enum.map(&MLIR.Block.get_arg!(Beaver.Env.block(), &1))
 
-              {successor, values ++ [v]}
-            end)
-
-          mlir block: exit_blk do
-            last_op = unquote_splicing(expr)
-            ret = last_op |> Beaver.Walker.results() |> Enum.at(0)
-            ret_term = Beaver.MIF.value_to_term(ctx, Beaver.Env.block(), env, ret)
-            Beaver.MLIR.Dialect.Func.return(ret_term) >>> []
+              unquote(body)
+            end
           end
-
-          mlir block: arg_err do
-            ret = Arith.constant(value: Attribute.integer(~t<i32>, -1111)) >>> ~t<i32>
-            ret_term = Beaver.MIF.value_to_term(ctx, Beaver.Env.block(), env, ret)
-            Beaver.MLIR.Dialect.Func.return(ret_term) >>> []
-          end
-
-          MLIR.CAPI.mlirRegionAppendOwnedBlock(Beaver.Env.region(), arg_err)
         end
       end
     end
   end
 
-  def compile_definitions(definitions, env) do
-    quote do
-      ctx = Beaver.MLIR.Context.create()
+  def compile_definitions(definitions) do
+    ctx = Beaver.MLIR.Context.create()
 
-      m =
-        mlir ctx: ctx do
-          module do
-            require Beaver.MLIR.Dialect.Func
-            alias Beaver.MLIR.Dialect.{Func, Arith, LLVM, CF}
-            alias MLIR.{Type, Attribute}
-            import Beaver.MLIR.Type
-            Beaver.ENIF.populate_external_functions(ctx, Beaver.Env.block())
-            unquote_splicing(Enum.map(definitions, &definition_to_func(&1, env)))
+    m =
+      mlir ctx: ctx do
+        module do
+          Beaver.ENIF.populate_external_functions(ctx, Beaver.Env.block())
+
+          for {env, _, _} = d <- definitions do
+            f = definition_to_func(d)
+            binding = [ctx: Beaver.Env.context(), block: Beaver.Env.block()]
+            Code.eval_quoted(f, binding, env)
           end
         end
-        |> MLIR.Operation.verify!(debug: true)
-        |> MLIR.dump!()
-        |> MLIR.to_string()
+      end
+      |> MLIR.Operation.verify!(debug: true)
+      |> MLIR.dump!()
+      |> MLIR.to_string()
 
-      MLIR.Context.destroy(ctx)
-      m
-    end
-    |> Code.eval_quoted()
-    |> elem(0)
+    MLIR.Context.destroy(ctx)
+    m
   end
 
   defmacro op({:"::", _, [call, types]}, _ \\ []) do
@@ -203,12 +156,107 @@ defmodule Beaver.MIF do
     end
   end
 
-  defmacro defm(call, expr \\ []) do
-    {name, args} = Macro.decompose_call(call)
-    args = for {:"::", _, [arg, _type]} <- args, do: arg
+  defp constant_of_same_type(i, v, opts) do
+    mlir ctx: opts[:ctx], block: opts[:block] do
+      t = MLIR.CAPI.mlirValueGetType(v)
+      Arith.constant(value: Attribute.integer(t, i)) >>> t
+    end
+  end
+
+  def handle_intrinsic(:enif_get_int64 = name, [env, term, ptr], opts) do
+    mlir ctx: opts[:ctx], block: opts[:block] do
+      Func.call([env, term, ptr],
+        callee: Attribute.flat_symbol_ref("#{name}")
+      ) >>>
+        Type.i32()
+    end
+  end
+
+  def handle_intrinsic(:enif_make_int64 = name, [env, i], opts) do
+    mlir ctx: opts[:ctx], block: opts[:block] do
+      Func.call([env, i],
+        callee: Attribute.flat_symbol_ref("#{name}")
+      ) >>>
+        Beaver.ENIF.mlir_t(:term)
+    end
+  end
+
+  def handle_intrinsic(:result_at, [%MLIR.Value{} = v, i], _opts) when is_integer(i) do
+    v
+  end
+
+  def handle_intrinsic(:result_at, [l, i], _opts) when is_list(l) do
+    l |> Enum.at(i)
+  end
+
+  def handle_intrinsic(:result_at, [%MLIR.Operation{} = op, i], _opts) do
+    MLIR.CAPI.mlirOperationGetResult(op, i)
+  end
+
+  def handle_intrinsic(:enif_make_atom_len = name, [env, ptr_atom, len], opts) do
+    mlir ctx: opts[:ctx], block: opts[:block] do
+      len =
+        case len do
+          %MLIR.Value{} ->
+            len
+
+          i when is_integer(i) ->
+            t = Type.i64()
+            Arith.constant(value: Attribute.integer(t, i)) >>> t
+        end
+
+      Func.call([env, ptr_atom, len],
+        callee: Attribute.flat_symbol_ref("#{name}")
+      ) >>>
+        Beaver.ENIF.mlir_t(:term)
+    end
+  end
+
+  def handle_intrinsic(:!=, [left, right], opts) do
+    mlir ctx: opts[:ctx], block: opts[:block] do
+      [left, right] =
+        case {left, right} do
+          {%MLIR.Value{} = v, i} when is_integer(i) ->
+            [v, constant_of_same_type(i, v, opts)]
+
+          {i, %MLIR.Value{} = v} when is_integer(i) ->
+            [constant_of_same_type(i, v, opts), v]
+
+          {%MLIR.Value{}, %MLIR.Value{}} ->
+            [left, right]
+        end
+
+      Arith.cmpi(left, right, predicate: Arith.cmp_i_predicate(:ne)) >>> Type.i1()
+    end
+  end
+
+  defmacro cond_br(condition, clauses) do
+    true_body = Keyword.fetch!(clauses, :do)
+    false_body = Keyword.fetch!(clauses, :else)
 
     quote do
-      @defm unquote(Macro.escape({call, expr}))
+      use Beaver
+
+      mlir do
+        CF.cond_br(
+          unquote(condition),
+          block do
+            unquote(true_body)
+          end,
+          block do
+            unquote(false_body)
+          end
+        ) >>> []
+      end
+    end
+  end
+
+  defmacro defm(call, body \\ []) do
+    {name, args} = Macro.decompose_call(call)
+    env = __CALLER__
+
+    quote do
+      @defm unquote(Macro.escape({env, call, body}))
       def unquote(name)(unquote_splicing(args)) do
         %{jit: jit} = Agent.get(__MODULE__, & &1)
 
