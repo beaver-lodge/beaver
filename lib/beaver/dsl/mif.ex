@@ -215,9 +215,7 @@ defmodule Beaver.MIF do
     args = args |> Enum.zip(arg_types) |> Enum.map(fn {a, t} -> wrap_arg(a, t, opts) end)
 
     mlir ctx: opts[:ctx], block: opts[:block] do
-      Func.call(args,
-        callee: Attribute.flat_symbol_ref("#{name}")
-      ) >>> ret_type
+      Func.call(args, callee: Attribute.flat_symbol_ref("#{name}")) >>> ret_type
     end
   end
 
