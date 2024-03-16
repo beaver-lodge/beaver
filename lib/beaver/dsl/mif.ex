@@ -164,7 +164,7 @@ defmodule Beaver.MIF do
     end
   end
 
-  defp wrap_arg(i, t, opts) when is_integer(i) do
+  defp wrap_arg({i, t}, opts) when is_integer(i) do
     mlir ctx: opts[:ctx], block: opts[:block] do
       case i do
         %MLIR.Value{} ->
@@ -176,7 +176,7 @@ defmodule Beaver.MIF do
     end
   end
 
-  defp wrap_arg(v, _, _) do
+  defp wrap_arg({v, _}, _) do
     v
   end
 
@@ -212,7 +212,7 @@ defmodule Beaver.MIF do
 
   def handle_intrinsic(name, args, opts) when name in @enif_functions do
     {arg_types, ret_type} = Beaver.ENIF.signature(opts[:ctx], name)
-    args = args |> Enum.zip(arg_types) |> Enum.map(fn {a, t} -> wrap_arg(a, t, opts) end)
+    args = args |> Enum.zip(arg_types) |> Enum.map(&wrap_arg(&1, opts))
 
     mlir ctx: opts[:ctx], block: opts[:block] do
       Func.call(args, callee: Attribute.flat_symbol_ref("#{name}")) >>> ret_type
