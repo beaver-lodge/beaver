@@ -625,7 +625,7 @@ fn mif_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.term) c
                 return beam.make_error_binary(env, "fail to allocate");
         }
         // {name, [arg_types...], ret_type}
-        signature_slice[0] = beam.make_slice(env, name);
+        signature_slice[0] = beam.make_atom(env, name);
         signature_slice[1] = beam.make_term_list(env, arg_type_slice);
         signature_slice[2] = dump_type_info(env, ctx, FTI.return_type.?) catch
             return beam.make_error_binary(env, "fail to allocate");

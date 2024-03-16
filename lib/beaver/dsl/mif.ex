@@ -46,7 +46,8 @@ defmodule Beaver.MIF do
     end
   end
 
-  @intrinsics Beaver.ENIF.functions() ++
+  @enif_functions Beaver.ENIF.functions()
+  @intrinsics @enif_functions ++
                 [
                   :result_at,
                   :!=
@@ -163,22 +164,20 @@ defmodule Beaver.MIF do
     end
   end
 
-  def handle_intrinsic(:enif_get_int64 = name, [env, term, ptr], opts) do
+  defp wrap_arg(i, t, opts) when is_integer(i) do
     mlir ctx: opts[:ctx], block: opts[:block] do
-      Func.call([env, term, ptr],
-        callee: Attribute.flat_symbol_ref("#{name}")
-      ) >>>
-        Type.i32()
+      case i do
+        %MLIR.Value{} ->
+          i
+
+        i when is_integer(i) ->
+          Arith.constant(value: Attribute.integer(t, i)) >>> t
+      end
     end
   end
 
-  def handle_intrinsic(:enif_make_int64 = name, [env, i], opts) do
-    mlir ctx: opts[:ctx], block: opts[:block] do
-      Func.call([env, i],
-        callee: Attribute.flat_symbol_ref("#{name}")
-      ) >>>
-        Beaver.ENIF.mlir_t(:term)
-    end
+  defp wrap_arg(v, _, _) do
+    v
   end
 
   def handle_intrinsic(:result_at, [%MLIR.Value{} = v, i], _opts) when is_integer(i) do
@@ -191,25 +190,6 @@ defmodule Beaver.MIF do
 
   def handle_intrinsic(:result_at, [%MLIR.Operation{} = op, i], _opts) do
     MLIR.CAPI.mlirOperationGetResult(op, i)
-  end
-
-  def handle_intrinsic(:enif_make_atom_len = name, [env, ptr_atom, len], opts) do
-    mlir ctx: opts[:ctx], block: opts[:block] do
-      len =
-        case len do
-          %MLIR.Value{} ->
-            len
-
-          i when is_integer(i) ->
-            t = Type.i64()
-            Arith.constant(value: Attribute.integer(t, i)) >>> t
-        end
-
-      Func.call([env, ptr_atom, len],
-        callee: Attribute.flat_symbol_ref("#{name}")
-      ) >>>
-        Beaver.ENIF.mlir_t(:term)
-    end
   end
 
   def handle_intrinsic(:!=, [left, right], opts) do
@@ -227,6 +207,17 @@ defmodule Beaver.MIF do
         end
 
       Arith.cmpi(left, right, predicate: Arith.cmp_i_predicate(:ne)) >>> Type.i1()
+    end
+  end
+
+  def handle_intrinsic(name, args, opts) when name in @enif_functions do
+    {arg_types, ret_type} = Beaver.ENIF.signature(opts[:ctx], name)
+    args = args |> Enum.zip(arg_types) |> Enum.map(fn {a, t} -> wrap_arg(a, t, opts) end)
+
+    mlir ctx: opts[:ctx], block: opts[:block] do
+      Func.call(args,
+        callee: Attribute.flat_symbol_ref("#{name}")
+      ) >>> ret_type
     end
   end
 

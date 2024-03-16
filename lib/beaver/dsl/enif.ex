@@ -30,8 +30,7 @@ defmodule Beaver.ENIF do
         Func.func _(
                     sym_name: "\"#{name}\"",
                     sym_visibility: MLIR.Attribute.string("private"),
-                    function_type:
-                      Type.function(Enum.map(arg_types, &wrap_mlir_t/1), [wrap_mlir_t(ret_type)])
+                    function_type: Type.function(arg_types, [ret_type])
                   ) do
           region do
           end
@@ -41,7 +40,16 @@ defmodule Beaver.ENIF do
   end
 
   def signatures(%MLIR.Context{} = ctx) do
-    MLIR.CAPI.mif_raw_enif_signatures(ctx.ref)
+    for {name, arg_types, ret_type} <- MLIR.CAPI.mif_raw_enif_signatures(ctx.ref) do
+      {name, Enum.map(arg_types, &wrap_mlir_t/1), wrap_mlir_t(ret_type)}
+    end
+  end
+
+  def signature(%MLIR.Context{} = ctx, name) do
+    for {^name, arg_types, ret_type} <- signatures(ctx) do
+      {arg_types, ret_type}
+    end
+    |> List.first()
   end
 
   defdelegate functions(), to: MLIR.CAPI, as: :mif_raw_enif_functions
