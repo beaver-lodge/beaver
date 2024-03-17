@@ -26,11 +26,11 @@ defmodule Beaver.ENIF do
   """
   def populate_external_functions(ctx, block) do
     mlir ctx: ctx, block: block do
-      for {name, arg_types, ret_type} <- signatures(ctx) do
+      for {name, arg_types, ret_types} <- signatures(ctx) do
         Func.func _(
                     sym_name: "\"#{name}\"",
                     sym_visibility: MLIR.Attribute.string("private"),
-                    function_type: Type.function(arg_types, [ret_type])
+                    function_type: Type.function(arg_types, ret_types)
                   ) do
           region do
           end
@@ -40,14 +40,16 @@ defmodule Beaver.ENIF do
   end
 
   def signatures(%MLIR.Context{} = ctx) do
-    for {name, arg_types, ret_type} <- MLIR.CAPI.mif_raw_enif_signatures(ctx.ref) do
-      {name, Enum.map(arg_types, &wrap_mlir_t/1), wrap_mlir_t(ret_type)}
+    signatures = MLIR.CAPI.mif_raw_enif_signatures(ctx.ref) |> Beaver.Native.check!()
+
+    for {name, arg_types, ret_types} <- signatures do
+      {name, Enum.map(arg_types, &wrap_mlir_t/1), Enum.map(ret_types, &wrap_mlir_t/1)}
     end
   end
 
   def signature(%MLIR.Context{} = ctx, name) do
-    for {^name, arg_types, ret_type} <- signatures(ctx) do
-      {arg_types, ret_type}
+    for {^name, arg_types, ret_types} <- signatures(ctx) do
+      {arg_types, ret_types}
     end
     |> List.first()
   end

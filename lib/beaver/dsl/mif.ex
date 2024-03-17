@@ -211,11 +211,18 @@ defmodule Beaver.MIF do
   end
 
   def handle_intrinsic(name, args, opts) when name in @enif_functions do
-    {arg_types, ret_type} = Beaver.ENIF.signature(opts[:ctx], name)
+    {arg_types, ret_types} = Beaver.ENIF.signature(opts[:ctx], name)
     args = args |> Enum.zip(arg_types) |> Enum.map(&wrap_arg(&1, opts))
 
     mlir ctx: opts[:ctx], block: opts[:block] do
-      Func.call(args, callee: Attribute.flat_symbol_ref("#{name}")) >>> ret_type
+      Func.call(args, callee: Attribute.flat_symbol_ref("#{name}")) >>>
+        case ret_types do
+          [ret] ->
+            ret
+
+          [] ->
+            []
+        end
     end
   end
 
