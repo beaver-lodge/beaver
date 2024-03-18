@@ -556,6 +556,13 @@ fn mif_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const beam.t
     return invocation.res_term;
 }
 
+const enif_functions_otp26 = if (@hasDecl(e, "enif_get_string_length")) .{
+    "enif_get_string_length",
+    "enif_make_new_atom",
+    "enif_make_new_atom_len",
+    "enif_set_option",
+} else .{};
+
 const enif_function_names = .{
     "enif_alloc",
     "enif_alloc_binary",
@@ -596,7 +603,6 @@ const enif_function_names = .{
     "enif_get_map_value",
     "enif_get_resource",
     "enif_get_string",
-    "enif_get_string_length",
     "enif_get_tuple",
     "enif_get_uint",
     "enif_get_uint64",
@@ -662,8 +668,6 @@ const enif_function_names = .{
     "enif_make_map_remove",
     "enif_make_map_update",
     "enif_make_monitor_term",
-    "enif_make_new_atom",
-    "enif_make_new_atom_len",
     "enif_make_new_binary",
     "enif_make_new_map",
     // "enif_make_pid",
@@ -729,7 +733,6 @@ const enif_function_names = .{
     // "enif_select_write",
     "enif_self",
     "enif_send",
-    "enif_set_option",
     "enif_set_pid_undefined",
     "enif_sizeof_resource",
     "enif_snprintf",
@@ -753,7 +756,7 @@ const enif_function_names = .{
     "enif_vsnprintf",
     "enif_whereis_pid",
     "enif_whereis_port",
-};
+} ++ enif_functions_otp26;
 
 fn mif_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
     var jit: mlir_capi.ExecutionEngine.T = mlir_capi.ExecutionEngine.resource.fetch(env, args[0]) catch
