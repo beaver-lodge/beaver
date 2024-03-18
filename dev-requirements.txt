@@ -1,2 +1,2 @@
-mlir==19.0.0.2024022301+7a5c01db
+mlir==19.0.0.2024030801+e7a22e72
 --find-links https://github.com/makslevental/mlir-wheels/releases/expanded_assets/latest
