@@ -26,6 +26,12 @@ defmodule Beaver.MIF.Pointer do
     end
   end
 
+  def handle_intrinsic(:store, [val, ptr], opts) do
+    mlir ctx: opts[:ctx], block: opts[:block] do
+      LLVM.store(val, ptr) >>> []
+    end
+  end
+
   def handle_intrinsic(:element_ptr, [elem_type, ptr, n], opts) do
     mlir ctx: opts[:ctx], block: opts[:block] do
       LLVM.getelementptr(ptr, n,
