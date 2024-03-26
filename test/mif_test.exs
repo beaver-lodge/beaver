@@ -2,13 +2,12 @@ defmodule MIFTest do
   use Beaver.Case, async: true
 
   @moduletag :smoke
-  test "add two integers", test_context do
+  test "add two integers" do
     defmodule AddTwoInt do
       use Beaver.MIF
-      alias Beaver.MIF.{BEAM, Pointer}
+      alias Beaver.MIF.{Pointer, Term}
 
-      defm add(a, b, error) do
-        env = BEAM.env()
+      defm add(env, a, b, error) :: Term.t() do
         ptr_a = Pointer.allocate(i64())
         ptr_b = Pointer.allocate(i64())
 
@@ -38,5 +37,13 @@ defmodule MIFTest do
     assert AddTwoInt.add(1, 2, :arg_err) == 3
     assert AddTwoInt.add(1, "", :arg_err) == :arg_err
     Beaver.MIF.destroy_jit(AddTwoInt)
+  end
+
+  test "quick sort" do
+    Beaver.MIF.init_jit(ENIFQuickSort)
+    assert ENIFQuickSort.sort(:what, :arg_err) == :arg_err
+    arr = [5, 4, 3, 2, 1]
+    assert ENIFQuickSort.sort(arr, :arg_err) == Enum.sort(arr)
+    Beaver.MIF.destroy_jit(ENIFQuickSort)
   end
 end

@@ -4,9 +4,9 @@ const stderr = io.getStdErr().writer();
 const testing = std.testing;
 const beam = @import("beam");
 const kinda = @import("kinda");
-const e = @import("erl_nif");
 const mlir_capi = @import("mlir_capi.zig");
 pub const c = @import("prelude.zig");
+const e = @import("runtime.zig");
 fn get_all_registered_ops(env: beam.env) !beam.term {
     const ctx = get_context_load_all_dialects();
     defer c.mlirContextDestroy(ctx);
@@ -515,19 +515,15 @@ const Invocation = struct {
     packed_args: []?*anyopaque = undefined, // [arg0, arg1... result]
     pub fn init(self: *@This(), environment: beam.env, list: beam.term) !void {
         const size = try beam.get_list_length(environment, list);
-        var idx: usize = 0;
         var head: beam.term = undefined;
         self.arg_terms = try beam.allocator.alloc(beam.term, size);
         self.packed_args = try beam.allocator.alloc(?*anyopaque, size + 2);
         var movable_list = list;
-        while (idx < size) {
+        for (0..size) |idx| {
             head = try beam.get_head_and_iter(environment, &movable_list);
             self.arg_terms[idx] = head;
-            self.packed_args[idx] = &self.arg_terms[idx];
-            idx += 1;
+            self.packed_args[idx + 1] = &self.arg_terms[idx];
         }
-        // self.packed_args[size] = @ptrCast(@constCast(&environment));
-        self.packed_args[size] = &self.res_term;
         self.packed_args[size + 1] = &self.res_term;
         errdefer beam.allocator.free(self.arg_terms);
         errdefer beam.allocator.free(self.packed_args);
@@ -536,7 +532,8 @@ const Invocation = struct {
         beam.allocator.free(self.arg_terms);
         beam.allocator.free(self.packed_args);
     }
-    pub fn invoke(self: *@This(), _: beam.env, jit: mlir_capi.ExecutionEngine.T, name: beam.binary) callconv(.C) mlir_capi.LogicalResult.T {
+    pub fn invoke(self: *@This(), environment: beam.env, jit: mlir_capi.ExecutionEngine.T, name: beam.binary) callconv(.C) mlir_capi.LogicalResult.T {
+        self.packed_args[0] = @ptrCast(@constCast(&environment));
         return c.mlirExecutionEngineInvokePacked(jit, c.MlirStringRef{ .data = name.data, .length = name.size }, &self.packed_args[0]);
     }
 };
@@ -562,6 +559,10 @@ const enif_functions_otp26 = if (@hasDecl(e, "enif_get_string_length")) .{
     "enif_make_new_atom_len",
     "enif_set_option",
 } else .{};
+
+const beaver_runtime_functions = .{
+    "beaver_debug_print_i32",
+};
 
 const enif_function_names = .{
     "enif_alloc",
@@ -756,18 +757,22 @@ const enif_function_names = .{
     "enif_vsnprintf",
     "enif_whereis_pid",
     "enif_whereis_port",
-} ++ enif_functions_otp26;
+} ++ enif_functions_otp26 ++ beaver_runtime_functions;
+
+fn register_jit_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const u8, comptime f: anytype) void {
+    const prefixed_name = "_mlir_ciface_" ++ name;
+    const name_str_ref = c.MlirStringRef{
+        .data = prefixed_name.ptr,
+        .length = prefixed_name.len,
+    };
+    c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @ptrCast(@constCast(&f)));
+}
 
 fn mif_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
     var jit: mlir_capi.ExecutionEngine.T = mlir_capi.ExecutionEngine.resource.fetch(env, args[0]) catch
         return beam.make_error_binary(env, "fail to fetch resource for ExecutionEngine, expected: " ++ @typeName(mlir_capi.ExecutionEngine.T));
     inline for (enif_function_names) |name| {
-        const prefixed_name = "_mlir_ciface_" ++ name;
-        const name_str_ref = c.MlirStringRef{
-            .data = prefixed_name.ptr,
-            .length = prefixed_name.len,
-        };
-        c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @ptrCast(@constCast(&@field(e, name))));
+        register_jit_symbol(jit, name, @field(e, name));
     }
     return beam.make_ok(env);
 }
@@ -803,7 +808,7 @@ fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !be
             return llvm_ptr_type(env, ctx);
         },
         else => {
-            const is_int = t == c_int or t == c_ulong or t == c_long or t == beam.env or t == usize or t == c_uint;
+            const is_int = t == c_int or t == c_ulong or t == c_long or t == beam.env or t == usize or t == c_uint or t == i32;
             const is_float = t == f32 or t == f64;
             const is_struct = t == beam.resource_type or t == e.ErlNifCond;
             if (is_int or is_struct) {
