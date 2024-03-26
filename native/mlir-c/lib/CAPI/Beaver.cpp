@@ -268,6 +268,14 @@ MLIR_CAPI_EXPORTED void beaverLocationPrint(MlirLocation location,
   }
 }
 
+void beaverOperationPrintSpecializedFrom(MlirOperation op,
+                                         MlirStringCallback callback,
+                                         void *userData) {
+  mlirOperationPrintWithFlags(
+      op, wrap(&OpPrintingFlags().useLocalScope().printGenericOpForm(false)),
+      callback, userData);
+}
+
 MLIR_CAPI_EXPORTED void beaverOperationDumpGeneric(MlirOperation op) {
   unwrap(op)->print(llvm::errs(),
                     OpPrintingFlags().useLocalScope().printGenericOpForm());
