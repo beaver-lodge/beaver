@@ -115,40 +115,48 @@ defmodule Beaver.MLIR do
     CAPI.beaverDialectIsNull(v) |> Beaver.Native.to_term()
   end
 
-  def to_string(%Attribute{ref: ref}) do
-    CAPI.beaver_raw_beaver_attribute_print(ref) |> Beaver.Native.check!()
+  @spec to_string(any(), dump_opts()) :: :ok
+
+  def to_string(mlir, opts \\ [])
+
+  def to_string(%Attribute{ref: ref}, _opts) do
+    CAPI.beaver_raw_to_string_attribute(ref) |> Beaver.Native.check!()
   end
 
-  def to_string(%Value{ref: ref}) do
-    CAPI.beaver_raw_beaver_value_print(ref) |> Beaver.Native.check!()
+  def to_string(%Value{ref: ref}, _opts) do
+    CAPI.beaver_raw_to_string_value(ref) |> Beaver.Native.check!()
   end
 
-  def to_string(%Operation{ref: ref}) do
-    CAPI.beaver_raw_beaver_operation_print(ref)
+  def to_string(%Operation{ref: ref}, opts) do
+    if opts[:generic] == false do
+      CAPI.beaver_raw_to_string_operation_specialized(ref)
+    else
+      CAPI.beaver_raw_to_string_operation(ref)
+    end
     |> Beaver.Native.check!()
   end
 
-  def to_string(%__MODULE__.Module{} = module) do
+  def to_string(%__MODULE__.Module{} = module, _opts) do
     module |> __MODULE__.Operation.from_module() |> __MODULE__.to_string()
   end
 
-  def to_string(%Type{ref: ref}) do
-    CAPI.beaver_raw_beaver_type_print(ref) |> Beaver.Native.check!()
+  def to_string(%Type{ref: ref}, _opts) do
+    CAPI.beaver_raw_to_string_type(ref) |> Beaver.Native.check!()
   end
 
-  def to_string(%AffineMap{ref: ref}) do
-    CAPI.beaver_raw_beaver_affine_map_print(ref) |> Beaver.Native.check!()
+  def to_string(%AffineMap{ref: ref}, _opts) do
+    CAPI.beaver_raw_to_string_affine_map(ref) |> Beaver.Native.check!()
   end
 
-  def to_string(%Location{ref: ref}) do
-    CAPI.beaver_raw_beaver_location_print(ref) |> Beaver.Native.check!()
+  def to_string(%Location{ref: ref}, _opts) do
+    CAPI.beaver_raw_to_string_location(ref) |> Beaver.Native.check!()
   end
 
-  def to_string(%MlirOpPassManager{ref: ref}) do
-    CAPI.beaver_raw_beaver_pm_print(ref) |> Beaver.Native.check!()
+  def to_string(%MlirOpPassManager{ref: ref}, _opts) do
+    CAPI.beaver_raw_to_string_pm(ref) |> Beaver.Native.check!()
   end
 
-  def to_string(%MlirPassManager{} = pm) do
+  def to_string(%MlirPassManager{} = pm, _opts) do
     pm |> CAPI.mlirPassManagerGetAsOpPassManager() |> __MODULE__.to_string()
   end
 end
