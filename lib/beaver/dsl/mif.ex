@@ -37,17 +37,7 @@ defmodule Beaver.MIF do
   end
 
   @enif_functions Beaver.ENIF.functions()
-  @intrinsics @enif_functions ++
-                [
-                  :result_at,
-                  :!=,
-                  :-,
-                  :+,
-                  :<,
-                  :>,
-                  :<=,
-                  :>=
-                ]
+  @intrinsics @enif_functions ++ [:result_at, :!=, :-, :+, :<, :>, :<=, :>=]
 
   defp inject_mlir_opts({f, _, args}) when f in @intrinsics do
     quote do
