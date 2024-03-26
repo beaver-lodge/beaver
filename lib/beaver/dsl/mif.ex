@@ -337,7 +337,7 @@ defmodule Beaver.MIF do
 
   defmacro struct_if(condition, clauses) do
     true_body = Keyword.fetch!(clauses, :do)
-    false_body = Keyword.fetch!(clauses, :else)
+    false_body = clauses[:else]
 
     quote do
       mlir do

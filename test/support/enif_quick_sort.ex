@@ -34,7 +34,6 @@ defmodule ENIFQuickSort do
                Pointer.element_ptr(Term.t(), arr, i),
                Pointer.element_ptr(Term.t(), arr, j)
              ) :: []
-      else
       end
     end
 
@@ -54,7 +53,6 @@ defmodule ENIFQuickSort do
       pi = result_at(pi, 0)
       call do_sort(arr, low, pi - 1) :: []
       call do_sort(arr, pi + 1, high) :: []
-    else
     end
 
     op func.return() :: []
