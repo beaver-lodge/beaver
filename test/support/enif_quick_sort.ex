@@ -61,7 +61,6 @@ defmodule ENIFQuickSort do
   end
 
   defm copy_terms(env :: Env.t(), movable_list_ptr :: Pointer.t(), arr :: Pointer.t()) do
-    # TODO: don't allocate term, use int and convert it to pointer
     head = Pointer.allocate(Term.t())
     zero_const = op arith.constant(value: Attribute.integer(i32(), 0)) :: i32()
     zero = result_at(zero_const, 0)
