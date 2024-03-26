@@ -7,7 +7,7 @@ defmodule ArithTest do
   require Func
   @moduletag :smoke
 
-  test "cmp_i_predicate", test_context do
+  test "int predicates", test_context do
     mlir ctx: test_context[:ctx] do
       module do
         for p <- [:eq, :ne, :slt, :sle, :sgt, :sge, :ult, :ule, :ugt, :uge] do
@@ -31,7 +31,7 @@ defmodule ArithTest do
     end
   end
 
-  test "f_type_to_magic_num", test_context do
+  test "float predicates", test_context do
     mlir ctx: test_context[:ctx] do
       module do
         for p <- [
