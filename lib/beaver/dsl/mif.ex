@@ -176,7 +176,7 @@ defmodule Beaver.MIF do
 
     quote do
       mlir do
-        alias Beaver.MLIR.Dialect.{Func, Arith, Index, SCF}
+        alias Beaver.MLIR.Dialect.{Index, SCF, LLVM}
         zero = Index.constant(value: Attribute.index(0)) >>> Type.index()
         lower_bound = zero
         upper_bound = Index.casts(unquote(len)) >>> Type.index()
@@ -341,20 +341,20 @@ defmodule Beaver.MIF do
 
     quote do
       mlir do
-        alias Beaver.MLIR.Dialect.{Func, Arith, Index, SCF}
+        alias Beaver.MLIR.Dialect.SCF
 
         SCF.if [unquote(condition)] do
           region do
             block _true() do
               unquote(true_body)
-              Beaver.MLIR.Dialect.SCF.yield() >>> []
+              SCF.yield() >>> []
             end
           end
 
           region do
             block _false() do
               unquote(false_body)
-              Beaver.MLIR.Dialect.SCF.yield() >>> []
+              SCF.yield() >>> []
             end
           end
         end >>> []
