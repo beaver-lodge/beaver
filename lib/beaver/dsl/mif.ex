@@ -89,7 +89,6 @@ defmodule Beaver.MIF do
 
     quote do
       mlir ctx: var!(ctx), block: var!(block) do
-        # -1 for env
         num_of_args = unquote(length(args))
 
         ret_types =
