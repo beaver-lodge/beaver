@@ -759,20 +759,20 @@ const enif_function_names = .{
     "enif_whereis_port",
 } ++ enif_functions_otp26 ++ beaver_runtime_functions;
 
-fn register_jit_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const u8, f: [*c]u8) void {
+fn register_jit_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const u8, comptime f: anytype) void {
     const prefixed_name = "_mlir_ciface_" ++ name;
     const name_str_ref = c.MlirStringRef{
         .data = prefixed_name.ptr,
         .length = prefixed_name.len,
     };
-    c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, f);
+    c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @ptrCast(@constCast(&f)));
 }
 
 fn mif_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
     var jit: mlir_capi.ExecutionEngine.T = mlir_capi.ExecutionEngine.resource.fetch(env, args[0]) catch
         return beam.make_error_binary(env, "fail to fetch resource for ExecutionEngine, expected: " ++ @typeName(mlir_capi.ExecutionEngine.T));
     inline for (enif_function_names) |name| {
-        register_jit_symbol(jit, name, @ptrCast(@constCast(&@field(e, name))));
+        register_jit_symbol(jit, name, @field(e, name));
     }
     return beam.make_ok(env);
 }
