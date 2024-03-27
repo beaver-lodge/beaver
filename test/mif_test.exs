@@ -44,6 +44,12 @@ defmodule MIFTest do
     assert ENIFQuickSort.sort(:what, :arg_err) == :arg_err
     arr = [5, 4, 3, 2, 1]
     assert ENIFQuickSort.sort(arr, :arg_err) == Enum.sort(arr)
+
+    for i <- 0..10000 do
+      arr = 0..i |> Enum.shuffle()
+      assert ENIFQuickSort.sort(arr, :arg_err) == Enum.sort(arr)
+    end
+
     Beaver.MIF.destroy_jit(ENIFQuickSort)
   end
 end

@@ -561,7 +561,16 @@ const enif_functions_otp26 = if (@hasDecl(e, "enif_get_string_length")) .{
 } else .{};
 
 const beaver_runtime_functions = .{
-    "beaver_debug_print_i32",
+    "print_i32",
+    "print_u32",
+    "print_i64",
+    "print_u64",
+    "print_f32",
+    "print_f64",
+    "print_open",
+    "print_close",
+    "print_comma",
+    "print_newline",
 };
 
 const enif_function_names = .{
@@ -808,7 +817,7 @@ fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !be
             return llvm_ptr_type(env, ctx);
         },
         else => {
-            const is_int = t == c_int or t == c_ulong or t == c_long or t == beam.env or t == usize or t == c_uint or t == i32;
+            const is_int = t == c_int or t == c_ulong or t == c_long or t == beam.env or t == usize or t == c_uint or t == i32 or t == u32 or t == i64 or t == u64;
             const is_float = t == f32 or t == f64;
             const is_struct = t == beam.resource_type or t == e.ErlNifCond;
             if (is_int or is_struct) {

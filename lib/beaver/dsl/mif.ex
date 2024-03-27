@@ -37,7 +37,7 @@ defmodule Beaver.MIF do
   end
 
   @enif_functions Beaver.ENIF.functions()
-  @intrinsics @enif_functions ++ [:result_at, :!=, :-, :+, :<, :>, :<=, :>=]
+  @intrinsics @enif_functions ++ [:result_at, :!=, :-, :+, :<, :>, :<=, :>=, :==]
 
   defp inject_mlir_opts({f, _, args}) when f in @intrinsics do
     quote do
@@ -260,7 +260,7 @@ defmodule Beaver.MIF do
     MLIR.CAPI.mlirOperationGetResult(op, i)
   end
 
-  def handle_intrinsic(op, [left, right], opts) when op in [:!=, :-, :+, :<, :>, :<=, :>=] do
+  def handle_intrinsic(op, [left, right], opts) when op in [:!=, :-, :+, :<, :>, :<=, :>=, :==] do
     mlir ctx: opts[:ctx], block: opts[:block] do
       operands =
         case {left, right} do
@@ -277,6 +277,9 @@ defmodule Beaver.MIF do
       case op do
         :!= ->
           Arith.cmpi(operands, predicate: Arith.cmp_i_predicate(:ne)) >>> Type.i1()
+
+        :== ->
+          Arith.cmpi(operands, predicate: Arith.cmp_i_predicate(:eq)) >>> Type.i1()
 
         :> ->
           Arith.cmpi(operands, predicate: Arith.cmp_i_predicate(:sgt)) >>> Type.i1()
