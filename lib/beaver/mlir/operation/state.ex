@@ -239,11 +239,11 @@ defmodule Beaver.MLIR.Operation.State do
 
   def add_argument(%__MODULE__{context: context} = state, {tag, f})
       when is_atom(tag) and is_function(f, 1) do
-    add_argument(state, {tag, f.(context)})
+    add_argument(state, {tag, Beaver.Deferred.create(f, context)})
   end
 
   def add_argument(%__MODULE__{context: context} = state, f) when is_function(f, 1) do
-    add_argument(state, f.(context))
+    add_argument(state, Beaver.Deferred.create(f, context))
   end
 
   def add_argument(%__MODULE__{regions: regions} = state, %MLIR.Region{} = region) do
