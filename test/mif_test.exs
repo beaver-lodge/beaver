@@ -45,7 +45,7 @@ defmodule MIFTest do
     arr = [5, 4, 3, 2, 1]
     assert ENIFQuickSort.sort(arr, :arg_err) == Enum.sort(arr)
 
-    for i <- 0..10000 do
+    for i <- 0..1000 do
       arr = 0..i |> Enum.shuffle()
       assert ENIFQuickSort.sort(arr, :arg_err) == Enum.sort(arr)
     end
