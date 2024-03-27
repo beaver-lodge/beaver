@@ -46,39 +46,6 @@ defmodule ENIFQuickSort do
     op func.return(i + 1) :: []
   end
 
-  defm print_i32_term(env :: Env.t(), term :: Term.t()) do
-    ptr = Pointer.allocate(i32())
-    enif_get_int(env, term, ptr)
-    i = Pointer.load(i32(), ptr)
-    print_i32(i)
-    op func.return() :: []
-  end
-
-  defm print_terms(env :: Env.t(), arr :: Pointer.t()) do
-    n_const = op arith.constant(value: Attribute.integer(i32(), 5)) :: i32()
-    n = result_at(n_const, 0)
-
-    for_loop {element, j} <- {Term.t(), arr, n} do
-      j = op index.casts(j) :: i32()
-      j = result_at(j, 0)
-
-      struct_if(j == 0) do
-        print_open()
-      end
-
-      call print_i32_term(env, element) :: []
-
-      struct_if(j == n - 1) do
-        print_close()
-        print_newline()
-      else
-        print_comma()
-      end
-    end
-
-    op func.return() :: []
-  end
-
   defm do_sort(arr :: Pointer.t(), low :: i32(), high :: i32()) do
     struct_if(low < high) do
       pi = call partition(arr, low, high) :: i32()
