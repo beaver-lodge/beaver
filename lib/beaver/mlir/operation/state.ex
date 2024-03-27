@@ -40,9 +40,6 @@ defmodule Beaver.MLIR.Operation.State do
             v when is_binary(v) ->
               CAPI.mlirAttributeParseGet(ctx, MLIR.StringRef.create(v))
 
-            f when is_function(f, 1) ->
-              f.(ctx)
-
             %Beaver.MLIR.Type{} = type ->
               Beaver.MLIR.Attribute.type(type)
 

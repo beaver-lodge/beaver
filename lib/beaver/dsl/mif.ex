@@ -145,7 +145,7 @@ defmodule Beaver.MIF do
     quote do
       %Beaver.SSA{
         op: unquote("#{dialect}.#{op}"),
-        arguments: unquote(args),
+        arguments: List.flatten([unquote_splicing(args)]),
         ctx: Beaver.Env.context(),
         block: Beaver.Env.block(),
         loc: Beaver.MLIR.Location.from_env(unquote(Macro.escape(__CALLER__)))
