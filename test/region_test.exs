@@ -73,6 +73,59 @@ defmodule RegionTest do
         end
       end
     end
-    |> MLIR.Operation.verify()
+    |> MLIR.Operation.verify!()
+  end
+
+  test "nested regions", test_context do
+    mlir ctx: test_context[:ctx] do
+      alias Beaver.MLIR.Dialect.SCF
+
+      module do
+        Func.func some_func(function_type: Type.function([], [])) do
+          region do
+            block do
+              i = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+              condition = Arith.cmpi(i, i, predicate: Arith.cmp_i_predicate(:ne)) >>> Type.i1()
+
+              Beaver.MLIR.Dialect.SCF.while [] do
+                region do
+                  block _() do
+                    SCF.condition(condition) >>> []
+                  end
+                end
+
+                region do
+                  block _() do
+                    SCF.if condition do
+                      region do
+                        block _true() do
+                          SCF.yield() >>> []
+                        end
+                      end
+
+                      assert beaver_internal_env_regions |> Enum.count() == 1
+
+                      region do
+                        block _false() do
+                          SCF.yield() >>> []
+                        end
+                      end
+                    end >>> []
+
+                    assert beaver_internal_env_regions |> Enum.count() == 1
+                    SCF.yield() >>> []
+                  end
+                end
+                |> tap(fn x -> assert x |> Enum.count() == 2 end)
+              end >>> []
+
+              assert beaver_internal_env_regions |> Enum.count() == 0
+              Func.return() >>> []
+            end
+          end
+        end
+      end
+    end
+    |> MLIR.Operation.verify!()
   end
 end
