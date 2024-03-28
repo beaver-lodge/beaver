@@ -67,7 +67,7 @@ defmodule Beaver.SSA do
          evaluator
        ) do
     quote do
-      args = [unquote_splicing(args)] |> List.flatten()
+      args = unquote(args) |> List.wrap() |> List.flatten()
       results = unquote(results) |> List.wrap() |> List.flatten()
 
       {loc, args} =

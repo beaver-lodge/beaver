@@ -96,7 +96,7 @@ defmodule RegionTest do
 
                 region do
                   block _() do
-                    SCF.if [condition] do
+                    SCF.if condition do
                       region do
                         block _true() do
                           SCF.yield() >>> []
