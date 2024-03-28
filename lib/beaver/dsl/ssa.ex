@@ -120,7 +120,10 @@ defmodule Beaver.SSA do
           evaluator
         )
       )
-      |> Beaver.SSA.put_filler(fn -> unquote(ast_block) end)
+      |> Beaver.SSA.put_filler(fn ->
+        Kernel.var!(beaver_internal_env_regions) = []
+        unquote(ast_block)
+      end)
       |> unquote({call, line, []})
     end
   end

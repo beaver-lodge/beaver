@@ -83,10 +83,10 @@ defmodule RegionTest do
       module do
         Func.func some_func(function_type: Type.function([], [])) do
           region do
-            i = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-            condition = Arith.cmpi(i, i, predicate: Arith.cmp_i_predicate(:ne)) >>> Type.i1()
-
             block do
+              i = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+              condition = Arith.cmpi(i, i, predicate: Arith.cmp_i_predicate(:ne)) >>> Type.i1()
+
               Beaver.MLIR.Dialect.SCF.while [] do
                 region do
                   block _() do
@@ -103,6 +103,8 @@ defmodule RegionTest do
                         end
                       end
 
+                      assert beaver_internal_env_regions |> Enum.count() == 1
+
                       region do
                         block _false() do
                           SCF.yield() >>> []
@@ -110,17 +112,20 @@ defmodule RegionTest do
                       end
                     end >>> []
 
+                    assert beaver_internal_env_regions |> Enum.count() == 1
                     SCF.yield() >>> []
                   end
                 end
+                |> tap(fn x -> assert x |> Enum.count() == 2 end)
               end >>> []
 
+              assert beaver_internal_env_regions |> Enum.count() == 0
               Func.return() >>> []
             end
           end
         end
       end
     end
-    |> MLIR.Operation.verify()
+    |> MLIR.Operation.verify!()
   end
 end

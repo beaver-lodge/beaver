@@ -107,7 +107,7 @@ defmodule Beaver.MLIR.Operation.State do
     state
   end
 
-  defp add_regions(%MLIR.CAPI.MlirOperationState{} = state, []) do
+  defp add_regions(%MLIR.CAPI.MlirOperationState{} = state, empty) when empty in [[], nil] do
     state
   end
 
