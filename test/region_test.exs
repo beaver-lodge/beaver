@@ -73,7 +73,7 @@ defmodule RegionTest do
         end
       end
     end
-    |> MLIR.Operation.verify()
+    |> MLIR.Operation.verify!()
   end
 
   test "nested regions", test_context do
