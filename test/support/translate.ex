@@ -156,7 +156,7 @@ defmodule TranslateMLIR do
   end
 
   defp gen_mlir(
-         {name, [line: _], nil},
+         {name, _, nil},
          acc,
          _ctx,
          _block
