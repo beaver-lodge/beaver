@@ -1,7 +1,7 @@
 Beaver.MIF.init_jit(ENIFQuickSort)
 Beaver.MIF.init_jit(ENIFMergeSort)
 
-arr = Enum.to_list(1..60_000) |> Enum.shuffle()
+arr = Enum.to_list(1..67_000) |> Enum.shuffle()
 
 Benchee.run(%{
   "Enum.sort" => fn -> Enum.sort(arr) end,
