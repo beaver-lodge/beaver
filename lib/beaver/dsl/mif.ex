@@ -37,7 +37,8 @@ defmodule Beaver.MIF do
   end
 
   @enif_functions Beaver.ENIF.functions()
-  @intrinsics @enif_functions ++ [:result_at, :!=, :-, :+, :<, :>, :<=, :>=, :==]
+  @binary_ops [:!=, :-, :+, :<, :>, :<=, :>=, :==, :&&]
+  @intrinsics @enif_functions ++ [:result_at] ++ @binary_ops
 
   defp inject_mlir_opts({f, _, args}) when f in @intrinsics do
     quote do
@@ -260,7 +261,7 @@ defmodule Beaver.MIF do
     MLIR.CAPI.mlirOperationGetResult(op, i)
   end
 
-  def handle_intrinsic(op, [left, right], opts) when op in [:!=, :-, :+, :<, :>, :<=, :>=, :==] do
+  def handle_intrinsic(op, [left, right], opts) when op in @binary_ops do
     mlir ctx: opts[:ctx], block: opts[:block] do
       operands =
         case {left, right} do
@@ -298,6 +299,9 @@ defmodule Beaver.MIF do
 
         :+ ->
           Arith.addi(operands) >>> MLIR.CAPI.mlirValueGetType(left)
+
+        :&& ->
+          Arith.andi(operands) >>> MLIR.CAPI.mlirValueGetType(left)
       end
     end
   end
@@ -440,7 +444,7 @@ defmodule Beaver.MIF do
       |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
       |> reconcile_unrealized_casts
       |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR") == "1")
-      |> MLIR.ExecutionEngine.create!()
+      |> MLIR.ExecutionEngine.create!(opt_level: 3, object_dump: true)
 
     :ok = Beaver.MLIR.CAPI.mif_raw_jit_register_enif(jit.ref)
 
