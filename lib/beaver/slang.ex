@@ -236,7 +236,7 @@ defmodule Beaver.Slang do
   end
 
   # This function generates the AST for a creator function for an IRDL operation (like `irdl.operation`, `irdl.type`). It uses the transform_defop_pins/1 function to transform the pins, generates the MLIR code for the operation and its arguments, and applies the operation using op_applier/1.
-  defp gen_creator(op, args_op, call, do_block, opts \\ []) do
+  defp gen_creator(op, args_op, call, do_block, opts) do
     {name, args} = call |> Macro.decompose_call()
     name = Atom.to_string(name)
     creator = String.to_atom("create_" <> name)
