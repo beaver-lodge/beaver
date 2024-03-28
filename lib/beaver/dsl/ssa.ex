@@ -67,7 +67,7 @@ defmodule Beaver.SSA do
          evaluator
        ) do
     quote do
-      args = [unquote_splicing(args)] |> List.flatten()
+      args = unquote(args) |> List.wrap() |> List.flatten()
       results = unquote(results) |> List.wrap() |> List.flatten()
 
       {loc, args} =
@@ -120,7 +120,10 @@ defmodule Beaver.SSA do
           evaluator
         )
       )
-      |> Beaver.SSA.put_filler(fn -> unquote(ast_block) end)
+      |> Beaver.SSA.put_filler(fn ->
+        Kernel.var!(beaver_internal_env_regions) = []
+        unquote(ast_block)
+      end)
       |> unquote({call, line, []})
     end
   end
