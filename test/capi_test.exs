@@ -1,6 +1,5 @@
 defmodule MlirTest do
   use Beaver.Case, async: true
-
   use Beaver
   alias Beaver.MLIR
   import Beaver.MLIR.CAPI
@@ -125,8 +124,6 @@ defmodule MlirTest do
       %MLIR.Operation.Changeset{name: "elixir.add", context: ctx}
       |> MLIR.Operation.create()
   end
-
-  alias Beaver.MLIR.CAPI
 
   def create_adder_module(ctx) do
     MLIR.Module.create(ctx, """
