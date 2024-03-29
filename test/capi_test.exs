@@ -318,9 +318,7 @@ defmodule MlirTest do
     affine_symbol_expr = MLIR.CAPI.mlirAffineSymbolExprGet(ctx, 1)
 
     exprs =
-      Beaver.Native.array([affine_dim_expr, affine_symbol_expr], MLIR.AffineExpr,
-        mut: true
-      )
+      Beaver.Native.array([affine_dim_expr, affine_symbol_expr], MLIR.AffineExpr, mut: true)
 
     map = MLIR.CAPI.mlirAffineMapGet(ctx, 3, 3, 2, exprs)
     txt = "(d0, d1, d2)[s0, s1, s2] -> (d0, s1)"
