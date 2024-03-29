@@ -11,38 +11,38 @@ defmodule Beaver.MLIR.Operation.State do
          %MLIR.Operation.Changeset{
            location: location,
            context: nil
-         } = c
+         } = changeset
        )
        when not is_nil(location) and not is_function(location) do
-    %MLIR.Operation.Changeset{c | context: CAPI.mlirLocationGetContext(location)}
+    %MLIR.Operation.Changeset{changeset | context: CAPI.mlirLocationGetContext(location)}
   end
 
   defp prepare(
          %MLIR.Operation.Changeset{
            location: nil,
            context: context
-         } = c
+         } = changeset
        )
        when not is_nil(context) do
-    %MLIR.Operation.Changeset{c | location: CAPI.mlirLocationUnknownGet(context)}
+    %MLIR.Operation.Changeset{changeset | location: CAPI.mlirLocationUnknownGet(context)}
   end
 
   defp prepare(
          %MLIR.Operation.Changeset{
            location: location,
            context: context
-         } = c
+         } = changeset
        )
        when not is_nil(context) and is_function(location, 1) do
-    %MLIR.Operation.Changeset{c | location: location.(context)}
+    %MLIR.Operation.Changeset{changeset | location: location.(context)}
   end
 
   defp prepare(
          %MLIR.Operation.Changeset{
            location: %Beaver.MLIR.Location{} = location
-         } = c
+         } = changeset
        ) do
-    %MLIR.Operation.Changeset{c | location: location}
+    %MLIR.Operation.Changeset{changeset | location: location}
   end
 
   defp add_attributes(state, []) do
@@ -171,7 +171,7 @@ defmodule Beaver.MLIR.Operation.State do
   @doc """
   Create a new operation state in MLIR CAPI.
   """
-  def create(%MLIR.Operation.Changeset{} = c) do
+  def create(%MLIR.Operation.Changeset{} = changeset) do
     %MLIR.Operation.Changeset{
       name: name,
       attributes: attributes,
@@ -181,7 +181,7 @@ defmodule Beaver.MLIR.Operation.State do
       regions: regions,
       location: location,
       context: _context
-    } = prepare(c)
+    } = prepare(changeset)
 
     name
     |> MLIR.StringRef.create()
