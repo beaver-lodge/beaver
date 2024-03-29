@@ -3,8 +3,8 @@ defmodule Beaver.MLIR.Operation do
   This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
   """
   alias Beaver.MLIR
-  alias Beaver.MLIR.CAPI
   alias __MODULE__.{State, Changeset}
+  import Beaver.MLIR.CAPI
   require Logger
 
   use Kinda.ResourceKind,
@@ -34,7 +34,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def create(%State{} = state) do
-    state |> Beaver.Native.ptr() |> Beaver.Native.bag(state) |> CAPI.mlirOperationCreate()
+    state |> Beaver.Native.ptr() |> Beaver.Native.bag(state) |> mlirOperationCreate()
   end
 
   @doc false
@@ -47,21 +47,21 @@ defmodule Beaver.MLIR.Operation do
       )
       when is_list(arguments) do
     op = do_create(ctx, op_name, arguments, loc)
-    CAPI.mlirBlockAppendOwnedOperation(block, op)
+    mlirBlockAppendOwnedOperation(block, op)
     op
   end
 
   def results(%__MODULE__{} = op) do
-    case CAPI.mlirOperationGetNumResults(op) |> Beaver.Native.to_term() do
+    case mlirOperationGetNumResults(op) |> Beaver.Native.to_term() do
       0 ->
         op
 
       1 ->
-        CAPI.mlirOperationGetResult(op, 0)
+        mlirOperationGetResult(op, 0)
 
       n when n > 1 ->
         for i <- 0..(n - 1)//1 do
-          CAPI.mlirOperationGetResult(op, i)
+          mlirOperationGetResult(op, i)
         end
     end
   end
@@ -101,7 +101,7 @@ defmodule Beaver.MLIR.Operation do
     if is_null do
       :null
     else
-      is_success = from_module(op) |> CAPI.mlirOperationVerify() |> Beaver.Native.to_term()
+      is_success = from_module(op) |> mlirOperationVerify() |> Beaver.Native.to_term()
 
       if not is_success and debug do
         Logger.info("Start printing op failed to pass the verification. This might crash.")
@@ -117,7 +117,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def dump(op) do
-    op |> from_module |> CAPI.mlirOperationDump()
+    op |> from_module |> mlirOperationDump()
     op
   end
 
@@ -126,18 +126,18 @@ defmodule Beaver.MLIR.Operation do
   """
   def dump!(%__MODULE__{} = op) do
     verify!(op)
-    CAPI.mlirOperationDump(op)
+    mlirOperationDump(op)
     op
   end
 
   def name(%__MODULE__{} = operation) do
-    CAPI.mlirOperationGetName(operation)
-    |> CAPI.mlirIdentifierStr()
+    mlirOperationGetName(operation)
+    |> mlirIdentifierStr()
     |> MLIR.StringRef.to_string()
   end
 
   def from_module(%MLIR.Module{} = module) do
-    CAPI.mlirModuleGetOperation(module)
+    mlirModuleGetOperation(module)
   end
 
   def from_module(%__MODULE__{} = op) do
