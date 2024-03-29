@@ -57,7 +57,7 @@ pub const SymbolTableWalkSymbolTablesCallback = MLIRKind("SymbolTableWalkSymbolT
 pub const OpOperand = MLIRKind("OpOperand");
 pub const AffineMapCompressUnusedSymbolsPopulateResult = MLIRKind("AffineMapCompressUnusedSymbolsPopulateResult");
 pub const UnmanagedDenseResourceElementsAttrGetDeleteCallback = MLIRKind("UnmanagedDenseResourceElementsAttrGetDeleteCallback");
-pub const Enum_MlirSparseTensorLevelType = MLIRKind("SparseTensorLevelType");
+pub const SparseTensorLevelType = MLIRKind("SparseTensorLevelType");
 pub const ShapedTypeComponentsCallback = MLIRKind("ShapedTypeComponentsCallback");
 pub const TypeID = MLIRKind("TypeID");
 pub const TypesCallback = MLIRKind("TypesCallback");
@@ -107,7 +107,7 @@ pub const allKinds = .{
     DialectHandle,
     CInt,
     AffineMap,
-    Enum_MlirSparseTensorLevelType,
+    SparseTensorLevelType,
     F64,
     Type,
     I32,
@@ -167,7 +167,7 @@ pub fn open_generated_resource_types(env: beam.env) void {
     kinda.aliasKind(OpaqueArray, kinda.Internal.OpaqueArray);
     kinda.aliasKind(USize, kinda.Internal.USize);
     kinda.aliasKind(DiagnosticHandlerID, U64);
-    kinda.aliasKind(Enum_MlirSparseTensorLevelType, U64);
+    kinda.aliasKind(SparseTensorLevelType, U64);
 }
 
 const numOfNIFsPerKind = 10;
