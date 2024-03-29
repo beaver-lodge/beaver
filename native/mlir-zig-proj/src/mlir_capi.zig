@@ -85,7 +85,7 @@ pub const WalkOrder = MLIRKind("WalkOrder");
 pub const BytecodeWriterConfig = MLIRKind("BytecodeWriterConfig");
 pub const OpPrintingFlags = MLIRKind("OpPrintingFlags");
 pub const TypeIDAllocator = MLIRKind("TypeIDAllocator");
-pub const LlvmThreadPool = MLIRKind2("MlirLlvmThreadPool", "LLVMThreadPool");
+pub const LLVMThreadPool = MLIRKind2("MlirLlvmThreadPool", "LLVMThreadPool");
 
 pub const allKinds = .{
     Pass,
@@ -156,7 +156,7 @@ pub const allKinds = .{
     WalkOrder,
     BytecodeWriterConfig,
     OpPrintingFlags,
-    LlvmThreadPool,
+    LLVMThreadPool,
     TypeIDAllocator,
 };
 pub fn open_generated_resource_types(env: beam.env) void {
