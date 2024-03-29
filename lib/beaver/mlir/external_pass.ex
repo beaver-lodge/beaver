@@ -6,8 +6,7 @@ defmodule Beaver.MLIR.ExternalPass do
 
   use Kinda.ResourceKind,
     root_module: Beaver.MLIR.CAPI,
-    forward_module: Beaver.Native,
-    fields: [external: nil]
+    forward_module: Beaver.Native
 
   defp op_name_from_persistent_attributes(pass_module) do
     op_name = pass_module.__info__(:attributes)[:root_op] || []
