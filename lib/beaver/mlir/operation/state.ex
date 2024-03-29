@@ -1,4 +1,4 @@
-defmodule Beaver.MLIR.Operation.State do
+defmodule Beaver.MLIR.Operation.Changeset do
   @moduledoc false
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI

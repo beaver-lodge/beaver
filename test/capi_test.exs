@@ -30,11 +30,11 @@ defmodule MlirTest do
 
     _ret_str = MLIR.StringRef.create("func.return")
 
-    operation_state = %MLIR.Operation.State{name: "func.return", location: location}
+    operation_state = %MLIR.Operation.Changeset{name: "func.return", location: location}
 
     for _i <- 0..200 do
       operation_state_ptr =
-        operation_state |> MLIR.Operation.State.create() |> Beaver.Native.ptr()
+        operation_state |> MLIR.Operation.Changeset.create() |> Beaver.Native.ptr()
 
       _ret_op = MLIR.CAPI.mlirOperationCreate(operation_state_ptr)
     end
@@ -50,21 +50,21 @@ defmodule MlirTest do
     MLIR.CAPI.mlirRegionAppendOwnedBlock(func_body_region, func_body)
     # create func
     operation_state =
-      %MLIR.Operation.State{name: "func.func", context: ctx}
-      |> MLIR.Operation.State.add_argument(
+      %MLIR.Operation.Changeset{name: "func.func", context: ctx}
+      |> MLIR.Operation.Changeset.add_argument(
         sym_name: "\"add\"",
         function_type: "(i64, i64) -> (i64)"
       )
-      |> MLIR.Operation.State.add_argument(func_body_region)
+      |> MLIR.Operation.Changeset.add_argument(func_body_region)
 
     func_op = operation_state |> MLIR.Operation.create()
 
     add_op_state =
-      %MLIR.Operation.State{name: "arith.addi", location: location}
-      |> MLIR.Operation.State.add_argument(MLIR.Block.get_arg!(func_body, 0))
-      |> MLIR.Operation.State.add_argument(arg1)
-      |> MLIR.Operation.State.add_argument({:result_types, ["i64"]})
-      |> MLIR.Operation.State.create()
+      %MLIR.Operation.Changeset{name: "arith.addi", location: location}
+      |> MLIR.Operation.Changeset.add_argument(MLIR.Block.get_arg!(func_body, 0))
+      |> MLIR.Operation.Changeset.add_argument(arg1)
+      |> MLIR.Operation.Changeset.add_argument({:result_types, ["i64"]})
+      |> MLIR.Operation.Changeset.create()
 
     name = MLIR.CAPI.beaverMlirOperationStateGetName(add_op_state)
 
@@ -88,8 +88,8 @@ defmodule MlirTest do
     r = MLIR.CAPI.mlirOperationGetResult(add_op, 0)
 
     return_op =
-      %MLIR.Operation.State{name: "func.return", context: ctx}
-      |> MLIR.Operation.State.add_argument(r)
+      %MLIR.Operation.Changeset{name: "func.return", context: ctx}
+      |> MLIR.Operation.Changeset.add_argument(r)
       |> MLIR.Operation.create()
 
     MLIR.CAPI.mlirBlockInsertOwnedOperation(func_body, 0, add_op)
@@ -122,7 +122,7 @@ defmodule MlirTest do
     MLIR.CAPI.mlirContextLoadAllAvailableDialects(ctx)
 
     _add_op =
-      %MLIR.Operation.State{name: "elixir.add", context: ctx}
+      %MLIR.Operation.Changeset{name: "elixir.add", context: ctx}
       |> MLIR.Operation.create()
   end
 

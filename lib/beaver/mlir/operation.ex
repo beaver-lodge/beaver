@@ -29,8 +29,8 @@ defmodule Beaver.MLIR.Operation do
     create_and_append(ctx, op_name, arguments ++ [result_types: results] ++ filler, block, loc)
   end
 
-  def create(%MLIR.Operation.State{} = state) do
-    state |> MLIR.Operation.State.create() |> create
+  def create(%MLIR.Operation.Changeset{} = state) do
+    state |> MLIR.Operation.Changeset.create() |> create
   end
 
   def create(%MLIR.OperationState{} = state) do
@@ -73,11 +73,11 @@ defmodule Beaver.MLIR.Operation do
   defp do_create(ctx, op_name, arguments, loc) when is_binary(op_name) and is_list(arguments) do
     location = loc || MLIR.Location.unknown()
 
-    state = %MLIR.Operation.State{name: op_name, location: location, context: ctx}
-    state = Enum.reduce(arguments, state, &MLIR.Operation.State.add_argument(&2, &1))
+    state = %MLIR.Operation.Changeset{name: op_name, location: location, context: ctx}
+    state = Enum.reduce(arguments, state, &MLIR.Operation.Changeset.add_argument(&2, &1))
 
     state
-    |> MLIR.Operation.State.create()
+    |> MLIR.Operation.Changeset.create()
     |> create()
   end
 
