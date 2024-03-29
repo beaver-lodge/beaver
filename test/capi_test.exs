@@ -30,11 +30,11 @@ defmodule MlirTest do
 
     _ret_str = MLIR.StringRef.create("func.return")
 
-    operation_state = %MLIR.Operation.Changeset{name: "func.return", location: location}
+    changeset = %MLIR.Operation.Changeset{name: "func.return", location: location}
 
     for _i <- 0..200 do
       operation_state_ptr =
-        operation_state |> MLIR.Operation.Changeset.create() |> Beaver.Native.ptr()
+        changeset |> MLIR.Operation.State.create() |> Beaver.Native.ptr()
 
       _ret_op = MLIR.CAPI.mlirOperationCreate(operation_state_ptr)
     end
@@ -49,7 +49,7 @@ defmodule MlirTest do
     # append block to region
     MLIR.CAPI.mlirRegionAppendOwnedBlock(func_body_region, func_body)
     # create func
-    operation_state =
+    changeset =
       %MLIR.Operation.Changeset{name: "func.func", context: ctx}
       |> MLIR.Operation.Changeset.add_argument(
         sym_name: "\"add\"",
@@ -57,14 +57,14 @@ defmodule MlirTest do
       )
       |> MLIR.Operation.Changeset.add_argument(func_body_region)
 
-    func_op = operation_state |> MLIR.Operation.create()
+    func_op = changeset |> MLIR.Operation.create()
 
     add_op_state =
       %MLIR.Operation.Changeset{name: "arith.addi", location: location}
       |> MLIR.Operation.Changeset.add_argument(MLIR.Block.get_arg!(func_body, 0))
       |> MLIR.Operation.Changeset.add_argument(arg1)
       |> MLIR.Operation.Changeset.add_argument({:result_types, ["i64"]})
-      |> MLIR.Operation.Changeset.create()
+      |> MLIR.Operation.State.create()
 
     name = MLIR.CAPI.beaverMlirOperationStateGetName(add_op_state)
 

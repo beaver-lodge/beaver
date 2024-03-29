@@ -4,6 +4,7 @@ defmodule Beaver.MLIR.Operation do
   """
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
+  alias __MODULE__.{State, Changeset}
   import Beaver.MLIR.CAPI
   require Logger
 
@@ -29,11 +30,11 @@ defmodule Beaver.MLIR.Operation do
     create_and_append(ctx, op_name, arguments ++ [result_types: results] ++ filler, block, loc)
   end
 
-  def create(%MLIR.Operation.Changeset{} = state) do
-    state |> MLIR.Operation.Changeset.create() |> create
+  def create(%Changeset{} = c) do
+    c |> State.create() |> create
   end
 
-  def create(%MLIR.OperationState{} = state) do
+  def create(%State{} = state) do
     state |> Beaver.Native.ptr() |> Beaver.Native.bag(state) |> MLIR.CAPI.mlirOperationCreate()
   end
 
@@ -51,7 +52,7 @@ defmodule Beaver.MLIR.Operation do
     op
   end
 
-  def results(%MLIR.Operation{} = op) do
+  def results(%__MODULE__{} = op) do
     case CAPI.mlirOperationGetNumResults(op) |> Beaver.Native.to_term() do
       0 ->
         op
@@ -72,12 +73,10 @@ defmodule Beaver.MLIR.Operation do
 
   defp do_create(ctx, op_name, arguments, loc) when is_binary(op_name) and is_list(arguments) do
     location = loc || MLIR.Location.unknown()
+    changeset = %Changeset{name: op_name, location: location, context: ctx}
 
-    state = %MLIR.Operation.Changeset{name: op_name, location: location, context: ctx}
-    state = Enum.reduce(arguments, state, &MLIR.Operation.Changeset.add_argument(&2, &1))
-
-    state
-    |> MLIR.Operation.Changeset.create()
+    Enum.reduce(arguments, changeset, &Changeset.add_argument(&2, &1))
+    |> State.create()
     |> create()
   end
 
@@ -126,13 +125,13 @@ defmodule Beaver.MLIR.Operation do
   @doc """
   Verify the op and dump it. It raises if the verification fails.
   """
-  def dump!(%MLIR.Operation{} = op) do
+  def dump!(%__MODULE__{} = op) do
     verify!(op)
     mlirOperationDump(op)
     op
   end
 
-  def name(%MLIR.Operation{} = operation) do
+  def name(%__MODULE__{} = operation) do
     MLIR.CAPI.mlirOperationGetName(operation)
     |> MLIR.CAPI.mlirIdentifierStr()
     |> MLIR.StringRef.to_string()
@@ -142,7 +141,7 @@ defmodule Beaver.MLIR.Operation do
     CAPI.mlirModuleGetOperation(module)
   end
 
-  def from_module(%MLIR.Operation{} = op) do
+  def from_module(%__MODULE__{} = op) do
     op
   end
 

@@ -14,7 +14,6 @@ mlir_mods = [
   DiagnosticSeverity,
   PassManager,
   RewritePatternSet,
-  OperationState,
   SymbolTable,
   RegisteredOperationName,
   ExternalPassCallbacks,

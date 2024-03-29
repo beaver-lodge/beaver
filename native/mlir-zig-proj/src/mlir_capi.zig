@@ -73,7 +73,6 @@ pub const DiagnosticSeverity = MLIRKind("DiagnosticSeverity");
 pub const PassManager = MLIRKind("PassManager");
 pub const RewritePatternSet = MLIRKind("RewritePatternSet");
 pub const ExecutionEngine = MLIRKind("ExecutionEngine");
-pub const OperationState = MLIRKind("OperationState");
 pub const SymbolTable = MLIRKind("SymbolTable");
 pub const RegisteredOperationName = MLIRKind("RegisteredOperationName");
 pub const ExternalPass = MLIRKind("ExternalPass");
@@ -86,7 +85,7 @@ pub const BytecodeWriterConfig = MLIRKind("BytecodeWriterConfig");
 pub const OpPrintingFlags = MLIRKind("OpPrintingFlags");
 pub const TypeIDAllocator = MLIRKind("TypeIDAllocator");
 pub const LLVMThreadPool = MLIRKind2("MlirLlvmThreadPool", "LLVMThreadPool");
-
+pub const OperationState = MLIRKind2("MlirOperationState", "Operation.State");
 pub const allKinds = .{
     Pass,
     LogicalResult,

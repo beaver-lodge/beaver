@@ -92,7 +92,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
           :PassManager,
           :RewritePatternSet,
           :ExecutionEngine,
-          :OperationState,
+          :"Operation.State",
           :SymbolTable,
           :RegisteredOperationName,
           :ExternalPass,
