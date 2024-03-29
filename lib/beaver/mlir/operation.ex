@@ -5,7 +5,6 @@ defmodule Beaver.MLIR.Operation do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
   alias __MODULE__.{State, Changeset}
-  import Beaver.MLIR.CAPI
   require Logger
 
   use Kinda.ResourceKind,
@@ -35,7 +34,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def create(%State{} = state) do
-    state |> Beaver.Native.ptr() |> Beaver.Native.bag(state) |> MLIR.CAPI.mlirOperationCreate()
+    state |> Beaver.Native.ptr() |> Beaver.Native.bag(state) |> CAPI.mlirOperationCreate()
   end
 
   @doc false
@@ -48,7 +47,7 @@ defmodule Beaver.MLIR.Operation do
       )
       when is_list(arguments) do
     op = do_create(ctx, op_name, arguments, loc)
-    Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(block, op)
+    CAPI.mlirBlockAppendOwnedOperation(block, op)
     op
   end
 
@@ -102,7 +101,7 @@ defmodule Beaver.MLIR.Operation do
     if is_null do
       :null
     else
-      is_success = from_module(op) |> MLIR.CAPI.mlirOperationVerify() |> Beaver.Native.to_term()
+      is_success = from_module(op) |> CAPI.mlirOperationVerify() |> Beaver.Native.to_term()
 
       if not is_success and debug do
         Logger.info("Start printing op failed to pass the verification. This might crash.")
@@ -118,7 +117,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def dump(op) do
-    op |> from_module |> mlirOperationDump()
+    op |> from_module |> CAPI.mlirOperationDump()
     op
   end
 
@@ -127,13 +126,13 @@ defmodule Beaver.MLIR.Operation do
   """
   def dump!(%__MODULE__{} = op) do
     verify!(op)
-    mlirOperationDump(op)
+    CAPI.mlirOperationDump(op)
     op
   end
 
   def name(%__MODULE__{} = operation) do
-    MLIR.CAPI.mlirOperationGetName(operation)
-    |> MLIR.CAPI.mlirIdentifierStr()
+    CAPI.mlirOperationGetName(operation)
+    |> CAPI.mlirIdentifierStr()
     |> MLIR.StringRef.to_string()
   end
 

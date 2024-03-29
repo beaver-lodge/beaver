@@ -3,21 +3,21 @@ defmodule MlirTest do
 
   use Beaver
   alias Beaver.MLIR
-  alias Beaver.MLIR.CAPI
+  import Beaver.MLIR.CAPI
 
   @moduletag :smoke
   test "call wrapped apis" do
     ctx = MLIR.Context.create()
 
     location =
-      MLIR.CAPI.mlirLocationFileLineColGet(
+      mlirLocationFileLineColGet(
         ctx,
         MLIR.StringRef.create(__DIR__),
         1,
         2
       )
 
-    _module = MLIR.CAPI.mlirModuleCreateEmpty(location)
+    _module = mlirModuleCreateEmpty(location)
 
     module =
       MLIR.Module.create(ctx, """
@@ -26,7 +26,7 @@ defmodule MlirTest do
       """)
 
     MLIR.Operation.verify!(module)
-    _operation = MLIR.CAPI.mlirModuleGetOperation(module)
+    _operation = mlirModuleGetOperation(module)
 
     _ret_str = MLIR.StringRef.create("func.return")
 
@@ -36,18 +36,18 @@ defmodule MlirTest do
       operation_state_ptr =
         changeset |> MLIR.Operation.State.create() |> Beaver.Native.ptr()
 
-      _ret_op = MLIR.CAPI.mlirOperationCreate(operation_state_ptr)
+      _ret_op = mlirOperationCreate(operation_state_ptr)
     end
 
-    i64_t = MLIR.CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create("i64"))
+    i64_t = mlirTypeParseGet(ctx, MLIR.StringRef.create("i64"))
     # create func body entry block
     func_body_arg_types = [i64_t]
     func_body_arg_locs = [location]
-    func_body_region = MLIR.CAPI.mlirRegionCreate()
+    func_body_region = mlirRegionCreate()
     func_body = MLIR.Block.create(func_body_arg_types, func_body_arg_locs)
     [arg1] = func_body |> MLIR.Block.add_args!(["i64"], ctx: ctx)
     # append block to region
-    MLIR.CAPI.mlirRegionAppendOwnedBlock(func_body_region, func_body)
+    mlirRegionAppendOwnedBlock(func_body_region, func_body)
     # create func
     changeset =
       %MLIR.Operation.Changeset{name: "func.func", context: ctx}
@@ -66,15 +66,15 @@ defmodule MlirTest do
       |> MLIR.Operation.Changeset.add_argument({:result_types, ["i64"]})
       |> MLIR.Operation.State.create()
 
-    name = MLIR.CAPI.beaverMlirOperationStateGetName(add_op_state)
+    name = beaverMlirOperationStateGetName(add_op_state)
 
-    assert 10 == MLIR.CAPI.beaverStringRefGetLength(name) |> Beaver.Native.to_term()
+    assert 10 == beaverStringRefGetLength(name) |> Beaver.Native.to_term()
 
-    location1 = add_op_state |> MLIR.CAPI.beaverMlirOperationStateGetLocation()
-    n_results = add_op_state |> MLIR.CAPI.beaverMlirOperationStateGetNumResults()
-    n_operands = add_op_state |> MLIR.CAPI.beaverMlirOperationStateGetNumOperands()
-    n_regions = add_op_state |> MLIR.CAPI.beaverMlirOperationStateGetNumRegions()
-    n_attributes = add_op_state |> MLIR.CAPI.beaverMlirOperationStateGetNumAttributes()
+    location1 = add_op_state |> beaverMlirOperationStateGetLocation()
+    n_results = add_op_state |> beaverMlirOperationStateGetNumResults()
+    n_operands = add_op_state |> beaverMlirOperationStateGetNumOperands()
+    n_regions = add_op_state |> beaverMlirOperationStateGetNumRegions()
+    n_attributes = add_op_state |> beaverMlirOperationStateGetNumAttributes()
 
     assert 0 == n_regions |> Beaver.Native.to_term()
     assert 1 == n_results |> Beaver.Native.to_term()
@@ -82,24 +82,24 @@ defmodule MlirTest do
     assert 0 == n_attributes |> Beaver.Native.to_term()
     add_op = add_op_state |> MLIR.Operation.create()
 
-    _ctx = MLIR.CAPI.mlirLocationGetContext(location)
-    ctx = MLIR.CAPI.mlirLocationGetContext(location1)
+    _ctx = mlirLocationGetContext(location)
+    ctx = mlirLocationGetContext(location1)
 
-    r = MLIR.CAPI.mlirOperationGetResult(add_op, 0)
+    r = mlirOperationGetResult(add_op, 0)
 
     return_op =
       %MLIR.Operation.Changeset{name: "func.return", context: ctx}
       |> MLIR.Operation.Changeset.add_argument(r)
       |> MLIR.Operation.create()
 
-    MLIR.CAPI.mlirBlockInsertOwnedOperation(func_body, 0, add_op)
-    MLIR.CAPI.mlirBlockInsertOwnedOperationAfter(func_body, add_op, return_op)
-    module_body = MLIR.CAPI.mlirModuleGetBody(module)
-    MLIR.CAPI.mlirBlockInsertOwnedOperation(module_body, 0, func_op)
+    mlirBlockInsertOwnedOperation(func_body, 0, add_op)
+    mlirBlockInsertOwnedOperationAfter(func_body, add_op, return_op)
+    module_body = mlirModuleGetBody(module)
+    mlirBlockInsertOwnedOperation(module_body, 0, func_op)
 
     MLIR.Operation.verify!(module, debug: true)
 
-    MLIR.CAPI.mlirContextDestroy(ctx)
+    mlirContextDestroy(ctx)
   end
 
   test "elixir dialect" do
@@ -111,15 +111,15 @@ defmodule MlirTest do
     for _ <- 1..200 do
       Task.async(fn ->
         :ok =
-          MLIR.CAPI.mlirDialectHandleRegisterDialect(
-            MLIR.CAPI.mlirGetDialectHandle__elixir__(),
+          mlirDialectHandleRegisterDialect(
+            mlirGetDialectHandle__elixir__(),
             ctx
           )
       end)
     end
     |> Task.await_many()
 
-    MLIR.CAPI.mlirContextLoadAllAvailableDialects(ctx)
+    mlirContextLoadAllAvailableDialects(ctx)
 
     _add_op =
       %MLIR.Operation.Changeset{name: "elixir.add", context: ctx}
@@ -153,20 +153,20 @@ defmodule MlirTest do
     ctx = MLIR.Context.create()
 
     module = create_adder_module(ctx)
-    module_op = module |> MLIR.CAPI.mlirModuleGetOperation()
+    module_op = module |> mlirModuleGetOperation()
 
-    assert MLIR.CAPI.mlirOperationVerify(module_op) |> Beaver.Native.to_term()
-    pm = CAPI.mlirPassManagerCreate(ctx)
-    CAPI.mlirPassManagerAddOwnedPass(pm, CAPI.mlirCreateTransformsCSE())
-    success = CAPI.mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(module))
+    assert mlirOperationVerify(module_op) |> Beaver.Native.to_term()
+    pm = mlirPassManagerCreate(ctx)
+    mlirPassManagerAddOwnedPass(pm, mlirCreateTransformsCSE())
+    success = mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(module))
 
     assert success
-           |> CAPI.beaverLogicalResultIsSuccess()
+           |> beaverLogicalResultIsSuccess()
            |> Beaver.Native.to_term()
 
-    CAPI.mlirPassManagerDestroy(pm)
-    CAPI.mlirModuleDestroy(module)
-    CAPI.mlirContextDestroy(ctx)
+    mlirPassManagerDestroy(pm)
+    mlirModuleDestroy(module)
+    mlirContextDestroy(ctx)
   end
 
   defmodule TestPass do
@@ -192,17 +192,17 @@ defmodule MlirTest do
     ctx = MLIR.Context.create()
     module = create_adder_module(ctx)
     assert not MLIR.Module.is_null(module)
-    type_id_allocator = CAPI.mlirTypeIDAllocatorCreate()
+    type_id_allocator = mlirTypeIDAllocatorCreate()
     external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestPass)
-    pm = CAPI.mlirPassManagerCreate(ctx)
-    CAPI.mlirPassManagerAddOwnedPass(pm, external)
-    CAPI.mlirPassManagerAddOwnedPass(pm, CAPI.mlirCreateTransformsCSE())
-    success = CAPI.mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(module))
+    pm = mlirPassManagerCreate(ctx)
+    mlirPassManagerAddOwnedPass(pm, external)
+    mlirPassManagerAddOwnedPass(pm, mlirCreateTransformsCSE())
+    success = mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(module))
     assert Beaver.MLIR.LogicalResult.success?(success)
-    CAPI.mlirPassManagerDestroy(pm)
-    CAPI.mlirModuleDestroy(module)
-    CAPI.mlirTypeIDAllocatorDestroy(type_id_allocator)
-    CAPI.mlirContextDestroy(ctx)
+    mlirPassManagerDestroy(pm)
+    mlirModuleDestroy(module)
+    mlirTypeIDAllocatorDestroy(type_id_allocator)
+    mlirContextDestroy(ctx)
   end
 
   test "Run a func operation pass", test_context do
@@ -210,13 +210,13 @@ defmodule MlirTest do
     module = create_adder_module(ctx)
     assert not MLIR.Module.is_null(module)
     external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestFuncPass)
-    pm = CAPI.mlirPassManagerCreate(ctx)
-    npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
-    CAPI.mlirOpPassManagerAddOwnedPass(npm, external)
-    success = CAPI.mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(module))
+    pm = mlirPassManagerCreate(ctx)
+    npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
+    mlirOpPassManagerAddOwnedPass(npm, external)
+    success = mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(module))
     assert Beaver.MLIR.LogicalResult.success?(success)
-    CAPI.mlirPassManagerDestroy(pm)
-    CAPI.mlirModuleDestroy(module)
+    mlirPassManagerDestroy(pm)
+    mlirModuleDestroy(module)
   end
 
   test "Run pass with patterns", test_context do
@@ -224,13 +224,13 @@ defmodule MlirTest do
     module = create_redundant_transpose_module(ctx)
     assert not MLIR.Module.is_null(module)
     external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestFuncPass)
-    pm = CAPI.mlirPassManagerCreate(ctx)
-    npm = CAPI.mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
-    CAPI.mlirOpPassManagerAddOwnedPass(npm, external)
-    success = CAPI.mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(module))
+    pm = mlirPassManagerCreate(ctx)
+    npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
+    mlirOpPassManagerAddOwnedPass(npm, external)
+    success = mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(module))
     assert Beaver.MLIR.LogicalResult.success?(success)
-    CAPI.mlirPassManagerDestroy(pm)
-    CAPI.mlirModuleDestroy(module)
+    mlirPassManagerDestroy(pm)
+    mlirModuleDestroy(module)
   end
 
   defmacro some_constrain(_t) do
@@ -240,8 +240,6 @@ defmodule MlirTest do
   defmacro has_one_use(_v) do
     true
   end
-
-  import Beaver.MLIR.CAPI
 
   def lower_to_llvm(ctx, module) do
     pm = mlirPassManagerCreate(ctx)
@@ -309,18 +307,18 @@ defmodule MlirTest do
 
     MLIR.ExecutionEngine.destroy(jit)
     MLIR.Module.destroy(module)
-    CAPI.mlirContextDestroy(ctx)
+    mlirContextDestroy(ctx)
   end
 
   test "affine expr and map", test_context do
     ctx = test_context[:ctx]
-    affine_dim_expr = MLIR.CAPI.mlirAffineDimExprGet(ctx, 0)
-    affine_symbol_expr = MLIR.CAPI.mlirAffineSymbolExprGet(ctx, 1)
+    affine_dim_expr = mlirAffineDimExprGet(ctx, 0)
+    affine_symbol_expr = mlirAffineSymbolExprGet(ctx, 1)
 
     exprs =
       Beaver.Native.array([affine_dim_expr, affine_symbol_expr], MLIR.AffineExpr, mut: true)
 
-    map = MLIR.CAPI.mlirAffineMapGet(ctx, 3, 3, 2, exprs)
+    map = mlirAffineMapGet(ctx, 3, 3, 2, exprs)
     txt = "(d0, d1, d2)[s0, s1, s2] -> (d0, s1)"
     assert map |> MLIR.to_string() == txt
     assert MLIR.Attribute.affine_map(map) |> MLIR.to_string() == "affine_map<#{txt}>"
