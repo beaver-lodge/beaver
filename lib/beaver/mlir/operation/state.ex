@@ -29,7 +29,7 @@ defmodule Beaver.MLIR.Operation.State do
     state
   end
 
-  defp add_attributes(%MLIR.CAPI.MlirOperationState{} = state, attr_kw)
+  defp add_attributes(%MLIR.OperationState{} = state, attr_kw)
        when is_list(attr_kw) do
     ctx = CAPI.beaverMlirOperationStateGetContext(state)
 
@@ -72,22 +72,22 @@ defmodule Beaver.MLIR.Operation.State do
     state
   end
 
-  defp add_operands(%MLIR.CAPI.MlirOperationState{} = state, []) do
+  defp add_operands(%MLIR.OperationState{} = state, []) do
     state
   end
 
-  defp add_operands(%MLIR.CAPI.MlirOperationState{} = state, operands) do
+  defp add_operands(%MLIR.OperationState{} = state, operands) do
     array = operands |> Beaver.Native.array(MLIR.Value)
 
     CAPI.mlirOperationStateAddOperands(Beaver.Native.ptr(state), length(operands), array)
     state
   end
 
-  defp add_results(%MLIR.CAPI.MlirOperationState{} = state, []) do
+  defp add_results(%MLIR.OperationState{} = state, []) do
     state
   end
 
-  defp add_results(%MLIR.CAPI.MlirOperationState{} = state, result_types)
+  defp add_results(%MLIR.OperationState{} = state, result_types)
        when is_list(result_types) do
     context = CAPI.beaverMlirOperationStateGetContext(state)
 
@@ -107,11 +107,11 @@ defmodule Beaver.MLIR.Operation.State do
     state
   end
 
-  defp add_regions(%MLIR.CAPI.MlirOperationState{} = state, empty) when empty in [[], nil] do
+  defp add_regions(%MLIR.OperationState{} = state, empty) when empty in [[], nil] do
     state
   end
 
-  defp add_regions(%MLIR.CAPI.MlirOperationState{} = state, regions) when is_list(regions) do
+  defp add_regions(%MLIR.OperationState{} = state, regions) when is_list(regions) do
     Enum.each(regions, fn
       %MLIR.Region{} ->
         :ok
@@ -135,7 +135,7 @@ defmodule Beaver.MLIR.Operation.State do
     state
   end
 
-  defp add_successors(%MLIR.CAPI.MlirOperationState{} = state, successors)
+  defp add_successors(%MLIR.OperationState{} = state, successors)
        when is_list(successors) do
     array_ptr = successors |> Beaver.Native.array(MLIR.Block)
 

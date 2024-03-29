@@ -43,7 +43,7 @@ defmodule Beaver.MLIR.Pass.Composer do
     MLIR.ExternalPass.create({argument, op, run})
   end
 
-  defp add_pipeline(%MLIR.CAPI.MlirOpPassManager{} = pm, pipeline_str)
+  defp add_pipeline(%MLIR.OpPassManager{} = pm, pipeline_str)
        when is_binary(pipeline_str) do
     ref =
       MLIR.CAPI.beaver_raw_parse_pass_pipeline(pm.ref, MLIR.StringRef.create(pipeline_str).ref)
@@ -58,7 +58,7 @@ defmodule Beaver.MLIR.Pass.Composer do
     pm
   end
 
-  defp add_pipeline(%MLIR.CAPI.MlirPassManager{} = pm, pipeline_str)
+  defp add_pipeline(%MLIR.PassManager{} = pm, pipeline_str)
        when is_binary(pipeline_str) do
     pm |> MLIR.CAPI.mlirPassManagerGetAsOpPassManager() |> add_pipeline(pipeline_str)
   end
@@ -68,10 +68,10 @@ defmodule Beaver.MLIR.Pass.Composer do
   defp add_pass(pm, {:nested, op_name, passes}) when is_binary(op_name) and is_list(passes) do
     npm =
       case pm do
-        %MLIR.CAPI.MlirPassManager{} ->
+        %MLIR.PassManager{} ->
           mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
 
-        %MLIR.CAPI.MlirOpPassManager{} ->
+        %MLIR.OpPassManager{} ->
           mlirOpPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
       end
 
@@ -83,10 +83,10 @@ defmodule Beaver.MLIR.Pass.Composer do
   defp add_pass(pm, pipeline_str) when is_binary(pipeline_str),
     do: add_pipeline(pm, pipeline_str)
 
-  defp add_pass(%MLIR.CAPI.MlirOpPassManager{} = pm, pass),
+  defp add_pass(%MLIR.OpPassManager{} = pm, pass),
     do: mlirOpPassManagerAddOwnedPass(pm, create_pass(pass))
 
-  defp add_pass(%MLIR.CAPI.MlirPassManager{} = pm, pass),
+  defp add_pass(%MLIR.PassManager{} = pm, pass),
     do: mlirPassManagerAddOwnedPass(pm, create_pass(pass))
 
   defp to_pm(%__MODULE__{passes: passes, op: op}) do

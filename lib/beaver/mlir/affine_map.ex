@@ -19,7 +19,7 @@ defmodule Beaver.MLIR.AffineMap do
             expr -> expr
           end)
 
-        expr_array = Beaver.Native.array(exprs, MLIR.CAPI.MlirAffineExpr, mut: true)
+        expr_array = Beaver.Native.array(exprs, MLIR.AffineExpr, mut: true)
         MLIR.CAPI.mlirAffineMapGet(ctx, dim_cnt, symbol_cnt, length(exprs), expr_array)
       end
     )
