@@ -6,6 +6,10 @@ defmodule Beaver.MLIR.ExecutionEngine do
   alias Beaver.MLIR.Pass.Composer
   import Beaver.MLIR.CAPI
 
+  use Kinda.ResourceKind,
+    root_module: Beaver.MLIR.CAPI,
+    forward_module: Beaver.Native
+
   def is_null(jit) do
     jit
     |> beaverMlirExecutionEngineIsNull()

@@ -3,7 +3,7 @@ defmodule Beaver.MLIR.Operation do
   This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
   """
   alias Beaver.MLIR
-  alias Beaver.MLIR.CAPI
+  alias __MODULE__.{State, Changeset}
   import Beaver.MLIR.CAPI
   require Logger
 
@@ -29,12 +29,12 @@ defmodule Beaver.MLIR.Operation do
     create_and_append(ctx, op_name, arguments ++ [result_types: results] ++ filler, block, loc)
   end
 
-  def create(%MLIR.Operation.State{} = state) do
-    state |> MLIR.Operation.State.create() |> create
+  def create(%Changeset{} = c) do
+    c |> State.create() |> create
   end
 
-  def create(%MLIR.CAPI.MlirOperationState{} = state) do
-    state |> Beaver.Native.ptr() |> Beaver.Native.bag(state) |> MLIR.CAPI.mlirOperationCreate()
+  def create(%State{} = state) do
+    state |> Beaver.Native.ptr() |> Beaver.Native.bag(state) |> mlirOperationCreate()
   end
 
   @doc false
@@ -47,21 +47,21 @@ defmodule Beaver.MLIR.Operation do
       )
       when is_list(arguments) do
     op = do_create(ctx, op_name, arguments, loc)
-    Beaver.MLIR.CAPI.mlirBlockAppendOwnedOperation(block, op)
+    mlirBlockAppendOwnedOperation(block, op)
     op
   end
 
-  def results(%MLIR.Operation{} = op) do
-    case CAPI.mlirOperationGetNumResults(op) |> Beaver.Native.to_term() do
+  def results(%__MODULE__{} = op) do
+    case mlirOperationGetNumResults(op) |> Beaver.Native.to_term() do
       0 ->
         op
 
       1 ->
-        CAPI.mlirOperationGetResult(op, 0)
+        mlirOperationGetResult(op, 0)
 
       n when n > 1 ->
         for i <- 0..(n - 1)//1 do
-          CAPI.mlirOperationGetResult(op, i)
+          mlirOperationGetResult(op, i)
         end
     end
   end
@@ -72,12 +72,10 @@ defmodule Beaver.MLIR.Operation do
 
   defp do_create(ctx, op_name, arguments, loc) when is_binary(op_name) and is_list(arguments) do
     location = loc || MLIR.Location.unknown()
+    changeset = %Changeset{name: op_name, location: location, context: ctx}
 
-    state = %MLIR.Operation.State{name: op_name, location: location, context: ctx}
-    state = Enum.reduce(arguments, state, &MLIR.Operation.State.add_argument(&2, &1))
-
-    state
-    |> MLIR.Operation.State.create()
+    Enum.reduce(arguments, changeset, &Changeset.add_argument(&2, &1))
+    |> State.create()
     |> create()
   end
 
@@ -103,7 +101,7 @@ defmodule Beaver.MLIR.Operation do
     if is_null do
       :null
     else
-      is_success = from_module(op) |> MLIR.CAPI.mlirOperationVerify() |> Beaver.Native.to_term()
+      is_success = from_module(op) |> mlirOperationVerify() |> Beaver.Native.to_term()
 
       if not is_success and debug do
         Logger.info("Start printing op failed to pass the verification. This might crash.")
@@ -126,23 +124,23 @@ defmodule Beaver.MLIR.Operation do
   @doc """
   Verify the op and dump it. It raises if the verification fails.
   """
-  def dump!(%MLIR.Operation{} = op) do
+  def dump!(%__MODULE__{} = op) do
     verify!(op)
     mlirOperationDump(op)
     op
   end
 
-  def name(%MLIR.Operation{} = operation) do
-    MLIR.CAPI.mlirOperationGetName(operation)
-    |> MLIR.CAPI.mlirIdentifierStr()
+  def name(%__MODULE__{} = operation) do
+    mlirOperationGetName(operation)
+    |> mlirIdentifierStr()
     |> MLIR.StringRef.to_string()
   end
 
   def from_module(%MLIR.Module{} = module) do
-    CAPI.mlirModuleGetOperation(module)
+    mlirModuleGetOperation(module)
   end
 
-  def from_module(%MLIR.Operation{} = op) do
+  def from_module(%__MODULE__{} = op) do
     op
   end
 

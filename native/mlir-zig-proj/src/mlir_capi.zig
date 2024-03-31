@@ -29,6 +29,10 @@ fn MLIRKind(comptime n: [*]const u8) type {
     const nsPrefix = "Elixir.Beaver.MLIR.";
     return kinda.ResourceKind(@field(c, "Mlir" ++ n), nsPrefix ++ n);
 }
+fn MLIRKind2(comptime s: []const u8, comptime n: []const u8) type {
+    const nsPrefix = "Elixir.Beaver.MLIR.";
+    return kinda.ResourceKind(@field(c, s), nsPrefix ++ n);
+}
 pub const Type = MLIRKind("Type");
 pub const Pass = MLIRKind("Pass");
 pub const LogicalResult = MLIRKind("LogicalResult");
@@ -53,42 +57,35 @@ pub const SymbolTableWalkSymbolTablesCallback = MLIRKind("SymbolTableWalkSymbolT
 pub const OpOperand = MLIRKind("OpOperand");
 pub const AffineMapCompressUnusedSymbolsPopulateResult = MLIRKind("AffineMapCompressUnusedSymbolsPopulateResult");
 pub const UnmanagedDenseResourceElementsAttrGetDeleteCallback = MLIRKind("UnmanagedDenseResourceElementsAttrGetDeleteCallback");
-
-pub const Enum_MlirSparseTensorLevelType = kinda.ResourceKind(c.MlirSparseTensorLevelType, root_module ++ "." ++ "Enum_MlirSparseTensorLevelType");
-
-fn MLIRCAPIKind(comptime n: []const u8) type {
-    return kinda.ResourceKind(@field(c, n), root_module ++ "." ++ n);
-}
-
-pub const ShapedTypeComponentsCallback = MLIRCAPIKind("MlirShapedTypeComponentsCallback");
-pub const TypeID = MLIRCAPIKind("MlirTypeID");
-pub const TypesCallback = MLIRCAPIKind("MlirTypesCallback");
-pub const IntegerSet = MLIRCAPIKind("MlirIntegerSet");
-pub const AffineExpr = MLIRCAPIKind("MlirAffineExpr");
-pub const StringCallback = MLIRCAPIKind("MlirStringCallback");
-pub const DialectHandle = MLIRCAPIKind("MlirDialectHandle");
-pub const DialectRegistry = MLIRCAPIKind("MlirDialectRegistry");
-pub const DiagnosticHandlerID = MLIRCAPIKind("MlirDiagnosticHandlerID");
-pub const DiagnosticHandler = MLIRCAPIKind("MlirDiagnosticHandler");
-pub const Diagnostic = MLIRCAPIKind("MlirDiagnostic");
-pub const DiagnosticSeverity = MLIRCAPIKind("MlirDiagnosticSeverity");
-pub const PassManager = MLIRCAPIKind("MlirPassManager");
-pub const RewritePatternSet = MLIRCAPIKind("MlirRewritePatternSet");
-pub const ExecutionEngine = MLIRCAPIKind("MlirExecutionEngine");
-pub const OperationState = MLIRCAPIKind("MlirOperationState");
-pub const SymbolTable = MLIRCAPIKind("MlirSymbolTable");
-pub const RegisteredOperationName = MLIRCAPIKind("MlirRegisteredOperationName");
-pub const ExternalPass = MLIRCAPIKind("MlirExternalPass");
-pub const ExternalPassCallbacks = MLIRCAPIKind("MlirExternalPassCallbacks");
-pub const OpPassManager = MLIRCAPIKind("MlirOpPassManager");
-pub const AsmState = MLIRCAPIKind("MlirAsmState");
-pub const OperationWalkCallback = MLIRCAPIKind("MlirOperationWalkCallback");
-pub const WalkOrder = MLIRCAPIKind("MlirWalkOrder");
-pub const BytecodeWriterConfig = MLIRCAPIKind("MlirBytecodeWriterConfig");
-pub const OpPrintingFlags = MLIRCAPIKind("MlirOpPrintingFlags");
-pub const LlvmThreadPool = MLIRCAPIKind("MlirLlvmThreadPool");
-pub const TypeIDAllocator = MLIRCAPIKind("MlirTypeIDAllocator");
-
+pub const SparseTensorLevelType = MLIRKind("SparseTensorLevelType");
+pub const ShapedTypeComponentsCallback = MLIRKind("ShapedTypeComponentsCallback");
+pub const TypeID = MLIRKind("TypeID");
+pub const TypesCallback = MLIRKind("TypesCallback");
+pub const IntegerSet = MLIRKind("IntegerSet");
+pub const AffineExpr = MLIRKind("AffineExpr");
+pub const StringCallback = MLIRKind("StringCallback");
+pub const DialectHandle = MLIRKind("DialectHandle");
+pub const DialectRegistry = MLIRKind("DialectRegistry");
+pub const DiagnosticHandlerID = MLIRKind("DiagnosticHandlerID");
+pub const DiagnosticHandler = MLIRKind("DiagnosticHandler");
+pub const Diagnostic = MLIRKind("Diagnostic");
+pub const DiagnosticSeverity = MLIRKind("DiagnosticSeverity");
+pub const PassManager = MLIRKind("PassManager");
+pub const RewritePatternSet = MLIRKind("RewritePatternSet");
+pub const ExecutionEngine = MLIRKind("ExecutionEngine");
+pub const SymbolTable = MLIRKind("SymbolTable");
+pub const RegisteredOperationName = MLIRKind("RegisteredOperationName");
+pub const ExternalPass = MLIRKind("ExternalPass");
+pub const ExternalPassCallbacks = MLIRKind("ExternalPassCallbacks");
+pub const OpPassManager = MLIRKind("OpPassManager");
+pub const AsmState = MLIRKind("AsmState");
+pub const OperationWalkCallback = MLIRKind("OperationWalkCallback");
+pub const WalkOrder = MLIRKind("WalkOrder");
+pub const BytecodeWriterConfig = MLIRKind("BytecodeWriterConfig");
+pub const OpPrintingFlags = MLIRKind("OpPrintingFlags");
+pub const TypeIDAllocator = MLIRKind("TypeIDAllocator");
+pub const LLVMThreadPool = MLIRKind2("MlirLlvmThreadPool", "LLVMThreadPool");
+pub const OperationState = MLIRKind2("MlirOperationState", "Operation.State");
 pub const allKinds = .{
     Pass,
     LogicalResult,
@@ -109,7 +106,7 @@ pub const allKinds = .{
     DialectHandle,
     CInt,
     AffineMap,
-    Enum_MlirSparseTensorLevelType,
+    SparseTensorLevelType,
     F64,
     Type,
     I32,
@@ -158,7 +155,7 @@ pub const allKinds = .{
     WalkOrder,
     BytecodeWriterConfig,
     OpPrintingFlags,
-    LlvmThreadPool,
+    LLVMThreadPool,
     TypeIDAllocator,
 };
 pub fn open_generated_resource_types(env: beam.env) void {
@@ -169,7 +166,7 @@ pub fn open_generated_resource_types(env: beam.env) void {
     kinda.aliasKind(OpaqueArray, kinda.Internal.OpaqueArray);
     kinda.aliasKind(USize, kinda.Internal.USize);
     kinda.aliasKind(DiagnosticHandlerID, U64);
-    kinda.aliasKind(Enum_MlirSparseTensorLevelType, U64);
+    kinda.aliasKind(SparseTensorLevelType, U64);
 }
 
 const numOfNIFsPerKind = 10;
