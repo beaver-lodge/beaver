@@ -15,14 +15,11 @@ defmodule Beaver.MLIR do
     Module,
     Operation,
     AffineMap,
-    Dialect
-  }
-
-  alias Beaver.MLIR.CAPI.{
-    MlirAffineExpr,
-    MlirIntegerSet,
-    MlirOpPassManager,
-    MlirPassManager
+    Dialect,
+    AffineExpr,
+    IntegerSet,
+    OpPassManager,
+    PassManager
   }
 
   defp dump_if_not_null(ir, dumper) do
@@ -59,7 +56,7 @@ defmodule Beaver.MLIR do
     dump_if_not_null(mlir, &CAPI.mlirValueDump/1)
   end
 
-  def dump(%MlirAffineExpr{} = mlir, _opts) do
+  def dump(%AffineExpr{} = mlir, _opts) do
     dump_if_not_null(mlir, &CAPI.mlirAffineExprDump/1)
   end
 
@@ -67,7 +64,7 @@ defmodule Beaver.MLIR do
     dump_if_not_null(mlir, &CAPI.mlirAffineMapDump/1)
   end
 
-  def dump(%MlirIntegerSet{} = mlir, _opts) do
+  def dump(%IntegerSet{} = mlir, _opts) do
     dump_if_not_null(mlir, &CAPI.mlirIntegerSetDump/1)
   end
 
@@ -152,11 +149,11 @@ defmodule Beaver.MLIR do
     CAPI.beaver_raw_to_string_location(ref) |> Beaver.Native.check!()
   end
 
-  def to_string(%MlirOpPassManager{ref: ref}, _opts) do
+  def to_string(%OpPassManager{ref: ref}, _opts) do
     CAPI.beaver_raw_to_string_pm(ref) |> Beaver.Native.check!()
   end
 
-  def to_string(%MlirPassManager{} = pm, _opts) do
+  def to_string(%PassManager{} = pm, _opts) do
     pm |> CAPI.mlirPassManagerGetAsOpPassManager() |> __MODULE__.to_string()
   end
 end

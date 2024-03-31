@@ -16,7 +16,7 @@ defmodule Beaver.MLIR.Pass.Server do
   @impl true
   def handle_info({:run, op_ref, pass_ref, token_ref}, %{run: run} = state) do
     op = %MLIR.Operation{ref: op_ref}
-    pass = %MLIR.CAPI.MlirExternalPass{ref: pass_ref}
+    pass = %MLIR.ExternalPass{ref: pass_ref}
 
     try do
       case run.(op) do
