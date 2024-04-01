@@ -40,6 +40,7 @@ defmodule MIFTest do
   end
 
   test "quick sort" do
+    Beaver.MIF.init_jit(ENIFTimSort)
     Beaver.MIF.init_jit(ENIFQuickSort)
     Beaver.MIF.init_jit(ENIFMergeSort)
     assert ENIFQuickSort.sort(:what, :arg_err) == :arg_err
@@ -48,11 +49,13 @@ defmodule MIFTest do
 
     for i <- 0..1000 do
       arr = 0..i |> Enum.shuffle()
+      assert ENIFTimSort.sort(arr, :arg_err) == Enum.sort(arr)
       assert ENIFQuickSort.sort(arr, :arg_err) == Enum.sort(arr)
       assert ENIFMergeSort.sort(arr, :arg_err) == Enum.sort(arr)
     end
 
     Beaver.MIF.destroy_jit(ENIFQuickSort)
     Beaver.MIF.destroy_jit(ENIFMergeSort)
+    Beaver.MIF.destroy_jit(ENIFTimSort)
   end
 end

@@ -37,7 +37,7 @@ defmodule Beaver.MIF do
   end
 
   @enif_functions Beaver.ENIF.functions()
-  @binary_ops [:!=, :-, :+, :<, :>, :<=, :>=, :==, :&&]
+  @binary_ops [:!=, :-, :+, :<, :>, :<=, :>=, :==, :&&, :*]
   @intrinsics @enif_functions ++ [:result_at] ++ @binary_ops
 
   defp inject_mlir_opts({f, _, args}) when f in @intrinsics do
@@ -264,6 +264,7 @@ defmodule Beaver.MIF do
   def handle_intrinsic(op, [left, right], opts) when op in @binary_ops do
     mlir ctx: opts[:ctx], block: opts[:block] do
       operands =
+        [left, _] =
         case {left, right} do
           {%MLIR.Value{} = v, i} when is_integer(i) ->
             [v, constant_of_same_type(i, v, opts)]
@@ -302,6 +303,9 @@ defmodule Beaver.MIF do
 
         :&& ->
           Arith.andi(operands) >>> MLIR.CAPI.mlirValueGetType(left)
+
+        :* ->
+          Arith.muli(operands) >>> MLIR.CAPI.mlirValueGetType(left)
       end
     end
   end
