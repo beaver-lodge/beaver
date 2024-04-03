@@ -33,10 +33,11 @@ defmodule MIFTest do
       end
     end
 
-    Beaver.MIF.init_jit(AddTwoInt)
-    assert AddTwoInt.add(1, 2, :arg_err) == 3
-    assert AddTwoInt.add(1, "", :arg_err) == :arg_err
-    Beaver.MIF.destroy_jit(AddTwoInt)
+    {:ok, pid} = Beaver.MIF.init_jit(AddTwoInt, name: :add_int)
+    jit = Beaver.MIF.get_jit(:add_int)
+    assert Beaver.MIF.invoke(jit, :add, [1, 2, :arg_err]) == 3
+    assert Beaver.MIF.invoke(jit, :add, [1, "", :arg_err]) == :arg_err
+    Beaver.MIF.destroy_jit(pid)
   end
 
   test "quick sort" do

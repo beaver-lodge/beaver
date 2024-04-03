@@ -422,21 +422,17 @@ defmodule Beaver.MIF do
     quote do
       @defm unquote(Macro.escape({env, {call, ret_types, body}}))
       def unquote(name)(unquote_splicing(invoke_args)) do
-        %{jit: jit} = Agent.get(__MODULE__, & &1)
-
-        Beaver.MLIR.CAPI.mif_raw_jit_invoke_with_terms(
-          jit.ref,
-          to_string(unquote(name)),
-          unquote(invoke_args)
-        )
+        Beaver.MIF.get_jit(__MODULE__)
+        |> Beaver.MIF.invoke(unquote(name), unquote(invoke_args))
       end
     end
   end
 
-  def init_jit(module) do
+  def init_jit(module, opts \\ []) do
     import Beaver.MLIR.Conversion
     ctx = MLIR.Context.create()
     Beaver.Diagnostic.attach(ctx)
+    name = opts[:name] || module
 
     jit =
       ~m{#{module.__ir__()}}.(ctx)
@@ -452,7 +448,20 @@ defmodule Beaver.MIF do
 
     :ok = Beaver.MLIR.CAPI.mif_raw_jit_register_enif(jit.ref)
 
-    Agent.start_link(fn -> %{ctx: ctx, jit: jit} end, name: module)
+    Agent.start_link(fn -> %{ctx: ctx, jit: jit} end, name: name)
+  end
+
+  def get_jit(module) do
+    %{jit: jit} = Agent.get(module, & &1)
+    jit
+  end
+
+  def invoke(jit, name, args) do
+    Beaver.MLIR.CAPI.mif_raw_jit_invoke_with_terms(
+      jit.ref,
+      to_string(name),
+      args
+    )
   end
 
   def destroy_jit(module) do
