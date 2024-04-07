@@ -71,8 +71,9 @@ defmodule Beaver.MIF do
     end
   end
 
-  defp definition_to_func({call, ret_types, body}) do
+  defp definition_to_func(env, {call, ret_types, body}) do
     {name, args} = Macro.decompose_call(call)
+    name = mangling(env.module, name)
 
     body =
       body[:do]
@@ -127,7 +128,7 @@ defmodule Beaver.MIF do
           Beaver.ENIF.populate_external_functions(ctx, Beaver.Env.block())
 
           for {env, d} <- definitions do
-            f = definition_to_func(d)
+            f = definition_to_func(env, d)
             binding = [ctx: Beaver.Env.context(), block: Beaver.Env.block()]
             Code.eval_quoted(f, binding, env)
           end
@@ -156,8 +157,13 @@ defmodule Beaver.MIF do
     end
   end
 
+  defp mangling(mod, func) do
+    Module.concat(mod, func)
+  end
+
   defmacro call({:"::", _, [call, types]}, _ \\ []) do
     {name, args} = Macro.decompose_call(call)
+    name = mangling(__CALLER__.module, name)
 
     quote do
       %Beaver.SSA{
@@ -412,7 +418,7 @@ defmodule Beaver.MIF do
     call = normalize_call(call)
     {name, args} = Macro.decompose_call(call)
     env = __CALLER__
-    [_env | invoke_args] = args
+    [_enif_env | invoke_args] = args
 
     invoke_args =
       for {:"::", _, [a, _t]} <- invoke_args do
@@ -423,7 +429,7 @@ defmodule Beaver.MIF do
       @defm unquote(Macro.escape({env, {call, ret_types, body}}))
       def unquote(name)(unquote_splicing(invoke_args)) do
         Beaver.MIF.get_jit(__MODULE__)
-        |> Beaver.MIF.invoke(unquote(name), unquote(invoke_args))
+        |> Beaver.MIF.invoke({unquote(env.module), unquote(name), unquote(invoke_args)})
       end
     end
   end
@@ -456,10 +462,10 @@ defmodule Beaver.MIF do
     jit
   end
 
-  def invoke(jit, name, args) do
+  def invoke(jit, {mod, func, args}) do
     Beaver.MLIR.CAPI.mif_raw_jit_invoke_with_terms(
       jit.ref,
-      to_string(name),
+      to_string(mangling(mod, func)),
       args
     )
   end
