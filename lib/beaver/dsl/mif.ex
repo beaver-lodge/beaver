@@ -15,7 +15,6 @@ defmodule Beaver.MIF do
       alias Beaver.MLIR.Dialect.{Func, Arith, LLVM, CF}
       alias MLIR.{Type, Attribute}
       import Type
-
       @before_compile Beaver.MIF
       Module.register_attribute(__MODULE__, :defm, accumulate: true)
     end
@@ -23,9 +22,8 @@ defmodule Beaver.MIF do
 
   defmacro __before_compile__(_env) do
     quote do
-      @ir @defm |> Enum.reverse() |> Beaver.MIF.compile_definitions()
-      def __ir__ do
-        @ir
+      def __ir__(ctx, block) do
+        @defm |> Enum.reverse() |> Beaver.MIF.compile_definitions(ctx, block)
       end
     end
   end
@@ -119,26 +117,14 @@ defmodule Beaver.MIF do
     end
   end
 
-  def compile_definitions(definitions) do
-    ctx = Beaver.MLIR.Context.create()
-
-    m =
-      mlir ctx: ctx do
-        module do
-          Beaver.ENIF.populate_external_functions(ctx, Beaver.Env.block())
-
-          for {env, d} <- definitions do
-            f = definition_to_func(env, d)
-            binding = [ctx: Beaver.Env.context(), block: Beaver.Env.block()]
-            Code.eval_quoted(f, binding, env)
-          end
-        end
+  def compile_definitions(definitions, ctx, block) do
+    mlir block: block, ctx: ctx do
+      for {env, d} <- definitions do
+        f = definition_to_func(env, d)
+        binding = [ctx: Beaver.Env.context(), block: Beaver.Env.block()]
+        Code.eval_quoted(f, binding, env)
       end
-      |> MLIR.Operation.verify!(debug: false)
-      |> MLIR.to_string()
-
-    MLIR.Context.destroy(ctx)
-    m
+    end
   end
 
   defmacro op({:"::", _, [call, types]}, _ \\ []) do
@@ -434,14 +420,20 @@ defmodule Beaver.MIF do
     end
   end
 
-  def init_jit(module, opts \\ []) do
+  def init_jit(elixir_module, opts \\ []) do
     import Beaver.MLIR.Conversion
     ctx = MLIR.Context.create()
     Beaver.Diagnostic.attach(ctx)
-    name = opts[:name] || module
+    name = opts[:name] || elixir_module
 
     jit =
-      ~m{#{module.__ir__()}}.(ctx)
+      mlir ctx: ctx do
+        module do
+          Beaver.ENIF.populate_external_functions(ctx, Beaver.Env.block())
+          elixir_module.__ir__(ctx, Beaver.Env.block())
+        end
+      end
+      |> MLIR.Operation.verify!(debug: false)
       |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
       |> convert_scf_to_cf
       |> convert_arith_to_llvm()
