@@ -23,6 +23,15 @@ defmodule Beaver.MLIR.ExecutionEngine do
     Composer.run!(composer_or_op) |> create!()
   end
 
+  @type opt_level :: 0 | 1 | 2 | 3
+  @type shared_lib_path :: String.t()
+  @type object_dump :: boolean()
+  @type opts :: [
+          {:shared_lib_paths, [shared_lib_path]},
+          {:opt_level, opt_level},
+          {:object_dump, object_dump}
+        ]
+  @spec create!(module(), opts()) :: t()
   def create!(module, opts \\ []) do
     shared_lib_paths = Keyword.get(opts, :shared_lib_paths, [])
     opt_level = Keyword.get(opts, :opt_level, 2)
