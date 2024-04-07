@@ -25,6 +25,8 @@ defmodule Beaver.MLIR.ExecutionEngine do
 
   def create!(module, opts \\ []) do
     shared_lib_paths = Keyword.get(opts, :shared_lib_paths, [])
+    opt_level = Keyword.get(opts, :opt_level, 2)
+    object_dump = Keyword.get(opts, :object_dump, false)
 
     shared_lib_paths_ptr =
       shared_lib_paths
@@ -36,10 +38,10 @@ defmodule Beaver.MLIR.ExecutionEngine do
     jit =
       mlirExecutionEngineCreate(
         module,
-        2,
+        opt_level,
         length(shared_lib_paths),
         shared_lib_paths_ptr,
-        false
+        object_dump
       )
 
     is_null = is_null(jit)
