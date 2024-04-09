@@ -114,12 +114,12 @@ defmodule Beaver.MIF do
             end
           end
         end
-        |> MLIR.dump!()
       end
     end
   end
 
   def compile_definitions(definitions) do
+    import Beaver.MLIR.Transforms
     ctx = Beaver.MLIR.Context.create()
 
     m =
@@ -134,7 +134,12 @@ defmodule Beaver.MIF do
           end
         end
       end
-      |> MLIR.Operation.verify!(debug: false)
+      |> MLIR.Pass.Composer.nested(
+        "func.func",
+        Beaver.MIF.Pass.CreateAbsentFunc
+      )
+      |> canonicalize
+      |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR") == "1")
       |> MLIR.to_string()
 
     MLIR.Context.destroy(ctx)
@@ -157,18 +162,25 @@ defmodule Beaver.MIF do
     end
   end
 
-  defp mangling(mod, func) do
+  def mangling(mod, func) do
     Module.concat(mod, func)
   end
 
-  defmacro call({:"::", _, [call, types]}, _ \\ []) do
+  defmacro call({:"::", _, [call, types]}) do
+    quote do
+      call(__MODULE__, unquote(call) :: unquote(types))
+    end
+  end
+
+  defmacro call(mod, {:"::", _, [call, types]}) do
     {name, args} = Macro.decompose_call(call)
-    name = mangling(__CALLER__.module, name)
 
     quote do
+      name = Beaver.MIF.mangling(unquote(mod), unquote(name))
+
       %Beaver.SSA{
         op: unquote("func.call"),
-        arguments: [unquote_splicing(args), callee: Attribute.flat_symbol_ref("#{unquote(name)}")],
+        arguments: [unquote_splicing(args), callee: Attribute.flat_symbol_ref("#{name}")],
         ctx: Beaver.Env.context(),
         block: Beaver.Env.block(),
         loc: Beaver.MLIR.Location.from_env(unquote(Macro.escape(__CALLER__)))
@@ -434,14 +446,41 @@ defmodule Beaver.MIF do
     end
   end
 
-  def init_jit(module, opts \\ []) do
+  def init_jit(module, opts \\ [])
+
+  def init_jit(module, opts) when is_atom(module) do
+    name = opts[:name] || module
+    opts = Keyword.put_new(opts, :name, name)
+    init_jit([module], opts)
+  end
+
+  def init_jit(modules, opts) do
     import Beaver.MLIR.Conversion
     ctx = MLIR.Context.create()
     Beaver.Diagnostic.attach(ctx)
-    name = opts[:name] || module
+
+    name = opts[:name]
+
+    m_enif =
+      mlir ctx: ctx do
+        module do
+          Beaver.ENIF.populate_external_functions(ctx, Beaver.Env.block())
+        end
+      end
+
+    for module <- modules do
+      m_elixir = MLIR.Module.create(ctx, module.__ir__())
+
+      if MLIR.is_null(m_elixir) do
+        raise "Failed to load MLIR compiled from Elixir module. Please check out the diagnostics."
+      end
+
+      MLIR.Module.merge(m_enif, m_elixir)
+    end
 
     jit =
-      ~m{#{module.__ir__()}}.(ctx)
+      m_enif
+      |> MLIR.Operation.verify!(debug: true)
       |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
       |> convert_scf_to_cf
       |> convert_arith_to_llvm()
@@ -454,7 +493,15 @@ defmodule Beaver.MIF do
 
     :ok = Beaver.MLIR.CAPI.mif_raw_jit_register_enif(jit.ref)
 
-    Agent.start_link(fn -> %{ctx: ctx, jit: jit} end, name: name)
+    case {name, modules} do
+      {name, [_]} when not is_nil(name) ->
+        Agent.start_link(fn -> %{ctx: ctx, jit: jit} end, name: name)
+
+      {nil, modules} ->
+        for {module, index} <- Enum.with_index(modules) do
+          Agent.start_link(fn -> %{ctx: ctx, jit: jit, owner: index == 0} end, name: module)
+        end
+    end
   end
 
   def get_jit(module) do
@@ -471,9 +518,11 @@ defmodule Beaver.MIF do
   end
 
   def destroy_jit(module) do
-    %{ctx: ctx, jit: jit} = Agent.get(module, & &1)
-    MLIR.ExecutionEngine.destroy(jit)
-    MLIR.Context.destroy(ctx)
+    with %{ctx: ctx, jit: jit, owner: true} <- Agent.get(module, & &1) do
+      MLIR.ExecutionEngine.destroy(jit)
+      MLIR.Context.destroy(ctx)
+    end
+
     Agent.stop(module)
   end
 end

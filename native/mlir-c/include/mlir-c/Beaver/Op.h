@@ -115,9 +115,12 @@ MLIR_CAPI_EXPORTED MlirType beaverGetIRDLDefinedType(MlirStringRef dialect,
 MLIR_CAPI_EXPORTED MlirAttribute beaverGetIRDLDefinedAttr(MlirStringRef dialect,
                                                           MlirStringRef attr,
                                                           MlirAttribute params);
+MLIR_CAPI_EXPORTED void beaverMergeModules(MlirModule module1,
+                                           MlirModule module2);
 #include "mlir-c/ExecutionEngine.h"
 
-MLIR_CAPI_EXPORTED bool beaverMlirExecutionEngineIsNull(MlirExecutionEngine w);
+MLIR_CAPI_EXPORTED
+bool beaverMlirExecutionEngineIsNull(MlirExecutionEngine w);
 #ifdef __cplusplus
 }
 #endif

@@ -35,4 +35,15 @@ defmodule Beaver.MLIR.Module do
   def destroy(module) do
     CAPI.mlirModuleDestroy(module)
   end
+
+  def merge(module1, module2, opts \\ []) do
+    destroy = opts[:destroy] || true
+    MLIR.CAPI.beaverMergeModules(module1, module2)
+
+    if destroy do
+      MLIR.Module.destroy(module2)
+    end
+
+    module1
+  end
 end
