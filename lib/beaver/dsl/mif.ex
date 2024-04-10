@@ -446,6 +446,31 @@ defmodule Beaver.MIF do
     end
   end
 
+  defp init_mod(ctx) do
+    mlir ctx: ctx do
+      module do
+        Beaver.ENIF.populate_external_functions(ctx, Beaver.Env.block())
+      end
+    end
+  end
+
+  defp jit_of_mod(m) do
+    import Beaver.MLIR.Conversion
+
+    m
+    |> MLIR.Operation.verify!(debug: true)
+    |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
+    |> convert_scf_to_cf
+    |> convert_arith_to_llvm()
+    |> convert_index_to_llvm()
+    |> convert_func_to_llvm()
+    |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
+    |> reconcile_unrealized_casts
+    |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR") == "1")
+    |> MLIR.ExecutionEngine.create!(opt_level: 3, object_dump: true)
+    |> tap(&Beaver.MLIR.CAPI.mif_raw_jit_register_enif(&1.ref))
+  end
+
   def init_jit(module, opts \\ [])
 
   def init_jit(module, opts) when is_atom(module) do
@@ -455,43 +480,20 @@ defmodule Beaver.MIF do
   end
 
   def init_jit(modules, opts) do
-    import Beaver.MLIR.Conversion
     ctx = MLIR.Context.create()
     Beaver.Diagnostic.attach(ctx)
-
     name = opts[:name]
-
-    m_enif =
-      mlir ctx: ctx do
-        module do
-          Beaver.ENIF.populate_external_functions(ctx, Beaver.Env.block())
-        end
-      end
+    m = init_mod(ctx)
 
     for module <- modules do
-      m_elixir = MLIR.Module.create(ctx, module.__ir__())
-
-      if MLIR.is_null(m_elixir) do
+      if not MLIR.is_null(m_elixir = MLIR.Module.create(ctx, module.__ir__())) do
+        MLIR.Module.merge(m, m_elixir)
+      else
         raise "Failed to load MLIR compiled from Elixir module. Please check out the diagnostics."
       end
-
-      MLIR.Module.merge(m_enif, m_elixir)
     end
 
-    jit =
-      m_enif
-      |> MLIR.Operation.verify!(debug: true)
-      |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
-      |> convert_scf_to_cf
-      |> convert_arith_to_llvm()
-      |> convert_index_to_llvm()
-      |> convert_func_to_llvm()
-      |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
-      |> reconcile_unrealized_casts
-      |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR") == "1")
-      |> MLIR.ExecutionEngine.create!(opt_level: 3, object_dump: true)
-
-    :ok = Beaver.MLIR.CAPI.mif_raw_jit_register_enif(jit.ref)
+    jit = jit_of_mod(m)
 
     case {name, modules} do
       {name, [_]} when not is_nil(name) ->
