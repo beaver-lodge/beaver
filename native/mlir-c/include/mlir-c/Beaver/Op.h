@@ -119,8 +119,7 @@ MLIR_CAPI_EXPORTED void beaverMergeModules(MlirModule module1,
                                            MlirModule module2);
 #include "mlir-c/ExecutionEngine.h"
 
-MLIR_CAPI_EXPORTED
-bool beaverMlirExecutionEngineIsNull(MlirExecutionEngine w);
+MLIR_CAPI_EXPORTED bool beaverMlirExecutionEngineIsNull(MlirExecutionEngine w);
 #ifdef __cplusplus
 }
 #endif
