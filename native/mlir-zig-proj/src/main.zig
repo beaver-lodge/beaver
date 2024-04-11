@@ -534,7 +534,7 @@ const Invocation = struct {
     }
     pub fn invoke(self: *@This(), environment: beam.env, jit: mlir_capi.ExecutionEngine.T, name: beam.binary) callconv(.C) mlir_capi.LogicalResult.T {
         self.packed_args[0] = @ptrCast(@constCast(&environment));
-        return c.mlirExecutionEngineInvokePacked(jit, c.MlirStringRef{ .data = name.data, .length = name.size }, &self.packed_args[0]);
+        return c.mlirExecutionEngineInvokePacked(jit, c.mlirStringRefCreate(name.data, name.size), &self.packed_args[0]);
     }
 };
 
@@ -546,10 +546,9 @@ fn mif_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const beam.t
     var invocation = Invocation{};
     invocation.init(env, args[2]) catch return beam.make_error_binary(env, "fail to init jit invocation");
     defer invocation.deinit();
-    _ = invocation.invoke(env, jit, name);
-    // if (c.mlirLogicalResultIsFailure(invocation.invoke(env, jit, name))) {
-    //     return beam.make_error_binary(env, "fail to call jit function");
-    // }
+    if (c.beaverLogicalResultIsFailure(invocation.invoke(env, jit, name))) {
+        return beam.make_error_binary(env, "fail to call jit function");
+    }
     return invocation.res_term;
 }
 
