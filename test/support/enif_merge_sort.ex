@@ -1,7 +1,7 @@
 defmodule ENIFMergeSort do
   use Beaver.MIF
   require Beaver.Env
-  alias Beaver.MIF.{Pointer, Term, Env}
+  alias Beaver.MIF.{Pointer, Term}
 
   defm merge(arr :: Pointer.t(), l :: i32(), m :: i32(), r :: i32()) do
     n1 = m - l + 1
@@ -103,31 +103,6 @@ defmodule ENIFMergeSort do
     op func.return() :: []
   end
 
-  defm copy_terms(env :: Env.t(), movable_list_ptr :: Pointer.t(), arr :: Pointer.t()) do
-    head = Pointer.allocate(Term.t())
-    zero_const = op arith.constant(value: Attribute.integer(i32(), 0)) :: i32()
-    zero = result_at(zero_const, 0)
-    i_ptr = Pointer.allocate(i32())
-    Pointer.store(zero, i_ptr)
-
-    while_loop(
-      enif_get_list_cell(
-        env,
-        Pointer.load(Term.t(), movable_list_ptr),
-        head,
-        movable_list_ptr
-      ) > 0
-    ) do
-      head_val = Pointer.load(Term.t(), head)
-      i = Pointer.load(i32(), i_ptr)
-      ith_term_ptr = Pointer.element_ptr(Term.t(), arr, i)
-      Pointer.store(head_val, ith_term_ptr)
-      Pointer.store(i + 1, i_ptr)
-    end
-
-    op func.return() :: []
-  end
-
   defm sort(env, list, err) :: Term.t() do
     len_ptr = Pointer.allocate(i32())
 
@@ -136,7 +111,7 @@ defmodule ENIFMergeSort do
       Pointer.store(list, movable_list_ptr)
       len = Pointer.load(i32(), len_ptr)
       arr = Pointer.allocate(Term.t(), len)
-      call copy_terms(env, movable_list_ptr, arr) :: []
+      call ENIFTimSort, copy_terms(env, movable_list_ptr, arr) :: []
       zero_const = op arith.constant(value: Attribute.integer(i32(), 0)) :: i32()
       zero = result_at(zero_const, 0)
       call do_sort(arr, zero, len - 1) :: []
