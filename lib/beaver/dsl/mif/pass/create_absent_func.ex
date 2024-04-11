@@ -31,24 +31,33 @@ defmodule Beaver.MIF.Pass.CreateAbsentFunc do
 
     Beaver.Walker.postwalk(
       func,
-      fn ir ->
-        with op = %MLIR.Operation{} <- ir,
-             "func.call" <- MLIR.Operation.name(op),
-             {name, arg_types, ret_types} <- decompose(op),
-             true <- MLIR.is_null(mlirSymbolTableLookup(symbolTable, name)) do
-          mlir ctx: ctx, block: block do
-            Func.func _(
-                        sym_name: "\"#{MLIR.StringRef.to_string(name)}\"",
-                        sym_visibility: MLIR.Attribute.string("private"),
-                        function_type: Type.function(arg_types, ret_types)
-                      ) do
-              region do
+      MapSet.new(),
+      fn ir, created ->
+        created =
+          with op = %MLIR.Operation{} <- ir,
+               "func.call" <- MLIR.Operation.name(op),
+               {name, arg_types, ret_types} <- decompose(op),
+               true <- MLIR.is_null(mlirSymbolTableLookup(symbolTable, name)),
+               name_str <- MLIR.StringRef.to_string(name),
+               false <- MapSet.member?(created, name_str) do
+            mlir ctx: ctx, block: block do
+              Func.func _(
+                          sym_name: "\"#{name_str}\"",
+                          sym_visibility: MLIR.Attribute.string("private"),
+                          function_type: Type.function(arg_types, ret_types)
+                        ) do
+                region do
+                end
               end
             end
-          end
-        end
 
-        ir
+            MapSet.put(created, name_str)
+          else
+            _ ->
+              created
+          end
+
+        {ir, created}
       end
     )
 

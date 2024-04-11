@@ -125,8 +125,6 @@ defmodule Beaver.MIF do
     m =
       mlir ctx: ctx do
         module do
-          Beaver.ENIF.populate_external_functions(ctx, Beaver.Env.block())
-
           for {env, d} <- definitions do
             f = definition_to_func(env, d)
             binding = [ctx: Beaver.Env.context(), block: Beaver.Env.block()]
