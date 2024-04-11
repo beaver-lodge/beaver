@@ -1,6 +1,5 @@
 Beaver.MIF.init_jit(ENIFQuickSort)
-Beaver.MIF.init_jit(ENIFMergeSort)
-Beaver.MIF.init_jit(ENIFTimSort)
+Beaver.MIF.init_jit([ENIFTimSort, ENIFMergeSort])
 
 Benchee.run(
   %{
