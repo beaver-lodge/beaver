@@ -332,15 +332,13 @@ MLIR_CAPI_EXPORTED void beaverMergeModules(MlirModule module1,
   for (Operation &op : *m2.getBody()) {
     if (auto func = dyn_cast<func::FuncOp>(op)) {
       auto found = m1.lookupSymbol(func.getSymName());
-      if (found && func.isExternal()) {
-        continue;
-      }
-      block->push_back(func.clone());
       if (found) {
+        if (func.isExternal()) {
+          continue;
+        }
         found->erase();
       }
-    } else {
-      block->push_back(op.clone());
     }
+    block->push_back(op.clone());
   }
 }
