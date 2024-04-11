@@ -446,14 +446,6 @@ defmodule Beaver.MIF do
     end
   end
 
-  defp init_mod(ctx) do
-    mlir ctx: ctx do
-      module do
-        Beaver.ENIF.populate_external_functions(ctx, Beaver.Env.block())
-      end
-    end
-  end
-
   defp jit_of_mod(m) do
     import Beaver.MLIR.Conversion
 
@@ -483,17 +475,13 @@ defmodule Beaver.MIF do
     ctx = MLIR.Context.create()
     Beaver.Diagnostic.attach(ctx)
     name = opts[:name]
-    m = init_mod(ctx)
 
-    for module <- modules do
-      if not MLIR.is_null(m_elixir = MLIR.Module.create(ctx, module.__ir__())) do
-        MLIR.Module.merge(m, m_elixir)
-      else
-        raise "Failed to load MLIR compiled from Elixir module. Please check out the diagnostics."
-      end
-    end
-
-    jit = jit_of_mod(m)
+    jit =
+      modules
+      |> Enum.map(& &1.__ir__())
+      |> Enum.map(&MLIR.Module.create(ctx, &1))
+      |> MLIR.Module.merge()
+      |> jit_of_mod
 
     case {name, modules} do
       {name, [_]} when not is_nil(name) ->

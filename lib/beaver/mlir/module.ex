@@ -36,14 +36,22 @@ defmodule Beaver.MLIR.Module do
     CAPI.mlirModuleDestroy(module)
   end
 
-  def merge(module1, module2, opts \\ []) do
+  def merge(modules, opts \\ []) do
     destroy = opts[:destroy] || true
-    MLIR.CAPI.beaverMergeModules(module1, module2)
+    [head | tail] = modules
 
-    if destroy do
-      MLIR.Module.destroy(module2)
+    for module <- tail do
+      if MLIR.is_null(module) do
+        raise "can't merge a null module"
+      end
+
+      MLIR.CAPI.beaverMergeModules(head, module)
+
+      if destroy do
+        MLIR.Module.destroy(module)
+      end
     end
 
-    module1
+    head
   end
 end
