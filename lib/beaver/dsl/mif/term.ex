@@ -1,7 +1,7 @@
 defmodule Beaver.MIF.Term do
-  use Beaver
+  use Beaver.MIF.Intrinsic
 
-  def handle_intrinsic(:t, [], opts) do
+  defi t(opts) do
     Beaver.ENIF.mlir_t(:term, opts)
   end
 end
