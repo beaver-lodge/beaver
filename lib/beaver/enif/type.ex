@@ -3,6 +3,14 @@ defmodule Beaver.ENIF.Type do
   Query the MLIR type of an Erlang term or environment.
   """
   alias Beaver.MLIR
+
+  @typedoc """
+  A tuple representing the signature of enif functions.
+  Each tuple contains:
+  - The name of the function, which is an atom.
+  - A list of argument MLIR types.
+  - A list of return MLIR types.
+  """
   @type signature() :: {atom(), [MLIR.Type.t()], [MLIR.Type.t()]}
   defp query_type(obj, opts) do
     Beaver.Deferred.from_opts(

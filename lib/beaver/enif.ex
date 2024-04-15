@@ -32,12 +32,6 @@ defmodule Beaver.ENIF do
   @spec signatures(MLIR.Context.t()) :: [Beaver.ENIF.Type.signature()]
   @doc """
   Retrieves the signatures of enif functions.
-
-  It returns list of tuples representing the signatures of the registered functions.
-  Each tuple contains:
-  - `name` - The name of the function.
-  - `arg_types` - A list of argument MLRI types.
-  - `ret_types` - A list of return MLRI types.
   """
   def signatures(%MLIR.Context{} = ctx) do
     signatures = MLIR.CAPI.beaver_raw_enif_signatures(ctx.ref) |> Beaver.Native.check!()
