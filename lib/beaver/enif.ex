@@ -30,7 +30,7 @@ defmodule Beaver.ENIF do
   end
 
   def signatures(%MLIR.Context{} = ctx) do
-    signatures = MLIR.CAPI.mif_raw_enif_signatures(ctx.ref) |> Beaver.Native.check!()
+    signatures = MLIR.CAPI.beaver_raw_enif_signatures(ctx.ref) |> Beaver.Native.check!()
 
     for {name, arg_types, ret_types} <- signatures do
       {name, Enum.map(arg_types, &wrap_mlir_t/1), Enum.map(ret_types, &wrap_mlir_t/1)}
@@ -44,5 +44,5 @@ defmodule Beaver.ENIF do
     |> List.first()
   end
 
-  defdelegate functions(), to: MLIR.CAPI, as: :mif_raw_enif_functions
+  defdelegate functions(), to: MLIR.CAPI, as: :beaver_raw_enif_functions
 end

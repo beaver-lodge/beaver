@@ -8,7 +8,7 @@ defmodule Beaver.ENIF.Type do
     Beaver.Deferred.from_opts(
       opts,
       fn %MLIR.Context{ref: ref} ->
-        ref = MLIR.CAPI.mif_raw_mlir_type_of_enif_obj(ref, obj) |> Beaver.Native.check!()
+        ref = MLIR.CAPI.beaver_raw_mlir_type_of_enif_obj(ref, obj) |> Beaver.Native.check!()
         %MLIR.Type{ref: ref}
       end
     )

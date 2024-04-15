@@ -52,8 +52,8 @@ defmodule EnifTest do
       m
       |> MLIR.ExecutionEngine.create!(opt_level: 3)
       |> tap(fn %MLIR.ExecutionEngine{ref: jit_ref} ->
-        MLIR.CAPI.mif_raw_jit_register_enif(jit_ref)
-        f = &MLIR.CAPI.mif_raw_jit_invoke_with_terms(jit_ref, "add", [&1, &2])
+        MLIR.CAPI.beaver_raw_jit_register_enif(jit_ref)
+        f = &MLIR.CAPI.beaver_raw_jit_invoke_with_terms(jit_ref, "add", [&1, &2])
         assert 3 == f.(1, 2)
         assert 1 == f.(-1, 2)
       end)
