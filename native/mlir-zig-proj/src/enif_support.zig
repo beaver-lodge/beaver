@@ -45,20 +45,7 @@ pub fn beaver_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const
     return invocation.res_term;
 }
 
-const beaver_runtime_functions = .{
-    "print_i32",
-    "print_u32",
-    "print_i64",
-    "print_u64",
-    "print_f32",
-    "print_f64",
-    "print_open",
-    "print_close",
-    "print_comma",
-    "print_newline",
-};
-
-const enif_function_names = @import("enif_list.zig").functions ++ beaver_runtime_functions;
+const enif_function_names = @import("enif_list.zig").functions ++ e.exported;
 
 fn register_jit_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const u8, comptime f: anytype) void {
     const prefixed_name = "_mlir_ciface_" ++ name;
