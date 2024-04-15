@@ -3,7 +3,7 @@ defmodule Beaver.ENIF.Type do
   Query the MLIR type of an Erlang term or environment.
   """
   alias Beaver.MLIR
-
+  @type signature() :: {atom(), [MLIR.Type.t()], [MLIR.Type.t()]}
   defp query_type(obj, opts) do
     Beaver.Deferred.from_opts(
       opts,

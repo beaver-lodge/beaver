@@ -61,4 +61,8 @@ defmodule EnifTest do
     end)
     |> MLIR.Module.destroy()
   end
+
+  test "query enif functions" do
+    assert :enif_binary_to_term in Beaver.ENIF.functions()
+  end
 end
