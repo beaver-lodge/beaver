@@ -5,7 +5,7 @@ defmodule Beaver.ENIF.Type do
   alias Beaver.MLIR
 
   @typedoc """
-  A tuple representing the signature of enif functions.
+  A tuple representing the signature of an enif function.
   Each tuple contains:
   - The name of the function, which is an atom.
   - A list of argument MLIR types.
