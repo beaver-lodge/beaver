@@ -5,7 +5,6 @@
 #include "mlir/Dialect/IRDL/IRDLLoading.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/ExtensibleDialect.h"
-#include "mlir/IR/ImplicitLocOpBuilder.h"
 
 using namespace mlir;
 
