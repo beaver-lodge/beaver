@@ -64,7 +64,7 @@ defmodule Beaver.MIF.JIT do
     )
   end
 
-  def invoke(jit, f, args) when is_function(f) do
+  def invoke(jit, f, args) when is_function(f, length(args)) do
     apply(f, args).(jit)
   end
 
