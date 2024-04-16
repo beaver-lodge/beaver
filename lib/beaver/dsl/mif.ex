@@ -458,7 +458,7 @@ defmodule Beaver.MIF do
     |> reconcile_unrealized_casts
     |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR") == "1")
     |> MLIR.ExecutionEngine.create!(opt_level: 3, object_dump: true)
-    |> tap(&Beaver.MLIR.CAPI.mif_raw_jit_register_enif(&1.ref))
+    |> tap(&Beaver.MLIR.CAPI.beaver_raw_jit_register_enif(&1.ref))
   end
 
   def init_jit(module, opts \\ [])
@@ -498,7 +498,7 @@ defmodule Beaver.MIF do
   end
 
   def invoke(jit, {mod, func, args}) do
-    Beaver.MLIR.CAPI.mif_raw_jit_invoke_with_terms(
+    Beaver.MLIR.CAPI.beaver_raw_jit_invoke_with_terms(
       jit.ref,
       to_string(mangling(mod, func)),
       args

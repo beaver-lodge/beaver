@@ -2,6 +2,6 @@ defmodule Beaver.MIF.Env do
   use Beaver
 
   def handle_intrinsic(:t, [], opts) do
-    Beaver.ENIF.mlir_t(:env, opts)
+    Beaver.ENIF.Type.env(opts)
   end
 end
