@@ -1,3 +1,5 @@
+const e = @import("erl_nif");
+pub usingnamespace e;
 const debug_print = @import("std").debug.print;
 pub fn print_i32(i: i32) callconv(.C) void {
     debug_print("{}", .{i});
@@ -29,5 +31,15 @@ pub fn print_comma() callconv(.C) void {
 pub fn print_newline() callconv(.C) void {
     debug_print("\n", .{});
 }
-const e = @import("erl_nif");
-pub usingnamespace e;
+pub const exported = .{
+    "print_i32",
+    "print_u32",
+    "print_i64",
+    "print_u64",
+    "print_f32",
+    "print_f64",
+    "print_open",
+    "print_close",
+    "print_comma",
+    "print_newline",
+};

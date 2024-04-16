@@ -1,8 +1,12 @@
 # Here are modules provide struct and functions to work with IR entities not eagerly created. Usually it is an attribute/type doesn't get created until there is a MLIR context from block/op state.
 
 defmodule Beaver.Deferred do
-  @moduledoc false
+  alias Beaver.MLIR
 
+  @type opts :: [ctx: MLIR.Context.t()]
+  @type type :: MLIR.Type.t() | (MLIR.Context.t() -> MLIR.Type.t())
+  @type operation :: MLIR.Operation.t() | (MLIR.Context.t() -> MLIR.Operation.t())
+  @type attribute :: MLIR.Attribute.t() | (MLIR.Context.t() -> MLIR.Attribute.t())
   def from_opts(opts, f) do
     if ctx = Keyword.get(opts, :ctx) do
       f.(ctx)

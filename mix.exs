@@ -62,6 +62,9 @@ defmodule Beaver.MixProject do
         Walker: [
           ~r"Beaver.Walker.*"
         ],
+        ENIF: [
+          ~r"Beaver.ENIF.*"
+        ],
         MLIR: [
           ~r"Beaver.MLIR.*"
         ],
