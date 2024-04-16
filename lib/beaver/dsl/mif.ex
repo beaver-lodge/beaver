@@ -336,8 +336,13 @@ defmodule Beaver.MIF do
     quote do
       @defm unquote(Macro.escape({env, {call, ret_types, body}}))
       def unquote(name)(unquote_splicing(invoke_args)) do
-        Beaver.MIF.JIT.get(__MODULE__)
-        |> Beaver.MIF.JIT.invoke({unquote(env.module), unquote(name), unquote(invoke_args)})
+        f = &Beaver.MIF.JIT.invoke(&1, {unquote(env.module), unquote(name), unquote(invoke_args)})
+
+        if jit = Beaver.MIF.JIT.get(__MODULE__) do
+          f.(jit)
+        else
+          f
+        end
       end
     end
   end

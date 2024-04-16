@@ -50,8 +50,10 @@ defmodule Beaver.MIF.JIT do
   end
 
   def get(module) do
-    %{jit: jit} = Agent.get(module, & &1)
-    jit
+    if Process.whereis(module) do
+      %{jit: jit} = Agent.get(module, & &1)
+      jit
+    end
   end
 
   def invoke(jit, {mod, func, args}) do
@@ -60,6 +62,10 @@ defmodule Beaver.MIF.JIT do
       to_string(Beaver.MIF.mangling(mod, func)),
       args
     )
+  end
+
+  def invoke(jit, f, args) when is_function(f) do
+    apply(f, args).(jit)
   end
 
   def destroy(module) do
