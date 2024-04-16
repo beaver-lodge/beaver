@@ -1,5 +1,5 @@
-Beaver.MIF.init_jit(ENIFQuickSort)
-Beaver.MIF.init_jit([ENIFTimSort, ENIFMergeSort])
+Beaver.MIF.JIT.init(ENIFQuickSort)
+Beaver.MIF.JIT.init([ENIFTimSort, ENIFMergeSort])
 
 Benchee.run(
   %{
@@ -19,6 +19,6 @@ Benchee.run(
   end
 )
 
-Beaver.MIF.destroy_jit(ENIFMergeSort)
-Beaver.MIF.destroy_jit(ENIFQuickSort)
-Beaver.MIF.destroy_jit(ENIFTimSort)
+Beaver.MIF.JIT.destroy(ENIFMergeSort)
+Beaver.MIF.JIT.destroy(ENIFQuickSort)
+Beaver.MIF.JIT.destroy(ENIFTimSort)

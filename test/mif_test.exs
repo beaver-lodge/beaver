@@ -33,16 +33,16 @@ defmodule MIFTest do
       end
     end
 
-    {:ok, pid} = Beaver.MIF.init_jit(AddTwoInt, name: :add_int)
-    jit = Beaver.MIF.get_jit(:add_int)
-    assert Beaver.MIF.invoke(jit, {AddTwoInt, :add, [1, 2, :arg_err]}) == 3
-    assert Beaver.MIF.invoke(jit, {AddTwoInt, :add, [1, "", :arg_err]}) == :arg_err
-    :ok = Beaver.MIF.destroy_jit(pid)
+    {:ok, pid} = Beaver.MIF.JIT.init(AddTwoInt, name: :add_int)
+    jit = Beaver.MIF.JIT.get(:add_int)
+    assert Beaver.MIF.JIT.invoke(jit, {AddTwoInt, :add, [1, 2, :arg_err]}) == 3
+    assert Beaver.MIF.JIT.invoke(jit, {AddTwoInt, :add, [1, "", :arg_err]}) == :arg_err
+    :ok = Beaver.MIF.JIT.destroy(pid)
   end
 
   test "quick sort" do
-    Beaver.MIF.init_jit(ENIFQuickSort)
-    Beaver.MIF.init_jit([ENIFTimSort, ENIFMergeSort])
+    Beaver.MIF.JIT.init(ENIFQuickSort)
+    Beaver.MIF.JIT.init([ENIFTimSort, ENIFMergeSort])
     assert ENIFQuickSort.sort(:what, :arg_err) == :arg_err
     arr = [5, 4, 3, 2, 1]
     assert ENIFQuickSort.sort(arr, :arg_err) == Enum.sort(arr)
@@ -54,8 +54,8 @@ defmodule MIFTest do
       assert ENIFMergeSort.sort(arr, :arg_err) == Enum.sort(arr)
     end
 
-    :ok = Beaver.MIF.destroy_jit(ENIFQuickSort)
-    :ok = Beaver.MIF.destroy_jit(ENIFMergeSort)
-    :ok = Beaver.MIF.destroy_jit(ENIFTimSort)
+    :ok = Beaver.MIF.JIT.destroy(ENIFQuickSort)
+    :ok = Beaver.MIF.JIT.destroy(ENIFMergeSort)
+    :ok = Beaver.MIF.JIT.destroy(ENIFTimSort)
   end
 end
