@@ -74,10 +74,6 @@ defmodule Beaver.Native do
     %{v | bag: MapSet.put(bag, item)}
   end
 
-  def c_string(value) when is_binary(value) do
-    %__MODULE__.C.String{ref: check!(CAPI.beaver_raw_get_resource_c_string(value))}
-  end
-
   def check!(ret) do
     case ret do
       {:kind, Beaver.Native.U8.Array, ref} when is_reference(ref) ->

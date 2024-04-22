@@ -1,4 +1,5 @@
 const std = @import("std");
+const mem = @import("std").mem;
 const io = std.io;
 const stderr = io.getStdErr().writer();
 const testing = std.testing;
@@ -108,28 +109,24 @@ export fn beaver_raw_resource_c_string_to_term_charlist(env: beam.env, _: c_int,
     return beam.make_c_string_charlist(env, arg0);
 }
 
-// create a C string resource by copying given binary
-const mem = @import("std").mem;
-// memory layout {address, real_binary, null}
-export fn beaver_raw_get_resource_c_string(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    const RType = [*c]u8;
+// memory layout {StringRef, real_binary, null}
+export fn beaver_raw_get_string_ref(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+    const StructT = mlir_capi.StringRef.T;
+    const DataT = [*c]u8;
     var bin: beam.binary = undefined;
     if (0 == e.enif_inspect_binary(env, args[0], &bin)) {
         return beam.make_error_binary(env, "not a binary");
     }
-    var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.U8.Array.resource.t, @sizeOf(RType) + bin.size + 1);
-    var obj: *RType = undefined;
-    var real_binary: RType = undefined;
+    var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.StringRef.resource.t, @sizeOf(StructT) + bin.size + 1);
     if (ptr == null) {
         unreachable();
-    } else {
-        obj = @ptrCast(@alignCast(ptr));
-        real_binary = @ptrCast(ptr);
-        real_binary += @sizeOf(RType);
-        real_binary[bin.size] = 0;
-        obj.* = real_binary;
     }
-    mem.copy(u8, real_binary[0..bin.size], bin.data[0..bin.size]);
+    var dptr: DataT = @ptrCast(ptr);
+    dptr += @sizeOf(StructT);
+    var sptr: *StructT = @ptrCast(@alignCast(ptr));
+    sptr.* = c.mlirStringRefCreate(dptr, bin.size);
+    mem.copy(u8, dptr[0..bin.size], bin.data[0..bin.size]);
+    dptr[bin.size] = '\x00';
     return e.enif_make_resource(env, ptr);
 }
 
@@ -744,11 +741,13 @@ const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.Entries
     e.ErlNifFunc{ .name = "beaver_raw_to_string_type", .arity = 1, .fptr = Printer(mlir_capi.Type, c.mlirTypePrint).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_operation", .arity = 1, .fptr = Printer(mlir_capi.Operation, c.mlirOperationPrint).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_operation_specialized", .arity = 1, .fptr = Printer(mlir_capi.Operation, c.beaverOperationPrintSpecializedFrom).to_string, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_to_string_operation_generic", .arity = 1, .fptr = Printer(mlir_capi.Operation, c.beaverOperationPrintGenericOpForm).to_string, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_to_string_operation_bytecode", .arity = 1, .fptr = Printer(mlir_capi.Operation, c.mlirOperationWriteBytecode).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_value", .arity = 1, .fptr = Printer(mlir_capi.Value, c.mlirValuePrint).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_pm", .arity = 1, .fptr = Printer(mlir_capi.OpPassManager, c.mlirPrintPassPipeline).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_affine_map", .arity = 1, .fptr = Printer(mlir_capi.AffineMap, c.mlirAffineMapPrint).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_location", .arity = 1, .fptr = Printer(mlir_capi.Location, c.beaverLocationPrint).to_string, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_get_resource_c_string", .arity = 1, .fptr = beaver_raw_get_resource_c_string, .flags = 0 },
+    e.ErlNifFunc{ .name = "beaver_raw_get_string_ref", .arity = 1, .fptr = beaver_raw_get_string_ref, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_mlir_named_attribute_get", .arity = 2, .fptr = beaver_raw_mlir_named_attribute_get, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_own_opaque_ptr", .arity = 1, .fptr = beaver_raw_own_opaque_ptr, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_read_opaque_ptr", .arity = 2, .fptr = beaver_raw_read_opaque_ptr, .flags = 0 },
