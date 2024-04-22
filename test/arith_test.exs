@@ -55,7 +55,7 @@ defmodule ArithTest do
           f =
             Func.func _(
                         function_type: Type.function([Type.f32(), Type.f32()], []),
-                        sym_name: "\"#{p}\""
+                        sym_name: "\"#{inspect(make_ref())}\""
                       ) do
               region do
                 block _(a >>> Type.f32(), b >>> Type.f32()) do
@@ -65,7 +65,8 @@ defmodule ArithTest do
               end
             end
 
-          assert f |> MLIR.to_string(generic: false) =~ "#{p}"
+          assert f |> MLIR.to_string(generic: false) =~ "#{p},"
+          refute f |> MLIR.to_string(generic: true) =~ "#{p},"
         end
       end
     end

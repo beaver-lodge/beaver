@@ -33,25 +33,24 @@ defmodule EntityTest do
       assert Type.equal?(Type.integer(128, opts), Type.get("i128").(ctx))
       assert Type.equal?(Type.complex(Type.f32()).(ctx), Type.get("complex<f32>").(ctx))
 
-      assert Type.unranked_tensor(Type.complex(Type.f32())).(ctx) |> MLIR.to_string() ==
+      assert Type.unranked_tensor(Type.complex(Type.f32())).(ctx) |> to_string() ==
                "tensor<*xcomplex<f32>>"
 
       assert Type.equal?(Type.unranked_tensor(Type.f32()).(ctx), ~t{tensor<*xf32>}.(ctx))
 
-      assert Type.ranked_tensor([], Type.f32()).(ctx)
-             |> MLIR.to_string() ==
+      assert Type.ranked_tensor([], Type.f32()).(ctx) |> to_string() ==
                "tensor<f32>"
 
       assert Type.ranked_tensor([1, 2], Type.f32()).(ctx)
-             |> MLIR.to_string() ==
+             |> to_string() ==
                "tensor<1x2xf32>"
 
       assert Type.ranked_tensor([1, :dynamic, 2], Type.f32()).(ctx)
-             |> MLIR.to_string() ==
+             |> to_string() ==
                "tensor<1x?x2xf32>"
 
       assert Type.memref([], Type.f32()).(ctx)
-             |> MLIR.to_string() ==
+             |> to_string() ==
                "memref<f32>"
     end
   end
@@ -63,7 +62,7 @@ defmodule EntityTest do
       assert Attribute.equal?(Attribute.type(Type.f32()), Attribute.type(Type.f32()).(ctx))
       assert Attribute.equal?(Attribute.type(Type.f32()).(ctx), Attribute.type(Type.f32()))
 
-      assert Attribute.integer(Type.i(32), 1) |> Beaver.Deferred.create(ctx) |> MLIR.to_string() ==
+      assert Attribute.integer(Type.i(32), 1) |> Beaver.Deferred.create(ctx) |> to_string() ==
                "1 : i32"
 
       assert Attribute.equal?(Attribute.integer(Type.i(32), 0).(ctx), ~a{0}i32.(ctx))
@@ -83,7 +82,7 @@ defmodule EntityTest do
                [Type.ranked_tensor([1, 2, 3, 4], Type.i(32))],
                [Type.i(32)]
              ).(ctx)
-             |> MLIR.to_string() ==
+             |> to_string() ==
                "(tensor<1x2x3x4xi32>) -> i32"
 
       assert Attribute.equal?(

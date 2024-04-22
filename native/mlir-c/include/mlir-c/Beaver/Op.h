@@ -107,6 +107,9 @@ MLIR_CAPI_EXPORTED void beaverLocationPrint(MlirLocation location,
                                             void *userData);
 MLIR_CAPI_EXPORTED void beaverOperationPrintSpecializedFrom(
     MlirOperation op, MlirStringCallback callback, void *userData);
+MLIR_CAPI_EXPORTED void
+beaverOperationPrintGenericOpForm(MlirOperation op, MlirStringCallback callback,
+                                  void *userData);
 MLIR_CAPI_EXPORTED void beaverOperationDumpGeneric(MlirOperation op);
 MLIR_CAPI_EXPORTED MlirLogicalResult beaverLoadIRDLDialects(MlirModule op);
 MLIR_CAPI_EXPORTED MlirType beaverGetIRDLDefinedType(MlirStringRef dialect,

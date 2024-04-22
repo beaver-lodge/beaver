@@ -9,17 +9,18 @@ defmodule Beaver.MLIR.StringRef do
     forward_module: Beaver.Native
 
   @doc """
-  Create a Elixir owned C string from a Elixir bitstring and create a StringRef from it. StringRef will keep a reference to the C string to prevent it from being garbage collected by BEAM.
+  Create a Elixir owned null-terminated C string from a Elixir bitstring and create a `StringRef` from it.
+
+  > Note: A `StringRef` will not reference the original BEAM binary.
+  > Instead, it will reference a copy of the binary and owns it.
+  > In other words, excessively creating `StringRef` using this function can lead to memory leak.
   """
   def create(value) when is_atom(value) do
     value |> Atom.to_string() |> create()
   end
 
   def create(value) when is_binary(value) do
-    c_string = Beaver.Native.c_string(value)
-
-    CAPI.mlirStringRefCreateFromCString(c_string)
-    |> Beaver.Native.bag(c_string)
+    %__MODULE__{ref: CAPI.beaver_raw_get_string_ref(value)}
   end
 
   @doc """
