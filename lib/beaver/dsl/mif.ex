@@ -136,7 +136,7 @@ defmodule Beaver.MIF do
       )
       |> canonicalize
       |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR") == "1")
-      |> MLIR.to_string()
+      |> MLIR.to_string(bytecode: true)
 
     MLIR.Context.destroy(ctx)
     m

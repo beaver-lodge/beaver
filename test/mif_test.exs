@@ -35,6 +35,7 @@ defmodule MIFTest do
 
     {:ok, pid} = Beaver.MIF.JIT.init(AddTwoInt, name: :add_int)
     jit = Beaver.MIF.JIT.get(:add_int)
+    assert String.starts_with?(AddTwoInt.__ir__(), "ML\xefR")
     assert Beaver.MIF.JIT.invoke(jit, {AddTwoInt, :add, [1, 2, :arg_err]}) == 3
     assert Beaver.MIF.JIT.invoke(jit, {AddTwoInt, :add, [1, "", :arg_err]}) == :arg_err
     assert Beaver.MIF.JIT.invoke(jit, &AddTwoInt.add/3, [1, 2, :arg_err]) == 3
