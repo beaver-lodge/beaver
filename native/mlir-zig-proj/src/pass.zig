@@ -92,7 +92,7 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
     const passID = c.mlirTypeIDAllocatorAllocateTypeID(typeIDAllocator);
     const nDependentDialects = 0;
     const dependentDialects = 0;
-    var userData: *BeaverPass.UserData = beam.allocator.create(BeaverPass.UserData) catch return beam.make_error_binary(env, "fail to allocate for pass userdata");
+    var userData: *BeaverPass.UserData = try beam.allocator.create(BeaverPass.UserData);
     userData.*.handler = handler;
     const RType = mlir_capi.Pass.T;
     var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.Pass.resource.t, @sizeOf(RType));
