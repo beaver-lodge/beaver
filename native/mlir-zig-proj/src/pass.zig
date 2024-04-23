@@ -1,0 +1,140 @@
+const std = @import("std");
+const beam = @import("beam");
+const mlir_capi = @import("mlir_capi.zig");
+pub const c = @import("prelude.zig");
+const e = @import("erl_nif");
+const debug_print = @import("std").debug.print;
+
+pub const Token = struct {
+    mutex: std.Thread.Mutex = .{},
+    cond: std.Thread.Condition = .{},
+    done: bool = false,
+    pub var resource_type: beam.resource_type = undefined;
+    pub const resource_name = "Beaver" ++ @typeName(@This());
+    fn wait(self: *@This()) void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        while (!self.done) {
+            self.cond.wait(&self.mutex);
+        }
+    }
+    fn signal(self: *@This()) void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        self.done = true;
+        self.cond.signal();
+    }
+    pub export fn pass_token_signal(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+        var token = beam.fetch_ptr_resource_wrapped(@This(), env, args[0]) catch return beam.make_error_binary(env, "fail to fetch resource for pass token");
+        token.signal();
+        return beam.make_ok(env);
+    }
+};
+
+const BeaverPass = struct {
+    const UserData = struct { handler: beam.pid };
+    fn construct(_: ?*anyopaque) callconv(.C) void {}
+
+    fn destruct(userData: ?*anyopaque) callconv(.C) void {
+        const ptr: *UserData = @ptrCast(@alignCast(userData));
+        beam.allocator.destroy(ptr);
+    }
+    fn initialize(_: mlir_capi.Context.T, _: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
+        return mlir_capi.LogicalResult.T{ .value = 1 };
+    }
+    fn clone(userData: ?*anyopaque) callconv(.C) ?*anyopaque {
+        const old: *UserData = @ptrCast(@alignCast(userData));
+        var new = beam.allocator.create(UserData) catch unreachable;
+        new.* = old.*;
+        return new;
+    }
+    fn run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) callconv(.C) void {
+        const ud: *UserData = @ptrCast(@alignCast(userData));
+        const env = e.enif_alloc_env() orelse {
+            debug_print("fail to creat env\n", .{});
+            return c.mlirExternalPassSignalFailure(pass);
+        };
+        defer e.enif_clear_env(env);
+        const handler = ud.*.handler;
+        var tuple_slice: []beam.term = beam.allocator.alloc(beam.term, 4) catch unreachable;
+        defer beam.allocator.free(tuple_slice);
+        tuple_slice[0] = beam.make_atom(env, "run");
+        tuple_slice[1] = beam.make_resource(env, op, mlir_capi.Operation.resource.t) catch {
+            debug_print("fail to make res: {}\n", .{@TypeOf(op)});
+            unreachable;
+        };
+        tuple_slice[2] = beam.make_resource(env, pass, mlir_capi.ExternalPass.resource.t) catch {
+            debug_print("fail to make res: {}\n", .{@TypeOf(pass)});
+            unreachable;
+        };
+        var token = Token{};
+        tuple_slice[3] = beam.make_ptr_resource_wrapped(env, &token) catch {
+            unreachable;
+        };
+        if (!beam.send(env, handler, beam.make_tuple(env, tuple_slice))) {
+            debug_print("fail to send message to pass handler.\n", .{});
+            c.mlirExternalPassSignalFailure(pass);
+        }
+        token.wait();
+    }
+};
+
+pub export fn beaver_raw_create_mlir_pass(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
+    var name: mlir_capi.StringRef.T = undefined;
+    if (beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[0])) |value| {
+        name = value;
+    } else |_| {
+        return beam.make_error_binary(env, "fail to fetch resource for pass name, expected: mlir_capi.StringRef.T");
+    }
+    var argument: mlir_capi.StringRef.T = undefined;
+    if (beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[1])) |value| {
+        argument = value;
+    } else |_| {
+        return beam.make_error_binary(env, "fail to fetch resource for pass argument, expected: mlir_capi.StringRef.T");
+    }
+    var description: mlir_capi.StringRef.T = undefined;
+    if (beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[2])) |value| {
+        description = value;
+    } else |_| {
+        return beam.make_error_binary(env, "fail to fetch resource for pass description, expected: mlir_capi.StringRef.T");
+    }
+    var op_name: mlir_capi.StringRef.T = undefined;
+    if (beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[3])) |value| {
+        op_name = value;
+    } else |_| {
+        return beam.make_error_binary(env, "fail to fetch resource for pass op name, expected: mlir_capi.StringRef.T");
+    }
+    var handler: beam.pid = beam.get_pid(env, args[4]) catch return beam.make_error_binary(env, "expect the handler to be a pid");
+
+    const typeIDAllocator = c.mlirTypeIDAllocatorCreate();
+    defer c.mlirTypeIDAllocatorDestroy(typeIDAllocator);
+    const passID = c.mlirTypeIDAllocatorAllocateTypeID(typeIDAllocator);
+    const nDependentDialects = 0;
+    const dependentDialects = 0;
+    var userData: *BeaverPass.UserData = beam.allocator.create(BeaverPass.UserData) catch return beam.make_error_binary(env, "fail to allocate for pass userdata");
+    userData.*.handler = handler;
+    const RType = mlir_capi.Pass.T;
+    var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.Pass.resource.t, @sizeOf(RType));
+    var obj: *RType = undefined;
+    if (ptr == null) {
+        unreachable();
+    } else {
+        obj = @ptrCast(@alignCast(ptr));
+        obj.* = c.beaverCreateExternalPass(
+            BeaverPass.construct, // move it first to prevent calling wrong function
+            passID,
+            name,
+            argument,
+            description,
+            op_name,
+            nDependentDialects,
+            dependentDialects,
+            BeaverPass.destruct,
+            BeaverPass.initialize,
+            BeaverPass.clone,
+            BeaverPass.run,
+            userData,
+        );
+    }
+    return e.enif_make_resource(env, ptr);
+}
