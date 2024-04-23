@@ -59,7 +59,8 @@ defmodule DialectRegistryTest do
         {"ub", "Ub"},
         {"vector", "Vector"},
         {"x86vector", "X86Vector"},
-        {"xegpu", "XeGPU"}
+        {"xegpu", "XeGPU"},
+        {"polynomial", "Polynomial"}
       ]
       |> MapSet.new()
 
