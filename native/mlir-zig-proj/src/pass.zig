@@ -33,24 +33,31 @@ pub const Token = struct {
 };
 
 const BeaverPass = struct {
-    const UserData = struct { handler: beam.pid };
+    callbacks: mlir_capi.ExternalPassCallbacks.T = mlir_capi.ExternalPassCallbacks.T{
+        .construct = construct,
+        .destruct = destruct,
+        .initialize = initialize,
+        .clone = clone,
+        .run = run,
+    },
+    handler: beam.pid,
     fn construct(_: ?*anyopaque) callconv(.C) void {}
 
     fn destruct(userData: ?*anyopaque) callconv(.C) void {
-        const ptr: *UserData = @ptrCast(@alignCast(userData));
+        const ptr: *@This() = @ptrCast(@alignCast(userData));
         beam.allocator.destroy(ptr);
     }
     fn initialize(_: mlir_capi.Context.T, _: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
         return mlir_capi.LogicalResult.T{ .value = 1 };
     }
     fn clone(userData: ?*anyopaque) callconv(.C) ?*anyopaque {
-        const old: *UserData = @ptrCast(@alignCast(userData));
-        var new = beam.allocator.create(UserData) catch unreachable;
+        const old: *@This() = @ptrCast(@alignCast(userData));
+        var new = beam.allocator.create(@This()) catch unreachable;
         new.* = old.*;
         return new;
     }
     fn run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) callconv(.C) void {
-        const ud: *UserData = @ptrCast(@alignCast(userData));
+        const ud: *@This() = @ptrCast(@alignCast(userData));
         const env = e.enif_alloc_env() orelse {
             debug_print("fail to creat env\n", .{});
             return c.mlirExternalPassSignalFailure(pass);
@@ -78,13 +85,6 @@ const BeaverPass = struct {
         }
         token.wait();
     }
-    const callbacks = mlir_capi.ExternalPassCallbacks.T{
-        .construct = construct,
-        .destruct = destruct,
-        .initialize = initialize,
-        .clone = clone,
-        .run = run,
-    };
 };
 
 pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
@@ -99,9 +99,9 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
     const passID = c.mlirTypeIDAllocatorAllocateTypeID(typeIDAllocator);
     const nDependentDialects = 0;
     const dependentDialects = 0;
-    var userData: *BeaverPass.UserData = try beam.allocator.create(BeaverPass.UserData);
-    userData.*.handler = handler;
-    return try mlir_capi.Pass.resource.make(env, c.mlirCreateExternalPass(passID, name, argument, description, op_name, nDependentDialects, dependentDialects, BeaverPass.callbacks, userData));
+    var pass: *BeaverPass = try beam.allocator.create(BeaverPass);
+    pass.* = BeaverPass{ .handler = handler };
+    return try mlir_capi.Pass.resource.make(env, c.mlirCreateExternalPass(passID, name, argument, description, op_name, nDependentDialects, dependentDialects, pass.callbacks, pass));
 }
 const create = result.nif("beaver_raw_create_mlir_pass", 5, do_create).entry;
 const token_signal = result.nif("beaver_raw_pass_token_signal", 1, Token.pass_token_signal).entry;
