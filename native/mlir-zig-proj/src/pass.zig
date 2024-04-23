@@ -101,15 +101,7 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
     const dependentDialects = 0;
     var userData: *BeaverPass.UserData = try beam.allocator.create(BeaverPass.UserData);
     userData.*.handler = handler;
-    const RType = mlir_capi.Pass.T;
-    var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.Pass.resource.t, @sizeOf(RType));
-    if (ptr == null) {
-        unreachable();
-    } else {
-        var obj: *RType = @ptrCast(@alignCast(ptr));
-        obj.* = c.mlirCreateExternalPass(passID, name, argument, description, op_name, nDependentDialects, dependentDialects, BeaverPass.callbacks, userData);
-    }
-    return e.enif_make_resource(env, ptr);
+    return try mlir_capi.Pass.resource.make(env, c.mlirCreateExternalPass(passID, name, argument, description, op_name, nDependentDialects, dependentDialects, BeaverPass.callbacks, userData));
 }
 const create = result.nif("beaver_raw_create_mlir_pass", 5, do_create).entry;
 const token_signal = result.nif("beaver_raw_pass_token_signal", 1, Token.pass_token_signal).entry;
