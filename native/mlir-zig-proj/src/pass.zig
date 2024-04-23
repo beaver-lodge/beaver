@@ -25,8 +25,8 @@ pub const Token = struct {
         self.done = true;
         self.cond.signal();
     }
-    pub export fn pass_token_signal(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-        var token = beam.fetch_ptr_resource_wrapped(@This(), env, args[0]) catch return beam.make_error_binary(env, "fail to fetch resource for pass token");
+    fn pass_token_signal(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+        var token = try beam.fetch_ptr_resource_wrapped(@This(), env, args[0]);
         token.signal();
         return beam.make_ok(env);
     }
@@ -119,4 +119,6 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
     }
     return e.enif_make_resource(env, ptr);
 }
-pub const create = result.nif("beaver_raw_create_mlir_pass", 5, do_create).entry;
+const create = result.nif("beaver_raw_create_mlir_pass", 5, do_create).entry;
+const token_signal = result.nif("beaver_raw_pass_token_signal", 1, Token.pass_token_signal).entry;
+pub const nifs = .{ create, token_signal };
