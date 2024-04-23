@@ -78,6 +78,13 @@ const BeaverPass = struct {
         }
         token.wait();
     }
+    const callbacks = mlir_capi.ExternalPassCallbacks.T{
+        .construct = construct,
+        .destruct = destruct,
+        .initialize = initialize,
+        .clone = clone,
+        .run = run,
+    };
 };
 
 pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
@@ -96,26 +103,11 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
     userData.*.handler = handler;
     const RType = mlir_capi.Pass.T;
     var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.Pass.resource.t, @sizeOf(RType));
-    var obj: *RType = undefined;
     if (ptr == null) {
         unreachable();
     } else {
-        obj = @ptrCast(@alignCast(ptr));
-        obj.* = c.beaverCreateExternalPass(
-            BeaverPass.construct, // move it first to prevent calling wrong function
-            passID,
-            name,
-            argument,
-            description,
-            op_name,
-            nDependentDialects,
-            dependentDialects,
-            BeaverPass.destruct,
-            BeaverPass.initialize,
-            BeaverPass.clone,
-            BeaverPass.run,
-            userData,
-        );
+        var obj: *RType = @ptrCast(@alignCast(ptr));
+        obj.* = c.mlirCreateExternalPass(passID, name, argument, description, op_name, nDependentDialects, dependentDialects, BeaverPass.callbacks, userData);
     }
     return e.enif_make_resource(env, ptr);
 }
