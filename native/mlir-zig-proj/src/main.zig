@@ -1,7 +1,5 @@
 const std = @import("std");
 const mem = @import("std").mem;
-const io = std.io;
-const stderr = io.getStdErr().writer();
 const testing = std.testing;
 const beam = @import("beam");
 const kinda = @import("kinda");
@@ -9,6 +7,8 @@ const e = @import("erl_nif");
 const mlir_capi = @import("mlir_capi.zig");
 pub const c = @import("prelude.zig");
 const enif_support = @import("enif_support.zig");
+const diagnostic = @import("diagnostic.zig");
+
 fn get_all_registered_ops(env: beam.env) !beam.term {
     const ctx = get_context_load_all_dialects();
     defer c.mlirContextDestroy(ctx);
@@ -439,72 +439,12 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
     };
 }
 
-const BeaverDiagnostic = struct {
-    handler: beam.pid,
-    fn printToMsg(str: anytype, userData: *@This()) void {
-        const env = e.enif_alloc_env() orelse unreachable;
-        defer e.enif_clear_env(env);
-        const msg = beam.make_slice(env, str);
-        _ = beam.send(env, userData.*.handler, msg);
-    }
-    fn printSlice(str: anytype, userData: ?*anyopaque) void {
-        const ud: ?*@This() = @ptrCast(@alignCast(userData));
-        if (ud) |ptr| {
-            printToMsg(str, ptr);
-        } else {
-            stderr.print("{s}", .{str}) catch return;
-        }
-    }
-    pub fn printDiagnostic(str: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
-        printSlice(str.data[0..str.length], userData);
-    }
-    pub fn deleteUserData(userData: ?*anyopaque) callconv(.C) void {
-        const ud: ?*@This() = @ptrCast(@alignCast(userData));
-        if (ud) |ptr| {
-            beam.allocator.destroy(ptr);
-        }
-    }
-    pub fn errorHandler(diagnostic: c.MlirDiagnostic, userData: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
-        printSlice("[Beaver] [Diagnostic] [", userData);
-        const loc = c.mlirDiagnosticGetLocation(diagnostic);
-        c.beaverLocationPrint(loc, printDiagnostic, userData);
-        printSlice("] ", userData);
-
-        c.mlirDiagnosticPrint(diagnostic, printDiagnostic, userData);
-        printSlice("\n", userData);
-
-        const num_note = c.mlirDiagnosticGetNumNotes(diagnostic);
-        var i: isize = 0;
-        while (i < num_note) {
-            const note_d = c.mlirDiagnosticGetNote(diagnostic, i);
-            c.mlirDiagnosticPrint(note_d, printDiagnostic, userData);
-            i += 1;
-        }
-        printSlice("\n", userData);
-        return c.mlirLogicalResultSuccess();
-    }
-};
-
-export fn beaver_raw_context_attach_diagnostic_handler(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var arg0: mlir_capi.Context.T = mlir_capi.Context.resource.fetch(env, args[0]) catch
-        return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(mlir_capi.Context.T));
-    var handler: ?beam.pid = undefined;
-    handler = beam.get_pid(env, args[1]) catch null;
-    var userData: ?*BeaverDiagnostic = null;
-    if (handler) |h| {
-        userData = beam.allocator.create(BeaverDiagnostic) catch return beam.make_error_binary(env, "fail to allocate for diagnostic user data");
-        userData.?.handler = h;
-    }
-    const id = c.mlirContextAttachDiagnosticHandler(arg0, BeaverDiagnostic.errorHandler, userData, BeaverDiagnostic.deleteUserData);
-    return mlir_capi.DiagnosticHandlerID.resource.make(env, id) catch return beam.make_error_binary(env, "when calling C function mlirContextAttachDiagnosticHandler, fail to make resource for: " ++ @typeName(mlir_capi.DiagnosticHandlerID.T));
-}
-
 fn beaver_raw_parse_pass_pipeline(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
     var passManager: mlir_capi.OpPassManager.T = mlir_capi.OpPassManager.resource.fetch(env, args[0]) catch
         return beam.make_error_binary(env, "when calling C function mlirParsePassPipeline, fail to fetch resource for passManager, expected: " ++ @typeName(mlir_capi.OpPassManager.T));
     var pipeline: mlir_capi.StringRef.T = mlir_capi.StringRef.resource.fetch(env, args[1]) catch
         return beam.make_error_binary(env, "when calling C function mlirParsePassPipeline, fail to fetch resource for pipeline, expected: " ++ @typeName(mlir_capi.StringRef.T));
-    return mlir_capi.LogicalResult.resource.make(env, c.mlirOpPassManagerAddPipeline(passManager, pipeline, BeaverDiagnostic.printDiagnostic, null)) catch return beam.make_error_binary(env, "when calling C function mlirParsePassPipeline, fail to make resource for: " ++ @typeName(mlir_capi.LogicalResult.T));
+    return mlir_capi.LogicalResult.resource.make(env, c.mlirOpPassManagerAddPipeline(passManager, pipeline, diagnostic.print, null)) catch return beam.make_error_binary(env, "when calling C function mlirParsePassPipeline, fail to make resource for: " ++ @typeName(mlir_capi.LogicalResult.T));
 }
 
 fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
@@ -729,13 +669,13 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
 }
 
 const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.EntriesOfKinds ++ .{
+    diagnostic.attach,
     e.ErlNifFunc{ .name = "beaver_raw_get_context_load_all_dialects", .arity = 0, .fptr = beaver_raw_get_context_load_all_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_ops", .arity = 0, .fptr = beaver_raw_registered_ops, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_ops_of_dialect", .arity = 2, .fptr = beaver_raw_registered_ops_of_dialect, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_dialects", .arity = 0, .fptr = beaver_raw_registered_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_create_mlir_pass", .arity = 5, .fptr = beaver_raw_create_mlir_pass, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_pass_token_signal", .arity = 1, .fptr = PassToken.pass_token_signal, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_context_attach_diagnostic_handler", .arity = 2, .fptr = beaver_raw_context_attach_diagnostic_handler, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_resource_c_string_to_term_charlist", .arity = 1, .fptr = beaver_raw_resource_c_string_to_term_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_attribute", .arity = 1, .fptr = Printer(mlir_capi.Attribute, c.mlirAttributePrint).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_type", .arity = 1, .fptr = Printer(mlir_capi.Type, c.mlirTypePrint).to_string, .flags = 0 },
