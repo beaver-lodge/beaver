@@ -54,15 +54,13 @@ const BeaverDiagnostic = struct {
 };
 
 fn do_attach(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    var arg0: mlir_capi.Context.T = try mlir_capi.Context.resource.fetch(env, args[0]);
-    var handler: ?beam.pid = undefined;
-    handler = beam.get_pid(env, args[1]) catch null;
+    var handler: ?beam.pid = beam.get_pid(env, args[1]) catch null;
     var userData: ?*BeaverDiagnostic = null;
     if (handler) |h| {
         userData = try beam.allocator.create(BeaverDiagnostic);
         userData.?.handler = h;
     }
-    const id = c.mlirContextAttachDiagnosticHandler(arg0, BeaverDiagnostic.errorHandler, userData, BeaverDiagnostic.deleteUserData);
+    const id = c.mlirContextAttachDiagnosticHandler(try mlir_capi.Context.resource.fetch(env, args[0]), BeaverDiagnostic.errorHandler, userData, BeaverDiagnostic.deleteUserData);
     return try mlir_capi.DiagnosticHandlerID.resource.make(env, id);
 }
 
