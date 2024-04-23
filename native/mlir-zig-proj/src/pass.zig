@@ -4,6 +4,7 @@ const mlir_capi = @import("mlir_capi.zig");
 pub const c = @import("prelude.zig");
 const e = @import("erl_nif");
 const debug_print = @import("std").debug.print;
+const result = @import("result.zig");
 
 pub const Token = struct {
     mutex: std.Thread.Mutex = .{},
@@ -79,32 +80,12 @@ const BeaverPass = struct {
     }
 };
 
-pub export fn beaver_raw_create_mlir_pass(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var name: mlir_capi.StringRef.T = undefined;
-    if (beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[0])) |value| {
-        name = value;
-    } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for pass name, expected: mlir_capi.StringRef.T");
-    }
-    var argument: mlir_capi.StringRef.T = undefined;
-    if (beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[1])) |value| {
-        argument = value;
-    } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for pass argument, expected: mlir_capi.StringRef.T");
-    }
-    var description: mlir_capi.StringRef.T = undefined;
-    if (beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[2])) |value| {
-        description = value;
-    } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for pass description, expected: mlir_capi.StringRef.T");
-    }
-    var op_name: mlir_capi.StringRef.T = undefined;
-    if (beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[3])) |value| {
-        op_name = value;
-    } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for pass op name, expected: mlir_capi.StringRef.T");
-    }
-    var handler: beam.pid = beam.get_pid(env, args[4]) catch return beam.make_error_binary(env, "expect the handler to be a pid");
+pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+    const name: mlir_capi.StringRef.T = try beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[0]);
+    const argument: mlir_capi.StringRef.T = try beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[1]);
+    const description: mlir_capi.StringRef.T = try beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[2]);
+    const op_name: mlir_capi.StringRef.T = try beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[3]);
+    const handler: beam.pid = try beam.get_pid(env, args[4]);
 
     const typeIDAllocator = c.mlirTypeIDAllocatorCreate();
     defer c.mlirTypeIDAllocatorDestroy(typeIDAllocator);
@@ -138,3 +119,4 @@ pub export fn beaver_raw_create_mlir_pass(env: beam.env, _: c_int, args: [*c]con
     }
     return e.enif_make_resource(env, ptr);
 }
+pub const create = result.nif("beaver_raw_create_mlir_pass", 5, do_create).entry;

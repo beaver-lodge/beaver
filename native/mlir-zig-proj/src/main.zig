@@ -540,7 +540,7 @@ const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.Entries
     e.ErlNifFunc{ .name = "beaver_raw_registered_ops", .arity = 0, .fptr = beaver_raw_registered_ops, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_ops_of_dialect", .arity = 2, .fptr = beaver_raw_registered_ops_of_dialect, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_dialects", .arity = 0, .fptr = beaver_raw_registered_dialects, .flags = 1 },
-    e.ErlNifFunc{ .name = "beaver_raw_create_mlir_pass", .arity = 5, .fptr = pass.beaver_raw_create_mlir_pass, .flags = 0 },
+    pass.create,
     e.ErlNifFunc{ .name = "beaver_raw_pass_token_signal", .arity = 1, .fptr = pass.Token.pass_token_signal, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_resource_c_string_to_term_charlist", .arity = 1, .fptr = beaver_raw_resource_c_string_to_term_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_attribute", .arity = 1, .fptr = Printer(mlir_capi.Attribute, c.mlirAttributePrint).to_string, .flags = 0 },
