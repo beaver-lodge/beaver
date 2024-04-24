@@ -98,7 +98,7 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
     defer c.mlirTypeIDAllocatorDestroy(typeIDAllocator);
     const passID = c.mlirTypeIDAllocatorAllocateTypeID(typeIDAllocator);
     const nDependentDialects = 0;
-    const dependentDialects = 0;
+    const dependentDialects = null;
     var pass: *BeaverPass = try beam.allocator.create(BeaverPass);
     pass.* = BeaverPass{ .handler = handler };
     return try mlir_capi.Pass.resource.make(env, c.mlirCreateExternalPass(passID, name, argument, description, op_name, nDependentDialects, dependentDialects, BeaverPass.callbacks, pass));
