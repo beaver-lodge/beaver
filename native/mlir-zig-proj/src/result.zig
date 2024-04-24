@@ -3,7 +3,7 @@ const e = @import("erl_nif");
 
 pub fn nif(comptime name: [*c]const u8, comptime arity: usize, comptime f: anytype) type {
     return struct {
-        export fn exported(env: beam.env, n: c_int, args: [*c]const beam.term) beam.term {
+        fn exported(env: beam.env, n: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
             var ret: beam.term = undefined;
             if (f(env, n, args)) |r| {
                 ret = r;
