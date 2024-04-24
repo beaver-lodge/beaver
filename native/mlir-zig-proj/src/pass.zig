@@ -54,18 +54,18 @@ const BeaverPass = extern struct {
     };
     fn do_run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) !void {
         const ud: *@This() = @ptrCast(@alignCast(userData));
-        const env = e.enif_alloc_env() orelse return Error.EnvAllocFailed;
+        const env = e.enif_alloc_env() orelse return Error.EnvAllocFailure;
         defer e.enif_clear_env(env);
         const handler = ud.*.handler;
         var tuple_slice: []beam.term = try beam.allocator.alloc(beam.term, 4);
         defer beam.allocator.free(tuple_slice);
         tuple_slice[0] = beam.make_atom(env, "run");
-        tuple_slice[1] = try beam.make_resource(env, op, mlir_capi.Operation.resource.t);
-        tuple_slice[2] = try beam.make_resource(env, pass, mlir_capi.ExternalPass.resource.t);
+        tuple_slice[1] = try mlir_capi.Operation.resource.make(env, op);
+        tuple_slice[2] = try mlir_capi.ExternalPass.resource.make(env, pass);
         var token = Token{};
         tuple_slice[3] = try beam.make_ptr_resource_wrapped(env, &token);
         if (!beam.send(env, handler, beam.make_tuple(env, tuple_slice))) {
-            return Error.MsgSendFailed;
+            return Error.MsgSendFailure;
         }
         token.wait();
     }
