@@ -32,14 +32,14 @@ pub const Token = struct {
     }
 };
 
-const BeaverPass = struct {
-    callbacks: mlir_capi.ExternalPassCallbacks.T = mlir_capi.ExternalPassCallbacks.T{
+const BeaverPass = extern struct {
+    const callbacks: mlir_capi.ExternalPassCallbacks.T = mlir_capi.ExternalPassCallbacks.T{
         .construct = construct,
         .destruct = destruct,
         .initialize = initialize,
         .clone = clone,
         .run = run,
-    },
+    };
     handler: beam.pid,
     fn construct(_: ?*anyopaque) callconv(.C) void {}
 
@@ -101,7 +101,7 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
     const dependentDialects = 0;
     var pass: *BeaverPass = try beam.allocator.create(BeaverPass);
     pass.* = BeaverPass{ .handler = handler };
-    return try mlir_capi.Pass.resource.make(env, c.mlirCreateExternalPass(passID, name, argument, description, op_name, nDependentDialects, dependentDialects, pass.callbacks, pass));
+    return try mlir_capi.Pass.resource.make(env, c.mlirCreateExternalPass(passID, name, argument, description, op_name, nDependentDialects, dependentDialects, BeaverPass.callbacks, pass));
 }
 const create = result.nif("beaver_raw_create_mlir_pass", 5, do_create).entry;
 const token_signal = result.nif("beaver_raw_pass_token_signal", 1, Token.pass_token_signal).entry;
