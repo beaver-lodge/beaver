@@ -99,9 +99,25 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
     const passID = c.mlirTypeIDAllocatorAllocateTypeID(typeIDAllocator);
     const nDependentDialects = 0;
     const dependentDialects = null;
-    var pass: *BeaverPass = try beam.allocator.create(BeaverPass);
-    pass.* = BeaverPass{ .handler = handler };
-    return try mlir_capi.Pass.resource.make(env, c.mlirCreateExternalPass(passID, name, argument, description, op_name, nDependentDialects, dependentDialects, BeaverPass.callbacks, pass));
+    var bp: *BeaverPass = try beam.allocator.create(BeaverPass);
+    bp.* = BeaverPass{ .handler = handler };
+    // use this function to avoid ABI issue
+    const ep = c.beaverCreateExternalPass(
+        BeaverPass.construct,
+        passID,
+        name,
+        argument,
+        description,
+        op_name,
+        nDependentDialects,
+        dependentDialects,
+        BeaverPass.destruct,
+        BeaverPass.initialize,
+        BeaverPass.clone,
+        BeaverPass.run,
+        bp,
+    );
+    return try mlir_capi.Pass.resource.make(env, ep);
 }
 const create = result.nif("beaver_raw_create_mlir_pass", 5, do_create).entry;
 const token_signal = result.nif("beaver_raw_pass_token_signal", 1, Token.pass_token_signal).entry;
