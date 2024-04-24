@@ -49,8 +49,8 @@ const BeaverPass = extern struct {
         return new;
     }
     const Error = error{
-        EnvAllocFailed,
-        MsgSendFailed,
+        EnvAllocFailure,
+        MsgSendFailure,
     };
     fn do_run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) !void {
         const ud: *@This() = @ptrCast(@alignCast(userData));
