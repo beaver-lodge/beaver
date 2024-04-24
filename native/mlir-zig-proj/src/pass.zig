@@ -40,7 +40,7 @@ const BeaverPass = extern struct {
         beam.allocator.destroy(ptr);
     }
     fn initialize(_: mlir_capi.Context.T, _: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
-        return mlir_capi.LogicalResult.T{ .value = 1 };
+        return c.mlirLogicalResultSuccess();
     }
     fn clone(userData: ?*anyopaque) callconv(.C) ?*anyopaque {
         const old: *@This() = @ptrCast(@alignCast(userData));
