@@ -103,6 +103,11 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
     bp.* = BeaverPass{ .handler = handler };
     // use this function to avoid ABI issue
     const ep = c.beaverCreateExternalPass(
+        BeaverPass.construct,
+        BeaverPass.destruct,
+        BeaverPass.initialize,
+        BeaverPass.clone,
+        BeaverPass.run,
         passID,
         name,
         argument,
@@ -110,11 +115,6 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
         op_name,
         nDependentDialects,
         dependentDialects,
-        BeaverPass.construct,
-        BeaverPass.destruct,
-        BeaverPass.initialize,
-        BeaverPass.clone,
-        BeaverPass.run,
         bp,
     );
     return try mlir_capi.Pass.resource.make(env, ep);
