@@ -33,16 +33,8 @@ pub const Token = struct {
 };
 
 const BeaverPass = extern struct {
-    const callbacks: mlir_capi.ExternalPassCallbacks.T = mlir_capi.ExternalPassCallbacks.T{
-        .construct = construct,
-        .destruct = destruct,
-        .initialize = initialize,
-        .clone = clone,
-        .run = run,
-    };
     handler: beam.pid,
     fn construct(_: ?*anyopaque) callconv(.C) void {}
-
     fn destruct(userData: ?*anyopaque) callconv(.C) void {
         const ptr: *@This() = @ptrCast(@alignCast(userData));
         beam.allocator.destroy(ptr);
@@ -56,34 +48,32 @@ const BeaverPass = extern struct {
         new.* = old.*;
         return new;
     }
-    fn run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) callconv(.C) void {
+    const Error = error{
+        EnvAllocFailed,
+        MsgSendFailed,
+    };
+    fn do_run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) !void {
         const ud: *@This() = @ptrCast(@alignCast(userData));
-        const env = e.enif_alloc_env() orelse {
-            debug_print("fail to creat env\n", .{});
-            return c.mlirExternalPassSignalFailure(pass);
-        };
+        const env = e.enif_alloc_env() orelse return Error.EnvAllocFailed;
         defer e.enif_clear_env(env);
         const handler = ud.*.handler;
-        var tuple_slice: []beam.term = beam.allocator.alloc(beam.term, 4) catch unreachable;
+        var tuple_slice: []beam.term = try beam.allocator.alloc(beam.term, 4);
         defer beam.allocator.free(tuple_slice);
         tuple_slice[0] = beam.make_atom(env, "run");
-        tuple_slice[1] = beam.make_resource(env, op, mlir_capi.Operation.resource.t) catch {
-            debug_print("fail to make res: {}\n", .{@TypeOf(op)});
-            unreachable;
-        };
-        tuple_slice[2] = beam.make_resource(env, pass, mlir_capi.ExternalPass.resource.t) catch {
-            debug_print("fail to make res: {}\n", .{@TypeOf(pass)});
-            unreachable;
-        };
+        tuple_slice[1] = try beam.make_resource(env, op, mlir_capi.Operation.resource.t);
+        tuple_slice[2] = try beam.make_resource(env, pass, mlir_capi.ExternalPass.resource.t);
         var token = Token{};
-        tuple_slice[3] = beam.make_ptr_resource_wrapped(env, &token) catch {
-            unreachable;
-        };
+        tuple_slice[3] = try beam.make_ptr_resource_wrapped(env, &token);
         if (!beam.send(env, handler, beam.make_tuple(env, tuple_slice))) {
-            debug_print("fail to send message to pass handler.\n", .{});
-            c.mlirExternalPassSignalFailure(pass);
+            return Error.MsgSendFailed;
         }
         token.wait();
+    }
+    fn run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) callconv(.C) void {
+        if (do_run(op, pass, userData)) |_| {} else |err| {
+            c.mlirEmitError(c.mlirOperationGetLocation(op), @errorName(err));
+            c.mlirExternalPassSignalFailure(pass);
+        }
     }
 };
 
