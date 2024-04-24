@@ -65,6 +65,15 @@ beaverGetNumRegisteredOperations(MlirContext context) {
   return unwrap(context)->getRegisteredOperations().size();
 }
 
+MLIR_CAPI_EXPORTED void beaverGetRegisteredOps(MlirContext context,
+                                               MlirStringCallback insert,
+                                               void *container) {
+  for (const RegisteredOperationName &op :
+       unwrap(context)->getRegisteredOperations()) {
+    insert(wrap(op.getStringRef()), container);
+  }
+}
+
 MLIR_CAPI_EXPORTED MlirRegisteredOperationName
 beaverGetRegisteredOperationName(MlirContext context, intptr_t pos) {
   mlir::RegisteredOperationName name =
@@ -78,7 +87,7 @@ beaverRegisteredOperationNameGetDialectName(MlirRegisteredOperationName name) {
 }
 
 MLIR_CAPI_EXPORTED MlirStringRef
-beaverRegisteredOperationNameGetOpName(MlirRegisteredOperationName name) {
+beaverRegisteredOperationNameStripDialect(MlirRegisteredOperationName name) {
   return wrap(unwrap(name).stripDialect());
 }
 

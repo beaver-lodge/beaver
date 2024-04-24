@@ -45,8 +45,6 @@ defmodule Beaver.MLIR.CAPI do
   end
 
   # stubs for hand-written NIFs
-  def beaver_raw_get_context_load_all_dialects(), do: raise("NIF not loaded")
-
   def beaver_raw_create_mlir_pass(
         _name,
         _argument,
@@ -57,7 +55,7 @@ defmodule Beaver.MLIR.CAPI do
       do: raise("NIF not loaded")
 
   def beaver_raw_pass_token_signal(_), do: raise("NIF not loaded")
-  def beaver_raw_registered_ops(), do: raise("NIF not loaded")
+  def beaver_raw_registered_ops(_ctx), do: raise("NIF not loaded")
   def beaver_raw_registered_ops_of_dialect(_ctx, _name), do: raise("NIF not loaded")
   def beaver_raw_registered_dialects(), do: raise("NIF not loaded")
   def beaver_raw_resource_c_string_to_term_charlist(_), do: raise("NIF not loaded")

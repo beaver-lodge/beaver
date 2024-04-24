@@ -430,8 +430,7 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
 
 const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ .{
     diagnostic.attach,
-    e.ErlNifFunc{ .name = "beaver_raw_get_context_load_all_dialects", .arity = 0, .fptr = registry.beaver_raw_get_context_load_all_dialects, .flags = 1 },
-    e.ErlNifFunc{ .name = "beaver_raw_registered_ops", .arity = 0, .fptr = registry.beaver_raw_registered_ops, .flags = 1 },
+    registry.beaver_raw_registered_ops,
     e.ErlNifFunc{ .name = "beaver_raw_registered_ops_of_dialect", .arity = 2, .fptr = registry.beaver_raw_registered_ops_of_dialect, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_registered_dialects", .arity = 0, .fptr = registry.beaver_raw_registered_dialects, .flags = 1 },
     e.ErlNifFunc{ .name = "beaver_raw_resource_c_string_to_term_charlist", .arity = 1, .fptr = beaver_raw_resource_c_string_to_term_charlist, .flags = 0 },

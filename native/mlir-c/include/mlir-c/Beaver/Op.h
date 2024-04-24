@@ -23,6 +23,10 @@ MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
 MLIR_CAPI_EXPORTED intptr_t
 beaverGetNumRegisteredOperations(MlirContext context);
 
+MLIR_CAPI_EXPORTED void beaverGetRegisteredOps(MlirContext context,
+                                               MlirStringCallback insert,
+                                               void *container);
+
 MLIR_CAPI_EXPORTED MlirRegisteredOperationName
 beaverGetRegisteredOperationName(MlirContext context, intptr_t pos);
 
@@ -30,7 +34,7 @@ MLIR_CAPI_EXPORTED MlirStringRef
 beaverRegisteredOperationNameGetDialectName(MlirRegisteredOperationName name);
 
 MLIR_CAPI_EXPORTED MlirStringRef
-beaverRegisteredOperationNameGetOpName(MlirRegisteredOperationName name);
+beaverRegisteredOperationNameStripDialect(MlirRegisteredOperationName name);
 
 MLIR_CAPI_EXPORTED void
 beaverRegisteredOperationsOfDialect(MlirContext context, MlirStringRef dialect,

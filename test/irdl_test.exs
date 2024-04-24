@@ -38,7 +38,9 @@ defmodule IRDLTest do
            |> Beaver.MLIR.CAPI.beaverLoadIRDLDialects()
            |> Beaver.MLIR.LogicalResult.success?()
 
-    assert ["mul", "norm"] == MLIR.Dialect.Registry.ops("cmath", ctx: ctx)
+    found = MapSet.new(MLIR.Dialect.Registry.ops("cmath", ctx: ctx))
+    expected = MapSet.new(["mul", "norm"])
+    assert MapSet.equal?(found, expected)
   end
 
   test "cmath dialect",

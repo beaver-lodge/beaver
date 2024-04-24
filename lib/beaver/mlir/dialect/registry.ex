@@ -41,10 +41,11 @@ defmodule Beaver.MLIR.Dialect.Registry do
 
   def ops(dialect, opts \\ []) do
     if ctx = opts[:ctx] do
-      Beaver.Native.check!(
-        CAPI.beaver_raw_registered_ops_of_dialect(ctx.ref, MLIR.StringRef.create(dialect).ref)
-      )
-      |> Enum.map(&List.to_string/1)
+      %MLIR.Context{ref: ref} = ctx
+
+      Beaver.Native.check!(CAPI.beaver_raw_registered_ops(ref))
+      |> Stream.filter(&String.starts_with?(&1, "#{dialect}."))
+      |> Enum.map(fn ^dialect <> "." <> x -> x end)
     else
       ctx = MLIR.Context.create()
       ret = ops(dialect, Keyword.put(opts, :ctx, ctx))

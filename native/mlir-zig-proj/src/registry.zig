@@ -6,29 +6,7 @@ const e = @import("erl_nif");
 const debug_print = @import("std").debug.print;
 const result = @import("result.zig");
 
-fn get_all_registered_ops(env: beam.env) !beam.term {
-    const ctx = get_context_load_all_dialects();
-    defer c.mlirContextDestroy(ctx);
-    const num_op: isize = c.beaverGetNumRegisteredOperations(ctx);
-    var i: isize = 0;
-    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(num_op));
-    defer beam.allocator.free(ret);
-    while (i < num_op) : ({
-        i += 1;
-    }) {
-        const registered_op_name = c.beaverGetRegisteredOperationName(ctx, i);
-        const dialect_name = c.beaverRegisteredOperationNameGetDialectName(registered_op_name);
-        const op_name = c.beaverRegisteredOperationNameGetOpName(registered_op_name);
-        var tuple_slice: []beam.term = try beam.allocator.alloc(beam.term, 2);
-        defer beam.allocator.free(tuple_slice);
-        tuple_slice[0] = beam.make_slice(env, dialect_name.data[0..dialect_name.length]);
-        tuple_slice[1] = beam.make_slice(env, op_name.data[0..op_name.length]);
-        ret[@intCast(i)] = beam.make_tuple(env, tuple_slice);
-    }
-    return beam.make_term_list(env, ret);
-}
-
-fn get_context_load_all_dialects() mlir_capi.Context.T {
+fn context_of_dialects() mlir_capi.Context.T {
     const ctx = c.mlirContextCreate();
     var registry = c.mlirDialectRegistryCreate();
     c.mlirRegisterAllDialects(registry);
@@ -38,7 +16,35 @@ fn get_context_load_all_dialects() mlir_capi.Context.T {
     return ctx;
 }
 
-fn get_all_registered_ops2(env: beam.env, ctx: mlir_capi.Context.T, dialect: mlir_capi.StringRef.T) !beam.term {
+// collect mlir StringRef as a list of erlang binary
+const StringRefCollector = struct {
+    const Container = std.ArrayList(beam.term);
+    container: Container = undefined,
+    env: beam.env = undefined,
+    fn append(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
+        const ptr: ?*@This() = @ptrCast(@alignCast(userData));
+        if (ptr) |self| {
+            self.container.append(beam.make_slice(self.env, s.data[0..s.length])) catch unreachable;
+        }
+    }
+    fn init(env: beam.env) @This() {
+        return @This(){ .container = Container.init(beam.allocator), .env = env };
+    }
+    fn collect(this: *@This()) !beam.term {
+        defer this.container.deinit();
+        return beam.make_term_list(this.env, try this.container.toOwnedSlice());
+    }
+};
+
+fn get_all_registered_ops(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+    const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
+    // we don't use beam.allocator.create here because MLIR will not free this user data
+    var col = StringRefCollector.init(env);
+    c.beaverGetRegisteredOps(ctx, StringRefCollector.append, @constCast(@ptrCast(@alignCast(&col))));
+    return try col.collect();
+}
+
+fn registered_ops_of_dialect(env: beam.env, ctx: mlir_capi.Context.T, dialect: mlir_capi.StringRef.T) !beam.term {
     var num_op: usize = 0;
     // TODO: refactor this dirty trick
     var names: [300]c.MlirRegisteredOperationName = undefined;
@@ -50,18 +56,14 @@ fn get_all_registered_ops2(env: beam.env, ctx: mlir_capi.Context.T, dialect: mli
         i += 1;
     }) {
         const registered_op_name = names[i];
-        const op_name = c.beaverRegisteredOperationNameGetOpName(registered_op_name);
-        ret[@intCast(i)] = beam.make_c_string_charlist(env, op_name.data);
+        const op_name = c.beaverRegisteredOperationNameStripDialect(registered_op_name);
+        ret[@intCast(i)] = beam.make_slice(env, op_name.data[0..op_name.length]);
     }
     return beam.make_term_list(env, ret);
 }
 
-pub export fn beaver_raw_registered_ops(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
-    return get_all_registered_ops(env) catch beam.make_error_binary(env, "launching nif");
-}
-
 fn get_registered_dialects(env: beam.env) !beam.term {
-    const ctx = get_context_load_all_dialects();
+    const ctx = context_of_dialects();
     defer c.mlirContextDestroy(ctx);
     var num_dialects: usize = 0;
     // TODO: refactor this dirty trick
@@ -81,6 +83,8 @@ fn get_registered_dialects(env: beam.env) !beam.term {
     return beam.make_term_list(env, ret);
 }
 
+pub const beaver_raw_registered_ops = result.nif("beaver_raw_registered_ops", 1, get_all_registered_ops).entry;
+
 pub export fn beaver_raw_registered_ops_of_dialect(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var dialect: mlir_capi.StringRef.T = undefined;
     var ctx: mlir_capi.Context.T = undefined;
@@ -94,22 +98,9 @@ pub export fn beaver_raw_registered_ops_of_dialect(env: beam.env, _: c_int, args
     } else |_| {
         return beam.make_error_binary(env, "fail to fetch resource for dialect, expected: mlir_capi.StringRef.T");
     }
-    return get_all_registered_ops2(env, ctx, dialect) catch beam.make_error_binary(env, "launching nif");
+    return registered_ops_of_dialect(env, ctx, dialect) catch beam.make_error_binary(env, "launching nif");
 }
 
 pub export fn beaver_raw_registered_dialects(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
     return get_registered_dialects(env) catch beam.make_error_binary(env, "launching nif");
-}
-
-pub export fn beaver_raw_get_context_load_all_dialects(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
-    var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.Context.resource.t, @sizeOf(mlir_capi.Context.T));
-    const RType = mlir_capi.Context.T;
-    var obj: *RType = undefined;
-    if (ptr == null) {
-        unreachable();
-    } else {
-        obj = @ptrCast(@alignCast(ptr));
-        obj.* = get_context_load_all_dialects();
-    }
-    return e.enif_make_resource(env, ptr);
 }
