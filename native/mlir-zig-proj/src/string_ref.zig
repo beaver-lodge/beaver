@@ -6,7 +6,7 @@ const result = @import("result.zig");
 pub const c = @import("prelude.zig");
 const mem = @import("std").mem;
 
-pub fn Printer(comptime ResourceKind: type, comptime print_fn: anytype) type {
+pub fn Printer(comptime name: [*c]const u8, comptime ResourceKind: type, comptime print_fn: anytype) type {
     return struct {
         const Buffer = std.ArrayList(u8);
         buffer: Buffer,
@@ -14,7 +14,7 @@ pub fn Printer(comptime ResourceKind: type, comptime print_fn: anytype) type {
             var printer: *@This() = @ptrCast(@alignCast(userData));
             printer.*.buffer.appendSlice(s.data[0..s.length]) catch unreachable;
         }
-        pub fn to_string(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+        fn to_string(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
             var entity: ResourceKind.T = ResourceKind.resource.fetch(env, args[0]) catch
                 return beam.make_error_binary(env, "fail to fetch resource for MLIR entity to print, expected: " ++ @typeName(ResourceKind.T));
             if (entity.ptr == null) {
@@ -25,6 +25,7 @@ pub fn Printer(comptime ResourceKind: type, comptime print_fn: anytype) type {
             print_fn(entity, collect_string_ref, &printer);
             return beam.make_slice(env, printer.buffer.items);
         }
+        const entry = e.ErlNifFunc{ .name = name, .arity = 1, .fptr = to_string, .flags = 0 };
     };
 }
 
@@ -82,4 +83,17 @@ fn beaver_raw_get_string_ref(env: beam.env, _: c_int, args: [*c]const beam.term)
     return e.enif_make_resource(env, ptr);
 }
 
-pub const nifs = .{ result.nif("beaver_raw_get_string_ref", 1, beaver_raw_get_string_ref).entry, result.nif("beaver_raw_string_ref_to_binary", 1, beaver_raw_string_ref_to_binary).entry };
+pub const nifs = .{
+    result.nif("beaver_raw_get_string_ref", 1, beaver_raw_get_string_ref).entry,
+    result.nif("beaver_raw_string_ref_to_binary", 1, beaver_raw_string_ref_to_binary).entry,
+    Printer("beaver_raw_to_string_attribute", mlir_capi.Attribute, c.mlirAttributePrint).entry,
+    Printer("beaver_raw_to_string_type", mlir_capi.Type, c.mlirTypePrint).entry,
+    Printer("beaver_raw_to_string_operation", mlir_capi.Operation, c.mlirOperationPrint).entry,
+    Printer("beaver_raw_to_string_operation_specialized", mlir_capi.Operation, c.beaverOperationPrintSpecializedFrom).entry,
+    Printer("beaver_raw_to_string_operation_generic", mlir_capi.Operation, c.beaverOperationPrintGenericOpForm).entry,
+    Printer("beaver_raw_to_string_operation_bytecode", mlir_capi.Operation, c.mlirOperationWriteBytecode).entry,
+    Printer("beaver_raw_to_string_value", mlir_capi.Value, c.mlirValuePrint).entry,
+    Printer("beaver_raw_to_string_pm", mlir_capi.OpPassManager, c.mlirPrintPassPipeline).entry,
+    Printer("beaver_raw_to_string_affine_map", mlir_capi.AffineMap, c.mlirAffineMapPrint).entry,
+    Printer("beaver_raw_to_string_location", mlir_capi.Location, c.beaverLocationPrint).entry,
+};
