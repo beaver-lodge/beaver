@@ -5,6 +5,7 @@ pub const c = @import("prelude.zig");
 const e = @import("erl_nif");
 const debug_print = @import("std").debug.print;
 const result = @import("result.zig");
+const diagnostic = @import("diagnostic.zig");
 
 pub const Token = struct {
     mutex: std.Thread.Mutex = .{},
@@ -109,6 +110,11 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
     );
     return try mlir_capi.Pass.resource.make(env, ep);
 }
-const create = result.nif("beaver_raw_create_mlir_pass", 5, do_create).entry;
-const token_signal = result.nif("beaver_raw_pass_token_signal", 1, Token.pass_token_signal).entry;
-pub const nifs = .{ create, token_signal };
+
+fn beaver_raw_parse_pass_pipeline(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+    var passManager = try mlir_capi.OpPassManager.resource.fetch(env, args[0]);
+    var pipeline = try mlir_capi.StringRef.resource.fetch(env, args[1]);
+    return try mlir_capi.LogicalResult.resource.make(env, c.mlirOpPassManagerAddPipeline(passManager, pipeline, diagnostic.print, null));
+}
+
+pub const nifs = .{ result.nif("beaver_raw_create_mlir_pass", 5, do_create).entry, result.nif("beaver_raw_pass_token_signal", 1, Token.pass_token_signal).entry, result.nif("beaver_raw_parse_pass_pipeline", 2, beaver_raw_parse_pass_pipeline).entry };

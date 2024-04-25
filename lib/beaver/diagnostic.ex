@@ -7,5 +7,9 @@ defmodule Beaver.Diagnostic do
     |> Beaver.Native.check!()
   end
 
+  def callback() do
+    %MLIR.StringCallback{ref: MLIR.CAPI.beaver_raw_get_diagnostic_string_callback()}
+  end
+
   defdelegate detach(ctx, handler_id), to: MLIR.CAPI, as: :mlirContextDetachDiagnosticHandler
 end
