@@ -69,8 +69,6 @@ defmodule Beaver.MLIR.Dialect.Registry do
       |> Beaver.Native.check!()
       |> Enum.uniq()
       |> Enum.sort()
-      # elixir dialect is currently only for testing purposes, so we filter it out
-      |> Enum.reject(&(&1 == "elixir"))
     end)
   end
 end
