@@ -56,7 +56,7 @@ defmodule Beaver.MLIR.Dialect.Registry do
     unwrap_ctx_then(opts, fn ref ->
       Beaver.Native.check!(CAPI.beaver_raw_registered_ops(ref))
       |> Stream.filter(&String.starts_with?(&1, "#{dialect}."))
-      |> Enum.map(fn ^dialect <> "." <> x -> x end)
+      |> Enum.map(&String.trim_leading(&1, "#{dialect}."))
     end)
   end
 
