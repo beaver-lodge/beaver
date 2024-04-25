@@ -23,7 +23,7 @@ export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs;
 export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     kinda.open_internal_resource_types(env);
     kinda.Internal.OpaqueStruct.open_all(env);
-    mlir_capi.open_generated_resource_types(env);
+    mlir_capi.open_all(env);
     memref.open_all(env);
     pointer.open_all(env);
     pass.open_all(env);

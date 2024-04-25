@@ -157,7 +157,7 @@ pub const allKinds = .{
     LLVMThreadPool,
     TypeIDAllocator,
 };
-pub fn open_generated_resource_types(env: beam.env) void {
+pub fn open_all(env: beam.env) void {
     inline for (allKinds) |k| {
         k.open_all(env);
     }
