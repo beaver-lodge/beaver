@@ -13,34 +13,6 @@ const registry = @import("registry.zig");
 const string_ref = @import("string_ref.zig");
 const Printer = string_ref.Printer;
 
-export fn beaver_raw_mlir_named_attribute_get(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var arg0: mlir_capi.Identifier.T = undefined;
-    if (beam.fetch_resource(mlir_capi.Identifier.T, env, mlir_capi.Identifier.resource.t, args[0])) |value| {
-        arg0 = value;
-    } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: mlir_capi.Identifier.T");
-    }
-    var arg1: c.MlirAttribute = undefined;
-    if (beam.fetch_resource(c.MlirAttribute, env, mlir_capi.Attribute.resource.t, args[1])) |value| {
-        arg1 = value;
-    } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.MlirAttribute");
-    }
-
-    var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.NamedAttribute.resource.t, @sizeOf(mlir_capi.NamedAttribute.T));
-
-    const RType = mlir_capi.NamedAttribute.T;
-    var obj: *RType = undefined;
-
-    if (ptr == null) {
-        unreachable();
-    } else {
-        obj = @ptrCast(@alignCast(ptr));
-        obj.* = mlir_capi.NamedAttribute.T{ .name = arg0, .attribute = arg1 };
-    }
-    return e.enif_make_resource(env, ptr);
-}
-
 const PtrOwner = extern struct {
     pub const Kind = kinda.ResourceKind(@This(), "Elixir.Beaver.Native.PtrOwner");
     ptr: mlir_capi.OpaquePtr.T,
@@ -393,7 +365,6 @@ const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.Entries
     e.ErlNifFunc{ .name = "beaver_raw_to_string_pm", .arity = 1, .fptr = Printer(mlir_capi.OpPassManager, c.mlirPrintPassPipeline).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_affine_map", .arity = 1, .fptr = Printer(mlir_capi.AffineMap, c.mlirAffineMapPrint).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_location", .arity = 1, .fptr = Printer(mlir_capi.Location, c.beaverLocationPrint).to_string, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_mlir_named_attribute_get", .arity = 2, .fptr = beaver_raw_mlir_named_attribute_get, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_own_opaque_ptr", .arity = 1, .fptr = beaver_raw_own_opaque_ptr, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_read_opaque_ptr", .arity = 2, .fptr = beaver_raw_read_opaque_ptr, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_parse_pass_pipeline", .arity = 2, .fptr = beaver_raw_parse_pass_pipeline, .flags = 0 },

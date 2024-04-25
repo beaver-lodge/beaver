@@ -68,7 +68,6 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_to_string_affine_map(_), do: raise("NIF not loaded")
   def beaver_raw_to_string_location(_), do: raise("NIF not loaded")
   def beaver_raw_to_string_pm(_), do: raise("NIF not loaded")
-  def beaver_raw_mlir_named_attribute_get(_, _), do: raise("NIF not loaded")
   def beaver_raw_get_string_ref(_), do: raise("NIF not loaded")
   def beaver_raw_read_opaque_ptr(_, _), do: raise("NIF not loaded")
   def beaver_raw_own_opaque_ptr(_), do: raise("NIF not loaded")
