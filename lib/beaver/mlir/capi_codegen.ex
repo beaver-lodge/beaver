@@ -94,7 +94,6 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
           :ExecutionEngine,
           :"Operation.State",
           :SymbolTable,
-          :RegisteredOperationName,
           :ExternalPass,
           :ExternalPassCallbacks,
           :OpPassManager,

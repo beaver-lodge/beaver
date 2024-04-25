@@ -15,7 +15,6 @@ mlir_mods = [
   PassManager,
   RewritePatternSet,
   SymbolTable,
-  RegisteredOperationName,
   ExternalPassCallbacks,
   OpPassManager,
   AsmState,

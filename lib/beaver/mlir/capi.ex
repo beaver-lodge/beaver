@@ -45,8 +45,6 @@ defmodule Beaver.MLIR.CAPI do
   end
 
   # stubs for hand-written NIFs
-  def beaver_raw_get_context_load_all_dialects(), do: raise("NIF not loaded")
-
   def beaver_raw_create_mlir_pass(
         _name,
         _argument,
@@ -57,10 +55,9 @@ defmodule Beaver.MLIR.CAPI do
       do: raise("NIF not loaded")
 
   def beaver_raw_pass_token_signal(_), do: raise("NIF not loaded")
-  def beaver_raw_registered_ops(), do: raise("NIF not loaded")
-  def beaver_raw_registered_ops_of_dialect(_ctx, _name), do: raise("NIF not loaded")
-  def beaver_raw_registered_dialects(), do: raise("NIF not loaded")
-  def beaver_raw_resource_c_string_to_term_charlist(_), do: raise("NIF not loaded")
+  def beaver_raw_registered_ops(_ctx), do: raise("NIF not loaded")
+  def beaver_raw_registered_dialects(_ctx), do: raise("NIF not loaded")
+  def beaver_raw_string_ref_to_binary(_), do: raise("NIF not loaded")
   def beaver_raw_to_string_attribute(_), do: raise("NIF not loaded")
   def beaver_raw_to_string_type(_), do: raise("NIF not loaded")
   def beaver_raw_to_string_operation(_), do: raise("NIF not loaded")
@@ -71,12 +68,12 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_to_string_affine_map(_), do: raise("NIF not loaded")
   def beaver_raw_to_string_location(_), do: raise("NIF not loaded")
   def beaver_raw_to_string_pm(_), do: raise("NIF not loaded")
-  def beaver_raw_mlir_named_attribute_get(_, _), do: raise("NIF not loaded")
   def beaver_raw_get_string_ref(_), do: raise("NIF not loaded")
   def beaver_raw_read_opaque_ptr(_, _), do: raise("NIF not loaded")
   def beaver_raw_own_opaque_ptr(_), do: raise("NIF not loaded")
+  def beaver_raw_get_null_ptr(), do: raise("NIF not loaded")
   def beaver_raw_context_attach_diagnostic_handler(_, _), do: raise("NIF not loaded")
-  def beaver_raw_parse_pass_pipeline(_, _), do: raise("NIF not loaded")
+  def beaver_raw_get_diagnostic_string_callback(), do: raise("NIF not loaded")
   def beaver_raw_jit_invoke_with_terms(_jit, _name, _args), do: raise("NIF not loaded")
   def beaver_raw_jit_register_enif(_jit), do: raise("NIF not loaded")
   def beaver_raw_enif_signatures(_ctx), do: raise("NIF not loaded")

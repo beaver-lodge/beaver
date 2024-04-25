@@ -74,7 +74,7 @@ pub const PassManager = MLIRKind("PassManager");
 pub const RewritePatternSet = MLIRKind("RewritePatternSet");
 pub const ExecutionEngine = MLIRKind("ExecutionEngine");
 pub const SymbolTable = MLIRKind("SymbolTable");
-pub const RegisteredOperationName = MLIRKind("RegisteredOperationName");
+
 pub const ExternalPass = MLIRKind("ExternalPass");
 pub const ExternalPassCallbacks = MLIRKind("ExternalPassCallbacks");
 pub const OpPassManager = MLIRKind("OpPassManager");
@@ -143,7 +143,6 @@ pub const allKinds = .{
     Value,
     Block,
     Dialect,
-    RegisteredOperationName,
     ExternalPass,
     ExternalPassCallbacks,
     OpPassManager,

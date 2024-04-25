@@ -9,219 +9,10 @@ pub const c = @import("prelude.zig");
 const enif_support = @import("enif_support.zig");
 const diagnostic = @import("diagnostic.zig");
 const pass = @import("pass.zig");
-
-fn get_all_registered_ops(env: beam.env) !beam.term {
-    const ctx = get_context_load_all_dialects();
-    defer c.mlirContextDestroy(ctx);
-    const num_op: isize = c.beaverGetNumRegisteredOperations(ctx);
-    var i: isize = 0;
-    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(num_op));
-    defer beam.allocator.free(ret);
-    while (i < num_op) : ({
-        i += 1;
-    }) {
-        const registered_op_name = c.beaverGetRegisteredOperationName(ctx, i);
-        const dialect_name = c.beaverRegisteredOperationNameGetDialectName(registered_op_name);
-        const op_name = c.beaverRegisteredOperationNameGetOpName(registered_op_name);
-        var tuple_slice: []beam.term = try beam.allocator.alloc(beam.term, 2);
-        defer beam.allocator.free(tuple_slice);
-        tuple_slice[0] = beam.make_slice(env, dialect_name.data[0..dialect_name.length]);
-        tuple_slice[1] = beam.make_slice(env, op_name.data[0..op_name.length]);
-        ret[@intCast(i)] = beam.make_tuple(env, tuple_slice);
-    }
-    return beam.make_term_list(env, ret);
-}
-
-fn get_context_load_all_dialects() mlir_capi.Context.T {
-    const ctx = c.mlirContextCreate();
-    var registry = c.mlirDialectRegistryCreate();
-    c.mlirRegisterAllDialects(registry);
-    c.mlirContextAppendDialectRegistry(ctx, registry);
-    c.mlirDialectRegistryDestroy(registry);
-    c.mlirContextLoadAllAvailableDialects(ctx);
-    return ctx;
-}
-
-fn get_all_registered_ops2(env: beam.env, ctx: mlir_capi.Context.T, dialect: mlir_capi.StringRef.T) !beam.term {
-    var num_op: usize = 0;
-    // TODO: refactor this dirty trick
-    var names: [300]c.MlirRegisteredOperationName = undefined;
-    c.beaverRegisteredOperationsOfDialect(ctx, dialect, &names, &num_op);
-    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(num_op));
-    defer beam.allocator.free(ret);
-    var i: usize = 0;
-    while (i < num_op) : ({
-        i += 1;
-    }) {
-        const registered_op_name = names[i];
-        const op_name = c.beaverRegisteredOperationNameGetOpName(registered_op_name);
-        ret[@intCast(i)] = beam.make_c_string_charlist(env, op_name.data);
-    }
-    return beam.make_term_list(env, ret);
-}
-
-export fn beaver_raw_registered_ops(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
-    return get_all_registered_ops(env) catch beam.make_error_binary(env, "launching nif");
-}
-
-fn get_registered_dialects(env: beam.env) !beam.term {
-    const ctx = get_context_load_all_dialects();
-    defer c.mlirContextDestroy(ctx);
-    var num_dialects: usize = 0;
-    // TODO: refactor this dirty trick
-    var names: [300]mlir_capi.StringRef.T = undefined;
-    c.beaverRegisteredDialects(ctx, &names, &num_dialects);
-    if (num_dialects == 0) {
-        return beam.make_error_binary(env, "no dialects found");
-    }
-    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(num_dialects));
-    defer beam.allocator.free(ret);
-    var i: usize = 0;
-    while (i < num_dialects) : ({
-        i += 1;
-    }) {
-        ret[@intCast(i)] = beam.make_c_string_charlist(env, names[i].data);
-    }
-    return beam.make_term_list(env, ret);
-}
-
-export fn beaver_raw_registered_ops_of_dialect(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var dialect: mlir_capi.StringRef.T = undefined;
-    var ctx: mlir_capi.Context.T = undefined;
-    if (beam.fetch_resource(mlir_capi.Context.T, env, mlir_capi.Context.resource.t, args[0])) |value| {
-        ctx = value;
-    } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for context, expected: mlir_capi.Context.T");
-    }
-    if (beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[1])) |value| {
-        dialect = value;
-    } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for dialect, expected: mlir_capi.StringRef.T");
-    }
-    return get_all_registered_ops2(env, ctx, dialect) catch beam.make_error_binary(env, "launching nif");
-}
-
-export fn beaver_raw_registered_dialects(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
-    return get_registered_dialects(env) catch beam.make_error_binary(env, "launching nif");
-}
-
-export fn beaver_raw_resource_c_string_to_term_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var arg0: mlir_capi.U8.Array.T = beam.fetch_resource(mlir_capi.U8.Array.T, env, mlir_capi.U8.Array.resource.t, args[0]) catch return beam.make_error_binary(env, "fail to fetch resource of c string");
-    return beam.make_c_string_charlist(env, arg0);
-}
-
-// memory layout {StringRef, real_binary, null}
-export fn beaver_raw_get_string_ref(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    const StructT = mlir_capi.StringRef.T;
-    const DataT = [*c]u8;
-    var bin: beam.binary = undefined;
-    if (0 == e.enif_inspect_binary(env, args[0], &bin)) {
-        return beam.make_error_binary(env, "not a binary");
-    }
-    var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.StringRef.resource.t, @sizeOf(StructT) + bin.size + 1);
-    if (ptr == null) {
-        unreachable();
-    }
-    var dptr: DataT = @ptrCast(ptr);
-    dptr += @sizeOf(StructT);
-    var sptr: *StructT = @ptrCast(@alignCast(ptr));
-    sptr.* = c.mlirStringRefCreate(dptr, bin.size);
-    mem.copy(u8, dptr[0..bin.size], bin.data[0..bin.size]);
-    dptr[bin.size] = '\x00';
-    return e.enif_make_resource(env, ptr);
-}
-
-export fn beaver_raw_mlir_named_attribute_get(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var arg0: mlir_capi.Identifier.T = undefined;
-    if (beam.fetch_resource(mlir_capi.Identifier.T, env, mlir_capi.Identifier.resource.t, args[0])) |value| {
-        arg0 = value;
-    } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: mlir_capi.Identifier.T");
-    }
-    var arg1: c.MlirAttribute = undefined;
-    if (beam.fetch_resource(c.MlirAttribute, env, mlir_capi.Attribute.resource.t, args[1])) |value| {
-        arg1 = value;
-    } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for argument #1, expected: c.MlirAttribute");
-    }
-
-    var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.NamedAttribute.resource.t, @sizeOf(mlir_capi.NamedAttribute.T));
-
-    const RType = mlir_capi.NamedAttribute.T;
-    var obj: *RType = undefined;
-
-    if (ptr == null) {
-        unreachable();
-    } else {
-        obj = @ptrCast(@alignCast(ptr));
-        obj.* = mlir_capi.NamedAttribute.T{ .name = arg0, .attribute = arg1 };
-    }
-    return e.enif_make_resource(env, ptr);
-}
-
-fn Printer(comptime ResourceKind: type, comptime print_fn: anytype) type {
-    return struct {
-        const Buffer = std.ArrayList(u8);
-        buffer: Buffer,
-        fn collect_string_ref(string_ref: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
-            var printer: *@This() = @ptrCast(@alignCast(userData));
-            printer.*.buffer.appendSlice(string_ref.data[0..string_ref.length]) catch unreachable;
-        }
-        fn to_string(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            var entity: ResourceKind.T = ResourceKind.resource.fetch(env, args[0]) catch
-                return beam.make_error_binary(env, "fail to fetch resource for MLIR entity to print, expected: " ++ @typeName(ResourceKind.T));
-            if (entity.ptr == null) {
-                return beam.make_error_binary(env, "null pointer found: " ++ @typeName(@TypeOf(entity)));
-            }
-            var printer = @This(){ .buffer = Buffer.init(beam.allocator) };
-            defer printer.buffer.deinit();
-            print_fn(entity, collect_string_ref, &printer);
-            return beam.make_slice(env, printer.buffer.items);
-        }
-    };
-}
-
-export fn beaver_raw_get_context_load_all_dialects(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
-    var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.Context.resource.t, @sizeOf(mlir_capi.Context.T));
-    const RType = mlir_capi.Context.T;
-    var obj: *RType = undefined;
-    if (ptr == null) {
-        unreachable();
-    } else {
-        obj = @ptrCast(@alignCast(ptr));
-        obj.* = get_context_load_all_dialects();
-    }
-    return e.enif_make_resource(env, ptr);
-}
-
-const PtrOwner = extern struct {
-    pub const Kind = kinda.ResourceKind(@This(), "Elixir.Beaver.Native.PtrOwner");
-    ptr: mlir_capi.OpaquePtr.T,
-    extern fn free(ptr: ?*anyopaque) void;
-    pub fn destroy(_: beam.env, resource_ptr: ?*anyopaque) callconv(.C) void {
-        const this_ptr: *@This() = @ptrCast(@alignCast(resource_ptr));
-        @import("std").debug.print("destroy {}.\n", .{this_ptr});
-        free(this_ptr.*.ptr);
-    }
-};
-
-export fn beaver_raw_own_opaque_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var ptr: mlir_capi.OpaquePtr.T = mlir_capi.OpaquePtr.resource.fetch(env, args[0]) catch
-        return beam.make_error_binary(env, "fail to fetch resource for ptr, expected: " ++ @typeName(mlir_capi.OpaquePtr.T));
-    var owner: PtrOwner = .{ .ptr = ptr };
-    return PtrOwner.Kind.resource.make(env, owner) catch return beam.make_error_binary(env, "fail to make owner");
-}
-
-export fn beaver_raw_read_opaque_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var ptr: mlir_capi.OpaquePtr.T = mlir_capi.OpaquePtr.resource.fetch(env, args[0]) catch
-        return beam.make_error_binary(env, "fail to fetch resource for ptr, expected: " ++ @typeName(mlir_capi.OpaquePtr.T));
-    var len = mlir_capi.U64.resource.fetch(env, args[1]) catch return beam.make_error_binary(env, "fail to fetch resource length, expected a integer");
-    if (ptr == null) {
-        return beam.make_error_binary(env, "ptr is null");
-    }
-    const slice = @as(mlir_capi.U8.Array.T, @ptrCast(ptr))[0..len];
-    return beam.make_slice(env, slice);
-}
+const registry = @import("registry.zig");
+const pointer = @import("pointer.zig");
+const string_ref = @import("string_ref.zig");
+const Printer = string_ref.Printer;
 
 fn MemRefDescriptorAccessor(comptime MemRefT: type) type {
     return struct {
@@ -303,14 +94,6 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
         }
         pub const nifs = .{ e.ErlNifFunc{ .name = module_name ++ ".allocated", .arity = 1, .fptr = allocated_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".aligned", .arity = 1, .fptr = aligned_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".offset", .arity = 1, .fptr = get_offset, .flags = 1 } };
     };
-}
-
-fn beaver_raw_parse_pass_pipeline(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-    var passManager: mlir_capi.OpPassManager.T = mlir_capi.OpPassManager.resource.fetch(env, args[0]) catch
-        return beam.make_error_binary(env, "when calling C function mlirParsePassPipeline, fail to fetch resource for passManager, expected: " ++ @typeName(mlir_capi.OpPassManager.T));
-    var pipeline: mlir_capi.StringRef.T = mlir_capi.StringRef.resource.fetch(env, args[1]) catch
-        return beam.make_error_binary(env, "when calling C function mlirParsePassPipeline, fail to fetch resource for pipeline, expected: " ++ @typeName(mlir_capi.StringRef.T));
-    return mlir_capi.LogicalResult.resource.make(env, c.mlirOpPassManagerAddPipeline(passManager, pipeline, diagnostic.print, null)) catch return beam.make_error_binary(env, "when calling C function mlirParsePassPipeline, fail to make resource for: " ++ @typeName(mlir_capi.LogicalResult.T));
 }
 
 fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
@@ -534,13 +317,7 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
     };
 }
 
-const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ .{
-    diagnostic.attach,
-    e.ErlNifFunc{ .name = "beaver_raw_get_context_load_all_dialects", .arity = 0, .fptr = beaver_raw_get_context_load_all_dialects, .flags = 1 },
-    e.ErlNifFunc{ .name = "beaver_raw_registered_ops", .arity = 0, .fptr = beaver_raw_registered_ops, .flags = 1 },
-    e.ErlNifFunc{ .name = "beaver_raw_registered_ops_of_dialect", .arity = 2, .fptr = beaver_raw_registered_ops_of_dialect, .flags = 1 },
-    e.ErlNifFunc{ .name = "beaver_raw_registered_dialects", .arity = 0, .fptr = beaver_raw_registered_dialects, .flags = 1 },
-    e.ErlNifFunc{ .name = "beaver_raw_resource_c_string_to_term_charlist", .arity = 1, .fptr = beaver_raw_resource_c_string_to_term_charlist, .flags = 0 },
+const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ diagnostic.nifs ++ pointer.nifs ++ .{
     e.ErlNifFunc{ .name = "beaver_raw_to_string_attribute", .arity = 1, .fptr = Printer(mlir_capi.Attribute, c.mlirAttributePrint).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_type", .arity = 1, .fptr = Printer(mlir_capi.Type, c.mlirTypePrint).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_operation", .arity = 1, .fptr = Printer(mlir_capi.Operation, c.mlirOperationPrint).to_string, .flags = 0 },
@@ -551,18 +328,13 @@ const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.Entries
     e.ErlNifFunc{ .name = "beaver_raw_to_string_pm", .arity = 1, .fptr = Printer(mlir_capi.OpPassManager, c.mlirPrintPassPipeline).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_affine_map", .arity = 1, .fptr = Printer(mlir_capi.AffineMap, c.mlirAffineMapPrint).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_location", .arity = 1, .fptr = Printer(mlir_capi.Location, c.beaverLocationPrint).to_string, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_get_string_ref", .arity = 1, .fptr = beaver_raw_get_string_ref, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_mlir_named_attribute_get", .arity = 2, .fptr = beaver_raw_mlir_named_attribute_get, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_own_opaque_ptr", .arity = 1, .fptr = beaver_raw_own_opaque_ptr, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_read_opaque_ptr", .arity = 2, .fptr = beaver_raw_read_opaque_ptr, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_parse_pass_pipeline", .arity = 2, .fptr = beaver_raw_parse_pass_pipeline, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_jit_invoke_with_terms", .arity = 3, .fptr = enif_support.beaver_raw_jit_invoke_with_terms, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_jit_register_enif", .arity = 1, .fptr = enif_support.beaver_raw_jit_register_enif, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_enif_signatures", .arity = 1, .fptr = enif_support.beaver_raw_enif_signatures, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_enif_functions", .arity = 0, .fptr = enif_support.beaver_raw_enif_functions, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_mlir_type_of_enif_obj", .arity = 2, .fptr = enif_support.beaver_raw_mlir_type_of_enif_obj, .flags = 0 },
 } ++
-    PtrOwner.Kind.nifs ++
+    pointer.PtrOwner.Kind.nifs ++
     Complex.F32.nifs ++
     dataKindToMemrefKind(Complex.F32).nifs ++
     dataKindToMemrefKind(mlir_capi.U8).nifs ++
@@ -588,7 +360,7 @@ export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     Complex.F32.open_all(env);
     beam.open_resource_wrapped(env, pass.Token);
     kinda.Internal.OpaqueStruct.open_all(env);
-    PtrOwner.Kind.open(env);
+    pointer.PtrOwner.Kind.open(env);
     return 0;
 }
 
