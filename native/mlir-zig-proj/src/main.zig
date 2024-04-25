@@ -10,33 +10,7 @@ const enif_support = @import("enif_support.zig");
 const diagnostic = @import("diagnostic.zig");
 const pass = @import("pass.zig");
 const registry = @import("registry.zig");
-
-// TODO: rm this function
-export fn beaver_raw_resource_c_string_to_term_charlist(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var arg0: mlir_capi.U8.Array.T = beam.fetch_resource(mlir_capi.U8.Array.T, env, mlir_capi.U8.Array.resource.t, args[0]) catch return beam.make_error_binary(env, "fail to fetch resource of c string");
-    return beam.make_c_string_charlist(env, arg0);
-}
-
-// memory layout {StringRef, real_binary, null}
-export fn beaver_raw_get_string_ref(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    const StructT = mlir_capi.StringRef.T;
-    const DataT = [*c]u8;
-    var bin: beam.binary = undefined;
-    if (0 == e.enif_inspect_binary(env, args[0], &bin)) {
-        return beam.make_error_binary(env, "not a binary");
-    }
-    var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.StringRef.resource.t, @sizeOf(StructT) + bin.size + 1);
-    if (ptr == null) {
-        unreachable();
-    }
-    var dptr: DataT = @ptrCast(ptr);
-    dptr += @sizeOf(StructT);
-    var sptr: *StructT = @ptrCast(@alignCast(ptr));
-    sptr.* = c.mlirStringRefCreate(dptr, bin.size);
-    mem.copy(u8, dptr[0..bin.size], bin.data[0..bin.size]);
-    dptr[bin.size] = '\x00';
-    return e.enif_make_resource(env, ptr);
-}
+const string_ref = @import("string_ref.zig");
 
 export fn beaver_raw_mlir_named_attribute_get(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var arg0: mlir_capi.Identifier.T = undefined;
@@ -70,9 +44,9 @@ fn Printer(comptime ResourceKind: type, comptime print_fn: anytype) type {
     return struct {
         const Buffer = std.ArrayList(u8);
         buffer: Buffer,
-        fn collect_string_ref(string_ref: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
+        fn collect_string_ref(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
             var printer: *@This() = @ptrCast(@alignCast(userData));
-            printer.*.buffer.appendSlice(string_ref.data[0..string_ref.length]) catch unreachable;
+            printer.*.buffer.appendSlice(s.data[0..s.length]) catch unreachable;
         }
         fn to_string(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
             var entity: ResourceKind.T = ResourceKind.resource.fetch(env, args[0]) catch
@@ -428,9 +402,8 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
     };
 }
 
-const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ .{
+const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ .{
     diagnostic.attach,
-    e.ErlNifFunc{ .name = "beaver_raw_resource_c_string_to_term_charlist", .arity = 1, .fptr = beaver_raw_resource_c_string_to_term_charlist, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_attribute", .arity = 1, .fptr = Printer(mlir_capi.Attribute, c.mlirAttributePrint).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_type", .arity = 1, .fptr = Printer(mlir_capi.Type, c.mlirTypePrint).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_operation", .arity = 1, .fptr = Printer(mlir_capi.Operation, c.mlirOperationPrint).to_string, .flags = 0 },
@@ -441,7 +414,6 @@ const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.Entries
     e.ErlNifFunc{ .name = "beaver_raw_to_string_pm", .arity = 1, .fptr = Printer(mlir_capi.OpPassManager, c.mlirPrintPassPipeline).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_affine_map", .arity = 1, .fptr = Printer(mlir_capi.AffineMap, c.mlirAffineMapPrint).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_location", .arity = 1, .fptr = Printer(mlir_capi.Location, c.beaverLocationPrint).to_string, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_get_string_ref", .arity = 1, .fptr = beaver_raw_get_string_ref, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_mlir_named_attribute_get", .arity = 2, .fptr = beaver_raw_mlir_named_attribute_get, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_own_opaque_ptr", .arity = 1, .fptr = beaver_raw_own_opaque_ptr, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_read_opaque_ptr", .arity = 2, .fptr = beaver_raw_read_opaque_ptr, .flags = 0 },
