@@ -26,13 +26,7 @@ defmodule Beaver.MLIR.StringRef do
   @doc """
   Converts an `StringRef` to a string.
   """
-  def to_string(%__MODULE__{} = string_ref) do
-    %{ref: ref} =
-      string_ref
-      |> CAPI.beaverStringRefGetData()
-
-    CAPI.beaver_raw_resource_c_string_to_term_charlist(ref)
-    |> Beaver.Native.check!()
-    |> List.to_string()
+  def to_string(%__MODULE__{ref: ref}) do
+    CAPI.beaver_raw_string_ref_to_binary(ref)
   end
 end

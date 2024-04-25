@@ -45,15 +45,18 @@ defmodule Beaver.MLIR.Pass.Composer do
 
   defp add_pipeline(%MLIR.OpPassManager{} = pm, pipeline_str)
        when is_binary(pipeline_str) do
-    ref =
-      beaver_raw_parse_pass_pipeline(pm.ref, MLIR.StringRef.create(pipeline_str).ref)
-      |> Beaver.Native.check!()
-
-    status = %MLIR.LogicalResult{ref: ref}
-
-    if not MLIR.LogicalResult.success?(status) do
-      raise "Unexpected failure parsing pipeline: #{pipeline_str}"
-    end
+    mlirOpPassManagerAddPipeline(
+      pm,
+      MLIR.StringRef.create(pipeline_str),
+      Beaver.Diagnostic.callback(),
+      Beaver.Native.OpaquePtr.null()
+    )
+    |> Beaver.Native.check!()
+    |> tap(fn res ->
+      if not MLIR.LogicalResult.success?(res) do
+        raise "Unexpected failure parsing pipeline: #{pipeline_str}"
+      end
+    end)
 
     pm
   end

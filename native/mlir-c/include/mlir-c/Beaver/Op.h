@@ -13,8 +13,6 @@ extern "C" {
   };                                                                           \
   typedef struct name name
 
-DEFINE_C_API_STRUCT(MlirRegisteredOperationName, void);
-
 #undef DEFINE_C_API_STRUCT
 
 MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
@@ -23,22 +21,13 @@ MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
 MLIR_CAPI_EXPORTED intptr_t
 beaverGetNumRegisteredOperations(MlirContext context);
 
-MLIR_CAPI_EXPORTED MlirRegisteredOperationName
-beaverGetRegisteredOperationName(MlirContext context, intptr_t pos);
+MLIR_CAPI_EXPORTED void beaverGetRegisteredOps(MlirContext context,
+                                               MlirStringCallback insert,
+                                               void *container);
 
-MLIR_CAPI_EXPORTED MlirStringRef
-beaverRegisteredOperationNameGetDialectName(MlirRegisteredOperationName name);
-
-MLIR_CAPI_EXPORTED MlirStringRef
-beaverRegisteredOperationNameGetOpName(MlirRegisteredOperationName name);
-
-MLIR_CAPI_EXPORTED void
-beaverRegisteredOperationsOfDialect(MlirContext context, MlirStringRef dialect,
-                                    MlirRegisteredOperationName *ret,
-                                    size_t *num);
-
-MLIR_CAPI_EXPORTED void
-beaverRegisteredDialects(MlirContext context, MlirStringRef *ret, size_t *num);
+MLIR_CAPI_EXPORTED void beaverRegisteredDialects(MlirContext context,
+                                                 MlirStringCallback insert,
+                                                 void *container);
 
 MLIR_CAPI_EXPORTED const char *beaverStringRefGetData(MlirStringRef string_ref);
 MLIR_CAPI_EXPORTED size_t beaverStringRefGetLength(MlirStringRef string_ref);
@@ -90,13 +79,13 @@ MLIR_CAPI_EXPORTED
 MlirAttribute beaverMlirNamedAttributeGetAttribute(MlirNamedAttribute na);
 
 MLIR_CAPI_EXPORTED MlirPass beaverCreateExternalPass(
-    void (*construct)(void *userData), MlirTypeID passID, MlirStringRef name,
-    MlirStringRef argument, MlirStringRef description, MlirStringRef opName,
-    intptr_t nDependentDialects, MlirDialectHandle *dependentDialects,
-    void (*destruct)(void *userData),
+    void (*construct)(void *userData), void (*destruct)(void *userData),
     MlirLogicalResult (*initialize)(MlirContext ctx, void *userData),
     void *(*clone)(void *userData),
     void (*run)(MlirOperation op, MlirExternalPass pass, void *userData),
+    MlirTypeID passID, MlirStringRef name, MlirStringRef argument,
+    MlirStringRef description, MlirStringRef opName,
+    intptr_t nDependentDialects, MlirDialectHandle *dependentDialects,
     void *userData);
 
 MLIR_CAPI_EXPORTED MlirAttribute beaverGetReassociationIndicesForReshape(

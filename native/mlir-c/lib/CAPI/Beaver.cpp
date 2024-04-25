@@ -66,54 +66,21 @@ beaverGetNumRegisteredOperations(MlirContext context) {
   return unwrap(context)->getRegisteredOperations().size();
 }
 
-MLIR_CAPI_EXPORTED MlirRegisteredOperationName
-beaverGetRegisteredOperationName(MlirContext context, intptr_t pos) {
-  mlir::RegisteredOperationName name =
-      unwrap(context)->getRegisteredOperations()[pos];
-  return wrap(name);
-}
-
-MLIR_CAPI_EXPORTED MlirStringRef
-beaverRegisteredOperationNameGetDialectName(MlirRegisteredOperationName name) {
-  return wrap(unwrap(name).getDialectNamespace());
-}
-
-MLIR_CAPI_EXPORTED MlirStringRef
-beaverRegisteredOperationNameGetOpName(MlirRegisteredOperationName name) {
-  return wrap(unwrap(name).stripDialect());
-}
-
-MLIR_CAPI_EXPORTED void
-beaverRegisteredOperationsOfDialect(MlirContext context, MlirStringRef dialect,
-                                    MlirRegisteredOperationName *ret,
-                                    size_t *num) {
-  int i = 0;
-  for (auto &op : unwrap(context)->getRegisteredOperations()) {
-    if (std::string(op.getDialectNamespace()) == std::string(unwrap(dialect))) {
-      if (i > 300) {
-        llvm::errs() << "dialect " << unwrap(dialect) << " has more than 300 "
-                     << "operations\n";
-        exit(1);
-      }
-      ret[i] = wrap(op);
-      i += 1;
-    }
+MLIR_CAPI_EXPORTED void beaverGetRegisteredOps(MlirContext context,
+                                               MlirStringCallback insert,
+                                               void *container) {
+  for (const RegisteredOperationName &op :
+       unwrap(context)->getRegisteredOperations()) {
+    insert(wrap(op.getStringRef()), container);
   }
-  *num = i;
 }
 
-MLIR_CAPI_EXPORTED void
-beaverRegisteredDialects(MlirContext context, MlirStringRef *ret, size_t *num) {
-  int i = 0;
+MLIR_CAPI_EXPORTED void beaverRegisteredDialects(MlirContext context,
+                                                 MlirStringCallback insert,
+                                                 void *container) {
   for (auto dialect : unwrap(context)->getDialectRegistry().getDialectNames()) {
-    if (i > 300) {
-      llvm::errs() << "more than 300 dialect in registry" << dialect;
-      exit(1);
-    }
-    ret[i] = wrap(dialect);
-    i += 1;
+    insert(wrap(dialect), container);
   }
-  *num = i;
 }
 
 MLIR_CAPI_EXPORTED void beaverEnterMultiThreadedExecution(MlirContext context) {
@@ -229,13 +196,13 @@ MlirAttribute beaverMlirNamedAttributeGetAttribute(MlirNamedAttribute na) {
 }
 
 MLIR_CAPI_EXPORTED MlirPass beaverCreateExternalPass(
-    void (*construct)(void *userData), MlirTypeID passID, MlirStringRef name,
-    MlirStringRef argument, MlirStringRef description, MlirStringRef opName,
-    intptr_t nDependentDialects, MlirDialectHandle *dependentDialects,
-    void (*destruct)(void *userData),
+    void (*construct)(void *userData), void (*destruct)(void *userData),
     MlirLogicalResult (*initialize)(MlirContext ctx, void *userData),
     void *(*clone)(void *userData),
     void (*run)(MlirOperation op, MlirExternalPass pass, void *userData),
+    MlirTypeID passID, MlirStringRef name, MlirStringRef argument,
+    MlirStringRef description, MlirStringRef opName,
+    intptr_t nDependentDialects, MlirDialectHandle *dependentDialects,
     void *userData) {
   return mlirCreateExternalPass(
       passID, name, argument, description, opName, nDependentDialects,

@@ -59,5 +59,9 @@ fn do_attach(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     return try mlir_capi.DiagnosticHandlerID.resource.make(env, id);
 }
 
+fn get_diagnostic_string_callback(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
+    return try mlir_capi.StringCallback.resource.make(env, BeaverDiagnostic.printDiagnostic);
+}
+
 pub const print = BeaverDiagnostic.printDiagnostic;
-pub const attach = result.nif("beaver_raw_context_attach_diagnostic_handler", 2, do_attach).entry;
+pub const nifs = .{ result.nif("beaver_raw_context_attach_diagnostic_handler", 2, do_attach).entry, result.nif("beaver_raw_get_diagnostic_string_callback", 0, get_diagnostic_string_callback).entry };
