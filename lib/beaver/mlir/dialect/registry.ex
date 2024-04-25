@@ -58,21 +58,21 @@ defmodule Beaver.MLIR.Dialect.Registry do
   Get dialects registered, if it is dev/test env with config key :skip_dialects of app :beaver configured,
   these dialects will not be returned (usually to speedup the compilation). Pass option dialects(full: true) to get all dialects anyway.
   """
-  def dialects(opts \\ [full: false]) do
-    full = Keyword.get(opts, :full, false)
+  def dialects(opts \\ []) do
+    if ctx = opts[:ctx] do
+      %MLIR.Context{ref: ref} = ctx
 
-    all_dialects =
-      CAPI.beaver_raw_registered_dialects()
+      CAPI.beaver_raw_registered_dialects(ref)
       |> Enum.map(&List.to_string/1)
       |> Beaver.Native.check!()
       |> Enum.uniq()
       |> Enum.sort()
-
-    if full do
-      all_dialects
+      |> Enum.reject(&(&1 == "elixir"))
     else
-      skip_dialects = Application.get_env(:beaver, :skip_dialects, [])
-      all_dialects |> Enum.reject(fn x -> x in skip_dialects end)
+      ctx = MLIR.Context.create()
+      ret = dialects(Keyword.put(opts, :ctx, ctx))
+      MLIR.Context.destroy(ctx)
+      ret
     end
   end
 end

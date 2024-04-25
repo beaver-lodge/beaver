@@ -44,9 +44,8 @@ fn get_all_registered_ops(env: beam.env, _: c_int, args: [*c]const beam.term) !b
     return try col.collect();
 }
 
-fn get_registered_dialects(env: beam.env) !beam.term {
-    const ctx = context_of_dialects();
-    defer c.mlirContextDestroy(ctx);
+fn get_registered_dialects(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+    const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
     var num_dialects: usize = 0;
     // TODO: refactor this dirty trick
     var names: [300]mlir_capi.StringRef.T = undefined;
@@ -65,8 +64,7 @@ fn get_registered_dialects(env: beam.env) !beam.term {
     return beam.make_term_list(env, ret);
 }
 
-pub const beaver_raw_registered_ops = result.nif("beaver_raw_registered_ops", 1, get_all_registered_ops).entry;
-
-pub export fn beaver_raw_registered_dialects(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
-    return get_registered_dialects(env) catch beam.make_error_binary(env, "launching nif");
-}
+pub const nifs = .{
+    result.nif("beaver_raw_registered_ops", 1, get_all_registered_ops).entry,
+    result.nif("beaver_raw_registered_dialects", 1, get_registered_dialects).entry,
+};
