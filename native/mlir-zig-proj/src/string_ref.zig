@@ -8,24 +8,26 @@ const mem = @import("std").mem;
 
 pub fn Printer(comptime name: [*c]const u8, comptime ResourceKind: type, comptime print_fn: anytype) type {
     return struct {
+        const Error = error{
+            NullPointerFound,
+        };
         const Buffer = std.ArrayList(u8);
         buffer: Buffer,
         fn collect_string_ref(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
             var printer: *@This() = @ptrCast(@alignCast(userData));
             printer.*.buffer.appendSlice(s.data[0..s.length]) catch unreachable;
         }
-        fn to_string(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            var entity: ResourceKind.T = ResourceKind.resource.fetch(env, args[0]) catch
-                return beam.make_error_binary(env, "fail to fetch resource for MLIR entity to print, expected: " ++ @typeName(ResourceKind.T));
+        fn to_string(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            var entity: ResourceKind.T = try ResourceKind.resource.fetch(env, args[0]);
             if (entity.ptr == null) {
-                return beam.make_error_binary(env, "null pointer found: " ++ @typeName(@TypeOf(entity)));
+                return Error.NullPointerFound;
             }
             var printer = @This(){ .buffer = Buffer.init(beam.allocator) };
             defer printer.buffer.deinit();
             print_fn(entity, collect_string_ref, &printer);
             return beam.make_slice(env, printer.buffer.items);
         }
-        const entry = e.ErlNifFunc{ .name = name, .arity = 1, .fptr = to_string, .flags = 0 };
+        const entry = result.nif(name, 1, to_string).entry;
     };
 }
 
@@ -57,13 +59,12 @@ fn beaver_raw_string_ref_to_binary(env: beam.env, _: c_int, args: [*c]const beam
     return string_ref_to_binary(env, try mlir_capi.StringRef.resource.fetch(env, args[0]));
 }
 
-const Error = error{
-    ResAllocFailure,
-    NotBinary,
-};
-
 // memory layout {StringRef, real_binary, null}
 fn beaver_raw_get_string_ref(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+    const Error = error{
+        ResAllocFailure,
+        NotBinary,
+    };
     const StructT = mlir_capi.StringRef.T;
     const DataT = [*c]u8;
     var bin: beam.binary = undefined;
