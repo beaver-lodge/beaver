@@ -25,8 +25,9 @@ MLIR_CAPI_EXPORTED void beaverGetRegisteredOps(MlirContext context,
                                                MlirStringCallback insert,
                                                void *container);
 
-MLIR_CAPI_EXPORTED void
-beaverRegisteredDialects(MlirContext context, MlirStringRef *ret, size_t *num);
+MLIR_CAPI_EXPORTED void beaverRegisteredDialects(MlirContext context,
+                                                 MlirStringCallback insert,
+                                                 void *container);
 
 MLIR_CAPI_EXPORTED const char *beaverStringRefGetData(MlirStringRef string_ref);
 MLIR_CAPI_EXPORTED size_t beaverStringRefGetLength(MlirStringRef string_ref);

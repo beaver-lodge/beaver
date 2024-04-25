@@ -66,7 +66,6 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def dialects(opts \\ []) do
     unwrap_ctx_then(opts, fn ref ->
       CAPI.beaver_raw_registered_dialects(ref)
-      |> Enum.map(&List.to_string/1)
       |> Beaver.Native.check!()
       |> Enum.uniq()
       |> Enum.sort()

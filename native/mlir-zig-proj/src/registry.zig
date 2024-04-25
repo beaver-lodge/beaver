@@ -38,7 +38,6 @@ const StringRefCollector = struct {
 
 fn get_all_registered_ops(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
-    // we don't use beam.allocator.create here because MLIR will not free this user data
     var col = StringRefCollector.init(env);
     c.beaverGetRegisteredOps(ctx, StringRefCollector.append, @constCast(@ptrCast(@alignCast(&col))));
     return try col.collect();
@@ -46,22 +45,9 @@ fn get_all_registered_ops(env: beam.env, _: c_int, args: [*c]const beam.term) !b
 
 fn get_registered_dialects(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
-    var num_dialects: usize = 0;
-    // TODO: refactor this dirty trick
-    var names: [300]mlir_capi.StringRef.T = undefined;
-    c.beaverRegisteredDialects(ctx, &names, &num_dialects);
-    if (num_dialects == 0) {
-        return beam.make_error_binary(env, "no dialects found");
-    }
-    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(num_dialects));
-    defer beam.allocator.free(ret);
-    var i: usize = 0;
-    while (i < num_dialects) : ({
-        i += 1;
-    }) {
-        ret[@intCast(i)] = beam.make_c_string_charlist(env, names[i].data);
-    }
-    return beam.make_term_list(env, ret);
+    var col = StringRefCollector.init(env);
+    c.beaverRegisteredDialects(ctx, StringRefCollector.append, @constCast(@ptrCast(@alignCast(&col))));
+    return try col.collect();
 }
 
 pub const nifs = .{

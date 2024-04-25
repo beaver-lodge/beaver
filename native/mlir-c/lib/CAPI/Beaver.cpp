@@ -74,18 +74,12 @@ MLIR_CAPI_EXPORTED void beaverGetRegisteredOps(MlirContext context,
   }
 }
 
-MLIR_CAPI_EXPORTED void
-beaverRegisteredDialects(MlirContext context, MlirStringRef *ret, size_t *num) {
-  int i = 0;
+MLIR_CAPI_EXPORTED void beaverRegisteredDialects(MlirContext context,
+                                                 MlirStringCallback insert,
+                                                 void *container) {
   for (auto dialect : unwrap(context)->getDialectRegistry().getDialectNames()) {
-    if (i > 300) {
-      llvm::errs() << "more than 300 dialect in registry" << dialect;
-      exit(1);
-    }
-    ret[i] = wrap(dialect);
-    i += 1;
+    insert(wrap(dialect), container);
   }
-  *num = i;
 }
 
 MLIR_CAPI_EXPORTED void beaverEnterMultiThreadedExecution(MlirContext context) {
