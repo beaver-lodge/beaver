@@ -9,17 +9,13 @@ const kinda = @import("kinda");
 
 fn MemRefDescriptorAccessor(comptime MemRefT: type) type {
     return struct {
-        fn allocated_ptr(env: beam.env, term: beam.term) callconv(.C) beam.term {
-            var descriptor: MemRefT = beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term) catch
-                return beam.make_error_binary(env, "fail to fetch resource for descriptor, expected: " ++ @typeName(MemRefT));
-            var ret: mlir_capi.OpaquePtr.T = @ptrCast(descriptor.allocated);
-            return mlir_capi.OpaquePtr.resource.make(env, ret) catch return beam.make_error_binary(env, "fail to make allocated ptr");
+        fn allocated_ptr(env: beam.env, term: beam.term) !beam.term {
+            var descriptor: MemRefT = try beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term);
+            return try mlir_capi.OpaquePtr.resource.make(env, @ptrCast(descriptor.allocated));
         }
-        fn aligned_ptr(env: beam.env, term: beam.term) callconv(.C) beam.term {
-            var descriptor: MemRefT = beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term) catch
-                return beam.make_error_binary(env, "fail to fetch resource for descriptor, expected: " ++ @typeName(MemRefT));
-            var ret: mlir_capi.OpaquePtr.T = @ptrCast(descriptor.aligned);
-            return mlir_capi.OpaquePtr.resource.make(env, ret) catch return beam.make_error_binary(env, "fail to make aligned ptr");
+        fn aligned_ptr(env: beam.env, term: beam.term) !beam.term {
+            var descriptor: MemRefT = try beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term);
+            return try mlir_capi.OpaquePtr.resource.make(env, @ptrCast(descriptor.aligned));
         }
         fn fetch_ptr_or_nil(env: beam.env, ptr_term: beam.term) !MemRefT.ElementResourceKind.Ptr.T {
             if (MemRefT.ElementResourceKind.Ptr.resource.fetch(env, ptr_term)) |value| {
@@ -32,9 +28,8 @@ fn MemRefDescriptorAccessor(comptime MemRefT: type) type {
                 }
             }
         }
-        fn offset(env: beam.env, term: beam.term) callconv(.C) beam.term {
-            var descriptor: MemRefT = beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term) catch
-                return beam.make_error_binary(env, "fail to fetch resource for descriptor, expected: " ++ @typeName(MemRefT));
+        fn offset(env: beam.env, term: beam.term) !beam.term {
+            var descriptor = try beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term);
             return beam.make_i64(env, descriptor.offset);
         }
     };
@@ -46,13 +41,10 @@ fn memref_module_name(comptime resource_kind: type, comptime rank: i32) []const 
 
 fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
     return extern struct {
-        pub fn make(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            var allocated: ResourceKind.Ptr.T = MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[0]) catch
-                return beam.make_error_binary(env, "fail to fetch allocated. expected: " ++ @typeName(ResourceKind.Ptr.T));
-            var aligned: ResourceKind.Ptr.T = MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[1]) catch
-                return beam.make_error_binary(env, "fail to fetch aligned. expected: " ++ @typeName(ResourceKind.Ptr.T));
-            var offset: mlir_capi.I64.T = mlir_capi.I64.resource.fetch(env, args[2]) catch
-                return beam.make_error_binary(env, "fail to fetch offset");
+        pub fn make(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            var allocated: ResourceKind.Ptr.T = try MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[0]);
+            var aligned: ResourceKind.Ptr.T = try MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[1]);
+            var offset: mlir_capi.I64.T = try mlir_capi.I64.resource.fetch(env, args[2]);
             const kind: type = dataKindToMemrefKind(ResourceKind);
             var descriptor: UnrankMemRefDescriptor(ResourceKind) = undefined;
             if (allocated == null) {
@@ -66,9 +58,9 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
                     .offset = offset,
                 };
             }
-            return kind.per_rank_resource_kinds[0].resource.make(env, descriptor) catch return beam.make_error_binary(env, "fail to make unranked memref descriptor");
+            return try kind.per_rank_resource_kinds[0].resource.make(env, descriptor);
         }
-        pub const maker = .{ make, 5 };
+        pub const maker = .{ result.wrap(make), 5 };
         pub const module_name = memref_module_name(ResourceKind, 0);
         const ElementResourceKind = ResourceKind;
         const T = ResourceKind.T;
@@ -76,16 +68,16 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
         aligned: ?*T = null,
         offset: i64 = undefined,
         pub var resource_type: beam.resource_type = undefined;
-        fn allocated_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            return MemRefDescriptorAccessor(@This()).allocated_ptr(env, args[0]);
+        fn allocated_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            return try MemRefDescriptorAccessor(@This()).allocated_ptr(env, args[0]);
         }
-        fn aligned_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            return MemRefDescriptorAccessor(@This()).aligned_ptr(env, args[0]);
+        fn aligned_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            return try MemRefDescriptorAccessor(@This()).aligned_ptr(env, args[0]);
         }
-        fn get_offset(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            return MemRefDescriptorAccessor(@This()).offset(env, args[0]);
+        fn get_offset(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            return try MemRefDescriptorAccessor(@This()).offset(env, args[0]);
         }
-        pub const nifs = .{ e.ErlNifFunc{ .name = module_name ++ ".allocated", .arity = 1, .fptr = allocated_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".aligned", .arity = 1, .fptr = aligned_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".offset", .arity = 1, .fptr = get_offset, .flags = 1 } };
+        pub const nifs = .{ result.nif(module_name ++ ".allocated", 1, allocated_ptr).entry, result.nif(module_name ++ ".aligned", 1, aligned_ptr).entry, result.nif(module_name ++ ".offset", 1, get_offset).entry };
     };
 }
 
@@ -111,27 +103,29 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
             mem.copy(i64, self.sizes[0..rank], sizes[0..rank]);
             mem.copy(i64, self.strides[0..rank], strides[0..rank]);
         }
-        pub fn make(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            var allocated: ResourceKind.Ptr.T = MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[0]) catch
-                return beam.make_error_binary(env, "fail to fetch allocated. expected: " ++ @typeName(ResourceKind.Ptr.T));
-            var aligned: ResourceKind.Ptr.T = MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[1]) catch
-                return beam.make_error_binary(env, "fail to fetch aligned. expected: " ++ @typeName(ResourceKind.Ptr.T));
-            var offset: mlir_capi.I64.T = mlir_capi.I64.resource.fetch(env, args[2]) catch
-                return beam.make_error_binary(env, "fail to fetch offset");
-            const sizes = beam.get_slice_of(i64, env, args[3]) catch return beam.make_error_binary(env, "fail to get sizes as zig slice");
+        pub fn make(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            const Error = error{
+                SizesAndStridesOfDifferentLength,
+                WrongSizesForRank,
+                WrongStridesForRank,
+            };
+            var allocated: ResourceKind.Ptr.T = try MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[0]);
+            var aligned: ResourceKind.Ptr.T = try MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[1]);
+            var offset: mlir_capi.I64.T = try mlir_capi.I64.resource.fetch(env, args[2]);
+            const sizes = try beam.get_slice_of(i64, env, args[3]);
             defer beam.allocator.free(sizes);
-            const strides = beam.get_slice_of(i64, env, args[4]) catch return beam.make_error_binary(env, "fail to get sizes as zig slice");
+            const strides = try beam.get_slice_of(i64, env, args[4]);
             defer beam.allocator.free(strides);
             if (sizes.len != strides.len) {
-                return beam.make_error_binary(env, "sizes and strides must have the same length");
+                return Error.SizesAndStridesOfDifferentLength;
             }
             const kind: type = dataKindToMemrefKind(ResourceKind);
             comptime var rank = N;
             if (rank != sizes.len) {
-                return beam.make_error_binary(env, "wrong sizes for " ++ @typeName(@This()));
+                return Error.WrongSizesForRank;
             }
             if (rank != strides.len) {
-                return beam.make_error_binary(env, "wrong strides for " ++ @typeName(@This()));
+                return Error.WrongStridesForRank;
             }
             var descriptor: MemRefDescriptor(ResourceKind, rank) = .{};
             if (allocated == null) {
@@ -139,27 +133,25 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
             } else {
                 descriptor.populate(allocated, aligned, offset, sizes, strides);
             }
-            return kind.per_rank_resource_kinds[rank].resource.make(env, descriptor) catch return beam.make_error_binary(env, "fail to make memref descriptor");
+            return try kind.per_rank_resource_kinds[rank].resource.make(env, descriptor);
         }
-        pub const maker = .{ make, 5 };
+        pub const maker = .{ result.wrap(make), 5 };
         pub const ElementResourceKind = ResourceKind;
         pub const module_name = memref_module_name(ResourceKind, N);
         pub var resource_type: beam.resource_type = undefined;
-        fn allocated_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            return MemRefDescriptorAccessor(@This()).allocated_ptr(env, args[0]);
+        fn allocated_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            return try MemRefDescriptorAccessor(@This()).allocated_ptr(env, args[0]);
         }
-        fn aligned_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            return MemRefDescriptorAccessor(@This()).aligned_ptr(env, args[0]);
+        fn aligned_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            return try MemRefDescriptorAccessor(@This()).aligned_ptr(env, args[0]);
         }
-        fn get_offset(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            return MemRefDescriptorAccessor(@This()).offset(env, args[0]);
+        fn get_offset(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            return try MemRefDescriptorAccessor(@This()).offset(env, args[0]);
         }
-        fn get_sizes(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+        fn get_sizes(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
             comptime var rank = N;
-            var descriptor: @This() = beam.fetch_resource(@This(), env, @This().resource_type, args[0]) catch
-                return beam.make_error_binary(env, "fail to fetch resource for descriptor, expected: " ++ @typeName(@This()));
-            var ret: []beam.term = beam.allocator.alloc(beam.term, @intCast(rank)) catch
-                return beam.make_error_binary(env, "fail to allocate");
+            var descriptor: @This() = try beam.fetch_resource(@This(), env, @This().resource_type, args[0]);
+            var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(rank));
             defer beam.allocator.free(ret);
             var i: usize = 0;
             while (i < rank) : ({
@@ -169,12 +161,10 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
             }
             return beam.make_term_list(env, ret);
         }
-        fn get_strides(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+        fn get_strides(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
             comptime var rank = N;
-            var descriptor: @This() = beam.fetch_resource(@This(), env, @This().resource_type, args[0]) catch
-                return beam.make_error_binary(env, "fail to fetch resource for descriptor, expected: " ++ @typeName(@This()));
-            var ret: []beam.term = beam.allocator.alloc(beam.term, @intCast(rank)) catch
-                return beam.make_error_binary(env, "fail to allocate");
+            var descriptor: @This() = try beam.fetch_resource(@This(), env, @This().resource_type, args[0]);
+            var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(rank));
             defer beam.allocator.free(ret);
             var i: usize = 0;
             while (i < rank) : ({
@@ -184,7 +174,13 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
             }
             return beam.make_term_list(env, ret);
         }
-        pub const nifs = .{ e.ErlNifFunc{ .name = module_name ++ ".allocated", .arity = 1, .fptr = allocated_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".aligned", .arity = 1, .fptr = aligned_ptr, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".offset", .arity = 1, .fptr = get_offset, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".sizes", .arity = 1, .fptr = get_sizes, .flags = 1 }, e.ErlNifFunc{ .name = module_name ++ ".strides", .arity = 1, .fptr = get_strides, .flags = 1 } };
+        pub const nifs = .{
+            result.nif(module_name ++ ".allocated", 1, allocated_ptr).entry,
+            result.nif(module_name ++ ".aligned", 1, aligned_ptr).entry,
+            result.nif(module_name ++ ".offset", 1, get_offset).entry,
+            result.nif(module_name ++ ".sizes", 1, get_sizes).entry,
+            result.nif(module_name ++ ".strides", 1, get_strides).entry,
+        };
     };
 }
 
