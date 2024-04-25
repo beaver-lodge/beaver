@@ -18,6 +18,6 @@ pub const StringRefCollector = struct {
     }
     pub fn collect_and_destroy(this: *@This()) !beam.term {
         defer this.container.deinit();
-        return beam.make_term_list(this.env, try this.container.toOwnedSlice());
+        return beam.make_term_list(this.env, this.container.items);
     }
 };
