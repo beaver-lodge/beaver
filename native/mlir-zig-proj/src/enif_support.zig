@@ -34,15 +34,14 @@ const Invocation = struct {
 };
 
 fn beaver_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    var jit: mlir_capi.ExecutionEngine.T = mlir_capi.ExecutionEngine.resource.fetch(env, args[0]) catch
-        return beam.make_error_binary(env, "fail to fetch resource for ExecutionEngine, expected: " ++ @typeName(mlir_capi.ExecutionEngine.T));
-    var name: beam.binary = beam.get_binary(env, args[1]) catch
-        return beam.make_error_binary(env, "fail to get binary for jit func name");
+    const Error = error{JITFunctionCallFailure};
+    var jit: mlir_capi.ExecutionEngine.T = try mlir_capi.ExecutionEngine.resource.fetch(env, args[0]);
+    var name: beam.binary = try beam.get_binary(env, args[1]);
     var invocation = Invocation{};
-    invocation.init(env, args[2]) catch return beam.make_error_binary(env, "fail to init jit invocation");
+    try invocation.init(env, args[2]);
     defer invocation.deinit();
     if (c.beaverLogicalResultIsFailure(invocation.invoke(env, jit, name))) {
-        return beam.make_error_binary(env, "fail to call jit function");
+        return Error.JITFunctionCallFailure;
     }
     return invocation.res_term;
 }
@@ -59,8 +58,7 @@ fn register_jit_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const 
 }
 
 fn beaver_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    var jit: mlir_capi.ExecutionEngine.T = mlir_capi.ExecutionEngine.resource.fetch(env, args[0]) catch
-        return beam.make_error_binary(env, "fail to fetch resource for ExecutionEngine, expected: " ++ @typeName(mlir_capi.ExecutionEngine.T));
+    var jit = try mlir_capi.ExecutionEngine.resource.fetch(env, args[0]);
     inline for (enif_function_names) |name| {
         register_jit_symbol(jit, name, @field(e, name));
     }
@@ -125,25 +123,20 @@ fn dump_type_info(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !be
 }
 
 fn beaver_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const ctx = mlir_capi.Context.resource.fetch(env, args[0]) catch
-        return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(mlir_capi.Context.T));
-    var signatures: []beam.term = beam.allocator.alloc(beam.term, enif_function_names.len) catch
-        return beam.make_error_binary(env, "fail to allocate");
+    const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
+    var signatures: []beam.term = try beam.allocator.alloc(beam.term, enif_function_names.len);
     inline for (enif_function_names, 0..) |name, i| {
         const f = @field(e, name);
         const FTI = @typeInfo(@TypeOf(f)).Fn;
-        var signature_slice: []beam.term = beam.allocator.alloc(beam.term, 3) catch
-            return beam.make_error_binary(env, "fail to allocate");
+        var signature_slice: []beam.term = try beam.allocator.alloc(beam.term, 3);
         defer beam.allocator.free(signature_slice);
-        var arg_type_slice: []beam.term = beam.allocator.alloc(beam.term, FTI.params.len) catch
-            return beam.make_error_binary(env, "fail to allocate");
+        var arg_type_slice: []beam.term = try beam.allocator.alloc(beam.term, FTI.params.len);
         defer beam.allocator.free(arg_type_slice);
         inline for (FTI.params, 0..) |p, arg_i| {
             if (p.type) |t| {
-                arg_type_slice[arg_i] = dump_type_info(env, ctx, t) catch
-                    return beam.make_error_binary(env, "fail to allocate");
+                arg_type_slice[arg_i] = try dump_type_info(env, ctx, t);
             } else if (@TypeOf(f) == @TypeOf(e.enif_compare_pids)) {
-                arg_type_slice[arg_i] = dump_type_info(env, ctx, [*c]u8) catch return beam.make_error_binary(env, "fail to dump type");
+                arg_type_slice[arg_i] = try dump_type_info(env, ctx, [*c]u8);
             } else {
                 @compileError("param type not found, function: " ++ name);
             }
@@ -157,15 +150,14 @@ fn beaver_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.term
                 ret_size = 0;
             }
         }
-        var ret_slice: []beam.term = beam.allocator.alloc(beam.term, ret_size) catch
-            return beam.make_error_binary(env, "fail to allocate");
+        var ret_slice: []beam.term = try beam.allocator.alloc(beam.term, ret_size);
         defer beam.allocator.free(ret_slice);
         if (FTI.return_type) |t| {
             if (t != void) {
-                ret_slice[0] = dump_type_info(env, ctx, t) catch return beam.make_error_binary(env, "fail to dump type");
+                ret_slice[0] = try dump_type_info(env, ctx, t);
             }
         } else if (f == e.enif_compare_pids) {
-            ret_slice[0] = dump_type_info(env, ctx, c_int) catch return beam.make_error_binary(env, "fail to dump type");
+            ret_slice[0] = try dump_type_info(env, ctx, c_int);
         } else {
             @compileError("return type not found, function: " ++ name);
         }
@@ -176,8 +168,7 @@ fn beaver_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.term
 }
 
 fn beaver_raw_enif_functions(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
-    var names: []beam.term = beam.allocator.alloc(beam.term, enif_function_names.len) catch
-        return beam.make_error_binary(env, "fail to allocate");
+    var names: []beam.term = try beam.allocator.alloc(beam.term, enif_function_names.len);
     inline for (enif_function_names, 0..) |name, i| {
         names[i] = beam.make_atom(env, name);
     }
@@ -185,17 +176,16 @@ fn beaver_raw_enif_functions(env: beam.env, _: c_int, _: [*c]const beam.term) !b
 }
 
 fn beaver_raw_mlir_type_of_enif_obj(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const ctx = mlir_capi.Context.resource.fetch(env, args[0]) catch
-        return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(mlir_capi.Context.T));
-    var name = beam.get_atom_slice(env, args[1]) catch
-        return beam.make_error_binary(env, "fail to get name");
+    const Error = error{MLIRTypeForEnifObjNotFound};
+    const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
+    var name = try beam.get_atom_slice(env, args[1]);
     inline for (.{ "term", "env" }) |obj| {
         if (@import("std").mem.eql(u8, name, obj)) {
             const t = @field(beam, obj);
-            return enif_mlir_type(env, ctx, t) catch return beam.make_error_binary(env, "fail to get mlir type");
+            return try enif_mlir_type(env, ctx, t);
         }
     }
-    return beam.make_error_binary(env, "mlir type not found for enif obj");
+    return Error.MLIRTypeForEnifObjNotFound;
 }
 
 pub const nifs = .{
