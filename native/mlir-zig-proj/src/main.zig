@@ -11,6 +11,7 @@ const diagnostic = @import("diagnostic.zig");
 const pass = @import("pass.zig");
 const registry = @import("registry.zig");
 const string_ref = @import("string_ref.zig");
+const Printer = string_ref.Printer;
 
 export fn beaver_raw_mlir_named_attribute_get(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
     var arg0: mlir_capi.Identifier.T = undefined;
@@ -38,28 +39,6 @@ export fn beaver_raw_mlir_named_attribute_get(env: beam.env, _: c_int, args: [*c
         obj.* = mlir_capi.NamedAttribute.T{ .name = arg0, .attribute = arg1 };
     }
     return e.enif_make_resource(env, ptr);
-}
-
-fn Printer(comptime ResourceKind: type, comptime print_fn: anytype) type {
-    return struct {
-        const Buffer = std.ArrayList(u8);
-        buffer: Buffer,
-        fn collect_string_ref(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
-            var printer: *@This() = @ptrCast(@alignCast(userData));
-            printer.*.buffer.appendSlice(s.data[0..s.length]) catch unreachable;
-        }
-        fn to_string(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
-            var entity: ResourceKind.T = ResourceKind.resource.fetch(env, args[0]) catch
-                return beam.make_error_binary(env, "fail to fetch resource for MLIR entity to print, expected: " ++ @typeName(ResourceKind.T));
-            if (entity.ptr == null) {
-                return beam.make_error_binary(env, "null pointer found: " ++ @typeName(@TypeOf(entity)));
-            }
-            var printer = @This(){ .buffer = Buffer.init(beam.allocator) };
-            defer printer.buffer.deinit();
-            print_fn(entity, collect_string_ref, &printer);
-            return beam.make_slice(env, printer.buffer.items);
-        }
-    };
 }
 
 const PtrOwner = extern struct {

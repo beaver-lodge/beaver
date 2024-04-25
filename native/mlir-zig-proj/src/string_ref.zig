@@ -6,6 +6,28 @@ const result = @import("result.zig");
 pub const c = @import("prelude.zig");
 const mem = @import("std").mem;
 
+pub fn Printer(comptime ResourceKind: type, comptime print_fn: anytype) type {
+    return struct {
+        const Buffer = std.ArrayList(u8);
+        buffer: Buffer,
+        fn collect_string_ref(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
+            var printer: *@This() = @ptrCast(@alignCast(userData));
+            printer.*.buffer.appendSlice(s.data[0..s.length]) catch unreachable;
+        }
+        pub fn to_string(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+            var entity: ResourceKind.T = ResourceKind.resource.fetch(env, args[0]) catch
+                return beam.make_error_binary(env, "fail to fetch resource for MLIR entity to print, expected: " ++ @typeName(ResourceKind.T));
+            if (entity.ptr == null) {
+                return beam.make_error_binary(env, "null pointer found: " ++ @typeName(@TypeOf(entity)));
+            }
+            var printer = @This(){ .buffer = Buffer.init(beam.allocator) };
+            defer printer.buffer.deinit();
+            print_fn(entity, collect_string_ref, &printer);
+            return beam.make_slice(env, printer.buffer.items);
+        }
+    };
+}
+
 fn string_ref_to_binary(env: beam.env, s: mlir_capi.StringRef.T) beam.term {
     return beam.make_slice(env, s.data[0..s.length]);
 }
