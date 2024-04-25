@@ -15,13 +15,7 @@ const string_ref = @import("string_ref.zig");
 const Printer = string_ref.Printer;
 const memref = @import("memref.zig");
 
-const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ diagnostic.nifs ++ pointer.nifs ++ memref.nifs ++ pointer.PtrOwner.Kind.nifs ++ .{
-    e.ErlNifFunc{ .name = "beaver_raw_jit_invoke_with_terms", .arity = 3, .fptr = enif_support.beaver_raw_jit_invoke_with_terms, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_jit_register_enif", .arity = 1, .fptr = enif_support.beaver_raw_jit_register_enif, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_enif_signatures", .arity = 1, .fptr = enif_support.beaver_raw_enif_signatures, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_enif_functions", .arity = 0, .fptr = enif_support.beaver_raw_enif_functions, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_mlir_type_of_enif_obj", .arity = 2, .fptr = enif_support.beaver_raw_mlir_type_of_enif_obj, .flags = 0 },
-};
+const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ diagnostic.nifs ++ pointer.nifs ++ memref.nifs ++ pointer.PtrOwner.Kind.nifs ++ enif_support.nifs;
 
 const num_nifs = handwritten_nifs.len;
 export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs;
