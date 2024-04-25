@@ -39,40 +39,39 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def normalize_dialect_name("xegpu"), do: "XeGPU"
   def normalize_dialect_name(other), do: other |> Macro.camelize()
 
-  def ops(dialect, opts \\ []) do
+  defp unwrap_ctx_then(opts, cb) do
     if ctx = opts[:ctx] do
       %MLIR.Context{ref: ref} = ctx
 
-      Beaver.Native.check!(CAPI.beaver_raw_registered_ops(ref))
-      |> Stream.filter(&String.starts_with?(&1, "#{dialect}."))
-      |> Enum.map(fn ^dialect <> "." <> x -> x end)
+      cb.(ref)
     else
-      ctx = MLIR.Context.create()
-      ret = ops(dialect, Keyword.put(opts, :ctx, ctx))
+      ctx = %MLIR.Context{ref: ref} = MLIR.Context.create()
+      ret = cb.(ref)
       MLIR.Context.destroy(ctx)
       ret
     end
   end
 
+  def ops(dialect, opts \\ []) do
+    unwrap_ctx_then(opts, fn ref ->
+      Beaver.Native.check!(CAPI.beaver_raw_registered_ops(ref))
+      |> Stream.filter(&String.starts_with?(&1, "#{dialect}."))
+      |> Enum.map(fn ^dialect <> "." <> x -> x end)
+    end)
+  end
+
   @doc """
-  Get dialects registered, if it is dev/test env with config key :skip_dialects of app :beaver configured,
-  these dialects will not be returned (usually to speedup the compilation). Pass option dialects(full: true) to get all dialects anyway.
+  Get dialects registered
   """
   def dialects(opts \\ []) do
-    if ctx = opts[:ctx] do
-      %MLIR.Context{ref: ref} = ctx
-
+    unwrap_ctx_then(opts, fn ref ->
       CAPI.beaver_raw_registered_dialects(ref)
       |> Enum.map(&List.to_string/1)
       |> Beaver.Native.check!()
       |> Enum.uniq()
       |> Enum.sort()
+      # elixir dialect is currently only for testing purposes, so we filter it out
       |> Enum.reject(&(&1 == "elixir"))
-    else
-      ctx = MLIR.Context.create()
-      ret = dialects(Keyword.put(opts, :ctx, ctx))
-      MLIR.Context.destroy(ctx)
-      ret
-    end
+    end)
   end
 end
