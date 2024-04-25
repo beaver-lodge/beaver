@@ -37,4 +37,7 @@ fn read_opaque_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.ter
     return beam.make_slice(env, slice);
 }
 
-pub const nifs = .{ result.nif("beaver_raw_get_null_ptr", 0, get_null).entry, result.nif("beaver_raw_own_opaque_ptr", 1, own_opaque_ptr).entry, result.nif("beaver_raw_read_opaque_ptr", 2, read_opaque_ptr).entry };
+pub const nifs = .{ result.nif("beaver_raw_get_null_ptr", 0, get_null).entry, result.nif("beaver_raw_own_opaque_ptr", 1, own_opaque_ptr).entry, result.nif("beaver_raw_read_opaque_ptr", 2, read_opaque_ptr).entry } ++ PtrOwner.Kind.nifs;
+pub fn open_all(env: beam.env) void {
+    PtrOwner.Kind.open(env);
+}

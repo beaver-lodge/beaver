@@ -15,18 +15,18 @@ const string_ref = @import("string_ref.zig");
 const Printer = string_ref.Printer;
 const memref = @import("memref.zig");
 
-const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ diagnostic.nifs ++ pointer.nifs ++ memref.nifs ++ pointer.PtrOwner.Kind.nifs ++ enif_support.nifs;
+const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ diagnostic.nifs ++ pointer.nifs ++ memref.nifs ++ enif_support.nifs;
 
 const num_nifs = handwritten_nifs.len;
 export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs;
 
 export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     kinda.open_internal_resource_types(env);
+    kinda.Internal.OpaqueStruct.open_all(env);
     mlir_capi.open_generated_resource_types(env);
     memref.open_all(env);
-    beam.open_resource_wrapped(env, pass.Token);
-    kinda.Internal.OpaqueStruct.open_all(env);
-    pointer.PtrOwner.Kind.open(env);
+    pointer.open_all(env);
+    pass.open_all(env);
     return 0;
 }
 
