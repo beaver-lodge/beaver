@@ -44,24 +44,6 @@ fn get_all_registered_ops(env: beam.env, _: c_int, args: [*c]const beam.term) !b
     return try col.collect();
 }
 
-fn registered_ops_of_dialect(env: beam.env, ctx: mlir_capi.Context.T, dialect: mlir_capi.StringRef.T) !beam.term {
-    var num_op: usize = 0;
-    // TODO: refactor this dirty trick
-    var names: [300]c.MlirRegisteredOperationName = undefined;
-    c.beaverRegisteredOperationsOfDialect(ctx, dialect, &names, &num_op);
-    var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(num_op));
-    defer beam.allocator.free(ret);
-    var i: usize = 0;
-    while (i < num_op) : ({
-        i += 1;
-    }) {
-        const registered_op_name = names[i];
-        const op_name = c.beaverRegisteredOperationNameStripDialect(registered_op_name);
-        ret[@intCast(i)] = beam.make_slice(env, op_name.data[0..op_name.length]);
-    }
-    return beam.make_term_list(env, ret);
-}
-
 fn get_registered_dialects(env: beam.env) !beam.term {
     const ctx = context_of_dialects();
     defer c.mlirContextDestroy(ctx);
@@ -84,22 +66,6 @@ fn get_registered_dialects(env: beam.env) !beam.term {
 }
 
 pub const beaver_raw_registered_ops = result.nif("beaver_raw_registered_ops", 1, get_all_registered_ops).entry;
-
-pub export fn beaver_raw_registered_ops_of_dialect(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var dialect: mlir_capi.StringRef.T = undefined;
-    var ctx: mlir_capi.Context.T = undefined;
-    if (beam.fetch_resource(mlir_capi.Context.T, env, mlir_capi.Context.resource.t, args[0])) |value| {
-        ctx = value;
-    } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for context, expected: mlir_capi.Context.T");
-    }
-    if (beam.fetch_resource(mlir_capi.StringRef.T, env, mlir_capi.StringRef.resource.t, args[1])) |value| {
-        dialect = value;
-    } else |_| {
-        return beam.make_error_binary(env, "fail to fetch resource for dialect, expected: mlir_capi.StringRef.T");
-    }
-    return registered_ops_of_dialect(env, ctx, dialect) catch beam.make_error_binary(env, "launching nif");
-}
 
 pub export fn beaver_raw_registered_dialects(env: beam.env, _: c_int, _: [*c]const beam.term) beam.term {
     return get_registered_dialects(env) catch beam.make_error_binary(env, "launching nif");

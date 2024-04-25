@@ -13,8 +13,6 @@ extern "C" {
   };                                                                           \
   typedef struct name name
 
-DEFINE_C_API_STRUCT(MlirRegisteredOperationName, void);
-
 #undef DEFINE_C_API_STRUCT
 
 MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
@@ -26,20 +24,6 @@ beaverGetNumRegisteredOperations(MlirContext context);
 MLIR_CAPI_EXPORTED void beaverGetRegisteredOps(MlirContext context,
                                                MlirStringCallback insert,
                                                void *container);
-
-MLIR_CAPI_EXPORTED MlirRegisteredOperationName
-beaverGetRegisteredOperationName(MlirContext context, intptr_t pos);
-
-MLIR_CAPI_EXPORTED MlirStringRef
-beaverRegisteredOperationNameGetDialectName(MlirRegisteredOperationName name);
-
-MLIR_CAPI_EXPORTED MlirStringRef
-beaverRegisteredOperationNameStripDialect(MlirRegisteredOperationName name);
-
-MLIR_CAPI_EXPORTED void
-beaverRegisteredOperationsOfDialect(MlirContext context, MlirStringRef dialect,
-                                    MlirRegisteredOperationName *ret,
-                                    size_t *num);
 
 MLIR_CAPI_EXPORTED void
 beaverRegisteredDialects(MlirContext context, MlirStringRef *ret, size_t *num);
