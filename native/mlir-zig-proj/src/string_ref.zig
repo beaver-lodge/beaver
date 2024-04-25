@@ -45,11 +45,11 @@ fn beaver_raw_get_string_ref(env: beam.env, _: c_int, args: [*c]const beam.term)
     const DataT = [*c]u8;
     var bin: beam.binary = undefined;
     if (0 == e.enif_inspect_binary(env, args[0], &bin)) {
-        return Error.ResAllocFailure;
+        return Error.NotBinary;
     }
     var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.StringRef.resource.t, @sizeOf(StructT) + bin.size + 1);
     if (ptr == null) {
-        return Error.NotBinary;
+        return Error.ResAllocFailure;
     }
     var dptr: DataT = @ptrCast(ptr);
     dptr += @sizeOf(StructT);
