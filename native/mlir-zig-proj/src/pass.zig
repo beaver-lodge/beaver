@@ -7,7 +7,7 @@ const debug_print = @import("std").debug.print;
 const result = @import("result.zig");
 const diagnostic = @import("diagnostic.zig");
 
-pub const Token = struct {
+const Token = struct {
     mutex: std.Thread.Mutex = .{},
     cond: std.Thread.Condition = .{},
     done: bool = false,
@@ -112,3 +112,6 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
 }
 
 pub const nifs = .{ result.nif("beaver_raw_create_mlir_pass", 5, do_create).entry, result.nif("beaver_raw_pass_token_signal", 1, Token.pass_token_signal).entry };
+pub fn open_all(env: beam.env) void {
+    beam.open_resource_wrapped(env, Token);
+}

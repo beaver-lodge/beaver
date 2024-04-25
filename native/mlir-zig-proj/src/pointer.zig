@@ -30,11 +30,15 @@ fn own_opaque_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term
 fn read_opaque_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     var ptr = try mlir_capi.OpaquePtr.resource.fetch(env, args[0]);
     var len = try mlir_capi.USize.resource.fetch(env, args[1]);
+    const Error = error{NullPointer};
     if (ptr == null) {
-        return beam.make_error_binary(env, "ptr is null");
+        return Error.NullPointer;
     }
     const slice = @as(mlir_capi.U8.Array.T, @ptrCast(ptr))[0..len];
     return beam.make_slice(env, slice);
 }
 
-pub const nifs = .{ result.nif("beaver_raw_get_null_ptr", 0, get_null).entry, result.nif("beaver_raw_own_opaque_ptr", 1, own_opaque_ptr).entry, result.nif("beaver_raw_read_opaque_ptr", 2, read_opaque_ptr).entry };
+pub const nifs = .{ result.nif("beaver_raw_get_null_ptr", 0, get_null).entry, result.nif("beaver_raw_own_opaque_ptr", 1, own_opaque_ptr).entry, result.nif("beaver_raw_read_opaque_ptr", 2, read_opaque_ptr).entry } ++ PtrOwner.Kind.nifs;
+pub fn open_all(env: beam.env) void {
+    PtrOwner.Kind.open(env);
+}
