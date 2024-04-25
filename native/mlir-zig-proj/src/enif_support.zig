@@ -2,11 +2,13 @@ const beam = @import("beam");
 const mlir_capi = @import("mlir_capi.zig");
 pub const c = @import("prelude.zig");
 const e = @import("runtime.zig");
+const result = @import("result.zig");
+
 const Invocation = struct {
     arg_terms: []beam.term = undefined,
     res_term: beam.term = undefined,
     packed_args: []?*anyopaque = undefined, // [arg0, arg1... result]
-    pub fn init(self: *@This(), environment: beam.env, list: beam.term) !void {
+    fn init(self: *@This(), environment: beam.env, list: beam.term) !void {
         const size = try beam.get_list_length(environment, list);
         var head: beam.term = undefined;
         self.arg_terms = try beam.allocator.alloc(beam.term, size);
@@ -21,17 +23,17 @@ const Invocation = struct {
         errdefer beam.allocator.free(self.arg_terms);
         errdefer beam.allocator.free(self.packed_args);
     }
-    pub fn deinit(self: *@This()) void {
+    fn deinit(self: *@This()) void {
         beam.allocator.free(self.arg_terms);
         beam.allocator.free(self.packed_args);
     }
-    pub fn invoke(self: *@This(), environment: beam.env, jit: mlir_capi.ExecutionEngine.T, name: beam.binary) callconv(.C) mlir_capi.LogicalResult.T {
+    fn invoke(self: *@This(), environment: beam.env, jit: mlir_capi.ExecutionEngine.T, name: beam.binary) callconv(.C) mlir_capi.LogicalResult.T {
         self.packed_args[0] = @ptrCast(@constCast(&environment));
         return c.mlirExecutionEngineInvokePacked(jit, c.mlirStringRefCreate(name.data, name.size), &self.packed_args[0]);
     }
 };
 
-pub fn beaver_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+fn beaver_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     var jit: mlir_capi.ExecutionEngine.T = mlir_capi.ExecutionEngine.resource.fetch(env, args[0]) catch
         return beam.make_error_binary(env, "fail to fetch resource for ExecutionEngine, expected: " ++ @typeName(mlir_capi.ExecutionEngine.T));
     var name: beam.binary = beam.get_binary(env, args[1]) catch
@@ -56,7 +58,7 @@ fn register_jit_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const 
     c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @ptrCast(@constCast(&f)));
 }
 
-pub fn beaver_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+fn beaver_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     var jit: mlir_capi.ExecutionEngine.T = mlir_capi.ExecutionEngine.resource.fetch(env, args[0]) catch
         return beam.make_error_binary(env, "fail to fetch resource for ExecutionEngine, expected: " ++ @typeName(mlir_capi.ExecutionEngine.T));
     inline for (enif_function_names) |name| {
@@ -122,7 +124,7 @@ fn dump_type_info(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !be
     return beam.make_tuple(env, type_info_slice);
 }
 
-pub fn beaver_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+fn beaver_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const ctx = mlir_capi.Context.resource.fetch(env, args[0]) catch
         return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(mlir_capi.Context.T));
     var signatures: []beam.term = beam.allocator.alloc(beam.term, enif_function_names.len) catch
@@ -173,7 +175,7 @@ pub fn beaver_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.
     return beam.make_term_list(env, signatures);
 }
 
-pub fn beaver_raw_enif_functions(env: beam.env, _: c_int, _: [*c]const beam.term) callconv(.C) beam.term {
+fn beaver_raw_enif_functions(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
     var names: []beam.term = beam.allocator.alloc(beam.term, enif_function_names.len) catch
         return beam.make_error_binary(env, "fail to allocate");
     inline for (enif_function_names, 0..) |name, i| {
@@ -182,7 +184,7 @@ pub fn beaver_raw_enif_functions(env: beam.env, _: c_int, _: [*c]const beam.term
     return beam.make_term_list(env, names);
 }
 
-pub fn beaver_raw_mlir_type_of_enif_obj(env: beam.env, _: c_int, args: [*c]const beam.term) callconv(.C) beam.term {
+fn beaver_raw_mlir_type_of_enif_obj(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const ctx = mlir_capi.Context.resource.fetch(env, args[0]) catch
         return beam.make_error_binary(env, "fail to fetch resource for argument #0, expected: " ++ @typeName(mlir_capi.Context.T));
     var name = beam.get_atom_slice(env, args[1]) catch
@@ -195,3 +197,11 @@ pub fn beaver_raw_mlir_type_of_enif_obj(env: beam.env, _: c_int, args: [*c]const
     }
     return beam.make_error_binary(env, "mlir type not found for enif obj");
 }
+
+pub const nifs = .{
+    result.nif("beaver_raw_jit_invoke_with_terms", 3, beaver_raw_jit_invoke_with_terms).entry,
+    result.nif("beaver_raw_jit_register_enif", 1, beaver_raw_jit_register_enif).entry,
+    result.nif("beaver_raw_enif_signatures", 1, beaver_raw_enif_signatures).entry,
+    result.nif("beaver_raw_enif_functions", 0, beaver_raw_enif_functions).entry,
+    result.nif("beaver_raw_mlir_type_of_enif_obj", 2, beaver_raw_mlir_type_of_enif_obj).entry,
+};
