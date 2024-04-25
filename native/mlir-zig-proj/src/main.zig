@@ -14,35 +14,6 @@ const pointer = @import("pointer.zig");
 const string_ref = @import("string_ref.zig");
 const Printer = string_ref.Printer;
 
-const PtrOwner = extern struct {
-    pub const Kind = kinda.ResourceKind(@This(), "Elixir.Beaver.Native.PtrOwner");
-    ptr: mlir_capi.OpaquePtr.T,
-    extern fn free(ptr: ?*anyopaque) void;
-    pub fn destroy(_: beam.env, resource_ptr: ?*anyopaque) callconv(.C) void {
-        const this_ptr: *@This() = @ptrCast(@alignCast(resource_ptr));
-        @import("std").debug.print("destroy {}.\n", .{this_ptr});
-        free(this_ptr.*.ptr);
-    }
-};
-
-export fn beaver_raw_own_opaque_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var ptr: mlir_capi.OpaquePtr.T = mlir_capi.OpaquePtr.resource.fetch(env, args[0]) catch
-        return beam.make_error_binary(env, "fail to fetch resource for ptr, expected: " ++ @typeName(mlir_capi.OpaquePtr.T));
-    var owner: PtrOwner = .{ .ptr = ptr };
-    return PtrOwner.Kind.resource.make(env, owner) catch return beam.make_error_binary(env, "fail to make owner");
-}
-
-export fn beaver_raw_read_opaque_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) beam.term {
-    var ptr: mlir_capi.OpaquePtr.T = mlir_capi.OpaquePtr.resource.fetch(env, args[0]) catch
-        return beam.make_error_binary(env, "fail to fetch resource for ptr, expected: " ++ @typeName(mlir_capi.OpaquePtr.T));
-    var len = mlir_capi.U64.resource.fetch(env, args[1]) catch return beam.make_error_binary(env, "fail to fetch resource length, expected a integer");
-    if (ptr == null) {
-        return beam.make_error_binary(env, "ptr is null");
-    }
-    const slice = @as(mlir_capi.U8.Array.T, @ptrCast(ptr))[0..len];
-    return beam.make_slice(env, slice);
-}
-
 fn MemRefDescriptorAccessor(comptime MemRefT: type) type {
     return struct {
         fn allocated_ptr(env: beam.env, term: beam.term) callconv(.C) beam.term {
@@ -357,15 +328,13 @@ const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.Entries
     e.ErlNifFunc{ .name = "beaver_raw_to_string_pm", .arity = 1, .fptr = Printer(mlir_capi.OpPassManager, c.mlirPrintPassPipeline).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_affine_map", .arity = 1, .fptr = Printer(mlir_capi.AffineMap, c.mlirAffineMapPrint).to_string, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_to_string_location", .arity = 1, .fptr = Printer(mlir_capi.Location, c.beaverLocationPrint).to_string, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_own_opaque_ptr", .arity = 1, .fptr = beaver_raw_own_opaque_ptr, .flags = 0 },
-    e.ErlNifFunc{ .name = "beaver_raw_read_opaque_ptr", .arity = 2, .fptr = beaver_raw_read_opaque_ptr, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_jit_invoke_with_terms", .arity = 3, .fptr = enif_support.beaver_raw_jit_invoke_with_terms, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_jit_register_enif", .arity = 1, .fptr = enif_support.beaver_raw_jit_register_enif, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_enif_signatures", .arity = 1, .fptr = enif_support.beaver_raw_enif_signatures, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_enif_functions", .arity = 0, .fptr = enif_support.beaver_raw_enif_functions, .flags = 0 },
     e.ErlNifFunc{ .name = "beaver_raw_mlir_type_of_enif_obj", .arity = 2, .fptr = enif_support.beaver_raw_mlir_type_of_enif_obj, .flags = 0 },
 } ++
-    PtrOwner.Kind.nifs ++
+    pointer.PtrOwner.Kind.nifs ++
     Complex.F32.nifs ++
     dataKindToMemrefKind(Complex.F32).nifs ++
     dataKindToMemrefKind(mlir_capi.U8).nifs ++
@@ -391,7 +360,7 @@ export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     Complex.F32.open_all(env);
     beam.open_resource_wrapped(env, pass.Token);
     kinda.Internal.OpaqueStruct.open_all(env);
-    PtrOwner.Kind.open(env);
+    pointer.PtrOwner.Kind.open(env);
     return 0;
 }
 
