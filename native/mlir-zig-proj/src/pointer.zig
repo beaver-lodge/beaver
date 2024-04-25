@@ -12,7 +12,7 @@ pub const PtrOwner = extern struct {
     extern fn free(ptr: ?*anyopaque) void;
     pub fn destroy(_: beam.env, resource_ptr: ?*anyopaque) callconv(.C) void {
         const this_ptr: *@This() = @ptrCast(@alignCast(resource_ptr));
-        @import("std").debug.print("destroy {}.\n", .{this_ptr});
+        std.debug.print("destroy {}.\n", .{this_ptr});
         free(this_ptr.*.ptr);
     }
 };
