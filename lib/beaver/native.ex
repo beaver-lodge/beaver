@@ -62,10 +62,6 @@ defmodule Beaver.Native do
     forward(mod, :primitive, [ref])
   end
 
-  def bag(v, _) do
-    v
-  end
-
   def check!(ret) do
     case ret do
       {:kind, mod, ref} when is_atom(mod) and is_reference(ref) ->

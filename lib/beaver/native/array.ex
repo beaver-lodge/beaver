@@ -3,7 +3,7 @@ defmodule Beaver.Native.Array do
   This module defines functions working with C array.
   """
   alias Beaver.MLIR.CAPI
-  defstruct ref: nil, element_kind: nil, bag: MapSet.new()
+  defstruct ref: nil, element_kind: nil
 
   def as_opaque(%{ref: ref, element_kind: element_kind}) do
     ref =

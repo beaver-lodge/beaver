@@ -120,29 +120,15 @@ defmodule Beaver.Native.Memory do
   return a opaque pointer to the memory
   """
   def aligned(%__MODULE__{
-        descriptor: d,
-        storage: storage
+        descriptor: d
       }) do
-    ptr = __MODULE__.Descriptor.aligned(d)
-
-    if storage do
-      ptr |> Native.bag(storage)
-    else
-      ptr
-    end
+    __MODULE__.Descriptor.aligned(d)
   end
 
   def allocated(%__MODULE__{
-        descriptor: d,
-        storage: storage
+        descriptor: d
       }) do
-    ptr = __MODULE__.Descriptor.allocated(d)
-
-    if storage do
-      ptr |> Native.bag(storage)
-    else
-      ptr
-    end
+    __MODULE__.Descriptor.allocated(d)
   end
 
   @doc """
@@ -150,17 +136,15 @@ defmodule Beaver.Native.Memory do
   If it is a array, will return the pointer of the array to mimic a struct of packed memory descriptors
   """
   def descriptor_ptr(%__MODULE__{
-        descriptor: d,
-        storage: storage
+        descriptor: d
       }) do
     __MODULE__.Descriptor.opaque_ptr(d)
-    |> Native.bag(storage)
   end
 
   # if this is an array, this should be packed memory descriptors for tuple
-  def descriptor_ptr(%Native.Array{ref: ref, element_kind: element_kind} = array) do
+  def descriptor_ptr(%Native.Array{ref: ref, element_kind: element_kind}) do
     ref = Native.forward(element_kind, :ptr_to_opaque, [ref])
-    struct!(Native.OpaquePtr, ref: ref) |> Native.bag(array)
+    struct!(Native.OpaquePtr, ref: ref)
   end
 
   def deallocate(
