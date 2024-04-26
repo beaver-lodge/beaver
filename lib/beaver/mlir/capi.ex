@@ -70,7 +70,7 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_to_string_pm(_), do: raise("NIF not loaded")
   def beaver_raw_get_string_ref(_), do: raise("NIF not loaded")
   def beaver_raw_read_opaque_ptr(_, _), do: raise("NIF not loaded")
-  def beaver_raw_own_opaque_ptr(_), do: raise("NIF not loaded")
+  def beaver_raw_deallocate_opaque_ptr(_), do: raise("NIF not loaded")
   def beaver_raw_get_null_ptr(), do: raise("NIF not loaded")
   def beaver_raw_context_attach_diagnostic_handler(_, _), do: raise("NIF not loaded")
   def beaver_raw_get_diagnostic_string_callback(), do: raise("NIF not loaded")

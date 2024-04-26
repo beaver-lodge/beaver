@@ -25,4 +25,8 @@ defmodule Beaver.Native.OpaquePtr do
   def null() do
     %__MODULE__{ref: beaver_raw_get_null_ptr() |> Beaver.Native.check!()}
   end
+
+  def deallocate(%__MODULE__{ref: ref}) do
+    beaver_raw_deallocate_opaque_ptr(ref) |> Beaver.Native.check!()
+  end
 end

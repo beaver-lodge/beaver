@@ -32,10 +32,7 @@ defmodule MlirTest do
     changeset = %MLIR.Operation.Changeset{name: "func.return", location: location}
 
     for _i <- 0..200 do
-      operation_state_ptr =
-        changeset |> MLIR.Operation.State.create() |> Beaver.Native.ptr()
-
-      _ret_op = mlirOperationCreate(operation_state_ptr)
+      changeset |> MLIR.Operation.State.create() |> Beaver.Native.ptr() |> mlirOperationCreate()
     end
 
     i64_t = mlirTypeParseGet(ctx, MLIR.StringRef.create("i64"))
