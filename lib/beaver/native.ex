@@ -68,9 +68,6 @@ defmodule Beaver.Native do
 
   def check!(ret) do
     case ret do
-      {:kind, Beaver.Native.U8.Array, ref} when is_reference(ref) ->
-        struct!(Beaver.Native.C.String, %{ref: ref})
-
       {:kind, mod, ref} when is_atom(mod) and is_reference(ref) ->
         struct!(mod, %{ref: ref})
 
