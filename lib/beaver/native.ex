@@ -62,16 +62,8 @@ defmodule Beaver.Native do
     forward(mod, :primitive, [ref])
   end
 
-  def bag(%{bag: _bag} = v, nil) do
+  def bag(v, _) do
     v
-  end
-
-  def bag(%{bag: bag} = v, list) when is_list(list) do
-    %{v | bag: MapSet.union(MapSet.new(list), bag)}
-  end
-
-  def bag(%{bag: bag} = v, item) do
-    %{v | bag: MapSet.put(bag, item)}
   end
 
   def check!(ret) do
