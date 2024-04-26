@@ -34,7 +34,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def create(%State{} = state) do
-    state |> Beaver.Native.ptr() |> Beaver.Native.bag(state) |> mlirOperationCreate()
+    state |> Beaver.Native.ptr() |> mlirOperationCreate()
   end
 
   @doc false

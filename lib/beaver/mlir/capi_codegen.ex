@@ -44,9 +44,6 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
     end ++
       [
         %KindDecl{
-          module_name: Beaver.Native.PtrOwner
-        },
-        %KindDecl{
           module_name: Beaver.Native.Complex.F32
         }
       ] ++

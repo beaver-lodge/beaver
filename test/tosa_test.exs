@@ -149,6 +149,6 @@ defmodule TosaTest do
     return.descriptor |> Native.Memory.Descriptor.dump()
     Native.Memory.descriptor_ptr(return) |> Native.dump()
     assert return.descriptor |> Native.Memory.Descriptor.offset() == 0
-    Native.Memory.own_allocated(return)
+    assert :ok == Native.Memory.deallocate(return)
   end
 end
