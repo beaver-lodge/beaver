@@ -65,7 +65,11 @@ defmodule Beaver.Native do
   def check!(ret) do
     case ret do
       {:kind, mod, ref} when is_atom(mod) and is_reference(ref) ->
-        struct!(mod, %{ref: ref})
+        try do
+          struct!(mod, %{ref: ref})
+        rescue
+          UndefinedFunctionError -> ref
+        end
 
       {:error, e} ->
         raise e
