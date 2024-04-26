@@ -25,7 +25,6 @@ export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     kinda.Internal.OpaqueStruct.open_all(env);
     mlir_capi.open_all(env);
     memref.open_all(env);
-    pointer.open_all(env);
     pass.open_all(env);
     return 0;
 }

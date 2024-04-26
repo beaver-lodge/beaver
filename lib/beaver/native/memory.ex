@@ -163,19 +163,11 @@ defmodule Beaver.Native.Memory do
     struct!(Native.OpaquePtr, ref: ref) |> Native.bag(array)
   end
 
-  @doc """
-  take ownership of the memory the descriptor's `allocated` field points to
-  """
-  def own_allocated(
+  def deallocate(
         %__MODULE__{
           storage: nil
         } = m
       ) do
-    owner =
-      m
-      |> allocated
-      |> Native.PtrOwner.new()
-
-    %{m | storage: owner}
+    m |> allocated |> Beaver.Native.OpaquePtr.deallocate()
   end
 end
