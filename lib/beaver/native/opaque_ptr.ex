@@ -11,7 +11,7 @@ defmodule Beaver.Native.OpaquePtr do
   read the N bytes starting from the pointer and returns an Erlang binary
   """
   def to_binary(%__MODULE__{ref: ref}, len) do
-    beaver_raw_read_opaque_ptr(ref, len) |> Beaver.Native.check!()
+    beaver_raw_read_opaque_ptr(ref, len)
   end
 
   @doc """
@@ -23,10 +23,10 @@ defmodule Beaver.Native.OpaquePtr do
   end
 
   def null() do
-    %__MODULE__{ref: beaver_raw_get_null_ptr() |> Beaver.Native.check!()}
+    %__MODULE__{ref: beaver_raw_get_null_ptr()}
   end
 
   def deallocate(%__MODULE__{ref: ref}) do
-    beaver_raw_deallocate_opaque_ptr(ref) |> Beaver.Native.check!()
+    beaver_raw_deallocate_opaque_ptr(ref)
   end
 end
