@@ -1,4 +1,4 @@
-defmodule Beaver.MIF.Std do
+defmodule Beaver.MIF.Prelude do
   use Beaver
   alias Beaver.MLIR.Dialect.{Arith, Func}
   @enif_functions Beaver.ENIF.functions()

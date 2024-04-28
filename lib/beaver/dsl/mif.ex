@@ -36,11 +36,11 @@ defmodule Beaver.MIF do
     end
   end
 
-  @intrinsics Beaver.MIF.Std.intrinsics()
+  @intrinsics Beaver.MIF.Prelude.intrinsics()
 
   defp inject_mlir_opts({f, _, args}) when f in @intrinsics do
     quote do
-      Beaver.MIF.Std.handle_intrinsic(unquote(f), [unquote_splicing(args)],
+      Beaver.MIF.Prelude.handle_intrinsic(unquote(f), [unquote_splicing(args)],
         ctx: Beaver.Env.context(),
         block: Beaver.Env.block()
       )
