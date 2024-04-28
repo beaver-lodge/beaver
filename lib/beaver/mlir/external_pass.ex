@@ -29,7 +29,6 @@ defmodule Beaver.MLIR.ExternalPass do
         op_name.ref,
         pid
       )
-      |> Beaver.Native.check!()
 
     %MLIR.Pass{ref: ref, handler: pid}
   end

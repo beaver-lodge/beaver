@@ -51,7 +51,6 @@ defmodule Beaver.MLIR.Pass.Composer do
       Beaver.Diagnostic.callback(),
       Beaver.Native.OpaquePtr.null()
     )
-    |> Beaver.Native.check!()
     |> tap(fn res ->
       if not MLIR.LogicalResult.success?(res) do
         raise "Unexpected failure parsing pipeline: #{pipeline_str}"

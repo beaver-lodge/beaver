@@ -168,16 +168,15 @@ pub fn open_all(env: beam.env) void {
     kinda.aliasKind(SparseTensorLevelType, U64);
 }
 
-const numOfNIFsPerKind = 10;
-const EntriesT = [allKinds.len * numOfNIFsPerKind]e.ErlNifFunc;
+const EntriesT = [allKinds.len * kinda.numOfNIFsPerKind]e.ErlNifFunc;
 pub const EntriesOfKinds = getEntries();
 fn getEntries() EntriesT {
     var ret: EntriesT = undefined;
     @setEvalBranchQuota(8000);
     const Kinds = allKinds;
     for (Kinds, 0..) |k, i| {
-        for (0..numOfNIFsPerKind) |j| {
-            ret[i * numOfNIFsPerKind + j] = k.nifs[j];
+        for (0..kinda.numOfNIFsPerKind) |j| {
+            ret[i * kinda.numOfNIFsPerKind + j] = k.nifs[j];
         }
     }
     return ret;

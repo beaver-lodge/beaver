@@ -71,10 +71,7 @@ defmodule Beaver.Native do
           UndefinedFunctionError -> ref
         end
 
-      {:error, e} ->
-        raise e
-
-      _ ->
+      ret ->
         ret
     end
   end

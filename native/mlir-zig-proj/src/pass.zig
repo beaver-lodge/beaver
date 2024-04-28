@@ -4,7 +4,7 @@ const mlir_capi = @import("mlir_capi.zig");
 pub const c = @import("prelude.zig");
 const e = @import("erl_nif");
 const debug_print = @import("std").debug.print;
-const result = @import("result.zig");
+const result = @import("kinda").result;
 const diagnostic = @import("diagnostic.zig");
 
 const Token = struct {

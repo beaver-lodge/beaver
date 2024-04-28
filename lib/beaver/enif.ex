@@ -34,7 +34,7 @@ defmodule Beaver.ENIF do
   Retrieves the signatures of enif functions.
   """
   def signatures(%MLIR.Context{} = ctx) do
-    signatures = MLIR.CAPI.beaver_raw_enif_signatures(ctx.ref) |> Beaver.Native.check!()
+    signatures = MLIR.CAPI.beaver_raw_enif_signatures(ctx.ref)
 
     for {name, arg_types, ret_types} <- signatures do
       {name, Enum.map(arg_types, &wrap_mlir_t/1), Enum.map(ret_types, &wrap_mlir_t/1)}

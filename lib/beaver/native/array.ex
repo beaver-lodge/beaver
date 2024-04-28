@@ -10,7 +10,6 @@ defmodule Beaver.Native.Array do
       apply(CAPI, Module.concat([element_kind, "array_as_opaque"]), [
         ref
       ])
-      |> Beaver.Native.check!()
 
     %Beaver.Native.OpaqueArray{ref: ref}
   end

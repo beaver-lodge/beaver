@@ -320,4 +320,8 @@ defmodule MlirTest do
     assert MLIR.AffineMap.create(3, 3, [MLIR.AffineMap.dim(0), MLIR.AffineMap.symbol(1)]).(ctx)
            |> MLIR.to_string() == txt
   end
+
+  test "exception" do
+    assert catch_error(beaver_raw_to_string_type(1)) == :FunctionClauseError
+  end
 end
