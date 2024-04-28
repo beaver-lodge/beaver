@@ -5,7 +5,7 @@ const stderr = io.getStdErr().writer();
 const mlir_capi = @import("mlir_capi.zig");
 pub const c = @import("prelude.zig");
 const e = @import("erl_nif");
-const result = @import("result.zig");
+const result = @import("kinda").result;
 
 const BeaverDiagnostic = struct {
     handler: ?beam.pid = null,

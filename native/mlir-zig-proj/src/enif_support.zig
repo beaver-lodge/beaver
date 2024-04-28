@@ -1,8 +1,8 @@
 const beam = @import("beam");
 const mlir_capi = @import("mlir_capi.zig");
 pub const c = @import("prelude.zig");
+const result = @import("kinda").result;
 const e = @import("runtime.zig");
-const result = @import("result.zig");
 
 const Invocation = struct {
     arg_terms: []beam.term = undefined,
