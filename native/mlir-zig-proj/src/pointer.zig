@@ -3,8 +3,8 @@ const std = @import("std");
 const mlir_capi = @import("mlir_capi.zig");
 pub const c = @import("prelude.zig");
 const e = @import("erl_nif");
-const result = @import("result.zig");
 const kinda = @import("kinda");
+const result = kinda.result;
 
 extern fn free(ptr: mlir_capi.OpaquePtr.T) void;
 

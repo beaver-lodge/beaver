@@ -2,7 +2,7 @@ const beam = @import("beam");
 const mlir_capi = @import("mlir_capi.zig");
 const std = @import("std");
 const e = @import("erl_nif");
-const result = @import("result.zig");
+const result = @import("kinda").result;
 pub const c = @import("prelude.zig");
 const mem = @import("std").mem;
 

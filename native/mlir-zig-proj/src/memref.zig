@@ -4,7 +4,7 @@ const mem = @import("std").mem;
 const mlir_capi = @import("mlir_capi.zig");
 pub const c = @import("prelude.zig");
 const e = @import("erl_nif");
-const result = @import("result.zig");
+const result = kinda.result;
 const kinda = @import("kinda");
 
 fn MemRefDescriptorAccessor(comptime MemRefT: type) type {
@@ -60,7 +60,7 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
             }
             return try kind.per_rank_resource_kinds[0].resource.make(env, descriptor);
         }
-        pub const maker = .{ result.wrap(make), 5 };
+        pub const maker = .{ make, 5 };
         pub const module_name = memref_module_name(ResourceKind, 0);
         const ElementResourceKind = ResourceKind;
         const T = ResourceKind.T;
@@ -135,7 +135,7 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
             }
             return try kind.per_rank_resource_kinds[rank].resource.make(env, descriptor);
         }
-        pub const maker = .{ result.wrap(make), 5 };
+        pub const maker = .{ make, 5 };
         pub const ElementResourceKind = ResourceKind;
         pub const module_name = memref_module_name(ResourceKind, N);
         pub var resource_type: beam.resource_type = undefined;
