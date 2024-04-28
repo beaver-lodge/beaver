@@ -50,6 +50,8 @@ defmodule Beaver.MIF do
   defp inject_mlir_opts(ast) do
     with {{:__aliases__, _, _} = m, f, args} <- Macro.decompose_call(ast) do
       quote do
+        Code.ensure_loaded!(unquote(m))
+
         if function_exported?(unquote(m), :handle_intrinsic, 3) or
              macro_exported?(unquote(m), :handle_intrinsic, 3) do
           unquote(m).handle_intrinsic(unquote(f), [unquote_splicing(args)],
