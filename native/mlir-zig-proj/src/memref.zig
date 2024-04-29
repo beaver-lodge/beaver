@@ -10,11 +10,11 @@ const kinda = @import("kinda");
 fn MemRefDescriptorAccessor(comptime MemRefT: type) type {
     return struct {
         fn allocated_ptr(env: beam.env, term: beam.term) !beam.term {
-            var descriptor: MemRefT = try beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term);
+            const descriptor: MemRefT = try beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term);
             return try mlir_capi.OpaquePtr.resource.make(env, @ptrCast(descriptor.allocated));
         }
         fn aligned_ptr(env: beam.env, term: beam.term) !beam.term {
-            var descriptor: MemRefT = try beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term);
+            const descriptor: MemRefT = try beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term);
             return try mlir_capi.OpaquePtr.resource.make(env, @ptrCast(descriptor.aligned));
         }
         fn fetch_ptr_or_nil(env: beam.env, ptr_term: beam.term) !MemRefT.ElementResourceKind.Ptr.T {
@@ -29,7 +29,7 @@ fn MemRefDescriptorAccessor(comptime MemRefT: type) type {
             }
         }
         fn offset(env: beam.env, term: beam.term) !beam.term {
-            var descriptor = try beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term);
+            const descriptor = try beam.fetch_resource(MemRefT, env, MemRefT.resource_type, term);
             return beam.make_i64(env, descriptor.offset);
         }
     };
@@ -42,9 +42,9 @@ fn memref_module_name(comptime resource_kind: type, comptime rank: i32) []const 
 fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
     return extern struct {
         pub fn make(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-            var allocated: ResourceKind.Ptr.T = try MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[0]);
-            var aligned: ResourceKind.Ptr.T = try MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[1]);
-            var offset: mlir_capi.I64.T = try mlir_capi.I64.resource.fetch(env, args[2]);
+            const allocated: ResourceKind.Ptr.T = try MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[0]);
+            const aligned: ResourceKind.Ptr.T = try MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[1]);
+            const offset: mlir_capi.I64.T = try mlir_capi.I64.resource.fetch(env, args[2]);
             const kind: type = dataKindToMemrefKind(ResourceKind);
             var descriptor: UnrankMemRefDescriptor(ResourceKind) = undefined;
             if (allocated == null) {
@@ -94,14 +94,14 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
             self.aligned = aligned;
             self.offset = offset;
             const rank = sizes.len;
-            mem.copy(i64, self.sizes[0..rank], sizes[0..rank]);
-            mem.copy(i64, self.strides[0..rank], strides[0..rank]);
+            mem.copyForwards(i64, self.sizes[0..rank], sizes[0..rank]);
+            mem.copyForwards(i64, self.strides[0..rank], strides[0..rank]);
         }
         fn populate2(self: *@This(), offset: i64, sizes: []i64, strides: []i64) void {
             self.offset = offset;
             const rank = sizes.len;
-            mem.copy(i64, self.sizes[0..rank], sizes[0..rank]);
-            mem.copy(i64, self.strides[0..rank], strides[0..rank]);
+            mem.copyForwards(i64, self.sizes[0..rank], sizes[0..rank]);
+            mem.copyForwards(i64, self.strides[0..rank], strides[0..rank]);
         }
         pub fn make(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
             const Error = error{
@@ -109,9 +109,9 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
                 WrongSizesForRank,
                 WrongStridesForRank,
             };
-            var allocated: ResourceKind.Ptr.T = try MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[0]);
-            var aligned: ResourceKind.Ptr.T = try MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[1]);
-            var offset: mlir_capi.I64.T = try mlir_capi.I64.resource.fetch(env, args[2]);
+            const allocated: ResourceKind.Ptr.T = try MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[0]);
+            const aligned: ResourceKind.Ptr.T = try MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[1]);
+            const offset: mlir_capi.I64.T = try mlir_capi.I64.resource.fetch(env, args[2]);
             const sizes = try beam.get_slice_of(i64, env, args[3]);
             defer beam.allocator.free(sizes);
             const strides = try beam.get_slice_of(i64, env, args[4]);
@@ -120,7 +120,7 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
                 return Error.SizesAndStridesOfDifferentLength;
             }
             const kind: type = dataKindToMemrefKind(ResourceKind);
-            comptime var rank = N;
+            const rank = N;
             if (rank != sizes.len) {
                 return Error.WrongSizesForRank;
             }
@@ -149,8 +149,8 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
             return try MemRefDescriptorAccessor(@This()).offset(env, args[0]);
         }
         fn get_sizes(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-            comptime var rank = N;
-            var descriptor: @This() = try beam.fetch_resource(@This(), env, @This().resource_type, args[0]);
+            const rank = N;
+            const descriptor: @This() = try beam.fetch_resource(@This(), env, @This().resource_type, args[0]);
             var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(rank));
             defer beam.allocator.free(ret);
             var i: usize = 0;
@@ -162,8 +162,8 @@ fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
             return beam.make_term_list(env, ret);
         }
         fn get_strides(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-            comptime var rank = N;
-            var descriptor: @This() = try beam.fetch_resource(@This(), env, @This().resource_type, args[0]);
+            const rank = N;
+            const descriptor: @This() = try beam.fetch_resource(@This(), env, @This().resource_type, args[0]);
             var ret: []beam.term = try beam.allocator.alloc(beam.term, @intCast(rank));
             defer beam.allocator.free(ret);
             var i: usize = 0;
