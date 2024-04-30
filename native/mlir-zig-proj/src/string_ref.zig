@@ -14,11 +14,11 @@ pub fn Printer(comptime name: [*c]const u8, comptime ResourceKind: type, comptim
         const Buffer = std.ArrayList(u8);
         buffer: Buffer,
         fn collect_string_ref(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
-            var printer: *@This() = @ptrCast(@alignCast(userData));
+            const printer: *@This() = @ptrCast(@alignCast(userData));
             printer.*.buffer.appendSlice(s.data[0..s.length]) catch unreachable;
         }
         fn to_string(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-            var entity: ResourceKind.T = try ResourceKind.resource.fetch(env, args[0]);
+            const entity: ResourceKind.T = try ResourceKind.resource.fetch(env, args[0]);
             if (entity.ptr == null) {
                 return Error.NullPointerFound;
             }
@@ -71,15 +71,15 @@ fn beaver_raw_get_string_ref(env: beam.env, _: c_int, args: [*c]const beam.term)
     if (0 == e.enif_inspect_binary(env, args[0], &bin)) {
         return Error.NotBinary;
     }
-    var ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.StringRef.resource.t, @sizeOf(StructT) + bin.size + 1);
+    const ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.StringRef.resource.t, @sizeOf(StructT) + bin.size + 1);
     if (ptr == null) {
         return Error.ResAllocFailure;
     }
     var dptr: DataT = @ptrCast(ptr);
     dptr += @sizeOf(StructT);
-    var sptr: *StructT = @ptrCast(@alignCast(ptr));
+    const sptr: *StructT = @ptrCast(@alignCast(ptr));
     sptr.* = c.mlirStringRefCreate(dptr, bin.size);
-    mem.copy(u8, dptr[0..bin.size], bin.data[0..bin.size]);
+    mem.copyForwards(u8, dptr[0..bin.size], bin.data[0..bin.size]);
     dptr[bin.size] = '\x00';
     return e.enif_make_resource(env, ptr);
 }

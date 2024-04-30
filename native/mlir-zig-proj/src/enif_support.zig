@@ -35,8 +35,8 @@ const Invocation = struct {
 
 fn beaver_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const Error = error{JITFunctionCallFailure};
-    var jit: mlir_capi.ExecutionEngine.T = try mlir_capi.ExecutionEngine.resource.fetch(env, args[0]);
-    var name: beam.binary = try beam.get_binary(env, args[1]);
+    const jit: mlir_capi.ExecutionEngine.T = try mlir_capi.ExecutionEngine.resource.fetch(env, args[0]);
+    const name: beam.binary = try beam.get_binary(env, args[1]);
     var invocation = Invocation{};
     try invocation.init(env, args[2]);
     defer invocation.deinit();
@@ -58,7 +58,7 @@ fn register_jit_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const 
 }
 
 fn beaver_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    var jit = try mlir_capi.ExecutionEngine.resource.fetch(env, args[0]);
+    const jit = try mlir_capi.ExecutionEngine.resource.fetch(env, args[0]);
     inline for (enif_function_names) |name| {
         register_jit_symbol(jit, name, @field(e, name));
     }
@@ -178,7 +178,7 @@ fn beaver_raw_enif_functions(env: beam.env, _: c_int, _: [*c]const beam.term) !b
 fn beaver_raw_mlir_type_of_enif_obj(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const Error = error{MLIRTypeForEnifObjNotFound};
     const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
-    var name = try beam.get_atom_slice(env, args[1]);
+    const name = try beam.get_atom_slice(env, args[1]);
     inline for (.{ "term", "env" }) |obj| {
         if (@import("std").mem.eql(u8, name, obj)) {
             const t = @field(beam, obj);
