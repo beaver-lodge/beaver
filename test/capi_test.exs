@@ -322,6 +322,9 @@ defmodule MlirTest do
   end
 
   test "exception" do
-    assert catch_error(beaver_raw_to_string_type(1)) == :FunctionClauseError
+    assert match?(
+             %Kinda.CallError{message: :FunctionClauseError, error_return_trace: _},
+             catch_error(beaver_raw_to_string_type(1))
+           )
   end
 end
