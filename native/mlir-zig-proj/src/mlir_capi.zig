@@ -3,7 +3,7 @@ const kinda = @import("kinda");
 pub const c = @import("prelude.zig");
 const e = @import("erl_nif");
 pub const root_module = "Elixir.Beaver.MLIR.CAPI";
-fn NativeKind(comptime t: type, comptime n: [*]const u8) type {
+fn NativeKind(comptime t: type, comptime n: []const u8) type {
     const nativeModPrefix = "Elixir.Beaver.Native.";
     return kinda.ResourceKind(t, nativeModPrefix ++ n);
 }
@@ -25,7 +25,7 @@ pub const U8 = NativeKind(u8, "U8");
 pub const USize = NativeKind(usize, "USize");
 pub const OpaqueArray = NativeKind(?*const anyopaque, "OpaqueArray");
 
-fn MLIRKind(comptime n: [*]const u8) type {
+fn MLIRKind(comptime n: []const u8) type {
     const nsPrefix = "Elixir.Beaver.MLIR.";
     return kinda.ResourceKind(@field(c, "Mlir" ++ n), nsPrefix ++ n);
 }

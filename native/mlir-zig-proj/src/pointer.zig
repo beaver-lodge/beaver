@@ -14,7 +14,7 @@ fn get_null(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
 
 fn deallocate(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const Error = error{NullPointer};
-    var ptr: mlir_capi.OpaquePtr.T = try mlir_capi.OpaquePtr.resource.fetch(env, args[0]);
+    const ptr: mlir_capi.OpaquePtr.T = try mlir_capi.OpaquePtr.resource.fetch(env, args[0]);
     if (ptr) |p| {
         free(p);
         return beam.make_ok(env);
@@ -24,8 +24,8 @@ fn deallocate(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
 }
 
 fn read_opaque_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    var ptr = try mlir_capi.OpaquePtr.resource.fetch(env, args[0]);
-    var len = try mlir_capi.USize.resource.fetch(env, args[1]);
+    const ptr = try mlir_capi.OpaquePtr.resource.fetch(env, args[0]);
+    const len = try mlir_capi.USize.resource.fetch(env, args[1]);
     const Error = error{NullPointer};
     if (ptr == null) {
         return Error.NullPointer;

@@ -9,7 +9,7 @@ const StringRefCollector = @import("string_ref.zig").StringRefCollector;
 
 fn context_of_dialects() mlir_capi.Context.T {
     const ctx = c.mlirContextCreate();
-    var registry = c.mlirDialectRegistryCreate();
+    const registry = c.mlirDialectRegistryCreate();
     c.mlirRegisterAllDialects(registry);
     c.mlirContextAppendDialectRegistry(ctx, registry);
     c.mlirDialectRegistryDestroy(registry);

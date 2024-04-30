@@ -45,7 +45,7 @@ const BeaverPass = extern struct {
     }
     fn clone(userData: ?*anyopaque) callconv(.C) ?*anyopaque {
         const old: *@This() = @ptrCast(@alignCast(userData));
-        var new = beam.allocator.create(@This()) catch unreachable;
+        const new = beam.allocator.create(@This()) catch unreachable;
         new.* = old.*;
         return new;
     }
@@ -90,7 +90,7 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
     const passID = c.mlirTypeIDAllocatorAllocateTypeID(typeIDAllocator);
     const nDependentDialects = 0;
     const dependentDialects = null;
-    var bp: *BeaverPass = try beam.allocator.create(BeaverPass);
+    const bp: *BeaverPass = try beam.allocator.create(BeaverPass);
     bp.* = BeaverPass{ .handler = handler };
     // use this function to avoid ABI issue
     const ep = c.beaverCreateExternalPass(
