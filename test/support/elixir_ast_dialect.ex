@@ -53,7 +53,7 @@ defmodule ElixirAST do
             %MLIR.Value{} =
               ret_value =
               case Macro.prewalk(do_body, &gen_mlir(&1, ctx, Beaver.Env.block())) do
-                {:__block__, [], values} ->
+                {:__block__, _, values} ->
                   values |> List.last()
 
                 %Beaver.MLIR.Value{} = v ->
