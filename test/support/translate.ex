@@ -241,7 +241,7 @@ defmodule TranslateMLIR do
 
     ret_val =
       case compile_body(ctx, entry_block, expr, %{variables: Map.new(Enum.zip(arg_names, args))}) do
-        {:__block__, [], values} when is_list(values) -> List.last(values)
+        {:__block__, _, values} when is_list(values) -> List.last(values)
         %MLIR.Value{} = v -> v
       end
 
