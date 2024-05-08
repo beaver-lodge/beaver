@@ -5,6 +5,7 @@ defmodule Beaver.MIF do
   require Beaver.Env
   alias Beaver.MLIR.{Type, Attribute}
   alias Beaver.MLIR.Dialect.{Arith, LLVM, Func, CF}
+  require Func
   use Beaver
 
   defmacro __using__(_opts) do
@@ -289,7 +290,7 @@ defmodule Beaver.MIF do
     end
   end
 
-  defp normalize_call(call) do
+  def normalize_call(call) do
     {name, args} = Macro.decompose_call(call)
 
     args =
@@ -302,7 +303,8 @@ defmodule Beaver.MIF do
             end
 
           # term
-          {a = {name, _, nil}, _} when is_atom(name) ->
+          {a = {name, _, context}, version}
+          when is_atom(name) and is_atom(context) and is_integer(version) ->
             quote do
               unquote(a) :: Beaver.MIF.Term.t()
             end

@@ -52,12 +52,18 @@ defmodule Beaver.MLIR.Dialect.Registry do
     end
   end
 
-  def ops(dialect, opts \\ []) do
+  def ops(dialect, opts \\ [])
+
+  def ops(:all, opts) do
     unwrap_ctx_then(opts, fn ref ->
       CAPI.beaver_raw_registered_ops(ref)
-      |> Stream.filter(&String.starts_with?(&1, "#{dialect}."))
-      |> Enum.map(&String.trim_leading(&1, "#{dialect}."))
     end)
+  end
+
+  def ops(dialect, opts) do
+    ops(:all, opts)
+    |> Stream.filter(&String.starts_with?(&1, "#{dialect}."))
+    |> Enum.map(&String.trim_leading(&1, "#{dialect}."))
   end
 
   @doc """

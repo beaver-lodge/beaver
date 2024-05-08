@@ -107,4 +107,14 @@ defmodule Beaver.MIF.Prelude do
         end
     end
   end
+
+  defmacro defm(call, body) do
+    call = Beaver.MIF.normalize_call(call)
+
+    quote do
+      def unquote(call) :: Beaver.MIF.Term.t() do
+        unquote(body)
+      end
+    end
+  end
 end

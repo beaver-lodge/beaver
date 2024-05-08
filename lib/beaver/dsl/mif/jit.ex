@@ -30,11 +30,15 @@ defmodule Beaver.MIF.JIT do
     ctx = MLIR.Context.create()
     Beaver.Diagnostic.attach(ctx)
     name = opts[:name]
+    modules = modules |> List.wrap()
 
     jit =
       modules
-      |> Enum.map(& &1.__ir__())
-      |> Enum.map(&MLIR.Module.create(ctx, &1))
+      |> Enum.map(fn
+        m when is_atom(m) -> m.__ir__() |> then(&MLIR.Module.create(ctx, &1))
+        s when is_binary(s) -> s |> then(&MLIR.Module.create(ctx, &1))
+        %MLIR.Module{} = m -> m
+      end)
       |> MLIR.Module.merge()
       |> jit_of_mod
 

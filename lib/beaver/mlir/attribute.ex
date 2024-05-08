@@ -179,6 +179,13 @@ defmodule Beaver.MLIR.Attribute do
     )
   end
 
+  def symbol_name(name, opts \\ []) do
+    Beaver.Deferred.from_opts(
+      opts,
+      ~a{"#{name}"}
+    )
+  end
+
   def index(value, opts \\ []) when is_integer(value) do
     Beaver.Deferred.from_opts(
       opts,
