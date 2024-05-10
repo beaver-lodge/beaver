@@ -114,9 +114,6 @@ defmodule POCTest do
       quote do
         defmodule ReturnPassedArg do
           import Beaver.MIF.Prelude
-          alias Beaver.MIF.Pointer
-          alias Beaver.MIF.Term
-          alias Beaver.MIF.Env
           def foo(a :: Beaver.MIF.Term.t()) :: Beaver.MIF.Term.t(), do: func.return(a)
 
           defm bar(env, a) do

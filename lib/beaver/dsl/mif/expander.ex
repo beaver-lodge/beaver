@@ -210,7 +210,7 @@ defmodule Beaver.MIF.Expander do
 
   ## Remote call
 
-  defp expand({{:., dot_meta, [module, fun]}, meta, args}, state, env)
+  defp expand({{:., _dot_meta, [module, fun]}, meta, args}, state, env)
        when is_atom(fun) and is_list(args) do
     {module, state, env} = expand(module, state, env)
     arity = length(args)
@@ -242,16 +242,17 @@ defmodule Beaver.MIF.Expander do
 
       {args, state, env} = expand_list(args, state, env)
 
-      %Beaver.SSA{
-        op: op,
-        arguments: args,
-        ctx: state.mlir.ctx,
-        block: state.mlir.blk,
-        loc: Beaver.MLIR.Location.from_env(env)
-      }
-      |> MLIR.Operation.create()
+      op =
+        %Beaver.SSA{
+          op: op,
+          arguments: args,
+          ctx: state.mlir.ctx,
+          block: state.mlir.blk,
+          loc: Beaver.MLIR.Location.from_env(env)
+        }
+        |> MLIR.Operation.create()
 
-      {{{:., dot_meta, [module, fun]}, meta, args}, state, env}
+      {{MLIR.Operation.results(op), meta, args}, state, env}
     end
   end
 
@@ -383,7 +384,7 @@ defmodule Beaver.MIF.Expander do
         {arg_types, state, env} = arg_types |> expand_list(state, env)
         ft = Type.function(arg_types, ret_types, ctx: Beaver.Env.context())
 
-        Beaver.MLIR.Dialect.Func.func _(sym_name: "\"#{name}\"", function_type: ft) do
+        Func.func _(sym_name: "\"#{name}\"", function_type: ft) do
           region do
             block _entry() do
               MLIR.Block.add_args!(Beaver.Env.block(), arg_types, ctx: Beaver.Env.context())
@@ -465,10 +466,8 @@ defmodule Beaver.MIF.Expander do
          ]} ->
           {name, args} = Macro.decompose_call(call)
           name = mangling(env.module, name)
-          {args, state, env} = args |> expand_list(state, env)
-          {return_types, state, env} = List.wrap(return_types) |> expand_list(state, env)
 
-          r =
+          op =
             %Beaver.SSA{
               op: "func.call",
               arguments: args ++ [callee: Attribute.flat_symbol_ref("#{name}")],
@@ -479,9 +478,10 @@ defmodule Beaver.MIF.Expander do
             |> Beaver.SSA.put_results(return_types)
             |> MLIR.Operation.create()
 
-          r = MLIR.Operation.results(r)
+          # TODO: move assignment to match
+          r = %Beaver.MLIR.Value{} = results = MLIR.Operation.results(op)
           state = put_in(state.mlir.vars, Map.put(state.mlir.vars, var, r))
-          {r, state, env}
+          {results, state, env}
 
         _ ->
           {{fun, meta, args}, state, env}
