@@ -230,7 +230,7 @@ defmodule Beaver.MIF.Expander do
             {module.handle_intrinsic(fun, args, ctx: state.mlir.ctx, block: state.mlir.blk),
              state, env}
           else
-            raise ArgumentError, "Unknown intrinsic: #{module}.#{fun}"
+            raise ArgumentError, "Unknown intrinsic: #{inspect(module)}.#{fun}"
           end
       end
     else
