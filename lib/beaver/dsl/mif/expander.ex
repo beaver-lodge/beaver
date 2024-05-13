@@ -108,13 +108,19 @@ defmodule Beaver.MIF.Expander do
         {alias, state, env}
 
       :error ->
-        {head, state, env} = expand(head, state, env)
-
-        if is_atom(head) do
-          # A compiler may want to emit a :local_function trace in here.
-          {Module.concat([head | tail]), state, env}
+        with alias <- Module.concat([head]),
+             {:ok, found} <- Keyword.fetch(env.aliases, alias) do
+          {found, state, env}
         else
-          {{:__aliases__, meta, [head | tail]}, state, env}
+          _ ->
+            {head, state, env} = expand(head, state, env)
+
+            if is_atom(head) do
+              # A compiler may want to emit a :local_function trace in here.
+              {Module.concat([head | tail]), state, env}
+            else
+              {{:__aliases__, meta, [head | tail]}, state, env}
+            end
         end
     end
   end
