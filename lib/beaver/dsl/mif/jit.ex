@@ -30,12 +30,11 @@ defmodule Beaver.MIF.JIT do
 
   defp clone_func_impl(to, from) do
     import MLIR.CAPI
+    ctx = mlirModuleGetContext(to)
     ops = MLIR.Module.body(from) |> Beaver.Walker.operations() |> Enum.to_list()
-
     s_table = to |> MLIR.Operation.from_module() |> mlirSymbolTableCreate()
 
     for op <- ops, MLIR.Operation.name(op) == "func.func" do
-      ctx = mlirOperationGetContext(op)
       sym = mlirOperationGetAttributeByName(op, mlirSymbolTableGetSymbolAttributeName())
       found = mlirSymbolTableLookup(s_table, mlirStringAttrGetValue(sym))
       body = MLIR.Module.body(to)
@@ -51,7 +50,6 @@ defmodule Beaver.MIF.JIT do
     end
 
     mlirSymbolTableDestroy(s_table)
-    :ok
   end
 
   defp merge_modules(modules, opts \\ []) do
