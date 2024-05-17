@@ -1,4 +1,6 @@
 defmodule Beaver.MIF.JIT do
+  alias Beaver.MLIR.Dialect.Func
+  alias Beaver.MLIR.CAPI
   alias Beaver.MLIR
 
   defp jit_of_mod(m) do
@@ -26,6 +28,51 @@ defmodule Beaver.MIF.JIT do
     init([module], opts)
   end
 
+  defp clone_func_impl(to, from) do
+    import MLIR.CAPI
+    ops = MLIR.Module.body(from) |> Beaver.Walker.operations() |> Enum.to_list()
+
+    s_table = to |> MLIR.Operation.from_module() |> mlirSymbolTableCreate()
+
+    for op <- ops, MLIR.Operation.name(op) == "func.func" do
+      ctx = mlirOperationGetContext(op)
+      sym = mlirOperationGetAttributeByName(op, mlirSymbolTableGetSymbolAttributeName())
+      found = mlirSymbolTableLookup(s_table, mlirStringAttrGetValue(sym))
+      body = MLIR.Module.body(to)
+
+      if MLIR.is_null(found) do
+        mlirBlockAppendOwnedOperation(body, mlirOperationClone(op))
+      else
+        if not Func.is_external(op) do
+          mlirOperationDestroy(found)
+          mlirBlockAppendOwnedOperation(body, mlirOperationClone(op))
+        end
+      end
+    end
+
+    mlirSymbolTableDestroy(s_table)
+    :ok
+  end
+
+  defp merge_modules(modules, opts \\ []) do
+    destroy = opts[:destroy] || true
+    [head | tail] = modules
+
+    for module <- tail do
+      if MLIR.is_null(module) do
+        raise "can't merge a null module"
+      end
+
+      clone_func_impl(head, module)
+
+      if destroy do
+        MLIR.Module.destroy(module)
+      end
+    end
+
+    head
+  end
+
   def init(modules, opts) do
     ctx = MLIR.Context.create()
     Beaver.Diagnostic.attach(ctx)
@@ -39,7 +86,7 @@ defmodule Beaver.MIF.JIT do
         s when is_binary(s) -> s |> then(&MLIR.Module.create(ctx, &1))
         %MLIR.Module{} = m -> m
       end)
-      |> MLIR.Module.merge()
+      |> merge_modules()
       |> jit_of_mod
 
     case {name, modules} do

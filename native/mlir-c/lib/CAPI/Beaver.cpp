@@ -1,7 +1,6 @@
 #include "mlir/CAPI/Beaver.h"
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
-#include "mlir/Dialect/Func/IR/FuncOps.h"
 #include "mlir/Dialect/IRDL/IRDLLoading.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/ExtensibleDialect.h"
@@ -295,22 +294,4 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverGetIRDLDefinedAttr(
       dialect, attr, params,
       [](auto d, auto name) { return d->lookupAttrDefinition(name); },
       DynamicAttr::get));
-}
-
-MLIR_CAPI_EXPORTED void beaverMergeModules(MlirModule module1,
-                                           MlirModule module2) {
-  auto m1 = unwrap(module1);
-  auto m2 = unwrap(module2);
-  Block *block = m1.getBody();
-  for (Operation &op : *m2.getBody()) {
-    if (auto func = dyn_cast<func::FuncOp>(op)) {
-      if (auto found = m1.lookupSymbol(func.getSymName())) {
-        if (func.isExternal()) {
-          continue;
-        }
-        found->erase();
-      }
-    }
-    block->push_back(op.clone());
-  }
 }
