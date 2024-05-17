@@ -41,7 +41,7 @@ defmodule Beaver.MIF.JIT do
       if MLIR.is_null(found) do
         mlirBlockAppendOwnedOperation(body, mlirOperationClone(op))
       else
-        if not Func.is_external(op) do
+        unless Func.is_external(op) do
           mlirOperationDestroy(found)
           mlirBlockAppendOwnedOperation(body, mlirOperationClone(op))
         end
