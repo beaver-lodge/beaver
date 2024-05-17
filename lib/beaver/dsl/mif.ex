@@ -55,8 +55,6 @@ defmodule Beaver.MIF do
                 def(unquote(call) :: unquote(ret_types), unquote(body))
               end
 
-            # |> tap(fn ast -> ast |> Macro.to_string() |> IO.puts() end)
-
             Beaver.MIF.Expander.expand_with_mlir(
               ast,
               mlir,
