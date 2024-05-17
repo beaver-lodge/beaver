@@ -23,11 +23,9 @@ defmodule ENIFQuickSort do
 
     for_loop {element, j} <- {Term.t(), start, high - low} do
       struct_if(enif_compare(element, pivot) < 0) do
-        i = Pointer.load(i32(), i_ptr)
-        i = i + 1
+        i = Pointer.load(i32(), i_ptr) + 1
         Pointer.store(i, i_ptr)
-        j = op index.casts(j) :: i32()
-        j = result_at(j, 0)
+        j = value index.casts(j) :: i32()
 
         call swap(
                Pointer.element_ptr(Term.t(), arr, i),
@@ -49,12 +47,11 @@ defmodule ENIFQuickSort do
   defm do_sort(arr :: Pointer.t(), low :: i32(), high :: i32()) do
     struct_if(low < high) do
       pi = call partition(arr, low, high) :: i32()
-      pi = result_at(pi, 0)
-      call do_sort(arr, low, pi - 1) :: []
-      call do_sort(arr, pi + 1, high) :: []
+      do_sort(arr, low, pi - 1)
+      do_sort(arr, pi + 1, high)
     end
 
-    op func.return() :: []
+    func.return()
   end
 
   defm copy_terms(env :: Env.t(), movable_list_ptr :: Pointer.t(), arr :: Pointer.t()) do
