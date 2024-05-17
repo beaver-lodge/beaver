@@ -35,12 +35,7 @@ defmodule ENIFQuickSort do
     end
 
     i = Pointer.load(i32(), i_ptr)
-
-    call swap(
-           Pointer.element_ptr(Term.t(), arr, i + 1),
-           Pointer.element_ptr(Term.t(), arr, high)
-         ) :: []
-
+    call swap(Pointer.element_ptr(Term.t(), arr, i + 1), Pointer.element_ptr(Term.t(), arr, high))
     op func.return(i + 1) :: []
   end
 
