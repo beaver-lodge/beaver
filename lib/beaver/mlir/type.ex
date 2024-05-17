@@ -29,6 +29,7 @@ defmodule Beaver.MLIR.Type do
   end
 
   def function(inputs, results, opts \\ []) do
+    results = List.wrap(results)
     num_inputs = length(inputs)
     num_results = length(results)
 

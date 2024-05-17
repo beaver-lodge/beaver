@@ -9,8 +9,8 @@ defmodule ENIFTimSort do
     n = right - start_i + 1
 
     for_loop {temp, i} <- {Term.t(), start, n} do
-      i = op index.casts(i) :: i32()
-      i = result_at(i, 0) + start_i
+      i = value index.casts(i) :: i32()
+      i = i + start_i
       j_ptr = Pointer.allocate(i32())
       Pointer.store(i - 1, j_ptr)
 
@@ -46,9 +46,8 @@ defmodule ENIFTimSort do
 
     while_loop(Pointer.load(i32(), i_ptr) < n) do
       i = Pointer.load(i32(), i_ptr)
-      min = op arith.minsi(i + run - 1, n - 1) :: i32()
-      min = result_at(min, 0)
-      call insertion_sort(arr, i, min) :: []
+      min = value arith.minsi(i + run - 1, n - 1) :: i32()
+      insertion_sort(arr, i, min)
       Pointer.store(i + run, i_ptr)
     end
 

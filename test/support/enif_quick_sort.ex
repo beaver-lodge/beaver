@@ -11,7 +11,7 @@ defmodule ENIFQuickSort do
     Pointer.store(val_a, b)
     val_tmp = Pointer.load(Term.t(), tmp)
     Pointer.store(val_tmp, a)
-    op func.return() :: []
+    func.return()
   end
 
   defm partition(arr :: Pointer.t(), low :: i32(), high :: i32()) :: i32() do
@@ -79,7 +79,7 @@ defmodule ENIFQuickSort do
       Pointer.store(i + 1, i_ptr)
     end
 
-    op func.return() :: []
+    func.return()
   end
 
   defm sort(env, list, err) :: Term.t() do
@@ -90,14 +90,14 @@ defmodule ENIFQuickSort do
       Pointer.store(list, movable_list_ptr)
       len = Pointer.load(i32(), len_ptr)
       arr = Pointer.allocate(Term.t(), len)
-      call copy_terms(env, movable_list_ptr, arr) :: []
+      copy_terms(env, movable_list_ptr, arr)
       zero_const = op arith.constant(value: Attribute.integer(i32(), 0)) :: i32()
       zero = result_at(zero_const, 0)
-      call do_sort(arr, zero, len - 1) :: []
+      call do_sort(arr, zero, len - 1)
       ret = enif_make_list_from_array(env, arr, len)
-      op func.return(ret) :: []
+      func.return(ret)
     else
-      op func.return(err) :: []
+      func.return(err)
     end
   end
 end

@@ -92,7 +92,9 @@ defmodule Beaver do
       if ctx = opts[:ctx] do
         quote do
           Kernel.var!(beaver_internal_env_ctx) = unquote(ctx)
-          %MLIR.Context{} = Kernel.var!(beaver_internal_env_ctx)
+
+          match?(%MLIR.Context{}, Kernel.var!(beaver_internal_env_ctx)) ||
+            raise Beaver.EnvNotFoundError, MLIR.Context
         end
       end
 
@@ -100,7 +102,9 @@ defmodule Beaver do
       if block = opts[:block] do
         quote do
           Kernel.var!(beaver_internal_env_block) = unquote(block)
-          %MLIR.Block{} = Kernel.var!(beaver_internal_env_block)
+
+          match?(%MLIR.Block{}, Kernel.var!(beaver_internal_env_block)) ||
+            raise Beaver.EnvNotFoundError, MLIR.Block
         end
       end
 
@@ -141,6 +145,16 @@ defmodule Beaver do
           ctx: Beaver.Env.context()
         )
       )
+    end
+  end
+
+  defmodule EnvNotFoundError do
+    defexception [:message]
+
+    @impl true
+    def exception(type) when type in [MLIR.Context, MLIR.Block] do
+      msg = "not a valid #{inspect(type)} in environment"
+      %EnvNotFoundError{message: msg}
     end
   end
 

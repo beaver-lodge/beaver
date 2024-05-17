@@ -3,7 +3,7 @@ defmodule Beaver.MIF.Expander do
   require Beaver.Env
   alias Beaver.MLIR.Attribute
   use Beaver
-  alias MLIR.Dialect.Func
+  alias MLIR.Dialect.{Func, CF}
   require Func
   # Define the environment we will use for expansion.
   # We reset the fields below but we will need to set
@@ -35,12 +35,31 @@ defmodule Beaver.MIF.Expander do
   def expand(ast, file) do
     ctx = MLIR.Context.create()
     available_ops = MapSet.new(MLIR.Dialect.Registry.ops(:all, ctx: ctx))
-    mlir = %{ctx: ctx, mod: nil, blk: nil, available_ops: available_ops, vars: Map.new()}
+
+    mlir = %{
+      ctx: ctx,
+      mod: nil,
+      blk: MLIR.Block.create(),
+      available_ops: available_ops,
+      vars: Map.new(),
+      region: nil
+    }
 
     expand(
       ast,
       %{attrs: [], remotes: [], locals: [], definitions: [], vars: [], mlir: mlir},
       %{env() | file: file}
+    )
+  end
+
+  def expand_with_mlir(ast, %{ctx: ctx} = mlir, env) do
+    available_ops = MapSet.new(MLIR.Dialect.Registry.ops(:all, ctx: ctx))
+    mlir = mlir |> Map.put(:available_ops, available_ops)
+
+    expand(
+      ast,
+      %{attrs: [], remotes: [], locals: [], definitions: [], vars: [], mlir: mlir},
+      env
     )
   end
 
@@ -146,10 +165,19 @@ defmodule Beaver.MIF.Expander do
     {arg, state, env} = expand(arg, state, env)
     {opts, state, env} = expand_directive_opts(opts, state, env)
 
-    # An actual compiler would raise if the alias fails.
-    case Macro.Env.define_alias(env, meta, arg, [trace: false] ++ opts) do
-      {:ok, env} -> {arg, state, env}
-      {:error, _} -> {arg, state, env}
+    case arg do
+      {:{}, _, aliases} ->
+        for alias <- aliases do
+          {:alias, meta, [alias, opts]}
+        end
+        |> expand(state, env)
+
+      # An actual compiler would raise if the alias fails.
+      _ ->
+        case Macro.Env.define_alias(env, meta, arg, [trace: false] ++ opts) do
+          {:ok, env} -> {arg, state, env}
+          {:error, _} -> {arg, state, env}
+        end
     end
   end
 
@@ -177,16 +205,28 @@ defmodule Beaver.MIF.Expander do
     end
   end
 
+  @intrinsics Beaver.MIF.Prelude.intrinsics()
+  defp expand({fun, _meta, [left, right]}, state, env) when fun in @intrinsics do
+    {left, state, env} = expand(left, state, env)
+    {right, state, env} = expand(right, state, env)
+
+    {Beaver.MIF.Prelude.handle_intrinsic(fun, [left, right],
+       ctx: state.mlir.ctx,
+       block: state.mlir.blk
+     ), state, env}
+  end
+
   ## =/2
   # We include = as an example of how we could handle variables.
   # For example, if you want to store where variables are defined,
   # you would collect this information in expand_pattern/3 and
   # invoke it from all relevant places (such as case, cond, try, etc).
 
-  defp expand({:=, meta, [left, right]}, state, env) do
+  defp expand({:=, _meta, [left, right]}, state, env) do
     {left, state, env} = expand_pattern(left, state, env)
     {right, state, env} = expand(right, state, env)
-    {{:=, meta, [left, right]}, state, env}
+    state = put_mlir_var(state, left, right)
+    {right, state, env}
   end
 
   ## quote/1, quote/2
@@ -209,9 +249,16 @@ defmodule Beaver.MIF.Expander do
   ## Pin operator
   # It only appears inside match and it disables the match behaviour.
 
-  defp expand({:^, meta, [arg]}, state, %{context: context} = env) do
-    {arg, state, env} = expand(arg, state, %{env | context: nil})
-    {{:^, meta, [arg]}, state, %{env | context: context}}
+  defp expand({:^, _meta, [arg]}, state, %{context: context} = env) do
+    {b, state, env} = expand(arg, state, %{env | context: nil})
+    match?(%MLIR.Block{}, b) || raise Beaver.EnvNotFoundError, MLIR.Block
+
+    br =
+      mlir ctx: state.mlir.ctx, block: state.mlir.blk do
+        CF.br({b, []}) >>> []
+      end
+
+    {br, state, %{env | context: context}}
   end
 
   ## Remote call
@@ -232,15 +279,23 @@ defmodule Beaver.MIF.Expander do
         :error ->
           Code.ensure_loaded(module)
 
-          if function_exported?(module, :handle_intrinsic, 3) do
-            {module.handle_intrinsic(fun, args, ctx: state.mlir.ctx, block: state.mlir.blk),
-             state, env}
-          else
-            raise ArgumentError, "Unknown intrinsic: #{inspect(module)}.#{fun}"
+          cond do
+            function_exported?(module, :handle_intrinsic, 3) ->
+              {args, state, env} = args |> expand(state, env)
+
+              {module.handle_intrinsic(fun, args, ctx: state.mlir.ctx, block: state.mlir.blk),
+               state, env}
+
+            module == Beaver.MLIR.Attribute ->
+              {args, state, env} = args |> expand(state, env)
+              {apply(Beaver.MLIR.Attribute, fun, args), state, env}
+
+            true ->
+              raise ArgumentError, "Unknown intrinsic: #{inspect(module)}.#{fun}"
           end
       end
     else
-      [{dialect, [], _}, op] = [module, fun]
+      [{dialect, _, _}, op] = [module, fun]
       op = "#{dialect}.#{op}"
 
       MapSet.member?(state.mlir.available_ops, op) or
@@ -318,7 +373,7 @@ defmodule Beaver.MIF.Expander do
   ## Fallback
 
   defp expand(ast, state, env) do
-    {Map.get(state.mlir.vars, ast) || ast, state, env}
+    {get_mlir_var(state, ast) || ast, state, env}
   end
 
   defp mangling(mod, func) do
@@ -365,11 +420,7 @@ defmodule Beaver.MIF.Expander do
   end
 
   defp expand_macro(_meta, Kernel, :def, [call, [do: body]], _callback, state, env) do
-    {call, ret_types} =
-      case call do
-        {:"::", _, [call, ret_type]} -> {call, [ret_type]}
-        call -> {call, []}
-      end
+    {:"::", _, [call, ret_types]} = call
 
     {name, args} = Macro.decompose_call(call)
     name = mangling(env.module, name)
@@ -386,12 +437,14 @@ defmodule Beaver.MIF.Expander do
 
     f =
       mlir ctx: state.mlir.ctx, block: state.mlir.blk do
-        {ret_types, state, env} = ret_types |> expand_list(state, env)
-        {arg_types, state, env} = arg_types |> expand_list(state, env)
+        {ret_types, state, env} = ret_types |> expand(state, env)
+        {arg_types, state, env} = arg_types |> expand(state, env)
         ft = Type.function(arg_types, ret_types, ctx: Beaver.Env.context())
 
         Func.func _(sym_name: "\"#{name}\"", function_type: ft) do
           region do
+            state = put_in(state.mlir.region, Beaver.Env.region())
+
             block _entry() do
               MLIR.Block.add_args!(Beaver.Env.block(), arg_types, ctx: Beaver.Env.context())
 
@@ -399,7 +452,10 @@ defmodule Beaver.MIF.Expander do
                 Range.new(0, length(args) - 1)
                 |> Enum.map(&MLIR.Block.get_arg!(Beaver.Env.block(), &1))
 
-              state = put_in(state.mlir.vars, Enum.zip(args, arg_values) |> Map.new())
+              state =
+                Enum.zip(args, arg_values)
+                |> Enum.reduce(state, fn {k, v}, state -> put_mlir_var(state, k, v) end)
+
               state = put_in(state.mlir.blk, Beaver.Env.block())
               expand(body, state, env)
             end
@@ -410,8 +466,262 @@ defmodule Beaver.MIF.Expander do
     {f, state, env}
   end
 
+  defp expand_macro(_meta, Beaver, :block, args, _callback, state, env) do
+    b =
+      mlir ctx: state.mlir.ctx do
+        block do
+          [[do: body]] = args
+          body |> expand(put_in(state.mlir.blk, Beaver.Env.block()), env)
+        end
+      end
+
+    MLIR.CAPI.mlirRegionAppendOwnedBlock(state.mlir.region, b)
+    {b, state, env}
+  end
+
+  defp expand_macro(_meta, Beaver.MIF, :cond_br, [condition, clauses], _callback, state, env) do
+    true_body = Keyword.fetch!(clauses, :do)
+    false_body = Keyword.fetch!(clauses, :else)
+    {condition, state, env} = expand(condition, state, env)
+
+    v =
+      mlir ctx: state.mlir.ctx, block: state.mlir.blk do
+        true_body =
+          block do
+            expand(true_body, put_in(state.mlir.blk, Beaver.Env.block()), env)
+          end
+          |> tap(&MLIR.CAPI.mlirRegionAppendOwnedBlock(state.mlir.region, &1))
+
+        false_body =
+          block do
+            expand(false_body, put_in(state.mlir.blk, Beaver.Env.block()), env)
+          end
+          |> tap(&MLIR.CAPI.mlirRegionAppendOwnedBlock(state.mlir.region, &1))
+
+        CF.cond_br(
+          condition,
+          true_body,
+          false_body,
+          loc: Beaver.MLIR.Location.from_env(env)
+        ) >>> []
+      end
+
+    {v, state, env}
+  end
+
+  defp expand_macro(_meta, Beaver.MIF, :struct_if, [condition, clauses], _callback, state, env) do
+    true_body = Keyword.fetch!(clauses, :do)
+    false_body = clauses[:else]
+    {condition, state, env} = expand(condition, state, env)
+
+    v =
+      mlir ctx: state.mlir.ctx, block: state.mlir.blk do
+        alias Beaver.MLIR.Dialect.SCF
+
+        SCF.if [condition] do
+          region do
+            block _true() do
+              expand(true_body, put_in(state.mlir.blk, Beaver.Env.block()), env)
+              SCF.yield() >>> []
+            end
+          end
+
+          region do
+            block _false() do
+              if false_body do
+                expand(false_body, put_in(state.mlir.blk, Beaver.Env.block()), env)
+              end
+
+              SCF.yield() >>> []
+            end
+          end
+        end >>> []
+      end
+
+    {v, state, env}
+  end
+
+  defp expand_macro(_meta, Beaver.MIF, :while_loop, [expr, [do: body]], _callback, state, env) do
+    v =
+      mlir ctx: state.mlir.ctx, block: state.mlir.blk do
+        Beaver.MLIR.Dialect.SCF.while [] do
+          region do
+            block _() do
+              {condition, _state, _env} =
+                expand(expr, put_in(state.mlir.blk, Beaver.Env.block()), env)
+
+              Beaver.MLIR.Dialect.SCF.condition(condition) >>> []
+            end
+          end
+
+          region do
+            block _() do
+              expand(body, put_in(state.mlir.blk, Beaver.Env.block()), env)
+              Beaver.MLIR.Dialect.SCF.yield() >>> []
+            end
+          end
+        end >>> []
+      end
+
+    {v, state, env}
+  end
+
+  defp expand_macro(_meta, Beaver.MIF, :for_loop, [expr, [do: body]], _callback, state, env) do
+    {:<-, _, [{element, index}, {:{}, _, [t, ptr, len]}]} = expr
+    {len, state, env} = expand(len, state, env)
+    {t, state, env} = expand(t, state, env)
+    {ptr, state, env} = expand(ptr, state, env)
+
+    v =
+      mlir ctx: state.mlir.ctx, block: state.mlir.blk do
+        alias Beaver.MLIR.Dialect.{Index, SCF, LLVM}
+        zero = Index.constant(value: Attribute.index(0)) >>> Type.index()
+        lower_bound = zero
+        upper_bound = Index.casts(len) >>> Type.index()
+        step = Index.constant(value: Attribute.index(1)) >>> Type.index()
+
+        SCF.for [lower_bound, upper_bound, step] do
+          region do
+            block _body(index_val >>> Type.index()) do
+              index_casted = Index.casts(index_val) >>> Type.i64()
+
+              element_ptr =
+                LLVM.getelementptr(ptr, index_casted,
+                  elem_type: t,
+                  rawConstantIndices: ~a{array<i32: -2147483648>}
+                ) >>> ~t{!llvm.ptr}
+
+              element_val = LLVM.load(element_ptr) >>> t
+              state = put_mlir_var(state, element, element_val)
+              state = put_mlir_var(state, index, index_val)
+              expand(body, put_in(state.mlir.blk, Beaver.Env.block()), env)
+              Beaver.MLIR.Dialect.SCF.yield() >>> []
+            end
+          end
+        end >>> []
+      end
+
+    {v, state, env}
+  end
+
+  defp expand_macro(_meta, Beaver.MIF, :op, [call], _callback, state, env) do
+    {call, return_types} = Beaver.MIF.decompose_call_and_returns(call)
+    {{dialect, _, _}, op, args} = Macro.decompose_call(call)
+    op = "#{dialect}.#{op}"
+    {args, state, env} = expand(args, state, env)
+    {[return_types], state, env} = expand(return_types, state, env)
+
+    op =
+      %Beaver.SSA{
+        op: op,
+        arguments: args,
+        ctx: state.mlir.ctx,
+        block: state.mlir.blk,
+        loc: Beaver.MLIR.Location.from_env(env)
+      }
+      |> Beaver.SSA.put_results(return_types)
+      |> MLIR.Operation.create()
+
+    {op, state, env}
+  end
+
+  defp expand_macro(meta, Beaver.MIF, :value, [call], callback, state, env) do
+    {op, state, env} =
+      expand_macro(meta, Beaver.MIF, :op, [call], callback, state, env)
+
+    {MLIR.Operation.results(op), state, env}
+  end
+
+  defp expand_macro(
+         meta,
+         Beaver.MIF,
+         :call,
+         [{:"::", type_meta, [call, types]}],
+         callback,
+         state,
+         env
+       ) do
+    expand_macro(
+      meta,
+      Beaver.MIF,
+      :call,
+      [env.module, {:"::", type_meta, [call, types]}],
+      callback,
+      state,
+      env
+    )
+  end
+
+  defp expand_macro(
+         _meta,
+         Beaver.MIF,
+         :call,
+         [mod, {:"::", _, [call, types]}],
+         _callback,
+         state,
+         env
+       ) do
+    {mod, state, env} = expand(mod, state, env)
+    {name, args} = Macro.decompose_call(call)
+    name = mangling(mod, name)
+    {args, state, env} = expand(args, state, env)
+
+    # TODO: flatten should be unnecessary, refactor to support call Mod.fun(args) instead of call Mod, fun(args)
+    args = args |> List.flatten()
+    {types, state, env} = expand(types, state, env)
+
+    op =
+      mlir ctx: state.mlir.ctx, block: state.mlir.blk do
+        %Beaver.SSA{
+          op: "func.call",
+          arguments: args ++ [callee: Attribute.flat_symbol_ref("#{name}")],
+          ctx: Beaver.Env.context(),
+          block: Beaver.Env.block(),
+          loc: Beaver.MLIR.Location.from_env(env)
+        }
+        |> Beaver.SSA.put_results(types)
+        |> MLIR.Operation.create()
+      end
+
+    {MLIR.Operation.results(op), state, env}
+  end
+
+  defp expand_macro(
+         meta,
+         Beaver.MIF,
+         :call,
+         [call],
+         callback,
+         state,
+         env
+       ) do
+    expand_macro(
+      meta,
+      Beaver.MIF,
+      :call,
+      [env.module, {:"::", meta, [call, []]}],
+      callback,
+      state,
+      env
+    )
+  end
+
   defp expand_macro(meta, module, fun, args, callback, state, env) do
-    expand_macro_callback(meta, module, fun, args, callback, state, env)
+    case {module, fun} do
+      mf when mf in [{Beaver, :block}, {Beaver, :mlir}] ->
+        expand_intrinsic_macro_callback(meta, module, fun, args, callback, state, env)
+
+      {Beaver.MIF, _} ->
+        expand_intrinsic_macro_callback(meta, module, fun, args, callback, state, env)
+
+      _ ->
+        expand_macro_callback(meta, module, fun, args, callback, state, env)
+    end
+  end
+
+  defp expand_intrinsic_macro_callback(_meta, module, fun, args, _callback, _state, _env) do
+    raise ArgumentError, "TODO: #{inspect(module)}.#{fun}, #{inspect(args, pretty: true)}"
+    # callback.(meta, args) |> expand(state, env)
   end
 
   defp expand_macro_callback(meta, _module, _fun, args, callback, state, env) do
@@ -448,11 +758,26 @@ defmodule Beaver.MIF.Expander do
 
   ## Helpers
 
+  @intrinsics Beaver.MIF.Prelude.intrinsics()
+  defp expand_remote(_meta, Kernel, fun, args, state, env) when fun in @intrinsics do
+    {args, state, env} = expand(args, state, env)
+
+    {Beaver.MIF.Prelude.handle_intrinsic(fun, args,
+       ctx: state.mlir.ctx,
+       block: state.mlir.blk
+     ), state, env}
+  end
+
   defp expand_remote(meta, module, fun, args, state, env) do
     # A compiler may want to emit a :remote_function trace in here.
     state = update_in(state.remotes, &[{module, fun, length(args)} | &1])
     {args, state, env} = expand_list(args, state, env)
-    {{{:., meta, [module, fun]}, meta, args}, state, env}
+
+    if module in [MLIR.Type] do
+      {apply(module, fun, [[ctx: state.mlir.ctx]]), state, env}
+    else
+      {{{:., meta, [module, fun]}, meta, args}, state, env}
+    end
   end
 
   defp expand_local(meta, fun, args, state, env) do
@@ -464,33 +789,24 @@ defmodule Beaver.MIF.Expander do
     if function_exported?(MLIR.Type, fun, 1) do
       {apply(MLIR.Type, fun, [[ctx: state.mlir.ctx]]), state, env}
     else
-      case {fun, args} do
-        {:"::",
-         [
-           {:=, [], [var, call]},
-           return_types
-         ]} ->
-          {name, args} = Macro.decompose_call(call)
-          name = mangling(env.module, name)
-
-          op =
-            %Beaver.SSA{
-              op: "func.call",
-              arguments: args ++ [callee: Attribute.flat_symbol_ref("#{name}")],
-              ctx: state.mlir.ctx,
-              block: state.mlir.blk,
-              loc: Beaver.MLIR.Location.from_env(env)
-            }
-            |> Beaver.SSA.put_results(return_types)
-            |> MLIR.Operation.create()
-
-          # TODO: move assignment to match
-          r = %Beaver.MLIR.Value{} = results = MLIR.Operation.results(op)
-          state = put_in(state.mlir.vars, Map.put(state.mlir.vars, var, r))
-          {results, state, env}
+      case i =
+             Beaver.MIF.Prelude.handle_intrinsic(fun, args,
+               ctx: state.mlir.ctx,
+               block: state.mlir.blk
+             ) do
+        :not_handled ->
+          expand_macro(
+            meta,
+            Beaver.MIF,
+            :call,
+            [{:"::", meta, [quote(do: unquote(fun)(unquote(args))), []]}],
+            nil,
+            state,
+            env
+          )
 
         _ ->
-          {{fun, meta, args}, state, env}
+          {i, state, env}
       end
     end
   end
@@ -542,5 +858,17 @@ defmodule Beaver.MIF.Expander do
       end)
 
     {ast, state, env}
+  end
+
+  defp put_mlir_var(state, {name, _meta, _ctx} = _ast, val) do
+    update_in(state.mlir.vars, &Map.put(&1, name, val))
+  end
+
+  defp get_mlir_var(state, {name, _meta, _ctx} = _ast) do
+    Map.get(state.mlir.vars, name)
+  end
+
+  defp get_mlir_var(_state, _ast) do
+    nil
   end
 end

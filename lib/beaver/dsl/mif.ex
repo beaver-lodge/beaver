@@ -31,105 +31,37 @@ defmodule Beaver.MIF do
     end
   end
 
-  defp inject_mlir_opts({:^, _, [{_, _, _} = var]}) do
-    quote do
-      CF.br({unquote(var), []}) >>> []
-    end
-  end
-
-  @intrinsics Beaver.MIF.Prelude.intrinsics()
-
-  defp inject_mlir_opts({f, _, args}) when f in @intrinsics do
-    quote do
-      Beaver.MIF.Prelude.handle_intrinsic(unquote(f), [unquote_splicing(args)],
-        ctx: Beaver.Env.context(),
-        block: Beaver.Env.block()
-      )
-    end
-  end
-
-  defp inject_mlir_opts(ast) do
-    with {{:__aliases__, _, _} = m, f, args} <- Macro.decompose_call(ast) do
-      quote do
-        Code.ensure_loaded!(unquote(m))
-
-        if function_exported?(unquote(m), :handle_intrinsic, 3) or
-             macro_exported?(unquote(m), :handle_intrinsic, 3) do
-          unquote(m).handle_intrinsic(unquote(f), [unquote_splicing(args)],
-            ctx: Beaver.Env.context(),
-            block: Beaver.Env.block()
-          )
-        else
-          unquote(ast)
-        end
-      end
-    else
-      :error ->
-        ast
-
-      _ ->
-        ast
-    end
-  end
-
-  defp definition_to_func(env, {call, ret_types, body}) do
-    {name, args} = Macro.decompose_call(call)
-    name = mangling(env.module, name)
-
-    body =
-      body[:do]
-      |> Macro.postwalk(&inject_mlir_opts(&1))
-      |> List.wrap()
-
-    {args, arg_types} =
-      for {:"::", _, [a, t]} <- args do
-        {a, t}
-      end
-      |> Enum.unzip()
-
-    arg_types = Enum.map(arg_types, &inject_mlir_opts/1)
-    ret_types = Enum.map(ret_types, &inject_mlir_opts/1)
-
-    quote do
-      mlir ctx: var!(ctx), block: var!(block) do
-        num_of_args = unquote(length(args))
-
-        ret_types =
-          unquote(ret_types) |> Enum.map(&Beaver.Deferred.create(&1, Beaver.Env.context()))
-
-        arg_types =
-          unquote(arg_types) |> Enum.map(&Beaver.Deferred.create(&1, Beaver.Env.context()))
-
-        Beaver.MLIR.Dialect.Func.func unquote(name)(
-                                        function_type: Type.function(arg_types, ret_types)
-                                      ) do
-          region do
-            block _entry() do
-              MLIR.Block.add_args!(Beaver.Env.block(), arg_types, ctx: Beaver.Env.context())
-
-              [unquote_splicing(args)] =
-                Range.new(0, num_of_args - 1)
-                |> Enum.map(&MLIR.Block.get_arg!(Beaver.Env.block(), &1))
-
-              unquote(body)
-            end
-          end
-        end
-      end
-    end
-  end
-
   def compile_definitions(definitions) do
     import Beaver.MLIR.Transforms
     ctx = Beaver.MLIR.Context.create()
+    available_ops = MapSet.new(MLIR.Dialect.Registry.ops(:all, ctx: ctx))
 
     m =
       mlir ctx: ctx do
         module do
+          mlir = %{
+            ctx: ctx,
+            blk: Beaver.Env.block(),
+            available_ops: available_ops,
+            vars: Map.new(),
+            region: nil
+          }
+
           for {env, d} <- definitions do
-            f = definition_to_func(env, d)
-            binding = [ctx: Beaver.Env.context(), block: Beaver.Env.block()]
-            Code.eval_quoted(f, binding, env)
+            {call, ret_types, body} = d
+
+            ast =
+              quote do
+                def(unquote(call) :: unquote(ret_types), unquote(body))
+              end
+
+            # |> tap(fn ast -> ast |> Macro.to_string() |> IO.puts() end)
+
+            Beaver.MIF.Expander.expand_with_mlir(
+              ast,
+              mlir,
+              env
+            )
           end
         end
       end
@@ -145,148 +77,28 @@ defmodule Beaver.MIF do
     m
   end
 
-  defmacro op({:"::", _, [call, types]}, _ \\ []) do
-    {{:., _, [{dialect, _meta, nil}, op]}, _, args} = call
-
-    quote do
-      %Beaver.SSA{
-        op: unquote("#{dialect}.#{op}"),
-        arguments: List.flatten(unquote(args)),
-        ctx: Beaver.Env.context(),
-        block: Beaver.Env.block(),
-        loc: Beaver.MLIR.Location.from_env(unquote(Macro.escape(__CALLER__)))
-      }
-      |> Beaver.SSA.put_results([unquote_splicing(List.wrap(types))])
-      |> MLIR.Operation.create()
-    end
-  end
-
   def mangling(mod, func) do
     Module.concat(mod, func)
   end
 
-  defmacro call({:"::", _, [call, types]}) do
-    quote do
-      call(__MODULE__, unquote(call) :: unquote(types))
-    end
-  end
+  defmacro op(_), do: :implemented_in_expander
+  defmacro call({:"::", _, [_call, _types]}), do: :implemented_in_expander
+  defmacro call(_mod, {:"::", _, [_call, _types]}), do: :implemented_in_expander
 
-  defmacro call(mod, {:"::", _, [call, types]}) do
-    {name, args} = Macro.decompose_call(call)
+  defmacro for_loop(_expr, do: _body), do: :implemented_in_expander
 
-    quote do
-      name = Beaver.MIF.mangling(unquote(mod), unquote(name))
+  defmacro while_loop(_expr, do: _body), do: :implemented_in_expander
 
-      %Beaver.SSA{
-        op: unquote("func.call"),
-        arguments: [unquote_splicing(args), callee: Attribute.flat_symbol_ref("#{name}")],
-        ctx: Beaver.Env.context(),
-        block: Beaver.Env.block(),
-        loc: Beaver.MLIR.Location.from_env(unquote(Macro.escape(__CALLER__)))
-      }
-      |> Beaver.SSA.put_results([unquote_splicing(List.wrap(types))])
-      |> MLIR.Operation.create()
-    end
-  end
+  defmacro cond_br(_condition, _clauses), do: :implemented_in_expander
 
-  defmacro for_loop(expr, do: body) do
-    {:<-, _, [{element, index}, {:{}, _, [t, ptr, len]}]} = expr
+  defmacro struct_if(_condition, _clauses), do: :implemented_in_expander
 
-    quote do
-      mlir do
-        alias Beaver.MLIR.Dialect.{Index, SCF, LLVM}
-        zero = Index.constant(value: Attribute.index(0)) >>> Type.index()
-        lower_bound = zero
-        upper_bound = Index.casts(unquote(len)) >>> Type.index()
-        step = Index.constant(value: Attribute.index(1)) >>> Type.index()
+  defmacro value(_expr), do: :implemented_in_expander
 
-        SCF.for [lower_bound, upper_bound, step] do
-          region do
-            block _body(unquote(index) >>> Type.index()) do
-              index_casted = Index.casts(unquote(index)) >>> Type.i64()
-
-              element_ptr =
-                LLVM.getelementptr(unquote(ptr), index_casted,
-                  elem_type: unquote(t),
-                  rawConstantIndices: ~a{array<i32: -2147483648>}
-                ) >>> ~t{!llvm.ptr}
-
-              var!(unquote(element)) = LLVM.load(element_ptr) >>> unquote(t)
-              unquote(body)
-              Beaver.MLIR.Dialect.SCF.yield() >>> []
-            end
-          end
-        end >>> []
-      end
-    end
-  end
-
-  defmacro while_loop(expr, do: body) do
-    quote do
-      mlir do
-        Beaver.MLIR.Dialect.SCF.while [] do
-          region do
-            block _() do
-              condition = unquote(expr)
-              Beaver.MLIR.Dialect.SCF.condition(condition) >>> []
-            end
-          end
-
-          region do
-            block _() do
-              unquote(body)
-              Beaver.MLIR.Dialect.SCF.yield() >>> []
-            end
-          end
-        end >>> []
-      end
-    end
-  end
-
-  defmacro cond_br(condition, clauses) do
-    true_body = Keyword.fetch!(clauses, :do)
-    false_body = Keyword.fetch!(clauses, :else)
-
-    quote do
-      mlir do
-        CF.cond_br(
-          unquote(condition),
-          block do
-            unquote(true_body)
-          end,
-          block do
-            unquote(false_body)
-          end,
-          loc: Beaver.MLIR.Location.from_env(unquote(Macro.escape(__CALLER__)))
-        ) >>> []
-      end
-    end
-  end
-
-  defmacro struct_if(condition, clauses) do
-    true_body = Keyword.fetch!(clauses, :do)
-    false_body = clauses[:else]
-
-    quote do
-      mlir do
-        alias Beaver.MLIR.Dialect.SCF
-
-        SCF.if [unquote(condition)] do
-          region do
-            block _true() do
-              unquote(true_body)
-              SCF.yield() >>> []
-            end
-          end
-
-          region do
-            block _false() do
-              unquote(false_body)
-              SCF.yield() >>> []
-            end
-          end
-        end >>> []
-      end
+  def decompose_call_and_returns(call) do
+    case call do
+      {:"::", _, [call, ret_type]} -> {call, [ret_type]}
+      call -> {call, []}
     end
   end
 
@@ -321,11 +133,7 @@ defmodule Beaver.MIF do
   end
 
   defmacro defm(call, body \\ []) do
-    {call, ret_types} =
-      case call do
-        {:"::", _, [call, ret_type]} -> {call, [ret_type]}
-        call -> {call, []}
-      end
+    {call, ret_types} = decompose_call_and_returns(call)
 
     call = normalize_call(call)
     {name, args} = Macro.decompose_call(call)

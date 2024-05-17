@@ -13,17 +13,16 @@ defmodule MIFTest do
 
         arg_err =
           block do
-            op func.return(error) :: []
+            func.return(error)
           end
 
         cond_br(enif_get_int64(env, a, ptr_a) != 0) do
           cond_br(0 != enif_get_int64(env, b, ptr_b)) do
             a = Pointer.load(i64(), ptr_a)
             b = Pointer.load(i64(), ptr_b)
-            add_op = op llvm.add(a, b) :: i64()
-            sum = result_at(add_op, 0)
+            sum = value llvm.add(a, b) :: i64()
             term = enif_make_int64(env, sum)
-            op func.return(term) :: []
+            func.return(term)
           else
             ^arg_err
           end
