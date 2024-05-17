@@ -1,6 +1,6 @@
 defmodule Beaver.MIF.JIT do
   alias Beaver.MLIR.Dialect.Func
-  alias Beaver.MLIR.CAPI
+  import Beaver.MLIR.CAPI
   alias Beaver.MLIR
 
   defp jit_of_mod(m) do
@@ -17,7 +17,7 @@ defmodule Beaver.MIF.JIT do
     |> reconcile_unrealized_casts
     |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR") == "1")
     |> MLIR.ExecutionEngine.create!(opt_level: 3, object_dump: true)
-    |> tap(&Beaver.MLIR.CAPI.beaver_raw_jit_register_enif(&1.ref))
+    |> tap(&beaver_raw_jit_register_enif(&1.ref))
   end
 
   def init(module, opts \\ [])
@@ -29,7 +29,6 @@ defmodule Beaver.MIF.JIT do
   end
 
   defp clone_func_impl(to, from) do
-    import MLIR.CAPI
     ctx = mlirModuleGetContext(to)
     ops = MLIR.Module.body(from) |> Beaver.Walker.operations() |> Enum.to_list()
     s_table = to |> MLIR.Operation.from_module() |> mlirSymbolTableCreate()
@@ -106,7 +105,7 @@ defmodule Beaver.MIF.JIT do
   end
 
   def invoke(jit, {mod, func, args}) do
-    Beaver.MLIR.CAPI.beaver_raw_jit_invoke_with_terms(
+    beaver_raw_jit_invoke_with_terms(
       jit.ref,
       to_string(Beaver.MIF.mangling(mod, func)),
       args
