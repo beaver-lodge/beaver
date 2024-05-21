@@ -335,7 +335,7 @@ defmodule Beaver.MIF.Expander do
       {:function, module, fun} ->
         expand_remote(meta, module, fun, args, state, env)
 
-      :error ->
+      {:error, :not_found} ->
         expand_local(meta, fun, args, state, env)
     end
   end
