@@ -194,6 +194,10 @@ defmodule Beaver.MLIR do
   def to_string(%PassManager{} = pm, _opts) do
     pm |> CAPI.mlirPassManagerGetAsOpPassManager() |> __MODULE__.to_string()
   end
+
+  def to_string(f, opts) when is_function(f) do
+    Beaver.Deferred.create(f, Keyword.fetch!(opts, :ctx)) |> to_string(opts)
+  end
 end
 
 for m <- [

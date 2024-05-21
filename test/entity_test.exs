@@ -144,5 +144,11 @@ defmodule EntityTest do
         null |> MLIR.dump!()
       end
     end
+
+    test "symbol name", test_context do
+      ctx = test_context[:ctx]
+      assert Attribute.symbol_name("foo") |> MLIR.to_string(ctx: ctx) == "\"foo\""
+      assert Attribute.symbol_name(__MODULE__) |> MLIR.to_string(ctx: ctx) == "\"#{__MODULE__}\""
+    end
   end
 end

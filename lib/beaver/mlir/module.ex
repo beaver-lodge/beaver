@@ -35,4 +35,6 @@ defmodule Beaver.MLIR.Module do
   def destroy(module) do
     CAPI.mlirModuleDestroy(module)
   end
+
+  defdelegate body(module), to: CAPI, as: :mlirModuleGetBody
 end

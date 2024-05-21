@@ -98,11 +98,6 @@ defmodule Beaver.MLIR.Operation.Changeset do
     %__MODULE__{changeset | successors: successors ++ [successor]}
   end
 
-  def add_argument(%__MODULE__{attributes: attributes} = changeset, value)
-      when is_integer(value) do
-    %__MODULE__{changeset | attributes: attributes ++ [value: value]}
-  end
-
   def add_argument(
         %__MODULE__{attributes: attributes} = changeset,
         {name, %MLIR.Attribute{} = attr}

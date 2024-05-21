@@ -67,7 +67,7 @@ defmodule Beaver.MLIR.Operation.State do
               v
 
             _ ->
-              raise "not supported kv for attribute: #{inspect({k, v})}"
+              raise "attribute not supported: #{inspect({k, v})}"
           end
 
         if MLIR.is_null(attr) do
