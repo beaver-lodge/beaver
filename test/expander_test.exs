@@ -71,7 +71,7 @@ defmodule POCTest do
     assert vars("var = 123") == [var: nil]
 
     assert catch_error(vars("^var = 123") == []) == %Beaver.EnvNotFoundError{
-             message: "not a valid Beaver.MLIR.Block in environment"
+             message: "no valid Beaver.MLIR.Block in the environment"
            }
   end
 
