@@ -40,6 +40,13 @@ defmodule EnifTest do
       end
     end
     |> MLIR.Operation.verify!()
+    |> tap(fn m ->
+      s_table = m |> MLIR.Operation.from_module() |> MLIR.CAPI.mlirSymbolTableCreate()
+      found = MLIR.CAPI.mlirSymbolTableLookup(s_table, MLIR.StringRef.create("enif_make_int64"))
+      assert not MLIR.is_null(found)
+      assert MLIR.Dialect.Func.is_external(found)
+      MLIR.CAPI.mlirSymbolTableDestroy(s_table)
+    end)
     |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
     |> convert_scf_to_cf
     |> convert_arith_to_llvm()

@@ -35,7 +35,7 @@ defmodule Beaver.MLIR.Dialect.Builtin do
         |> Beaver.MLIR.CAPI.mlirOperationSetAttributeByName(name, attr)
       end
 
-      module_body_block = Beaver.MLIR.CAPI.mlirModuleGetBody(module)
+      module_body_block = Beaver.MLIR.Module.body(module)
       unquote(block_cache)
       Kernel.var!(beaver_internal_env_block) = module_body_block
       %Beaver.MLIR.Block{} = Kernel.var!(beaver_internal_env_block)

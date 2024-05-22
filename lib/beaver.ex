@@ -152,8 +152,8 @@ defmodule Beaver do
     defexception [:message]
 
     @impl true
-    def exception(type) when type in [MLIR.Context, MLIR.Block] do
-      msg = "not a valid #{inspect(type)} in environment"
+    def exception(type) when type in [MLIR.Context, MLIR.Region, MLIR.Block] do
+      msg = "no valid #{inspect(type)} in the environment"
       %EnvNotFoundError{message: msg}
     end
   end
