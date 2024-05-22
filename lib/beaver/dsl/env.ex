@@ -9,10 +9,13 @@ defmodule Beaver.Env do
   defmacro context() do
     if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_ctx, nil}) do
       quote do
+        match?(%Beaver.MLIR.Context{}, Kernel.var!(beaver_internal_env_ctx)) ||
+          raise Beaver.EnvNotFoundError, Beaver.MLIR.Context
+
         Kernel.var!(beaver_internal_env_ctx)
       end
     else
-      raise "no MLIR context in environment, maybe you forgot to put the ssa form inside the 'mlir ctx: ctx, do: ....' ?"
+      raise Beaver.EnvNotFoundError, Beaver.MLIR.Context
     end
   end
 
@@ -22,9 +25,13 @@ defmodule Beaver.Env do
   defmacro region() do
     if Macro.Env.has_var?(__CALLER__, {:beaver_env_region, nil}) do
       quote do
+        match?(%Beaver.MLIR.Region{}, Kernel.var!(beaver_env_region)) ||
+          raise Beaver.EnvNotFoundError, Beaver.MLIR.Region
+
         Kernel.var!(beaver_env_region)
       end
     else
+      # NOTE: will not raise error if region is not found, because macro mlir/2 doesn't work with region
       quote do
         Beaver.not_found(__ENV__)
       end
@@ -40,7 +47,7 @@ defmodule Beaver.Env do
         Kernel.var!(beaver_internal_env_block)
       end
     else
-      raise "no block in environment, maybe you forgot to put the ssa form inside the Beaver.mlir/2 macro or a block/1 macro?"
+      raise Beaver.EnvNotFoundError, Beaver.MLIR.Block
     end
   end
 
