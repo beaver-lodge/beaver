@@ -54,7 +54,7 @@ defmodule Beaver.Env do
   @doc """
   Return block with a given name in the DSL environment
   """
-  defmacro block({var_name, _line, _} = block_var) do
+  defmacro block({var_name, _line, nil} = block_var) do
     if Macro.Env.has_var?(__CALLER__, {var_name, nil}) do
       block_var
     else
