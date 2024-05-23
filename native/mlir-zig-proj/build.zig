@@ -16,10 +16,10 @@ pub fn build(b: *std.Build) void {
     lib.root_module.addImport("erl_nif", kinda.module("erl_nif"));
     lib.root_module.addImport("beam", kinda.module("beam"));
     if (os == .linux) {
-        lib.addRPath(.{ .path = ":$ORIGIN" });
+        lib.addRPath(.{ .path = "\\$ORIGIN" });
     }
     if (os == .macos) {
-        lib.addRPath(.{ .path = "@loader_path" });
+        lib.addRPath(.{ .path = "\\@loader_path" });
     }
     lib.linkSystemLibrary("MLIRBeaver");
     lib.linker_allow_shlib_undefined = true;
