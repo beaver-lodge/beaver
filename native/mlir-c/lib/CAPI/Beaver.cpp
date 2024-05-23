@@ -213,8 +213,8 @@ MLIR_CAPI_EXPORTED MlirPass beaverCreateExternalPass(
 MLIR_CAPI_EXPORTED MlirAttribute beaverGetReassociationIndicesForReshape(
     MlirType sourceType, MlirType targetType) {
   auto indices = mlir::getReassociationIndicesForReshape(
-      unwrap(sourceType).cast<RankedTensorType>(),
-      unwrap(targetType).cast<RankedTensorType>());
+      mlir::cast<RankedTensorType>(unwrap(sourceType)),
+      mlir::cast<RankedTensorType>(unwrap(targetType)));
   OpBuilder b{unwrap(sourceType).getContext()};
   if (!indices) {
     return wrap(Attribute{});
@@ -225,7 +225,7 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverGetReassociationIndicesForReshape(
 MLIR_CAPI_EXPORTED void beaverLocationPrint(MlirLocation location,
                                             MlirStringCallback callback,
                                             void *userData) {
-  if (auto loc = unwrap(location)->dyn_cast<FileLineColLoc>()) {
+  if (auto loc = mlir::dyn_cast<FileLineColLoc>(unwrap(location))) {
     std::string s = loc.getFilename().str() + ":" +
                     std::to_string(loc.getLine()) + ":" +
                     std::to_string(loc.getColumn());
@@ -266,9 +266,9 @@ T getIRDLDefinedEntity(MlirStringRef dialect, MlirStringRef name,
                        EntityGetter getter) {
   if (auto d =
           unwrap(attrArr).getContext()->getOrLoadDialect(unwrap(dialect))) {
-    if (auto e = llvm::dyn_cast<ExtensibleDialect>(d)) {
+    if (auto e = mlir::dyn_cast<ExtensibleDialect>(d)) {
       if (auto definition = lookup(e, unwrap(name))) {
-        if (auto arr = unwrap(attrArr).dyn_cast<ArrayAttr>()) {
+        if (auto arr = mlir::dyn_cast<ArrayAttr>(unwrap(attrArr))) {
           return getter(definition, arr.getValue());
         }
       }
