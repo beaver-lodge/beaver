@@ -266,9 +266,9 @@ T getIRDLDefinedEntity(MlirStringRef dialect, MlirStringRef name,
                        EntityGetter getter) {
   if (auto d =
           unwrap(attrArr).getContext()->getOrLoadDialect(unwrap(dialect))) {
-    if (auto e = llvm::dyn_cast<ExtensibleDialect>(d)) {
+    if (auto e = mlir::dyn_cast<ExtensibleDialect>(d)) {
       if (auto definition = lookup(e, unwrap(name))) {
-        if (auto arr = unwrap(attrArr).dyn_cast<ArrayAttr>()) {
+        if (auto arr = mlir::dyn_cast<ArrayAttr>(unwrap(attrArr))) {
           return getter(definition, arr.getValue());
         }
       }
