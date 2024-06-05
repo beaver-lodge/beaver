@@ -150,5 +150,17 @@ defmodule EntityTest do
       assert Attribute.symbol_name("foo") |> MLIR.to_string(ctx: ctx) == "\"foo\""
       assert Attribute.symbol_name(__MODULE__) |> MLIR.to_string(ctx: ctx) == "\"#{__MODULE__}\""
     end
+
+    test "nested symbol", test_context do
+      ctx = test_context[:ctx]
+      ccc = MLIR.Attribute.flat_symbol_ref("ccc", ctx: ctx)
+      aaa_bbb_ccc = "@aaa::@bbb::@ccc"
+
+      assert aaa_bbb_ccc ==
+               MLIR.Attribute.symbol_ref("aaa", ["bbb", "ccc"], ctx: ctx) |> MLIR.to_string()
+
+      assert aaa_bbb_ccc ==
+               MLIR.Attribute.symbol_ref("aaa", ["bbb", ccc], ctx: ctx) |> MLIR.to_string()
+    end
   end
 end

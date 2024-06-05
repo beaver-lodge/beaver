@@ -22,5 +22,6 @@ add_mlir_aggregate(
   MLIRCAPIShape
   MLIRCAPISparseTensor
   MLIRCAPITensor
+  MLIRCAPIIRDL
   MLIRCAPITransforms
   MLIRCAPIElixir)

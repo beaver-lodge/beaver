@@ -14,6 +14,7 @@
 #include <mlir-c/Dialect/Elixir.h>
 #include <mlir-c/Dialect/Func.h>
 #include <mlir-c/Dialect/GPU.h>
+#include <mlir-c/Dialect/IRDL.h>
 #include <mlir-c/Dialect/LLVM.h>
 #include <mlir-c/Dialect/Linalg.h>
 #include <mlir-c/Dialect/PDL.h>

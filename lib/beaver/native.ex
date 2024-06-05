@@ -85,8 +85,7 @@ defmodule Beaver.Native do
     |> check!()
   end
 
-  def dump(%kind{ref: ref} = v) do
+  def dump(%kind{ref: ref}) do
     Beaver.Native.forward(kind, "dump", [ref])
-    v
   end
 end

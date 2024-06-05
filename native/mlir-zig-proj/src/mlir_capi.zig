@@ -24,6 +24,7 @@ pub const I16 = NativeKind(i16, "I16");
 pub const U8 = NativeKind(u8, "U8");
 pub const USize = NativeKind(usize, "USize");
 pub const OpaqueArray = NativeKind(?*const anyopaque, "OpaqueArray");
+pub const StringArray = NativeKind([*c][*c]const u8, "StringArray");
 
 fn MLIRKind(comptime n: []const u8) type {
     const nsPrefix = "Elixir.Beaver.MLIR.";
@@ -128,6 +129,7 @@ pub const allKinds = .{
     USize,
     UnmanagedDenseResourceElementsAttrGetDeleteCallback,
     OpaqueArray,
+    StringArray,
     NamedAttribute,
     PassManager,
     RewritePatternSet,
@@ -173,8 +175,7 @@ pub const EntriesOfKinds = getEntries();
 fn getEntries() EntriesT {
     var ret: EntriesT = undefined;
     @setEvalBranchQuota(8000);
-    const Kinds = allKinds;
-    for (Kinds, 0..) |k, i| {
+    for (allKinds, 0..) |k, i| {
         for (0..kinda.numOfNIFsPerKind) |j| {
             ret[i * kinda.numOfNIFsPerKind + j] = k.nifs[j];
         }
