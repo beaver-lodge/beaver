@@ -256,10 +256,6 @@ MLIR_CAPI_EXPORTED void beaverOperationDumpGeneric(MlirOperation op) {
   llvm::errs() << "\n";
 }
 
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverLoadIRDLDialects(MlirModule module) {
-  return wrap(irdl::loadDialects(unwrap(module)));
-}
-
 template <typename T, typename EntityLookup, typename EntityGetter>
 T getIRDLDefinedEntity(MlirStringRef dialect, MlirStringRef name,
                        MlirAttribute attrArr, EntityLookup lookup,

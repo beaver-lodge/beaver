@@ -308,7 +308,9 @@ defmodule Beaver.Slang do
       gen_creator(element, :parameters, call, nil, need_variadicity: false),
       quote do
         def unquote(name)(unquote_splicing(get_args_as_vars(args)), opts \\ []) do
-          {:parametric, unquote(name), [unquote_splicing(get_args_as_vars(args))],
+          {:parametric,
+           MLIR.Attribute.symbol_ref(@__slang_dialect_name__, [to_string(unquote(name))]),
+           [unquote_splicing(get_args_as_vars(args))],
            Beaver.Slang.create_constrained_element(
              unquote(element),
              @__slang_dialect_name__,
@@ -421,13 +423,13 @@ defmodule Beaver.Slang do
   @doc false
   # This function creates a parametric attribute for a given value. It generates the code for `irdl.parametric` op.
   def create_parametric({:parametric, symbol, values, _}, opts) do
+    base_type = Beaver.Deferred.from_opts(opts, symbol)
+
     Beaver.Deferred.from_opts(
       opts,
       fn ctx ->
         mlir ctx: ctx, block: opts[:block] do
-          IRDL.parametric(values,
-            base_type: MLIR.Attribute.flat_symbol_ref("#{symbol}", ctx: Beaver.Env.context())
-          ) >>> ~t{!irdl.attribute}
+          IRDL.parametric(values, base_type: base_type) >>> ~t{!irdl.attribute}
         end
       end
     )
@@ -468,6 +470,6 @@ defmodule Beaver.Slang do
     |> Beaver.MLIR.Transforms.canonicalize()
     |> MLIR.Pass.Composer.run!()
     |> MLIR.Operation.verify!()
-    |> Beaver.MLIR.CAPI.beaverLoadIRDLDialects()
+    |> Beaver.MLIR.CAPI.mlirLoadIRDLDialects()
   end
 end

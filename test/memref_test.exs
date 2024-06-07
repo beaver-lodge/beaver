@@ -37,9 +37,7 @@ defmodule MemRefTest do
       |> canonicalize
       |> cse
       |> MLIR.Pass.Composer.nested("func.func", convert_linalg_to_loops())
-      |> MLIR.Pass.Composer.append("arith-bufferize")
-      |> MLIR.Pass.Composer.nested("func.func", "linalg-bufferize")
-      |> MLIR.Pass.Composer.append("func-bufferize")
+      |> MLIR.Pass.Composer.append("one-shot-bufferize")
       |> MLIR.Pass.Composer.nested(
         "func.func",
         ~w{finalizing-bufferize buffer-deallocation convert-linalg-to-loops}

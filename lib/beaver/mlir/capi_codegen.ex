@@ -122,7 +122,8 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
           :I16,
           :U8,
           :USize,
-          :OpaqueArray
+          :OpaqueArray,
+          :StringArray
         ],
         &%KindDecl{module_name: Module.concat(Beaver.Native, &1)}
       )

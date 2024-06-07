@@ -179,6 +179,25 @@ defmodule Beaver.MLIR.Attribute do
     )
   end
 
+  def symbol_ref(symbol, nested_symbols \\ [], opts \\ []) do
+    symbol = MLIR.StringRef.create(symbol)
+
+    Beaver.Deferred.from_opts(
+      opts,
+      fn ctx ->
+        nested_arr =
+          nested_symbols
+          |> Enum.map(fn
+            s when is_binary(s) -> flat_symbol_ref(s, ctx: ctx)
+            %MLIR.Attribute{} = s -> s
+          end)
+          |> Beaver.Native.array(MLIR.Attribute)
+
+        CAPI.mlirSymbolRefAttrGet(ctx, symbol, length(nested_symbols), nested_arr)
+      end
+    )
+  end
+
   def symbol_name(name, opts \\ []) do
     Beaver.Deferred.from_opts(
       opts,
