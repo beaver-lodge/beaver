@@ -226,7 +226,7 @@ defmodule CfTest do
       |> convert_func_to_llvm
       |> canonicalize
       |> MLIR.Pass.Composer.append({"DoNothing1", "builtin.module", fn _ -> :ok end})
-      |> MLIR.Pass.Composer.run!(timing: true)
+      |> MLIR.Pass.Composer.run!()
     end
 
     def get_func(ir, func) do
