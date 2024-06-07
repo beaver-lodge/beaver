@@ -1,10 +1,10 @@
 defmodule DebugOutputTest do
   use Beaver.Case, async: true
   use Beaver
-  alias Beaver.MLIR
 
   @moduletag :stderr
   @moduletag :smoke
+
   def ir(ctx) do
     ~m"""
     func.func @add(%arg0 : i32, %arg1 : i32) -> i32 {
