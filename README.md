@@ -1,6 +1,7 @@
 # Beaver 🦫
 
 [![Package](https://img.shields.io/badge/-Package-important)](https://hex.pm/packages/beaver) [![Documentation](https://img.shields.io/badge/-Documentation-blueviolet)](https://hexdocs.pm/beaver)
+[![Check Upstream](https://github.com/beaver-lodge/beaver/actions/workflows/upstream.yml/badge.svg)](https://github.com/beaver-lodge/beaver/actions/workflows/upstream.yml)
 
 **Boost the almighty blue-silver dragon with some magical elixir!** 🧙🧙‍♀️🧙‍♂️
 
