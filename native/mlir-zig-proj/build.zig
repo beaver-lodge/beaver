@@ -7,7 +7,7 @@ pub fn build(b: *std.Build) void {
     // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
     const lib = b.addSharedLibrary(.{
         .name = "BeaverNIF",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .optimize = .Debug,
         .target = b.host,
     });
