@@ -4,8 +4,8 @@
 
     .dependencies = .{
         .kinda = .{
-            .url = "https://github.com/beaver-lodge/kinda/archive/de9ddc7d4c9fdd066673467926f3968596b9af9f.tar.gz",
-            .hash = "1220ed4b3559e130d98c675552c1455e90a08bc678d481ef41a73d77f81ca2d2f80b",
+            .url = "https://github.com/beaver-lodge/kinda/archive/b23113bf2f1b414e07c221e0118cc30c1c7b28df.tar.gz",
+            .hash = "1220074c55ae451b45381c6fd081ba4674d3ff29418ddbdb657b8c8a9d353f243dc3",
         },
     },
     .paths = .{""},
