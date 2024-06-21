@@ -28,4 +28,9 @@ defmodule Beaver.MLIR.Value do
       {:error, "not a result"}
     end
   end
+
+  @doc """
+  Return the type of this value
+  """
+  defdelegate type(value), to: CAPI, as: :mlirValueGetType
 end
