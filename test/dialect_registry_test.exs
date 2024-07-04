@@ -47,6 +47,7 @@ defmodule DialectRegistryTest do
         {"omp", "OMP"},
         {"pdl", "PDL"},
         {"pdl_interp", "PDLInterp"},
+        {"ptr", "Ptr"},
         {"quant", "Quant"},
         {"rocdl", "ROCDL"},
         {"scf", "SCF"},
