@@ -4,43 +4,32 @@ pub const c = @import("prelude.zig");
 const result = @import("kinda").result;
 const e = @import("runtime.zig");
 
-const Invocation = struct {
-    arg_terms: []beam.term = undefined,
-    res_term: beam.term = undefined,
-    packed_args: []?*anyopaque = undefined, // [arg0, arg1... result]
-    fn init(self: *@This(), environment: beam.env, list: beam.term) !void {
-        const size = try beam.get_list_length(environment, list);
-        var head: beam.term = undefined;
-        self.arg_terms = try beam.allocator.alloc(beam.term, size);
-        self.packed_args = try beam.allocator.alloc(?*anyopaque, size + 2);
-        var movable_list = list;
-        for (0..size) |idx| {
-            head = try beam.get_head_and_iter(environment, &movable_list);
-            self.arg_terms[idx] = head;
-            self.packed_args[idx + 1] = &self.arg_terms[idx];
+fn Invocation(
+    comptime ArgCount: u8,
+) type {
+    return struct {
+        res_term: beam.term = undefined,
+        packed_args: [ArgCount + 2]?*anyopaque = undefined, // [arg0, arg1... result]
+        fn init(self: *@This(), environment: beam.env, args: *const [2]c_ulong) !void {
+            self.packed_args[0] = @ptrCast(@constCast(&environment));
+            inline for (0..ArgCount) |idx| {
+                self.packed_args[idx + 1] = @ptrCast(@constCast(&args[idx]));
+            }
+            self.packed_args[ArgCount + 1] = &self.res_term;
         }
-        self.packed_args[size + 1] = &self.res_term;
-        errdefer beam.allocator.free(self.arg_terms);
-        errdefer beam.allocator.free(self.packed_args);
-    }
-    fn deinit(self: *@This()) void {
-        beam.allocator.free(self.arg_terms);
-        beam.allocator.free(self.packed_args);
-    }
-    fn invoke(self: *@This(), environment: beam.env, jit: mlir_capi.ExecutionEngine.T, name: beam.binary) callconv(.C) mlir_capi.LogicalResult.T {
-        self.packed_args[0] = @ptrCast(@constCast(&environment));
-        return c.mlirExecutionEngineInvokePacked(jit, c.mlirStringRefCreate(name.data, name.size), &self.packed_args[0]);
-    }
-};
+        fn invoke(self: *@This(), jit: mlir_capi.ExecutionEngine.T, name: beam.binary) callconv(.C) mlir_capi.LogicalResult.T {
+            return c.mlirExecutionEngineInvokePacked(jit, c.mlirStringRefCreate(name.data, name.size), &self.packed_args[0]);
+        }
+    };
+}
 
 fn beaver_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const Error = error{JITFunctionCallFailure};
     const jit: mlir_capi.ExecutionEngine.T = try mlir_capi.ExecutionEngine.resource.fetch(env, args[0]);
     const name: beam.binary = try beam.get_binary(env, args[1]);
-    var invocation = Invocation{};
-    try invocation.init(env, args[2]);
-    defer invocation.deinit();
-    if (c.beaverLogicalResultIsFailure(invocation.invoke(env, jit, name))) {
+    var invocation = Invocation(2){};
+    try invocation.init(env, args[2..4]);
+    if (c.beaverLogicalResultIsFailure(invocation.invoke(jit, name))) {
         return Error.JITFunctionCallFailure;
     }
     return invocation.res_term;
@@ -188,8 +177,9 @@ fn beaver_raw_mlir_type_of_enif_obj(env: beam.env, _: c_int, args: [*c]const bea
     return Error.MLIRTypeForEnifObjNotFound;
 }
 
+const ArgSize = 2;
 pub const nifs = .{
-    result.nif("beaver_raw_jit_invoke_with_terms", 3, beaver_raw_jit_invoke_with_terms).entry,
+    result.nif("beaver_raw_jit_invoke_with_terms", 1 + ArgSize + 1, beaver_raw_jit_invoke_with_terms).entry,
     result.nif("beaver_raw_jit_register_enif", 1, beaver_raw_jit_register_enif).entry,
     result.nif("beaver_raw_enif_signatures", 1, beaver_raw_enif_signatures).entry,
     result.nif("beaver_raw_enif_functions", 0, beaver_raw_enif_functions).entry,

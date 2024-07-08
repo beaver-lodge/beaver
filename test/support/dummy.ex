@@ -1,5 +1,4 @@
 defmodule Beaver.Dummy do
-  require Beaver.Env
   use Beaver
   alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Dialect.{Func, Arith, CF}
