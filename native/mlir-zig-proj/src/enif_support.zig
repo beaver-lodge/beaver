@@ -13,6 +13,7 @@ const Invocation = struct {
         var head: beam.term = undefined;
         self.arg_terms = try beam.allocator.alloc(beam.term, size);
         self.packed_args = try beam.allocator.alloc(?*anyopaque, size + 2);
+        self.packed_args[0] = @ptrCast(@constCast(&environment));
         var movable_list = list;
         for (0..size) |idx| {
             head = try beam.get_head_and_iter(environment, &movable_list);
@@ -27,8 +28,7 @@ const Invocation = struct {
         beam.allocator.free(self.arg_terms);
         beam.allocator.free(self.packed_args);
     }
-    fn invoke(self: *@This(), environment: beam.env, jit: mlir_capi.ExecutionEngine.T, name: beam.binary) callconv(.C) mlir_capi.LogicalResult.T {
-        self.packed_args[0] = @ptrCast(@constCast(&environment));
+    fn invoke(self: *@This(), jit: mlir_capi.ExecutionEngine.T, name: beam.binary) callconv(.C) mlir_capi.LogicalResult.T {
         return c.mlirExecutionEngineInvokePacked(jit, c.mlirStringRefCreate(name.data, name.size), &self.packed_args[0]);
     }
 };
@@ -40,7 +40,7 @@ fn beaver_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const bea
     var invocation = Invocation{};
     try invocation.init(env, args[2]);
     defer invocation.deinit();
-    if (c.beaverLogicalResultIsFailure(invocation.invoke(env, jit, name))) {
+    if (c.beaverLogicalResultIsFailure(invocation.invoke(jit, name))) {
         return Error.JITFunctionCallFailure;
     }
     return invocation.res_term;

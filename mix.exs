@@ -103,7 +103,8 @@ defmodule Beaver.MixProject do
     ]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  defp elixirc_paths(:dev), do: ["lib", "bench"]
+  defp elixirc_paths(:test), do: ["lib", "bench", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
   defp deps do
@@ -114,7 +115,8 @@ defmodule Beaver.MixProject do
         do: {:kinda, path: p},
         else: {:kinda, "~> 0.8.1"}
       ),
-      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
+      {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
+      {:benchee, "~> 1.0", only: :dev}
     ]
   end
 end
