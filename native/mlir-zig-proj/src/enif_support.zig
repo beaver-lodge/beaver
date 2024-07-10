@@ -65,12 +65,19 @@ fn beaver_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.te
     return beam.make_ok(env);
 }
 
-fn llvm_ptr_type(env: beam.env, ctx: mlir_capi.Context.T) !beam.term {
-    const llvm_ptr = "!llvm.ptr";
+fn parse_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, t: []const u8) !beam.term {
     return try mlir_capi.Type.resource.make(env, c.mlirTypeParseGet(ctx, c.MlirStringRef{
-        .data = llvm_ptr.ptr,
-        .length = llvm_ptr.len,
+        .data = t.ptr,
+        .length = t.len,
     }));
+}
+
+fn llvm_ptr_type(env: beam.env, ctx: mlir_capi.Context.T) !beam.term {
+    return parse_mlir_type(env, ctx, "!llvm.ptr");
+}
+
+fn binary_memref_type(env: beam.env, ctx: mlir_capi.Context.T) !beam.term {
+    return parse_mlir_type(env, ctx, e.BinaryMemRefType);
 }
 
 fn mlir_i_type_of_size(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
@@ -90,6 +97,9 @@ fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !be
             return try mlir_i_type_of_size(env, ctx, t);
         },
         .Struct => {
+            if (t == e.BinaryMemRefDescriptor) {
+                return try binary_memref_type(env, ctx);
+            }
             return try mlir_i_type_of_size(env, ctx, t);
         },
         .Optional => {
@@ -126,7 +136,8 @@ fn beaver_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.term
     const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
     var signatures: []beam.term = try beam.allocator.alloc(beam.term, enif_function_names.len);
     inline for (enif_function_names, 0..) |name, i| {
-        const f = @field(e, name);
+        const decl_name = "__decl__" ++ name;
+        const f = if (@hasDecl(e, decl_name)) @field(e, decl_name) else @field(e, name);
         const FTI = @typeInfo(@TypeOf(f)).Fn;
         var signature_slice: []beam.term = try beam.allocator.alloc(beam.term, 3);
         defer beam.allocator.free(signature_slice);

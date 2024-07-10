@@ -1,7 +1,7 @@
 alias Beaver.MLIR
 ctx = MLIR.Context.create()
-{m, e} = AddENIF.init(ctx)
-invoker = AddENIF.invoker(e)
+s = AddENIF.init(ctx)
+invoker = &Beaver.ENIF.invoke(s.engine, "add", [&1, &2])
 
 Benchee.run(
   %{
@@ -18,5 +18,5 @@ Benchee.run(
   end
 )
 
-AddENIF.destroy(m, e)
+ENIFSupport.destroy(s)
 MLIR.Context.destroy(ctx)

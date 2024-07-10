@@ -50,4 +50,13 @@ defmodule Beaver.ENIF do
   end
 
   defdelegate functions(), to: MLIR.CAPI, as: :beaver_raw_enif_functions
+
+  def register_symbols(%MLIR.ExecutionEngine{ref: ref} = e) do
+    MLIR.CAPI.beaver_raw_jit_register_enif(ref)
+    e
+  end
+
+  def invoke(%MLIR.ExecutionEngine{ref: ref}, function, arguments) do
+    MLIR.CAPI.beaver_raw_jit_invoke_with_terms(ref, function, arguments)
+  end
 end

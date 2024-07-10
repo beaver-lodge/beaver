@@ -81,7 +81,7 @@ fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
     };
 }
 
-fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
+pub fn MemRefDescriptor(comptime ResourceKind: type, comptime N: usize) type {
     return extern struct {
         const T = ResourceKind.T;
         allocated: ?*T = null,
