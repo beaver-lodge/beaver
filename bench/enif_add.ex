@@ -2,12 +2,30 @@ defmodule AddENIF do
   alias Beaver.ENIF
   use Beaver
   alias Beaver.MLIR
-  alias MLIR.{Attribute, Type}
-  alias MLIR.Dialect.{Func, Arith, LLVM}
-  import MLIR.Conversion
-  require Func
 
-  def init(ctx) do
+  alias MLIR.Dialect.{Func, Arith, LLVM}
+  require Func
+  use ENIFSupport
+
+  @impl ENIFSupport
+  def after_verification(op) do
+    s_table = op |> MLIR.Operation.from_module() |> MLIR.CAPI.mlirSymbolTableCreate()
+    found = MLIR.CAPI.mlirSymbolTableLookup(s_table, MLIR.StringRef.create("enif_make_int64"))
+
+    if MLIR.is_null(found) do
+      raise "Function not found"
+    end
+
+    if not MLIR.Dialect.Func.is_external(found) do
+      raise "Function is not external"
+    end
+
+    MLIR.CAPI.mlirSymbolTableDestroy(s_table)
+    op
+  end
+
+  @impl ENIFSupport
+  def create(ctx) do
     mlir ctx: ctx do
       module do
         Beaver.ENIF.populate_external_functions(Beaver.Env.context(), Beaver.Env.block())
@@ -37,42 +55,5 @@ defmodule AddENIF do
         end
       end
     end
-    |> MLIR.Operation.verify!()
-    |> tap(fn m ->
-      s_table = m |> MLIR.Operation.from_module() |> MLIR.CAPI.mlirSymbolTableCreate()
-      found = MLIR.CAPI.mlirSymbolTableLookup(s_table, MLIR.StringRef.create("enif_make_int64"))
-
-      if MLIR.is_null(found) do
-        raise "Function not found"
-      end
-
-      if not MLIR.Dialect.Func.is_external(found) do
-        raise "Function is not external"
-      end
-
-      MLIR.CAPI.mlirSymbolTableDestroy(s_table)
-    end)
-    |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
-    |> convert_scf_to_cf
-    |> convert_arith_to_llvm()
-    |> convert_index_to_llvm()
-    |> convert_func_to_llvm()
-    |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
-    |> reconcile_unrealized_casts
-    |> MLIR.Pass.Composer.run!()
-    |> then(fn m ->
-      e = %MLIR.ExecutionEngine{ref: jit_ref} = MLIR.ExecutionEngine.create!(m, opt_level: 3)
-      MLIR.CAPI.beaver_raw_jit_register_enif(jit_ref)
-      {m, e}
-    end)
-  end
-
-  def invoker(%MLIR.ExecutionEngine{ref: jit_ref}) do
-    &MLIR.CAPI.beaver_raw_jit_invoke_with_terms(jit_ref, "add", [&1, &2])
-  end
-
-  def destroy(m, e) do
-    MLIR.ExecutionEngine.destroy(e)
-    MLIR.Module.destroy(m)
   end
 end
