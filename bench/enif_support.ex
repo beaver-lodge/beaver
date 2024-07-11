@@ -1,4 +1,5 @@
 defmodule ENIFSupport do
+  @moduledoc false
   defstruct [:mod, :engine]
   alias Beaver.MLIR
   import MLIR.Conversion

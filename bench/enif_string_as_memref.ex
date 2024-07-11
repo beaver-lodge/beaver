@@ -1,4 +1,5 @@
 defmodule ENIFStringAsMemRef do
+  @moduledoc false
   alias Beaver.ENIF
   use Beaver
   alias Beaver.MLIR
