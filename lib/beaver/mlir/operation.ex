@@ -168,4 +168,8 @@ defmodule Beaver.MLIR.Operation do
         results
     end
   end
+
+  def equal?(%__MODULE__{} = a, %__MODULE__{} = b) do
+    mlirOperationEqual(a, b) |> Beaver.Native.to_term()
+  end
 end
