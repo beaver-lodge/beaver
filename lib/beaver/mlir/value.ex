@@ -30,6 +30,19 @@ defmodule Beaver.MLIR.Value do
   end
 
   @doc """
+  Return the defining op of this value. Raises if this value is not a result
+  """
+  def owner!(value) do
+    case owner(value) do
+      {:ok, op} ->
+        op
+
+      {:error, msg} ->
+        raise ArgumentError, msg
+    end
+  end
+
+  @doc """
   Return the type of this value
   """
   defdelegate type(value), to: CAPI, as: :mlirValueGetType

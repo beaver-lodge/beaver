@@ -57,6 +57,9 @@ jobs:
         uses: goto-bus-stop/setup-zig@v2
         with:
           version: 0.13.0
+      - name: Check formatting of Elixir
+        run: |
+          zig fmt --check native/mlir-zig-proj/src native/mlir-zig-proj/build.zig
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
@@ -85,11 +88,18 @@ jobs:
           python3 -m pip install -r dev-requirements.txt
           echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
       - name: Build native library
+        env:
+          MIX_ENV: test
         run: |
-          MIX_ENV=test mix compile.elixir_make
+          mix compile.elixir_make
       - name: Run smoke tests
         run: |
           mix test --force --only smoke
+      - name: Check formatting of Elixir
+        env:
+          MIX_ENV: test
+        run: |
+          mix format --check-formatted
       - name: Run tests
         run: |
           mix test --exclude vulkan --exclude todo

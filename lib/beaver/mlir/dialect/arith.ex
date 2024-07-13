@@ -6,9 +6,7 @@ defmodule Beaver.MLIR.Dialect.Arith do
   alias Beaver.MLIR.Dialect
   import MLIR.Sigils
 
-  use Beaver.MLIR.Dialect,
-    dialect: "arith",
-    ops: Dialect.Registry.ops("arith")
+  use Dialect, dialect: "arith", ops: Dialect.Registry.ops("arith")
 
   @constant "arith.constant"
   def constant(%Beaver.SSA{arguments: [true], evaluator: evaluator} = ssa) do

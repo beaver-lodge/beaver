@@ -136,6 +136,8 @@ defmodule Beaver.MLIR.Operation do
     |> MLIR.StringRef.to_string()
   end
 
+  defdelegate location(op), to: MLIR.CAPI, as: :mlirOperationGetLocation
+
   def from_module(%MLIR.Module{} = module) do
     mlirModuleGetOperation(module)
   end

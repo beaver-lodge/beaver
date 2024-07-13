@@ -56,7 +56,9 @@ defmodule Beaver.MixProject do
           Beaver,
           Beaver.Env,
           Beaver.Pattern,
-          Beaver.Slang
+          Beaver.Slang,
+          ~r"Beaver.Exterior.*",
+          Beaver.SSA
         ],
         Walker: [
           ~r"Beaver.Walker.*"
@@ -69,6 +71,10 @@ defmodule Beaver.MixProject do
         ],
         Native: [
           ~r"Beaver.Native.*"
+        ],
+        Utils: [
+          Beaver.Deferred,
+          ~r"Beaver.Diagnostic.*"
         ]
       ]
     ]
