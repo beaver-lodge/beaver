@@ -198,6 +198,10 @@ defmodule Beaver.MLIR do
   def to_string(f, opts) when is_function(f) do
     Beaver.Deferred.create(f, Keyword.fetch!(opts, :ctx)) |> to_string(opts)
   end
+
+  def equal?(%m{} = a, %m{} = b) do
+    apply(m, :equal?, [a, b])
+  end
 end
 
 for m <- [

@@ -37,7 +37,7 @@ defmodule Updater do
     return kinda.NIFFunc(Kinds, c_, name, .{ .nif_name = nifPrefix ++ name });
     }
     pub fn L(comptime Kinds: anytype, c_: anytype, comptime name: anytype) e.ErlNifFunc {
-    return kinda.NIFFunc(Kinds, c_, name, .{ .flags = 1, .nif_name = nifPrefix ++ name });
+    return kinda.NIFFunc(Kinds, c_, name, .{ .flags = e.ERL_NIF_DIRTY_JOB_CPU_BOUND, .nif_name = nifPrefix ++ name });
     }
     const mlir_capi = @import("mlir_capi.zig");
     const K = mlir_capi.allKinds;

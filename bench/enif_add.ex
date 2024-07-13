@@ -1,4 +1,5 @@
 defmodule AddENIF do
+  @moduledoc false
   alias Beaver.ENIF
   use Beaver
   alias Beaver.MLIR
@@ -28,7 +29,7 @@ defmodule AddENIF do
   def create(ctx) do
     mlir ctx: ctx do
       module do
-        Beaver.ENIF.populate_external_functions(Beaver.Env.context(), Beaver.Env.block())
+        Beaver.ENIF.declare_external_functions(Beaver.Env.context(), Beaver.Env.block())
         env_t = ENIF.Type.env()
         term_t = ENIF.Type.term()
 
@@ -39,16 +40,12 @@ defmodule AddENIF do
               size = Arith.constant(value: size) >>> ~t<i32>
               left_ptr = LLVM.alloca(size, elem_type: Type.i64()) >>> ~t{!llvm.ptr}
               right_ptr = LLVM.alloca(size, elem_type: Type.i64()) >>> ~t{!llvm.ptr}
-              {_, result_t} = Beaver.ENIF.signature(Beaver.Env.context(), :enif_get_int64)
-              symbol = Attribute.flat_symbol_ref(:enif_get_int64)
-              Func.call(env, left, left_ptr, callee: symbol) >>> result_t
-              Func.call(env, right, right_ptr, callee: symbol) >>> result_t
+              ENIF.get_int64(env, left, left_ptr) >>> :infer
+              ENIF.get_int64(env, right, right_ptr) >>> :infer
               left = LLVM.load(left_ptr) >>> Type.i64()
               right = LLVM.load(right_ptr) >>> Type.i64()
               sum = Arith.addi(left, right) >>> Type.i64()
-              {_, sum_t} = Beaver.ENIF.signature(Beaver.Env.context(), :enif_make_int64)
-              symbol = Attribute.flat_symbol_ref(:enif_make_int64)
-              sum = Func.call(env, sum, callee: symbol) >>> sum_t
+              sum = ENIF.make_int64(env, sum) >>> :infer
               Func.return(sum) >>> []
             end
           end

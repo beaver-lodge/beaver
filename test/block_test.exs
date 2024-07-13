@@ -157,4 +157,26 @@ defmodule BlockTest do
       assert {:not_found, [file: __ENV__.file, line: 145]} == Beaver.Env.block()
     end
   end
+
+  test "block arg has no owner", test_context do
+    mlir ctx: test_context[:ctx] do
+      module do
+        Func.func some_func(function_type: Type.function([Type.i(32)], [Type.i(32)])) do
+          region do
+            block _(a >>> Type.i(32)) do
+              assert_raise ArgumentError, "not a result", fn -> MLIR.Value.owner!(a) end
+
+              {const, v0} =
+                Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> {:op, Type.i(32)}
+
+              {:ok, owner} = MLIR.Value.owner(v0)
+              assert MLIR.equal?(owner, const)
+              Func.return(v0) >>> []
+            end
+          end
+        end
+      end
+      |> MLIR.Operation.verify!()
+    end
+  end
 end

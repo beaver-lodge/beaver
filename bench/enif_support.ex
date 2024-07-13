@@ -1,4 +1,5 @@
 defmodule ENIFSupport do
+  @moduledoc false
   defstruct [:mod, :engine]
   alias Beaver.MLIR
   import MLIR.Conversion
@@ -30,6 +31,7 @@ defmodule ENIFSupport do
     |> convert_arith_to_llvm()
     |> convert_index_to_llvm()
     |> convert_func_to_llvm()
+    |> MLIR.Pass.Composer.append("convert-vector-to-llvm{reassociate-fp-reductions}")
     |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
     |> then(&if(System.get_env(@print_flag), do: MLIR.Transforms.print_ir(&1), else: &1))
     |> reconcile_unrealized_casts

@@ -31,4 +31,9 @@ defmodule Beaver.ENIF.Type do
   def term(opts \\ []) do
     query_type(:term, opts)
   end
+
+  @spec binary(Beaver.Deferred.opts()) :: Beaver.Deferred.type()
+  def binary(opts \\ []) do
+    query_type(:binary, opts)
+  end
 end
