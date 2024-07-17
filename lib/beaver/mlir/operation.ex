@@ -195,7 +195,13 @@ defmodule Beaver.MLIR.Operation do
 
     case function.(attr) do
       {_current_value, new_value} ->
-        mlirOperationSetAttributeByName(operation, MLIR.StringRef.create(attribute), new_value)
+        ctx = mlirOperationGetContext(operation)
+
+        mlirOperationSetAttributeByName(
+          operation,
+          MLIR.StringRef.create(attribute),
+          Beaver.Deferred.create(new_value, ctx)
+        )
 
       :pop ->
         mlirOperationRemoveAttributeByName(operation, MLIR.StringRef.create(attribute))
