@@ -4,7 +4,7 @@ defmodule OpTest do
   import Beaver.MLIR.Sigils
 
   test "get_and_update", test_context do
-    constant =
+    const =
       ~m"""
       %0 = arith.constant dense<42> : vector<4xi32>
       """.(test_context[:ctx])
@@ -14,21 +14,25 @@ defmodule OpTest do
       |> Enum.to_list()
       |> List.first()
 
-    new_attr_str1 = "dense<1> : vector<4xi32>"
-    new_attr_str2 = "dense<2> : vector<4xi32>"
-    old_attr = constant[:value]
-    {attr, op} = get_and_update_in(constant[:value], &{&1, ~a{#{new_attr_str1}}})
+    attr_str1 = "dense<1> : vector<4xi32>"
+    attr_str2 = "dense<2> : vector<4xi32>"
+    old_attr = const[:value]
+    {attr, op} = get_and_update_in(const[:value], &{&1, ~a{#{attr_str1}}})
     assert MLIR.equal?(attr, old_attr)
-    assert MLIR.equal?(op, constant)
-    assert constant |> MLIR.to_string() =~ new_attr_str1
+    assert MLIR.equal?(op, const)
+    assert const |> MLIR.to_string() =~ attr_str1
 
-    old_attr = constant[:value]
-
-    {attr, op} =
-      get_and_update_in(constant[:value], &{&1, ~a{#{new_attr_str2}}.(test_context[:ctx])})
-
+    # check deferred attribute
+    old_attr = const[:value]
+    {attr, op} = get_and_update_in(const[:value], &{&1, ~a{#{attr_str2}}.(test_context[:ctx])})
     assert MLIR.equal?(attr, old_attr)
-    assert MLIR.equal?(op, constant)
-    assert constant |> MLIR.to_string() =~ new_attr_str2
+    assert MLIR.equal?(op, const)
+    assert const |> MLIR.to_string() =~ attr_str2
+
+    # check popping
+    old_attr = const[:value]
+    {popped, op} = pop_in(const[:value])
+    assert MLIR.equal?(popped, old_attr)
+    assert op[:value] == nil
   end
 end
