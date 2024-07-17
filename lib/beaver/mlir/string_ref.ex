@@ -15,12 +15,17 @@ defmodule Beaver.MLIR.StringRef do
   > Instead, it will reference a copy of the binary and owns it.
   > In other words, excessively creating `StringRef` using this function can lead to memory leak.
   """
-  def create(value) when is_atom(value) do
-    value |> Atom.to_string() |> create()
-  end
 
   def create(value) when is_binary(value) do
     %__MODULE__{ref: CAPI.beaver_raw_get_string_ref(value)}
+  end
+
+  def create(%__MODULE__{} = sr) do
+    sr
+  end
+
+  def create(value) do
+    value |> Kernel.to_string() |> create()
   end
 
   @doc """

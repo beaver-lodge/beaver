@@ -148,4 +148,8 @@ defmodule Beaver.SSA do
   def postwalk(ast, evaluator) when is_function(evaluator, 1) do
     Macro.postwalk(ast, &do_transform(&1, evaluator))
   end
+
+  def eval(%__MODULE__{evaluator: evaluator} = ssa) do
+    evaluator.(ssa)
+  end
 end

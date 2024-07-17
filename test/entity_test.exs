@@ -110,6 +110,11 @@ defmodule EntityTest do
              )
 
       assert Attribute.equal?(
+               Attribute.dense_elements("abcd").(ctx),
+               ~a{dense<[#{?a}, #{?b}, #{?c}, #{?d}]> : tensor<4xi8>}.(ctx)
+             )
+
+      assert Attribute.equal?(
                MLIR.ODS.operand_segment_sizes([0, 0]).(ctx),
                ~a{array<i32: 0, 0>}.(ctx)
              )
@@ -147,8 +152,8 @@ defmodule EntityTest do
 
     test "symbol name", test_context do
       ctx = test_context[:ctx]
-      assert Attribute.symbol_name("foo") |> MLIR.to_string(ctx: ctx) == "\"foo\""
-      assert Attribute.symbol_name(__MODULE__) |> MLIR.to_string(ctx: ctx) == "\"#{__MODULE__}\""
+      assert Attribute.string("foo") |> MLIR.to_string(ctx: ctx) == "\"foo\""
+      assert Attribute.string(__MODULE__) |> MLIR.to_string(ctx: ctx) == "\"#{__MODULE__}\""
     end
 
     test "nested symbol", test_context do

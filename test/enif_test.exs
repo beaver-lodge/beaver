@@ -18,7 +18,7 @@ defmodule EnifTest do
   test "binary serialize", test_context do
     mlir ctx: test_context[:ctx] do
       module do
-        b = Beaver.ENIF.binary("hello") >>> :infer
+        b = Beaver.MLIR.Dialect.MemRef.global("hello") >>> :infer
         assert to_string(b) =~ "dense<[104, 101, 108, 108, 111]>"
       end
     end

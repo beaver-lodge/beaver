@@ -14,7 +14,7 @@ defmodule Beaver.MLIR.Dialect do
 
     quote(bind_quoted: [dialect: dialect, ops: ops]) do
       @behaviour Beaver.MLIR.Dialect
-
+      @doc false
       def eval_ssa(%Beaver.SSA{evaluator: evaluator} = ssa) do
         evaluator.(ssa)
       end
@@ -52,6 +52,7 @@ defmodule Beaver.MLIR.Dialect do
       ops = Dialect.Registry.ops(d)
 
       defmodule module_name do
+        @moduledoc false
         use Beaver.MLIR.Dialect,
           dialect: d,
           ops: ops

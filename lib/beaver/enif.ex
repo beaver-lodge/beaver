@@ -5,9 +5,6 @@ defmodule Beaver.ENIF do
   ## Main usages
   - call `declare_external_functions/2` to insert external function declarations into a `Beaver.MLIR.Block`
   - call `register_symbols/1` to register symbols of ENIF functions in a `Beaver.MLIR.ExecutionEngine`
-
-  ## Extra functions by Beaver
-  - `ptr_to_memref(ptr, size)::memref<?xi8>`: Convert a pointer to a memref
   """
 
   use Beaver
@@ -70,31 +67,33 @@ defmodule Beaver.ENIF do
   end
 
   for f <- MLIR.CAPI.beaver_raw_enif_functions() do
-    op =
-      case to_string(f) do
-        "enif_" <> op -> op |> String.to_atom()
-        _ -> f
-      end
+    case to_string(f) do
+      "enif_" <> op ->
+        @doc """
+        function call to [#{f}](https://www.erlang.org/doc/apps/erts/erl_nif.html##{f})
+        """
+        def unquote(String.to_atom(op))(ssa) do
+          call(unquote(f), ssa)
+        end
 
-    @doc """
-    function call to [#{f}](https://www.erlang.org/doc/apps/erts/erl_nif.html##{f})
-    """
-    def unquote(op)(ssa) do
-      call(unquote(f), ssa)
+      _ ->
+        @doc (case f do
+                :ptr_to_memref ->
+                  """
+                  Convert a pointer to a memref
+
+                  `ptr_to_memref(ptr(), size()) :: memref<?xi8>`
+                  """
+
+                _ ->
+                  """
+                  function call to #{f}
+                  """
+              end)
+        def unquote(f)(ssa) do
+          call(unquote(f), ssa)
+        end
     end
-  end
-
-  @doc """
-  Create a constant to serialize a binary to MLIR. By default, it will be a vector.
-  """
-  def binary(%Beaver.SSA{arguments: [txt], evaluator: evaluator} = ssa) do
-    width = 8
-    et = Type.i(width)
-    txt = for(<<byte::size(width) <- txt>>, do: byte) |> Enum.map(&Attribute.integer(et, &1))
-    t = Type.vector([length(txt)], et)
-    value = Attribute.dense_elements(txt, t)
-    ssa = %Beaver.SSA{ssa | op: "arith.constant", arguments: [value: value], results: [:infer]}
-    evaluator.(ssa)
   end
 
   defdelegate functions(), to: MLIR.CAPI, as: :beaver_raw_enif_functions

@@ -106,6 +106,9 @@ MLIR_CAPI_EXPORTED MlirType beaverGetIRDLDefinedType(MlirStringRef dialect,
 MLIR_CAPI_EXPORTED MlirAttribute beaverGetIRDLDefinedAttr(MlirStringRef dialect,
                                                           MlirStringRef attr,
                                                           MlirAttribute params);
+MLIR_CAPI_EXPORTED MLIR_CAPI_EXPORTED MlirAttribute
+beaverDenseElementsAttrRawBufferGet(MlirType shapedType, MlirStringRef buffer);
+
 #include "mlir-c/ExecutionEngine.h"
 
 MLIR_CAPI_EXPORTED bool beaverMlirExecutionEngineIsNull(MlirExecutionEngine w);
