@@ -1,4 +1,5 @@
 #include "mlir/CAPI/Beaver.h"
+#include "mlir-c/BuiltinAttributes.h"
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
 #include "mlir/Dialect/IRDL/IRDLLoading.h"
@@ -290,4 +291,11 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverGetIRDLDefinedAttr(
       dialect, attr, params,
       [](auto d, auto name) { return d->lookupAttrDefinition(name); },
       DynamicAttr::get));
+}
+
+MLIR_CAPI_EXPORTED MlirAttribute
+beaverDenseElementsAttrRawBufferGet(MlirType shapedType, MlirStringRef buffer) {
+
+  return mlirDenseElementsAttrRawBufferGet(shapedType, buffer.length,
+                                           buffer.data);
 }

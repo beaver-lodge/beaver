@@ -46,9 +46,7 @@ defmodule Beaver.MixProject do
       ],
       filter_modules: fn m, _meta ->
         name = Atom.to_string(m)
-
-        not (String.contains?(name, "Beaver.MLIR.Dialect.") ||
-               String.contains?(name, "Beaver.MLIR.CAPI."))
+        not String.contains?(name, "Beaver.MLIR.CAPI.")
       end,
       api_reference: false,
       groups_for_modules: [
@@ -65,6 +63,9 @@ defmodule Beaver.MixProject do
         ],
         ENIF: [
           ~r"Beaver.ENIF.*"
+        ],
+        Dialect: [
+          ~r"Beaver.MLIR.Dialect.*"
         ],
         MLIR: [
           ~r"Beaver.MLIR.*"

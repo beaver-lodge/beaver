@@ -2,9 +2,7 @@ defmodule ENIFStringAsMemRef do
   @moduledoc false
   alias Beaver.ENIF
   use Beaver
-  alias Beaver.MLIR
-  alias MLIR.{Attribute, Type}
-  alias MLIR.Dialect.{Func, MemRef, Index, LLVM, Arith, CF, Vector}
+  alias MLIR.Dialect.{Func, MemRef, Index, LLVM, Arith, CF}
   require Func
   use ENIFSupport
 
@@ -43,6 +41,11 @@ defmodule ENIFStringAsMemRef do
           end
         end
 
+        msg = "not a binary"
+        global = MemRef.global(msg) >>> :infer
+        global_t = MLIR.Attribute.unwrap(global[:type])
+        global_s = MLIR.Attribute.unwrap(global[:sym_name])
+
         Func.func alloc_bin_and_copy(function_type: Type.function([env_t, term_t], [term_t])) do
           region do
             block _(env >>> env_t, s >>> term_t) do
@@ -57,8 +60,7 @@ defmodule ENIFStringAsMemRef do
             end
 
             block exit_blk() do
-              msg = "not a binary"
-              msg = ENIF.binary(msg) >>> :infer
+              msg = MemRef.get_global(name: Attribute.flat_symbol_ref(global_s)) >>> global_t
 
               size =
                 msg
@@ -71,16 +73,14 @@ defmodule ENIFStringAsMemRef do
               d_ptr = ENIF.make_new_binary(env, size, term_ptr) >>> :infer
               m = ENIF.ptr_to_memref(d_ptr, size) >>> :infer
               loc = m |> MLIR.Value.owner!() |> MLIR.Operation.location() |> MLIR.to_string()
-
-              unless loc =~ __ENV__.file do
-                raise "wrong location"
-              end
-
-              zero = Index.constant(value: Attribute.index(0)) >>> Type.index()
-              Vector.store(msg, m, zero) >>> []
+              MemRef.copy(msg, m) >>> []
               msg = LLVM.load(term_ptr) >>> ENIF.Type.term()
               e = ENIF.raise_exception(env, msg) >>> []
               Func.return(e) >>> []
+            end
+
+            unless loc =~ __ENV__.file do
+              raise "wrong location"
             end
 
             block successor() do

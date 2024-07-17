@@ -13,6 +13,7 @@ defmodule Beaver.MLIR.Attribute do
   alias Beaver.MLIR.CAPI
 
   alias Beaver.MLIR
+  alias Beaver.MLIR.Type
   import MLIR.Sigils
 
   use Kinda.ResourceKind,
@@ -57,7 +58,22 @@ defmodule Beaver.MLIR.Attribute do
     )
   end
 
-  def dense_elements(elements, shaped_type, opts \\ []) when is_list(elements) do
+  def dense_elements(elements, shaped_type \\ {:i, 8}, opts \\ [])
+
+  def dense_elements(elements, {t, width}, opts)
+      when is_binary(elements) and t in [:i, :f] and is_integer(width) do
+    Beaver.Deferred.from_opts(
+      opts,
+      fn ctx ->
+        et = apply(MLIR.Type, t, [width, [ctx: ctx]])
+
+        Type.ranked_tensor([byte_size(elements)], et)
+        |> CAPI.beaverDenseElementsAttrRawBufferGet(MLIR.StringRef.create(elements))
+      end
+    )
+  end
+
+  def dense_elements(elements, shaped_type, opts) when is_list(elements) do
     Beaver.Deferred.from_opts(
       opts,
       fn ctx ->
@@ -114,7 +130,7 @@ defmodule Beaver.MLIR.Attribute do
     )
   end
 
-  def string(str, opts \\ []) when is_binary(str) do
+  def string(str, opts \\ []) do
     Beaver.Deferred.from_opts(
       opts,
       &CAPI.mlirStringAttrGet(&1, MLIR.StringRef.create(str))
@@ -198,13 +214,6 @@ defmodule Beaver.MLIR.Attribute do
     )
   end
 
-  def symbol_name(name, opts \\ []) do
-    Beaver.Deferred.from_opts(
-      opts,
-      ~a{"#{name}"}
-    )
-  end
-
   def index(value, opts \\ []) when is_integer(value) do
     Beaver.Deferred.from_opts(
       opts,
@@ -214,5 +223,19 @@ defmodule Beaver.MLIR.Attribute do
 
   def null() do
     CAPI.mlirAttributeGetNull()
+  end
+
+  defdelegate unwrap_type(type_attr), to: CAPI, as: :mlirTypeAttrGetValue
+
+  defdelegate unwrap_string(str_attr), to: CAPI, as: :mlirStringAttrGetValue
+
+  def unwrap(%__MODULE__{} = attribute) do
+    cond do
+      Beaver.Native.to_term(CAPI.mlirAttributeIsAType(attribute)) ->
+        unwrap_type(attribute)
+
+      Beaver.Native.to_term(CAPI.mlirAttributeIsAString(attribute)) ->
+        unwrap_string(attribute)
+    end
   end
 end

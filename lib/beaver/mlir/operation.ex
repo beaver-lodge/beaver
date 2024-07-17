@@ -6,6 +6,7 @@ defmodule Beaver.MLIR.Operation do
   alias __MODULE__.{State, Changeset}
   import Beaver.MLIR.CAPI
   require Logger
+  @behaviour Access
 
   use Kinda.ResourceKind,
     forward_module: Beaver.Native
@@ -171,5 +172,48 @@ defmodule Beaver.MLIR.Operation do
 
   def equal?(%__MODULE__{} = a, %__MODULE__{} = b) do
     mlirOperationEqual(a, b) |> Beaver.Native.to_term()
+  end
+
+  @impl Access
+  def fetch(operation, attribute) do
+    attr = mlirOperationGetAttributeByName(operation, MLIR.StringRef.create(attribute))
+
+    if MLIR.is_null(attr) do
+      :error
+    else
+      {:ok, attr}
+    end
+  end
+
+  @impl Access
+  def get_and_update(operation, attribute, function) do
+    attr =
+      case fetch(operation, attribute) do
+        {:ok, attr} -> attr
+        :error -> nil
+      end
+
+    case function.(attr) do
+      {_current_value, new_value} ->
+        ctx = mlirOperationGetContext(operation)
+
+        mlirOperationSetAttributeByName(
+          operation,
+          MLIR.StringRef.create(attribute),
+          Beaver.Deferred.create(new_value, ctx)
+        )
+
+      :pop ->
+        mlirOperationRemoveAttributeByName(operation, MLIR.StringRef.create(attribute))
+    end
+
+    {attr, operation}
+  end
+
+  @impl Access
+  def pop(operation, attribute) do
+    {:ok, attr} = fetch(operation, attribute)
+    mlirOperationRemoveAttributeByName(operation, MLIR.StringRef.create(attribute))
+    {attr, operation}
   end
 end
