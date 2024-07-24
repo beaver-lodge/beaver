@@ -36,7 +36,7 @@ defmodule Beaver.MLIR.StringRef do
   end
 
   def length(%__MODULE__{} = str) do
-    CAPI.beaverStringRefGetLength(str)
+    CAPI.beaverStringRefGetLength(str) |> Beaver.Native.to_term()
   end
 
   def data(%__MODULE__{} = str) do
