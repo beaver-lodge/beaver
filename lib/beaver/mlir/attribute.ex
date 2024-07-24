@@ -66,9 +66,15 @@ defmodule Beaver.MLIR.Attribute do
       opts,
       fn ctx ->
         et = apply(MLIR.Type, t, [width, [ctx: ctx]])
+        str = MLIR.StringRef.create(elements)
 
         Type.ranked_tensor([byte_size(elements)], et)
-        |> CAPI.beaverDenseElementsAttrRawBufferGet(MLIR.StringRef.create(elements))
+        |> CAPI.mlirDenseElementsAttrRawBufferGet(
+          MLIR.CAPI.beaverStringRefGetLength(str),
+          MLIR.CAPI.beaverStringRefGetData(str)
+          |> then(&%Beaver.Native.Array{ref: &1, element_kind: Beaver.Native.U8})
+          |> Beaver.Native.Array.as_opaque()
+        )
       end
     )
   end
