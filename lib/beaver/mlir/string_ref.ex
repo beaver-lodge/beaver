@@ -34,4 +34,13 @@ defmodule Beaver.MLIR.StringRef do
   def to_string(%__MODULE__{ref: ref}) do
     CAPI.beaver_raw_string_ref_to_binary(ref)
   end
+
+  def length(%__MODULE__{} = str) do
+    CAPI.beaverStringRefGetLength(str)
+  end
+
+  def data(%__MODULE__{} = str) do
+    CAPI.beaverStringRefGetData(str)
+    |> then(&%Beaver.Native.Array{ref: &1, element_kind: Beaver.Native.U8})
+  end
 end
