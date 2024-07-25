@@ -292,10 +292,3 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverGetIRDLDefinedAttr(
       [](auto d, auto name) { return d->lookupAttrDefinition(name); },
       DynamicAttr::get));
 }
-
-MLIR_CAPI_EXPORTED MlirAttribute
-beaverDenseElementsAttrRawBufferGet(MlirType shapedType, MlirStringRef buffer) {
-
-  return mlirDenseElementsAttrRawBufferGet(shapedType, buffer.length,
-                                           buffer.data);
-}
