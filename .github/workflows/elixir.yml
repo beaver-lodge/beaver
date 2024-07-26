@@ -66,6 +66,7 @@ jobs:
           use-github-cache: false
           log-file-suffix: '${{matrix.runs-on}}-otp${{matrix.otp}}-ex${{matrix.elixir}}.txt'
           sub-packages: '["nvcc"]'
+          method: network
       - name: Check formatting of Zig
         run: |
           zig fmt --check native/mlir-zig-proj/src native/mlir-zig-proj/build.zig

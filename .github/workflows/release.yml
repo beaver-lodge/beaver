@@ -68,6 +68,7 @@ jobs:
           use-github-cache: false
           log-file-suffix: '${{matrix.job.os}}-${{ matrix.job.otp }}-(${{ matrix.job.elixir }}).txt'
           sub-packages: '["nvcc"]'
+          method: network
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
