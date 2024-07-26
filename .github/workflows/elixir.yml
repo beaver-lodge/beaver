@@ -60,6 +60,13 @@ jobs:
         uses: goto-bus-stop/setup-zig@v2
         with:
           version: 0.13.0
+      - uses: Jimver/cuda-toolkit@master
+        id: cuda-toolkit
+        with:
+          use-github-cache: false
+          log-file-suffix: '${{matrix.runs-on}}-otp${{matrix.otp}}-ex${{matrix.elixir}}.txt'
+          sub-packages: '["nvcc"]'
+          method: network
       - name: Check formatting of Zig
         run: |
           zig fmt --check native/mlir-zig-proj/src native/mlir-zig-proj/build.zig
