@@ -32,4 +32,5 @@ defmodule Beaver.MLIR.Context do
   end
 
   defdelegate destroy(ctx), to: MLIR.CAPI, as: :mlirContextDestroy
+  defdelegate register_translations(ctx), to: MLIR.CAPI, as: :mlirRegisterAllLLVMTranslations
 end
