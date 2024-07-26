@@ -6,6 +6,9 @@ defmodule GPUTest do
   @moduletag :smoke
 
   test "multiple regions", test_context do
+    ctx = test_context[:ctx]
+    MLIR.CAPI.mlirRegisterAllLLVMTranslations(ctx)
+
     ~m"""
     func.func @other_func(%arg0 : f32, %arg1 : memref<?xf32>) {
     %cst = arith.constant 1 : index
@@ -40,7 +43,7 @@ defmodule GPUTest do
 
     func.func private @printMemrefF32(%ptr : memref<*xf32>)
 
-    """.(test_context[:ctx])
+    """.(ctx)
     |> MLIR.Pass.Composer.append("gpu-lower-to-nvvm-pipeline{cubin-format=fatbin}")
     |> MLIR.Pass.Composer.run!()
     |> MLIR.dump!()
