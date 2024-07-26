@@ -69,6 +69,10 @@ jobs:
           log-file-suffix: '${{matrix.job.os}}-${{ matrix.job.otp }}-(${{ matrix.job.elixir }}).txt'
           sub-packages: '["nvcc"]'
           method: network
+      - name: Validate CUDA
+        run: |
+          nvcc --version
+          ptxas --version
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
