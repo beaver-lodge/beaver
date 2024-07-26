@@ -64,7 +64,8 @@ jobs:
         id: cuda-toolkit
         with:
           use-github-cache: false
-          log-file-suffix: '${{matrix.runs-on}}.txt'
+          log-file-suffix: '${{matrix.runs-on}}-otp${{matrix.otp}}-ex${{matrix.elixir}}.txt'
+          sub-packages: '["nvcc"]'
       - name: Check formatting of Zig
         run: |
           zig fmt --check native/mlir-zig-proj/src native/mlir-zig-proj/build.zig
