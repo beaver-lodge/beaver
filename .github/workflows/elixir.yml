@@ -63,6 +63,7 @@ jobs:
       - uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
         with:
+          use-github-cache: false
           log-file-suffix: '${{matrix.runs-on}}.txt'
       - name: Check formatting of Zig
         run: |
