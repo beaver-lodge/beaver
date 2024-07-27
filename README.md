@@ -136,7 +136,7 @@ by adding `beaver` to your list of dependencies in `mix.exs`:
 ```elixir
 def deps do
   [
-    {:beaver, "~> 0.3.8"}
+    {:beaver, "~> 0.3.9"}
   ]
 end
 ```
@@ -316,9 +316,12 @@ Usually a function accepting a MLIR context to create an operation or type is ca
   - Use `vulkaninfo` and `vkvia` to verify Vulkan is working
   - Add `-DMLIR_ENABLE_VULKAN_RUNNER=ON` in LLVM CMake config command
 
-4. Run tests
-
-- Clone the repo
+4. Develop and run tests
+- Clone this repo and `kinda` in the same directory
+  ```bash
+  git clone https://github.com/beaver-lodge/beaver.git
+  git clone https://github.com/beaver-lodge/kinda.git
+  ```
 - Make sure LLVM environment variable is set properly, otherwise it might fail to build
 
   ```bash
