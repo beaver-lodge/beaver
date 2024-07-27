@@ -22,7 +22,7 @@ defmodule CUDARuntimeTest do
         shared_lib_paths: Enum.map(libs, &Path.join([:code.priv_dir(:beaver), "lib", &1]))
       )
 
-    MLIR.ExecutionEngine.invoke!(jit, "main")
+    MLIR.ExecutionEngine.invoke!(jit, "main", [], nil, dirty: :cpu_bound)
     MLIR.ExecutionEngine.destroy(jit)
   end
 end

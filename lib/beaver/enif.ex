@@ -112,13 +112,13 @@ defmodule Beaver.ENIF do
           term()
   def invoke(%MLIR.ExecutionEngine{ref: ref}, function, arguments, opts \\ []) do
     case opts[:dirty] do
-      cpu when cpu in [:cpu_bound, true] ->
+      :cpu_bound ->
         :beaver_raw_jit_invoke_with_terms_cpu_bound
 
       :io_bound ->
         :beaver_raw_jit_invoke_with_terms_io_bound
 
-      regular when regular in [nil, false] ->
+      nil ->
         :beaver_raw_jit_invoke_with_terms
     end
     |> then(&apply(MLIR.CAPI, &1, [ref, function, arguments]))

@@ -88,7 +88,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
       :cpu_bound ->
         :mlirExecutionEngineInvokePacked_dirty_cpu
 
-      _ ->
+      nil ->
         :mlirExecutionEngineInvokePacked
     end
     |> then(
