@@ -28,9 +28,12 @@ defmodule E2ETest do
       |> MLIR.Pass.Composer.run!()
       |> MLIR.ExecutionEngine.create!()
 
-    return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
-
+    MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
     assert return |> Beaver.Native.to_term() == 84
+    MLIR.ExecutionEngine.invoke!(jit, "add", [return, arg], return, dirty: :cpu_bound)
+    assert return |> Beaver.Native.to_term() == 126
+    MLIR.ExecutionEngine.invoke!(jit, "add", [arg, return], return, dirty: :io_bound)
+    assert return |> Beaver.Native.to_term() == 168
 
     for i <- 0..100_0 do
       Task.async(fn ->

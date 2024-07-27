@@ -5,12 +5,27 @@ defmodule Updater do
     System.argv() |> Enum.chunk_every(2)
   end
 
-  def gen(functions, :elixir) do
-    manifest = inspect(functions, pretty: true, limit: :infinity)
+  @io_only ~w{mlirPassManagerRunOnOp} |> Enum.map(&String.to_atom/1)
+  @regular_io_cpu ~w{mlirExecutionEngineInvokePacked} |> Enum.map(&String.to_atom/1)
 
-    for ["--elixir", dst] <- args() do
-      File.write!(dst, manifest)
+  defp dirty_io(name), do: "#{name}_dirty_io" |> String.to_atom()
+  defp dirty_cpu(name), do: "#{name}_dirty_cpu" |> String.to_atom()
+
+  def gen(functions, :elixir) do
+    for {name, arity} <- functions do
+      if name in @regular_io_cpu do
+        [{name, arity}, {dirty_io(name), arity}, {dirty_cpu(name), arity}]
+      else
+        {name, arity}
+      end
     end
+    |> List.flatten()
+    |> inspect(pretty: true, limit: :infinity)
+    |> then(
+      &for ["--elixir", dst] <- args() do
+        File.write!(dst, &1)
+      end
+    )
 
     functions
   end
@@ -18,29 +33,30 @@ defmodule Updater do
   def gen(functions, :zig) do
     entries =
       for {name, _arity} <- functions do
-        lazy_fns = ~w{mlirPassManagerRunOnOp} |> Enum.map(&String.to_atom/1)
+        cond do
+          name in @io_only ->
+            ~s{D_CPU(K, c, "#{name}", null),}
 
-        if name in lazy_fns do
-          ~s{L(K, c, "#{name}"),}
-        else
-          ~s{N(K, c, "#{name}"),}
+          name in @regular_io_cpu ->
+            [
+              ~s{N(K, c, "#{name}"),},
+              ~s{D_IO(K, c, "#{name}", "#{dirty_io(name)}"),},
+              ~s{D_CPU(K, c, "#{name}", "#{dirty_cpu(name)}"),}
+            ]
+
+          true ->
+            ~s{N(K, c, "#{name}"),}
         end
       end
+      |> List.flatten()
       |> Enum.join("\n")
 
     txt = """
     pub const c = @import("prelude.zig");
-    const kinda = @import("kinda");
-    const e = @import("erl_nif");
-    const nifPrefix = "Elixir.Beaver.MLIR.CAPI.";
-    pub fn N(comptime Kinds: anytype, c_: anytype, comptime name: anytype) e.ErlNifFunc {
-    return kinda.NIFFunc(Kinds, c_, name, .{ .nif_name = nifPrefix ++ name });
-    }
-    pub fn L(comptime Kinds: anytype, c_: anytype, comptime name: anytype) e.ErlNifFunc {
-    return kinda.NIFFunc(Kinds, c_, name, .{ .flags = e.ERL_NIF_DIRTY_JOB_CPU_BOUND, .nif_name = nifPrefix ++ name });
-    }
-    const mlir_capi = @import("mlir_capi.zig");
-    const K = mlir_capi.allKinds;
+    const N = c.N;
+    const K = c.K;
+    const D_CPU = c.D_CPU;
+    const D_IO = c.D_IO;
     pub const nif_entries = .{
     #{entries}
     };
