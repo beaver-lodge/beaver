@@ -24,7 +24,7 @@ defmodule E2ETest do
       |> MLIR.ExecutionEngine.create!()
     end
 
-    test "dirty scheduler invoke", test_context do
+    test "dirty scheduler invocation", test_context do
       arg = Beaver.Native.I32.make(42)
       return = Beaver.Native.I32.make(-1)
       jit = make_jit(test_context[:ctx])
@@ -36,7 +36,7 @@ defmodule E2ETest do
       assert return |> Beaver.Native.to_term() == 168
     end
 
-    test "parallel invoke", test_context do
+    test "parallel invocation", test_context do
       jit = make_jit(test_context[:ctx])
 
       for i <- 0..100_0 do
@@ -44,7 +44,6 @@ defmodule E2ETest do
           arg = Beaver.Native.I32.make(i)
           return = Beaver.Native.I32.make(-1)
           return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
-          # return here is a resource reference
           assert return |> Beaver.Native.to_term() == i * 2
         end)
       end
