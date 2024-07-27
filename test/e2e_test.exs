@@ -3,16 +3,11 @@ defmodule E2ETest do
   alias Beaver.MLIR
   @moduletag :smoke
 
-  test "run mlir module defined by sigil", test_context do
+  describe "test e2e compilation and JIT" do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}
 
-    arg = Beaver.Native.I32.make(42)
-    return = Beaver.Native.I32.make(-1)
-
-    ctx = test_context[:ctx]
-
-    jit =
+    def make_jit(ctx) do
       ~m"""
       module {
         func.func @add(%arg0 : i32, %arg1 : i32) -> i32 attributes { llvm.emit_c_interface } {
@@ -27,23 +22,33 @@ defmodule E2ETest do
       |> convert_arith_to_llvm
       |> MLIR.Pass.Composer.run!()
       |> MLIR.ExecutionEngine.create!()
-
-    MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
-    assert return |> Beaver.Native.to_term() == 84
-    MLIR.ExecutionEngine.invoke!(jit, "add", [return, arg], return, dirty: :cpu_bound)
-    assert return |> Beaver.Native.to_term() == 126
-    MLIR.ExecutionEngine.invoke!(jit, "add", [arg, return], return, dirty: :io_bound)
-    assert return |> Beaver.Native.to_term() == 168
-
-    for i <- 0..100_0 do
-      Task.async(fn ->
-        arg = Beaver.Native.I32.make(i)
-        return = Beaver.Native.I32.make(-1)
-        return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
-        # return here is a resource reference
-        assert return |> Beaver.Native.to_term() == i * 2
-      end)
     end
-    |> Task.await_many()
+
+    test "dirty scheduler invoke", test_context do
+      arg = Beaver.Native.I32.make(42)
+      return = Beaver.Native.I32.make(-1)
+      jit = make_jit(test_context[:ctx])
+      MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
+      assert return |> Beaver.Native.to_term() == 84
+      MLIR.ExecutionEngine.invoke!(jit, "add", [return, arg], return, dirty: :cpu_bound)
+      assert return |> Beaver.Native.to_term() == 126
+      MLIR.ExecutionEngine.invoke!(jit, "add", [arg, return], return, dirty: :io_bound)
+      assert return |> Beaver.Native.to_term() == 168
+    end
+
+    test "parallel invoke", test_context do
+      jit = make_jit(test_context[:ctx])
+
+      for i <- 0..100_0 do
+        Task.async(fn ->
+          arg = Beaver.Native.I32.make(i)
+          return = Beaver.Native.I32.make(-1)
+          return = MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
+          # return here is a resource reference
+          assert return |> Beaver.Native.to_term() == i * 2
+        end)
+      end
+      |> Task.await_many()
+    end
   end
 end
