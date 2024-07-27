@@ -3,7 +3,7 @@ defmodule E2ETest do
   alias Beaver.MLIR
   @moduletag :smoke
 
-  describe "test e2e compilation and JIT" do
+  describe "e2e compilation and JIT invocation" do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}
 
