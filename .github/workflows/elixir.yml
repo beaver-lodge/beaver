@@ -47,7 +47,8 @@ jobs:
         name: Check-out kinda
         with:
           repository: beaver-lodge/kinda
-          path: ../kinda
+          path: kinda
+      - run: mv kinda ..
       - uses: actions/checkout@v3
         name: Check-out Kinda
         if: contains(github.event.pull_request.labels.*.name, 'checkout_kinda')
