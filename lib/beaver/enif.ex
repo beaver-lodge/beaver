@@ -103,6 +103,13 @@ defmodule Beaver.ENIF do
     e
   end
 
+  @spec invoke(
+          MLIR.ExecutionEngine.t(),
+          String.t(),
+          list(),
+          MLIR.ExecutionEngine.invoke_opts()
+        ) ::
+          term()
   def invoke(%MLIR.ExecutionEngine{ref: ref}, function, arguments, opts \\ []) do
     case opts[:dirty] do
       cpu when cpu in [:cpu_bound, true] ->

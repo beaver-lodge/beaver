@@ -31,7 +31,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
           {:opt_level, opt_level},
           {:object_dump, object_dump}
         ]
-  @spec create!(module(), opts()) :: t()
+  @spec create!(MLIR.Module.t(), opts()) :: t()
   def create!(module, opts \\ []) do
     shared_lib_paths = Keyword.get(opts, :shared_lib_paths, [])
     opt_level = Keyword.get(opts, :opt_level, 2)
@@ -62,18 +62,15 @@ defmodule Beaver.MLIR.ExecutionEngine do
     jit
   end
 
-  defp do_invoke!(jit, symbol, arg_ptr_list) do
-    mlirExecutionEngineInvokePacked(
-      jit,
-      MLIR.StringRef.create(symbol),
-      Beaver.Native.array(arg_ptr_list, Beaver.Native.OpaquePtr, mut: true)
-    )
-  end
-
   @doc """
   invoke a function by symbol name.
   """
-  def invoke!(jit, symbol, args \\ [], return \\ nil) when is_list(args) do
+  @type dirty :: nil | :io_bound | :cpu_bound
+  @type invoke_opts :: [
+          {:dirty, dirty}
+        ]
+  @spec invoke!(t(), String.t() | MLIR.StringRef.t(), list(), any(), invoke_opts()) :: :ok
+  def invoke!(jit, symbol, args \\ [], return \\ nil, opts \\ []) when is_list(args) do
     arg_ptr_list = args |> Enum.map(&Beaver.Native.opaque_ptr/1)
 
     return_ptr =
@@ -84,13 +81,30 @@ defmodule Beaver.MLIR.ExecutionEngine do
       end
       |> List.wrap()
 
-    result = do_invoke!(jit, symbol, arg_ptr_list ++ return_ptr)
+    case opts[:dirty] do
+      :io_bound ->
+        :mlirExecutionEngineInvokePacked_dirty_io
 
-    if MLIR.LogicalResult.success?(result) do
-      return || :ok
-    else
-      raise "Execution engine invoke failed"
+      :cpu_bound ->
+        :mlirExecutionEngineInvokePacked_dirty_cpu
+
+      _ ->
+        :mlirExecutionEngineInvokePacked
     end
+    |> then(
+      &apply(MLIR.CAPI, &1, [
+        jit,
+        MLIR.StringRef.create(symbol),
+        Beaver.Native.array(arg_ptr_list ++ return_ptr, Beaver.Native.OpaquePtr, mut: true)
+      ])
+    )
+    |> then(
+      &if MLIR.LogicalResult.success?(&1) do
+        return || :ok
+      else
+        raise "Execution engine invoke failed"
+      end
+    )
   end
 
   def destroy(jit) do
