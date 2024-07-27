@@ -73,7 +73,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
   @doc """
   invoke a function by symbol name.
   """
-  def invoke!(jit, symbol, args, return \\ nil) when is_list(args) do
+  def invoke!(jit, symbol, args \\ [], return \\ nil) when is_list(args) do
     arg_ptr_list = args |> Enum.map(&Beaver.Native.opaque_ptr/1)
 
     return_ptr =
