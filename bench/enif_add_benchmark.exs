@@ -5,6 +5,11 @@ invoker = &Beaver.ENIF.invoke(s.engine, "add", [&1, &2])
 invoker_cpu = &Beaver.ENIF.invoke(s.engine, "add", [&1, &2], dirty: :cpu_bound)
 invoker_io = &Beaver.ENIF.invoke(s.engine, "add", [&1, &2], dirty: :io_bound)
 
+a = b = 100
+invoker.(a, b)
+invoker_cpu.(a, b)
+invoker_io.(a, b)
+
 Benchee.run(
   %{
     "jit.add" => fn {a, b} -> invoker.(a, b) end,
