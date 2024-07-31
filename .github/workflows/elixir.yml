@@ -40,6 +40,10 @@ jobs:
         exclude:
           - otp: "24.2"
             elixir: "1.17.2"
+        include:
+          - runs-on: "ubuntu-latest"
+            otp: "27.0.1"
+            elixir: "1.17.2"
     steps:
       - uses: actions/checkout@v3
         name: Check-out beaver
@@ -120,8 +124,10 @@ jobs:
       - name: Run tests
         run: |
           mix test --exclude vulkan --exclude todo
-      - uses: actions/upload-artifact@v3
-        if: failure()
-        with:
-          name: beaver-tmp-${{ github.run_number }}-${{ github.run_attempt }}
-          path: ./tmp/**/*.zig
+      - name: Run dev build
+        run: |
+          mix
+      - name: Run overhead profiling
+        if: matrix.otp == '27.0.1'
+        run: |
+          mix profile.tprof --no-compile profile/enif_add_overhead.exs

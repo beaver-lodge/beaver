@@ -130,5 +130,4 @@ jobs:
         env:
           BEAVER_ARTEFACT_URL: "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/${{ needs.generate_id.outputs.formatted_date }}/@{artefact_filename}"
         run: |
-          mix compile
-          mix run bench/enif_add_overhead.exs
+          mix run bench/enif_add_benchmark.exs
