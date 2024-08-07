@@ -22,10 +22,11 @@ defmodule Beaver.MLIR.Dialect.MemRef do
       when is_binary(txt) do
     {t, width} = {:i, 8}
     value = Attribute.dense_elements(txt, {t, width})
+    sym_name = :erlang.md5(txt) |> Base.encode16(case: :lower)
 
     arguments =
       arguments
-      |> Keyword.put_new(:sym_name, Attribute.string(:crypto.hash(:sha256, txt)))
+      |> Keyword.put_new(:sym_name, Attribute.string(sym_name))
       |> Keyword.put_new(:initial_value, value)
       |> Keyword.put_new(:type, ~t{memref<#{byte_size(txt)}x#{t}#{width}>})
 
