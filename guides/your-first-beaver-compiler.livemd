@@ -4,22 +4,8 @@
 
 ```elixir
 Mix.install([
-  {:beaver, "~> 0.2"}
+  {:beaver, "~> 0.3"}
 ])
-```
-
-<!-- livebook:{"output":true} -->
-
-```
-:ok
-```
-
-<!-- livebook:{"output":true} -->
-
-```
-
-14:06:55.047 [debug] [Beaver] all passes registered
-
 ```
 
 ## What makes a compiler
@@ -113,10 +99,10 @@ llvm_ir |> Beaver.MLIR.to_string() |> IO.puts()
 <!-- livebook:{"output":true} -->
 
 ```
-module attributes {llvm.data_layout = ""} {
+module {
   llvm.func @some_func(%arg0: i32) -> i32 attributes {llvm.emit_c_interface} {
     %0 = llvm.mlir.constant(1024 : i32) : i32
-    %1 = llvm.add %arg0, %0  : i32
+    %1 = llvm.add %arg0, %0 : i32
     llvm.return %1 : i32
   }
   llvm.func @_mlir_ciface_some_func(%arg0: i32) -> i32 attributes {llvm.emit_c_interface} {
