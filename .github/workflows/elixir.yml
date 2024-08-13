@@ -100,7 +100,7 @@ jobs:
       - name: Install MLIR (latest), via ${{ github.event_name }}
         if: inputs.mlir_wheel_version == 'latest' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'use-latest-mlir'))
         run: |
-          mlir_freeze=$(python3 -m pip list -f https://makslevental.github.io/wheels | grep "mlir" | sed 's/+/+cuda./' | sed 's/mlir/mlir==/')
+          mlir_freeze=$(python3 -m pip list --index-url https://makslevental.github.io/wheels | grep "mlir" | sed 's/+/+cuda./' | sed 's/mlir/mlir==/')
           python3 -m pip install "${mlir_freeze}" -f https://makslevental.github.io/wheels -U
           echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
       - name: Install MLIR (fixed version), via ${{ github.event_name }}
