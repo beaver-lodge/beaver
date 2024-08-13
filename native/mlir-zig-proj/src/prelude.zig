@@ -1,8 +1,4 @@
-pub const c = @cImport({
-    @cDefine("_NO_CRT_STDIO_INLINE", "1");
-    @cInclude("mlir-c/Beaver/wrapper.h");
-});
-
+pub const c = @import("wrapper.h.zig");
 pub const MlirDiagnosticHandlerDeleteUserData = ?*const fn (?*anyopaque) callconv(.C) void;
 pub const MlirExternalPassConstruct = ?*const fn (?*anyopaque) callconv(.C) ?*anyopaque;
 pub const MlirExternalPassRun = ?*const fn (c.MlirOperation, c.MlirExternalPass, ?*anyopaque) callconv(.C) void;
