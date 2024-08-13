@@ -8,6 +8,7 @@ on:
       mlir_wheel_version:
         description: "mlir wheel version to install"
         required: false
+        default: "latest"
   push:
     branches:
       - "upstream/*"
@@ -24,4 +25,4 @@ jobs:
       pull-requests: write
     uses: ./.github/workflows/elixir.yml
     with:
-      mlir_wheel_version: ${{ inputs.mlir_wheel_version || 'latest' }}
+      mlir_wheel_version: ${{ inputs.mlir_wheel_version }}
