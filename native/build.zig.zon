@@ -4,7 +4,7 @@
 
     .dependencies = .{
         .kinda = .{
-            .path = "../../../kinda",
+            .path = "../../kinda",
         },
     },
     .paths = .{""},
