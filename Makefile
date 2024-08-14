@@ -18,7 +18,8 @@ zig_translate:
 		-I ${MLIR_INCLUDE_DIR} | tee native/src/wrapper.h.zig | elixir scripts/update_generated.exs \
 			--elixir ${NATIVE_INSTALL_DIR}/capi_functions.ex \
 			--zig native/src/wrapper.zig
-zig_build: zig_translate cmake_build
+zig_build:
+	( $(MAKE) zig_translate & $(MAKE) cmake_build & wait )
 	zig build --build-file native/build.zig --cache-dir ${ZIG_CACHE_DIR} \
 	  --prefix ${NATIVE_INSTALL_DIR} \
 		--search-prefix ${NATIVE_INSTALL_DIR} \
