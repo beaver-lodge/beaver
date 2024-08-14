@@ -79,7 +79,7 @@ jobs:
           method: network
       - name: Check formatting of Zig
         run: |
-          zig fmt --check native/mlir-zig-proj/src native/mlir-zig-proj/build.zig
+          zig fmt --check native/src native/build.zig
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
