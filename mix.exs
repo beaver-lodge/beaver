@@ -88,16 +88,10 @@ defmodule Beaver.MixProject do
       files: ~w{
         lib .formatter.exs mix.exs README*
         scripts/*.exs
-        native/src/*.zig
-        native/build.zig
-        native/build.zig.zon
-        native/**/CMakeLists.txt
-        native/**/*.cmake
-        native/**/*.h
-        native/**/*.td
-        native/**/*.cpp
         checksum.exs
         Makefile
+        native/files.txt
+        #{File.read!("native/files.txt")}
       }
     ]
   end

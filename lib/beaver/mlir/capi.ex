@@ -35,11 +35,9 @@ defmodule Beaver.MLIR.CAPI do
 
   # setting up elixir re-compilation triggered by changes in external files
   for path <-
-        llvm_headers ++
-          Path.wildcard("native/**/*.h") ++
-          Path.wildcard("native/**/*.cpp") ++
-          Path.wildcard("native/**/*.zig") ++
-          Path.wildcard("native/**/*.zon") do
+        ~w{#{File.read!("native/files.txt")}}
+        |> Enum.flat_map(&Path.wildcard/1)
+        |> Enum.concat(llvm_headers) do
     @external_resource path
   end
 
