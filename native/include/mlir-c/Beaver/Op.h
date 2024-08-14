@@ -72,7 +72,7 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverOperationGetAttribute(MlirOperation op,
                                                              intptr_t pos);
 
 MLIR_CAPI_EXPORTED
-MlirIdentifier beaverMlirNamedAttributeGetName(MlirNamedAttribute);
+MlirIdentifier beaverMlirNamedAttributeGetName(MlirNamedAttribute na);
 MLIR_CAPI_EXPORTED
 
 MLIR_CAPI_EXPORTED

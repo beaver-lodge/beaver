@@ -30,7 +30,8 @@ defmodule Beaver.MixProject do
               ["2.16", "2.17"]
             end
           end
-        ]
+        ],
+        make_args: ~w{-j}
       ]
   end
 
@@ -99,7 +100,6 @@ defmodule Beaver.MixProject do
   def application do
     [
       mod: {Beaver.Application, []},
-      start_phases: [mlir_register_all_passes: []],
       extra_applications: [:logger]
     ]
   end

@@ -7,7 +7,6 @@ NATIVE_INSTALL_DIR = ${MIX_APP_PATH}/priv
 MLIR_INCLUDE_DIR = ${LLVM_LIB_DIR}/../include
 BEAVER_INCLUDE_DIR = native/include
 ZIG_CACHE_DIR = ${MIX_APP_PATH}/zig_cache
-.PHONY: all zig_build cmake_build
 
 all: zig_build
 
@@ -18,19 +17,19 @@ zig_translate:
 		-I ${MLIR_INCLUDE_DIR} | tee native/src/wrapper.h.zig | elixir scripts/update_generated.exs \
 			--elixir ${NATIVE_INSTALL_DIR}/capi_functions.ex \
 			--zig native/src/wrapper.zig
-zig_build:
-	( $(MAKE) zig_translate & $(MAKE) cmake_build & wait )
+
+cmake_build:
+	cmake -G Ninja -S native -B ${CMAKE_BUILD_DIR} -DLLVM_DIR=${LLVM_CMAKE_DIR} -DMLIR_DIR=${MLIR_CMAKE_DIR} -DCMAKE_INSTALL_PREFIX=${NATIVE_INSTALL_DIR}
+	cmake --build ${CMAKE_BUILD_DIR} --target install
+	cp -v ${LLVM_LIB_DIR}/libmlir_* ${NATIVE_INSTALL_DIR}/lib
+
+zig_build: zig_translate cmake_build
 	zig build --build-file native/build.zig --cache-dir ${ZIG_CACHE_DIR} \
 	  --prefix ${NATIVE_INSTALL_DIR} \
 		--search-prefix ${NATIVE_INSTALL_DIR} \
 		--search-prefix ${LLVM_LIB_DIR}/.. \
 		--search-prefix ${ERTS_INCLUDE_DIR}/.. \
 		-freference-trace
-cmake_config:
-	cmake -G Ninja -S native -B ${CMAKE_BUILD_DIR} -DLLVM_DIR=${LLVM_CMAKE_DIR} -DMLIR_DIR=${MLIR_CMAKE_DIR} -DCMAKE_INSTALL_PREFIX=${NATIVE_INSTALL_DIR}
-cmake_build: cmake_config
-	cmake --build ${CMAKE_BUILD_DIR} --target install
-	cp -v ${LLVM_LIB_DIR}/libmlir_* ${NATIVE_INSTALL_DIR}/lib
 
 clean:
 	rm -rf ${CMAKE_BUILD_DIR}
