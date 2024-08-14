@@ -111,7 +111,6 @@ defmodule Beaver.MixProject do
   defp deps do
     [
       {:elixir_make, "~> 0.4", runtime: false},
-      {:llvm_config, "~> 0.1.0"},
       {:kinda, "~> 0.9.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:benchee, "~> 1.0", only: :dev}

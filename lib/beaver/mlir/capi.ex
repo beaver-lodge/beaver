@@ -22,22 +22,8 @@ defmodule Beaver.MLIR.CAPI do
     end
   end
 
-  llvm_headers =
-    case LLVMConfig.include_dir() do
-      {:ok, include_dir} ->
-        include_dir
-        |> Path.join("*.h")
-        |> Path.wildcard()
-
-      _ ->
-        []
-    end
-
   # setting up elixir re-compilation triggered by changes in external files
-  for path <-
-        ~w{#{File.read!("external_files.txt")}}
-        |> Enum.flat_map(&Path.wildcard/1)
-        |> Enum.concat(llvm_headers) do
+  for path <- ~w{#{File.read!("external_files.txt")}} |> Enum.flat_map(&Path.wildcard/1) do
     @external_resource path
   end
 
