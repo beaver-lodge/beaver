@@ -88,16 +88,10 @@ defmodule Beaver.MixProject do
       files: ~w{
         lib .formatter.exs mix.exs README*
         scripts/*.exs
-        native/mlir-zig-proj/src/*.zig
-        native/mlir-zig-proj/build.zig
-        native/mlir-zig-proj/build.zig.zon
-        native/**/CMakeLists.txt
-        native/**/*.cmake
-        native/**/*.h
-        native/**/*.td
-        native/**/*.cpp
         checksum.exs
         Makefile
+        external_files.txt
+        #{File.read!("external_files.txt")}
       }
     ]
   end
@@ -117,7 +111,6 @@ defmodule Beaver.MixProject do
   defp deps do
     [
       {:elixir_make, "~> 0.4", runtime: false},
-      {:llvm_config, "~> 0.1.0"},
       {:kinda, "~> 0.9.0"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:benchee, "~> 1.0", only: :dev}

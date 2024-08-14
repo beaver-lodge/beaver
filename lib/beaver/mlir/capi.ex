@@ -22,25 +22,8 @@ defmodule Beaver.MLIR.CAPI do
     end
   end
 
-  llvm_headers =
-    case LLVMConfig.include_dir() do
-      {:ok, include_dir} ->
-        include_dir
-        |> Path.join("*.h")
-        |> Path.wildcard()
-
-      _ ->
-        []
-    end
-
   # setting up elixir re-compilation triggered by changes in external files
-  for path <-
-        llvm_headers ++
-          Path.wildcard("native/mlir-c/**/*.h") ++
-          Path.wildcard("native/mlir-c/**/*.cpp") ++
-          Path.wildcard("native/mlir-zig-proj/**/*.zig") ++
-          Path.wildcard("native/mlir-zig-proj/**/*.zon"),
-      not String.contains?(path, "kinda.gen.zig") do
+  for path <- ~w{#{File.read!("external_files.txt")}} |> Enum.flat_map(&Path.wildcard/1) do
     @external_resource path
   end
 
