@@ -128,6 +128,7 @@ jobs:
       - name: Run dev build
         run: |
           mix
+          mix hex.build
       - name: Run overhead profiling
         if: matrix.otp == '27.0.1'
         run: |
