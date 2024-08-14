@@ -1,2 +1,4 @@
 src/wrapper.*
 .zig-cache
+compile_commands.json
+.cache
