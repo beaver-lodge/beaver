@@ -90,8 +90,8 @@ defmodule Beaver.MixProject do
         scripts/*.exs
         checksum.exs
         Makefile
-        native/files.txt
-        #{File.read!("native/files.txt")}
+        external_files.txt
+        #{File.read!("external_files.txt")}
       }
     ]
   end
