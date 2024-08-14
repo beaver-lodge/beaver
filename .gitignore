@@ -23,8 +23,6 @@ erl_crash.dump
 /tmp/
 .DS_Store
 
-zig-cache
-
 *.so.tar.gz
 
 checksum-*.exs
