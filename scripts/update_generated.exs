@@ -1,6 +1,8 @@
 Mix.install([{:zig_parser, "~> 0.1.0"}])
 
 defmodule Updater do
+  require Logger
+
   def args() do
     System.argv() |> Enum.chunk_every(2)
   end
@@ -24,6 +26,7 @@ defmodule Updater do
     |> then(
       &for ["--elixir", dst] <- args() do
         File.write!(dst, &1)
+        Logger.info("Updated: #{dst}")
       end
     )
 
@@ -65,6 +68,7 @@ defmodule Updater do
     for ["--zig", dst] <- args() do
       File.write!(dst, txt)
       {_, 0} = System.cmd("zig", ["fmt", dst])
+      Logger.info("Updated: #{dst}")
     end
 
     functions
