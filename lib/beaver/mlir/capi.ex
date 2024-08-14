@@ -36,11 +36,10 @@ defmodule Beaver.MLIR.CAPI do
   # setting up elixir re-compilation triggered by changes in external files
   for path <-
         llvm_headers ++
-          Path.wildcard("native/mlir-c/**/*.h") ++
-          Path.wildcard("native/mlir-c/**/*.cpp") ++
-          Path.wildcard("native/mlir-zig-proj/**/*.zig") ++
-          Path.wildcard("native/mlir-zig-proj/**/*.zon"),
-      not String.contains?(path, "kinda.gen.zig") do
+          Path.wildcard("native/**/*.h") ++
+          Path.wildcard("native/**/*.cpp") ++
+          Path.wildcard("native/**/*.zig") ++
+          Path.wildcard("native/**/*.zon") do
     @external_resource path
   end
 
