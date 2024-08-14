@@ -88,9 +88,9 @@ defmodule Beaver.MixProject do
       files: ~w{
         lib .formatter.exs mix.exs README*
         scripts/*.exs
-        native/mlir-zig-proj/src/*.zig
-        native/mlir-zig-proj/build.zig
-        native/mlir-zig-proj/build.zig.zon
+        native/src/*.zig
+        native/build.zig
+        native/build.zig.zon
         native/**/CMakeLists.txt
         native/**/*.cmake
         native/**/*.h
