@@ -31,7 +31,8 @@ defmodule Beaver.MixProject do
             end
           end
         ],
-        make_args: ~w{-j}
+        make_args: ~w{-j},
+        make_cwd: "native"
       ]
   end
 
@@ -88,9 +89,7 @@ defmodule Beaver.MixProject do
       links: %{"GitHub" => "https://github.com/beaver-lodge/beaver"},
       files: ~w{
         lib .formatter.exs mix.exs README*
-        scripts/*.exs
         checksum.exs
-        Makefile
         external_files.txt
         #{File.read!("external_files.txt")}
       }

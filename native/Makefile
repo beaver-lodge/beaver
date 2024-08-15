@@ -5,26 +5,24 @@ MLIR_CMAKE_DIR = $(LLVM_LIB_DIR)/cmake/mlir
 CMAKE_BUILD_DIR = ${MIX_APP_PATH}/cmake_build
 NATIVE_INSTALL_DIR = ${MIX_APP_PATH}/priv
 MLIR_INCLUDE_DIR = ${LLVM_LIB_DIR}/../include
-BEAVER_INCLUDE_DIR = native/include
-ZIG_CACHE_DIR = ${MIX_APP_PATH}/zig_cache
 
 all: zig_build
 
 zig_translate:
 	mkdir -p ${NATIVE_INSTALL_DIR}
-	zig translate-c ${BEAVER_INCLUDE_DIR}/mlir-c/Beaver/wrapper.h --cache-dir ${ZIG_CACHE_DIR} \
-		-I ${BEAVER_INCLUDE_DIR} \
-		-I ${MLIR_INCLUDE_DIR} | tee native/src/wrapper.h.zig | elixir scripts/update_generated.exs \
+	zig translate-c include/mlir-c/Beaver/wrapper.h \
+		-I include \
+		-I ${MLIR_INCLUDE_DIR} | tee src/wrapper.h.zig | elixir update_generated.exs \
 			--elixir ${NATIVE_INSTALL_DIR}/capi_functions.ex \
-			--zig native/src/wrapper.zig
+			--zig src/wrapper.zig
 
 cmake_build:
-	cmake -G Ninja -S native -B ${CMAKE_BUILD_DIR} -DLLVM_DIR=${LLVM_CMAKE_DIR} -DMLIR_DIR=${MLIR_CMAKE_DIR} -DCMAKE_INSTALL_PREFIX=${NATIVE_INSTALL_DIR}
+	cmake -G Ninja -B ${CMAKE_BUILD_DIR} -DLLVM_DIR=${LLVM_CMAKE_DIR} -DMLIR_DIR=${MLIR_CMAKE_DIR} -DCMAKE_INSTALL_PREFIX=${NATIVE_INSTALL_DIR}
 	cmake --build ${CMAKE_BUILD_DIR} --target install
 	cp -v ${LLVM_LIB_DIR}/libmlir_* ${NATIVE_INSTALL_DIR}/lib
 
 zig_build: zig_translate cmake_build
-	zig build --build-file native/build.zig --cache-dir ${ZIG_CACHE_DIR} \
+	zig build \
 	  --prefix ${NATIVE_INSTALL_DIR} \
 		--search-prefix ${NATIVE_INSTALL_DIR} \
 		--search-prefix ${LLVM_LIB_DIR}/.. \

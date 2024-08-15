@@ -6,3 +6,5 @@ native/**/*.cmake
 native/**/*.h
 native/**/*.td
 native/**/*.cpp
+native/*.exs
+native/Makefile
