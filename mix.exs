@@ -30,7 +30,9 @@ defmodule Beaver.MixProject do
               ["2.16", "2.17"]
             end
           end
-        ]
+        ],
+        make_args: ~w{-j},
+        make_cwd: "native"
       ]
   end
 
@@ -87,9 +89,7 @@ defmodule Beaver.MixProject do
       links: %{"GitHub" => "https://github.com/beaver-lodge/beaver"},
       files: ~w{
         lib .formatter.exs mix.exs README*
-        scripts/*.exs
         checksum.exs
-        Makefile
         external_files.txt
         #{File.read!("external_files.txt")}
       }
@@ -99,7 +99,6 @@ defmodule Beaver.MixProject do
   def application do
     [
       mod: {Beaver.Application, []},
-      start_phases: [mlir_register_all_passes: []],
       extra_applications: [:logger]
     ]
   end

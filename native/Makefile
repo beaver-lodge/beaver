@@ -1,0 +1,34 @@
+LLVM_CONFIG_PATH ?= $($(shell echo $$LLVM_CONFIG_PATH), llvm-config)
+LLVM_LIB_DIR := $(shell ${LLVM_CONFIG_PATH} --libdir)
+LLVM_CMAKE_DIR = $(LLVM_LIB_DIR)/cmake/llvm
+MLIR_CMAKE_DIR = $(LLVM_LIB_DIR)/cmake/mlir
+CMAKE_BUILD_DIR = ${MIX_APP_PATH}/cmake_build
+NATIVE_INSTALL_DIR = ${MIX_APP_PATH}/priv
+MLIR_INCLUDE_DIR = ${LLVM_LIB_DIR}/../include
+
+all: zig_build
+
+zig_translate:
+	mkdir -p ${NATIVE_INSTALL_DIR}
+	zig translate-c include/mlir-c/Beaver/wrapper.h \
+		-I include \
+		-I ${MLIR_INCLUDE_DIR} | tee src/wrapper.h.zig | elixir update_generated.exs \
+			--elixir ${NATIVE_INSTALL_DIR}/capi_functions.ex \
+			--zig src/wrapper.zig
+
+cmake_build:
+	cmake -G Ninja -B ${CMAKE_BUILD_DIR} -DLLVM_DIR=${LLVM_CMAKE_DIR} -DMLIR_DIR=${MLIR_CMAKE_DIR} -DCMAKE_INSTALL_PREFIX=${NATIVE_INSTALL_DIR}
+	cmake --build ${CMAKE_BUILD_DIR} --target install
+	cp -v ${LLVM_LIB_DIR}/libmlir_* ${NATIVE_INSTALL_DIR}/lib
+
+zig_build: zig_translate cmake_build
+	zig build \
+	  --prefix ${NATIVE_INSTALL_DIR} \
+		--search-prefix ${NATIVE_INSTALL_DIR} \
+		--search-prefix ${LLVM_LIB_DIR}/.. \
+		--search-prefix ${ERTS_INCLUDE_DIR}/.. \
+		-freference-trace
+
+clean:
+	rm -rf ${CMAKE_BUILD_DIR}
+	rm -rf ${NATIVE_INSTALL_DIR}

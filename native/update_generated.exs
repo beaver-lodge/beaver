@@ -1,5 +1,3 @@
-Mix.install([{:zig_parser, "~> 0.1.0"}])
-
 defmodule Updater do
   require Logger
 
@@ -26,7 +24,7 @@ defmodule Updater do
     |> then(
       &for ["--elixir", dst] <- args() do
         File.write!(dst, &1)
-        Logger.info("Updated: #{dst}")
+        Logger.info("Updated #{dst}")
       end
     )
 
@@ -68,23 +66,52 @@ defmodule Updater do
     for ["--zig", dst] <- args() do
       File.write!(dst, txt)
       {_, 0} = System.cmd("zig", ["fmt", dst])
-      Logger.info("Updated: #{dst}")
+      Logger.info("Updated #{dst}")
     end
 
     functions
   end
 
-  def run do
-    %{code: zig_ast} =
-      IO.stream(:stdio, :line)
-      |> Stream.map(&String.trim/1)
-      |> Enum.join()
-      |> Zig.Parser.parse()
+  defp parse(tokens, acc \\ [])
 
-    for {:fn, %Zig.Parser.FnOptions{extern: true, inline: inline}, parts} <- zig_ast,
-        inline != true do
-      {parts[:name], parts[:params] |> Enum.reject(&(&1 == :...)) |> length()}
-    end
+  defp parse([], acc) do
+    Enum.reverse(acc)
+  end
+
+  defp parse(["(" | tail], acc) do
+    {tail, sub_acc} = parse(tail, [])
+    parse(tail, [sub_acc | acc])
+  end
+
+  defp parse([")" | tail], acc) do
+    {tail, Enum.reverse(acc)}
+  end
+
+  defp parse([head | tail], acc) do
+    parse(tail, [head | acc])
+  end
+
+  @deliminator "()\:\;\,"
+  defp tokenize(decl) do
+    Regex.scan(~r/[^\s#{@deliminator}]+|[#{@deliminator}]/, decl) |> List.flatten()
+  end
+
+  defp fa(decl) do
+    ["pub", "extern", "fn", name, args | _] = tokenize(decl) |> parse()
+
+    args
+    |> Enum.chunk_by(&(&1 == ","))
+    |> Enum.reject(&(&1 in [[","], ["..."]]))
+    |> length()
+    |> then(&{String.to_atom(name), &1})
+  end
+
+  def run do
+    IO.stream(:stdio, :line)
+    |> Stream.map(&String.trim/1)
+    |> Enum.to_list()
+    |> Enum.filter(&String.starts_with?(&1, ["pub extern fn beaver", "pub extern fn mlir"]))
+    |> Enum.map(&fa/1)
     |> Enum.sort()
     |> gen(:elixir)
     |> gen(:zig)

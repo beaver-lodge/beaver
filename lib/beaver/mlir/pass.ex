@@ -18,4 +18,24 @@ defmodule Beaver.MLIR.Pass do
       @root_op Keyword.get(unquote(opts), :on, "builtin.module")
     end
   end
+
+  @registrar __MODULE__.GlobalRegistrar
+  @doc """
+  Ensure all passes are registered with the global registry.
+  """
+  def ensure_all_registered!() do
+    :ok = Agent.get(@registrar, & &1, :infinity)
+  end
+
+  @doc false
+  def global_registrar_child_specs() do
+    [
+      update_in(Agent.child_spec(fn -> nil end).start, fn {m, f, a} ->
+        {m, f, a ++ [[name: @registrar]]}
+      end),
+      Task.child_spec(fn ->
+        Agent.update(@registrar, fn _ -> Beaver.MLIR.CAPI.mlirRegisterAllPasses() end)
+      end)
+    ]
+  end
 end

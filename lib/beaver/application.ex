@@ -3,13 +3,6 @@ defmodule Beaver.Application do
   require Logger
   @moduledoc false
   def start(_type, _args) do
-    Supervisor.start_link(
-      [],
-      strategy: :one_for_one
-    )
-  end
-
-  def start_phase(:mlir_register_all_passes, :normal, []) do
-    Beaver.MLIR.CAPI.mlirRegisterAllPasses()
+    Supervisor.start_link(Beaver.MLIR.Pass.global_registrar_child_specs(), strategy: :one_for_one)
   end
 end
