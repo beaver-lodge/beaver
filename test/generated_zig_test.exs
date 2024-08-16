@@ -1,5 +1,5 @@
 defmodule Beaver.MLIR.CAPI.KindaTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   alias Beaver.Native
 
   @moduletag :smoke

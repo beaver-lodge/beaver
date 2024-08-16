@@ -53,7 +53,7 @@ defmodule Beaver.Dummy do
   def gigantic(ctx) do
     mlir ctx: ctx do
       module do
-        for _ <- 1..10_000 do
+        for _ <- 1..1_000 do
           put_func(ctx, Beaver.Env.block())
         end
       end

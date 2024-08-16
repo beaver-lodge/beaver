@@ -1,5 +1,5 @@
 defmodule DialectRegistryTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
 
   alias Beaver.MLIR.Dialect
 
@@ -71,9 +71,10 @@ defmodule DialectRegistryTest do
   end
 
   test "ops are unique" do
-    for d <- Dialect.Registry.dialects() do
+    Task.async_stream(Dialect.Registry.dialects(), fn d ->
       ops = Dialect.Registry.ops(d)
       assert Enum.uniq(ops) == ops
-    end
+    end)
+    |> Enum.to_list()
   end
 end
