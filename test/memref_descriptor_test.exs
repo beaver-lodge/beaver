@@ -1,5 +1,5 @@
 defmodule MemRefDescriptorTest do
-  use ExUnit.Case
+  use ExUnit.Case, async: true
   alias Beaver.Native
 
   test "test memref descriptor" do
