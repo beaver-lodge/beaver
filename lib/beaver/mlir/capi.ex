@@ -23,7 +23,9 @@ defmodule Beaver.MLIR.CAPI do
   end
 
   # setting up elixir re-compilation triggered by changes in external files
-  for path <- ~w{#{File.read!("external_files.txt")}} |> Enum.flat_map(&Path.wildcard/1) do
+  for path <-
+        ~w{#{Mix.Project.project_file() |> Path.dirname() |> Path.join("external_files.txt") |> File.read!()}}
+        |> Enum.flat_map(&Path.wildcard/1) do
     @external_resource path
   end
 
