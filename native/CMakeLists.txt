@@ -24,13 +24,3 @@ include_directories(${PROJECT_BINARY_DIR}/include)
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(aggregate)
-
-add_custom_target(symlink_compile_commands_json ALL)
-add_custom_command(
-  TARGET symlink_compile_commands_json
-  COMMAND
-    ${CMAKE_COMMAND} -E create_symlink
-    ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
-    ${PROJECT_SOURCE_DIR}/compile_commands.json DEPENDS
-    ${CMAKE_CURRENT_BINARY_DIR}/compile_commands.json
-  VERBATIM ON)
