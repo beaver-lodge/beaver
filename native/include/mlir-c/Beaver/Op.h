@@ -18,9 +18,6 @@ extern "C" {
 MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
                                                  MlirContext context);
 
-MLIR_CAPI_EXPORTED intptr_t
-beaverGetNumRegisteredOperations(MlirContext context);
-
 MLIR_CAPI_EXPORTED void beaverGetRegisteredOps(MlirContext context,
                                                MlirStringCallback insert,
                                                void *container);

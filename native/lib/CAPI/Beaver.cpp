@@ -61,11 +61,6 @@ MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
   return name.isRegistered() && name.mightHaveTrait<OpTrait::IsTerminator>();
 }
 
-MLIR_CAPI_EXPORTED intptr_t
-beaverGetNumRegisteredOperations(MlirContext context) {
-  return unwrap(context)->getRegisteredOperations().size();
-}
-
 MLIR_CAPI_EXPORTED void beaverGetRegisteredOps(MlirContext context,
                                                MlirStringCallback insert,
                                                void *container) {
