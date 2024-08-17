@@ -83,6 +83,7 @@ defmodule Beaver.MixProject do
     ]
   end
 
+  @external_files __DIR__ |> Path.join("external_files.txt") |> File.read!()
   defp package() do
     [
       licenses: ["Apache-2.0", "MIT"],
@@ -91,7 +92,7 @@ defmodule Beaver.MixProject do
         lib .formatter.exs mix.exs README*
         checksum.exs
         external_files.txt
-        #{File.read!("external_files.txt")}
+        #{@external_files}
       }
     ]
   end
