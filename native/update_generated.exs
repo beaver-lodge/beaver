@@ -23,6 +23,7 @@ defmodule Updater do
     |> inspect(pretty: true, limit: :infinity)
     |> then(
       &for ["--elixir", dst] <- args() do
+        dst = Path.expand(dst)
         File.write!(dst, &1)
         Logger.info("Updated #{dst}")
       end
@@ -66,6 +67,7 @@ defmodule Updater do
     for ["--zig", dst] <- args() do
       File.write!(dst, txt)
       {_, 0} = System.cmd("zig", ["fmt", dst])
+      dst = Path.expand(dst)
       Logger.info("Updated #{dst}")
     end
 
