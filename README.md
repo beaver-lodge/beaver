@@ -41,13 +41,12 @@ And a small example to showcase what it is like to define and run a pass in Beav
 
 ```elixir
 defmodule ToyPass do
+  @moduledoc false
   use Beaver
   alias MLIR.Dialect.{Func, TOSA}
   require Func
   import Beaver.Pattern
   use MLIR.Pass, on: "builtin.module"
-
-  @moduledoc false
 
   defpat replace_add_op() do
     a = value()
