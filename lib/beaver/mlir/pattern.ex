@@ -44,6 +44,7 @@ defmodule Beaver.MLIR.Pattern do
     result = beaverApplyPatternsAndFoldGreedily(op, frozen_pat_set)
     mlirPDLPatternModuleDestroy(pdl_pat_mod)
     mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
+    MLIR.Module.destroy(pattern_module)
 
     if MLIR.LogicalResult.success?(result) do
       {:ok, op}
