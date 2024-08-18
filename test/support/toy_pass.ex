@@ -1,15 +1,10 @@
 defmodule ToyPass do
+  @moduledoc false
   use Beaver
-  alias Beaver.MLIR
-  alias MLIR.Type
   alias MLIR.Dialect.{Func, TOSA}
   require Func
-  require TOSA
-  require Type
-
-  @moduledoc false
-  use MLIR.Pass, on: "builtin.module"
   import Beaver.Pattern
+  use MLIR.Pass, on: "builtin.module"
 
   defpat replace_add_op() do
     a = value()
