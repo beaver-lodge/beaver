@@ -24,7 +24,8 @@ defmodule ToyPass do
   end
 
   def run(%MLIR.Operation{} = operation) do
-    parent = MLIR.Operation.parent(operation) |> MLIR.Module.from_operation
+    parent = MLIR.Operation.parent(operation) |> MLIR.Module.from_operation()
+
     with "func.func" <- MLIR.Operation.name(operation),
          attributes <- Beaver.Walker.attributes(operation),
          2 <- Enum.count(attributes),
