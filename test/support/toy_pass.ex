@@ -8,7 +8,7 @@ defmodule ToyPass do
   require Type
 
   @moduledoc false
-  use MLIR.Pass, on: "func.func"
+  use MLIR.Pass, on: "builtin.module"
   import Beaver.Pattern
 
   defpat replace_add_op() do
@@ -24,12 +24,9 @@ defmodule ToyPass do
   end
 
   def run(%MLIR.Operation{} = operation) do
-    parent = MLIR.Operation.parent(operation) |> MLIR.Module.from_operation()
-
-    with "func.func" <- MLIR.Operation.name(operation),
-         attributes <- Beaver.Walker.attributes(operation),
-         2 <- Enum.count(attributes),
-         {:ok, _} <- MLIR.Pattern.apply_(parent, [replace_add_op(benefit: 2)]) do
+    with 1 <- Beaver.Walker.regions(operation) |> Enum.count(),
+         {:ok, _} <-
+           MLIR.Pattern.apply_(MLIR.Module.from_operation(operation), [replace_add_op(benefit: 2)]) do
       :ok
     end
   end
