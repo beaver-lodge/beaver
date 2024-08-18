@@ -128,21 +128,20 @@ defmodule PDLTest do
     ir_module = MLIR.Module.create(ctx, @apply_rewrite_op_ir)
     MLIR.Operation.verify!(pattern_module)
     MLIR.Operation.verify!(ir_module)
-    pattern_set = CAPI.beaverRewritePatternSetGet(ctx)
-    pattern_set = CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pattern_module)
 
-    region =
-      ir_module
-      |> MLIR.Operation.from_module()
-      |> CAPI.mlirOperationGetFirstRegion()
+    pattern_set =
+      CAPI.mlirPDLPatternModuleFromModule(pattern_module)
+      |> CAPI.mlirRewritePatternSetFromPDLPatternModule()
+      |> CAPI.mlirFreezeRewritePattern()
 
-    result = CAPI.beaverApplyOwnedPatternSetOnRegion(region, pattern_set)
+    result = CAPI.beaverApplyPatternsAndFoldGreedily(ir_module, pattern_set)
 
     assert MLIR.LogicalResult.success?(result)
 
     ir_string = MLIR.to_string(ir_module)
     assert not String.contains?(ir_string, "test.op")
     assert String.contains?(ir_string, "test.success")
+    CAPI.mlirFrozenRewritePatternSetDestroy(pattern_set)
   end
 
   @are_equal_op_pdl Path.join(__DIR__, "pdl_erase_and_create.mlir") |> File.read!()
