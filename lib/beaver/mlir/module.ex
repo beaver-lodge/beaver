@@ -37,4 +37,5 @@ defmodule Beaver.MLIR.Module do
   end
 
   defdelegate body(module), to: CAPI, as: :mlirModuleGetBody
+  defdelegate from_operation(op), to: CAPI, as: :mlirModuleFromOperation
 end

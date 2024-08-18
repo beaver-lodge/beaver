@@ -138,6 +138,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   defdelegate location(op), to: MLIR.CAPI, as: :mlirOperationGetLocation
+  defdelegate parent(op), to: MLIR.CAPI, as: :mlirOperationGetParentOperation
 
   def from_module(%MLIR.Module{} = module) do
     mlirModuleGetOperation(module)

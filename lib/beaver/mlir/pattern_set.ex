@@ -3,11 +3,6 @@ defmodule Beaver.MLIR.PatternSet do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  def insert(pattern_set, %Beaver.MLIR.Module{} = pattern_module) do
-    CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pattern_module)
-    pattern_set
-  end
-
   def apply!(container, pattern_set) do
     case apply_(container, pattern_set) do
       {:ok, container} ->
