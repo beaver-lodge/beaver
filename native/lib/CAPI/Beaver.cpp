@@ -1,5 +1,6 @@
 #include "mlir/CAPI/Beaver.h"
 #include "mlir-c/BuiltinAttributes.h"
+#include "mlir-c/Rewrite.h"
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
 #include "mlir/Dialect/IRDL/IRDLLoading.h"
@@ -7,29 +8,6 @@
 #include "mlir/IR/ExtensibleDialect.h"
 
 using namespace mlir;
-
-MLIR_CAPI_EXPORTED MlirRewritePatternSet
-beaverRewritePatternSetGet(MlirContext context) {
-  return wrap(new RewritePatternSet(unwrap(context)));
-}
-
-MLIR_CAPI_EXPORTED MlirRewritePatternSet beaverPatternSetAddOwnedPDLPattern(
-    MlirRewritePatternSet patternList, MlirModule module) {
-  auto &set = unwrap(patternList)->add(PDLPatternModule(unwrap(module)));
-  return wrap(&set);
-}
-
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyOwnedPatternSetOnRegion(
-    MlirRegion region, MlirRewritePatternSet patternList) {
-  return wrap(applyPatternsAndFoldGreedily(*unwrap(region),
-                                           std::move(*unwrap(patternList))));
-}
-
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyOwnedPatternSetOnOperation(
-    MlirOperation op, MlirRewritePatternSet patternList) {
-  return wrap(applyPatternsAndFoldGreedily(unwrap(op),
-                                           std::move(*unwrap(patternList))));
-}
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetArgument(MlirPass pass) {
   auto argument = unwrap(pass)->getArgument();

@@ -100,7 +100,11 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
           :BytecodeWriterConfig,
           :OpPrintingFlags,
           :LLVMThreadPool,
-          :TypeIDAllocator
+          :TypeIDAllocator,
+          :RewriterBase,
+          :FrozenRewritePatternSet,
+          :PDLPatternModule,
+          :GreedyRewriteDriverConfig
         ],
         &%KindDecl{module_name: Module.concat(Beaver.MLIR, &1)}
       ) ++

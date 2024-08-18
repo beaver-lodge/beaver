@@ -75,6 +75,10 @@ pub const PassManager = MLIRKind("PassManager");
 pub const RewritePatternSet = MLIRKind("RewritePatternSet");
 pub const ExecutionEngine = MLIRKind("ExecutionEngine");
 pub const SymbolTable = MLIRKind("SymbolTable");
+pub const RewriterBase = MLIRKind("RewriterBase");
+pub const FrozenRewritePatternSet = MLIRKind("FrozenRewritePatternSet");
+pub const PDLPatternModule = MLIRKind("PDLPatternModule");
+pub const GreedyRewriteDriverConfig = MLIRKind("GreedyRewriteDriverConfig");
 
 pub const ExternalPass = MLIRKind("ExternalPass");
 pub const ExternalPassCallbacks = MLIRKind("ExternalPassCallbacks");
@@ -158,6 +162,10 @@ pub const allKinds = .{
     OpPrintingFlags,
     LLVMThreadPool,
     TypeIDAllocator,
+    RewriterBase,
+    FrozenRewritePatternSet,
+    PDLPatternModule,
+    GreedyRewriteDriverConfig
 };
 pub fn open_all(env: beam.env) void {
     inline for (allKinds) |k| {

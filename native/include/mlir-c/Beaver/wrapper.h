@@ -2,7 +2,6 @@
 #include <mlir-c/AffineMap.h>
 #include <mlir-c/Beaver/Context.h>
 #include <mlir-c/Beaver/Op.h>
-#include <mlir-c/Beaver/PDL.h>
 #include <mlir-c/Beaver/Pass.h>
 #include <mlir-c/BuiltinAttributes.h>
 #include <mlir-c/BuiltinTypes.h>
@@ -29,5 +28,6 @@
 #include <mlir-c/Interfaces.h>
 #include <mlir-c/Pass.h>
 #include <mlir-c/RegisterEverything.h>
+#include <mlir-c/Rewrite.h>
 #include <mlir-c/Support.h>
 #include <mlir-c/Transforms.h>
