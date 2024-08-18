@@ -157,10 +157,13 @@ defmodule PDLTest do
     pattern_string = MLIR.to_string(pattern_module)
     assert String.contains?(pattern_string, "test.op")
     assert String.contains?(pattern_string, "test.success2")
-    pattern_set = CAPI.beaverRewritePatternSetGet(ctx)
-    pattern_set = CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pattern_module)
-    region = ir_module |> MLIR.Operation.from_module() |> CAPI.mlirOperationGetFirstRegion()
-    result = CAPI.beaverApplyOwnedPatternSetOnRegion(region, pattern_set)
+
+    pattern_set =
+      CAPI.mlirPDLPatternModuleFromModule(pattern_module)
+      |> CAPI.mlirRewritePatternSetFromPDLPatternModule()
+      |> CAPI.mlirFreezeRewritePattern()
+
+    result = CAPI.beaverApplyPatternsAndFoldGreedily(ir_module, pattern_set)
 
     assert MLIR.LogicalResult.success?(result), "fail to apply pattern"
 

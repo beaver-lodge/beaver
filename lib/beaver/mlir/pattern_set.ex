@@ -3,10 +3,6 @@ defmodule Beaver.MLIR.PatternSet do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  def get(ctx) do
-    CAPI.beaverRewritePatternSetGet(ctx)
-  end
-
   def insert(pattern_set, %Beaver.MLIR.Module{} = pattern_module) do
     CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pattern_module)
     pattern_set
@@ -32,12 +28,8 @@ defmodule Beaver.MLIR.PatternSet do
     end
   end
 
-  def apply_(%MLIR.Region{} = region, pattern_set) do
-    do_apply(region, pattern_set, &CAPI.beaverApplyOwnedPatternSetOnRegion/2)
-  end
-
   def apply_(%MLIR.Operation{} = operation, pattern_set) do
-    do_apply(operation, pattern_set, &CAPI.beaverApplyOwnedPatternSetOnOperation/2)
+    do_apply(operation, pattern_set, &CAPI.beaverApplyPatternsAndFoldGreedily/2)
   end
 
   def apply_(%MLIR.Module{} = module, pattern_set) do
