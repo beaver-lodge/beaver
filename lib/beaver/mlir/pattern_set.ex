@@ -28,17 +28,7 @@ defmodule Beaver.MLIR.PatternSet do
     end
   end
 
-  def apply_(%MLIR.Operation{} = operation, pattern_set) do
-    do_apply(operation, pattern_set, &CAPI.beaverApplyPatternsAndFoldGreedily/2)
-  end
-
   def apply_(%MLIR.Module{} = module, pattern_set) do
-    case MLIR.Operation.from_module(module) |> apply_(pattern_set) do
-      {:ok, %MLIR.Operation{}} ->
-        {:ok, module}
-
-      _ ->
-        :error
-    end
+    do_apply(module, pattern_set, &CAPI.beaverApplyPatternsAndFoldGreedily/2)
   end
 end
