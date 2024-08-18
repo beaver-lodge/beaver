@@ -8,29 +8,6 @@
 
 using namespace mlir;
 
-MLIR_CAPI_EXPORTED MlirRewritePatternSet
-beaverRewritePatternSetGet(MlirContext context) {
-  return wrap(new RewritePatternSet(unwrap(context)));
-}
-
-MLIR_CAPI_EXPORTED MlirRewritePatternSet beaverPatternSetAddOwnedPDLPattern(
-    MlirRewritePatternSet patternList, MlirModule module) {
-  auto &set = unwrap(patternList)->add(PDLPatternModule(unwrap(module)));
-  return wrap(&set);
-}
-
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyOwnedPatternSetOnRegion(
-    MlirRegion region, MlirRewritePatternSet patternList) {
-  return wrap(applyPatternsAndFoldGreedily(*unwrap(region),
-                                           std::move(*unwrap(patternList))));
-}
-
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyOwnedPatternSetOnOperation(
-    MlirOperation op, MlirRewritePatternSet patternList) {
-  return wrap(applyPatternsAndFoldGreedily(unwrap(op),
-                                           std::move(*unwrap(patternList))));
-}
-
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetArgument(MlirPass pass) {
   auto argument = unwrap(pass)->getArgument();
   return wrap(argument);
@@ -59,11 +36,6 @@ MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
                                                  MlirContext context) {
   auto name = OperationName(unwrap(op_name), unwrap(context));
   return name.isRegistered() && name.mightHaveTrait<OpTrait::IsTerminator>();
-}
-
-MLIR_CAPI_EXPORTED intptr_t
-beaverGetNumRegisteredOperations(MlirContext context) {
-  return unwrap(context)->getRegisteredOperations().size();
 }
 
 MLIR_CAPI_EXPORTED void beaverGetRegisteredOps(MlirContext context,
@@ -291,4 +263,9 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverGetIRDLDefinedAttr(
       dialect, attr, params,
       [](auto d, auto name) { return d->lookupAttrDefinition(name); },
       DynamicAttr::get));
+}
+
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyPatternsAndFoldGreedily(
+    MlirModule op, MlirFrozenRewritePatternSet patterns) {
+  return mlirApplyPatternsAndFoldGreedily(op, patterns, {});
 }

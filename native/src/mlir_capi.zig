@@ -75,6 +75,10 @@ pub const PassManager = MLIRKind("PassManager");
 pub const RewritePatternSet = MLIRKind("RewritePatternSet");
 pub const ExecutionEngine = MLIRKind("ExecutionEngine");
 pub const SymbolTable = MLIRKind("SymbolTable");
+pub const RewriterBase = MLIRKind("RewriterBase");
+pub const FrozenRewritePatternSet = MLIRKind("FrozenRewritePatternSet");
+pub const PDLPatternModule = MLIRKind("PDLPatternModule");
+pub const GreedyRewriteDriverConfig = MLIRKind("GreedyRewriteDriverConfig");
 
 pub const ExternalPass = MLIRKind("ExternalPass");
 pub const ExternalPassCallbacks = MLIRKind("ExternalPassCallbacks");
@@ -87,78 +91,7 @@ pub const OpPrintingFlags = MLIRKind("OpPrintingFlags");
 pub const TypeIDAllocator = MLIRKind("TypeIDAllocator");
 pub const LLVMThreadPool = MLIRKind2("MlirLlvmThreadPool", "LLVMThreadPool");
 pub const OperationState = MLIRKind2("MlirOperationState", "Operation.State");
-pub const allKinds = .{
-    Pass,
-    LogicalResult,
-    StringRef,
-    Context,
-    Location,
-    ISize,
-    Attribute,
-    OpaquePtr,
-    ShapedTypeComponentsCallback,
-    TypeID,
-    TypesCallback,
-    Bool,
-    Operation,
-    IntegerSet,
-    AffineExpr,
-    StringCallback,
-    DialectHandle,
-    CInt,
-    AffineMap,
-    SparseTensorLevelType,
-    F64,
-    Type,
-    I32,
-    I64,
-    CUInt,
-    DialectRegistry,
-    DiagnosticHandlerID,
-    DiagnosticHandler,
-    DiagnosticHandlerDeleteUserData,
-    Diagnostic,
-    DiagnosticSeverity,
-    F32,
-    U64,
-    U32,
-    U16,
-    I16,
-    U8,
-    I8,
-    USize,
-    UnmanagedDenseResourceElementsAttrGetDeleteCallback,
-    OpaqueArray,
-    StringArray,
-    NamedAttribute,
-    PassManager,
-    RewritePatternSet,
-    Region,
-    Module,
-    ExecutionEngine,
-    GenericCallback,
-    ExternalPassConstruct,
-    ExternalPassRun,
-    Identifier,
-    OperationState,
-    SymbolTable,
-    Value,
-    Block,
-    Dialect,
-    ExternalPass,
-    ExternalPassCallbacks,
-    OpPassManager,
-    AffineMapCompressUnusedSymbolsPopulateResult,
-    SymbolTableWalkSymbolTablesCallback,
-    OpOperand,
-    AsmState,
-    OperationWalkCallback,
-    WalkOrder,
-    BytecodeWriterConfig,
-    OpPrintingFlags,
-    LLVMThreadPool,
-    TypeIDAllocator,
-};
+pub const allKinds = .{ Pass, LogicalResult, StringRef, Context, Location, ISize, Attribute, OpaquePtr, ShapedTypeComponentsCallback, TypeID, TypesCallback, Bool, Operation, IntegerSet, AffineExpr, StringCallback, DialectHandle, CInt, AffineMap, SparseTensorLevelType, F64, Type, I32, I64, CUInt, DialectRegistry, DiagnosticHandlerID, DiagnosticHandler, DiagnosticHandlerDeleteUserData, Diagnostic, DiagnosticSeverity, F32, U64, U32, U16, I16, U8, I8, USize, UnmanagedDenseResourceElementsAttrGetDeleteCallback, OpaqueArray, StringArray, NamedAttribute, PassManager, RewritePatternSet, Region, Module, ExecutionEngine, GenericCallback, ExternalPassConstruct, ExternalPassRun, Identifier, OperationState, SymbolTable, Value, Block, Dialect, ExternalPass, ExternalPassCallbacks, OpPassManager, AffineMapCompressUnusedSymbolsPopulateResult, SymbolTableWalkSymbolTablesCallback, OpOperand, AsmState, OperationWalkCallback, WalkOrder, BytecodeWriterConfig, OpPrintingFlags, LLVMThreadPool, TypeIDAllocator, RewriterBase, FrozenRewritePatternSet, PDLPatternModule, GreedyRewriteDriverConfig };
 pub fn open_all(env: beam.env) void {
     inline for (allKinds) |k| {
         k.open_all(env);

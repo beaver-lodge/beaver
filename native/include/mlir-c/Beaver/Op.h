@@ -2,6 +2,7 @@
 #define APPS_BEAVER_CAPI_NATIVE_MLIR_NIF_MET_INCLUDE_MLIR_C_BEAVER_OP_H_
 
 #include "mlir-c/Pass.h"
+#include "mlir-c/Rewrite.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -17,9 +18,6 @@ extern "C" {
 
 MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
                                                  MlirContext context);
-
-MLIR_CAPI_EXPORTED intptr_t
-beaverGetNumRegisteredOperations(MlirContext context);
 
 MLIR_CAPI_EXPORTED void beaverGetRegisteredOps(MlirContext context,
                                                MlirStringCallback insert,
@@ -107,9 +105,13 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverGetIRDLDefinedAttr(MlirStringRef dialect,
                                                           MlirStringRef attr,
                                                           MlirAttribute params);
 
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyPatternsAndFoldGreedily(
+    MlirModule op, MlirFrozenRewritePatternSet patterns);
+
 #include "mlir-c/ExecutionEngine.h"
 
-MLIR_CAPI_EXPORTED bool beaverMlirExecutionEngineIsNull(MlirExecutionEngine w);
+MLIR_CAPI_EXPORTED
+bool beaverMlirExecutionEngineIsNull(MlirExecutionEngine w);
 #ifdef __cplusplus
 }
 #endif

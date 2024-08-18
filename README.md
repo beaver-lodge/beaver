@@ -40,10 +40,13 @@ end
 And a small example to showcase what it is like to define and run a pass in Beaver (with some monad magic):
 
 ```elixir
-alias Beaver.MLIR.Dialect.Func
-
 defmodule ToyPass do
-  use Beaver.MLIR.Pass, on: "func.func"
+  @moduledoc false
+  use Beaver
+  alias MLIR.Dialect.{Func, TOSA}
+  require Func
+  import Beaver.Pattern
+  use MLIR.Pass, on: "builtin.module"
 
   defpat replace_add_op() do
     a = value()
@@ -58,10 +61,9 @@ defmodule ToyPass do
   end
 
   def run(%MLIR.Operation{} = operation) do
-    with "func.func" <- Beaver.MLIR.Operation.name(operation),
-          attributes <- Beaver.Walker.attributes(operation),
-          2 <- Enum.count(attributes),
-          {:ok, _} <- MLIR.Pattern.apply_(operation, [replace_add_op(benefit: 2)]) do
+    with 1 <- Beaver.Walker.regions(operation) |> Enum.count(),
+         {:ok, _} <-
+           MLIR.Pattern.apply_(MLIR.Module.from_operation(operation), [replace_add_op(benefit: 2)]) do
       :ok
     end
   end
@@ -75,9 +77,7 @@ module {
   }
 }
 """.(ctx)
-|> MLIR.Pass.Composer.nested("func.func", [
-  ToyPass.create()
-])
+|> MLIR.Pass.Composer.append(ToyPass)
 |> canonicalize
 |> MLIR.Pass.Composer.run!()
 ```

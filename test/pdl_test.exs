@@ -3,7 +3,7 @@ defmodule PDLTest do
   use Beaver
   alias Beaver.MLIR
   alias MLIR.Type
-  alias MLIR.CAPI
+  import MLIR.CAPI
   alias MLIR.Dialect.{Func, TOSA}
   import MLIR.Transforms
   require Func
@@ -42,9 +42,24 @@ defmodule PDLTest do
   }
   """
 
+  def apply_patterns(pattern_module, ir_module, cb) do
+    MLIR.Operation.verify!(pattern_module)
+    MLIR.Operation.verify!(ir_module)
+    pdl_pat_mod = mlirPDLPatternModuleFromModule(pattern_module)
+
+    frozen_pat_set =
+      pdl_pat_mod |> mlirRewritePatternSetFromPDLPatternModule() |> mlirFreezeRewritePattern()
+
+    result = beaverApplyPatternsAndFoldGreedily(ir_module, frozen_pat_set)
+    assert MLIR.LogicalResult.success?(result)
+    cb.(ir_module)
+    mlirPDLPatternModuleDestroy(pdl_pat_mod)
+    mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
+  end
+
   test "AreEqualOp", test_context do
     ctx = test_context[:ctx]
-    CAPI.mlirContextSetAllowUnregisteredDialects(ctx, true)
+    mlirContextSetAllowUnregisteredDialects(ctx, true)
     pattern_module = MLIR.Module.create(ctx, @apply_rewrite_op_patterns)
 
     inspector = fn
@@ -121,35 +136,25 @@ defmodule PDLTest do
              "builtin.module"
            ]
 
-    assert mlir
-           |> MLIR.CAPI.mlirOperationEqual(MLIR.Operation.from_module(pattern_module))
-           |> Beaver.Native.to_term()
+    assert MLIR.equal?(mlir, MLIR.Operation.from_module(pattern_module))
 
     ir_module = MLIR.Module.create(ctx, @apply_rewrite_op_ir)
-    MLIR.Operation.verify!(pattern_module)
-    MLIR.Operation.verify!(ir_module)
-    pattern_set = CAPI.beaverRewritePatternSetGet(ctx)
-    pattern_set = CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pattern_module)
 
-    region =
-      ir_module
-      |> MLIR.Operation.from_module()
-      |> CAPI.mlirOperationGetFirstRegion()
+    apply_patterns(pattern_module, ir_module, fn ir_module ->
+      ir_string = MLIR.to_string(ir_module)
+      assert not String.contains?(ir_string, "test.op")
+      assert String.contains?(ir_string, "test.success")
+    end)
 
-    result = CAPI.beaverApplyOwnedPatternSetOnRegion(region, pattern_set)
-
-    assert MLIR.LogicalResult.success?(result)
-
-    ir_string = MLIR.to_string(ir_module)
-    assert not String.contains?(ir_string, "test.op")
-    assert String.contains?(ir_string, "test.success")
+    MLIR.Module.destroy(pattern_module)
+    MLIR.Module.destroy(ir_module)
   end
 
   @are_equal_op_pdl Path.join(__DIR__, "pdl_erase_and_create.mlir") |> File.read!()
 
-  test "AreEqualOp pdl version" do
-    ctx = MLIR.Context.create()
-    CAPI.mlirContextSetAllowUnregisteredDialects(ctx, true)
+  test "AreEqualOp pdl version", test_context do
+    ctx = test_context[:ctx]
+    mlirContextSetAllowUnregisteredDialects(ctx, true)
     pattern_module = MLIR.Module.create(ctx, @are_equal_op_pdl)
     assert not MLIR.Module.is_null(pattern_module), "fail to parse module"
     ir_module = MLIR.Module.create(ctx, @apply_rewrite_op_ir)
@@ -158,17 +163,15 @@ defmodule PDLTest do
     pattern_string = MLIR.to_string(pattern_module)
     assert String.contains?(pattern_string, "test.op")
     assert String.contains?(pattern_string, "test.success2")
-    pattern_set = CAPI.beaverRewritePatternSetGet(ctx)
-    pattern_set = CAPI.beaverPatternSetAddOwnedPDLPattern(pattern_set, pattern_module)
-    region = ir_module |> MLIR.Operation.from_module() |> CAPI.mlirOperationGetFirstRegion()
-    result = CAPI.beaverApplyOwnedPatternSetOnRegion(region, pattern_set)
 
-    assert MLIR.LogicalResult.success?(result), "fail to apply pattern"
+    apply_patterns(pattern_module, ir_module, fn ir_module ->
+      ir_string = MLIR.to_string(ir_module)
+      assert not String.contains?(ir_string, "test.op")
+      assert String.contains?(ir_string, "test.success2")
+    end)
 
-    ir_string = MLIR.to_string(ir_module)
-    assert not String.contains?(ir_string, "test.op")
-    assert String.contains?(ir_string, "test.success2")
-    CAPI.mlirContextDestroy(ctx)
+    MLIR.Module.destroy(pattern_module)
+    MLIR.Module.destroy(ir_module)
   end
 
   test "replace tosa", test_context do
@@ -210,9 +213,7 @@ defmodule PDLTest do
         }
       }
       """.(ctx)
-      |> MLIR.Pass.Composer.nested("func.func", [
-        ToyPass
-      ])
+      |> MLIR.Pass.Composer.append(ToyPass)
       |> canonicalize
       |> MLIR.Pass.Composer.run!()
 

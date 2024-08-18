@@ -1,15 +1,10 @@
 defmodule ToyPass do
+  @moduledoc false
   use Beaver
-  alias Beaver.MLIR
-  alias MLIR.Type
   alias MLIR.Dialect.{Func, TOSA}
   require Func
-  require TOSA
-  require Type
-
-  @moduledoc false
-  use MLIR.Pass, on: "func.func"
   import Beaver.Pattern
+  use MLIR.Pass, on: "builtin.module"
 
   defpat replace_add_op() do
     a = value()
@@ -24,10 +19,9 @@ defmodule ToyPass do
   end
 
   def run(%MLIR.Operation{} = operation) do
-    with "func.func" <- MLIR.Operation.name(operation),
-         attributes <- Beaver.Walker.attributes(operation),
-         2 <- Enum.count(attributes),
-         {:ok, _} <- MLIR.Pattern.apply_(operation, [replace_add_op(benefit: 2)]) do
+    with 1 <- Beaver.Walker.regions(operation) |> Enum.count(),
+         {:ok, _} <-
+           MLIR.Pattern.apply_(MLIR.Module.from_operation(operation), [replace_add_op(benefit: 2)]) do
       :ok
     end
   end

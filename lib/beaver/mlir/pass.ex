@@ -34,7 +34,7 @@ defmodule Beaver.MLIR.Pass do
         {m, f, a ++ [[name: @registrar]]}
       end),
       Task.child_spec(fn ->
-        Agent.update(@registrar, fn _ -> Beaver.MLIR.CAPI.mlirRegisterAllPasses() end)
+        Agent.update(@registrar, fn _ -> Beaver.MLIR.CAPI.mlirRegisterAllPasses() end, :infinity)
       end)
     ]
   end

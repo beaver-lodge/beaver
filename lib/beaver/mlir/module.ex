@@ -32,9 +32,7 @@ defmodule Beaver.MLIR.Module do
     MLIR.Operation.verify!(module)
   end
 
-  def destroy(module) do
-    CAPI.mlirModuleDestroy(module)
-  end
-
+  defdelegate destroy(module), to: CAPI, as: :mlirModuleDestroy
   defdelegate body(module), to: CAPI, as: :mlirModuleGetBody
+  defdelegate from_operation(op), to: CAPI, as: :mlirModuleFromOperation
 end
