@@ -37,9 +37,7 @@ defmodule Beaver.Pattern do
 
     quote do
       def unquote(name)(opts \\ [benefit: 1]) do
-        fn mod ->
-          block = Beaver.MLIR.Module.body(mod)
-          ctx = Beaver.MLIR.CAPI.mlirModuleGetContext(mod)
+        fn block, ctx ->
           alias Beaver.Pattern
           pdl_pattern_module_op = unquote(pdl_pattern_module_op)
 

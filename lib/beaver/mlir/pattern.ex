@@ -25,9 +25,10 @@ defmodule Beaver.MLIR.Pattern do
     if MLIR.is_null(op), do: raise("op is null")
     ctx = MLIR.Operation.from_module(op) |> mlirOperationGetContext()
     pattern_module = MLIR.Location.from_env(__ENV__, ctx: ctx) |> MLIR.Module.empty()
+    block = Beaver.MLIR.Module.body(pattern_module)
 
     for p <- patterns do
-      p = p.(pattern_module)
+      p = p.(block, ctx)
 
       if opts[:debug] do
         p |> MLIR.dump!()
