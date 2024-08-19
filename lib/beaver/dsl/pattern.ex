@@ -30,9 +30,9 @@ defmodule Beaver.Pattern do
     |> MLIR.Operation.verify!(debug: true)
   end
 
-  defmacro defpat(call, do: block) do
+  defmacro defpat(call, do: body) do
     {name, _args} = Macro.decompose_call(call)
-    block_ast = block |> Beaver.SSA.prewalk(&__MODULE__.eval_rewrite/1)
+    block_ast = body |> Beaver.SSA.prewalk(&__MODULE__.eval_rewrite/1)
 
     quote do
       def unquote(name)(opts \\ [benefit: 1]) do
