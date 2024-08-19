@@ -28,7 +28,7 @@ defmodule Beaver.MLIR.Pattern do
     block = Beaver.MLIR.Module.body(pattern_module)
 
     for p <- patterns do
-      p = p.(block, ctx)
+      p = p.(ctx, block)
 
       if opts[:debug] do
         p |> MLIR.dump!()
