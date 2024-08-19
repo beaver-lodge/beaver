@@ -24,7 +24,7 @@ defmodule Beaver.MLIR.Pattern do
   def apply_(op, patterns, opts \\ @apply_default_opts) when is_list(patterns) do
     if MLIR.is_null(op), do: raise("op is null")
     ctx = MLIR.Operation.from_module(op) |> mlirOperationGetContext()
-    pattern_module = MLIR.Module.create(ctx, "")
+    pattern_module = MLIR.Location.from_env(__ENV__, ctx: ctx) |> MLIR.Module.empty()
 
     for p <- patterns do
       p = p.(pattern_module)
