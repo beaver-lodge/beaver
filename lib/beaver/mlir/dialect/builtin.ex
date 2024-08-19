@@ -7,7 +7,7 @@ defmodule Beaver.MLIR.Dialect.Builtin do
     ops: Beaver.MLIR.Dialect.Registry.ops("builtin") |> Enum.reject(fn x -> x in ~w{module} end)
 
   @doc """
-  Macro to create a module and insert ops into its body. region/1 shouldn't be called because region of one block will be created.
+  Macro to create a module and insert ops into its body. Beaver.region/1 shouldn't be called because module's one-block region will be created.
   """
   defmacro module(attrs \\ [], do: body) do
     {block_cache, block_restore} = Beaver.parent_scope_block_caching(__CALLER__)
