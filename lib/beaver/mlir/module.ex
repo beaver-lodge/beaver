@@ -35,4 +35,5 @@ defmodule Beaver.MLIR.Module do
   defdelegate destroy(module), to: CAPI, as: :mlirModuleDestroy
   defdelegate body(module), to: CAPI, as: :mlirModuleGetBody
   defdelegate from_operation(op), to: CAPI, as: :mlirModuleFromOperation
+  defdelegate empty(location), to: CAPI, as: :mlirModuleCreateEmpty
 end
