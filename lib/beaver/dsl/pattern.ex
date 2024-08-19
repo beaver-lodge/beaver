@@ -14,15 +14,15 @@ defmodule Beaver.Pattern do
   alias Beaver.Pattern.Env
 
   @doc false
-  def insert(cb, ctx, block, name, opts) do
+  def insert_pat(cb, ctx, block, name, opts) do
     mlir ctx: ctx, block: block do
       benefit = Keyword.get(opts, :benefit, 1)
 
       PDL.pattern benefit: Attribute.integer(Type.i16(), benefit),
                   sym_name: Attribute.string(name) do
         region do
-          block _pattern_block() do
-            cb.(Beaver.Env.context(), Beaver.Env.block())
+          block _() do
+            cb.(Beaver.Env.block())
           end
         end
       end >>> []
@@ -36,12 +36,17 @@ defmodule Beaver.Pattern do
 
     quote do
       def unquote(name)(opts \\ [benefit: 1]) do
-        cb =
-          &mlir ctx: &1, block: &2 do
-            unquote(block_ast)
-          end
-
-        &Beaver.Pattern.insert(cb, &1, &2, unquote(name), opts)
+        &Beaver.Pattern.insert_pat(
+          fn pat_block ->
+            mlir ctx: &1, block: pat_block do
+              unquote(block_ast)
+            end
+          end,
+          &1,
+          &2,
+          unquote(name),
+          opts
+        )
       end
     end
   end
