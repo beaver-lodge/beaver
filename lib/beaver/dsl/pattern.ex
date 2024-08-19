@@ -27,6 +27,7 @@ defmodule Beaver.Pattern do
         end
       end >>> []
     end
+    |> MLIR.Operation.verify!(debug: true)
   end
 
   defmacro defpat(call, do: block) do
@@ -40,9 +41,7 @@ defmodule Beaver.Pattern do
             unquote(block_ast)
           end
 
-        &(cb
-          |> Beaver.Pattern.insert(&1, &2, unquote(name), opts)
-          |> Beaver.MLIR.Operation.verify!(debug: true))
+        &Beaver.Pattern.insert(cb, &1, &2, unquote(name), opts)
       end
     end
   end
