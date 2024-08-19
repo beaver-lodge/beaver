@@ -176,14 +176,13 @@ defmodule PDLTest do
 
   test "replace tosa", test_context do
     ctx = test_context[:ctx]
-    opts = [ctx: ctx]
 
     for pattern <- [
           TestTOSAPatterns.replace_add_op(),
-          TestTOSAPatterns.replace_multi_add_op(opts),
-          TestTOSAPatterns.replace_multi_add_op1(opts),
-          TestTOSAPatterns.replace_multi_add_op2(opts),
-          TestTOSAPatterns.replace_multi_add_op3(opts)
+          TestTOSAPatterns.replace_multi_add_op(),
+          TestTOSAPatterns.replace_multi_add_op1(),
+          TestTOSAPatterns.replace_multi_add_op2(),
+          TestTOSAPatterns.replace_multi_add_op3()
         ] do
       ir_module = TestTOSAPatterns.gen_ir_module(ctx)
       MLIR.Operation.verify!(ir_module)

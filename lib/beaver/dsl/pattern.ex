@@ -16,10 +16,9 @@ defmodule Beaver.Pattern do
   @doc false
   def insert_pat(cb, ctx, block, name, opts) do
     mlir ctx: ctx, block: block do
-      benefit = Keyword.get(opts, :benefit, 1)
+      benefit = Keyword.fetch!(opts, :benefit) |> then(&Attribute.integer(Type.i16(), &1))
 
-      PDL.pattern benefit: Attribute.integer(Type.i16(), benefit),
-                  sym_name: Attribute.string(name) do
+      PDL.pattern benefit: benefit, sym_name: Attribute.string(name) do
         region do
           block _() do
             cb.(Beaver.Env.block())
