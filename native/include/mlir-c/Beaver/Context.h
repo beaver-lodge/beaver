@@ -7,8 +7,10 @@
 extern "C" {
 #endif
 
-MLIR_CAPI_EXPORTED void beaverEnterMultiThreadedExecution(MlirContext context);
-MLIR_CAPI_EXPORTED void beaverExitMultiThreadedExecution(MlirContext context);
+MLIR_CAPI_EXPORTED void
+beaverContextEnterMultiThreadedExecution(MlirContext context);
+MLIR_CAPI_EXPORTED void
+beaverContextExitMultiThreadedExecution(MlirContext context);
 
 #ifdef __cplusplus
 }

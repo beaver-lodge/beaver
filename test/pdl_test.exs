@@ -50,7 +50,7 @@ defmodule PDLTest do
     frozen_pat_set =
       pdl_pat_mod |> mlirRewritePatternSetFromPDLPatternModule() |> mlirFreezeRewritePattern()
 
-    result = beaverApplyPatternsAndFoldGreedily(ir_module, frozen_pat_set)
+    result = beaverModuleApplyPatternsAndFoldGreedily(ir_module, frozen_pat_set)
     assert MLIR.LogicalResult.success?(result)
     cb.(ir_module)
     mlirPDLPatternModuleDestroy(pdl_pat_mod)

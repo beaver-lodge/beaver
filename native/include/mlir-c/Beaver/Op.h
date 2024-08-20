@@ -19,45 +19,45 @@ extern "C" {
 MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
                                                  MlirContext context);
 
-MLIR_CAPI_EXPORTED void beaverGetRegisteredOps(MlirContext context,
-                                               MlirStringCallback insert,
-                                               void *container);
+MLIR_CAPI_EXPORTED void beaverContextGetOps(MlirContext context,
+                                            MlirStringCallback insert,
+                                            void *container);
 
-MLIR_CAPI_EXPORTED void beaverRegisteredDialects(MlirContext context,
+MLIR_CAPI_EXPORTED void beaverContextGetDialects(MlirContext context,
                                                  MlirStringCallback insert,
                                                  void *container);
 
 MLIR_CAPI_EXPORTED const char *beaverStringRefGetData(MlirStringRef string_ref);
 MLIR_CAPI_EXPORTED size_t beaverStringRefGetLength(MlirStringRef string_ref);
 
-MLIR_CAPI_EXPORTED bool beaverContextIsNull(MlirContext context);
-MLIR_CAPI_EXPORTED bool beaverDialectIsNull(MlirDialect dialect);
+MLIR_CAPI_EXPORTED bool beaverIsNullContext(MlirContext context);
+MLIR_CAPI_EXPORTED bool beaverIsNullDialect(MlirDialect dialect);
 MLIR_CAPI_EXPORTED bool
-beaverDialectRegistryIsNull(MlirDialectRegistry registry);
-MLIR_CAPI_EXPORTED bool beaverLocationIsNull(MlirLocation location);
-MLIR_CAPI_EXPORTED bool beaverModuleIsNull(MlirModule module);
-MLIR_CAPI_EXPORTED bool beaverOperationIsNull(MlirOperation op);
-MLIR_CAPI_EXPORTED bool beaverRegionIsNull(MlirRegion region);
-MLIR_CAPI_EXPORTED bool beaverBlockIsNull(MlirBlock block);
-MLIR_CAPI_EXPORTED bool beaverValueIsNull(MlirValue value);
-MLIR_CAPI_EXPORTED bool beaverTypeIsNull(MlirType type);
-MLIR_CAPI_EXPORTED bool beaverAttributeIsNull(MlirAttribute attr);
-MLIR_CAPI_EXPORTED bool beaverSymbolTableIsNull(MlirSymbolTable symbolTable);
+beaverIsNullDialectRegistry(MlirDialectRegistry registry);
+MLIR_CAPI_EXPORTED bool beaverIsNullLocation(MlirLocation location);
+MLIR_CAPI_EXPORTED bool beaverIsNullModule(MlirModule module);
+MLIR_CAPI_EXPORTED bool beaverIsNullOperation(MlirOperation op);
+MLIR_CAPI_EXPORTED bool beaverIsNullRegion(MlirRegion region);
+MLIR_CAPI_EXPORTED bool beaverIsNullBlock(MlirBlock block);
+MLIR_CAPI_EXPORTED bool beaverIsNullValue(MlirValue value);
+MLIR_CAPI_EXPORTED bool beaverIsNullType(MlirType type);
+MLIR_CAPI_EXPORTED bool beaverIsNullAttribute(MlirAttribute attr);
+MLIR_CAPI_EXPORTED bool beaverIsNullSymbolTable(MlirSymbolTable symbolTable);
 
 MLIR_CAPI_EXPORTED MlirStringRef
-beaverMlirOperationStateGetName(MlirOperationState state);
+beaverOperationStateGetName(MlirOperationState state);
 MLIR_CAPI_EXPORTED MlirContext
-beaverMlirOperationStateGetContext(MlirOperationState state);
+beaverOperationStateGetContext(MlirOperationState state);
 MLIR_CAPI_EXPORTED MlirLocation
-beaverMlirOperationStateGetLocation(MlirOperationState state);
+beaverOperationStateGetLocation(MlirOperationState state);
 MLIR_CAPI_EXPORTED intptr_t
-beaverMlirOperationStateGetNumResults(MlirOperationState state);
+beaverOperationStateGetNumResults(MlirOperationState state);
 MLIR_CAPI_EXPORTED intptr_t
-beaverMlirOperationStateGetNumOperands(MlirOperationState state);
+beaverOperationStateGetNumOperands(MlirOperationState state);
 MLIR_CAPI_EXPORTED intptr_t
-beaverMlirOperationStateGetNumRegions(MlirOperationState state);
+beaverOperationStateGetNumRegions(MlirOperationState state);
 MLIR_CAPI_EXPORTED intptr_t
-beaverMlirOperationStateGetNumAttributes(MlirOperationState state);
+beaverOperationStateGetNumAttributes(MlirOperationState state);
 
 MLIR_CAPI_EXPORTED bool beaverLogicalResultIsSuccess(MlirLogicalResult res);
 MLIR_CAPI_EXPORTED bool beaverLogicalResultIsFailure(MlirLogicalResult res);
@@ -70,13 +70,13 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverOperationGetAttribute(MlirOperation op,
                                                              intptr_t pos);
 
 MLIR_CAPI_EXPORTED
-MlirIdentifier beaverMlirNamedAttributeGetName(MlirNamedAttribute na);
+MlirIdentifier beaverNamedAttributeGetName(MlirNamedAttribute na);
 MLIR_CAPI_EXPORTED
 
 MLIR_CAPI_EXPORTED
-MlirAttribute beaverMlirNamedAttributeGetAttribute(MlirNamedAttribute na);
+MlirAttribute beaverNamedAttributeGetAttribute(MlirNamedAttribute na);
 
-MLIR_CAPI_EXPORTED MlirPass beaverCreateExternalPass(
+MLIR_CAPI_EXPORTED MlirPass beaverPassCreate(
     void (*construct)(void *userData), void (*destruct)(void *userData),
     MlirLogicalResult (*initialize)(MlirContext ctx, void *userData),
     void *(*clone)(void *userData),
@@ -98,20 +98,20 @@ MLIR_CAPI_EXPORTED void
 beaverOperationPrintGenericOpForm(MlirOperation op, MlirStringCallback callback,
                                   void *userData);
 MLIR_CAPI_EXPORTED void beaverOperationDumpGeneric(MlirOperation op);
-MLIR_CAPI_EXPORTED MlirType beaverGetIRDLDefinedType(MlirStringRef dialect,
+MLIR_CAPI_EXPORTED MlirType beaverIRDLGetDefinedType(MlirStringRef dialect,
                                                      MlirStringRef type,
                                                      MlirAttribute params);
-MLIR_CAPI_EXPORTED MlirAttribute beaverGetIRDLDefinedAttr(MlirStringRef dialect,
+MLIR_CAPI_EXPORTED MlirAttribute beaverIRDLGetDefinedAttr(MlirStringRef dialect,
                                                           MlirStringRef attr,
                                                           MlirAttribute params);
 
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyPatternsAndFoldGreedily(
-    MlirModule op, MlirFrozenRewritePatternSet patterns);
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverModuleApplyPatternsAndFoldGreedily(
+    MlirModule module, MlirFrozenRewritePatternSet patterns);
 
 #include "mlir-c/ExecutionEngine.h"
 
 MLIR_CAPI_EXPORTED
-bool beaverMlirExecutionEngineIsNull(MlirExecutionEngine w);
+bool beaverIsNullExecutionEngine(MlirExecutionEngine w);
 #ifdef __cplusplus
 }
 #endif

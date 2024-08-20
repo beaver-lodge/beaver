@@ -42,7 +42,7 @@ defmodule Beaver.MLIR.Pattern do
     frozen_pat_set =
       pdl_pat_mod |> mlirRewritePatternSetFromPDLPatternModule() |> mlirFreezeRewritePattern()
 
-    result = beaverApplyPatternsAndFoldGreedily(op, frozen_pat_set)
+    result = beaverModuleApplyPatternsAndFoldGreedily(op, frozen_pat_set)
     mlirPDLPatternModuleDestroy(pdl_pat_mod)
     mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
     MLIR.Module.destroy(pattern_module)

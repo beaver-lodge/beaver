@@ -20,7 +20,7 @@ defmodule Beaver.MLIR.Attribute do
     forward_module: Beaver.Native
 
   def is_null(a) do
-    CAPI.beaverAttributeIsNull(a) |> Beaver.Native.to_term()
+    CAPI.beaverIsNullAttribute(a) |> Beaver.Native.to_term()
   end
 
   def get(attr_str, opts \\ []) when is_binary(attr_str) do

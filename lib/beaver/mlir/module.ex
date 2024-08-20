@@ -18,7 +18,7 @@ defmodule Beaver.MLIR.Module do
   use Kinda.ResourceKind, forward_module: Beaver.Native
 
   def is_null(module) do
-    CAPI.beaverModuleIsNull(module) |> Beaver.Native.to_term()
+    CAPI.beaverIsNullModule(module) |> Beaver.Native.to_term()
   end
 
   defp not_null!(module) do
