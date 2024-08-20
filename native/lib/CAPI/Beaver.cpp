@@ -38,16 +38,16 @@ MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
   return name.isRegistered() && name.mightHaveTrait<OpTrait::IsTerminator>();
 }
 
-MLIR_CAPI_EXPORTED void beaverGetRegisteredOps(MlirContext context,
-                                               MlirStringCallback insert,
-                                               void *container) {
+MLIR_CAPI_EXPORTED void beaverContextGetOps(MlirContext context,
+                                            MlirStringCallback insert,
+                                            void *container) {
   for (const RegisteredOperationName &op :
        unwrap(context)->getRegisteredOperations()) {
     insert(wrap(op.getStringRef()), container);
   }
 }
 
-MLIR_CAPI_EXPORTED void beaverRegisteredDialects(MlirContext context,
+MLIR_CAPI_EXPORTED void beaverContextGetDialects(MlirContext context,
                                                  MlirStringCallback insert,
                                                  void *container) {
   for (auto dialect : unwrap(context)->getDialectRegistry().getDialectNames()) {
@@ -55,11 +55,13 @@ MLIR_CAPI_EXPORTED void beaverRegisteredDialects(MlirContext context,
   }
 }
 
-MLIR_CAPI_EXPORTED void beaverEnterMultiThreadedExecution(MlirContext context) {
+MLIR_CAPI_EXPORTED void
+beaverContextEnterMultiThreadedExecution(MlirContext context) {
   unwrap(context)->enterMultiThreadedExecution();
 }
 
-MLIR_CAPI_EXPORTED void beaverExitMultiThreadedExecution(MlirContext context) {
+MLIR_CAPI_EXPORTED void
+beaverContextExitMultiThreadedExecution(MlirContext context) {
   unwrap(context)->exitMultiThreadedExecution();
 }
 
@@ -72,62 +74,62 @@ MLIR_CAPI_EXPORTED size_t beaverStringRefGetLength(MlirStringRef string_ref) {
   return string_ref.length;
 }
 
-MLIR_CAPI_EXPORTED bool beaverContextIsNull(MlirContext w) { return !w.ptr; }
-MLIR_CAPI_EXPORTED bool beaverDialectIsNull(MlirDialect w) { return !w.ptr; }
-MLIR_CAPI_EXPORTED bool beaverDialectRegistryIsNull(MlirDialectRegistry w) {
+MLIR_CAPI_EXPORTED bool beaverIsNullContext(MlirContext w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverIsNullDialect(MlirDialect w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverIsNullDialectRegistry(MlirDialectRegistry w) {
   return !w.ptr;
 }
-MLIR_CAPI_EXPORTED bool beaverLocationIsNull(MlirLocation w) { return !w.ptr; }
-MLIR_CAPI_EXPORTED bool beaverModuleIsNull(MlirModule w) { return !w.ptr; }
-MLIR_CAPI_EXPORTED bool beaverOperationIsNull(MlirOperation w) {
+MLIR_CAPI_EXPORTED bool beaverIsNullLocation(MlirLocation w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverIsNullModule(MlirModule w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverIsNullOperation(MlirOperation w) {
   return !w.ptr;
 }
-MLIR_CAPI_EXPORTED bool beaverRegionIsNull(MlirRegion w) { return !w.ptr; }
-MLIR_CAPI_EXPORTED bool beaverBlockIsNull(MlirBlock w) { return !w.ptr; }
-MLIR_CAPI_EXPORTED bool beaverValueIsNull(MlirValue w) { return !w.ptr; }
-MLIR_CAPI_EXPORTED bool beaverTypeIsNull(MlirType w) { return !w.ptr; }
-MLIR_CAPI_EXPORTED bool beaverAttributeIsNull(MlirAttribute w) {
+MLIR_CAPI_EXPORTED bool beaverIsNullRegion(MlirRegion w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverIsNullBlock(MlirBlock w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverIsNullValue(MlirValue w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverIsNullType(MlirType w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverIsNullAttribute(MlirAttribute w) {
   return !w.ptr;
 }
-MLIR_CAPI_EXPORTED bool beaverSymbolTableIsNull(MlirSymbolTable w) {
+MLIR_CAPI_EXPORTED bool beaverIsNullSymbolTable(MlirSymbolTable w) {
   return !w.ptr;
 }
-MLIR_CAPI_EXPORTED bool beaverMlirExecutionEngineIsNull(MlirExecutionEngine w) {
+MLIR_CAPI_EXPORTED bool beaverIsNullExecutionEngine(MlirExecutionEngine w) {
   return !w.ptr;
 }
 
 MLIR_CAPI_EXPORTED MlirLocation
-beaverMlirOperationStateGetLocation(MlirOperationState state) {
+beaverOperationStateGetLocation(MlirOperationState state) {
   return state.location;
 }
 
 MLIR_CAPI_EXPORTED intptr_t
-beaverMlirOperationStateGetNumResults(MlirOperationState state) {
+beaverOperationStateGetNumResults(MlirOperationState state) {
   return state.nResults;
 }
 
 MLIR_CAPI_EXPORTED intptr_t
-beaverMlirOperationStateGetNumOperands(MlirOperationState state) {
+beaverOperationStateGetNumOperands(MlirOperationState state) {
   return state.nOperands;
 }
 
 MLIR_CAPI_EXPORTED intptr_t
-beaverMlirOperationStateGetNumRegions(MlirOperationState state) {
+beaverOperationStateGetNumRegions(MlirOperationState state) {
   return state.nRegions;
 }
 
 MLIR_CAPI_EXPORTED intptr_t
-beaverMlirOperationStateGetNumAttributes(MlirOperationState state) {
+beaverOperationStateGetNumAttributes(MlirOperationState state) {
   return state.nAttributes;
 }
 
 MLIR_CAPI_EXPORTED MlirStringRef
-beaverMlirOperationStateGetName(MlirOperationState state) {
+beaverOperationStateGetName(MlirOperationState state) {
   return state.name;
 }
 
 MLIR_CAPI_EXPORTED MlirContext
-beaverMlirOperationStateGetContext(MlirOperationState state) {
+beaverOperationStateGetContext(MlirOperationState state) {
   return mlirLocationGetContext(state.location);
 }
 
@@ -158,16 +160,16 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverOperationGetAttribute(MlirOperation op,
 }
 
 MLIR_CAPI_EXPORTED
-MlirIdentifier beaverMlirNamedAttributeGetName(MlirNamedAttribute na) {
+MlirIdentifier beaverNamedAttributeGetName(MlirNamedAttribute na) {
   return na.name;
 }
 
 MLIR_CAPI_EXPORTED
-MlirAttribute beaverMlirNamedAttributeGetAttribute(MlirNamedAttribute na) {
+MlirAttribute beaverNamedAttributeGetAttribute(MlirNamedAttribute na) {
   return na.attribute;
 }
 
-MLIR_CAPI_EXPORTED MlirPass beaverCreateExternalPass(
+MLIR_CAPI_EXPORTED MlirPass beaverPassCreate(
     void (*construct)(void *userData), void (*destruct)(void *userData),
     MlirLogicalResult (*initialize)(MlirContext ctx, void *userData),
     void *(*clone)(void *userData),
@@ -246,7 +248,7 @@ T getIRDLDefinedEntity(MlirStringRef dialect, MlirStringRef name,
   return {};
 }
 
-MLIR_CAPI_EXPORTED MlirType beaverGetIRDLDefinedType(MlirStringRef dialect,
+MLIR_CAPI_EXPORTED MlirType beaverIRDLGetDefinedType(MlirStringRef dialect,
                                                      MlirStringRef type,
                                                      MlirAttribute params) {
 
@@ -256,7 +258,7 @@ MLIR_CAPI_EXPORTED MlirType beaverGetIRDLDefinedType(MlirStringRef dialect,
       DynamicType::get));
 }
 
-MLIR_CAPI_EXPORTED MlirAttribute beaverGetIRDLDefinedAttr(
+MLIR_CAPI_EXPORTED MlirAttribute beaverIRDLGetDefinedAttr(
     MlirStringRef dialect, MlirStringRef attr, MlirAttribute params) {
 
   return wrap(getIRDLDefinedEntity<Attribute>(
@@ -265,7 +267,7 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverGetIRDLDefinedAttr(
       DynamicAttr::get));
 }
 
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverApplyPatternsAndFoldGreedily(
-    MlirModule op, MlirFrozenRewritePatternSet patterns) {
-  return mlirApplyPatternsAndFoldGreedily(op, patterns, {});
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverModuleApplyPatternsAndFoldGreedily(
+    MlirModule module, MlirFrozenRewritePatternSet patterns) {
+  return mlirApplyPatternsAndFoldGreedily(module, patterns, {});
 }

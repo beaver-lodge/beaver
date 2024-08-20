@@ -289,10 +289,10 @@ defmodule Beaver.Slang do
         MLIR.CAPI,
         case element do
           :attribute ->
-            :beaverGetIRDLDefinedAttr
+            :beaverIRDLGetDefinedAttr
 
           :type ->
-            :beaverGetIRDLDefinedType
+            :beaverIRDLGetDefinedType
         end,
         [MLIR.StringRef.create(dialect), MLIR.StringRef.create(name), params]
       )

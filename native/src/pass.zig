@@ -93,7 +93,7 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
     const bp: *BeaverPass = try beam.allocator.create(BeaverPass);
     bp.* = BeaverPass{ .handler = handler };
     // use this function to avoid ABI issue
-    const ep = c.beaverCreateExternalPass(
+    const ep = c.beaverPassCreate(
         BeaverPass.construct,
         BeaverPass.destruct,
         BeaverPass.initialize,

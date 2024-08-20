@@ -110,31 +110,31 @@ defmodule Beaver.MLIR do
   @spec is_null(nullable()) :: boolean()
 
   def is_null(%Attribute{} = v) do
-    CAPI.beaverAttributeIsNull(v) |> Beaver.Native.to_term()
+    CAPI.beaverIsNullAttribute(v) |> Beaver.Native.to_term()
   end
 
   def is_null(%Operation{} = v) do
-    CAPI.beaverOperationIsNull(v) |> Beaver.Native.to_term()
+    CAPI.beaverIsNullOperation(v) |> Beaver.Native.to_term()
   end
 
   def is_null(%Module{} = m) do
-    CAPI.beaverModuleIsNull(m) |> Beaver.Native.to_term()
+    CAPI.beaverIsNullModule(m) |> Beaver.Native.to_term()
   end
 
   def is_null(%Block{} = v) do
-    CAPI.beaverBlockIsNull(v) |> Beaver.Native.to_term()
+    CAPI.beaverIsNullBlock(v) |> Beaver.Native.to_term()
   end
 
   def is_null(%Value{} = v) do
-    CAPI.beaverValueIsNull(v) |> Beaver.Native.to_term()
+    CAPI.beaverIsNullValue(v) |> Beaver.Native.to_term()
   end
 
   def is_null(%Type{} = v) do
-    CAPI.beaverTypeIsNull(v) |> Beaver.Native.to_term()
+    CAPI.beaverIsNullType(v) |> Beaver.Native.to_term()
   end
 
   def is_null(%Dialect{} = v) do
-    CAPI.beaverDialectIsNull(v) |> Beaver.Native.to_term()
+    CAPI.beaverIsNullDialect(v) |> Beaver.Native.to_term()
   end
 
   @spec to_string(printable(), dump_opts()) :: :ok

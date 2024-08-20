@@ -319,7 +319,7 @@ defmodule Beaver.Walker do
       |> Enum.find(fn named_attribute ->
         with name <-
                named_attribute
-               |> MLIR.CAPI.beaverMlirNamedAttributeGetName()
+               |> MLIR.CAPI.beaverNamedAttributeGetName()
                |> MLIR.CAPI.mlirIdentifierStr()
                |> MLIR.StringRef.to_string() do
           name == key
@@ -327,7 +327,7 @@ defmodule Beaver.Walker do
       end)
 
     case found do
-      %NamedAttribute{} -> {:ok, MLIR.CAPI.beaverMlirNamedAttributeGetAttribute(found)}
+      %NamedAttribute{} -> {:ok, MLIR.CAPI.beaverNamedAttributeGetAttribute(found)}
       :error -> :error
     end
   end
@@ -474,9 +474,9 @@ defmodule Beaver.Walker do
   end
 
   defp do_traverse(%NamedAttribute{} = named_attribute, acc, pre, post) do
-    name = %Identifier{} = named_attribute |> MLIR.CAPI.beaverMlirNamedAttributeGetName()
+    name = %Identifier{} = named_attribute |> MLIR.CAPI.beaverNamedAttributeGetName()
 
-    attribute = %Attribute{} = named_attribute |> MLIR.CAPI.beaverMlirNamedAttributeGetAttribute()
+    attribute = %Attribute{} = named_attribute |> MLIR.CAPI.beaverNamedAttributeGetAttribute()
 
     {{name, attribute}, acc} = pre.({name, attribute}, acc)
     {{name, attribute}, acc} = post.({name, attribute}, acc)

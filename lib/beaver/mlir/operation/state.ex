@@ -51,7 +51,7 @@ defmodule Beaver.MLIR.Operation.State do
 
   defp add_attributes(%MLIR.Operation.State{} = state, attr_kw)
        when is_list(attr_kw) do
-    ctx = CAPI.beaverMlirOperationStateGetContext(state)
+    ctx = CAPI.beaverOperationStateGetContext(state)
 
     attr_list =
       for {k, v} <- attr_kw do
@@ -113,7 +113,7 @@ defmodule Beaver.MLIR.Operation.State do
 
   defp add_results(%MLIR.Operation.State{} = state, result_types)
        when is_list(result_types) do
-    context = CAPI.beaverMlirOperationStateGetContext(state)
+    context = CAPI.beaverOperationStateGetContext(state)
 
     array =
       result_types

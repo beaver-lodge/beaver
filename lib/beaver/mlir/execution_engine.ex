@@ -12,7 +12,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
 
   def is_null(jit) do
     jit
-    |> beaverMlirExecutionEngineIsNull()
+    |> beaverIsNullExecutionEngine()
     |> Beaver.Native.to_term()
   end
 

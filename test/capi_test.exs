@@ -62,15 +62,15 @@ defmodule MlirTest do
       |> MLIR.Operation.Changeset.add_argument({:result_types, ["i64"]})
       |> MLIR.Operation.State.create()
 
-    name = beaverMlirOperationStateGetName(add_op_state)
+    name = beaverOperationStateGetName(add_op_state)
 
     assert 10 == beaverStringRefGetLength(name) |> Beaver.Native.to_term()
 
-    location1 = add_op_state |> beaverMlirOperationStateGetLocation()
-    n_results = add_op_state |> beaverMlirOperationStateGetNumResults()
-    n_operands = add_op_state |> beaverMlirOperationStateGetNumOperands()
-    n_regions = add_op_state |> beaverMlirOperationStateGetNumRegions()
-    n_attributes = add_op_state |> beaverMlirOperationStateGetNumAttributes()
+    location1 = add_op_state |> beaverOperationStateGetLocation()
+    n_results = add_op_state |> beaverOperationStateGetNumResults()
+    n_operands = add_op_state |> beaverOperationStateGetNumOperands()
+    n_regions = add_op_state |> beaverOperationStateGetNumRegions()
+    n_attributes = add_op_state |> beaverOperationStateGetNumAttributes()
 
     assert 0 == n_regions |> Beaver.Native.to_term()
     assert 1 == n_results |> Beaver.Native.to_term()
