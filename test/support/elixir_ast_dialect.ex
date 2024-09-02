@@ -162,7 +162,7 @@ defmodule ElixirAST do
           case MLIR.Operation.name(op) do
             "ex.bind" ->
               val = Beaver.Walker.operands(op)[1]
-              1 = Beaver.Walker.uses(val) |> Enum.to_list() |> Enum.count()
+              1 = Beaver.Walker.uses(val) |> Enum.count()
 
               var =
                 Beaver.Walker.operands(op)[0]

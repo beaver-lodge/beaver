@@ -11,8 +11,7 @@ defmodule OpTest do
       |> MLIR.Operation.verify!()
       |> MLIR.Module.body()
       |> Beaver.Walker.operations()
-      |> Enum.to_list()
-      |> List.first()
+      |> Enum.at(0)
 
     attr_str1 = "dense<1> : vector<4xi32>"
     attr_str2 = "dense<2> : vector<4xi32>"

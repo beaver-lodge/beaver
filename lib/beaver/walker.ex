@@ -12,23 +12,9 @@ alias Beaver.MLIR.{
   Identifier
 }
 
-defmodule Beaver.Walker.OpReplacement do
-  @moduledoc """
-  A placeholder when an operation is replaced by value.
-  """
-  @type t() :: %__MODULE__{
-          operands: Beaver.Walker.t() | list(),
-          attributes: Beaver.Walker.t() | list(),
-          results: Beaver.Walker.t() | list(),
-          successors: Beaver.Walker.t() | list(),
-          regions: Beaver.Walker.t() | list()
-        }
-  defstruct operands: [], attributes: [], results: [], successors: [], regions: []
-end
-
 defmodule Beaver.Walker do
   alias Beaver.MLIR.CAPI
-  alias Beaver.Walker.OpReplacement
+  alias __MODULE__.OpReplacement
 
   @moduledoc """
   Walker to traverse MLIR structures including operands, results, successors, attributes, regions.
@@ -556,8 +542,8 @@ defmodule Beaver.Walker do
       {:ok, get_num.(container) |> Beaver.Native.to_term()}
     end
 
-    def count(%Beaver.Walker{container: %container_module{}}) do
-      {:error, container_module}
+    def count(%Beaver.Walker{}) do
+      {:error, __MODULE__}
     end
 
     @spec member?(Beaver.Walker.t(), Beaver.Walker.element()) ::
@@ -609,6 +595,11 @@ defmodule Beaver.Walker do
         error ->
           error
       end
+    end
+
+    def slice(%Beaver.Walker{get_first: get_first, get_next: get_next})
+        when is_function(get_first, 1) and is_function(get_next, 1) do
+      {:error, __MODULE__}
     end
 
     @spec reduce(Beaver.Walker.t(), Enumerable.acc(), Enumerable.reducer()) :: Enumerable.result()

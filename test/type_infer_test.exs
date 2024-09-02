@@ -16,7 +16,6 @@ defmodule TypeInferTest do
         value =
           1..width
           |> Enum.map(&Attribute.integer(Type.i32(), &1))
-          |> Enum.to_list()
           |> Attribute.dense_elements(Type.vector([width], Type.i32()).(ctx), ctx: ctx)
 
         Func.func some_func(function_type: Type.function([], [vector_t])) do
