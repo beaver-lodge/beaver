@@ -556,8 +556,8 @@ defmodule Beaver.Walker do
       {:ok, get_num.(container) |> Beaver.Native.to_term()}
     end
 
-    def count(%Beaver.Walker{container: %container_module{}}) do
-      {:error, container_module}
+    def count(%Beaver.Walker{}) do
+      {:error, __MODULE__}
     end
 
     @spec member?(Beaver.Walker.t(), Beaver.Walker.element()) ::
