@@ -12,23 +12,9 @@ alias Beaver.MLIR.{
   Identifier
 }
 
-defmodule Beaver.Walker.OpReplacement do
-  @moduledoc """
-  A placeholder when an operation is replaced by value.
-  """
-  @type t() :: %__MODULE__{
-          operands: Beaver.Walker.t() | list(),
-          attributes: Beaver.Walker.t() | list(),
-          results: Beaver.Walker.t() | list(),
-          successors: Beaver.Walker.t() | list(),
-          regions: Beaver.Walker.t() | list()
-        }
-  defstruct operands: [], attributes: [], results: [], successors: [], regions: []
-end
-
 defmodule Beaver.Walker do
   alias Beaver.MLIR.CAPI
-  alias Beaver.Walker.OpReplacement
+  alias __MODULE__.OpReplacement
 
   @moduledoc """
   Walker to traverse MLIR structures including operands, results, successors, attributes, regions.
