@@ -111,9 +111,8 @@ defmodule Updater do
   def run do
     IO.stream(:stdio, :line)
     |> Stream.map(&String.trim/1)
-    |> Enum.to_list()
-    |> Enum.filter(&String.starts_with?(&1, ["pub extern fn beaver", "pub extern fn mlir"]))
-    |> Enum.map(&fa/1)
+    |> Stream.filter(&String.starts_with?(&1, ["pub extern fn beaver", "pub extern fn mlir"]))
+    |> Stream.map(&fa/1)
     |> Enum.sort()
     |> gen(:elixir)
     |> gen(:zig)
