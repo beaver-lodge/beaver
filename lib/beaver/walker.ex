@@ -611,6 +611,11 @@ defmodule Beaver.Walker do
       end
     end
 
+    def slice(%Beaver.Walker{get_first: get_first, get_next: get_next})
+        when is_function(get_first, 1) and is_function(get_next, 1) do
+      {:error, __MODULE__}
+    end
+
     @spec reduce(Beaver.Walker.t(), Enumerable.acc(), Enumerable.reducer()) :: Enumerable.result()
 
     # Do nothing special receiving :halt or :suspend
