@@ -1,3 +1,3 @@
-mlir==20.0.0.2024090204+647f892a; sys_platform != "linux"
-mlir==20.0.0.2024090204+cuda.647f892a; sys_platform == "linux"
+mlir==20.0.0.2024090301+b6597f52; sys_platform != "linux"
+mlir==20.0.0.2024090301+cuda.b6597f52; sys_platform == "linux"
 --find-links https://github.com/makslevental/mlir-wheels/releases/expanded_assets/latest
