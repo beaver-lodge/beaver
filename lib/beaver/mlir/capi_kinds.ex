@@ -12,7 +12,6 @@ mlir_mods = [
   DiagnosticHandler,
   Diagnostic,
   DiagnosticSeverity,
-  PassManager,
   RewritePatternSet,
   SymbolTable,
   ExternalPassCallbacks,
