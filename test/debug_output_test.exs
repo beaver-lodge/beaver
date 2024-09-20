@@ -31,4 +31,10 @@ defmodule DebugOutputTest do
     |> MLIR.Transforms.canonicalize()
     |> MLIR.Pass.Composer.run!(timing: true)
   end
+
+  test "pass manager enable print ir", test_context do
+    ir(test_context[:ctx])
+    |> MLIR.Transforms.canonicalize()
+    |> MLIR.Pass.Composer.run!(print: true)
+  end
 end
