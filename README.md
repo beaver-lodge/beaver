@@ -149,7 +149,7 @@ import_deps: [:beaver],
 ### Projects built on top of Beaver
 
 - [Charm](https://github.com/beaver-lodge/charms): Compile a subset of Elixir to native targets.
-- [MLIR Accelerated NX](https://github.com/beaver-lodge/manx): A backend for [Nx](https://github.com/elixir-nx/nx/tree/main/nx#readme).
+- [MLIR Accelerated Nx](https://github.com/beaver-lodge/manx): A backend for [Nx](https://github.com/elixir-nx/nx/tree/main/nx#readme).
 
 ## Erlang apps in Beaver
 
