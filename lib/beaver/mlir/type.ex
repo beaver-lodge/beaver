@@ -211,6 +211,13 @@ defmodule Beaver.MLIR.Type do
     )
   end
 
+  def none(opts \\ []) do
+    Beaver.Deferred.from_opts(
+      opts,
+      &CAPI.mlirNoneTypeGet(&1)
+    )
+  end
+
   defdelegate i(bitwidth, opts \\ []), to: __MODULE__, as: :integer
 
   for bitwidth <- [1, 8, 16, 32, 64, 128] do
