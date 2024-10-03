@@ -57,7 +57,7 @@ defmodule DialectRegistryTest do
         {"tensor", "Tensor"},
         {"tosa", "TOSA"},
         {"transform", "Transform"},
-        {"ub", "Ub"},
+        {"ub", "UB"},
         {"vector", "Vector"},
         {"x86vector", "X86Vector"},
         {"xegpu", "XeGPU"},
