@@ -129,7 +129,7 @@ defmodule BlockTest do
               Func.return(v0) >>> []
             end
 
-            MLIR.CAPI.mlirRegionAppendOwnedBlock(Beaver.Env.region(), b)
+            MLIR.Region.append(Beaver.Env.region(), b)
           end
         end
       end

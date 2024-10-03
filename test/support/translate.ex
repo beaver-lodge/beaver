@@ -280,7 +280,7 @@ defmodule TranslateMLIR do
                         Type.function(arg_types, [MLIR.CAPI.mlirValueGetType(ret_val)])
                     ) do
             region do
-              MLIR.CAPI.mlirRegionAppendOwnedBlock(Beaver.Env.region(), entry_block)
+              MLIR.Region.append(Beaver.Env.region(), entry_block)
             end
           end
         end
