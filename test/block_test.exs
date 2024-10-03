@@ -140,6 +140,31 @@ defmodule BlockTest do
              "empty block: expect at least a terminator"
   end
 
+  test "manual block inserting", test_context do
+    mlir ctx: test_context[:ctx] do
+      module do
+        Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+          b =
+            block do
+            end
+
+          region do
+            block do
+              v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+              Func.return(v0) >>> []
+            end
+
+            MLIR.Region.insert(Beaver.Env.region(), 1, b)
+          end
+        end
+      end
+    end
+    |> MLIR.Operation.verify()
+
+    assert Beaver.Diagnostic.Server.flush(test_context[:diagnostic_server]) =~
+             "empty block: expect at least a terminator"
+  end
+
   test "block in env got popped", test_context do
     mlir ctx: test_context[:ctx] do
       module do
@@ -154,7 +179,7 @@ defmodule BlockTest do
       end
       |> MLIR.Operation.verify!()
 
-      assert {:not_found, [file: __ENV__.file, line: 145]} == Beaver.Env.block()
+      assert {:not_found, [file: __ENV__.file, line: 170]} == Beaver.Env.block()
     end
   end
 
