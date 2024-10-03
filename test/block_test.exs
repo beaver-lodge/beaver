@@ -151,6 +151,8 @@ defmodule BlockTest do
   end
 
   test "block in env got popped", test_context do
+    line = __ENV__.line + 3
+
     mlir ctx: test_context[:ctx] do
       module do
         Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
@@ -164,7 +166,7 @@ defmodule BlockTest do
       end
       |> MLIR.Operation.verify!()
 
-      assert {:not_found, [file: __ENV__.file, line: 155]} == Beaver.Env.block()
+      assert {:not_found, [file: __ENV__.file, line: ^line]} = Beaver.Env.block()
     end
   end
 
