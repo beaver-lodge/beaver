@@ -6,16 +6,7 @@ defmodule WalkerTest do
     m = Beaver.Dummy.func_of_3_blocks(ctx)
     f = m |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.at(0)
 
-    by_atom =
-      Beaver.Walker.attributes(f)[:sym_name]
-      |> MLIR.CAPI.mlirStringAttrGetValue()
-      |> to_string()
-
-    by_str =
-      Beaver.Walker.attributes(f)["sym_name"]
-      |> MLIR.CAPI.mlirStringAttrGetValue()
-      |> to_string()
-
-    assert by_atom == by_str
+    assert Beaver.Walker.attributes(f)[:sym_name] |> to_string() ==
+             Beaver.Walker.attributes(f)["sym_name"] |> to_string()
   end
 end
