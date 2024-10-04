@@ -299,7 +299,7 @@ defmodule Beaver.Walker do
     end
   end
 
-  def fetch(%__MODULE__{element_module: NamedAttribute} = walker, key) when is_binary(key) do
+  def fetch(%__MODULE__{element_module: NamedAttribute} = walker, key) do
     found =
       walker
       |> Enum.find(fn named_attribute ->
@@ -308,7 +308,7 @@ defmodule Beaver.Walker do
                |> MLIR.CAPI.beaverNamedAttributeGetName()
                |> MLIR.CAPI.mlirIdentifierStr()
                |> MLIR.StringRef.to_string() do
-          name == key
+          name == to_string(key)
         end
       end)
 
@@ -318,8 +318,7 @@ defmodule Beaver.Walker do
     end
   end
 
-  def fetch(%__MODULE__{element_module: {Identifier, Attribute}} = walker, key)
-      when is_binary(key) do
+  def fetch(%__MODULE__{element_module: {Identifier, Attribute}} = walker, key) do
     found =
       walker
       |> Enum.find(fn {name, _attribute} ->
@@ -327,7 +326,7 @@ defmodule Beaver.Walker do
                name
                |> MLIR.CAPI.mlirIdentifierStr()
                |> MLIR.StringRef.to_string() do
-          name_str == key
+          name_str == to_string(key)
         end
       end)
 
