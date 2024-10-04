@@ -292,7 +292,6 @@ defmodule Beaver.Walker do
 
   @behaviour Access
   @impl true
-
   def fetch(%__MODULE__{element_module: NamedAttribute} = walker, key) do
     walker
     |> Enum.find(fn named_attribute ->
