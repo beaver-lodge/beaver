@@ -9,6 +9,7 @@ defmodule WalkerTest do
     assert Beaver.Walker.attributes(f)[:sym_name] |> to_string() ==
              Beaver.Walker.attributes(f)["sym_name"] |> to_string()
 
+    assert nil == Beaver.Walker.attributes(f)[:foo]
     r0 = Beaver.Walker.regions(f)[0]
     b0 = Beaver.Walker.blocks(r0)[0]
     assert "arith.constant" = Beaver.Walker.operations(b0)[0] |> MLIR.Operation.name()

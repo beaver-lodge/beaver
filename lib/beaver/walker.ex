@@ -308,7 +308,7 @@ defmodule Beaver.Walker do
 
     case found do
       %NamedAttribute{} -> {:ok, MLIR.CAPI.beaverNamedAttributeGetAttribute(found)}
-      :error -> :error
+      nil -> :error
     end
   end
 
@@ -326,7 +326,7 @@ defmodule Beaver.Walker do
 
     case found do
       {_, %Attribute{} = attr} -> {:ok, attr}
-      :error -> :error
+      nil -> :error
     end
   end
 
