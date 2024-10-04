@@ -52,6 +52,8 @@ defmodule EntityTest do
       assert Type.memref([], Type.f32()).(ctx)
              |> to_string() ==
                "memref<f32>"
+
+      assert Type.equal?(Type.none().(ctx), Type.get("none").(ctx))
     end
   end
 
