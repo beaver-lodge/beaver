@@ -292,48 +292,48 @@ defmodule Beaver.Walker do
 
   @behaviour Access
   @impl true
-  def fetch(%__MODULE__{element_module: Value} = walker, key) when is_integer(key) do
+  def fetch(%__MODULE__{element_module: NamedAttribute} = walker, key) do
+    walker
+    |> Enum.find(fn named_attribute ->
+      with name <-
+             named_attribute
+             |> MLIR.CAPI.beaverNamedAttributeGetName()
+             |> MLIR.CAPI.mlirIdentifierStr()
+             |> MLIR.StringRef.to_string() do
+        name == to_string(key)
+      end
+    end)
+    |> then(
+      &case &1 do
+        %NamedAttribute{} -> {:ok, MLIR.CAPI.beaverNamedAttributeGetAttribute(&1)}
+        nil -> :error
+      end
+    )
+  end
+
+  def fetch(%__MODULE__{element_module: {Identifier, Attribute}} = walker, key) do
+    walker
+    |> Enum.find(fn {name, _attribute} ->
+      with name_str <-
+             name
+             |> MLIR.CAPI.mlirIdentifierStr()
+             |> MLIR.StringRef.to_string() do
+        name_str == to_string(key)
+      end
+    end)
+    |> then(
+      &case &1 do
+        {_, %Attribute{} = attr} -> {:ok, attr}
+        nil -> :error
+      end
+    )
+  end
+
+  def fetch(%__MODULE__{element_module: element} = walker, key)
+      when is_integer(key) do
     case Enum.at(walker, key) do
-      %Value{} = value -> {:ok, value}
+      %^element{} = value -> {:ok, value}
       nil -> :error
-    end
-  end
-
-  def fetch(%__MODULE__{element_module: NamedAttribute} = walker, key) when is_binary(key) do
-    found =
-      walker
-      |> Enum.find(fn named_attribute ->
-        with name <-
-               named_attribute
-               |> MLIR.CAPI.beaverNamedAttributeGetName()
-               |> MLIR.CAPI.mlirIdentifierStr()
-               |> MLIR.StringRef.to_string() do
-          name == key
-        end
-      end)
-
-    case found do
-      %NamedAttribute{} -> {:ok, MLIR.CAPI.beaverNamedAttributeGetAttribute(found)}
-      :error -> :error
-    end
-  end
-
-  def fetch(%__MODULE__{element_module: {Identifier, Attribute}} = walker, key)
-      when is_binary(key) do
-    found =
-      walker
-      |> Enum.find(fn {name, _attribute} ->
-        with name_str <-
-               name
-               |> MLIR.CAPI.mlirIdentifierStr()
-               |> MLIR.StringRef.to_string() do
-          name_str == key
-        end
-      end)
-
-    case found do
-      {_, %Attribute{} = attr} -> {:ok, attr}
-      :error -> :error
     end
   end
 

@@ -55,7 +55,7 @@ defmodule ArithTest do
           f =
             Func.func _(
                         function_type: Type.function([Type.f32(), Type.f32()], []),
-                        sym_name: "\"#{inspect(make_ref())}\""
+                        sym_name: MLIR.Attribute.string("f#{System.unique_integer()}")
                       ) do
               region do
                 block _(a >>> Type.f32(), b >>> Type.f32()) do

@@ -8,6 +8,7 @@ defmodule StringRefTest do
       s = "hello world"
       r = MLIR.StringRef.create(s)
       assert s == MLIR.StringRef.to_string(r)
+      assert s == to_string(r)
     end
   end
 
