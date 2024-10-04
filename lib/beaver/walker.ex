@@ -292,9 +292,12 @@ defmodule Beaver.Walker do
 
   @behaviour Access
   @impl true
-  def fetch(%__MODULE__{element_module: Value} = walker, key) when is_integer(key) do
+  @sub_elem [Value, Operation, Block, Region]
+  def fetch(%__MODULE__{element_module: element} = walker, key)
+      when is_integer(key)
+      when element in @sub_elem do
     case Enum.at(walker, key) do
-      %Value{} = value -> {:ok, value}
+      %element{} = value when element in @sub_elem -> {:ok, value}
       nil -> :error
     end
   end
