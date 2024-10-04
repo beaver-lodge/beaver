@@ -43,4 +43,8 @@ defmodule Beaver.MLIR.StringRef do
     CAPI.beaverStringRefGetData(str)
     |> then(&%Beaver.Native.Array{ref: &1, element_kind: Beaver.Native.U8})
   end
+
+  defimpl String.Chars do
+    defdelegate to_string(mlir), to: Beaver.MLIR.StringRef
+  end
 end
