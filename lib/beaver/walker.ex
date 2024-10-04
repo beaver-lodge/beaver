@@ -292,15 +292,6 @@ defmodule Beaver.Walker do
 
   @behaviour Access
   @impl true
-  @sub_elem [Value, Operation, Block, Region]
-  def fetch(%__MODULE__{element_module: element} = walker, key)
-      when is_integer(key)
-      when element in @sub_elem do
-    case Enum.at(walker, key) do
-      %element{} = value when element in @sub_elem -> {:ok, value}
-      nil -> :error
-    end
-  end
 
   def fetch(%__MODULE__{element_module: NamedAttribute} = walker, key) do
     found =
@@ -336,6 +327,14 @@ defmodule Beaver.Walker do
     case found do
       {_, %Attribute{} = attr} -> {:ok, attr}
       :error -> :error
+    end
+  end
+
+  def fetch(%__MODULE__{element_module: element} = walker, key)
+      when is_integer(key) do
+    case Enum.at(walker, key) do
+      %^element{} = value -> {:ok, value}
+      nil -> :error
     end
   end
 
