@@ -8,7 +8,7 @@ defmodule Beaver.Dummy do
     mlir ctx: ctx, block: block do
       Func.func some_func(
                   function_type: Type.function([], [Type.i(32)]),
-                  sym_name: "\"#{inspect(make_ref())}\""
+                  sym_name: MLIR.Attribute.string("f#{System.unique_integer()}")
                 ) do
         region do
           block do
