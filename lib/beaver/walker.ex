@@ -294,40 +294,40 @@ defmodule Beaver.Walker do
   @impl true
 
   def fetch(%__MODULE__{element_module: NamedAttribute} = walker, key) do
-    found =
-      walker
-      |> Enum.find(fn named_attribute ->
-        with name <-
-               named_attribute
-               |> MLIR.CAPI.beaverNamedAttributeGetName()
-               |> MLIR.CAPI.mlirIdentifierStr()
-               |> MLIR.StringRef.to_string() do
-          name == to_string(key)
-        end
-      end)
-
-    case found do
-      %NamedAttribute{} -> {:ok, MLIR.CAPI.beaverNamedAttributeGetAttribute(found)}
-      nil -> :error
-    end
+    walker
+    |> Enum.find(fn named_attribute ->
+      with name <-
+             named_attribute
+             |> MLIR.CAPI.beaverNamedAttributeGetName()
+             |> MLIR.CAPI.mlirIdentifierStr()
+             |> MLIR.StringRef.to_string() do
+        name == to_string(key)
+      end
+    end)
+    |> then(
+      &case &1 do
+        %NamedAttribute{} -> {:ok, MLIR.CAPI.beaverNamedAttributeGetAttribute(&1)}
+        nil -> :error
+      end
+    )
   end
 
   def fetch(%__MODULE__{element_module: {Identifier, Attribute}} = walker, key) do
-    found =
-      walker
-      |> Enum.find(fn {name, _attribute} ->
-        with name_str <-
-               name
-               |> MLIR.CAPI.mlirIdentifierStr()
-               |> MLIR.StringRef.to_string() do
-          name_str == to_string(key)
-        end
-      end)
-
-    case found do
-      {_, %Attribute{} = attr} -> {:ok, attr}
-      nil -> :error
-    end
+    walker
+    |> Enum.find(fn {name, _attribute} ->
+      with name_str <-
+             name
+             |> MLIR.CAPI.mlirIdentifierStr()
+             |> MLIR.StringRef.to_string() do
+        name_str == to_string(key)
+      end
+    end)
+    |> then(
+      &case &1 do
+        {_, %Attribute{} = attr} -> {:ok, attr}
+        nil -> :error
+      end
+    )
   end
 
   def fetch(%__MODULE__{element_module: element} = walker, key)
