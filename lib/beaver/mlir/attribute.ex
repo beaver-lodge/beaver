@@ -10,7 +10,7 @@ defmodule Beaver.MLIR.Attribute do
   @moduledoc """
   This module defines functions parsing and creating attributes in MLIR.
   """
-  alias Beaver.MLIR.CAPI
+  import Beaver.MLIR.CAPI
 
   alias Beaver.MLIR
   alias Beaver.MLIR.Type
@@ -20,14 +20,14 @@ defmodule Beaver.MLIR.Attribute do
     forward_module: Beaver.Native
 
   def is_null(a) do
-    CAPI.beaverIsNullAttribute(a) |> Beaver.Native.to_term()
+    beaverIsNullAttribute(a) |> Beaver.Native.to_term()
   end
 
   def get(attr_str, opts \\ []) when is_binary(attr_str) do
     attr = MLIR.StringRef.create(attr_str)
 
     Beaver.Deferred.from_opts(opts, fn ctx ->
-      attr = CAPI.mlirAttributeParseGet(ctx, attr)
+      attr = mlirAttributeParseGet(ctx, attr)
 
       if is_null(attr) do
         raise "fail to parse attribute: #{attr_str}"
@@ -38,35 +38,17 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   def equal?(a, b = %__MODULE__{}) when is_function(a, 1) do
-    ctx = MLIR.CAPI.mlirAttributeGetContext(b)
+    ctx = mlirAttributeGetContext(b)
     equal?(Beaver.Deferred.create(a, ctx), b)
   end
 
   def equal?(a = %__MODULE__{}, b) when is_function(b, 1) do
-    ctx = MLIR.CAPI.mlirAttributeGetContext(a)
+    ctx = mlirAttributeGetContext(a)
     equal?(a, Beaver.Deferred.create(b, ctx))
   end
 
   def equal?(%__MODULE__{} = a, %__MODULE__{} = b) do
-    CAPI.mlirAttributeEqual(a, b) |> Beaver.Native.to_term()
-  end
-
-  def float(type, value, opts \\ [])
-
-  def float(%MLIR.Type{} = t, value, _opts) do
-    if MLIR.Type.float?(t) do
-      ctx = CAPI.mlirTypeGetContext(t)
-      CAPI.mlirFloatAttrDoubleGet(ctx, t, value)
-    else
-      raise ArgumentError, "incompatible type"
-    end
-  end
-
-  def float(type, value, opts) do
-    Beaver.Deferred.from_opts(
-      opts,
-      &float(Beaver.Deferred.create(type, &1), value)
-    )
+    mlirAttributeEqual(a, b) |> Beaver.Native.to_term()
   end
 
   def dense_elements(elements, shaped_type \\ {:i, 8}, opts \\ [])
@@ -80,7 +62,7 @@ defmodule Beaver.MLIR.Attribute do
         str = MLIR.StringRef.create(elements)
 
         Type.ranked_tensor([byte_size(elements)], et)
-        |> CAPI.mlirDenseElementsAttrRawBufferGet(
+        |> mlirDenseElementsAttrRawBufferGet(
           MLIR.StringRef.length(str),
           MLIR.StringRef.data(str) |> Beaver.Native.Array.as_opaque()
         )
@@ -99,7 +81,7 @@ defmodule Beaver.MLIR.Attribute do
           |> Enum.map(&Beaver.Deferred.create(&1, ctx))
           |> Beaver.Native.array(MLIR.Attribute)
 
-        CAPI.mlirDenseElementsAttrGet(
+        mlirDenseElementsAttrGet(
           Beaver.Deferred.create(shaped_type, ctx),
           num_elements,
           elements
@@ -112,7 +94,7 @@ defmodule Beaver.MLIR.Attribute do
     Beaver.Deferred.from_opts(
       opts,
       fn ctx ->
-        CAPI.mlirArrayAttrGet(
+        mlirArrayAttrGet(
           ctx,
           length(elements),
           elements
@@ -127,10 +109,10 @@ defmodule Beaver.MLIR.Attribute do
     getter =
       case type do
         Beaver.Native.I32 ->
-          &CAPI.mlirDenseI32ArrayGet/3
+          &mlirDenseI32ArrayGet/3
 
         Beaver.Native.I64 ->
-          &CAPI.mlirDenseI64ArrayGet/3
+          &mlirDenseI64ArrayGet/3
       end
 
     Beaver.Deferred.from_opts(
@@ -148,7 +130,7 @@ defmodule Beaver.MLIR.Attribute do
   def string(str, opts \\ []) do
     Beaver.Deferred.from_opts(
       opts,
-      &CAPI.mlirStringAttrGet(&1, MLIR.StringRef.create(str))
+      &mlirStringAttrGet(&1, MLIR.StringRef.create(str))
     )
   end
 
@@ -158,19 +140,35 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   def type(%MLIR.Type{} = t) do
-    CAPI.mlirTypeAttrGet(t)
+    mlirTypeAttrGet(t)
   end
 
-  def integer(t, value) when is_function(t, 1) do
-    &integer(t.(&1), value)
-  end
-
-  def integer(%MLIR.Type{} = t, value) do
-    if MLIR.Type.integer?(t) or MLIR.Type.index?(t) do
-      CAPI.mlirIntegerAttrGet(t, value)
+  defp composite_by_type(%MLIR.Type{} = t, validator, getter) do
+    if validator.(t) do
+      getter.(t)
     else
       raise ArgumentError, "incompatible type"
     end
+  end
+
+  defp composite_by_type(t, validator, getter) when is_function(t, 1) do
+    &composite_by_type(t.(&1), validator, getter)
+  end
+
+  def integer(t, value) do
+    composite_by_type(
+      t,
+      &(MLIR.Type.integer?(&1) or MLIR.Type.index?(&1)),
+      &mlirIntegerAttrGet(&1, value)
+    )
+  end
+
+  def float(t, value) do
+    composite_by_type(
+      t,
+      &MLIR.Type.float?/1,
+      &mlirFloatAttrDoubleGet(mlirTypeGetContext(&1), &1, value)
+    )
   end
 
   def bool(value, opts \\ []) do
@@ -183,7 +181,7 @@ defmodule Beaver.MLIR.Attribute do
             false -> 0
           end
 
-        CAPI.mlirBoolAttrGet(ctx, value)
+        mlirBoolAttrGet(ctx, value)
       end
     )
   end
@@ -193,13 +191,13 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   def affine_map(%MLIR.AffineMap{} = map) do
-    MLIR.CAPI.mlirAffineMapAttrGet(map)
+    mlirAffineMapAttrGet(map)
   end
 
   def unit(opts \\ []) do
     Beaver.Deferred.from_opts(
       opts,
-      &CAPI.mlirUnitAttrGet(&1)
+      &mlirUnitAttrGet(&1)
     )
   end
 
@@ -208,7 +206,7 @@ defmodule Beaver.MLIR.Attribute do
 
     Beaver.Deferred.from_opts(
       opts,
-      &CAPI.mlirFlatSymbolRefAttrGet(&1, symbol)
+      &mlirFlatSymbolRefAttrGet(&1, symbol)
     )
   end
 
@@ -226,32 +224,29 @@ defmodule Beaver.MLIR.Attribute do
           end)
           |> Beaver.Native.array(MLIR.Attribute)
 
-        CAPI.mlirSymbolRefAttrGet(ctx, symbol, length(nested_symbols), nested_arr)
+        mlirSymbolRefAttrGet(ctx, symbol, length(nested_symbols), nested_arr)
       end
     )
   end
 
   def index(value, opts \\ []) when is_integer(value) do
-    Beaver.Deferred.from_opts(
-      opts,
-      fn ctx -> ~a{#{value} : index}.(ctx) end
-    )
+    Beaver.Deferred.from_opts(opts, ~a{#{value} : index})
   end
 
   def null() do
-    CAPI.mlirAttributeGetNull()
+    mlirAttributeGetNull()
   end
 
-  defdelegate unwrap_type(type_attr), to: CAPI, as: :mlirTypeAttrGetValue
+  defdelegate unwrap_type(type_attr), to: MLIR.CAPI, as: :mlirTypeAttrGetValue
 
-  defdelegate unwrap_string(str_attr), to: CAPI, as: :mlirStringAttrGetValue
+  defdelegate unwrap_string(str_attr), to: MLIR.CAPI, as: :mlirStringAttrGetValue
 
   def unwrap(%__MODULE__{} = attribute) do
     cond do
-      Beaver.Native.to_term(CAPI.mlirAttributeIsAType(attribute)) ->
+      Beaver.Native.to_term(mlirAttributeIsAType(attribute)) ->
         unwrap_type(attribute)
 
-      Beaver.Native.to_term(CAPI.mlirAttributeIsAString(attribute)) ->
+      Beaver.Native.to_term(mlirAttributeIsAString(attribute)) ->
         unwrap_string(attribute)
     end
   end
