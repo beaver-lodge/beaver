@@ -147,7 +147,7 @@ defmodule Beaver.MLIR.Attribute do
     if validator.(t) do
       getter.(t)
     else
-      raise ArgumentError, "incompatible type"
+      raise ArgumentError, "incompatible type #{to_string(t)}"
     end
   end
 

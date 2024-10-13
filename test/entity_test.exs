@@ -70,13 +70,13 @@ defmodule EntityTest do
       assert Attribute.equal?(Attribute.integer(Type.i(32), 0).(ctx), ~a{0}i32.(ctx))
       assert Attribute.equal?(Attribute.float(Type.f(32), 0.0).(ctx), ~a{0.0}f32.(ctx))
 
-      assert_raise ArgumentError, "incompatible type", fn ->
+      assert_raise ArgumentError, "incompatible type i32", fn ->
         Attribute.float(Type.i(32), 0.0).(ctx)
       end
 
       assert Attribute.equal?(Attribute.integer(Type.index(), 1).(ctx), ~a{1}index.(ctx))
 
-      assert_raise ArgumentError, "incompatible type", fn ->
+      assert_raise ArgumentError, "incompatible type f32", fn ->
         Attribute.integer(Type.f32(), 1).(ctx)
       end
 
