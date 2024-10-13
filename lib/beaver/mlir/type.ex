@@ -227,4 +227,16 @@ defmodule Beaver.MLIR.Type do
       apply(__MODULE__, :i, [unquote(bitwidth), opts])
     end
   end
+
+  def integer?(%MLIR.Type{} = t) do
+    MLIR.CAPI.mlirTypeIsAInteger(t) |> Beaver.Native.to_term()
+  end
+
+  def index?(%MLIR.Type{} = t) do
+    MLIR.CAPI.mlirTypeIsAIndex(t) |> Beaver.Native.to_term()
+  end
+
+  def float?(%MLIR.Type{} = t) do
+    MLIR.CAPI.mlirTypeIsAFloat(t) |> Beaver.Native.to_term()
+  end
 end
