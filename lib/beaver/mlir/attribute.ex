@@ -51,10 +51,21 @@ defmodule Beaver.MLIR.Attribute do
     CAPI.mlirAttributeEqual(a, b) |> Beaver.Native.to_term()
   end
 
-  def float(type, value, opts \\ []) do
+  def float(type, value, opts \\ [])
+
+  def float(%MLIR.Type{} = t, value, _opts) do
+    if MLIR.Type.float?(t) do
+      ctx = CAPI.mlirTypeGetContext(t)
+      CAPI.mlirFloatAttrDoubleGet(ctx, t, value)
+    else
+      raise ArgumentError, "incompatible type"
+    end
+  end
+
+  def float(type, value, opts) do
     Beaver.Deferred.from_opts(
       opts,
-      &CAPI.mlirFloatAttrDoubleGet(&1, Beaver.Deferred.create(type, &1), value)
+      &float(Beaver.Deferred.create(type, &1), value)
     )
   end
 
@@ -151,13 +162,15 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   def integer(t, value) when is_function(t, 1) do
-    fn ctx ->
-      integer(t.(ctx), value)
-    end
+    &integer(t.(&1), value)
   end
 
   def integer(%MLIR.Type{} = t, value) do
-    CAPI.mlirIntegerAttrGet(t, value)
+    if MLIR.Type.integer?(t) or MLIR.Type.index?(t) do
+      CAPI.mlirIntegerAttrGet(t, value)
+    else
+      raise ArgumentError, "incompatible type"
+    end
   end
 
   def bool(value, opts \\ []) do
