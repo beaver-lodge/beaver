@@ -106,7 +106,7 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   def dense_array(elements, type, opts \\ []) when is_list(elements) do
-    getter =
+    get =
       case type do
         Beaver.Native.I32 ->
           &mlirDenseI32ArrayGet/3
@@ -118,7 +118,7 @@ defmodule Beaver.MLIR.Attribute do
     Beaver.Deferred.from_opts(
       opts,
       fn ctx ->
-        getter.(
+        get.(
           ctx,
           length(elements),
           Beaver.Native.array(elements, type)
@@ -143,32 +143,23 @@ defmodule Beaver.MLIR.Attribute do
     mlirTypeAttrGet(t)
   end
 
-  defp composite_by_type(%MLIR.Type{} = t, validator, getter) do
-    if validator.(t) do
-      getter.(t)
-    else
-      raise ArgumentError, "incompatible type #{to_string(t)}"
-    end
+  defp composite(%MLIR.Type{} = t, validate, get)
+       when is_function(validate, 1) and is_function(get, 1) do
+    if validate.(t), do: get.(t), else: raise(ArgumentError, "incompatible type #{to_string(t)}")
   end
 
-  defp composite_by_type(t, validator, getter) when is_function(t, 1) do
-    &composite_by_type(t.(&1), validator, getter)
-  end
+  defp composite(t, validate, get) when is_function(t, 1), do: &composite(t.(&1), validate, get)
 
-  def integer(t, value) do
-    composite_by_type(
+  def integer(t, value) when is_integer(value) do
+    composite(
       t,
       &(MLIR.Type.integer?(&1) or MLIR.Type.index?(&1)),
       &mlirIntegerAttrGet(&1, value)
     )
   end
 
-  def float(t, value) do
-    composite_by_type(
-      t,
-      &MLIR.Type.float?/1,
-      &mlirFloatAttrDoubleGet(mlirTypeGetContext(&1), &1, value)
-    )
+  def float(t, value) when is_float(value) do
+    composite(t, &MLIR.Type.float?/1, &mlirFloatAttrDoubleGet(mlirTypeGetContext(&1), &1, value))
   end
 
   def bool(value, opts \\ []) do
