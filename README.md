@@ -1,3 +1,5 @@
+[![Run in Livebook](https://livebook.dev/badge/v1/black.svg)](https://livebook.dev/run?url=https%3A%2F%2Fhexdocs.pm%2Fbeaver%2Fyour-first-beaver-compiler.livemd)
+
 # Beaver 🦫
 
 [![Package](https://img.shields.io/badge/-Package-important)](https://hex.pm/packages/beaver) [![Documentation](https://img.shields.io/badge/-Documentation-blueviolet)](https://hexdocs.pm/beaver)
@@ -346,30 +348,6 @@ Usually a function accepting a MLIR context to create an operation or type is ca
 
 - setting environment variable to control Erlang scheduler number, `ERL_AFLAGS="+S 10:5"`
 - run mix test under LLDB, `scripts/lldb-mix-test`
-
-6. Livebook
-
-- Please use Elixir 1.14 and install Livebook from source on GitHub:
-  ```bash
-  mix escript.install github livebook-dev/livebook
-  ```
-- To use Beaver in [Livebook](https://livebook.dev/), run this in the source directory:
-  ```bash
-  livebook server --name livebook@127.0.0.1 --home .
-  ```
-- In the setup cell, replace the content with:
-
-  ```elixir
-  beaver_app_root = Path.join(__DIR__, "..")
-
-  Mix.install(
-    [
-      {:beaver, path: beaver_app_root, env: :test}
-    ],
-    config_path: Path.join(beaver_app_root, "config/config.exs"),
-    lockfile: Path.join(beaver_app_root, "mix.lock")
-  )
-  ```
 
 ## Release a new version
 
