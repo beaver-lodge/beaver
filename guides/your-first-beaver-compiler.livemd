@@ -1,5 +1,3 @@
-<!-- livebook:{"persist_outputs":true} -->
-
 # Your first compiler with Beaver!
 
 ```elixir
@@ -45,25 +43,6 @@ ir =
 ir |> Beaver.MLIR.to_string() |> IO.puts()
 ```
 
-<!-- livebook:{"output":true} -->
-
-```
-module {
-  func.func @some_func(%arg0: i32) -> i32 {
-    %c1024_i32 = arith.constant 1024 : i32
-    %0 = arith.addi %arg0, %c1024_i32 : i32
-    return %0 : i32
-  }
-}
-
-```
-
-<!-- livebook:{"output":true} -->
-
-```
-:ok
-```
-
 As you can see, with MLIR we are not working with those low level LLVM instructions you might have seen somewhere else.
 Here we have this `Func.func` and `Func.return` thing looks like a function and return statement in a programming language.
 And the `Arith` stuff seems to be doing some arithmetic for us.
@@ -96,29 +75,6 @@ llvm_ir =
 llvm_ir |> Beaver.MLIR.to_string() |> IO.puts()
 ```
 
-<!-- livebook:{"output":true} -->
-
-```
-module {
-  llvm.func @some_func(%arg0: i32) -> i32 attributes {llvm.emit_c_interface} {
-    %0 = llvm.mlir.constant(1024 : i32) : i32
-    %1 = llvm.add %arg0, %0 : i32
-    llvm.return %1 : i32
-  }
-  llvm.func @_mlir_ciface_some_func(%arg0: i32) -> i32 attributes {llvm.emit_c_interface} {
-    %0 = llvm.call @some_func(%arg0) : (i32) -> i32
-    llvm.return %0 : i32
-  }
-}
-
-```
-
-<!-- livebook:{"output":true} -->
-
-```
-:ok
-```
-
 Now you can see the IR seems to "grow" a little. It is called "lowering".
 What we just did is running two passes `convert_func_to_llvm` and `convert_arith_to_llvm` on our IR.
 So that the higher level abstraction like `Func` and `Arith` are lowered to LLVM IR,
@@ -137,12 +93,6 @@ arguments = [Beaver.Native.I32.make(1024)]
 
 MLIR.ExecutionEngine.invoke!(jit, "some_func", arguments, return)
 |> Beaver.Native.to_term()
-```
-
-<!-- livebook:{"output":true} -->
-
-```
-2048
 ```
 
 ## Recap
