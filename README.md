@@ -1,3 +1,5 @@
+[![Run in Livebook](https://livebook.dev/badge/v1/black.svg)](https://livebook.dev/run?url=https%3A%2F%2Fhexdocs.pm%2Fbeaver%2Fyour-first-beaver-compiler.livemd)
+
 # Beaver 🦫
 
 [![Package](https://img.shields.io/badge/-Package-important)](https://hex.pm/packages/beaver) [![Documentation](https://img.shields.io/badge/-Documentation-blueviolet)](https://hexdocs.pm/beaver)
