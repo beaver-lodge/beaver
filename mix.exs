@@ -67,7 +67,7 @@ defmodule Beaver.MixProject do
           ~r"Beaver.ENIF.*"
         ],
         Utils: [
-          Beaver.Deferred,
+          ~r"Beaver.Deferred.*",
           ~r"Beaver.Diagnostic.*",
           ~r"Beaver.Pass.*",
           ~r"Beaver.String.*"
