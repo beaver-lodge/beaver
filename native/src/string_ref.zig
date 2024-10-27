@@ -62,8 +62,8 @@ pub const Printer = struct {
     pub fn flush(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         const printer: *@This() = try ResourceKind.resource.fetch_ptr(env, args[0]);
         if (printer.flushed) return Error.@"Already flushed";
-        defer printer.buffer.deinit();
         printer.flushed = true;
+        printer.buffer.deinit();
         return beam.make_slice(env, printer.buffer.items);
     }
     const entries = .{
