@@ -6,11 +6,11 @@ defmodule DiagnosticTest do
     def start_and_attach(ctx, cb) do
       {:ok, server} =
         GenServer.start(
-          Beaver.DiagnosticHandlerRunner,
+          Beaver.DiagnosticsCapturer,
           cb
         )
 
-      handler_id = Beaver.DiagnosticHandlerRunner.attach(ctx, server)
+      handler_id = Beaver.DiagnosticsCapturer.attach(ctx, server)
       {server, handler_id}
     end
 
@@ -39,7 +39,7 @@ defmodule DiagnosticTest do
         )
 
       assert_raise RuntimeError, @err_msg, fn -> DiagnosticTestHelper.get_attr(ctx) end
-      assert Beaver.DiagnosticHandlerRunner.collect(server) == @collected
+      assert Beaver.DiagnosticsCapturer.collect(server) == @collected
       DiagnosticTestHelper.cleanup_handler(ctx, server, handler_id)
     end
 
@@ -52,7 +52,7 @@ defmodule DiagnosticTest do
 
       assert_raise RuntimeError, @err_msg, fn -> DiagnosticTestHelper.get_attr(ctx) end
 
-      assert Beaver.DiagnosticHandlerRunner.collect(server) ==
+      assert Beaver.DiagnosticsCapturer.collect(server) ==
                "hello#{@collected}"
 
       DiagnosticTestHelper.cleanup_handler(ctx, server, handler_id)

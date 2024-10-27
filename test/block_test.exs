@@ -52,7 +52,7 @@ defmodule BlockTest do
     end
     |> MLIR.Operation.verify()
 
-    assert Beaver.DiagnosticHandlerRunner.collect(diagnostic_server) =~
+    assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
              "reference to block defined in another region"
   end
 
@@ -74,7 +74,7 @@ defmodule BlockTest do
     end
     |> MLIR.Operation.verify()
 
-    assert Beaver.DiagnosticHandlerRunner.collect(diagnostic_server) =~
+    assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
              "branch has 1 operands for successor"
   end
 
@@ -111,7 +111,7 @@ defmodule BlockTest do
     end
     |> MLIR.Operation.verify()
 
-    assert Beaver.DiagnosticHandlerRunner.collect(diagnostic_server) =~
+    assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
              "branch has 1 operands for successor"
   end
 
@@ -144,7 +144,7 @@ defmodule BlockTest do
         end
         |> MLIR.Operation.verify()
 
-        assert Beaver.DiagnosticHandlerRunner.collect(diagnostic_server) =~
+        assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
                  "expect at least a terminator"
       end
     end

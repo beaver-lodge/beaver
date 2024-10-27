@@ -189,7 +189,7 @@ defmodule EntityTest do
         Attribute.get("???", ctx: ctx) |> MLIR.is_null()
       end
 
-      assert Beaver.DiagnosticHandlerRunner.collect(diagnostic_server) =~
+      assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
                "expected attribute value"
     end
   end

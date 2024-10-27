@@ -274,14 +274,14 @@ defmodule Beaver do
       when is_function(fun, 0) and is_function(init, 0) and is_function(handler, 2) do
     {:ok, pid} =
       GenServer.start(
-        Beaver.DiagnosticHandlerRunner,
+        Beaver.DiagnosticsCapturer,
         handler
       )
 
-    handler_id = Beaver.DiagnosticHandlerRunner.attach(ctx, pid)
+    handler_id = Beaver.DiagnosticsCapturer.attach(ctx, pid)
 
     try do
-      {fun.(), Beaver.DiagnosticHandlerRunner.collect(pid)}
+      {fun.(), Beaver.DiagnosticsCapturer.collect(pid)}
     after
       Beaver.MLIR.Diagnostic.detach(ctx, handler_id)
       :ok = GenServer.stop(pid)
