@@ -48,7 +48,7 @@ defmodule Beaver.Slang do
 
     quote do
       mlir do
-        opts = [ctx: Beaver.Env.context(), block: Beaver.Env.block()]
+        opts = [ctx: Beaver.Env.context(), blk: Beaver.Env.block()]
         unquote(alias_name)(opts)
       end
     end
@@ -60,7 +60,7 @@ defmodule Beaver.Slang do
     quote do
       unquote(var) =
         Beaver.Slang.create_constraint(unquote(right),
-          block: Beaver.Env.block(),
+          blk: Beaver.Env.block(),
           ctx: Beaver.Env.context()
         )
     end
@@ -79,7 +79,7 @@ defmodule Beaver.Slang do
   def create_constraint(t, opts) do
     use Beaver
 
-    mlir ctx: opts[:ctx], block: opts[:block] do
+    mlir ctx: opts[:ctx], blk: Beaver.Deferred.fetch_block(opts) do
       Beaver.MLIR.Dialect.IRDL.is(expected: t) >>> ~t{!irdl.attribute}
     end
   end
@@ -144,11 +144,11 @@ defmodule Beaver.Slang do
     Beaver.Deferred.from_opts(
       opts,
       fn ctx ->
-        mlir block: opts[:block], ctx: ctx do
+        mlir blk: Beaver.Deferred.fetch_block(opts), ctx: ctx do
           op_applier slang_target_op: op, sym_name: "\"#{name}\"" do
             region do
               block _op() do
-                {args, ret} = constrain_f.(block: Beaver.Env.block(), ctx: ctx)
+                {args, ret} = constrain_f.(blk: Beaver.Env.block(), ctx: ctx)
 
                 case strip_variadicity(args) do
                   [] ->
@@ -169,7 +169,7 @@ defmodule Beaver.Slang do
                   {return_op, ret} when not is_nil(return_op) ->
                     op_applier(
                       ret
-                      |> Enum.map(&create_constraint(&1, block: Beaver.Env.block(), ctx: ctx)),
+                      |> Enum.map(&create_constraint(&1, blk: Beaver.Env.block(), ctx: ctx)),
                       get_variadicity(ret, opts),
                       slang_target_op: return_op
                     ) >>> []
@@ -219,7 +219,7 @@ defmodule Beaver.Slang do
             quote do
               unquote(get_slang_arg_ast(i)) =
                 Beaver.Slang.create_constraint(unquote(ast),
-                  block: Beaver.Env.block(),
+                  blk: Beaver.Env.block(),
                   ctx: Beaver.Env.context()
                 )
             end
@@ -262,7 +262,7 @@ defmodule Beaver.Slang do
           fn opts ->
             use Beaver
 
-            mlir block: opts[:block], ctx: opts[:ctx] do
+            mlir blk: Beaver.Deferred.fetch_block(opts), ctx: opts[:ctx] do
               unquote_splicing(input_constrains)
               {[unquote_splicing(args_var_ast)], unquote(do_block)}
             end
@@ -364,11 +364,11 @@ defmodule Beaver.Slang do
       def unquote(alias_name)(opts) do
         use Beaver
 
-        mlir ctx: opts[:ctx], block: opts[:block] do
+        mlir ctx: opts[:ctx], blk: Beaver.Deferred.fetch_block(opts) do
           unquote(block[:do])
           |> Beaver.Slang.create_parametric(
             ctx: Beaver.Env.context(),
-            block: Beaver.Env.block()
+            blk: Beaver.Env.block()
           )
         end
       end
@@ -428,7 +428,7 @@ defmodule Beaver.Slang do
     Beaver.Deferred.from_opts(
       opts,
       fn ctx ->
-        mlir ctx: ctx, block: opts[:block] do
+        mlir ctx: ctx, blk: Beaver.Deferred.fetch_block(opts) do
           IRDL.parametric(values, base_type: base_type) >>> ~t{!irdl.attribute}
         end
       end
@@ -450,7 +450,7 @@ defmodule Beaver.Slang do
               region do
                 block _dialect() do
                   for {_type, m, f} <- creators do
-                    opts = [ctx: Beaver.Env.context(), block: Beaver.Env.block()]
+                    opts = [ctx: Beaver.Env.context(), blk: Beaver.Env.block()]
                     apply(m, f, [opts])
                   end
                 end

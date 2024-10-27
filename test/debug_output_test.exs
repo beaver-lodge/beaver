@@ -14,26 +14,26 @@ defmodule DebugOutputTest do
     """.(ctx)
   end
 
-  test "op stats", test_context do
-    ir(test_context[:ctx])
+  test "op stats", %{ctx: ctx} do
+    ir(ctx)
     |> MLIR.Transforms.print_op_stats()
     |> MLIR.Pass.Composer.run!()
   end
 
-  test "print ir", test_context do
-    ir(test_context[:ctx])
+  test "print ir", %{ctx: ctx} do
+    ir(ctx)
     |> MLIR.Transforms.print_ir()
     |> MLIR.Pass.Composer.run!()
   end
 
-  test "timing", test_context do
-    ir(test_context[:ctx])
+  test "timing", %{ctx: ctx} do
+    ir(ctx)
     |> MLIR.Transforms.canonicalize()
     |> MLIR.Pass.Composer.run!(timing: true)
   end
 
-  test "pass manager enable print ir", test_context do
-    ir(test_context[:ctx])
+  test "pass manager enable print ir", %{ctx: ctx} do
+    ir(ctx)
     |> MLIR.Transforms.canonicalize()
     |> MLIR.Pass.Composer.run!(print: true)
   end

@@ -3,9 +3,8 @@ defmodule IRDLTest do
   alias Beaver.MLIR
   @moduletag :smoke
 
-  test "gen irdl", test_context do
+  test "gen irdl", %{ctx: ctx} do
     import Beaver.MLIR.Sigils
-    ctx = test_context[:ctx]
 
     m =
       ~m"""
@@ -43,33 +42,31 @@ defmodule IRDLTest do
     assert MapSet.equal?(found, expected)
   end
 
-  test "cmath dialect",
-       test_context do
+  test "cmath dialect", %{ctx: ctx} do
     use Beaver
     alias Beaver.MLIR.Dialect.Func
     alias Beaver.MLIR.Type
     require Func
 
-    CMath.__slang_dialect__(test_context[:ctx]) |> MLIR.Operation.verify!()
-    Beaver.Slang.load(test_context[:ctx], CMath)
+    CMath.__slang_dialect__(ctx) |> MLIR.Operation.verify!()
+    Beaver.Slang.load(ctx, CMath)
 
-    CMath.IRExample.get(test_context[:ctx])
-    CMath.IRExample.gen(test_context[:ctx])
+    CMath.IRExample.get(ctx)
+    CMath.IRExample.gen(ctx)
 
     assert not (CMath.some_attr(Type.f32())
-                |> Beaver.Deferred.create(test_context[:ctx])
+                |> Beaver.Deferred.create(ctx)
                 |> MLIR.is_null())
 
     assert not (MLIR.CAPI.mlirContextGetOrLoadDialect(
-                  test_context[:ctx],
+                  ctx,
                   MLIR.StringRef.create("cmath")
                 )
                 |> MLIR.is_null())
   end
 
-  test "var dialect",
-       test_context do
+  test "var dialect", %{ctx: ctx} do
     use Beaver
-    TestVariadic.__slang_dialect__(test_context[:ctx]) |> MLIR.Operation.verify!()
+    TestVariadic.__slang_dialect__(ctx) |> MLIR.Operation.verify!()
   end
 end

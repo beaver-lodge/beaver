@@ -89,7 +89,7 @@ defmodule Beaver do
     dsl_block_ast = dsl_block |> Beaver.SSA.prewalk(&MLIR.Operation.eval_ssa/1)
 
     ctx_ast =
-      if ctx = opts[:ctx] do
+      if ctx = Beaver.Deferred.fetch_context(opts) do
         quote do
           Kernel.var!(beaver_internal_env_ctx) = unquote(ctx)
 
@@ -99,7 +99,7 @@ defmodule Beaver do
       end
 
     block_ast =
-      if block = opts[:block] do
+      if block = Beaver.Deferred.fetch_block(opts) do
         quote do
           Kernel.var!(beaver_internal_env_block) = unquote(block)
 
@@ -251,5 +251,40 @@ defmodule Beaver do
     raise(
       "`>>>` operator is expected to be transformed away. Maybe you forget to put the expression inside the Beaver.mlir/1 macro's do block?"
     )
+  end
+
+  @type result :: any()
+  @type handler_acc :: any()
+  @spec with_diagnostics(
+          MLIR.Context.t(),
+          (-> result),
+          (MLIR.Diagnostic.t(), handler_acc -> handler_acc)
+          | {(-> handler_acc), (MLIR.Diagnostic.t(), handler_acc -> handler_acc)}
+        ) :: {result, handler_acc}
+
+  @doc """
+  Run the given function with a diagnostic handler attached to the MLIR context.
+  """
+  def with_diagnostics(%MLIR.Context{} = ctx, fun, handler)
+      when is_function(fun, 0) and is_function(handler, 2) do
+    with_diagnostics(%MLIR.Context{} = ctx, fun, {fn -> nil end, handler})
+  end
+
+  def with_diagnostics(%MLIR.Context{} = ctx, fun, {init, handler})
+      when is_function(fun, 0) and is_function(init, 0) and is_function(handler, 2) do
+    {:ok, pid} =
+      GenServer.start(
+        Beaver.DiagnosticsCapturer,
+        handler
+      )
+
+    handler_id = Beaver.DiagnosticsCapturer.attach(ctx, pid)
+
+    try do
+      {fun.(), Beaver.DiagnosticsCapturer.collect(pid)}
+    after
+      Beaver.MLIR.Diagnostic.detach(ctx, handler_id)
+      :ok = GenServer.stop(pid)
+    end
   end
 end

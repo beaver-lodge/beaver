@@ -6,32 +6,7 @@ const e = @import("erl_nif");
 const debug_print = @import("std").debug.print;
 const result = @import("kinda").result;
 const diagnostic = @import("diagnostic.zig");
-
-const Token = struct {
-    mutex: std.Thread.Mutex = .{},
-    cond: std.Thread.Condition = .{},
-    done: bool = false,
-    pub var resource_type: beam.resource_type = undefined;
-    pub const resource_name = "Beaver" ++ @typeName(@This());
-    fn wait(self: *@This()) void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
-        while (!self.done) {
-            self.cond.wait(&self.mutex);
-        }
-    }
-    fn signal(self: *@This()) void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
-        self.done = true;
-        self.cond.signal();
-    }
-    fn pass_token_signal(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-        var token = try beam.fetch_ptr_resource_wrapped(@This(), env, args[0]);
-        token.signal();
-        return beam.make_ok(env);
-    }
-};
+const Token = @import("logical_mutex.zig").Token;
 
 const BeaverPass = extern struct {
     handler: beam.pid,
@@ -49,29 +24,25 @@ const BeaverPass = extern struct {
         new.* = old.*;
         return new;
     }
-    const Error = error{
-        EnvAllocFailure,
-        MsgSendFailure,
-    };
-    fn do_run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) !void {
+    const Error = error{ @"Fail to allocate BEAM environment", @"Fail to send message to pass server", @"Fail to run a pass implemented in Elixir" };
+    fn do_run(op: mlir_capi.Operation.T, userData: ?*anyopaque) !void {
         const ud: *@This() = @ptrCast(@alignCast(userData));
-        const env = e.enif_alloc_env() orelse return Error.EnvAllocFailure;
+        const env = e.enif_alloc_env() orelse return Error.@"Fail to allocate BEAM environment";
         defer e.enif_clear_env(env);
         const handler = ud.*.handler;
-        var tuple_slice: []beam.term = try beam.allocator.alloc(beam.term, 4);
+        var tuple_slice: []beam.term = try beam.allocator.alloc(beam.term, 3);
         defer beam.allocator.free(tuple_slice);
         tuple_slice[0] = beam.make_atom(env, "run");
         tuple_slice[1] = try mlir_capi.Operation.resource.make(env, op);
-        tuple_slice[2] = try mlir_capi.ExternalPass.resource.make(env, pass);
         var token = Token{};
-        tuple_slice[3] = try beam.make_ptr_resource_wrapped(env, &token);
+        tuple_slice[2] = try beam.make_ptr_resource_wrapped(env, &token);
         if (!beam.send(env, handler, beam.make_tuple(env, tuple_slice))) {
-            return Error.MsgSendFailure;
+            return Error.@"Fail to send message to pass server";
         }
-        token.wait();
+        if (c.beaverLogicalResultIsFailure(token.wait_logical())) return Error.@"Fail to run a pass implemented in Elixir";
     }
     fn run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) callconv(.C) void {
-        if (do_run(op, pass, userData)) |_| {} else |err| {
+        if (do_run(op, userData)) |_| {} else |err| {
             c.mlirEmitError(c.mlirOperationGetLocation(op), @errorName(err));
             c.mlirExternalPassSignalFailure(pass);
         }
@@ -111,7 +82,6 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
     return try mlir_capi.Pass.resource.make(env, ep);
 }
 
-pub const nifs = .{ result.nif("beaver_raw_create_mlir_pass", 5, do_create).entry, result.nif("beaver_raw_pass_token_signal", 1, Token.pass_token_signal).entry };
-pub fn open_all(env: beam.env) void {
-    beam.open_resource_wrapped(env, Token);
-}
+pub const nifs = .{
+    result.nif("beaver_raw_create_mlir_pass", 5, do_create).entry,
+};

@@ -6,9 +6,9 @@ defmodule CFTest do
   alias Beaver.MLIR.Dialect.{Func, Arith, CF}
   require Func
 
-  test "generate mlir with function calls", test_context do
+  test "generate mlir with function calls", %{ctx: ctx} do
     ir =
-      mlir ctx: test_context[:ctx] do
+      mlir ctx: ctx do
         module do
           unquote(File.read!("test/readme_example.exs") |> Code.string_to_quoted!())
 

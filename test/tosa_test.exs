@@ -23,9 +23,9 @@ defmodule TosaTest do
     |> reconcile_unrealized_casts
   end
 
-  test "generate and run tosa", test_context do
+  test "generate and run tosa", %{ctx: ctx} do
     ir =
-      mlir ctx: test_context[:ctx] do
+      mlir ctx: ctx do
         module do
           Func.func test_multi_broadcast(
                       function_type: ~a"(tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>"

@@ -10,7 +10,6 @@ mlir_mods = [
   DialectRegistry,
   DiagnosticHandlerID,
   DiagnosticHandler,
-  Diagnostic,
   DiagnosticSeverity,
   RewritePatternSet,
   SymbolTable,

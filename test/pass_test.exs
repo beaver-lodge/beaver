@@ -1,5 +1,5 @@
 defmodule PassTest do
-  use Beaver.Case, async: true
+  use Beaver.Case, async: true, diagnostic: :server
   import ExUnit.CaptureLog
   use Beaver
   alias Beaver.MLIR.Dialect.{Func, Arith}
@@ -15,8 +15,8 @@ defmodule PassTest do
     end
   end
 
-  defp example_ir(test_context) do
-    mlir ctx: test_context[:ctx] do
+  defp example_ir(ctx) do
+    mlir ctx: ctx do
       module do
         Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
           region do
@@ -32,8 +32,8 @@ defmodule PassTest do
     |> MLIR.Operation.verify!()
   end
 
-  test "exception in run/1", test_context do
-    ir = example_ir(test_context)
+  test "exception in run/1", %{ctx: ctx, diagnostic_server: diagnostic_server} do
+    ir = example_ir(ctx)
 
     assert_raise RuntimeError, ~r"Unexpected failure running passes", fn ->
       assert capture_log(fn ->
@@ -44,24 +44,26 @@ defmodule PassTest do
                |> MLIR.Pass.Composer.run!()
              end) =~ ~r"fail to run a pass"
     end
+
+    assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
+             "Fail to run a pass implemented in Elixir"
   end
 
-  test "pass of anonymous function", test_context do
-    ir = example_ir(test_context)
+  test "pass of anonymous function", %{ctx: ctx} do
+    ir = example_ir(ctx)
 
     ir
     |> MLIR.Pass.Composer.append(
       {"test-pass", "builtin.module",
        fn op ->
          assert MLIR.to_string(op) =~ ~r"func.func @some_func"
-         :ok
        end}
     )
     |> MLIR.Pass.Composer.run!()
   end
 
-  test "multi level nested", test_context do
-    ir = example_ir(test_context)
+  test "multi level nested", %{ctx: ctx} do
+    ir = example_ir(ctx)
 
     assert ir
            |> canonicalize()
@@ -81,5 +83,17 @@ defmodule PassTest do
            )
            |> MLIR.Pass.Composer.to_pipeline() =~
              ~r/func1.+func2.+func.func3\(canonicalize/
+  end
+
+  test "invalid pipeline txt", %{ctx: ctx} do
+    ir = example_ir(ctx)
+
+    assert_raise RuntimeError,
+                 ~r"Unexpected failure parsing pipeline: something wrong, MLIR Textual PassPipeline Parser:1:1: error: 'something wrong' does not refer to a registered pass or pass pipeline",
+                 fn ->
+                   ir
+                   |> MLIR.Pass.Composer.append("something wrong")
+                   |> MLIR.Pass.Composer.run!()
+                 end
   end
 end

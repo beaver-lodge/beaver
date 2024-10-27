@@ -7,9 +7,9 @@ defmodule RegionTest do
   require Func
   @moduletag :smoke
 
-  test "multiple regions", test_context do
+  test "multiple regions", %{ctx: ctx} do
     op =
-      mlir ctx: test_context[:ctx] do
+      mlir ctx: ctx do
         module do
           Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
             region do
@@ -59,8 +59,8 @@ defmodule RegionTest do
     assert region_num == 2
   end
 
-  test "module region not accessible by env macro", test_context do
-    mlir ctx: test_context[:ctx] do
+  test "module region not accessible by env macro", %{ctx: ctx} do
+    mlir ctx: ctx do
       module do
         assert {:not_found, [file: __ENV__.file, line: 65]} == Beaver.Env.region()
 
@@ -76,8 +76,8 @@ defmodule RegionTest do
     |> MLIR.Operation.verify!()
   end
 
-  test "nested regions", test_context do
-    mlir ctx: test_context[:ctx] do
+  test "nested regions", %{ctx: ctx} do
+    mlir ctx: ctx do
       alias Beaver.MLIR.Dialect.SCF
 
       module do

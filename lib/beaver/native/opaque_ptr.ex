@@ -4,8 +4,7 @@ defmodule Beaver.Native.OpaquePtr do
   """
   import Beaver.MLIR.CAPI
 
-  use Kinda.ResourceKind,
-    forward_module: Beaver.Native
+  use Kinda.ResourceKind, forward_module: Beaver.Native
 
   @doc """
   read the N bytes starting from the pointer and returns an Erlang binary

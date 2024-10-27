@@ -5,8 +5,7 @@ defmodule CUDARuntimeTest do
 
   @moduletag :cuda_runtime
 
-  test "invoke main", test_context do
-    ctx = test_context[:ctx]
+  test "invoke main", %{ctx: ctx} do
     MLIR.Context.register_translations(ctx)
     # trap sigchld when running ptxas to generate fatbin
     System.trap_signal(:sigchld, fn -> :ok end)

@@ -5,7 +5,7 @@ defmodule Beaver.Dummy do
   require Func
 
   defp put_func(ctx, block) do
-    mlir ctx: ctx, block: block do
+    mlir ctx: ctx, blk: block do
       Func.func some_func(
                   function_type: Type.function([], [Type.i(32)]),
                   sym_name: MLIR.Attribute.string("f#{System.unique_integer()}")

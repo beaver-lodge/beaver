@@ -45,17 +45,19 @@ defmodule Beaver.MLIR.Pass.Composer do
 
   defp add_pipeline(%MLIR.OpPassManager{} = pm, pipeline_str)
        when is_binary(pipeline_str) do
-    mlirOpPassManagerAddPipeline(
-      pm,
-      MLIR.StringRef.create(pipeline_str),
-      Beaver.Diagnostic.callback(),
-      Beaver.Native.OpaquePtr.null()
-    )
-    |> tap(fn res ->
-      if not MLIR.LogicalResult.success?(res) do
-        raise "Unexpected failure parsing pipeline: #{pipeline_str}"
-      end
-    end)
+    {res, err} =
+      Beaver.StringPrinter.run(
+        &mlirOpPassManagerAddPipeline(
+          pm,
+          MLIR.StringRef.create(pipeline_str),
+          &1,
+          &2
+        )
+      )
+
+    if not MLIR.LogicalResult.success?(res) do
+      raise "Unexpected failure parsing pipeline: #{pipeline_str}, #{err}"
+    end
 
     pm
   end
@@ -92,7 +94,7 @@ defmodule Beaver.MLIR.Pass.Composer do
     do: mlirPassManagerAddOwnedPass(pm, create_pass(pass))
 
   defp to_pm(%__MODULE__{passes: passes, op: op}) do
-    ctx = mlirOperationGetContext(MLIR.Operation.from_module(op))
+    ctx = MLIR.context(MLIR.Operation.from_module(op))
 
     pm = mlirPassManagerCreate(ctx)
 
@@ -141,7 +143,7 @@ defmodule Beaver.MLIR.Pass.Composer do
     print = Keyword.get(opts, :print)
     timing = Keyword.get(opts, :timing)
     debug = Keyword.get(opts, :debug)
-    ctx = mlirOperationGetContext(MLIR.Operation.from_module(op))
+    ctx = MLIR.context(MLIR.Operation.from_module(op))
 
     pm = to_pm(composer)
 

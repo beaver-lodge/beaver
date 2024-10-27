@@ -1,8 +1,7 @@
 defmodule WalkerTest do
   use Beaver.Case, async: true
 
-  test "access", test_context do
-    ctx = test_context[:ctx]
+  test "access", %{ctx: ctx} do
     m = Beaver.Dummy.func_of_3_blocks(ctx)
     f = m |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.at(0)
 

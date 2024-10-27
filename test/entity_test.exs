@@ -2,7 +2,7 @@ defmodule EntityTest do
   @moduledoc """
   Test the creation of MLIR entities including attributes, types and locations.
   """
-  use Beaver.Case, async: true
+  use Beaver.Case, async: true, diagnostic: :server
   alias Beaver.MLIR
   alias MLIR.{Type, Attribute}
   import MLIR.Sigils
@@ -11,32 +11,31 @@ defmodule EntityTest do
   doctest Beaver.MLIR.Location
 
   describe "type apis" do
-    test "generated", test_context do
-      ctx = test_context[:ctx]
+    test "generated", %{ctx: ctx} do
       opts = [ctx: ctx]
-      assert Type.equal?(Type.f16(opts), Type.get("f16", opts))
-      assert Type.equal?(Type.f(16, opts), Type.get("f16", opts))
-      assert Type.equal?(Type.f32(opts), Type.get("f32", opts))
-      assert Type.equal?(Type.f(32, opts), Type.get("f32", opts))
-      assert Type.equal?(Type.f64(opts), Type.get("f64", opts))
-      assert Type.equal?(Type.f(64, opts), Type.get("f64", opts))
-      assert Type.equal?(Type.i(1, opts), Type.get("i1", opts))
-      assert Type.equal?(Type.i(16, opts), Type.get("i16", opts))
-      assert Type.equal?(Type.i(32, opts), Type.get("i32", opts))
-      assert Type.equal?(Type.i1(opts), Type.i(1, opts))
-      assert Type.equal?(Type.i8(opts), Type.i(8, opts))
-      assert Type.equal?(Type.i32(opts), Type.i(32, opts))
-      assert Type.equal?(Type.i64(opts), Type.i(64, opts))
-      assert Type.equal?(Type.i128(opts), Type.i(128, opts))
-      assert Type.equal?(Type.integer(32, opts), ~t{i32}.(ctx))
-      assert Type.equal?(Type.integer(64, opts), Type.get("i64").(ctx))
-      assert Type.equal?(Type.integer(128, opts), Type.get("i128").(ctx))
-      assert Type.equal?(Type.complex(Type.f32()).(ctx), Type.get("complex<f32>").(ctx))
+      assert MLIR.equal?(Type.f16(opts), Type.get("f16", opts))
+      assert MLIR.equal?(Type.f(16, opts), Type.get("f16", opts))
+      assert MLIR.equal?(Type.f32(opts), Type.get("f32", opts))
+      assert MLIR.equal?(Type.f(32, opts), Type.get("f32", opts))
+      assert MLIR.equal?(Type.f64(opts), Type.get("f64", opts))
+      assert MLIR.equal?(Type.f(64, opts), Type.get("f64", opts))
+      assert MLIR.equal?(Type.i(1, opts), Type.get("i1", opts))
+      assert MLIR.equal?(Type.i(16, opts), Type.get("i16", opts))
+      assert MLIR.equal?(Type.i(32, opts), Type.get("i32", opts))
+      assert MLIR.equal?(Type.i1(opts), Type.i(1, opts))
+      assert MLIR.equal?(Type.i8(opts), Type.i(8, opts))
+      assert MLIR.equal?(Type.i32(opts), Type.i(32, opts))
+      assert MLIR.equal?(Type.i64(opts), Type.i(64, opts))
+      assert MLIR.equal?(Type.i128(opts), Type.i(128, opts))
+      assert MLIR.equal?(Type.integer(32, opts), ~t{i32}.(ctx))
+      assert MLIR.equal?(Type.integer(64, opts), Type.get("i64").(ctx))
+      assert MLIR.equal?(Type.integer(128, opts), Type.get("i128").(ctx))
+      assert MLIR.equal?(Type.complex(Type.f32()).(ctx), Type.get("complex<f32>").(ctx))
 
       assert Type.unranked_tensor(Type.complex(Type.f32())).(ctx) |> to_string() ==
                "tensor<*xcomplex<f32>>"
 
-      assert Type.equal?(Type.unranked_tensor(Type.f32()).(ctx), ~t{tensor<*xf32>}.(ctx))
+      assert MLIR.equal?(Type.unranked_tensor(Type.f32()).(ctx), ~t{tensor<*xf32>}.(ctx))
 
       assert Type.ranked_tensor([], Type.f32()).(ctx) |> to_string() ==
                "tensor<f32>"
@@ -53,28 +52,27 @@ defmodule EntityTest do
              |> to_string() ==
                "memref<f32>"
 
-      assert Type.equal?(Type.none().(ctx), Type.get("none").(ctx))
+      assert MLIR.equal?(Type.none().(ctx), Type.get("none").(ctx))
     end
   end
 
   describe "attr apis" do
-    test "generate", test_context do
-      ctx = test_context[:ctx]
-      assert Attribute.equal?(Attribute.type(Type.f32()).(ctx), Attribute.type(Type.f32()).(ctx))
-      assert Attribute.equal?(Attribute.type(Type.f32()), Attribute.type(Type.f32()).(ctx))
-      assert Attribute.equal?(Attribute.type(Type.f32()).(ctx), Attribute.type(Type.f32()))
+    test "generate", %{ctx: ctx} do
+      assert MLIR.equal?(Attribute.type(Type.f32()).(ctx), Attribute.type(Type.f32()).(ctx))
+      assert MLIR.equal?(Attribute.type(Type.f32()), Attribute.type(Type.f32()).(ctx))
+      assert MLIR.equal?(Attribute.type(Type.f32()).(ctx), Attribute.type(Type.f32()))
 
       assert Attribute.integer(Type.i(32), 1) |> Beaver.Deferred.create(ctx) |> to_string() ==
                "1 : i32"
 
-      assert Attribute.equal?(Attribute.integer(Type.i(32), 0).(ctx), ~a{0}i32.(ctx))
-      assert Attribute.equal?(Attribute.float(Type.f(32), 0.0).(ctx), ~a{0.0}f32.(ctx))
+      assert MLIR.equal?(Attribute.integer(Type.i(32), 0).(ctx), ~a{0}i32.(ctx))
+      assert MLIR.equal?(Attribute.float(Type.f(32), 0.0).(ctx), ~a{0.0}f32.(ctx))
 
       assert_raise ArgumentError, "incompatible type i32", fn ->
         Attribute.float(Type.i(32), 0.0).(ctx)
       end
 
-      assert Attribute.equal?(Attribute.integer(Type.index(), 1).(ctx), ~a{1}index.(ctx))
+      assert MLIR.equal?(Attribute.integer(Type.index(), 1).(ctx), ~a{1}index.(ctx))
 
       assert_raise ArgumentError, "incompatible type f32", fn ->
         Attribute.integer(Type.f32(), 1).(ctx)
@@ -96,7 +94,7 @@ defmodule EntityTest do
              |> to_string() ==
                "(tensor<1x2x3x4xi32>) -> i32"
 
-      assert Attribute.equal?(
+      assert MLIR.equal?(
                Attribute.type(
                  Type.function(
                    [Type.i(32)],
@@ -110,38 +108,37 @@ defmodule EntityTest do
       assert MLIR.to_string(vec2xi32) == "vector<2xi32>"
       i0attr = Attribute.integer(Type.i(32), 0)
 
-      assert Attribute.equal?(
+      assert MLIR.equal?(
                Attribute.dense_elements([i0attr, i0attr], vec2xi32).(ctx),
                ~a{dense<0> : vector<2xi32>}.(ctx)
              )
 
-      assert Attribute.equal?(
+      assert MLIR.equal?(
                Attribute.dense_elements([i0attr], vec2xi32).(ctx),
                ~a{dense<0> : vector<2xi32>}.(ctx)
              )
 
-      assert Attribute.equal?(
+      assert MLIR.equal?(
                Attribute.dense_elements("abcd").(ctx),
                ~a{dense<[#{?a}, #{?b}, #{?c}, #{?d}]> : tensor<4xi8>}.(ctx)
              )
 
-      assert Attribute.equal?(
+      assert MLIR.equal?(
                MLIR.ODS.operand_segment_sizes([0, 0]).(ctx),
                ~a{array<i32: 0, 0>}.(ctx)
              )
 
-      assert Attribute.equal?(
+      assert MLIR.equal?(
                MLIR.ODS.operand_segment_sizes([1, 0]).(ctx),
                ~a{array<i32: 1, 0>}.(ctx)
              )
     end
 
-    test "iterator_types", test_context do
-      ctx = test_context[:ctx]
+    test "iterator_types", %{ctx: ctx} do
       parallel = Attribute.string("parallel")
       parallel2 = Attribute.array([parallel, parallel])
 
-      assert Attribute.equal?(
+      assert MLIR.equal?(
                parallel2.(ctx),
                ~a{["parallel", "parallel"]}.(ctx)
              )
@@ -156,19 +153,17 @@ defmodule EntityTest do
     test "null" do
       null = Attribute.null()
 
-      assert_raise RuntimeError, ~r"can't dump null", fn ->
+      assert_raise RuntimeError, "Attribute is null", fn ->
         null |> MLIR.dump!()
       end
     end
 
-    test "symbol name", test_context do
-      ctx = test_context[:ctx]
+    test "symbol name", %{ctx: ctx} do
       assert Attribute.string("foo") |> MLIR.to_string(ctx: ctx) == "\"foo\""
       assert Attribute.string(__MODULE__) |> MLIR.to_string(ctx: ctx) == "\"#{__MODULE__}\""
     end
 
-    test "nested symbol", test_context do
-      ctx = test_context[:ctx]
+    test "nested symbol", %{ctx: ctx} do
       ccc = MLIR.Attribute.flat_symbol_ref("ccc", ctx: ctx)
       aaa_bbb_ccc = "@aaa::@bbb::@ccc"
 
@@ -177,6 +172,25 @@ defmodule EntityTest do
 
       assert aaa_bbb_ccc ==
                MLIR.Attribute.symbol_ref("aaa", ["bbb", ccc], ctx: ctx) |> MLIR.to_string()
+    end
+  end
+
+  test "identifier", %{ctx: ctx} do
+    str = "foo"
+    assert str == Beaver.MLIR.Identifier.get(str, ctx: ctx) |> to_string()
+    a = Beaver.MLIR.Identifier.get(str, ctx: ctx)
+    b = Beaver.MLIR.Identifier.get(str, ctx: ctx)
+    assert MLIR.equal?(a, b)
+  end
+
+  describe "null" do
+    test "attr", %{ctx: ctx, diagnostic_server: diagnostic_server} do
+      assert_raise RuntimeError, "fail to parse attribute: ???", fn ->
+        Attribute.get("???", ctx: ctx) |> MLIR.is_null()
+      end
+
+      assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
+               "expected attribute value"
     end
   end
 end

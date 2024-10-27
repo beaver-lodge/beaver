@@ -25,7 +25,7 @@ defmodule ElixirAST do
          ctx,
          block
        ) do
-    mlir ctx: ctx, block: block do
+    mlir ctx: ctx, blk: block do
       m =
         module sym_name: ~a{"#{name}"} do
           Macro.prewalk(do_body, &gen_mlir(&1, ctx, Beaver.Env.block()))
@@ -46,7 +46,7 @@ defmodule ElixirAST do
          ctx,
          block
        ) do
-    mlir ctx: ctx, block: block do
+    mlir ctx: ctx, blk: block do
       Func.func sym_name: "\"#{name}\"", function_type: Type.function([], [dyn()]) do
         region do
           block _func_body do
@@ -77,7 +77,7 @@ defmodule ElixirAST do
          ctx,
          block
        ) do
-    mlir ctx: ctx, block: block do
+    mlir ctx: ctx, blk: block do
       bound = Macro.prewalk(bound, &gen_mlir(&1, ctx, block))
       var = __MODULE__.var(name: "\"#{name}\"") >>> __MODULE__.unbound()
       __MODULE__.bind(var, bound) >>> __MODULE__.bound()
@@ -89,7 +89,7 @@ defmodule ElixirAST do
          ctx,
          block
        ) do
-    mlir ctx: ctx, block: block do
+    mlir ctx: ctx, blk: block do
       [left, right] =
         for i <- [left, right] do
           Macro.prewalk(i, &gen_mlir(&1, ctx, block))
@@ -100,20 +100,20 @@ defmodule ElixirAST do
   end
 
   defp gen_mlir({name, [], mod}, ctx, block) when is_atom(name) and is_atom(mod) do
-    mlir ctx: ctx, block: block do
+    mlir ctx: ctx, blk: block do
       __MODULE__.var(name: "\"#{name}\"") >>> __MODULE__.dyn()
     end
   end
 
   defp gen_mlir({name, [], [] = args}, ctx, block) when is_atom(name) do
-    mlir ctx: ctx, block: block do
+    mlir ctx: ctx, blk: block do
       Func.call(args, callee: Attribute.flat_symbol_ref("#{name}", ctx: ctx)) >>>
         __MODULE__.dyn()
     end
   end
 
   defp gen_mlir(i, ctx, block) when is_integer(i) do
-    mlir ctx: ctx, block: block do
+    mlir ctx: ctx, blk: block do
       __MODULE__.lit_int(value: Attribute.integer(Type.i64(), i)) >>> Type.i64()
     end
   end
@@ -194,8 +194,6 @@ defmodule ElixirAST do
         mlir, acc ->
           {mlir, acc}
       end)
-
-      :ok
     end
   end
 end

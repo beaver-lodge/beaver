@@ -92,6 +92,9 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverGetReassociationIndicesForReshape(
 MLIR_CAPI_EXPORTED void beaverLocationPrint(MlirLocation location,
                                             MlirStringCallback callback,
                                             void *userData);
+MLIR_CAPI_EXPORTED void mlirIdentifierPrint(MlirIdentifier identifier,
+                                            MlirStringCallback callback,
+                                            void *userData);
 MLIR_CAPI_EXPORTED void beaverOperationPrintSpecializedFrom(
     MlirOperation op, MlirStringCallback callback, void *userData);
 MLIR_CAPI_EXPORTED void

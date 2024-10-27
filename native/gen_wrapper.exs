@@ -5,7 +5,8 @@ defmodule Updater do
     System.argv() |> Enum.chunk_every(2)
   end
 
-  @io_only ~w{mlirPassManagerRunOnOp} |> Enum.map(&String.to_atom/1)
+  @io_only ~w{mlirPassManagerRunOnOp mlirOperationVerify mlirAttributeParseGet mlirTypeParseGet mlirModuleCreateParse}
+           |> Enum.map(&String.to_atom/1)
   @regular_io_cpu ~w{mlirExecutionEngineInvokePacked} |> Enum.map(&String.to_atom/1)
 
   defp dirty_io(name), do: "#{name}_dirty_io" |> String.to_atom()

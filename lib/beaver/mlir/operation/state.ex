@@ -1,8 +1,7 @@
 defmodule Beaver.MLIR.Operation.State do
   @moduledoc false
 
-  use Kinda.ResourceKind,
-    forward_module: Beaver.Native
+  use Kinda.ResourceKind, forward_module: Beaver.Native
 
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
@@ -14,7 +13,7 @@ defmodule Beaver.MLIR.Operation.State do
          } = changeset
        )
        when not is_nil(location) and not is_function(location) do
-    %MLIR.Operation.Changeset{changeset | context: CAPI.mlirLocationGetContext(location)}
+    %MLIR.Operation.Changeset{changeset | context: MLIR.context(location)}
   end
 
   defp prepare(
@@ -24,7 +23,7 @@ defmodule Beaver.MLIR.Operation.State do
          } = changeset
        )
        when not is_nil(context) do
-    %MLIR.Operation.Changeset{changeset | location: CAPI.mlirLocationUnknownGet(context)}
+    %MLIR.Operation.Changeset{changeset | location: MLIR.Location.unknown(ctx: context)}
   end
 
   defp prepare(

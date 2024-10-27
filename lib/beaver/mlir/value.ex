@@ -4,8 +4,7 @@ defmodule Beaver.MLIR.Value do
   """
   alias Beaver.MLIR.CAPI
 
-  use Kinda.ResourceKind,
-    forward_module: Beaver.Native
+  use Kinda.ResourceKind, forward_module: Beaver.Native
 
   def argument?(%__MODULE__{} = value) do
     CAPI.mlirValueIsABlockArgument(value) |> Beaver.Native.to_term()

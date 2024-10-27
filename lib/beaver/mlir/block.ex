@@ -4,8 +4,7 @@ defmodule Beaver.MLIR.Block do
   """
   alias Beaver.MLIR
 
-  use Kinda.ResourceKind,
-    forward_module: Beaver.Native
+  use Kinda.ResourceKind, forward_module: Beaver.Native
 
   defp do_add_args!(block, ctx, {t, loc}) when is_function(t, 1) or is_function(loc, 1) do
     MLIR.CAPI.mlirBlockAddArgument(
@@ -45,9 +44,9 @@ defmodule Beaver.MLIR.Block do
     ctx =
       opts[:ctx] ||
         Enum.find_value(args, fn
-          t = %MLIR.Type{} -> MLIR.CAPI.mlirTypeGetContext(t)
-          {t = %MLIR.Type{}, _} -> MLIR.CAPI.mlirTypeGetContext(t)
-          {_, l = %MLIR.Location{}} -> MLIR.CAPI.mlirLocationGetContext(l)
+          t = %MLIR.Type{} -> MLIR.context(t)
+          {t = %MLIR.Type{}, _} -> MLIR.context(t)
+          {_, l = %MLIR.Location{}} -> MLIR.context(l)
           _ -> nil
         end)
 

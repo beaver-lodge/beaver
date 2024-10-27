@@ -3,10 +3,11 @@ const mlir_capi = @import("mlir_capi.zig");
 const std = @import("std");
 const e = @import("erl_nif");
 const result = @import("kinda").result;
+const kinda = @import("kinda");
 pub const c = @import("prelude.zig");
 const mem = @import("std").mem;
 
-pub fn Printer(comptime name: [*c]const u8, comptime ResourceKind: type, comptime print_fn: anytype) type {
+pub fn PrinterNIF(comptime name: []const u8, comptime ResourceKind: type, comptime print_fn: anytype) type {
     return struct {
         const Error = error{
             NullPointerFound,
@@ -27,15 +28,56 @@ pub fn Printer(comptime name: [*c]const u8, comptime ResourceKind: type, comptim
             print_fn(entity, collect_string_ref, &printer);
             return beam.make_slice(env, printer.buffer.items);
         }
-        const entry = result.nif(name, 1, to_string).entry;
+        const entry = result.nif("beaver_raw_to_string_" ++ name, 1, to_string).entry;
     };
 }
+
+// collect multiple MLIR StringRef and join them as a single erlang binary
+pub const Printer = struct {
+    pub const ResourceKind = kinda.ResourceKind(@This(), "Elixir.Beaver.StringPrinter");
+    pub const PtrType = *@This();
+    pub const ArrayType = [*]@This();
+    const Error = error{ NullPointerFound, InvalidPrinter, @"Already flushed" };
+    const Buffer = std.ArrayList(u8);
+    const Flushed = std.atomic.Value(bool);
+    buffer: Buffer,
+    flushed: Flushed = Flushed.init(false),
+    pub fn make(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
+        const v = @This(){ .buffer = Buffer.init(beam.allocator) };
+        return ResourceKind.resource.make(env, v) catch return beam.Error.@"Fail to create primitive";
+    }
+    pub const maker = .{ make, 0 };
+    fn collect_string_ref(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
+        const printer: *@This() = @ptrCast(@alignCast(userData));
+        printer.*.buffer.appendSlice(s.data[0..s.length]) catch unreachable;
+    }
+    pub fn destroy(_: beam.env, userData: ?*anyopaque) callconv(.C) void {
+        const printer: *@This() = @ptrCast(@alignCast(userData));
+        if (!printer.flushed.load(.acquire)) {
+            printer.buffer.deinit();
+        }
+    }
+    fn callback(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
+        return try mlir_capi.StringCallback.resource.make(env, collect_string_ref);
+    }
+    pub fn flush(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+        const printer: *@This() = try ResourceKind.resource.fetch_ptr(env, args[0]);
+        if (printer.flushed.load(.acquire)) return Error.@"Already flushed";
+        defer printer.buffer.deinit(); // defer to free buffer after return term has been created
+        printer.flushed.store(true, .release);
+        return beam.make_slice(env, printer.buffer.items);
+    }
+    const entries = .{
+        result.nif("beaver_raw_string_printer_callback", 0, callback).entry,
+        result.nif("beaver_raw_string_printer_flush", 1, flush).entry,
+    };
+};
 
 fn string_ref_to_binary(env: beam.env, s: mlir_capi.StringRef.T) beam.term {
     return beam.make_slice(env, s.data[0..s.length]);
 }
 
-// collect mlir StringRef as a list of erlang binary
+// collect multiple MLIR StringRef as a list of erlang binary
 pub const StringRefCollector = struct {
     const Container = std.ArrayList(beam.term);
     container: Container = undefined,
@@ -87,14 +129,16 @@ fn beaver_raw_get_string_ref(env: beam.env, _: c_int, args: [*c]const beam.term)
 pub const nifs = .{
     result.nif("beaver_raw_get_string_ref", 1, beaver_raw_get_string_ref).entry,
     result.nif("beaver_raw_string_ref_to_binary", 1, beaver_raw_string_ref_to_binary).entry,
-    Printer("beaver_raw_to_string_attribute", mlir_capi.Attribute, c.mlirAttributePrint).entry,
-    Printer("beaver_raw_to_string_type", mlir_capi.Type, c.mlirTypePrint).entry,
-    Printer("beaver_raw_to_string_operation", mlir_capi.Operation, c.mlirOperationPrint).entry,
-    Printer("beaver_raw_to_string_operation_specialized", mlir_capi.Operation, c.beaverOperationPrintSpecializedFrom).entry,
-    Printer("beaver_raw_to_string_operation_generic", mlir_capi.Operation, c.beaverOperationPrintGenericOpForm).entry,
-    Printer("beaver_raw_to_string_operation_bytecode", mlir_capi.Operation, c.mlirOperationWriteBytecode).entry,
-    Printer("beaver_raw_to_string_value", mlir_capi.Value, c.mlirValuePrint).entry,
-    Printer("beaver_raw_to_string_pm", mlir_capi.OpPassManager, c.mlirPrintPassPipeline).entry,
-    Printer("beaver_raw_to_string_affine_map", mlir_capi.AffineMap, c.mlirAffineMapPrint).entry,
-    Printer("beaver_raw_to_string_location", mlir_capi.Location, c.beaverLocationPrint).entry,
-};
+    PrinterNIF("Attribute", mlir_capi.Attribute, c.mlirAttributePrint).entry,
+    PrinterNIF("Type", mlir_capi.Type, c.mlirTypePrint).entry,
+    PrinterNIF("Operation", mlir_capi.Operation, c.mlirOperationPrint).entry,
+    PrinterNIF("OperationSpecialized", mlir_capi.Operation, c.beaverOperationPrintSpecializedFrom).entry,
+    PrinterNIF("OperationGeneric", mlir_capi.Operation, c.beaverOperationPrintGenericOpForm).entry,
+    PrinterNIF("OperationBytecode", mlir_capi.Operation, c.mlirOperationWriteBytecode).entry,
+    PrinterNIF("Value", mlir_capi.Value, c.mlirValuePrint).entry,
+    PrinterNIF("OpPassManager", mlir_capi.OpPassManager, c.mlirPrintPassPipeline).entry,
+    PrinterNIF("AffineMap", mlir_capi.AffineMap, c.mlirAffineMapPrint).entry,
+    PrinterNIF("Location", mlir_capi.Location, c.beaverLocationPrint).entry,
+    PrinterNIF("Identifier", mlir_capi.Identifier, c.mlirIdentifierPrint).entry,
+    PrinterNIF("Diagnostic", mlir_capi.Diagnostic, c.mlirDiagnosticPrint).entry,
+} ++ Printer.entries;

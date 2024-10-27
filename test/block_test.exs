@@ -7,8 +7,8 @@ defmodule BlockTest do
   require Func
   @moduletag :smoke
 
-  test "block usage after defining", test_context do
-    mlir ctx: test_context[:ctx] do
+  test "block usage after defining", %{ctx: ctx} do
+    mlir ctx: ctx do
       module do
         Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
           region do
@@ -37,8 +37,8 @@ defmodule BlockTest do
     |> MLIR.Operation.verify!()
   end
 
-  test "dangling block", test_context do
-    mlir ctx: test_context[:ctx] do
+  test "dangling block", %{ctx: ctx, diagnostic_server: diagnostic_server} do
+    mlir ctx: ctx do
       module do
         Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
           region do
@@ -52,12 +52,12 @@ defmodule BlockTest do
     end
     |> MLIR.Operation.verify()
 
-    assert Beaver.Diagnostic.Server.flush(test_context[:diagnostic_server]) =~
+    assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
              "reference to block defined in another region"
   end
 
-  test "successor of wrong arg type", test_context do
-    mlir ctx: test_context[:ctx] do
+  test "successor of wrong arg type", %{ctx: ctx, diagnostic_server: diagnostic_server} do
+    mlir ctx: ctx do
       module do
         Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
           region do
@@ -74,12 +74,12 @@ defmodule BlockTest do
     end
     |> MLIR.Operation.verify()
 
-    assert Beaver.Diagnostic.Server.flush(test_context[:diagnostic_server]) =~
+    assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
              "branch has 1 operands for successor"
   end
 
-  test "nested block creation", test_context do
-    mlir ctx: test_context[:ctx] do
+  test "nested block creation", %{ctx: ctx, diagnostic_server: diagnostic_server} do
+    mlir ctx: ctx do
       module do
         top_level_block = Beaver.Env.block()
 
@@ -111,14 +111,14 @@ defmodule BlockTest do
     end
     |> MLIR.Operation.verify()
 
-    assert Beaver.Diagnostic.Server.flush(test_context[:diagnostic_server]) =~
+    assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
              "branch has 1 operands for successor"
   end
 
   describe "insert block to region" do
     for action <- [:insert, :append] do
-      test "appending #{action}", test_context do
-        mlir ctx: test_context[:ctx] do
+      test "appending #{action}", %{ctx: ctx, diagnostic_server: diagnostic_server} do
+        mlir ctx: ctx do
           module do
             Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
               b =
@@ -144,17 +144,17 @@ defmodule BlockTest do
         end
         |> MLIR.Operation.verify()
 
-        assert Beaver.Diagnostic.Server.flush(test_context[:diagnostic_server]) =~
-                 "empty block: expect at least a terminator"
+        assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
+                 "expect at least a terminator"
       end
     end
   end
 
-  test "block in env got popped", test_context do
+  test "block in env got popped", %{ctx: ctx} do
     file = __ENV__.file
     line = __ENV__.line + 3
 
-    mlir ctx: test_context[:ctx] do
+    mlir ctx: ctx do
       module do
         Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
           region do
@@ -171,8 +171,8 @@ defmodule BlockTest do
     end
   end
 
-  test "block arg has no owner", test_context do
-    mlir ctx: test_context[:ctx] do
+  test "block arg has no owner", %{ctx: ctx} do
+    mlir ctx: ctx do
       module do
         Func.func some_func(function_type: Type.function([Type.i(32)], [Type.i(32)])) do
           region do

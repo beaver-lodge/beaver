@@ -5,7 +5,7 @@ defmodule Beaver.MixProject do
     [
       app: :beaver,
       version: "0.3.11-dev",
-      elixir: "~> 1.9",
+      elixir: "~> 1.12",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
@@ -66,6 +66,12 @@ defmodule Beaver.MixProject do
         ENIF: [
           ~r"Beaver.ENIF.*"
         ],
+        Utils: [
+          ~r"Beaver.Deferred.*",
+          ~r"Beaver.Diagnostic.*",
+          ~r"Beaver.Pass.*",
+          ~r"Beaver.String.*"
+        ],
         Dialect: [
           ~r"Beaver.MLIR.Dialect.*"
         ],
@@ -74,10 +80,6 @@ defmodule Beaver.MixProject do
         ],
         Native: [
           ~r"Beaver.Native.*"
-        ],
-        Utils: [
-          Beaver.Deferred,
-          ~r"Beaver.Diagnostic.*"
         ]
       ]
     ]
