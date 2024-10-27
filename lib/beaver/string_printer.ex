@@ -28,6 +28,12 @@ defmodule Beaver.StringPrinter do
   """
   def run(f) when is_function(f, 2) do
     {sp, user_data} = create()
-    {f.(callback(), user_data), flush(sp)}
+    try do
+      {f.(callback(), user_data), flush(sp)}
+    rescue
+      e ->
+        flush(sp)
+        reraise e, __STACKTRACE__
+    end
   end
 end
