@@ -53,7 +53,7 @@ pub const Printer = struct {
     pub fn destroy(_: beam.env, userData: ?*anyopaque) callconv(.C) void {
         const printer: *@This() = @ptrCast(@alignCast(userData));
         if (!printer.flushed) {
-            @panic("Printer not flushed");
+            printer.buffer.deinit();
         }
     }
     fn callback(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {

@@ -77,7 +77,7 @@ defmodule Beaver.MLIR do
     function_exported?(CAPI, f, 1) && apply(CAPI, f, [entity]) |> Beaver.Native.to_term()
   end
 
-  defp dump_if_not_null(%m{} = entity, dumper) do
+  defp not_null_run(%m{} = entity, dumper) do
     entity_name = extract_entity_name(m)
 
     if is_null(entity) do
@@ -112,15 +112,15 @@ defmodule Beaver.MLIR do
 
   def dump(%Operation{} = mlir, opts) do
     if opts[:generic] do
-      dump_if_not_null(mlir, &CAPI.beaverOperationDumpGeneric/1)
+      not_null_run(mlir, &CAPI.beaverOperationDumpGeneric/1)
     else
-      dump_if_not_null(mlir, &CAPI.mlirOperationDump/1)
+      not_null_run(mlir, &CAPI.mlirOperationDump/1)
     end
   end
 
   def dump(%m{} = entity, _opts) do
     entity_name = extract_entity_name(m)
-    dump_if_not_null(entity, &apply(CAPI, :"mlir#{entity_name}Dump", [&1]))
+    not_null_run(entity, &apply(CAPI, :"mlir#{entity_name}Dump", [&1]))
   end
 
   def dump!(mlir, opts \\ [])
@@ -172,9 +172,9 @@ defmodule Beaver.MLIR do
     Beaver.Deferred.create(f, Keyword.fetch!(opts, :ctx)) |> to_string(opts)
   end
 
-  def to_string(%m{ref: _ref} = entity, _opts) do
+  def to_string(%m{} = entity, _opts) do
     entity_name = extract_entity_name(m)
-    dump_if_not_null(entity, &apply(CAPI, :"beaver_raw_to_string_#{entity_name}", [&1.ref]))
+    not_null_run(entity, &apply(CAPI, :"beaver_raw_to_string_#{entity_name}", [&1.ref]))
   end
 end
 
