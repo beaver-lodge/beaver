@@ -61,8 +61,8 @@ pub const Printer = struct {
     }
     pub fn flush(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         const printer: *@This() = try ResourceKind.resource.fetch_ptr(env, args[0]);
-        defer printer.buffer.deinit(); // defer to free buffer after return term has been created
         if (printer.flushed) return Error.@"Already flushed";
+        defer printer.buffer.deinit(); // defer to free buffer after return term has been created
         printer.flushed = true;
         return beam.make_slice(env, printer.buffer.items);
     }
