@@ -14,10 +14,10 @@ defmodule MemRefTest do
     assert [6, 3, 1] = Beaver.Native.Memory.dense_strides([1, 2, 3])
   end
 
-  test "run mlir module defined by sigil", test_context do
+  test "run mlir module defined by sigil", %{ctx: ctx} do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}
-    ctx = test_context[:ctx]
+    ctx = ctx
 
     jit =
       ~m"""

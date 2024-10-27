@@ -3,11 +3,11 @@ defmodule OpTest do
   alias Beaver.MLIR
   import Beaver.MLIR.Sigils
 
-  test "get_and_update", test_context do
+  test "get_and_update", %{ctx: ctx} do
     const =
       ~m"""
       %0 = arith.constant dense<42> : vector<4xi32>
-      """.(test_context[:ctx])
+      """.(ctx)
       |> MLIR.Operation.verify!()
       |> MLIR.Module.body()
       |> Beaver.Walker.operations()
@@ -23,7 +23,7 @@ defmodule OpTest do
 
     # check deferred attribute
     old_attr = const[:value]
-    {attr, op} = get_and_update_in(const[:value], &{&1, ~a{#{attr_str2}}.(test_context[:ctx])})
+    {attr, op} = get_and_update_in(const[:value], &{&1, ~a{#{attr_str2}}.(ctx)})
     assert MLIR.equal?(attr, old_attr)
     assert MLIR.equal?(op, const)
     assert const |> MLIR.to_string() =~ attr_str2

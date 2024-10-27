@@ -1,31 +1,89 @@
 defmodule Beaver.MLIR do
   @moduledoc """
-  This module provides functions to dump MLIR elements or print them to Elixir string.
+  This module provides common functions to work with MLIR entities.
+
+  The functions in this module will leverage pattern matching to extract the entity type and call the corresponding CAPI function.
   """
-  require Logger
   alias Beaver.MLIR.CAPI
 
+  defp extract_entity_name(m) do
+    ["Beaver", "MLIR", entity_name] = m |> Module.split()
+    entity_name
+  end
+
   alias Beaver.MLIR.{
+    Module,
     Value,
     Attribute,
     Type,
     Block,
     Location,
-    Module,
     Operation,
     AffineMap,
     Dialect,
-    AffineExpr,
-    IntegerSet,
     OpPassManager,
-    PassManager
+    PassManager,
+    Identifier,
+    Diagnostic
   }
 
-  defp dump_if_not_null(ir, dumper) do
-    if is_null(ir) do
-      {:error, "can't dump null"}
+  @doc """
+  Get the MLIR context of an MLIR entity.
+  """
+  def context(%m{} = entity) do
+    entity_name = extract_entity_name(m)
+    apply(CAPI, :"mlir#{entity_name}GetContext", [entity])
+  end
+
+  @doc """
+  Get the MLIR location of an MLIR entity.
+  """
+  def location(%m{} = entity) do
+    entity_name = extract_entity_name(m)
+    apply(CAPI, :"mlir#{entity_name}GetLocation", [entity])
+  end
+
+  @doc """
+  Compare two MLIR entities.
+  """
+  def equal?(a = %m{}, b = %m{}) do
+    entity_name = extract_entity_name(m)
+    apply(CAPI, :"mlir#{entity_name}Equal", [a, b]) |> Beaver.Native.to_term()
+  end
+
+  def equal?(a, b) when is_function(a, 1) do
+    ctx = context(b)
+    equal?(Beaver.Deferred.create(a, ctx), b)
+  end
+
+  def equal?(a, b) when is_function(b, 1) do
+    ctx = context(a)
+    equal?(a, Beaver.Deferred.create(b, ctx))
+  end
+
+  @type nullable() ::
+          Attribute.t()
+          | Value.t()
+          | Type.t()
+          | Operation.t()
+          | Module.t()
+          | Block.t()
+          | Dialect.t()
+
+  @spec is_null(nullable()) :: boolean()
+  def is_null(%m{} = entity) do
+    entity_name = extract_entity_name(m)
+    f = :"beaverIsNull#{entity_name}"
+    function_exported?(CAPI, f, 1) && apply(CAPI, f, [entity]) |> Beaver.Native.to_term()
+  end
+
+  defp dump_if_not_null(%m{} = entity, dumper) do
+    entity_name = extract_entity_name(m)
+
+    if is_null(entity) do
+      {:error, "#{entity_name} is null"}
     else
-      dumper.(ir)
+      dumper.(entity)
     end
   end
 
@@ -39,13 +97,15 @@ defmodule Beaver.MLIR do
           | OpPassManager.t()
           | PassManager.t()
           | Module.t()
+          | Identifier.t()
+          | Diagnostic.t()
 
   @type dump_opts :: [generic: boolean()]
   @spec dump(printable(), dump_opts()) :: :ok
   @spec dump!(printable(), dump_opts()) :: any()
   def dump(mlir, opts \\ [])
 
-  def dump(%Module{} = mlir, opts) do
+  def dump(%Beaver.MLIR.Module{} = mlir, opts) do
     CAPI.mlirModuleGetOperation(mlir)
     |> dump(opts)
   end
@@ -58,32 +118,9 @@ defmodule Beaver.MLIR do
     end
   end
 
-  def dump(%Attribute{} = mlir, _opts) do
-    dump_if_not_null(mlir, &CAPI.mlirAttributeDump/1)
-  end
-
-  def dump(%Value{} = mlir, _opts) do
-    dump_if_not_null(mlir, &CAPI.mlirValueDump/1)
-  end
-
-  def dump(%AffineExpr{} = mlir, _opts) do
-    dump_if_not_null(mlir, &CAPI.mlirAffineExprDump/1)
-  end
-
-  def dump(%AffineMap{} = mlir, _opts) do
-    dump_if_not_null(mlir, &CAPI.mlirAffineMapDump/1)
-  end
-
-  def dump(%IntegerSet{} = mlir, _opts) do
-    dump_if_not_null(mlir, &CAPI.mlirIntegerSetDump/1)
-  end
-
-  def dump(%Type{} = mlir, _opts) do
-    dump_if_not_null(mlir, &CAPI.mlirTypeDump/1)
-  end
-
-  def dump(_, _) do
-    {:error, "not a mlir element can be dumped"}
+  def dump(%m{} = entity, _opts) do
+    entity_name = extract_entity_name(m)
+    dump_if_not_null(entity, &apply(CAPI, :"mlir#{entity_name}Dump", [&1]))
   end
 
   def dump!(mlir, opts \\ [])
@@ -98,45 +135,6 @@ defmodule Beaver.MLIR do
     end
   end
 
-  @type nullable() ::
-          Attribute.t()
-          | Value.t()
-          | Type.t()
-          | Operation.t()
-          | Module.t()
-          | Block.t()
-          | Dialect.t()
-
-  @spec is_null(nullable()) :: boolean()
-
-  def is_null(%Attribute{} = v) do
-    CAPI.beaverIsNullAttribute(v) |> Beaver.Native.to_term()
-  end
-
-  def is_null(%Operation{} = v) do
-    CAPI.beaverIsNullOperation(v) |> Beaver.Native.to_term()
-  end
-
-  def is_null(%Module{} = m) do
-    CAPI.beaverIsNullModule(m) |> Beaver.Native.to_term()
-  end
-
-  def is_null(%Block{} = v) do
-    CAPI.beaverIsNullBlock(v) |> Beaver.Native.to_term()
-  end
-
-  def is_null(%Value{} = v) do
-    CAPI.beaverIsNullValue(v) |> Beaver.Native.to_term()
-  end
-
-  def is_null(%Type{} = v) do
-    CAPI.beaverIsNullType(v) |> Beaver.Native.to_term()
-  end
-
-  def is_null(%Dialect{} = v) do
-    CAPI.beaverIsNullDialect(v) |> Beaver.Native.to_term()
-  end
-
   @spec to_string(printable(), dump_opts()) :: :ok
 
   @doc """
@@ -145,50 +143,25 @@ defmodule Beaver.MLIR do
 
   def to_string(mlir, opts \\ [])
 
-  def to_string(%Attribute{ref: ref}, _opts) do
-    CAPI.beaver_raw_to_string_attribute(ref)
-  end
-
-  def to_string(%Value{ref: ref}, _opts) do
-    CAPI.beaver_raw_to_string_value(ref)
-  end
-
   def to_string(%Operation{ref: ref}, opts) do
-    generic = Keyword.get(opts, :generic)
-
     cond do
       opts[:bytecode] ->
-        CAPI.beaver_raw_to_string_operation_bytecode(ref)
+        :Bytecode
 
-      generic == false ->
-        CAPI.beaver_raw_to_string_operation_specialized(ref)
+      opts[:generic] == false ->
+        :Specialized
 
-      generic == true ->
-        CAPI.beaver_raw_to_string_operation_generic(ref)
+      opts[:generic] == true ->
+        :Generic
 
       true ->
-        CAPI.beaver_raw_to_string_operation(ref)
+        nil
     end
+    |> then(&apply(CAPI, :"beaver_raw_to_string_Operation#{&1}", [ref]))
   end
 
-  def to_string(%Module{} = module, opts) do
-    module |> Operation.from_module() |> __MODULE__.to_string(opts)
-  end
-
-  def to_string(%Type{ref: ref}, _opts) do
-    CAPI.beaver_raw_to_string_type(ref)
-  end
-
-  def to_string(%AffineMap{ref: ref}, _opts) do
-    CAPI.beaver_raw_to_string_affine_map(ref)
-  end
-
-  def to_string(%Location{ref: ref}, _opts) do
-    CAPI.beaver_raw_to_string_location(ref)
-  end
-
-  def to_string(%OpPassManager{ref: ref}, _opts) do
-    CAPI.beaver_raw_to_string_pm(ref)
+  def to_string(%Beaver.MLIR.Module{} = module, opts) do
+    module |> Operation.from_module() |> to_string(opts)
   end
 
   def to_string(%PassManager{} = pm, _opts) do
@@ -199,8 +172,9 @@ defmodule Beaver.MLIR do
     Beaver.Deferred.create(f, Keyword.fetch!(opts, :ctx)) |> to_string(opts)
   end
 
-  def equal?(%m{} = a, %m{} = b) do
-    apply(m, :equal?, [a, b])
+  def to_string(%m{ref: _ref} = entity, _opts) do
+    entity_name = extract_entity_name(m)
+    dump_if_not_null(entity, &apply(CAPI, :"beaver_raw_to_string_#{entity_name}", [&1.ref]))
   end
 end
 
@@ -213,7 +187,9 @@ for m <- [
       Beaver.MLIR.AffineMap,
       Beaver.MLIR.Location,
       Beaver.MLIR.OpPassManager,
-      Beaver.MLIR.PassManager
+      Beaver.MLIR.PassManager,
+      Beaver.MLIR.Identifier,
+      Beaver.MLIR.Diagnostic
     ] do
   defimpl String.Chars, for: m do
     defdelegate to_string(mlir), to: Beaver.MLIR

@@ -6,8 +6,8 @@ defmodule GPUTest do
   @moduletag :smoke
   @moduletag :cuda
 
-  test "fatbin", test_context do
-    ctx = test_context[:ctx]
+  test "fatbin", %{ctx: ctx} do
+    ctx = ctx
     MLIR.Context.register_translations(ctx)
     # trap sigchld when running ptxas to generate fatbin
     System.trap_signal(:sigchld, fn -> :ok end)
@@ -18,8 +18,8 @@ defmodule GPUTest do
            |> to_string() =~ "gpu.binary @other_func_kernel"
   end
 
-  test "isa", test_context do
-    ctx = test_context[:ctx]
+  test "isa", %{ctx: ctx} do
+    ctx = ctx
     MLIR.Context.register_translations(ctx)
 
     assert MLIR.Module.create(ctx, File.read!("test/gpu-to-cubin.mlir"))

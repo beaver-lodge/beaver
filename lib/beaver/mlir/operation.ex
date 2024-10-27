@@ -13,7 +13,7 @@ defmodule Beaver.MLIR.Operation do
 
   def create(%Beaver.SSA{
         op: op_name,
-        block: %MLIR.Block{} = block,
+        blk: %MLIR.Block{} = block,
         arguments: arguments,
         results: results,
         filler: filler,
@@ -171,10 +171,6 @@ defmodule Beaver.MLIR.Operation do
     end
   end
 
-  def equal?(%__MODULE__{} = a, %__MODULE__{} = b) do
-    mlirOperationEqual(a, b) |> Beaver.Native.to_term()
-  end
-
   @impl Access
   def fetch(operation, attribute) do
     attr = mlirOperationGetAttributeByName(operation, MLIR.StringRef.create(attribute))
@@ -196,7 +192,7 @@ defmodule Beaver.MLIR.Operation do
 
     case function.(attr) do
       {_current_value, new_value} ->
-        ctx = mlirOperationGetContext(operation)
+        ctx = MLIR.context(operation)
 
         mlirOperationSetAttributeByName(
           operation,

@@ -5,8 +5,8 @@ defmodule TypeInferTest do
   require Func
   @moduletag :smoke
 
-  test "type infer", test_context do
-    ctx = test_context[:ctx]
+  test "type infer", %{ctx: ctx} do
+    ctx = ctx
 
     mlir ctx: ctx do
       module do
@@ -23,7 +23,7 @@ defmodule TypeInferTest do
             block do
               v = Arith.constant(value: value) >>> vector_t
               v0 = Arith.addi(v, v) >>> :infer
-              assert v0 |> MLIR.Value.type() |> MLIR.Type.equal?(vector_t)
+              assert v0 |> MLIR.Value.type() |> MLIR.equal?(vector_t)
               Func.return(v0) >>> []
             end
           end

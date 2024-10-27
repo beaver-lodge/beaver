@@ -7,9 +7,9 @@ defmodule ExteriorTest do
   alias Beaver.MLIR.Dialect.Elixir, as: Ex
   require Func
 
-  test "generate ops in elixir dialect", test_context do
+  test "generate ops in elixir dialect", %{ctx: ctx} do
     ir =
-      mlir ctx: test_context[:ctx] do
+      mlir ctx: ctx do
         module do
           Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
             region do

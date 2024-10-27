@@ -24,10 +24,10 @@ defmodule E2ETest do
       |> MLIR.ExecutionEngine.create!()
     end
 
-    test "dirty scheduler invocation", test_context do
+    test "dirty scheduler invocation", %{ctx: ctx} do
       arg = Beaver.Native.I32.make(42)
       return = Beaver.Native.I32.make(-1)
-      jit = make_jit(test_context[:ctx])
+      jit = make_jit(ctx)
       MLIR.ExecutionEngine.invoke!(jit, "add", [arg, arg], return)
       assert return |> Beaver.Native.to_term() == 84
       MLIR.ExecutionEngine.invoke!(jit, "add", [return, arg], return, dirty: :cpu_bound)
@@ -36,8 +36,8 @@ defmodule E2ETest do
       assert return |> Beaver.Native.to_term() == 168
     end
 
-    test "parallel invocation", test_context do
-      jit = make_jit(test_context[:ctx])
+    test "parallel invocation", %{ctx: ctx} do
+      jit = make_jit(ctx)
 
       for i <- 0..100_0 do
         Task.async(fn ->

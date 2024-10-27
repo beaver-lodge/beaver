@@ -37,20 +37,6 @@ defmodule Beaver.MLIR.Attribute do
     end)
   end
 
-  def equal?(a, b = %__MODULE__{}) when is_function(a, 1) do
-    ctx = mlirAttributeGetContext(b)
-    equal?(Beaver.Deferred.create(a, ctx), b)
-  end
-
-  def equal?(a = %__MODULE__{}, b) when is_function(b, 1) do
-    ctx = mlirAttributeGetContext(a)
-    equal?(a, Beaver.Deferred.create(b, ctx))
-  end
-
-  def equal?(%__MODULE__{} = a, %__MODULE__{} = b) do
-    mlirAttributeEqual(a, b) |> Beaver.Native.to_term()
-  end
-
   def dense_elements(elements, shaped_type \\ {:i, 8}, opts \\ [])
 
   def dense_elements(elements, {t, width}, opts)
@@ -159,7 +145,7 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   def float(t, value) when is_float(value) do
-    composite(t, &MLIR.Type.float?/1, &mlirFloatAttrDoubleGet(mlirTypeGetContext(&1), &1, value))
+    composite(t, &MLIR.Type.float?/1, &mlirFloatAttrDoubleGet(MLIR.context(&1), &1, value))
   end
 
   def bool(value, opts \\ []) do

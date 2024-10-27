@@ -11,7 +11,7 @@ defmodule TranslateMLIR do
   require Func
 
   defp compile_for_loop(result, write_index, [[do: do_block]], acc, ctx, block) do
-    mlir ctx: ctx, block: block do
+    mlir ctx: ctx, blk: block do
       {ret, acc} = Macro.prewalk(do_block, acc, &gen_mlir(&1, &2, ctx, block))
       MemRef.store(ret, result, write_index) >>> []
       {nil, acc}
@@ -26,7 +26,7 @@ defmodule TranslateMLIR do
          ctx,
          block
        ) do
-    mlir ctx: ctx, block: block do
+    mlir ctx: ctx, blk: block do
       zero = Index.constant(value: Attribute.index(0)) >>> Type.index()
       lower_bound = Index.constant(value: Attribute.index(0)) >>> Type.index()
       upper_bound = MemRef.dim(memref, zero) >>> Type.index()
@@ -55,7 +55,7 @@ defmodule TranslateMLIR do
          ctx,
          block
        ) do
-    mlir ctx: ctx, block: block do
+    mlir ctx: ctx, blk: block do
       {expressions, acc} =
         expressions
         |> Enum.reduce({[], acc}, fn
@@ -99,7 +99,7 @@ defmodule TranslateMLIR do
          block
        ) do
     {value, acc} =
-      mlir ctx: ctx, block: block do
+      mlir ctx: ctx, blk: block do
         Macro.prewalk(bound, acc, &gen_mlir(&1, &2, ctx, Beaver.Env.block()))
       end
 
@@ -113,7 +113,7 @@ defmodule TranslateMLIR do
          block
        ) do
     value =
-      mlir ctx: ctx, block: block do
+      mlir ctx: ctx, blk: block do
         {[left, right], acc} =
           Enum.reduce([left, right], {[], acc}, fn i, {ops, acc} ->
             {r, acc} = Macro.prewalk(i, acc, &gen_mlir(&1, &2, ctx, Beaver.Env.block()))
@@ -140,7 +140,7 @@ defmodule TranslateMLIR do
           {ops ++ [r], acc}
         end)
 
-      mlir ctx: ctx, block: block do
+      mlir ctx: ctx, blk: block do
         memref = MemRef.alloca() >>> Type.memref([length(list)], Type.i64())
 
         for {v, i} <- Enum.with_index(values) do
@@ -166,7 +166,7 @@ defmodule TranslateMLIR do
 
   defp gen_mlir(i, acc, ctx, block) when is_integer(i) do
     value =
-      mlir ctx: ctx, block: block do
+      mlir ctx: ctx, blk: block do
         Arith.constant(value: Attribute.integer(Type.i64(), i)) >>> Type.i64()
       end
 
@@ -202,7 +202,7 @@ defmodule TranslateMLIR do
   end
 
   defp compile_body(ctx, block, expr, acc_init) do
-    mlir ctx: ctx, block: block do
+    mlir ctx: ctx, blk: block do
       {ret, _acc} =
         Macro.prewalk(expr, acc_init, &gen_mlir(&1, &2, ctx, Beaver.Env.block()))
 
@@ -245,7 +245,7 @@ defmodule TranslateMLIR do
         %MLIR.Value{} = v -> v
       end
 
-    mlir ctx: ctx, block: entry_block do
+    mlir ctx: ctx, blk: entry_block do
       Func.return(ret_val) >>> []
     end
 

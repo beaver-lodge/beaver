@@ -78,8 +78,8 @@ defmodule MlirTest do
     assert 0 == n_attributes |> Beaver.Native.to_term()
     add_op = add_op_state |> MLIR.Operation.create()
 
-    _ctx = mlirLocationGetContext(location)
-    ctx = mlirLocationGetContext(location1)
+    _ctx = MLIR.context(location)
+    ctx = MLIR.context(location1)
 
     r = mlirOperationGetResult(add_op, 0)
 
@@ -168,7 +168,6 @@ defmodule MlirTest do
 
     def run(%Beaver.MLIR.Operation{} = op) do
       MLIR.Operation.verify!(op)
-      :ok
     end
   end
 
@@ -178,7 +177,6 @@ defmodule MlirTest do
 
     def run(%Beaver.MLIR.Operation{} = op) do
       MLIR.Operation.verify!(op)
-      :ok
     end
   end
 
@@ -199,8 +197,8 @@ defmodule MlirTest do
     mlirContextDestroy(ctx)
   end
 
-  test "Run a func operation pass", test_context do
-    ctx = test_context[:ctx]
+  test "Run a func operation pass", %{ctx: ctx} do
+    ctx = ctx
     module = create_adder_module(ctx)
     assert not MLIR.Module.is_null(module)
     external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestFuncPass)
@@ -213,8 +211,8 @@ defmodule MlirTest do
     mlirModuleDestroy(module)
   end
 
-  test "Run pass with patterns", test_context do
-    ctx = test_context[:ctx]
+  test "Run pass with patterns", %{ctx: ctx} do
+    ctx = ctx
     module = create_redundant_transpose_module(ctx)
     assert not MLIR.Module.is_null(module)
     external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestFuncPass)
@@ -291,8 +289,8 @@ defmodule MlirTest do
     mlirContextDestroy(ctx)
   end
 
-  test "affine expr and map", test_context do
-    ctx = test_context[:ctx]
+  test "affine expr and map", %{ctx: ctx} do
+    ctx = ctx
     affine_dim_expr = mlirAffineDimExprGet(ctx, 0)
     affine_symbol_expr = mlirAffineSymbolExprGet(ctx, 1)
 
@@ -311,7 +309,7 @@ defmodule MlirTest do
   test "exception" do
     assert match?(
              %Kinda.CallError{message: :FunctionClauseError, error_return_trace: _},
-             catch_error(beaver_raw_to_string_type(1))
+             catch_error(beaver_raw_to_string_Type(1))
            )
   end
 end

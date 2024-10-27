@@ -210,6 +210,12 @@ MLIR_CAPI_EXPORTED void beaverLocationPrint(MlirLocation location,
   }
 }
 
+MLIR_CAPI_EXPORTED void mlirIdentifierPrint(MlirIdentifier identifier,
+                                            MlirStringCallback callback,
+                                            void *userData) {
+  callback(mlirIdentifierStr(identifier), userData);
+}
+
 MLIR_CAPI_EXPORTED void beaverOperationPrintSpecializedFrom(
     MlirOperation op, MlirStringCallback callback, void *userData) {
   mlirOperationPrintWithFlags(

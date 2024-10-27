@@ -5,8 +5,8 @@ defmodule EnvTest do
   alias Beaver.MLIR.Dialect.Func
   require Func
 
-  test "MLIR.__BLOCK__", test_context do
-    mlir ctx: test_context[:ctx] do
+  test "MLIR.__BLOCK__", %{ctx: ctx} do
+    mlir ctx: ctx do
       module do
         Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
           region do
@@ -21,8 +21,8 @@ defmodule EnvTest do
     end
   end
 
-  test "location", test_context do
-    mlir ctx: test_context[:ctx] do
+  test "location", %{ctx: ctx} do
+    mlir ctx: ctx do
       loc = %MLIR.Location{} = MLIR.Location.from_env(__ENV__, ctx: Beaver.Env.context())
       assert loc |> MLIR.to_string() =~ ~r{env_test.exs:\d+:0}
     end

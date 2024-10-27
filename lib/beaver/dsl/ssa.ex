@@ -9,7 +9,7 @@ defmodule Beaver.SSA do
           arguments: any(),
           results: any(),
           filler: any(),
-          block: nil,
+          blk: nil,
           ctx: any(),
           loc: any(),
           evaluator: function()
@@ -18,7 +18,7 @@ defmodule Beaver.SSA do
             arguments: [],
             results: [],
             filler: nil,
-            block: nil,
+            blk: nil,
             ctx: nil,
             loc: nil,
             evaluator: nil
@@ -54,7 +54,7 @@ defmodule Beaver.SSA do
   end
 
   def put_block(%__MODULE__{} = ssa, block) do
-    %__MODULE__{ssa | block: block}
+    %__MODULE__{ssa | blk: block}
   end
 
   def put_ctx(%__MODULE__{} = ssa, %MLIR.Context{} = ctx) do

@@ -89,7 +89,7 @@ defmodule Beaver do
     dsl_block_ast = dsl_block |> Beaver.SSA.prewalk(&MLIR.Operation.eval_ssa/1)
 
     ctx_ast =
-      if ctx = opts[:ctx] do
+      if ctx = Beaver.Deferred.fetch_context(opts) do
         quote do
           Kernel.var!(beaver_internal_env_ctx) = unquote(ctx)
 
@@ -99,7 +99,7 @@ defmodule Beaver do
       end
 
     block_ast =
-      if block = opts[:block] do
+      if block = Beaver.Deferred.fetch_block(opts) do
         quote do
           Kernel.var!(beaver_internal_env_block) = unquote(block)
 

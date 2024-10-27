@@ -130,7 +130,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
           :StringArray
         ],
         &%KindDecl{module_name: Module.concat(Beaver.Native, &1)}
-      )
+      ) ++ [%KindDecl{module_name: Beaver.StringPrinter, kind_functions: [make: 0]}]
   end
 
   @impl Kinda.CodeGen

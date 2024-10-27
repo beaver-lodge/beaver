@@ -3,8 +3,8 @@ defmodule EnifTest do
   use Beaver.Case, async: true
 
   @moduletag :smoke
-  test "populate enif functions", test_context do
-    %ENIFSupport{engine: e} = s = AddENIF.init(test_context[:ctx])
+  test "populate enif functions", %{ctx: ctx} do
+    %ENIFSupport{engine: e} = s = AddENIF.init(ctx)
     invoker = &Beaver.ENIF.invoke(e, "add", [&1, &2])
     assert 3 == invoker.(1, 2)
     assert 1 == invoker.(-1, 2)
@@ -15,8 +15,8 @@ defmodule EnifTest do
     assert :enif_binary_to_term in Beaver.ENIF.functions()
   end
 
-  test "binary serialize", test_context do
-    mlir ctx: test_context[:ctx] do
+  test "binary serialize", %{ctx: ctx} do
+    mlir ctx: ctx do
       module do
         b = Beaver.MLIR.Dialect.MemRef.global("hello") >>> :infer
         assert to_string(b) =~ "dense<[104, 101, 108, 108, 111]>"
@@ -25,10 +25,10 @@ defmodule EnifTest do
     |> MLIR.Operation.verify!()
   end
 
-  test "enif string inspected as memref", test_context do
+  test "enif string inspected as memref", %{ctx: ctx} do
     txt = "hello"
 
-    ENIFStringAsMemRef.init(test_context[:ctx])
+    ENIFStringAsMemRef.init(ctx)
     |> tap(fn %ENIFSupport{engine: e} ->
       invoker = &Beaver.ENIF.invoke(e, "original_str", [&1])
       assert txt == invoker.(txt)

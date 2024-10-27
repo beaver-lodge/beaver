@@ -8,22 +8,22 @@ defmodule BytecodeTest do
     |> MLIR.Operation.verify!()
     |> MLIR.to_string(bytecode: true)
     |> tap(fn s -> assert String.starts_with?(s, "ML\xefR") end)
-    |> then(&MLIR.Module.create!(MLIR.CAPI.mlirModuleGetContext(m), &1))
+    |> then(&MLIR.Module.create!(MLIR.context(m), &1))
     |> MLIR.Operation.verify!()
   end
 
-  test "bytecode writing and parsing", test_context do
-    Beaver.Dummy.func_of_3_blocks(test_context[:ctx])
+  test "bytecode writing and parsing", %{ctx: ctx} do
+    Beaver.Dummy.func_of_3_blocks(ctx)
     |> roundtrip_bytecode
   end
 
-  test "bytecode writing and parsing readme", test_context do
-    Beaver.Dummy.readme(test_context[:ctx])
+  test "bytecode writing and parsing readme", %{ctx: ctx} do
+    Beaver.Dummy.readme(ctx)
     |> roundtrip_bytecode
   end
 
-  test "bytecode writing and parsing gigantic", test_context do
-    Beaver.Dummy.gigantic(test_context[:ctx])
+  test "bytecode writing and parsing gigantic", %{ctx: ctx} do
+    Beaver.Dummy.gigantic(ctx)
     |> roundtrip_bytecode
   end
 end

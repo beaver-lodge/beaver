@@ -3,7 +3,7 @@ defmodule ELXDialectTest do
   alias Beaver.MLIR
   @moduletag :smoke
 
-  test "gen elx from ast", test_context do
+  test "gen elx from ast", %{ctx: ctx} do
     ast =
       quote do
         defmodule TwoFuncMod do
@@ -29,7 +29,7 @@ defmodule ELXDialectTest do
 
     mlir_module =
       ast
-      |> ElixirAST.from_ast(ctx: test_context[:ctx])
+      |> ElixirAST.from_ast(ctx: ctx)
       |> MLIR.Pass.Composer.nested(
         "builtin.module",
         [

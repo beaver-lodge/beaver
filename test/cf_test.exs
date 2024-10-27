@@ -252,7 +252,7 @@ defmodule CfTest do
     end
   end
 
-  test "cf with mutation", test_context do
+  test "cf with mutation", %{ctx: ctx} do
     import MutCompiler
 
     mlir =
@@ -276,7 +276,7 @@ defmodule CfTest do
         return(base_lr)
       end
 
-    ctx = test_context[:ctx]
+    ctx = ctx
     ir = ~m{#{mlir}}.(ctx)
 
     f = get_func(ir, "get_lr_with_ctrl_flow")

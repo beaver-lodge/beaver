@@ -15,7 +15,7 @@ defmodule Beaver.MLIR.ExternalPass do
   end
 
   defp do_create(name, description, op, run) do
-    {:ok, pid} = GenServer.start_link(MLIR.Pass.Server, run: run)
+    {:ok, pid} = GenServer.start_link(Beaver.PassRunner, run)
     description = description |> MLIR.StringRef.create()
     op_name = op |> MLIR.StringRef.create()
     name = name |> MLIR.StringRef.create()

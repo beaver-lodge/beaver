@@ -23,6 +23,8 @@ defmodule ToyPass do
          {:ok, _} <-
            MLIR.Pattern.apply_(MLIR.Module.from_operation(operation), [replace_add_op(benefit: 2)]) do
       :ok
+    else
+      _ -> raise "unreachable"
     end
   end
 end

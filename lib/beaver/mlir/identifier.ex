@@ -4,4 +4,15 @@ defmodule Beaver.MLIR.Identifier do
   """
   use Kinda.ResourceKind,
     forward_module: Beaver.Native
+
+  alias Beaver.MLIR
+
+  def get(str, opts) do
+    Beaver.Deferred.from_opts(
+      opts,
+      fn ctx ->
+        MLIR.CAPI.mlirIdentifierGet(ctx, MLIR.StringRef.create(str))
+      end
+    )
+  end
 end

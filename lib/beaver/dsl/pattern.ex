@@ -1,6 +1,6 @@
 defmodule Beaver.Pattern.Env do
   @moduledoc false
-  defstruct ctx: nil, block: nil, loc: nil
+  defstruct ctx: nil, blk: nil, loc: nil
 end
 
 defmodule Beaver.Pattern do
@@ -15,7 +15,7 @@ defmodule Beaver.Pattern do
 
   @doc false
   def insert_pat(cb, ctx, block, name, opts) do
-    mlir ctx: ctx, block: block do
+    mlir ctx: ctx, blk: block do
       benefit = Keyword.fetch!(opts, :benefit) |> then(&Attribute.integer(Type.i16(), &1))
 
       PDL.pattern benefit: benefit, sym_name: Attribute.string(name) do
@@ -37,7 +37,7 @@ defmodule Beaver.Pattern do
       def unquote(name)(opts \\ [benefit: 1]) do
         &Beaver.Pattern.insert_pat(
           fn pat_block ->
-            mlir ctx: &1, block: pat_block do
+            mlir ctx: &1, blk: pat_block do
               unquote(block_ast)
             end
           end,
@@ -136,13 +136,13 @@ defmodule Beaver.Pattern do
 
   @doc false
   def gen_pdl(%Env{} = env, %MLIR.Type{} = type) do
-    mlir block: env.block, ctx: env.ctx do
+    mlir blk: env.blk, ctx: env.ctx do
       Beaver.MLIR.Dialect.PDL.type(constantType: type) >>> ~t{!pdl.type}
     end
   end
 
   def gen_pdl(%Env{} = env, %MLIR.Attribute{} = attribute) do
-    mlir block: env.block, ctx: env.ctx do
+    mlir blk: env.blk, ctx: env.ctx do
       Beaver.MLIR.Dialect.PDL.attribute(value: attribute) >>>
         ~t{!pdl.attribute}
     end
@@ -166,14 +166,14 @@ defmodule Beaver.Pattern do
   - in a rewrite body, all variables are considered bound before creation pdl ops
   """
   def create_operation(
-        %Env{ctx: ctx, block: block, loc: loc} = env,
+        %Env{ctx: ctx, blk: block, loc: loc} = env,
         op_name,
         operands,
         attributes,
         results
       )
       when is_list(attributes) do
-    mlir block: block, ctx: ctx do
+    mlir blk: block, ctx: ctx do
       results = results |> Enum.map(&gen_pdl(env, &1))
 
       attribute_names =
@@ -212,12 +212,12 @@ defmodule Beaver.Pattern do
         arguments: arguments,
         results: result_types,
         ctx: ctx,
-        block: block,
+        blk: block,
         loc: loc
       }) do
     attributes = for {_k, _a} = a <- arguments, do: a
     operands = for %MLIR.Value{} = o <- arguments, do: o
-    env = %Env{ctx: ctx, block: block, loc: loc}
+    env = %Env{ctx: ctx, blk: block, loc: loc}
 
     result_types_unwrap =
       case result_types do
@@ -250,9 +250,9 @@ defmodule Beaver.Pattern do
     end
   end
 
-  defp result(%Env{block: block, ctx: ctx}, %Beaver.MLIR.Value{} = v, i)
+  defp result(%Env{blk: block, ctx: ctx}, %Beaver.MLIR.Value{} = v, i)
        when is_integer(i) do
-    mlir block: block, ctx: ctx do
+    mlir blk: block, ctx: ctx do
       PDL.result(v, index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), i)) >>>
         ~t{!pdl.value}
     end

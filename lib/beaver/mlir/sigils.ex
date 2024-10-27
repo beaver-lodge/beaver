@@ -29,7 +29,7 @@ defmodule Beaver.MLIR.Sigils do
   ## Examples
 
       iex> ctx = MLIR.Context.create()
-      iex> Attribute.equal?(Attribute.float(Type.f(32), 0.0).(ctx), ~a{0.0}f32.(ctx))
+      iex> MLIR.equal?(Attribute.float(Type.f(32), 0.0).(ctx), ~a{0.0}f32.(ctx))
       true
       iex> ~a{1 : i32}.(ctx) |> MLIR.to_string()
       "1 : i32"
@@ -48,13 +48,13 @@ defmodule Beaver.MLIR.Sigils do
   ## Examples
 
       iex> ctx = MLIR.Context.create()
-      iex> Type.equal?(Type.unranked_tensor(Type.f32()).(ctx), ~t{tensor<*xf32>}.(ctx))
+      iex> MLIR.equal?(Type.unranked_tensor(Type.f32()).(ctx), ~t{tensor<*xf32>}.(ctx))
       true
-      iex> Type.equal?(Type.unranked_tensor(Type.f32()).(ctx), ~t{tensor<*xf32>})
+      iex> MLIR.equal?(Type.unranked_tensor(Type.f32()).(ctx), ~t{tensor<*xf32>})
       true
-      iex> Type.equal?(Type.complex(Type.f32()).(ctx), ~t<f32>complex.(ctx))
+      iex> MLIR.equal?(Type.complex(Type.f32()).(ctx), ~t<f32>complex.(ctx))
       true
-      iex> Type.equal?(Type.complex(Type.f32()), ~t<f32>complex.(ctx))
+      iex> MLIR.equal?(Type.complex(Type.f32()), ~t<f32>complex.(ctx))
       true
       iex> ctx |> MLIR.Context.destroy
   """
