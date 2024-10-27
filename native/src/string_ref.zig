@@ -43,7 +43,7 @@ pub const Printer = struct {
     flushed: bool = false,
     pub fn make(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
         const v = @This(){ .buffer = Buffer.init(beam.allocator) };
-        return ResourceKind.resource.make(env, v) catch return beam.Error.failToCreatePrimitive;
+        return ResourceKind.resource.make(env, v) catch return beam.Error.@"Fail to create primitive";
     }
     pub const maker = .{ make, 0 };
     fn collect_string_ref(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {

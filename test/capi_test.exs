@@ -305,7 +305,7 @@ defmodule MlirTest do
 
   test "exception" do
     assert match?(
-             %Kinda.CallError{message: :FunctionClauseError, error_return_trace: _},
+             %Kinda.CallError{message: "Function clause error", error_return_trace: _},
              catch_error(beaver_raw_to_string_Type(1))
            )
   end
