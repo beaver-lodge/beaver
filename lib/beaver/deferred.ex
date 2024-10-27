@@ -21,7 +21,7 @@ defmodule Beaver.Deferred do
     opts[:ctx] || opts[:context]
   end
 
-  @spec fetch_context(opts :: opts) :: MLIR.Block.t() | Macro.t() | nil
+  @spec fetch_block(opts :: opts) :: MLIR.Block.t() | Macro.t() | nil
   def fetch_block(opts) do
     opts[:blk] || opts[:block]
   end
