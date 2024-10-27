@@ -40,7 +40,7 @@ pub const Printer = struct {
     const Error = error{ NullPointerFound, InvalidPrinter, @"Already flushed" };
     const Buffer = std.ArrayList(u8);
     buffer: Buffer,
-    flushed: bool = false,
+    flushed: bool = false, // TODO: use atomic when is is stable in zig
     pub fn make(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
         const v = @This(){ .buffer = Buffer.init(beam.allocator) };
         return ResourceKind.resource.make(env, v) catch return beam.Error.@"Fail to create primitive";
@@ -61,9 +61,9 @@ pub const Printer = struct {
     }
     pub fn flush(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         const printer: *@This() = try ResourceKind.resource.fetch_ptr(env, args[0]);
+        defer printer.buffer.deinit(); // defer to free buffer after return term has been created
         if (printer.flushed) return Error.@"Already flushed";
         printer.flushed = true;
-        printer.buffer.deinit();
         return beam.make_slice(env, printer.buffer.items);
     }
     const entries = .{
