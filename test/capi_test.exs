@@ -198,7 +198,6 @@ defmodule MlirTest do
   end
 
   test "Run a func operation pass", %{ctx: ctx} do
-    ctx = ctx
     module = create_adder_module(ctx)
     assert not MLIR.Module.is_null(module)
     external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestFuncPass)
@@ -212,7 +211,6 @@ defmodule MlirTest do
   end
 
   test "Run pass with patterns", %{ctx: ctx} do
-    ctx = ctx
     module = create_redundant_transpose_module(ctx)
     assert not MLIR.Module.is_null(module)
     external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestFuncPass)
@@ -290,7 +288,6 @@ defmodule MlirTest do
   end
 
   test "affine expr and map", %{ctx: ctx} do
-    ctx = ctx
     affine_dim_expr = mlirAffineDimExprGet(ctx, 0)
     affine_symbol_expr = mlirAffineSymbolExprGet(ctx, 1)
 

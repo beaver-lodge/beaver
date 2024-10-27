@@ -17,7 +17,6 @@ defmodule MemRefTest do
   test "run mlir module defined by sigil", %{ctx: ctx} do
     import Beaver.MLIR.Sigils
     import MLIR.{Transforms, Conversion}
-    ctx = ctx
 
     jit =
       ~m"""

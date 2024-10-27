@@ -6,8 +6,6 @@ defmodule TypeInferTest do
   @moduletag :smoke
 
   test "type infer", %{ctx: ctx} do
-    ctx = ctx
-
     mlir ctx: ctx do
       module do
         width = 8

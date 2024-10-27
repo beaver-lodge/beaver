@@ -12,7 +12,6 @@ defmodule EntityTest do
 
   describe "type apis" do
     test "generated", %{ctx: ctx} do
-      ctx = ctx
       opts = [ctx: ctx]
       assert MLIR.equal?(Type.f16(opts), Type.get("f16", opts))
       assert MLIR.equal?(Type.f(16, opts), Type.get("f16", opts))
@@ -59,7 +58,6 @@ defmodule EntityTest do
 
   describe "attr apis" do
     test "generate", %{ctx: ctx} do
-      ctx = ctx
       assert MLIR.equal?(Attribute.type(Type.f32()).(ctx), Attribute.type(Type.f32()).(ctx))
       assert MLIR.equal?(Attribute.type(Type.f32()), Attribute.type(Type.f32()).(ctx))
       assert MLIR.equal?(Attribute.type(Type.f32()).(ctx), Attribute.type(Type.f32()))
@@ -137,7 +135,6 @@ defmodule EntityTest do
     end
 
     test "iterator_types", %{ctx: ctx} do
-      ctx = ctx
       parallel = Attribute.string("parallel")
       parallel2 = Attribute.array([parallel, parallel])
 
@@ -162,13 +159,11 @@ defmodule EntityTest do
     end
 
     test "symbol name", %{ctx: ctx} do
-      ctx = ctx
       assert Attribute.string("foo") |> MLIR.to_string(ctx: ctx) == "\"foo\""
       assert Attribute.string(__MODULE__) |> MLIR.to_string(ctx: ctx) == "\"#{__MODULE__}\""
     end
 
     test "nested symbol", %{ctx: ctx} do
-      ctx = ctx
       ccc = MLIR.Attribute.flat_symbol_ref("ccc", ctx: ctx)
       aaa_bbb_ccc = "@aaa::@bbb::@ccc"
 

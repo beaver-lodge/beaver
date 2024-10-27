@@ -58,7 +58,6 @@ defmodule PDLTest do
   end
 
   test "AreEqualOp", %{ctx: ctx} do
-    ctx = ctx
     mlirContextSetAllowUnregisteredDialects(ctx, true)
     pattern_module = MLIR.Module.create(ctx, @apply_rewrite_op_patterns)
 
@@ -153,7 +152,6 @@ defmodule PDLTest do
   @are_equal_op_pdl Path.join(__DIR__, "pdl_erase_and_create.mlir") |> File.read!()
 
   test "AreEqualOp pdl version", %{ctx: ctx} do
-    ctx = ctx
     mlirContextSetAllowUnregisteredDialects(ctx, true)
     pattern_module = MLIR.Module.create(ctx, @are_equal_op_pdl)
     assert not MLIR.Module.is_null(pattern_module), "fail to parse module"
@@ -175,8 +173,6 @@ defmodule PDLTest do
   end
 
   test "replace tosa", %{ctx: ctx} do
-    ctx = ctx
-
     for pattern <- [
           TestTOSAPatterns.replace_add_op(),
           TestTOSAPatterns.replace_multi_add_op(),
@@ -201,8 +197,6 @@ defmodule PDLTest do
   end
 
   test "toy compiler with pass", %{ctx: ctx} do
-    ctx = ctx
-
     ir =
       ~m"""
       module {

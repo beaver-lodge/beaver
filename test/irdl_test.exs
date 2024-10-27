@@ -5,7 +5,6 @@ defmodule IRDLTest do
 
   test "gen irdl", %{ctx: ctx} do
     import Beaver.MLIR.Sigils
-    ctx = ctx
 
     m =
       ~m"""

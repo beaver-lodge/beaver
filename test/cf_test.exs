@@ -276,7 +276,6 @@ defmodule CfTest do
         return(base_lr)
       end
 
-    ctx = ctx
     ir = ~m{#{mlir}}.(ctx)
 
     f = get_func(ir, "get_lr_with_ctrl_flow")
