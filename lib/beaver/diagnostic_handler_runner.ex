@@ -38,7 +38,7 @@ defmodule Beaver.DiagnosticHandlerRunner do
 
   @impl true
   def handle_call(:collect, _from, %__MODULE__{return: return}) do
-    {:reply, return, %__MODULE__{return: nil}}
+    {:reply, return, %__MODULE__{}}
   end
 
   @impl true
