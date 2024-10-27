@@ -4,8 +4,7 @@ defmodule Beaver.MLIR.Block do
   """
   alias Beaver.MLIR
 
-  use Kinda.ResourceKind,
-    forward_module: Beaver.Native
+  use Kinda.ResourceKind, forward_module: Beaver.Native
 
   defp do_add_args!(block, ctx, {t, loc}) when is_function(t, 1) or is_function(loc, 1) do
     MLIR.CAPI.mlirBlockAddArgument(

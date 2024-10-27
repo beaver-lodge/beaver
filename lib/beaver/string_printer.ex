@@ -4,8 +4,7 @@ defmodule Beaver.StringPrinter do
   """
   alias Beaver.MLIR
 
-  use Kinda.ResourceKind,
-    forward_module: Beaver.Native
+  use Kinda.ResourceKind, forward_module: Beaver.Native
 
   @doc false
   def create() do

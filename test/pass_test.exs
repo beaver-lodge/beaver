@@ -45,7 +45,7 @@ defmodule PassTest do
              end) =~ ~r"fail to run a pass"
     end
 
-    assert Beaver.DiagnosticHandler.collect(diagnostic_server) =~
+    assert Beaver.DiagnosticHandlerRunner.collect(diagnostic_server) =~
              "Fail to run a pass implemented in Elixir"
   end
 

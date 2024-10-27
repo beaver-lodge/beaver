@@ -1,6 +1,5 @@
 defmodule Beaver.MLIR.PassManager do
-  use Kinda.ResourceKind,
-    forward_module: Beaver.Native
+  use Kinda.ResourceKind, forward_module: Beaver.Native
 
   alias Beaver.MLIR
 

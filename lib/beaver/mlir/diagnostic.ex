@@ -6,4 +6,6 @@ defmodule Beaver.MLIR.Diagnostic do
     i = MLIR.CAPI.mlirDiagnosticGetSeverity(diagnostic) |> Beaver.Native.to_term()
     Enum.at([:error, :warning, :note, :remark], i) || raise "unknown severity: #{i}"
   end
+
+  defdelegate detach(ctx, handler_id), to: MLIR.CAPI, as: :mlirContextDetachDiagnosticHandler
 end

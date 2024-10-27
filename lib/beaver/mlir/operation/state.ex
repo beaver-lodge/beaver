@@ -1,8 +1,7 @@
 defmodule Beaver.MLIR.Operation.State do
   @moduledoc false
 
-  use Kinda.ResourceKind,
-    forward_module: Beaver.Native
+  use Kinda.ResourceKind, forward_module: Beaver.Native
 
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI

@@ -8,8 +8,7 @@ defmodule Beaver.MLIR.Operation do
   require Logger
   @behaviour Access
 
-  use Kinda.ResourceKind,
-    forward_module: Beaver.Native
+  use Kinda.ResourceKind, forward_module: Beaver.Native
 
   def create(%Beaver.SSA{
         op: op_name,

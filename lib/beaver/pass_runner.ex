@@ -4,7 +4,7 @@ defmodule Beaver.PassRunner do
   require Logger
 
   @moduledoc """
-  A gen_server to run an MLIR pass implemented in Elixir
+  `GenServer` to run an MLIR pass implemented in Elixir
   """
   use GenServer
 

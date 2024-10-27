@@ -66,6 +66,12 @@ defmodule Beaver.MixProject do
         ENIF: [
           ~r"Beaver.ENIF.*"
         ],
+        Utils: [
+          Beaver.Deferred,
+          ~r"Beaver.Diagnostic.*",
+          ~r"Beaver.Pass.*",
+          ~r"Beaver.String.*"
+        ],
         Dialect: [
           ~r"Beaver.MLIR.Dialect.*"
         ],
@@ -74,10 +80,6 @@ defmodule Beaver.MixProject do
         ],
         Native: [
           ~r"Beaver.Native.*"
-        ],
-        Utils: [
-          Beaver.Deferred,
-          ~r"Beaver.Diagnostic.*"
         ]
       ]
     ]

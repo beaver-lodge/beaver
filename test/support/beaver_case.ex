@@ -17,11 +17,11 @@ defmodule Beaver.Case do
           if unquote(options)[:diagnostic] == :server do
             {:ok, pid} =
               GenServer.start(
-                Beaver.DiagnosticHandler,
+                Beaver.DiagnosticHandlerRunner,
                 &"#{&2}[Beaver] [Diagnostic] [#{to_string(MLIR.location(&1))}] #{to_string(&1)}\n"
               )
 
-            {pid, Beaver.Diagnostic.attach(ctx, pid)}
+            {pid, Beaver.DiagnosticHandlerRunner.attach(ctx, pid)}
           else
             {nil, nil}
           end
@@ -29,7 +29,7 @@ defmodule Beaver.Case do
         on_exit(fn ->
           if server do
             :ok = GenServer.stop(server)
-            Beaver.Diagnostic.detach(ctx, handler_id)
+            Beaver.MLIR.Diagnostic.detach(ctx, handler_id)
           end
 
           MLIR.Context.destroy(ctx)

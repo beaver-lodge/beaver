@@ -4,8 +4,7 @@ defmodule Beaver.MLIR.Dialect do
   You might override `eval_ssa/1` function to introduce your custom op generation
   """
 
-  use Kinda.ResourceKind,
-    forward_module: Beaver.Native
+  use Kinda.ResourceKind, forward_module: Beaver.Native
 
   @callback eval_ssa(Beaver.SSA.t()) :: any()
   defmacro __using__(opts) do
