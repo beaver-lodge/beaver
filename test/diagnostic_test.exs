@@ -19,11 +19,17 @@ defmodule DiagnosticTest do
       Beaver.MLIR.Diagnostic.detach(ctx, handler_id)
     end
 
+    def get_attr(ctx) do
+      Attribute.get("invalid_attr", ctx: ctx)
+    end
+
     def format_with_severity_and_loc(d, acc) do
       "#{acc}--#{MLIR.Diagnostic.severity(d)}--#{to_string(MLIR.location(d))}--#{to_string(d)}"
     end
   end
 
+  @collected "--error--invalid_attr:1:1--expected attribute value"
+  @err_msg "fail to parse attribute: invalid_attr"
   describe "server" do
     test "handler", %{ctx: ctx} do
       {server, handler_id} =
@@ -32,13 +38,8 @@ defmodule DiagnosticTest do
           &DiagnosticTestHelper.format_with_severity_and_loc/2
         )
 
-      assert_raise RuntimeError, "fail to parse attribute: ???", fn ->
-        Attribute.get("???", ctx: ctx)
-      end
-
-      assert Beaver.DiagnosticHandlerRunner.collect(server) ==
-               "--error--???:1:1--expected attribute value"
-
+      assert_raise RuntimeError, @err_msg, fn -> DiagnosticTestHelper.get_attr(ctx) end
+      assert Beaver.DiagnosticHandlerRunner.collect(server) == @collected
       DiagnosticTestHelper.cleanup_handler(ctx, server, handler_id)
     end
 
@@ -49,12 +50,10 @@ defmodule DiagnosticTest do
           {fn -> "hello" end, &DiagnosticTestHelper.format_with_severity_and_loc/2}
         )
 
-      assert_raise RuntimeError, "fail to parse attribute: ???", fn ->
-        Attribute.get("???", ctx: ctx)
-      end
+      assert_raise RuntimeError, @err_msg, fn -> DiagnosticTestHelper.get_attr(ctx) end
 
       assert Beaver.DiagnosticHandlerRunner.collect(server) ==
-               "hello--error--???:1:1--expected attribute value"
+               "hello#{@collected}"
 
       DiagnosticTestHelper.cleanup_handler(ctx, server, handler_id)
     end
@@ -66,14 +65,12 @@ defmodule DiagnosticTest do
         Beaver.with_diagnostics(
           ctx,
           fn ->
-            assert_raise RuntimeError, "fail to parse attribute: ???", fn ->
-              Attribute.get("???", ctx: ctx)
-            end
+            assert_raise RuntimeError, @err_msg, fn -> DiagnosticTestHelper.get_attr(ctx) end
           end,
           &DiagnosticTestHelper.format_with_severity_and_loc/2
         )
 
-      assert txt == "--error--???:1:1--expected attribute value"
+      assert txt == @collected
     end
   end
 end
