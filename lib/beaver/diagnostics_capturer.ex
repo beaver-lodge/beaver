@@ -5,7 +5,7 @@ defmodule Beaver.DiagnosticsCapturer do
   @moduledoc """
   `GenServer` to run MLIR diagnostic error handler.
 
-  The handler should be a function that takes a `MLIR.Diagnostic.t()` and returns a value. The return value will be collected by the server and can be retrieved by calling `__MODULE__.collect/1`.
+  The handler should be a function that takes an MLIR diagnostic and returns a value. The return value will be collected by the server and can be retrieved by calling `collect/1`.
 
   > #### Diagnostic's lifecycle {: .warning}
   >
