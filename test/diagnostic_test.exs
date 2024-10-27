@@ -3,6 +3,17 @@ defmodule DiagnosticTest do
   alias Beaver.MLIR.Attribute
 
   defmodule DiagnosticTestHelper do
+    def start_and_attach(ctx, cb) do
+      {:ok, server} =
+        GenServer.start(
+          Beaver.DiagnosticHandlerRunner,
+          cb
+        )
+
+      handler_id = Beaver.DiagnosticHandlerRunner.attach(ctx, server)
+      {server, handler_id}
+    end
+
     def cleanup_handler(ctx, server, handler_id) do
       :ok = GenServer.stop(server)
       Beaver.MLIR.Diagnostic.detach(ctx, handler_id)
@@ -15,16 +26,14 @@ defmodule DiagnosticTest do
 
   describe "server" do
     test "handler", %{ctx: ctx} do
-      {:ok, server} =
-        GenServer.start(
-          Beaver.DiagnosticHandlerRunner,
+      {server, handler_id} =
+        DiagnosticTestHelper.start_and_attach(
+          ctx,
           &DiagnosticTestHelper.format_with_severity_and_loc/2
         )
 
-      handler_id = Beaver.DiagnosticHandlerRunner.attach(ctx, server)
-
       assert_raise RuntimeError, "fail to parse attribute: ???", fn ->
-        Attribute.get("???", ctx: ctx) |> MLIR.is_null()
+        Attribute.get("???", ctx: ctx)
       end
 
       assert Beaver.DiagnosticHandlerRunner.collect(server) ==
@@ -34,16 +43,14 @@ defmodule DiagnosticTest do
     end
 
     test "handler with init state", %{ctx: ctx} do
-      {:ok, server} =
-        GenServer.start(
-          Beaver.DiagnosticHandlerRunner,
+      {server, handler_id} =
+        DiagnosticTestHelper.start_and_attach(
+          ctx,
           {fn -> "hello" end, &DiagnosticTestHelper.format_with_severity_and_loc/2}
         )
 
-      handler_id = Beaver.DiagnosticHandlerRunner.attach(ctx, server)
-
       assert_raise RuntimeError, "fail to parse attribute: ???", fn ->
-        Attribute.get("???", ctx: ctx) |> MLIR.is_null()
+        Attribute.get("???", ctx: ctx)
       end
 
       assert Beaver.DiagnosticHandlerRunner.collect(server) ==
@@ -60,7 +67,7 @@ defmodule DiagnosticTest do
           ctx,
           fn ->
             assert_raise RuntimeError, "fail to parse attribute: ???", fn ->
-              Attribute.get("???", ctx: ctx) |> MLIR.is_null()
+              Attribute.get("???", ctx: ctx)
             end
           end,
           &DiagnosticTestHelper.format_with_severity_and_loc/2
