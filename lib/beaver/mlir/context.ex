@@ -12,8 +12,12 @@ defmodule Beaver.MLIR.Context do
   def with_registry(ctx, fun) when is_function(fun, 1) do
     registry = mlirDialectRegistryCreate()
     mlirContextAppendDialectRegistry(ctx, registry)
-    fun.(registry)
-    mlirDialectRegistryDestroy(registry)
+
+    try do
+      fun.(registry)
+    after
+      mlirDialectRegistryDestroy(registry)
+    end
   end
 
   # create an interim registry and append all dialects to the context
