@@ -1,8 +1,6 @@
 defmodule Beaver.PassRunner do
   alias Beaver.MLIR
 
-  require Logger
-
   @moduledoc """
   `GenServer` to run an MLIR pass implemented in Elixir
   """

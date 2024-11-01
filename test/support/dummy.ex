@@ -1,4 +1,5 @@
 defmodule Beaver.Dummy do
+  @moduledoc false
   use Beaver
   alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Dialect.{Func, Arith, CF}
@@ -8,7 +9,7 @@ defmodule Beaver.Dummy do
     mlir ctx: ctx, blk: block do
       Func.func some_func(
                   function_type: Type.function([], [Type.i(32)]),
-                  sym_name: MLIR.Attribute.string("f#{System.unique_integer()}")
+                  sym_name: MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
                 ) do
         region do
           block do

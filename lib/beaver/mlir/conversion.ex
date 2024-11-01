@@ -2,5 +2,5 @@ defmodule Beaver.MLIR.Conversion do
   @moduledoc """
   Conversions MLIR provides by default.
   """
-  use Beaver.MLIR.Pass.Composer.Generator, prefix: "mlirCreateConversion"
+  use Beaver.ComposerGenerator, prefix: "mlirCreateConversion"
 end

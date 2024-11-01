@@ -7,6 +7,7 @@ const kinda = @import("kinda");
 pub const c = @import("prelude.zig");
 const mem = @import("std").mem;
 
+const print_nif_prefix = "beaver_raw_to_string_";
 pub fn PrinterNIF(comptime name: []const u8, comptime ResourceKind: type, comptime print_fn: anytype) type {
     return struct {
         const Error = error{
@@ -28,13 +29,13 @@ pub fn PrinterNIF(comptime name: []const u8, comptime ResourceKind: type, compti
             print_fn(entity, collect_string_ref, &printer);
             return beam.make_slice(env, printer.buffer.items);
         }
-        const entry = result.nif("beaver_raw_to_string_" ++ name, 1, to_string).entry;
+        const entry = result.nif(print_nif_prefix ++ name, 1, to_string).entry;
     };
 }
 
 // collect multiple MLIR StringRef and join them as a single erlang binary
 pub const Printer = struct {
-    pub const ResourceKind = kinda.ResourceKind(@This(), "Elixir.Beaver.StringPrinter");
+    pub const ResourceKind = kinda.ResourceKind(@This(), "Elixir.Beaver.Printer");
     pub const PtrType = *@This();
     pub const ArrayType = [*]@This();
     const Error = error{ NullPointerFound, InvalidPrinter, @"Already flushed" };
@@ -128,7 +129,7 @@ fn beaver_raw_get_string_ref(env: beam.env, _: c_int, args: [*c]const beam.term)
 
 pub const nifs = .{
     result.nif("beaver_raw_get_string_ref", 1, beaver_raw_get_string_ref).entry,
-    result.nif("beaver_raw_string_ref_to_binary", 1, beaver_raw_string_ref_to_binary).entry,
+    result.nif(print_nif_prefix ++ "StringRef", 1, beaver_raw_string_ref_to_binary).entry,
     PrinterNIF("Attribute", mlir_capi.Attribute, c.mlirAttributePrint).entry,
     PrinterNIF("Type", mlir_capi.Type, c.mlirTypePrint).entry,
     PrinterNIF("Operation", mlir_capi.Operation, c.mlirOperationPrint).entry,

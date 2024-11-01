@@ -26,7 +26,7 @@ defmodule Beaver.Pattern do
         end
       end >>> []
     end
-    |> MLIR.Operation.verify!(debug: true)
+    |> MLIR.verify!()
   end
 
   defmacro defpat(call, do: body) do

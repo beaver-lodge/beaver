@@ -66,11 +66,16 @@ defmodule ToyPass do
     with 1 <- Beaver.Walker.regions(operation) |> Enum.count(),
          {:ok, _} <-
            MLIR.Pattern.apply_(MLIR.Module.from_operation(operation), [replace_add_op(benefit: 2)]) do
-      MLIR.dump!(operation)
+      :ok
+    else
+      _ -> raise "unreachable"
     end
   end
 end
 
+use Beaver
+import MLIR.Transforms
+ctx = MLIR.Context.create()
 ~m"""
 module {
   func.func @tosa_add(%arg0: tensor<1x3xf32>, %arg1: tensor<2x1xf32>) -> tensor<2x3xf32> {
@@ -79,9 +84,9 @@ module {
   }
 }
 """.(ctx)
-|> MLIR.Pass.Composer.append(ToyPass)
+|> Beaver.Composer.append(ToyPass)
 |> canonicalize
-|> MLIR.Pass.Composer.run!()
+|> Beaver.Composer.run!()
 ```
 
 ## Goals
@@ -151,26 +156,7 @@ import_deps: [:beaver],
 ### Projects built on top of Beaver
 
 - [Charm](https://github.com/beaver-lodge/charms): Compile a subset of Elixir to native targets.
-- [MLIR Accelerated Nx](https://github.com/beaver-lodge/manx): A backend for [Nx](https://github.com/elixir-nx/nx/tree/main/nx#readme).
-
-## Erlang apps in Beaver
-
-LLVM/MLIR is a giant project, and built around that Beaver have thousands of functions. To properly ship LLVM/MLIR and streamline the development process, we need to carefully break the functionalities at different level into different Erlang apps under the same umbrella.
-
-- `:beaver`: Elixir and C/C++ hybrid.
-  - Top level app ships the high level functionalities including IR generation and pattern definition.
-  - MLIR CAPI wrappers built by parsing LLVM/MLIR CAPI C headers and some middle level helper functions to hide the C pointer related operations. This app will add the loaded MLIR C library and managed MLIR context to Erlang supervisor tree. Rust is also used in this app, but mainly for LLVM/MLIR CMake integration.
-  - All the Ops defined in stock MLIR dialects, built by querying the registry. This app will ship MLIR Ops with Erlang idiomatic practices like behavior compliance.
-- `:kinda`: Elixir and Zig hybrid, generating NIFs from MLIR C headers. Repo: https://github.com/beaver-lodge/kinda
-
-### Notes on consuming and development
-
-- Only `:beaver` and `:kinda` are designed to be used as stand-alone app being directly consumed by other apps.
-- `:manx` could only work with Nx.
-- Although `:kinda` is built for Beaver, any Erlang/Elixir app with interest bundling some C API could take advantage of it as well.
-- The namespace `Beaver.MLIR` is for standard features are generally expected in any MLIR tools.
-- The namespace `Beaver` is for concepts and practice only exists in Beaver, which are mostly in a DSL provided as a set of macros (including `mlir/0`, `block/1`, `defpat/2`, etc). The implementations are usually under `Beaver.DSL` namespace.
-- In Beaver, there is no strict requirements on the consistency between the Erlang app name and Elixir module name. Two modules with same namespace prefix could locate in different Erlang apps (this happens a lot to the `Beaver.MLIR` namespace). Of course redefinition of Elixir modules with an identical name should be avoided.
+- [MLIR Accelerated Nx](https://github.com/beaver-lodge/manx): A backend for [Nx](https://github.com/elixir-nx/nx/).
 
 ## How it works?
 
@@ -280,117 +266,4 @@ Usually a function accepting a MLIR context to create an operation or type is ca
 
 ## Development
 
-1. Install Elixir, https://elixir-lang.org/install.html
-2. Install Zig, https://ziglang.org/learn/getting-started/#installing-zig
-3. Install LLVM/MLIR
-
-- Option 1: Install with pip
-
-  ```bash
-  python3 -m pip install -r dev-requirements.txt
-  export LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config
-  ```
-
-- Option 2: Build from source https://mlir.llvm.org/getting_started/
-  Recommended install commands:
-
-  ```bash
-  cmake -B build -S llvm -G Ninja -DLLVM_ENABLE_PROJECTS=mlir \
-    -DLLVM_TARGETS_TO_BUILD="host" \
-    -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-    -DLLVM_ENABLE_ASSERTIONS=ON \
-    -DLLVM_ENABLE_OCAMLDOC=OFF \
-    -DLLVM_ENABLE_BINDINGS=OFF \
-    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-    -DCMAKE_INSTALL_PREFIX=${HOME}/llvm-install
-  cmake --build build -t install
-  export LLVM_CONFIG_PATH=$HOME/llvm-install/bin/llvm-config
-  ```
-
-  (Optional) To use Vulkan:
-
-  - Install Vulkan SDK (global installation is required), reference: https://vulkan.lunarg.com/sdk/home
-  - Setting environment variable by adding commands these to your bash/zsh profile:
-
-    ```
-    # you might need to change the version here
-    cd $HOME/VulkanSDK/1.3.216.0/
-    source setup-env.sh
-    cd -
-    ```
-
-  - Use `vulkaninfo` and `vkvia` to verify Vulkan is working
-  - Add `-DMLIR_ENABLE_VULKAN_RUNNER=ON` in LLVM CMake config command
-
-4. Develop and run tests
-- Clone this repo and `kinda` in the same directory
-  ```bash
-  git clone https://github.com/beaver-lodge/beaver.git
-  git clone https://github.com/beaver-lodge/kinda.git
-  ```
-- Make sure LLVM environment variable is set properly, otherwise it might fail to build
-
-  ```bash
-  echo $LLVM_CONFIG_PATH
-  ```
-
-- Build and run Elixir tests
-  ```bash
-  mix deps.get
-  BEAVER_BUILD_CMAKE=1 mix test
-  # run tests with filters
-  mix test --exclude vulkan # use this to skip vulkan tests
-  mix test --only smoke
-  mix test --only nx
-  ```
-
-5. debug
-
-- setting environment variable to control Erlang scheduler number, `ERL_AFLAGS="+S 10:5"`
-- run mix test under LLDB, `scripts/lldb-mix-test`
-
-## Release a new version
-
-### Update Elixir source
-
-- Bump versions in [`README.md`](README.md) and [`mix.exs`](/mix.exs)
-
-### Linux
-
-- Run CI, which generates the new GitHub release uploaded to https://github.com/beaver-lodge/beaver-prebuilt/releases.
-- Update release url in [`mix.exs`](/mix.exs)
-
-### Mac
-
-- Run macOS build with:
-
-  ```bash
-  rm -rf _build/prod
-  bash scripts/build-for-publish.sh
-  ```
-
-- Upload the `beaver-nif-[xxx].tar.gz` file to release
-
-### Generate `checksum.exs`
-
-```
-rm checksum.exs
-mix clean
-mix
-mix elixir_make.checksum --all --ignore-unavailable --print
-```
-
-Check the version in the output is correct.
-
-### Publish to Hex
-
-```
-BEAVER_BUILD_CMAKE=1 mix hex.publish
-```
-
-## (Optional) Format CMake files
-
-```bash
-python3 -m pip install cmake-format
-cmake-format -i native/**/CMakeLists.txt native/**/*.cmake
-```
+Please refer to [Beaver's contributing guide](/CONTRIBUTING.md)

@@ -1,4 +1,4 @@
-defmodule Beaver.DiagnosticsCapturer do
+defmodule Beaver.Capturer do
   alias Beaver.MLIR
   use GenServer
 

@@ -13,11 +13,11 @@ defmodule AddENIF do
     s_table = op |> MLIR.Operation.from_module() |> MLIR.CAPI.mlirSymbolTableCreate()
     found = MLIR.CAPI.mlirSymbolTableLookup(s_table, MLIR.StringRef.create("enif_make_int64"))
 
-    if MLIR.is_null(found) do
+    if MLIR.null?(found) do
       raise "Function not found"
     end
 
-    if not MLIR.Dialect.Func.is_external(found) do
+    if not MLIR.Dialect.Func.external?(found) do
       raise "Function is not external"
     end
 

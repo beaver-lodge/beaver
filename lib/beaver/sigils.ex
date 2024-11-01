@@ -1,4 +1,4 @@
-defmodule Beaver.MLIR.Sigils do
+defmodule Beaver.Sigils do
   @moduledoc """
   Sigils return a function to create MLIR elements by parsing the content.
   """
@@ -16,16 +16,17 @@ defmodule Beaver.MLIR.Sigils do
       ...>     return %res : i32
       ...>   }
       ...> }
-      ...> \""".(ctx) |> MLIR.Operation.verify!()
-      iex> ctx |> MLIR.Context.destroy
+      ...> \""".(ctx) |> MLIR.verify!()
+      iex> MLIR.Context.destroy(ctx)
   """
   def sigil_m(string, []) do
-    &MLIR.Module.create(&1, string)
+    &MLIR.Module.create(string, ctx: &1)
   end
 
   @doc """
   Create an attribute creator.
-  You might add a modifier to it as a shortcut to annotate the type
+
+  Add a modifier to it as a shortcut to annotate the type
   ## Examples
 
       iex> ctx = MLIR.Context.create()
@@ -33,7 +34,7 @@ defmodule Beaver.MLIR.Sigils do
       true
       iex> ~a{1 : i32}.(ctx) |> MLIR.to_string()
       "1 : i32"
-      iex> ctx |> MLIR.Context.destroy
+      iex> MLIR.Context.destroy(ctx)
   """
   def sigil_a(string, []), do: MLIR.Attribute.get(string)
 
@@ -44,7 +45,8 @@ defmodule Beaver.MLIR.Sigils do
 
   @doc """
   Create a type creator.
-  You might add a modifier to it as a shortcut to make it a higher order type.
+
+  Add a modifier to it as a shortcut to make it a higher order type.
   ## Examples
 
       iex> ctx = MLIR.Context.create()
@@ -56,7 +58,7 @@ defmodule Beaver.MLIR.Sigils do
       true
       iex> MLIR.equal?(Type.complex(Type.f32()), ~t<f32>complex.(ctx))
       true
-      iex> ctx |> MLIR.Context.destroy
+      iex> MLIR.Context.destroy(ctx)
   """
 
   def sigil_t(string, []), do: MLIR.Type.get(string)

@@ -1,4 +1,4 @@
-defmodule Beaver.MLIR.Pass.Composer do
+defmodule Beaver.Composer do
   import Beaver.MLIR.CAPI
   alias Beaver.MLIR
   require Logger
@@ -46,7 +46,7 @@ defmodule Beaver.MLIR.Pass.Composer do
   defp add_pipeline(%MLIR.OpPassManager{} = pm, pipeline_str)
        when is_binary(pipeline_str) do
     {res, err} =
-      Beaver.StringPrinter.run(
+      Beaver.Printer.run(
         &mlirOpPassManagerAddPipeline(
           pm,
           MLIR.StringRef.create(pipeline_str),

@@ -3,10 +3,7 @@ defmodule Beaver.MLIR.ExternalPass do
   # Lower level API to work with MLIR's external pass (pass defined in C). Use Beaver.MLIR.Pass for idiomatic Erlang behavior.
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
-
-  use Kinda.ResourceKind,
-    root_module: Beaver.MLIR.CAPI,
-    forward_module: Beaver.Native
+  use Kinda.ResourceKind, forward_module: Beaver.Native
 
   defp op_name_from_persistent_attributes(pass_module) do
     op_name = pass_module.__info__(:attributes)[:root_op] || []

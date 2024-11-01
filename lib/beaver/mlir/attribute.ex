@@ -1,10 +1,3 @@
-defmodule Beaver.MLIR.NamedAttribute do
-  @moduledoc """
-  This module defines a wrapper struct of NamedAttribute in MLIR
-  """
-  use Kinda.ResourceKind, forward_module: Beaver.Native
-end
-
 defmodule Beaver.MLIR.Attribute do
   @moduledoc """
   This module defines functions parsing and creating attributes in MLIR.
@@ -13,13 +6,9 @@ defmodule Beaver.MLIR.Attribute do
 
   alias Beaver.MLIR
   alias Beaver.MLIR.Type
-  import MLIR.Sigils
+  import Beaver.Sigils
 
   use Kinda.ResourceKind, forward_module: Beaver.Native
-
-  def is_null(a) do
-    beaverIsNullAttribute(a) |> Beaver.Native.to_term()
-  end
 
   def get(attr_str, opts \\ []) when is_binary(attr_str) do
     attr = MLIR.StringRef.create(attr_str)
@@ -27,7 +16,7 @@ defmodule Beaver.MLIR.Attribute do
     Beaver.Deferred.from_opts(opts, fn ctx ->
       attr = mlirAttributeParseGet(ctx, attr)
 
-      if is_null(attr) do
+      if MLIR.null?(attr) do
         raise "fail to parse attribute: #{attr_str}"
       end
 

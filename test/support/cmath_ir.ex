@@ -1,4 +1,5 @@
 defmodule CMath.IRExample do
+  @moduledoc false
   use Beaver
   alias Beaver.MLIR.Dialect.{Func, Arith}
   require Func
@@ -31,7 +32,7 @@ defmodule CMath.IRExample do
         end
       end
     end
-    |> MLIR.Operation.verify!()
+    |> MLIR.verify!()
   end
 
   def get(ctx) do
@@ -51,6 +52,6 @@ defmodule CMath.IRExample do
       return %conorm : f32
     }
     """.(ctx)
-    |> MLIR.Operation.verify!()
+    |> MLIR.verify!()
   end
 end

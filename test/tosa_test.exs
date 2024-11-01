@@ -4,20 +4,23 @@ defmodule TosaTest do
   alias Beaver.MLIR.Dialect.{Func, TOSA}
   require Func
   alias Beaver.Native
-  import MLIR.{Transforms, Conversion}
+  import MLIR.{Transform, Conversion}
 
   def test_lower_to_llvm(op) do
     op
-    |> MLIR.Pass.Composer.nested("func.func", [convert_vector_to_scf(), convert_linalg_to_loops()])
+    |> Beaver.Composer.nested("func.func", [
+      convert_vector_to_scf(),
+      convert_linalg_to_loops()
+    ])
     |> lower_affine()
     |> convert_scf_to_cf()
     |> canonicalize()
     |> cse()
-    |> MLIR.Pass.Composer.append("convert-vector-to-llvm{reassociate-fp-reductions}")
-    |> MLIR.Pass.Composer.nested("func.func", convert_math_to_llvm())
-    |> MLIR.Pass.Composer.append("expand-strided-metadata")
+    |> Beaver.Composer.append("convert-vector-to-llvm{reassociate-fp-reductions}")
+    |> Beaver.Composer.nested("func.func", convert_math_to_llvm())
+    |> Beaver.Composer.append("expand-strided-metadata")
     |> lower_affine()
-    |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
+    |> Beaver.Composer.append("finalize-memref-to-llvm")
     |> convert_func_to_llvm
     |> convert_index_to_llvm
     |> reconcile_unrealized_casts
@@ -50,16 +53,16 @@ defmodule TosaTest do
 
     ir
     |> MLIR.Operation.from_module()
-    |> MLIR.Pass.Composer.nested("func.func", [
+    |> Beaver.Composer.nested("func.func", [
       tosa_to_linalg_named(),
       tosa_to_linalg(),
       tosa_to_arith()
     ])
-    |> MLIR.Pass.Composer.append("one-shot-bufferize{bufferize-function-boundaries}")
-    |> MLIR.Pass.Composer.append("buffer-deallocation-pipeline")
-    |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
+    |> Beaver.Composer.append("one-shot-bufferize{bufferize-function-boundaries}")
+    |> Beaver.Composer.append("buffer-deallocation-pipeline")
+    |> Beaver.Composer.nested("func.func", "llvm-request-c-wrappers")
     |> test_lower_to_llvm
-    |> MLIR.Pass.Composer.run!()
+    |> Beaver.Composer.run!()
 
     jit = ir |> MLIR.ExecutionEngine.create!()
 

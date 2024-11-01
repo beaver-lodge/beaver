@@ -6,14 +6,27 @@ defmodule Beaver.MLIR.Context do
   import MLIR.CAPI
   use Kinda.ResourceKind, forward_module: Beaver.Native
 
+  @doc """
+  Run a function with a registry appended to the context.
+  """
+  def with_registry(ctx, fun) when is_function(fun, 1) do
+    registry = mlirDialectRegistryCreate()
+    mlirContextAppendDialectRegistry(ctx, registry)
+    fun.(registry)
+    mlirDialectRegistryDestroy(registry)
+  end
+
   # create an interim registry and append all dialects to the context
   defp load_all_dialects(ctx) do
     registry = mlirDialectRegistryCreate()
-    mlirRegisterAllDialects(registry)
-    mlirContextAppendDialectRegistry(ctx, registry)
-    Beaver.Exterior.register_all(ctx)
+
+    with_registry(ctx, fn registry ->
+      mlirRegisterAllDialects(registry)
+      mlirContextAppendDialectRegistry(ctx, registry)
+      mlirContextLoadAllAvailableDialects(ctx)
+    end)
+
     mlirDialectRegistryDestroy(registry)
-    mlirContextLoadAllAvailableDialects(ctx)
   end
 
   @type context_option :: {:allow_unregistered, boolean()} | {:all_dialects, boolean()}

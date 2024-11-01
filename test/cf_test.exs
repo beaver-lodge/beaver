@@ -7,7 +7,6 @@ defmodule CfTest do
   require Func
   @moduletag :smoke
 
-  # TODO: move MutCompiler to an independent file, so it would be clear for new users
   defmodule MutCompiler do
     use Beaver
     require Beaver.MLIR
@@ -45,7 +44,7 @@ defmodule CfTest do
       {arg = %MLIR.Value{}, acc} = gen_mlir(arg, acc)
 
       mlir =
-        mlir block: block, ctx: ctx do
+        mlir blk: block, ctx: ctx do
           Func.return(arg) >>> []
         end
 
@@ -97,7 +96,7 @@ defmodule CfTest do
           end
         end
 
-      mlir block: entry, ctx: ctx do
+      mlir blk: entry, ctx: ctx do
         CF.cond_br(condition, true_branch, false_branch) >>> []
       end
 
@@ -128,7 +127,7 @@ defmodule CfTest do
       {right = %MLIR.Value{}, acc} = gen_mlir(right, acc)
 
       less =
-        mlir block: block, ctx: ctx do
+        mlir blk: block, ctx: ctx do
           Arith.cmpf(left, right, predicate: Arith.cmp_f_predicate(:ugt)) >>> Type.i1()
         end
 
@@ -142,7 +141,7 @@ defmodule CfTest do
       {right = %MLIR.Value{}, acc} = gen_mlir(right, acc)
       # we only work with float 32 for now
       add =
-        mlir block: block, ctx: ctx do
+        mlir blk: block, ctx: ctx do
           Arith.mulf(left, right) >>> Type.f32()
         end
 
@@ -200,7 +199,7 @@ defmodule CfTest do
         end
       end
       # we let MLIR verify the generated IR for us, so it gonna be legit!
-      |> MLIR.Operation.verify!(debug: true)
+      |> MLIR.verify!()
     end
 
     # In most of LLVM or other compiler guidance, it starts with ast parsing.
@@ -217,16 +216,16 @@ defmodule CfTest do
     end
 
     defp lower(ir) do
-      import MLIR.{Transforms, Conversion}
+      import MLIR.{Transform, Conversion}
 
       ir
       |> convert_arith_to_llvm
-      |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
-      |> MLIR.Pass.Composer.nested("func.func", {"DoNothing0", "func.func", fn _ -> :ok end})
+      |> Beaver.Composer.nested("func.func", "llvm-request-c-wrappers")
+      |> Beaver.Composer.nested("func.func", {"DoNothing0", "func.func", fn _ -> :ok end})
       |> convert_func_to_llvm
       |> canonicalize
-      |> MLIR.Pass.Composer.append({"DoNothing1", "builtin.module", fn _ -> :ok end})
-      |> MLIR.Pass.Composer.run!()
+      |> Beaver.Composer.append({"DoNothing1", "builtin.module", fn _ -> :ok end})
+      |> Beaver.Composer.run!()
     end
 
     def get_func(ir, func) do

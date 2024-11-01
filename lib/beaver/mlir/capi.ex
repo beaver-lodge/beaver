@@ -16,8 +16,9 @@ defmodule Beaver.MLIR.CAPI do
 
   def load_nif do
     nif_file = ~c"#{:code.priv_dir(:beaver)}/lib/libBeaverNIF"
+    dylib = "#{nif_file}.dylib"
 
-    if File.exists?(dylib = "#{nif_file}.dylib") do
+    if File.exists?(dylib) do
       dylib
       |> Path.basename()
       |> File.ln_s("#{nif_file}.so")
@@ -51,19 +52,26 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_logical_mutex_token_signal_failure(_), do: raise("NIF not loaded")
   def beaver_raw_registered_ops(_ctx), do: raise("NIF not loaded")
   def beaver_raw_registered_dialects(_ctx), do: raise("NIF not loaded")
-  def beaver_raw_string_ref_to_binary(_), do: raise("NIF not loaded")
-  def beaver_raw_to_string_Attribute(_), do: raise("NIF not loaded")
-  def beaver_raw_to_string_Type(_), do: raise("NIF not loaded")
-  def beaver_raw_to_string_Operation(_), do: raise("NIF not loaded")
-  def beaver_raw_to_string_OperationSpecialized(_), do: raise("NIF not loaded")
-  def beaver_raw_to_string_OperationGeneric(_), do: raise("NIF not loaded")
-  def beaver_raw_to_string_OperationBytecode(_), do: raise("NIF not loaded")
-  def beaver_raw_to_string_Value(_), do: raise("NIF not loaded")
-  def beaver_raw_to_string_AffineMap(_), do: raise("NIF not loaded")
-  def beaver_raw_to_string_Location(_), do: raise("NIF not loaded")
-  def beaver_raw_to_string_OpPassManager(_), do: raise("NIF not loaded")
-  def beaver_raw_to_string_Identifier(_), do: raise("NIF not loaded")
-  def beaver_raw_to_string_Diagnostic(_), do: raise("NIF not loaded")
+
+  for f <- ~w{
+    StringRef
+    Attribute
+    Type
+    Operation
+    OperationSpecialized
+    OperationGeneric
+    OperationBytecode
+    Value
+    AffineMap
+    Location
+    OpPassManager
+    Identifier
+    Diagnostic
+  } do
+    f = :"beaver_raw_to_string_#{f}"
+    def unquote(f)(_), do: raise("NIF not loaded")
+  end
+
   def beaver_raw_get_string_ref(_), do: raise("NIF not loaded")
   def beaver_raw_read_opaque_ptr(_, _), do: raise("NIF not loaded")
   def beaver_raw_deallocate_opaque_ptr(_), do: raise("NIF not loaded")

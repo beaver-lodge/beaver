@@ -4,7 +4,15 @@ defmodule Beaver.Slang do
   @variadic_tags [:variadic, :optional, :single]
   @callback __slang_dialect__(ctx :: Beaver.MLIR.Context.t()) :: :ok | {:error, String.t()}
   @moduledoc """
-  Defining a MLIR dialect with macros in Elixir. Internally expressions are compiled to [IRDL](https://mlir.llvm.org/docs/Dialects/IRDL/)
+  Provides macros and utilities for defining MLIR dialects in Elixir.
+
+  This module allows you to define MLIR dialects using Elixir macros, which are internally compiled to
+  [IRDL](https://mlir.llvm.org/docs/Dialects/IRDL/). It provides:
+
+  - Macro-based dialect definition
+  - Operation creation and manipulation
+  - Type and attribute handling
+  - Constraint definition support
   """
 
   @doc """
@@ -105,14 +113,13 @@ defmodule Beaver.Slang do
       tags =
         values
         |> List.wrap()
-        |> Enum.map(fn
+        |> Enum.map_join(",", fn
           {variadic_tag, _} when variadic_tag in @variadic_tags ->
             variadic_tag |> Atom.to_string()
 
           _ ->
             "single"
         end)
-        |> Enum.join(",")
 
       [
         variadicity: ~a{#irdl<variadicity_array[#{tags}]>}
@@ -188,51 +195,47 @@ defmodule Beaver.Slang do
   end
 
   # This function transforms the given argument AST based on the provided usage (if it is using as variable or constraint declaration). It handles different cases based on the structure of the argument and returns the transformed AST.
-  defp transform_arg(ast, i, usage) when usage in [:constraint, :variable] do
+  defp transform_constraint(ast, i) do
     case ast do
       {_name, _line0, nil} ->
-        case usage do
-          # erase hanging vars to suppress warning
-          :constraint ->
-            nil
+        nil
 
-          :variable ->
-            ast
-        end
+      {:=, _line0, [_var, _right]} ->
+        ast
 
-      {:=, _line0, [var, _right]} ->
-        case usage do
-          :constraint ->
-            ast
-
-          :variable ->
-            var
-        end
-
-      {variadic_tag, {_name, _line0, nil}}
-      when variadic_tag in @variadic_tags ->
+      {variadic_tag, {_name, _line0, nil}} when variadic_tag in @variadic_tags ->
         ast
 
       _ ->
-        case usage do
-          :constraint ->
-            quote do
-              unquote(get_slang_arg_ast(i)) =
-                Beaver.Slang.create_constraint(unquote(ast),
-                  blk: Beaver.Env.block(),
-                  ctx: Beaver.Env.context()
-                )
-            end
-
-          :variable ->
-            get_slang_arg_ast(i)
+        quote do
+          unquote(get_slang_arg_ast(i)) =
+            Beaver.Slang.create_constraint(unquote(ast),
+              blk: Beaver.Env.block(),
+              ctx: Beaver.Env.context()
+            )
         end
+    end
+  end
+
+  defp transform_variable(ast, i) do
+    case ast do
+      {_name, _line0, nil} ->
+        ast
+
+      {:=, _line0, [var, _right]} ->
+        var
+
+      {variadic_tag, {_name, _line0, nil}} when variadic_tag in @variadic_tags ->
+        ast
+
+      _ ->
+        get_slang_arg_ast(i)
     end
   end
 
   # This function generates the AST for the arguments of a creator function as variables.
   defp get_args_as_vars(args) do
-    for {v, i} <- Enum.with_index(args), do: transform_arg(v, i, :variable)
+    for {v, i} <- Enum.with_index(args), do: transform_variable(v, i)
   end
 
   # This function generates the AST for a creator function for an IRDL operation (like `irdl.operation`, `irdl.type`). It uses the transform_defop_pins/1 function to transform the pins, generates the MLIR code for the operation and its arguments, and applies the operation using op_applier/1.
@@ -248,7 +251,7 @@ defmodule Beaver.Slang do
       |> Macro.postwalk(&transform_defop_pins/1)
       |> Enum.with_index()
       |> Enum.map(fn {ast, i} ->
-        transform_arg(ast, i, :constraint)
+        transform_constraint(ast, i)
       end)
 
     quote do
@@ -467,9 +470,9 @@ defmodule Beaver.Slang do
   """
   def load(ctx, mod) when is_atom(mod) do
     apply(mod, :__slang_dialect__, [ctx])
-    |> Beaver.MLIR.Transforms.canonicalize()
-    |> MLIR.Pass.Composer.run!()
-    |> MLIR.Operation.verify!()
+    |> Beaver.MLIR.Transform.canonicalize()
+    |> Beaver.Composer.run!()
+    |> MLIR.verify!()
     |> Beaver.MLIR.CAPI.mlirLoadIRDLDialects()
   end
 end

@@ -68,9 +68,9 @@ import MLIR.Conversion
 llvm_ir =
   ir
   |> convert_arith_to_llvm
-  |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
+  |> Beaver.Composer.nested("func.func", "llvm-request-c-wrappers")
   |> convert_func_to_llvm
-  |> MLIR.Pass.Composer.run!()
+  |> Beaver.Composer.run!()
 
 llvm_ir |> Beaver.MLIR.to_string() |> IO.puts()
 ```

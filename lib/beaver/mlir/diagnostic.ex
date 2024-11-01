@@ -1,6 +1,9 @@
 defmodule Beaver.MLIR.Diagnostic do
-  alias Beaver.MLIR
+  @moduledoc """
+  This module provides functions to work with MLIR diagnostics.
+  """
   use Kinda.ResourceKind, forward_module: Beaver.Native
+  alias Beaver.MLIR
 
   @mlir_severity_levels [:error, :warning, :note, :remark]
   @doc """

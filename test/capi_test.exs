@@ -19,17 +19,20 @@ defmodule MlirTest do
     _module = mlirModuleCreateEmpty(location)
 
     module =
-      MLIR.Module.create(ctx, """
-      func.func private @printNewline()
-      func.func private @printI64(i64)
-      """)
+      MLIR.Module.create(
+        """
+        func.func private @printNewline()
+        func.func private @printI64(i64)
+        """,
+        ctx: ctx
+      )
 
-    MLIR.Operation.verify!(module)
+    MLIR.verify!(module)
     _operation = mlirModuleGetOperation(module)
 
     _ret_str = MLIR.StringRef.create("func.return")
 
-    changeset = %MLIR.Operation.Changeset{name: "func.return", location: location}
+    changeset = %Beaver.Changeset{name: "func.return", location: location}
 
     for _i <- 0..200 do
       changeset |> MLIR.Operation.State.create() |> Beaver.Native.ptr() |> mlirOperationCreate()
@@ -46,20 +49,20 @@ defmodule MlirTest do
     mlirRegionAppendOwnedBlock(func_body_region, func_body)
     # create func
     changeset =
-      %MLIR.Operation.Changeset{name: "func.func", context: ctx}
-      |> MLIR.Operation.Changeset.add_argument(
+      %Beaver.Changeset{name: "func.func", context: ctx}
+      |> Beaver.Changeset.add_argument(
         sym_name: "\"add\"",
         function_type: "(i64, i64) -> (i64)"
       )
-      |> MLIR.Operation.Changeset.add_argument(func_body_region)
+      |> Beaver.Changeset.add_argument(func_body_region)
 
     func_op = changeset |> MLIR.Operation.create()
 
     add_op_state =
-      %MLIR.Operation.Changeset{name: "arith.addi", location: location}
-      |> MLIR.Operation.Changeset.add_argument(MLIR.Block.get_arg!(func_body, 0))
-      |> MLIR.Operation.Changeset.add_argument(arg1)
-      |> MLIR.Operation.Changeset.add_argument({:result_types, ["i64"]})
+      %Beaver.Changeset{name: "arith.addi", location: location}
+      |> Beaver.Changeset.add_argument(MLIR.Block.get_arg!(func_body, 0))
+      |> Beaver.Changeset.add_argument(arg1)
+      |> Beaver.Changeset.add_argument({:result_types, ["i64"]})
       |> MLIR.Operation.State.create()
 
     name = beaverOperationStateGetName(add_op_state)
@@ -84,17 +87,15 @@ defmodule MlirTest do
     r = mlirOperationGetResult(add_op, 0)
 
     return_op =
-      %MLIR.Operation.Changeset{name: "func.return", context: ctx}
-      |> MLIR.Operation.Changeset.add_argument(r)
+      %Beaver.Changeset{name: "func.return", context: ctx}
+      |> Beaver.Changeset.add_argument(r)
       |> MLIR.Operation.create()
 
     mlirBlockInsertOwnedOperation(func_body, 0, add_op)
     mlirBlockInsertOwnedOperationAfter(func_body, add_op, return_op)
     module_body = mlirModuleGetBody(module)
     mlirBlockInsertOwnedOperation(module_body, 0, func_op)
-
-    MLIR.Operation.verify!(module, debug: true)
-
+    MLIR.verify!(module)
     mlirContextDestroy(ctx)
   end
 
@@ -118,21 +119,24 @@ defmodule MlirTest do
     mlirContextLoadAllAvailableDialects(ctx)
 
     _add_op =
-      %MLIR.Operation.Changeset{name: "elixir.add", context: ctx}
+      %Beaver.Changeset{name: "elixir.add", context: ctx}
       |> MLIR.Operation.create()
   end
 
   def create_adder_module(ctx) do
-    MLIR.Module.create(ctx, """
-    func.func @foo(%arg0 : i32) -> i32 {
-      %res = arith.addi %arg0, %arg0 : i32
-      return %res : i32
-    }
-    """)
+    MLIR.Module.create(
+      """
+      func.func @foo(%arg0 : i32) -> i32 {
+        %res = arith.addi %arg0, %arg0 : i32
+        return %res : i32
+      }
+      """,
+      ctx: ctx
+    )
   end
 
   def create_redundant_transpose_module(ctx) do
-    MLIR.Module.create(ctx, """
+    MLIR.Module.create("""
     func.func @test_transpose(%arg0: tensor<1x2x3xi32>) -> () {
       %0 = arith.constant dense<[1, 2, 0]> : tensor<3xi32>
       %1 = "tosa.transpose"(%arg0, %0) : (tensor<1x2x3xi32>, tensor<3xi32>) -> (tensor<2x3x1xi32>)
@@ -140,7 +144,7 @@ defmodule MlirTest do
       %3 = "tosa.transpose"(%1, %2) : (tensor<2x3x1xi32>, tensor<3xi32>) -> (tensor<1x2x3xi32>)
       return
     }
-    """)
+    """).(ctx)
   end
 
   test "run a simple pass" do
@@ -167,7 +171,7 @@ defmodule MlirTest do
     @moduledoc false
 
     def run(%Beaver.MLIR.Operation{} = op) do
-      MLIR.Operation.verify!(op)
+      MLIR.verify!(op)
     end
   end
 
@@ -176,14 +180,14 @@ defmodule MlirTest do
     use MLIR.Pass, on: "func.func"
 
     def run(%Beaver.MLIR.Operation{} = op) do
-      MLIR.Operation.verify!(op)
+      MLIR.verify!(op)
     end
   end
 
   test "Run a generic pass" do
     ctx = MLIR.Context.create()
     module = create_adder_module(ctx)
-    assert not MLIR.Module.is_null(module)
+    assert not MLIR.null?(module)
     type_id_allocator = mlirTypeIDAllocatorCreate()
     external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestPass)
     pm = mlirPassManagerCreate(ctx)
@@ -199,7 +203,7 @@ defmodule MlirTest do
 
   test "Run a func operation pass", %{ctx: ctx} do
     module = create_adder_module(ctx)
-    assert not MLIR.Module.is_null(module)
+    assert not MLIR.null?(module)
     external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestFuncPass)
     pm = mlirPassManagerCreate(ctx)
     npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
@@ -212,7 +216,7 @@ defmodule MlirTest do
 
   test "Run pass with patterns", %{ctx: ctx} do
     module = create_redundant_transpose_module(ctx)
-    assert not MLIR.Module.is_null(module)
+    assert not MLIR.null?(module)
     external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestFuncPass)
     pm = mlirPassManagerCreate(ctx)
     npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
@@ -255,8 +259,8 @@ defmodule MlirTest do
     """
 
     ctx = MLIR.Context.create()
-    module = MLIR.Module.create(ctx, module_str)
-    MLIR.Operation.verify!(module)
+    module = MLIR.Module.create(module_str, ctx: ctx)
+    MLIR.verify!(module)
     lower_to_llvm(ctx, MLIR.Operation.from_module(module))
     jit = MLIR.ExecutionEngine.create!(module)
     arg = Beaver.Native.I32.make(42)

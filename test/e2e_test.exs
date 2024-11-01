@@ -4,8 +4,8 @@ defmodule E2ETest do
   @moduletag :smoke
 
   describe "e2e compilation and JIT invocation" do
-    import Beaver.MLIR.Sigils
-    import MLIR.{Transforms, Conversion}
+    import Beaver.Sigils
+    import MLIR.{Transform, Conversion}
 
     def make_jit(ctx) do
       ~m"""
@@ -20,7 +20,7 @@ defmodule E2ETest do
       |> cse
       |> convert_func_to_llvm
       |> convert_arith_to_llvm
-      |> MLIR.Pass.Composer.run!()
+      |> Beaver.Composer.run!()
       |> MLIR.ExecutionEngine.create!()
     end
 

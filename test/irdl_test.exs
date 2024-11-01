@@ -4,7 +4,7 @@ defmodule IRDLTest do
   @moduletag :smoke
 
   test "gen irdl", %{ctx: ctx} do
-    import Beaver.MLIR.Sigils
+    import Beaver.Sigils
 
     m =
       ~m"""
@@ -31,7 +31,7 @@ defmodule IRDLTest do
         }
       }
       """.(ctx)
-      |> MLIR.Operation.verify!()
+      |> MLIR.verify!()
 
     assert m
            |> Beaver.MLIR.CAPI.mlirLoadIRDLDialects()
@@ -48,7 +48,7 @@ defmodule IRDLTest do
     alias Beaver.MLIR.Type
     require Func
 
-    CMath.__slang_dialect__(ctx) |> MLIR.Operation.verify!()
+    CMath.__slang_dialect__(ctx) |> MLIR.verify!()
     Beaver.Slang.load(ctx, CMath)
 
     CMath.IRExample.get(ctx)
@@ -56,17 +56,17 @@ defmodule IRDLTest do
 
     assert not (CMath.some_attr(Type.f32())
                 |> Beaver.Deferred.create(ctx)
-                |> MLIR.is_null())
+                |> MLIR.null?())
 
     assert not (MLIR.CAPI.mlirContextGetOrLoadDialect(
                   ctx,
                   MLIR.StringRef.create("cmath")
                 )
-                |> MLIR.is_null())
+                |> MLIR.null?())
   end
 
   test "var dialect", %{ctx: ctx} do
     use Beaver
-    TestVariadic.__slang_dialect__(ctx) |> MLIR.Operation.verify!()
+    TestVariadic.__slang_dialect__(ctx) |> MLIR.verify!()
   end
 end

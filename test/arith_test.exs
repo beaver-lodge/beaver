@@ -11,23 +11,48 @@ defmodule ArithTest do
     mlir ctx: ctx do
       module do
         for p <- [:eq, :ne, :slt, :sle, :sgt, :sge, :ult, :ule, :ugt, :uge] do
-          f =
-            Func.func _(
-                        function_type: Type.function([Type.i32(), Type.i32()], []),
-                        sym_name: "\"#{p}\""
-                      ) do
-              region do
-                block _(a >>> Type.i32(), b >>> Type.i32()) do
-                  Arith.cmpi(a, b, predicate: Arith.cmp_i_predicate(p)) >>> Type.i1()
-                  Func.return() >>> []
-                end
+          Func.func _(
+                      function_type: Type.function([Type.i32(), Type.i32()], []),
+                      sym_name:
+                        Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                    ) do
+            region do
+              block _(a >>> Type.i32(), b >>> Type.i32()) do
+                Arith.cmpi(a, b, predicate: Arith.cmp_i_predicate(p)) >>> Type.i1()
+                Func.return() >>> []
               end
             end
-
-          assert f |> MLIR.to_string(generic: false) =~ "#{p}"
+          end
+          |> tap(&assert(MLIR.to_string(&1, generic: false) =~ "#{p}"))
         end
       end
-      |> MLIR.Operation.verify!()
+      |> MLIR.verify!()
+    end
+  end
+
+  for p <- [:!=, :==, :>, :>=, :<, :<=], signed <- [true, false] do
+    test "int operator #{p}, signed: #{signed}", %{ctx: ctx} do
+      mlir ctx: ctx do
+        module do
+          Func.func _(
+                      function_type: Type.function([Type.i32(), Type.i32()], []),
+                      sym_name:
+                        Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                    ) do
+            region do
+              block _(a >>> Type.i32(), b >>> Type.i32()) do
+                Arith.cmpi(a, b,
+                  predicate: Arith.operator_to_predicate(unquote(p), unquote(signed))
+                ) >>>
+                  Type.i1()
+
+                Func.return() >>> []
+              end
+            end
+          end
+        end
+      end
+      |> MLIR.verify!()
     end
   end
 
@@ -55,7 +80,7 @@ defmodule ArithTest do
           f =
             Func.func _(
                         function_type: Type.function([Type.f32(), Type.f32()], []),
-                        sym_name: MLIR.Attribute.string("f#{System.unique_integer()}")
+                        sym_name: MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
                       ) do
               region do
                 block _(a >>> Type.f32(), b >>> Type.f32()) do
@@ -70,6 +95,6 @@ defmodule ArithTest do
         end
       end
     end
-    |> MLIR.Operation.verify!()
+    |> MLIR.verify!()
   end
 end

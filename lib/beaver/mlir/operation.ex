@@ -3,7 +3,8 @@ defmodule Beaver.MLIR.Operation do
   This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
   """
   alias Beaver.MLIR
-  alias __MODULE__.{State, Changeset}
+  alias __MODULE__.State
+  alias Beaver.Changeset
   import Beaver.MLIR.CAPI
   require Logger
   @behaviour Access
@@ -79,61 +80,10 @@ defmodule Beaver.MLIR.Operation do
     |> create()
   end
 
-  @default_verify_opts [debug: false]
-  def verify!(op, opts \\ @default_verify_opts) do
-    case verify(op, opts ++ [should_raise: true]) do
-      {:ok, op} ->
-        op
-
-      :null ->
-        raise "MLIR operation verification failed because the operation is null. Maybe it is parsed from an ill-formed text format? Please have a look at the diagnostic output above by MLIR C++"
-
-      :fail ->
-        raise "MLIR operation verification failed"
-    end
-  end
-
-  def verify(op, opts \\ @default_verify_opts) do
-    debug = opts |> Keyword.get(:debug, false)
-
-    is_null = MLIR.is_null(op)
-
-    if is_null do
-      :null
-    else
-      is_success = from_module(op) |> mlirOperationVerify() |> Beaver.Native.to_term()
-
-      if not is_success and debug do
-        Logger.info("Start printing op failed to pass the verification. This might crash.")
-        Logger.info(MLIR.to_string(op))
-      end
-
-      if is_success do
-        {:ok, op}
-      else
-        :fail
-      end
-    end
-  end
-
-  def dump(op) do
-    op |> from_module |> mlirOperationDump()
-    op
-  end
-
-  @doc """
-  Verify the op and dump it. It raises if the verification fails.
-  """
-  def dump!(%__MODULE__{} = op) do
-    verify!(op)
-    mlirOperationDump(op)
-    op
-  end
-
   def name(%__MODULE__{} = operation) do
     mlirOperationGetName(operation)
     |> mlirIdentifierStr()
-    |> MLIR.StringRef.to_string()
+    |> MLIR.to_string()
   end
 
   defdelegate location(op), to: MLIR.CAPI, as: :mlirOperationGetLocation
@@ -174,7 +124,7 @@ defmodule Beaver.MLIR.Operation do
   def fetch(operation, attribute) do
     attr = mlirOperationGetAttributeByName(operation, MLIR.StringRef.create(attribute))
 
-    if MLIR.is_null(attr) do
+    if MLIR.null?(attr) do
       :error
     else
       {:ok, attr}

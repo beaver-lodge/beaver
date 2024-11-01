@@ -5,31 +5,30 @@ defmodule Beaver.MLIR.Module do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  def create(context, str) when is_binary(str) do
-    CAPI.mlirModuleCreateParse(context, MLIR.StringRef.create(str))
+  @doc """
+  Create a MLIR module by parsing string.
+  """
+  def create(str, opts \\ []) when is_binary(str) do
+    Beaver.Deferred.from_opts(
+      opts,
+      fn ctx ->
+        CAPI.mlirModuleCreateParse(ctx, MLIR.StringRef.create(str))
+      end
+    )
   end
 
-  def create!(context, str) when is_binary(str) do
-    module = create(context, str)
-    verify!(module)
-    module
+  def create!(str, opts \\ []) when is_binary(str) do
+    create(str, opts) |> verify!()
   end
 
   use Kinda.ResourceKind, forward_module: Beaver.Native
 
-  def is_null(module) do
-    CAPI.beaverIsNullModule(module) |> Beaver.Native.to_term()
-  end
-
-  defp not_null!(module) do
-    if is_null(module) do
+  def verify!(module) do
+    if MLIR.null?(module) do
       raise "module is null"
     end
-  end
 
-  def verify!(module) do
-    not_null!(module)
-    MLIR.Operation.verify!(module)
+    MLIR.verify!(module)
   end
 
   defdelegate destroy(module), to: CAPI, as: :mlirModuleDestroy

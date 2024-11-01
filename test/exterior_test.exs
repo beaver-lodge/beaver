@@ -8,6 +8,9 @@ defmodule ExteriorTest do
   require Func
 
   test "generate ops in elixir dialect", %{ctx: ctx} do
+    Beaver.Exterior.Elixir.register_dialect(ctx)
+    MLIR.CAPI.mlirContextLoadAllAvailableDialects(ctx)
+
     ir =
       mlir ctx: ctx do
         module do
@@ -21,7 +24,7 @@ defmodule ExteriorTest do
             end
           end
         end
-        |> MLIR.Operation.verify!()
+        |> MLIR.verify!()
       end
 
     text = ir |> MLIR.to_string()

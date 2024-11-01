@@ -1,4 +1,5 @@
 defmodule TranslateMLIR do
+  @moduledoc false
   defmacro __using__(_) do
     quote do
       import TranslateMLIR
@@ -300,14 +301,14 @@ defmodule TranslateMLIR do
 
     jit =
       ~m{#{ir}}.(ctx)
-      |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
+      |> Beaver.Composer.nested("func.func", "llvm-request-c-wrappers")
       |> convert_scf_to_cf
       |> convert_arith_to_llvm()
       |> convert_index_to_llvm()
       |> convert_func_to_llvm()
-      |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
+      |> Beaver.Composer.append("finalize-memref-to-llvm")
       |> reconcile_unrealized_casts
-      |> MLIR.Pass.Composer.run!(print: System.get_env("DEFM_PRINT_IR") == "1")
+      |> Beaver.Composer.run!(print: System.get_env("DEFM_PRINT_IR") == "1")
       |> MLIR.ExecutionEngine.create!()
 
     %{mode: return_mode, maker: {mod, func, args}} =
@@ -352,7 +353,7 @@ defmodule TranslateMLIR do
     {ir, return_convention} =
       compile_defm(call, expr, ctx)
 
-    ir = ir |> MLIR.Operation.verify!() |> MLIR.to_string()
+    ir = ir |> MLIR.verify!() |> MLIR.to_string()
 
     MLIR.Context.destroy(ctx)
 

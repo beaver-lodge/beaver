@@ -1,4 +1,5 @@
 defmodule TestTOSAPatterns do
+  @moduledoc false
   use Beaver
   alias Beaver.MLIR
   alias MLIR.Type

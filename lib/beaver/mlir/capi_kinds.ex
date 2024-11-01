@@ -28,8 +28,6 @@ for m <- mlir_mods do
   m = Module.concat(Beaver.MLIR, m)
 
   defmodule m do
-    use Kinda.ResourceKind,
-      root_module: Beaver.MLIR.CAPI,
-      forward_module: Beaver.Native
+    use Kinda.ResourceKind, forward_module: Beaver.Native
   end
 end

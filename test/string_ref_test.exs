@@ -7,7 +7,7 @@ defmodule StringRefTest do
     for _ <- 1..1_000 do
       s = "hello world"
       r = MLIR.StringRef.create(s)
-      assert s == MLIR.StringRef.to_string(r)
+      assert s == MLIR.to_string(r)
       assert s == to_string(r)
     end
   end
@@ -17,7 +17,7 @@ defmodule StringRefTest do
       :rand.seed(:exsss, {100, 101, 102})
       s = 0..size |> Enum.shuffle() |> List.to_string()
       r = MLIR.StringRef.create(s)
-      assert s == MLIR.StringRef.to_string(r)
+      assert s == MLIR.to_string(r)
       assert byte_size(s) == MLIR.StringRef.length(r)
     end
   end
@@ -25,7 +25,7 @@ defmodule StringRefTest do
   describe "printer" do
     test "collect string ref", %{ctx: ctx} do
       {:ok, txt} =
-        Beaver.StringPrinter.run(fn cb, ud ->
+        Beaver.Printer.run(fn cb, ud ->
           MLIR.Location.file(name: "1", line: 2, column: 3, ctx: ctx)
           |> MLIR.CAPI.mlirLocationPrint(cb, ud)
         end)
@@ -33,22 +33,22 @@ defmodule StringRefTest do
       assert ~s{loc("1":2:3)} == txt
 
       {attr, "1 : i64"} =
-        Beaver.StringPrinter.run(fn cb, ud ->
+        Beaver.Printer.run(fn cb, ud ->
           MLIR.Attribute.get("1", ctx: ctx)
           |> tap(&MLIR.CAPI.mlirAttributePrint(&1, cb, ud))
         end)
 
-      refute MLIR.is_null(attr)
+      refute MLIR.null?(attr)
     end
 
     test "flush only once", %{ctx: ctx} do
-      {sp, user_data} = Beaver.StringPrinter.create()
+      {sp, user_data} = Beaver.Printer.create()
 
       MLIR.Location.file(name: "1", line: 2, column: 3, ctx: ctx)
-      |> MLIR.CAPI.mlirLocationPrint(Beaver.StringPrinter.callback(), user_data)
+      |> MLIR.CAPI.mlirLocationPrint(Beaver.Printer.callback(), user_data)
 
-      assert ~s{loc("1":2:3)} == Beaver.StringPrinter.flush(sp)
-      assert_raise Kinda.CallError, ~r"Already flushed", fn -> Beaver.StringPrinter.flush(sp) end
+      assert ~s{loc("1":2:3)} == Beaver.Printer.flush(sp)
+      assert_raise Kinda.CallError, ~r"Already flushed", fn -> Beaver.Printer.flush(sp) end
     end
   end
 end
