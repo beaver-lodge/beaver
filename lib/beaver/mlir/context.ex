@@ -22,15 +22,11 @@ defmodule Beaver.MLIR.Context do
 
   # create an interim registry and append all dialects to the context
   defp load_all_dialects(ctx) do
-    registry = mlirDialectRegistryCreate()
-
     with_registry(ctx, fn registry ->
       mlirRegisterAllDialects(registry)
       mlirContextAppendDialectRegistry(ctx, registry)
       mlirContextLoadAllAvailableDialects(ctx)
     end)
-
-    mlirDialectRegistryDestroy(registry)
   end
 
   @type context_option :: {:allow_unregistered, boolean()} | {:all_dialects, boolean()}
