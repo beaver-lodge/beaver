@@ -128,6 +128,7 @@ jobs:
       - name: Run dev build
         run: |
           mix
+          mix credo
           mix elixir_make.checksum --only-local --ignore-unavailable --print
           mix hex.build
       - name: Run overhead profiling
