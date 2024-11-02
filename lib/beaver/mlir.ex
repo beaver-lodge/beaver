@@ -31,9 +31,9 @@ defmodule Beaver.MLIR do
   Many MLIR operations can return null values. Use `null?/1` to safely check entities
   before performing operations that require non-null values.
 
-  ## Name spaces to include difference kinds of CAPI delegates
-  - `Beaver.MLIR.***`: APIs to related to lifecycle, including creating and destroying MLIR entities.
-  - `Beaver.MLIR`: APIs like `Beaver.MLIR.dump!/1` or `Beaver.MLIR.null?/1`. These are standard features are generally expected in any MLIR tools
+  ## Name spaces to include different kinds of CAPI delegates
+  - `Beaver.MLIR.***`: APIs related to lifecycle, including creating and destroying MLIR entities.
+  - `Beaver.MLIR`: APIs like `Beaver.MLIR.dump!/1` or `Beaver.MLIR.null?/1`. These are standard features generally expected in any MLIR tools.
   """
 
   defp extract_entity_name(m) do

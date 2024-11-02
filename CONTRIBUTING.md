@@ -73,7 +73,7 @@ Bindings are the part that provides the interface to the MLIR CAPIs. It is imple
   git clone https://github.com/beaver-lodge/beaver.git
   git clone https://github.com/beaver-lodge/kinda.git
   ```
-- Make sure LLVM environment variable is set properly, otherwise it might fail to build
+- Make sure LLVM environment variable is set properly, as otherwise it might fail to build
 
   ```bash
   echo $LLVM_CONFIG_PATH
@@ -145,7 +145,7 @@ cmake-format -i native/**/CMakeLists.txt native/**/*.cmake
 LLVM/MLIR is a giant project, and built around that Beaver have thousands of functions. To properly ship LLVM/MLIR and streamline the development process, we need to carefully break the functionalities at different level into different Erlang apps under the same umbrella.
 
 - `:beaver`: Elixir and C/C++ hybrid.
-  - Top level app ships the high level functionalities including IR generation and pattern definition.
+  - Top-level app ships the high-level functionalities including IR generation and pattern definition.
   - MLIR CAPI wrappers built by parsing LLVM/MLIR CAPI C headers and some middle level helper functions to hide the C pointer related operations. This app will add the loaded MLIR C library and managed MLIR context to Erlang supervisor tree. Rust is also used in this app, but mainly for LLVM/MLIR CMake integration.
   - All the Ops defined in stock MLIR dialects, built by querying the registry. This app will ship MLIR Ops with Erlang idiomatic practices like behavior compliance.
 - `:kinda`: Elixir and Zig hybrid, generating NIFs from MLIR C headers. Repo: https://github.com/beaver-lodge/kinda
