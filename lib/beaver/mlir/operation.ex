@@ -162,4 +162,14 @@ defmodule Beaver.MLIR.Operation do
     mlirOperationRemoveAttributeByName(operation, MLIR.StringRef.create(attribute))
     {attr, operation}
   end
+
+  def with_symbol_table(%__MODULE__{} = op, fun) do
+    symbol_table = mlirSymbolTableCreate(op)
+
+    try do
+      fun.(symbol_table)
+    after
+      mlirSymbolTableDestroy(symbol_table)
+    end
+  end
 end
