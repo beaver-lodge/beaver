@@ -57,7 +57,7 @@ Bindings are the part that provides the interface to the MLIR CAPIs. It is imple
   - Install Vulkan SDK (global installation is required), reference: https://vulkan.lunarg.com/sdk/home
   - Setting environment variable by adding commands these to your bash/zsh profile:
 
-    ```
+    ```bash
     # you might need to change the version here
     cd $HOME/VulkanSDK/1.3.216.0/
     source setup-env.sh
