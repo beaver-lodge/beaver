@@ -1,6 +1,7 @@
 defmodule DiagnosticTest do
   use Beaver.Case, async: true, diagnostic: :server
   alias Beaver.MLIR.Attribute
+  alias Beaver.MLIR
 
   defmodule DiagnosticTestHelper do
     def start_and_attach(ctx, cb) do
@@ -62,7 +63,7 @@ defmodule DiagnosticTest do
   describe "with_diagnostics" do
     test "no init", %{ctx: ctx} do
       {%RuntimeError{}, txt} =
-        Beaver.with_diagnostics(
+        MLIR.Context.with_diagnostics(
           ctx,
           fn ->
             assert_raise RuntimeError, @err_msg, fn -> DiagnosticTestHelper.get_attr(ctx) end
