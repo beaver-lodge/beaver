@@ -267,8 +267,8 @@ defmodule Beaver.MLIR do
       {:ok, module} ->
         module
 
-      _ ->
-        raise "failed to apply pattern"
+      {:error, msg} ->
+        raise msg
     end
   end
 
@@ -280,33 +280,44 @@ defmodule Beaver.MLIR do
   def apply_(op, patterns, opts \\ @apply_default_opts) when is_list(patterns) do
     if MLIR.null?(op), do: raise("op is null")
     ctx = MLIR.Operation.from_module(op) |> MLIR.context()
-    pattern_module = MLIR.Location.from_env(__ENV__, ctx: ctx) |> MLIR.Module.empty()
-    block = Beaver.MLIR.Module.body(pattern_module)
 
-    for p <- patterns do
-      p = p.(ctx, block)
+    {result, err} =
+      MLIR.Context.with_diagnostics(
+        ctx,
+        fn ->
+          pattern_module = MLIR.Location.from_env(__ENV__, ctx: ctx) |> MLIR.Module.empty()
+          block = Beaver.MLIR.Module.body(pattern_module)
 
-      if opts[:debug] do
-        p |> MLIR.dump!()
-      end
-    end
+          for p <- patterns do
+            p = p.(ctx, block)
 
-    MLIR.verify!(pattern_module)
-    MLIR.verify!(op)
-    pdl_pat_mod = mlirPDLPatternModuleFromModule(pattern_module)
+            if opts[:debug] do
+              p |> MLIR.dump!()
+            end
+          end
 
-    frozen_pat_set =
-      pdl_pat_mod |> mlirRewritePatternSetFromPDLPatternModule() |> mlirFreezeRewritePattern()
+          MLIR.verify!(pattern_module)
+          MLIR.verify!(op)
+          pdl_pat_mod = mlirPDLPatternModuleFromModule(pattern_module)
 
-    result = beaverModuleApplyPatternsAndFoldGreedily(op, frozen_pat_set)
-    mlirPDLPatternModuleDestroy(pdl_pat_mod)
-    mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
-    MLIR.Module.destroy(pattern_module)
+          frozen_pat_set =
+            pdl_pat_mod
+            |> mlirRewritePatternSetFromPDLPatternModule()
+            |> mlirFreezeRewritePattern()
+
+          res = beaverModuleApplyPatternsAndFoldGreedily(op, frozen_pat_set)
+          mlirPDLPatternModuleDestroy(pdl_pat_mod)
+          mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
+          MLIR.Module.destroy(pattern_module)
+          res
+        end,
+        &"#{&2} #{MLIR.to_string(&1)}"
+      )
 
     if MLIR.LogicalResult.success?(result) do
       {:ok, op}
     else
-      {:error, "failed to apply pattern set"}
+      {:error, "failed to apply pattern set. #{err}"}
     end
   end
 end
