@@ -150,7 +150,7 @@ defmodule CfTest do
 
     # at some point you should see logging of node not supported for MLIR CAPI Value,
     # let's add the match to disable this kind of logging
-    defp gen_mlir(%Beaver.MLIR.Value{} = mlir, acc) do
+    defp gen_mlir(%MLIR.Value{} = mlir, acc) do
       {mlir, acc}
     end
 

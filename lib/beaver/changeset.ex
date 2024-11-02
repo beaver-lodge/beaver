@@ -132,7 +132,7 @@ defmodule Beaver.Changeset do
 
   def add_argument(
         %__MODULE__{operands: operands} = changeset,
-        %Beaver.MLIR.Value{} = operand
+        %MLIR.Value{} = operand
       ) do
     %__MODULE__{changeset | operands: operands ++ [operand]}
   end

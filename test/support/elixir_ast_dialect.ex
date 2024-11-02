@@ -56,7 +56,7 @@ defmodule ElixirAST do
                 {:__block__, _, values} ->
                   values |> List.last()
 
-                %Beaver.MLIR.Value{} = v ->
+                %MLIR.Value{} = v ->
                   v
               end
 

@@ -250,7 +250,7 @@ defmodule Beaver.Pattern do
     end
   end
 
-  defp result(%Env{blk: block, ctx: ctx}, %Beaver.MLIR.Value{} = v, i)
+  defp result(%Env{blk: block, ctx: ctx}, %MLIR.Value{} = v, i)
        when is_integer(i) do
     mlir blk: block, ctx: ctx do
       PDL.result(v, index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), i)) >>>
