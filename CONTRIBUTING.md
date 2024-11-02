@@ -19,7 +19,7 @@ Modules including `Beaver.Walker`, `Beaver.Composer`
 Utilities are the helper functions that help to generate or manipulate MLIR IR. They are implemented in Elixir and is designed to be used in the DSL part to further enhance it and improve ergonomics.
 
 ### Bindings
-Modules including `Beaver.MLIR`, `Beaver.MLIR.Dialect`, `Beaver.MLIR.Pass`, `Beaver.MLIR.Transforms`, `Beaver.MLIR.ExecutionEngine`
+Modules including `Beaver.MLIR`, `Beaver.MLIR.Dialect`, `Beaver.MLIR.Pass`, `Beaver.MLIR.Transform`, `Beaver.MLIR.ExecutionEngine`
 
 Bindings are the part that provides the interface to the MLIR CAPIs. It is implemented in Zig and is responsible for calling MLIR functions. Note that Beaver's bindings will try not to use `TableGen` and instead try to make use Elixir and Zig's meta-programming features to generate the bindings.
 

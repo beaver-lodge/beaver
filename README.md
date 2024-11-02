@@ -74,7 +74,7 @@ defmodule ToyPass do
 end
 
 use Beaver
-import MLIR.Transforms
+import MLIR.Transform
 ctx = MLIR.Context.create()
 ~m"""
 module {
