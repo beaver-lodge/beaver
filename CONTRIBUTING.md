@@ -25,8 +25,8 @@ Bindings are the part that provides the interface to the MLIR CAPIs. It is imple
 
 ## Development
 
-1. Install Elixir, https://elixir-lang.org/install.html
-2. Install Zig, https://ziglang.org/learn/getting-started/#installing-zig
+1. Install Elixir, [see installation guide](https://elixir-lang.org/install.html)
+2. Install Zig, [see installation guide](https://ziglang.org/learn/getting-started/#installing-zig)
 3. Install LLVM/MLIR
 
 - Option 1: Install with pip
