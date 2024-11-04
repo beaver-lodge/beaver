@@ -221,4 +221,12 @@ defmodule Beaver.Composer do
       {:error, "Unexpected failure running passes"}
     end
   end
+
+  @doc false
+  def pass_runner_child_specs() do
+    [
+      {DynamicSupervisor, name: @supervisor, strategy: :one_for_one},
+      {Registry, keys: :unique, name: @registry}
+    ]
+  end
 end
