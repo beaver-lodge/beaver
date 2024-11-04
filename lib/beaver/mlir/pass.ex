@@ -2,14 +2,9 @@ defmodule Beaver.MLIR.Pass do
   @moduledoc """
   This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
   """
-
   alias Beaver.MLIR
-
-  use Kinda.ResourceKind,
-    fields: [handler: nil],
-    forward_module: Beaver.Native
-
-  @callback run(MLIR.Operation.t()) :: :ok | :error
+  use Kinda.ResourceKind, fields: [handler: nil], forward_module: Beaver.Native
+  @callback run(MLIR.Operation.t()) :: any()
 
   defmacro __using__(opts) do
     quote do

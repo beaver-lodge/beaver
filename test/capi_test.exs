@@ -189,7 +189,7 @@ defmodule MlirTest do
     module = create_adder_module(ctx)
     assert not MLIR.null?(module)
     type_id_allocator = mlirTypeIDAllocatorCreate()
-    external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestPass)
+    external = %MLIR.Pass{} = Beaver.Composer.create_pass(TestPass)
     pm = mlirPassManagerCreate(ctx)
     mlirPassManagerAddOwnedPass(pm, external)
     mlirPassManagerAddOwnedPass(pm, mlirCreateTransformsCSE())
@@ -204,7 +204,7 @@ defmodule MlirTest do
   test "Run a func operation pass", %{ctx: ctx} do
     module = create_adder_module(ctx)
     assert not MLIR.null?(module)
-    external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestFuncPass)
+    external = %MLIR.Pass{} = Beaver.Composer.create_pass(TestFuncPass)
     pm = mlirPassManagerCreate(ctx)
     npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
     mlirOpPassManagerAddOwnedPass(npm, external)
@@ -217,7 +217,7 @@ defmodule MlirTest do
   test "Run pass with patterns", %{ctx: ctx} do
     module = create_redundant_transpose_module(ctx)
     assert not MLIR.null?(module)
-    external = %MLIR.Pass{} = MLIR.ExternalPass.create(TestFuncPass)
+    external = %MLIR.Pass{} = Beaver.Composer.create_pass(TestFuncPass)
     pm = mlirPassManagerCreate(ctx)
     npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
     mlirOpPassManagerAddOwnedPass(npm, external)
