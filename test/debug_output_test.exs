@@ -16,25 +16,25 @@ defmodule DebugOutputTest do
 
   test "op stats", %{ctx: ctx} do
     ir(ctx)
-    |> MLIR.Transforms.print_op_stats()
-    |> MLIR.Pass.Composer.run!()
+    |> MLIR.Transform.print_op_stats()
+    |> Beaver.Composer.run!()
   end
 
   test "print ir", %{ctx: ctx} do
     ir(ctx)
-    |> MLIR.Transforms.print_ir()
-    |> MLIR.Pass.Composer.run!()
+    |> MLIR.Transform.print_ir()
+    |> Beaver.Composer.run!()
   end
 
   test "timing", %{ctx: ctx} do
     ir(ctx)
-    |> MLIR.Transforms.canonicalize()
-    |> MLIR.Pass.Composer.run!(timing: true)
+    |> MLIR.Transform.canonicalize()
+    |> Beaver.Composer.run!(timing: true)
   end
 
   test "pass manager enable print ir", %{ctx: ctx} do
     ir(ctx)
-    |> MLIR.Transforms.canonicalize()
-    |> MLIR.Pass.Composer.run!(print: true)
+    |> MLIR.Transform.canonicalize()
+    |> Beaver.Composer.run!(print: true)
   end
 end

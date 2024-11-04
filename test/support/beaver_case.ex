@@ -17,11 +17,11 @@ defmodule Beaver.Case do
           if unquote(options)[:diagnostic] == :server do
             {:ok, pid} =
               GenServer.start(
-                Beaver.DiagnosticsCapturer,
+                Beaver.Capturer,
                 &"#{&2}[Beaver] [Diagnostic] [#{to_string(MLIR.location(&1))}] #{to_string(&1)}\n"
               )
 
-            {pid, Beaver.DiagnosticsCapturer.attach(ctx, pid)}
+            {pid, Beaver.Capturer.attach(ctx, pid)}
           else
             {nil, nil}
           end

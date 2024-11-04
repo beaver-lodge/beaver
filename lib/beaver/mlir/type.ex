@@ -1,16 +1,38 @@
 defmodule Beaver.MLIR.Type do
   @moduledoc """
-  This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
+  This module provides functions to work with MLIR's type system, allowing creation of MLIR type.
+
+  ## Type Categories
+
+  ### Basic Types
+  - `integer/1` (`i32/1`, `i64/1`, etc.)
+  - `float/1` (`f32/1`, `f64/1`, etc.)
+  - `index/1`
+  - `none/1`
+
+  ### Composite Types
+  - Tensors (`ranked_tensor/2` and `unranked_tensor/1`)
+  - `vector/2`
+  - `memref/3`
+  - `function/3`
   """
   alias Beaver.MLIR
-  alias Beaver.MLIR.CAPI
+  import Beaver.MLIR.CAPI
 
   use Kinda.ResourceKind, forward_module: Beaver.Native
 
   def get(string, opts \\ [])
 
   def get(string, opts) when is_binary(string) do
-    Beaver.Deferred.from_opts(opts, &CAPI.mlirTypeParseGet(&1, MLIR.StringRef.create(string)))
+    Beaver.Deferred.from_opts(opts, fn ctx ->
+      t = mlirTypeParseGet(ctx, MLIR.StringRef.create(string))
+
+      if MLIR.null?(t) do
+        raise "fail to parse type: #{string}"
+      end
+
+      t
+    end)
   end
 
   def function(inputs, results, opts \\ []) do
@@ -28,7 +50,7 @@ defmodule Beaver.MLIR.Type do
         |> Enum.map(&Beaver.Deferred.create(&1, ctx))
         |> Beaver.Native.array(__MODULE__)
 
-      CAPI.mlirFunctionTypeGet(ctx, num_inputs, inputs, num_results, results)
+      mlirFunctionTypeGet(ctx, num_inputs, inputs, num_results, results)
     end)
   end
 
@@ -53,7 +75,7 @@ defmodule Beaver.MLIR.Type do
         nil
       )
       when is_list(shape) do
-    ranked_tensor(shape, element_type, CAPI.mlirAttributeGetNull())
+    ranked_tensor(shape, element_type, mlirAttributeGetNull())
   end
 
   def ranked_tensor(
@@ -69,7 +91,7 @@ defmodule Beaver.MLIR.Type do
       |> Enum.map(&escape_dynamic/1)
       |> Beaver.Native.array(Beaver.Native.I64)
 
-    CAPI.mlirRankedTensorTypeGet(rank, shape, element_type, encoding)
+    mlirRankedTensorTypeGet(rank, shape, element_type, encoding)
   end
 
   def unranked_tensor(element_type)
@@ -78,7 +100,7 @@ defmodule Beaver.MLIR.Type do
   end
 
   def unranked_tensor(%__MODULE__{} = element_type) do
-    CAPI.mlirUnrankedTensorTypeGet(element_type)
+    mlirUnrankedTensorTypeGet(element_type)
   end
 
   def complex(element_type) when is_function(element_type, 1) do
@@ -86,7 +108,7 @@ defmodule Beaver.MLIR.Type do
   end
 
   def complex(%__MODULE__{} = element_type) do
-    CAPI.mlirComplexTypeGet(element_type)
+    mlirComplexTypeGet(element_type)
   end
 
   def memref(
@@ -109,11 +131,11 @@ defmodule Beaver.MLIR.Type do
 
     shape = shape |> Enum.map(&escape_dynamic/1) |> Beaver.Native.array(Beaver.Native.I64)
 
-    default_null = CAPI.mlirAttributeGetNull()
+    default_null = mlirAttributeGetNull()
     layout = Keyword.get(opts, :layout) || default_null
     memory_space = Keyword.get(opts, :memory_space) || default_null
 
-    CAPI.mlirMemRefTypeGet(element_type, rank, shape, layout, memory_space)
+    mlirMemRefTypeGet(element_type, rank, shape, layout, memory_space)
   end
 
   @doc """
@@ -123,7 +145,7 @@ defmodule Beaver.MLIR.Type do
       iex> ctx = MLIR.Context.create()
       iex> MLIR.Type.vector([1, 2, 3], MLIR.Type.i32).(ctx) |> MLIR.to_string()
       "vector<1x2x3xi32>"
-      iex> ctx |> MLIR.Context.destroy
+      iex> MLIR.Context.destroy(ctx)
   """
 
   def vector(shape, element_type) when is_function(element_type, 1) do
@@ -133,7 +155,7 @@ defmodule Beaver.MLIR.Type do
   def vector(shape, %__MODULE__{} = element_type) when is_list(shape) do
     rank = length(shape)
     shape = shape |> Beaver.Native.array(Beaver.Native.I64)
-    CAPI.mlirVectorTypeGet(rank, shape, element_type)
+    mlirVectorTypeGet(rank, shape, element_type)
   end
 
   @doc """
@@ -143,7 +165,7 @@ defmodule Beaver.MLIR.Type do
       iex> ctx = MLIR.Context.create()
       iex> MLIR.Type.tuple([MLIR.Type.i32, MLIR.Type.i32], ctx: ctx) |> MLIR.to_string()
       "tuple<i32, i32>"
-      iex> ctx |> MLIR.Context.destroy
+      iex> MLIR.Context.destroy(ctx)
   """
   def tuple(elements, opts \\ []) when is_list(elements) do
     Beaver.Deferred.from_opts(opts, fn ctx ->
@@ -154,25 +176,27 @@ defmodule Beaver.MLIR.Type do
         |> Enum.map(&Beaver.Deferred.create(&1, ctx))
         |> Beaver.Native.array(__MODULE__)
 
-      CAPI.mlirTupleTypeGet(ctx, num_elements, elements)
+      mlirTupleTypeGet(ctx, num_elements, elements)
     end)
   end
 
   def f16(opts \\ []) do
-    Beaver.Deferred.from_opts(opts, &CAPI.mlirF16TypeGet/1)
+    Beaver.Deferred.from_opts(opts, &mlirF16TypeGet/1)
   end
 
   def f32(opts \\ []) do
-    Beaver.Deferred.from_opts(opts, &CAPI.mlirF32TypeGet/1)
+    Beaver.Deferred.from_opts(opts, &mlirF32TypeGet/1)
   end
 
   def f64(opts \\ []) do
-    Beaver.Deferred.from_opts(opts, &CAPI.mlirF64TypeGet/1)
+    Beaver.Deferred.from_opts(opts, &mlirF64TypeGet/1)
   end
 
-  def f(bitwidth, opts \\ []) when is_integer(bitwidth) do
+  def float(bitwidth, opts \\ []) when is_integer(bitwidth) do
     apply(__MODULE__, String.to_atom("f#{bitwidth}"), [opts])
   end
+
+  defdelegate f(bitwidth, opts \\ []), to: __MODULE__, as: :float
 
   def integer(bitwidth, opts \\ [signed: false]) do
     signed = Keyword.get(opts, :signed)
@@ -181,9 +205,9 @@ defmodule Beaver.MLIR.Type do
       opts,
       fn ctx ->
         if signed do
-          CAPI.mlirIntegerTypeSignedGet(ctx, bitwidth)
+          mlirIntegerTypeSignedGet(ctx, bitwidth)
         else
-          CAPI.mlirIntegerTypeGet(ctx, bitwidth)
+          mlirIntegerTypeGet(ctx, bitwidth)
         end
       end
     )
@@ -192,14 +216,14 @@ defmodule Beaver.MLIR.Type do
   def index(opts \\ []) do
     Beaver.Deferred.from_opts(
       opts,
-      &CAPI.mlirIndexTypeGet(&1)
+      &mlirIndexTypeGet(&1)
     )
   end
 
   def none(opts \\ []) do
     Beaver.Deferred.from_opts(
       opts,
-      &CAPI.mlirNoneTypeGet(&1)
+      &mlirNoneTypeGet(&1)
     )
   end
 
@@ -214,14 +238,14 @@ defmodule Beaver.MLIR.Type do
   end
 
   def integer?(%MLIR.Type{} = t) do
-    MLIR.CAPI.mlirTypeIsAInteger(t) |> Beaver.Native.to_term()
+    mlirTypeIsAInteger(t) |> Beaver.Native.to_term()
   end
 
   def index?(%MLIR.Type{} = t) do
-    MLIR.CAPI.mlirTypeIsAIndex(t) |> Beaver.Native.to_term()
+    mlirTypeIsAIndex(t) |> Beaver.Native.to_term()
   end
 
   def float?(%MLIR.Type{} = t) do
-    MLIR.CAPI.mlirTypeIsAFloat(t) |> Beaver.Native.to_term()
+    mlirTypeIsAFloat(t) |> Beaver.Native.to_term()
   end
 end

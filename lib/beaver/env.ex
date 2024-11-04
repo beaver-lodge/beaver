@@ -2,6 +2,7 @@ defmodule Beaver.Env do
   @moduledoc """
   This module defines macros to getting MLIR context, region, block within the do block of mlir/1. It works like __MODULE__/0, __CALLER__/0 of Elixir special forms.
   """
+  alias Beaver.MLIR
 
   @doc """
   Return context in the DSL environment
@@ -10,12 +11,13 @@ defmodule Beaver.Env do
     if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_ctx, nil}) do
       quote do
         match?(%Beaver.MLIR.Context{}, Kernel.var!(beaver_internal_env_ctx)) ||
-          raise Beaver.EnvNotFoundError, Beaver.MLIR.Context
+          raise CompileError,
+                Beaver.Env.compile_err_msg(Beaver.MLIR.Context, unquote(Macro.escape(__CALLER__)))
 
         Kernel.var!(beaver_internal_env_ctx)
       end
     else
-      raise Beaver.EnvNotFoundError, Beaver.MLIR.Context
+      raise CompileError, Beaver.Env.compile_err_msg(Beaver.MLIR.Context, __CALLER__)
     end
   end
 
@@ -26,7 +28,8 @@ defmodule Beaver.Env do
     if Macro.Env.has_var?(__CALLER__, {:beaver_env_region, nil}) do
       quote do
         match?(%Beaver.MLIR.Region{}, Kernel.var!(beaver_env_region)) ||
-          raise Beaver.EnvNotFoundError, Beaver.MLIR.Region
+          raise CompileError,
+                Beaver.Env.compile_err_msg(Beaver.MLIR.Region, unquote(Macro.escape(__CALLER__)))
 
         Kernel.var!(beaver_env_region)
       end
@@ -47,7 +50,7 @@ defmodule Beaver.Env do
         Kernel.var!(beaver_internal_env_block)
       end
     else
-      raise Beaver.EnvNotFoundError, Beaver.MLIR.Block
+      raise CompileError, Beaver.Env.compile_err_msg(MLIR.Block, __CALLER__)
     end
   end
 
@@ -62,5 +65,12 @@ defmodule Beaver.Env do
         Kernel.var!(unquote(block_var)) = Beaver.MLIR.Block.create()
       end
     end
+  end
+
+  @doc false
+  def compile_err_msg(entity, %Macro.Env{} = env)
+      when entity in [MLIR.Context, MLIR.Region, MLIR.Block] do
+    m = Module.split(entity) |> List.last() |> String.downcase()
+    [file: env.file, line: env.line, description: "no valid #{m} in the environment"]
   end
 end

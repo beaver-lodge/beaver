@@ -30,7 +30,7 @@ defmodule ELXDialectTest do
     mlir_module =
       ast
       |> ElixirAST.from_ast(ctx: ctx)
-      |> MLIR.Pass.Composer.nested(
+      |> Beaver.Composer.nested(
         "builtin.module",
         [
           {:nested, "func.func",
@@ -39,8 +39,8 @@ defmodule ELXDialectTest do
            ]}
         ]
       )
-      |> MLIR.Pass.Composer.run!()
-      |> MLIR.Operation.verify!()
+      |> Beaver.Composer.run!()
+      |> MLIR.verify!()
 
     {_, op_names} =
       mlir_module

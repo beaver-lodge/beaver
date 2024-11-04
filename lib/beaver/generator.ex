@@ -1,4 +1,4 @@
-defmodule Beaver.MLIR.Pass.Composer.Generator do
+defmodule Beaver.ComposerGenerator do
   @moduledoc false
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
@@ -14,7 +14,7 @@ defmodule Beaver.MLIR.Pass.Composer.Generator do
     quote bind_quoted: [prefix: prefix] do
       alias Beaver.MLIR
       alias Beaver.MLIR.CAPI
-      alias Beaver.MLIR.Pass.Composer
+      alias Beaver.Composer
 
       # We are calling C functions dynamically at compile time, so we need to make sure managed libraries get loaded.
 
@@ -28,16 +28,16 @@ defmodule Beaver.MLIR.Pass.Composer.Generator do
             arg_name =
               pass
               |> CAPI.beaverPassGetArgument()
-              |> MLIR.StringRef.to_string()
+              |> MLIR.to_string()
 
             pass_name =
               pass
               |> CAPI.beaverPassGetName()
-              |> MLIR.StringRef.to_string()
+              |> MLIR.to_string()
 
-            normalized_name = MLIR.Pass.Composer.Generator.normalized_name(arg_name)
+            normalized_name = Beaver.ComposerGenerator.normalized_name(arg_name)
 
-            doc = pass |> CAPI.beaverPassGetDescription() |> MLIR.StringRef.to_string()
+            doc = pass |> CAPI.beaverPassGetDescription() |> MLIR.to_string()
 
             @doc """
             #{doc}

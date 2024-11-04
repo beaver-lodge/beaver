@@ -73,7 +73,7 @@ defmodule RegionTest do
         end
       end
     end
-    |> MLIR.Operation.verify!()
+    |> MLIR.verify!()
   end
 
   test "nested regions", %{ctx: ctx} do
@@ -126,6 +126,6 @@ defmodule RegionTest do
         end
       end
     end
-    |> MLIR.Operation.verify!()
+    |> MLIR.verify!()
   end
 end

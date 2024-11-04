@@ -1,4 +1,4 @@
-defmodule Beaver.StringPrinter do
+defmodule Beaver.Printer do
   @moduledoc """
   This module provides a way to run MLIR CAPI with a string callback and user data.
   """

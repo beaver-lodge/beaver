@@ -5,7 +5,7 @@ defmodule PDLTest do
   alias MLIR.Type
   import MLIR.CAPI
   alias MLIR.Dialect.{Func, TOSA}
-  import MLIR.Transforms
+  import MLIR.Transform
   require Func
   require TOSA
   require Type
@@ -43,8 +43,8 @@ defmodule PDLTest do
   """
 
   def apply_patterns(pattern_module, ir_module, cb) do
-    MLIR.Operation.verify!(pattern_module)
-    MLIR.Operation.verify!(ir_module)
+    MLIR.verify!(pattern_module)
+    MLIR.verify!(ir_module)
     pdl_pat_mod = mlirPDLPatternModuleFromModule(pattern_module)
 
     frozen_pat_set =
@@ -59,7 +59,7 @@ defmodule PDLTest do
 
   test "AreEqualOp", %{ctx: ctx} do
     mlirContextSetAllowUnregisteredDialects(ctx, true)
-    pattern_module = MLIR.Module.create(ctx, @apply_rewrite_op_patterns)
+    pattern_module = MLIR.Module.create(@apply_rewrite_op_patterns, ctx: ctx)
 
     inspector = fn
       {:successor, %MLIR.Block{} = successor}, acc ->
@@ -137,7 +137,7 @@ defmodule PDLTest do
 
     assert MLIR.equal?(mlir, MLIR.Operation.from_module(pattern_module))
 
-    ir_module = MLIR.Module.create(ctx, @apply_rewrite_op_ir)
+    ir_module = MLIR.Module.create(@apply_rewrite_op_ir, ctx: ctx)
 
     apply_patterns(pattern_module, ir_module, fn ir_module ->
       ir_string = MLIR.to_string(ir_module)
@@ -153,11 +153,11 @@ defmodule PDLTest do
 
   test "AreEqualOp pdl version", %{ctx: ctx} do
     mlirContextSetAllowUnregisteredDialects(ctx, true)
-    pattern_module = MLIR.Module.create(ctx, @are_equal_op_pdl)
-    assert not MLIR.Module.is_null(pattern_module), "fail to parse module"
-    ir_module = MLIR.Module.create(ctx, @apply_rewrite_op_ir)
-    MLIR.Operation.verify!(pattern_module)
-    MLIR.Operation.verify!(ir_module)
+    pattern_module = MLIR.Module.create(@are_equal_op_pdl, ctx: ctx)
+    assert not MLIR.null?(pattern_module), "fail to parse module"
+    ir_module = MLIR.Module.create(@apply_rewrite_op_ir, ctx: ctx)
+    MLIR.verify!(pattern_module)
+    MLIR.verify!(ir_module)
     pattern_string = MLIR.to_string(pattern_module)
     assert String.contains?(pattern_string, "test.op")
     assert String.contains?(pattern_string, "test.success2")
@@ -181,14 +181,14 @@ defmodule PDLTest do
           TestTOSAPatterns.replace_multi_add_op3()
         ] do
       ir_module = TestTOSAPatterns.gen_ir_module(ctx)
-      MLIR.Operation.verify!(ir_module)
+      MLIR.verify!(ir_module)
       ir_string = MLIR.to_string(ir_module)
       assert not String.contains?(ir_string, "tosa.sub"), ir_string
 
-      MLIR.Pattern.apply!(ir_module, [pattern])
-      |> MLIR.Operation.verify!(debug: true)
-      |> MLIR.Transforms.canonicalize()
-      |> MLIR.Pass.Composer.run!()
+      MLIR.apply!(ir_module, [pattern])
+      |> MLIR.verify!()
+      |> MLIR.Transform.canonicalize()
+      |> Beaver.Composer.run!()
 
       ir_string = MLIR.to_string(ir_module)
       assert not String.contains?(ir_string, "tosa.add"), ir_string
@@ -206,9 +206,9 @@ defmodule PDLTest do
         }
       }
       """.(ctx)
-      |> MLIR.Pass.Composer.append(ToyPass)
+      |> Beaver.Composer.append(ToyPass)
       |> canonicalize
-      |> MLIR.Pass.Composer.run!()
+      |> Beaver.Composer.run!()
 
     ir_string = MLIR.to_string(ir)
     assert not (ir_string =~ "tosa.add")

@@ -1,6 +1,9 @@
 defmodule Beaver.MLIR.Value do
   @moduledoc """
-  This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
+  This module handles MLIR values, which represent SSA (Static Single Assignment) values in the IR.
+
+  Values can be either block arguments or operation results. That's why this module provides
+  functions to check if a value is an argument or a result (`argument?/1`, `result?/1`), or to get the owner of a result (`owner/1`).
   """
   alias Beaver.MLIR.CAPI
 

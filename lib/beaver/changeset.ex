@@ -1,4 +1,4 @@
-defmodule Beaver.MLIR.Operation.Changeset do
+defmodule Beaver.Changeset do
   @moduledoc false
   alias Beaver.MLIR
 
@@ -132,7 +132,7 @@ defmodule Beaver.MLIR.Operation.Changeset do
 
   def add_argument(
         %__MODULE__{operands: operands} = changeset,
-        %Beaver.MLIR.Value{} = operand
+        %MLIR.Value{} = operand
       ) do
     %__MODULE__{changeset | operands: operands ++ [operand]}
   end

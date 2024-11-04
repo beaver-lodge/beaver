@@ -4,7 +4,7 @@ defmodule Beaver.MLIR.Dialect.Arith do
   """
   alias Beaver.MLIR
   alias Beaver.MLIR.Dialect
-  import MLIR.Sigils
+  import Beaver.Sigils
 
   use Dialect, dialect: "arith", ops: Dialect.Registry.ops("arith")
 
@@ -57,5 +57,19 @@ defmodule Beaver.MLIR.Dialect.Arith do
   def cmp_i_predicate(type) do
     i = i_type_to_magic_num(type)
     MLIR.Attribute.integer(MLIR.Type.i64(), i)
+  end
+
+  @compare_operators [:!=, :==, :>, :>=, :<, :<=]
+  defp operator_to_type(:!=, _), do: :ne
+  defp operator_to_type(:==, _), do: :eq
+  defp operator_to_type(:>, signed), do: :"#{if signed, do: :s, else: :u}gt"
+  defp operator_to_type(:>=, signed), do: :"#{if signed, do: :s, else: :u}ge"
+  defp operator_to_type(:<, signed), do: :"#{if signed, do: :s, else: :u}lt"
+  defp operator_to_type(:<=, signed), do: :"#{if signed, do: :s, else: :u}le"
+
+  def operator_to_predicate(operator, signed \\ true)
+
+  def operator_to_predicate(operator, signed) when operator in @compare_operators do
+    operator_to_type(operator, signed) |> cmp_i_predicate()
   end
 end

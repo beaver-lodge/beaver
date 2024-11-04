@@ -4,7 +4,7 @@ defmodule PassTest do
   use Beaver
   alias Beaver.MLIR.Dialect.{Func, Arith}
   require Func
-  import MLIR.Transforms
+  import MLIR.Transform
 
   defmodule PassRaisingException do
     @moduledoc false
@@ -26,10 +26,10 @@ defmodule PassTest do
             end
           end
         end
-        |> MLIR.Operation.verify!(debug: true)
+        |> MLIR.verify!()
       end
     end
-    |> MLIR.Operation.verify!()
+    |> MLIR.verify!()
   end
 
   test "exception in run/1", %{ctx: ctx, diagnostic_server: diagnostic_server} do
@@ -38,14 +38,14 @@ defmodule PassTest do
     assert_raise RuntimeError, ~r"Unexpected failure running passes", fn ->
       assert capture_log(fn ->
                ir
-               |> MLIR.Pass.Composer.nested("func.func", [
+               |> Beaver.Composer.nested("func.func", [
                  PassRaisingException
                ])
-               |> MLIR.Pass.Composer.run!()
+               |> Beaver.Composer.run!()
              end) =~ ~r"fail to run a pass"
     end
 
-    assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
+    assert Beaver.Capturer.collect(diagnostic_server) =~
              "Fail to run a pass implemented in Elixir"
   end
 
@@ -53,13 +53,13 @@ defmodule PassTest do
     ir = example_ir(ctx)
 
     ir
-    |> MLIR.Pass.Composer.append(
+    |> Beaver.Composer.append(
       {"test-pass", "builtin.module",
        fn op ->
          assert MLIR.to_string(op) =~ ~r"func.func @some_func"
        end}
     )
-    |> MLIR.Pass.Composer.run!()
+    |> Beaver.Composer.run!()
   end
 
   test "multi level nested", %{ctx: ctx} do
@@ -67,7 +67,7 @@ defmodule PassTest do
 
     assert ir
            |> canonicalize()
-           |> MLIR.Pass.Composer.nested(
+           |> Beaver.Composer.nested(
              "func.func1",
              [
                canonicalize(),
@@ -81,7 +81,7 @@ defmodule PassTest do
                 ]}
              ]
            )
-           |> MLIR.Pass.Composer.to_pipeline() =~
+           |> Beaver.Composer.to_pipeline() =~
              ~r/func1.+func2.+func.func3\(canonicalize/
   end
 
@@ -92,8 +92,8 @@ defmodule PassTest do
                  ~r"Unexpected failure parsing pipeline: something wrong, MLIR Textual PassPipeline Parser:1:1: error: 'something wrong' does not refer to a registered pass or pass pipeline",
                  fn ->
                    ir
-                   |> MLIR.Pass.Composer.append("something wrong")
-                   |> MLIR.Pass.Composer.run!()
+                   |> Beaver.Composer.append("something wrong")
+                   |> Beaver.Composer.run!()
                  end
   end
 end

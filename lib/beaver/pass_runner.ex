@@ -1,16 +1,18 @@
 defmodule Beaver.PassRunner do
   alias Beaver.MLIR
 
-  require Logger
-
   @moduledoc """
   `GenServer` to run an MLIR pass implemented in Elixir
   """
   use GenServer
 
+  def start_link([run | opts]) do
+    GenServer.start_link(__MODULE__, run, opts)
+  end
+
   @impl true
-  def init(fun) do
-    {:ok, %{run: fun}}
+  def init(run) do
+    {:ok, %{run: run}}
   end
 
   @impl true

@@ -1,16 +1,17 @@
 defmodule DiagnosticTest do
   use Beaver.Case, async: true, diagnostic: :server
   alias Beaver.MLIR.Attribute
+  alias Beaver.MLIR
 
   defmodule DiagnosticTestHelper do
     def start_and_attach(ctx, cb) do
       {:ok, server} =
         GenServer.start(
-          Beaver.DiagnosticsCapturer,
+          Beaver.Capturer,
           cb
         )
 
-      handler_id = Beaver.DiagnosticsCapturer.attach(ctx, server)
+      handler_id = Beaver.Capturer.attach(ctx, server)
       {server, handler_id}
     end
 
@@ -39,7 +40,7 @@ defmodule DiagnosticTest do
         )
 
       assert_raise RuntimeError, @err_msg, fn -> DiagnosticTestHelper.get_attr(ctx) end
-      assert Beaver.DiagnosticsCapturer.collect(server) == @collected
+      assert Beaver.Capturer.collect(server) == @collected
       DiagnosticTestHelper.cleanup_handler(ctx, server, handler_id)
     end
 
@@ -52,7 +53,7 @@ defmodule DiagnosticTest do
 
       assert_raise RuntimeError, @err_msg, fn -> DiagnosticTestHelper.get_attr(ctx) end
 
-      assert Beaver.DiagnosticsCapturer.collect(server) ==
+      assert Beaver.Capturer.collect(server) ==
                "hello#{@collected}"
 
       DiagnosticTestHelper.cleanup_handler(ctx, server, handler_id)
@@ -62,7 +63,7 @@ defmodule DiagnosticTest do
   describe "with_diagnostics" do
     test "no init", %{ctx: ctx} do
       {%RuntimeError{}, txt} =
-        Beaver.with_diagnostics(
+        MLIR.Context.with_diagnostics(
           ctx,
           fn ->
             assert_raise RuntimeError, @err_msg, fn -> DiagnosticTestHelper.get_attr(ctx) end

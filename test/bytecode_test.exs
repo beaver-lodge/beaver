@@ -5,11 +5,11 @@ defmodule BytecodeTest do
 
   defp roundtrip_bytecode(m) do
     m
-    |> MLIR.Operation.verify!()
+    |> MLIR.verify!()
     |> MLIR.to_string(bytecode: true)
     |> tap(fn s -> assert String.starts_with?(s, "ML\xefR") end)
-    |> then(&MLIR.Module.create!(MLIR.context(m), &1))
-    |> MLIR.Operation.verify!()
+    |> then(&MLIR.Module.create!(&1, ctx: MLIR.context(m)))
+    |> MLIR.verify!()
   end
 
   test "bytecode writing and parsing", %{ctx: ctx} do

@@ -56,7 +56,7 @@ defmodule ElixirAST do
                 {:__block__, _, values} ->
                   values |> List.last()
 
-                %Beaver.MLIR.Value{} = v ->
+                %MLIR.Value{} = v ->
                   v
               end
 
@@ -152,7 +152,22 @@ defmodule ElixirAST do
     defp extract_var_name(var_op) do
       Beaver.Walker.attributes(var_op)["name"]
       |> MLIR.CAPI.mlirStringAttrGetValue()
-      |> MLIR.StringRef.to_string()
+      |> MLIR.to_string()
+    end
+
+    defp lookup_var(op, acc) do
+      [val] =
+        Beaver.Walker.results(op)[0]
+        |> Beaver.Walker.uses()
+        |> Enum.to_list()
+
+      case val |> MLIR.CAPI.mlirOpOperandGetOwner() |> MLIR.Operation.name() do
+        "ex.bind" ->
+          {op, acc}
+
+        _ ->
+          {Beaver.Walker.replace(op, acc.variables[extract_var_name(op)]), acc}
+      end
     end
 
     def run(func) do
@@ -174,18 +189,7 @@ defmodule ElixirAST do
               {r, acc}
 
             "ex.var" ->
-              [val] =
-                Beaver.Walker.results(op)[0]
-                |> Beaver.Walker.uses()
-                |> Enum.to_list()
-
-              case val |> MLIR.CAPI.mlirOpOperandGetOwner() |> MLIR.Operation.name() do
-                "ex.bind" ->
-                  {op, acc}
-
-                _ ->
-                  {Beaver.Walker.replace(op, acc.variables[extract_var_name(op)]), acc}
-              end
+              lookup_var(op, acc)
 
             _ ->
               {op, acc}

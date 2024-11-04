@@ -13,14 +13,45 @@ alias Beaver.MLIR.{
 }
 
 defmodule Beaver.Walker do
+  require Beaver.Pattern
   alias Beaver.MLIR.CAPI
   alias __MODULE__.OpReplacement
 
   @moduledoc """
-  Walker to traverse MLIR structures including operands, results, successors, attributes, regions.
-  It implements the `Enumerable` protocol and the `Access` behavior.
-  """
+  Provides traversal capabilities for MLIR structures.
 
+  This module implements traversal functionality for MLIR structures including:
+  - `operations/1`
+  - `results/1`
+  - `successors/1`
+  - `attributes/1`
+  - `regions/1`
+
+  It implements both the `Enumerable` protocol and the `Access` behavior to provide
+  a familiar interface for working with MLIR structures.
+
+  ### Depth-first, pre-order and post-order walking
+  Allows traversing MLIR structures in depth-first order, visiting each node and its
+  children before moving to siblings. Supports both pre-order (visit node before children) and post-order (visit children
+  before node).
+
+  ### Mutation Support
+  It is possible to modifying the MLIR structure during traversal with CAPIs. It is recommended to use `replace/2` to replace an operation to keep the traversal going.
+
+  ### Pattern-based Transformations
+  You can apply transformation patterns defined using `Beaver.Pattern.defpat/2` to MLIR structures during traversal.
+
+  ### Access Syntax
+  - Access behavior to provide convenient attribute access:
+  ```elixir
+  op[:attr_name]
+  op["attr_name"]
+  ```
+  - convenient access to get operands, results, regions
+  ```
+  operands(op)[0]
+  ```
+  """
   @type operation() :: Module.t() | Operation.t() | OpReplacement.t()
   @type container() :: operation() | Region.t() | Block.t() | NamedAttribute.t()
   @type element() :: operation() | Region.t() | Block.t() | Value.t() | NamedAttribute.t()
@@ -256,7 +287,7 @@ defmodule Beaver.Walker do
       get_first: &CAPI.mlirBlockGetFirstOperation/1,
       get_next: &CAPI.mlirOperationGetNextInBlock/1,
       get_parent: &CAPI.mlirOperationGetBlock/1,
-      is_null: &MLIR.is_null/1
+      is_null: &MLIR.null?/1
     )
   end
 
@@ -271,7 +302,7 @@ defmodule Beaver.Walker do
       get_first: &CAPI.mlirRegionGetFirstBlock/1,
       get_next: &CAPI.mlirBlockGetNextInRegion/1,
       get_parent: &CAPI.mlirBlockGetParentRegion/1,
-      is_null: &MLIR.is_null/1
+      is_null: &MLIR.null?/1
     )
   end
 
@@ -299,7 +330,7 @@ defmodule Beaver.Walker do
              named_attribute
              |> MLIR.CAPI.beaverNamedAttributeGetName()
              |> MLIR.CAPI.mlirIdentifierStr()
-             |> MLIR.StringRef.to_string() do
+             |> MLIR.to_string() do
         name == to_string(key)
       end
     end)
@@ -317,7 +348,7 @@ defmodule Beaver.Walker do
       with name_str <-
              name
              |> MLIR.CAPI.mlirIdentifierStr()
-             |> MLIR.StringRef.to_string() do
+             |> MLIR.to_string() do
         name_str == to_string(key)
       end
     end)

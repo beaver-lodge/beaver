@@ -1,10 +1,40 @@
 defmodule Beaver.MLIR do
-  @moduledoc """
-  This module provides common functions to work with MLIR entities.
-
-  The functions in this module will leverage pattern matching to extract the entity type and call the corresponding CAPI function.
-  """
+  alias Beaver.MLIR.{Attribute, Type, Operation}
+  alias Beaver.MLIR
+  import Beaver.MLIR.CAPI
   alias Beaver.MLIR.CAPI
+
+  @moduledoc """
+  Core functionality for working with MLIR.
+
+  This module serves as the primary interface for MLIR operations and entities in Beaver. It provides:
+
+  - String conversion utilities for debugging and serialization
+  - Null checking for safe operation handling
+  - Context and location retrieval for MLIR entities
+
+  ## Printing Operations
+
+  When converting operations to strings, you can specify the output format:
+  - `generic: true` - Uses MLIR's generic format
+  - `generic: false` - Uses MLIR's specialized format
+  - `bytecode: true` - Uses MLIR's bytecode format
+
+  The default format may vary between MLIR versions, so explicitly specify the format
+  when consistent output is required.
+
+  ## Inspecting MLIR Entities
+  Beaver doesn't implement `Inspect` protocol for MLIR entities because the output might be too verbose and can crash the BEAM if invalid entities are passed. Use `Beaver.MLIR.to_string/2` to convert entities to inspect it.
+
+  ## Null Safety
+
+  Many MLIR operations can return null values. Use `null?/1` to safely check entities
+  before performing operations that require non-null values.
+
+  ## Name spaces to include different kinds of CAPI delegates
+  - `Beaver.MLIR.***`: APIs related to lifecycle, including creating and destroying MLIR entities.
+  - `Beaver.MLIR`: APIs like `Beaver.MLIR.dump!/1` or `Beaver.MLIR.null?/1`. These are standard features generally expected in any MLIR tools.
+  """
 
   defp extract_entity_name(m) do
     ["Beaver", "MLIR", entity_name] = m |> Module.split()
@@ -24,7 +54,7 @@ defmodule Beaver.MLIR do
     OpPassManager,
     PassManager,
     Identifier,
-    Diagnostic
+    ExecutionEngine
   }
 
   @doc """
@@ -46,7 +76,7 @@ defmodule Beaver.MLIR do
   @doc """
   Compare two MLIR entities.
   """
-  def equal?(a = %m{}, b = %m{}) do
+  def equal?(%m{} = a, %m{} = b) do
     entity_name = extract_entity_name(m)
     apply(CAPI, :"mlir#{entity_name}Equal", [a, b]) |> Beaver.Native.to_term()
   end
@@ -69,9 +99,15 @@ defmodule Beaver.MLIR do
           | Module.t()
           | Block.t()
           | Dialect.t()
+          | ExecutionEngine.t()
 
-  @spec is_null(nullable()) :: boolean()
-  def is_null(%m{} = entity) do
+  @doc """
+  Check if an MLIR entity is null.
+
+  To prevent crashing the BEAM, it is encouraged to use this function to check if an entity is null before calling functions that require a non-null entity.
+  """
+  @spec null?(nullable()) :: boolean()
+  def null?(%m{} = entity) do
     entity_name = extract_entity_name(m)
     f = :"beaverIsNull#{entity_name}"
     function_exported?(CAPI, f, 1) && apply(CAPI, f, [entity]) |> Beaver.Native.to_term()
@@ -80,7 +116,7 @@ defmodule Beaver.MLIR do
   defp not_null_run(%m{} = entity, dumper) do
     entity_name = extract_entity_name(m)
 
-    if is_null(entity) do
+    if null?(entity) do
       {:error, "#{entity_name} is null"}
     else
       dumper.(entity)
@@ -98,23 +134,26 @@ defmodule Beaver.MLIR do
           | PassManager.t()
           | Module.t()
           | Identifier.t()
-          | Diagnostic.t()
 
   @type dump_opts :: [generic: boolean()]
   @spec dump(printable(), dump_opts()) :: :ok
   @spec dump!(printable(), dump_opts()) :: any()
+  @doc """
+  Dump MLIR element to stdio.
+
+  This will call the printer registered in C/C++. Note that the outputs wouldn't go through Erlang's IO system, so it's not possible to capture the output in Elixir. If you need to capture the output, use `to_string/1` instead.
+  """
   def dump(mlir, opts \\ [])
 
   def dump(%Beaver.MLIR.Module{} = mlir, opts) do
-    CAPI.mlirModuleGetOperation(mlir)
-    |> dump(opts)
+    mlirModuleGetOperation(mlir) |> dump(opts)
   end
 
   def dump(%Operation{} = mlir, opts) do
     if opts[:generic] do
-      not_null_run(mlir, &CAPI.beaverOperationDumpGeneric/1)
+      not_null_run(mlir, &beaverOperationDumpGeneric/1)
     else
-      not_null_run(mlir, &CAPI.mlirOperationDump/1)
+      not_null_run(mlir, &mlirOperationDump/1)
     end
   end
 
@@ -123,6 +162,9 @@ defmodule Beaver.MLIR do
     not_null_run(entity, &apply(CAPI, :"mlir#{entity_name}Dump", [&1]))
   end
 
+  @doc """
+  Dump MLIR element to stdio and raise an error if it fails.
+  """
   def dump!(mlir, opts \\ [])
 
   def dump!(mlir, opts) do
@@ -138,7 +180,9 @@ defmodule Beaver.MLIR do
   @spec to_string(printable(), dump_opts()) :: :ok
 
   @doc """
-  Print MLIR element as Elixir binary string. When printing an operation, it is recommended to use `generic: false` or `generic: true` to explicitly specify the format if your usage requires consistent output. If not specified, the default behavior is subject to change according to the MLIR version.
+  Print MLIR element or StringRef as Elixir binary string.
+
+  When printing an operation, it is recommended to use `generic: false` or `generic: true` to explicitly specify the format if your usage requires consistent output. If not specified, the default behavior is subject to change according to the MLIR version.
   """
 
   def to_string(mlir, opts \\ [])
@@ -165,7 +209,7 @@ defmodule Beaver.MLIR do
   end
 
   def to_string(%PassManager{} = pm, _opts) do
-    pm |> CAPI.mlirPassManagerGetAsOpPassManager() |> __MODULE__.to_string()
+    pm |> mlirPassManagerGetAsOpPassManager() |> __MODULE__.to_string()
   end
 
   def to_string(f, opts) when is_function(f) do
@@ -175,6 +219,106 @@ defmodule Beaver.MLIR do
   def to_string(%m{} = entity, _opts) do
     entity_name = extract_entity_name(m)
     not_null_run(entity, &apply(CAPI, :"beaver_raw_to_string_#{entity_name}", [&1.ref]))
+  end
+
+  @type verifiable() :: Operation.t() | Module.t()
+  @spec verify!(verifiable()) :: :ok
+  def verify!(op) do
+    case verify(op) do
+      {:ok, op} ->
+        op
+
+      :null ->
+        raise "MLIR operation verification failed because the operation is null. Maybe it is parsed from an ill-formed text format? Please have a look at the diagnostic output above by MLIR C++"
+
+      :fail ->
+        raise "MLIR operation verification failed"
+    end
+  end
+
+  @spec verify(verifiable()) :: {:ok, verifiable()} | :null | :fail
+  def verify(op) do
+    if null?(op) do
+      :null
+    else
+      is_success =
+        MLIR.Operation.from_module(op)
+        |> mlirOperationVerify()
+        |> Beaver.Native.to_term()
+
+      if is_success do
+        {:ok, op}
+      else
+        :fail
+      end
+    end
+  end
+
+  @type applicable() :: Operation.t() | Module.t()
+  @type apply_opt :: {:debug, boolean()}
+  @apply_default_opts [debug: false]
+  @spec apply!(applicable(), apply_opt) :: applicable()
+  @doc """
+  Apply patterns on a container (region, operation, module).
+  It returns the container if it succeeds otherwise it raises.
+  """
+  def apply!(op, patterns, opts \\ @apply_default_opts) do
+    case apply_(op, patterns, opts) do
+      {:ok, module} ->
+        module
+
+      {:error, msg} ->
+        raise msg
+    end
+  end
+
+  @doc """
+  Apply patterns on a container (operation, module).
+  It is named `apply_` with a underscore to avoid name collision with `Kernel.apply/2`
+  """
+  @spec apply_(applicable(), apply_opt) :: {:ok, applicable()} | {:error, String.t()}
+  def apply_(op, patterns, opts \\ @apply_default_opts) when is_list(patterns) do
+    if MLIR.null?(op), do: raise("op is null")
+    ctx = MLIR.Operation.from_module(op) |> MLIR.context()
+
+    {result, err} =
+      MLIR.Context.with_diagnostics(
+        ctx,
+        fn ->
+          pattern_module = MLIR.Location.from_env(__ENV__, ctx: ctx) |> MLIR.Module.empty()
+          block = Beaver.MLIR.Module.body(pattern_module)
+
+          for p <- patterns do
+            p = p.(ctx, block)
+
+            if opts[:debug] do
+              p |> MLIR.dump!()
+            end
+          end
+
+          MLIR.verify!(pattern_module)
+          MLIR.verify!(op)
+          pdl_pat_mod = mlirPDLPatternModuleFromModule(pattern_module)
+
+          frozen_pat_set =
+            pdl_pat_mod
+            |> mlirRewritePatternSetFromPDLPatternModule()
+            |> mlirFreezeRewritePattern()
+
+          res = beaverModuleApplyPatternsAndFoldGreedily(op, frozen_pat_set)
+          mlirPDLPatternModuleDestroy(pdl_pat_mod)
+          mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
+          MLIR.Module.destroy(pattern_module)
+          res
+        end,
+        &"#{&2} #{MLIR.to_string(&1)}"
+      )
+
+    if MLIR.LogicalResult.success?(result) do
+      {:ok, op}
+    else
+      {:error, "failed to apply pattern set. #{err}"}
+    end
   end
 end
 
@@ -189,7 +333,8 @@ for m <- [
       Beaver.MLIR.OpPassManager,
       Beaver.MLIR.PassManager,
       Beaver.MLIR.Identifier,
-      Beaver.MLIR.Diagnostic
+      Beaver.MLIR.Diagnostic,
+      Beaver.MLIR.StringRef
     ] do
   defimpl String.Chars, for: m do
     defdelegate to_string(mlir), to: Beaver.MLIR

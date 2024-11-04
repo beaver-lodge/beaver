@@ -1,4 +1,7 @@
 defmodule Beaver.MLIR.PassManager do
+  @moduledoc """
+  This module defines functions working with MLIR PassManager.
+  """
   use Kinda.ResourceKind, forward_module: Beaver.Native
 
   alias Beaver.MLIR

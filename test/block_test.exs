@@ -34,7 +34,7 @@ defmodule BlockTest do
         end
       end
     end
-    |> MLIR.Operation.verify!()
+    |> MLIR.verify!()
   end
 
   test "dangling block", %{ctx: ctx, diagnostic_server: diagnostic_server} do
@@ -50,9 +50,9 @@ defmodule BlockTest do
         end
       end
     end
-    |> MLIR.Operation.verify()
+    |> MLIR.verify()
 
-    assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
+    assert Beaver.Capturer.collect(diagnostic_server) =~
              "reference to block defined in another region"
   end
 
@@ -72,9 +72,9 @@ defmodule BlockTest do
         end
       end
     end
-    |> MLIR.Operation.verify()
+    |> MLIR.verify()
 
-    assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
+    assert Beaver.Capturer.collect(diagnostic_server) =~
              "branch has 1 operands for successor"
   end
 
@@ -109,9 +109,9 @@ defmodule BlockTest do
         end
       end
     end
-    |> MLIR.Operation.verify()
+    |> MLIR.verify()
 
-    assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
+    assert Beaver.Capturer.collect(diagnostic_server) =~
              "branch has 1 operands for successor"
   end
 
@@ -142,9 +142,9 @@ defmodule BlockTest do
             end
           end
         end
-        |> MLIR.Operation.verify()
+        |> MLIR.verify()
 
-        assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
+        assert Beaver.Capturer.collect(diagnostic_server) =~
                  "expect at least a terminator"
       end
     end
@@ -165,7 +165,7 @@ defmodule BlockTest do
           end
         end
       end
-      |> MLIR.Operation.verify!()
+      |> MLIR.verify!()
 
       assert {:not_found, [file: ^file, line: ^line]} = Beaver.Env.block()
     end
@@ -189,7 +189,20 @@ defmodule BlockTest do
           end
         end
       end
-      |> MLIR.Operation.verify!()
+      |> MLIR.verify!()
+    end
+  end
+
+  test "no block to insert to", %{ctx: ctx} do
+    assert_raise CompileError, "nofile:1: no valid block in the environment", fn ->
+      Code.eval_quoted(
+        quote do
+          mlir ctx: var!(ctx) do
+            Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> {:op, Type.i(32)}
+          end
+        end,
+        ctx: ctx
+      )
     end
   end
 end

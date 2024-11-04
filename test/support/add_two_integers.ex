@@ -1,4 +1,5 @@
 defmodule AddTwoIntegers do
+  @moduledoc false
   use TranslateMLIR
 
   mlir_func llvm_add(a :: i64, b :: i64) do

@@ -22,7 +22,7 @@ defmodule EnifTest do
         assert to_string(b) =~ "dense<[104, 101, 108, 108, 111]>"
       end
     end
-    |> MLIR.Operation.verify!()
+    |> MLIR.verify!()
   end
 
   test "enif string inspected as memref", %{ctx: ctx} do

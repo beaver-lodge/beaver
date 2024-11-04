@@ -1,14 +1,14 @@
 defmodule OpTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR
-  import Beaver.MLIR.Sigils
+  import Beaver.Sigils
 
   test "get_and_update", %{ctx: ctx} do
     const =
       ~m"""
       %0 = arith.constant dense<42> : vector<4xi32>
       """.(ctx)
-      |> MLIR.Operation.verify!()
+      |> MLIR.verify!()
       |> MLIR.Module.body()
       |> Beaver.Walker.operations()
       |> Enum.at(0)

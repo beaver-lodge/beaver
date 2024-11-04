@@ -28,8 +28,8 @@ defmodule TypeInferTest do
         end
       end
     end
-    |> MLIR.Operation.verify!()
-    |> MLIR.Transforms.canonicalize()
-    |> MLIR.Pass.Composer.run!()
+    |> MLIR.verify!()
+    |> MLIR.Transform.canonicalize()
+    |> Beaver.Composer.run!()
   end
 end

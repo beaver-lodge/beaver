@@ -7,7 +7,7 @@ defmodule RedundantTransposeTest do
 
   test "pass to optimize redundant transpose", %{ctx: ctx} do
     use Beaver
-    import Beaver.MLIR.Transforms
+    import Beaver.MLIR.Transform
 
     defmodule Helper do
       @moduledoc false
@@ -43,7 +43,7 @@ defmodule RedundantTransposeTest do
             end
           end
         end
-        |> MLIR.Operation.verify!(debug: true)
+        |> MLIR.verify!()
       end
 
     defmodule DeduplicateTransposePass do
@@ -85,11 +85,11 @@ defmodule RedundantTransposeTest do
 
     ir_string =
       ir
-      |> MLIR.Pass.Composer.nested("func.func", [
+      |> Beaver.Composer.nested("func.func", [
         DeduplicateTransposePass
       ])
       |> canonicalize
-      |> MLIR.Pass.Composer.run!()
+      |> Beaver.Composer.run!()
       |> MLIR.to_string()
 
     assert ir_string =~ "return %arg0 : tensor<*xf32>", ir_string

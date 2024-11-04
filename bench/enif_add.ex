@@ -10,18 +10,20 @@ defmodule AddENIF do
 
   @impl ENIFSupport
   def after_verification(op) do
-    s_table = op |> MLIR.Operation.from_module() |> MLIR.CAPI.mlirSymbolTableCreate()
-    found = MLIR.CAPI.mlirSymbolTableLookup(s_table, MLIR.StringRef.create("enif_make_int64"))
+    op
+    |> MLIR.Operation.from_module()
+    |> MLIR.Operation.with_symbol_table(fn s_table ->
+      found = MLIR.CAPI.mlirSymbolTableLookup(s_table, MLIR.StringRef.create("enif_make_int64"))
 
-    if MLIR.is_null(found) do
-      raise "Function not found"
-    end
+      if MLIR.null?(found) do
+        raise "Function not found"
+      end
 
-    if not MLIR.Dialect.Func.is_external(found) do
-      raise "Function is not external"
-    end
+      if not MLIR.Dialect.Func.external?(found) do
+        raise "Function is not external"
+      end
+    end)
 
-    MLIR.CAPI.mlirSymbolTableDestroy(s_table)
     op
   end
 

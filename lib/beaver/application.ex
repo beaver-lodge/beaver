@@ -3,6 +3,8 @@ defmodule Beaver.Application do
   require Logger
   @moduledoc false
   def start(_type, _args) do
-    Supervisor.start_link(Beaver.MLIR.Pass.global_registrar_child_specs(), strategy: :one_for_one)
+    [Beaver.MLIR.Pass.global_registrar_child_specs(), Beaver.Composer.pass_runner_child_specs()]
+    |> List.flatten()
+    |> Supervisor.start_link(strategy: :one_for_one)
   end
 end

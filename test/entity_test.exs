@@ -5,8 +5,9 @@ defmodule EntityTest do
   use Beaver.Case, async: true, diagnostic: :server
   alias Beaver.MLIR
   alias MLIR.{Type, Attribute}
-  import MLIR.Sigils
-  doctest Beaver.MLIR.Sigils
+  import Beaver.Sigils
+  doctest Beaver
+  doctest Beaver.Sigils
   doctest Beaver.MLIR.Type
   doctest Beaver.MLIR.Location
 
@@ -78,7 +79,7 @@ defmodule EntityTest do
         Attribute.integer(Type.f32(), 1).(ctx)
       end
 
-      assert not Attribute.is_null(
+      assert not MLIR.null?(
                Attribute.type(
                  Type.function(
                    [Type.i(32)],
@@ -186,10 +187,10 @@ defmodule EntityTest do
   describe "null" do
     test "attr", %{ctx: ctx, diagnostic_server: diagnostic_server} do
       assert_raise RuntimeError, "fail to parse attribute: ???", fn ->
-        Attribute.get("???", ctx: ctx) |> MLIR.is_null()
+        Attribute.get("???", ctx: ctx) |> MLIR.null?()
       end
 
-      assert Beaver.DiagnosticsCapturer.collect(diagnostic_server) =~
+      assert Beaver.Capturer.collect(diagnostic_server) =~
                "expected attribute value"
     end
   end

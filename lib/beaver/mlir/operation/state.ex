@@ -7,41 +7,41 @@ defmodule Beaver.MLIR.Operation.State do
   alias Beaver.MLIR.CAPI
 
   defp prepare(
-         %MLIR.Operation.Changeset{
+         %Beaver.Changeset{
            location: location,
            context: nil
          } = changeset
        )
        when not is_nil(location) and not is_function(location) do
-    %MLIR.Operation.Changeset{changeset | context: MLIR.context(location)}
+    %Beaver.Changeset{changeset | context: MLIR.context(location)}
   end
 
   defp prepare(
-         %MLIR.Operation.Changeset{
+         %Beaver.Changeset{
            location: nil,
            context: context
          } = changeset
        )
        when not is_nil(context) do
-    %MLIR.Operation.Changeset{changeset | location: MLIR.Location.unknown(ctx: context)}
+    %Beaver.Changeset{changeset | location: MLIR.Location.unknown(ctx: context)}
   end
 
   defp prepare(
-         %MLIR.Operation.Changeset{
+         %Beaver.Changeset{
            location: location,
            context: context
          } = changeset
        )
        when not is_nil(context) and is_function(location, 1) do
-    %MLIR.Operation.Changeset{changeset | location: location.(context)}
+    %Beaver.Changeset{changeset | location: location.(context)}
   end
 
   defp prepare(
-         %MLIR.Operation.Changeset{
+         %Beaver.Changeset{
            location: %Beaver.MLIR.Location{} = location
          } = changeset
        ) do
-    %MLIR.Operation.Changeset{changeset | location: location}
+    %Beaver.Changeset{changeset | location: location}
   end
 
   defp add_attributes(state, []) do
@@ -69,7 +69,7 @@ defmodule Beaver.MLIR.Operation.State do
               raise "attribute not supported: #{inspect({k, v})}"
           end
 
-        if MLIR.is_null(attr) do
+        if MLIR.null?(attr) do
           raise "attribute can't be null, #{inspect({k, v})}"
         end
 
@@ -174,8 +174,8 @@ defmodule Beaver.MLIR.Operation.State do
   @doc """
   Create a new operation state in MLIR CAPI.
   """
-  def create(%MLIR.Operation.Changeset{} = changeset) do
-    %MLIR.Operation.Changeset{
+  def create(%Beaver.Changeset{} = changeset) do
+    %Beaver.Changeset{
       name: name,
       attributes: attributes,
       operands: operands,

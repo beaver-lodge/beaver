@@ -44,7 +44,9 @@ defmodule Beaver.MixProject do
     [
       main: "Beaver",
       extras: [
-        "guides/your-first-beaver-compiler.livemd"
+        "guides/your-first-beaver-compiler.livemd",
+        "CONTRIBUTING.md",
+        "README.md"
       ],
       filter_modules: fn m, _meta ->
         name = Atom.to_string(m)
@@ -60,23 +62,23 @@ defmodule Beaver.MixProject do
           ~r"Beaver.Exterior.*",
           Beaver.SSA
         ],
-        Walker: [
-          ~r"Beaver.Walker.*"
+        Utils: [
+          ~r"Beaver.Walker.*",
+          ~r"Beaver.Deferred.*",
+          ~r"Beaver.Capturer.*",
+          ~r"Beaver.Pass.*",
+          ~r"Beaver.Printer.*",
+          ~r"Beaver.Composer.*",
+          ~r"Beaver.Sigils.*"
         ],
         ENIF: [
           ~r"Beaver.ENIF.*"
         ],
-        Utils: [
-          ~r"Beaver.Deferred.*",
-          ~r"Beaver.Diagnostic.*",
-          ~r"Beaver.Pass.*",
-          ~r"Beaver.String.*"
+        MLIR: [
+          ~r"Beaver.MLIR(?!\.Dialect).*"
         ],
         Dialect: [
           ~r"Beaver.MLIR.Dialect.*"
-        ],
-        MLIR: [
-          ~r"Beaver.MLIR.*"
         ],
         Native: [
           ~r"Beaver.Native.*"
@@ -115,7 +117,8 @@ defmodule Beaver.MixProject do
       {:elixir_make, "~> 0.4", runtime: false},
       {:kinda, "~> 0.9.2"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
-      {:benchee, "~> 1.0", only: :dev}
+      {:benchee, "~> 1.0", only: :dev},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 end

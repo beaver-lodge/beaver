@@ -1,81 +1,45 @@
 defmodule Beaver do
   alias Beaver.MLIR
+  require Beaver.Env
 
   @moduledoc """
   This module contains top level functions and macros for Beaver DSL for MLIR.
 
-  Here are some of the examples of most common forms of Beaver DSL:
-  - single result
-  ```
-  res = TOSA.add(a, b) >>> res_t
-  ```
-  - multiple results
-  ```
-  [res1, res2] = TOSA.add(a, b) >>> [res_t, res_t]
-  [res1, res2] = TOSA.add(a, b) >>> res_t_list
-  res_list = TOSA.add(a, b) >>> res_t_list
-  ```
-  - infer results
-  ```
-  TOSA.add(a, b) >>> :infer
-  ```
-  - with op
-  ```
-  {op, res} = TOSA.add(a, b) >>> {:op, res_t}
-  ```
-  - with no result
-  ```
-  TOSA.add(a, b) >>> []
-  ```
+  `use Beaver` will import and alias the essential modules and functions for Beaver'DSL for MLIR. It also imports the sigils used in the DSL.
+
+  ## Basic usage
+  To create an MLIR operation and insert it to a block, you can use the `mlir` macro. Here is an example of creating a constant operation:
+      iex> use Beaver
+      iex> {ctx, blk} = {MLIR.Context.create(), MLIR.Block.create()}
+      iex> alias Beaver.MLIR.Dialect.Arith
+      iex> const = mlir ctx: ctx, blk: blk do
+      iex>   Arith.constant(value: ~a{64: i32}) >>> ~t{i32}
+      iex> end
+      iex> const |> MLIR.Value.owner!() |> MLIR.verify!()
+      iex> MLIR.Block.destroy(blk)
+      iex> MLIR.Context.destroy(ctx)
+
+  ## Naming conventions
+  There are some concepts in Elixir and MLIR shared the same name, so it is encouraged to use the following naming conventions for variables:
+  - use `ctx` for MLIR context
+  - use `blk` for MLIR block
+
+  ## Lazy creation of MLIR entities
+  In Beaver, various functions and sigils might return a function with a signature like `MLIR.Context.t() -> MLIR.Type.t()`, if the context is not provided. When a creator gets passed to a SSA expression, it will be called with the context to create the entity or later the operation. Deferring the creation of the entity until context available is intended to keep the DSL code clean and succinct. For more information, see the docs of module `Beaver.Deferred`.
   """
 
   defmacro __using__(_) do
     quote do
       import Beaver
       alias Beaver.MLIR
-      import MLIR.Sigils
+      import Beaver.Sigils
     end
   end
 
   @doc """
-  This is a macro where Beaver's MLIR DSL expressions get transformed to MLIR API calls.
-  This transformation will works on any expression of this form, so it is also possible to call any other function/macro rather than an Op creation function. There is one operator `>>>` for typing the result of the SSA or an argument of a block. It kind of works like the `::` in specs and types of Elixir.
+  Transform the given DSL block but without specifying the context and block.
 
-  ## How it works under the hood
-  ```
-  mlir do
-    [res0, res1] = TestDialect.some_op(operand0, operand1, attr0: ~a{11 : i32}) >>> ~t{f32}
-  end
-  # will be transform to:
-  [res0, res1] =
-    %DSL.SSA{}
-    |> DSL.SSA.arguments([operand0, operand1, attr0: ~a{11 : i32}, attr1: ~a{11 : i32}])
-    |> DSL.SSA.results([~t{f32}])
-    |> TestDialect.some_op()
-  ```
-  The SSA form will return:
-  - For op with multiple result: the results of this op in a list.
-  - For op with one single result: the result
-  - For op with no result: the op itself (for instance, module, func, and terminators)
-
-  If there is no returns, add a `[]` to make the transformation effective:
-  ```
-  TestDialect.some_op(operand0) >>> []
-  ```
-  To defer the creation of a terminator in case its successor block has not been created. You can pass an atom of the name in the block's call form.
-  ```
-  CF.cond_br(cond0, :bb1, {:bb2, [v0]})  >>> []
-  ```
-  To create region, call the op with a do block. The block macro works like the function definition in Elixir, and in the do block of `block` macro you can reference an argument by name. One caveat is that if it is a Op with region, it requires all arguments to be passed in one list to make it to call the macro version of the Op creation function.
-  ```
-  TestDialect.op_with_region [operand0, attr0: ~a{1}i32] do
-    region do
-      block(arg >>> ~t{f32}) do
-        TestDialect.some_op(arg) >>> ~t{f32}
-      end
-    end
-  end >>> ~t{f32}
-  ```
+  This is useful when you want to generate partials of quoted code and doesn't want to pass around the context and block.
   """
   defmacro mlir(do: dsl_block) do
     quote do
@@ -85,6 +49,26 @@ defmodule Beaver do
     end
   end
 
+  @doc """
+  Macro where Beaver's MLIR DSL expressions get transformed to MLIR API calls.
+
+
+  This transformation will works on any expression of the `>>>` form, so it is also possible to call any other vanilla Elixir function/macro.
+
+  ## How it works under the hood
+  ```
+  [res0, res1] = TestDialect.some_op(operand0, operand1, attr0: ~a{11 : i32}) >>> ~t{f32}
+  ```
+  will be transform to:
+  ```
+  [res0, res1] =
+    %SSA{}
+    |> SSA.arguments([operand0, operand1, attr0: ~a{11 : i32}, attr1: ~a{11 : i32}])
+    |> SSA.results([~t{f32}])
+    |> TestDialect.some_op()
+  ```
+  and `TestDialect.some_op()` is an Elixir function to actually create the MLIR operation. So it is possible to replace the left hand of the `>>>` operator with any Elixir function.
+  """
   defmacro mlir(opts, do: dsl_block) do
     dsl_block_ast = dsl_block |> Beaver.SSA.prewalk(&MLIR.Operation.eval_ssa/1)
 
@@ -94,7 +78,8 @@ defmodule Beaver do
           Kernel.var!(beaver_internal_env_ctx) = unquote(ctx)
 
           match?(%MLIR.Context{}, Kernel.var!(beaver_internal_env_ctx)) ||
-            raise Beaver.EnvNotFoundError, MLIR.Context
+            raise CompileError,
+                  Beaver.Env.compile_err_msg(MLIR.Context, unquote(Macro.escape(__CALLER__)))
         end
       end
 
@@ -104,7 +89,8 @@ defmodule Beaver do
           Kernel.var!(beaver_internal_env_block) = unquote(block)
 
           match?(%MLIR.Block{}, Kernel.var!(beaver_internal_env_block)) ||
-            raise Beaver.EnvNotFoundError, MLIR.Block
+            raise CompileError,
+                  Beaver.Env.compile_err_msg(MLIR.Block, unquote(Macro.escape(__CALLER__)))
         end
       end
 
@@ -112,7 +98,7 @@ defmodule Beaver do
       require Beaver.Env
       alias Beaver.MLIR
       alias Beaver.MLIR.{Type, Attribute, ODS}
-      import Beaver.MLIR.Sigils
+      import Beaver.Sigils
       import Beaver.MLIR.Dialect.Builtin
 
       unquote(ctx_ast)
@@ -148,16 +134,6 @@ defmodule Beaver do
     end
   end
 
-  defmodule EnvNotFoundError do
-    defexception [:message]
-
-    @impl true
-    def exception(type) when type in [MLIR.Context, MLIR.Region, MLIR.Block] do
-      msg = "no valid #{inspect(type)} in the environment"
-      %EnvNotFoundError{message: msg}
-    end
-  end
-
   @doc false
   def not_found(%Macro.Env{} = env) do
     {:not_found, [file: env.file, line: env.line]}
@@ -185,6 +161,11 @@ defmodule Beaver do
     end
   end
 
+  @doc """
+  Create an anonymous block.
+
+  The block can be used to call CAPI.
+  """
   defmacro block(do: body) do
     quote do
       block _() do
@@ -193,6 +174,16 @@ defmodule Beaver do
     end
   end
 
+  @doc """
+  Create a named block.
+
+  The block macro works like the function definition in Elixir, and in the do block of `block` macro you can reference an argument by name.
+  It should follow Elixir's lexical scoping rules and can be referenced by `Beaver.Env.block/1`
+
+  > #### MLIR doesn't have named block {: .info}
+  >
+  > Note that the idea of named block is Beaver's concept. MLIR doesn't have it.
+  """
   defmacro block(call, do: body) do
     {b_name, args} = Macro.decompose_call(call)
     if not is_atom(b_name), do: raise("block name must be an atom or underscore")
@@ -217,6 +208,20 @@ defmodule Beaver do
     end
   end
 
+  @doc """
+  Create MLIR region. Calling the macro within a do block will create an operation with the region.
+
+  One caveat is that if it is a Op with region, it requires all arguments to be passed in one list to make it to call the macro version of the Op creation function.
+  ```
+  TestDialect.op_with_region [operand0, attr0: ~a{1}i32] do
+    region do
+      block(arg >>> ~t{f32}) do
+        TestDialect.some_op(arg) >>> ~t{f32}
+      end
+    end
+  end >>> ~t{f32}
+  ```
+  """
   defmacro region(do: body) do
     regions =
       if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_regions, nil}) do
@@ -247,44 +252,48 @@ defmodule Beaver do
     end
   end
 
+  @doc """
+  Create an MLIR SSA expression with the given arguments and results.
+
+  The right hand of operator `>>>` is used to typing the result of the SSA or an argument of a block. It kind of works like the `::` in specs and types of Elixir.
+
+  ## The return of SSA expression
+  By default SSA expression will return the MLIR values or the operation created.
+  - For op with multiple result: the results of this op in a list.
+  - For op with one single result: the result
+  - For op with no result: the op itself (for instance, module, func, and terminators)
+
+  ## Different result declarations
+  There are several ways to declare the result of an SSA expression. The most common cases are single result and multi-results.
+
+  - Single result
+  ```
+  res = Foo.bar(a, b) >>> res_t
+  ```
+  - Multiple results
+  ```
+  [res1, res2] = Foo.bar(a, b) >>> [res_t, res_t]
+  [res1, res2] = Foo.bar(a, b) >>> res_t_list
+  res_list = Foo.bar(a, b) >>> res_t_list
+  ```
+  - Zero result
+  ```
+  Foo.bar(a, b) >>> []
+  ```
+
+  - Enable type inference,
+  ```
+  Foo.bar(a, b) >>> :infer
+  ```
+  - To return the op together with the result
+  ```
+  {op, res} = Foo.bar(a, b) >>> {:op, types}
+  ```
+
+  """
   def _call >>> _results do
     raise(
       "`>>>` operator is expected to be transformed away. Maybe you forget to put the expression inside the Beaver.mlir/1 macro's do block?"
     )
-  end
-
-  @type result :: any()
-  @type handler_acc :: any()
-  @spec with_diagnostics(
-          MLIR.Context.t(),
-          (-> result),
-          (MLIR.Diagnostic.t(), handler_acc -> handler_acc)
-          | {(-> handler_acc), (MLIR.Diagnostic.t(), handler_acc -> handler_acc)}
-        ) :: {result, handler_acc}
-
-  @doc """
-  Run the given function with a diagnostic handler attached to the MLIR context.
-  """
-  def with_diagnostics(%MLIR.Context{} = ctx, fun, handler)
-      when is_function(fun, 0) and is_function(handler, 2) do
-    with_diagnostics(%MLIR.Context{} = ctx, fun, {fn -> nil end, handler})
-  end
-
-  def with_diagnostics(%MLIR.Context{} = ctx, fun, {init, handler})
-      when is_function(fun, 0) and is_function(init, 0) and is_function(handler, 2) do
-    {:ok, pid} =
-      GenServer.start(
-        Beaver.DiagnosticsCapturer,
-        handler
-      )
-
-    handler_id = Beaver.DiagnosticsCapturer.attach(ctx, pid)
-
-    try do
-      {fun.(), Beaver.DiagnosticsCapturer.collect(pid)}
-    after
-      Beaver.MLIR.Diagnostic.detach(ctx, handler_id)
-      :ok = GenServer.stop(pid)
-    end
   end
 end

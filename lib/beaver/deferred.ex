@@ -18,12 +18,16 @@ defmodule Beaver.Deferred do
 
   @spec fetch_context(opts :: opts) :: MLIR.Context.t() | Macro.t() | nil
   def fetch_context(opts) do
-    opts[:ctx] || opts[:context]
+    opts[:ctx]
   end
 
   @spec fetch_block(opts :: opts) :: MLIR.Block.t() | Macro.t() | nil
   def fetch_block(opts) do
-    opts[:blk] || opts[:block]
+    if opts[:block] do
+      raise ArgumentError, "use :blk instead of :block as key"
+    end
+
+    opts[:blk]
   end
 
   def create({:parametric, _, _, f}, ctx) when is_function(f) and not is_nil(ctx) do

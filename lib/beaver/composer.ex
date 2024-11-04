@@ -1,4 +1,4 @@
-defmodule Beaver.MLIR.Pass.Composer do
+defmodule Beaver.Composer do
   import Beaver.MLIR.CAPI
   alias Beaver.MLIR
   require Logger
@@ -31,22 +31,65 @@ defmodule Beaver.MLIR.Pass.Composer do
     nested(composer_or_op, op_name, [pass])
   end
 
-  defp create_pass(pass_module) when is_atom(pass_module) do
-    MLIR.ExternalPass.create(pass_module)
+  defp op_name_from_persistent_attributes(pass_module) do
+    op_name = pass_module.__info__(:attributes)[:root_op] || []
+    op_name = op_name |> List.first()
+    op_name || "builtin.module"
   end
 
-  defp create_pass(%MLIR.Pass{} = pass) do
+  # Create an external pass.
+  defp do_create_pass(pid, argument, description, op) do
+    argument_ref = MLIR.StringRef.create(argument).ref
+
+    MLIR.CAPI.beaver_raw_create_mlir_pass(
+      argument_ref,
+      argument_ref,
+      MLIR.StringRef.create(description).ref,
+      MLIR.StringRef.create(op).ref,
+      pid
+    )
+    |> then(&%MLIR.Pass{ref: &1, handler: pid})
+  end
+
+  @supervisor __MODULE__.DynamicSupervisor
+  @registry __MODULE__.Registry
+  defp create_pass(argument, desc, op, run) do
+    spec =
+      {Beaver.PassRunner, [run, name: {:via, Registry, {@registry, :"#{argument}-#{op}"}}]}
+
+    case DynamicSupervisor.start_child(@supervisor, spec) do
+      {:ok, pid} ->
+        pid
+
+      {:error, {:already_started, pid}} ->
+        pid
+
+      {:error, e} ->
+        raise Application.format_error(e)
+    end
+    |> do_create_pass(argument, desc, op)
+  end
+
+  def create_pass(%MLIR.Pass{} = pass) do
     pass
   end
 
-  defp create_pass({argument, op, run}) when is_bitstring(op) and is_function(run) do
-    MLIR.ExternalPass.create({argument, op, run})
+  def create_pass({argument, op, run}) when is_function(run) do
+    description = "beaver generated pass of #{Function.info(run) |> inspect}"
+    create_pass(argument, description, op, run)
+  end
+
+  def create_pass(pass_module) do
+    description = "beaver generated pass of #{pass_module}"
+    op_name = op_name_from_persistent_attributes(pass_module)
+    name = Atom.to_string(pass_module)
+    create_pass(name, description, op_name, &pass_module.run/1)
   end
 
   defp add_pipeline(%MLIR.OpPassManager{} = pm, pipeline_str)
        when is_binary(pipeline_str) do
     {res, err} =
-      Beaver.StringPrinter.run(
+      Beaver.Printer.run(
         &mlirOpPassManagerAddPipeline(
           pm,
           MLIR.StringRef.create(pipeline_str),
@@ -177,5 +220,13 @@ defmodule Beaver.MLIR.Pass.Composer do
     else
       {:error, "Unexpected failure running passes"}
     end
+  end
+
+  @doc false
+  def pass_runner_child_specs() do
+    [
+      {DynamicSupervisor, name: @supervisor, strategy: :one_for_one},
+      {Registry, keys: :unique, name: @registry}
+    ]
   end
 end

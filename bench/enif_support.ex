@@ -15,7 +15,7 @@ defmodule ENIFSupport do
       @behaviour ENIFSupport
       def init(ctx) do
         create(ctx)
-        |> MLIR.Operation.verify!()
+        |> MLIR.verify!()
         |> after_verification()
         |> ENIFSupport.lower()
       end
@@ -25,17 +25,17 @@ defmodule ENIFSupport do
   @print_flag "ENIF_SUPPORT_PRINT_IR"
   def lower(op) do
     op
-    |> then(&if(System.get_env(@print_flag), do: MLIR.Transforms.print_ir(&1), else: &1))
-    |> MLIR.Pass.Composer.nested("func.func", "llvm-request-c-wrappers")
+    |> then(&if(System.get_env(@print_flag), do: MLIR.Transform.print_ir(&1), else: &1))
+    |> Beaver.Composer.nested("func.func", "llvm-request-c-wrappers")
     |> convert_scf_to_cf
     |> convert_arith_to_llvm()
     |> convert_index_to_llvm()
     |> convert_func_to_llvm()
-    |> MLIR.Pass.Composer.append("convert-vector-to-llvm{reassociate-fp-reductions}")
-    |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
-    |> then(&if(System.get_env(@print_flag), do: MLIR.Transforms.print_ir(&1), else: &1))
+    |> Beaver.Composer.append("convert-vector-to-llvm{reassociate-fp-reductions}")
+    |> Beaver.Composer.append("finalize-memref-to-llvm")
+    |> then(&if(System.get_env(@print_flag), do: MLIR.Transform.print_ir(&1), else: &1))
     |> reconcile_unrealized_casts
-    |> MLIR.Pass.Composer.run!()
+    |> Beaver.Composer.run!()
     |> then(fn m ->
       e = MLIR.ExecutionEngine.create!(m, opt_level: 3) |> Beaver.ENIF.register_symbols()
       %ENIFSupport{mod: m, engine: e}

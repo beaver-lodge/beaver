@@ -27,7 +27,7 @@ defmodule Beaver.MLIR.Dialect.Func do
     end
   end
 
-  def is_external(op) do
+  def external?(op) do
     with [r] <- Beaver.Walker.regions(op) |> Enum.to_list(),
          [] <- Beaver.Walker.blocks(r) |> Enum.to_list() do
       true

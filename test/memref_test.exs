@@ -15,8 +15,8 @@ defmodule MemRefTest do
   end
 
   test "run mlir module defined by sigil", %{ctx: ctx} do
-    import Beaver.MLIR.Sigils
-    import MLIR.{Transforms, Conversion}
+    import Beaver.Sigils
+    import MLIR.{Transform, Conversion}
 
     jit =
       ~m"""
@@ -32,20 +32,20 @@ defmodule MemRefTest do
         return
       }
       """.(ctx)
-      |> MLIR.Operation.verify!()
+      |> MLIR.verify!()
       |> canonicalize
       |> cse
-      |> MLIR.Pass.Composer.nested("func.func", convert_linalg_to_loops())
-      |> MLIR.Pass.Composer.append("one-shot-bufferize")
-      |> MLIR.Pass.Composer.nested(
+      |> Beaver.Composer.nested("func.func", convert_linalg_to_loops())
+      |> Beaver.Composer.append("one-shot-bufferize")
+      |> Beaver.Composer.nested(
         "func.func",
         ~w{finalizing-bufferize buffer-deallocation convert-linalg-to-loops}
       )
       |> convert_scf_to_cf
-      |> MLIR.Pass.Composer.append("finalize-memref-to-llvm")
+      |> Beaver.Composer.append("finalize-memref-to-llvm")
       |> convert_func_to_llvm
       |> reconcile_unrealized_casts
-      |> MLIR.Pass.Composer.run!()
+      |> Beaver.Composer.run!()
       |> MLIR.ExecutionEngine.create!()
 
     arr = [0.112122112, 0.2123213, 10_020.9, 213_120.0, 0.2, 100.4]

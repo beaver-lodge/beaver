@@ -3,18 +3,10 @@ defmodule Beaver.MLIR.ExecutionEngine do
   This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
   """
   alias Beaver.MLIR
-  alias Beaver.MLIR.Pass.Composer
+  alias Beaver.Composer
   import Beaver.MLIR.CAPI
 
-  use Kinda.ResourceKind,
-    root_module: Beaver.MLIR.CAPI,
-    forward_module: Beaver.Native
-
-  def is_null(jit) do
-    jit
-    |> beaverIsNullExecutionEngine()
-    |> Beaver.Native.to_term()
-  end
+  use Kinda.ResourceKind, forward_module: Beaver.Native
 
   @doc """
   Create a MLIR JIT engine for a module and check if successful. Usually this module should be of LLVM dialect.
@@ -53,9 +45,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
         object_dump
       )
 
-    is_null = is_null(jit)
-
-    if is_null do
+    if MLIR.null?(jit) do
       raise "Execution engine creation failed"
     end
 

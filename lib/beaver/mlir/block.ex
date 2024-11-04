@@ -87,4 +87,6 @@ defmodule Beaver.MLIR.Block do
       locs
     )
   end
+
+  defdelegate destroy(blk), to: MLIR.CAPI, as: :mlirBlockDestroy
 end

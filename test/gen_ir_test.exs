@@ -32,7 +32,7 @@ defmodule CFTest do
           end
         end
       end
-      |> MLIR.Operation.verify!()
+      |> MLIR.verify!()
 
     text = ir |> MLIR.to_string()
 
