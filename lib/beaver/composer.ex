@@ -39,9 +39,11 @@ defmodule Beaver.Composer do
 
   # Create an external pass.
   defp do_create_pass(pid, argument, description, op) do
+    argument_ref = MLIR.StringRef.create(argument).ref
+
     MLIR.CAPI.beaver_raw_create_mlir_pass(
-      MLIR.StringRef.create(argument).ref,
-      MLIR.StringRef.create(argument).ref,
+      argument_ref,
+      argument_ref,
       MLIR.StringRef.create(description).ref,
       MLIR.StringRef.create(op).ref,
       pid
