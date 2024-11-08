@@ -31,13 +31,12 @@ defmodule Beaver.MLIR.Context do
 
   @type context_option :: {:allow_unregistered, boolean()} | {:all_dialects, boolean()}
   @spec create(context_option()) :: __MODULE__.t()
-  @default_context_option [allow_unregistered: false, all_dialects: true]
   @doc """
   Create a MLIR context. By default it registers and loads all dialects.
   """
-  def create(opts \\ @default_context_option) do
-    allow_unregistered = opts[:allow_unregistered] || @default_context_option[:allow_unregistered]
-    all_dialects = opts[:all_dialects] || @default_context_option[:all_dialects]
+  def create(opts \\ []) do
+    allow_unregistered = Keyword.get(opts, :allow_unregistered, false)
+    all_dialects = Keyword.get(opts, :all_dialects, true)
 
     mlirContextCreate()
     |> tap(fn ctx -> if all_dialects, do: load_all_dialects(ctx) end)
