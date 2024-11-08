@@ -30,7 +30,7 @@ defmodule Beaver.MLIR.Context do
   end
 
   @type context_option :: {:allow_unregistered, boolean()} | {:all_dialects, boolean()}
-  @spec create(context_option()) :: __MODULE__.t()
+  @spec create([context_option()]) :: __MODULE__.t()
   @doc """
   Create a MLIR context. By default it registers and loads all dialects.
   """
