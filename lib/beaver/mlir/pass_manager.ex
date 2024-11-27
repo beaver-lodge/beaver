@@ -12,6 +12,7 @@ defmodule Beaver.MLIR.PassManager do
           | {:module_scope, boolean()}
           | {:after_only_on_change, boolean()}
           | {:after_only_on_failure, boolean()}
+          | {:tree_printing_path, String.t()}
   @type print_opts :: [print_opt()]
   @spec enable_ir_printing(MLIR.PassManager.t(), print_opts()) :: :ok
   def enable_ir_printing(%MLIR.PassManager{} = pm, opts \\ []) do
@@ -21,7 +22,8 @@ defmodule Beaver.MLIR.PassManager do
       !!Keyword.get(opts, :after_all, true),
       !!Keyword.get(opts, :module_scope, false),
       !!Keyword.get(opts, :after_only_on_change, false),
-      !!Keyword.get(opts, :after_only_on_failure, false)
+      !!Keyword.get(opts, :after_only_on_failure, false),
+      MLIR.StringRef.create(Keyword.get(opts, :tree_printing_path, ""))
     )
   end
 end
