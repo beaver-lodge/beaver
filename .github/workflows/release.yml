@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - release*
     tags:
       - "*"
   pull_request:
@@ -65,7 +66,7 @@ jobs:
           otp-version: ${{ matrix.job.otp }} # Define the OTP version [required]
       - run: elixir --eval ":erlang.system_info(:nif_version) |> IO.puts"
       - name: Set up Zig
-        uses: goto-bus-stop/setup-zig@v2
+        uses: mlugg/setup-zig@v1
         with:
           version: 0.13.0
       - uses: Jimver/cuda-toolkit@master
@@ -131,3 +132,62 @@ jobs:
           BEAVER_ARTEFACT_URL: "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/${{ needs.generate_id.outputs.formatted_date }}/@{artefact_filename}"
         run: |
           mix run bench/enif_add_benchmark.exs
+
+  arm_docker:
+    needs: [generate_id]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image:
+          - {
+              platform: "linux/arm64/v8",
+              suffix: "arm64",
+              zig: "https://ziglang.org/download/0.13.0/zig-linux-aarch64-0.13.0.tar.xz"
+            }
+          - {
+              platform: "linux/amd64",
+              suffix: "amd64",
+              zig: "https://ziglang.org/download/0.13.0/zig-linux-x86_64-0.13.0.tar.xz"
+            }
+    steps:
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        if: ${{ matrix.image.platform != 'linux/amd64' }}
+        uses: docker/setup-buildx-action@v3
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          push: ${{ secrets.DOCKERHUB_USERNAME != '' }}
+          tags: jackalcooper/beaver-livebook-${{ matrix.image.suffix }}:latest
+          cache-from: type=registry,ref=jackalcooper/beaver-livebook-${{ matrix.image.suffix }}:latest
+          cache-to: type=inline
+          platforms: |
+            ${{ matrix.image.platform }}
+          file: docker/livebook.dockerfile
+          target: base
+          build-args: |
+            ZIG_URL=${{ matrix.image.zig }}
+      - uses: actions/checkout@v3
+        name: Check-out beaver
+        with:
+          repository: beaver-lodge/beaver
+          path: beaver
+      - uses: actions/checkout@v3
+        name: Check-out kinda
+        with:
+          repository: beaver-lodge/kinda
+          path: kinda
+      - name: Build ARM
+        continue-on-error: true
+        if: ${{ matrix.image.platform == 'linux/arm64/v8' }}
+        run: docker run --platform ${{ matrix.image.platform }} -v $PWD:/src -w /src/beaver jackalcooper/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
+      - name: Build x86
+        if: ${{ matrix.image.platform == 'linux/amd64' }}
+        run: docker run -v $PWD:/src -w /src/beaver jackalcooper/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh

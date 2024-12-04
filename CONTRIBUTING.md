@@ -104,6 +104,10 @@ Bindings are the part that provides the interface to the MLIR CAPIs. It is imple
 
 - Run CI, which generates the new GitHub release uploaded to https://github.com/beaver-lodge/beaver-prebuilt/releases.
 - Update release url in [`mix.exs`](/mix.exs)
+- Run docker image to build for ARM:
+  ```bash
+  docker run -it --rm -v $PWD/..:/src -w /src/beaver --env MIX_BUILD_ROOT='_build/arm' jackalcooper/beaver-livebook-arm64:latest bash scripts/build-for-publish.sh
+  ```
 
 ### Mac
 

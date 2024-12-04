@@ -34,14 +34,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runs-on: ["ubuntu-latest"]
+        runs-on: ["ubuntu-22.04"]
         otp: ["24.2", "25.0"]
         elixir: ["1.13.0", "1.16.2", "1.17.2"]
         exclude:
           - otp: "24.2"
             elixir: "1.17.2"
         include:
-          - runs-on: "ubuntu-latest"
+          - runs-on: "ubuntu-22.04"
             otp: "27.0.1"
             elixir: "1.17.2"
     steps:
@@ -67,7 +67,7 @@ jobs:
           otp-version: ${{matrix.otp}}
           elixir-version: ${{matrix.elixir}}
       - name: Set up Zig
-        uses: goto-bus-stop/setup-zig@v2
+        uses: mlugg/setup-zig@v1
         with:
           version: 0.13.0
       - uses: Jimver/cuda-toolkit@master
