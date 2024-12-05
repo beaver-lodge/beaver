@@ -1,5 +1,6 @@
 defmodule Beaver.PassRunner do
   alias Beaver.MLIR
+  require Logger
 
   @moduledoc """
   `GenServer` to run an MLIR pass implemented in Elixir
@@ -23,7 +24,7 @@ defmodule Beaver.PassRunner do
     rescue
       exception ->
         MLIR.CAPI.beaver_raw_logical_mutex_token_signal_failure(token_ref)
-        reraise exception, __STACKTRACE__
+        Logger.error("#{Exception.format(:error, exception, __STACKTRACE__)}")
     end
 
     {:noreply, state}

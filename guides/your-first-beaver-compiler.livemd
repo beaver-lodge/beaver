@@ -2,7 +2,7 @@
 
 ```elixir
 Mix.install([
-  {:beaver, "~> 0.3"}
+  {:beaver, "~> 0.4"}
 ])
 ```
 

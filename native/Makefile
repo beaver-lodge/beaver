@@ -1,4 +1,4 @@
-LLVM_CONFIG_PATH ?= $($(shell echo $$LLVM_CONFIG_PATH), llvm-config)
+LLVM_CONFIG_PATH ?= llvm-config
 LLVM_LIB_DIR := $(shell ${LLVM_CONFIG_PATH} --libdir)
 LLVM_CMAKE_DIR = $(LLVM_LIB_DIR)/cmake/llvm
 MLIR_CMAKE_DIR = $(LLVM_LIB_DIR)/cmake/mlir
