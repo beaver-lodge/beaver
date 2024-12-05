@@ -171,7 +171,6 @@ jobs:
           platforms: |
             ${{ matrix.image.platform }}
           file: docker/livebook.dockerfile
-          target: base
           build-args: |
             ZIG_URL=${{ matrix.image.zig }}
       - uses: actions/checkout@v3

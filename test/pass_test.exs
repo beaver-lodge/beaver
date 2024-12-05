@@ -1,6 +1,5 @@
 defmodule PassTest do
   use Beaver.Case, async: true, diagnostic: :server
-  import ExUnit.CaptureLog
   use Beaver
   alias Beaver.MLIR.Dialect.{Func, Arith}
   require Func
@@ -32,17 +31,16 @@ defmodule PassTest do
     |> MLIR.verify!()
   end
 
+  @tag capture_log: true
   test "exception in run/1", %{ctx: ctx, diagnostic_server: diagnostic_server} do
     ir = example_ir(ctx)
 
     assert_raise RuntimeError, ~r"Unexpected failure running passes", fn ->
-      assert capture_log(fn ->
-               ir
-               |> Beaver.Composer.nested("func.func", [
-                 PassRaisingException
-               ])
-               |> Beaver.Composer.run!()
-             end) =~ ~r"fail to run a pass"
+      ir
+      |> Beaver.Composer.nested("func.func", [
+        PassRaisingException
+      ])
+      |> Beaver.Composer.run!()
     end
 
     assert Beaver.Capturer.collect(diagnostic_server) =~

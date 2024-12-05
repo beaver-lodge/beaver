@@ -1,4 +1,4 @@
-FROM ghcr.io/livebook-dev/livebook:0.14.5 AS base
+FROM ghcr.io/livebook-dev/livebook:0.14.5
 RUN apt-get upgrade -y \
   && apt-get update \
   && apt-get install --no-install-recommends -y \
@@ -21,11 +21,3 @@ RUN wget "${ZIG_URL}" -O "zig-linux.tar.xz" \
 ENV PATH=/usr/local/zig-linux:${PATH}
 RUN zig version
 ENV ERL_FLAGS="+JMsingle true"
-
-FROM base AS build
-COPY . /src
-WORKDIR /src
-ENV MIX_ENV=prod
-ENV ELIXIR_MAKE_CACHE_DIR=.
-RUN mix deps.get
-RUN mix elixir_make.precompile

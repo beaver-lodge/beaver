@@ -5,6 +5,6 @@ authors:
   given-names: "Shenghang"
   orcid: "https://orcid.org/0009-0003-7397-1203"
 title: "Beaver: MLIR Toolkit in Elixir and Zig"
-version: 0.3.9
+version: 0.4.0
 date-released: 2024-07-27
 url: "https://github.com/beaver-lodge/beaver"
