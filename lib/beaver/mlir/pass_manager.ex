@@ -23,6 +23,7 @@ defmodule Beaver.MLIR.PassManager do
       !!Keyword.get(opts, :module_scope, false),
       !!Keyword.get(opts, :after_only_on_change, false),
       !!Keyword.get(opts, :after_only_on_failure, false),
+      MLIR.CAPI.mlirOpPrintingFlagsCreate(),
       MLIR.StringRef.create(Keyword.get(opts, :tree_printing_path, ""))
     )
   end
