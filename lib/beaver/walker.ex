@@ -616,9 +616,7 @@ defmodule Beaver.Walker do
         {:ok, count} ->
           {:ok, count,
            fn start, length, step ->
-             pos_range = start..(start + length - 1)//step
-
-             for pos <- pos_range do
+             for pos <- start..(start + length - 1)//step do
                get_element.(container, pos)
              end
            end}
