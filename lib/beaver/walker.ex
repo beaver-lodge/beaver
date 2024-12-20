@@ -615,8 +615,8 @@ defmodule Beaver.Walker do
       case count(walker) do
         {:ok, count} ->
           {:ok, count,
-           fn start, length ->
-             pos_range = start..(start + length - 1)
+           fn start, length, step ->
+             pos_range = start..(start + length - 1)//step
 
              for pos <- pos_range do
                get_element.(container, pos)
