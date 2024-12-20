@@ -115,34 +115,41 @@ defmodule BlockTest do
              "branch has 1 operands for successor"
   end
 
-  describe "insert block to region" do
-    for action <- [:insert, :append] do
-      test "appending #{action}", %{ctx: ctx, diagnostic_server: diagnostic_server} do
-        mlir ctx: ctx do
-          module do
-            Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
-              b =
-                block do
-                end
+  defmodule BlockHelper do
+    def create_ir_by_action(ctx, action) do
+      mlir ctx: ctx do
+        module do
+          Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+            b =
+              block do
+              end
 
-              region do
-                block do
-                  v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-                  Func.return(v0) >>> []
-                end
+            region do
+              block do
+                v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+                Func.return(v0) >>> []
+              end
 
-                case unquote(action) do
-                  :append ->
-                    MLIR.Region.append(Beaver.Env.region(), b)
+              case action do
+                :append ->
+                  MLIR.Region.append(Beaver.Env.region(), b)
 
-                  :insert ->
-                    MLIR.Region.insert(Beaver.Env.region(), 1, b)
-                end
+                :insert ->
+                  MLIR.Region.insert(Beaver.Env.region(), 1, b)
               end
             end
           end
         end
-        |> MLIR.verify()
+      end
+      |> MLIR.verify()
+    end
+  end
+
+  @moduledoc false
+  describe "insert block to region" do
+    for action <- [:insert, :append] do
+      test "appending #{action}", %{ctx: ctx, diagnostic_server: diagnostic_server} do
+        BlockHelper.create_ir_by_action(ctx, unquote(action))
 
         assert Beaver.Capturer.collect(diagnostic_server) =~
                  "expect at least a terminator"

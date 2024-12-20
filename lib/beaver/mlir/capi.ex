@@ -46,12 +46,12 @@ defmodule Beaver.MLIR.CAPI do
         _op_name,
         _handler
       ),
-      do: raise("NIF not loaded")
+      do: :erlang.nif_error(:not_loaded)
 
-  def beaver_raw_logical_mutex_token_signal_success(_), do: raise("NIF not loaded")
-  def beaver_raw_logical_mutex_token_signal_failure(_), do: raise("NIF not loaded")
-  def beaver_raw_registered_ops(_ctx), do: raise("NIF not loaded")
-  def beaver_raw_registered_dialects(_ctx), do: raise("NIF not loaded")
+  def beaver_raw_logical_mutex_token_signal_success(_), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_logical_mutex_token_signal_failure(_), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_registered_ops(_ctx), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_registered_dialects(_ctx), do: :erlang.nif_error(:not_loaded)
 
   for f <- ~w{
     StringRef
@@ -69,21 +69,27 @@ defmodule Beaver.MLIR.CAPI do
     Diagnostic
   } do
     f = :"beaver_raw_to_string_#{f}"
-    def unquote(f)(_), do: raise("NIF not loaded")
+    def unquote(f)(_), do: :erlang.nif_error(:not_loaded)
+    {f, 1}
   end
 
-  def beaver_raw_get_string_ref(_), do: raise("NIF not loaded")
-  def beaver_raw_read_opaque_ptr(_, _), do: raise("NIF not loaded")
-  def beaver_raw_deallocate_opaque_ptr(_), do: raise("NIF not loaded")
-  def beaver_raw_get_null_ptr(), do: raise("NIF not loaded")
-  def beaver_raw_context_attach_diagnostic_handler(_, _), do: raise("NIF not loaded")
-  def beaver_raw_jit_invoke_with_terms(_jit, _name, _args), do: raise("NIF not loaded")
-  def beaver_raw_jit_invoke_with_terms_cpu_bound(_jit, _name, _args), do: raise("NIF not loaded")
-  def beaver_raw_jit_invoke_with_terms_io_bound(_jit, _name, _args), do: raise("NIF not loaded")
-  def beaver_raw_jit_register_enif(_jit), do: raise("NIF not loaded")
-  def beaver_raw_enif_signatures(_ctx), do: raise("NIF not loaded")
-  def beaver_raw_enif_functions(), do: raise("NIF not loaded")
-  def beaver_raw_mlir_type_of_enif_obj(_ctx, _obj), do: raise("NIF not loaded")
-  def beaver_raw_string_printer_callback(), do: raise("NIF not loaded")
-  def beaver_raw_string_printer_flush(_sp), do: raise("NIF not loaded")
+  def beaver_raw_get_string_ref(_), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_read_opaque_ptr(_, _), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_deallocate_opaque_ptr(_), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_get_null_ptr(), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_context_attach_diagnostic_handler(_, _), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_jit_invoke_with_terms(_jit, _name, _args), do: :erlang.nif_error(:not_loaded)
+
+  def beaver_raw_jit_invoke_with_terms_cpu_bound(_jit, _name, _args),
+    do: :erlang.nif_error(:not_loaded)
+
+  def beaver_raw_jit_invoke_with_terms_io_bound(_jit, _name, _args),
+    do: :erlang.nif_error(:not_loaded)
+
+  def beaver_raw_jit_register_enif(_jit), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_enif_signatures(_ctx), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_enif_functions(), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_mlir_type_of_enif_obj(_ctx, _obj), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_string_printer_callback(), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_string_printer_flush(_sp), do: :erlang.nif_error(:not_loaded)
 end
