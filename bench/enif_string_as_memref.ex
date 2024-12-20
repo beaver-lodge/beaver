@@ -79,7 +79,7 @@ defmodule ENIFStringAsMemRef do
               Func.return(e) >>> []
             end
 
-            unless loc =~ __ENV__.file do
+            if !(loc =~ __ENV__.file) do
               raise "wrong location"
             end
 
