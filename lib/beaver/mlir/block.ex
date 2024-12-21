@@ -50,7 +50,7 @@ defmodule Beaver.MLIR.Block do
           _ -> nil
         end)
 
-    unless ctx do
+    if !ctx do
       raise "Requires MLIR Context to add arguments. Otherwise, use types or locations already created."
     end
 

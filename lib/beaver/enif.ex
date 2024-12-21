@@ -38,8 +38,8 @@ defmodule Beaver.ENIF do
   @doc """
   Retrieve the signatures of all available ENIF functions.
   """
-  def signatures(%MLIR.Context{} = ctx) do
-    signatures = MLIR.CAPI.beaver_raw_enif_signatures(ctx.ref)
+  def signatures(%MLIR.Context{ref: ref}) do
+    signatures = MLIR.CAPI.beaver_raw_enif_signatures(ref)
 
     for {name, arg_types, ret_types} <- signatures do
       {name, Enum.map(arg_types, &wrap_mlir_t/1), Enum.map(ret_types, &wrap_mlir_t/1)}

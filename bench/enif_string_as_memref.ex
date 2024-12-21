@@ -72,15 +72,10 @@ defmodule ENIFStringAsMemRef do
               term_ptr = LLVM.alloca(one, elem_type: ENIF.Type.term()) >>> ~t{!llvm.ptr}
               d_ptr = ENIF.make_new_binary(env, size, term_ptr) >>> :infer
               m = ENIF.ptr_to_memref(d_ptr, size) >>> :infer
-              loc = m |> MLIR.Value.owner!() |> MLIR.Operation.location() |> MLIR.to_string()
               MemRef.copy(msg, m) >>> []
               msg = LLVM.load(term_ptr) >>> ENIF.Type.term()
               e = ENIF.raise_exception(env, msg) >>> []
               Func.return(e) >>> []
-            end
-
-            unless loc =~ __ENV__.file do
-              raise "wrong location"
             end
 
             block successor() do
