@@ -15,13 +15,16 @@ defmodule Beaver.MLIR.ExecutionEngine do
     Composer.run!(composer_or_op) |> create!()
   end
 
+  @type dirty :: nil | :io_bound | :cpu_bound
+
   @type opt_level :: 0 | 1 | 2 | 3
   @type shared_lib_path :: String.t()
   @type object_dump :: boolean()
   @type opts :: [
           {:shared_lib_paths, [shared_lib_path]},
           {:opt_level, opt_level},
-          {:object_dump, object_dump}
+          {:object_dump, object_dump},
+          {:dirty, dirty}
         ]
   @spec create!(MLIR.Module.t(), opts()) :: t()
   def create!(module, opts \\ []) do
@@ -37,12 +40,16 @@ defmodule Beaver.MLIR.ExecutionEngine do
     require MLIR.Context
 
     jit =
-      mlirExecutionEngineCreate(
-        module,
-        opt_level,
-        length(shared_lib_paths),
-        shared_lib_paths_ptr,
-        object_dump
+      Beaver.Native.apply_dirty(
+        :mlirExecutionEngineCreate,
+        [
+          module,
+          opt_level,
+          length(shared_lib_paths),
+          shared_lib_paths_ptr,
+          object_dump
+        ],
+        opts[:dirty]
       )
 
     if MLIR.null?(jit) do
@@ -55,7 +62,6 @@ defmodule Beaver.MLIR.ExecutionEngine do
   @doc """
   invoke a function by symbol name.
   """
-  @type dirty :: nil | :io_bound | :cpu_bound
   @type invoke_opts :: [
           {:dirty, dirty}
         ]
@@ -71,22 +77,14 @@ defmodule Beaver.MLIR.ExecutionEngine do
       end
       |> List.wrap()
 
-    case opts[:dirty] do
-      :io_bound ->
-        :mlirExecutionEngineInvokePacked_dirty_io
-
-      :cpu_bound ->
-        :mlirExecutionEngineInvokePacked_dirty_cpu
-
-      nil ->
-        :mlirExecutionEngineInvokePacked
-    end
-    |> then(
-      &apply(MLIR.CAPI, &1, [
+    Beaver.Native.apply_dirty(
+      :mlirExecutionEngineInvokePacked,
+      [
         jit,
         MLIR.StringRef.create(symbol),
         Beaver.Native.array(arg_ptr_list ++ return_ptr, Beaver.Native.OpaquePtr, mut: true)
-      ])
+      ],
+      opts[:dirty]
     )
     |> then(
       &if MLIR.LogicalResult.success?(&1) do

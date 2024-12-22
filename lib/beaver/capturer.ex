@@ -1,6 +1,7 @@
 defmodule Beaver.Capturer do
   alias Beaver.MLIR
   use GenServer
+  require Logger
 
   @moduledoc """
   `GenServer` to run MLIR diagnostic error handler.
@@ -52,9 +53,9 @@ defmodule Beaver.Capturer do
         MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref)
       end)
     rescue
-      e ->
+      exception ->
         MLIR.CAPI.beaver_raw_logical_mutex_token_signal_failure(token_ref)
-        reraise e, __STACKTRACE__
+        Logger.error("#{Exception.format(:error, exception, __STACKTRACE__)}")
     end
     |> then(&{:noreply, %__MODULE__{state | return: &1}})
   end

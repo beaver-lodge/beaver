@@ -88,4 +88,20 @@ defmodule Beaver.Native do
   def dump(%kind{ref: ref}) do
     Beaver.Native.forward(kind, "dump", [ref])
   end
+
+  def apply_dirty(fun, args, dirty_flag) do
+    f =
+      case dirty_flag do
+        :io_bound ->
+          :"#{fun}_dirty_io"
+
+        :cpu_bound ->
+          :"#{fun}_dirty_cpu"
+
+        nil ->
+          fun
+      end
+
+    apply(CAPI, f, args)
+  end
 end
