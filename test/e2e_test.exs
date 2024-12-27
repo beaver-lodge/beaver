@@ -18,6 +18,7 @@ defmodule E2ETest do
       """.(ctx)
       |> canonicalize
       |> cse
+      |> convert_arith_to_llvm()
       |> convert_func_to_llvm
       |> convert_arith_to_llvm
       |> Beaver.Composer.run!()

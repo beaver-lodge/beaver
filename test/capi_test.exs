@@ -238,6 +238,7 @@ defmodule MlirTest do
   def lower_to_llvm(ctx, module) do
     pm = mlirPassManagerCreate(ctx)
     mlirPassManagerAddOwnedPass(pm, mlirCreateConversionConvertFuncToLLVMPass())
+    mlirPassManagerAddOwnedPass(pm, mlirCreateConversionArithToLLVMConversionPass())
     status = mlirPassManagerRunOnOp(pm, module)
 
     if not MLIR.LogicalResult.success?(status) do

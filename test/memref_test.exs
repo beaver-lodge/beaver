@@ -43,6 +43,8 @@ defmodule MemRefTest do
       )
       |> convert_scf_to_cf
       |> Beaver.Composer.append("finalize-memref-to-llvm")
+      |> convert_cf_to_llvm()
+      |> convert_arith_to_llvm()
       |> convert_func_to_llvm
       |> reconcile_unrealized_casts
       |> Beaver.Composer.run!()

@@ -219,6 +219,7 @@ defmodule CfTest do
       import MLIR.{Transform, Conversion}
 
       ir
+      |> convert_cf_to_llvm()
       |> convert_arith_to_llvm
       |> Beaver.Composer.nested("func.func", "llvm-request-c-wrappers")
       |> Beaver.Composer.nested("func.func", {"DoNothing0", "func.func", fn _ -> :ok end})
