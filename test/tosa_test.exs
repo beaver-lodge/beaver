@@ -20,6 +20,8 @@ defmodule TosaTest do
     |> Beaver.Composer.nested("func.func", convert_math_to_llvm())
     |> Beaver.Composer.append("expand-strided-metadata")
     |> lower_affine()
+    |> convert_cf_to_llvm()
+    |> convert_arith_to_llvm()
     |> Beaver.Composer.append("finalize-memref-to-llvm")
     |> convert_func_to_llvm
     |> convert_index_to_llvm

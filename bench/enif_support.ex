@@ -29,6 +29,7 @@ defmodule ENIFSupport do
     |> Beaver.Composer.nested("func.func", "llvm-request-c-wrappers")
     |> convert_scf_to_cf
     |> convert_arith_to_llvm()
+    |> convert_cf_to_llvm()
     |> convert_index_to_llvm()
     |> convert_func_to_llvm()
     |> Beaver.Composer.append("convert-vector-to-llvm{reassociate-fp-reductions}")
