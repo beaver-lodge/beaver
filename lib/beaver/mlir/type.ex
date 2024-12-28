@@ -240,14 +240,7 @@ defmodule Beaver.MLIR.Type do
   for {f, "mlirTypeIsA" <> type_name, 1} <-
         Beaver.MLIR.CAPI.__info__(:functions)
         |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
-    helper_name = type_name |> Macro.underscore()
-
-    helper_name =
-      if helper_name == "mem_ref" do
-        "memref"
-      else
-        helper_name
-      end
+    helper_name = type_name |> Macro.underscore() |> String.replace("mem_ref", "memref")
 
     def unquote(:"#{helper_name}?")(%MLIR.Type{} = t) do
       unquote(f)(t) |> Beaver.Native.to_term()
