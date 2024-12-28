@@ -237,15 +237,13 @@ defmodule Beaver.MLIR.Type do
     end
   end
 
-  def integer?(%MLIR.Type{} = t) do
-    mlirTypeIsAInteger(t) |> Beaver.Native.to_term()
-  end
+  for {f, "mlirTypeIsA" <> type_name, 1} <-
+        Beaver.MLIR.CAPI.__info__(:functions)
+        |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
+    helper_name = type_name |> Macro.underscore() |> String.replace("mem_ref", "memref")
 
-  def index?(%MLIR.Type{} = t) do
-    mlirTypeIsAIndex(t) |> Beaver.Native.to_term()
-  end
-
-  def float?(%MLIR.Type{} = t) do
-    mlirTypeIsAFloat(t) |> Beaver.Native.to_term()
+    def unquote(:"#{helper_name}?")(%MLIR.Type{} = t) do
+      unquote(f)(t) |> Beaver.Native.to_term()
+    end
   end
 end

@@ -57,6 +57,14 @@ defmodule EntityTest do
     end
   end
 
+  test "type detection", %{ctx: ctx} do
+    assert Type.tensor?(~t{tensor<*xf32>}.(ctx))
+    assert Type.i(32).(ctx) |> Type.integer?()
+    refute Type.f(32).(ctx) |> Type.integer?()
+    assert Type.f(32).(ctx) |> Type.float?()
+    assert Type.memref([], Type.f32()).(ctx) |> Type.memref?()
+  end
+
   describe "attr apis" do
     test "generate", %{ctx: ctx} do
       assert MLIR.equal?(Attribute.type(Type.f32()).(ctx), Attribute.type(Type.f32()).(ctx))
