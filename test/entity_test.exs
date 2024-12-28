@@ -49,7 +49,7 @@ defmodule EntityTest do
              |> to_string() ==
                "tensor<1x?x2xf32>"
 
-      assert Type.memref([], Type.f32()).(ctx)
+      assert Type.memref!([], Type.f32(ctx: ctx))
              |> to_string() ==
                "memref<f32>"
 
@@ -57,12 +57,26 @@ defmodule EntityTest do
     end
   end
 
+  test "checked composition", %{ctx: ctx} do
+    assert Type.unranked_memref!(Type.f32(ctx: ctx))
+           |> to_string() ==
+             "memref<*xf32>"
+
+    assert_raise ArgumentError,
+                 "fail to create UnrankedMemRef",
+                 fn -> Type.unranked_memref!(Type.none(ctx: ctx)) end
+
+    assert_raise ArgumentError,
+                 "calling a bang function to compose a type must be eager",
+                 fn -> Type.unranked_memref!(Type.i16()) end
+  end
+
   test "type detection", %{ctx: ctx} do
     assert Type.tensor?(~t{tensor<*xf32>}.(ctx))
     assert Type.i(32).(ctx) |> Type.integer?()
     refute Type.f(32).(ctx) |> Type.integer?()
     assert Type.f(32).(ctx) |> Type.float?()
-    assert Type.memref([], Type.f32()).(ctx) |> Type.memref?()
+    assert Type.memref!([], Type.f32(ctx: ctx)) |> Type.memref?()
   end
 
   describe "attr apis" do

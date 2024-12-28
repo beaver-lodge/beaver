@@ -58,6 +58,31 @@ defmodule Beaver.MLIR.Type do
 
   defp escape_dynamic(dim), do: dim
 
+  defp checked_composite_type(ctx, getter, args, opts) do
+    loc = opts[:loc] || MLIR.Location.unknown(ctx: ctx)
+    t = apply(MLIR.CAPI, getter, [loc | args])
+
+    if MLIR.null?(t) do
+      {:error,
+       "fail to create #{String.replace(Atom.to_string(getter), ["mlir", "TypeGetChecked"], "")}"}
+    else
+      {:ok, t}
+    end
+  end
+
+  defp bang_composite_type(cb, args) do
+    case apply(cb, args) do
+      f when is_function(f, 1) ->
+        raise ArgumentError, "calling a bang function to compose a type must be eager"
+
+      {:ok, t} ->
+        t
+
+      {:error, msg} ->
+        raise ArgumentError, msg
+    end
+  end
+
   def ranked_tensor(shape, element_type, encoding \\ nil)
 
   def ranked_tensor(
@@ -103,6 +128,30 @@ defmodule Beaver.MLIR.Type do
     mlirUnrankedTensorTypeGet(element_type)
   end
 
+  def unranked_memref(element_type, opts \\ [])
+
+  def unranked_memref(element_type, opts)
+      when is_function(element_type, 1) do
+    &unranked_memref(element_type.(&1), opts)
+  end
+
+  def unranked_memref(%__MODULE__{} = element_type, opts) do
+    ctx = MLIR.context(element_type)
+    default_null = mlirAttributeGetNull()
+    memory_space = opts[:memory_space] || default_null
+
+    checked_composite_type(
+      ctx,
+      :mlirUnrankedMemRefTypeGetChecked,
+      [element_type, memory_space],
+      opts
+    )
+  end
+
+  def unranked_memref!(element_type, opts \\ []) do
+    bang_composite_type(&unranked_memref/2, [element_type, opts])
+  end
+
   def complex(element_type) when is_function(element_type, 1) do
     &complex(element_type.(&1))
   end
@@ -127,15 +176,23 @@ defmodule Beaver.MLIR.Type do
         opts
       )
       when is_list(shape) do
+    ctx = MLIR.context(element_type)
     rank = length(shape)
-
     shape = shape |> Enum.map(&escape_dynamic/1) |> Beaver.Native.array(Beaver.Native.I64)
-
     default_null = mlirAttributeGetNull()
     layout = Keyword.get(opts, :layout) || default_null
     memory_space = Keyword.get(opts, :memory_space) || default_null
 
-    mlirMemRefTypeGet(element_type, rank, shape, layout, memory_space)
+    checked_composite_type(
+      ctx,
+      :mlirMemRefTypeGetChecked,
+      [element_type, rank, shape, layout, memory_space],
+      opts
+    )
+  end
+
+  def memref!(shape, %__MODULE__{} = element_type, opts \\ []) do
+    bang_composite_type(&memref/3, [shape, element_type, opts])
   end
 
   @doc """
