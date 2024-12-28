@@ -71,6 +71,17 @@ defmodule Beaver.Native do
           UndefinedFunctionError -> ref
         end
 
+      {{:kind, mod, ref}, diagnostics} ->
+        {try do
+           struct!(mod, %{ref: ref})
+         rescue
+           UndefinedFunctionError -> ref
+         end,
+         for {severity_i, loc_ref, note, num} <- diagnostics do
+           {Beaver.MLIR.Diagnostic.severity(severity_i), %Beaver.MLIR.Location{ref: loc_ref},
+            Enum.join(note), num}
+         end}
+
       ret ->
         ret
     end

@@ -47,11 +47,11 @@ defmodule Beaver.Changeset do
 
   def add_argument(%__MODULE__{context: context} = changeset, {tag, f})
       when is_atom(tag) and is_function(f, 1) do
-    add_argument(changeset, {tag, f.(context)})
+    add_argument(changeset, {tag, Beaver.Deferred.create(f, context)})
   end
 
   def add_argument(%__MODULE__{context: context} = changeset, f) when is_function(f, 1) do
-    add_argument(changeset, f.(context))
+    add_argument(changeset, Beaver.Deferred.create(f, context))
   end
 
   def add_argument(%__MODULE__{regions: regions} = changeset, %MLIR.Region{} = region) do

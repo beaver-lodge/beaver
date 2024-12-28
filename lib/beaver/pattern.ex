@@ -153,7 +153,7 @@ defmodule Beaver.Pattern do
   end
 
   def gen_pdl(%Env{ctx: ctx} = env, f) when is_function(f, 1) do
-    gen_pdl(env, f.(ctx))
+    gen_pdl(env, Beaver.Deferred.create(f, ctx))
   end
 
   def gen_pdl(_env, element) do

@@ -14,10 +14,21 @@ defmodule Beaver.MLIR.Attribute do
     attr = MLIR.StringRef.create(attr_str)
 
     Beaver.Deferred.from_opts(opts, fn ctx ->
-      attr = mlirAttributeParseGet(ctx, attr)
+      {attr, diagnostics} = mlirAttributeParseGetWithDiagnostics(ctx, ctx, attr)
 
       if MLIR.null?(attr) do
-        raise "fail to parse attribute: #{attr_str}"
+        case diagnostics do
+          [] ->
+            raise ArgumentError, "fail to parse attribute: #{attr_str}"
+
+          diagnostics when is_list(diagnostics) ->
+            msg =
+              for {_severity, loc, d, _num} <- diagnostics, reduce: "fail to parse attribute" do
+                acc -> "#{acc}\n#{to_string(loc)}: #{d}"
+              end
+
+            raise ArgumentError, msg
+        end
       end
 
       attr
@@ -34,7 +45,7 @@ defmodule Beaver.MLIR.Attribute do
         et = apply(MLIR.Type, t, [width, [ctx: ctx]])
         str = MLIR.StringRef.create(elements)
 
-        Type.ranked_tensor([byte_size(elements)], et)
+        Type.ranked_tensor!([byte_size(elements)], et)
         |> mlirDenseElementsAttrRawBufferGet(
           MLIR.StringRef.length(str),
           MLIR.StringRef.data(str) |> Beaver.Native.Array.as_opaque()

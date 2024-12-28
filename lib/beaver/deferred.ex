@@ -30,8 +30,16 @@ defmodule Beaver.Deferred do
     opts[:blk]
   end
 
+  defp unwrap_f(f, ctx) do
+    case f.(ctx) do
+      {:ok, value} -> value
+      {:error, reason} -> raise ArgumentError, reason
+      entity -> entity
+    end
+  end
+
   def create({:parametric, _, _, f}, ctx) when is_function(f) and not is_nil(ctx) do
-    f.(ctx)
+    unwrap_f(f, ctx)
   end
 
   def create({:parametric, _, _, entity}, _ctx) do
@@ -39,7 +47,7 @@ defmodule Beaver.Deferred do
   end
 
   def create(f, ctx) when is_function(f) do
-    f.(ctx)
+    unwrap_f(f, ctx)
   end
 
   def create(entity, _ctx) do

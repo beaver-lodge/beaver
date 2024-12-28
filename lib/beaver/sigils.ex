@@ -50,9 +50,9 @@ defmodule Beaver.Sigils do
   ## Examples
 
       iex> ctx = MLIR.Context.create()
-      iex> MLIR.equal?(Type.unranked_tensor(Type.f32()).(ctx), ~t{tensor<*xf32>}.(ctx))
+      iex> MLIR.equal?(Type.unranked_tensor!(Type.f32(ctx: ctx)), ~t{tensor<*xf32>}.(ctx))
       true
-      iex> MLIR.equal?(Type.unranked_tensor(Type.f32()).(ctx), ~t{tensor<*xf32>})
+      iex> MLIR.equal?(Type.unranked_tensor!(Type.f32(ctx: ctx)), ~t{tensor<*xf32>})
       true
       iex> MLIR.equal?(Type.complex(Type.f32()).(ctx), ~t<f32>complex.(ctx))
       true

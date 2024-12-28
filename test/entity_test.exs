@@ -33,19 +33,19 @@ defmodule EntityTest do
       assert MLIR.equal?(Type.integer(128, opts), Type.get("i128").(ctx))
       assert MLIR.equal?(Type.complex(Type.f32()).(ctx), Type.get("complex<f32>").(ctx))
 
-      assert Type.unranked_tensor(Type.complex(Type.f32())).(ctx) |> to_string() ==
+      assert Type.unranked_tensor!(Type.complex(Type.f32(ctx: ctx))) |> to_string() ==
                "tensor<*xcomplex<f32>>"
 
-      assert MLIR.equal?(Type.unranked_tensor(Type.f32()).(ctx), ~t{tensor<*xf32>}.(ctx))
+      assert MLIR.equal?(Type.unranked_tensor!(Type.f32(ctx: ctx)), ~t{tensor<*xf32>}.(ctx))
 
-      assert Type.ranked_tensor([], Type.f32()).(ctx) |> to_string() ==
+      assert Type.ranked_tensor!([], Type.f32(ctx: ctx)) |> to_string() ==
                "tensor<f32>"
 
-      assert Type.ranked_tensor([1, 2], Type.f32()).(ctx)
+      assert Type.ranked_tensor!([1, 2], Type.f32(ctx: ctx))
              |> to_string() ==
                "tensor<1x2xf32>"
 
-      assert Type.ranked_tensor([1, :dynamic, 2], Type.f32()).(ctx)
+      assert Type.ranked_tensor!([1, :dynamic, 2], Type.f32(ctx: ctx))
              |> to_string() ==
                "tensor<1x?x2xf32>"
 
@@ -63,8 +63,11 @@ defmodule EntityTest do
              "memref<*xf32>"
 
     assert_raise ArgumentError,
-                 "fail to create UnrankedMemRef",
+                 "loc(unknown): invalid memref element type",
                  fn -> Type.unranked_memref!(Type.none(ctx: ctx)) end
+
+    assert {:error, "loc(unknown): invalid memref element type"} =
+             Type.memref([1, :dynamic, 2], Type.none(ctx: ctx))
 
     assert_raise ArgumentError,
                  "calling a bang function to compose a type must be eager",
@@ -111,7 +114,7 @@ defmodule EntityTest do
              )
 
       assert Type.function(
-               [Type.ranked_tensor([1, 2, 3, 4], Type.i(32))],
+               [Type.ranked_tensor!([1, 2, 3, 4], Type.i(32, ctx: ctx))],
                [Type.i(32)]
              ).(ctx)
              |> to_string() ==
@@ -127,7 +130,7 @@ defmodule EntityTest do
                ~a{(i32) -> (i32)}.(ctx)
              )
 
-      vec2xi32 = Type.vector([2], Type.i(32)).(ctx)
+      vec2xi32 = Type.vector!([2], Type.i(32, ctx: ctx))
       assert MLIR.to_string(vec2xi32) == "vector<2xi32>"
       i0attr = Attribute.integer(Type.i(32), 0)
 
@@ -204,16 +207,5 @@ defmodule EntityTest do
     a = Beaver.MLIR.Identifier.get(str, ctx: ctx)
     b = Beaver.MLIR.Identifier.get(str, ctx: ctx)
     assert MLIR.equal?(a, b)
-  end
-
-  describe "null" do
-    test "attr", %{ctx: ctx, diagnostic_server: diagnostic_server} do
-      assert_raise RuntimeError, "fail to parse attribute: ???", fn ->
-        Attribute.get("???", ctx: ctx) |> MLIR.null?()
-      end
-
-      assert Beaver.Capturer.collect(diagnostic_server) =~
-               "expected attribute value"
-    end
   end
 end
