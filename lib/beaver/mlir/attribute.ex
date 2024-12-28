@@ -10,17 +10,31 @@ defmodule Beaver.MLIR.Attribute do
 
   use Kinda.ResourceKind, forward_module: Beaver.Native
 
+  defp raise_with_diagnostics(attr_str, diagnostics) do
+    case diagnostics do
+      [] ->
+        raise ArgumentError, "fail to parse attribute: #{attr_str}"
+
+      diagnostics when is_list(diagnostics) ->
+        raise ArgumentError,
+              (for {_severity, loc, d, _num} <- diagnostics,
+                   reduce: "fail to parse attribute" do
+                 acc -> "#{acc}\n#{to_string(loc)}: #{d}"
+               end)
+    end
+  end
+
   def get(attr_str, opts \\ []) when is_binary(attr_str) do
     attr = MLIR.StringRef.create(attr_str)
 
     Beaver.Deferred.from_opts(opts, fn ctx ->
-      attr = mlirAttributeParseGet(ctx, attr)
+      {attr, diagnostics} = mlirAttributeParseGetWithDiagnostics(ctx, ctx, attr)
 
       if MLIR.null?(attr) do
-        raise "fail to parse attribute: #{attr_str}"
+        raise_with_diagnostics(attr_str, diagnostics)
+      else
+        attr
       end
-
-      attr
     end)
   end
 
@@ -34,7 +48,7 @@ defmodule Beaver.MLIR.Attribute do
         et = apply(MLIR.Type, t, [width, [ctx: ctx]])
         str = MLIR.StringRef.create(elements)
 
-        Type.ranked_tensor([byte_size(elements)], et)
+        Type.ranked_tensor!([byte_size(elements)], et)
         |> mlirDenseElementsAttrRawBufferGet(
           MLIR.StringRef.length(str),
           MLIR.StringRef.data(str) |> Beaver.Native.Array.as_opaque()

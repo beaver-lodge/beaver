@@ -1,5 +1,5 @@
 defmodule BlockTest do
-  use Beaver.Case, async: true, diagnostic: :server
+  use Beaver.Case, async: true
   use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Type}
@@ -37,82 +37,92 @@ defmodule BlockTest do
     |> MLIR.verify!()
   end
 
-  test "dangling block", %{ctx: ctx, diagnostic_server: diagnostic_server} do
-    mlir ctx: ctx do
-      module do
-        Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
-          region do
-            block do
-              v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-              CF.br({Beaver.Env.block(_bb1), [v0]}) >>> []
+  test "dangling block", %{ctx: ctx} do
+    res =
+      mlir ctx: ctx do
+        module do
+          Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+            region do
+              block do
+                v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+                CF.br({Beaver.Env.block(_bb1), [v0]}) >>> []
+              end
             end
           end
         end
       end
-    end
-    |> MLIR.verify()
+      |> MLIR.verify()
 
-    assert Beaver.Capturer.collect(diagnostic_server) =~
-             "reference to block defined in another region"
+    assert {:error,
+            [
+              {:error, _, "reference to block defined in another region", 1},
+              {:note, _, "see current operation: \"cf.br\"(%0)[INVALIDBLOCK] : (i32) -> ()", 0}
+            ]} = res
   end
 
-  test "successor of wrong arg type", %{ctx: ctx, diagnostic_server: diagnostic_server} do
-    mlir ctx: ctx do
-      module do
-        Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
-          region do
-            block do
-              v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-              CF.br({Beaver.Env.block(bb1), [v0]}) >>> []
-            end
-
-            block bb1() do
-            end
-          end
-        end
-      end
-    end
-    |> MLIR.verify()
-
-    assert Beaver.Capturer.collect(diagnostic_server) =~
-             "branch has 1 operands for successor"
-  end
-
-  test "nested block creation", %{ctx: ctx, diagnostic_server: diagnostic_server} do
-    mlir ctx: ctx do
-      module do
-        top_level_block = Beaver.Env.block()
-
-        Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
-          region do
-            %Beaver.MLIR.Block{} =
+  test "successor of wrong arg type", %{ctx: ctx} do
+    {:error, diagnostics} =
+      mlir ctx: ctx do
+        module do
+          Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+            region do
               block do
                 v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
                 CF.br({Beaver.Env.block(bb1), [v0]}) >>> []
               end
 
-            %Beaver.MLIR.Block{} =
               block bb1() do
-                block_1 = Beaver.Env.block()
-
-                %Beaver.MLIR.Block{} =
-                  block do
-                    refute Beaver.Env.block() == block_1
-                    refute Beaver.Env.block() == top_level_block
-                  end
-
-                assert Beaver.Env.block() == block_1
               end
-
-            assert Beaver.Env.block() == top_level_block
+            end
           end
         end
       end
-    end
-    |> MLIR.verify()
+      |> MLIR.verify()
 
-    assert Beaver.Capturer.collect(diagnostic_server) =~
-             "branch has 1 operands for successor"
+    assert [
+             {:error, _, "branch has 1 operands for successor #0, but target block has 0", 1},
+             {:note, _, "see current operation:" <> _, 0}
+           ] = diagnostics
+  end
+
+  test "nested block creation", %{ctx: ctx} do
+    {:error, diagnostics} =
+      mlir ctx: ctx do
+        module do
+          top_level_block = Beaver.Env.block()
+
+          Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+            region do
+              %Beaver.MLIR.Block{} =
+                block do
+                  v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+                  CF.br({Beaver.Env.block(bb1), [v0]}) >>> []
+                end
+
+              %Beaver.MLIR.Block{} =
+                block bb1() do
+                  block_1 = Beaver.Env.block()
+
+                  %Beaver.MLIR.Block{} =
+                    block do
+                      refute Beaver.Env.block() == block_1
+                      refute Beaver.Env.block() == top_level_block
+                    end
+
+                  assert Beaver.Env.block() == block_1
+                end
+
+              assert Beaver.Env.block() == top_level_block
+            end
+          end
+        end
+      end
+      |> MLIR.verify()
+
+    assert [
+             {:error, _, "branch has 1 operands for successor #0, but target block has 0", 1},
+             {:note, _, "see current operation" <> _, 0}
+           ] = diagnostics
   end
 
   defmodule BlockHelper do
@@ -148,11 +158,9 @@ defmodule BlockTest do
   @moduledoc false
   describe "insert block to region" do
     for action <- [:insert, :append] do
-      test "appending #{action}", %{ctx: ctx, diagnostic_server: diagnostic_server} do
-        BlockHelper.create_ir_by_action(ctx, unquote(action))
-
-        assert Beaver.Capturer.collect(diagnostic_server) =~
-                 "expect at least a terminator"
+      test "appending #{action}", %{ctx: ctx} do
+        assert {:error, [{:error, _, "empty block: expect at least a terminator", 0}]} =
+                 BlockHelper.create_ir_by_action(ctx, unquote(action))
       end
     end
   end

@@ -83,7 +83,7 @@ defmodule TranslateMLIR do
 
       result =
         MemRef.alloc(size, operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 0])) >>>
-          Type.memref([:dynamic], Type.i64())
+          Type.memref!([:dynamic], Type.i64(ctx: ctx))
 
       compile_for_loop(result, zero, expressions, acc, ctx, block)
     end
@@ -142,7 +142,7 @@ defmodule TranslateMLIR do
         end)
 
       mlir ctx: ctx, blk: block do
-        memref = MemRef.alloca() >>> Type.memref([length(list)], Type.i64())
+        memref = MemRef.alloca() >>> Type.memref!([length(list)], Type.i64(ctx: ctx))
 
         for {v, i} <- Enum.with_index(values) do
           indices = Index.constant(value: Attribute.index(i)) >>> Type.index()

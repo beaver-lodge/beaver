@@ -5,20 +5,28 @@ defmodule Updater do
     System.argv() |> Enum.chunk_every(2)
   end
 
-  @dirty_io ~w{mlirPassManagerRunOnOp mlirOperationVerify mlirAttributeParseGet mlirTypeParseGet mlirModuleCreateParse}
+  @dirty_io ~w{mlirPassManagerRunOnOp}
             |> Enum.map(&String.to_atom/1)
+  @with_diagnostics ~w{mlirAttributeParseGet mlirOperationVerify mlirTypeParseGet mlirModuleCreateParse}
+                    |> Enum.map(&String.to_atom/1)
   @regular_and_dirty ~w{mlirExecutionEngineInvokePacked mlirExecutionEngineCreate}
                      |> Enum.map(&String.to_atom/1)
 
   defp dirty_io(name), do: "#{name}_dirty_io" |> String.to_atom()
   defp dirty_cpu(name), do: "#{name}_dirty_cpu" |> String.to_atom()
+  defp with_diagnostics(name), do: "#{name}WithDiagnostics" |> String.to_atom()
 
   def gen(functions, :elixir) do
     for {name, arity} <- functions do
-      if name in @regular_and_dirty do
-        [{name, arity}, {dirty_io(name), arity}, {dirty_cpu(name), arity}]
-      else
-        {name, arity}
+      cond do
+        name in @with_diagnostics or String.ends_with?(Atom.to_string(name), "GetChecked") ->
+          [{name, arity}, {with_diagnostics(name), arity + 1}]
+
+        name in @regular_and_dirty ->
+          [{name, arity}, {dirty_io(name), arity}, {dirty_cpu(name), arity}]
+
+        true ->
+          {name, arity}
       end
     end
     |> List.flatten()
@@ -38,6 +46,9 @@ defmodule Updater do
     entries =
       for {name, _arity} <- functions do
         cond do
+          name in @with_diagnostics or String.ends_with?(Atom.to_string(name), "GetChecked") ->
+            [~s{N(K, c, "#{name}"),}, ~s{diagnostic.WithDiagnosticsNIF(K, c, "#{name}"),}]
+
           name in @dirty_io ->
             ~s{D_CPU(K, c, "#{name}", null),}
 
@@ -57,6 +68,7 @@ defmodule Updater do
 
     txt = """
     pub const c = @import("prelude.zig");
+    pub const diagnostic = @import("diagnostic.zig");
     const N = c.N;
     const K = c.K;
     const D_CPU = c.D_CPU;

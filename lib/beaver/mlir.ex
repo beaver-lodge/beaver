@@ -231,25 +231,30 @@ defmodule Beaver.MLIR do
       :null ->
         raise "MLIR operation verification failed because the operation is null. Maybe it is parsed from an ill-formed text format? Please have a look at the diagnostic output above by MLIR C++"
 
-      :fail ->
-        raise "MLIR operation verification failed"
+      {:error, diagnostics} ->
+        diagnostics =
+          for {_, loc, d, _} <- diagnostics, reduce: "" do
+            acc -> "#{acc}\n#{__MODULE__.to_string(loc)}: #{d}"
+          end
+
+        raise "MLIR operation verification failed, #{diagnostics}"
     end
   end
 
-  @spec verify(verifiable()) :: {:ok, verifiable()} | :null | :fail
+  @spec verify(verifiable()) :: {:ok, verifiable()} | :null | {:error, list()}
   def verify(op) do
     if null?(op) do
       :null
     else
-      is_success =
-        MLIR.Operation.from_module(op)
-        |> mlirOperationVerify()
-        |> Beaver.Native.to_term()
+      ctx = MLIR.context(op)
 
-      if is_success do
+      {is_success, diagnostics} =
+        mlirOperationVerifyWithDiagnostics(ctx, MLIR.Operation.from_module(op))
+
+      if Beaver.Native.to_term(is_success) do
         {:ok, op}
       else
-        :fail
+        {:error, diagnostics}
       end
     end
   end

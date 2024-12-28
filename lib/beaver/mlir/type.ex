@@ -58,49 +58,116 @@ defmodule Beaver.MLIR.Type do
 
   defp escape_dynamic(dim), do: dim
 
-  def ranked_tensor(shape, element_type, encoding \\ nil)
+  defp checked_composite_type(ctx, getter, args, opts) do
+    loc = opts[:loc] || MLIR.Location.unknown(ctx: ctx)
+    {t, diagnostics} = apply(getter, [ctx, loc | args])
+
+    if MLIR.null?(t) do
+      {:error,
+       for {_, loc, d, _} <- diagnostics, reduce: "" do
+         "" -> "#{to_string(loc)}: #{d}"
+         acc -> "#{acc}\n#{to_string(loc)}: #{d}"
+       end}
+    else
+      {:ok, t}
+    end
+  end
+
+  defp bang_composite_type(cb, args) do
+    case apply(cb, args) do
+      f when is_function(f, 1) ->
+        raise ArgumentError, "calling a bang function to compose a type must be eager"
+
+      {:ok, t} ->
+        t
+
+      {:error, msg} ->
+        raise ArgumentError, msg
+    end
+  end
+
+  def ranked_tensor(shape, element_type, opts \\ [])
 
   def ranked_tensor(
         shape,
         f,
-        encoding
+        opts
       )
       when is_function(f, 1) do
-    &ranked_tensor(shape, f.(&1), encoding)
+    &ranked_tensor(shape, f.(&1), opts)
   end
 
   def ranked_tensor(
         shape,
         %__MODULE__{} = element_type,
-        nil
+        opts
       )
       when is_list(shape) do
-    ranked_tensor(shape, element_type, mlirAttributeGetNull())
-  end
-
-  def ranked_tensor(
-        shape,
-        %__MODULE__{} = element_type,
-        encoding
-      )
-      when is_list(shape) do
+    ctx = MLIR.context(element_type)
     rank = length(shape)
+    encoding = opts[:encoding] || mlirAttributeGetNull()
 
     shape =
       shape
       |> Enum.map(&escape_dynamic/1)
       |> Beaver.Native.array(Beaver.Native.I64)
 
-    mlirRankedTensorTypeGet(rank, shape, element_type, encoding)
+    checked_composite_type(
+      ctx,
+      &mlirRankedTensorTypeGetCheckedWithDiagnostics/6,
+      [rank, shape, element_type, encoding],
+      opts
+    )
   end
 
-  def unranked_tensor(element_type)
+  def ranked_tensor!(shape, element_type, opts \\ []) do
+    bang_composite_type(&ranked_tensor/3, [shape, element_type, opts])
+  end
+
+  def unranked_tensor(element_type, opts \\ [])
+
+  def unranked_tensor(element_type, opts)
       when is_function(element_type, 1) do
-    &unranked_tensor(element_type.(&1))
+    &unranked_tensor(element_type.(&1), opts)
   end
 
-  def unranked_tensor(%__MODULE__{} = element_type) do
-    mlirUnrankedTensorTypeGet(element_type)
+  def unranked_tensor(%__MODULE__{} = element_type, opts) do
+    ctx = MLIR.context(element_type)
+
+    checked_composite_type(
+      ctx,
+      &mlirUnrankedTensorTypeGetCheckedWithDiagnostics/3,
+      [element_type],
+      opts
+    )
+  end
+
+  def unranked_tensor!(element_type, opts \\ []) do
+    bang_composite_type(&unranked_tensor/2, [element_type, opts])
+  end
+
+  def unranked_memref(element_type, opts \\ [])
+
+  def unranked_memref(element_type, opts)
+      when is_function(element_type, 1) do
+    &unranked_memref(element_type.(&1), opts)
+  end
+
+  def unranked_memref(%__MODULE__{} = element_type, opts) do
+    ctx = MLIR.context(element_type)
+    default_null = mlirAttributeGetNull()
+    memory_space = opts[:memory_space] || default_null
+
+    checked_composite_type(
+      ctx,
+      &mlirUnrankedMemRefTypeGetCheckedWithDiagnostics/4,
+      [element_type, memory_space],
+      opts
+    )
+  end
+
+  def unranked_memref!(element_type, opts \\ []) do
+    bang_composite_type(&unranked_memref/2, [element_type, opts])
   end
 
   def complex(element_type) when is_function(element_type, 1) do
@@ -127,15 +194,23 @@ defmodule Beaver.MLIR.Type do
         opts
       )
       when is_list(shape) do
+    ctx = MLIR.context(element_type)
     rank = length(shape)
-
     shape = shape |> Enum.map(&escape_dynamic/1) |> Beaver.Native.array(Beaver.Native.I64)
-
     default_null = mlirAttributeGetNull()
     layout = Keyword.get(opts, :layout) || default_null
     memory_space = Keyword.get(opts, :memory_space) || default_null
 
-    mlirMemRefTypeGet(element_type, rank, shape, layout, memory_space)
+    checked_composite_type(
+      ctx,
+      &mlirMemRefTypeGetCheckedWithDiagnostics/7,
+      [element_type, rank, shape, layout, memory_space],
+      opts
+    )
+  end
+
+  def memref!(shape, %__MODULE__{} = element_type, opts \\ []) do
+    bang_composite_type(&memref/3, [shape, element_type, opts])
   end
 
   @doc """
@@ -143,19 +218,32 @@ defmodule Beaver.MLIR.Type do
 
   ## Examples
       iex> ctx = MLIR.Context.create()
-      iex> MLIR.Type.vector([1, 2, 3], MLIR.Type.i32).(ctx) |> MLIR.to_string()
+      iex> MLIR.Type.vector!([1, 2, 3], MLIR.Type.i32(ctx: ctx)) |> MLIR.to_string()
       "vector<1x2x3xi32>"
       iex> MLIR.Context.destroy(ctx)
   """
 
-  def vector(shape, element_type) when is_function(element_type, 1) do
-    &vector(shape, element_type.(&1))
+  def vector(shape, element_type, opts \\ [])
+
+  def vector(shape, element_type, opts) when is_function(element_type, 1) do
+    &vector(shape, element_type.(&1), opts)
   end
 
-  def vector(shape, %__MODULE__{} = element_type) when is_list(shape) do
+  def vector(shape, %__MODULE__{} = element_type, opts) when is_list(shape) do
+    ctx = MLIR.context(element_type)
     rank = length(shape)
     shape = shape |> Beaver.Native.array(Beaver.Native.I64)
-    mlirVectorTypeGet(rank, shape, element_type)
+
+    checked_composite_type(
+      ctx,
+      &mlirVectorTypeGetCheckedWithDiagnostics/5,
+      [rank, shape, element_type],
+      opts
+    )
+  end
+
+  def vector!(shape, %__MODULE__{} = element_type, opts \\ []) do
+    bang_composite_type(&vector/3, [shape, element_type, opts])
   end
 
   @doc """
