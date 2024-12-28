@@ -21,7 +21,8 @@ mlir_mods = [
   BytecodeWriterConfig,
   OpPrintingFlags,
   LLVMThreadPool,
-  TypeIDAllocator
+  TypeIDAllocator,
+  TransformOptions
 ]
 
 for m <- mlir_mods do
