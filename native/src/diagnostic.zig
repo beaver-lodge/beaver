@@ -56,7 +56,7 @@ const DiagnosticAggregator = struct {
         entry_slice[2] = note;
         const num_notes: usize = @intCast(c.mlirDiagnosticGetNumNotes(diagnostic));
         entry_slice[3] = try beam.make(usize, env, num_notes);
-        userData.?.container.append(beam.make_tuple(env, entry_slice)) catch unreachable;
+        try userData.?.container.append(beam.make_tuple(env, entry_slice));
         defer beam.allocator.free(entry_slice);
         if (num_notes > 0) {
             const nested: []c.MlirDiagnostic = try beam.allocator.alloc(c.MlirDiagnostic, num_notes);
