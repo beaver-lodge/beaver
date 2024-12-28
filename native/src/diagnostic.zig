@@ -116,4 +116,4 @@ fn do_attach(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     return try mlir_capi.DiagnosticHandlerID.resource.make(env, id);
 }
 
-pub const nifs = .{ result.nif("beaver_raw_context_attach_diagnostic_handler", 2, do_attach).entry};
+pub const nifs = .{result.nif("beaver_raw_context_attach_diagnostic_handler", 2, do_attach).entry};
