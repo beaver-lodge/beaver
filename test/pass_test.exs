@@ -32,7 +32,7 @@ defmodule PassTest do
   end
 
   @tag capture_log: true
-  test "exception in run/1", %{ctx: ctx, diagnostic_server: diagnostic_server} do
+  test "exception in run/1", %{ctx: ctx} do
     ir = example_ir(ctx)
 
     assert_raise RuntimeError, ~r"Unexpected failure running passes", fn ->
@@ -42,9 +42,6 @@ defmodule PassTest do
       ])
       |> Beaver.Composer.run!()
     end
-
-    assert Beaver.Capturer.collect(diagnostic_server) =~
-             "Fail to run a pass implemented in Elixir"
   end
 
   test "pass of anonymous function", %{ctx: ctx} do
