@@ -65,7 +65,6 @@ defmodule Beaver.MixProject do
         Utils: [
           ~r"Beaver.Walker.*",
           ~r"Beaver.Deferred.*",
-          ~r"Beaver.Capturer.*",
           ~r"Beaver.Pass.*",
           ~r"Beaver.Printer.*",
           ~r"Beaver.Composer.*",
