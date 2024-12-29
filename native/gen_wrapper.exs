@@ -7,9 +7,9 @@ defmodule Updater do
 
   @dirty_io ~w{mlirPassManagerRunOnOp}
             |> Enum.map(&String.to_atom/1)
-  @with_diagnostics ~w{mlirAttributeParseGet mlirOperationVerify mlirTypeParseGet mlirModuleCreateParse beaverModuleApplyPatternsAndFoldGreedily}
+  @with_diagnostics ~w{mlirAttributeParseGet mlirOperationVerify mlirTypeParseGet mlirModuleCreateParse beaverModuleApplyPatternsAndFoldGreedily mlirExecutionEngineCreate}
                     |> Enum.map(&String.to_atom/1)
-  @regular_and_dirty ~w{mlirExecutionEngineInvokePacked mlirExecutionEngineCreate}
+  @regular_and_dirty ~w{mlirExecutionEngineInvokePacked}
                      |> Enum.map(&String.to_atom/1)
 
   defp dirty_io(name), do: "#{name}_dirty_io" |> String.to_atom()

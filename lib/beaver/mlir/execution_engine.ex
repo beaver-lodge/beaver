@@ -39,21 +39,23 @@ defmodule Beaver.MLIR.ExecutionEngine do
 
     require MLIR.Context
 
-    jit =
-      Beaver.Native.apply_dirty(
-        :mlirExecutionEngineCreate,
-        [
-          module,
-          opt_level,
-          length(shared_lib_paths),
-          shared_lib_paths_ptr,
-          object_dump
-        ],
-        opts[:dirty]
+    {jit, diagnostics} =
+      mlirExecutionEngineCreateWithDiagnostics(
+        MLIR.context(module),
+        module,
+        opt_level,
+        length(shared_lib_paths),
+        shared_lib_paths_ptr,
+        object_dump
       )
 
     if MLIR.null?(jit) do
-      raise "Execution engine creation failed"
+      diagnostics =
+        for {_, loc, d, _} <- diagnostics, reduce: "Execution engine creation failed" do
+          acc -> "#{acc}\n#{to_string(loc)}: #{d}"
+        end
+
+      raise ArgumentError, diagnostics
     end
 
     jit
