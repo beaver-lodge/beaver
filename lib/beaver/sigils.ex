@@ -20,7 +20,7 @@ defmodule Beaver.Sigils do
       iex> MLIR.Context.destroy(ctx)
   """
   def sigil_m(string, []) do
-    &MLIR.Module.create(string, ctx: &1)
+    &MLIR.Module.create!(string, ctx: &1)
   end
 
   @doc """

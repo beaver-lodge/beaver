@@ -8,7 +8,7 @@ System.trap_signal(:sigchld, fn -> :ok end)
 libs = ~w{libmlir_cuda_runtime.so libmlir_runner_utils.so libmlir_c_runner_utils.so}
 
 jit =
-  MLIR.Module.create(ctx, File.read!("test/gpu-to-cubin.mlir"))
+  MLIR.Module.create!(ctx, File.read!("test/gpu-to-cubin.mlir"))
   |> Beaver.Composer.nested("func.func", "llvm-request-c-wrappers")
   |> Beaver.Composer.append("gpu-lower-to-nvvm-pipeline{cubin-format=fatbin}")
   |> Beaver.Composer.run!()

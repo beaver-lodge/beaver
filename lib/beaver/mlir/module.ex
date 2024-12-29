@@ -12,24 +12,39 @@ defmodule Beaver.MLIR.Module do
     Beaver.Deferred.from_opts(
       opts,
       fn ctx ->
-        CAPI.mlirModuleCreateParse(ctx, MLIR.StringRef.create(str))
+        {module, diagnostics} =
+          CAPI.mlirModuleCreateParseWithDiagnostics(ctx, ctx, MLIR.StringRef.create(str))
+
+        if MLIR.null?(module) do
+          {:error, diagnostics}
+        else
+          {:ok, module}
+        end
       end
     )
   end
 
   def create!(str, opts \\ []) when is_binary(str) do
-    create(str, opts) |> verify!()
+    res =
+      Beaver.Deferred.from_opts(opts, fn ctx -> Beaver.Deferred.create(create(str, opts), ctx) end)
+
+    case res do
+      f when is_function(f, 1) ->
+        raise ArgumentError, "calling a bang function to parse module must be eager"
+
+      {:error, diagnostics} ->
+        raise ArgumentError,
+              (for {_severity, loc, d, _num} <- diagnostics,
+                   reduce: "fail to parse module" do
+                 acc -> "#{acc}\n#{to_string(loc)}: #{d}"
+               end)
+
+      {:ok, module} ->
+        MLIR.verify!(module)
+    end
   end
 
   use Kinda.ResourceKind, forward_module: Beaver.Native
-
-  def verify!(module) do
-    if MLIR.null?(module) do
-      raise "module is null"
-    end
-
-    MLIR.verify!(module)
-  end
 
   defdelegate destroy(module), to: CAPI, as: :mlirModuleDestroy
   defdelegate body(module), to: CAPI, as: :mlirModuleGetBody
