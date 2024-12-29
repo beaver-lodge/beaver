@@ -37,19 +37,11 @@ defmodule Beaver.MLIR.Module do
                end)
 
       {:ok, module} ->
-        verify!(module)
+        MLIR.verify!(module)
     end
   end
 
   use Kinda.ResourceKind, forward_module: Beaver.Native
-
-  defp verify!(module) do
-    if MLIR.null?(module) do
-      raise "module is null"
-    end
-
-    MLIR.verify!(module)
-  end
 
   defdelegate destroy(module), to: CAPI, as: :mlirModuleDestroy
   defdelegate body(module), to: CAPI, as: :mlirModuleGetBody
