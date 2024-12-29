@@ -7,7 +7,7 @@ defmodule Updater do
 
   @dirty_io ~w{mlirPassManagerRunOnOp}
             |> Enum.map(&String.to_atom/1)
-  @with_diagnostics ~w{mlirAttributeParseGet mlirOperationVerify mlirTypeParseGet mlirModuleCreateParse}
+  @with_diagnostics ~w{mlirAttributeParseGet mlirOperationVerify mlirTypeParseGet mlirModuleCreateParse beaverModuleApplyPatternsAndFoldGreedily}
                     |> Enum.map(&String.to_atom/1)
   @regular_and_dirty ~w{mlirExecutionEngineInvokePacked mlirExecutionEngineCreate}
                      |> Enum.map(&String.to_atom/1)
