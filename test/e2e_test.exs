@@ -25,6 +25,22 @@ defmodule E2ETest do
       |> MLIR.ExecutionEngine.create!()
     end
 
+    test "fail to create JIT engine", %{ctx: ctx} do
+      assert_raise ArgumentError,
+                   ~r"cannot be converted to LLVM IR",
+                   fn ->
+                     ~m"""
+                     module {
+                       func.func @add(%arg0 : i32, %arg1 : i32) -> i32 attributes { llvm.emit_c_interface } {
+                         %res = arith.addi %arg0, %arg1 : i32
+                         return %res : i32
+                       }
+                     }
+                     """.(ctx)
+                     |> MLIR.ExecutionEngine.create!()
+                   end
+    end
+
     test "dirty scheduler invocation", %{ctx: ctx} do
       arg = Beaver.Native.I32.make(42)
       return = Beaver.Native.I32.make(-1)
