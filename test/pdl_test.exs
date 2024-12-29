@@ -59,7 +59,7 @@ defmodule PDLTest do
 
   test "AreEqualOp", %{ctx: ctx} do
     mlirContextSetAllowUnregisteredDialects(ctx, true)
-    pattern_module = MLIR.Module.create(@apply_rewrite_op_patterns, ctx: ctx)
+    pattern_module = MLIR.Module.create!(@apply_rewrite_op_patterns, ctx: ctx)
 
     inspector = fn
       {:successor, %MLIR.Block{} = successor}, acc ->
@@ -137,7 +137,7 @@ defmodule PDLTest do
 
     assert MLIR.equal?(mlir, MLIR.Operation.from_module(pattern_module))
 
-    ir_module = MLIR.Module.create(@apply_rewrite_op_ir, ctx: ctx)
+    ir_module = MLIR.Module.create!(@apply_rewrite_op_ir, ctx: ctx)
 
     apply_patterns(pattern_module, ir_module, fn ir_module ->
       ir_string = MLIR.to_string(ir_module)
@@ -153,9 +153,9 @@ defmodule PDLTest do
 
   test "AreEqualOp pdl version", %{ctx: ctx} do
     mlirContextSetAllowUnregisteredDialects(ctx, true)
-    pattern_module = MLIR.Module.create(@are_equal_op_pdl, ctx: ctx)
+    pattern_module = MLIR.Module.create!(@are_equal_op_pdl, ctx: ctx)
     assert not MLIR.null?(pattern_module), "fail to parse module"
-    ir_module = MLIR.Module.create(@apply_rewrite_op_ir, ctx: ctx)
+    ir_module = MLIR.Module.create!(@apply_rewrite_op_ir, ctx: ctx)
     MLIR.verify!(pattern_module)
     MLIR.verify!(ir_module)
     pattern_string = MLIR.to_string(pattern_module)

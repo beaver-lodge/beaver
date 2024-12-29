@@ -19,7 +19,7 @@ defmodule MlirTest do
     _module = mlirModuleCreateEmpty(location)
 
     module =
-      MLIR.Module.create(
+      MLIR.Module.create!(
         """
         func.func private @printNewline()
         func.func private @printI64(i64)
@@ -27,7 +27,6 @@ defmodule MlirTest do
         ctx: ctx
       )
 
-    MLIR.verify!(module)
     _operation = mlirModuleGetOperation(module)
 
     _ret_str = MLIR.StringRef.create("func.return")
@@ -150,7 +149,7 @@ defmodule MlirTest do
   test "run a simple pass" do
     ctx = MLIR.Context.create()
 
-    module = create_adder_module(ctx)
+    {:ok, module} = create_adder_module(ctx)
     module_op = module |> mlirModuleGetOperation()
 
     assert mlirOperationVerify(module_op) |> Beaver.Native.to_term()
@@ -186,8 +185,7 @@ defmodule MlirTest do
 
   test "Run a generic pass" do
     ctx = MLIR.Context.create()
-    module = create_adder_module(ctx)
-    assert not MLIR.null?(module)
+    {:ok, module} = create_adder_module(ctx)
     type_id_allocator = mlirTypeIDAllocatorCreate()
     external = %MLIR.Pass{} = Beaver.Composer.create_pass(TestPass)
     pm = mlirPassManagerCreate(ctx)
@@ -202,8 +200,7 @@ defmodule MlirTest do
   end
 
   test "Run a func operation pass", %{ctx: ctx} do
-    module = create_adder_module(ctx)
-    assert not MLIR.null?(module)
+    {:ok, module} = create_adder_module(ctx)
     external = %MLIR.Pass{} = Beaver.Composer.create_pass(TestFuncPass)
     pm = mlirPassManagerCreate(ctx)
     npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
@@ -215,8 +212,7 @@ defmodule MlirTest do
   end
 
   test "Run pass with patterns", %{ctx: ctx} do
-    module = create_redundant_transpose_module(ctx)
-    assert not MLIR.null?(module)
+    {:ok, module} = create_redundant_transpose_module(ctx)
     external = %MLIR.Pass{} = Beaver.Composer.create_pass(TestFuncPass)
     pm = mlirPassManagerCreate(ctx)
     npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
@@ -260,7 +256,7 @@ defmodule MlirTest do
     """
 
     ctx = MLIR.Context.create()
-    module = MLIR.Module.create(module_str, ctx: ctx)
+    {:ok, module} = MLIR.Module.create(module_str, ctx: ctx)
     MLIR.verify!(module)
     lower_to_llvm(ctx, MLIR.Operation.from_module(module))
     jit = MLIR.ExecutionEngine.create!(module)

@@ -12,7 +12,7 @@ defmodule GPUTest do
     System.trap_signal(:sigchld, fn -> :ok end)
 
     assert File.read!("test/gpu-to-cubin.mlir")
-           |> MLIR.Module.create(ctx: ctx)
+           |> MLIR.Module.create!(ctx: ctx)
            |> Beaver.Composer.append("gpu-lower-to-nvvm-pipeline{cubin-format=fatbin}")
            |> Beaver.Composer.run!()
            |> to_string() =~ "gpu.binary @other_func_kernel"
