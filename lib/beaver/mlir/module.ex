@@ -29,6 +29,9 @@ defmodule Beaver.MLIR.Module do
       Beaver.Deferred.from_opts(opts, fn ctx -> Beaver.Deferred.create(create(str, opts), ctx) end)
 
     case res do
+      f when is_function(f, 1) ->
+        raise ArgumentError, "calling a bang function to parse module must be eager"
+
       {:error, diagnostics} ->
         raise ArgumentError,
               (for {_severity, loc, d, _num} <- diagnostics,
