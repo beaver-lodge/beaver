@@ -59,21 +59,25 @@ pub const DiagnosticAggregator = struct {
     }
 };
 
+pub fn call_with_diagnostics(env: beam.env, ctx: mlir_capi.Context.T, f: anytype, args: anytype) !beam.term {
+    const userData = try DiagnosticAggregator.init(env);
+    const id = c.mlirContextAttachDiagnosticHandler(ctx, DiagnosticAggregator.errorHandler, @ptrCast(@alignCast(userData)), DiagnosticAggregator.deleteUserData);
+    defer c.mlirContextDetachDiagnosticHandler(ctx, id);
+    var res_slice: []beam.term = try beam.allocator.alloc(beam.term, 2);
+    res_slice[0] = try @call(.auto, f, args);
+    res_slice[1] = try DiagnosticAggregator.collect_and_destroy(userData);
+    defer beam.allocator.free(res_slice);
+    return beam.make_tuple(env, res_slice);
+}
+
 pub fn WithDiagnosticsNIF(comptime Kinds: anytype, c_: anytype, comptime name: anytype) e.ErlNifFunc {
     const bang = kinda.BangFunc(Kinds, c_, name);
     const nifPrefix = "Elixir.Beaver.MLIR.CAPI.";
     const nifSuffix = "WithDiagnostics";
     const AttachAndRun = struct {
         fn with_diagnostics(env: beam.env, n: c_int, args: [*c]const beam.term) !beam.term {
-            const userData = try DiagnosticAggregator.init(env);
             const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
-            const id = c.mlirContextAttachDiagnosticHandler(ctx, DiagnosticAggregator.errorHandler, @ptrCast(@alignCast(userData)), DiagnosticAggregator.deleteUserData);
-            defer c.mlirContextDetachDiagnosticHandler(ctx, id);
-            var res_slice: []beam.term = try beam.allocator.alloc(beam.term, 2);
-            res_slice[0] = try bang.nif(env, n - 1, args[1..]);
-            res_slice[1] = try DiagnosticAggregator.collect_and_destroy(userData);
-            defer beam.allocator.free(res_slice);
-            return beam.make_tuple(env, res_slice);
+            return call_with_diagnostics(env, ctx, bang.nif, .{env, n - 1, args[1..]});
         }
     };
     return result.nif(nifPrefix ++ name ++ nifSuffix, 1 + bang.arity, AttachAndRun.with_diagnostics).entry;

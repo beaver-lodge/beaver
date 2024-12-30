@@ -92,25 +92,18 @@ const PassManagerRunner = extern struct {
     op: mlir_capi.Operation.T,
     fn run_with_diagnostics(this: @This()) !void {
         const env = e.enif_alloc_env() orelse return WorkerError.@"Fail to allocate BEAM environment";
-        const userData = try DiagnosticAggregator.init(env);
         const ctx = c.mlirOperationGetContext(this.op);
-        const id = c.mlirContextAttachDiagnosticHandler(ctx, DiagnosticAggregator.errorHandler, @ptrCast(@alignCast(userData)), DiagnosticAggregator.deleteUserData);
-        defer c.mlirContextDetachDiagnosticHandler(ctx, id);
-        const res = c.mlirPassManagerRunOnOp(this.pm, this.op);
-        var res_slice: []beam.term = try beam.allocator.alloc(beam.term, 2);
         // we only use the return functionality of BangFunc here because we are not fetching resources here
-        const bang = kinda.BangFunc(c.K, c, "mlirPassManagerRunOnOp");
-        res_slice[0] = try bang.make_return(env, res);
-        res_slice[1] = try DiagnosticAggregator.collect_and_destroy(userData);
-        defer beam.allocator.free(res_slice);
-        if (!beam.send_advanced(env, this.pid, env, beam.make_tuple(env, res_slice))) {
+        const f = kinda.BangFunc(c.K, c, "mlirPassManagerRunOnOp").wrap_ret_call;
+        const args = .{this.pm, this.op};
+        if (!beam.send_advanced(env, this.pid, env, try diagnostic.call_with_diagnostics(env, ctx, f, .{env, args}))) {
             return WorkerError.@"Fail to send message to pm caller";
         }
     }
     fn run_and_send(worker: ?*anyopaque) callconv(.C) void {
         const this: ?*@This() = @ptrCast(@alignCast(worker));
         defer beam.allocator.destroy(this.?);
-        run_with_diagnostics(this.?.*) catch @panic("Fail to run pass on operation");
+        if (run_with_diagnostics(this.?.*)) |_| {} else |err| {@panic(@errorName(err));}
     }
 };
 
