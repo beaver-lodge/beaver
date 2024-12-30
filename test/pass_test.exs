@@ -35,7 +35,7 @@ defmodule PassTest do
   test "exception in run/1", %{ctx: ctx} do
     ir = example_ir(ctx)
 
-    assert_raise RuntimeError, ~r"Unexpected failure running passes", fn ->
+    assert_raise ArgumentError, ~r"Fail to run a pass implemented in Elixir", fn ->
       ir
       |> Beaver.Composer.nested("func.func", [
         PassRaisingException

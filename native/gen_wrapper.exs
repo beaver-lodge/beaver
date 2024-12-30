@@ -5,12 +5,10 @@ defmodule Updater do
     System.argv() |> Enum.chunk_every(2)
   end
 
-  @dirty_io ~w{mlirPassManagerRunOnOp}
-            |> Enum.map(&String.to_atom/1)
   @with_diagnostics ~w{mlirAttributeParseGet mlirOperationVerify mlirTypeParseGet mlirModuleCreateParse beaverModuleApplyPatternsAndFoldGreedily mlirExecutionEngineCreate}
                     |> Enum.map(&String.to_atom/1)
-  @regular_and_dirty ~w{mlirExecutionEngineInvokePacked}
-                     |> Enum.map(&String.to_atom/1)
+  @normal_and_dirty ~w{mlirExecutionEngineInvokePacked}
+                    |> Enum.map(&String.to_atom/1)
 
   defp dirty_io(name), do: "#{name}_dirty_io" |> String.to_atom()
   defp dirty_cpu(name), do: "#{name}_dirty_cpu" |> String.to_atom()
@@ -22,7 +20,7 @@ defmodule Updater do
         name in @with_diagnostics or String.ends_with?(Atom.to_string(name), "GetChecked") ->
           [{name, arity}, {with_diagnostics(name), arity + 1}]
 
-        name in @regular_and_dirty ->
+        name in @normal_and_dirty ->
           [{name, arity}, {dirty_io(name), arity}, {dirty_cpu(name), arity}]
 
         true ->
@@ -49,10 +47,7 @@ defmodule Updater do
           name in @with_diagnostics or String.ends_with?(Atom.to_string(name), "GetChecked") ->
             [~s{N(K, c, "#{name}"),}, ~s{diagnostic.WithDiagnosticsNIF(K, c, "#{name}"),}]
 
-          name in @dirty_io ->
-            ~s{D_CPU(K, c, "#{name}", null),}
-
-          name in @regular_and_dirty ->
+          name in @normal_and_dirty ->
             [
               ~s{N(K, c, "#{name}"),},
               ~s{D_IO(K, c, "#{name}", "#{dirty_io(name)}"),},
