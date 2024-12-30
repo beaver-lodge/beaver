@@ -216,11 +216,15 @@ defmodule Beaver.Composer do
       txt |> Logger.info()
     end
 
-    :ok = beaver_raw_run_pm_on_op_async(pm.ref, MLIR.Operation.from_module(op).ref)
-
     {status, diagnostics} =
-      receive do
-        ret -> Beaver.Native.check!(ret)
+      case beaver_raw_run_pm_on_op_async(pm.ref, MLIR.Operation.from_module(op).ref) do
+        :ok ->
+          receive do
+            ret -> Beaver.Native.check!(ret)
+          end
+
+        ret ->
+          Beaver.Native.check!(ret)
       end
 
     if print do
