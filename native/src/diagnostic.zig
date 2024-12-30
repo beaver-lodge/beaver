@@ -47,7 +47,7 @@ const DiagnosticAggregator = struct {
         const ud: ?*@This() = @ptrCast(@alignCast(userData));
         beam.allocator.destroy(ud.?);
     }
-    pub fn init(env: beam.env) !*@This() {
+    fn init(env: beam.env) !*@This() {
         var userData = try beam.allocator.create(DiagnosticAggregator);
         userData.env = env;
         userData.container = Container.init(beam.allocator);
