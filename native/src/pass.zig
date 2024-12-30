@@ -95,15 +95,17 @@ const PassManagerRunner = extern struct {
         const ctx = c.mlirOperationGetContext(this.op);
         // we only use the return functionality of BangFunc here because we are not fetching resources here
         const f = kinda.BangFunc(c.K, c, "mlirPassManagerRunOnOp").wrap_ret_call;
-        const args = .{this.pm, this.op};
-        if (!beam.send_advanced(env, this.pid, env, try diagnostic.call_with_diagnostics(env, ctx, f, .{env, args}))) {
+        const args = .{ this.pm, this.op };
+        if (!beam.send_advanced(env, this.pid, env, try diagnostic.call_with_diagnostics(env, ctx, f, .{ env, args }))) {
             return WorkerError.@"Fail to send message to pm caller";
         }
     }
     fn run_and_send(worker: ?*anyopaque) callconv(.C) void {
         const this: ?*@This() = @ptrCast(@alignCast(worker));
         defer beam.allocator.destroy(this.?);
-        if (run_with_diagnostics(this.?.*)) |_| {} else |err| {@panic(@errorName(err));}
+        if (run_with_diagnostics(this.?.*)) |_| {} else |err| {
+            @panic(@errorName(err));
+        }
     }
 };
 

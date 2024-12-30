@@ -77,7 +77,7 @@ pub fn WithDiagnosticsNIF(comptime Kinds: anytype, c_: anytype, comptime name: a
     const AttachAndRun = struct {
         fn with_diagnostics(env: beam.env, n: c_int, args: [*c]const beam.term) !beam.term {
             const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
-            return call_with_diagnostics(env, ctx, bang.nif, .{env, n - 1, args[1..]});
+            return call_with_diagnostics(env, ctx, bang.nif, .{ env, n - 1, args[1..] });
         }
     };
     return result.nif(nifPrefix ++ name ++ nifSuffix, 1 + bang.arity, AttachAndRun.with_diagnostics).entry;
