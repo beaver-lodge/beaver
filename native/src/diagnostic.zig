@@ -15,7 +15,7 @@ pub const DiagnosticAggregator = struct {
     const Container = std.ArrayList(beam.term);
     env: beam.env,
     container: Container = undefined,
-    pub fn collectDiagnostic(diagnostic: c.MlirDiagnostic, userData: ?*@This()) !mlir_capi.LogicalResult.T {
+    fn collectDiagnostic(diagnostic: c.MlirDiagnostic, userData: ?*@This()) !mlir_capi.LogicalResult.T {
         const env = userData.?.env;
         var note_col = StringRefCollector.init(env);
         c.mlirDiagnosticPrint(diagnostic, StringRefCollector.append, @constCast(@ptrCast(@alignCast(&note_col))));
@@ -40,10 +40,10 @@ pub const DiagnosticAggregator = struct {
         }
         return c.mlirLogicalResultSuccess();
     }
-    pub fn errorHandler(diagnostic: c.MlirDiagnostic, userData: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
+    fn errorHandler(diagnostic: c.MlirDiagnostic, userData: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
         return collectDiagnostic(diagnostic, @ptrCast(@alignCast(userData))) catch return c.mlirLogicalResultFailure();
     }
-    pub fn deleteUserData(userData: ?*anyopaque) callconv(.C) void {
+    fn deleteUserData(userData: ?*anyopaque) callconv(.C) void {
         const ud: ?*@This() = @ptrCast(@alignCast(userData));
         beam.allocator.destroy(ud.?);
     }
@@ -53,7 +53,7 @@ pub const DiagnosticAggregator = struct {
         userData.container = Container.init(beam.allocator);
         return userData;
     }
-    pub fn collect_and_destroy(this: *@This()) !beam.term {
+    fn collect_and_destroy(this: *@This()) !beam.term {
         defer this.container.deinit();
         return beam.make_term_list(this.env, this.container.items);
     }

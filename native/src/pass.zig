@@ -7,7 +7,6 @@ const debug_print = @import("std").debug.print;
 const kinda = @import("kinda");
 const result = @import("kinda").result;
 const diagnostic = @import("diagnostic.zig");
-const DiagnosticAggregator = diagnostic.DiagnosticAggregator;
 const Token = @import("logical_mutex.zig").Token;
 
 const BeaverPass = extern struct {
