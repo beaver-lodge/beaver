@@ -56,16 +56,6 @@ MLIR_CAPI_EXPORTED void beaverContextGetDialects(MlirContext context,
   }
 }
 
-MLIR_CAPI_EXPORTED void
-beaverContextEnterMultiThreadedExecution(MlirContext context) {
-  unwrap(context)->enterMultiThreadedExecution();
-}
-
-MLIR_CAPI_EXPORTED void
-beaverContextExitMultiThreadedExecution(MlirContext context) {
-  unwrap(context)->exitMultiThreadedExecution();
-}
-
 MLIR_CAPI_EXPORTED const char *
 beaverStringRefGetData(MlirStringRef string_ref) {
   return string_ref.data;
