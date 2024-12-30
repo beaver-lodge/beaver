@@ -11,7 +11,7 @@ const result = @import("kinda").result;
 const StringRefCollector = @import("string_ref.zig").StringRefCollector;
 
 // collect diagnostic as {severity, loc, message, num_notes}
-pub const DiagnosticAggregator = struct {
+const DiagnosticAggregator = struct {
     const Container = std.ArrayList(beam.term);
     env: beam.env,
     container: Container = undefined,
