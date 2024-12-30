@@ -84,7 +84,7 @@ pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term 
     return try mlir_capi.Pass.resource.make(env, ep);
 }
 
-const WorkerError = error{ @"failed to add work", @"Fail to allocate BEAM environment", @"Fail to send message to pm caller" };
+const WorkerError = error{ @"fail to allocate BEAM environment", @"fail to send message to pm caller", @"fail get caller's self pid" };
 
 // we only use the return functionality of BangFunc here because we are not fetching resources here
 const mlirPassManagerRunOnOpWrap = kinda.BangFunc(c.K, c, "mlirPassManagerRunOnOp").wrap_ret_call;
@@ -93,11 +93,11 @@ const PassManagerRunner = extern struct {
     pm: mlir_capi.PassManager.T,
     op: mlir_capi.Operation.T,
     fn run_with_diagnostics(this: @This()) !void {
-        const env = e.enif_alloc_env() orelse return WorkerError.@"Fail to allocate BEAM environment";
+        const env = e.enif_alloc_env() orelse return WorkerError.@"fail to allocate BEAM environment";
         const ctx = c.mlirOperationGetContext(this.op);
         const args = .{ this.pm, this.op };
         if (!beam.send_advanced(env, this.pid, env, try diagnostic.call_with_diagnostics(env, ctx, mlirPassManagerRunOnOpWrap, .{ env, args }))) {
-            return WorkerError.@"Fail to send message to pm caller";
+            return WorkerError.@"fail to send message to pm caller";
         }
     }
     fn run_and_send(worker: ?*anyopaque) callconv(.C) void {
@@ -112,7 +112,7 @@ const PassManagerRunner = extern struct {
 pub fn run_pm_on_op(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const w = try beam.allocator.create(PassManagerRunner);
     if (e.enif_self(env, &w.*.pid) == null) {
-        @panic("Fail to get self pid");
+        return WorkerError.@"fail get caller's self pid";
     }
     w.*.pm = try mlir_capi.PassManager.resource.fetch(env, args[0]);
     w.*.op = try mlir_capi.Operation.resource.fetch(env, args[1]);
@@ -121,7 +121,7 @@ pub fn run_pm_on_op(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.te
         return beam.make_ok(env);
     } else {
         defer beam.allocator.destroy(w);
-        return try diagnostic.call_with_diagnostics(env, ctx, mlirPassManagerRunOnOpWrap, .{ env, .{w.*.pm, w.*.op} });
+        return try diagnostic.call_with_diagnostics(env, ctx, mlirPassManagerRunOnOpWrap, .{ env, .{ w.*.pm, w.*.op } });
     }
 }
 
