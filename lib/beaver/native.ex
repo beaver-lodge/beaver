@@ -79,7 +79,7 @@ defmodule Beaver.Native do
          end,
          for {severity_i, loc_ref, note, num} <- diagnostics do
            {Beaver.MLIR.Diagnostic.severity(severity_i), %Beaver.MLIR.Location{ref: loc_ref},
-            Enum.join(note), num}
+            to_string(note), num}
          end}
 
       ret ->

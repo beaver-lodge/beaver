@@ -11,6 +11,8 @@ MLIR_CAPI_EXPORTED void
 beaverContextEnterMultiThreadedExecution(MlirContext context);
 MLIR_CAPI_EXPORTED void
 beaverContextExitMultiThreadedExecution(MlirContext context);
+MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context,
+                                             void (*task)(void *), void *arg);
 
 #ifdef __cplusplus
 }

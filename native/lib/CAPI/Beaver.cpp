@@ -5,6 +5,7 @@
 #include "mlir/Dialect/IRDL/IRDLLoading.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/ExtensibleDialect.h"
+#include "llvm/Support/ThreadPool.h"
 
 using namespace mlir;
 
@@ -276,4 +277,14 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverIRDLGetDefinedAttr(
 MLIR_CAPI_EXPORTED MlirLogicalResult beaverModuleApplyPatternsAndFoldGreedily(
     MlirModule module, MlirFrozenRewritePatternSet patterns) {
   return mlirApplyPatternsAndFoldGreedily(module, patterns, {});
+}
+
+MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context,
+                                             void (*task)(void *), void *arg) {
+  if (unwrap(context)->isMultithreadingEnabled()) {
+    unwrap(context)->getThreadPool().async([task, arg]() { task(arg); });
+    return true;
+  } else {
+    return false;
+  }
 }

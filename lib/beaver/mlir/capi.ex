@@ -48,6 +48,7 @@ defmodule Beaver.MLIR.CAPI do
       ),
       do: :erlang.nif_error(:not_loaded)
 
+  def beaver_raw_run_pm_on_op_async(_pm, _op), do: :erlang.nif_error(:not_loaded)
   def beaver_raw_logical_mutex_token_signal_success(_), do: :erlang.nif_error(:not_loaded)
   def beaver_raw_logical_mutex_token_signal_failure(_), do: :erlang.nif_error(:not_loaded)
   def beaver_raw_registered_ops(_ctx), do: :erlang.nif_error(:not_loaded)

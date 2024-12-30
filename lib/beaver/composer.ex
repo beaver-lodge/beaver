@@ -171,14 +171,23 @@ defmodule Beaver.Composer do
       {:ok, op} ->
         op
 
-      {:error, msg} ->
-        raise msg
+      {:error, diagnostics} ->
+        raise ArgumentError,
+              (for {_severity, loc, d, _num} <- diagnostics,
+                   reduce: "Unexpected failure running passes" do
+                 acc -> "#{acc}\n#{to_string(loc)}: #{d}"
+               end)
     end
   end
 
   @spec run(composer) :: run_result
   @spec run(composer, [run_option]) :: run_result
 
+  @doc """
+  Run the passes on the operation.
+
+  Note that it can be more expensive than a C/C++ implementation because ENIF Thread will be created to run the CAPI.
+  """
   def run(
         %__MODULE__{op: op} = composer,
         opts \\ @run_default_opts
@@ -207,7 +216,12 @@ defmodule Beaver.Composer do
       txt |> Logger.info()
     end
 
-    status = mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(op))
+    :ok = beaver_raw_run_pm_on_op_async(pm.ref, MLIR.Operation.from_module(op).ref)
+
+    {status, diagnostics} =
+      receive do
+        ret -> Beaver.Native.check!(ret)
+      end
 
     if print do
       mlirContextEnableMultithreading(ctx, true)
@@ -218,7 +232,7 @@ defmodule Beaver.Composer do
     if MLIR.LogicalResult.success?(status) do
       {:ok, op}
     else
-      {:error, "Unexpected failure running passes"}
+      {:error, diagnostics}
     end
   end
 
