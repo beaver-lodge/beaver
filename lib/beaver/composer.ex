@@ -186,7 +186,9 @@ defmodule Beaver.Composer do
   @doc """
   Run the passes on the operation.
 
-  Note that it can be more expensive than a C/C++ implementation because ENIF Thread will be created to run the CAPI.
+  > #### Must be a multi-threaded context if an Elixir pass is in the pipeline {: .info}
+  >
+  > MLIR context's thread pool is used to run the CAPI. If an Elixir pass is in the pipeline, the context must be multi-threaded otherwise there can be a deadlock. Also note that it can be more expensive than a C/C++ implementation due to the overhead of the thread pool.
   """
   def run(
         %__MODULE__{op: op} = composer,
