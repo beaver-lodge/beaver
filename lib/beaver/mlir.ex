@@ -232,12 +232,7 @@ defmodule Beaver.MLIR do
         raise "MLIR operation verification failed because the operation is null. Maybe it is parsed from an ill-formed text format? Please have a look at the diagnostic output above by MLIR C++"
 
       {:error, diagnostics} ->
-        diagnostics =
-          for {_, loc, d, _} <- diagnostics, reduce: "" do
-            acc -> "#{acc}\n#{__MODULE__.to_string(loc)}: #{d}"
-          end
-
-        raise "MLIR operation verification failed, #{diagnostics}"
+        raise MLIR.Diagnostic.format(diagnostics, "MLIR operation verification failed")
     end
   end
 
@@ -316,12 +311,7 @@ defmodule Beaver.MLIR do
     if MLIR.LogicalResult.success?(result) do
       {:ok, op}
     else
-      diagnostics =
-        for {_, loc, d, _} <- diagnostics, reduce: "" do
-          acc -> "#{acc}\n#{__MODULE__.to_string(loc)}: #{d}"
-        end
-
-      {:error, "failed to apply pattern set.\n#{diagnostics}"}
+      {:error, MLIR.Diagnostic.format(diagnostics, "failed to apply pattern set.")}
     end
   end
 end

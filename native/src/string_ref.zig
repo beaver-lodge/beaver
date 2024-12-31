@@ -8,7 +8,7 @@ pub const c = @import("prelude.zig");
 const mem = @import("std").mem;
 
 const print_nif_prefix = "beaver_raw_to_string_";
-pub fn PrinterNIF(comptime name: []const u8, comptime ResourceKind: type, comptime print_fn: anytype) type {
+pub fn PrinterNIF(comptime ResourceKind: type, comptime print_fn: anytype) type {
     return struct {
         const Error = error{
             NullPointerFound,
@@ -19,8 +19,7 @@ pub fn PrinterNIF(comptime name: []const u8, comptime ResourceKind: type, compti
             const printer: *@This() = @ptrCast(@alignCast(userData));
             printer.*.buffer.appendSlice(s.data[0..s.length]) catch unreachable;
         }
-        fn to_string(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-            const entity: ResourceKind.T = try ResourceKind.resource.fetch(env, args[0]);
+        pub fn print_make(env: beam.env, entity: ResourceKind.T) !beam.term {
             if (entity.ptr == null) {
                 return Error.NullPointerFound;
             }
@@ -29,7 +28,13 @@ pub fn PrinterNIF(comptime name: []const u8, comptime ResourceKind: type, compti
             print_fn(entity, collect_string_ref, &printer);
             return beam.make_slice(env, printer.buffer.items);
         }
-        const entry = result.nif(print_nif_prefix ++ name, 1, to_string).entry;
+        fn to_string(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            const entity: ResourceKind.T = try ResourceKind.resource.fetch(env, args[0]);
+            return print_make(env, entity);
+        }
+        fn nif(comptime name: []const u8) e.ErlNifFunc {
+            return result.nif(print_nif_prefix ++ name, 1, to_string).entry;
+        }
     };
 }
 
@@ -130,16 +135,16 @@ fn beaver_raw_get_string_ref(env: beam.env, _: c_int, args: [*c]const beam.term)
 pub const nifs = .{
     result.nif("beaver_raw_get_string_ref", 1, beaver_raw_get_string_ref).entry,
     result.nif(print_nif_prefix ++ "StringRef", 1, beaver_raw_string_ref_to_binary).entry,
-    PrinterNIF("Attribute", mlir_capi.Attribute, c.mlirAttributePrint).entry,
-    PrinterNIF("Type", mlir_capi.Type, c.mlirTypePrint).entry,
-    PrinterNIF("Operation", mlir_capi.Operation, c.mlirOperationPrint).entry,
-    PrinterNIF("OperationSpecialized", mlir_capi.Operation, c.beaverOperationPrintSpecializedFrom).entry,
-    PrinterNIF("OperationGeneric", mlir_capi.Operation, c.beaverOperationPrintGenericOpForm).entry,
-    PrinterNIF("OperationBytecode", mlir_capi.Operation, c.mlirOperationWriteBytecode).entry,
-    PrinterNIF("Value", mlir_capi.Value, c.mlirValuePrint).entry,
-    PrinterNIF("OpPassManager", mlir_capi.OpPassManager, c.mlirPrintPassPipeline).entry,
-    PrinterNIF("AffineMap", mlir_capi.AffineMap, c.mlirAffineMapPrint).entry,
-    PrinterNIF("Location", mlir_capi.Location, c.beaverLocationPrint).entry,
-    PrinterNIF("Identifier", mlir_capi.Identifier, c.mlirIdentifierPrint).entry,
-    PrinterNIF("Diagnostic", mlir_capi.Diagnostic, c.mlirDiagnosticPrint).entry,
+    PrinterNIF(mlir_capi.Attribute, c.mlirAttributePrint).nif("Attribute"),
+    PrinterNIF(mlir_capi.Type, c.mlirTypePrint).nif("Type"),
+    PrinterNIF(mlir_capi.Operation, c.mlirOperationPrint).nif("Operation"),
+    PrinterNIF(mlir_capi.Operation, c.beaverOperationPrintSpecializedFrom).nif("OperationSpecialized"),
+    PrinterNIF(mlir_capi.Operation, c.beaverOperationPrintGenericOpForm).nif("OperationGeneric"),
+    PrinterNIF(mlir_capi.Operation, c.mlirOperationWriteBytecode).nif("OperationBytecode"),
+    PrinterNIF(mlir_capi.Value, c.mlirValuePrint).nif("Value"),
+    PrinterNIF(mlir_capi.OpPassManager, c.mlirPrintPassPipeline).nif("OpPassManager"),
+    PrinterNIF(mlir_capi.AffineMap, c.mlirAffineMapPrint).nif("AffineMap"),
+    PrinterNIF(mlir_capi.Location, c.beaverLocationPrint).nif("Location"),
+    PrinterNIF(mlir_capi.Identifier, c.mlirIdentifierPrint).nif("Identifier"),
+    PrinterNIF(mlir_capi.Diagnostic, c.mlirDiagnosticPrint).nif("Diagnostic"),
 } ++ Printer.entries;

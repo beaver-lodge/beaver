@@ -8,44 +8,47 @@ const e = @import("erl_nif");
 const MutexToken = @import("logical_mutex.zig").Token;
 const kinda = @import("kinda");
 const result = @import("kinda").result;
-const StringRefCollector = @import("string_ref.zig").StringRefCollector;
+const PrinterNIF = @import("string_ref.zig").PrinterNIF;
 
-// collect diagnostic as {severity, loc, message, num_notes}
+// collect diagnostic as {severity, loc, message, nested_notes}
 const DiagnosticAggregator = struct {
     const Container = std.ArrayList(beam.term);
     env: beam.env,
     container: Container = undefined,
-    fn collectDiagnostic(diagnostic: c.MlirDiagnostic, userData: ?*@This()) !mlir_capi.LogicalResult.T {
+    fn collectDiagnosticNested(diagnostic: c.MlirDiagnostic, userData: ?*@This()) !beam.term {
         const env = userData.?.env;
-        var note_col = StringRefCollector.init(env);
-        c.mlirDiagnosticPrint(diagnostic, StringRefCollector.append, @constCast(@ptrCast(@alignCast(&note_col))));
-        const note = try note_col.collect_and_destroy();
-        var entry_slice: []beam.term = try beam.allocator.alloc(beam.term, 4);
-        entry_slice[0] = try beam.make(i64, env, c.mlirDiagnosticGetSeverity(diagnostic));
-        entry_slice[1] = try mlir_capi.Location.resource.make(env, c.mlirDiagnosticGetLocation(diagnostic));
-        entry_slice[2] = note;
+        const severity = c.mlirDiagnosticGetSeverity(diagnostic);
+        const location = try mlir_capi.Location.resource.make(env, c.mlirDiagnosticGetLocation(diagnostic));
+        const note = try PrinterNIF(mlir_capi.Diagnostic, c.mlirDiagnosticPrint).print_make(env, diagnostic);
+
         const num_notes: usize = @intCast(c.mlirDiagnosticGetNumNotes(diagnostic));
-        entry_slice[3] = try beam.make(usize, env, num_notes);
-        try userData.?.container.append(beam.make_tuple(env, entry_slice));
-        defer beam.allocator.free(entry_slice);
-        if (num_notes > 0) {
-            const nested: []c.MlirDiagnostic = try beam.allocator.alloc(c.MlirDiagnostic, num_notes);
-            defer beam.allocator.free(nested);
-            for (0..num_notes) |i| {
-                const nested_diagnostic = c.mlirDiagnosticGetNote(diagnostic, @intCast(i));
-                if (c.beaverLogicalResultIsFailure(try collectDiagnostic(nested_diagnostic, userData))) {
-                    return c.mlirLogicalResultFailure();
-                }
-            }
+        var nested_notes: []beam.term = try beam.allocator.alloc(beam.term, num_notes);
+        defer beam.allocator.free(nested_notes);
+        for (0..num_notes) |i| {
+            const nested_diagnostic = c.mlirDiagnosticGetNote(diagnostic, @intCast(i));
+            nested_notes[i] = try collectDiagnosticNested(nested_diagnostic, userData);
         }
+
+        var entry_slice: []beam.term = try beam.allocator.alloc(beam.term, 4);
+        defer beam.allocator.free(entry_slice);
+        entry_slice[0] = try beam.make(i64, env, severity);
+        entry_slice[1] = location;
+        entry_slice[2] = note;
+        entry_slice[3] = beam.make_term_list(env, nested_notes);
+        return beam.make_tuple(env, entry_slice);
+    }
+
+    fn collectDiagnosticTopLevel(diagnostic: c.MlirDiagnostic, userData: ?*@This()) !mlir_capi.LogicalResult.T {
+        try userData.?.container.append(try collectDiagnosticNested(diagnostic, userData));
         return c.mlirLogicalResultSuccess();
     }
     fn errorHandler(diagnostic: c.MlirDiagnostic, userData: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
-        return collectDiagnostic(diagnostic, @ptrCast(@alignCast(userData))) catch return c.mlirLogicalResultFailure();
+        return collectDiagnosticTopLevel(diagnostic, @ptrCast(@alignCast(userData))) catch return c.mlirLogicalResultFailure();
     }
     fn deleteUserData(userData: ?*anyopaque) callconv(.C) void {
-        const ud: ?*@This() = @ptrCast(@alignCast(userData));
-        beam.allocator.destroy(ud.?);
+        const this: ?*@This() = @ptrCast(@alignCast(userData));
+        this.?.container.deinit();
+        beam.allocator.destroy(this.?);
     }
     fn init(env: beam.env) !*@This() {
         var userData = try beam.allocator.create(DiagnosticAggregator);
@@ -53,8 +56,7 @@ const DiagnosticAggregator = struct {
         userData.container = Container.init(beam.allocator);
         return userData;
     }
-    fn collect_and_destroy(this: *@This()) !beam.term {
-        defer this.container.deinit();
+    fn to_list(this: *@This()) !beam.term {
         return beam.make_term_list(this.env, this.container.items);
     }
 };
@@ -65,7 +67,7 @@ pub fn call_with_diagnostics(env: beam.env, ctx: mlir_capi.Context.T, f: anytype
     defer c.mlirContextDetachDiagnosticHandler(ctx, id);
     var res_slice: []beam.term = try beam.allocator.alloc(beam.term, 2);
     res_slice[0] = try @call(.auto, f, args);
-    res_slice[1] = try DiagnosticAggregator.collect_and_destroy(userData);
+    res_slice[1] = try DiagnosticAggregator.to_list(userData);
     defer beam.allocator.free(res_slice);
     return beam.make_tuple(env, res_slice);
 }

@@ -33,11 +33,7 @@ defmodule Beaver.MLIR.Module do
         raise ArgumentError, "calling a bang function to parse module must be eager"
 
       {:error, diagnostics} ->
-        raise ArgumentError,
-              (for {_severity, loc, d, _num} <- diagnostics,
-                   reduce: "fail to parse module" do
-                 acc -> "#{acc}\n#{to_string(loc)}: #{d}"
-               end)
+        raise ArgumentError, MLIR.Diagnostic.format(diagnostics, "fail to parse module")
 
       {:ok, module} ->
         MLIR.verify!(module)

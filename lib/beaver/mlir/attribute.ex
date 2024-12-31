@@ -16,11 +16,7 @@ defmodule Beaver.MLIR.Attribute do
         raise ArgumentError, "fail to parse attribute: #{attr_str}"
 
       diagnostics when is_list(diagnostics) ->
-        raise ArgumentError,
-              (for {_severity, loc, d, _num} <- diagnostics,
-                   reduce: "fail to parse attribute" do
-                 acc -> "#{acc}\n#{to_string(loc)}: #{d}"
-               end)
+        raise ArgumentError, MLIR.Diagnostic.format(diagnostics, "fail to parse attribute")
     end
   end
 

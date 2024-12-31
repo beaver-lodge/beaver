@@ -50,12 +50,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
       )
 
     if MLIR.null?(jit) do
-      diagnostics =
-        for {_, loc, d, _} <- diagnostics, reduce: "Execution engine creation failed" do
-          acc -> "#{acc}\n#{to_string(loc)}: #{d}"
-        end
-
-      raise ArgumentError, diagnostics
+      raise ArgumentError, MLIR.Diagnostic.format(diagnostics, "Execution engine creation failed")
     end
 
     jit

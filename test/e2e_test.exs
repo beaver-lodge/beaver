@@ -27,7 +27,7 @@ defmodule E2ETest do
 
     test "fail to create JIT engine", %{ctx: ctx} do
       assert_raise ArgumentError,
-                   ~r"cannot be converted to LLVM IR",
+                   ~r{Execution engine creation failed\nat -:2:3: .+for op: func.func\n  at -:2:3: see current operation: \n    \"func.func\".+\n    .+\n    },
                    fn ->
                      ~m"""
                      module {
