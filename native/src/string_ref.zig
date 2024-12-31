@@ -33,7 +33,7 @@ pub fn PrinterNIF(comptime ResourceKind: type, comptime print_fn: anytype) type 
             return print_make(env, entity);
         }
         fn nif(comptime name: []const u8) e.ErlNifFunc {
-           return result.nif(print_nif_prefix ++ name, 1, to_string).entry;
+            return result.nif(print_nif_prefix ++ name, 1, to_string).entry;
         }
     };
 }
