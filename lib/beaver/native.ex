@@ -62,6 +62,11 @@ defmodule Beaver.Native do
     forward(mod, :primitive, [ref])
   end
 
+  defp postprocess_diagnostics({severity_i, loc_ref, note, nested}) do
+    {Beaver.MLIR.Diagnostic.severity(severity_i), %Beaver.MLIR.Location{ref: loc_ref},
+     to_string(note), Enum.map(nested, &postprocess_diagnostics/1)}
+  end
+
   def check!(ret) do
     case ret do
       {:kind, mod, ref} when is_atom(mod) and is_reference(ref) ->
@@ -76,11 +81,7 @@ defmodule Beaver.Native do
            struct!(mod, %{ref: ref})
          rescue
            UndefinedFunctionError -> ref
-         end,
-         for {severity_i, loc_ref, note, num} <- diagnostics do
-           {Beaver.MLIR.Diagnostic.severity(severity_i), %Beaver.MLIR.Location{ref: loc_ref},
-            to_string(note), num}
-         end}
+         end, Enum.map(diagnostics, &postprocess_diagnostics/1)}
 
       ret ->
         ret

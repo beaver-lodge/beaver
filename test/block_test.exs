@@ -55,8 +55,11 @@ defmodule BlockTest do
 
     assert {:error,
             [
-              {:error, _, "reference to block defined in another region", 1},
-              {:note, _, "see current operation: \"cf.br\"(%0)[INVALIDBLOCK] : (i32) -> ()", 0}
+              {:error, _, "reference to block defined in another region",
+               [
+                 {:note, _, "see current operation: \"cf.br\"(%0)[INVALIDBLOCK] : (i32) -> ()",
+                  []}
+               ]}
             ]} = res
   end
 
@@ -80,8 +83,8 @@ defmodule BlockTest do
       |> MLIR.verify()
 
     assert [
-             {:error, _, "branch has 1 operands for successor #0, but target block has 0", 1},
-             {:note, _, "see current operation:" <> _, 0}
+             {:error, _, "branch has 1 operands for successor #0, but target block has 0",
+              [{:note, _, "see current operation:" <> _, []}]}
            ] = diagnostics
   end
 
@@ -120,8 +123,8 @@ defmodule BlockTest do
       |> MLIR.verify()
 
     assert [
-             {:error, _, "branch has 1 operands for successor #0, but target block has 0", 1},
-             {:note, _, "see current operation" <> _, 0}
+             {:error, _, "branch has 1 operands for successor #0, but target block has 0",
+              [{:note, _, "see current operation" <> _, []}]}
            ] = diagnostics
   end
 
@@ -159,7 +162,7 @@ defmodule BlockTest do
   describe "insert block to region" do
     for action <- [:insert, :append] do
       test "appending #{action}", %{ctx: ctx} do
-        assert {:error, [{:error, _, "empty block: expect at least a terminator", 0}]} =
+        assert {:error, [{:error, _, "empty block: expect at least a terminator", []}]} =
                  BlockHelper.create_ir_by_action(ctx, unquote(action))
       end
     end

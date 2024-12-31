@@ -20,4 +20,31 @@ defmodule Beaver.MLIR.Diagnostic do
   end
 
   defdelegate detach(ctx, handler_id), to: MLIR.CAPI, as: :mlirContextDetachDiagnosticHandler
+
+  def walk({_, _, _, []} = diagnostic, acc, fun) do
+    fun.(diagnostic, acc)
+  end
+
+  def walk({_, _, _, nested} = diagnostic, acc, fun) do
+    acc = fun.(diagnostic, acc)
+
+    Enum.reduce(nested, acc, fn d, acc ->
+      walk(d, acc, fun)
+    end)
+  end
+
+  def format(diagnostics, prefix \\ "") do
+    {str, _} =
+      for d <- diagnostics,
+          reduce: {prefix, 0} do
+        acc ->
+          MLIR.Diagnostic.walk(d, acc, fn {_, loc, d, _}, {str, level} ->
+            prefix = String.duplicate(" ", level * 2)
+            d = String.replace(d, ~r"\n", "\n#{prefix}  ")
+            {"#{str}\n#{prefix}at #{loc}: #{d}", level + 1}
+          end)
+      end
+
+    str
+  end
 end

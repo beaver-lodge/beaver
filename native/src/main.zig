@@ -5,7 +5,6 @@ const beam = @import("beam");
 const kinda = @import("kinda");
 const e = @import("erl_nif");
 const mlir_capi = @import("mlir_capi.zig");
-pub const c = @import("prelude.zig");
 const enif_support = @import("enif_support.zig");
 const diagnostic = @import("diagnostic.zig");
 const pass = @import("pass.zig");

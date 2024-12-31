@@ -173,10 +173,7 @@ defmodule Beaver.Composer do
 
       {:error, diagnostics} ->
         raise ArgumentError,
-              (for {_severity, loc, d, _num} <- diagnostics,
-                   reduce: "Unexpected failure running passes" do
-                 acc -> "#{acc}\n#{to_string(loc)}: #{d}"
-               end)
+              MLIR.Diagnostic.format(diagnostics, "Unexpected failure running passes")
     end
   end
 
