@@ -91,4 +91,10 @@ defmodule PassTest do
                    |> Beaver.Composer.run!()
                  end
   end
+
+  test "parallel processing func.func", %{ctx: ctx} do
+    Beaver.Dummy.gigantic(ctx)
+    |> Beaver.Composer.nested("func.func", {"DoNothingHere", "func.func", fn _ -> :ok end})
+    |> Beaver.Composer.run!()
+  end
 end

@@ -11,59 +11,65 @@ const Token = @import("logical_mutex.zig").Token;
 
 const BeaverPass = extern struct {
     handler: beam.pid,
+    env: beam.env,
+    run_fn: beam.term,
     fn construct(_: ?*anyopaque) callconv(.C) void {}
     fn destruct(userData: ?*anyopaque) callconv(.C) void {
-        const ptr: *@This() = @ptrCast(@alignCast(userData));
-        beam.allocator.destroy(ptr);
+        const this: *@This() = @ptrCast(@alignCast(userData));
+        e.enif_free_env(this.env);
+        beam.allocator.destroy(this);
     }
-    fn initialize(_: mlir_capi.Context.T, _: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
+    fn initialize(_: mlir_capi.Context.T, userData: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
+        const this: *@This() = @ptrCast(@alignCast(userData));
+        this.*.env = e.enif_alloc_env() orelse return c.mlirLogicalResultFailure();
         return c.mlirLogicalResultSuccess();
     }
     fn clone(userData: ?*anyopaque) callconv(.C) ?*anyopaque {
         const old: *@This() = @ptrCast(@alignCast(userData));
         const new = beam.allocator.create(@This()) catch unreachable;
         new.* = old.*;
+        new.*.env = e.enif_alloc_env();
+        new.*.run_fn = e.enif_make_copy(new.*.env, old.run_fn);
         return new;
     }
-    const Error = error{ @"Fail to allocate BEAM environment", @"Fail to send message to pass server", @"Fail to run a pass implemented in Elixir" };
-    fn do_run(op: mlir_capi.Operation.T, userData: ?*anyopaque) !void {
-        const ud: *@This() = @ptrCast(@alignCast(userData));
+    const Error = error{ @"Fail to allocate BEAM environment", @"Fail to send message to pass server", @"Fail to run a pass implemented in Elixir", @"External pass must be run on non-scheduler thread to prevent deadlock" };
+    fn do_run(op: mlir_capi.Operation.T, this: *@This()) !void {
+        if (e.enif_thread_type() != e.ERL_NIF_THR_UNDEFINED) {
+            return Error.@"External pass must be run on non-scheduler thread to prevent deadlock";
+        }
         const env = e.enif_alloc_env() orelse return Error.@"Fail to allocate BEAM environment";
-        defer e.enif_clear_env(env);
-        const handler = ud.*.handler;
-        var tuple_slice: []beam.term = try beam.allocator.alloc(beam.term, 3);
-        defer beam.allocator.free(tuple_slice);
-        tuple_slice[0] = beam.make_atom(env, "run");
-        tuple_slice[1] = try mlir_capi.Operation.resource.make(env, op);
         var token = Token{};
-        tuple_slice[2] = try beam.make_ptr_resource_wrapped(env, &token);
-        if (!beam.send_advanced(env, handler, env, beam.make_tuple(env, tuple_slice))) {
+        const tuple_slice: []const beam.term = &.{ beam.make_atom(env, "run"), try mlir_capi.Operation.resource.make(env, op), try beam.make_ptr_resource_wrapped(env, &token), e.enif_make_copy(env, this.run_fn) };
+        const msg = beam.make_tuple(env, @constCast(tuple_slice));
+        if (!beam.send_advanced(env, this.*.handler, env, msg)) {
             return Error.@"Fail to send message to pass server";
         }
         if (c.beaverLogicalResultIsFailure(token.wait_logical())) return Error.@"Fail to run a pass implemented in Elixir";
     }
     fn run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) callconv(.C) void {
-        if (do_run(op, userData)) |_| {} else |err| {
+        if (do_run(op, @ptrCast(@alignCast(userData)))) |_| {} else |err| {
             c.mlirEmitError(c.mlirOperationGetLocation(op), @errorName(err));
             c.mlirExternalPassSignalFailure(pass);
         }
     }
 };
 
+threadlocal var typeIDAllocator: ?mlir_capi.TypeIDAllocator.T = null;
 pub fn do_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const name = try mlir_capi.StringRef.resource.fetch(env, args[0]);
     const argument = try mlir_capi.StringRef.resource.fetch(env, args[1]);
     const description = try mlir_capi.StringRef.resource.fetch(env, args[2]);
     const op_name = try mlir_capi.StringRef.resource.fetch(env, args[3]);
     const handler: beam.pid = try beam.get_pid(env, args[4]);
-
-    const typeIDAllocator = c.mlirTypeIDAllocatorCreate();
-    defer c.mlirTypeIDAllocatorDestroy(typeIDAllocator);
-    const passID = c.mlirTypeIDAllocatorAllocateTypeID(typeIDAllocator);
+    if (typeIDAllocator == null) {
+        typeIDAllocator = c.mlirTypeIDAllocatorCreate();
+    }
+    const passID = c.mlirTypeIDAllocatorAllocateTypeID(typeIDAllocator.?);
     const nDependentDialects = 0;
     const dependentDialects = null;
     const bp: *BeaverPass = try beam.allocator.create(BeaverPass);
-    bp.* = BeaverPass{ .handler = handler };
+    const bp_env = e.enif_alloc_env();
+    bp.* = BeaverPass{ .handler = handler, .env = bp_env, .run_fn = e.enif_make_copy(bp_env, args[5]) };
     // use this function to avoid ABI issue
     const ep = c.beaverPassCreate(
         BeaverPass.construct,
@@ -125,6 +131,6 @@ pub fn run_pm_on_op(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.te
 }
 
 pub const nifs = .{
-    result.nif("beaver_raw_create_mlir_pass", 5, do_create).entry,
+    result.nif("beaver_raw_create_mlir_pass", 6, do_create).entry,
     result.nif("beaver_raw_run_pm_on_op_async", 2, run_pm_on_op).entry,
 };
