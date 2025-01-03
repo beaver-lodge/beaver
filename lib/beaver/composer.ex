@@ -49,7 +49,7 @@ defmodule Beaver.Composer do
       pid,
       run
     )
-    |> then(&%MLIR.Pass{ref: &1, handler: pid})
+    |> Beaver.Native.check!()
   end
 
   defp create_pass(argument, desc, op, run) do
