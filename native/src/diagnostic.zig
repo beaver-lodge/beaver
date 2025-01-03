@@ -66,9 +66,9 @@ pub fn call_with_diagnostics(env: beam.env, ctx: mlir_capi.Context.T, f: anytype
     const id = c.mlirContextAttachDiagnosticHandler(ctx, DiagnosticAggregator.errorHandler, @ptrCast(@alignCast(userData)), DiagnosticAggregator.deleteUserData);
     defer c.mlirContextDetachDiagnosticHandler(ctx, id);
     var res_slice: []beam.term = try beam.allocator.alloc(beam.term, 2);
+    defer beam.allocator.free(res_slice);
     res_slice[0] = try @call(.auto, f, args);
     res_slice[1] = try DiagnosticAggregator.to_list(userData);
-    defer beam.allocator.free(res_slice);
     return beam.make_tuple(env, res_slice);
 }
 

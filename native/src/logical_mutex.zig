@@ -29,12 +29,12 @@ pub const Token = struct {
         self.done = true;
         self.cond.signal();
     }
-    pub fn pass_token_signal_logical_success(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+    pub fn signal_logical_success(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         var token = try beam.fetch_ptr_resource_wrapped(@This(), env, args[0]);
         token.signal(true);
         return beam.make_ok(env);
     }
-    pub fn pass_token_signal_logical_failure(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+    pub fn signal_logical_failure(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         var token = try beam.fetch_ptr_resource_wrapped(@This(), env, args[0]);
         token.signal(false);
         return beam.make_ok(env);
@@ -42,8 +42,8 @@ pub const Token = struct {
 };
 
 pub const nifs = .{
-    result.nif("beaver_raw_logical_mutex_token_signal_success", 1, Token.pass_token_signal_logical_success).entry,
-    result.nif("beaver_raw_logical_mutex_token_signal_failure", 1, Token.pass_token_signal_logical_failure).entry,
+    result.nif("beaver_raw_logical_mutex_token_signal_success", 1, Token.signal_logical_success).entry,
+    result.nif("beaver_raw_logical_mutex_token_signal_failure", 1, Token.signal_logical_failure).entry,
 };
 pub fn open_all(env: beam.env) void {
     beam.open_resource_wrapped(env, Token);

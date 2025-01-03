@@ -4,7 +4,7 @@ defmodule Beaver.Composer do
   require Logger
 
   @moduledoc """
-  This module provide functions to compose passes.
+  This module provide functions to compose and run passes.
   """
   @enforce_keys [:op]
   defstruct passes: [], op: nil
@@ -38,7 +38,7 @@ defmodule Beaver.Composer do
   end
 
   # Create an external pass.
-  defp do_create_pass(pid, argument, description, op) do
+  defp do_create_pass(pid, argument, description, op, run) do
     argument_ref = MLIR.StringRef.create(argument).ref
 
     MLIR.CAPI.beaver_raw_create_mlir_pass(
@@ -46,28 +46,14 @@ defmodule Beaver.Composer do
       argument_ref,
       MLIR.StringRef.create(description).ref,
       MLIR.StringRef.create(op).ref,
-      pid
+      pid,
+      run
     )
-    |> then(&%MLIR.Pass{ref: &1, handler: pid})
+    |> Beaver.Native.check!()
   end
 
-  @supervisor __MODULE__.DynamicSupervisor
-  @registry __MODULE__.Registry
   defp create_pass(argument, desc, op, run) do
-    spec =
-      {Beaver.PassRunner, [run, name: {:via, Registry, {@registry, :"#{argument}-#{op}"}}]}
-
-    case DynamicSupervisor.start_child(@supervisor, spec) do
-      {:ok, pid} ->
-        pid
-
-      {:error, {:already_started, pid}} ->
-        pid
-
-      {:error, e} ->
-        raise Application.format_error(e)
-    end
-    |> do_create_pass(argument, desc, op)
+    do_create_pass(self(), argument, desc, op, run)
   end
 
   def create_pass(%MLIR.Pass{} = pass) do
@@ -163,6 +149,31 @@ defmodule Beaver.Composer do
   @spec run!(composer) :: operation
   @spec run!(composer, [run_option]) :: operation
 
+  defp dispatch_pass_action() do
+    receive do
+      {:run, op_ref, token_ref, run} ->
+        spawn_link(fn ->
+          try do
+            run.(%MLIR.Operation{ref: op_ref})
+            MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref)
+          rescue
+            exception ->
+              MLIR.CAPI.beaver_raw_logical_mutex_token_signal_failure(token_ref)
+              Logger.error(Exception.format(:error, exception, __STACKTRACE__))
+          end
+        end)
+
+        dispatch_pass_action()
+
+      {{:kind, MLIR.LogicalResult, _}, diagnostics} = ret when is_list(diagnostics) ->
+        Beaver.Native.check!(ret)
+
+      other ->
+        Logger.error("Unexpected message: #{inspect(other)}")
+        dispatch_pass_action()
+    end
+  end
+
   def run!(
         composer,
         opts \\ @run_default_opts
@@ -215,16 +226,7 @@ defmodule Beaver.Composer do
       txt |> Logger.info()
     end
 
-    {status, diagnostics} =
-      case beaver_raw_run_pm_on_op_async(pm.ref, MLIR.Operation.from_module(op).ref) do
-        :ok ->
-          receive do
-            ret -> Beaver.Native.check!(ret)
-          end
-
-        ret ->
-          Beaver.Native.check!(ret)
-      end
+    {status, diagnostics} = run_pm_async(pm, op)
 
     if print do
       mlirContextEnableMultithreading(ctx, true)
@@ -240,10 +242,13 @@ defmodule Beaver.Composer do
   end
 
   @doc false
-  def pass_runner_child_specs() do
-    [
-      {DynamicSupervisor, name: @supervisor, strategy: :one_for_one},
-      {Registry, keys: :unique, name: @registry}
-    ]
+  def run_pm_async(%MLIR.PassManager{ref: pm_ref}, op) do
+    case beaver_raw_run_pm_on_op_async(pm_ref, MLIR.Operation.from_module(op).ref) do
+      :ok ->
+        dispatch_pass_action()
+
+      ret ->
+        Beaver.Native.check!(ret)
+    end
   end
 end

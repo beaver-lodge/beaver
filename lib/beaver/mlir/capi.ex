@@ -44,7 +44,8 @@ defmodule Beaver.MLIR.CAPI do
         _argument,
         _description,
         _op_name,
-        _handler
+        _handler,
+        _run
       ),
       do: :erlang.nif_error(:not_loaded)
 
