@@ -21,9 +21,7 @@ const CallbackDispatcher = extern struct {
         e.enif_free_env(this.env);
         beam.allocator.destroy(this);
     }
-    fn initialize(_: mlir_capi.Context.T, userData: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
-        const this: *@This() = @ptrCast(@alignCast(userData));
-        this.*.env = e.enif_alloc_env() orelse return c.mlirLogicalResultFailure();
+    fn initialize(_: mlir_capi.Context.T, _: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
         return c.mlirLogicalResultSuccess();
     }
     fn clone(userData: ?*anyopaque) callconv(.C) ?*anyopaque {
@@ -67,10 +65,10 @@ const CallbackDispatcher = extern struct {
         const passID = c.mlirTypeIDAllocatorAllocateTypeID(typeIDAllocator.?);
         const nDependentDialects = 0;
         const dependentDialects = null;
-        const bp: *@This() = try beam.allocator.create(@This());
-        const bp_env = e.enif_alloc_env() orelse return Error.@"Fail to allocate BEAM environment";
-        bp.* = @This(){ .handler = handler, .env = bp_env, .run_fn = e.enif_make_copy(bp_env, args[5]) };
-        return beaverPassCreateWrap(env, .{ construct, destruct, initialize, clone, run, passID, name, argument, description, op_name, nDependentDialects, dependentDialects, bp });
+        const this: *@This() = try beam.allocator.create(@This());
+        const this_env = e.enif_alloc_env() orelse return Error.@"Fail to allocate BEAM environment";
+        this.* = @This(){ .handler = handler, .env = this_env, .run_fn = e.enif_make_copy(this_env, args[5]) };
+        return beaverPassCreateWrap(env, .{ construct, destruct, initialize, clone, run, passID, name, argument, description, op_name, nDependentDialects, dependentDialects, this });
     }
 };
 
