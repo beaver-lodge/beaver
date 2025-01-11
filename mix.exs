@@ -32,7 +32,8 @@ defmodule Beaver.MixProject do
           end
         ],
         make_args: ~w{-j},
-        make_cwd: "native"
+        make_cwd: "native",
+        make_clean: ["clean"]
       ]
   end
 

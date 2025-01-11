@@ -168,9 +168,11 @@ defmodule MlirTest do
 
   defmodule TestPass do
     @moduledoc false
+    use MLIR.Pass
 
-    def run(%Beaver.MLIR.Operation{} = op) do
+    def run(%Beaver.MLIR.Operation{} = op, state) do
       MLIR.verify!(op)
+      state
     end
   end
 
@@ -178,8 +180,9 @@ defmodule MlirTest do
     @moduledoc false
     use MLIR.Pass, on: "func.func"
 
-    def run(%Beaver.MLIR.Operation{} = op) do
+    def run(%Beaver.MLIR.Operation{} = op, state) do
       MLIR.verify!(op)
+      state
     end
   end
 
@@ -191,9 +194,8 @@ defmodule MlirTest do
     pm = mlirPassManagerCreate(ctx)
     mlirPassManagerAddOwnedPass(pm, external)
     mlirPassManagerAddOwnedPass(pm, mlirCreateTransformsCSE())
-    {success, _} = Beaver.Composer.run_pm_async(pm, module)
-    assert Beaver.MLIR.LogicalResult.success?(success)
-    mlirPassManagerDestroy(pm)
+    :ok = MLIR.PassManager.run(pm, module)
+    :ok = MLIR.PassManager.destroy(pm)
     mlirModuleDestroy(module)
     mlirTypeIDAllocatorDestroy(type_id_allocator)
     mlirContextDestroy(ctx)
@@ -205,9 +207,8 @@ defmodule MlirTest do
     pm = mlirPassManagerCreate(ctx)
     npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
     mlirOpPassManagerAddOwnedPass(npm, external)
-    {success, _} = Beaver.Composer.run_pm_async(pm, module)
-    assert Beaver.MLIR.LogicalResult.success?(success)
-    mlirPassManagerDestroy(pm)
+    :ok = MLIR.PassManager.run(pm, module)
+    :ok = MLIR.PassManager.destroy(pm)
     mlirModuleDestroy(module)
   end
 
@@ -217,9 +218,8 @@ defmodule MlirTest do
     pm = mlirPassManagerCreate(ctx)
     npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
     mlirOpPassManagerAddOwnedPass(npm, external)
-    {success, _} = Beaver.Composer.run_pm_async(pm, module)
-    assert Beaver.MLIR.LogicalResult.success?(success)
-    mlirPassManagerDestroy(pm)
+    :ok = MLIR.PassManager.run(pm, module)
+    :ok = MLIR.PassManager.destroy(pm)
     mlirModuleDestroy(module)
   end
 

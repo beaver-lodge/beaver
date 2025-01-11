@@ -3,6 +3,7 @@ const mlir_capi = @import("mlir_capi.zig");
 pub const c = @import("prelude.zig");
 const beam = @import("beam");
 const result = @import("kinda").result;
+const e = @import("erl_nif");
 
 pub const Token = struct {
     mutex: std.Thread.Mutex = .{},
@@ -31,19 +32,13 @@ pub const Token = struct {
     }
     pub fn signal_logical_success(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         var token = try beam.fetch_ptr_resource_wrapped(@This(), env, args[0]);
-        token.signal(true);
-        return beam.make_ok(env);
-    }
-    pub fn signal_logical_failure(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-        var token = try beam.fetch_ptr_resource_wrapped(@This(), env, args[0]);
-        token.signal(false);
+        token.signal(beam.get_bool(env, args[1]) catch unreachable);
         return beam.make_ok(env);
     }
 };
 
 pub const nifs = .{
-    result.nif("beaver_raw_logical_mutex_token_signal_success", 1, Token.signal_logical_success).entry,
-    result.nif("beaver_raw_logical_mutex_token_signal_failure", 1, Token.signal_logical_failure).entry,
+    result.nif("beaver_raw_logical_mutex_token_signal_success", 2, Token.signal_logical_success).entry,
 };
 pub fn open_all(env: beam.env) void {
     beam.open_resource_wrapped(env, Token);

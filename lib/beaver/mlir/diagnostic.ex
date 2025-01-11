@@ -47,4 +47,9 @@ defmodule Beaver.MLIR.Diagnostic do
 
     str
   end
+
+  def emit(ctx, msg) do
+    msg_str = MLIR.StringRef.create(msg) |> MLIR.StringRef.data()
+    MLIR.CAPI.mlirEmitError(ctx, msg_str)
+  end
 end

@@ -26,3 +26,4 @@ zig_build: zig_translate cmake_build
 clean:
 	rm -rf ${CMAKE_BUILD_DIR}
 	rm -rf ${NATIVE_INSTALL_DIR}
+	rm -rf .zig-cache

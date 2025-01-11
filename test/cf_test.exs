@@ -222,10 +222,10 @@ defmodule CfTest do
       |> convert_cf_to_llvm()
       |> convert_arith_to_llvm
       |> Beaver.Composer.nested("func.func", "llvm-request-c-wrappers")
-      |> Beaver.Composer.nested("func.func", {"DoNothing0", "func.func", fn _ -> :ok end})
+      |> Beaver.Composer.nested("func.func", {"DoNothing0", "func.func", fn _, _ -> :ok end})
       |> convert_func_to_llvm
       |> canonicalize
-      |> Beaver.Composer.append({"DoNothing1", "builtin.module", fn _ -> :ok end})
+      |> Beaver.Composer.append({"DoNothing1", "builtin.module", fn _, _ -> :ok end})
       |> Beaver.Composer.run!()
     end
 
