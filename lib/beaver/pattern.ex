@@ -50,10 +50,20 @@ defmodule Beaver.Pattern do
     end
   end
 
+  defmacro attribute() do
+    quote do
+      mlir do
+        Beaver.MLIR.Dialect.PDL.attribute() >>> ~t{!pdl.attribute}
+      end
+    end
+  end
+
   defmacro attribute(a) do
     quote do
-      Beaver.MLIR.Dialect.PDL.attribute(value: unquote(a)) >>>
-        ~t{!pdl.attribute}
+      mlir do
+        Beaver.MLIR.Dialect.PDL.attribute(value: unquote(a)) >>>
+          ~t{!pdl.attribute}
+      end
     end
   end
 
