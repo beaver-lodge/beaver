@@ -54,7 +54,7 @@ defmodule TestTOSAPatterns do
   end
 
   defpat replace_multi_add_op() do
-    one = Attribute.integer(Type.i32(), 1)
+    one = attribute()
     _x = %Range{first: 1, last: 10, step: 2}
     ty = Type.ranked_tensor([2, 3], Type.f32())
     a = value()
@@ -74,7 +74,7 @@ defmodule TestTOSAPatterns do
   end
 
   defpat replace_multi_add_op1() do
-    one = Attribute.integer(Type.i32(), 1)
+    one = attribute()
     ty = Type.ranked_tensor([2, 3], Type.f32())
     a = value()
     b = value()
