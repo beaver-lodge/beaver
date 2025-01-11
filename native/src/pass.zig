@@ -73,6 +73,7 @@ const CallbackDispatcher = struct {
                 try buffer.append(arg);
             }
             const msg = beam.make_tuple(env, buffer.items);
+            errdefer e.enif_free_env(env);
             if (!beam.send_advanced(env, this.*.handler, env, msg)) {
                 return Error.@"Fail to send message to pass server";
             }
@@ -141,6 +142,7 @@ const ManagerRunner = struct {
         const env = e.enif_alloc_env() orelse return Error.@"fail to allocate BEAM environment";
         const ctx = c.mlirOperationGetContext(this.op.?);
         const args = .{ this.pm, this.op.? };
+        errdefer e.enif_free_env(env);
         if (!beam.send_advanced(env, this.pid, env, try diagnostic.call_with_diagnostics(env, ctx, mlirPassManagerRunOnOpWrap, .{ env, args }))) {
             return Error.@"fail to send message to pm caller";
         }
@@ -154,6 +156,7 @@ const ManagerRunner = struct {
     }
     fn run_pm_on_op(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         const this = try init(env);
+        errdefer beam.allocator.destroy(this);
         this.*.pm = try mlir_capi.PassManager.resource.fetch(env, args[0]);
         this.*.op = try mlir_capi.Operation.resource.fetch(env, args[1]);
         const ctx = c.mlirOperationGetContext(this.op.?);
@@ -178,6 +181,7 @@ const ManagerRunner = struct {
     }
     fn destroy(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         const this = try init(env);
+        errdefer beam.allocator.destroy(this);
         this.*.pm = try mlir_capi.PassManager.resource.fetch(env, args[0]);
         const ctx = c.beaverPassManagerGetContext(this.pm);
         if (c.beaverContextAddWork(ctx, destroyManager, @ptrCast(@constCast(this)))) {
