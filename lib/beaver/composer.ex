@@ -6,11 +6,11 @@ defmodule Beaver.Composer do
   @moduledoc """
   This module provide functions to compose and run passes.
   """
-  @enforce_keys [:op]
-  defstruct passes: [], op: nil
+  defstruct passes: [], op: nil, ctx: nil
   @type operation :: MLIR.Module.t() | MLIR.Operation.t()
   @type t :: %__MODULE__{passes: list(any()), op: operation}
 
+  def new(ctx: ctx), do: %__MODULE__{ctx: ctx}
   def new(%__MODULE__{} = composer), do: composer
 
   def new(op), do: %__MODULE__{op: op}
@@ -37,39 +37,27 @@ defmodule Beaver.Composer do
     op_name || "builtin.module"
   end
 
-  # Create an external pass.
-  defp do_create_pass(pid, argument, description, op, run) do
-    argument_ref = MLIR.StringRef.create(argument).ref
-
-    MLIR.CAPI.beaver_raw_create_mlir_pass(
-      argument_ref,
-      argument_ref,
-      MLIR.StringRef.create(description).ref,
-      MLIR.StringRef.create(op).ref,
-      pid,
-      run
-    )
-    |> Beaver.Native.check!()
-  end
-
-  defp create_pass(argument, desc, op, run) do
-    do_create_pass(self(), argument, desc, op, run)
-  end
-
+  @doc false
   def create_pass(%MLIR.Pass{} = pass) do
     pass
   end
 
   def create_pass({argument, op, run}) when is_function(run) do
     description = "beaver generated pass of #{Function.info(run) |> inspect}"
-    create_pass(argument, description, op, run)
+    MLIR.Pass.create(argument, description, op, run: run)
   end
 
   def create_pass(pass_module) do
     description = "beaver generated pass of #{pass_module}"
     op_name = op_name_from_persistent_attributes(pass_module)
     name = Atom.to_string(pass_module)
-    create_pass(name, description, op_name, &pass_module.run/1)
+
+    MLIR.Pass.create(name, description, op_name,
+      destruct: &pass_module.destruct/1,
+      initialize: &pass_module.initialize/2,
+      clone: &pass_module.clone/1,
+      run: &pass_module.run/2
+    )
   end
 
   defp add_pipeline(%MLIR.OpPassManager{} = pm, pipeline_str)
@@ -122,8 +110,8 @@ defmodule Beaver.Composer do
   defp add_pass(%MLIR.PassManager{} = pm, pass),
     do: mlirPassManagerAddOwnedPass(pm, create_pass(pass))
 
-  defp to_pm(%__MODULE__{passes: passes, op: op}) do
-    ctx = MLIR.context(MLIR.Operation.from_module(op))
+  defp to_pm(%__MODULE__{passes: passes, op: op, ctx: ctx}) do
+    ctx = ctx || MLIR.context(MLIR.Operation.from_module(op))
 
     pm = mlirPassManagerCreate(ctx)
 
@@ -148,31 +136,6 @@ defmodule Beaver.Composer do
   @type composer :: __MODULE__.t()
   @spec run!(composer) :: operation
   @spec run!(composer, [run_option]) :: operation
-
-  defp dispatch_pass_action() do
-    receive do
-      {:run, op_ref, token_ref, run} ->
-        spawn_link(fn ->
-          try do
-            run.(%MLIR.Operation{ref: op_ref})
-            MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref)
-          rescue
-            exception ->
-              MLIR.CAPI.beaver_raw_logical_mutex_token_signal_failure(token_ref)
-              Logger.error(Exception.format(:error, exception, __STACKTRACE__))
-          end
-        end)
-
-        dispatch_pass_action()
-
-      {{:kind, MLIR.LogicalResult, _}, diagnostics} = ret when is_list(diagnostics) ->
-        Beaver.Native.check!(ret)
-
-      other ->
-        Logger.error("Unexpected message: #{inspect(other)}")
-        dispatch_pass_action()
-    end
-  end
 
   def run!(
         composer,
@@ -203,10 +166,34 @@ defmodule Beaver.Composer do
         opts \\ @run_default_opts
       ) do
     print = Keyword.get(opts, :print)
+    ctx = MLIR.context(MLIR.Operation.from_module(op))
+    pm = init(composer, opts)
+
+    if print do
+      mlirContextEnableMultithreading(ctx, false)
+      MLIR.PassManager.enable_ir_printing(pm)
+    end
+
+    res = MLIR.PassManager.run(pm, op)
+
+    if print do
+      mlirContextEnableMultithreading(ctx, true)
+    end
+
+    MLIR.PassManager.destroy(pm)
+
+    case res do
+      :ok -> {:ok, op}
+      {:error, diagnostics} -> {:error, diagnostics}
+    end
+  end
+
+  def init(
+        %__MODULE__{} = composer,
+        opts \\ @run_default_opts
+      ) do
     timing = Keyword.get(opts, :timing)
     debug = Keyword.get(opts, :debug)
-    ctx = MLIR.context(MLIR.Operation.from_module(op))
-
     pm = to_pm(composer)
 
     if timing do
@@ -215,40 +202,12 @@ defmodule Beaver.Composer do
 
     mlirPassManagerEnableVerifier(pm, true)
 
-    if print do
-      mlirContextEnableMultithreading(ctx, false)
-      MLIR.PassManager.enable_ir_printing(pm)
-    end
-
     if debug do
       txt = pm |> MLIR.to_string()
       txt = "[pass pipeline] " <> txt
       txt |> Logger.info()
     end
 
-    {status, diagnostics} = run_pm_async(pm, op)
-
-    if print do
-      mlirContextEnableMultithreading(ctx, true)
-    end
-
-    mlirPassManagerDestroy(pm)
-
-    if MLIR.LogicalResult.success?(status) do
-      {:ok, op}
-    else
-      {:error, diagnostics}
-    end
-  end
-
-  @doc false
-  def run_pm_async(%MLIR.PassManager{ref: pm_ref}, op) do
-    case beaver_raw_run_pm_on_op_async(pm_ref, MLIR.Operation.from_module(op).ref) do
-      :ok ->
-        dispatch_pass_action()
-
-      ret ->
-        Beaver.Native.check!(ret)
-    end
+    pm
   end
 end

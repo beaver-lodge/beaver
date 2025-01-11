@@ -9,4 +9,10 @@ defmodule DiagnosticTest do
                    MLIR.Attribute.get("invalid_attr", ctx: ctx)
                  end
   end
+
+  @tag :stderr
+  test "emit", %{ctx: ctx} do
+    loc = MLIR.Location.unknown(ctx: ctx)
+    MLIR.Diagnostic.emit(loc, "some error msg")
+  end
 end

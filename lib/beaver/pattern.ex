@@ -257,4 +257,28 @@ defmodule Beaver.Pattern do
         ~t{!pdl.value}
     end
   end
+
+  import Beaver.MLIR.CAPI
+  @doc false
+  def compile_patterns(ctx, patterns, opts \\ []) do
+    pattern_module = MLIR.Location.from_env(__ENV__, ctx: ctx) |> MLIR.Module.empty()
+    block = Beaver.MLIR.Module.body(pattern_module)
+
+    for p <- patterns do
+      p = p.(ctx, block)
+
+      if opts[:debug] do
+        p |> MLIR.dump!()
+      end
+    end
+
+    MLIR.verify!(pattern_module)
+
+    pdl_pat_mod = mlirPDLPatternModuleFromModule(pattern_module)
+
+    pdl_pat_mod
+    |> mlirRewritePatternSetFromPDLPatternModule()
+    |> mlirFreezeRewritePattern()
+    |> tap(fn _ -> MLIR.Module.destroy(pattern_module) end)
+  end
 end

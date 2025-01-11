@@ -170,7 +170,7 @@ defmodule ElixirAST do
       end
     end
 
-    def run(func) do
+    def run(func, state) do
       func
       |> Beaver.Walker.postwalk(%{variables: %{}}, fn
         %MLIR.Operation{} = op, acc ->
@@ -198,6 +198,8 @@ defmodule ElixirAST do
         mlir, acc ->
           {mlir, acc}
       end)
+
+      state
     end
   end
 end

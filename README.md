@@ -62,7 +62,7 @@ defmodule ToyPass do
     end
   end
 
-  def run(%MLIR.Operation{} = operation) do
+  def run(%MLIR.Operation{} = operation, _state) do
     with 1 <- Beaver.Walker.regions(operation) |> Enum.count(),
          {:ok, _} <-
            MLIR.apply_(MLIR.Module.from_operation(operation), [replace_add_op(benefit: 2)]) do

@@ -277,36 +277,26 @@ defmodule Beaver.MLIR do
   It is named `apply_` with a underscore to avoid name collision with `Kernel.apply/2`
   """
   @spec apply_(applicable(), apply_opt) :: {:ok, applicable()} | {:error, String.t()}
-  def apply_(op, patterns, opts \\ @apply_default_opts) when is_list(patterns) do
+
+  def apply_(op, patterns, opts \\ @apply_default_opts) do
     if MLIR.null?(op), do: raise("op is null")
     ctx = MLIR.Operation.from_module(op) |> MLIR.context()
 
-    pattern_module = MLIR.Location.from_env(__ENV__, ctx: ctx) |> MLIR.Module.empty()
-    block = Beaver.MLIR.Module.body(pattern_module)
-
-    for p <- patterns do
-      p = p.(ctx, block)
-
-      if opts[:debug] do
-        p |> MLIR.dump!()
+    {frozen_pat_set, should_destroy} =
+      if is_list(patterns) do
+        {Beaver.Pattern.compile_patterns(ctx, patterns, opts), true}
+      else
+        {patterns, false}
       end
-    end
 
-    MLIR.verify!(pattern_module)
     MLIR.verify!(op)
-    pdl_pat_mod = mlirPDLPatternModuleFromModule(pattern_module)
-
-    frozen_pat_set =
-      pdl_pat_mod
-      |> mlirRewritePatternSetFromPDLPatternModule()
-      |> mlirFreezeRewritePattern()
 
     {result, diagnostics} =
       beaverModuleApplyPatternsAndFoldGreedilyWithDiagnostics(ctx, op, frozen_pat_set)
 
-    mlirPDLPatternModuleDestroy(pdl_pat_mod)
-    mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
-    MLIR.Module.destroy(pattern_module)
+    if should_destroy do
+      mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
+    end
 
     if MLIR.LogicalResult.success?(result) do
       {:ok, op}

@@ -63,7 +63,7 @@ defmodule RedundantTransposeTest do
         MLIR.equal?(attr1, attr2)
       end
 
-      def run(func) do
+      def run(func, state) do
         func
         |> Beaver.Walker.prewalk(fn
           x ->
@@ -80,6 +80,8 @@ defmodule RedundantTransposeTest do
               _ -> x
             end
         end)
+
+        state
       end
     end
 

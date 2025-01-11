@@ -194,22 +194,24 @@ defmodule PDLTest do
     end
   end
 
-  test "toy compiler with pass", %{ctx: ctx} do
-    ir =
-      ~m"""
-      module {
-        func.func @tosa_add(%arg0: tensor<1x3xf32>, %arg1: tensor<2x1xf32>) -> tensor<2x3xf32> {
-          %0 = "tosa.add"(%arg0, %arg1) : (tensor<1x3xf32>, tensor<2x1xf32>) -> tensor<2x3xf32>
-          return %0 : tensor<2x3xf32>
+  for p <- [ToyPass, ToyPassWithInit] do
+    test "toy compiler with pass: #{p}", %{ctx: ctx} do
+      ir =
+        ~m"""
+        module {
+          func.func @tosa_add(%arg0: tensor<1x3xf32>, %arg1: tensor<2x1xf32>) -> tensor<2x3xf32> {
+            %0 = "tosa.add"(%arg0, %arg1) : (tensor<1x3xf32>, tensor<2x1xf32>) -> tensor<2x3xf32>
+            return %0 : tensor<2x3xf32>
+          }
         }
-      }
-      """.(ctx)
-      |> Beaver.Composer.append(ToyPass)
-      |> canonicalize
-      |> Beaver.Composer.run!()
+        """.(ctx)
+        |> Beaver.Composer.append(unquote(p))
+        |> canonicalize
+        |> Beaver.Composer.run!()
 
-    ir_string = MLIR.to_string(ir)
-    assert not (ir_string =~ "tosa.add")
-    assert ir_string =~ "tosa.sub"
+      ir_string = MLIR.to_string(ir)
+      assert not (ir_string =~ "tosa.add")
+      assert ir_string =~ "tosa.sub"
+    end
   end
 end

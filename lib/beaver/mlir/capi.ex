@@ -44,14 +44,19 @@ defmodule Beaver.MLIR.CAPI do
         _argument,
         _description,
         _op_name,
-        _handler,
+        _destruct,
+        _initialize,
+        _clone,
         _run
       ),
       do: :erlang.nif_error(:not_loaded)
 
   def beaver_raw_run_pm_on_op_async(_pm, _op), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_logical_mutex_token_signal_success(_), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_logical_mutex_token_signal_failure(_), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_destroy_pm_async(_pm), do: :erlang.nif_error(:not_loaded)
+
+  def beaver_raw_logical_mutex_token_signal_success(_token, _is_success),
+    do: :erlang.nif_error(:not_loaded)
+
   def beaver_raw_registered_ops(_ctx), do: :erlang.nif_error(:not_loaded)
   def beaver_raw_registered_dialects(_ctx), do: :erlang.nif_error(:not_loaded)
 
