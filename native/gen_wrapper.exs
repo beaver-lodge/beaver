@@ -14,6 +14,29 @@ defmodule Updater do
   defp dirty_cpu(name), do: "#{name}_dirty_cpu" |> String.to_atom()
   defp with_diagnostics(name), do: "#{name}WithDiagnostics" |> String.to_atom()
 
+  defp write_file(dst, txt) do
+    tmp_dir = System.get_env("MIX_APP_PATH") || System.tmp_dir()
+
+    if tmp_dir do
+      tmp_dir
+    else
+      "./tmp" |> Path.expand() |> tap(&File.mkdir_p!/1)
+    end
+
+    tmp = Path.join(tmp_dir, "tmp-#{System.pid()}--#{Path.basename(dst)}")
+    File.touch!(tmp)
+
+    try do
+      File.write!(tmp, txt)
+      File.rename!(tmp, dst)
+      Logger.info("Updated #{dst}")
+    rescue
+      e ->
+        File.rm!(tmp)
+        reraise e, __STACKTRACE__
+    end
+  end
+
   def gen(functions, :elixir) do
     for {name, arity} <- functions do
       cond do
@@ -32,8 +55,7 @@ defmodule Updater do
     |> then(
       &for ["--elixir", dst] <- args() do
         dst = Path.expand(dst)
-        File.write!(dst, &1)
-        Logger.info("Updated #{dst}")
+        write_file(dst, &1)
       end
     )
 
@@ -74,10 +96,8 @@ defmodule Updater do
     """
 
     for ["--zig", dst] <- args() do
-      File.write!(dst, txt)
-      {_, 0} = System.cmd("zig", ["fmt", dst])
-      dst = Path.expand(dst)
-      Logger.info("Updated #{dst}")
+      write_file(dst, txt)
+      {_, 0} = System.cmd("zig", ["fmt", dst], stderr_to_stdout: true)
     end
 
     functions
