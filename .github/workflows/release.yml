@@ -164,7 +164,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          push: ${{ secrets.DOCKERHUB_USERNAME != '' }}
+          push: ${{ secrets.DOCKERHUB_TOKEN != '' }}
           tags: ${{ env.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest
           cache-from: type=registry,ref=${{ env.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest
           cache-to: type=inline
