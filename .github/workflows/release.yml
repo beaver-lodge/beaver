@@ -154,7 +154,7 @@ jobs:
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ vars.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -164,9 +164,9 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
-          push: ${{ secrets.DOCKERHUB_USERNAME != '' }}
-          tags: jackalcooper/beaver-livebook-${{ matrix.image.suffix }}:latest
-          cache-from: type=registry,ref=jackalcooper/beaver-livebook-${{ matrix.image.suffix }}:latest
+          push: ${{ secrets.DOCKERHUB_TOKEN != '' }}
+          tags: ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest
+          cache-from: type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest
           cache-to: type=inline
           platforms: |
             ${{ matrix.image.platform }}
@@ -186,7 +186,7 @@ jobs:
       - name: Build ARM
         continue-on-error: true
         if: ${{ matrix.image.platform == 'linux/arm64/v8' }}
-        run: docker run --platform ${{ matrix.image.platform }} -v $PWD:/src -w /src/beaver jackalcooper/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
+        run: docker run --platform ${{ matrix.image.platform }} -v $PWD:/src -w /src/beaver ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
       - name: Build x86
         if: ${{ matrix.image.platform == 'linux/amd64' }}
-        run: docker run -v $PWD:/src -w /src/beaver jackalcooper/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
+        run: docker run -v $PWD:/src -w /src/beaver ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
