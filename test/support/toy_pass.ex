@@ -32,8 +32,6 @@ end
 defmodule ToyPassWithInit do
   @moduledoc false
   use Beaver
-  alias MLIR.Dialect.{Func, TOSA}
-  require Func
   use MLIR.Pass, on: "builtin.module"
 
   def initialize(ctx, nil) do
