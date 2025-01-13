@@ -129,9 +129,13 @@ defmodule Beaver.Composer do
     txt
   end
 
-  @run_default_opts [debug: false, print: false, timing: false]
+  @run_default_opts [debug: false, print: false, timing: false, verifier: true]
 
-  @type run_option :: {:debug, boolean()} | {:print, boolean()} | {:timing, boolean()}
+  @type run_option ::
+          {:debug, boolean()}
+          | {:print, boolean()}
+          | {:timing, boolean()}
+          | {:verifier, boolean()}
   @type run_result :: {:ok, any()} | {:error, String.t()}
   @type composer :: __MODULE__.t()
   @spec run!(composer) :: operation
@@ -194,13 +198,14 @@ defmodule Beaver.Composer do
       ) do
     timing = Keyword.get(opts, :timing)
     debug = Keyword.get(opts, :debug)
+    verifier = !!Keyword.get(opts, :verifier)
     pm = to_pm(composer)
 
     if timing do
       pm |> beaverPassManagerEnableTiming()
     end
 
-    mlirPassManagerEnableVerifier(pm, true)
+    :ok = MLIR.PassManager.enable_verifier(pm, verifier)
 
     if debug do
       txt = pm |> MLIR.to_string()
