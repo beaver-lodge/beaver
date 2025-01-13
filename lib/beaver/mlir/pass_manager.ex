@@ -76,4 +76,6 @@ defmodule Beaver.MLIR.PassManager do
         Beaver.Native.check!(ret)
     end
   end
+
+  defdelegate enable_verifier(pm, enable), to: MLIR.CAPI, as: :mlirPassManagerEnableVerifier
 end

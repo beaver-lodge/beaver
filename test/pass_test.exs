@@ -223,7 +223,7 @@ defmodule PassTest do
       |> Beaver.Composer.nested("func.func", ErrInit)
       |> canonicalize()
 
-    pm = Beaver.Composer.init(composer)
+    pm = Beaver.Composer.init(composer, verifier: true)
     {:error, diagnostics} = MLIR.PassManager.run(pm, op)
 
     assert MLIR.Diagnostic.format(diagnostics) =~
