@@ -194,8 +194,21 @@ const ManagerRunner = struct {
     }
 };
 
+var mutex: std.Thread.Mutex = .{};
+var all_passes_registered = false;
+fn register_all_passes(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
+    mutex.lock();
+    defer mutex.unlock();
+    if (!all_passes_registered) {
+        all_passes_registered = true;
+        c.mlirRegisterAllPasses();
+    }
+    return beam.make_ok(env);
+}
+
 pub const nifs = .{
     result.nif("beaver_raw_create_mlir_pass", 8, CallbackDispatcher.create_mlir_pass).entry,
     result.nif("beaver_raw_run_pm_on_op_async", 2, ManagerRunner.run_pm_on_op).entry,
     result.nif("beaver_raw_destroy_pm_async", 1, ManagerRunner.destroy).entry,
+    result.nif("beaver_raw_register_all_passes", 0, register_all_passes).entry,
 };
