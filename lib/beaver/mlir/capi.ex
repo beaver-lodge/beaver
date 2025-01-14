@@ -97,7 +97,50 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_enif_signatures(_ctx), do: :erlang.nif_error(:not_loaded)
   def beaver_raw_enif_functions(), do: :erlang.nif_error(:not_loaded)
   def beaver_raw_mlir_type_of_enif_obj(_ctx, _obj), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_string_printer_callback(), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_string_printer_flush(_sp), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_register_all_passes(), do: :erlang.nif_error(:not_loaded)
+  @doc """
+Provides a stub for the MLIR string printer callback NIF.
+
+This function is a placeholder for a Native Implemented Function (NIF) that will be loaded dynamically. When called before the NIF is loaded, it raises a `:not_loaded` error.
+
+## Returns
+
+Normally would return a callback mechanism for printing MLIR strings, but currently returns an error indicating the NIF is not yet loaded.
+
+## Remarks
+
+- Part of the Beaver MLIR C API interface
+- Actual implementation will be provided by the dynamically loaded NIF
+- Calling this function before NIF loading will result in an error
+"""
+def beaver_raw_string_printer_callback(), do: :erlang.nif_error(:not_loaded)
+  @doc """
+Attempts to flush a string printer, but returns a not loaded error since the NIF is not implemented.
+
+## Parameters
+
+  - `_sp`: An opaque pointer representing the string printer to be flushed.
+
+## Returns
+
+Always returns `:erlang.nif_error(:not_loaded)` indicating that the Native Implemented Function (NIF) has not been loaded.
+
+## Notes
+
+This is a stub function that will be replaced by the actual implementation when the NIF library is successfully loaded.
+"""
+def beaver_raw_string_printer_flush(_sp), do: :erlang.nif_error(:not_loaded)
+  @doc """
+Attempts to register all available MLIR passes via the NIF library.
+
+## Returns
+
+`:erlang.nif_error(:not_loaded)` when the NIF library has not been successfully loaded.
+
+## Notes
+
+- This is a stub function that will be replaced by the actual NIF implementation
+- Must be called after successfully loading the MLIR NIF library
+- Part of the MLIR C API interface for pass management
+"""
+def beaver_raw_register_all_passes(), do: :erlang.nif_error(:not_loaded)
 end

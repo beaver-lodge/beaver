@@ -35,7 +35,32 @@ defmodule Beaver.MLIR.Pass do
   end
 
   @registry __MODULE__.Registry
-  @doc false
+  """
+  @doc """
+  Generates child specifications for the global MLIR pass registrar and registry.
+  
+  Returns a list of child specifications for a supervisor, including:
+  - An `Agent` for registering all MLIR passes using the `beaver_raw_register_all_passes/0` function
+  - A `Registry` for managing unique pass registrations
+  
+  ## Returns
+  
+  A list of child specifications compatible with Elixir supervision trees:
+  - First element: An `Agent` child spec configured to start with the pass registration function
+  - Second element: A `Registry` child spec with unique key registration
+  
+  ## Examples
+  
+      iex> Beaver.MLIR.Pass.global_registrar_child_specs()
+      [
+        %{
+          id: Agent,
+          start: {Agent, :start_link, [&Beaver.MLIR.CAPI.beaver_raw_register_all_passes/0, [name: @registrar]]}
+        },
+        {Registry, keys: :unique, name: @registry}
+      ]
+  """
+  @spec global_registrar_child_specs() :: [Supervisor.child_spec()]
   def global_registrar_child_specs() do
     [
       Supervisor.child_spec(Agent,
