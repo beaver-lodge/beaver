@@ -99,4 +99,5 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_mlir_type_of_enif_obj(_ctx, _obj), do: :erlang.nif_error(:not_loaded)
   def beaver_raw_string_printer_callback(), do: :erlang.nif_error(:not_loaded)
   def beaver_raw_string_printer_flush(_sp), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_register_all_passes(), do: :erlang.nif_error(:not_loaded)
 end
