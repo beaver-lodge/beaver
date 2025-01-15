@@ -36,9 +36,7 @@ defmodule Beaver.MLIR.Pass do
   @registry __MODULE__.Registry
   @doc false
   def global_registrar_child_specs() do
-    [
-      {Registry, keys: :unique, name: @registry}
-    ]
+    [Task.child_spec(&ensure_all_registered!/0), {Registry, keys: :unique, name: @registry}]
   end
 
   defp start_worker(name) do
