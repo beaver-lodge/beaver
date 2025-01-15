@@ -196,6 +196,7 @@ defmodule Beaver.Composer do
         %__MODULE__{} = composer,
         opts \\ @run_default_opts
       ) do
+    :ok = MLIR.Pass.ensure_all_registered!()
     timing = Keyword.get(opts, :timing)
     debug = Keyword.get(opts, :debug)
     verifier = !!Keyword.get(opts, :verifier)
