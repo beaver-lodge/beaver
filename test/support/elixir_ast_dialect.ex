@@ -1,3 +1,33 @@
+defmodule ElixirAST.Sample do
+  @moduledoc false
+  @doc false
+  def naive_modules() do
+    quote do
+      defmodule TwoFuncMod do
+        @moduledoc false
+        def add_two_literal() do
+          a = 1 + 2
+          b = a + 3
+          b
+        end
+
+        def main() do
+          add_two_literal()
+        end
+      end
+
+      defmodule OneFuncMod do
+        @moduledoc false
+        def add_two_literal() do
+          a = 1 + 2
+          b = a + 3
+          b
+        end
+      end
+    end
+  end
+end
+
 defmodule ElixirAST do
   require Logger
   @moduledoc "Prototype the Elixir AST dialect."
@@ -119,6 +149,10 @@ defmodule ElixirAST do
   end
 
   defp gen_mlir({:__block__, _, _} = ast, _, _) do
+    ast
+  end
+
+  defp gen_mlir({:@, _, _}, ast, _) do
     ast
   end
 

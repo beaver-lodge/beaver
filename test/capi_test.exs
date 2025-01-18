@@ -166,26 +166,6 @@ defmodule MlirTest do
     mlirContextDestroy(ctx)
   end
 
-  defmodule TestPass do
-    @moduledoc false
-    use MLIR.Pass
-
-    def run(%Beaver.MLIR.Operation{} = op, state) do
-      MLIR.verify!(op)
-      state
-    end
-  end
-
-  defmodule TestFuncPass do
-    @moduledoc false
-    use MLIR.Pass, on: "func.func"
-
-    def run(%Beaver.MLIR.Operation{} = op, state) do
-      MLIR.verify!(op)
-      state
-    end
-  end
-
   test "Run a generic pass" do
     ctx = MLIR.Context.create()
     {:ok, module} = create_adder_module(ctx)

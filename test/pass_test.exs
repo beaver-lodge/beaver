@@ -5,15 +5,6 @@ defmodule PassTest do
   require Func
   import MLIR.Transform
 
-  defmodule PassRaisingException do
-    @moduledoc false
-    use Beaver.MLIR.Pass, on: "func.func"
-
-    def run(_op, _state) do
-      raise "exception in pass run"
-    end
-  end
-
   defp example_ir(ctx) do
     mlir ctx: ctx do
       module do
@@ -35,7 +26,7 @@ defmodule PassTest do
     ir = example_ir(ctx)
 
     assert_raise ArgumentError,
-                 ~r"PassTest.PassRaisingException.run\/2.+Fail to run a pass implemented in Elixir"s,
+                 ~r"exception in pass run"s,
                  fn ->
                    ir
                    |> Beaver.Composer.nested("func.func", [
@@ -99,63 +90,6 @@ defmodule PassTest do
     |> Beaver.Composer.run!()
   end
 
-  defmodule AllCallbacks do
-    @moduledoc false
-    use Beaver.MLIR.Pass, on: "func.func"
-
-    @counter %{
-      destruct: 0,
-      initialize: 0,
-      clone: 0,
-      run: 0
-    }
-    def initialize(_ctx, nil) do
-      {:ok, pid} =
-        Agent.start_link(
-          fn ->
-            %{@counter | initialize: 1}
-          end,
-          name: __MODULE__
-        )
-
-      {:ok, {:init, pid}}
-    end
-
-    def initialize(_ctx, {:init, pid}) do
-      Agent.update(
-        pid,
-        fn state ->
-          update_in(state.initialize, &(&1 + 1))
-        end
-      )
-
-      {:ok, {:re_init, pid}}
-    end
-
-    def clone({:init, pid}) do
-      Agent.update(pid, fn state -> update_in(state.clone, &(&1 + 1)) end)
-      {:clone, pid}
-    end
-
-    def run(op, {:clone, pid} = state) do
-      assert MLIR.Operation.name(op) == "func.func"
-      Agent.update(pid, fn state -> update_in(state.run, &(&1 + 1)) end)
-      state
-    end
-
-    def destruct({:clone, pid}) do
-      Agent.update(pid, fn state -> update_in(state.destruct, &(&1 + 1)) end)
-    end
-
-    def destruct({:init, pid}) do
-      Agent.update(pid, fn state -> update_in(state.destruct, &(&1 + 1)) end)
-    end
-
-    def destruct({:re_init, pid}) do
-      Agent.update(pid, fn state -> update_in(state.destruct, &(&1 + 1)) end)
-    end
-  end
-
   test "full life cycle", %{ctx: ctx} do
     n = 100
 
@@ -199,20 +133,6 @@ defmodule PassTest do
     assert clone0 == clone
     assert clone + 1 == destruct
     assert :ok = Agent.stop(AllCallbacks)
-  end
-
-  defmodule ErrInit do
-    @moduledoc false
-    use Beaver.MLIR.Pass, on: "func.func"
-
-    def initialize(_ctx, nil) do
-      {:error, "new state used in cleanup"}
-    end
-
-    def destruct(state) do
-      {:ok, _} = Agent.start_link(fn -> state end, name: __MODULE__)
-      :ok
-    end
   end
 
   test "run init with err", %{ctx: ctx} do
