@@ -20,6 +20,7 @@ const num_nifs = handwritten_nifs.len;
 export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs;
 
 export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
+    pass.register_all_passes();
     kinda.open_internal_resource_types(env);
     kinda.Internal.OpaqueStruct.open_all(env);
     mlir_capi.open_all(env);

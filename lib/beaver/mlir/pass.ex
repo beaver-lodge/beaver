@@ -26,17 +26,10 @@ defmodule Beaver.MLIR.Pass do
     end
   end
 
-  @doc """
-  Ensure all passes are registered with the global registry.
-  """
-  def ensure_all_registered!() do
-    :ok = Beaver.MLIR.CAPI.beaver_raw_register_all_passes()
-  end
-
   @registry __MODULE__.Registry
   @doc false
   def global_registrar_child_specs() do
-    [Task.child_spec(&ensure_all_registered!/0), {Registry, keys: :unique, name: @registry}]
+    [{Registry, keys: :unique, name: @registry}]
   end
 
   defp start_worker(name) do

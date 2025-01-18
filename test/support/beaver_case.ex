@@ -10,7 +10,6 @@ defmodule Beaver.Case do
       alias Beaver.MLIR
 
       setup do
-        Beaver.MLIR.Pass.ensure_all_registered!()
         ctx = MLIR.Context.create(unquote(options))
 
         on_exit(fn ->
