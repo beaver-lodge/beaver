@@ -55,7 +55,6 @@ defmodule MutCompiler do
 
       :not_found ->
         raise "block arg not found, #{inspect(ast)}"
-        {gen_mlir(ast, acc), acc}
     end
   end
 
@@ -123,7 +122,7 @@ defmodule MutCompiler do
 
     less =
       mlir blk: block, ctx: ctx do
-        Arith.cmpf(left, right, predicate: Arith.cmp_f_predicate(:ugt)) >>> Type.i1()
+        Arith.cmpf(left, right, predicate: Arith.cmp_f_predicate(:olt)) >>> Type.i1()
       end
 
     {less, acc}

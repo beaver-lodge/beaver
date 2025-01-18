@@ -33,7 +33,7 @@ defmodule CfTest do
     f = get_func(ir, "get_lr_with_ctrl_flow")
 
     assert f.(1000.0, 0.5, 0.002, 200.0) /
-             f.(1000.0, 0.5, 0.002, 2000.0) == 2
+             f.(1000.0, 0.5, 0.002, 2000.0) == 0.5
 
     assert mlir =~ "%1 = arith.mulf %arg2, %arg1 : f32", mlir
     assert mlir =~ "return %2 : f32", mlir
