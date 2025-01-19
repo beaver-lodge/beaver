@@ -19,7 +19,16 @@ const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.Entries
 const num_nifs = handwritten_nifs.len;
 export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs;
 
-export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
+fn nif_load(env: beam.env, priv_data: [*c]?*anyopaque, _: beam.term)  callconv(.C) c_int {
+    std.debug.print("nif_load {?}\n", .{env});
+    std.debug.print("priv_data {*}\n", .{priv_data.*});
+    if (priv_data.*) |data| {
+        std.debug.print("priv_data {*}\n", .{data});
+    } else {
+        std.debug.print("priv_data is null\n", .{});
+        priv_data.* = env;
+        std.debug.print("enif_priv_data: {*}\n", .{e.enif_priv_data(env)});
+    }
     pass.register_all_passes();
     kinda.open_internal_resource_types(env);
     kinda.Internal.OpaqueStruct.open_all(env);
@@ -27,6 +36,21 @@ export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     memref.open_all(env);
     logical_mutex.open_all(env);
     return 0;
+}
+
+fn nif_upgrade(env: beam.env, _: [*c]?*anyopaque, _: [*c]?*anyopaque, _: beam.term)  callconv(.C) c_int {
+    std.debug.print("nif_upgrade\n", .{});
+    kinda.open_internal_resource_types(env);
+    kinda.Internal.OpaqueStruct.open_all(env);
+    mlir_capi.open_all(env);
+    memref.open_all(env);
+    logical_mutex.open_all(env);
+    return 0;
+}
+
+fn nif_unload(_: beam.env, _: ?*anyopaque) callconv(.C)  void {
+    std.debug.print("nif_unload\n", .{});
+    // Perform any necessary cleanup steps here
 }
 
 const entry = e.ErlNifEntry{
@@ -37,8 +61,8 @@ const entry = e.ErlNifEntry{
     .funcs = &(nifs[0]),
     .load = nif_load,
     .reload = null, // currently unsupported
-    .upgrade = null, // currently unsupported
-    .unload = null, // currently unsupported
+    .upgrade = nif_upgrade,
+    .unload = nif_unload, // currently unsupported
     .vm_variant = "beam.vanilla",
     .options = 1,
     .sizeof_ErlNifResourceTypeInit = @sizeOf(e.ErlNifResourceTypeInit),
