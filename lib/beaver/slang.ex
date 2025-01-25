@@ -105,9 +105,16 @@ defmodule Beaver.Slang do
     n = arguments |> Enum.count(&match?(%MLIR.Value{}, &1))
 
     names =
-      Range.new(1, n, 1) |> Enum.map(&MLIR.Attribute.string("#{op}_#{&1}"))
+      if op in [:operands, :results, :parameters] do
+        names =
+          Range.new(1, n, 1) |> Enum.map(&MLIR.Attribute.string("#{op}_#{&1}"))
 
-    arguments = arguments ++ [names: MLIR.Attribute.array(names)]
+        [names: MLIR.Attribute.array(names)]
+      else
+        []
+      end
+
+    arguments = arguments ++ names
 
     apply(Beaver.MLIR.Dialect.IRDL, op, [
       %{ssa | arguments: arguments}
