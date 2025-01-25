@@ -102,7 +102,16 @@ defmodule Beaver.Slang do
       end)
 
     {{:slang_target_op, op}, arguments} = List.pop_at(ssa.arguments, i)
-    apply(Beaver.MLIR.Dialect.IRDL, op, [%{ssa | arguments: arguments}])
+    n = arguments |> Enum.count(&match?(%MLIR.Value{}, &1))
+
+    names =
+      Range.new(1, n, 1) |> Enum.map(&MLIR.Attribute.string("#{op}_#{&1}"))
+
+    arguments = arguments ++ [names: MLIR.Attribute.array(names)]
+
+    apply(Beaver.MLIR.Dialect.IRDL, op, [
+      %{ssa | arguments: arguments}
+    ])
   end
 
   # This function determines the variadicity of the given values based on the provided options. It generates the variadicity attribute for the values if needed.
