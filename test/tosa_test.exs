@@ -41,9 +41,10 @@ defmodule TosaTest do
                       arg1 >>> Type.ranked_tensor([:dynamic, :dynamic], Type.f32())
                     ) do
                 v0 = TOSA.add(arg0, arg1) >>> Type.ranked_tensor([:dynamic, :dynamic], Type.f32())
+                shift = TOSA.const(values: ~a{dense<0> : tensor<1xi8>}) >>> ~t{tensor<1xi8>}
 
                 v0 =
-                  TOSA.mul(v0, arg1, {:shift, ~a{0 : i8}}) >>>
+                  TOSA.mul(v0, arg1, shift) >>>
                     Type.ranked_tensor([:dynamic, :dynamic], Type.f32())
 
                 Func.return(v0) >>> []
