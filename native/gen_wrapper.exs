@@ -134,7 +134,6 @@ defmodule Updater do
   defp parse(txt) do
     txt
     |> JSON.decode!()
-    |> Map.get("inner", [])
     |> traverse()
     |> Enum.sort()
   end
