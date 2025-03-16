@@ -91,7 +91,7 @@ fn mlir_f_type_of_size(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type
 
 fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
     switch (@typeInfo(t)) {
-        .@"pointer" => {
+        .pointer => {
             return llvm_ptr_type(env, ctx);
         },
         .@"opaque" => {
