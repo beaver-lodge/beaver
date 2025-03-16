@@ -38,7 +38,9 @@ defmodule Updater do
   end
 
   def gen(functions, :elixir) do
-    for {name, arity} <- functions do
+    for {name, params} <- functions do
+      arity = length(params)
+
       cond do
         name in @with_diagnostics or String.ends_with?(Atom.to_string(name), "GetChecked") ->
           [{name, arity}, {with_diagnostics(name), arity + 1}]
@@ -103,46 +105,48 @@ defmodule Updater do
     functions
   end
 
-  defp parse(tokens, acc \\ [])
-
-  defp parse([], acc) do
-    Enum.reverse(acc)
+  def parse_functions(json) do
+    traverse(json)
+    |> Enum.sort()
   end
 
-  defp parse(["(" | tail], acc) do
-    {tail, sub_acc} = parse(tail, [])
-    parse(tail, [sub_acc | acc])
+  defp traverse(node) when is_list(node) do
+    Enum.flat_map(node, &traverse/1)
   end
 
-  defp parse([")" | tail], acc) do
-    {tail, Enum.reverse(acc)}
+  defp traverse(node) when is_map(node) do
+    function_decl = process_function_decl(node)
+    children = traverse(Map.get(node, "inner", []))
+
+    if function_decl do
+      [function_decl | children]
+    else
+      children
+    end
   end
 
-  defp parse([head | tail], acc) do
-    parse(tail, [head | acc])
+  defp process_function_decl(%{"kind" => "FunctionDecl", "name" => name, "inner" => inner}) do
+    params =
+      for {elem, index} <- Enum.with_index(inner), elem["kind"] == "ParmVarDecl" do
+        Map.get(elem, "name", "param_#{index}")
+      end
+
+    {String.to_atom(name), params}
   end
 
-  @deliminator "()\:\;\,"
-  defp tokenize(decl) do
-    Regex.scan(~r/[^\s#{@deliminator}]+|[#{@deliminator}]/, decl) |> List.flatten()
-  end
+  defp process_function_decl(_), do: nil
 
-  defp fa(decl) do
-    ["pub", "extern", "fn", name, args | _] = tokenize(decl) |> parse()
-
-    args
-    |> Enum.chunk_by(&(&1 == ","))
-    |> Enum.reject(&(&1 in [[","], ["..."]]))
-    |> length()
-    |> then(&{String.to_atom(name), &1})
+  def parse(txt) do
+    txt
+    |> JSON.decode!()
+    |> Map.get("inner", [])
+    |> parse_functions()
   end
 
   def run do
-    IO.stream(:stdio, :line)
-    |> Stream.map(&String.trim/1)
-    |> Stream.filter(&String.starts_with?(&1, ["pub extern fn beaver", "pub extern fn mlir"]))
-    |> Stream.map(&fa/1)
-    |> Enum.sort()
+    IO.stream(:stdio, 10000)
+    |> Enum.into("")
+    |> parse()
     |> gen(:elixir)
     |> gen(:zig)
   end

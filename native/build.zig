@@ -10,6 +10,7 @@ pub fn build(b: *std.Build) void {
     lib.root_module.addImport("kinda", kinda.module("kinda"));
     lib.root_module.addImport("erl_nif", kinda.module("erl_nif"));
     lib.root_module.addImport("beam", kinda.module("beam"));
+    lib.root_module.addIncludePath(.{ .cwd_relative = "include" });
     if (os == .linux) {
         lib.root_module.addRPathSpecial("$ORIGIN");
     }
