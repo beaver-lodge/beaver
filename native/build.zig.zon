@@ -1,7 +1,7 @@
 .{
-    .name = "beaver",
+    .name = .beaver,
     .version = "0.0.1",
-
+    .fingerprint = 0xd04bfcb952b135d6,
     .dependencies = .{
         .kinda = .{
             .path = "../../kinda",

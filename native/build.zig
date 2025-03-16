@@ -9,7 +9,7 @@ pub fn build(b: *std.Build) void {
         .name = "BeaverNIF",
         .root_source_file = b.path("src/main.zig"),
         .optimize = .Debug,
-        .target = b.host,
+        .target = b.standardTargetOptions(.{})
     });
     const kinda = b.dependency("kinda", .{});
     lib.root_module.addImport("kinda", kinda.module("kinda"));
