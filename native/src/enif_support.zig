@@ -91,13 +91,13 @@ fn mlir_f_type_of_size(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type
 
 fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
     switch (@typeInfo(t)) {
-        .Pointer => {
+        .pointer => {
             return llvm_ptr_type(env, ctx);
         },
-        .Opaque => {
+        .@"opaque" => {
             return try mlir_i_type_of_size(env, ctx, t);
         },
-        .Struct => {
+        .@"struct" => {
             if (t == e.BinaryMemRefDescriptor) {
                 return try binary_memref_type(env, ctx);
             } else if (t == beam.binary) {
@@ -105,7 +105,7 @@ fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !be
             }
             return try mlir_i_type_of_size(env, ctx, t);
         },
-        .Optional => {
+        .optional => {
             return llvm_ptr_type(env, ctx);
         },
         else => {
@@ -141,7 +141,7 @@ fn beaver_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.term
     inline for (enif_function_names, 0..) |name, i| {
         const decl_name = "__decl__" ++ name;
         const f = if (@hasDecl(e, decl_name)) @field(e, decl_name) else @field(e, name);
-        const FTI = @typeInfo(@TypeOf(f)).Fn;
+        const FTI = @typeInfo(@TypeOf(f)).@"fn";
         var signature_slice: []beam.term = try beam.allocator.alloc(beam.term, 3);
         defer beam.allocator.free(signature_slice);
         var arg_type_slice: []beam.term = try beam.allocator.alloc(beam.term, FTI.params.len);

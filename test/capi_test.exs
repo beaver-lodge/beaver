@@ -137,10 +137,8 @@ defmodule MlirTest do
   def create_redundant_transpose_module(ctx) do
     MLIR.Module.create("""
     func.func @test_transpose(%arg0: tensor<1x2x3xi32>) -> () {
-      %0 = arith.constant dense<[1, 2, 0]> : tensor<3xi32>
-      %1 = "tosa.transpose"(%arg0, %0) : (tensor<1x2x3xi32>, tensor<3xi32>) -> (tensor<2x3x1xi32>)
-      %2 = arith.constant dense<[2, 0, 1]> : tensor<3xi32>
-      %3 = "tosa.transpose"(%1, %2) : (tensor<2x3x1xi32>, tensor<3xi32>) -> (tensor<1x2x3xi32>)
+      %1 = "tosa.transpose"(%arg0) {perms = array<i32: 1, 2, 0>} : (tensor<1x2x3xi32>) -> (tensor<2x3x1xi32>)
+      %3 = "tosa.transpose"(%1) {perms = array<i32: 2, 0, 1>} : (tensor<2x3x1xi32>) -> (tensor<1x2x3xi32>)
       return
     }
     """).(ctx)

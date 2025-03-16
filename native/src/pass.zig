@@ -36,11 +36,11 @@ const CallbackDispatcher = struct {
         }
         return res;
     }
-    const callbacks = .{ "destruct", "initialize", "clone", "run" };
+    const callback_names = .{ "destruct", "initialize", "clone", "run" };
     fn clone(userData: ?*anyopaque) callconv(.C) ?*anyopaque {
         const this: *@This() = @ptrCast(@alignCast(userData));
         const new = @This().init(this.handler) catch unreachable;
-        inline for (callbacks) |f| {
+        inline for (callback_names) |f| {
             const cb: ?beam.term = @field(this.*.callbacks, f);
             if (cb != null) {
                 @field(new.*.callbacks, f) = e.enif_make_copy(new.*.env, cb.?);
@@ -115,7 +115,7 @@ const CallbackDispatcher = struct {
         const nDependentDialects = 0;
         const dependentDialects = null;
         const this: *@This() = try @This().init(handler);
-        inline for (callbacks, 4..) |f, i| {
+        inline for (callback_names, 4..) |f, i| {
             const cb = args[i];
             if (!beam.is_nil2(env, cb)) {
                 @field(this.*.callbacks, f) = e.enif_make_copy(this.env, args[i]);

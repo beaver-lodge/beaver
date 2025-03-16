@@ -39,7 +39,7 @@ defmodule MemRefTest do
       |> Beaver.Composer.append("one-shot-bufferize")
       |> Beaver.Composer.nested(
         "func.func",
-        ~w{buffer-deallocation convert-linalg-to-loops}
+        ~w{convert-linalg-to-loops}
       )
       |> convert_scf_to_cf
       |> Beaver.Composer.append("finalize-memref-to-llvm")

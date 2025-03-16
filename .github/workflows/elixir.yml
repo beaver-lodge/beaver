@@ -71,7 +71,7 @@ jobs:
       - name: Set up Zig
         uses: mlugg/setup-zig@v1
         with:
-          version: 0.13.0
+          version: 0.14.0
       - uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
         with:
@@ -102,8 +102,7 @@ jobs:
       - name: Install MLIR (latest), via ${{ github.event_name }}
         if: inputs.mlir_wheel_version == 'latest' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'use-latest-mlir'))
         run: |
-          latest_version=$(curl -Ls https://makslevental.github.io/wheels | grep -oh '[0-9.]*+cuda.[a-z0-9]*' | sort | tail -n 1)
-          python3 -m pip install "mlir==${latest_version}" -f https://makslevental.github.io/wheels -U
+          python3 -m pip install mlir -f https://makslevental.github.io/wheels -U
           echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
       - name: Install MLIR (fixed version), via ${{ github.event_name }}
         if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'use-latest-mlir')

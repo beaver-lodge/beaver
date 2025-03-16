@@ -3,7 +3,6 @@ defmodule GPUTest do
   use Beaver
   alias Beaver.MLIR
 
-  @moduletag :smoke
   @moduletag :cuda
 
   test "fatbin", %{ctx: ctx} do
