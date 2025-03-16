@@ -1,7 +1,7 @@
 defmodule Updater do
   require Logger
 
-  def args() do
+  defp args() do
     System.argv() |> Enum.chunk_every(2)
   end
 
@@ -37,7 +37,7 @@ defmodule Updater do
     end
   end
 
-  def gen(functions, :elixir) do
+  defp gen(functions, :elixir) do
     for {name, params} <- functions do
       arity = length(params)
 
@@ -64,7 +64,7 @@ defmodule Updater do
     functions
   end
 
-  def gen(functions, :zig) do
+  defp gen(functions, :zig) do
     entries =
       for {name, _arity} <- functions do
         cond do
@@ -105,11 +105,6 @@ defmodule Updater do
     functions
   end
 
-  def parse_functions(json) do
-    traverse(json)
-    |> Enum.sort()
-  end
-
   defp traverse(node) when is_list(node) do
     Enum.flat_map(node, &traverse/1)
   end
@@ -136,11 +131,12 @@ defmodule Updater do
 
   defp process_function_decl(_), do: nil
 
-  def parse(txt) do
+  defp parse(txt) do
     txt
     |> JSON.decode!()
     |> Map.get("inner", [])
-    |> parse_functions()
+    |> traverse()
+    |> Enum.sort()
   end
 
   def run do
