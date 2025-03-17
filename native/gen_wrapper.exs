@@ -1,6 +1,6 @@
 if Version.match?(System.version(), "< 1.18.0") do
   Mix.install([
-    {{:jason, "~> 1.4"}}
+    {:jason, "~> 1.4"}
   ])
 end
 
