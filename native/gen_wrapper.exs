@@ -1,3 +1,9 @@
+if Version.match?(System.version(), "< 1.18.0") do
+  Mix.install([
+    {{:jason, "~> 1.4"}}
+  ])
+end
+
 defmodule Updater do
   require Logger
 
@@ -132,8 +138,9 @@ defmodule Updater do
   defp process_function_decl(_), do: nil
 
   defp parse(txt) do
-    txt
-    |> JSON.decode!()
+    json_mod = if Version.match?(System.version(), "< 1.18.0"), do: Jason, else: JSON
+
+    apply(json_mod, :decode!, [txt])
     |> traverse()
     |> Enum.sort()
   end
