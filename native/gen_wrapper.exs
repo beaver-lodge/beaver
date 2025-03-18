@@ -45,17 +45,17 @@ defmodule Updater do
 
   defp gen(functions, :elixir) do
     for {name, params} <- functions do
-      arity = length(params)
+      params = params |> Enum.map(&String.to_atom/1)
 
       cond do
         name in @with_diagnostics or String.ends_with?(Atom.to_string(name), "GetChecked") ->
-          [{name, arity}, {with_diagnostics(name), arity + 1}]
+          [{name, params}, {with_diagnostics(name), [:context | params]}]
 
         name in @normal_and_dirty ->
-          [{name, arity}, {dirty_io(name), arity}, {dirty_cpu(name), arity}]
+          [{name, params}, {dirty_io(name), params}, {dirty_cpu(name), params}]
 
         true ->
-          {name, arity}
+          {name, params}
       end
     end
     |> List.flatten()
