@@ -9,13 +9,11 @@ pub fn build(b: *std.Build) void {
     defer arena.deinit();
     const allocator = arena.allocator();
     const mix_env = std.process.getEnvVarOwned(allocator, "MIX_ENV") catch "";
-    var optimize = builtin.mode;
+    var optimize: std.builtin.OptimizeMode = .ReleaseSafe;
     if (std.mem.eql(u8, mix_env, "prod")) {
         optimize = .ReleaseFast;
     } else if (std.mem.eql(u8, mix_env, "test")) {
         optimize = .Debug;
-    } else {
-        optimize = .ReleaseSafe;
     }
     const lib = b.addSharedLibrary(.{ .name = "BeaverNIF", .root_source_file = b.path("src/main.zig"), .optimize = optimize, .target = b.standardTargetOptions(.{}) });
     std.log.info("Building {s}, MIX_ENV={s}, {?}\n", .{ lib.name, mix_env, lib.root_module.optimize });
