@@ -48,6 +48,9 @@ defmodule AddENIF do
               right = LLVM.load(right_ptr) >>> Type.i64()
               sum = Arith.addi(left, right) >>> Type.i64()
               sum = ENIF.make_int64(env, sum) >>> :infer
+              f = Attribute.float(Type.f64(), 0.1)
+              f = Arith.constant(value: f) >>> ~t<f64>
+              ENIF.make_double(env, f) >>> :infer
               Func.return(sum) >>> []
             end
           end
