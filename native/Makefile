@@ -11,7 +11,7 @@ all: zig_build
 
 zig_translate:
 	mkdir -p ${NATIVE_INSTALL_DIR}
-	clang -Xclang -ast-dump=json -fsyntax-only include/mlir-c/Beaver/wrapper.h -I include -I ${MLIR_INCLUDE_DIR} | tee ${MIX_APP_PATH}/wrapper.h.clang.ast.json | elixir gen_wrapper.exs --elixir ${NATIVE_INSTALL_DIR}/capi_functions.ex --zig src/wrapper.zig
+	zig cc -Xclang -ast-dump=json -fsyntax-only include/mlir-c/Beaver/wrapper.h -I include -I ${MLIR_INCLUDE_DIR} -o ${MIX_APP_PATH}/wrapper.h.clang.ast.out | tee ${MIX_APP_PATH}/wrapper.h.clang.ast.json | elixir gen_wrapper.exs --elixir ${NATIVE_INSTALL_DIR}/capi_functions.ex --zig src/wrapper.zig
 
 ${BUILD_STAMP}:
 	cmake -G Ninja -B ${CMAKE_BUILD_DIR} -DLLVM_DIR=${LLVM_CMAKE_DIR} -DMLIR_DIR=${MLIR_CMAKE_DIR} -DCMAKE_INSTALL_PREFIX=${NATIVE_INSTALL_DIR}
