@@ -52,6 +52,17 @@ defmodule AddENIF do
             end
           end
         end
+
+        Func.func add_point_one(function_type: Type.function([env_t], [term_t])) do
+          region do
+            block _(env >>> env_t) do
+              f = Attribute.float(Type.f64(), 0.1)
+              f = Arith.constant(value: f) >>> ~t<f64>
+              f = ENIF.make_double(env, f) >>> :infer
+              Func.return(f) >>> []
+            end
+          end
+        end
       end
     end
   end

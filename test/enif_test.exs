@@ -11,6 +11,12 @@ defmodule EnifTest do
     ENIFSupport.destroy(s)
   end
 
+  test "enif float api", %{ctx: ctx} do
+    %ENIFSupport{engine: e} = s = AddENIF.init(ctx)
+    assert 0.1 == Beaver.ENIF.invoke(e, "add_point_one", [])
+    ENIFSupport.destroy(s)
+  end
+
   test "query enif functions" do
     assert :enif_binary_to_term in Beaver.ENIF.functions()
   end

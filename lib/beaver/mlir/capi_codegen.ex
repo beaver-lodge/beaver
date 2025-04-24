@@ -105,7 +105,9 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
           :FrozenRewritePatternSet,
           :PDLPatternModule,
           :GreedyRewriteDriverConfig,
-          :TransformOptions
+          :TransformOptions,
+          :LinalgContractionDimensions,
+          :LinalgConvolutionDimensions
         ],
         &%KindDecl{module_name: Module.concat(Beaver.MLIR, &1)}
       ) ++

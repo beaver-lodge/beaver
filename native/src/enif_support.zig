@@ -86,7 +86,12 @@ fn mlir_i_type_of_size(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type
 }
 
 fn mlir_f_type_of_size(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
-    return mlir_capi.Type.resource.make(env, c.mlirFloatTypeGet(ctx, @bitSizeOf(t)));
+    const mlir_t = switch (@bitSizeOf(t)) {
+        32 => c.mlirF32TypeGet(ctx),
+        64 => c.mlirF64TypeGet(ctx),
+        else => @compileError("unsupported float type"),
+    };
+    return mlir_capi.Type.resource.make(env, mlir_t);
 }
 
 fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
@@ -115,7 +120,7 @@ fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !be
             if (is_int or is_struct) {
                 return try mlir_i_type_of_size(env, ctx, t);
             } else if (is_float) {
-                return try mlir_i_type_of_size(env, ctx, t);
+                return try mlir_f_type_of_size(env, ctx, t);
             } else if (t == void) {
                 return beam.make_atom(env, "void");
             } else if (t == ?*anyopaque) {
