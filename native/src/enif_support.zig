@@ -115,7 +115,7 @@ fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !be
         },
         else => {
             const is_int = t == c_int or t == c_ulong or t == c_long or t == beam.env or t == usize or t == c_uint or t == i32 or t == u32 or t == i64 or t == u64;
-            const is_float = t == f16 or t == f32 or t == f64;
+            const is_float = t == f32 or t == f64;
             const is_struct = t == beam.resource_type or t == e.ErlNifCond;
             if (is_int or is_struct) {
                 return try mlir_i_type_of_size(env, ctx, t);
