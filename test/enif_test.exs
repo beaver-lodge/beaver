@@ -13,7 +13,7 @@ defmodule EnifTest do
 
   test "enif float api", %{ctx: ctx} do
     %ENIFSupport{engine: e} = s = AddENIF.init(ctx)
-    assert 0.1 == Beaver.ENIF.invoke(e, "point_one", [])
+    assert 0.1 == Beaver.ENIF.invoke(e, "add_point_one", [])
     ENIFSupport.destroy(s)
   end
 

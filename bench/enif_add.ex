@@ -53,7 +53,7 @@ defmodule AddENIF do
           end
         end
 
-        Func.func point_one(function_type: Type.function([env_t], [term_t])) do
+        Func.func add_point_one(function_type: Type.function([env_t], [term_t])) do
           region do
             block _(env >>> env_t) do
               f = Attribute.float(Type.f64(), 0.1)
