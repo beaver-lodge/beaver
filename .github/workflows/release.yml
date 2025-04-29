@@ -184,6 +184,7 @@ jobs:
           repository: beaver-lodge/kinda
           path: kinda
       - name: Strip dev suffix
+        working-directory: beaver
         run: sed -i 's/-dev//g' mix.exs
       - name: Build ARM
         if: ${{ matrix.image.platform == 'linux/arm64/v8' }}
