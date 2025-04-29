@@ -183,6 +183,8 @@ jobs:
         with:
           repository: beaver-lodge/kinda
           path: kinda
+      - name: Strip dev suffix
+        run: sed -i 's/-dev//g' mix.exs
       - name: Build ARM
         if: ${{ matrix.image.platform == 'linux/arm64/v8' }}
         run: docker run --platform ${{ matrix.image.platform }} -v $PWD:/src -w /src/beaver ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
@@ -191,7 +193,7 @@ jobs:
         if: ${{ github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != null }}
         with:
           files: |
-            *.tar.gz
+            beaver/*.tar.gz
           repository: beaver-lodge/beaver-prebuilt
           token: ${{ secrets.PRE_BUILT_RELEASE_GITHUB_TOKEN }}
           tag_name: ${{ needs.generate_id.outputs.formatted_date }}
