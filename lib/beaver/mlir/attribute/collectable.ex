@@ -1,6 +1,5 @@
 defimpl Collectable, for: Beaver.MLIR.Attribute do
   alias Beaver.MLIR
-  defstruct getter: nil
 
   def into(%Beaver.MLIR.Attribute{} = attr) do
     # dense elements will fail to create if init values are empty, so we lift the restriction here
