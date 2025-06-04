@@ -2,6 +2,7 @@ defmodule Beaver.MLIR.StringRef do
   @moduledoc """
   This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
   """
+  alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
   use Kinda.ResourceKind, forward_module: Beaver.Native
 
@@ -18,6 +19,10 @@ defmodule Beaver.MLIR.StringRef do
 
   def create(%__MODULE__{} = sr) do
     sr
+  end
+
+  def create(%MLIR.Identifier{} = id) do
+    id |> MLIR.CAPI.mlirIdentifierStr()
   end
 
   def create(value) do

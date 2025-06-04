@@ -1,5 +1,5 @@
 defmodule PassTest do
-  use Beaver.Case, async: true, diagnostic: :server
+  use Beaver.Case, async: true
   use Beaver
   alias Beaver.MLIR.Dialect.{Func, Arith}
   require Func

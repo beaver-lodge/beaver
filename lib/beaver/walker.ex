@@ -16,6 +16,7 @@ defmodule Beaver.Walker do
   require Beaver.Pattern
   alias Beaver.MLIR.CAPI
   alias __MODULE__.OpReplacement
+  @behaviour Access
 
   @moduledoc """
   Provides traversal capabilities for MLIR structures.
@@ -321,18 +322,12 @@ defmodule Beaver.Walker do
     )
   end
 
-  @behaviour Access
-  @impl true
+  @impl Access
   def fetch(%__MODULE__{element_module: NamedAttribute} = walker, key) do
     walker
     |> Enum.find(fn named_attribute ->
-      with name <-
-             named_attribute
-             |> MLIR.CAPI.beaverNamedAttributeGetName()
-             |> MLIR.CAPI.mlirIdentifierStr()
-             |> MLIR.to_string() do
-        name == to_string(key)
-      end
+      name = named_attribute |> MLIR.NamedAttribute.name() |> MLIR.to_string()
+      name == to_string(key)
     end)
     |> then(
       &case &1 do
@@ -368,12 +363,12 @@ defmodule Beaver.Walker do
     end
   end
 
-  @impl true
+  @impl Access
   def get_and_update(_data, _key, _function) do
     raise "get_and_update not supported"
   end
 
-  @impl true
+  @impl Access
   def pop(_data, _key) do
     raise "pop not supported"
   end
@@ -491,13 +486,12 @@ defmodule Beaver.Walker do
   end
 
   defp do_traverse(%NamedAttribute{} = named_attribute, acc, pre, post) do
-    name = %Identifier{} = named_attribute |> MLIR.CAPI.beaverNamedAttributeGetName()
-
-    attribute = %Attribute{} = named_attribute |> MLIR.CAPI.beaverNamedAttributeGetAttribute()
+    name = %Identifier{} = named_attribute |> MLIR.NamedAttribute.name()
+    attribute = %Attribute{} = named_attribute |> MLIR.NamedAttribute.attribute()
 
     {{name, attribute}, acc} = pre.({name, attribute}, acc)
     {{name, attribute}, acc} = post.({name, attribute}, acc)
-    named_attribute = MLIR.CAPI.mlirNamedAttributeGet(name, attribute)
+    named_attribute = MLIR.NamedAttribute.get(name, attribute)
     {named_attribute, acc}
   end
 
