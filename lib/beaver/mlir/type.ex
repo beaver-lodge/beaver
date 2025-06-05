@@ -343,13 +343,35 @@ defmodule Beaver.MLIR.Type do
     end
   end
 
-  for {f, "mlirTypeIsA" <> type_name, 1} <-
+  for {f, "mlirTypeIsA" <> helper_name, 1} <-
         Beaver.MLIR.CAPI.__info__(:functions)
         |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
-    helper_name = type_name |> Macro.underscore() |> String.replace("mem_ref", "memref")
+    helper_name =
+      helper_name
+      |> Macro.underscore()
+      |> String.replace("mem_ref", "memref")
 
     def unquote(:"#{helper_name}?")(%__MODULE__{} = t) do
       unquote(f)(t) |> Beaver.Native.to_term()
+    end
+  end
+
+  def width(%__MODULE__{} = type) do
+    cond do
+      integer?(type) ->
+        mlirIntegerTypeGetWidth(type)
+
+      float?(type) ->
+        mlirFloatTypeGetWidth(type)
+    end
+    |> Beaver.Native.to_term()
+  end
+
+  for sign_type <- ~w{signless signed unsigned} do
+    f = :"mlirIntegerTypeIs#{Macro.camelize(sign_type)}"
+
+    def unquote(:"#{sign_type}?")(%__MODULE__{} = type) do
+      unquote(f)(type) |> Beaver.Native.to_term()
     end
   end
 end

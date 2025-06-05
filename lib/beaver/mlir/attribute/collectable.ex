@@ -16,17 +16,15 @@ defimpl Collectable, for: Beaver.MLIR.Attribute do
             _ -> Enum.to_list(acc)
           end
 
-        cond do
-          MLIR.Attribute.dense_bool_array?(attr) ->
-            [elem == true | acc]
-
-          true ->
-            [elem | acc]
+        if MLIR.Attribute.dense_bool_array?(attr) do
+          [elem == true | acc]
+        else
+          [elem | acc]
         end
 
       acc, :done ->
         acc = Enum.reverse(acc)
-        MLIR.Attribute.accessor(attr).getter.(acc, ctx: MLIR.context(attr))
+        MLIR.Attribute.Accessor.new(attr).getter.(acc, ctx: MLIR.context(attr))
 
       _acc, :halt ->
         :ok

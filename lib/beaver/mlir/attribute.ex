@@ -34,6 +34,125 @@ defmodule Beaver.MLIR.Attribute do
     end)
   end
 
+  defp truthy_elements(elements) do
+    Enum.map(elements, &if(&1, do: 1, else: 0))
+  end
+
+  defp dense_elements_splat_get(shaped_type, value, ctx) do
+    element_type = mlirShapedTypeGetElementType(shaped_type)
+
+    cond do
+      # there is no mlirDenseElementsAttrInt16SplatGet and mlirDenseElementsAttrUInt16SplatGet
+      match?(%MLIR.Attribute{}, value) ->
+        mlirDenseElementsAttrSplatGet(shaped_type, value)
+
+      is_boolean(value) ->
+        mlirDenseElementsAttrBoolSplatGet(shaped_type, value)
+
+      MLIR.Type.integer?(element_type) ->
+        width = MLIR.Type.width(element_type)
+
+        apply(
+          MLIR.CAPI,
+          if MLIR.Type.unsigned?(element_type) do
+            :"mlirDenseElementsAttrUInt#{width}SplatGet"
+          else
+            :"mlirDenseElementsAttrInt#{width}SplatGet"
+          end,
+          [shaped_type, value]
+        )
+
+      MLIR.equal?(element_type, MLIR.Type.f(32, ctx: ctx)) ->
+        mlirDenseElementsAttrFloatSplatGet(shaped_type, value)
+
+      MLIR.equal?(element_type, MLIR.Type.f(64, ctx: ctx)) ->
+        mlirDenseElementsAttrDoubleSplatGet(shaped_type, value)
+
+      true ->
+        raise ArgumentError, "unsupported splat value type"
+    end
+  end
+
+  defp string_elements?(elements) do
+    (Enum.all?(elements, &is_binary/1) or
+       Enum.all?(elements, &match?(%MLIR.StringRef{}, &1))) and
+      length(elements) > 0
+  end
+
+  defp attr_elements?(elements) do
+    Enum.all?(elements, &match?(%MLIR.Attribute{}, &1)) and length(elements) > 0
+  end
+
+  defp int_dense_elements_attr_getter(element_type) do
+    width = MLIR.Type.width(element_type)
+
+    {f, t} =
+      if MLIR.Type.unsigned?(element_type) do
+        {:"mlirDenseElementsAttrUInt#{width}Get", :"Elixir.Beaver.Native.U#{width}"}
+      else
+        {:"mlirDenseElementsAttrInt#{width}Get", :"Elixir.Beaver.Native.I#{width}"}
+      end
+
+    &apply(MLIR.CAPI, f, [&1, &2, Beaver.Native.array(&3, t)])
+  end
+
+  defp float_dense_elements_attr_getter(element_type) do
+    {f, t} =
+      case MLIR.Type.width(element_type) do
+        32 ->
+          {:mlirDenseElementsAttrFloatGet, Beaver.Native.F32}
+
+        64 ->
+          {:mlirDenseElementsAttrDoubleGet, Beaver.Native.F64}
+      end
+
+    &apply(MLIR.CAPI, f, [&1, &2, Beaver.Native.array(&3, t)])
+  end
+
+  defp dense_elements_get(shaped_type, num_elements, elements) do
+    element_type = mlirShapedTypeGetElementType(shaped_type)
+
+    cond do
+      MLIR.Type.opaque?(element_type) or string_elements?(elements) ->
+        strings =
+          elements
+          |> Enum.map(&MLIR.StringRef.create/1)
+          |> Beaver.Native.array(MLIR.StringRef, mut: true)
+
+        mlirDenseElementsAttrStringGet(shaped_type, num_elements, strings)
+
+      attr_elements?(elements) ->
+        attrs = Beaver.Native.array(elements, MLIR.Attribute)
+        mlirDenseElementsAttrGet(shaped_type, num_elements, attrs)
+
+      MLIR.equal?(element_type, MLIR.Type.i1()) ->
+        elements = truthy_elements(elements)
+
+        mlirDenseElementsAttrBoolGet(
+          shaped_type,
+          num_elements,
+          Beaver.Native.array(elements, Beaver.Native.CInt)
+        )
+
+      MLIR.Type.integer?(element_type) ->
+        int_dense_elements_attr_getter(element_type).(shaped_type, num_elements, elements)
+
+      MLIR.equal?(element_type, MLIR.Type.index()) ->
+        mlirDenseElementsAttrUInt64Get(
+          shaped_type,
+          num_elements,
+          Beaver.Native.array(elements, Beaver.Native.U64)
+        )
+
+      MLIR.Type.float?(element_type) ->
+        float_dense_elements_attr_getter(element_type).(shaped_type, num_elements, elements)
+
+      true ->
+        raise ArgumentError,
+              "unsupported element type #{inspect(elements)}"
+    end
+  end
+
   def dense_elements(elements_or_value, shaped_type \\ {:i, 8}, opts \\ [])
 
   def dense_elements(elements, {t, width}, opts)
@@ -65,7 +184,6 @@ defmodule Beaver.MLIR.Attribute do
 
         elements = elements_or_value |> Enum.map(&Beaver.Deferred.create(&1, ctx))
         num_elements = length(elements)
-        element_type = mlirShapedTypeGetElementType(shaped_type)
 
         shaped_type_num_elements =
           beaverShapedTypeGetNumElements(shaped_type) |> Beaver.Native.to_term()
@@ -75,118 +193,7 @@ defmodule Beaver.MLIR.Attribute do
                 "number of elements #{num_elements} does not match shaped type #{shaped_type_num_elements}"
         end
 
-        cond do
-          Enum.all?(elements, &match?(%MLIR.StringRef{}, &1)) and length(elements) > 0 ->
-            strings = Beaver.Native.array(elements, MLIR.StringRef, mut: true)
-            mlirDenseElementsAttrStringGet(shaped_type, num_elements, strings)
-
-          Enum.all?(elements, &is_binary/1) and length(elements) > 0 ->
-            elements
-            |> Enum.map(&MLIR.StringRef.create/1)
-            |> dense_elements(shaped_type, opts)
-
-          Enum.all?(elements, &match?(%MLIR.Attribute{}, &1)) and length(elements) > 0 ->
-            attrs = Beaver.Native.array(elements, MLIR.Attribute)
-            mlirDenseElementsAttrGet(shaped_type, num_elements, attrs)
-
-          MLIR.Type.opaque?(element_type) ->
-            strings =
-              elements
-              |> Enum.map(&MLIR.StringRef.create/1)
-              |> Beaver.Native.array(MLIR.StringRef, mut: true)
-
-            mlirDenseElementsAttrStringGet(shaped_type, num_elements, strings)
-
-          MLIR.equal?(element_type, MLIR.Type.i(1, ctx: ctx)) ->
-            elements = Enum.map(elements, &if(&1, do: 1, else: 0))
-
-            mlirDenseElementsAttrBoolGet(
-              shaped_type,
-              num_elements,
-              Beaver.Native.array(elements, Beaver.Native.CInt)
-            )
-
-          MLIR.equal?(element_type, MLIR.Type.i(8, ctx: ctx)) ->
-            mlirDenseElementsAttrInt8Get(
-              shaped_type,
-              num_elements,
-              Beaver.Native.array(elements, Beaver.Native.I8)
-            )
-
-          MLIR.equal?(element_type, MLIR.Type.i(8, ctx: ctx, signed: false)) ->
-            mlirDenseElementsAttrUInt8Get(
-              shaped_type,
-              num_elements,
-              Beaver.Native.array(elements, Beaver.Native.U8)
-            )
-
-          MLIR.equal?(element_type, MLIR.Type.i(16, ctx: ctx)) ->
-            mlirDenseElementsAttrInt16Get(
-              shaped_type,
-              num_elements,
-              Beaver.Native.array(elements, Beaver.Native.I16)
-            )
-
-          MLIR.equal?(element_type, MLIR.Type.i(16, ctx: ctx, signed: false)) ->
-            mlirDenseElementsAttrUInt16Get(
-              shaped_type,
-              num_elements,
-              Beaver.Native.array(elements, Beaver.Native.U16)
-            )
-
-          MLIR.equal?(element_type, MLIR.Type.i(32, ctx: ctx)) ->
-            mlirDenseElementsAttrInt32Get(
-              shaped_type,
-              num_elements,
-              Beaver.Native.array(elements, Beaver.Native.I32)
-            )
-
-          MLIR.equal?(element_type, MLIR.Type.i(32, ctx: ctx, signed: false)) ->
-            mlirDenseElementsAttrUInt32Get(
-              shaped_type,
-              num_elements,
-              Beaver.Native.array(elements, Beaver.Native.U32)
-            )
-
-          MLIR.equal?(element_type, MLIR.Type.i(64, ctx: ctx)) ->
-            mlirDenseElementsAttrInt64Get(
-              shaped_type,
-              num_elements,
-              Beaver.Native.array(elements, Beaver.Native.I64)
-            )
-
-          MLIR.equal?(element_type, MLIR.Type.i(64, ctx: ctx, signed: false)) ->
-            mlirDenseElementsAttrUInt64Get(
-              shaped_type,
-              num_elements,
-              Beaver.Native.array(elements, Beaver.Native.U64)
-            )
-
-          MLIR.equal?(element_type, MLIR.Type.index(ctx: ctx)) ->
-            mlirDenseElementsAttrUInt64Get(
-              shaped_type,
-              num_elements,
-              Beaver.Native.array(elements, Beaver.Native.U64)
-            )
-
-          MLIR.equal?(element_type, MLIR.Type.f(32, ctx: ctx)) ->
-            mlirDenseElementsAttrFloatGet(
-              shaped_type,
-              num_elements,
-              Beaver.Native.array(elements, Beaver.Native.F32)
-            )
-
-          MLIR.equal?(element_type, MLIR.Type.f(64, ctx: ctx)) ->
-            mlirDenseElementsAttrDoubleGet(
-              shaped_type,
-              num_elements,
-              Beaver.Native.array(elements, Beaver.Native.F64)
-            )
-
-          true ->
-            raise ArgumentError,
-                  "unsupported element type #{inspect(elements)}"
-        end
+        dense_elements_get(shaped_type, num_elements, elements)
       end
     )
   end
@@ -195,60 +202,9 @@ defmodule Beaver.MLIR.Attribute do
     Beaver.Deferred.from_opts(
       opts,
       fn ctx ->
-        case value do
-          true ->
-            mlirDenseElementsAttrBoolSplatGet(Beaver.Deferred.create(shaped_type, ctx), true)
-
-          false ->
-            mlirDenseElementsAttrBoolSplatGet(Beaver.Deferred.create(shaped_type, ctx), false)
-
-          v when is_integer(v) ->
-            element_type = mlirShapedTypeGetElementType(Beaver.Deferred.create(shaped_type, ctx))
-
-            cond do
-              MLIR.equal?(element_type, MLIR.Type.i(8, ctx: ctx)) ->
-                mlirDenseElementsAttrInt8SplatGet(Beaver.Deferred.create(shaped_type, ctx), v)
-
-              MLIR.equal?(element_type, MLIR.Type.i(8, ctx: ctx, signed: false)) ->
-                mlirDenseElementsAttrUInt8SplatGet(Beaver.Deferred.create(shaped_type, ctx), v)
-
-              # there is no mlirDenseElementsAttrInt16SplatGet
-
-              # there is no mlirDenseElementsAttrUInt16SplatGet
-
-              MLIR.equal?(element_type, MLIR.Type.i(32, ctx: ctx)) ->
-                mlirDenseElementsAttrInt32SplatGet(Beaver.Deferred.create(shaped_type, ctx), v)
-
-              MLIR.equal?(element_type, MLIR.Type.i(32, ctx: ctx, signed: false)) ->
-                mlirDenseElementsAttrUInt32SplatGet(Beaver.Deferred.create(shaped_type, ctx), v)
-
-              MLIR.equal?(element_type, MLIR.Type.i(64, ctx: ctx)) ->
-                mlirDenseElementsAttrInt64SplatGet(Beaver.Deferred.create(shaped_type, ctx), v)
-
-              MLIR.equal?(element_type, MLIR.Type.i(64, ctx: ctx, signed: false)) ->
-                mlirDenseElementsAttrUInt64SplatGet(Beaver.Deferred.create(shaped_type, ctx), v)
-
-              true ->
-                raise ArgumentError, "unsupported integer element type"
-            end
-
-          v when is_float(v) ->
-            element_type = mlirShapedTypeGetElementType(Beaver.Deferred.create(shaped_type, ctx))
-
-            cond do
-              MLIR.equal?(element_type, MLIR.Type.f(32, ctx: ctx)) ->
-                mlirDenseElementsAttrFloatSplatGet(Beaver.Deferred.create(shaped_type, ctx), v)
-
-              MLIR.equal?(element_type, MLIR.Type.f(64, ctx: ctx)) ->
-                mlirDenseElementsAttrDoubleSplatGet(Beaver.Deferred.create(shaped_type, ctx), v)
-
-              true ->
-                raise ArgumentError, "unsupported float element type"
-            end
-
-          _ ->
-            raise ArgumentError, "unsupported splat value type"
-        end
+        value = Beaver.Deferred.create(value, ctx)
+        shaped_type = Beaver.Deferred.create(shaped_type, ctx)
+        dense_elements_splat_get(shaped_type, value, ctx)
       end
     )
   end
@@ -268,30 +224,16 @@ defmodule Beaver.MLIR.Attribute do
     )
   end
 
+  defp dense_array_getter(Beaver.Native.Bool), do: &mlirDenseBoolArrayGet/3
+  defp dense_array_getter(Beaver.Native.I8), do: &mlirDenseI8ArrayGet/3
+  defp dense_array_getter(Beaver.Native.I16), do: &mlirDenseI16ArrayGet/3
+  defp dense_array_getter(Beaver.Native.I32), do: &mlirDenseI32ArrayGet/3
+  defp dense_array_getter(Beaver.Native.I64), do: &mlirDenseI64ArrayGet/3
+  defp dense_array_getter(Beaver.Native.F32), do: &mlirDenseF32ArrayGet/3
+  defp dense_array_getter(Beaver.Native.F64), do: &mlirDenseF64ArrayGet/3
+
   def dense_array(elements, type, opts \\ []) when is_list(elements) do
-    get =
-      case type do
-        Beaver.Native.Bool ->
-          &mlirDenseBoolArrayGet/3
-
-        Beaver.Native.I8 ->
-          &mlirDenseI8ArrayGet/3
-
-        Beaver.Native.I16 ->
-          &mlirDenseI16ArrayGet/3
-
-        Beaver.Native.I32 ->
-          &mlirDenseI32ArrayGet/3
-
-        Beaver.Native.I64 ->
-          &mlirDenseI64ArrayGet/3
-
-        Beaver.Native.F32 ->
-          &mlirDenseF32ArrayGet/3
-
-        Beaver.Native.F64 ->
-          &mlirDenseF64ArrayGet/3
-      end
+    getter = dense_array_getter(type)
 
     {elements, type} =
       case type do
@@ -305,7 +247,7 @@ defmodule Beaver.MLIR.Attribute do
     Beaver.Deferred.from_opts(
       opts,
       fn ctx ->
-        get.(
+        getter.(
           ctx,
           length(elements),
           Beaver.Native.array(elements, type)
@@ -450,160 +392,16 @@ defmodule Beaver.MLIR.Attribute do
     end
   end
 
-  @doc false
-  def accessor(attr) do
-    cond do
-      array?(attr) ->
-        %__MODULE__.Accessor{
-          get_num_element: &mlirArrayAttrGetNumElements/1,
-          get_element: &mlirArrayAttrGetElement/2,
-          getter: &array/2
-        }
-
-      dictionary?(attr) ->
-        %__MODULE__.Accessor{
-          get_num_element: &mlirDictionaryAttrGetNumElements/1,
-          get_element: fn
-            attr, pos when is_integer(pos) ->
-              mlirDictionaryAttrGetElement(attr, pos)
-
-            attr, name when is_bitstring(name) or is_atom(name) ->
-              mlirDictionaryAttrGetElementByName(attr, MLIR.StringRef.create(name))
-          end,
-          getter: &dictionary/2
-        }
-
-      dense_bool_array?(attr) ->
-        %__MODULE__.Accessor{
-          get_num_element: &mlirDenseArrayGetNumElements/1,
-          get_element: &mlirDenseBoolArrayGetElement/2,
-          getter: &dense_array(&1, Beaver.Native.Bool, &2)
-        }
-
-      dense_i8_array?(attr) ->
-        %__MODULE__.Accessor{
-          get_num_element: &mlirDenseArrayGetNumElements/1,
-          get_element: &mlirDenseI8ArrayGetElement/2,
-          getter: &dense_array(&1, Beaver.Native.I8, &2)
-        }
-
-      dense_i16_array?(attr) ->
-        %__MODULE__.Accessor{
-          get_num_element: &mlirDenseArrayGetNumElements/1,
-          get_element: &mlirDenseI16ArrayGetElement/2,
-          getter: &dense_array(&1, Beaver.Native.I16, &2)
-        }
-
-      dense_i32_array?(attr) ->
-        %__MODULE__.Accessor{
-          get_num_element: &mlirDenseArrayGetNumElements/1,
-          get_element: &mlirDenseI32ArrayGetElement/2,
-          getter: &dense_array(&1, Beaver.Native.I32, &2)
-        }
-
-      dense_i64_array?(attr) ->
-        %__MODULE__.Accessor{
-          get_num_element: &mlirDenseArrayGetNumElements/1,
-          get_element: &mlirDenseI64ArrayGetElement/2,
-          getter: &dense_array(&1, Beaver.Native.I64, &2)
-        }
-
-      dense_f32_array?(attr) ->
-        %__MODULE__.Accessor{
-          get_num_element: &mlirDenseArrayGetNumElements/1,
-          get_element: &mlirDenseF32ArrayGetElement/2,
-          getter: &dense_array(&1, Beaver.Native.F32, &2)
-        }
-
-      dense_f64_array?(attr) ->
-        %__MODULE__.Accessor{
-          get_num_element: &mlirDenseArrayGetNumElements/1,
-          get_element: &mlirDenseF64ArrayGetElement/2,
-          getter: &dense_array(&1, Beaver.Native.F64, &2)
-        }
-
-      dense_elements?(attr) ->
-        element_type = beaverDenseElementsAttrGetElementType(attr)
-        shaped_type = beaverDenseElementsAttrGetType(attr)
-        ctx = MLIR.context(attr)
-
-        %__MODULE__.Accessor{
-          get_num_element: &beaverDenseElementsGetNumElements/1,
-          get_element: fn attr, pos ->
-            cond do
-              MLIR.equal?(element_type, MLIR.Type.i(1, ctx: ctx)) ->
-                mlirDenseElementsAttrGetBoolValue(attr, pos)
-
-              MLIR.equal?(element_type, MLIR.Type.i(8, ctx: ctx)) ->
-                mlirDenseElementsAttrGetInt8Value(attr, pos)
-
-              MLIR.equal?(element_type, MLIR.Type.i(16, ctx: ctx)) ->
-                mlirDenseElementsAttrGetInt16Value(attr, pos)
-
-              MLIR.equal?(element_type, MLIR.Type.i(32, ctx: ctx)) ->
-                mlirDenseElementsAttrGetInt32Value(attr, pos)
-
-              MLIR.equal?(element_type, MLIR.Type.i(64, ctx: ctx)) ->
-                mlirDenseElementsAttrGetInt64Value(attr, pos)
-
-              MLIR.equal?(element_type, MLIR.Type.i(8, ctx: ctx, signed: false)) ->
-                mlirDenseElementsAttrGetUInt8Value(attr, pos)
-
-              MLIR.equal?(element_type, MLIR.Type.i(16, ctx: ctx, signed: false)) ->
-                mlirDenseElementsAttrGetUInt16Value(attr, pos)
-
-              MLIR.equal?(element_type, MLIR.Type.i(32, ctx: ctx, signed: false)) ->
-                mlirDenseElementsAttrGetUInt32Value(attr, pos)
-
-              MLIR.equal?(element_type, MLIR.Type.i(64, ctx: ctx, signed: false)) ->
-                mlirDenseElementsAttrGetUInt64Value(attr, pos)
-
-              MLIR.equal?(element_type, MLIR.Type.index(ctx: ctx)) ->
-                mlirDenseElementsAttrGetIndexValue(attr, pos)
-
-              MLIR.equal?(element_type, MLIR.Type.f(32, ctx: ctx)) ->
-                mlirDenseElementsAttrGetFloatValue(attr, pos)
-
-              MLIR.equal?(element_type, MLIR.Type.f(64, ctx: ctx)) ->
-                mlirDenseElementsAttrGetDoubleValue(attr, pos)
-
-              true ->
-                mlirDenseElementsAttrGetStringValue(attr, pos)
-            end
-          end,
-          getter: &dense_elements(&1, shaped_type, &2)
-        }
-
-      true ->
-        raise "not a container attribute"
-    end
-    |> then(fn %__MODULE__.Accessor{} = acs ->
-      update_in(acs.get_num_element, fn f -> &Beaver.Native.to_term(f.(&1)) end)
-    end)
-    |> then(fn %__MODULE__.Accessor{} = acs ->
-      update_in(acs.get_element, fn f ->
-        fn attr, key ->
-          case f.(attr, key) do
-            %MLIR.Attribute{} = a -> a
-            %MLIR.NamedAttribute{} = na -> na
-            %MLIR.StringRef{} = s -> s |> MLIR.to_string()
-            native_val -> Beaver.Native.to_term(native_val)
-          end
-        end
-      end)
-    end)
-  end
-
   defguardp is_index_or_name(key) when is_integer(key) or is_binary(key) or is_atom(key)
 
   @impl Access
   def fetch(attr, key) when is_index_or_name(key) do
-    accessor(attr) |> __MODULE__.Accessor.fetch(attr, key)
+    __MODULE__.Accessor.new(attr) |> __MODULE__.Accessor.fetch(attr, key)
   end
 
   @impl Access
   def get_and_update(attr, key, fun) when is_index_or_name(key) do
-    accessor(attr) |> __MODULE__.Accessor.get_and_update(attr, key, fun)
+    __MODULE__.Accessor.new(attr) |> __MODULE__.Accessor.get_and_update(attr, key, fun)
   end
 
   @impl Access
@@ -612,7 +410,7 @@ defmodule Beaver.MLIR.Attribute do
       raise ArgumentError, "cannot pop from dense elements attribute"
     end
 
-    accessor(attr) |> __MODULE__.Accessor.pop(attr, key)
+    __MODULE__.Accessor.new(attr) |> __MODULE__.Accessor.pop(attr, key)
   end
 
   defdelegate unwrap_type(type_attr), to: MLIR.CAPI, as: :mlirTypeAttrGetValue

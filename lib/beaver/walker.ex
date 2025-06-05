@@ -62,7 +62,6 @@ defmodule Beaver.Walker do
           element_module: element_module(),
           get_num: (container() -> Beaver.Native.I64.t() | integer()) | nil,
           get_element: (container(), integer() -> element()) | nil,
-          element_equal: (element(), element() -> Beaver.Native.Bool.t() | bool()) | nil,
           get_first: (container() -> element()) | nil,
           get_next: (element() -> element()) | nil,
           get_parent: (element() -> container()) | nil,
@@ -73,7 +72,7 @@ defmodule Beaver.Walker do
         }
 
   container_keys = [:container, :element_module]
-  index_func_keys = [:get_num, :get_element, :element_equal]
+  index_func_keys = [:get_num, :get_element]
   iter_keys = [:this, :num]
   iter_func_keys = [:get_first, :get_next, :get_parent, :is_null, :parent_equal]
   @enforce_keys container_keys
@@ -125,12 +124,10 @@ defmodule Beaver.Walker do
          container,
          element_module,
          get_num: get_num,
-         get_element: get_element,
-         element_equal: element_equal
+         get_element: get_element
        )
        when is_function(get_num, 1) and
-              is_function(get_element, 2) and
-              is_function(element_equal, 2) do
+              is_function(get_element, 2) do
     container = %container_module{} = extract_container(container)
     verify_nesting!(container_module, element_module)
 
@@ -138,8 +135,7 @@ defmodule Beaver.Walker do
       container: container,
       element_module: element_module,
       get_num: get_num,
-      get_element: get_element,
-      element_equal: element_equal
+      get_element: get_element
     }
   end
 
@@ -181,8 +177,7 @@ defmodule Beaver.Walker do
       op,
       Value,
       get_num: &CAPI.mlirOperationGetNumOperands/1,
-      get_element: &CAPI.mlirOperationGetOperand/2,
-      element_equal: &CAPI.mlirValueEqual/2
+      get_element: &CAPI.mlirOperationGetOperand/2
     )
   end
 
@@ -199,8 +194,7 @@ defmodule Beaver.Walker do
       op,
       Value,
       get_num: &CAPI.mlirOperationGetNumResults/1,
-      get_element: &CAPI.mlirOperationGetResult/2,
-      element_equal: &CAPI.mlirValueEqual/2
+      get_element: &CAPI.mlirOperationGetResult/2
     )
   end
 
@@ -217,8 +211,7 @@ defmodule Beaver.Walker do
       op,
       Region,
       get_num: &CAPI.mlirOperationGetNumRegions/1,
-      get_element: &CAPI.mlirOperationGetRegion/2,
-      element_equal: &CAPI.mlirRegionEqual/2
+      get_element: &CAPI.mlirOperationGetRegion/2
     )
   end
 
@@ -235,8 +228,7 @@ defmodule Beaver.Walker do
       op,
       Block,
       get_num: &CAPI.mlirOperationGetNumSuccessors/1,
-      get_element: &CAPI.mlirOperationGetSuccessor/2,
-      element_equal: &CAPI.mlirBlockEqual/2
+      get_element: &CAPI.mlirOperationGetSuccessor/2
     )
   end
 
@@ -258,8 +250,7 @@ defmodule Beaver.Walker do
           CAPI.beaverOperationGetName(o, i),
           CAPI.beaverOperationGetAttribute(o, i)
         }
-      end,
-      element_equal: &CAPI.mlirAttributeEqual/2
+      end
     )
   end
 
@@ -272,8 +263,7 @@ defmodule Beaver.Walker do
       block,
       Value,
       get_num: &CAPI.mlirBlockGetNumArguments/1,
-      get_element: &CAPI.mlirBlockGetArgument/2,
-      element_equal: &CAPI.mlirValueEqual/2
+      get_element: &CAPI.mlirBlockGetArgument/2
     )
   end
 
@@ -574,16 +564,10 @@ defmodule Beaver.Walker do
     @spec member?(Beaver.Walker.t(), Beaver.Walker.element()) ::
             {:ok, boolean()} | {:error, module()}
     def member?(
-          walker = %Beaver.Walker{element_equal: element_equal, element_module: element_module},
+          %Beaver.Walker{element_module: element_module} = walker,
           %element_module{} = element
-        )
-        when is_function(element_equal, 2) do
-      is_member =
-        Enum.any?(walker, fn member ->
-          element_equal.(member, element) |> Beaver.Native.to_term()
-        end)
-
-      {:ok, is_member}
+        ) do
+      {:ok, Enum.any?(walker, &MLIR.equal?(&1, element))}
     end
 
     @spec member?(Beaver.Walker.t(), Beaver.Walker.element()) ::

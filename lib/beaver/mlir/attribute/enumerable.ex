@@ -3,7 +3,7 @@ defimpl Enumerable, for: Beaver.MLIR.Attribute do
   defstruct num_elements: nil, get_element: nil, index: 0
 
   def new(attr) do
-    accessor = MLIR.Attribute.accessor(attr)
+    accessor = MLIR.Attribute.Accessor.new(attr)
 
     %__MODULE__{
       num_elements: accessor.get_num_element.(attr),
@@ -15,49 +15,34 @@ defimpl Enumerable, for: Beaver.MLIR.Attribute do
     {:ok, new(attr).num_elements}
   end
 
+  defguardp is_term_element(a, b)
+            when (is_integer(a) and is_integer(b)) or (is_float(a) and is_float(b)) or
+                   (is_boolean(a) and is_boolean(b)) or (is_binary(a) and is_binary(b))
+
   def member?(attr, element) do
     %__MODULE__{num_elements: num_elements, get_element: get_element} = new(attr)
 
     {:ok,
-     for pos <- 0..(num_elements - 1)//1, reduce: false do
-       true ->
-         true
+     Enum.any?(0..(num_elements - 1), fn pos ->
+       case {get_element.(pos), element} do
+         {%MLIR.NamedAttribute{} = a, %MLIR.NamedAttribute{} = b} ->
+           MLIR.equal?(MLIR.NamedAttribute.name(a), MLIR.NamedAttribute.name(b)) and
+             MLIR.equal?(MLIR.NamedAttribute.attribute(a), MLIR.NamedAttribute.attribute(b))
 
-       false ->
-         case {get_element.(pos), element} do
-           {%MLIR.NamedAttribute{} = a, %MLIR.NamedAttribute{} = b} ->
-             MLIR.equal?(MLIR.NamedAttribute.name(a), MLIR.NamedAttribute.name(b)) and
-               MLIR.equal?(MLIR.NamedAttribute.attribute(a), MLIR.NamedAttribute.attribute(b))
+         {%MLIR.NamedAttribute{} = na, {name, attr}} ->
+           MLIR.equal?(
+             MLIR.NamedAttribute.name(na),
+             MLIR.Identifier.get(name, ctx: MLIR.context(attr))
+           ) and
+             MLIR.equal?(MLIR.NamedAttribute.attribute(na), attr)
 
-           {%MLIR.Attribute{} = a, %MLIR.Attribute{} = b} ->
-             MLIR.equal?(a, b)
+         {%m{} = a, %m{} = b} ->
+           MLIR.equal?(a, b)
 
-           {%MLIR.Identifier{} = id, %MLIR.Identifier{} = id2} ->
-             MLIR.equal?(id, id2)
-
-           {%MLIR.NamedAttribute{} = na, {name, attr}} ->
-             MLIR.equal?(
-               MLIR.NamedAttribute.name(na),
-               MLIR.Identifier.get(name, ctx: MLIR.context(attr))
-             ) and
-               MLIR.equal?(MLIR.NamedAttribute.attribute(na), attr)
-
-           {%m{} = a, %m{} = b} ->
-             MLIR.equal?(a, b)
-
-           {a, b} when is_integer(a) and is_integer(b) ->
-             a == b
-
-           {a, b} when is_float(a) and is_float(b) ->
-             a == b
-
-           {a, b} when is_boolean(a) and is_boolean(b) ->
-             a == b
-
-           {a, b} when is_binary(a) and is_binary(b) ->
-             a == b
-         end
-     end}
+         {a, b} when is_term_element(a, b) ->
+           a == b
+       end
+     end)}
   end
 
   def reduce(%__MODULE__{}, {:halt, acc}, _fun), do: {:halted, acc}

@@ -257,7 +257,113 @@ defmodule AttributeAccessTest do
     assert 1.0 = get_f
     assert 10.0 = updated_f[1]
 
+    # Test string dense elements
+    MLIR.Context.allow_unregistered_dialects(ctx)
+
+    dense_str =
+      ["hello", "world", "!"]
+      |> MLIR.Attribute.dense_elements(
+        Type.ranked_tensor([3], Type.opaque("test", "str", opts)),
+        opts
+      )
+
+    assert "hello" = dense_str[0]
+    assert "world" = dense_str[1]
+    assert "!" = dense_str[2]
+
+    # Test get_and_update with string elements
+    {get_str, updated_str} =
+      Access.get_and_update(dense_str, 1, fn val ->
+        new_val = "updated"
+        {val, new_val}
+      end)
+
+    assert "world" = get_str
+    assert "updated" = updated_str[1]
+
+    # Test pop with string elements (should raise same error)
+    assert_raise ArgumentError, "cannot pop from dense elements attribute", fn ->
+      Access.pop(dense_str, 0)
+    end
+
     # Test error cases
     assert {nil, %MLIR.Attribute{}} = Access.get_and_update(dense_i32, 100, fn x -> {x, x} end)
+    assert {nil, %MLIR.Attribute{}} = Access.get_and_update(dense_str, 100, fn x -> {x, x} end)
+
+    # Test bool dense elements
+    dense_bool =
+      [true, false, true]
+      |> MLIR.Attribute.dense_elements(Type.ranked_tensor([3], Type.i1(opts)), opts)
+
+    assert true = dense_bool[0]
+    assert false == dense_bool[1]
+    assert true = dense_bool[2]
+
+    # Test get_and_update with bool elements
+    {get_bool, updated_bool} =
+      Access.get_and_update(dense_bool, 1, fn val ->
+        new_val = true
+        {val, new_val}
+      end)
+
+    assert false == get_bool
+    assert true = updated_bool[1]
+
+    # Test i8 dense elements
+    dense_i8 =
+      [-1, 0, 1]
+      |> MLIR.Attribute.dense_elements(Type.ranked_tensor([3], Type.i8(opts)), opts)
+
+    assert -1 = dense_i8[0]
+    assert 0 = dense_i8[1]
+    assert 1 = dense_i8[2]
+
+    # Test u8 dense elements
+    dense_u8 =
+      [0, 128, 255]
+      |> MLIR.Attribute.dense_elements(Type.ranked_tensor([3], Type.ui8(opts)), opts)
+
+    assert 0 = dense_u8[0]
+    assert 128 = dense_u8[1]
+    assert 255 = dense_u8[2]
+
+    # Test i64 dense elements
+    dense_i64 =
+      [-10_000_000_000, 0, 10_000_000_000]
+      |> MLIR.Attribute.dense_elements(Type.ranked_tensor([3], Type.i64(opts)), opts)
+
+    assert -10_000_000_000 = dense_i64[0]
+    assert 0 = dense_i64[1]
+    assert 10_000_000_000 = dense_i64[2]
+
+    # Test f64 dense elements
+    dense_f64 =
+      [1.0, 2.0, 3.0]
+      |> MLIR.Attribute.dense_elements(Type.ranked_tensor([3], Type.f64(opts)), opts)
+
+    assert 1.0 = dense_f64[0]
+    assert 2.0 = dense_f64[1]
+    assert 3.0 = dense_f64[2]
+
+    # Test get_and_update with f64 elements
+    {get_f64, updated_f64} =
+      Access.get_and_update(dense_f64, 2, fn val ->
+        new_val = 30.0
+        {val, new_val}
+      end)
+
+    assert 3.0 = get_f64
+    assert 30.0 = updated_f64[2]
+
+    # Test empty dense elements
+    empty_dense =
+      []
+      |> MLIR.Attribute.dense_elements(
+        Type.ranked_tensor([0], Type.opaque("test2", "str2", opts)),
+        opts
+      )
+
+    assert nil == empty_dense[0]
+    assert {nil, %MLIR.Attribute{}} = Access.get_and_update(empty_dense, 0, fn x -> {x, x} end)
   end
 end

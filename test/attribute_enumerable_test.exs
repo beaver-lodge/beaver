@@ -2,6 +2,7 @@ defmodule AttributeEnumerableTest do
   @moduledoc """
   Test the Enumerable protocol implementation for MLIR attributes.
   """
+  alias Beaver.MLIR.Attribute
   use Beaver.Case, async: true
   alias Beaver.MLIR
   alias MLIR.Type
@@ -58,7 +59,10 @@ defmodule AttributeEnumerableTest do
     assert Enum.member?(dense_bool, true)
     assert Enum.member?(dense_bool, false)
     assert MLIR.CAPI.mlirDenseElementsAttrGetBoolValue(dense_bool, 0) |> Beaver.Native.to_term()
-    refute MLIR.CAPI.mlirDenseElementsAttrGetBoolValue(dense_bool, 1) |> Beaver.Native.to_term()
+
+    assert false ==
+             MLIR.CAPI.mlirDenseElementsAttrGetBoolValue(dense_bool, 1) |> Beaver.Native.to_term()
+
     assert MLIR.CAPI.mlirDenseElementsAttrGetBoolValue(dense_bool, 2) |> Beaver.Native.to_term()
     assert Enum.at(dense_bool, 0) == true
     assert Enum.at(dense_bool, 1) == false
@@ -161,20 +165,20 @@ defmodule AttributeEnumerableTest do
 
     # Test uint16 dense elements
     dense_u16 =
-      [0, 32768, 65535]
+      [0, 32_768, 65_535]
       |> MLIR.Attribute.dense_elements(Type.ranked_tensor!([3], Type.ui16(opts)), opts)
 
     assert Enum.count(dense_u16) == 3
-    assert Enum.member?(dense_u16, 32768)
+    assert Enum.member?(dense_u16, 32_768)
 
     assert MLIR.CAPI.mlirDenseElementsAttrGetUInt16Value(dense_u16, 0) |> Beaver.Native.to_term() ==
              0
 
     assert MLIR.CAPI.mlirDenseElementsAttrGetUInt16Value(dense_u16, 1) |> Beaver.Native.to_term() ==
-             32768
+             32_768
 
     assert MLIR.CAPI.mlirDenseElementsAttrGetUInt16Value(dense_u16, 2) |> Beaver.Native.to_term() ==
-             65535
+             65_535
 
     # Test int64 dense elements
     dense_i64 =
@@ -425,6 +429,17 @@ defmodule AttributeEnumerableTest do
     assert Enum.member?(dense_f64_splat, 2.71828)
 
     assert MLIR.CAPI.mlirDenseElementsAttrGetDoubleValue(dense_f64_splat, 0)
+           |> Beaver.Native.to_term() == 2.71828
+
+    # Test f64 splat
+    dense_f64_attr_splat =
+      Attribute.float(Type.f64(), 2.71828)
+      |> MLIR.Attribute.dense_elements(Type.ranked_tensor!([3], Type.f64(opts)), opts)
+
+    assert Enum.count(dense_f64_attr_splat) == 3
+    assert Enum.member?(dense_f64_attr_splat, 2.71828)
+
+    assert MLIR.CAPI.mlirDenseElementsAttrGetDoubleValue(dense_f64_attr_splat, 0)
            |> Beaver.Native.to_term() == 2.71828
   end
 
