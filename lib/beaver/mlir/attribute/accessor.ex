@@ -62,24 +62,22 @@ defmodule Beaver.MLIR.Attribute.Accessor do
     num_elements = get_num_element.(attr)
     ctx = MLIR.context(attr)
 
-    case normalize_key(key, num_elements) do
-      {:ok, key} ->
-        elements =
-          Range.new(0, num_elements - 1, 1)
-          |> Enum.map(&get_element.(attr, &1))
+    with {:ok, key} <- normalize_key(key, num_elements),
+         elements <-
+           Range.new(0, num_elements - 1, 1)
+           |> Enum.map(&get_element.(attr, &1)),
+         index <- to_index(key, elements, ctx),
+         false <- is_nil(index) do
+      case fun.(Enum.at(elements, index)) do
+        :pop ->
+          __MODULE__.pop(acs, attr, key)
 
-        index = to_index(key, elements, ctx)
-
-        case fun.(Enum.at(elements, index)) do
-          :pop ->
-            __MODULE__.pop(acs, attr, key)
-
-          {get, update} ->
-            update = repack_named_attribute_for_dict(key, update)
-            new_attr = getter.(List.replace_at(elements, index, update), ctx: ctx)
-            {get, new_attr}
-        end
-
+        {get, update} ->
+          update = repack_named_attribute_for_dict(key, update)
+          new_attr = getter.(List.replace_at(elements, index, update), ctx: ctx)
+          {get, new_attr}
+      end
+    else
       _ ->
         {nil, attr}
     end
@@ -102,6 +100,7 @@ defmodule Beaver.MLIR.Attribute.Accessor do
            Range.new(0, num_elements - 1, 1)
            |> Enum.map(&get_element.(attr, &1)),
          index <- to_index(key, elements, ctx),
+         false <- is_nil(index),
          true <- is_integer(index) do
       elements
       |> List.pop_at(index)
