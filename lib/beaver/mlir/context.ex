@@ -44,5 +44,14 @@ defmodule Beaver.MLIR.Context do
   end
 
   defdelegate destroy(ctx), to: MLIR.CAPI, as: :mlirContextDestroy
-  defdelegate register_translations(ctx), to: MLIR.CAPI, as: :mlirRegisterAllLLVMTranslations
+
+  def allow_unregistered_dialects(ctx, allow \\ true) do
+    MLIR.CAPI.mlirContextSetAllowUnregisteredDialects(ctx, allow)
+    ctx
+  end
+
+  def register_translations(ctx) do
+    MLIR.CAPI.mlirRegisterAllLLVMTranslations(ctx)
+    ctx
+  end
 end

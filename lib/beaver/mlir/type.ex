@@ -286,16 +286,26 @@ defmodule Beaver.MLIR.Type do
 
   defdelegate f(bitwidth, opts \\ []), to: __MODULE__, as: :float
 
+  def opaque(dialect_namespace, type_data, opts \\ []) do
+    Beaver.Deferred.from_opts(opts, fn ctx ->
+      mlirOpaqueTypeGet(
+        ctx,
+        MLIR.StringRef.create(dialect_namespace),
+        MLIR.StringRef.create(type_data)
+      )
+    end)
+  end
+
   def integer(bitwidth, opts \\ [signed: false]) do
     signed = Keyword.get(opts, :signed)
 
     Beaver.Deferred.from_opts(
       opts,
       fn ctx ->
-        if signed do
-          mlirIntegerTypeSignedGet(ctx, bitwidth)
-        else
-          mlirIntegerTypeGet(ctx, bitwidth)
+        case signed do
+          nil -> mlirIntegerTypeGet(ctx, bitwidth)
+          true -> mlirIntegerTypeSignedGet(ctx, bitwidth)
+          false -> mlirIntegerTypeUnsignedGet(ctx, bitwidth)
         end
       end
     )
@@ -317,21 +327,51 @@ defmodule Beaver.MLIR.Type do
 
   defdelegate i(bitwidth, opts \\ []), to: __MODULE__, as: :integer
 
-  for bitwidth <- [1, 8, 16, 32, 64, 128] do
-    i_name = "i#{bitwidth}" |> String.to_atom()
+  for bitwidth <- [1, 8, 16, 32, 64, 128], sign <- ~w{i si ui} do
+    i_name = "#{sign}#{bitwidth}" |> String.to_atom()
+
+    signed =
+      case sign do
+        "i" -> nil
+        "si" -> true
+        "ui" -> false
+      end
 
     def unquote(i_name)(opts \\ []) do
+      opts = Keyword.put_new(opts, :signed, unquote(signed))
       apply(__MODULE__, :i, [unquote(bitwidth), opts])
     end
   end
 
-  for {f, "mlirTypeIsA" <> type_name, 1} <-
+  for {f, "mlirTypeIsA" <> helper_name, 1} <-
         Beaver.MLIR.CAPI.__info__(:functions)
         |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
-    helper_name = type_name |> Macro.underscore() |> String.replace("mem_ref", "memref")
+    helper_name =
+      helper_name
+      |> Macro.underscore()
+      |> String.replace("mem_ref", "memref")
 
-    def unquote(:"#{helper_name}?")(%MLIR.Type{} = t) do
+    def unquote(:"#{helper_name}?")(%__MODULE__{} = t) do
       unquote(f)(t) |> Beaver.Native.to_term()
+    end
+  end
+
+  def width(%__MODULE__{} = type) do
+    cond do
+      integer?(type) ->
+        mlirIntegerTypeGetWidth(type)
+
+      float?(type) ->
+        mlirFloatTypeGetWidth(type)
+    end
+    |> Beaver.Native.to_term()
+  end
+
+  for sign_type <- ~w{signless signed unsigned} do
+    f = :"mlirIntegerTypeIs#{Macro.camelize(sign_type)}"
+
+    def unquote(:"#{sign_type}?")(%__MODULE__{} = type) do
+      unquote(f)(type) |> Beaver.Native.to_term()
     end
   end
 end

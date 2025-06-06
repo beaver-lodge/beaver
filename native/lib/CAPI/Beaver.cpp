@@ -278,3 +278,22 @@ MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context,
     return false;
   }
 }
+
+MLIR_CAPI_EXPORTED MlirType
+beaverDenseElementsAttrGetElementType(MlirAttribute attr) {
+  return wrap(
+      llvm::cast<DenseElementsAttr>(unwrap(attr)).getType().getElementType());
+}
+
+MLIR_CAPI_EXPORTED MlirType beaverDenseElementsAttrGetType(MlirAttribute attr) {
+  return wrap(llvm::cast<DenseElementsAttr>(unwrap(attr)).getType());
+}
+
+MLIR_CAPI_EXPORTED intptr_t
+beaverDenseElementsGetNumElements(MlirAttribute attr) {
+  return llvm::cast<DenseElementsAttr>(unwrap(attr)).getType().getNumElements();
+}
+
+MLIR_CAPI_EXPORTED intptr_t beaverShapedTypeGetNumElements(MlirType type) {
+  return llvm::cast<ShapedType>(unwrap(type)).getNumElements();
+}

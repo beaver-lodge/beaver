@@ -111,10 +111,19 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverIRDLGetDefinedAttr(MlirStringRef dialect,
 MLIR_CAPI_EXPORTED MlirLogicalResult beaverModuleApplyPatternsAndFoldGreedily(
     MlirModule module, MlirFrozenRewritePatternSet patterns);
 
+MLIR_CAPI_EXPORTED MlirType
+beaverDenseElementsAttrGetElementType(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED MlirType beaverDenseElementsAttrGetType(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED intptr_t
+beaverDenseElementsGetNumElements(MlirAttribute attr);
+
+MLIR_CAPI_EXPORTED intptr_t beaverShapedTypeGetNumElements(MlirType type);
+
 #include "mlir-c/ExecutionEngine.h"
 
-MLIR_CAPI_EXPORTED
-bool beaverIsNullExecutionEngine(MlirExecutionEngine w);
+MLIR_CAPI_EXPORTED bool beaverIsNullExecutionEngine(MlirExecutionEngine w);
 #ifdef __cplusplus
 }
 #endif

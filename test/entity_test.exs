@@ -2,7 +2,7 @@ defmodule EntityTest do
   @moduledoc """
   Test the creation of MLIR entities including attributes, types and locations.
   """
-  use Beaver.Case, async: true, diagnostic: :server
+  use Beaver.Case, async: true
   alias Beaver.MLIR
   alias MLIR.{Type, Attribute}
   import Beaver.Sigils
@@ -145,6 +145,11 @@ defmodule EntityTest do
              )
 
       assert MLIR.equal?(
+               Attribute.dense_elements(0, vec2xi32).(ctx),
+               ~a{dense<0> : vector<2xi32>}.(ctx)
+             )
+
+      assert MLIR.equal?(
                Attribute.dense_elements("abcd").(ctx),
                ~a{dense<[#{?a}, #{?b}, #{?c}, #{?d}]> : tensor<4xi8>}.(ctx)
              )
@@ -158,6 +163,10 @@ defmodule EntityTest do
                MLIR.ODS.operand_segment_sizes([1, 0]).(ctx),
                ~a{array<i32: 1, 0>}.(ctx)
              )
+
+      assert_raise ArgumentError, "number of elements 0 does not match shaped type 3", fn ->
+        MLIR.Attribute.dense_elements([], ~t{tensor<3xi8>}, ctx: ctx)
+      end
     end
 
     test "iterator_types", %{ctx: ctx} do
@@ -170,10 +179,9 @@ defmodule EntityTest do
              )
     end
 
-    test "empty" do
-      empty = Attribute.array([])
-
-      assert empty
+    test "empty", %{ctx: ctx} do
+      empty = Attribute.array([], ctx: ctx)
+      assert %Attribute{} = empty
     end
 
     test "null" do
