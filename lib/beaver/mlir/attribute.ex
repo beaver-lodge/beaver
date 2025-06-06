@@ -149,7 +149,7 @@ defmodule Beaver.MLIR.Attribute do
 
       true ->
         raise ArgumentError,
-              "unsupported element type #{inspect(elements)}"
+              "unsupported element type #{MLIR.to_string(element_type)}"
     end
   end
 
