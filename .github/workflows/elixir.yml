@@ -69,7 +69,7 @@ jobs:
           otp-version: ${{matrix.otp}}
           elixir-version: ${{matrix.elixir}}
       - name: Set up Zig
-        uses: mlugg/setup-zig@v1
+        uses: goto-bus-stop/setup-zig@v1
         with:
           version: 0.14.1
       - uses: Jimver/cuda-toolkit@master
