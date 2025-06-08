@@ -99,13 +99,13 @@ defmodule Beaver.MLIR.Attribute do
     {f, t} =
       case MLIR.Type.width(element_type) do
         32 ->
-          {:mlirDenseElementsAttrFloatGet, Beaver.Native.F32}
+          {&mlirDenseElementsAttrFloatGet/3, Beaver.Native.F32}
 
         64 ->
-          {:mlirDenseElementsAttrDoubleGet, Beaver.Native.F64}
+          {&mlirDenseElementsAttrDoubleGet/3, Beaver.Native.F64}
       end
 
-    &apply(MLIR.CAPI, f, [&1, &2, Beaver.Native.array(&3, t)])
+    &apply(f, [&1, &2, Beaver.Native.array(&3, t)])
   end
 
   defp dense_elements_get(shaped_type, num_elements, elements) do
