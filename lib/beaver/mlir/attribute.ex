@@ -39,7 +39,7 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   defp dense_elements_splat_get(shaped_type, value, ctx) do
-    element_type = mlirShapedTypeGetElementType(shaped_type)
+    element_type = MLIR.Type.element_type(shaped_type)
 
     cond do
       match?(%MLIR.Attribute{}, value) ->
@@ -109,7 +109,7 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   defp dense_elements_get(shaped_type, num_elements, elements) do
-    element_type = mlirShapedTypeGetElementType(shaped_type)
+    element_type = MLIR.Type.element_type(shaped_type)
 
     cond do
       MLIR.Type.opaque?(element_type) or string_elements?(elements) ->

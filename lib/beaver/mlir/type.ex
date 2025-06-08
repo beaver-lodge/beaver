@@ -384,4 +384,6 @@ defmodule Beaver.MLIR.Type do
     end
     |> Beaver.Native.to_term()
   end
+
+  defdelegate element_type(shaped_type), to: MLIR.CAPI, as: :mlirShapedTypeGetElementType
 end
