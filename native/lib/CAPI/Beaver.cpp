@@ -132,24 +132,6 @@ MLIR_CAPI_EXPORTED bool beaverLogicalResultIsFailure(MlirLogicalResult res) {
   return mlirLogicalResultIsFailure(res);
 }
 
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultSuccess() {
-  return mlirLogicalResultSuccess();
-}
-
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultFailure() {
-  return mlirLogicalResultFailure();
-}
-
-MLIR_CAPI_EXPORTED MlirIdentifier beaverOperationGetName(MlirOperation op,
-                                                         intptr_t pos) {
-  return mlirOperationGetAttribute(op, pos).name;
-}
-
-MLIR_CAPI_EXPORTED MlirAttribute beaverOperationGetAttribute(MlirOperation op,
-                                                             intptr_t pos) {
-  return mlirOperationGetAttribute(op, pos).attribute;
-}
-
 MLIR_CAPI_EXPORTED
 MlirIdentifier beaverNamedAttributeGetName(MlirNamedAttribute na) {
   return na.name;
@@ -279,19 +261,8 @@ MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context,
   }
 }
 
-MLIR_CAPI_EXPORTED MlirType
-beaverDenseElementsAttrGetElementType(MlirAttribute attr) {
-  return wrap(
-      llvm::cast<DenseElementsAttr>(unwrap(attr)).getType().getElementType());
-}
-
 MLIR_CAPI_EXPORTED MlirType beaverDenseElementsAttrGetType(MlirAttribute attr) {
   return wrap(llvm::cast<DenseElementsAttr>(unwrap(attr)).getType());
-}
-
-MLIR_CAPI_EXPORTED intptr_t
-beaverDenseElementsGetNumElements(MlirAttribute attr) {
-  return llvm::cast<DenseElementsAttr>(unwrap(attr)).getType().getNumElements();
 }
 
 MLIR_CAPI_EXPORTED intptr_t beaverShapedTypeGetNumElements(MlirType type) {

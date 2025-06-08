@@ -268,18 +268,6 @@ defmodule Beaver.MLIR.Type do
     end)
   end
 
-  def f16(opts \\ []) do
-    Beaver.Deferred.from_opts(opts, &mlirF16TypeGet/1)
-  end
-
-  def f32(opts \\ []) do
-    Beaver.Deferred.from_opts(opts, &mlirF32TypeGet/1)
-  end
-
-  def f64(opts \\ []) do
-    Beaver.Deferred.from_opts(opts, &mlirF64TypeGet/1)
-  end
-
   def float(bitwidth, opts \\ []) when is_integer(bitwidth) do
     apply(__MODULE__, String.to_atom("f#{bitwidth}"), [opts])
   end
@@ -311,20 +299,6 @@ defmodule Beaver.MLIR.Type do
     )
   end
 
-  def index(opts \\ []) do
-    Beaver.Deferred.from_opts(
-      opts,
-      &mlirIndexTypeGet(&1)
-    )
-  end
-
-  def none(opts \\ []) do
-    Beaver.Deferred.from_opts(
-      opts,
-      &mlirNoneTypeGet(&1)
-    )
-  end
-
   defdelegate i(bitwidth, opts \\ []), to: __MODULE__, as: :integer
 
   for bitwidth <- [1, 8, 16, 32, 64, 128], sign <- ~w{i si ui} do
@@ -348,14 +322,58 @@ defmodule Beaver.MLIR.Type do
         |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
     helper_name =
       helper_name
+      |> String.replace(~r"Type$", "")
       |> Macro.underscore()
       |> String.replace("mem_ref", "memref")
 
+    @doc """
+    calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is a #{helper_name} type.
+    """
     def unquote(:"#{helper_name}?")(%__MODULE__{} = t) do
       unquote(f)(t) |> Beaver.Native.to_term()
     end
   end
 
+  for sign_type <- ~w{signless signed unsigned} do
+    f = :"mlirIntegerTypeIs#{Macro.camelize(sign_type)}"
+
+    @doc """
+    calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is a #{sign_type} integer.
+    """
+
+    def unquote(:"#{sign_type}?")(%__MODULE__{} = type) do
+      unquote(f)(type) |> Beaver.Native.to_term()
+    end
+  end
+
+  for {f, "mlir" <> helper_name, 1} <-
+        Beaver.MLIR.CAPI.__info__(:functions)
+        |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end)
+        |> Enum.filter(fn {_, helper_name, _} ->
+          String.ends_with?(helper_name, "TypeGet") and
+            not String.contains?(helper_name, "Complex") and
+            not String.contains?(helper_name, "UnrankedTensor")
+        end) do
+    helper_name =
+      helper_name
+      |> String.trim_trailing("TypeGet")
+      |> Macro.underscore()
+      |> String.replace("mem_ref", "memref")
+
+    @doc """
+    calls `Beaver.MLIR.CAPI.#{f}/1` to get #{helper_name} type
+    """
+    def unquote(:"#{helper_name}")(opts \\ []) do
+      Beaver.Deferred.from_opts(
+        opts,
+        &unquote(f)(&1)
+      )
+    end
+  end
+
+  @doc """
+  get the width of the int or float type
+  """
   def width(%__MODULE__{} = type) do
     cond do
       integer?(type) ->
@@ -365,13 +383,5 @@ defmodule Beaver.MLIR.Type do
         mlirFloatTypeGetWidth(type)
     end
     |> Beaver.Native.to_term()
-  end
-
-  for sign_type <- ~w{signless signed unsigned} do
-    f = :"mlirIntegerTypeIs#{Macro.camelize(sign_type)}"
-
-    def unquote(:"#{sign_type}?")(%__MODULE__{} = type) do
-      unquote(f)(type) |> Beaver.Native.to_term()
-    end
   end
 end

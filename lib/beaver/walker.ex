@@ -246,9 +246,11 @@ defmodule Beaver.Walker do
       {Identifier, Attribute},
       get_num: &CAPI.mlirOperationGetNumAttributes/1,
       get_element: fn o, i ->
+        na = CAPI.mlirOperationGetAttribute(o, i)
+
         {
-          CAPI.beaverOperationGetName(o, i),
-          CAPI.beaverOperationGetAttribute(o, i)
+          MLIR.NamedAttribute.name(na),
+          MLIR.NamedAttribute.attribute(na)
         }
       end
     )

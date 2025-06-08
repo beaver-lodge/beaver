@@ -280,11 +280,11 @@ defmodule Beaver.MLIR.Attribute.Accessor do
         da
 
       MLIR.Attribute.dense_elements?(attr) ->
-        element_type = beaverDenseElementsAttrGetElementType(attr)
         shaped_type = beaverDenseElementsAttrGetType(attr)
+        element_type = mlirShapedTypeGetElementType(shaped_type)
 
         %__MODULE__{
-          get_num_element: &beaverDenseElementsGetNumElements/1,
+          get_num_element: &beaverShapedTypeGetNumElements(beaverDenseElementsAttrGetType(&1)),
           get_element: &dense_element_getter(element_type, &1, &2),
           getter: &MLIR.Attribute.dense_elements(&1, shaped_type, &2)
         }

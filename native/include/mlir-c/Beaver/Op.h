@@ -61,13 +61,6 @@ beaverOperationStateGetNumAttributes(MlirOperationState state);
 
 MLIR_CAPI_EXPORTED bool beaverLogicalResultIsSuccess(MlirLogicalResult res);
 MLIR_CAPI_EXPORTED bool beaverLogicalResultIsFailure(MlirLogicalResult res);
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultSuccess();
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultFailure();
-
-MLIR_CAPI_EXPORTED MlirIdentifier beaverOperationGetName(MlirOperation op,
-                                                         intptr_t pos);
-MLIR_CAPI_EXPORTED MlirAttribute beaverOperationGetAttribute(MlirOperation op,
-                                                             intptr_t pos);
 
 MLIR_CAPI_EXPORTED
 MlirIdentifier beaverNamedAttributeGetName(MlirNamedAttribute na);
@@ -111,13 +104,7 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverIRDLGetDefinedAttr(MlirStringRef dialect,
 MLIR_CAPI_EXPORTED MlirLogicalResult beaverModuleApplyPatternsAndFoldGreedily(
     MlirModule module, MlirFrozenRewritePatternSet patterns);
 
-MLIR_CAPI_EXPORTED MlirType
-beaverDenseElementsAttrGetElementType(MlirAttribute attr);
-
 MLIR_CAPI_EXPORTED MlirType beaverDenseElementsAttrGetType(MlirAttribute attr);
-
-MLIR_CAPI_EXPORTED intptr_t
-beaverDenseElementsGetNumElements(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED intptr_t beaverShapedTypeGetNumElements(MlirType type);
 

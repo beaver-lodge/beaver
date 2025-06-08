@@ -42,7 +42,6 @@ defmodule Beaver.MLIR.Attribute do
     element_type = mlirShapedTypeGetElementType(shaped_type)
 
     cond do
-      # there is no mlirDenseElementsAttrInt16SplatGet and mlirDenseElementsAttrUInt16SplatGet
       match?(%MLIR.Attribute{}, value) ->
         mlirDenseElementsAttrSplatGet(shaped_type, value)
 
@@ -385,7 +384,7 @@ defmodule Beaver.MLIR.Attribute do
     helper_name = type_name |> Macro.underscore()
 
     @doc """
-    Check if the attribute is #{type_name}
+    calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is #{type_name} attribute
     """
     def unquote(:"#{helper_name}?")(%__MODULE__{} = t) do
       unquote(f)(t) |> Beaver.Native.to_term()
