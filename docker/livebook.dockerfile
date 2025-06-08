@@ -16,7 +16,7 @@ RUN llvm-config --version
 ARG ZIG_URL="https://ziglang.org/download/0.14.1/zig-aarch64-linux-0.14.1.tar.xz"
 RUN wget "${ZIG_URL}" -O "zig-linux.tar.xz" \
   && tar Jxvf "zig-linux.tar.xz" -C /usr/local \
-  && mv /usr/local/zig-linux-*-* /usr/local/zig-linux \
+  && mv /usr/local/zig-*-linux-* /usr/local/zig-linux \
   && rm "zig-linux.tar.xz"
 ENV PATH=/usr/local/zig-linux:${PATH}
 RUN zig version
