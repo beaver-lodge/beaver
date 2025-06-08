@@ -268,23 +268,21 @@ defmodule Beaver.MLIR.Type do
     end)
   end
 
-  def f16(opts \\ []) do
-    Beaver.Deferred.from_opts(opts, &mlirF16TypeGet/1)
-  end
-
-  def f32(opts \\ []) do
-    Beaver.Deferred.from_opts(opts, &mlirF32TypeGet/1)
-  end
-
-  def f64(opts \\ []) do
-    Beaver.Deferred.from_opts(opts, &mlirF64TypeGet/1)
-  end
-
   def float(bitwidth, opts \\ []) when is_integer(bitwidth) do
     apply(__MODULE__, String.to_atom("f#{bitwidth}"), [opts])
   end
 
   defdelegate f(bitwidth, opts \\ []), to: __MODULE__, as: :float
+
+  def opaque(dialect_namespace, type_data, opts \\ []) do
+    Beaver.Deferred.from_opts(opts, fn ctx ->
+      mlirOpaqueTypeGet(
+        ctx,
+        MLIR.StringRef.create(dialect_namespace),
+        MLIR.StringRef.create(type_data)
+      )
+    end)
+  end
 
   def integer(bitwidth, opts \\ [signed: false]) do
     signed = Keyword.get(opts, :signed)
@@ -292,46 +290,100 @@ defmodule Beaver.MLIR.Type do
     Beaver.Deferred.from_opts(
       opts,
       fn ctx ->
-        if signed do
-          mlirIntegerTypeSignedGet(ctx, bitwidth)
-        else
-          mlirIntegerTypeGet(ctx, bitwidth)
+        case signed do
+          nil -> mlirIntegerTypeGet(ctx, bitwidth)
+          true -> mlirIntegerTypeSignedGet(ctx, bitwidth)
+          false -> mlirIntegerTypeUnsignedGet(ctx, bitwidth)
         end
       end
     )
   end
 
-  def index(opts \\ []) do
-    Beaver.Deferred.from_opts(
-      opts,
-      &mlirIndexTypeGet(&1)
-    )
-  end
-
-  def none(opts \\ []) do
-    Beaver.Deferred.from_opts(
-      opts,
-      &mlirNoneTypeGet(&1)
-    )
-  end
-
   defdelegate i(bitwidth, opts \\ []), to: __MODULE__, as: :integer
 
-  for bitwidth <- [1, 8, 16, 32, 64, 128] do
-    i_name = "i#{bitwidth}" |> String.to_atom()
+  for bitwidth <- [1, 8, 16, 32, 64, 128], sign <- ~w{i si ui} do
+    i_name = "#{sign}#{bitwidth}" |> String.to_atom()
+
+    signed =
+      case sign do
+        "i" -> nil
+        "si" -> true
+        "ui" -> false
+      end
 
     def unquote(i_name)(opts \\ []) do
+      opts = Keyword.put_new(opts, :signed, unquote(signed))
       apply(__MODULE__, :i, [unquote(bitwidth), opts])
     end
   end
 
-  for {f, "mlirTypeIsA" <> type_name, 1} <-
+  for {f, "mlirTypeIsA" <> helper_name, 1} <-
         Beaver.MLIR.CAPI.__info__(:functions)
         |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
-    helper_name = type_name |> Macro.underscore() |> String.replace("mem_ref", "memref")
+    helper_name =
+      helper_name
+      |> String.replace(~r"Type$", "")
+      |> Macro.underscore()
+      |> String.replace("mem_ref", "memref")
 
-    def unquote(:"#{helper_name}?")(%MLIR.Type{} = t) do
+    @doc """
+    calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is a #{helper_name} type.
+    """
+    def unquote(:"#{helper_name}?")(%__MODULE__{} = t) do
       unquote(f)(t) |> Beaver.Native.to_term()
     end
   end
+
+  for sign_type <- ~w{signless signed unsigned} do
+    f = :"mlirIntegerTypeIs#{Macro.camelize(sign_type)}"
+
+    @doc """
+    calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is a #{sign_type} integer.
+    """
+
+    def unquote(:"#{sign_type}?")(%__MODULE__{} = type) do
+      unquote(f)(type) |> Beaver.Native.to_term()
+    end
+  end
+
+  for {f, "mlir" <> helper_name, 1} <-
+        Beaver.MLIR.CAPI.__info__(:functions)
+        |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end)
+        |> Enum.filter(fn {_, helper_name, _} ->
+          String.ends_with?(helper_name, "TypeGet") and
+            not String.contains?(helper_name, "Complex") and
+            not String.contains?(helper_name, "UnrankedTensor")
+        end) do
+    helper_name =
+      helper_name
+      |> String.trim_trailing("TypeGet")
+      |> Macro.underscore()
+      |> String.replace("mem_ref", "memref")
+
+    @doc """
+    calls `Beaver.MLIR.CAPI.#{f}/1` to get #{helper_name} type
+    """
+    def unquote(:"#{helper_name}")(opts \\ []) do
+      Beaver.Deferred.from_opts(
+        opts,
+        &unquote(f)(&1)
+      )
+    end
+  end
+
+  @doc """
+  get the width of the int or float type
+  """
+  def width(%__MODULE__{} = type) do
+    cond do
+      integer?(type) ->
+        mlirIntegerTypeGetWidth(type)
+
+      float?(type) ->
+        mlirFloatTypeGetWidth(type)
+    end
+    |> Beaver.Native.to_term()
+  end
+
+  defdelegate element_type(shaped_type), to: MLIR.CAPI, as: :mlirShapedTypeGetElementType
 end

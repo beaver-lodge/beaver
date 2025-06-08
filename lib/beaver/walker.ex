@@ -16,6 +16,7 @@ defmodule Beaver.Walker do
   require Beaver.Pattern
   alias Beaver.MLIR.CAPI
   alias __MODULE__.OpReplacement
+  @behaviour Access
 
   @moduledoc """
   Provides traversal capabilities for MLIR structures.
@@ -61,7 +62,6 @@ defmodule Beaver.Walker do
           element_module: element_module(),
           get_num: (container() -> Beaver.Native.I64.t() | integer()) | nil,
           get_element: (container(), integer() -> element()) | nil,
-          element_equal: (element(), element() -> Beaver.Native.Bool.t() | bool()) | nil,
           get_first: (container() -> element()) | nil,
           get_next: (element() -> element()) | nil,
           get_parent: (element() -> container()) | nil,
@@ -72,7 +72,7 @@ defmodule Beaver.Walker do
         }
 
   container_keys = [:container, :element_module]
-  index_func_keys = [:get_num, :get_element, :element_equal]
+  index_func_keys = [:get_num, :get_element]
   iter_keys = [:this, :num]
   iter_func_keys = [:get_first, :get_next, :get_parent, :is_null, :parent_equal]
   @enforce_keys container_keys
@@ -124,12 +124,10 @@ defmodule Beaver.Walker do
          container,
          element_module,
          get_num: get_num,
-         get_element: get_element,
-         element_equal: element_equal
+         get_element: get_element
        )
        when is_function(get_num, 1) and
-              is_function(get_element, 2) and
-              is_function(element_equal, 2) do
+              is_function(get_element, 2) do
     container = %container_module{} = extract_container(container)
     verify_nesting!(container_module, element_module)
 
@@ -137,8 +135,7 @@ defmodule Beaver.Walker do
       container: container,
       element_module: element_module,
       get_num: get_num,
-      get_element: get_element,
-      element_equal: element_equal
+      get_element: get_element
     }
   end
 
@@ -180,8 +177,7 @@ defmodule Beaver.Walker do
       op,
       Value,
       get_num: &CAPI.mlirOperationGetNumOperands/1,
-      get_element: &CAPI.mlirOperationGetOperand/2,
-      element_equal: &CAPI.mlirValueEqual/2
+      get_element: &CAPI.mlirOperationGetOperand/2
     )
   end
 
@@ -198,8 +194,7 @@ defmodule Beaver.Walker do
       op,
       Value,
       get_num: &CAPI.mlirOperationGetNumResults/1,
-      get_element: &CAPI.mlirOperationGetResult/2,
-      element_equal: &CAPI.mlirValueEqual/2
+      get_element: &CAPI.mlirOperationGetResult/2
     )
   end
 
@@ -216,8 +211,7 @@ defmodule Beaver.Walker do
       op,
       Region,
       get_num: &CAPI.mlirOperationGetNumRegions/1,
-      get_element: &CAPI.mlirOperationGetRegion/2,
-      element_equal: &CAPI.mlirRegionEqual/2
+      get_element: &CAPI.mlirOperationGetRegion/2
     )
   end
 
@@ -234,8 +228,7 @@ defmodule Beaver.Walker do
       op,
       Block,
       get_num: &CAPI.mlirOperationGetNumSuccessors/1,
-      get_element: &CAPI.mlirOperationGetSuccessor/2,
-      element_equal: &CAPI.mlirBlockEqual/2
+      get_element: &CAPI.mlirOperationGetSuccessor/2
     )
   end
 
@@ -253,12 +246,13 @@ defmodule Beaver.Walker do
       {Identifier, Attribute},
       get_num: &CAPI.mlirOperationGetNumAttributes/1,
       get_element: fn o, i ->
+        na = CAPI.mlirOperationGetAttribute(o, i)
+
         {
-          CAPI.beaverOperationGetName(o, i),
-          CAPI.beaverOperationGetAttribute(o, i)
+          MLIR.NamedAttribute.name(na),
+          MLIR.NamedAttribute.attribute(na)
         }
-      end,
-      element_equal: &CAPI.mlirAttributeEqual/2
+      end
     )
   end
 
@@ -271,8 +265,7 @@ defmodule Beaver.Walker do
       block,
       Value,
       get_num: &CAPI.mlirBlockGetNumArguments/1,
-      get_element: &CAPI.mlirBlockGetArgument/2,
-      element_equal: &CAPI.mlirValueEqual/2
+      get_element: &CAPI.mlirBlockGetArgument/2
     )
   end
 
@@ -321,18 +314,12 @@ defmodule Beaver.Walker do
     )
   end
 
-  @behaviour Access
-  @impl true
+  @impl Access
   def fetch(%__MODULE__{element_module: NamedAttribute} = walker, key) do
     walker
     |> Enum.find(fn named_attribute ->
-      with name <-
-             named_attribute
-             |> MLIR.CAPI.beaverNamedAttributeGetName()
-             |> MLIR.CAPI.mlirIdentifierStr()
-             |> MLIR.to_string() do
-        name == to_string(key)
-      end
+      name = named_attribute |> MLIR.NamedAttribute.name() |> MLIR.to_string()
+      name == to_string(key)
     end)
     |> then(
       &case &1 do
@@ -368,12 +355,12 @@ defmodule Beaver.Walker do
     end
   end
 
-  @impl true
+  @impl Access
   def get_and_update(_data, _key, _function) do
     raise "get_and_update not supported"
   end
 
-  @impl true
+  @impl Access
   def pop(_data, _key) do
     raise "pop not supported"
   end
@@ -491,13 +478,12 @@ defmodule Beaver.Walker do
   end
 
   defp do_traverse(%NamedAttribute{} = named_attribute, acc, pre, post) do
-    name = %Identifier{} = named_attribute |> MLIR.CAPI.beaverNamedAttributeGetName()
-
-    attribute = %Attribute{} = named_attribute |> MLIR.CAPI.beaverNamedAttributeGetAttribute()
+    name = %Identifier{} = named_attribute |> MLIR.NamedAttribute.name()
+    attribute = %Attribute{} = named_attribute |> MLIR.NamedAttribute.attribute()
 
     {{name, attribute}, acc} = pre.({name, attribute}, acc)
     {{name, attribute}, acc} = post.({name, attribute}, acc)
-    named_attribute = MLIR.CAPI.mlirNamedAttributeGet(name, attribute)
+    named_attribute = MLIR.NamedAttribute.get(name, attribute)
     {named_attribute, acc}
   end
 
@@ -580,16 +566,10 @@ defmodule Beaver.Walker do
     @spec member?(Beaver.Walker.t(), Beaver.Walker.element()) ::
             {:ok, boolean()} | {:error, module()}
     def member?(
-          walker = %Beaver.Walker{element_equal: element_equal, element_module: element_module},
+          %Beaver.Walker{element_module: element_module} = walker,
           %element_module{} = element
-        )
-        when is_function(element_equal, 2) do
-      is_member =
-        Enum.any?(walker, fn member ->
-          element_equal.(member, element) |> Beaver.Native.to_term()
-        end)
-
-      {:ok, is_member}
+        ) do
+      {:ok, Enum.any?(walker, &MLIR.equal?(&1, element))}
     end
 
     @spec member?(Beaver.Walker.t(), Beaver.Walker.element()) ::
