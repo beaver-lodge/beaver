@@ -13,7 +13,7 @@ RUN ln -s $(python3 -c 'import mlir;print(mlir.__path__[0])') /usr/local/mlir
 ENV PATH=/usr/local/mlir/bin:${PATH}
 RUN llvm-config --version
 # Zig
-ARG ZIG_URL="https://ziglang.org/download/0.14.0/zig-linux-aarch64-0.14.0.tar.xz"
+ARG ZIG_URL="https://ziglang.org/download/0.14.1/zig-linux-aarch64-0.14.1.tar.xz"
 RUN wget "${ZIG_URL}" -O "zig-linux.tar.xz" \
   && tar Jxvf "zig-linux.tar.xz" -C /usr/local \
   && mv /usr/local/zig-linux-*-* /usr/local/zig-linux \
