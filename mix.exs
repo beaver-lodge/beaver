@@ -4,7 +4,7 @@ defmodule Beaver.MixProject do
   def project do
     [
       app: :beaver,
-      version: "0.4.4-dev",
+      version: "0.4.5-dev",
       elixir: "~> 1.14",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
@@ -19,7 +19,7 @@ defmodule Beaver.MixProject do
         make_force_build: System.get_env("BEAVER_BUILD_CMAKE") in ["1", "true"],
         make_precompiler_url:
           System.get_env("BEAVER_ARTEFACT_URL") ||
-            "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2025-05-06-0310/@{artefact_filename}",
+            "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2025-06-08-1512/@{artefact_filename}",
         make_precompiler_nif_versions: [
           versions: fn opts ->
             target = opts.target

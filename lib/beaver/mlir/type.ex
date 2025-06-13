@@ -317,18 +317,21 @@ defmodule Beaver.MLIR.Type do
     end
   end
 
-  for {f, "mlirTypeIsA" <> helper_name, 1} <-
+  for {f, "mlirTypeIsA" <> type_name, 1} <-
         Beaver.MLIR.CAPI.__info__(:functions)
         |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
-    helper_name =
-      helper_name
+    type_name =
+      type_name
       |> String.replace(~r"Type$", "")
+
+    @doc """
+    calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is #{type_name} type.
+    """
+    helper_name =
+      type_name
       |> Macro.underscore()
       |> String.replace("mem_ref", "memref")
 
-    @doc """
-    calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is a #{helper_name} type.
-    """
     def unquote(:"#{helper_name}?")(%__MODULE__{} = t) do
       unquote(f)(t) |> Beaver.Native.to_term()
     end
@@ -346,23 +349,26 @@ defmodule Beaver.MLIR.Type do
     end
   end
 
-  for {f, "mlir" <> helper_name, 1} <-
+  for {f, "mlir" <> type_name, 1} <-
         Beaver.MLIR.CAPI.__info__(:functions)
         |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end)
-        |> Enum.filter(fn {_, helper_name, _} ->
-          String.ends_with?(helper_name, "TypeGet") and
-            not String.contains?(helper_name, "Complex") and
-            not String.contains?(helper_name, "UnrankedTensor")
+        |> Enum.filter(fn {_, type_name, _} ->
+          String.ends_with?(type_name, "TypeGet") and
+            not String.contains?(type_name, "Complex") and
+            not String.contains?(type_name, "UnrankedTensor")
         end) do
-    helper_name =
-      helper_name
+    type_name =
+      type_name
       |> String.trim_trailing("TypeGet")
+
+    @doc """
+    calls `Beaver.MLIR.CAPI.#{f}/1` to get #{type_name} type
+    """
+    helper_name =
+      type_name
       |> Macro.underscore()
       |> String.replace("mem_ref", "memref")
 
-    @doc """
-    calls `Beaver.MLIR.CAPI.#{f}/1` to get #{helper_name} type
-    """
     def unquote(:"#{helper_name}")(opts \\ []) do
       Beaver.Deferred.from_opts(
         opts,
