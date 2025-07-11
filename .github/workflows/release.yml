@@ -133,9 +133,10 @@ jobs:
         run: |
           mix run bench/enif_add_benchmark.exs
 
-  arm_docker:
+  docker_build:
     needs: [generate_id]
     runs-on: ubuntu-latest
+    name: Docker build ${{ matrix.image.suffix }}
     strategy:
       fail-fast: false
       matrix:
