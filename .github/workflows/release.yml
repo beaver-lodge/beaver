@@ -187,7 +187,6 @@ jobs:
         working-directory: beaver
         run: sed -i 's/-dev//g' mix.exs
       - name: Build ARM
-        continue-on-error: true
         if: ${{ matrix.image.platform == 'linux/arm64/v8' }}
         run: docker run --platform ${{ matrix.image.platform }} -v $PWD:/src -w /src/beaver ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
       - name: Publish archives and packages
