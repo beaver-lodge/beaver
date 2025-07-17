@@ -3,7 +3,6 @@ const beam = @import("beam");
 const mlir_capi = @import("mlir_capi.zig");
 const c = @import("prelude.zig");
 const e = @import("erl_nif");
-const debug_print = @import("std").debug.print;
 const kinda = @import("kinda");
 const result = @import("kinda").result;
 const diagnostic = @import("diagnostic.zig");

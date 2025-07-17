@@ -14,10 +14,10 @@ const string_ref = @import("string_ref.zig");
 const memref = @import("memref.zig");
 const logical_mutex = @import("logical_mutex.zig");
 
-const handwritten_nifs = @import("wrapper.zig").nif_entries ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ diagnostic.nifs ++ pointer.nifs ++ memref.nifs ++ enif_support.nifs ++ logical_mutex.nifs;
+const nifs_ = @import("wrapper.zig").nif_entries ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ diagnostic.nifs ++ pointer.nifs ++ memref.nifs ++ enif_support.nifs ++ logical_mutex.nifs;
 
-const num_nifs = handwritten_nifs.len;
-export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs;
+const num_nifs = nifs_.len;
+export var nifs: [num_nifs]e.ErlNifFunc = nifs_;
 
 export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     pass.register_all_passes();
@@ -26,6 +26,7 @@ export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     mlir_capi.open_all(env);
     memref.open_all(env);
     logical_mutex.open_all(env);
+    std.log.debug("Found {d} NIFs in " ++ mlir_capi.root_module, .{num_nifs});
     return 0;
 }
 

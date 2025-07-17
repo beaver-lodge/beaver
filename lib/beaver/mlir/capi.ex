@@ -11,6 +11,7 @@ defmodule Beaver.MLIR.CAPI do
   - `mlirOperationVerify`, `mlirAttributeParseGet`, `mlirTypeParseGet`, `mlirModuleCreateParse`: the diagnostic handler implemented in Elixir.
   """
   use Kinda.CodeGen, with: Beaver.MLIR.CAPI.CodeGen, root: __MODULE__, forward: Beaver.Native
+  require Logger
 
   @on_load :load_nif
 
@@ -24,11 +25,19 @@ defmodule Beaver.MLIR.CAPI do
       |> File.ln_s("#{nif_file}.so")
     end
 
-    case :erlang.load_nif(nif_file, 0) do
-      :ok -> :ok
-      {:error, {:reload, _}} -> :ok
-      {:error, reason} -> IO.puts("Failed to load nif: #{inspect(reason)}")
-    end
+    Logger.debug("Start loading NIF library: #{nif_file}")
+
+    {duration_us, result} =
+      :timer.tc(fn ->
+        case :erlang.load_nif(nif_file, 0) do
+          :ok -> :ok
+          {:error, {:reload, _}} -> :ok
+          {:error, reason} -> Logger.error("Failed to load nif: #{inspect(reason)}")
+        end
+      end)
+
+    Logger.debug("NIF library loaded, took #{duration_us / 1_000_000}s")
+    result
   end
 
   # setting up elixir re-compilation triggered by changes in external files
