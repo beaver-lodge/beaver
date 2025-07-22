@@ -82,7 +82,7 @@ Bindings are the part that provides the interface to the MLIR CAPIs. It is imple
 - Build and run Elixir tests
   ```bash
   mix deps.get
-  1 mix test
+  mix test
   # run tests with filters
   mix test --exclude vulkan # use this to skip vulkan tests
   mix test --only smoke
