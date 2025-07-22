@@ -82,7 +82,7 @@ Bindings are the part that provides the interface to the MLIR CAPIs. It is imple
 - Build and run Elixir tests
   ```bash
   mix deps.get
-  BEAVER_BUILD_CMAKE=1 mix test
+  1 mix test
   # run tests with filters
   mix test --exclude vulkan # use this to skip vulkan tests
   mix test --only smoke
@@ -134,7 +134,7 @@ Check the version in the output is correct.
 ### Publish to Hex
 
 ```
-BEAVER_BUILD_CMAKE=1 mix hex.publish
+mix hex.publish
 ```
 
 ## Format CMake files
