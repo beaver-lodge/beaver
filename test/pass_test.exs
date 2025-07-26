@@ -153,4 +153,23 @@ defmodule PassTest do
     assert "new state used in cleanup" = Agent.get(ErrInit, fn s -> s end)
     assert :ok = Agent.stop(ErrInit)
   end
+
+  test "incorrect init returns", %{ctx: ctx} do
+    op = Beaver.Dummy.gigantic(ctx, 10)
+
+    composer =
+      Beaver.Composer.new(ctx: ctx)
+      |> Beaver.Composer.nested("func.func", IncorrectInitReturns)
+      |> canonicalize()
+
+    pm = Beaver.Composer.init(composer, verifier: true)
+    {:error, diagnostics} = MLIR.PassManager.run(pm, op)
+
+    assert MLIR.Diagnostic.format(diagnostics) =~
+             "Fail to initialize a pass implemented in Elixir"
+
+    assert :ok = MLIR.PassManager.destroy(pm)
+    assert nil == Agent.get(IncorrectInitReturns, fn s -> s end)
+    assert :ok = Agent.stop(IncorrectInitReturns)
+  end
 end
