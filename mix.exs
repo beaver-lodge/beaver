@@ -21,15 +21,7 @@ defmodule Beaver.MixProject do
           System.get_env("BEAVER_ARTEFACT_URL") ||
             "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2025-06-08-1512/@{artefact_filename}",
         make_precompiler_nif_versions: [
-          versions: fn opts ->
-            target = opts.target
-
-            if String.contains?(target, "darwin") do
-              ["2.17"]
-            else
-              ["2.16", "2.17"]
-            end
-          end
+          versions: fn _ -> ["2.16", "2.17"] end
         ],
         make_args: ~w{-j},
         make_cwd: "native",
