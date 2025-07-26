@@ -39,7 +39,6 @@ defmodule DialectRegistryTest do
         {"llvm", "LLVM"},
         {"math", "Math"},
         {"memref", "MemRef"},
-        {"mesh", "Mesh"},
         {"ml_program", "MLProgram"},
         {"mpi", "MPI"},
         {"nvgpu", "NVGPU"},
@@ -62,7 +61,8 @@ defmodule DialectRegistryTest do
         {"x86vector", "X86Vector"},
         {"xegpu", "XeGPU"},
         {"smt", "SMT"},
-        {"xevm", "XeVM"}
+        {"xevm", "XeVM"},
+        {"shard", "Shard"}
       ]
       |> MapSet.new()
 
