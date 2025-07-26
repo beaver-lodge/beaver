@@ -33,7 +33,7 @@ jobs:
 
   build_release:
     needs: [generate_id]
-    name: NIF ${{ matrix.job.otp }} (${{ matrix.job.elixir }})
+    name: NIF ${{ matrix.job.otp }} - (${{ matrix.job.os }}) (${{ matrix.job.elixir }})
     runs-on: ${{ matrix.job.os }}
     strategy:
       fail-fast: false
@@ -41,6 +41,10 @@ jobs:
         job:
           - { otp: 24.2, os: ubuntu-22.04, elixir: 1.14 }
           - { otp: 26, os: ubuntu-22.04, elixir: 1.15 }
+          - { otp: 25, os: macos-13, elixir: 1.14 }
+          - { otp: 26, os: macos-13, elixir: 1.15 }
+          - { otp: 25, os: macos-latest, elixir: 1.14 }
+          - { otp: 26, os: macos-latest, elixir: 1.15 }
     steps:
       - uses: actions/checkout@v3
         name: Check-out beaver
@@ -66,11 +70,12 @@ jobs:
           otp-version: ${{ matrix.job.otp }} # Define the OTP version [required]
       - run: elixir --eval ":erlang.system_info(:nif_version) |> IO.puts"
       - name: Set up Zig
-        uses: goto-bus-stop/setup-zig@v1
+        uses: mlugg/setup-zig@v2
         with:
           version: 0.14.1
       - uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
+        if: runner.os == 'Linux'
         with:
           use-github-cache: false
           log-file-suffix: '${{matrix.job.os}}-${{ matrix.job.otp }}-(${{ matrix.job.elixir }}).txt'
@@ -88,7 +93,7 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
       - name: Strip dev suffix
-        run: sed -i 's/-dev//g' mix.exs
+        run: sed -i.bak 's/-dev//g' mix.exs && rm -f mix.exs.bak
       - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Install pre-build LLVM
         run: |

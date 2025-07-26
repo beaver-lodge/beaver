@@ -21,15 +21,7 @@ defmodule Beaver.MixProject do
           System.get_env("BEAVER_ARTEFACT_URL") ||
             "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/2025-06-08-1512/@{artefact_filename}",
         make_precompiler_nif_versions: [
-          versions: fn opts ->
-            target = opts.target
-
-            if String.contains?(target, "darwin") do
-              ["2.17"]
-            else
-              ["2.16", "2.17"]
-            end
-          end
+          versions: fn _ -> ["2.16", "2.17"] end
         ],
         make_args: ~w{-j},
         make_cwd: "native",
@@ -115,7 +107,7 @@ defmodule Beaver.MixProject do
   defp deps do
     [
       {:elixir_make, "~> 0.4", runtime: false},
-      {:kinda, "~> 0.10.2"},
+      {:kinda, "~> 0.10.3"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:benchee, "~> 1.0", only: :dev},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
