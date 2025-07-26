@@ -91,7 +91,9 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
       - name: Strip dev suffix
-        run: sed -i 's/-dev//g' mix.exs
+        run: |
+          mix archive.install hex mix_version
+          mix version --patch
       - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Install pre-build LLVM
         run: |
