@@ -58,10 +58,10 @@ defmodule PassTest do
              "func.func1",
              [
                canonicalize(),
-               {:nested, "func.func2",
+               {"func.func2",
                 [
                   canonicalize(),
-                  {:nested, "func.func3",
+                  {"func.func3",
                    [
                      canonicalize()
                    ]}

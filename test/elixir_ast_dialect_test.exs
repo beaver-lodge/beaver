@@ -12,7 +12,7 @@ defmodule ELXDialectTest do
       |> Beaver.Composer.nested(
         "builtin.module",
         [
-          {:nested, "func.func",
+          {"func.func",
            [
              ElixirAST.MaterializeBoundVariables
            ]}

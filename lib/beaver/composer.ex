@@ -23,8 +23,8 @@ defmodule Beaver.Composer do
   def append(%__MODULE__{passes: passes} = composer, pass),
     do: %__MODULE__{composer | passes: passes ++ [pass]}
 
-  def nested(composer_or_op, op_name, passes) when is_list(passes) do
-    composer_or_op |> append({:nested, op_name, passes})
+  def nested(composer_or_op, op_name, passes) when is_bitstring(op_name) and is_list(passes) do
+    composer_or_op |> append({op_name, passes})
   end
 
   def nested(composer_or_op, op_name, pass) do
@@ -86,7 +86,7 @@ defmodule Beaver.Composer do
 
   # nested pm
 
-  defp add_pass(pm, {:nested, op_name, passes}) when is_binary(op_name) and is_list(passes) do
+  defp add_pass(pm, {op_name, passes}) when is_binary(op_name) and is_list(passes) do
     npm =
       case pm do
         %MLIR.PassManager{} ->
