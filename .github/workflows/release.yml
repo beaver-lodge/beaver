@@ -68,7 +68,7 @@ jobs:
           otp-version: ${{ matrix.job.otp }} # Define the OTP version [required]
       - run: elixir --eval ":erlang.system_info(:nif_version) |> IO.puts"
       - name: Set up Zig
-        uses: goto-bus-stop/setup-zig@v1
+        uses: mlugg/setup-zig@v2
         with:
           version: 0.14.1
       - uses: Jimver/cuda-toolkit@master
