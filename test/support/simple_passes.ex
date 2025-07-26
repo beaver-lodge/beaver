@@ -33,3 +33,17 @@ defmodule ErrInit do
     :ok
   end
 end
+
+defmodule IncorrectInitReturns do
+  @moduledoc false
+  use Beaver.MLIR.Pass, on: "func.func"
+
+  def initialize(_ctx, nil) do
+    :some
+  end
+
+  def destruct(state) do
+    {:ok, _} = Agent.start_link(fn -> state end, name: __MODULE__)
+    :ok
+  end
+end
