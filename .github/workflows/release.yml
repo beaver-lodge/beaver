@@ -73,7 +73,7 @@ jobs:
           version: 0.14.1
       - uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
-        if: contains(matrix.job.os, 'linux')
+        if: runner.os == 'Linux'
         with:
           use-github-cache: false
           log-file-suffix: '${{matrix.job.os}}-${{ matrix.job.otp }}-(${{ matrix.job.elixir }}).txt'
