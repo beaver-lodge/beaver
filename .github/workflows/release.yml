@@ -33,7 +33,7 @@ jobs:
 
   build_release:
     needs: [generate_id]
-    name: NIF ${{ matrix.job.otp }} (${{ matrix.job.elixir }})
+    name: NIF ${{ matrix.job.otp }} - (${{ matrix.job.os }}) (${{ matrix.job.elixir }})
     runs-on: ${{ matrix.job.os }}
     strategy:
       fail-fast: false
