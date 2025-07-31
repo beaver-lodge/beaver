@@ -24,21 +24,22 @@ defmodule Beaver.Changeset do
             location: nil,
             context: nil
 
-  @type attr_tag ::
-          {atom(), MLIR.Type.t()}
-          | {atom(), MLIR.Attribute.t()}
+  @type type_argument() :: MLIR.Type.t() | (MLIR.Context.t() -> MLIR.Type.t())
+  @type attribute_argument() :: MLIR.Attribute.t() | (MLIR.Context.t() -> MLIR.Attribute.t())
+  @type value_argument() :: MLIR.Value.t() | (MLIR.Context.t() -> MLIR.Value.t())
+  @type tagged_attribute :: {atom(), type_argument() | attribute_argument()}
+  @type branching_argument() :: MLIR.Block.t() | {MLIR.Block.t(), [MLIR.Value.t()]}
+  @type region_argument() :: MLIR.Region.t() | {:regions, (-> [MLIR.Region.t()])}
+  @type result_argument() :: MLIR.Type.t() | {:result_types, [MLIR.Type.t()]}
+  @type loc_argument() :: MLIR.Location.t() | {:loc, MLIR.Location.t()}
+
   @type argument() ::
-          MLIR.Value.t()
-          | MLIR.Block.t()
-          | MLIR.Region.t()
-          | attr_tag
-          | [attr_tag]
-          | {:regions, function()}
-          | {:result_types, [MLIR.Type.t()]}
-          | MLIR.Type.t()
-          | {:loc, Beaver.MLIR.Location.t()}
-          | {MLIR.Block.t(), [MLIR.Value.t()]}
-          | fun()
+          value_argument()
+          | tagged_attribute()
+          | [tagged_attribute()]
+          | branching_argument()
+          | result_argument()
+          | loc_argument()
   @spec add_argument(t(), argument()) :: t()
 
   @doc """
@@ -135,5 +136,26 @@ defmodule Beaver.Changeset do
         %MLIR.Value{} = operand
       ) do
     %__MODULE__{changeset | operands: operands ++ [operand]}
+  end
+
+  def add_argument(%__MODULE__{}, operand) do
+    raise ArgumentError, """
+    Invalid argument.
+
+    The following argument types are supported:
+    - {:loc, %MLIR.Location{}} - Location argument
+    - {:regions, (%MLIR.Context{} -> [%MLIR.Region{}])} - Region filler function
+    - {:result_types, [%MLIR.Type{}]} - Result types list
+    - %MLIR.Type{} - Single result type
+    - {%MLIR.Block{}, [%MLIR.Value{}]} - Successor block with args
+    - %MLIR.Block{} - Successor block
+    - {atom(), (%MLIR.Attribute{} | (%MLIR.Context{} -> %MLIR.Attribute{}))} - Tagged attribute
+    - {atom(), %MLIR.Type{}} - Tagged type
+    - {atom(), binary()} - Tagged string attribute
+    - [{atom(), any()}] - List of attributes
+    - %MLIR.Value{} or (%MLIR.Context{} -> %MLIR.Value{}) - Operand value
+
+    Received: #{inspect(operand)}
+    """
   end
 end
