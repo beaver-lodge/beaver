@@ -24,21 +24,22 @@ defmodule Beaver.Changeset do
             location: nil,
             context: nil
 
-  @type attr_tag ::
-          {atom(), MLIR.Type.t()}
-          | {atom(), MLIR.Attribute.t()}
+  @type type_argument() :: MLIR.Type.t() | (MLIR.Context.t() -> MLIR.Type.t())
+  @type attribute_argument() :: MLIR.Attribute.t() | (MLIR.Context.t() -> MLIR.Attribute.t())
+  @type value_argument() :: MLIR.Value.t() | (MLIR.Context.t() -> MLIR.Value.t())
+  @type tagged_attribute :: {atom(), type_argument() | attribute_argument()}
+  @type branching_argument() :: MLIR.Block.t() | {MLIR.Block.t(), [MLIR.Value.t()]}
+  @type region_argument() :: MLIR.Region.t() | {:regions, (-> [MLIR.Region.t()])}
+  @type result_argument() :: MLIR.Type.t() | {:result_types, [MLIR.Type.t()]}
+  @type loc_argument() :: MLIR.Location.t() | {:loc, MLIR.Location.t()}
+
   @type argument() ::
-          MLIR.Value.t()
-          | MLIR.Block.t()
-          | MLIR.Region.t()
-          | attr_tag
-          | [attr_tag]
-          | {:regions, function()}
-          | {:result_types, [MLIR.Type.t()]}
-          | MLIR.Type.t()
-          | {:loc, Beaver.MLIR.Location.t()}
-          | {MLIR.Block.t(), [MLIR.Value.t()]}
-          | fun()
+          value_argument()
+          | tagged_attribute()
+          | [tagged_attribute()]
+          | branching_argument()
+          | result_argument()
+          | loc_argument()
   @spec add_argument(t(), argument()) :: t()
 
   @doc """
@@ -135,5 +136,23 @@ defmodule Beaver.Changeset do
         %MLIR.Value{} = operand
       ) do
     %__MODULE__{changeset | operands: operands ++ [operand]}
+  end
+
+  def add_argument(%__MODULE__{}, operand) do
+    raise ArgumentError, """
+    Invalid argument received: #{inspect(operand)}
+
+    Supported argument types:
+    - (list of) value
+    - (list of) {atom, attribute | type | binary()}
+    - {block, values} (for block successors)
+    - block (for block successors)
+    - MLIR.Region.t() (for regions)
+    - {:regions, (-> [region])} (for regions)
+    - {:result_types, [type]}
+    - {:loc, location}
+
+    Received: #{inspect(operand)}
+    """
   end
 end

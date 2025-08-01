@@ -34,4 +34,17 @@ defmodule OpTest do
     assert MLIR.equal?(popped, old_attr)
     assert op[:value] == nil
   end
+
+  test "incorrect argument", %{ctx: ctx} do
+    use Beaver
+    alias MLIR.Dialect.MemRef
+
+    assert_raise ArgumentError, ~r{Invalid argument.+:not_supported}s, fn ->
+      mlir ctx: ctx do
+        module do
+          MemRef.global(:not_supported) >>> []
+        end
+      end
+    end
+  end
 end

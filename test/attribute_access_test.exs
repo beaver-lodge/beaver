@@ -366,4 +366,10 @@ defmodule AttributeAccessTest do
     assert nil == empty_dense[0]
     assert {nil, %MLIR.Attribute{}} = Access.get_and_update(empty_dense, 0, fn x -> {x, x} end)
   end
+
+  test "access wrong attribute", %{ctx: ctx} do
+    assert_raise ArgumentError, "not a container attribute", fn ->
+      MLIR.Attribute.integer(Type.i(32, ctx: ctx), 0)[0]
+    end
+  end
 end

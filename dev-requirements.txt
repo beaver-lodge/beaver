@@ -1,3 +1,3 @@
-mlir==22.0.0.2025072601+cuda.1a4f0d61; sys_platform == "linux" and platform_machine == "x86_64"
-mlir==22.0.0.2025072601+1a4f0d61; sys_platform != "linux" or platform_machine != "x86_64"
+mlir==22.0.0.2025080101+cuda.f8a2ed7a; sys_platform == "linux" and platform_machine == "x86_64"
+mlir==22.0.0.2025080101+f8a2ed7a; sys_platform != "linux" or platform_machine != "x86_64"
 --find-links https://makslevental.github.io/wheels
