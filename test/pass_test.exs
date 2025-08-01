@@ -127,7 +127,7 @@ defmodule PassTest do
 
     n2 = n * 2
 
-    assert %{run: ^n2, clone: clone, initialize: 2, destruct: destruct} =
+    assert %{run: ^n2, clone: clone, initialize: 1, destruct: destruct} =
              Agent.get(AllCallbacks, & &1, :infinity)
 
     assert clone0 == clone
