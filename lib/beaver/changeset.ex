@@ -140,20 +140,17 @@ defmodule Beaver.Changeset do
 
   def add_argument(%__MODULE__{}, operand) do
     raise ArgumentError, """
-    Invalid argument.
+    Invalid argument received: #{inspect(operand)}
 
-    The following argument types are supported:
-    - {:loc, %MLIR.Location{}} - Location argument
-    - {:regions, (%MLIR.Context{} -> [%MLIR.Region{}])} - Region filler function
-    - {:result_types, [%MLIR.Type{}]} - Result types list
-    - %MLIR.Type{} - Single result type
-    - {%MLIR.Block{}, [%MLIR.Value{}]} - Successor block with args
-    - %MLIR.Block{} - Successor block
-    - {atom(), (%MLIR.Attribute{} | (%MLIR.Context{} -> %MLIR.Attribute{}))} - Tagged attribute
-    - {atom(), %MLIR.Type{}} - Tagged type
-    - {atom(), binary()} - Tagged string attribute
-    - [{atom(), any()}] - List of attributes
-    - %MLIR.Value{} or (%MLIR.Context{} -> %MLIR.Value{}) - Operand value
+    Supported argument types:
+    - (list of) value
+    - (list of) {atom, attribute | type | binary()}
+    - {block, values} (for block successors)
+    - block (for block successors)
+    - MLIR.Region.t() (for regions)
+    - {:regions, (-> [region])} (for regions)
+    - {:result_types, [type]}
+    - {:loc, location}
 
     Received: #{inspect(operand)}
     """
