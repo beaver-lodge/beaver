@@ -25,19 +25,20 @@ defmodule Beaver.Changeset do
             context: nil
 
   @type type_argument() :: MLIR.Type.t() | (MLIR.Context.t() -> MLIR.Type.t())
-  @type attribute_argument() :: MLIR.Attribute.t() | (MLIR.Context.t() -> MLIR.Attribute.t())
-  @type value_argument() :: MLIR.Value.t() | (MLIR.Context.t() -> MLIR.Value.t())
-  @type tagged_attribute :: {atom(), type_argument() | attribute_argument()}
+  @type attribute() :: MLIR.Attribute.t() | (MLIR.Context.t() -> MLIR.Attribute.t())
+  @type operand_argument() :: MLIR.Value.t() | (MLIR.Context.t() -> MLIR.Value.t())
+  @type tagged_attribute :: {atom(), type_argument() | attribute()}
+  @type attribute_argument() :: tagged_attribute() | [tagged_attribute()]
   @type branching_argument() :: MLIR.Block.t() | {MLIR.Block.t(), [MLIR.Value.t()]}
   @type region_argument() :: MLIR.Region.t() | {:regions, (-> [MLIR.Region.t()])}
-  @type result_argument() :: MLIR.Type.t() | {:result_types, [MLIR.Type.t()]}
+  @type result_argument() :: type_argument() | {:result_types, [type_argument()]}
   @type loc_argument() :: MLIR.Location.t() | {:loc, MLIR.Location.t()}
 
   @type argument() ::
-          value_argument()
-          | tagged_attribute()
-          | [tagged_attribute()]
+          operand_argument()
+          | attribute_argument()
           | branching_argument()
+          | region_argument()
           | result_argument()
           | loc_argument()
   @spec add_argument(t(), argument()) :: t()
