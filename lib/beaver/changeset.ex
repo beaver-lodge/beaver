@@ -146,12 +146,10 @@ defmodule Beaver.Changeset do
     Supported argument types:
     - (list of) value
     - (list of) {atom, attribute | type | binary()}
-    - {block, values} (for block successors)
-    - block (for block successors)
-    - MLIR.Region.t() (for regions)
-    - {:regions, (-> [region])} (for regions)
-    - {:result_types, [type]}
-    - {:loc, location}
+    - block or {block, values} (for block successors)
+    - region or {:regions, (-> [region])} (for regions)
+    - type or {:result_types, [type]} (for types)
+    - location or {:loc, location} (for locations)
 
     Received: #{inspect(operand)}
     """
