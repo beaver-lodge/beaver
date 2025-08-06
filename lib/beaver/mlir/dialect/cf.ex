@@ -28,7 +28,7 @@ defmodule Beaver.MLIR.Dialect.CF do
   @doc """
   Create cf.cond_br op. Passing atom will lead to defer the creation of this terminator.
   """
-  def cond_br(%Beaver.SSA{arguments: arguments, blk: block, ctx: ctx}) do
+  def cond_br(%Beaver.SSA{arguments: arguments, blk: block, ctx: ctx, results: []}) do
     sizes = sizes_of_block_args(arguments)
 
     if length(sizes) not in [1, 2] do
@@ -42,6 +42,7 @@ defmodule Beaver.MLIR.Dialect.CF do
       ctx,
       "cf.cond_br",
       arguments ++ [operand_segment_sizes: operand_segment_sizes],
+      [],
       block
     )
   end

@@ -22,12 +22,12 @@ defmodule Beaver.MLIR.Operation do
       }) do
     filler =
       if is_function(filler, 0) do
-        [regions: filler]
+        List.wrap(filler)
       else
         []
       end
 
-    create_and_append(ctx, op_name, arguments ++ [result_types: results] ++ filler, block, loc)
+    create_and_append(ctx, op_name, arguments ++ filler, results, block, loc)
   end
 
   def create(%Changeset{} = c) do
@@ -43,13 +43,19 @@ defmodule Beaver.MLIR.Operation do
         %MLIR.Context{} = ctx,
         op_name,
         arguments,
+        results,
         %MLIR.Block{} = block,
         loc \\ nil
       )
       when is_list(arguments) do
-    op = do_create(ctx, op_name, arguments, loc)
-    mlirBlockAppendOwnedOperation(block, op)
-    op
+    location = loc || MLIR.Location.unknown()
+    changeset = %Changeset{name: op_name, location: location, context: ctx}
+
+    Enum.reduce(arguments, changeset, &Changeset.add_argument(&2, &1))
+    |> then(fn changeset -> Enum.reduce(results, changeset, &Changeset.add_result(&2, &1)) end)
+    |> State.create()
+    |> create()
+    |> tap(&mlirBlockAppendOwnedOperation(block, &1))
   end
 
   def results(%__MODULE__{} = op) do
@@ -69,15 +75,6 @@ defmodule Beaver.MLIR.Operation do
 
   def results({:deferred, {_func_name, _arguments}} = deferred) do
     deferred
-  end
-
-  defp do_create(ctx, op_name, arguments, loc) when is_binary(op_name) and is_list(arguments) do
-    location = loc || MLIR.Location.unknown()
-    changeset = %Changeset{name: op_name, location: location, context: ctx}
-
-    Enum.reduce(arguments, changeset, &Changeset.add_argument(&2, &1))
-    |> State.create()
-    |> create()
   end
 
   def name(%__MODULE__{} = operation) do
