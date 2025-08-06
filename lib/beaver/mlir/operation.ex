@@ -47,7 +47,7 @@ defmodule Beaver.MLIR.Operation do
         %MLIR.Block{} = block,
         loc \\ nil
       )
-      when is_list(arguments) do
+      when is_list(arguments) and is_list(results) do
     location = loc || MLIR.Location.unknown()
     changeset = %Changeset{name: op_name, location: location, context: ctx}
 
