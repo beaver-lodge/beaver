@@ -24,34 +24,62 @@ defmodule Beaver.Changeset do
             location: nil,
             context: nil
 
-  @type attr_tag ::
-          {atom(), MLIR.Type.t()}
-          | {atom(), MLIR.Attribute.t()}
+  @type attribute() :: MLIR.Attribute.t() | (MLIR.Context.t() -> MLIR.Attribute.t())
+  @type operand_argument() :: MLIR.Value.t() | (MLIR.Context.t() -> MLIR.Value.t())
+  @type type_argument() :: MLIR.Type.t() | (MLIR.Context.t() -> MLIR.Type.t())
+  @type tagged_attribute :: {atom(), type_argument() | attribute()}
+  @type attribute_argument() :: tagged_attribute() | [tagged_attribute()]
+  @type branching_argument() :: MLIR.Block.t() | {MLIR.Block.t(), [MLIR.Value.t()]}
+  @type region_argument() :: MLIR.Region.t() | (-> [MLIR.Region.t()])
+  @type loc_argument() :: MLIR.Location.t() | {:loc, MLIR.Location.t()}
+
   @type argument() ::
-          MLIR.Value.t()
-          | MLIR.Block.t()
-          | MLIR.Region.t()
-          | attr_tag
-          | [attr_tag]
-          | {:regions, function()}
-          | {:result_types, [MLIR.Type.t()]}
-          | MLIR.Type.t()
-          | {:loc, Beaver.MLIR.Location.t()}
-          | {MLIR.Block.t(), [MLIR.Value.t()]}
-          | fun()
+          operand_argument()
+          | attribute_argument()
+          | branching_argument()
+          | region_argument()
+          | loc_argument()
+
   @spec add_argument(t(), argument()) :: t()
 
   @doc """
   Add an ODS argument to changeset.
   """
 
+  def add_argument(%__MODULE__{} = changeset, argument) when is_list(argument) do
+    cond do
+      Enum.all?(argument, &match?(%MLIR.Value{}, &1)) ->
+        %__MODULE__{changeset | operands: changeset.operands ++ argument}
+
+      Enum.all?(argument, &match?({_atom, %MLIR.Attribute{}}, &1)) ->
+        %__MODULE__{changeset | attributes: changeset.attributes ++ argument}
+
+      Enum.all?(argument, &match?(%MLIR.Region{}, &1)) ->
+        %__MODULE__{changeset | regions: changeset.regions ++ argument}
+
+      Enum.all?(argument, &match?(%MLIR.Type{}, &1)) ->
+        %__MODULE__{changeset | results: changeset.results ++ argument}
+
+      true ->
+        for arg <- argument, reduce: changeset do
+          changeset -> add_argument(changeset, arg)
+        end
+    end
+  end
+
   def add_argument(%__MODULE__{context: context} = changeset, {tag, f})
       when is_atom(tag) and is_function(f, 1) do
     add_argument(changeset, {tag, Beaver.Deferred.create(f, context)})
   end
 
-  def add_argument(%__MODULE__{context: context} = changeset, f) when is_function(f, 1) do
-    add_argument(changeset, Beaver.Deferred.create(f, context))
+  # f should return regions
+  def add_argument(%__MODULE__{} = changeset, f) when is_function(f, 0) do
+    add_argument(changeset, f.())
+  end
+
+  # If the context is not set, we extract it from the argument
+  def add_argument(%__MODULE__{context: nil} = changeset, %{} = argument) do
+    add_argument(%__MODULE__{changeset | context: MLIR.context(argument)}, argument)
   end
 
   def add_argument(%__MODULE__{regions: regions} = changeset, %MLIR.Region{} = region) do
@@ -60,24 +88,6 @@ defmodule Beaver.Changeset do
 
   def add_argument(%__MODULE__{} = changeset, {:loc, %Beaver.MLIR.Location{} = location}) do
     %__MODULE__{changeset | location: location}
-  end
-
-  def add_argument(%__MODULE__{regions: regions} = changeset, {:regions, region_filler})
-      when is_function(region_filler, 0) do
-    %__MODULE__{changeset | regions: regions ++ region_filler.()}
-  end
-
-  def add_argument(_changeset, {:regions, _}) do
-    raise "the function to create regions should have a arity of 0"
-  end
-
-  def add_argument(%__MODULE__{results: results} = changeset, {:result_types, result_types})
-      when is_list(result_types) do
-    %__MODULE__{changeset | results: results ++ result_types}
-  end
-
-  def add_argument(%__MODULE__{results: results} = changeset, %MLIR.Type{} = result_type) do
-    %__MODULE__{changeset | results: results ++ [result_type]}
   end
 
   def add_argument(
@@ -123,17 +133,67 @@ defmodule Beaver.Changeset do
   end
 
   def add_argument(
-        %__MODULE__{attributes: attributes} = changeset,
-        [{name, _attr} | _tail] = attrs
-      )
-      when is_atom(name) do
-    %__MODULE__{changeset | attributes: attributes ++ attrs}
-  end
-
-  def add_argument(
         %__MODULE__{operands: operands} = changeset,
         %MLIR.Value{} = operand
       ) do
     %__MODULE__{changeset | operands: operands ++ [operand]}
+  end
+
+  def add_argument(%__MODULE__{}, argument) do
+    raise ArgumentError, """
+    Invalid argument received: #{inspect(argument)}
+
+    Supported argument types:
+    - (list of) value
+    - (list of) {atom, attribute | type | binary()}
+    - block or {block, values} (for block successors)
+    - region or (-> [region])
+    - location or {:loc, location} (for locations)
+    """
+  end
+
+  @type type() :: MLIR.Type.t() | [MLIR.Type.t()]
+  @type result() :: type() | (MLIR.Context.t() -> type())
+  @spec add_result(t(), result()) :: t()
+
+  def add_result(%__MODULE__{} = changeset, argument) when is_list(argument) do
+    if Enum.all?(argument, &match?(%MLIR.Type{}, &1)) do
+      %__MODULE__{changeset | results: changeset.results ++ argument}
+    else
+      for arg <- argument, reduce: changeset do
+        changeset -> add_result(changeset, arg)
+      end
+    end
+  end
+
+  def add_result(%__MODULE__{context: context} = changeset, f) when is_function(f, 1) do
+    add_result(changeset, Beaver.Deferred.create(f, context))
+  end
+
+  def add_result(%__MODULE__{results: :infer}, type) when type != :infer do
+    raise ArgumentError, "already set to infer the result types"
+  end
+
+  def add_result(%__MODULE__{} = changeset, :infer) do
+    %__MODULE__{changeset | results: :infer}
+  end
+
+  def add_result(%__MODULE__{results: results} = changeset, %MLIR.Type{} = result_type) do
+    %__MODULE__{changeset | results: results ++ [result_type]}
+  end
+
+  def add_result(%__MODULE__{results: results} = changeset, {:parametric, _, _, _f} = result_type) do
+    %__MODULE__{changeset | results: results ++ [result_type]}
+  end
+
+  def add_result(%__MODULE__{}, result) do
+    raise ArgumentError, """
+    Invalid result received: #{inspect(result)}
+
+    Supported results:
+    - (list of) type
+    - function that returns type
+    - :infer
+    """
   end
 end

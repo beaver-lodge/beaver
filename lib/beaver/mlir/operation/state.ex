@@ -106,7 +106,7 @@ defmodule Beaver.MLIR.Operation.State do
     state
   end
 
-  defp add_results(%MLIR.Operation.State{} = state, [:infer]) do
+  defp add_results(%MLIR.Operation.State{} = state, :infer) do
     state |> tap(&CAPI.mlirOperationStateEnableResultTypeInference(Beaver.Native.ptr(&1)))
   end
 

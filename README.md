@@ -218,7 +218,7 @@ end
 # will be transformed to:
 
 SomeDialect.some_op(
-  regions: fn -> do
+  fn -> do
     region = Beaver.Env.region() # first region created
     block = Beaver.Env.block()
     x = Arith.constant(...)

@@ -290,7 +290,7 @@ defmodule Beaver.MLIR.Attribute.Accessor do
         }
 
       true ->
-        raise "not a container attribute"
+        raise ArgumentError, "not a container attribute"
     end
     |> wrap_postprocessing()
   end

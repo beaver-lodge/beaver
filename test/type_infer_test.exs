@@ -32,4 +32,21 @@ defmodule TypeInferTest do
     |> MLIR.Transform.canonicalize()
     |> Beaver.Composer.run!()
   end
+
+  test "set to infer but given types", %{ctx: ctx} do
+    assert_raise ArgumentError, "already set to infer the result types", fn ->
+      mlir ctx: ctx do
+        module do
+          Func.func some_func(function_type: Type.function([], [])) do
+            region do
+              block do
+                v = Arith.constant(value: Attribute.integer(Type.i32(), 1)) >>> ~t{i32}
+                Arith.addi(v, v) >>> [:infer, ~t{i32}]
+              end
+            end
+          end
+        end
+      end
+    end
+  end
 end

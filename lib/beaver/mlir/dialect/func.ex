@@ -14,13 +14,13 @@ defmodule Beaver.MLIR.Dialect.Func do
       |> List.wrap()
       |> List.flatten()
       |> Keyword.put_new(:sym_name, Beaver.MLIR.Attribute.string(unquote(func_name)))
-      |> Keyword.put_new(:regions, fn -> unquote(body) end)
       |> Keyword.put_new(:loc, Beaver.MLIR.Location.from_env(__ENV__))
       |> then(
         &Beaver.MLIR.Operation.create_and_append(
           Beaver.Env.context(),
           "func.func",
-          &1,
+          [fn -> unquote(body) end | &1],
+          [],
           Beaver.Env.block()
         )
       )

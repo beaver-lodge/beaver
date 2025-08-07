@@ -61,7 +61,7 @@ defmodule MlirTest do
       %Beaver.Changeset{name: "arith.addi", location: location}
       |> Beaver.Changeset.add_argument(MLIR.Block.get_arg!(func_body, 0))
       |> Beaver.Changeset.add_argument(arg1)
-      |> Beaver.Changeset.add_argument({:result_types, ["i64"]})
+      |> Beaver.Changeset.add_result(~t{i64})
       |> MLIR.Operation.State.create()
 
     name = beaverOperationStateGetName(add_op_state)
