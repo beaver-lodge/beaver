@@ -155,7 +155,7 @@ defmodule EntityTest do
              )
 
       assert MLIR.equal?(
-               MLIR.ODS.operand_segment_sizes([0, 0]).(ctx),
+               MLIR.ODS.operand_segment_sizes([0, 0], ctx: ctx),
                ~a{array<i32: 0, 0>}.(ctx)
              )
 

@@ -47,6 +47,7 @@ Bindings are the part that provides the interface to the MLIR CAPIs. It is imple
     -DLLVM_ENABLE_OCAMLDOC=OFF \
     -DLLVM_ENABLE_BINDINGS=OFF \
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DCMAKE_CXX_FLAGS="-fuse-ld=lld" \
     -DCMAKE_INSTALL_PREFIX=${HOME}/llvm-install
   cmake --build build -t install
   export LLVM_CONFIG_PATH=$HOME/llvm-install/bin/llvm-config
