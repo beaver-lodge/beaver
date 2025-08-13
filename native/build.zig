@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) void {
     const mix_env = std.process.getEnvVarOwned(allocator, "MIX_ENV") catch "";
     var optimize: std.builtin.OptimizeMode = .ReleaseSafe;
     if (std.mem.eql(u8, mix_env, "prod")) {
-        optimize = .Debug;
+        optimize = .ReleaseSafe;
     } else if (std.mem.eql(u8, mix_env, "test")) {
         optimize = .Debug;
     }
