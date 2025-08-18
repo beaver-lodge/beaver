@@ -16,5 +16,5 @@ defmodule Beaver.MLIR.ODS do
     )
   end
 
-  defdelegate result_segment_sizes(sizes), to: __MODULE__, as: :operand_segment_sizes
+  defdelegate result_segment_sizes(sizes, opts \\ []), to: __MODULE__, as: :operand_segment_sizes
 end
