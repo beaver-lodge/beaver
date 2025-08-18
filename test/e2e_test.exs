@@ -23,6 +23,7 @@ defmodule E2ETest do
       |> convert_arith_to_llvm
       |> Beaver.Composer.run!()
       |> MLIR.ExecutionEngine.create!()
+      |> MLIR.ExecutionEngine.init()
     end
 
     test "fail to create JIT engine", %{ctx: ctx} do

@@ -39,6 +39,7 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def normalize_dialect_name("xegpu"), do: "XeGPU"
   def normalize_dialect_name("xevm"), do: "XeVM"
   def normalize_dialect_name("ub"), do: "UB"
+  def normalize_dialect_name("wasmssa"), do: "WasmSSA"
   def normalize_dialect_name(other), do: other |> Macro.camelize()
 
   defp unwrap_ctx_then(opts, cb) do

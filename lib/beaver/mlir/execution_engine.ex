@@ -92,7 +92,9 @@ defmodule Beaver.MLIR.ExecutionEngine do
     )
   end
 
-  def destroy(jit) do
-    mlirExecutionEngineDestroy(jit)
+  def init(jit) do
+    tap(jit, &MLIR.CAPI.mlirExecutionEngineInitialize/1)
   end
+
+  defdelegate destroy(jit), to: MLIR.CAPI, as: :mlirExecutionEngineDestroy
 end
