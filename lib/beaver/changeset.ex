@@ -1,6 +1,7 @@
 defmodule Beaver.Changeset do
   @moduledoc false
   alias Beaver.MLIR
+  require Logger
 
   @doc """
   Changeset of entities to create an operation.
@@ -227,32 +228,56 @@ defmodule Beaver.Changeset do
 
   @doc false
   def reorder_operands(%__MODULE__{operands: operands, name: name} = changeset) do
-    # TODO: only lookup if operands have both tagged and untagged
-    has_tag_operand = Enum.any?(operands, &match?({_atom, %MLIR.Value{}}, &1))
+    case {should_reorder?(operands), MLIR.ODS.Dump.lookup(name)} do
+      {true, {:ok, op_dump}} ->
+        %__MODULE__{changeset | operands: process_operands(operands, op_dump)}
 
-    if has_tag_operand do
-      case MLIR.ODS.Dump.lookup(name) do
-        {:ok, op_dump} ->
-          # TODO: validate there is no duplication in dump
-          operands =
-            for %{"name" => operand_name} <- op_dump["operands"] do
-              # TODO: print operand not consumed
-              Enum.filter(operands, fn
-                {tag, %MLIR.Value{}} ->
-                  tag = to_string(tag)
-                  operand_name == tag or operand_name == Macro.camelize(tag)
-              end)
-            end
-            |> List.flatten()
-            |> Enum.map(fn {_, v} -> v end)
+      _ ->
+        changeset
+    end
+  end
 
-          %__MODULE__{changeset | operands: operands}
+  defp should_reorder?(operands) do
+    has_tagged = Enum.any?(operands, &match?({_atom, %MLIR.Value{}}, &1))
+    has_untagged = Enum.any?(operands, &match?(%MLIR.Value{}, &1))
 
-        _ ->
-          changeset
+    if has_tagged and has_untagged do
+      raise ArgumentError,
+            "Cannot mix tagged and untagged operands"
+    end
+
+    has_tagged
+  end
+
+  defp process_operands(operands, op_dump) do
+    validate_operand_names!(op_dump["operands"])
+
+    op_dump["operands"]
+    |> Enum.flat_map(fn %{"name" => operand_name} ->
+      matches =
+        Enum.filter(operands, fn
+          {tag, %MLIR.Value{}} ->
+            tag = to_string(tag)
+            operand_name == tag or operand_name == Macro.camelize(tag)
+
+          _ ->
+            false
+        end)
+
+      if Enum.empty?(matches) do
+        Logger.warning("Operand '#{operand_name}' not consumed in operation")
       end
-    else
-      changeset
+
+      matches
+    end)
+    |> Enum.map(fn {_, v} -> v end)
+  end
+
+  defp validate_operand_names!(operands) do
+    names = Enum.map(operands, & &1["name"])
+
+    if length(names) != length(Enum.uniq(names)) do
+      raise "Duplicate operand names found in ODS dump"
     end
   end
 end

@@ -1,4 +1,15 @@
 defmodule Beaver.MLIR.ODS.Dump do
+  @moduledoc """
+  This module provides functionality for working with MLIR ODS (Operation Definition Specification) dumps.
+  It allows looking up operation definitions by name and generating documentation for them.
+
+  The module loads ODS dump data at compile time and provides functions to:
+  - Look up operations by their fully qualified names (e.g. "affine.for")
+  - Generate documentation for operations including their attributes, operands, and results
+  - Check if an operation supports result type inference
+
+  Operations can be looked up using `lookup/1`, and documentation can be generated using `gen_doc/1`.
+  """
   @dump Application.app_dir(:beaver)
         |> Path.join("priv/ods_dump.ex")
         |> File.read!()
@@ -42,7 +53,7 @@ defmodule Beaver.MLIR.ODS.Dump do
       """
 
       ## #{String.capitalize(key)}
-      #{decls |> Enum.map(&"- #{fmt_name(&1["name"])} - #{&1["kind"]}, #{fmt_constraint(&1["constraint"])}, #{&1["description"]}") |> Enum.join("\n")}
+      #{Enum.map_join(decls, "\n", &"- #{fmt_name(&1["name"])} - #{&1["kind"]}, #{fmt_constraint(&1["constraint"])}, #{&1["description"]}")}
       """
     else
       ""
