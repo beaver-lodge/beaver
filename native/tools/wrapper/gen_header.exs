@@ -11,12 +11,19 @@ files =
   |> Enum.reject(&String.contains?(&1, "Python"))
   |> Enum.reject(&String.contains?(&1, "LLVMIR"))
   |> Enum.map(&Path.relative_to(&1, mlir_include_dir))
+
+if Enum.empty?(files) do
+  raise "no headers found: #{mlir_include_dir}"
+end
+
+files =
+  files
   |> Enum.concat(~w{
-  mlir-c/Beaver/Context.h
-  mlir-c/Beaver/Op.h
-  mlir-c/Beaver/Pass.h
-  mlir-c/Dialect/Elixir.h
-  })
+mlir-c/Beaver/Context.h
+mlir-c/Beaver/Op.h
+mlir-c/Beaver/Pass.h
+mlir-c/Dialect/Elixir.h
+})
   |> Enum.sort()
 
 File.write!(
