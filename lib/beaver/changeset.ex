@@ -52,34 +52,22 @@ defmodule Beaver.Changeset do
   def add_argument(%__MODULE__{} = changeset, argument) when is_list(argument) do
     cond do
       Enum.all?(argument, &match?({_atom, %MLIR.Value{}}, &1)) ->
-        %__MODULE__{changeset | operands: changeset.operands ++ argument}
+        add_tagged_operands(changeset, argument)
 
       Enum.all?(argument, &match?(%MLIR.Value{}, &1)) ->
-        %__MODULE__{changeset | operands: changeset.operands ++ argument}
+        add_operands(changeset, argument)
 
       Enum.all?(
         argument,
         &(match?({_atom, %MLIR.Attribute{}}, &1) or match?({_atom, %MLIR.Value{}}, &1))
       ) ->
-        for a <- argument, reduce: changeset do
-          changeset ->
-            case a do
-              {name, %MLIR.Attribute{} = attr} when is_atom(name) ->
-                %__MODULE__{changeset | attributes: changeset.attributes ++ [{name, attr}]}
-
-              {name, %MLIR.Value{} = value} when is_atom(name) ->
-                %__MODULE__{changeset | operands: changeset.operands ++ [{name, value}]}
-
-              _ ->
-                raise ArgumentError, "Invalid argument in attribute list: #{inspect(a)}"
-            end
-        end
+        add_attributes_or_operands(changeset, argument)
 
       Enum.all?(argument, &match?(%MLIR.Region{}, &1)) ->
-        %__MODULE__{changeset | regions: changeset.regions ++ argument}
+        add_regions(changeset, argument)
 
       Enum.all?(argument, &match?(%MLIR.Type{}, &1)) ->
-        %__MODULE__{changeset | results: changeset.results ++ argument}
+        add_results(changeset, argument)
 
       true ->
         for arg <- argument, reduce: changeset do
@@ -179,6 +167,38 @@ defmodule Beaver.Changeset do
     - region or (-> [region])
     - location or {:loc, location} (for locations)
     """
+  end
+
+  defp add_operands(changeset, operands) do
+    %__MODULE__{changeset | operands: changeset.operands ++ operands}
+  end
+
+  defp add_tagged_operands(changeset, operands) do
+    %__MODULE__{changeset | operands: changeset.operands ++ operands}
+  end
+
+  defp add_regions(changeset, regions) do
+    %__MODULE__{changeset | regions: changeset.regions ++ regions}
+  end
+
+  defp add_results(changeset, results) do
+    %__MODULE__{changeset | results: changeset.results ++ results}
+  end
+
+  defp add_attributes_or_operands(changeset, list) do
+    for a <- list, reduce: changeset do
+      changeset ->
+        case a do
+          {name, %MLIR.Attribute{} = attr} when is_atom(name) ->
+            %__MODULE__{changeset | attributes: changeset.attributes ++ [{name, attr}]}
+
+          {name, %MLIR.Value{} = value} when is_atom(name) ->
+            %__MODULE__{changeset | operands: changeset.operands ++ [{name, value}]}
+
+          _ ->
+            raise ArgumentError, "Invalid argument in attribute list: #{inspect(a)}"
+        end
+    end
   end
 
   @type type() :: MLIR.Type.t() | [MLIR.Type.t()]
