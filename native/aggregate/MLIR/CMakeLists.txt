@@ -1,44 +1,5 @@
 # This lib is for dlopen or being linked by Zig/Rust
-add_mlir_aggregate(
-  MLIRBeaver
-  SHARED
-  EMBED_LIBS
-  MLIRCAPIAMDGPU
-  MLIRCAPIArith
-  MLIRCAPIAsync
-  MLIRCAPIControlFlow
-  MLIRCAPIConversion
-  MLIRCAPIDebug
-  MLIRCAPIElixir
-  MLIRCAPIEmitC
-  MLIRCAPIExecutionEngine
-  MLIRCAPIFunc
-  MLIRCAPIGPU
-  MLIRCAPIIR
-  MLIRCAPIIndex
-  MLIRCAPIIRDL
-  MLIRCAPIInterfaces
-  MLIRCAPILLVM
-  MLIRCAPILinalg
-  MLIRCAPIMLProgram
-  MLIRCAPIMath
-  MLIRCAPIMemRef
-  MLIRCAPINVGPU
-  MLIRCAPINVVM
-  MLIRCAPIOpenMP
-  MLIRCAPIPDL
-  MLIRCAPIQuant
-  MLIRCAPIROCDL
-  MLIRCAPIRegisterEverything
-  MLIRCAPISMT
-  MLIRCAPISCF
-  MLIRCAPISPIRV
-  MLIRCAPIShape
-  MLIRCAPISparseTensor
-  MLIRCAPITensor
-  MLIRCAPITransformDialect
-  MLIRCAPITransformDialectTransforms
-  MLIRCAPITransforms
-  MLIRCAPITarget
-  MLIRCAPIExportSMTLIB
-  MLIRCAPIVector)
+
+get_property(_capi_libraries GLOBAL PROPERTY MLIR_UPSTREAM_CAPI_LIBS)
+add_mlir_aggregate(MLIRBeaver SHARED EMBED_LIBS MLIRCAPIElixir
+                   ${_capi_libraries})
