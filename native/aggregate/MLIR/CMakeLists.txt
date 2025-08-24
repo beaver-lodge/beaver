@@ -15,6 +15,7 @@ add_mlir_aggregate(
   MLIRCAPIFunc
   MLIRCAPIGPU
   MLIRCAPIIR
+  MLIRCAPIIndex
   MLIRCAPIIRDL
   MLIRCAPIInterfaces
   MLIRCAPILLVM
@@ -29,6 +30,7 @@ add_mlir_aggregate(
   MLIRCAPIQuant
   MLIRCAPIROCDL
   MLIRCAPIRegisterEverything
+  MLIRCAPISMT
   MLIRCAPISCF
   MLIRCAPISPIRV
   MLIRCAPIShape
@@ -37,4 +39,6 @@ add_mlir_aggregate(
   MLIRCAPITransformDialect
   MLIRCAPITransformDialectTransforms
   MLIRCAPITransforms
+  MLIRCAPITarget
+  MLIRCAPIExportSMTLIB
   MLIRCAPIVector)

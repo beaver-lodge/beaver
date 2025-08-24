@@ -6,6 +6,9 @@ defmodule Beaver.MLIR.Dialect.Func do
     dialect: "func",
     ops: Beaver.MLIR.Dialect.Registry.ops("func")
 
+  @doc """
+  Syntax sugar for `Func.func` SSA expression. No need to specify result types.
+  """
   defmacro func(call, do: body) do
     {func_name, args} = call |> Macro.decompose_call()
 

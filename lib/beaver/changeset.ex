@@ -25,7 +25,9 @@ defmodule Beaver.Changeset do
             context: nil
 
   @type attribute() :: MLIR.Attribute.t() | (MLIR.Context.t() -> MLIR.Attribute.t())
-  @type operand_argument() :: MLIR.Value.t() | (MLIR.Context.t() -> MLIR.Value.t())
+  @type operand() :: MLIR.Value.t() | (MLIR.Context.t() -> MLIR.Value.t())
+  @type tagged_operand() :: {atom(), operand() | [operand()]} | operand()
+  @type operand_argument() :: tagged_operand() | [tagged_operand()]
   @type type_argument() :: MLIR.Type.t() | (MLIR.Context.t() -> MLIR.Type.t())
   @type tagged_attribute :: {atom(), type_argument() | attribute()}
   @type attribute_argument() :: tagged_attribute() | [tagged_attribute()]
@@ -48,11 +50,29 @@ defmodule Beaver.Changeset do
 
   def add_argument(%__MODULE__{} = changeset, argument) when is_list(argument) do
     cond do
+      Enum.all?(argument, &match?({_atom, %MLIR.Value{}}, &1)) ->
+        %__MODULE__{changeset | operands: changeset.operands ++ argument}
+
       Enum.all?(argument, &match?(%MLIR.Value{}, &1)) ->
         %__MODULE__{changeset | operands: changeset.operands ++ argument}
 
-      Enum.all?(argument, &match?({_atom, %MLIR.Attribute{}}, &1)) ->
-        %__MODULE__{changeset | attributes: changeset.attributes ++ argument}
+      Enum.all?(
+        argument,
+        &(match?({_atom, %MLIR.Attribute{}}, &1) or match?({_atom, %MLIR.Value{}}, &1))
+      ) ->
+        for a <- argument, reduce: changeset do
+          changeset ->
+            case a do
+              {name, %MLIR.Attribute{} = attr} when is_atom(name) ->
+                %__MODULE__{changeset | attributes: changeset.attributes ++ [{name, attr}]}
+
+              {name, %MLIR.Value{} = value} when is_atom(name) ->
+                %__MODULE__{changeset | operands: changeset.operands ++ [{name, value}]}
+
+              _ ->
+                raise ArgumentError, "Invalid argument in attribute list: #{inspect(a)}"
+            end
+        end
 
       Enum.all?(argument, &match?(%MLIR.Region{}, &1)) ->
         %__MODULE__{changeset | regions: changeset.regions ++ argument}
@@ -134,6 +154,14 @@ defmodule Beaver.Changeset do
 
   def add_argument(
         %__MODULE__{operands: operands} = changeset,
+        {operand_name, %MLIR.Value{}} = operand
+      )
+      when is_atom(operand_name) do
+    %__MODULE__{changeset | operands: operands ++ [operand]}
+  end
+
+  def add_argument(
+        %__MODULE__{operands: operands} = changeset,
         %MLIR.Value{} = operand
       ) do
     %__MODULE__{changeset | operands: operands ++ [operand]}
@@ -195,5 +223,36 @@ defmodule Beaver.Changeset do
     - function that returns type
     - :infer
     """
+  end
+
+  @doc false
+  def reorder_operands(%__MODULE__{operands: operands, name: name} = changeset) do
+    # TODO: only lookup if operands have both tagged and untagged
+    has_tag_operand = Enum.any?(operands, &match?({_atom, %MLIR.Value{}}, &1))
+
+    if has_tag_operand do
+      case MLIR.ODS.Dump.lookup(name) do
+        {:ok, op_dump} ->
+          # TODO: validate there is no duplication in dump
+          operands =
+            for %{"name" => operand_name} <- op_dump["operands"] do
+              # TODO: print operand not consumed
+              Enum.filter(operands, fn
+                {tag, %MLIR.Value{}} ->
+                  tag = to_string(tag)
+                  operand_name == tag or operand_name == Macro.camelize(tag)
+              end)
+            end
+            |> List.flatten()
+            |> Enum.map(fn {_, v} -> v end)
+
+          %__MODULE__{changeset | operands: operands}
+
+        _ ->
+          changeset
+      end
+    else
+      changeset
+    end
   end
 end
