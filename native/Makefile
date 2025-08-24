@@ -12,7 +12,9 @@ all: zig_build
 zig_translate:
 	mkdir -p ${NATIVE_INSTALL_DIR}
 	elixir tools/ods-extract/dump_ods.exs --mlir-include-dir ${MLIR_INCLUDE_DIR} --output ${MIX_APP_PATH}/ods_dump
+	cat ${MIX_APP_PATH}/ods_dump.pdll
 	elixir tools/wrapper/gen_header.exs --mlir-include-dir ${MLIR_INCLUDE_DIR} --output ${MIX_APP_PATH}/tmp.wrapper.h
+	cat ${MIX_APP_PATH}/tmp.wrapper.h
 	zig cc -E -Xclang -ast-dump=json include/mlir-c/Beaver/wrapper.h -I include -I ${MLIR_INCLUDE_DIR} | tee ${MIX_APP_PATH}/wrapper.h.clang.ast.json | elixir tools/wrapper/gen.exs --elixir ${NATIVE_INSTALL_DIR}/capi_functions.ex --zig src/wrapper.zig
 
 ${BUILD_STAMP}:
