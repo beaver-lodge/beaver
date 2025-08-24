@@ -17,7 +17,6 @@
 #include <mlir-c/Dialect/Func.h>
 #include <mlir-c/Dialect/GPU.h>
 #include <mlir-c/Dialect/IRDL.h>
-#include <mlir-c/Dialect/Index.h>
 #include <mlir-c/Dialect/LLVM.h>
 #include <mlir-c/Dialect/Linalg.h>
 #include <mlir-c/Dialect/MLProgram.h>
@@ -30,7 +29,6 @@
 #include <mlir-c/Dialect/Quant.h>
 #include <mlir-c/Dialect/ROCDL.h>
 #include <mlir-c/Dialect/SCF.h>
-#include <mlir-c/Dialect/SMT.h>
 #include <mlir-c/Dialect/SPIRV.h>
 #include <mlir-c/Dialect/Shape.h>
 #include <mlir-c/Dialect/SparseTensor.h>
@@ -46,5 +44,4 @@
 #include <mlir-c/RegisterEverything.h>
 #include <mlir-c/Rewrite.h>
 #include <mlir-c/Support.h>
-#include <mlir-c/Target/ExportSMTLIB.h>
 #include <mlir-c/Transforms.h>
