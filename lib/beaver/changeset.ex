@@ -213,8 +213,6 @@ defmodule Beaver.Changeset do
   end
 
   defp process_operands(operands, op_dump) do
-    validate_operand_names!(op_dump["operands"])
-
     op_dump["operands"]
     |> Enum.flat_map(fn %{"name" => operand_name, "kind" => kind} ->
       matches =
@@ -236,13 +234,5 @@ defmodule Beaver.Changeset do
       matches
     end)
     |> Enum.map(fn {_, v} -> v end)
-  end
-
-  defp validate_operand_names!(operands) do
-    names = Enum.map(operands, & &1["name"])
-
-    if length(names) != length(Enum.uniq(names)) do
-      raise "Duplicate operand names found in ODS dump"
-    end
   end
 end

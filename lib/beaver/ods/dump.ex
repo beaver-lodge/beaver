@@ -23,7 +23,18 @@ defmodule Beaver.MLIR.ODS.Dump do
   Lookup an operation by name (e.g. "affine.for").
   """
   for %{"operations" => operations} <- @dialects do
-    for %{"name" => name} = op <- operations do
+    for %{"name" => name, "operands" => operands} = op <- operations do
+      duplicates =
+        Enum.map(operands, & &1["name"])
+        |> Enum.group_by(& &1)
+        |> Enum.filter(fn {_k, v} -> length(v) > 1 end)
+        |> Enum.map(fn {k, _v} -> k end)
+        |> Enum.reject(&(&1 == ""))
+
+      if duplicates != [] do
+        raise "Duplicate operand names found in ODS dump for operation '#{name}': #{inspect(duplicates)}"
+      end
+
       def lookup(unquote(name)) do
         {:ok, unquote(Macro.escape(op))}
       end
