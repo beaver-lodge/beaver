@@ -216,7 +216,7 @@ defmodule Beaver.Changeset do
     validate_operand_names!(op_dump["operands"])
 
     op_dump["operands"]
-    |> Enum.flat_map(fn %{"name" => operand_name} ->
+    |> Enum.flat_map(fn %{"name" => operand_name, "kind" => kind} ->
       matches =
         Enum.filter(operands, fn
           {tag, %MLIR.Value{}} ->
@@ -227,8 +227,10 @@ defmodule Beaver.Changeset do
             false
         end)
 
-      if Enum.empty?(matches) do
-        Logger.warning("Operand '#{operand_name}' not consumed in operation")
+      if Enum.empty?(matches) and kind == "Single" do
+        Logger.warning(
+          "Single operand '#{operand_name}' not set when creating operation #{op_dump["name"]}"
+        )
       end
 
       matches
