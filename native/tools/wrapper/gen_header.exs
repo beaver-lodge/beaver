@@ -1,9 +1,10 @@
-args = System.argv() |> Enum.chunk_every(2)
+{opts, _, _} =
+  OptionParser.parse(System.argv(),
+    strict: [mlir_include_dir: :string, output: :string]
+  )
 
-[["--mlir-include-dir", mlir_include_dir], ["--output", output]] =
-  args
-
-mlir_include_dir = Path.expand(mlir_include_dir)
+mlir_include_dir = Path.expand(Keyword.fetch!(opts, :mlir_include_dir))
+output = Keyword.fetch!(opts, :output)
 
 files =
   ~w{mlir-c/**/*.h}
