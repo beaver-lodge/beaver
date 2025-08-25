@@ -15,7 +15,7 @@ defmodule ODSDumpTest do
               "results" => _
             }} = MLIR.ODS.Dump.lookup("affine.for")
 
-    assert {:error, "fail to found ods dump of \"???\""} = MLIR.ODS.Dump.lookup("???")
+    assert {:error, "failed to find ODS dump of \"???\""} = MLIR.ODS.Dump.lookup("???")
   end
 
   test "tagged operands", %{ctx: ctx} do

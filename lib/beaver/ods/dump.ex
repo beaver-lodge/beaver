@@ -31,7 +31,7 @@ defmodule Beaver.MLIR.ODS.Dump do
   end
 
   def lookup(op) do
-    {:error, "fail to found ods dump of #{inspect(op)}"}
+    {:error, "failed to find ODS dump of #{inspect(op)}"}
   end
 
   defp fmt_constraint(constraint) do
