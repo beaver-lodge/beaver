@@ -65,27 +65,27 @@ defmodule ODSDumpTest do
     import ExUnit.CaptureLog
 
     mlir ctx: ctx do
-      assert ~r"Single operand 'lhs' not set when creating operation arith.addis",
-             capture_log(fn ->
-               mlir ctx: ctx do
-                 module do
-                   Func.func _(
-                               function_type: Type.function([Type.i32(), Type.i32()], []),
-                               sym_name:
-                                 Beaver.MLIR.Attribute.string(
-                                   "f#{System.unique_integer([:positive])}"
-                                 )
-                             ) do
-                     region do
-                       block _(_a >>> Type.i32(), b >>> Type.i32()) do
-                         Arith.addi(rhs: b) >>> Type.i32()
-                         Func.return() >>> []
-                       end
-                     end
-                   end
-                 end
-               end
-             end)
+      logs =
+        capture_log(fn ->
+          mlir ctx: ctx do
+            module do
+              Func.func _(
+                          function_type: Type.function([Type.i32(), Type.i32()], []),
+                          sym_name:
+                            Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                        ) do
+                region do
+                  block _(_a >>> Type.i32(), b >>> Type.i32()) do
+                    Arith.addi(rhs: b) >>> Type.i32()
+                    Func.return() >>> []
+                  end
+                end
+              end
+            end
+          end
+        end)
+
+      assert logs =~ ~r"Single operand 'lhs' not set when creating operation arith\.addi"
     end
   end
 end
