@@ -1,6 +1,7 @@
 defmodule Beaver.Changeset do
   @moduledoc false
   alias Beaver.MLIR
+  require Logger
 
   @doc """
   Changeset of entities to create an operation.
@@ -25,7 +26,9 @@ defmodule Beaver.Changeset do
             context: nil
 
   @type attribute() :: MLIR.Attribute.t() | (MLIR.Context.t() -> MLIR.Attribute.t())
-  @type operand_argument() :: MLIR.Value.t() | (MLIR.Context.t() -> MLIR.Value.t())
+  @type operand() :: MLIR.Value.t() | (MLIR.Context.t() -> MLIR.Value.t())
+  @type tagged_operand() :: {atom(), operand() | [operand()]} | operand()
+  @type operand_argument() :: tagged_operand() | [tagged_operand()]
   @type type_argument() :: MLIR.Type.t() | (MLIR.Context.t() -> MLIR.Type.t())
   @type tagged_attribute :: {atom(), type_argument() | attribute()}
   @type attribute_argument() :: tagged_attribute() | [tagged_attribute()]
@@ -47,23 +50,8 @@ defmodule Beaver.Changeset do
   """
 
   def add_argument(%__MODULE__{} = changeset, argument) when is_list(argument) do
-    cond do
-      Enum.all?(argument, &match?(%MLIR.Value{}, &1)) ->
-        %__MODULE__{changeset | operands: changeset.operands ++ argument}
-
-      Enum.all?(argument, &match?({_atom, %MLIR.Attribute{}}, &1)) ->
-        %__MODULE__{changeset | attributes: changeset.attributes ++ argument}
-
-      Enum.all?(argument, &match?(%MLIR.Region{}, &1)) ->
-        %__MODULE__{changeset | regions: changeset.regions ++ argument}
-
-      Enum.all?(argument, &match?(%MLIR.Type{}, &1)) ->
-        %__MODULE__{changeset | results: changeset.results ++ argument}
-
-      true ->
-        for arg <- argument, reduce: changeset do
-          changeset -> add_argument(changeset, arg)
-        end
+    for arg <- argument, reduce: changeset do
+      changeset -> add_argument(changeset, arg)
     end
   end
 
@@ -134,6 +122,22 @@ defmodule Beaver.Changeset do
 
   def add_argument(
         %__MODULE__{operands: operands} = changeset,
+        {operand_name, %MLIR.Value{}} = operand
+      )
+      when is_atom(operand_name) do
+    %__MODULE__{changeset | operands: operands ++ [operand]}
+  end
+
+  def add_argument(
+        %__MODULE__{operands: operands} = changeset,
+        {operand_name, variadic_operands} = operand
+      )
+      when is_atom(operand_name) and is_list(variadic_operands) do
+    %__MODULE__{changeset | operands: operands ++ [operand]}
+  end
+
+  def add_argument(
+        %__MODULE__{operands: operands} = changeset,
         %MLIR.Value{} = operand
       ) do
     %__MODULE__{changeset | operands: operands ++ [operand]}
@@ -157,12 +161,8 @@ defmodule Beaver.Changeset do
   @spec add_result(t(), result()) :: t()
 
   def add_result(%__MODULE__{} = changeset, argument) when is_list(argument) do
-    if Enum.all?(argument, &match?(%MLIR.Type{}, &1)) do
-      %__MODULE__{changeset | results: changeset.results ++ argument}
-    else
-      for arg <- argument, reduce: changeset do
-        changeset -> add_result(changeset, arg)
-      end
+    for arg <- argument, reduce: changeset do
+      changeset -> add_result(changeset, arg)
     end
   end
 
@@ -195,5 +195,64 @@ defmodule Beaver.Changeset do
     - function that returns type
     - :infer
     """
+  end
+
+  @doc false
+  def reorder_operands(%__MODULE__{operands: operands, name: name} = changeset) do
+    case {should_reorder?(operands), MLIR.ODS.Dump.lookup(name)} do
+      {true, {:ok, op_dump}} ->
+        %__MODULE__{changeset | operands: process_operands(operands, op_dump)}
+
+      _ ->
+        changeset
+    end
+  end
+
+  defp should_reorder?(operands) do
+    grouped = Enum.group_by(operands, &match?({_atom, _value}, &1))
+
+    has_tagged = not Enum.empty?(grouped[true] || [])
+    has_untagged = not Enum.empty?(grouped[false] || [])
+
+    if has_tagged and has_untagged do
+      raise ArgumentError,
+            "Cannot mix tagged and untagged operands"
+    end
+
+    has_tagged
+  end
+
+  defp compare_tag(tag, operand_name) do
+    tag = to_string(tag)
+    operand_name == tag or Macro.camelize(operand_name) == Macro.camelize(tag)
+  end
+
+  defp process_operands(operands, op_dump) do
+    op_dump["operands"]
+    |> Enum.flat_map(fn %{"name" => operand_name, "kind" => kind} ->
+      matches =
+        Enum.filter(operands, fn
+          {tag, %MLIR.Value{}} ->
+            compare_tag(tag, operand_name)
+
+          {tag, values} when is_list(values) ->
+            compare_tag(tag, operand_name)
+
+          _ ->
+            false
+        end)
+
+      if Enum.empty?(matches) and kind == "Single" do
+        Logger.warning(
+          "Single operand '#{operand_name}' not set when creating operation #{op_dump["name"]}"
+        )
+      end
+
+      matches
+    end)
+    |> Enum.flat_map(fn
+      {_, %MLIR.Value{} = value} -> [value]
+      {_, values} when is_list(values) -> values
+    end)
   end
 end

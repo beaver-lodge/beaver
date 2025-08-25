@@ -18,7 +18,7 @@ defmodule ArithTest do
                     ) do
             region do
               block _(a >>> Type.i32(), b >>> Type.i32()) do
-                Arith.cmpi(a, b, predicate: Arith.cmp_i_predicate(p)) >>> Type.i1()
+                Arith.cmpi(lhs: a, rhs: b, predicate: Arith.cmp_i_predicate(p)) >>> Type.i1()
                 Func.return() >>> []
               end
             end

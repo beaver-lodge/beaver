@@ -27,6 +27,14 @@ defmodule Beaver.MLIR.Dialect do
           func_name = Beaver.MLIR.Dialect.Registry.normalize_op_name(op)
           full_name = Enum.join([dialect, op], ".")
 
+          @doc (case(Beaver.MLIR.ODS.Dump.lookup(full_name)) do
+                  {:ok, found} ->
+                    Beaver.MLIR.ODS.Dump.gen_doc(found)
+
+                  _ ->
+                    "`#{full_name}`"
+                end)
+
           def unquote(func_name)(ssa) do
             eval_ssa(%Beaver.SSA{ssa | op: unquote(full_name)})
           end
@@ -51,7 +59,6 @@ defmodule Beaver.MLIR.Dialect do
       ops = Dialect.Registry.ops(d)
 
       defmodule module_name do
-        @moduledoc false
         use Beaver.MLIR.Dialect,
           dialect: d,
           ops: ops
