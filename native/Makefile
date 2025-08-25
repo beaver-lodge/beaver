@@ -29,9 +29,8 @@ zig_build: zig_translate cmake_build
 	-I ${MLIR_INCLUDE_DIR}/mlir/Dialect/IRDL/IR \
 	-I ${MLIR_INCLUDE_DIR}/mlir/Dialect/UB/IR \
 	-write-if-changed \
-	-o ${MIX_APP_PATH}/ods_dump.json \
+	-o ${NATIVE_INSTALL_DIR}/ods_dump.json \
 	${MIX_APP_PATH}/ods_dump.txt
-	elixir tools/ods-extract/json_to_ex.exs --input ${MIX_APP_PATH}/ods_dump.json --output ${NATIVE_INSTALL_DIR}/ods_dump.ex
 	zig build --prefix ${NATIVE_INSTALL_DIR} --search-prefix ${NATIVE_INSTALL_DIR} --search-prefix ${LLVM_LIB_DIR}/.. --search-prefix ${ERTS_INCLUDE_DIR}/.. -freference-trace
 
 clean:

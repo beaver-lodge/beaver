@@ -157,7 +157,8 @@ std::string processAndFormatDoc(const Twine &doc) {
   std::string docStr;
   {
     llvm::raw_string_ostream docOS(docStr);
-    raw_indented_ostream(docOS).printReindented(StringRef(docStr).rtrim(" \t"));
+    raw_indented_ostream(docOS).printReindented(
+        doc.getSingleStringRef().rtrim(" \t"));
   }
   return docStr;
 }
