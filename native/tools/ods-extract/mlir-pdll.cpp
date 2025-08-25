@@ -152,12 +152,14 @@ void printODSContext(raw_ostream &os, const ods::Context &odsContext) {
   });
 }
 
-std::string processAndFormatDoc(const StringRef &doc) {
+std::string processAndFormatDoc(const Twine &doc) {
 
   std::string docStr;
   {
     llvm::raw_string_ostream docOS(docStr);
-    raw_indented_ostream(docOS).printReindented(doc.rtrim(" \t"));
+    std::string tmpDocStr = doc.str();
+    raw_indented_ostream(docOS).printReindented(
+        StringRef(tmpDocStr).rtrim(" \t"));
   }
   return docStr;
 }
