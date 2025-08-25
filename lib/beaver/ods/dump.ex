@@ -89,13 +89,19 @@ defmodule Beaver.MLIR.ODS.Dump do
     summary = op["summary"]
 
     description = op["description"]
-    description = Regex.replace(~r{\.\./(.+?)\.md}, description, "https://mlir.llvm.org/docs/\\1")
-    description = Regex.replace(~r{\.\./(.+?)\/\#}, description, "https://mlir.llvm.org/docs/\\1")
-    description = Regex.replace(~r{(.+?)\.md}, description, "https://mlir.llvm.org/docs/\\1")
+
+    description =
+      Regex.replace(~r{\(\.\./(.+?)\.md}, description, "(https://mlir.llvm.org/docs/\\1")
+
+    description =
+      Regex.replace(~r{\(\.\./(.+?)\/\#}, description, "(https://mlir.llvm.org/docs/\\1")
+
+    description =
+      Regex.replace(~r{\((.+?)\.md}, description, "(https://mlir.llvm.org/docs/Dialects/\\1")
 
     description =
       description
-      |> String.replace("Builtin/#", "https://mlir.llvm.org/docs/Builtin/#")
+      |> String.replace("(Builtin/#", "(https://mlir.llvm.org/docs/Dialects/Builtin/#")
 
     summary = if summary != "", do: " - #{summary}", else: ""
 
