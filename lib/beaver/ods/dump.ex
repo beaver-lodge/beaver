@@ -24,12 +24,21 @@ defmodule Beaver.MLIR.ODS.Dump do
   """
   for %{"operations" => operations} <- @dialects do
     for %{"name" => name, "operands" => operands} = op <- operations do
+      # Transform empty operand names to sequential names (arg0, arg1, etc.)
+      {operands, _} =
+        Enum.map_reduce(operands, 0, fn operand, index ->
+          if operand["name"] == "" do
+            {Map.put(operand, "name", "arg#{index}"), index + 1}
+          else
+            {operand, index}
+          end
+        end)
+
       duplicates =
         Enum.map(operands, & &1["name"])
         |> Enum.group_by(& &1)
         |> Enum.filter(fn {_k, v} -> length(v) > 1 end)
         |> Enum.map(fn {k, _v} -> k end)
-        |> Enum.reject(&(&1 == ""))
 
       if duplicates != [] do
         raise "Duplicate operand names found in ODS dump for operation '#{name}': #{inspect(duplicates)}"
@@ -78,7 +87,16 @@ defmodule Beaver.MLIR.ODS.Dump do
         } = op
       ) do
     summary = op["summary"]
+    description = op["description"]
     summary = if summary != "" and summary != nil, do: " - #{summary}", else: ""
+
+    description =
+      if description != "" and description != nil,
+        do: """
+        ## Description
+        #{op["description"]}
+        """,
+        else: ""
 
     result_type_inference =
       if result_type_inference?(op) do
@@ -90,12 +108,12 @@ defmodule Beaver.MLIR.ODS.Dump do
     """
     `#{name}`#{summary}
 
-    #{op["description"]}
-
     #{result_type_inference}
     """ <>
       gen_if_exist(op, "attributes") <>
-      gen_if_exist(op, "operands") <> gen_if_exist(op, "results")
+      gen_if_exist(op, "operands") <>
+      gen_if_exist(op, "results") <>
+      description
   end
 
   def gen_doc(op) do

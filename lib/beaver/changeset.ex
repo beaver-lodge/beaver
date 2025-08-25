@@ -130,6 +130,14 @@ defmodule Beaver.Changeset do
 
   def add_argument(
         %__MODULE__{operands: operands} = changeset,
+        {operand_name, variadic_operands} = operand
+      )
+      when is_atom(operand_name) and is_list(variadic_operands) do
+    %__MODULE__{changeset | operands: operands ++ [operand]}
+  end
+
+  def add_argument(
+        %__MODULE__{operands: operands} = changeset,
         %MLIR.Value{} = operand
       ) do
     %__MODULE__{changeset | operands: operands ++ [operand]}
@@ -201,8 +209,10 @@ defmodule Beaver.Changeset do
   end
 
   defp should_reorder?(operands) do
-    has_tagged = Enum.any?(operands, &match?({_atom, %MLIR.Value{}}, &1))
-    has_untagged = Enum.any?(operands, &match?(%MLIR.Value{}, &1))
+    grouped = Enum.group_by(operands, &match?({_atom, _value}, &1))
+
+    has_tagged = not Enum.empty?(grouped[true] || [])
+    has_untagged = not Enum.empty?(grouped[false] || [])
 
     if has_tagged and has_untagged do
       raise ArgumentError,
@@ -212,14 +222,21 @@ defmodule Beaver.Changeset do
     has_tagged
   end
 
+  defp compare_tag(tag, operand_name) do
+    tag = to_string(tag)
+    operand_name == tag or Macro.camelize(operand_name) == Macro.camelize(tag)
+  end
+
   defp process_operands(operands, op_dump) do
     op_dump["operands"]
     |> Enum.flat_map(fn %{"name" => operand_name, "kind" => kind} ->
       matches =
         Enum.filter(operands, fn
           {tag, %MLIR.Value{}} ->
-            tag = to_string(tag)
-            operand_name == tag or operand_name == Macro.camelize(tag)
+            compare_tag(tag, operand_name)
+
+          {tag, values} when is_list(values) ->
+            compare_tag(tag, operand_name)
 
           _ ->
             false
@@ -233,6 +250,9 @@ defmodule Beaver.Changeset do
 
       matches
     end)
-    |> Enum.map(fn {_, v} -> v end)
+    |> Enum.flat_map(fn
+      {_, %MLIR.Value{} = value} -> [value]
+      {_, values} when is_list(values) -> values
+    end)
   end
 end

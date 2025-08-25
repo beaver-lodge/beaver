@@ -199,9 +199,9 @@ defmodule Beaver.Pattern do
 
       Beaver.MLIR.Dialect.PDL.operation(
         loc,
-        operands,
-        attributes,
-        results,
+        operand_values: operands,
+        attributeValues: attributes,
+        typeValues: results,
         opName: Beaver.MLIR.Attribute.string(op_name),
         attributeValueNames: Beaver.MLIR.Attribute.array(attribute_names),
         operand_segment_sizes:
