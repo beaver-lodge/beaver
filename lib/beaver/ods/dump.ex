@@ -90,13 +90,12 @@ defmodule Beaver.MLIR.ODS.Dump do
 
     description = op["description"]
     description = Regex.replace(~r{\.\./(.+?)\.md}, description, "https://mlir.llvm.org/docs/\\1")
+    description = Regex.replace(~r{\.\./(.+?)\/\#}, description, "https://mlir.llvm.org/docs/\\1")
     description = Regex.replace(~r{(.+?)\.md}, description, "https://mlir.llvm.org/docs/\\1")
 
     description =
       description
       |> String.replace("Builtin/#", "https://mlir.llvm.org/docs/Builtin/#")
-      |> String.replace("../Vector/#", "https://mlir.llvm.org/docs/Vector/#")
-      |> String.replace("../Traits/#", "https://mlir.llvm.org/docs/Vector/#")
 
     summary = if summary != "", do: " - #{summary}", else: ""
 
