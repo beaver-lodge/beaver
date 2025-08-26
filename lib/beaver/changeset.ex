@@ -98,6 +98,19 @@ defmodule Beaver.Changeset do
 
   def add_argument(
         %__MODULE__{attributes: attributes} = changeset,
+        {name, :infer}
+      )
+      when name in [
+             :operand_segment_sizes,
+             :operandSegmentSizes,
+             :result_segment_sizes,
+             :resultSegmentSizes
+           ] do
+    %__MODULE__{changeset | attributes: attributes ++ [{name, :infer}]}
+  end
+
+  def add_argument(
+        %__MODULE__{attributes: attributes} = changeset,
         {name, %MLIR.Attribute{} = attr}
       )
       when is_atom(name) do
@@ -198,10 +211,27 @@ defmodule Beaver.Changeset do
   end
 
   @doc false
-  def reorder_operands(%__MODULE__{operands: operands, name: name} = changeset) do
+  def reorder_operands(
+        %__MODULE__{operands: operands, name: name, attributes: attributes, context: context} =
+          changeset
+      ) do
     case {should_reorder?(operands), MLIR.ODS.Dump.lookup(name)} do
       {true, {:ok, op_dump}} ->
-        %__MODULE__{changeset | operands: process_operands(operands, op_dump)}
+        operand_segment_sizes =
+          attributes[:operand_segment_sizes] || attributes[:operandSegmentSizes]
+
+        {operands, segment_sizes} = process_operands(operands, op_dump)
+
+        attributes =
+          if operand_segment_sizes == :infer do
+            Keyword.update!(attributes, :operand_segment_sizes, fn :infer ->
+              Beaver.Deferred.create(segment_sizes, context)
+            end)
+          else
+            attributes
+          end
+
+        %__MODULE__{changeset | operands: operands, attributes: attributes}
 
       _ ->
         changeset
@@ -228,31 +258,38 @@ defmodule Beaver.Changeset do
   end
 
   defp process_operands(operands, op_dump) do
-    op_dump["operands"]
-    |> Enum.flat_map(fn %{"name" => operand_name, "kind" => kind} ->
-      matches =
-        Enum.filter(operands, fn
-          {tag, %MLIR.Value{}} ->
-            compare_tag(tag, operand_name)
+    operands = Map.new(operands)
 
-          {tag, values} when is_list(values) ->
-            compare_tag(tag, operand_name)
+    tagged_operands =
+      op_dump["operands"]
+      |> Enum.flat_map(fn %{"name" => operand_name, "kind" => kind} ->
+        matches =
+          Enum.filter(operands, fn
+            {tag, %MLIR.Value{}} ->
+              compare_tag(tag, operand_name)
 
-          _ ->
-            false
-        end)
+            {tag, values} when is_list(values) ->
+              compare_tag(tag, operand_name)
 
-      if Enum.empty?(matches) and kind == "Single" do
-        Logger.warning(
-          "Single operand '#{operand_name}' not set when creating operation #{op_dump["name"]}"
-        )
-      end
+            _ ->
+              false
+          end)
 
-      matches
-    end)
-    |> Enum.flat_map(fn
-      {_, %MLIR.Value{} = value} -> [value]
-      {_, values} when is_list(values) -> values
-    end)
+        if Enum.empty?(matches) and kind == "Single" do
+          Logger.warning(
+            "Single operand '#{operand_name}' not set when creating operation #{op_dump["name"]}"
+          )
+        end
+
+        matches
+      end)
+
+    segment_sizes =
+      MLIR.ODS.segment_sizes(Enum.map(tagged_operands, fn {_, v} -> length(List.wrap(v)) end))
+
+    {Enum.flat_map(tagged_operands, fn
+       {_, %MLIR.Value{} = value} -> [value]
+       {_, values} when is_list(values) -> values
+     end), segment_sizes}
   end
 end

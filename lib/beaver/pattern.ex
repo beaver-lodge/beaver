@@ -204,12 +204,7 @@ defmodule Beaver.Pattern do
         typeValues: results,
         opName: Beaver.MLIR.Attribute.string(op_name),
         attributeValueNames: Beaver.MLIR.Attribute.array(attribute_names),
-        operand_segment_sizes:
-          Beaver.MLIR.ODS.operand_segment_sizes([
-            length(operands),
-            length(attributes),
-            length(results)
-          ])
+        operand_segment_sizes: :infer
       ) >>> ~t{!pdl.operation}
     end
   end
