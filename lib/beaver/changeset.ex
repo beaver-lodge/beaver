@@ -217,25 +217,36 @@ defmodule Beaver.Changeset do
       ) do
     case {should_reorder?(operands), MLIR.ODS.Dump.lookup(name)} do
       {true, {:ok, op_dump}} ->
-        operand_segment_sizes =
-          attributes[:operand_segment_sizes] || attributes[:operandSegmentSizes]
-
-        {operands, segment_sizes} = process_operands(operands, op_dump)
-
-        attributes =
-          if operand_segment_sizes == :infer do
-            Keyword.update!(attributes, :operand_segment_sizes, fn :infer ->
-              Beaver.Deferred.create(segment_sizes, context)
-            end)
-          else
-            attributes
-          end
-
-        %__MODULE__{changeset | operands: operands, attributes: attributes}
+        reorder_operands_with_dump(changeset, op_dump, attributes, context)
 
       _ ->
         changeset
     end
+  end
+
+  defp reorder_operands_with_dump(
+         changeset,
+         op_dump,
+         attributes,
+         context
+       ) do
+    operand_segment_sizes =
+      attributes[:operand_segment_sizes] || attributes[:operandSegmentSizes]
+
+    {operands, segment_sizes} = process_operands(changeset.operands, op_dump)
+
+    attributes =
+      case operand_segment_sizes do
+        :infer ->
+          Keyword.update!(attributes, :operand_segment_sizes, fn :infer ->
+            Beaver.Deferred.create(segment_sizes, context)
+          end)
+
+        _ ->
+          attributes
+      end
+
+    %__MODULE__{changeset | operands: operands, attributes: attributes}
   end
 
   defp should_reorder?(operands) do
