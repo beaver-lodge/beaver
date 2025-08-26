@@ -293,7 +293,11 @@ defmodule Beaver.Changeset do
           )
         end
 
-        matches
+        if Enum.empty?(matches) do
+          [{String.to_atom(operand_name), []}]
+        else
+          matches
+        end
       end)
 
     segment_sizes =

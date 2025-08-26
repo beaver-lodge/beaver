@@ -134,11 +134,11 @@ defmodule Beaver.Pattern do
             ]) >>> []
 
           "pdl.operation" ->
-            Beaver.MLIR.Dialect.PDL.replace([
-              unquote(root),
-              repl,
-              operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 1, 0])
-            ]) >>> []
+            Beaver.MLIR.Dialect.PDL.replace(
+              opValue: unquote(root),
+              replOperation: repl,
+              operandSegmentSizes: :infer
+            ) >>> []
         end
       end
     end
