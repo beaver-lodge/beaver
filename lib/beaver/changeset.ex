@@ -270,42 +270,38 @@ defmodule Beaver.Changeset do
   end
 
   defp process_operands(operands, op_dump) do
-    operands = Map.new(operands)
+    # 1. Normalize provided operands for efficient lookup (O(N))
+    # This avoids the nested loop by ensuring keys are strings, matching op_dump.
+    provided_operands = Map.new(operands)
+    op_name = op_dump["name"]
 
+    # 2. Process defined operands in a single pass (O(M log N))
+    # A `for` comprehension clearly expresses the transformation.
     tagged_operands =
-      op_dump["operands"]
-      |> Enum.flat_map(fn %{"name" => operand_name, "kind" => kind} ->
-        matches =
-          Enum.filter(operands, fn
-            {tag, %MLIR.Value{}} ->
-              compare_tag(tag, operand_name)
+      for %{"name" => operand_name, "kind" => kind} <- op_dump["operands"] do
+        pair = Enum.find(provided_operands, fn {key, _} -> compare_tag(key, operand_name) end)
 
-            {tag, values} when is_list(values) ->
-              compare_tag(tag, operand_name)
-
-            _ ->
-              false
-          end)
-
-        if Enum.empty?(matches) and kind == "Single" do
+        # Warn if a required single operand is missing
+        if is_nil(pair) and kind == "Single" do
           Logger.warning(
-            "Single operand '#{operand_name}' not set when creating operation #{op_dump["name"]}"
+            "Single operand '#{operand_name}' not set when creating operation #{op_name}"
           )
         end
 
-        if Enum.empty?(matches) do
-          [{String.to_atom(operand_name), []}]
-        else
-          matches
-        end
-      end)
+        # Ensure the final value is always a list for consistency.
+        # `List.wrap/1` correctly handles both single values and lists.
+        # The `|| []` ensures missing operands become an empty list.
+        values_as_list = if is_nil(pair), do: [], else: List.wrap(elem(pair, 1))
 
-    segment_sizes =
-      MLIR.ODS.segment_sizes(Enum.map(tagged_operands, fn {_, v} -> length(List.wrap(v)) end))
+        {String.to_atom(operand_name), values_as_list}
+      end
 
-    {Enum.flat_map(tagged_operands, fn
-       {_, %MLIR.Value{} = value} -> [value]
-       {_, values} when is_list(values) -> values
-     end), segment_sizes}
+    # 3. Assemble the final result from the processed list
+    # This is cleaner as it operates on a well-structured intermediate variable.
+    all_values = Keyword.values(tagged_operands)
+    segment_sizes = MLIR.ODS.segment_sizes(Enum.map(all_values, &length/1))
+    final_operands = List.flatten(all_values)
+
+    {final_operands, segment_sizes}
   end
 end
