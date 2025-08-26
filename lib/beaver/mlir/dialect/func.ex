@@ -9,7 +9,16 @@ defmodule Beaver.MLIR.Dialect.Func do
   @doc """
   Syntax sugar for `Func.func` SSA expression. No need to specify result types.
   """
-  defmacro func(call, do: body) do
+  defmacro func(call, opts) do
+    quote do
+      Beaver.MLIR.Dialect.Func.func_like(unquote(call), "func.func", unquote(opts))
+    end
+  end
+
+  @doc """
+  Syntax sugar for `Func.func` alike SSA expression. No need to specify result types.
+  """
+  defmacro func_like(call, op, do: body) do
     {func_name, args} = call |> Macro.decompose_call()
 
     quote do
@@ -21,7 +30,7 @@ defmodule Beaver.MLIR.Dialect.Func do
       |> then(
         &Beaver.MLIR.Operation.create_and_append(
           Beaver.Env.context(),
-          "func.func",
+          unquote(op),
           [fn -> unquote(body) end | &1],
           [],
           Beaver.Env.block()
