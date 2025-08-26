@@ -228,7 +228,7 @@ defmodule Beaver.Changeset do
          changeset,
          op_dump,
          attributes,
-         context
+         %MLIR.Context{} = context
        ) do
     operand_segment_sizes =
       attributes[:operand_segment_sizes] || attributes[:operandSegmentSizes]
@@ -238,9 +238,10 @@ defmodule Beaver.Changeset do
     attributes =
       case operand_segment_sizes do
         :infer ->
-          Keyword.update!(attributes, :operand_segment_sizes, fn :infer ->
-            Beaver.Deferred.create(segment_sizes, context)
-          end)
+          attributes
+          |> Keyword.delete(:operand_segment_sizes)
+          |> Keyword.delete(:operandSegmentSizes)
+          |> Keyword.put(:operand_segment_sizes, Beaver.Deferred.create(segment_sizes, context))
 
         _ ->
           attributes
