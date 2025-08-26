@@ -5,8 +5,6 @@ if Version.match?(System.version(), "< 1.18.0") do
 end
 
 defmodule Updater do
-  require Logger
-
   @with_diagnostics ~w{mlirAttributeParseGet mlirOperationVerify mlirTypeParseGet mlirModuleCreateParse beaverModuleApplyPatternsAndFoldGreedily mlirExecutionEngineCreate}
                     |> Enum.map(&String.to_atom/1)
   @normal_and_dirty ~w{mlirExecutionEngineInvokePacked}
@@ -31,7 +29,6 @@ defmodule Updater do
     try do
       File.write!(tmp, txt)
       File.rename!(tmp, dst)
-      Logger.info("Updated #{dst}")
     rescue
       e ->
         File.rm!(tmp)
