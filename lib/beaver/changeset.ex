@@ -272,28 +272,25 @@ defmodule Beaver.Changeset do
   defp process_operands(operands, op_dump) do
     # 1. Normalize provided operands for efficient lookup (O(N))
     # This avoids the nested loop by ensuring keys are strings, matching op_dump.
-    provided_operands = Map.new(operands)
     op_name = op_dump["name"]
 
     # 2. Process defined operands in a single pass (O(M log N))
     # A `for` comprehension clearly expresses the transformation.
     tagged_operands =
       for %{"name" => operand_name, "kind" => kind} <- op_dump["operands"] do
-        pair = Enum.find(provided_operands, fn {key, _} -> compare_tag(key, operand_name) end)
+        values =
+          Enum.reduce(operands, [], fn {key, values}, acc ->
+            if compare_tag(key, operand_name), do: acc ++ List.wrap(values), else: acc
+          end)
 
         # Warn if a required single operand is missing
-        if is_nil(pair) and kind == "Single" do
+        if Enum.empty?(values) and kind == "Single" do
           Logger.warning(
             "Single operand '#{operand_name}' not set when creating operation #{op_name}"
           )
         end
 
-        # Ensure the final value is always a list for consistency.
-        # `List.wrap/1` correctly handles both single values and lists.
-        # The `|| []` ensures missing operands become an empty list.
-        values_as_list = if is_nil(pair), do: [], else: List.wrap(elem(pair, 1))
-
-        {String.to_atom(operand_name), values_as_list}
+        {String.to_atom(operand_name), values}
       end
 
     # 3. Assemble the final result from the processed list
