@@ -27,8 +27,8 @@ defmodule Beaver.Changeset do
 
   @type attribute() :: MLIR.Attribute.t() | (MLIR.Context.t() -> MLIR.Attribute.t())
   @type operand() :: MLIR.Value.t() | (MLIR.Context.t() -> MLIR.Value.t())
-  @type tagged_operand() :: {atom(), operand() | [operand()]} | operand()
-  @type operand_argument() :: tagged_operand() | [tagged_operand()]
+  @type tagged_operand() :: {atom(), operand() | [operand()]}
+  @type operand_argument() :: tagged_operand() | operand() | [operand()]
   @type type_argument() :: MLIR.Type.t() | (MLIR.Context.t() -> MLIR.Type.t())
   @type tagged_attribute :: {atom(), type_argument() | attribute()}
   @type attribute_argument() :: tagged_attribute() | [tagged_attribute()]
