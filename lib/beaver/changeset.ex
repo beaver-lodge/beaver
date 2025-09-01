@@ -217,23 +217,38 @@ defmodule Beaver.Changeset do
       ) do
     case {should_reorder?(operands), MLIR.ODS.Dump.lookup(name)} do
       {true, {:ok, op_dump}} ->
-        reorder_operands_with_dump(changeset, op_dump, attributes, context)
+        {operands, segment_sizes} = process_operands_with_dump(changeset.operands, op_dump)
+        update_changeset_with_operands(changeset, operands, segment_sizes, attributes, context)
+
+      {true, _} ->
+        # Extract unique operand keys and group values by key
+        {operands, segment_sizes} = process_operands_with_keys(changeset.operands)
+        update_changeset_with_operands(changeset, operands, segment_sizes, attributes, context)
 
       _ ->
         changeset
     end
   end
 
-  defp reorder_operands_with_dump(
-         changeset,
-         op_dump,
-         attributes,
-         %MLIR.Context{} = context
-       ) do
+  defp process_operands_with_keys(operands) do
+    # Check for duplicate keys
+    keys = Keyword.keys(operands)
+
+    if length(keys) != length(Enum.uniq(keys)) do
+      raise "Duplicate keys found in operands: #{inspect(keys)}"
+    end
+
+    # Extract all values in order
+    grouped_values = Keyword.values(operands) |> Enum.map(&List.wrap/1)
+    segment_sizes = Enum.map(grouped_values, &length/1)
+    all_values = grouped_values |> List.flatten()
+
+    {all_values, MLIR.ODS.segment_sizes(segment_sizes)}
+  end
+
+  defp update_changeset_with_operands(changeset, operands, segment_sizes, attributes, context) do
     operand_segment_sizes =
       attributes[:operand_segment_sizes] || attributes[:operandSegmentSizes]
-
-    {operands, segment_sizes} = process_operands(changeset.operands, op_dump)
 
     attributes =
       case operand_segment_sizes do
@@ -269,7 +284,7 @@ defmodule Beaver.Changeset do
     operand_name == tag or Macro.camelize(operand_name) == Macro.camelize(tag)
   end
 
-  defp process_operands(operands, op_dump) do
+  defp process_operands_with_dump(operands, op_dump) do
     # 1. Normalize provided operands for efficient lookup (O(N))
     # This avoids the nested loop by ensuring keys are strings, matching op_dump.
     op_name = op_dump["name"]

@@ -88,4 +88,26 @@ defmodule ODSDumpTest do
       assert logs =~ ~r"Single operand 'lhs' not set when creating operation arith\.addi"
     end
   end
+
+  test "segment_sizes without ods dump", %{ctx: ctx} do
+    mlir ctx: ctx do
+      MLIR.Context.allow_unregistered_dialects(ctx)
+
+      m =
+        module do
+          a = Arith.constant(value: Attribute.integer(Type.i32(), 1)) >>> :infer
+          b = Arith.constant(value: Attribute.integer(Type.i32(), 2)) >>> :infer
+          UndefinedDialect.foo(lhs: a, rhs: b, operand_segment_sizes: :infer) >>> Type.i32()
+
+          UndefinedDialect.foo(rhs: [a], lhs: [a, b], operand_segment_sizes: :infer) >>>
+            Type.i32()
+        end
+
+      ops = MLIR.Module.body(m) |> Beaver.Walker.operations()
+      assert 1 = ops[2][:operand_segment_sizes][0]
+      assert 1 = ops[2][:operand_segment_sizes][1]
+      assert 1 = ops[3][:operand_segment_sizes][0]
+      assert 2 = ops[3][:operand_segment_sizes][1]
+    end
+  end
 end
