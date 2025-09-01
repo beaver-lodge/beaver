@@ -26,7 +26,7 @@ defmodule Beaver.Changeset do
             context: nil
 
   @type attribute() :: MLIR.Attribute.t() | (MLIR.Context.t() -> MLIR.Attribute.t())
-  @type operand() :: MLIR.Value.t() | (MLIR.Context.t() -> MLIR.Value.t())
+  @type operand() :: MLIR.Value.t()
   @type tagged_operand() :: {atom(), operand() | [operand()]}
   @type operand_argument() :: tagged_operand() | operand() | [operand()]
   @type type_argument() :: MLIR.Type.t() | (MLIR.Context.t() -> MLIR.Type.t())
