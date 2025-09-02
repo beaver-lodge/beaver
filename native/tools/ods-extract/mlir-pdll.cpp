@@ -1,11 +1,3 @@
-//===- mlir-pdll.cpp - MLIR PDLL frontend -----------------------*- C++ -*-===//
-//
-// Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
-// See https://llvm.org/LICENSE.txt for license information.
-// SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
-//
-//===----------------------------------------------------------------------===//
-
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/IndentedOstream.h"
 #include "mlir/Support/ToolUtilities.h"
@@ -31,17 +23,6 @@
 
 using namespace mlir;
 using namespace mlir::pdll;
-
-//===----------------------------------------------------------------------===//
-// main
-//===----------------------------------------------------------------------===//
-
-/// The desired output type.
-enum class OutputType {
-  AST,
-  MLIR,
-  CPP,
-};
 
 namespace parser {
 
@@ -291,8 +272,8 @@ LogicalResult parseTdInclude(
 
 static LogicalResult
 processBuffer(raw_ostream &os, std::unique_ptr<llvm::MemoryBuffer> chunkBuffer,
-              OutputType outputType, std::vector<std::string> &includeDirs,
-              bool dumpODS, std::set<std::string> *includedFiles) {
+              std::vector<std::string> &includeDirs,
+              std::set<std::string> *includedFiles) {
   llvm::SourceMgr sourceMgr;
   sourceMgr.setIncludeDirs(includeDirs);
   sourceMgr.AddNewSourceBuffer(std::move(chunkBuffer), SMLoc());
@@ -350,11 +331,6 @@ int main(int argc, char **argv) {
       "I", llvm::cl::desc("Directory of include files"),
       llvm::cl::value_desc("directory"), llvm::cl::Prefix);
 
-  llvm::cl::opt<bool> dumpODS(
-      "dump-ods",
-      llvm::cl::desc(
-          "Print out the parsed ODS information from the input file"),
-      llvm::cl::init(false));
   llvm::cl::opt<std::string> inputSplitMarker{
       "split-input-file", llvm::cl::ValueOptional,
       llvm::cl::callback([&](const std::string &str) {
@@ -369,16 +345,6 @@ int main(int argc, char **argv) {
       "output-split-marker",
       llvm::cl::desc("Split marker to use for merging the ouput"),
       llvm::cl::init(kDefaultSplitMarker));
-  llvm::cl::opt<enum OutputType> outputType(
-      "x", llvm::cl::init(OutputType::AST),
-      llvm::cl::desc("The type of output desired"),
-      llvm::cl::values(clEnumValN(OutputType::AST, "ast",
-                                  "generate the AST for the input file"),
-                       clEnumValN(OutputType::MLIR, "mlir",
-                                  "generate the PDL MLIR for the input file"),
-                       clEnumValN(OutputType::CPP, "cpp",
-                                  "generate a C++ source file containing the "
-                                  "patterns for the input file")));
   llvm::cl::opt<std::string> dependencyFilename(
       "d", llvm::cl::desc("Dependency filename"),
       llvm::cl::value_desc("filename"), llvm::cl::init(""));
@@ -426,8 +392,8 @@ int main(int argc, char **argv) {
       chunkBuffer = llvm::MemoryBuffer::getMemBufferCopy(
           chunkBuffer->getBuffer(), chunkBuffer->getBufferIdentifier());
     }
-    return processBuffer(os, std::move(chunkBuffer), outputType, includeDirs,
-                         dumpODS, includedFiles);
+    return processBuffer(os, std::move(chunkBuffer), includeDirs,
+                         includedFiles);
   };
   if (failed(splitAndProcessBuffer(std::move(inputFile), processFn, outputStrOS,
                                    inputSplitMarker, outputSplitMarker)))
