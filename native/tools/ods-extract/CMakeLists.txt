@@ -5,8 +5,6 @@ set(LIBS MLIRIR MLIRPDLLODS MLIRTableGen)
 add_tablegen(
   ods-extract
   MLIR_PDLL
-  DESTINATION
-  "${CMAKE_INSTALL_PREFIX}/tools"
   EXPORT
   MLIR
   mlir-pdll.cpp
@@ -16,3 +14,5 @@ add_tablegen(
 target_link_libraries(ods-extract PRIVATE ${LIBS})
 
 mlir_check_all_link_libraries(ods-extract)
+
+install(TARGETS ods-extract RUNTIME DESTINATION tools)

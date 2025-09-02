@@ -24,7 +24,7 @@ cmake_build: ${BUILD_STAMP}
 	cmake -E copy_if_different ${LLVM_LIB_DIR}/libmlir_* ${NATIVE_INSTALL_DIR}/lib
 
 zig_build: zig_translate cmake_build
-	${CMAKE_BUILD_DIR}/bin/ods-extract -I ${MLIR_INCLUDE_DIR} \
+	${NATIVE_INSTALL_DIR}/tools/ods-extract -I ${MLIR_INCLUDE_DIR} \
 	-I ${MLIR_INCLUDE_DIR}/mlir/Dialect/ArmSME/IR \
 	-I ${MLIR_INCLUDE_DIR}/mlir/Dialect/IRDL/IR \
 	-I ${MLIR_INCLUDE_DIR}/mlir/Dialect/UB/IR \
