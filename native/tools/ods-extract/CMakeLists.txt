@@ -7,7 +7,7 @@ add_tablegen(
   MLIR_PDLL
   EXPORT
   MLIR
-  mlir-pdll.cpp
+  dump-ods.cpp
   DEPENDS
   ${LIBS})
 

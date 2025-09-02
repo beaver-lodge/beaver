@@ -18,8 +18,6 @@
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/TableGen/Error.h"
 #include "llvm/TableGen/Parser.h"
-#include <set>
-#include <string>
 
 using namespace mlir;
 using namespace mlir::pdll;
@@ -270,58 +268,14 @@ LogicalResult parseTdInclude(
 
 } // namespace parser
 
-static LogicalResult
-processBuffer(raw_ostream &os, std::unique_ptr<llvm::MemoryBuffer> chunkBuffer,
-              std::vector<std::string> &includeDirs,
-              std::set<std::string> *includedFiles) {
-  llvm::SourceMgr sourceMgr;
-  sourceMgr.setIncludeDirs(includeDirs);
-  sourceMgr.AddNewSourceBuffer(std::move(chunkBuffer), SMLoc());
-
-  ods::Context odsContext;
-
-  // Process each buffer in the source manager (skipping buffer 0 which is the
-  // main file)
-  for (unsigned i = 0, e = sourceMgr.getNumBuffers(); i < e; ++i) {
-    const llvm::MemoryBuffer *buffer = sourceMgr.getMemoryBuffer(i + 1);
-    std::string filename = buffer->getBufferIdentifier().str();
-
-    // Read each line from the buffer
-    StringRef bufferContent = buffer->getBuffer();
-    SmallVector<StringRef> lines;
-    bufferContent.split(lines, '\n');
-
-    for (StringRef line : lines) {
-      line = line.trim();
-      // Skip empty lines and comments
-      if (line.empty() || line.starts_with("//"))
-        continue;
-
-      // Process .td file references
-      if (line.ends_with(".td")) {
-        if (failed(parser::parseTdInclude(
-                odsContext, line, sourceMgr,
-                [](llvm::SMRange loc, const Twine &msg) {
-                  llvm::errs() << "error: " << msg << "\n";
-                  return failure();
-                }))) {
-          return failure();
-        }
-      }
-    }
-  }
-  parser::printODSContext(os, odsContext);
-  return success();
-}
-
 int main(int argc, char **argv) {
   // FIXME: This is necessary because we link in TableGen, which defines its
   // options as static variables.. some of which overlap with our options.
   llvm::cl::ResetCommandLineParser();
 
-  llvm::cl::opt<std::string> inputFilename(
-      llvm::cl::Positional, llvm::cl::desc("<input file>"), llvm::cl::init("-"),
-      llvm::cl::value_desc("filename"));
+  llvm::cl::list<std::string> inputFilenames(llvm::cl::Positional,
+                                             llvm::cl::desc("<input files>"),
+                                             llvm::cl::value_desc("filename"));
 
   llvm::cl::opt<std::string> outputFilename(
       "o", llvm::cl::desc("Output filename"), llvm::cl::value_desc("filename"),
@@ -331,73 +285,41 @@ int main(int argc, char **argv) {
       "I", llvm::cl::desc("Directory of include files"),
       llvm::cl::value_desc("directory"), llvm::cl::Prefix);
 
-  llvm::cl::opt<std::string> inputSplitMarker{
-      "split-input-file", llvm::cl::ValueOptional,
-      llvm::cl::callback([&](const std::string &str) {
-        // Implicit value: use default marker if flag was used without value.
-        if (str.empty())
-          inputSplitMarker.setValue(kDefaultSplitMarker);
-      }),
-      llvm::cl::desc("Split the input file into chunks using the given or "
-                     "default marker and process each chunk independently"),
-      llvm::cl::init("")};
-  llvm::cl::opt<std::string> outputSplitMarker(
-      "output-split-marker",
-      llvm::cl::desc("Split marker to use for merging the ouput"),
-      llvm::cl::init(kDefaultSplitMarker));
-  llvm::cl::opt<std::string> dependencyFilename(
-      "d", llvm::cl::desc("Dependency filename"),
-      llvm::cl::value_desc("filename"), llvm::cl::init(""));
   llvm::cl::opt<bool> writeIfChanged(
       "write-if-changed",
       llvm::cl::desc("Only write to the output file if it changed"));
 
-  // `ResetCommandLineParser` at the above unregistered the "D" option
-  // of `llvm-tblgen`, which causes tblgen usage to fail due to
-  // "Unknnown command line argument '-D...`" when a macros name is
-  // present. The following is a workaround to re-register it again.
-  llvm::cl::list<std::string> macroNames(
-      "D",
-      llvm::cl::desc("Name of the macro to be defined -- ignored by mlir-pdll"),
-      llvm::cl::value_desc("macro name"), llvm::cl::Prefix);
-
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "PDLL Frontend");
 
-  // Set up the input file.
-  std::string errorMessage;
-  std::unique_ptr<llvm::MemoryBuffer> inputFile =
-      openInputFile(inputFilename, &errorMessage);
-  if (!inputFile) {
-    llvm::errs() << errorMessage << "\n";
-    return 1;
+  // Process each input file directly
+  ods::Context odsContext;
+  llvm::SourceMgr sourceMgr;
+  sourceMgr.setIncludeDirs(includeDirs);
+
+  for (const auto &inputFilename : inputFilenames) {
+    std::string errorMessage;
+    std::unique_ptr<llvm::MemoryBuffer> inputFile =
+        openInputFile(inputFilename, &errorMessage);
+    if (!inputFile) {
+      llvm::errs() << errorMessage << "\n";
+      return 1;
+    }
+
+    // Process the .td file directly
+    if (failed(parser::parseTdInclude(odsContext, inputFilename, sourceMgr,
+                                      [](llvm::SMRange loc, const Twine &msg) {
+                                        llvm::errs()
+                                            << "error: " << msg << "\n";
+                                        return failure();
+                                      }))) {
+      return 1;
+    }
   }
-
-  // If we are creating a dependency file, we'll also need to track what files
-  // get included during processing.
-  std::set<std::string> includedFilesStorage;
-  std::set<std::string> *includedFiles = nullptr;
-  if (!dependencyFilename.empty())
-    includedFiles = &includedFilesStorage;
-
-  // The split-input-file mode is a very specific mode that slices the file
-  // up into small pieces and checks each independently.
+  // Set up the output
   std::string outputStr;
   llvm::raw_string_ostream outputStrOS(outputStr);
-  auto processFn = [&](std::unique_ptr<llvm::MemoryBuffer> chunkBuffer,
-                       raw_ostream &os) {
-    // Split does not guarantee null-termination. Make a copy of the buffer to
-    // ensure null-termination.
-    if (!chunkBuffer->getBuffer().ends_with('\0')) {
-      chunkBuffer = llvm::MemoryBuffer::getMemBufferCopy(
-          chunkBuffer->getBuffer(), chunkBuffer->getBufferIdentifier());
-    }
-    return processBuffer(os, std::move(chunkBuffer), includeDirs,
-                         includedFiles);
-  };
-  if (failed(splitAndProcessBuffer(std::move(inputFile), processFn, outputStrOS,
-                                   inputSplitMarker, outputSplitMarker)))
-    return 1;
+  parser::printODSContext(outputStrOS, odsContext);
 
   // Write the output.
   bool shouldWriteOutput = true;
@@ -413,6 +335,7 @@ int main(int argc, char **argv) {
 
   // Populate the output file if necessary.
   if (shouldWriteOutput) {
+    std::string errorMessage;
     std::unique_ptr<llvm::ToolOutputFile> outputFile =
         openOutputFile(outputFilename, &errorMessage);
     if (!outputFile) {
