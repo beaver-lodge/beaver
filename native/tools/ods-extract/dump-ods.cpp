@@ -292,7 +292,6 @@ int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "PDLL Frontend");
 
-  // Process each input file directly
   ods::Context odsContext;
   llvm::SourceMgr sourceMgr;
   sourceMgr.setIncludeDirs(includeDirs);
