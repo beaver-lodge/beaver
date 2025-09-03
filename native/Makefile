@@ -13,7 +13,9 @@ zig_translate:
 	mkdir -p ${NATIVE_INSTALL_DIR}
 	mkdir -p ${MIX_APP_PATH}/include/mlir-c/Beaver
 	elixir tools/wrapper/gen_header.exs --mlir-include-dir ${MLIR_INCLUDE_DIR} --output ${MIX_APP_PATH}/include/mlir-c/Beaver/wrapper.h
-	zig cc -E -Xclang -ast-dump=json ${MIX_APP_PATH}/include/mlir-c/Beaver/wrapper.h -I include -I ${MLIR_INCLUDE_DIR} | tee ${MIX_APP_PATH}/wrapper.h.clang.ast.json | elixir tools/wrapper/gen.exs --elixir ${NATIVE_INSTALL_DIR}/capi_functions.ex --zig src/wrapper.zig
+	zig cc -E -Xclang -ast-dump=json ${MIX_APP_PATH}/include/mlir-c/Beaver/wrapper.h -I include -I ${MLIR_INCLUDE_DIR} | \
+		tee ${MIX_APP_PATH}/wrapper.h.clang.ast.json | \
+		elixir tools/wrapper/gen.exs --elixir ${NATIVE_INSTALL_DIR}/capi_functions.ex --zig src/wrapper.zig
 
 ${BUILD_STAMP}:
 	cmake -G Ninja -B ${CMAKE_BUILD_DIR} -DLLVM_DIR=${LLVM_CMAKE_DIR} -DMLIR_DIR=${MLIR_CMAKE_DIR} -DCMAKE_INSTALL_PREFIX=${NATIVE_INSTALL_DIR}
@@ -25,12 +27,17 @@ cmake_build: ${BUILD_STAMP}
 zig_build: zig_translate cmake_build
 	elixir tools/ods-extract/dump_ods.exs --mlir-include-dir ${MLIR_INCLUDE_DIR} | xargs \
 	${NATIVE_INSTALL_DIR}/tools/ods-extract -I ${MLIR_INCLUDE_DIR} \
-	-I ${MLIR_INCLUDE_DIR}/mlir/Dialect/ArmSME/IR \
-	-I ${MLIR_INCLUDE_DIR}/mlir/Dialect/IRDL/IR \
-	-I ${MLIR_INCLUDE_DIR}/mlir/Dialect/UB/IR \
-	-write-if-changed \
+		-I ${MLIR_INCLUDE_DIR}/mlir/Dialect/ArmSME/IR \
+		-I ${MLIR_INCLUDE_DIR}/mlir/Dialect/IRDL/IR \
+		-I ${MLIR_INCLUDE_DIR}/mlir/Dialect/UB/IR \
+		-write-if-changed \
 	-o ${NATIVE_INSTALL_DIR}/ods_dump.json
-	zig build --prefix ${NATIVE_INSTALL_DIR} --search-prefix ${NATIVE_INSTALL_DIR} --search-prefix ${LLVM_LIB_DIR}/.. --search-prefix ${ERTS_INCLUDE_DIR}/.. --search-prefix ${MIX_APP_PATH} -freference-trace
+	zig build --prefix ${NATIVE_INSTALL_DIR} \
+		--search-prefix ${NATIVE_INSTALL_DIR} \
+		--search-prefix ${LLVM_LIB_DIR}/.. \
+		--search-prefix ${ERTS_INCLUDE_DIR}/.. \
+		--search-prefix ${MIX_APP_PATH} \
+		-freference-trace
 
 clean:
 	rm -rf ${CMAKE_BUILD_DIR}
