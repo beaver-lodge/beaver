@@ -5,12 +5,6 @@ if Version.match?(System.version(), "< 1.18.0") do
 end
 
 defmodule Updater do
-  require Logger
-
-  defp args() do
-    System.argv() |> Enum.chunk_every(2)
-  end
-
   @with_diagnostics ~w{mlirAttributeParseGet mlirOperationVerify mlirTypeParseGet mlirModuleCreateParse beaverModuleApplyPatternsAndFoldGreedily mlirExecutionEngineCreate}
                     |> Enum.map(&String.to_atom/1)
   @normal_and_dirty ~w{mlirExecutionEngineInvokePacked}
@@ -35,7 +29,6 @@ defmodule Updater do
     try do
       File.write!(tmp, txt)
       File.rename!(tmp, dst)
-      Logger.info("Updated #{dst}")
     rescue
       e ->
         File.rm!(tmp)
@@ -43,7 +36,7 @@ defmodule Updater do
     end
   end
 
-  defp gen(functions, :elixir) do
+  defp gen(functions, :elixir, opts) do
     for {name, params} <- functions do
       params = params |> Enum.map(&String.to_atom/1)
 
@@ -60,17 +53,17 @@ defmodule Updater do
     end
     |> List.flatten()
     |> inspect(pretty: true, limit: :infinity)
-    |> then(
-      &for ["--elixir", dst] <- args() do
-        dst = Path.expand(dst)
-        write_file(dst, &1)
+    |> then(fn content ->
+      if opts[:elixir] do
+        dst = Path.expand(opts[:elixir])
+        write_file(dst, content)
       end
-    )
+    end)
 
     functions
   end
 
-  defp gen(functions, :zig) do
+  defp gen(functions, :zig, opts) do
     entries =
       for {name, _arity} <- functions do
         cond do
@@ -103,7 +96,8 @@ defmodule Updater do
     };
     """
 
-    for ["--zig", dst] <- args() do
+    if opts[:zig] do
+      dst = Path.expand(opts[:zig])
       write_file(dst, txt)
       {_, 0} = System.cmd("zig", ["fmt", dst], stderr_to_stdout: true)
     end
@@ -146,11 +140,22 @@ defmodule Updater do
   end
 
   def run do
-    IO.stream(:stdio, 10000)
-    |> Enum.into("")
-    |> parse()
-    |> gen(:elixir)
-    |> gen(:zig)
+    opts =
+      OptionParser.parse!(System.argv(),
+        strict: [
+          elixir: :string,
+          zig: :string
+        ]
+      )
+      |> elem(0)
+
+    functions =
+      IO.stream(:stdio, 10000)
+      |> Enum.into("")
+      |> parse()
+
+    gen(functions, :elixir, opts)
+    gen(functions, :zig, opts)
   end
 end
 

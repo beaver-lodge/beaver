@@ -184,7 +184,7 @@ defmodule Beaver.MLIR.Operation.State do
       regions: regions,
       location: location,
       context: _context
-    } = prepare(changeset)
+    } = changeset |> Beaver.Changeset.reorder_operands() |> prepare()
 
     name
     |> MLIR.StringRef.create()

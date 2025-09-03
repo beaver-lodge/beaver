@@ -39,6 +39,10 @@ defmodule ToyPassWithInit do
     {:ok, %{patterns: frozen_pat_set}}
   end
 
+  def destruct(nil) do
+    :ok
+  end
+
   def destruct(%{patterns: frozen_pat_set}) do
     MLIR.CAPI.mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
   end

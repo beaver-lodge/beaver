@@ -32,9 +32,11 @@ defmodule TosaTest do
     ir =
       mlir ctx: ctx do
         module do
-          Func.func test_multi_broadcast(
-                      function_type: ~a"(tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>"
-                    ) do
+          Func.func_like test_multi_broadcast(
+                           function_type:
+                             ~a"(tensor<?x?xf32>, tensor<?x?xf32>) -> tensor<?x?xf32>"
+                         ),
+                         "func.func" do
             region do
               block _entry(
                       arg0 >>> Type.ranked_tensor([:dynamic, :dynamic], Type.f32()),

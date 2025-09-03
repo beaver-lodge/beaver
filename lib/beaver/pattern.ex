@@ -134,11 +134,11 @@ defmodule Beaver.Pattern do
             ]) >>> []
 
           "pdl.operation" ->
-            Beaver.MLIR.Dialect.PDL.replace([
-              unquote(root),
-              repl,
-              operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 1, 0])
-            ]) >>> []
+            Beaver.MLIR.Dialect.PDL.replace(
+              opValue: unquote(root),
+              replOperation: repl,
+              operandSegmentSizes: :infer
+            ) >>> []
         end
       end
     end
@@ -199,17 +199,12 @@ defmodule Beaver.Pattern do
 
       Beaver.MLIR.Dialect.PDL.operation(
         loc,
-        operands,
-        attributes,
-        results,
+        operand_values: operands,
+        attributeValues: attributes,
+        typeValues: results,
         opName: Beaver.MLIR.Attribute.string(op_name),
         attributeValueNames: Beaver.MLIR.Attribute.array(attribute_names),
-        operand_segment_sizes:
-          Beaver.MLIR.ODS.operand_segment_sizes([
-            length(operands),
-            length(attributes),
-            length(results)
-          ])
+        operand_segment_sizes: :infer
       ) >>> ~t{!pdl.operation}
     end
   end
