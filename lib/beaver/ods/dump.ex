@@ -11,9 +11,10 @@ defmodule Beaver.MLIR.ODS.Dump do
   Operations can be looked up using `lookup/1`, and documentation can be generated using `gen_doc/1`.
   """
   @dump Application.app_dir(:beaver)
-        |> Path.join("priv/ods_dump.json")
+        |> Path.join("priv/ods_dump.ex")
         |> File.read!()
-        |> Jason.decode!()
+        |> Code.eval_string()
+        |> elem(0)
 
   @dialects @dump
             |> Enum.flat_map(fn {"dialects", dialects} ->
