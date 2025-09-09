@@ -16,4 +16,4 @@ decoded =
   if(Version.match?(System.version(), "< 1.18.0"), do: Jason, else: JSON)
   |> apply(:decode!, [File.read!(input)])
 
-File.write(output, inspect(decoded, pretty: true, limit: :infinity, printable_limit: :infinity))
+File.write!(output, inspect(decoded, pretty: true, limit: :infinity, printable_limit: :infinity))
