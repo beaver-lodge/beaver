@@ -52,7 +52,7 @@ defmodule Updater do
       end
     end
     |> List.flatten()
-    |> inspect(pretty: true, limit: :infinity)
+    |> inspect(pretty: true, limit: :infinity, printable_limit: :infinity)
     |> then(fn content ->
       if opts[:elixir] do
         dst = Path.expand(opts[:elixir])
