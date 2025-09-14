@@ -50,6 +50,24 @@ void printODSContext(raw_ostream &os, const ods::Context &odsContext) {
   };
 
   llvm::json::OStream j(os, 2);
+
+  auto printOperandsOrResults = [&](StringRef name,
+                                    ArrayRef<OperandOrResult> elements) {
+    if (elements.empty())
+      return;
+    j.attributeArray(name, [&] {
+      for (const auto &element : elements) {
+        j.object([&] {
+          j.attribute("name", element.getName());
+          j.attribute("constraint", element.getConstraint().getDemangledName());
+          j.attribute("description", element.getConstraint().getSummary());
+          j.attribute("kind",
+                      getVariableLengthStr(element.getVariableLengthKind()));
+        });
+      }
+    });
+  };
+
   j.object([&] {
     j.attributeArray("dialects", [&] {
       for (const Dialect &dialect : odsContext.getDialects()) {
@@ -86,42 +104,10 @@ void printODSContext(raw_ostream &os, const ods::Context &odsContext) {
                 }
 
                 // Operands
-                ArrayRef<OperandOrResult> operands = op->getOperands();
-                if (!operands.empty()) {
-                  j.attributeArray("operands", [&] {
-                    for (const OperandOrResult &operand : operands) {
-                      j.object([&] {
-                        j.attribute("name", operand.getName());
-                        j.attribute("constraint",
-                                    operand.getConstraint().getDemangledName());
-                        j.attribute("description",
-                                    operand.getConstraint().getSummary());
-                        j.attribute("kind",
-                                    getVariableLengthStr(
-                                        operand.getVariableLengthKind()));
-                      });
-                    }
-                  });
-                }
+                printOperandsOrResults("operands", op->getOperands());
 
                 // Results
-                ArrayRef<OperandOrResult> results = op->getResults();
-                if (!results.empty()) {
-                  j.attributeArray("results", [&] {
-                    for (const OperandOrResult &result : results) {
-                      j.object([&] {
-                        j.attribute("name", result.getName());
-                        j.attribute("constraint",
-                                    result.getConstraint().getDemangledName());
-                        j.attribute("description",
-                                    result.getConstraint().getSummary());
-                        j.attribute("kind",
-                                    getVariableLengthStr(
-                                        result.getVariableLengthKind()));
-                      });
-                    }
-                  });
-                }
+                printOperandsOrResults("results", op->getResults());
               });
             }
           });
@@ -138,7 +124,7 @@ std::string processAndFormatDoc(const Twine &doc) {
     llvm::raw_string_ostream docOS(docStr);
     std::string tmpDocStr = doc.str();
     raw_indented_ostream(docOS).printReindented(
-        StringRef(tmpDocStr).rtrim(" \t"));
+        StringRef(tmpDocStr).rtrim(" 	"));
   }
   return docStr;
 }
@@ -193,43 +179,6 @@ void processTdIncludeRecords(const llvm::RecordKeeper &tdRecords,
                           addTypeConstraint(result));
     }
   }
-
-  auto shouldBeSkipped = [](const llvm::Record *def) {
-    return def->isAnonymous() || def->isSubClassOf("DeclareInterfaceMethods");
-  };
-
-  /// Attr constraints.
-  for (const llvm::Record *def : tdRecords.getAllDerivedDefinitions("Attr")) {
-    if (shouldBeSkipped(def))
-      continue;
-
-    tblgen::Attribute constraint(def);
-  }
-  /// Type constraints.
-  for (const llvm::Record *def : tdRecords.getAllDerivedDefinitions("Type")) {
-    if (shouldBeSkipped(def))
-      continue;
-
-    tblgen::TypeConstraint constraint(def);
-  }
-  /// OpInterfaces.
-  for (const llvm::Record *def :
-       tdRecords.getAllDerivedDefinitions("OpInterface")) {
-    if (shouldBeSkipped(def))
-      continue;
-
-    std::string cppClassName =
-        llvm::formatv("{0}::{1}", def->getValueAsString("cppNamespace"),
-                      def->getValueAsString("cppInterfaceName"))
-            .str();
-    std::string codeBlock =
-        llvm::formatv("return ::mlir::success(llvm::isa<{0}>(self));",
-                      cppClassName)
-            .str();
-
-    std::string desc =
-        processAndFormatDoc(def->getValueAsString("description"));
-  }
 }
 
 LogicalResult parseTdInclude(
@@ -239,6 +188,8 @@ LogicalResult parseTdInclude(
   std::string includedFile;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> includeBuffer =
       parserSrcMgr.OpenIncludeFile(filename.str(), includedFile);
+  if (!includeBuffer)
+    return emitError({}, "could not open file '" + filename + "'");
 
   // Setup the source manager for parsing the tablegen file.
   llvm::SourceMgr tdSrcMgr;
@@ -297,14 +248,6 @@ int main(int argc, char **argv) {
   sourceMgr.setIncludeDirs(includeDirs);
 
   for (const auto &inputFilename : inputFilenames) {
-    std::string errorMessage;
-    std::unique_ptr<llvm::MemoryBuffer> inputFile =
-        openInputFile(inputFilename, &errorMessage);
-    if (!inputFile) {
-      llvm::errs() << errorMessage << "\n";
-      return 1;
-    }
-
     // Process the .td file directly
     if (failed(parser::parseTdInclude(odsContext, inputFilename, sourceMgr,
                                       [](llvm::SMRange loc, const Twine &msg) {
