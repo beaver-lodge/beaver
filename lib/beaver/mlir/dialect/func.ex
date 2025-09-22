@@ -28,13 +28,12 @@ defmodule Beaver.MLIR.Dialect.Func do
       |> Keyword.put_new(:sym_name, Beaver.MLIR.Attribute.string(unquote(func_name)))
       |> Keyword.put_new(:loc, Beaver.MLIR.Location.from_env(__ENV__))
       |> then(
-        &Beaver.MLIR.Operation.create_and_append(
-          Beaver.Env.context(),
-          unquote(op),
-          [fn -> unquote(body) end | &1],
-          [],
-          Beaver.Env.block()
-        )
+        &Beaver.MLIR.Operation.create(%Beaver.SSA{
+          op: unquote(op),
+          blk: Beaver.Env.block(),
+          ctx: Beaver.Env.context(),
+          arguments: [fn -> unquote(body) end | &1]
+        })
       )
     end
   end

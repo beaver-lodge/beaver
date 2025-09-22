@@ -110,4 +110,26 @@ defmodule ODSDumpTest do
       assert 2 = ops[3][:operand_segment_sizes][1]
     end
   end
+
+  test "segment_sizes infer in non-generating usage", %{ctx: ctx} do
+    mlir ctx: ctx do
+      module do
+        Func.func _(
+                    function_type: Type.function([Type.i32(), Type.i32()], []),
+                    sym_name:
+                      Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                  ) do
+          region do
+            block _(a >>> Type.i32(), b >>> Type.i32()) do
+              Arith.addi(lhs: a, rhs: b) >>> Type.i32()
+              Func.return() >>> []
+            end
+          end
+        end
+      end
+      |> MLIR.verify!()
+    end
+    |> Beaver.Composer.append(UseENIFAlloc)
+    |> Beaver.Composer.run!()
+  end
 end

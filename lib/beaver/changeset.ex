@@ -266,10 +266,9 @@ defmodule Beaver.Changeset do
   end
 
   defp should_reorder?(operands) do
-    grouped = Enum.group_by(operands, &match?({_atom, _value}, &1))
-
-    has_tagged = not Enum.empty?(grouped[true] || [])
-    has_untagged = not Enum.empty?(grouped[false] || [])
+    {tagged, untagged} = Enum.split_with(operands, &match?({_atom, _value}, &1))
+    has_tagged = not Enum.empty?(tagged)
+    has_untagged = not Enum.empty?(untagged)
 
     if has_tagged and has_untagged do
       raise ArgumentError,

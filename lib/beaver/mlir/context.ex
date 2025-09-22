@@ -46,12 +46,32 @@ defmodule Beaver.MLIR.Context do
   defdelegate destroy(ctx), to: MLIR.CAPI, as: :mlirContextDestroy
 
   def allow_unregistered_dialects(ctx, allow \\ true) do
-    MLIR.CAPI.mlirContextSetAllowUnregisteredDialects(ctx, allow)
+    mlirContextSetAllowUnregisteredDialects(ctx, allow)
     ctx
   end
 
   def register_translations(ctx) do
-    MLIR.CAPI.mlirRegisterAllLLVMTranslations(ctx)
+    mlirRegisterAllLLVMTranslations(ctx)
     ctx
+  end
+
+  @doc """
+  Check if the op name is terminator
+  """
+  def terminator?(%__MODULE__{} = ctx, op) do
+    beaverIsOpNameTerminator(MLIR.StringRef.create(op), ctx) |> Beaver.Native.to_term()
+  end
+
+  def implements_interface?(ctx, op, interface_id) do
+    mlirOperationImplementsInterfaceStatic(MLIR.StringRef.create(op), ctx, interface_id)
+    |> Beaver.Native.to_term()
+  end
+
+  def infer_type?(%__MODULE__{} = ctx, op) do
+    implements_interface?(ctx, MLIR.StringRef.create(op), mlirInferTypeOpInterfaceTypeID())
+  end
+
+  def infer_shaped?(%__MODULE__{} = ctx, op) do
+    implements_interface?(ctx, MLIR.StringRef.create(op), mlirInferShapedTypeOpInterfaceTypeID())
   end
 end

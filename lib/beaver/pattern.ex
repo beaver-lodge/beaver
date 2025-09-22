@@ -1,8 +1,3 @@
-defmodule Beaver.Pattern.Env do
-  @moduledoc false
-  defstruct ctx: nil, blk: nil, loc: nil
-end
-
 defmodule Beaver.Pattern do
   @moduledoc """
   Beaver pattern DSL for MLIR, a PDL frontend in Elixir.
@@ -10,8 +5,6 @@ defmodule Beaver.Pattern do
   use Beaver
   alias Beaver.MLIR.Dialect.PDL
   alias Beaver.MLIR.{Attribute, Type}
-
-  alias Beaver.Pattern.Env
 
   @doc false
   def insert_pat(cb, ctx, block, name, opts) do
@@ -96,10 +89,7 @@ defmodule Beaver.Pattern do
 
     quote do
       mlir do
-        Beaver.MLIR.Dialect.PDL.rewrite [
-          unquote(root),
-          operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 0])
-        ] do
+        Beaver.MLIR.Dialect.PDL.rewrite root: unquote(root), operand_segment_sizes: :infer do
           region do
             block _rewrite_block() do
               unquote(rewrite_block_ast)
@@ -127,11 +117,11 @@ defmodule Beaver.Pattern do
 
         case pdl_handler do
           "pdl.result" ->
-            Beaver.MLIR.Dialect.PDL.replace([
-              unquote(root),
-              repl,
-              operand_segment_sizes: Beaver.MLIR.ODS.operand_segment_sizes([1, 0, 1])
-            ]) >>> []
+            Beaver.MLIR.Dialect.PDL.replace(
+              opValue: unquote(root),
+              replValues: repl,
+              operand_segment_sizes: :infer
+            ) >>> []
 
           "pdl.operation" ->
             Beaver.MLIR.Dialect.PDL.replace(
@@ -145,28 +135,28 @@ defmodule Beaver.Pattern do
   end
 
   @doc false
-  def gen_pdl(%Env{} = env, %MLIR.Type{} = type) do
-    mlir blk: env.blk, ctx: env.ctx do
+  def gen_pdl(blk, %Beaver.Changeset{context: ctx}, %MLIR.Type{} = type) do
+    mlir blk: blk, ctx: ctx do
       Beaver.MLIR.Dialect.PDL.type(constantType: type) >>> ~t{!pdl.type}
     end
   end
 
-  def gen_pdl(%Env{} = env, %MLIR.Attribute{} = attribute) do
-    mlir blk: env.blk, ctx: env.ctx do
+  def gen_pdl(blk, %Beaver.Changeset{context: ctx}, %MLIR.Attribute{} = attribute) do
+    mlir blk: blk, ctx: ctx do
       Beaver.MLIR.Dialect.PDL.attribute(value: attribute) >>>
         ~t{!pdl.attribute}
     end
   end
 
-  def gen_pdl(_env, %MLIR.Value{} = value) do
+  def gen_pdl(_, _, %MLIR.Value{} = value) do
     value
   end
 
-  def gen_pdl(%Env{ctx: ctx} = env, f) when is_function(f, 1) do
-    gen_pdl(env, Beaver.Deferred.create(f, ctx))
+  def gen_pdl(blk, %Beaver.Changeset{context: context} = changeset, f) when is_function(f, 1) do
+    gen_pdl(blk, changeset, Beaver.Deferred.create(f, context))
   end
 
-  def gen_pdl(_env, element) do
+  def gen_pdl(_, _, element) do
     raise "fail to generate pdl handle for element: #{inspect(element)}"
   end
 
@@ -176,15 +166,19 @@ defmodule Beaver.Pattern do
   - in a rewrite body, all variables are considered bound before creation pdl ops
   """
   def create_operation(
-        %Env{ctx: ctx, blk: block, loc: loc} = env,
-        op_name,
-        operands,
-        attributes,
-        results
+        %Beaver.Changeset{
+          name: op_name,
+          attributes: attributes,
+          operands: operands,
+          location: loc,
+          context: ctx,
+          results: results
+        } = changeset,
+        block
       )
       when is_list(attributes) do
     mlir blk: block, ctx: ctx do
-      results = results |> Enum.map(&gen_pdl(env, &1))
+      results = results |> Enum.map(&gen_pdl(block, changeset, &1))
 
       attribute_names =
         for {k, _} <- attributes do
@@ -195,7 +189,7 @@ defmodule Beaver.Pattern do
         for {_, a} <- attributes do
           a
         end
-        |> Enum.map(&gen_pdl(env, &1))
+        |> Enum.map(&gen_pdl(block, changeset, &1))
 
       Beaver.MLIR.Dialect.PDL.operation(
         loc,
@@ -220,9 +214,25 @@ defmodule Beaver.Pattern do
         blk: block,
         loc: loc
       }) do
-    attributes = for {_k, _a} = a <- arguments, do: a
-    operands = for %MLIR.Value{} = o <- arguments, do: o
-    env = %Env{ctx: ctx, blk: block, loc: loc}
+    ods_operands =
+      case MLIR.ODS.Dump.lookup(op_name) do
+        {:ok, op_dump} -> Enum.map(op_dump["operands"], & &1["name"])
+        _ -> []
+      end
+
+    {operands, attributes} =
+      Enum.split_with(arguments, fn
+        {k, _v} -> Atom.to_string(k) in ods_operands
+        %MLIR.Value{} -> true
+      end)
+
+    changeset = %Beaver.Changeset{
+      name: op_name,
+      attributes: attributes,
+      operands: operands,
+      location: loc,
+      context: ctx
+    }
 
     result_types_unwrap =
       case result_types do
@@ -230,19 +240,15 @@ defmodule Beaver.Pattern do
         [{:op, types}] -> types |> List.wrap()
         _ -> result_types
       end
-      |> Enum.map(&gen_pdl(env, &1))
+      |> Enum.map(&gen_pdl(block, changeset, &1))
 
     op =
-      create_operation(
-        env,
-        op_name,
-        operands,
-        attributes,
-        result_types_unwrap
-      )
+      %Beaver.Changeset{changeset | results: result_types_unwrap}
+      |> Beaver.Changeset.reorder_operands()
+      |> create_operation(block)
 
     results =
-      result_types_unwrap |> Enum.with_index() |> Enum.map(fn {_, i} -> result(env, op, i) end)
+      result_types_unwrap |> Enum.with_index() |> Enum.map(fn {_, i} -> result(block, op, i) end)
 
     results = if length(results) == 1, do: List.first(results), else: results
 
@@ -255,9 +261,9 @@ defmodule Beaver.Pattern do
     end
   end
 
-  defp result(%Env{blk: block, ctx: ctx}, %MLIR.Value{} = v, i)
+  defp result(blk, %MLIR.Value{} = v, i)
        when is_integer(i) do
-    mlir blk: block, ctx: ctx do
+    mlir blk: blk, ctx: MLIR.context(v) do
       PDL.result(v, index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), i)) >>>
         ~t{!pdl.value}
     end

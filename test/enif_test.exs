@@ -53,4 +53,14 @@ defmodule EnifTest do
     end)
     |> ENIFSupport.destroy()
   end
+
+  test "enif send message", %{ctx: ctx} do
+    ENIFSendMsg.init(ctx)
+    |> tap(fn %ENIFSupport{engine: e} ->
+      invoker = &Beaver.ENIF.invoke(e, "send", [&1, &2])
+      assert "hello from child" = invoker.(self(), "hello from child")
+      assert_receive "hello from child", 1_000
+    end)
+    |> ENIFSupport.destroy()
+  end
 end

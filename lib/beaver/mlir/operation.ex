@@ -39,15 +39,15 @@ defmodule Beaver.MLIR.Operation do
   end
 
   @doc false
-  def create_and_append(
-        %MLIR.Context{} = ctx,
-        op_name,
-        arguments,
-        results,
-        %MLIR.Block{} = block,
-        loc \\ nil
-      )
-      when is_list(arguments) and is_list(results) do
+  defp create_and_append(
+         %MLIR.Context{} = ctx,
+         op_name,
+         arguments,
+         results,
+         %MLIR.Block{} = block,
+         loc
+       )
+       when is_list(arguments) and is_list(results) do
     location = loc || MLIR.Location.unknown()
     changeset = %Changeset{name: op_name, location: location, context: ctx}
 
@@ -168,5 +168,25 @@ defmodule Beaver.MLIR.Operation do
     after
       mlirSymbolTableDestroy(symbol_table)
     end
+  end
+
+  @doc """
+  Check if the operation is a terminator.
+  """
+  def terminator?(%__MODULE__{} = op) do
+    MLIR.Context.terminator?(MLIR.context(op), name(op))
+  end
+
+  def implements_interface?(%__MODULE__{} = op, interface_id) do
+    mlirOperationImplementsInterface(op, interface_id)
+    |> Beaver.Native.to_term()
+  end
+
+  def infer_type?(%__MODULE__{} = op) do
+    implements_interface?(op, mlirInferTypeOpInterfaceTypeID())
+  end
+
+  def infer_shaped?(%__MODULE__{} = op) do
+    implements_interface?(op, mlirInferShapedTypeOpInterfaceTypeID())
   end
 end

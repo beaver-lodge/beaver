@@ -39,6 +39,11 @@ defmodule Beaver.MLIR.Dialect do
             eval_ssa(%Beaver.SSA{ssa | op: unquote(full_name)})
           end
 
+          @doc false
+          def unquote(func_name)() do
+            unquote(full_name)
+          end
+
           defoverridable [{func_name, 1}]
 
           func_name
