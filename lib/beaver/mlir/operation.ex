@@ -27,7 +27,14 @@ defmodule Beaver.MLIR.Operation do
         []
       end
 
-    create_and_append_to_block(block, ctx, op_name, arguments ++ filler, results, loc)
+    location = loc || MLIR.Location.unknown()
+    changeset = %Changeset{name: op_name, location: location, context: ctx}
+
+    Enum.reduce(arguments ++ filler, changeset, &Changeset.add_argument(&2, &1))
+    |> then(fn changeset -> Enum.reduce(results, changeset, &Changeset.add_result(&2, &1)) end)
+    |> State.create()
+    |> create()
+    |> tap(&mlirBlockAppendOwnedOperation(block, &1))
   end
 
   def create(%Changeset{} = c) do
@@ -36,25 +43,6 @@ defmodule Beaver.MLIR.Operation do
 
   def create(%State{} = state) do
     state |> Beaver.Native.ptr() |> mlirOperationCreate()
-  end
-
-  defp create_and_append_to_block(
-         %MLIR.Block{} = block,
-         %MLIR.Context{} = ctx,
-         op_name,
-         arguments,
-         results,
-         loc
-       )
-       when is_list(arguments) and is_list(results) do
-    location = loc || MLIR.Location.unknown()
-    changeset = %Changeset{name: op_name, location: location, context: ctx}
-
-    Enum.reduce(arguments, changeset, &Changeset.add_argument(&2, &1))
-    |> then(fn changeset -> Enum.reduce(results, changeset, &Changeset.add_result(&2, &1)) end)
-    |> State.create()
-    |> create()
-    |> tap(&mlirBlockAppendOwnedOperation(block, &1))
   end
 
   def results(%__MODULE__{} = op) do
