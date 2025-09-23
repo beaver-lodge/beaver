@@ -20,7 +20,7 @@ defmodule ENIFSendMsg do
             block _(env >>> env_t, pid_term >>> term_t, msg >>> term_t) do
               one = Arith.constant(value: Attribute.integer(Type.i32(), 1)) >>> :infer
               pid = LLVM.alloca(one, elem_type: pid_t) >>> Type.llvm_pointer()
-              null_env = ENIF.alloc_env() >>> :infer
+              null_env = LLVM.mlir_zero() >>> Type.llvm_pointer()
               ENIF.get_local_pid(env, pid_term, pid) >>> :infer
               ENIF.send(env, pid, null_env, msg) >>> :infer
               Func.return(msg) >>> []
