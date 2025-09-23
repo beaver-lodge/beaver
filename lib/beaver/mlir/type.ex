@@ -392,4 +392,13 @@ defmodule Beaver.MLIR.Type do
   end
 
   defdelegate element_type(shaped_type), to: MLIR.CAPI, as: :mlirShapedTypeGetElementType
+
+  def llvm_pointer(opts \\ []) do
+    Beaver.Deferred.from_opts(
+      opts,
+      fn ctx ->
+        MLIR.CAPI.mlirLLVMPointerTypeGet(ctx, opts[:address_space] || 0)
+      end
+    )
+  end
 end

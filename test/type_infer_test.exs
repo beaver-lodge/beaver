@@ -20,7 +20,9 @@ defmodule TypeInferTest do
           region do
             block do
               v = Arith.constant(value: value) >>> vector_t
-              v0 = Arith.addi(v, v) >>> :infer
+              {op, v0} = Arith.addi(v, v) >>> {:op, :infer}
+              assert MLIR.Operation.infer_type?(op)
+              refute MLIR.Operation.infer_shaped?(op)
               assert v0 |> MLIR.Value.type() |> MLIR.equal?(vector_t)
               Func.return(v0) >>> []
             end
@@ -31,6 +33,13 @@ defmodule TypeInferTest do
     |> MLIR.verify!()
     |> MLIR.Transform.canonicalize()
     |> Beaver.Composer.run!()
+  end
+
+  test "implements infer?", %{ctx: ctx} do
+    assert MLIR.Context.infer_type?(ctx, Arith.addi())
+    refute MLIR.Context.infer_shaped?(ctx, Arith.addi())
+    assert MLIR.Context.infer_shaped?(ctx, "tosa.sub")
+    refute MLIR.Context.infer_type?(ctx, "tosa.sub")
   end
 
   test "set to infer but given types", %{ctx: ctx} do

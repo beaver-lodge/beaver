@@ -22,18 +22,9 @@ defmodule Beaver.ENIF.Type do
     )
   end
 
-  @spec env(Beaver.Deferred.opts()) :: Beaver.Deferred.type()
-  def env(opts \\ []) do
-    query_type(:env, opts)
-  end
-
-  @spec term(Beaver.Deferred.opts()) :: Beaver.Deferred.type()
-  def term(opts \\ []) do
-    query_type(:term, opts)
-  end
-
-  @spec binary(Beaver.Deferred.opts()) :: Beaver.Deferred.type()
-  def binary(opts \\ []) do
-    query_type(:binary, opts)
+  for t <- ~w{env term binary pid} do
+    def unquote(:"#{t}")(opts \\ []) do
+      query_type(unquote(:"#{t}"), opts)
+    end
   end
 end

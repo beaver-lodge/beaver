@@ -198,7 +198,7 @@ fn beaver_raw_mlir_type_of_enif_obj(env: beam.env, _: c_int, args: [*c]const bea
     const Error = error{MLIRTypeForEnifObjNotFound};
     const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
     const name = try beam.get_atom_slice(env, args[1]);
-    inline for (.{ "term", "env", "binary" }) |obj| {
+    inline for (.{ "term", "env", "binary", "pid" }) |obj| {
         if (@import("std").mem.eql(u8, name, obj)) {
             const t = @field(beam, obj);
             return try enif_mlir_type(env, ctx, t);

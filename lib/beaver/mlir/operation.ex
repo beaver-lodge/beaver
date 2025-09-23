@@ -27,7 +27,14 @@ defmodule Beaver.MLIR.Operation do
         []
       end
 
-    create_and_append(ctx, op_name, arguments ++ filler, results, block, loc)
+    location = loc || MLIR.Location.unknown()
+    changeset = %Changeset{name: op_name, location: location, context: ctx}
+
+    Enum.reduce(arguments ++ filler, changeset, &Changeset.add_argument(&2, &1))
+    |> then(fn changeset -> Enum.reduce(results, changeset, &Changeset.add_result(&2, &1)) end)
+    |> State.create()
+    |> create()
+    |> tap(&mlirBlockAppendOwnedOperation(block, &1))
   end
 
   def create(%Changeset{} = c) do
@@ -36,26 +43,6 @@ defmodule Beaver.MLIR.Operation do
 
   def create(%State{} = state) do
     state |> Beaver.Native.ptr() |> mlirOperationCreate()
-  end
-
-  @doc false
-  def create_and_append(
-        %MLIR.Context{} = ctx,
-        op_name,
-        arguments,
-        results,
-        %MLIR.Block{} = block,
-        loc \\ nil
-      )
-      when is_list(arguments) and is_list(results) do
-    location = loc || MLIR.Location.unknown()
-    changeset = %Changeset{name: op_name, location: location, context: ctx}
-
-    Enum.reduce(arguments, changeset, &Changeset.add_argument(&2, &1))
-    |> then(fn changeset -> Enum.reduce(results, changeset, &Changeset.add_result(&2, &1)) end)
-    |> State.create()
-    |> create()
-    |> tap(&mlirBlockAppendOwnedOperation(block, &1))
   end
 
   def results(%__MODULE__{} = op) do
@@ -168,5 +155,25 @@ defmodule Beaver.MLIR.Operation do
     after
       mlirSymbolTableDestroy(symbol_table)
     end
+  end
+
+  @doc """
+  Check if the operation is a terminator.
+  """
+  def terminator?(%__MODULE__{} = op) do
+    MLIR.Context.terminator?(MLIR.context(op), name(op))
+  end
+
+  def implements_interface?(%__MODULE__{} = op, interface_id) do
+    mlirOperationImplementsInterface(op, interface_id)
+    |> Beaver.Native.to_term()
+  end
+
+  def infer_type?(%__MODULE__{} = op) do
+    implements_interface?(op, mlirInferTypeOpInterfaceTypeID())
+  end
+
+  def infer_shaped?(%__MODULE__{} = op) do
+    implements_interface?(op, mlirInferShapedTypeOpInterfaceTypeID())
   end
 end
