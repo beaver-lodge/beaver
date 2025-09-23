@@ -27,7 +27,7 @@ defmodule Beaver.MLIR.Operation do
         []
       end
 
-    create_and_append(ctx, op_name, arguments ++ filler, results, block, loc)
+    create_and_append_to_block(block, ctx, op_name, arguments ++ filler, results, loc)
   end
 
   def create(%Changeset{} = c) do
@@ -38,13 +38,12 @@ defmodule Beaver.MLIR.Operation do
     state |> Beaver.Native.ptr() |> mlirOperationCreate()
   end
 
-  @doc false
-  defp create_and_append(
+  defp create_and_append_to_block(
+         %MLIR.Block{} = block,
          %MLIR.Context{} = ctx,
          op_name,
          arguments,
          results,
-         %MLIR.Block{} = block,
          loc
        )
        when is_list(arguments) and is_list(results) do
