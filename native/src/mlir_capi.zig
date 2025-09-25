@@ -82,6 +82,9 @@ pub const PDLPatternModule = MLIRKind("PDLPatternModule");
 pub const GreedyRewriteDriverConfig = MLIRKind("GreedyRewriteDriverConfig");
 pub const LinalgContractionDimensions = MLIRKind("LinalgContractionDimensions");
 pub const LinalgConvolutionDimensions = MLIRKind("LinalgConvolutionDimensions");
+pub const PDLValue = MLIRKind("PDLValue");
+pub const PDLResultList = MLIRKind("PDLResultList");
+pub const PDLRewriteFunction = MLIRKind("PDLRewriteFunction");
 
 pub const ExternalPass = MLIRKind("ExternalPass");
 pub const ExternalPassCallbacks = MLIRKind("ExternalPassCallbacks");
@@ -95,7 +98,7 @@ pub const TypeIDAllocator = MLIRKind("TypeIDAllocator");
 pub const TransformOptions = MLIRKind("TransformOptions");
 pub const LLVMThreadPool = MLIRKind2("MlirLlvmThreadPool", "LLVMThreadPool");
 pub const OperationState = MLIRKind2("MlirOperationState", "Operation.State");
-pub const allKinds = .{ Pass, LogicalResult, StringRef, Context, Location, ISize, Attribute, OpaquePtr, ShapedTypeComponentsCallback, TypeID, TypesCallback, Bool, Operation, IntegerSet, AffineExpr, StringCallback, DialectHandle, CInt, AffineMap, SparseTensorLevelType, F64, Type, I32, I64, CUInt, DialectRegistry, DiagnosticHandlerID, DiagnosticHandler, DiagnosticHandlerDeleteUserData, Diagnostic, DiagnosticSeverity, F32, U64, U32, U16, I16, U8, I8, USize, UnmanagedDenseResourceElementsAttrGetDeleteCallback, OpaqueArray, StringArray, NamedAttribute, PassManager, RewritePatternSet, Region, Module, ExecutionEngine, GenericCallback, ExternalPassConstruct, ExternalPassRun, Identifier, OperationState, SymbolTable, Value, Block, Dialect, ExternalPass, ExternalPassCallbacks, OpPassManager, AffineMapCompressUnusedSymbolsPopulateResult, SymbolTableWalkSymbolTablesCallback, OpOperand, AsmState, OperationWalkCallback, WalkOrder, BytecodeWriterConfig, OpPrintingFlags, LLVMThreadPool, TypeIDAllocator, TransformOptions, RewriterBase, FrozenRewritePatternSet, PDLPatternModule, GreedyRewriteDriverConfig, string_ref.Printer.ResourceKind, LinalgContractionDimensions, LinalgConvolutionDimensions };
+pub const allKinds = .{ Pass, LogicalResult, StringRef, Context, Location, ISize, Attribute, OpaquePtr, ShapedTypeComponentsCallback, TypeID, TypesCallback, Bool, Operation, IntegerSet, AffineExpr, StringCallback, DialectHandle, CInt, AffineMap, SparseTensorLevelType, F64, Type, I32, I64, CUInt, DialectRegistry, DiagnosticHandlerID, DiagnosticHandler, DiagnosticHandlerDeleteUserData, Diagnostic, DiagnosticSeverity, F32, U64, U32, U16, I16, U8, I8, USize, UnmanagedDenseResourceElementsAttrGetDeleteCallback, OpaqueArray, StringArray, NamedAttribute, PassManager, RewritePatternSet, Region, Module, ExecutionEngine, GenericCallback, ExternalPassConstruct, ExternalPassRun, Identifier, OperationState, SymbolTable, Value, Block, Dialect, ExternalPass, ExternalPassCallbacks, OpPassManager, AffineMapCompressUnusedSymbolsPopulateResult, SymbolTableWalkSymbolTablesCallback, OpOperand, AsmState, OperationWalkCallback, WalkOrder, BytecodeWriterConfig, OpPrintingFlags, LLVMThreadPool, TypeIDAllocator, TransformOptions, RewriterBase, FrozenRewritePatternSet, PDLPatternModule, GreedyRewriteDriverConfig, string_ref.Printer.ResourceKind, LinalgContractionDimensions, LinalgConvolutionDimensions ,PDLValue, PDLResultList, PDLRewriteFunction};
 pub fn open_all(env: beam.env) void {
     inline for (allKinds) |k| {
         k.open_all(env);
