@@ -1,6 +1,11 @@
 defmodule Beaver.SSA do
   @moduledoc """
   Storing MLIR IR structure with a Elixir struct. Macros like `Beaver.mlir/1` will generate SSA structs defined by this module.
+
+  Semantically a SSA has no concept of "current block" or "current context". These are only needed when creating an operation.
+  Therefore SSA syntax in Beaver can be used in both IR-generating and PDL-generating.
+  To be more specific, the macro system in Beaver will use an SSA and its surrounding environment to construct a operation changeset,
+  and then create an operation from it by calling MLIR CAPI.
   """
   alias Beaver.MLIR
 
