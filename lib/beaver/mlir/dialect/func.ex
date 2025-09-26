@@ -46,4 +46,11 @@ defmodule Beaver.MLIR.Dialect.Func do
       _ -> false
     end
   end
+
+  def entry_block(op) do
+    case Beaver.Walker.regions(op) |> Enum.to_list() do
+      [r] -> r |> Beaver.Walker.blocks() |> Enum.at(0)
+      _ -> nil
+    end
+  end
 end
