@@ -89,4 +89,5 @@ defmodule Beaver.MLIR.Block do
   end
 
   defdelegate destroy(blk), to: MLIR.CAPI, as: :mlirBlockDestroy
+  defdelegate append(blk, op), to: MLIR.CAPI, as: :mlirBlockAppendOwnedOperation
 end

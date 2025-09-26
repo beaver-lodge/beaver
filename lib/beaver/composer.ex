@@ -146,7 +146,14 @@ defmodule Beaver.Composer do
         opts \\ @run_default_opts
       ) do
     case run(composer, opts) do
-      {:ok, op} ->
+      {:ok, op, []} ->
+        op
+
+      {:ok, op, diagnostics} ->
+        Logger.warning(
+          "Passes completed with diagnostics:\n" <> MLIR.Diagnostic.format(diagnostics)
+        )
+
         op
 
       {:error, diagnostics} ->
@@ -187,7 +194,7 @@ defmodule Beaver.Composer do
     MLIR.PassManager.destroy(pm)
 
     case res do
-      :ok -> {:ok, op}
+      {:ok, diagnostics} -> {:ok, op, diagnostics}
       {:error, diagnostics} -> {:error, diagnostics}
     end
   end

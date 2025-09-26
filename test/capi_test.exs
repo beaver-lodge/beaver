@@ -172,7 +172,7 @@ defmodule MlirTest do
     pm = mlirPassManagerCreate(ctx)
     mlirPassManagerAddOwnedPass(pm, external)
     mlirPassManagerAddOwnedPass(pm, mlirCreateTransformsCSE())
-    :ok = MLIR.PassManager.run(pm, module)
+    {:ok, []} = MLIR.PassManager.run(pm, module)
     :ok = MLIR.PassManager.destroy(pm)
     mlirModuleDestroy(module)
     mlirTypeIDAllocatorDestroy(type_id_allocator)
@@ -185,7 +185,7 @@ defmodule MlirTest do
     pm = mlirPassManagerCreate(ctx)
     npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
     mlirOpPassManagerAddOwnedPass(npm, external)
-    :ok = MLIR.PassManager.run(pm, module)
+    {:ok, []} = MLIR.PassManager.run(pm, module)
     :ok = MLIR.PassManager.destroy(pm)
     mlirModuleDestroy(module)
   end
@@ -196,7 +196,7 @@ defmodule MlirTest do
     pm = mlirPassManagerCreate(ctx)
     npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
     mlirOpPassManagerAddOwnedPass(npm, external)
-    :ok = MLIR.PassManager.run(pm, module)
+    {:ok, []} = MLIR.PassManager.run(pm, module)
     :ok = MLIR.PassManager.destroy(pm)
     mlirModuleDestroy(module)
   end

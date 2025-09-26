@@ -10,24 +10,24 @@ defmodule BlockTest do
   test "block usage after defining", %{ctx: ctx} do
     mlir ctx: ctx do
       module do
-        Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+        Func.func some_func(function_type: Type.function([], [Type.i32()])) do
           region do
             block do
-              v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+              v0 = Arith.constant(value: Attribute.integer(Type.i32(), 0)) >>> Type.i32()
               CF.br({Beaver.Env.block(bb1), [v0]}) >>> []
             end
 
-            block bb_a(arg >>> Type.i(32)) do
+            block bb_a(arg >>> Type.i32()) do
               Func.return(arg) >>> []
             end
 
-            block _bb_b(arg >>> Type.i(32)) do
+            block _bb_b(arg >>> Type.i32()) do
               CF.br({Beaver.Env.block(bb_a), [arg]}) >>> []
             end
 
-            block bb1(arg >>> Type.i(32)) do
-              v2 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-              add = Arith.addi(arg, v2) >>> Type.i(32)
+            block bb1(arg >>> Type.i32()) do
+              v2 = Arith.constant(value: Attribute.integer(Type.i32(), 0)) >>> Type.i32()
+              add = Arith.addi(arg, v2) >>> Type.i32()
               Func.return(add) >>> []
             end
           end
@@ -41,10 +41,10 @@ defmodule BlockTest do
     res =
       mlir ctx: ctx do
         module do
-          Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+          Func.func some_func(function_type: Type.function([], [Type.i32()])) do
             region do
               block do
-                v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+                v0 = Arith.constant(value: Attribute.integer(Type.i32(), 0)) >>> Type.i32()
                 CF.br({Beaver.Env.block(_bb1), [v0]}) >>> []
               end
             end
@@ -67,10 +67,10 @@ defmodule BlockTest do
     {:error, diagnostics} =
       mlir ctx: ctx do
         module do
-          Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+          Func.func some_func(function_type: Type.function([], [Type.i32()])) do
             region do
               block do
-                v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+                v0 = Arith.constant(value: Attribute.integer(Type.i32(), 0)) >>> Type.i32()
                 CF.br({Beaver.Env.block(bb1), [v0]}) >>> []
               end
 
@@ -94,11 +94,11 @@ defmodule BlockTest do
         module do
           top_level_block = Beaver.Env.block()
 
-          Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+          Func.func some_func(function_type: Type.function([], [Type.i32()])) do
             region do
               %Beaver.MLIR.Block{} =
                 block do
-                  v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+                  v0 = Arith.constant(value: Attribute.integer(Type.i32(), 0)) >>> Type.i32()
                   CF.br({Beaver.Env.block(bb1), [v0]}) >>> []
                 end
 
@@ -144,10 +144,10 @@ defmodule BlockTest do
 
     mlir ctx: ctx do
       module do
-        Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+        Func.func some_func(function_type: Type.function([], [Type.i32()])) do
           region do
             block do
-              v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+              v0 = Arith.constant(value: Attribute.integer(Type.i32(), 0)) >>> Type.i32()
               Func.return(v0) >>> []
             end
           end
@@ -162,13 +162,13 @@ defmodule BlockTest do
   test "block arg has no owner", %{ctx: ctx} do
     mlir ctx: ctx do
       module do
-        Func.func some_func(function_type: Type.function([Type.i(32)], [Type.i(32)])) do
+        Func.func some_func(function_type: Type.function([Type.i32()], [Type.i32()])) do
           region do
-            block _(a >>> Type.i(32)) do
+            block _(a >>> Type.i32()) do
               assert_raise ArgumentError, "not a result", fn -> MLIR.Value.owner!(a) end
 
               {const, v0} =
-                Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> {:op, Type.i(32)}
+                Arith.constant(value: Attribute.integer(Type.i32(), 0)) >>> {:op, Type.i32()}
 
               {:ok, owner} = MLIR.Value.owner(v0)
               assert MLIR.equal?(owner, const)
@@ -186,11 +186,43 @@ defmodule BlockTest do
       Code.eval_quoted(
         quote do
           mlir ctx: var!(ctx) do
-            Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> {:op, Type.i(32)}
+            Arith.constant(value: Attribute.integer(Type.i32(), 0)) >>> {:op, Type.i32()}
           end
         end,
         ctx: ctx
       )
     end
+  end
+
+  test "append", %{ctx: ctx} do
+    m =
+      mlir ctx: ctx do
+        module do
+          Func.func some_func(function_type: Type.function([], [])) do
+            region do
+              block _entry() do
+              end
+            end
+          end
+        end
+      end
+
+    const =
+      mlir ctx: ctx do
+        {op, _} = Arith.constant(value: Attribute.integer(Type.i32(), 0)) >>> {:op, Type.i32()}
+        op
+      end
+
+    return =
+      mlir ctx: ctx do
+        Func.return() >>> []
+      end
+
+    ops = MLIR.Module.body(m) |> Beaver.Walker.operations()
+
+    b = ops[0] |> MLIR.Dialect.Func.entry_block()
+    MLIR.Block.append(b, const)
+    MLIR.Block.append(b, return)
+    m |> MLIR.verify!()
   end
 end

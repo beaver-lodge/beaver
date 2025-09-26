@@ -40,7 +40,7 @@ defmodule Beaver.MLIR.PassManager do
       end
 
     if MLIR.LogicalResult.success?(status) do
-      :ok
+      {:ok, diagnostics}
     else
       {:error, diagnostics}
     end

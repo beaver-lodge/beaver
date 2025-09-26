@@ -117,12 +117,12 @@ defmodule PassTest do
 
     pm = Beaver.Composer.init(composer)
 
-    assert :ok = MLIR.PassManager.run(pm, op)
+    assert {:ok, []} = MLIR.PassManager.run(pm, op)
 
     assert %{run: ^n, clone: clone0, initialize: 1, destruct: 0} =
              Agent.get(AllCallbacks, & &1, :infinity)
 
-    assert :ok = MLIR.PassManager.run(pm, op)
+    assert {:ok, []} = MLIR.PassManager.run(pm, op)
     assert :ok = MLIR.PassManager.destroy(pm)
 
     n2 = n * 2

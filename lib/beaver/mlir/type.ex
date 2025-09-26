@@ -54,9 +54,21 @@ defmodule Beaver.MLIR.Type do
     end)
   end
 
-  defp escape_dynamic(:dynamic), do: MLIR.CAPI.mlirShapedTypeGetDynamicStrideOrOffset()
+  defdelegate dynamic_stride_or_offset(),
+    to: Beaver.MLIR.CAPI,
+    as: :mlirShapedTypeGetDynamicStrideOrOffset
+
+  defp escape_dynamic(:dynamic), do: dynamic_stride_or_offset()
 
   defp escape_dynamic(dim), do: dim
+
+  def dynamic_stride_or_offset?(dim) do
+    mlirShapedTypeIsDynamicStrideOrOffset(dim) |> Beaver.Native.to_term()
+  end
+
+  def static_stride_or_offset?(dim) do
+    mlirShapedTypeIsStaticStrideOrOffset(dim) |> Beaver.Native.to_term()
+  end
 
   defp checked_composite_type(ctx, getter, args, opts) do
     loc = opts[:loc] || MLIR.Location.unknown(ctx: ctx)
