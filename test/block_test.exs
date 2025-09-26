@@ -218,22 +218,11 @@ defmodule BlockTest do
         Func.return() >>> []
       end
 
-    ops =
-      MLIR.Module.body(m)
-      |> Beaver.Walker.operations()
+    ops = MLIR.Module.body(m) |> Beaver.Walker.operations()
 
     b = ops[0] |> MLIR.Dialect.Func.entry_block()
-
-    MLIR.Block.append(
-      b,
-      const
-    )
-
-    MLIR.Block.append(
-      b,
-      return
-    )
-
+    MLIR.Block.append(b, const)
+    MLIR.Block.append(b, return)
     m |> MLIR.verify!()
   end
 end
