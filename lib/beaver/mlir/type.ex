@@ -62,6 +62,14 @@ defmodule Beaver.MLIR.Type do
 
   defp escape_dynamic(dim), do: dim
 
+  def dynamic_stride_or_offset?(dim) do
+    mlirShapedTypeIsDynamicStrideOrOffset(dim) |> Beaver.Native.to_term()
+  end
+
+  def static_stride_or_offset?(dim) do
+    mlirShapedTypeIsStaticStrideOrOffset(dim) |> Beaver.Native.to_term()
+  end
+
   defp checked_composite_type(ctx, getter, args, opts) do
     loc = opts[:loc] || MLIR.Location.unknown(ctx: ctx)
     {t, diagnostics} = apply(getter, [ctx, loc | args])
