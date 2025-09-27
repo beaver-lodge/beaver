@@ -54,9 +54,9 @@ defmodule Beaver.MLIR.Type do
     end)
   end
 
-  defdelegate dynamic_stride_or_offset(),
-    to: Beaver.MLIR.CAPI,
-    as: :mlirShapedTypeGetDynamicStrideOrOffset
+  def dynamic_stride_or_offset() do
+    mlirShapedTypeGetDynamicStrideOrOffset() |> Beaver.Native.to_term()
+  end
 
   defp escape_dynamic(:dynamic), do: dynamic_stride_or_offset()
 

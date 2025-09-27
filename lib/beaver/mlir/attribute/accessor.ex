@@ -289,6 +289,21 @@ defmodule Beaver.MLIR.Attribute.Accessor do
           getter: &MLIR.Attribute.dense_elements(&1, shaped_type, &2)
         }
 
+      MLIR.Attribute.strided_layout?(attr) ->
+        offset = mlirStridedLayoutAttrGetOffset(attr)
+
+        %__MODULE__{
+          get_num_element: &mlirStridedLayoutAttrGetNumStrides/1,
+          get_element: fn
+            _, :offset ->
+              offset
+
+            attr, pos ->
+              mlirStridedLayoutAttrGetStride(attr, pos)
+          end,
+          getter: &MLIR.Attribute.strided_layout(offset, &1, &2)
+        }
+
       true ->
         raise ArgumentError, "not a container attribute"
     end

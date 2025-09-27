@@ -220,11 +220,11 @@ defmodule EntityTest do
 
       strided_attr =
         Attribute.strided_layout(
-          0,
+          1,
           [1, 2, 3]
-        )
+        ).(ctx)
 
-      assert not MLIR.null?(strided_attr.(ctx))
+      assert not MLIR.null?(strided_attr)
     end
   end
 
