@@ -372,4 +372,32 @@ defmodule AttributeAccessTest do
       MLIR.Attribute.integer(Type.i(32, ctx: ctx), 0)[0]
     end
   end
+
+  test "access layout attr", %{ctx: ctx} do
+    strided_layout = MLIR.Attribute.strided_layout(10, [1, 2, 3], ctx: ctx)
+    assert 1 = strided_layout[0]
+    assert 2 = strided_layout[1]
+    assert 3 = strided_layout[2]
+    assert 10 = strided_layout[:offset]
+
+    {get, updated} =
+      Access.get_and_update(strided_layout, 2, fn val ->
+        new_val = 30
+        {val, new_val}
+      end)
+
+    assert 3 = get
+    assert 30 = updated[2]
+    assert 10 = updated[:offset]
+
+    assert :dynamic = MLIR.Attribute.strided_layout(:dynamic, [1, 2, 3], ctx: ctx)[:offset]
+
+    strided_layout =
+      MLIR.Attribute.strided_layout(MLIR.Type.dynamic_stride_or_offset(), [1, :dynamic, 3],
+        ctx: ctx
+      )
+
+    assert :dynamic = strided_layout[:offset]
+    assert :dynamic = strided_layout[1]
+  end
 end

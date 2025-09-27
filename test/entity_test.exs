@@ -207,6 +207,25 @@ defmodule EntityTest do
       assert aaa_bbb_ccc ==
                MLIR.Attribute.symbol_ref("aaa", ["bbb", ccc], ctx: ctx) |> MLIR.to_string()
     end
+
+    test "strided_layout", %{ctx: ctx} do
+      strided_attr =
+        Attribute.strided_layout(
+          Type.dynamic_stride_or_offset(),
+          [1],
+          ctx: ctx
+        )
+
+      assert not MLIR.null?(strided_attr)
+
+      strided_attr =
+        Attribute.strided_layout(
+          1,
+          [1, 2, 3]
+        ).(ctx)
+
+      assert not MLIR.null?(strided_attr)
+    end
   end
 
   test "identifier", %{ctx: ctx} do

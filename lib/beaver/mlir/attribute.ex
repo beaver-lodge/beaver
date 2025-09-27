@@ -425,4 +425,18 @@ defmodule Beaver.MLIR.Attribute do
         unwrap_string(attribute)
     end
   end
+
+  def strided_layout(offset, strides, opts \\ []) do
+    Beaver.Deferred.from_opts(
+      opts,
+      fn ctx ->
+        mlirStridedLayoutAttrGet(
+          ctx,
+          MLIR.Type.escape_dynamic(offset),
+          length(strides),
+          Beaver.Native.array(Enum.map(strides, &MLIR.Type.escape_dynamic/1), Beaver.Native.I64)
+        )
+      end
+    )
+  end
 end

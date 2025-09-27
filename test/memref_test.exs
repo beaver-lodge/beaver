@@ -124,8 +124,12 @@ defmodule MemRefTest do
 
   test "dynamic stride or offset" do
     assert Beaver.MLIR.Type.dynamic_stride_or_offset?(Beaver.MLIR.Type.dynamic_stride_or_offset())
-    refute Beaver.MLIR.Type.dynamic_stride_or_offset?(1)
     refute Beaver.MLIR.Type.static_stride_or_offset?(Beaver.MLIR.Type.dynamic_stride_or_offset())
+
+    refute Beaver.MLIR.Type.dynamic_stride_or_offset?(1)
     assert Beaver.MLIR.Type.static_stride_or_offset?(1)
+
+    assert Beaver.MLIR.Type.dynamic_stride_or_offset?(:dynamic)
+    refute Beaver.MLIR.Type.static_stride_or_offset?(:dynamic)
   end
 end
