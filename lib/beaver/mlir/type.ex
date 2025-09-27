@@ -58,13 +58,33 @@ defmodule Beaver.MLIR.Type do
     mlirShapedTypeGetDynamicStrideOrOffset() |> Beaver.Native.to_term()
   end
 
-  defp escape_dynamic(:dynamic), do: dynamic_stride_or_offset()
+  @doc false
+  def escape_dynamic(:dynamic), do: dynamic_stride_or_offset()
 
-  defp escape_dynamic(dim), do: dim
+  def escape_dynamic(dim), do: dim
+
+  @doc false
+  def cast_dynamic_magic_number(:dynamic), do: :dynamic
+
+  def cast_dynamic_magic_number(dim) do
+    if MLIR.Type.dynamic_stride_or_offset?(dim) do
+      :dynamic
+    else
+      dim
+    end
+  end
+
+  def dynamic_stride_or_offset?(:dynamic) do
+    true
+  end
+
+  def dynamic_stride_or_offset?(:dynamic), do: true
 
   def dynamic_stride_or_offset?(dim) do
     mlirShapedTypeIsDynamicStrideOrOffset(dim) |> Beaver.Native.to_term()
   end
+
+  def static_stride_or_offset?(:dynamic), do: false
 
   def static_stride_or_offset?(dim) do
     mlirShapedTypeIsStaticStrideOrOffset(dim) |> Beaver.Native.to_term()

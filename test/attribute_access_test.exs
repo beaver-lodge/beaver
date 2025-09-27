@@ -389,5 +389,15 @@ defmodule AttributeAccessTest do
     assert 3 = get
     assert 30 = updated[2]
     assert 10 = updated[:offset]
+
+    assert :dynamic = MLIR.Attribute.strided_layout(:dynamic, [1, 2, 3], ctx: ctx)[:offset]
+
+    strided_layout =
+      MLIR.Attribute.strided_layout(MLIR.Type.dynamic_stride_or_offset(), [1, :dynamic, 3],
+        ctx: ctx
+      )
+
+    assert :dynamic = strided_layout[:offset]
+    assert :dynamic = strided_layout[1]
   end
 end

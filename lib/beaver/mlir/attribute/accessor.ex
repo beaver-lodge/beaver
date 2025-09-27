@@ -138,6 +138,9 @@ defmodule Beaver.MLIR.Attribute.Accessor do
 
           v when is_integer(v) or is_float(v) or is_binary(v) or is_boolean(v) ->
             {:ok, v}
+
+          :dynamic ->
+            {:ok, :dynamic}
         end
 
       _ ->
@@ -155,6 +158,7 @@ defmodule Beaver.MLIR.Attribute.Accessor do
         %MLIR.Attribute{} = a -> a
         %MLIR.NamedAttribute{} = na -> na
         %MLIR.StringRef{} = s -> s |> MLIR.to_string()
+        :dynamic -> :dynamic
         native_val -> Beaver.Native.to_term(native_val)
       end
     end)
@@ -290,7 +294,7 @@ defmodule Beaver.MLIR.Attribute.Accessor do
         }
 
       MLIR.Attribute.strided_layout?(attr) ->
-        offset = mlirStridedLayoutAttrGetOffset(attr)
+        offset = mlirStridedLayoutAttrGetOffset(attr) |> MLIR.Type.cast_dynamic_magic_number()
 
         %__MODULE__{
           get_num_element: &mlirStridedLayoutAttrGetNumStrides/1,
@@ -299,7 +303,7 @@ defmodule Beaver.MLIR.Attribute.Accessor do
               offset
 
             attr, pos ->
-              mlirStridedLayoutAttrGetStride(attr, pos)
+              mlirStridedLayoutAttrGetStride(attr, pos) |> MLIR.Type.cast_dynamic_magic_number()
           end,
           getter: &MLIR.Attribute.strided_layout(offset, &1, &2)
         }
