@@ -74,10 +74,6 @@ defmodule Beaver.MLIR.Type do
     end
   end
 
-  def dynamic_stride_or_offset?(:dynamic) do
-    true
-  end
-
   def dynamic_stride_or_offset?(:dynamic), do: true
 
   def dynamic_stride_or_offset?(dim) do
