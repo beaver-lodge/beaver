@@ -66,6 +66,17 @@ defmodule Beaver.MLIR.Type do
   @doc false
   def cast_dynamic_magic_number(:dynamic), do: :dynamic
 
+  @doc """
+  Map MLIR's dynamic stride/offset sentinel to the canonical `:dynamic` atom.
+  
+  If `dim` equals MLIR's runtime sentinel for a dynamic stride or offset, returns `:dynamic`; otherwise returns `dim` unchanged.
+  
+  ## Parameters
+  
+    - dim: A stride or offset value that may be the MLIR dynamic sentinel.
+  
+  """
+  @spec cast_dynamic_magic_number(any()) :: any()
   def cast_dynamic_magic_number(dim) do
     if MLIR.Type.dynamic_stride_or_offset?(dim) do
       :dynamic
@@ -74,8 +85,21 @@ defmodule Beaver.MLIR.Type do
     end
   end
 
-  def dynamic_stride_or_offset?(:dynamic), do: true
+  @doc """
+Determine if a value is the dynamic stride-or-offset sentinel.
+"""
+@spec dynamic_stride_or_offset?(term()) :: boolean()
+@doc """
+`true` if the value is the canonical `:dynamic` sentinel, `false` otherwise.
+"""
+def dynamic_stride_or_offset?(:dynamic), do: true
 
+  @doc """
+  Checks whether a dimension value represents the MLIR dynamic stride-or-offset sentinel.
+  
+  Accepts a dimension value (integer or sentinel) and returns whether it corresponds to the MLIR sentinel for dynamic stride or offset.
+  """
+  @spec dynamic_stride_or_offset?(term()) :: boolean()
   def dynamic_stride_or_offset?(dim) do
     mlirShapedTypeIsDynamicStrideOrOffset(dim) |> Beaver.Native.to_term()
   end
