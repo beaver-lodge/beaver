@@ -294,7 +294,9 @@ defmodule Beaver.MLIR.Attribute.Accessor do
         }
 
       MLIR.Attribute.strided_layout?(attr) ->
-        offset = mlirStridedLayoutAttrGetOffset(attr) |> MLIR.Type.cast_dynamic_magic_number()
+        offset =
+          mlirStridedLayoutAttrGetOffset(attr)
+          |> MLIR.Type.Shaped.cast_dynamic_magic_number(:offset)
 
         %__MODULE__{
           get_num_element: &mlirStridedLayoutAttrGetNumStrides/1,
@@ -303,7 +305,8 @@ defmodule Beaver.MLIR.Attribute.Accessor do
               offset
 
             attr, pos ->
-              mlirStridedLayoutAttrGetStride(attr, pos) |> MLIR.Type.cast_dynamic_magic_number()
+              mlirStridedLayoutAttrGetStride(attr, pos)
+              |> MLIR.Type.Shaped.cast_dynamic_magic_number(:stride)
           end,
           getter: &MLIR.Attribute.strided_layout(offset, &1, &2)
         }

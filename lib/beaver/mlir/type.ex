@@ -54,38 +54,6 @@ defmodule Beaver.MLIR.Type do
     end)
   end
 
-  def dynamic_stride_or_offset() do
-    mlirShapedTypeGetDynamicStrideOrOffset() |> Beaver.Native.to_term()
-  end
-
-  @doc false
-  def escape_dynamic(:dynamic), do: dynamic_stride_or_offset()
-
-  def escape_dynamic(dim), do: dim
-
-  @doc false
-  def cast_dynamic_magic_number(:dynamic), do: :dynamic
-
-  def cast_dynamic_magic_number(dim) do
-    if MLIR.Type.dynamic_stride_or_offset?(dim) do
-      :dynamic
-    else
-      dim
-    end
-  end
-
-  def dynamic_stride_or_offset?(:dynamic), do: true
-
-  def dynamic_stride_or_offset?(dim) do
-    mlirShapedTypeIsDynamicStrideOrOffset(dim) |> Beaver.Native.to_term()
-  end
-
-  def static_stride_or_offset?(:dynamic), do: false
-
-  def static_stride_or_offset?(dim) do
-    mlirShapedTypeIsStaticStrideOrOffset(dim) |> Beaver.Native.to_term()
-  end
-
   defp checked_composite_type(ctx, getter, args, opts) do
     loc = opts[:loc] || MLIR.Location.unknown(ctx: ctx)
     {t, diagnostics} = apply(getter, [ctx, loc | args])
@@ -137,7 +105,7 @@ defmodule Beaver.MLIR.Type do
 
     shape =
       shape
-      |> Enum.map(&escape_dynamic/1)
+      |> Enum.map(&__MODULE__.Shaped.to_dynamic_magic_number(&1, :size))
       |> Beaver.Native.array(Beaver.Native.I64)
 
     checked_composite_type(
@@ -224,7 +192,12 @@ defmodule Beaver.MLIR.Type do
       when is_list(shape) do
     ctx = MLIR.context(element_type)
     rank = length(shape)
-    shape = shape |> Enum.map(&escape_dynamic/1) |> Beaver.Native.array(Beaver.Native.I64)
+
+    shape =
+      shape
+      |> Enum.map(&__MODULE__.Shaped.to_dynamic_magic_number(&1, :size))
+      |> Beaver.Native.array(Beaver.Native.I64)
+
     default_null = mlirAttributeGetNull()
     layout = Keyword.get(opts, :layout) || default_null
     memory_space = Keyword.get(opts, :memory_space) || default_null

@@ -211,7 +211,7 @@ defmodule EntityTest do
     test "strided_layout", %{ctx: ctx} do
       strided_attr =
         Attribute.strided_layout(
-          Type.dynamic_stride_or_offset(),
+          Type.Shaped.dynamic_stride_or_offset(),
           [1],
           ctx: ctx
         )

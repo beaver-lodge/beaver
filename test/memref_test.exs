@@ -1,6 +1,7 @@
 defmodule MemRefTest do
   use Beaver.Case, async: true
-
+  use Beaver
+  alias Beaver.MLIR.Dialect.MemRef
   @moduletag :smoke
   test "creation" do
     assert %Beaver.Native.Memory{} =
@@ -123,13 +124,65 @@ defmodule MemRefTest do
   end
 
   test "dynamic stride or offset" do
-    assert Beaver.MLIR.Type.dynamic_stride_or_offset?(Beaver.MLIR.Type.dynamic_stride_or_offset())
-    refute Beaver.MLIR.Type.static_stride_or_offset?(Beaver.MLIR.Type.dynamic_stride_or_offset())
+    assert Beaver.MLIR.Type.Shaped.dynamic_stride_or_offset?(
+             Beaver.MLIR.Type.Shaped.dynamic_stride_or_offset()
+           )
 
-    refute Beaver.MLIR.Type.dynamic_stride_or_offset?(1)
-    assert Beaver.MLIR.Type.static_stride_or_offset?(1)
+    refute Beaver.MLIR.Type.Shaped.static_stride_or_offset?(
+             Beaver.MLIR.Type.Shaped.dynamic_stride_or_offset()
+           )
 
-    assert Beaver.MLIR.Type.dynamic_stride_or_offset?(:dynamic)
-    refute Beaver.MLIR.Type.static_stride_or_offset?(:dynamic)
+    refute Beaver.MLIR.Type.Shaped.dynamic_stride_or_offset?(1)
+    assert Beaver.MLIR.Type.Shaped.static_stride_or_offset?(1)
+
+    assert Beaver.MLIR.Type.Shaped.dynamic_stride_or_offset?(:dynamic)
+    refute Beaver.MLIR.Type.Shaped.static_stride_or_offset?(:dynamic)
+  end
+
+  test "memref layout and memory space", %{ctx: ctx} do
+    assert_raise ArgumentError, "only ranked memref has layout", fn ->
+      ~t{memref<*xbf16>}.(ctx) |> MemRef.layout()
+    end
+
+    assert_raise ArgumentError, "only ranked memref has layout", fn ->
+      MLIR.Type.index(ctx: ctx) |> MemRef.layout()
+    end
+
+    assert memref_type = ~t{memref<128xbf16>}.(ctx)
+    assert MLIR.Type.Shaped.static_dim?(memref_type, 0)
+    refute MLIR.Type.Shaped.dynamic_dim?(memref_type, 0)
+    assert 128 = MLIR.Type.Shaped.dim_size(memref_type, 0)
+
+    assert MemRef.memory_space(memref_type) == nil
+
+    assert layout = MemRef.layout(memref_type)
+    assert to_string(layout) == "affine_map<(d0) -> (d0)>"
+
+    memref_type = ~t{memref<128x?xbf16>}.(ctx)
+    assert :dynamic = MLIR.Type.Shaped.dim_size(memref_type, 1)
+    assert 2 = MLIR.Type.Shaped.rank(memref_type)
+    refute MLIR.Type.Shaped.static?(memref_type)
+    assert MLIR.equal?(MLIR.Type.Shaped.element_type(memref_type), MLIR.Type.bf16(ctx: ctx))
+
+    assert_raise ArgumentError, "not a shaped type", fn ->
+      MLIR.Type.index(ctx: ctx) |> MLIR.Type.Shaped.element_type()
+    end
+  end
+
+  test "get strides and offset of a memref type", %{ctx: ctx} do
+    type = ~t{memref<1x2xi32, strided<[?, 1], offset: 0>>}.(ctx)
+    refute MLIR.null?(type)
+    assert {[:dynamic, 1], 0} = MemRef.strides_and_offset(type)
+
+    assert_raise ArgumentError, "only ranked memref has strides and offset", fn ->
+      MemRef.strides_and_offset(MLIR.Type.index(ctx: ctx))
+    end
+  end
+
+  test "affine map of a memref type", %{ctx: ctx} do
+    type = ~t{memref<1x2xi32, affine_map<(d0, d1) -> (d0, d1)>>}.(ctx)
+    refute MLIR.null?(type)
+    assert affine_map = MemRef.affine_map(type)
+    assert to_string(affine_map) == "(d0, d1) -> (d0, d1)"
   end
 end

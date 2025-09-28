@@ -36,4 +36,34 @@ defmodule Beaver.MLIR.Dialect.MemRef do
   def global(%Beaver.SSA{} = ssa) do
     Beaver.SSA.eval(%Beaver.SSA{ssa | op: @global})
   end
+
+  def layout(%MLIR.Type{} = memref_type) do
+    if not MLIR.Type.memref?(memref_type) do
+      raise ArgumentError, "only ranked memref has layout"
+    end
+
+    MLIR.CAPI.mlirMemRefTypeGetLayout(memref_type)
+  end
+
+  def strides_and_offset(%MLIR.Type{ref: ref} = memref_type) do
+    if not MLIR.Type.memref?(memref_type) do
+      raise ArgumentError, "only ranked memref has strides and offset"
+    end
+
+    {strides, offset} = MLIR.CAPI.beaver_raw_memref_type_get_strides_and_offset(ref)
+    {Enum.map(strides, &MLIR.Type.Shaped.cast_dynamic_magic_number(&1, :stride)), offset}
+  end
+
+  def memory_space(%MLIR.Type{} = memref_type) do
+    s = MLIR.CAPI.mlirMemRefTypeGetMemorySpace(memref_type)
+    if not MLIR.null?(s), do: s
+  end
+
+  def affine_map(%MLIR.Type{} = memref_type) do
+    if not MLIR.Type.memref?(memref_type) do
+      raise ArgumentError, "only ranked memref has affine map"
+    end
+
+    MLIR.CAPI.mlirMemRefTypeGetAffineMap(memref_type)
+  end
 end
