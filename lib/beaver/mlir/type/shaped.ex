@@ -1,4 +1,7 @@
 defmodule Beaver.MLIR.Type.Shaped do
+  @moduledoc """
+  This module provides utilities for MLIR shaped types.
+  """
   alias Beaver.MLIR
   import MLIR.CAPI
 
