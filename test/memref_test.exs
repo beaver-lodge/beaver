@@ -191,7 +191,7 @@ defmodule MemRefTest do
     assert 0 = ~t{memref<0x3xf32>}.(ctx) |> MLIR.Type.Shaped.num_elements()
 
     assert_raise ArgumentError, "not a shaped type", fn ->
-      MemRef.num_elements(MLIR.Type.index(ctx: ctx))
+      MLIR.Type.Shaped.num_elements(MLIR.Type.index(ctx: ctx))
     end
 
     assert_raise ArgumentError, "cannot get element count of dynamic shaped type", fn ->
