@@ -185,4 +185,17 @@ defmodule MemRefTest do
     assert affine_map = MemRef.affine_map(type)
     assert to_string(affine_map) == "(d0, d1) -> (d0, d1)"
   end
+
+  test "num of elements of a shaped type", %{ctx: ctx} do
+    assert 6 = ~t{memref<2x3xf32>}.(ctx) |> MLIR.Type.Shaped.num_elements()
+    assert 0 = ~t{memref<0x3xf32>}.(ctx) |> MLIR.Type.Shaped.num_elements()
+
+    assert_raise ArgumentError, "not a shaped type", fn ->
+      MemRef.num_elements(MLIR.Type.index(ctx: ctx))
+    end
+
+    assert_raise ArgumentError, "cannot get element count of dynamic shaped type", fn ->
+      ~t{memref<*xf32>}.(ctx) |> MLIR.Type.Shaped.num_elements()
+    end
+  end
 end

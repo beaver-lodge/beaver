@@ -55,6 +55,18 @@ defmodule Beaver.MLIR.Type.Shaped do
     mlirShapedTypeGetRank(type) |> Beaver.Native.to_term()
   end
 
+  def num_elements(type) do
+    if not MLIR.Type.shaped?(type) do
+      raise ArgumentError, "not a shaped type"
+    end
+
+    if not static?(type) do
+      raise ArgumentError, "cannot get element count of dynamic shaped type"
+    end
+
+    beaverShapedTypeGetNumElements(type) |> Beaver.Native.to_term()
+  end
+
   @doc """
   Returns whether the shape is fully static.
   """
