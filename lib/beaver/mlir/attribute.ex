@@ -432,9 +432,12 @@ defmodule Beaver.MLIR.Attribute do
       fn ctx ->
         mlirStridedLayoutAttrGet(
           ctx,
-          MLIR.Type.escape_dynamic(offset),
+          MLIR.Type.Shaped.to_dynamic_magic_number(offset, :offset),
           length(strides),
-          Beaver.Native.array(Enum.map(strides, &MLIR.Type.escape_dynamic/1), Beaver.Native.I64)
+          Beaver.Native.array(
+            Enum.map(strides, &MLIR.Type.Shaped.to_dynamic_magic_number(&1, :stride)),
+            Beaver.Native.I64
+          )
         )
       end
     )

@@ -103,6 +103,7 @@ jobs:
         if: inputs.mlir_wheel_version == 'latest' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'use-latest-mlir'))
         run: |
           curl -L https://github.com/jackalcooper/mlir-wheels/releases/expanded_assets/latest -o wheels.html
+          elixir --eval 'File.read!("wheels.html") |> String.replace("/jackalcooper/", "https://github.com/jackalcooper/") |> then(&File.write!("wheels.html", &1))'
           cat wheels.html | grep cuda > wheels.cuda.html
           python3 -m pip install mlir -f wheels.cuda.html
           echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
