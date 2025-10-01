@@ -34,18 +34,17 @@ defmodule Beaver.MLIR.Diagnostic do
   end
 
   def format(diagnostics, prefix \\ "") do
-    {str, _} =
-      for d <- diagnostics,
-          reduce: {prefix, 0} do
-        acc ->
-          MLIR.Diagnostic.walk(d, acc, fn {_, loc, d, _}, {str, level} ->
-            prefix = String.duplicate(" ", level * 2)
-            d = String.replace(d, ~r"\n", "\n#{prefix}  ")
-            {"#{str}\n#{prefix}at #{loc}: #{d}", level + 1}
-          end)
-      end
+    diagnostics
+    |> Enum.reduce(prefix, fn diagnostic, acc ->
+      {str, _} = walk(diagnostic, {acc, 0}, &format_diagnostic/2)
+      str
+    end)
+  end
 
-    str
+  defp format_diagnostic({_, loc, message, _}, {str, level}) do
+    indent = String.duplicate(" ", level * 2)
+    formatted_message = String.replace(message, ~r"\n", "\n#{indent}  ")
+    {"#{str}\n#{indent}at #{loc}: #{formatted_message}", level + 1}
   end
 
   def emit(ctx, msg) do
