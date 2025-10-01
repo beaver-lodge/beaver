@@ -36,7 +36,7 @@ defmodule Beaver.MLIR.Diagnostic do
   def format(diagnostics, prefix \\ "") do
     diagnostics
     |> Enum.reduce(prefix, fn diagnostic, acc ->
-      {str, _} = MLIR.Diagnostic.walk(diagnostic, {acc, 0}, &format_diagnostic/2)
+      {str, _} = walk(diagnostic, {acc, 0}, &format_diagnostic/2)
       str
     end)
   end
