@@ -51,7 +51,7 @@ defmodule Beaver.MLIR.Dialect.MemRef do
     end
 
     {strides, offset} = MLIR.CAPI.beaver_raw_memref_type_get_strides_and_offset(ref)
-    {Enum.map(strides, &MLIR.Type.Shaped.cast_dynamic_magic_number(&1, :stride)), offset}
+    {Enum.map(strides, &MLIR.ShapedType.cast_dynamic_magic_number(&1, :stride)), offset}
   end
 
   def memory_space(%MLIR.Type{} = memref_type) do

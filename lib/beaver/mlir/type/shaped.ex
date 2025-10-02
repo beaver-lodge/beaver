@@ -1,4 +1,4 @@
-defmodule Beaver.MLIR.Type.Shaped do
+defmodule Beaver.MLIR.ShapedType do
   @moduledoc """
   This module provides utilities for MLIR shaped types.
   """
@@ -94,7 +94,7 @@ defmodule Beaver.MLIR.Type.Shaped do
 
   def cast_dynamic_magic_number(stride_or_offset, modifier)
       when modifier in [:stride, :offset] do
-    if MLIR.Type.Shaped.dynamic_stride_or_offset?(stride_or_offset) do
+    if MLIR.ShapedType.dynamic_stride_or_offset?(stride_or_offset) do
       :dynamic
     else
       stride_or_offset
@@ -102,7 +102,7 @@ defmodule Beaver.MLIR.Type.Shaped do
   end
 
   def cast_dynamic_magic_number(size, :size) do
-    if MLIR.Type.Shaped.dynamic_size?(size) do
+    if MLIR.ShapedType.dynamic_size?(size) do
       :dynamic
     else
       size

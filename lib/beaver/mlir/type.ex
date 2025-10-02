@@ -105,7 +105,7 @@ defmodule Beaver.MLIR.Type do
 
     shape =
       shape
-      |> Enum.map(&__MODULE__.Shaped.to_dynamic_magic_number(&1, :size))
+      |> Enum.map(&MLIR.ShapedType.to_dynamic_magic_number(&1, :size))
       |> Beaver.Native.array(Beaver.Native.I64)
 
     checked_composite_type(
@@ -195,7 +195,7 @@ defmodule Beaver.MLIR.Type do
 
     shape =
       shape
-      |> Enum.map(&__MODULE__.Shaped.to_dynamic_magic_number(&1, :size))
+      |> Enum.map(&MLIR.ShapedType.to_dynamic_magic_number(&1, :size))
       |> Beaver.Native.array(Beaver.Native.I64)
 
     default_null = mlirAttributeGetNull()
