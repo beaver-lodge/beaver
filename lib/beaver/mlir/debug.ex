@@ -1,6 +1,6 @@
 defmodule Beaver.MLIR.Debug do
   @moduledoc """
-  Config MLIR debug options.
+  Configure MLIR debug options.
   """
   alias Beaver.MLIR
   import MLIR.CAPI
