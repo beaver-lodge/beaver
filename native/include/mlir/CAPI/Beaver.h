@@ -2,6 +2,7 @@
 #define NATIVE_MLIR_C_INCLUDE_MLIR_CAPI_BEAVER_H_
 
 #include "mlir-c/Beaver/Context.h"
+#include "mlir-c/Beaver/Debug.h"
 #include "mlir-c/Beaver/Op.h"
 #include "mlir-c/Beaver/Pass.h"
 #include "mlir/CAPI/Wrap.h"
