@@ -55,7 +55,18 @@ defmodule Beaver.MLIR.Dialect.MemRef do
   end
 
   def memory_space(%MLIR.Type{} = memref_type) do
-    s = MLIR.CAPI.mlirMemRefTypeGetMemorySpace(memref_type)
+    s =
+      cond do
+        MLIR.Type.memref?(memref_type) ->
+          MLIR.CAPI.mlirMemRefTypeGetMemorySpace(memref_type)
+
+        MLIR.Type.unranked_memref?(memref_type) ->
+          MLIR.CAPI.mlirUnrankedMemrefGetMemorySpace(memref_type)
+
+        true ->
+          raise ArgumentError, "only memref and unranked memref has memory space"
+      end
+
     if not MLIR.null?(s), do: s
   end
 

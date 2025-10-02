@@ -152,7 +152,7 @@ defmodule Beaver.MLIR.Type do
   def unranked_memref(%__MODULE__{} = element_type, opts) do
     ctx = MLIR.context(element_type)
     default_null = mlirAttributeGetNull()
-    memory_space = opts[:memory_space] || default_null
+    memory_space = (opts[:memory_space] || default_null) |> Beaver.Deferred.create(ctx)
 
     checked_composite_type(
       ctx,
@@ -199,8 +199,12 @@ defmodule Beaver.MLIR.Type do
       |> Beaver.Native.array(Beaver.Native.I64)
 
     default_null = mlirAttributeGetNull()
-    layout = Keyword.get(opts, :layout) || default_null
-    memory_space = Keyword.get(opts, :memory_space) || default_null
+
+    layout =
+      %MLIR.Attribute{} = (opts[:layout] || default_null) |> Beaver.Deferred.create(ctx)
+
+    memory_space =
+      %MLIR.Attribute{} = (opts[:memory_space] || default_null) |> Beaver.Deferred.create(ctx)
 
     checked_composite_type(
       ctx,

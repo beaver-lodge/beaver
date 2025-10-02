@@ -265,6 +265,10 @@ defmodule Beaver.Changeset do
     %__MODULE__{changeset | operands: operands, attributes: attributes}
   end
 
+  defp should_reorder?([]) do
+    true
+  end
+
   defp should_reorder?(operands) do
     {tagged, untagged} = Enum.split_with(operands, &match?({_atom, _value}, &1))
     has_tagged = not Enum.empty?(tagged)
