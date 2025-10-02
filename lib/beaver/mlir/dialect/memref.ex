@@ -51,11 +51,22 @@ defmodule Beaver.MLIR.Dialect.MemRef do
     end
 
     {strides, offset} = MLIR.CAPI.beaver_raw_memref_type_get_strides_and_offset(ref)
-    {Enum.map(strides, &MLIR.Type.Shaped.cast_dynamic_magic_number(&1, :stride)), offset}
+    {Enum.map(strides, &MLIR.ShapedType.cast_dynamic_magic_number(&1, :stride)), offset}
   end
 
   def memory_space(%MLIR.Type{} = memref_type) do
-    s = MLIR.CAPI.mlirMemRefTypeGetMemorySpace(memref_type)
+    s =
+      cond do
+        MLIR.Type.memref?(memref_type) ->
+          MLIR.CAPI.mlirMemRefTypeGetMemorySpace(memref_type)
+
+        MLIR.Type.unranked_memref?(memref_type) ->
+          MLIR.CAPI.mlirUnrankedMemrefGetMemorySpace(memref_type)
+
+        true ->
+          raise ArgumentError, "only memref and unranked memref has memory space"
+      end
+
     if not MLIR.null?(s), do: s
   end
 
