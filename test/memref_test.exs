@@ -198,4 +198,32 @@ defmodule MemRefTest do
       ~t{memref<*xf32>}.(ctx) |> MLIR.Type.Shaped.num_elements()
     end
   end
+
+  test "memref<?xi8>", %{ctx: ctx} do
+    import Beaver.Sigils
+    assert memref_type = ~t{memref<?xi8>}.(ctx)
+    assert 1 = MLIR.Type.Shaped.rank(memref_type)
+    assert :dynamic = MLIR.Type.Shaped.dim_size(memref_type, 0)
+    assert MLIR.equal?(MLIR.Type.Shaped.element_type(memref_type), MLIR.Type.i8(ctx: ctx))
+    assert {[1], 0} = MemRef.strides_and_offset(memref_type)
+    assert MLIR.equal?(memref_type, ~t{memref<?xi8>}.(ctx))
+    memref_type_from_api = MLIR.Type.memref!([:dynamic], MLIR.Type.i8(ctx: ctx))
+    assert MLIR.equal?(memref_type, memref_type_from_api)
+
+    assert memref_type_strided = ~t{memref<?xi8, strided<[1]>>}.(ctx)
+    assert {[1], 0} = MemRef.strides_and_offset(memref_type_strided)
+    refute MLIR.equal?(memref_type_strided, memref_type)
+
+    assert memref_type_strided_offset = ~t{memref<?xi8, strided<[1], offset: 0>>}.(ctx)
+    assert {[1], 0} = MemRef.strides_and_offset(memref_type_strided_offset)
+    assert MLIR.equal?(memref_type_strided_offset, memref_type_strided)
+    refute MLIR.equal?(memref_type_strided_offset, memref_type)
+
+    memref_type_strided_offset_from_api =
+      MLIR.Type.memref!([:dynamic], MLIR.Type.i8(ctx: ctx),
+        layout: MLIR.Attribute.strided_layout(0, [1], ctx: ctx)
+      )
+
+    assert MLIR.equal?(memref_type_strided_offset, memref_type_strided_offset_from_api)
+  end
 end
