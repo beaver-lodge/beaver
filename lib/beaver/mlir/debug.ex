@@ -35,7 +35,7 @@ defmodule Beaver.MLIR.Debug do
       iex> Beaver.MLIR.Debug.set_debug_type("pass-manager")
       :ok
 
-      iex> Beaver.MLIR.Debug.set_debug_type(["pass-manager", "transform"])
+      iex> Beaver.MLIR.Debug.set_debug_type(~w[pass-manager dialect-conversion])
       :ok
   """
   def set_debug_type(type) when is_binary(type) do
