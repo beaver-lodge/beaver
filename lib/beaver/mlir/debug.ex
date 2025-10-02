@@ -26,7 +26,7 @@ defmodule Beaver.MLIR.Debug do
   end
 
   @doc """
-  Set the current debug type.
+  Set debug type(s).
 
   Note: Global debug must be enabled for any output to be produced.
 
@@ -34,23 +34,16 @@ defmodule Beaver.MLIR.Debug do
 
       iex> Beaver.MLIR.Debug.set_debug_type("pass-manager")
       :ok
+
+      iex> Beaver.MLIR.Debug.set_debug_type(["pass-manager", "transform"])
+      :ok
   """
   def set_debug_type(type) when is_binary(type) do
     type_str = MLIR.StringRef.create(type) |> MLIR.StringRef.data()
     mlirSetGlobalDebugType(type_str)
   end
 
-  @doc """
-  Set multiple debug types.
-
-  Note: Global debug must be enabled for any output to be produced.
-
-  ## Examples
-
-      iex> Beaver.MLIR.Debug.set_debug_types(["pass-manager", "transform"])
-      :ok
-  """
-  def set_debug_types(types) when is_list(types) do
+  def set_debug_type(types) when is_list(types) do
     types
     |> Enum.map(&MLIR.StringRef.create/1)
     |> Beaver.Native.array(MLIR.StringRef)
