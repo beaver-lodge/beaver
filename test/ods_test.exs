@@ -2,7 +2,7 @@ defmodule ODSDumpTest do
   use Beaver
   alias Beaver.MLIR
   alias Beaver.MLIR.Type
-  alias Beaver.MLIR.Dialect.{Func, Arith}
+  alias Beaver.MLIR.Dialect.{Func, Arith, MemRef}
   require Func
   use Beaver.Case, async: true
 
@@ -131,5 +131,27 @@ defmodule ODSDumpTest do
     end
     |> Beaver.Composer.append(UseENIFAlloc)
     |> Beaver.Composer.run!()
+  end
+
+  test "all-zero segment_sizes", %{ctx: ctx} do
+    mlir ctx: ctx do
+      module do
+        Func.func _(
+                    function_type: Type.function([], []),
+                    sym_name:
+                      Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                  ) do
+          region do
+            block _() do
+              MemRef.alloca(operand_segment_sizes: :infer) >>>
+                Type.memref!([1], Type.i32(ctx: ctx))
+
+              Func.return() >>> []
+            end
+          end
+        end
+      end
+      |> MLIR.verify!()
+    end
   end
 end
