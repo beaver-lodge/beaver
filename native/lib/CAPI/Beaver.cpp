@@ -268,3 +268,17 @@ MLIR_CAPI_EXPORTED MlirType beaverDenseElementsAttrGetType(MlirAttribute attr) {
 MLIR_CAPI_EXPORTED intptr_t beaverShapedTypeGetNumElements(MlirType type) {
   return llvm::cast<ShapedType>(unwrap(type)).getNumElements();
 }
+
+#include "mlir-c/Debug.h"
+MLIR_CAPI_EXPORTED void beaverSetGlobalDebugTypes(const MlirStringRef *types,
+                                                  intptr_t n) {
+  // Convert MlirStringRef array to array of C strings
+  std::vector<const char *> cstrings;
+  cstrings.reserve(n);
+  for (intptr_t i = 0; i < n; ++i) {
+    cstrings.push_back(beaverStringRefGetData(types[i]));
+  }
+
+  // Call the underlying MLIR function
+  mlirSetGlobalDebugTypes(cstrings.data(), n);
+}
