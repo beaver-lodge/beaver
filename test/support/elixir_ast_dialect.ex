@@ -219,7 +219,7 @@ defmodule ElixirAST do
 
               acc = put_in(acc, [:variables, extract_var_name(var)], val)
               r = Beaver.Walker.replace(op, val)
-              MLIR.CAPI.mlirOperationDestroy(var)
+              MLIR.Operation.destroy(var)
               {r, acc}
 
             "ex.var" ->

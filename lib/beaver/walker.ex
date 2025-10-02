@@ -540,7 +540,7 @@ defmodule Beaver.Walker do
       CAPI.mlirValueReplaceAllUsesOfWith(result, value)
 
       if opts[:destroy] do
-        CAPI.mlirOperationDestroy(op)
+        MLIR.Operation.destroy(op)
       end
 
       %OpReplacement{
