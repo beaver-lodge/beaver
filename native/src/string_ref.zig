@@ -1,10 +1,10 @@
-const beam = @import("beam");
 const mlir_capi = @import("mlir_capi.zig");
 const std = @import("std");
-const e = @import("erl_nif");
-const result = @import("kinda").result;
 const kinda = @import("kinda");
-pub const c = @import("prelude.zig");
+const e = kinda.erl_nif;
+const beam = kinda.beam;
+const result = kinda.result;
+pub const c = @import("prelude.zig").c;
 const mem = @import("std").mem;
 
 const print_nif_prefix = "beaver_raw_to_string_";
@@ -13,9 +13,9 @@ pub fn PrinterNIF(comptime ResourceKind: type, comptime print_fn: anytype) type 
         const Error = error{
             NullPointerFound,
         };
-        const Buffer = std.ArrayList(u8);
+        const Buffer = std.array_list.Managed(u8);
         buffer: Buffer,
-        fn collect_string_ref(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
+        fn collect_string_ref(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.c) void {
             const printer: *@This() = @ptrCast(@alignCast(userData));
             printer.*.buffer.appendSlice(s.data[0..s.length]) catch unreachable;
         }
@@ -44,7 +44,7 @@ pub const Printer = struct {
     pub const PtrType = *@This();
     pub const ArrayType = [*]@This();
     const Error = error{ NullPointerFound, InvalidPrinter, @"Already flushed" };
-    const Buffer = std.ArrayList(u8);
+    const Buffer = std.array_list.AlignedManaged(u8, null);
     const Flushed = std.atomic.Value(bool);
     buffer: Buffer,
     flushed: Flushed = Flushed.init(false),
@@ -53,11 +53,11 @@ pub const Printer = struct {
         return ResourceKind.resource.make(env, v) catch return beam.Error.@"Fail to create primitive";
     }
     pub const maker = .{ make, 0 };
-    fn collect_string_ref(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
+    fn collect_string_ref(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.c) void {
         const printer: *@This() = @ptrCast(@alignCast(userData));
         printer.*.buffer.appendSlice(s.data[0..s.length]) catch unreachable;
     }
-    pub fn destroy(_: beam.env, userData: ?*anyopaque) callconv(.C) void {
+    pub fn destroy(_: beam.env, userData: ?*anyopaque) callconv(.c) void {
         const printer: *@This() = @ptrCast(@alignCast(userData));
         if (!printer.flushed.load(.acquire)) {
             printer.buffer.deinit();
@@ -85,10 +85,10 @@ fn string_ref_to_binary(env: beam.env, s: mlir_capi.StringRef.T) beam.term {
 
 // collect multiple MLIR StringRef as a list of erlang binary
 pub const StringRefCollector = struct {
-    const Container = std.ArrayList(beam.term);
+    const Container = std.array_list.Managed(beam.term);
     container: Container = undefined,
     env: beam.env = undefined,
-    pub fn append(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.C) void {
+    pub fn append(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.c) void {
         const ptr: ?*@This() = @ptrCast(@alignCast(userData));
         if (ptr) |self| {
             self.container.append(string_ref_to_binary(self.env, s)) catch unreachable;

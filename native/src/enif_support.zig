@@ -1,8 +1,10 @@
-const beam = @import("beam");
 const mlir_capi = @import("mlir_capi.zig");
-pub const c = @import("prelude.zig");
-const result = @import("kinda").result;
-const e = @import("runtime.zig");
+pub const c = @import("prelude.zig").c;
+const rt = @import("runtime.zig");
+const kinda = @import("kinda");
+const result = kinda.result;
+const e = kinda.erl_nif;
+const beam = kinda.beam;
 
 const Invocation = struct {
     arg_terms: []beam.term = undefined,
@@ -27,7 +29,7 @@ const Invocation = struct {
         beam.allocator.free(self.arg_terms);
         beam.allocator.free(self.packed_args);
     }
-    fn invoke(self: *@This(), jit: mlir_capi.ExecutionEngine.T, name: beam.binary, env: beam.env) callconv(.C) mlir_capi.LogicalResult.T {
+    fn invoke(self: *@This(), jit: mlir_capi.ExecutionEngine.T, name: beam.binary, env: beam.env) callconv(.c) mlir_capi.LogicalResult.T {
         // must set env here to make sure it stays alive during the call
         self.packed_args[0] = @ptrCast(@constCast(&env));
         return c.mlirExecutionEngineInvokePacked(jit, c.mlirStringRefCreate(name.data, name.size), &self.packed_args[0]);
@@ -47,7 +49,7 @@ fn beaver_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const bea
     return invocation.res_term;
 }
 
-const enif_function_names = @import("enif_list.zig").functions ++ e.exported;
+const enif_function_names = @import("enif_list.zig").functions ++ rt.exported;
 
 fn register_jit_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const u8, comptime f: anytype) void {
     const prefixed_name = "_mlir_ciface_" ++ name;
@@ -61,7 +63,8 @@ fn register_jit_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const 
 fn beaver_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const jit = try mlir_capi.ExecutionEngine.resource.fetch(env, args[0]);
     inline for (enif_function_names) |name| {
-        register_jit_symbol(jit, name, @field(e, name));
+        const f = if (@hasDecl(e, name)) @field(e, name) else @field(rt, name);
+        register_jit_symbol(jit, name, f);
     }
     return beam.make_ok(env);
 }
@@ -78,7 +81,7 @@ fn llvm_ptr_type(env: beam.env, ctx: mlir_capi.Context.T) !beam.term {
 }
 
 fn binary_memref_type(env: beam.env, ctx: mlir_capi.Context.T) !beam.term {
-    return parse_mlir_type(env, ctx, e.BinaryMemRefType);
+    return parse_mlir_type(env, ctx, rt.BinaryMemRefType);
 }
 
 fn mlir_i_type_of_size(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
@@ -103,7 +106,7 @@ fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !be
             return try mlir_i_type_of_size(env, ctx, t);
         },
         .@"struct" => {
-            if (t == e.BinaryMemRefDescriptor) {
+            if (t == rt.BinaryMemRefDescriptor) {
                 return try binary_memref_type(env, ctx);
             } else if (t == beam.binary) {
                 return try parse_mlir_type(env, ctx, "!llvm.struct<(i64, ptr)>");
@@ -145,7 +148,7 @@ fn beaver_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.term
     var signatures: []beam.term = try beam.allocator.alloc(beam.term, enif_function_names.len);
     inline for (enif_function_names, 0..) |name, i| {
         const decl_name = "__decl__" ++ name;
-        const f = if (@hasDecl(e, decl_name)) @field(e, decl_name) else @field(e, name);
+        const f = if (@hasDecl(rt, decl_name)) @field(rt, decl_name) else (if (@hasDecl(e, name)) @field(e, name) else @field(rt, name));
         const FTI = @typeInfo(@TypeOf(f)).@"fn";
         var signature_slice: []beam.term = try beam.allocator.alloc(beam.term, 3);
         defer beam.allocator.free(signature_slice);

@@ -1,4 +1,5 @@
-const e = @import("runtime.zig");
+const kinda = @import("kinda");
+const e = kinda.erl_nif;
 const enif_functions_otp26 = if (@hasDecl(e, "enif_get_string_length")) .{
     "enif_get_string_length",
     "enif_make_new_atom",

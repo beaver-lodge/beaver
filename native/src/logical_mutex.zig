@@ -1,9 +1,10 @@
 const std = @import("std");
 const mlir_capi = @import("mlir_capi.zig");
-pub const c = @import("prelude.zig");
-const beam = @import("beam");
+pub const c = @import("prelude.zig").c;
 const result = @import("kinda").result;
-const e = @import("erl_nif");
+const kinda = @import("kinda");
+const e = kinda.erl_nif;
+const beam = kinda.beam;
 
 pub const Token = struct {
     mutex: std.Thread.Mutex = .{},
