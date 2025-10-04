@@ -1,18 +1,18 @@
-const beam = @import("beam");
 const std = @import("std");
 const io = std.io;
 const stderr = io.getStdErr().writer();
 const mlir_capi = @import("mlir_capi.zig");
-pub const c = @import("prelude.zig");
-const e = @import("erl_nif");
-const MutexToken = @import("logical_mutex.zig").Token;
+pub const c = @import("prelude.zig").c;
 const kinda = @import("kinda");
+const e = kinda.erl_nif;
+const beam = kinda.beam;
+const MutexToken = @import("logical_mutex.zig").Token;
 const result = @import("kinda").result;
 const PrinterNIF = @import("string_ref.zig").PrinterNIF;
 
 // collect diagnostic as {severity, loc, message, nested_notes}
 const DiagnosticAggregator = struct {
-    const Container = std.ArrayList(beam.term);
+    const Container = std.array_list.Managed(beam.term);
     env: beam.env,
     container: Container = undefined,
     fn collectDiagnosticNested(diagnostic: c.MlirDiagnostic, userData: ?*@This()) !beam.term {
@@ -42,10 +42,10 @@ const DiagnosticAggregator = struct {
         try userData.?.container.append(try collectDiagnosticNested(diagnostic, userData));
         return c.mlirLogicalResultSuccess();
     }
-    fn errorHandler(diagnostic: c.MlirDiagnostic, userData: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
+    fn errorHandler(diagnostic: c.MlirDiagnostic, userData: ?*anyopaque) callconv(.c) mlir_capi.LogicalResult.T {
         return collectDiagnosticTopLevel(diagnostic, @ptrCast(@alignCast(userData))) catch return c.mlirLogicalResultFailure();
     }
-    fn deleteUserData(userData: ?*anyopaque) callconv(.C) void {
+    fn deleteUserData(userData: ?*anyopaque) callconv(.c) void {
         const this: ?*@This() = @ptrCast(@alignCast(userData));
         this.?.container.deinit();
         beam.allocator.destroy(this.?);

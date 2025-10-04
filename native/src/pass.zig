@@ -1,24 +1,25 @@
 const std = @import("std");
-const beam = @import("beam");
 const mlir_capi = @import("mlir_capi.zig");
-const c = @import("prelude.zig");
-const e = @import("erl_nif");
-const debug_print = @import("std").debug.print;
+const prelude = @import("prelude.zig");
+const c = prelude.c;
 const kinda = @import("kinda");
+const e = kinda.erl_nif;
+const beam = kinda.beam;
+const debug_print = @import("std").debug.print;
 const result = @import("kinda").result;
 const diagnostic = @import("diagnostic.zig");
 
-const beaverPassCreateWrap = kinda.BangFunc(c.K, c, "beaverPassCreate").wrap_ret_call;
+const beaverPassCreateWrap = kinda.BangFunc(prelude.K, c, "beaverPassCreate").wrap_ret_call;
 threadlocal var typeIDAllocator: ?mlir_capi.TypeIDAllocator.T = null;
 const CallbackDispatcher = struct {
     handler: beam.pid,
     env: beam.env,
     id: beam.term,
     callbacks: struct { construct: ?beam.term = null, destruct: ?beam.term = null, initialize: ?beam.term = null, clone: ?beam.term = null, run: ?beam.term = null },
-    fn construct(_: ?*anyopaque) callconv(.C) void {
+    fn construct(_: ?*anyopaque) callconv(.c) void {
         // support construct callback will require pass creation to be async, do nothing to keep it simple for now
     }
-    fn destruct(userData: ?*anyopaque) callconv(.C) void {
+    fn destruct(userData: ?*anyopaque) callconv(.c) void {
         const this: *@This() = @ptrCast(@alignCast(userData));
         const env = e.enif_alloc_env() orelse unreachable;
         const res = forward_cb(this, "destruct", env, .{}) catch unreachable;
@@ -26,7 +27,7 @@ const CallbackDispatcher = struct {
         e.enif_free_env(this.env);
         beam.allocator.destroy(this);
     }
-    fn initialize(ctx: mlir_capi.Context.T, userData: ?*anyopaque) callconv(.C) mlir_capi.LogicalResult.T {
+    fn initialize(ctx: mlir_capi.Context.T, userData: ?*anyopaque) callconv(.c) mlir_capi.LogicalResult.T {
         const this: *@This() = @ptrCast(@alignCast(userData));
         const env = e.enif_alloc_env() orelse unreachable;
         const res = forward_cb(this, "initialize", env, .{mlir_capi.Context.resource.make(env, ctx) catch unreachable}) catch return c.mlirLogicalResultFailure();
@@ -37,7 +38,7 @@ const CallbackDispatcher = struct {
         return res;
     }
     const callback_names = .{ "destruct", "initialize", "clone", "run" };
-    fn clone(userData: ?*anyopaque) callconv(.C) ?*anyopaque {
+    fn clone(userData: ?*anyopaque) callconv(.c) ?*anyopaque {
         const this: *@This() = @ptrCast(@alignCast(userData));
         const new = @This().init(this.handler) catch unreachable;
         inline for (callback_names) |f| {
@@ -63,7 +64,7 @@ const CallbackDispatcher = struct {
             return c.mlirLogicalResultSuccess();
         } else {
             var token = Token{};
-            var buffer = std.ArrayList(beam.term).init(beam.allocator);
+            var buffer = std.array_list.Managed(beam.term).init(beam.allocator);
             defer buffer.deinit();
             try buffer.append(beam.make_atom(env, callback));
             try buffer.append(try beam.make_ptr_resource_wrapped(env, &token));
@@ -80,7 +81,7 @@ const CallbackDispatcher = struct {
             return token.wait_logical();
         }
     }
-    fn run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) callconv(.C) void {
+    fn run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) callconv(.c) void {
         const this: *@This() = @ptrCast(@alignCast(userData));
         const env = e.enif_alloc_env() orelse unreachable;
         const op_ = mlir_capi.Operation.resource.make(env, op) catch return c.mlirExternalPassSignalFailure(pass);
@@ -125,7 +126,7 @@ const CallbackDispatcher = struct {
     }
 };
 
-const mlirPassManagerRunOnOpWrap = kinda.BangFunc(c.K, c, "mlirPassManagerRunOnOp").wrap_ret_call;
+const mlirPassManagerRunOnOpWrap = kinda.BangFunc(prelude.K, c, "mlirPassManagerRunOnOp").wrap_ret_call;
 const ManagerRunner = struct {
     const Error = error{ @"fail to allocate BEAM environment", @"fail to send message to pm caller", @"fail get caller's self pid" };
     pid: beam.pid,
@@ -147,7 +148,7 @@ const ManagerRunner = struct {
             return Error.@"fail to send message to pm caller";
         }
     }
-    fn run_and_send(worker: ?*anyopaque) callconv(.C) void {
+    fn run_and_send(worker: ?*anyopaque) callconv(.c) void {
         const this: ?*@This() = @ptrCast(@alignCast(worker));
         defer beam.allocator.destroy(this.?);
         if (run_with_diagnostics(this.?.*)) |_| {} else |err| {
@@ -173,7 +174,7 @@ const ManagerRunner = struct {
             return Error.@"fail to send message to pm caller";
         }
     }
-    fn destroyManager(worker: ?*anyopaque) callconv(.C) void {
+    fn destroyManager(worker: ?*anyopaque) callconv(.c) void {
         const this: ?*@This() = @ptrCast(@alignCast(worker));
         defer beam.allocator.destroy(this.?);
         c.mlirPassManagerDestroy(this.?.*.pm);

@@ -85,12 +85,13 @@ defmodule Updater do
       |> Enum.join("\n")
 
     txt = """
-    pub const c = @import("prelude.zig");
+    pub const prelude = @import("prelude.zig");
+    pub const c = prelude.c;
     pub const diagnostic = @import("diagnostic.zig");
-    const N = c.N;
-    const K = c.K;
-    const D_CPU = c.D_CPU;
-    const D_IO = c.D_IO;
+    const N = prelude.N;
+    const K = prelude.K;
+    const D_CPU = prelude.D_CPU;
+    const D_IO = prelude.D_IO;
     pub const nif_entries = .{
     #{entries}
     };

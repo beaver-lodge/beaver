@@ -72,7 +72,7 @@ jobs:
       - name: Set up Zig
         uses: mlugg/setup-zig@v2
         with:
-          version: 0.14.1
+          version: 0.15.1
       - uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
         if: runner.os == 'Linux'
@@ -149,12 +149,12 @@ jobs:
           - {
               platform: "linux/arm64/v8",
               suffix: "arm64",
-              zig: "https://ziglang.org/download/0.14.1/zig-aarch64-linux-0.14.1.tar.xz"
+              zig: "https://ziglang.org/download/0.15.1/zig-aarch64-linux-0.15.1.tar.xz"
             }
           - {
               platform: "linux/amd64",
               suffix: "amd64",
-              zig: "https://ziglang.org/download/0.14.1/zig-x86_64-linux-0.14.1.tar.xz"
+              zig: "https://ziglang.org/download/0.15.1/zig-x86_64-linux-0.15.1.tar.xz"
             }
     steps:
       - name: Login to Docker Hub

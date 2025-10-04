@@ -1,7 +1,7 @@
-const beam = @import("beam");
+pub const c = @import("prelude.zig").c;
 const kinda = @import("kinda");
-pub const c = @import("prelude.zig");
-const e = @import("erl_nif");
+const e = kinda.erl_nif;
+const beam = kinda.beam;
 const string_ref = @import("string_ref.zig");
 pub const root_module = "Elixir.Beaver.MLIR.CAPI";
 fn NativeKind(comptime t: type, comptime n: []const u8) type {

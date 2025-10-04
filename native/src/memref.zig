@@ -1,11 +1,11 @@
-const beam = @import("beam");
 const std = @import("std");
 const mem = @import("std").mem;
 const mlir_capi = @import("mlir_capi.zig");
-pub const c = @import("prelude.zig");
-const e = @import("erl_nif");
-const result = kinda.result;
+pub const c = @import("prelude.zig").c;
 const kinda = @import("kinda");
+const e = kinda.erl_nif;
+const beam = kinda.beam;
+const result = kinda.result;
 
 fn MemRefDescriptorAccessor(comptime MemRefT: type) type {
     return struct {

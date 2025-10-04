@@ -1,9 +1,9 @@
-const beam = @import("beam");
 const std = @import("std");
 const mlir_capi = @import("mlir_capi.zig");
-pub const c = @import("prelude.zig");
-const e = @import("erl_nif");
+pub const c = @import("prelude.zig").c;
 const kinda = @import("kinda");
+const e = kinda.erl_nif;
+const beam = kinda.beam;
 const result = kinda.result;
 
 extern fn free(ptr: mlir_capi.OpaquePtr.T) void;
