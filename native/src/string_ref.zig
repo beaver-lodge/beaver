@@ -44,7 +44,7 @@ pub const Printer = struct {
     pub const PtrType = *@This();
     pub const ArrayType = [*]@This();
     const Error = error{ NullPointerFound, InvalidPrinter, @"Already flushed" };
-    const Buffer = std.array_list.AlignedManaged(u8, null);
+    const Buffer = std.array_list.Managed(u8);
     const Flushed = std.atomic.Value(bool);
     buffer: Buffer,
     flushed: Flushed = Flushed.init(false),
