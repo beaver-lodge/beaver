@@ -9,7 +9,7 @@ const debug_print = @import("std").debug.print;
 const result = @import("kinda").result;
 const diagnostic = @import("diagnostic.zig");
 
-const beaverPassCreateWrap = kinda.BangFunc(prelude.K, c, "beaverPassCreate").wrap_ret_call;
+const beaverPassCreateWrap = kinda.BangFunc(prelude.allKinds, c, "beaverPassCreate").wrap_ret_call;
 threadlocal var typeIDAllocator: ?mlir_capi.TypeIDAllocator.T = null;
 const CallbackDispatcher = struct {
     handler: beam.pid,
@@ -126,7 +126,7 @@ const CallbackDispatcher = struct {
     }
 };
 
-const mlirPassManagerRunOnOpWrap = kinda.BangFunc(prelude.K, c, "mlirPassManagerRunOnOp").wrap_ret_call;
+const mlirPassManagerRunOnOpWrap = kinda.BangFunc(prelude.allKinds, c, "mlirPassManagerRunOnOp").wrap_ret_call;
 const ManagerRunner = struct {
     const Error = error{ @"fail to allocate BEAM environment", @"fail to send message to pm caller", @"fail get caller's self pid" };
     pid: beam.pid,
