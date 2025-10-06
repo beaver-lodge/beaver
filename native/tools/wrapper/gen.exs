@@ -68,17 +68,20 @@ defmodule Updater do
       for {name, _arity} <- functions do
         cond do
           name in @with_diagnostics or String.ends_with?(Atom.to_string(name), "GetChecked") ->
-            [~s{nif(K, c, "#{name}"),}, ~s{diagnostic.WithDiagnosticsNIF(K, c, "#{name}"),}]
+            [
+              ~s{nif("#{name}"),},
+              ~s{diagnostic.WithDiagnosticsNIF("#{name}"),}
+            ]
 
           name in @normal_and_dirty ->
             [
-              ~s{nif(K, c, "#{name}"),},
-              ~s{nifDirtyCPU(K, c, "#{name}", "#{dirty_io(name)}"),},
-              ~s{nifDirtyIO(K, c, "#{name}", "#{dirty_cpu(name)}"),}
+              ~s{nif("#{name}"),},
+              ~s{nifDirtyCPU("#{name}", "#{dirty_cpu(name)}"),},
+              ~s{nifDirtyIO("#{name}", "#{dirty_io(name)}"),}
             ]
 
           true ->
-            ~s{nif(K, c, "#{name}"),}
+            ~s{nif("#{name}"),}
         end
       end
       |> List.flatten()
@@ -88,7 +91,6 @@ defmodule Updater do
     pub const prelude = @import("prelude.zig");
     pub const c = prelude.c;
     pub const diagnostic = @import("diagnostic.zig");
-    const K = prelude.allKinds;
     const nif = prelude.nif;
     const nifDirtyCPU = prelude.nifDirtyCPU;
     const nifDirtyIO = prelude.nifDirtyIO;
