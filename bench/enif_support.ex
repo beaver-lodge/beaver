@@ -34,7 +34,14 @@ defmodule ENIFSupport do
     |> reconcile_unrealized_casts
     |> Beaver.Composer.run!()
     |> then(fn m ->
-      e = MLIR.ExecutionEngine.create!(m, opt_level: 3) |> Beaver.ENIF.register_symbols()
+      libs =
+        MLIR.ExecutionEngine.runtime_libs()
+        |> Enum.filter(&String.contains?(&1, "libmlir_c_runner_utils"))
+
+      e =
+        MLIR.ExecutionEngine.create!(m, opt_level: 3, shared_lib_paths: libs)
+        |> Beaver.ENIF.register_symbols()
+
       %ENIFSupport{mod: m, engine: e}
     end)
   end

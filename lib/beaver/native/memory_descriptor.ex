@@ -45,7 +45,7 @@ defmodule Beaver.Native.Memory.Descriptor do
 
   def sizes(%__MODULE__{ref: ref, descriptor_kind: k}) do
     case Module.split(k) |> List.last() do
-      "DescriptorUnranked" ->
+      "Descriptor0D" ->
         nil
 
       _ ->
@@ -55,7 +55,7 @@ defmodule Beaver.Native.Memory.Descriptor do
 
   def strides(%__MODULE__{ref: ref, descriptor_kind: k}) do
     case Module.split(k) |> List.last() do
-      "DescriptorUnranked" ->
+      "Descriptor0D" ->
         nil
 
       _ ->

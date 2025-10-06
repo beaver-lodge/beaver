@@ -9,7 +9,7 @@ defmodule Beaver.Native.Memory do
   defstruct storage: nil, descriptor: nil
 
   defp shape_to_descriptor_kind(type, []) do
-    Module.concat([type, MemRef.DescriptorUnranked])
+    Module.concat([type, MemRef.Descriptor0D])
   end
 
   defp shape_to_descriptor_kind(type, list) when is_list(list) do

@@ -2,7 +2,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
   @moduledoc false
   alias Kinda.CodeGen.{KindDecl}
   @behaviour Kinda.CodeGen
-  defp memref_kind_functions(DescriptorUnranked) do
+  defp memref_kind_functions(Descriptor0D) do
     [
       make: 5,
       aligned: 1,
@@ -25,7 +25,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
   @impl Kinda.CodeGen
   def kinds() do
     for rank <- [
-          DescriptorUnranked,
+          Descriptor0D,
           Descriptor1D,
           Descriptor2D,
           Descriptor3D,

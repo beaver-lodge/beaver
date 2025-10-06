@@ -39,14 +39,14 @@ fn memref_module_name(comptime resource_kind: type, comptime rank: i32) []const 
     return resource_kind.module_name ++ ".MemRef." ++ @tagName(@as(MemRefRankType, @enumFromInt(rank)));
 }
 
-fn UnrankMemRefDescriptor(comptime ResourceKind: type) type {
+fn ZeroRankMemRefDescriptor(comptime ResourceKind: type) type {
     return extern struct {
         pub fn make(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
             const allocated: ResourceKind.Ptr.T = try MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[0]);
             const aligned: ResourceKind.Ptr.T = try MemRefDescriptorAccessor(@This()).fetch_ptr_or_nil(env, args[1]);
             const offset: mlir_capi.I64.T = try mlir_capi.I64.resource.fetch(env, args[2]);
             const kind: type = dataKindToMemrefKind(ResourceKind);
-            var descriptor: UnrankMemRefDescriptor(ResourceKind) = undefined;
+            var descriptor: ZeroRankMemRefDescriptor(ResourceKind) = undefined;
             if (allocated == null) {
                 descriptor = .{
                     .offset = offset,
@@ -260,7 +260,7 @@ fn dataKindToMemrefKind(comptime self: type) type {
 }
 
 const MemRefRankType = enum {
-    DescriptorUnranked,
+    Descriptor0D,
     Descriptor1D,
     Descriptor2D,
     Descriptor3D,
@@ -284,7 +284,7 @@ fn BeaverMemRef(comptime ResourceKind: type) type {
             per_rank_resource_kinds[5].nifs;
         fn MemRefOfRank(comptime rank: u8) type {
             if (rank == 0) {
-                return kinda.ResourceKind2(UnrankMemRefDescriptor(ResourceKind));
+                return kinda.ResourceKind2(ZeroRankMemRefDescriptor(ResourceKind));
             } else {
                 return kinda.ResourceKind2(MemRefDescriptor(ResourceKind, rank));
             }
