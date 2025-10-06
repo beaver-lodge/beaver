@@ -48,7 +48,16 @@ pub fn ptr_to_memref(d: *BinaryMemRefDescriptor, ptr: Ptr, size: usize) callconv
 pub fn __decl__ptr_to_memref(_: *u8, _: usize) callconv(.c) BinaryMemRefDescriptor {
     @panic("call ptr_to_memref for correct ABI");
 }
-pub fn enif_binary_get_data(b: beam.binary) callconv(.c) *u8 {
-    return b.data;
-}
-pub const exported = .{ "print_i32", "print_u32", "print_i64", "print_u64", "print_f32", "print_f64", "print_open", "print_close", "print_comma", "print_newline", "ptr_to_memref", "enif_binary_get_data" };
+pub const exported = .{
+    "print_i32",
+    "print_u32",
+    "print_i64",
+    "print_u64",
+    "print_f32",
+    "print_f64",
+    "print_open",
+    "print_close",
+    "print_comma",
+    "print_newline",
+    "ptr_to_memref",
+};
