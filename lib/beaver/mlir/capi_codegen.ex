@@ -110,7 +110,8 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
           :LinalgConvolutionDimensions,
           :PDLValue,
           :PDLResultList,
-          :PDLRewriteFunction
+          :PDLRewriteFunction,
+          :PatternRewriter
         ],
         &%KindDecl{module_name: Module.concat(Beaver.MLIR, &1)}
       ) ++
