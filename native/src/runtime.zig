@@ -38,6 +38,7 @@ pub fn print_newline() callconv(.c) void {
 
 pub const BinaryMemRefDescriptor = m.MemRefDescriptor(mlir_capi.U8, 1);
 pub const BinaryMemRefType = "memref<?xi8>";
+pub const BinaryStructLLVMType = "!llvm.struct<(i64, ptr)>";
 // Due to the change of function signature when MemRef is converted to LLVM, we can't implement this function with MLIR CAPI only.
 // One other way is to implement a conversion pass for LLVMConversionTarget in C++.
 const Ptr = *u8;
@@ -47,4 +48,7 @@ pub fn ptr_to_memref(d: *BinaryMemRefDescriptor, ptr: Ptr, size: usize) callconv
 pub fn __decl__ptr_to_memref(_: *u8, _: usize) callconv(.c) BinaryMemRefDescriptor {
     @panic("call ptr_to_memref for correct ABI");
 }
-pub const exported = .{ "print_i32", "print_u32", "print_i64", "print_u64", "print_f32", "print_f64", "print_open", "print_close", "print_comma", "print_newline", "ptr_to_memref" };
+pub fn enif_binary_get_data(b: beam.binary) callconv(.c) *u8 {
+    return b.data;
+}
+pub const exported = .{ "print_i32", "print_u32", "print_i64", "print_u64", "print_f32", "print_f64", "print_open", "print_close", "print_comma", "print_newline", "ptr_to_memref", "enif_binary_get_data" };
