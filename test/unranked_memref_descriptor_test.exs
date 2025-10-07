@@ -64,7 +64,7 @@ defmodule UnrankedMemRefDescriptorTest do
   end
 
   test "abi", %{ctx: ctx} do
-    d = UnrankedMemRefDescriptor.empty(2)
+    d = UnrankedMemRefDescriptor.empty()
     opaque_ptr = d |> UnrankedMemRefDescriptor.opaque_ptr()
 
     TestingUnrankedMemRefABI.init(ctx)
