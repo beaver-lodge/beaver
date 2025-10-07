@@ -25,9 +25,7 @@ defmodule UnrankedMemRefDescriptorTest do
 
     TestingUnrankedMemRefABI.init(ctx)
     |> tap(fn %ENIFSupport{engine: e} ->
-      MLIR.ExecutionEngine.invoke!(e, "assign_meta", [
-        opaque_ptr
-      ])
+      MLIR.ExecutionEngine.invoke!(e, "assign_meta", [opaque_ptr])
     end)
 
     assert 2 = UnrankedMemRefDescriptor.rank(d)
