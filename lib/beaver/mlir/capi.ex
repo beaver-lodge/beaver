@@ -100,4 +100,20 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_string_printer_callback(), do: :erlang.nif_error(:not_loaded)
   def beaver_raw_string_printer_flush(_sp), do: :erlang.nif_error(:not_loaded)
   def beaver_raw_memref_type_get_strides_and_offset(_type), do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_unranked_memref_descriptor_empty(_rank), do: :erlang.nif_error(:not_loaded)
+
+  def beaver_raw_unranked_memref_descriptor_get_rank(_unranked_memref_descriptor),
+    do: :erlang.nif_error(:not_loaded)
+
+  def beaver_raw_unranked_memref_descriptor_get_offset(_unranked_memref_descriptor),
+    do: :erlang.nif_error(:not_loaded)
+
+  def beaver_raw_unranked_memref_descriptor_get_sizes(_unranked_memref_descriptor),
+    do: :erlang.nif_error(:not_loaded)
+
+  def beaver_raw_unranked_memref_descriptor_get_strides(_unranked_memref_descriptor),
+    do: :erlang.nif_error(:not_loaded)
+
+  def beaver_raw_unranked_memref_descriptor_free_allocated(_unranked_memref_descriptor),
+    do: :erlang.nif_error(:not_loaded)
 end

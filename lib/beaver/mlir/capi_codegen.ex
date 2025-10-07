@@ -112,6 +112,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
           PDLResultList
           PDLRewriteFunction
           PatternRewriter
+          UnrankedMemRefDescriptor
         ],
         &%KindDecl{module_name: Module.concat(Beaver.MLIR, &1)}
       ) ++
