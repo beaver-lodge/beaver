@@ -14,7 +14,7 @@ defmodule Beaver.MLIR.UnrankedMemRefDescriptor do
   @doc """
   Creates an empty unranked memref descriptor with the specified rank.
   """
-  def empty(rank) when is_integer(rank) and rank >= 0 do
+  def empty(rank \\ 0) when is_integer(rank) and rank >= 0 do
     %__MODULE__{ref: MLIR.CAPI.beaver_raw_unranked_memref_descriptor_empty(rank)}
   end
 
