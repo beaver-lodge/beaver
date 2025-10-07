@@ -55,11 +55,11 @@ pub fn unranked_memref_get_offset(env: beam.env, _: c_int, args: [*c]const beam.
 }
 
 // Helper function to get either sizes or strides using @field
-fn get_ranked_field(env: beam.env, d: UnrankedMemRefDescriptor, comptime field_name: []const u8) !beam.term {
+fn get_ranked_field(env: beam.env, arg: beam.term, comptime field_name: []const u8) !beam.term {
+    const d = try UnrankedMemRefDescriptor.resource.fetch(env, arg);
     if (d.rank == 0) {
         return beam.make_term_list(env, &[_]beam.term{});
     }
-
     // Dispatch to handle the specific RankedDescriptor(R) type.
     inline for (supported_ranks_excluding_zero) |R| {
         if (d.rank == R) {
@@ -83,20 +83,17 @@ fn get_ranked_field(env: beam.env, d: UnrankedMemRefDescriptor, comptime field_n
 
 // NIF: Get sizes as Erlang list
 pub fn unranked_memref_get_sizes(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
-    return get_ranked_field(env, d, "sizes");
+    return get_ranked_field(env, args[0], "sizes");
 }
 
 // NIF: Get strides as Erlang list
 pub fn unranked_memref_get_strides(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
-    return get_ranked_field(env, d, "strides");
+    return get_ranked_field(env, args[0], "strides");
 }
 
 // NIF: Free the externally allocated buffer
 pub fn unranked_memref_deallocate(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
-
     if (d.rank == 0) {
         const zero_rank = @as(*memref.RankedMemRefDescriptor(0), @ptrCast(@alignCast(d.descriptor)));
         if (zero_rank.allocated) |ptr| {
