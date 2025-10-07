@@ -26,14 +26,13 @@ pub const U8 = NativeKind(u8, "U8");
 pub const USize = NativeKind(usize, "USize");
 pub const OpaqueArray = NativeKind(?*const anyopaque, "OpaqueArray");
 pub const StringArray = NativeKind([*c][*c]const u8, "StringArray");
+pub const ElixirNameSpacePrefix = "Elixir.Beaver.MLIR.";
 
 fn MLIRKind(comptime n: []const u8) type {
-    const nsPrefix = "Elixir.Beaver.MLIR.";
-    return kinda.ResourceKind(@field(c, "Mlir" ++ n), nsPrefix ++ n);
+    return kinda.ResourceKind(@field(c, "Mlir" ++ n), ElixirNameSpacePrefix ++ n);
 }
 fn MLIRKind2(comptime s: []const u8, comptime n: []const u8) type {
-    const nsPrefix = "Elixir.Beaver.MLIR.";
-    return kinda.ResourceKind(@field(c, s), nsPrefix ++ n);
+    return kinda.ResourceKind(@field(c, s), ElixirNameSpacePrefix ++ n);
 }
 pub const Type = MLIRKind("Type");
 pub const Pass = MLIRKind("Pass");
