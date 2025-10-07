@@ -7,6 +7,24 @@ const e = kinda.erl_nif;
 const beam = kinda.beam;
 const result = kinda.result;
 
+pub fn RankedMemRefDescriptor(comptime Rank: usize) type {
+    if (Rank == 0) {
+        return extern struct {
+            allocated: ?*anyopaque = null,
+            aligned: ?*anyopaque = null,
+            offset: i64,
+        };
+    } else {
+        return extern struct {
+            allocated: ?*anyopaque = null,
+            aligned: ?*anyopaque = null,
+            offset: i64,
+            sizes: [Rank]i64,
+            strides: [Rank]i64,
+        };
+    }
+}
+
 pub fn memref_type_get_strides_and_offset(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const t = try mlir_capi.Type.resource.fetch(env, args[0]);
     const rank = c.mlirShapedTypeGetRank(t);

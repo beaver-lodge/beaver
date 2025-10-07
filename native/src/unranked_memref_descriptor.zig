@@ -3,12 +3,14 @@ const mlir_capi = @import("mlir_capi.zig");
 pub const c = @import("prelude.zig").c;
 const result = @import("kinda").result;
 const kinda = @import("kinda");
+const memref = @import("memref.zig");
 const e = kinda.erl_nif;
 const beam = kinda.beam;
 
 // A constant list of ranks we support with comptime-sized structs.
 // This can be easily extended.
 const supported_ranks = .{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+const supported_ranks_include_zeros = .{0} ++ supported_ranks;
 
 // Simple Unranked MemRef descriptor
 pub const UnrankedMemRefDescriptor = extern struct {
@@ -25,26 +27,6 @@ pub const UnrankedMemRefDescriptor = extern struct {
     }
 };
 
-// Internal descriptor for rank 0
-pub const ZeroRankDescriptor = extern struct {
-    allocated: ?*anyopaque = null,
-    aligned: ?*anyopaque = null,
-    offset: i64,
-};
-
-// REFACTORED: Generic descriptor for ranks > 0.
-// This is now a function that returns a type, generic over the rank.
-pub fn RankedDescriptor(comptime Rank: usize) type {
-    return extern struct {
-        allocated: ?*anyopaque = null,
-        aligned: ?*anyopaque = null,
-        offset: i64,
-        // The sizes and strides arrays are now embedded directly in the struct.
-        sizes: [Rank]i64,
-        strides: [Rank]i64,
-    };
-}
-
 // NIF: Create empty unranked memref
 pub fn unranked_memref_empty(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const rank: i64 = try beam.get(i64, env, args[0]);
@@ -60,35 +42,29 @@ pub fn unranked_memref_get_rank(env: beam.env, _: c_int, args: [*c]const beam.te
 
 // NIF: Get offset
 pub fn unranked_memref_get_offset(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const memref = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
-
-    if (memref.rank == 0) {
-        const zero_rank = @as(*const ZeroRankDescriptor, @ptrCast(@alignCast(memref.descriptor)));
-        return beam.make_i64(env, zero_rank.offset);
-    } else {
-        // Dispatch to cast to the correct type before accessing the field.
-        inline for (supported_ranks) |R| {
-            if (memref.rank == R) {
-                const D = RankedDescriptor(R);
-                const ranked = @as(*const D, @ptrCast(@alignCast(memref.descriptor)));
-                return beam.make_i64(env, ranked.offset);
-            }
+    const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
+    // Dispatch to cast to the correct type before accessing the field.
+    inline for (supported_ranks_include_zeros) |R| {
+        if (d.rank == R) {
+            const D = memref.RankedMemRefDescriptor(R);
+            const ranked = @as(*const D, @ptrCast(@alignCast(d.descriptor)));
+            return beam.make_i64(env, ranked.offset);
         }
-        return error.UnsupportedRank;
     }
+    return error.UnsupportedRank;
 }
 
 // Helper function to get either sizes or strides using @field
-fn get_ranked_field(env: beam.env, memref: UnrankedMemRefDescriptor, comptime field_name: []const u8) !beam.term {
-    if (memref.rank == 0) {
+fn get_ranked_field(env: beam.env, d: UnrankedMemRefDescriptor, comptime field_name: []const u8) !beam.term {
+    if (d.rank == 0) {
         return beam.make_term_list(env, &[_]beam.term{});
     }
 
     // Dispatch to handle the specific RankedDescriptor(R) type.
     inline for (supported_ranks) |R| {
-        if (memref.rank == R) {
-            const D = RankedDescriptor(R);
-            const ranked = @as(*const D, @ptrCast(@alignCast(memref.descriptor)));
+        if (d.rank == R) {
+            const D = memref.RankedMemRefDescriptor(R);
+            const ranked = @as(*const D, @ptrCast(@alignCast(d.descriptor)));
 
             var terms = try beam.allocator.alloc(beam.term, R);
             defer beam.allocator.free(terms);
@@ -119,10 +95,10 @@ pub fn unranked_memref_get_strides(env: beam.env, _: c_int, args: [*c]const beam
 
 // NIF: Free the externally allocated buffer
 pub fn unranked_memref_deallocate(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const memref = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
+    const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
 
-    if (memref.rank == 0) {
-        const zero_rank = @as(*ZeroRankDescriptor, @ptrCast(@alignCast(memref.descriptor)));
+    if (d.rank == 0) {
+        const zero_rank = @as(*memref.RankedMemRefDescriptor(0), @ptrCast(@alignCast(d.descriptor)));
         if (zero_rank.allocated) |ptr| {
             // Memory is assumed to be allocated by a C-compatible allocator.
             std.c.free(ptr);
@@ -135,9 +111,9 @@ pub fn unranked_memref_deallocate(env: beam.env, _: c_int, args: [*c]const beam.
     } else {
         // Dispatch to cast to the correct type before freeing.
         inline for (supported_ranks) |R| {
-            if (memref.rank == R) {
-                const D = RankedDescriptor(R);
-                const ranked = @as(*D, @ptrCast(@alignCast(memref.descriptor)));
+            if (d.rank == R) {
+                const D = memref.RankedMemRefDescriptor(R);
+                const ranked = @as(*D, @ptrCast(@alignCast(d.descriptor)));
                 if (ranked.allocated) |ptr| {
                     std.c.free(ptr);
                     ranked.allocated = null;
