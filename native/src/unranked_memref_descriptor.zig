@@ -20,26 +20,7 @@ pub const UnrankedMemRefDescriptor = extern struct {
     const resource = kind.resource;
 
     pub fn init(rank: i64) !@This() {
-        var self = @This(){ .rank = rank, .descriptor = undefined };
-
-        if (rank == 0) {
-            // Allocate zero-rank descriptor
-            const zero_rank = try beam.allocator.create(ZeroRankDescriptor);
-            zero_rank.* = .{ .offset = 0 };
-            self.descriptor = zero_rank;
-        } else {
-            // Use an `inline for` to dispatch from the runtime `rank` value
-            // to a compile-time instantiation of the generic RankedDescriptor.
-            inline for (supported_ranks) |R| {
-                if (rank == R) {
-                    self.rank = R;
-                    return self;
-                }
-            }
-            // If the rank is not in our supported list, return an error.
-            return error.UnsupportedRank;
-        }
-
+        const self = @This(){ .rank = rank, .descriptor = undefined };
         return self;
     }
 };
