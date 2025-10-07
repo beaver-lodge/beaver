@@ -17,10 +17,7 @@ defmodule TestingUnrankedMemRefABI do
           region do
             block _() do
               v = Arith.constant(value: Attribute.integer(elem_type, 100)) >>> ~t<i32>
-
-              m =
-                MemRef.alloc(operand_segment_sizes: :infer) >>>
-                  Type.memref!([2, 3], elem_type)
+              m = MemRef.alloc(operand_segment_sizes: :infer) >>> Type.memref!([2, 3], elem_type)
 
               Linalg.fill inputs: v, outputs: m, operand_segment_sizes: :infer do
                 region do
@@ -28,11 +25,9 @@ defmodule TestingUnrankedMemRefABI do
                     Linalg.yield(in_arg) >>> []
                   end
                 end
-              end >>>
-                []
+              end >>> []
 
               u = MemRef.cast(m) >>> unranked_memref_t
-
               Func.return(u) >>> []
             end
           end
