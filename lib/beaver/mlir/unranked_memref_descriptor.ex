@@ -59,10 +59,4 @@ defmodule Beaver.MLIR.UnrankedMemRefDescriptor do
   def free(%__MODULE__{ref: descriptor}) do
     MLIR.CAPI.beaver_raw_unranked_memref_descriptor_deallocate(descriptor)
   end
-
-  @doc false
-  def opaque_ptr(%__MODULE__{ref: descriptor}) do
-    ref = Beaver.Native.forward(__MODULE__, :opaque_ptr, [descriptor])
-    struct!(Beaver.Native.OpaquePtr, ref: ref)
-  end
 end

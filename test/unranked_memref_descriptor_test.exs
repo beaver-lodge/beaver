@@ -21,7 +21,7 @@ defmodule UnrankedMemRefDescriptorTest do
 
   test "abi", %{ctx: ctx} do
     d = UnrankedMemRefDescriptor.empty()
-    opaque_ptr = d |> UnrankedMemRefDescriptor.opaque_ptr()
+    opaque_ptr = d |> Beaver.Native.opaque_ptr()
 
     TestingUnrankedMemRefABI.init(ctx)
     |> tap(fn %ENIFSupport{engine: e} ->
