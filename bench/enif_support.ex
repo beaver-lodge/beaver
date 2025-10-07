@@ -31,13 +31,7 @@ defmodule ENIFSupport do
     |> canonicalize()
     |> convert_linalg_to_loops()
     |> convert_scf_to_cf
-    |> convert_arith_to_llvm()
-    |> convert_cf_to_llvm()
-    |> convert_index_to_llvm()
-    |> convert_func_to_llvm()
     |> convert_to_llvm()
-    |> Beaver.Composer.append("convert-vector-to-llvm{reassociate-fp-reductions}")
-    |> Beaver.Composer.append("finalize-memref-to-llvm")
     |> then(&if(System.get_env(@print_flag), do: MLIR.Transform.print_ir(&1), else: &1))
     |> reconcile_unrealized_casts
     |> Beaver.Composer.run!()

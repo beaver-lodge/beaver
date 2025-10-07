@@ -26,7 +26,7 @@ pub const UnrankedMemRefDescriptor = extern struct {
 };
 
 // Internal descriptor for rank 0
-const ZeroRankDescriptor = extern struct {
+pub const ZeroRankDescriptor = extern struct {
     allocated: ?*anyopaque = null,
     aligned: ?*anyopaque = null,
     offset: i64,
@@ -34,7 +34,7 @@ const ZeroRankDescriptor = extern struct {
 
 // REFACTORED: Generic descriptor for ranks > 0.
 // This is now a function that returns a type, generic over the rank.
-fn RankedDescriptor(comptime Rank: usize) type {
+pub fn RankedDescriptor(comptime Rank: usize) type {
     return extern struct {
         allocated: ?*anyopaque = null,
         aligned: ?*anyopaque = null,

@@ -1,7 +1,6 @@
 const kinda = @import("kinda");
 const e = kinda.erl_nif;
 const beam = kinda.beam;
-const m = @import("memref.zig");
 const mlir_capi = @import("mlir_capi.zig");
 
 const debug_print = @import("std").debug.print;
@@ -36,7 +35,7 @@ pub fn print_newline() callconv(.c) void {
     debug_print("\n", .{});
 }
 
-pub const BinaryMemRefDescriptor = m.MemRefDescriptor(mlir_capi.U8, 1);
+pub const BinaryMemRefDescriptor = @import("unranked_memref_descriptor.zig").RankedDescriptor(1);
 pub const BinaryMemRefType = "memref<?xi8>";
 // Due to the change of function signature when MemRef is converted to LLVM, we can't implement this function with MLIR CAPI only.
 // One other way is to implement a conversion pass for LLVMConversionTarget in C++.
