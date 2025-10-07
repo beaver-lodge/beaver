@@ -9,8 +9,8 @@ const beam = kinda.beam;
 
 // A constant list of ranks we support with comptime-sized structs.
 // This can be easily extended.
-const supported_ranks = .{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-const supported_ranks_include_zeros = .{0} ++ supported_ranks;
+const supported_ranks_excluding_zero = .{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
+const supported_ranks_including_zero = .{0} ++ supported_ranks_excluding_zero;
 
 // Simple Unranked MemRef descriptor
 pub const UnrankedMemRefDescriptor = extern struct {
@@ -44,7 +44,7 @@ pub fn unranked_memref_get_rank(env: beam.env, _: c_int, args: [*c]const beam.te
 pub fn unranked_memref_get_offset(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
     // Dispatch to cast to the correct type before accessing the field.
-    inline for (supported_ranks_include_zeros) |R| {
+    inline for (supported_ranks_including_zero) |R| {
         if (d.rank == R) {
             const D = memref.RankedMemRefDescriptor(R);
             const ranked = @as(*const D, @ptrCast(@alignCast(d.descriptor)));
@@ -61,7 +61,7 @@ fn get_ranked_field(env: beam.env, d: UnrankedMemRefDescriptor, comptime field_n
     }
 
     // Dispatch to handle the specific RankedDescriptor(R) type.
-    inline for (supported_ranks) |R| {
+    inline for (supported_ranks_excluding_zero) |R| {
         if (d.rank == R) {
             const D = memref.RankedMemRefDescriptor(R);
             const ranked = @as(*const D, @ptrCast(@alignCast(d.descriptor)));
@@ -110,7 +110,7 @@ pub fn unranked_memref_deallocate(env: beam.env, _: c_int, args: [*c]const beam.
         }
     } else {
         // Dispatch to cast to the correct type before freeing.
-        inline for (supported_ranks) |R| {
+        inline for (supported_ranks_excluding_zero) |R| {
             if (d.rank == R) {
                 const D = memref.RankedMemRefDescriptor(R);
                 const ranked = @as(*D, @ptrCast(@alignCast(d.descriptor)));
