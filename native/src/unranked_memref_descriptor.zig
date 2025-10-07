@@ -118,7 +118,7 @@ pub fn unranked_memref_get_strides(env: beam.env, _: c_int, args: [*c]const beam
 }
 
 // NIF: Free the externally allocated buffer
-pub fn unranked_memref_free_allocated(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+pub fn unranked_memref_deallocate(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const memref = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
 
     if (memref.rank == 0) {
@@ -159,7 +159,7 @@ pub const nifs = .{
     result.nif("beaver_raw_unranked_memref_descriptor_get_offset", 1, unranked_memref_get_offset).entry,
     result.nif("beaver_raw_unranked_memref_descriptor_get_sizes", 1, unranked_memref_get_sizes).entry,
     result.nif("beaver_raw_unranked_memref_descriptor_get_strides", 1, unranked_memref_get_strides).entry,
-    result.nif("beaver_raw_unranked_memref_descriptor_free_allocated", 1, unranked_memref_free_allocated).entry,
+    result.nif("beaver_raw_unranked_memref_descriptor_deallocate", 1, unranked_memref_deallocate).entry,
 } ++ UnrankedMemRefDescriptor.kind.nifs;
 
 // Resource type registration

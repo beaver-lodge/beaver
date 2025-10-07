@@ -114,6 +114,6 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_unranked_memref_descriptor_get_strides(_unranked_memref_descriptor),
     do: :erlang.nif_error(:not_loaded)
 
-  def beaver_raw_unranked_memref_descriptor_free_allocated(_unranked_memref_descriptor),
+  def beaver_raw_unranked_memref_descriptor_deallocate(_unranked_memref_descriptor),
     do: :erlang.nif_error(:not_loaded)
 end

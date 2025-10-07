@@ -57,7 +57,7 @@ defmodule Beaver.MLIR.UnrankedMemRefDescriptor do
   and needs to be freed after use.
   """
   def free(%__MODULE__{ref: descriptor}) do
-    MLIR.CAPI.beaver_raw_unranked_memref_descriptor_free_allocated(descriptor)
+    MLIR.CAPI.beaver_raw_unranked_memref_descriptor_deallocate(descriptor)
   end
 
   @doc false
