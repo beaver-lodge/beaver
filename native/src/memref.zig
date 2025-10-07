@@ -310,7 +310,7 @@ pub fn memref_type_get_strides_and_offset(env: beam.env, _: c_int, args: [*c]con
     const t = try mlir_capi.Type.resource.fetch(env, args[0]);
     const rank = c.mlirShapedTypeGetRank(t);
     if (rank < 0) {
-        return error.UnrankedMemref;
+        return error.RankCannotBeNegative;
     }
     const strides_slice: []i64 = try beam.allocator.alloc(i64, @intCast(rank));
     defer beam.allocator.free(strides_slice);
