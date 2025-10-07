@@ -29,6 +29,7 @@ defmodule ENIFSupport do
     |> then(&if(System.get_env(@print_flag), do: MLIR.Transform.print_ir(&1), else: &1))
     |> Beaver.Composer.nested("func.func", "llvm-request-c-wrappers")
     |> canonicalize()
+    |> convert_linalg_to_loops()
     |> convert_to_llvm()
     |> then(&if(System.get_env(@print_flag), do: MLIR.Transform.print_ir(&1), else: &1))
     |> reconcile_unrealized_casts

@@ -225,5 +225,8 @@ defmodule MemRefTest do
       )
 
     assert MLIR.equal?(memref_type_strided_offset, memref_type_strided_offset_from_api)
+
+    memref_type_strided = ~t{memref<16xi8, strided<[2]>>}.(ctx)
+    assert 16 = memref_type_strided |> MLIR.ShapedType.num_elements()
   end
 end
