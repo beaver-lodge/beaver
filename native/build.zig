@@ -26,6 +26,7 @@ pub fn build(b: *std.Build) void {
 
     if (os == .linux) {
         lib.root_module.addRPathSpecial("$ORIGIN");
+        lib.linkLibC();
     }
     if (os == .macos) {
         lib.root_module.addRPathSpecial("@loader_path");
