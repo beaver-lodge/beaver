@@ -92,9 +92,21 @@ defmodule Beaver.MLIR.ExecutionEngine do
     )
   end
 
+  @doc """
+  Initialize the JIT runtime.
+
+  If not already initialized, this will be called implicitly when first invocation happens.
+  """
   def init(jit) do
     tap(jit, &MLIR.CAPI.mlirExecutionEngineInitialize/1)
   end
 
   defdelegate destroy(jit), to: MLIR.CAPI, as: :mlirExecutionEngineDestroy
+
+  @doc """
+  Get the paths to the runtime libraries provided by MLIR.
+  """
+  def runtime_libs do
+    Path.join([:code.priv_dir(:beaver), "lib", "*"]) |> Path.wildcard()
+  end
 end
