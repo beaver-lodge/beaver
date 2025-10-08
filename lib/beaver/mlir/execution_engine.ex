@@ -97,4 +97,8 @@ defmodule Beaver.MLIR.ExecutionEngine do
   end
 
   defdelegate destroy(jit), to: MLIR.CAPI, as: :mlirExecutionEngineDestroy
+
+  def runtime_libs do
+    Path.join([:code.priv_dir(:beaver), "lib", "*"]) |> Path.wildcard()
+  end
 end
