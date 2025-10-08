@@ -37,6 +37,7 @@ pub fn print_newline() callconv(.c) void {
 
 pub const BinaryMemRefDescriptor = @import("memref.zig").RankedMemRefDescriptor(1);
 pub const BinaryMemRefType = "memref<?xi8>";
+pub const BinaryStructLLVMType = "!llvm.struct<(i64, ptr)>";
 // Due to the change of function signature when MemRef is converted to LLVM, we can't implement this function with MLIR CAPI only.
 // One other way is to implement a conversion pass for LLVMConversionTarget in C++.
 const Ptr = *u8;

@@ -109,7 +109,7 @@ fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !be
             if (t == rt.BinaryMemRefDescriptor) {
                 return try binary_memref_type(env, ctx);
             } else if (t == beam.binary) {
-                return try parse_mlir_type(env, ctx, "!llvm.struct<(i64, ptr)>");
+                return try parse_mlir_type(env, ctx, rt.BinaryStructLLVMType);
             }
             return try mlir_i_type_of_size(env, ctx, t);
         },
