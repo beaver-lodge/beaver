@@ -92,6 +92,11 @@ defmodule Beaver.MLIR.ExecutionEngine do
     )
   end
 
+  @doc """
+  Initialize the JIT runtime.
+
+  If not already initialized, this will be called implicitly when first invocation happens.
+  """
   def init(jit) do
     tap(jit, &MLIR.CAPI.mlirExecutionEngineInitialize/1)
   end
