@@ -120,6 +120,9 @@ defmodule Beaver.ENIF do
 
   defdelegate functions(), to: MLIR.CAPI, as: :beaver_raw_enif_functions
 
+  @doc """
+  Register ENIF functions in the given `Beaver.MLIR.ExecutionEngine`.
+  """
   def register_symbols(%MLIR.ExecutionEngine{ref: ref} = e) do
     MLIR.CAPI.beaver_raw_jit_register_enif(ref)
     e
