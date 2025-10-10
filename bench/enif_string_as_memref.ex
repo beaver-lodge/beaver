@@ -63,7 +63,7 @@ defmodule ENIFStringAsMemRef do
               d_ptr_arg =
                 Builtin.unrealized_conversion_cast(d_ptr) >>> ~t{!ptr.ptr<#ptr.generic_space>}
 
-              m = ptr_as_memref(d_ptr_arg, size) >>> :infer
+              m = ENIF.ptr_to_memref(d_ptr_arg, size) >>> :infer
               zero = Index.constant(value: Attribute.index(0)) >>> Type.index()
               len = MemRef.dim(m, zero) >>> :infer
               len = Index.casts(len) >>> ~t<i64>
