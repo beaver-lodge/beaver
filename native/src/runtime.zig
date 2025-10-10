@@ -38,13 +38,36 @@ pub fn print_newline() callconv(.c) void {
 pub const BinaryMemRefDescriptor = @import("memref.zig").RankedMemRefDescriptor(1);
 pub const BinaryMemRefType = "memref<?xi8>";
 pub const BinaryStructLLVMType = "!llvm.struct<(i64, ptr)>";
-// Due to the change of function signature when MemRef is converted to LLVM, we can't implement this function with MLIR CAPI only.
-// One other way is to implement a conversion pass for LLVMConversionTarget in C++.
-const Ptr = *u8;
-pub fn ptr_to_memref(d: *BinaryMemRefDescriptor, ptr: Ptr, size: usize) callconv(.c) void {
+
+// `__decl__` function are added due to the change of function signature during MemRef-to-LLVM translation
+pub fn make_new_binary_as_memref(d: *BinaryMemRefDescriptor, env: beam.env, size: usize, term_ptr: [*c]beam.term) callconv(.c) void {
+    const ptr = e.enif_make_new_binary(env, size, term_ptr);
     d.* = BinaryMemRefDescriptor{ .allocated = ptr, .aligned = ptr, .offset = 0, .sizes = .{@intCast(size)}, .strides = .{1} };
 }
-pub fn __decl__ptr_to_memref(_: *u8, _: usize) callconv(.c) BinaryMemRefDescriptor {
-    @panic("call ptr_to_memref for correct ABI");
+pub fn __decl__make_new_binary_as_memref(_: beam.env, _: usize, _: [*c]beam.term) callconv(.c) BinaryMemRefDescriptor {
+    @panic("call make_new_binary_as_memref for correct ABI");
 }
-pub const exported = .{ "print_i32", "print_u32", "print_i64", "print_u64", "print_f32", "print_f64", "print_open", "print_close", "print_comma", "print_newline", "ptr_to_memref" };
+pub fn inspect_binary_as_memref(d: *BinaryMemRefDescriptor, env: beam.env, term: beam.term) callconv(.c) void {
+    var b: beam.binary = undefined;
+    if (e.enif_inspect_binary(env, term, &b) == 0) {
+        @panic("failed to inspect binary");
+    }
+    d.* = BinaryMemRefDescriptor{ .allocated = null, .aligned = b.data, .offset = 0, .sizes = .{@intCast(b.size)}, .strides = .{1} };
+}
+pub fn __decl__inspect_binary_as_memref(_: beam.env, _: beam.term) callconv(.c) BinaryMemRefDescriptor {
+    @panic("call inspect_binary_as_memref for correct ABI");
+}
+pub const exported = .{
+    "print_i32",
+    "print_u32",
+    "print_i64",
+    "print_u64",
+    "print_f32",
+    "print_f64",
+    "print_open",
+    "print_close",
+    "print_comma",
+    "print_newline",
+    "inspect_binary_as_memref",
+    "make_new_binary_as_memref",
+};

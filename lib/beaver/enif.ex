@@ -1,10 +1,29 @@
 defmodule Beaver.ENIF do
+  @erlang_doc_enif_url "https://www.erlang.org/doc/apps/erts/erl_nif.html"
+  @make_new_binary_as_memref "call [`enif_make_new_binary`](#{@erlang_doc_enif_url}#enif_make_new_binary) and save the data pointer and size to a `memref<?xi8>`"
+  @inspect_binary_as_memref "call [`enif_inspect_binary`](#{@erlang_doc_enif_url}#enif_inspect_binary) and save the data pointer and size to a `memref<?xi8>`"
   @moduledoc """
   This module provides functions to work with Erlang's [erl_nif](https://www.erlang.org/doc/man/erl_nif.html) APIs in MLIR.
 
   ## Main usages
   - call `declare_external_functions/2` to insert external function declarations into a `Beaver.MLIR.Block`
   - call `register_symbols/1` to register symbols of ENIF functions in a `Beaver.MLIR.ExecutionEngine`
+
+  ## Supplemental Functions for ENIF and MLIR Runtime Interoperation
+
+  Beaver comes with supplemental functions to facilitate the interoperation between ENIF and MLIR runtime:
+
+  ### Rationale
+  - Arguments (including value and pointer) in the supplement functions should be created by MLIR
+  - Avoid reinterpreting a raw pointer created by ENIF or other C functions to a MLIR representation,
+  this ensures the stability of the ABI and clarity of semantics.
+  For instance, we should not generate IR to reinterpret a binary buffer to `memref<?xi8>` directly.
+  Instead, we provide a function `inspect_binary_as_memref/1` to perform the conversion explicitly.
+  - These functions and existing ENIF functions will be defined as an MLIR dialect in the future once IRDL is mature enough.
+
+  ### Provided Functions
+  - `make_new_binary_as_memref/1`: #{@make_new_binary_as_memref}
+  - `inspect_binary_as_memref/1`: #{@inspect_binary_as_memref}
   """
 
   use Beaver
@@ -70,7 +89,7 @@ defmodule Beaver.ENIF do
     case to_string(f) do
       "enif_" <> op ->
         @doc """
-        function call to [#{f}](https://www.erlang.org/doc/apps/erts/erl_nif.html##{f})
+        function call to [`#{f}`](#{@erlang_doc_enif_url}##{f})
         """
         def unquote(String.to_atom(op))(ssa) do
           call(unquote(f), ssa)
@@ -78,11 +97,14 @@ defmodule Beaver.ENIF do
 
       _ ->
         @doc (case f do
-                :ptr_to_memref ->
+                :make_new_binary_as_memref ->
                   """
-                  Convert a pointer to a memref
+                  #{@make_new_binary_as_memref}
+                  """
 
-                  `ptr_to_memref(ptr(), size()) :: memref<?xi8>`
+                :inspect_binary_as_memref ->
+                  """
+                  #{@inspect_binary_as_memref}
                   """
 
                 _ ->
@@ -98,6 +120,9 @@ defmodule Beaver.ENIF do
 
   defdelegate functions(), to: MLIR.CAPI, as: :beaver_raw_enif_functions
 
+  @doc """
+  Register ENIF functions in the given `Beaver.MLIR.ExecutionEngine`.
+  """
   def register_symbols(%MLIR.ExecutionEngine{ref: ref} = e) do
     MLIR.CAPI.beaver_raw_jit_register_enif(ref)
     e
@@ -110,6 +135,9 @@ defmodule Beaver.ENIF do
           MLIR.ExecutionEngine.invoke_opts()
         ) ::
           term()
+  @doc """
+  Invoke a function in the given `Beaver.MLIR.ExecutionEngine` with arguments and return all have type `Beaver.ENIF.Type.term/1`.
+  """
   def invoke(%MLIR.ExecutionEngine{ref: ref}, function, arguments, opts \\ []) do
     case opts[:dirty] do
       :cpu_bound ->

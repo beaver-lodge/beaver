@@ -76,8 +76,8 @@ fn parse_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, t: []const u8) !beam
     }));
 }
 
-fn llvm_ptr_type(env: beam.env, ctx: mlir_capi.Context.T) !beam.term {
-    return parse_mlir_type(env, ctx, "!llvm.ptr");
+fn ptr_type(env: beam.env, ctx: mlir_capi.Context.T) !beam.term {
+    return parse_mlir_type(env, ctx, "!ptr.ptr<#ptr.generic_space>");
 }
 
 fn binary_memref_type(env: beam.env, ctx: mlir_capi.Context.T) !beam.term {
@@ -100,7 +100,7 @@ fn mlir_f_type_of_size(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type
 fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
     switch (@typeInfo(t)) {
         .pointer => {
-            return llvm_ptr_type(env, ctx);
+            return ptr_type(env, ctx);
         },
         .@"opaque" => {
             return try mlir_i_type_of_size(env, ctx, t);
@@ -114,7 +114,7 @@ fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !be
             return try mlir_i_type_of_size(env, ctx, t);
         },
         .optional => {
-            return llvm_ptr_type(env, ctx);
+            return ptr_type(env, ctx);
         },
         else => {
             const is_int = t == c_int or t == c_ulong or t == c_long or t == beam.env or t == usize or t == c_uint or t == i32 or t == u32 or t == i64 or t == u64;
@@ -127,7 +127,7 @@ fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !be
             } else if (t == void) {
                 return beam.make_atom(env, "void");
             } else if (t == ?*anyopaque) {
-                return llvm_ptr_type(env, ctx);
+                return ptr_type(env, ctx);
             } else {
                 @compileError("not supported type in enif signature: " ++ @typeName(t));
             }
