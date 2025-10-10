@@ -16,7 +16,7 @@ defmodule Beaver.ENIF do
   ### Rationale
   - Arguments (including value and pointer) in the supplement functions should be created by MLIR
   - Avoid reinterpreting a raw pointer created by ENIF or other C functions to a MLIR representation,
-  this ensure the stability of the ABI and clarity of semantics.
+  this ensures the stability of the ABI and clarity of semantics.
   For instance, we should not generate IR to reinterpret a binary buffer to `memref<?xi8>` directly.
   Instead, we provide a function `inspect_binary_as_memref/1` to perform the conversion explicitly.
   - These functions and existing ENIF functions will be defined as an MLIR dialect in the future once IRDL is mature enough.
