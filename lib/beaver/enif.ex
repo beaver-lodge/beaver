@@ -1,7 +1,7 @@
 defmodule Beaver.ENIF do
   @erlang_doc_enif_url "https://www.erlang.org/doc/apps/erts/erl_nif.html"
-  @make_new_binary_as_memref "call [enif_make_new_binary](#{@erlang_doc_enif_url}#enif_make_new_binary) and save the data pointer and size to a `memref<?xi8>`"
-  @inspect_binary_as_memref "call [enif_make_new_binary](#{@erlang_doc_enif_url}#enif_inspect_binary) and save the data pointer and size to a `memref<?xi8>`"
+  @make_new_binary_as_memref "call [`enif_make_new_binary`](#{@erlang_doc_enif_url}#enif_make_new_binary) and save the data pointer and size to a `memref<?xi8>`"
+  @inspect_binary_as_memref "call [`enif_make_new_binary`](#{@erlang_doc_enif_url}#enif_inspect_binary) and save the data pointer and size to a `memref<?xi8>`"
   @moduledoc """
   This module provides functions to work with Erlang's [erl_nif](https://www.erlang.org/doc/man/erl_nif.html) APIs in MLIR.
 
@@ -89,7 +89,7 @@ defmodule Beaver.ENIF do
     case to_string(f) do
       "enif_" <> op ->
         @doc """
-        function call to [#{f}](#{@erlang_doc_enif_url}##{f})
+        function call to [`#{f}`](#{@erlang_doc_enif_url}##{f})
         """
         def unquote(String.to_atom(op))(ssa) do
           call(unquote(f), ssa)
