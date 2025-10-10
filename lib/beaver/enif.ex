@@ -135,6 +135,9 @@ defmodule Beaver.ENIF do
           MLIR.ExecutionEngine.invoke_opts()
         ) ::
           term()
+  @doc """
+  Invoke a function in the given `Beaver.MLIR.ExecutionEngine` with arguments and return all have type `Beaver.ENIF.Type.term/1`.
+  """
   def invoke(%MLIR.ExecutionEngine{ref: ref}, function, arguments, opts \\ []) do
     case opts[:dirty] do
       :cpu_bound ->
