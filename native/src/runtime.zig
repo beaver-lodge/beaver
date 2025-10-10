@@ -48,9 +48,9 @@ pub fn __decl__make_new_binary_as_memref(_: beam.env, _: usize, _: [*c]beam.term
     @panic("call make_new_binary_as_memref for correct ABI");
 }
 pub fn inspect_binary_as_memref(d: *BinaryMemRefDescriptor, env: beam.env, term: beam.term) callconv(.c) void {
-    var b : beam.binary = undefined;
+    var b: beam.binary = undefined;
     if (e.enif_inspect_binary(env, term, &b) == 0) {
-       @panic("failed to inspect binary");
+        @panic("failed to inspect binary");
     }
     d.* = BinaryMemRefDescriptor{ .allocated = null, .aligned = b.data, .offset = 0, .sizes = .{@intCast(b.size)}, .strides = .{1} };
 }
