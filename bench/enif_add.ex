@@ -3,8 +3,8 @@ defmodule AddENIF do
   alias Beaver.ENIF
   use Beaver
   alias Beaver.MLIR
-
-  alias MLIR.Dialect.{Func, Arith, LLVM}
+  alias MLIR.Type
+  alias MLIR.Dialect.{Func, Arith, Ptr, MemRef}
   require Func
   use ENIFSupport
 
@@ -38,14 +38,20 @@ defmodule AddENIF do
         Func.func add(function_type: Type.function([env_t, term_t, term_t], [term_t])) do
           region do
             block _(env >>> env_t, left >>> term_t, right >>> term_t) do
-              size = Attribute.integer(Type.i32(), 64)
-              size = Arith.constant(value: size) >>> ~t<i32>
-              left_ptr = LLVM.alloca(size, elem_type: Type.i64()) >>> ~t{!llvm.ptr}
-              right_ptr = LLVM.alloca(size, elem_type: Type.i64()) >>> ~t{!llvm.ptr}
-              ENIF.get_int64(env, left, left_ptr) >>> :infer
-              ENIF.get_int64(env, right, right_ptr) >>> :infer
-              left = LLVM.load(left_ptr) >>> Type.i64()
-              right = LLVM.load(right_ptr) >>> Type.i64()
+              left_ptr =
+                MemRef.alloca(operand_segment_sizes: :infer) >>>
+                  Type.memref!([], Type.i64(ctx: ctx), memory_space: ~a{#ptr.generic_space})
+
+              right_ptr =
+                MemRef.alloca(operand_segment_sizes: :infer) >>>
+                  Type.memref!([], Type.i64(ctx: ctx), memory_space: ~a{#ptr.generic_space})
+
+              left_ptr_arg = Ptr.to_ptr(left_ptr) >>> ~t{!ptr.ptr<#ptr.generic_space>}
+              right_ptr_arg = Ptr.to_ptr(right_ptr) >>> ~t{!ptr.ptr<#ptr.generic_space>}
+              ENIF.get_int64(env, left, left_ptr_arg) >>> :infer
+              ENIF.get_int64(env, right, right_ptr_arg) >>> :infer
+              left = MemRef.load(left_ptr) >>> Type.i64()
+              right = MemRef.load(right_ptr) >>> Type.i64()
               sum = Arith.addi(left, right) >>> Type.i64()
               sum = ENIF.make_int64(env, sum) >>> :infer
               Func.return(sum) >>> []

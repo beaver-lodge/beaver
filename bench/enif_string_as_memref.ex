@@ -2,9 +2,17 @@ defmodule ENIFStringAsMemRef do
   @moduledoc false
   alias Beaver.ENIF
   use Beaver
-  alias MLIR.Dialect.{Func, MemRef, Index, LLVM, Arith, CF}
+  alias MLIR.Dialect.{Func, MemRef, Index, Arith, CF, Ptr}
   require Func
   use ENIFSupport
+
+  defp dim0_size_as_i64(%Beaver.SSA{arguments: [m], ctx: ctx, blk: blk}) do
+    mlir ctx: ctx, blk: blk do
+      zero = Index.constant(value: Attribute.index(0)) >>> Type.index()
+      len = MemRef.dim(m, zero) >>> :infer
+      Index.casts(len) >>> ~t<i64>
+    end
+  end
 
   @impl ENIFSupport
   def create(ctx) do
@@ -25,16 +33,8 @@ defmodule ENIFStringAsMemRef do
         Func.func str_as_memref_get_len(function_type: Type.function([env_t, term_t], [term_t])) do
           region do
             block _(env >>> env_t, s >>> term_t) do
-              one = Arith.constant(value: Attribute.integer(Type.i(32), 1)) >>> :infer
-              b_ptr = LLVM.alloca(one, elem_type: ENIF.Type.binary()) >>> ~t{!llvm.ptr}
-              ENIF.inspect_binary(env, s, b_ptr) >>> :infer
-              b = LLVM.load(b_ptr) >>> ENIF.Type.binary()
-              size = LLVM.extractvalue(b, position: ~a{array<i64: 0>}) >>> Type.i64()
-              d_ptr = LLVM.extractvalue(b, position: ~a{array<i64: 1>}) >>> ~t{!llvm.ptr}
-              m = ENIF.ptr_to_memref(d_ptr, size) >>> :infer
-              zero = Index.constant(value: Attribute.index(0)) >>> Type.index()
-              len = MemRef.dim(m, zero) >>> :infer
-              len = Index.casts(len) >>> ~t<i64>
+              m = ENIF.inspect_binary_as_memref(env, s) >>> :infer
+              len = dim0_size_as_i64(m) >>> :infer
               len = ENIF.make_int64(env, len) >>> :infer
               Func.return(len) >>> []
             end
@@ -50,8 +50,7 @@ defmodule ENIFStringAsMemRef do
           region do
             block _(env >>> env_t, s >>> term_t) do
               one = Arith.constant(value: Attribute.integer(Type.i(32), 1)) >>> :infer
-              b_ptr = LLVM.alloca(one, elem_type: ENIF.Type.binary()) >>> ~t{!llvm.ptr}
-              success = ENIF.inspect_binary(env, s, b_ptr) >>> :infer
+              success = ENIF.is_binary(env, s) >>> :infer
 
               success =
                 Arith.cmpi(success, one, predicate: Arith.cmp_i_predicate(:eq)) >>> Type.i1()
@@ -61,33 +60,35 @@ defmodule ENIFStringAsMemRef do
 
             block exit_blk() do
               msg = MemRef.get_global(name: Attribute.flat_symbol_ref(global_s)) >>> global_t
+              size = msg |> MLIR.Value.type() |> MLIR.ShapedType.dim_size(0)
+              size = Arith.constant(value: Attribute.integer(Type.i64(), size)) >>> :infer
 
-              size =
-                msg
-                |> MLIR.Value.type()
-                |> MLIR.CAPI.mlirShapedTypeGetDimSize(0)
-                |> Beaver.Native.to_term()
+              term_ptr =
+                MemRef.alloca(operand_segment_sizes: :infer) >>>
+                  Type.memref!([], ENIF.Type.term(ctx: ctx), memory_space: ~a{#ptr.generic_space})
 
-              size = Arith.constant(value: Attribute.integer(Type.i(64), size)) >>> :infer
-              term_ptr = LLVM.alloca(one, elem_type: ENIF.Type.term()) >>> ~t{!llvm.ptr}
-              d_ptr = ENIF.make_new_binary(env, size, term_ptr) >>> :infer
-              m = ENIF.ptr_to_memref(d_ptr, size) >>> :infer
-              MemRef.copy(msg, m) >>> []
-              msg = LLVM.load(term_ptr) >>> ENIF.Type.term()
+              term_ptr_arg = Ptr.to_ptr(term_ptr) >>> ~t{!ptr.ptr<#ptr.generic_space>}
+              # assign the term and return the pointer to binary data
+              m = ENIF.make_new_binary_as_memref(env, size, term_ptr_arg) >>> :infer
+              MemRef.copy(source: msg, target: m) >>> []
+              # load the term from the memref and wrap it as exception
+              msg = MemRef.load(term_ptr) >>> ENIF.Type.term()
               e = ENIF.raise_exception(env, msg) >>> []
               Func.return(e) >>> []
             end
 
             block successor() do
-              b = LLVM.load(b_ptr) >>> ENIF.Type.binary()
-              size = LLVM.extractvalue(b, position: ~a{array<i64: 0>}) >>> Type.i64()
-              d_ptr = LLVM.extractvalue(b, position: ~a{array<i64: 1>}) >>> ~t{!llvm.ptr}
-              m1 = ENIF.ptr_to_memref(d_ptr, size) >>> :infer
-              term_ptr = LLVM.alloca(one, elem_type: ENIF.Type.term()) >>> ~t{!llvm.ptr}
-              d_ptr = ENIF.make_new_binary(env, size, term_ptr) >>> :infer
-              m2 = ENIF.ptr_to_memref(d_ptr, size) >>> :infer
-              MemRef.copy(m1, m2) >>> []
-              b = LLVM.load(term_ptr) >>> ENIF.Type.term()
+              m1 = ENIF.inspect_binary_as_memref(env, s) >>> :infer
+              size = dim0_size_as_i64(m1) >>> :infer
+
+              term_ptr =
+                MemRef.alloca(operand_segment_sizes: :infer) >>>
+                  Type.memref!([], ENIF.Type.term(ctx: ctx), memory_space: ~a{#ptr.generic_space})
+
+              term_ptr_arg = Ptr.to_ptr(term_ptr) >>> ~t{!ptr.ptr<#ptr.generic_space>}
+              m2 = ENIF.make_new_binary_as_memref(env, size, term_ptr_arg) >>> :infer
+              MemRef.copy(source: m1, target: m2) >>> []
+              b = MemRef.load(term_ptr) >>> ENIF.Type.term()
               Func.return(b) >>> []
             end
           end
