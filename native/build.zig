@@ -17,7 +17,12 @@ fn generateWrapper(b: *std.Build, generated_dir: []const u8, mlir_include_dir: [
 
     // Generate wrapper files using clang AST
     _ = b.run(&.{
-        "sh", "-c", b.fmt("zig cc -E -Xclang -ast-dump=json {s}/include/mlir-c/Beaver/wrapper.h -I include -I {s} | tee {s}/wrapper.h.clang.ast.json | elixir tools/wrapper/gen.exs --elixir {s}/capi_functions.ex --zig {s}/wrapper.zig", .{ generated_dir, mlir_include_dir, generated_dir, b.install_path, generated_dir }),
+        "sh", "-c", b.fmt(
+            \\zig cc -E -Xclang -ast-dump=json "{s}/include/mlir-c/Beaver/wrapper.h" \
+            \\  -I include -I "{s}" \
+            \\| tee "{s}/wrapper.h.clang.ast.json" \
+            \\| elixir tools/wrapper/gen.exs --elixir "{s}/capi_functions.ex" --zig "{s}/wrapper.zig"
+        , .{ generated_dir, mlir_include_dir, generated_dir, b.install_path, generated_dir }),
     });
 }
 
