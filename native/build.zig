@@ -59,7 +59,17 @@ fn createODSExtractionStep(b: *std.Build, generated_dir: []const u8, mlir_includ
     });
 
     const dump_ods = b.addSystemCommand(&.{
-        "sh", "-c", b.fmt("elixir tools/ods-extract/dump_ods.exs --mlir-include-dir {s} | xargs {s}/tools/ods-extract -I {s} -I {s}/mlir/Dialect/ArmSME/IR -I {s}/mlir/Dialect/IRDL/IR -I {s}/mlir/Dialect/UB/IR -write-if-changed -o {s}/ods_dump.json", .{ mlir_include_dir, b.install_path, mlir_include_dir, mlir_include_dir, mlir_include_dir, mlir_include_dir, generated_dir }),
+        "sh",
+        "-c",
+        b.fmt(
+            \\elixir tools/ods-extract/dump_ods.exs --mlir-include-dir "{s}" \
+            \\| xargs "{s}/tools/ods-extract" \
+            \\   -I "{s}" \
+            \\   -I "{s}/mlir/Dialect/ArmSME/IR" \
+            \\   -I "{s}/mlir/Dialect/IRDL/IR" \
+            \\   -I "{s}/mlir/Dialect/UB/IR" \
+            \\   -write-if-changed -o "{s}/ods_dump.json"
+        , .{ mlir_include_dir, b.install_path, mlir_include_dir, mlir_include_dir, mlir_include_dir, mlir_include_dir, generated_dir }),
     });
     dump_ods.step.dependOn(cmake_step);
     dump_ods.step.dependOn(&create_include_dir.step);
