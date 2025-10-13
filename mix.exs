@@ -23,6 +23,12 @@ defmodule Beaver.MixProject do
         make_precompiler_nif_versions: [
           versions: fn _ -> ["2.16", "2.17"] end
         ],
+        make_precompiler_priv_paths: [
+          "lib/libmlir*",
+          "lib/libBeaver*",
+          "lib/libMLIRBeaver*",
+          "*.ex"
+        ],
         make_args: ~w{-j},
         make_cwd: "native",
         make_clean: ["clean"]

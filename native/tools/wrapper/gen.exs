@@ -85,18 +85,17 @@ defmodule Updater do
         end
       end
       |> List.flatten()
-      |> Enum.join("\n")
 
     txt = """
-    pub const prelude = @import("prelude.zig");
-    pub const c = prelude.c;
-    pub const diagnostic = @import("diagnostic.zig");
-    const nif = prelude.nif;
-    const nifDirtyCPU = prelude.nifDirtyCPU;
-    const nifDirtyIO = prelude.nifDirtyIO;
-    pub const nif_entries = .{
-    #{entries}
-    };
+    const e = @import("kinda").erl_nif;
+    pub fn nif_entries(comptime prelude: anytype, comptime diagnostic: anytype) [#{length(entries)}]e.ErlNifFunc {
+        const nif = prelude.nif;
+        const nifDirtyCPU = prelude.nifDirtyCPU;
+        const nifDirtyIO = prelude.nifDirtyIO;
+        return .{
+        #{entries |> Enum.join("\n")}
+        };
+    }
     """
 
     if opts[:zig] do
