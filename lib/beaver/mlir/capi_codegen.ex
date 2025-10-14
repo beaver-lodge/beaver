@@ -45,7 +45,9 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
           Diagnostic
           DiagnosticSeverity
           PassManager
+          RewritePattern
           RewritePatternSet
+          RewritePatternCallbacks
           ExecutionEngine
           Operation.State
           SymbolTable

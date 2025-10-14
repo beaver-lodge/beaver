@@ -34,7 +34,7 @@ defmodule Beaver.MLIR.Dialect do
                   _ ->
                     "`#{full_name}`"
                 end)
-
+          @file full_name
           def unquote(func_name)(ssa) do
             eval_ssa(%Beaver.SSA{ssa | op: unquote(full_name)})
           end
@@ -55,7 +55,7 @@ defmodule Beaver.MLIR.Dialect do
     end
   end
 
-  defmacro define_modules(name) do
+  defmacro define(name) do
     quote bind_quoted: [d: name] do
       alias Beaver.MLIR.Dialect
       module_name = d |> Dialect.Registry.normalize_dialect_name()
@@ -64,6 +64,7 @@ defmodule Beaver.MLIR.Dialect do
       ops = Dialect.Registry.ops(d)
 
       defmodule module_name do
+        @file d
         use Beaver.MLIR.Dialect,
           dialect: d,
           ops: ops

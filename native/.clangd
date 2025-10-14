@@ -1,2 +1,2 @@
 CompileFlags:
-  CompilationDatabase: ../_build/test/lib/beaver/cmake_build
+  CompilationDatabase: ../_build/test/lib/beaver/priv/cmake_build

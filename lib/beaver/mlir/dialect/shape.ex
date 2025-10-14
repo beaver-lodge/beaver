@@ -1,2 +1,2 @@
 require Beaver.MLIR.Dialect
-Beaver.MLIR.Dialect.define_modules("shape")
+Beaver.MLIR.Dialect.define("shape")
