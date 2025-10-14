@@ -34,7 +34,7 @@ defmodule Beaver.MLIR.Dialect do
                   _ ->
                     "`#{full_name}`"
                 end)
-          @file full_name
+
           def unquote(func_name)(ssa) do
             eval_ssa(%Beaver.SSA{ssa | op: unquote(full_name)})
           end
@@ -64,7 +64,6 @@ defmodule Beaver.MLIR.Dialect do
       ops = Dialect.Registry.ops(d)
 
       defmodule module_name do
-        @file d
         use Beaver.MLIR.Dialect,
           dialect: d,
           ops: ops
