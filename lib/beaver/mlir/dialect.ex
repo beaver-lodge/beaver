@@ -55,7 +55,7 @@ defmodule Beaver.MLIR.Dialect do
     end
   end
 
-  defmacro define_modules(name) do
+  defmacro define(name) do
     quote bind_quoted: [d: name] do
       alias Beaver.MLIR.Dialect
       module_name = d |> Dialect.Registry.normalize_dialect_name()

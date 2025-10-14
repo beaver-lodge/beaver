@@ -1,2 +1,2 @@
 require Beaver.MLIR.Dialect
-Beaver.MLIR.Dialect.define_modules("llvm")
+Beaver.MLIR.Dialect.define("llvm")

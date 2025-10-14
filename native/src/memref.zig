@@ -1,5 +1,3 @@
-const std = @import("std");
-const mem = @import("std").mem;
 const mlir_capi = @import("mlir_capi.zig");
 pub const c = @import("prelude.zig").c;
 const kinda = @import("kinda");

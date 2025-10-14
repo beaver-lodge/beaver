@@ -26,23 +26,34 @@ fn generateWrapper(b: *std.Build, generated_dir: []const u8, mlir_include_dir: [
     });
 }
 
-fn createCMakeStep(b: *std.Build, llvm_cmake_dir: []const u8, mlir_cmake_dir: []const u8) *std.Build.Step {
+fn createCMakeStep(b: *std.Build, llvm_cmake_dir: []const u8, mlir_cmake_dir: []const u8, optimize: std.builtin.OptimizeMode) *std.Build.Step {
     const step = b.step("cmake", "Build and install CMake targets");
 
     const cmake_build_dir = b.pathJoin(&.{ b.install_path, "cmake_build" });
+    const cmake_cache_path = b.pathJoin(&.{ cmake_build_dir, "CMakeCache.txt" });
 
     // cmake_build command
-    const cmake_configure = b.addSystemCommand(&.{
-        "cmake",                                    "-G",                                       "Ninja",                                                "-B", cmake_build_dir,
-        b.fmt("-DLLVM_DIR={s}", .{llvm_cmake_dir}), b.fmt("-DMLIR_DIR={s}", .{mlir_cmake_dir}), b.fmt("-DCMAKE_INSTALL_PREFIX={s}", .{b.install_path}),
+    const cmake_configure = b.addSystemCommand(&.{ "cmake", "-G", "Ninja", "-B", cmake_build_dir });
+    cmake_configure.addArgs(&.{
+        b.fmt("-DLLVM_DIR={s}", .{llvm_cmake_dir}),
+        b.fmt("-DMLIR_DIR={s}", .{mlir_cmake_dir}),
+        b.fmt("-DCMAKE_INSTALL_PREFIX={s}", .{b.install_path}),
+        b.fmt("-DCMAKE_BUILD_TYPE={s}", .{switch (optimize) {
+            .Debug => "Debug",
+            .ReleaseSafe => "RelWithDebInfo",
+            .ReleaseFast => "Release",
+            .ReleaseSmall => "MinSizeRel",
+        }}),
     });
-    step.dependOn(&cmake_configure.step);
-
     const cmake_build_install = b.addSystemCommand(&.{
         "cmake", "--build", cmake_build_dir, "--target", "install",
     });
-    cmake_build_install.step.dependOn(&cmake_configure.step);
     step.dependOn(&cmake_build_install.step);
+
+    std.fs.accessAbsolute(cmake_cache_path, .{}) catch {
+        step.dependOn(&cmake_configure.step);
+        cmake_build_install.step.dependOn(&cmake_configure.step);
+    };
     return step;
 }
 
@@ -88,7 +99,14 @@ fn createODSExtractionStep(b: *std.Build, generated_dir: []const u8, mlir_includ
 
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
-    const optimize = b.standardOptimizeOption(.{});
+    var optimize = b.standardOptimizeOption(.{});
+    if (std.posix.getenv("MIX_ENV")) |env| {
+        if (std.mem.eql(u8, env, "test")) {
+            optimize = .Debug;
+        } else if (std.mem.eql(u8, env, "dev") or std.mem.eql(u8, env, "prod")) {
+            optimize = .ReleaseSafe;
+        }
+    }
 
     // Environment variables and paths
     const llvm_config_path = b.option([]const u8, "llvm-config", "Path to llvm-config") orelse std.posix.getenv("LLVM_CONFIG_PATH") orelse "llvm-config";
@@ -98,16 +116,16 @@ pub fn build(b: *std.Build) void {
     const llvm_lib_dir = std.mem.trim(u8, llvm_lib_dir_raw, " \t\n\r");
     const llvm_cmake_dir = b.pathJoin(&.{ llvm_lib_dir, "cmake", "llvm" });
     const mlir_cmake_dir = b.pathJoin(&.{ llvm_lib_dir, "cmake", "mlir" });
-    const llvm_install_dir = b.pathJoin(&.{ llvm_lib_dir, ".." });
+    const llvm_install_dir = b.pathResolve(&.{ llvm_lib_dir, ".." });
     const mlir_include_dir = b.pathJoin(&.{ llvm_install_dir, "include" });
-    std.log.info("Using LLVM installation: {s}\n", .{llvm_install_dir});
+    std.log.info("Using LLVM installation: {s}", .{llvm_install_dir});
 
     b.addSearchPrefix(llvm_install_dir);
     // add install path to search prefixes because CMake will shared this path as its install prefix
     b.addSearchPrefix(b.install_path);
 
     generateWrapper(b, generated_dir, mlir_include_dir);
-    const cmake_step = createCMakeStep(b, llvm_cmake_dir, mlir_cmake_dir);
+    const cmake_step = createCMakeStep(b, llvm_cmake_dir, mlir_cmake_dir, optimize);
     // ODS extraction step (depends on cmake_build)
     const ods_extraction_step = createODSExtractionStep(b, generated_dir, mlir_include_dir, cmake_step);
     b.getInstallStep().dependOn(ods_extraction_step);
@@ -124,7 +142,7 @@ pub fn build(b: *std.Build) void {
     });
     lib.step.dependOn(cmake_step);
 
-    std.log.info("Building {s}, {any}\n", .{ lib.name, lib.root_module.optimize });
+    std.log.info("Building {s}, {any}", .{ lib.name, lib.root_module.optimize });
 
     const kinda = b.dependency("kinda", .{});
     lib.root_module.addImport("kinda", kinda.module("kinda"));
