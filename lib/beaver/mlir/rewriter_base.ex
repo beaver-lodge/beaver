@@ -10,7 +10,7 @@ defmodule Beaver.MLIR.RewriterBase do
         |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
     suffix = String.replace_prefix(suffix, "Get", "")
     helper_name = Macro.underscore(suffix)
-    args = Macro.generate_arguments(arity, Beaver.MLIR.PatternRewriter)
+    args = Macro.generate_arguments(arity, __MODULE__)
     defdelegate unquote(:"#{helper_name}")(unquote_splicing(args)), to: MLIR.CAPI, as: f
   end
 
