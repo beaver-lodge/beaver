@@ -5,5 +5,5 @@ defmodule Beaver.MLIR.FrozenRewritePatternSet do
   use Kinda.ResourceKind, forward_module: Beaver.Native
   alias Beaver.MLIR
   defdelegate destroy(set), to: MLIR.CAPI, as: :mlirFrozenRewritePatternSetDestroy
-  defdelegate destroy(destroy, set), to: MLIR.RewritePatternSet, as: :destroy
+  defdelegate destroy(ctx, set), to: MLIR.RewritePatternSet, as: :destroy
 end
