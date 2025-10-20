@@ -36,14 +36,14 @@ defmodule ToyPassWithInit do
 
   def initialize(ctx, nil) do
     frozen_pat_set = Beaver.Pattern.compile_patterns(ctx, [ToyPass.replace_add_op(benefit: 2)])
-    {:ok, %{patterns: frozen_pat_set, owned: true}}
+    {:ok, %{patterns: frozen_pat_set}}
   end
 
-  def clone(%{patterns: frozen_pat_set}) do
-    %{patterns: frozen_pat_set, owned: false}
+  def destruct(nil) do
+    :ok
   end
 
-  def destruct(%{patterns: frozen_pat_set, owned: true}) do
+  def destruct(%{patterns: frozen_pat_set}) do
     MLIR.CAPI.mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
   end
 
