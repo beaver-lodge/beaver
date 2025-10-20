@@ -2,6 +2,7 @@
 #define APPS_BEAVER_NATIVE_MLIR_NIF_MET_INCLUDE_MLIR_C_BEAVER_PASS_H_
 
 #include "mlir-c/Pass.h"
+#include "mlir-c/Rewrite.h"
 
 #ifdef __cplusplus
 extern "C" {

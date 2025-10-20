@@ -12,7 +12,7 @@ end
 defmodule TestFuncPass do
   @moduledoc false
   alias Beaver.MLIR
-  use MLIR.Pass, on: "func.func"
+  use MLIR.Pass, on: MLIR.Dialect.Func.func()
 
   def run(%Beaver.MLIR.Operation{} = op, state) do
     MLIR.verify!(op)
@@ -22,7 +22,7 @@ end
 
 defmodule ErrInit do
   @moduledoc false
-  use Beaver.MLIR.Pass, on: "func.func"
+  use Beaver.MLIR.Pass, on: Beaver.MLIR.Dialect.Func.func()
 
   def initialize(_ctx, nil) do
     {:error, "new state used in cleanup"}
@@ -36,7 +36,7 @@ end
 
 defmodule IncorrectInitReturns do
   @moduledoc false
-  use Beaver.MLIR.Pass, on: "func.func"
+  use Beaver.MLIR.Pass, on: Beaver.MLIR.Dialect.Func.func()
 
   def initialize(_ctx, nil) do
     :some

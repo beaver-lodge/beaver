@@ -16,6 +16,7 @@
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
+#include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/TableGen/Error.h"
 #include "llvm/TableGen/Parser.h"
 
@@ -195,6 +196,7 @@ LogicalResult parseTdInclude(
   llvm::SourceMgr tdSrcMgr;
   tdSrcMgr.AddNewSourceBuffer(std::move(*includeBuffer), SMLoc());
   tdSrcMgr.setIncludeDirs(parserSrcMgr.getIncludeDirs());
+  tdSrcMgr.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
 
   // Set the diagnostic handler for the tablegen source manager.
   tdSrcMgr.setDiagHandler(
@@ -246,6 +248,7 @@ int main(int argc, char **argv) {
   ods::Context odsContext;
   llvm::SourceMgr sourceMgr;
   sourceMgr.setIncludeDirs(includeDirs);
+  sourceMgr.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
 
   for (const auto &inputFilename : inputFilenames) {
     // Process the .td file directly

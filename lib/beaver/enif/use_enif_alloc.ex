@@ -1,8 +1,8 @@
-defmodule UseENIFAlloc do
+defmodule Beaver.ENIF.UseENIFAlloc do
   @moduledoc false
   use Beaver
-  use MLIR.Pass, on: "builtin.module"
-  alias MLIR.Dialect.LLVM
+  alias MLIR.Dialect.{LLVM, Func}
+  use MLIR.Pass, on: Func.func()
   import Beaver.Pattern
 
   def initialize(ctx, nil) do
@@ -12,15 +12,19 @@ defmodule UseENIFAlloc do
     ]
 
     frozen_pat_set = Beaver.Pattern.compile_patterns(ctx, patterns)
-    {:ok, %{patterns: frozen_pat_set}}
+    {:ok, %{patterns: frozen_pat_set, owned: true}}
   end
 
-  def destruct(nil) do
-    :ok
+  def clone(%{patterns: frozen_pat_set}) do
+    %{patterns: frozen_pat_set, owned: false}
   end
 
-  def destruct(%{patterns: frozen_pat_set}) do
+  def destruct(%{patterns: frozen_pat_set, owned: true}) do
     MLIR.CAPI.mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
+  end
+
+  def destruct(%{owned: false}) do
+    :ok
   end
 
   defpat replace_alloc(benefit: 10) do
@@ -59,8 +63,7 @@ defmodule UseENIFAlloc do
   end
 
   def run(op, %{patterns: patterns} = state) do
-    module = MLIR.Module.from_operation(op)
-    MLIR.apply!(module, patterns)
+    MLIR.apply!(op, patterns)
     state
   end
 end

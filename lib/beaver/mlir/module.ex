@@ -43,6 +43,10 @@ defmodule Beaver.MLIR.Module do
   use Kinda.ResourceKind, forward_module: Beaver.Native
 
   defdelegate destroy(module), to: CAPI, as: :mlirModuleDestroy
+
+  @doc """
+  Gets the body of the module, i.e. the only block it contains.
+  """
   defdelegate body(module), to: CAPI, as: :mlirModuleGetBody
   defdelegate from_operation(op), to: CAPI, as: :mlirModuleFromOperation
   defdelegate empty(location), to: CAPI, as: :mlirModuleCreateEmpty

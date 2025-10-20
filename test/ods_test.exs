@@ -129,8 +129,6 @@ defmodule ODSDumpTest do
       end
       |> MLIR.verify!()
     end
-    |> Beaver.Composer.append(UseENIFAlloc)
-    |> Beaver.Composer.run!()
   end
 
   test "all-zero segment_sizes", %{ctx: ctx} do

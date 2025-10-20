@@ -292,7 +292,7 @@ defmodule Beaver.MLIR do
     MLIR.verify!(op)
 
     {result, diagnostics} =
-      beaverModuleApplyPatternsAndFoldGreedilyWithDiagnostics(ctx, op, frozen_pat_set)
+      Beaver.MLIR.Rewrite.apply_patterns(op, frozen_pat_set)
 
     if should_destroy do
       mlirFrozenRewritePatternSetDestroy(frozen_pat_set)

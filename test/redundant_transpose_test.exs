@@ -44,7 +44,7 @@ defmodule RedundantTransposeTest do
 
     ir_string =
       ir
-      |> Beaver.Composer.nested("func.func", [
+      |> Beaver.Composer.nested(Func.func(), [
         DeduplicateTransposePass
       ])
       |> canonicalize

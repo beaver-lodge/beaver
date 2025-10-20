@@ -246,7 +246,13 @@ defmodule Beaver.Changeset do
     {all_values, MLIR.ODS.segment_sizes(segment_sizes)}
   end
 
-  defp update_changeset_with_operands(changeset, operands, segment_sizes, attributes, context) do
+  defp update_changeset_with_operands(
+         %__MODULE__{} = changeset,
+         operands,
+         segment_sizes,
+         attributes,
+         context
+       ) do
     operand_segment_sizes =
       attributes[:operand_segment_sizes] || attributes[:operandSegmentSizes]
 

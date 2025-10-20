@@ -1,3 +1,3 @@
-mlir==22.0.0.2025101401+cuda.e8f721e6; sys_platform == "linux" and platform_machine == "x86_64"
-mlir==22.0.0.2025101401+e8f721e6; sys_platform != "linux" or platform_machine != "x86_64"
+mlir==22.0.0.2025101901+cuda.5a20b72f; sys_platform == "linux" and platform_machine == "x86_64"
+mlir==22.0.0.2025101901+5a20b72f; sys_platform != "linux" or platform_machine != "x86_64"
 --find-links https://github.com/jackalcooper/mlir-wheels/releases/expanded_assets/latest

@@ -51,6 +51,28 @@ defmodule Beaver.MLIR.CAPI do
       ),
       do: :erlang.nif_error(:not_loaded)
 
+  def beaver_raw_create_mlir_rewrite_pattern(
+        _root_name,
+        _benefit,
+        _context,
+        _construct,
+        _destruct,
+        _match_and_rewrite
+      ),
+      do: :erlang.nif_error(:not_loaded)
+
+  def beaver_raw_destroy_frozen_rewrite_pattern_set(_ctx, _set),
+    do: :erlang.nif_error(:not_loaded)
+
+  def beaver_raw_destroy_rewrite_pattern_set(_ctx, _set),
+    do: :erlang.nif_error(:not_loaded)
+
+  def beaver_raw_apply_rewrite_pattern_set_with_module(_ctx, _mod, _set, _cfg),
+    do: :erlang.nif_error(:not_loaded)
+
+  def beaver_raw_apply_rewrite_pattern_set_with_op(_ctx, _op, _set, _cfg),
+    do: :erlang.nif_error(:not_loaded)
+
   def beaver_raw_run_pm_on_op_async(_pm, _op), do: :erlang.nif_error(:not_loaded)
   def beaver_raw_destroy_pm_async(_pm), do: :erlang.nif_error(:not_loaded)
 

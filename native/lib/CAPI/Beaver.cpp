@@ -2,6 +2,7 @@
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
+#include "mlir/CAPI/Rewrite.h"
 #include "mlir/Dialect/IRDL/IRDLLoading.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/ExtensibleDialect.h"
@@ -246,9 +247,9 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverIRDLGetDefinedAttr(
       DynamicAttr::get));
 }
 
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverModuleApplyPatternsAndFoldGreedily(
-    MlirModule module, MlirFrozenRewritePatternSet patterns) {
-  return mlirApplyPatternsAndFoldGreedily(module, patterns, {});
+MLIR_CAPI_EXPORTED MlirGreedyRewriteDriverConfig
+beaverGreedyRewriteDriverConfigGet() {
+  return {};
 }
 
 MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context,

@@ -50,11 +50,17 @@ defmodule PDLTest do
     frozen_pat_set =
       pdl_pat_mod |> mlirRewritePatternSetFromPDLPatternModule() |> mlirFreezeRewritePattern()
 
-    result = beaverModuleApplyPatternsAndFoldGreedily(ir_module, frozen_pat_set)
+    result =
+      mlirApplyPatternsAndFoldGreedily(
+        ir_module,
+        frozen_pat_set,
+        beaverGreedyRewriteDriverConfigGet()
+      )
+
     assert MLIR.LogicalResult.success?(result)
     cb.(ir_module)
     mlirPDLPatternModuleDestroy(pdl_pat_mod)
-    mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
+    MLIR.FrozenRewritePatternSet.destroy(frozen_pat_set)
   end
 
   test "AreEqualOp", %{ctx: ctx} do

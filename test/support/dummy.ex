@@ -46,7 +46,7 @@ defmodule Beaver.Dummy do
   def readme(ctx) do
     mlir ctx: ctx do
       module do
-        unquote(File.read!("test/readme_example.exs") |> Code.string_to_quoted!())
+        unquote(File.read!("test/support/readme_example.exs") |> Code.string_to_quoted!())
       end
     end
   end

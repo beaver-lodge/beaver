@@ -29,7 +29,7 @@ defmodule PassTest do
                  ~r"exception in pass run"s,
                  fn ->
                    ir
-                   |> Beaver.Composer.nested("func.func", [
+                   |> Beaver.Composer.nested(Func.func(), [
                      PassRaisingException
                    ])
                    |> Beaver.Composer.run!()
@@ -86,7 +86,7 @@ defmodule PassTest do
 
   test "parallel processing func.func", %{ctx: ctx} do
     Beaver.Dummy.gigantic(ctx)
-    |> Beaver.Composer.nested("func.func", {"DoNothingHere", "func.func", fn _ -> :ok end})
+    |> Beaver.Composer.nested(Func.func(), {"DoNothingHere", Func.func(), fn _ -> :ok end})
     |> Beaver.Composer.run!()
   end
 
@@ -94,7 +94,7 @@ defmodule PassTest do
     n = 100
 
     Beaver.Dummy.gigantic(ctx, n)
-    |> Beaver.Composer.nested("func.func", AllCallbacks)
+    |> Beaver.Composer.nested(Func.func(), AllCallbacks)
     |> canonicalize()
     |> Beaver.Composer.run!()
 
@@ -112,7 +112,7 @@ defmodule PassTest do
 
     composer =
       Beaver.Composer.new(ctx: ctx)
-      |> Beaver.Composer.nested("func.func", AllCallbacks)
+      |> Beaver.Composer.nested(Func.func(), AllCallbacks)
       |> canonicalize()
 
     pm = Beaver.Composer.init(composer)
@@ -140,7 +140,7 @@ defmodule PassTest do
 
     composer =
       Beaver.Composer.new(ctx: ctx)
-      |> Beaver.Composer.nested("func.func", ErrInit)
+      |> Beaver.Composer.nested(Func.func(), ErrInit)
       |> canonicalize()
 
     pm = Beaver.Composer.init(composer, verifier: true)
@@ -159,7 +159,7 @@ defmodule PassTest do
 
     composer =
       Beaver.Composer.new(ctx: ctx)
-      |> Beaver.Composer.nested("func.func", IncorrectInitReturns)
+      |> Beaver.Composer.nested(Func.func(), IncorrectInitReturns)
       |> canonicalize()
 
     pm = Beaver.Composer.init(composer, verifier: true)

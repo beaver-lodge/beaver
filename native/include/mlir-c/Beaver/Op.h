@@ -101,9 +101,8 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverIRDLGetDefinedAttr(MlirStringRef dialect,
                                                           MlirStringRef attr,
                                                           MlirAttribute params);
 
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverModuleApplyPatternsAndFoldGreedily(
-    MlirModule module, MlirFrozenRewritePatternSet patterns);
-
+MLIR_CAPI_EXPORTED MlirGreedyRewriteDriverConfig
+beaverGreedyRewriteDriverConfigGet();
 MLIR_CAPI_EXPORTED MlirType beaverDenseElementsAttrGetType(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED intptr_t beaverShapedTypeGetNumElements(MlirType type);

@@ -3,7 +3,10 @@ defmodule Beaver.Application do
   require Logger
   @moduledoc false
   def start(_type, _args) do
-    [Beaver.MLIR.Pass.global_registrar_child_specs()]
+    [
+      Beaver.MLIR.Pass.global_registrar_child_specs(),
+      Beaver.MLIR.RewritePattern.global_registrar_child_specs()
+    ]
     |> List.flatten()
     |> Supervisor.start_link(strategy: :one_for_one)
   end
