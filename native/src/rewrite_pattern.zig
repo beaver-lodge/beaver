@@ -244,7 +244,7 @@ const CallbackDispatcher = struct {
                     return beam.make_atom(env, "async");
                 } else {
                     defer beam.allocator.destroy(doer);
-                    return error.FailToDestroyRewritePattern;
+                    return error.FailToApplyRewritePatternSet;
                 }
             }
         };
