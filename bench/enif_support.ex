@@ -32,6 +32,7 @@ defmodule ENIFSupport do
     |> convert_linalg_to_loops()
     |> convert_scf_to_cf
     |> convert_to_llvm()
+    |> Beaver.Composer.nested(MLIR.Dialect.Func.func(), Beaver.ENIF.UseENIFAlloc)
     |> then(&if(System.get_env(@print_flag), do: MLIR.Transform.print_ir(&1), else: &1))
     |> reconcile_unrealized_casts
     |> Beaver.Composer.run!()

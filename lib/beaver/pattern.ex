@@ -284,10 +284,7 @@ defmodule Beaver.Pattern do
     end
 
     MLIR.verify!(pattern_module)
-
-    pdl_pat_mod = mlirPDLPatternModuleFromModule(pattern_module)
-
-    pdl_pat_mod
+    |> mlirPDLPatternModuleFromModule()
     |> mlirRewritePatternSetFromPDLPatternModule()
     |> mlirFreezeRewritePattern()
     |> tap(fn _ -> MLIR.Module.destroy(pattern_module) end)

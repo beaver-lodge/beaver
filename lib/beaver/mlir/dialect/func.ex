@@ -11,7 +11,11 @@ defmodule Beaver.MLIR.Dialect.Func do
   """
   defmacro func(call, opts) do
     quote do
-      Beaver.MLIR.Dialect.Func.func_like(unquote(call), "func.func", unquote(opts))
+      Beaver.MLIR.Dialect.Func.func_like(
+        unquote(call),
+        Beaver.MLIR.Dialect.Func.func(),
+        unquote(opts)
+      )
     end
   end
 

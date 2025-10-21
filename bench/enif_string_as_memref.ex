@@ -73,7 +73,7 @@ defmodule ENIFStringAsMemRef do
               MemRef.copy(source: msg, target: m) >>> []
               # load the term from the memref and wrap it as exception
               msg = MemRef.load(term_ptr) >>> ENIF.Type.term()
-              e = ENIF.raise_exception(env, msg) >>> []
+              e = ENIF.raise_exception(env, msg) >>> :infer
               Func.return(e) >>> []
             end
 

@@ -77,9 +77,18 @@ defmodule Beaver.ENIF do
   end
 
   # Insert a function call to an ENIF function into a MLIR block with appropriate return type.
-  defp call(f, %Beaver.SSA{arguments: arguments, blk: block, ctx: ctx, loc: loc}) do
+  defp call(f, %Beaver.SSA{arguments: arguments, results: results, blk: block, ctx: ctx, loc: loc}) do
     mlir blk: block, ctx: ctx do
-      {_, t} = Beaver.ENIF.signature(Beaver.Env.context(), f)
+      t =
+        case results do
+          [:infer] ->
+            {_, t} = Beaver.ENIF.signature(Beaver.Env.context(), f)
+            t
+
+          _ ->
+            results
+        end
+
       symbol = Attribute.flat_symbol_ref(f)
       Func.call(arguments, callee: symbol, loc: loc) >>> t
     end

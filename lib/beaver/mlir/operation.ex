@@ -51,17 +51,23 @@ defmodule Beaver.MLIR.Operation do
     state |> Beaver.Native.ptr() |> mlirOperationCreate()
   end
 
+  @doc """
+  Normalize the results of the given operation in the following way:
+  - If the operation has no result, return the operation itself.
+  - If the operation has one result, return that result.
+  - If the operation has multiple results, return a list of results.
+  """
   def results(%__MODULE__{} = op) do
     case mlirOperationGetNumResults(op) |> Beaver.Native.to_term() do
       0 ->
         op
 
       1 ->
-        mlirOperationGetResult(op, 0)
+        result(op, 0)
 
       n when n > 1 ->
         for i <- 0..(n - 1)//1 do
-          mlirOperationGetResult(op, i)
+          result(op, i)
         end
     end
   end
@@ -80,6 +86,7 @@ defmodule Beaver.MLIR.Operation do
   defdelegate parent(op), to: MLIR.CAPI, as: :mlirOperationGetParentOperation
   defdelegate destroy(op), to: MLIR.CAPI, as: :mlirOperationDestroy
   defdelegate clone(op), to: MLIR.CAPI, as: :mlirOperationClone
+  defdelegate result(op, pos), to: MLIR.CAPI, as: :mlirOperationGetResult
 
   def from_module(%MLIR.Module{} = module) do
     mlirModuleGetOperation(module)

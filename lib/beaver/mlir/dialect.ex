@@ -35,11 +35,13 @@ defmodule Beaver.MLIR.Dialect do
                     "`#{full_name}`"
                 end)
 
-          def unquote(func_name)(ssa) do
+          def unquote(func_name)(%Beaver.SSA{} = ssa) do
             eval_ssa(%Beaver.SSA{ssa | op: unquote(full_name)})
           end
 
-          @doc false
+          @doc """
+          Return op name `#{full_name}` as a bitstring.
+          """
           def unquote(func_name)() do
             unquote(full_name)
           end

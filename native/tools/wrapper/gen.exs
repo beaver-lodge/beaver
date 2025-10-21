@@ -5,7 +5,7 @@ if Version.match?(System.version(), "< 1.18.0") do
 end
 
 defmodule Updater do
-  @with_diagnostics ~w{mlirAttributeParseGet mlirOperationVerify mlirTypeParseGet mlirModuleCreateParse beaverModuleApplyPatternsAndFoldGreedily mlirExecutionEngineCreate}
+  @with_diagnostics ~w{mlirAttributeParseGet mlirOperationVerify mlirTypeParseGet mlirModuleCreateParse mlirExecutionEngineCreate}
                     |> Enum.map(&String.to_atom/1)
   @normal_and_dirty ~w{mlirExecutionEngineInvokePacked}
                     |> Enum.map(&String.to_atom/1)
