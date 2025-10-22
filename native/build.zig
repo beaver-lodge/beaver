@@ -45,7 +45,7 @@ fn createCMakeStep(b: *std.Build, llvm_cmake_dir: []const u8, mlir_cmake_dir: []
             .ReleaseSmall => "MinSizeRel",
         }}),
     });
-    const cmake_build_install = b.addSystemCommand(&.{ "cmake", "--build", cmake_build_dir, "--target", "install", "--", "--quiet" });
+    const cmake_build_install = b.addSystemCommand(&.{ "cmake", "--build", cmake_build_dir, "--target", "install" });
     step.dependOn(&cmake_build_install.step);
 
     std.fs.accessAbsolute(cmake_cache_path, .{}) catch {
