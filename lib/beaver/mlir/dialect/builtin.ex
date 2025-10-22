@@ -10,7 +10,7 @@ defmodule Beaver.MLIR.Dialect.Builtin do
   Macro to create a module and insert ops into its body. Beaver.region/1 shouldn't be called because module's one-block region will be created.
   """
   defmacro module(attrs \\ [], do: body) do
-    {block_cache, block_restore} = Beaver.parent_scope_block_caching(__CALLER__)
+    {ip_cache, ip_restore} = Beaver.parent_scope_ip_caching(__CALLER__)
 
     quote do
       ctx = Beaver.Env.context()
@@ -36,11 +36,11 @@ defmodule Beaver.MLIR.Dialect.Builtin do
       end
 
       module_body_block = Beaver.MLIR.Module.body(module)
-      unquote(block_cache)
-      Kernel.var!(beaver_internal_env_block) = module_body_block
-      %Beaver.MLIR.Block{} = Kernel.var!(beaver_internal_env_block)
+      unquote(ip_cache)
+      Kernel.var!(beaver_internal_env_ip) = module_body_block
+      %Beaver.MLIR.Block{} = Kernel.var!(beaver_internal_env_ip)
       unquote(body)
-      unquote(block_restore)
+      unquote(ip_restore)
       module
     end
   end

@@ -42,15 +42,24 @@ defmodule Beaver.Env do
   end
 
   @doc """
+  Return insertion point in the DSL environment
+  """
+  defmacro ip() do
+    if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_ip, nil}) do
+      quote do
+        Kernel.var!(beaver_internal_env_ip)
+      end
+    else
+      raise CompileError, Beaver.Env.compile_err_msg("insertion point", __CALLER__)
+    end
+  end
+
+  @doc """
   Return block in the DSL environment
   """
   defmacro block() do
-    if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_block, nil}) do
-      quote do
-        Kernel.var!(beaver_internal_env_block)
-      end
-    else
-      raise CompileError, Beaver.Env.compile_err_msg(MLIR.Block, __CALLER__)
+    quote do
+      Beaver.Env.ip() |> MLIR.InsertionPoint.to_block() || Beaver.not_found(__ENV__)
     end
   end
 
@@ -68,9 +77,22 @@ defmodule Beaver.Env do
   end
 
   @doc false
+  def compile_err_msg(entity, %Macro.Env{} = env) when is_bitstring(entity) do
+    [file: env.file, line: env.line, description: "no valid #{entity} in the environment"]
+  end
+
   def compile_err_msg(entity, %Macro.Env{} = env)
       when entity in [MLIR.Context, MLIR.Region, MLIR.Block] do
     m = Module.split(entity) |> List.last() |> String.downcase()
-    [file: env.file, line: env.line, description: "no valid #{m} in the environment"]
+    compile_err_msg(m, env)
+  end
+
+  def valid_insertion_point?(ip) do
+    case ip do
+      %MLIR.Block{} -> true
+      %MLIR.PatternRewriter{} -> true
+      %MLIR.RewriterBase{} -> true
+      _ -> false
+    end
   end
 end

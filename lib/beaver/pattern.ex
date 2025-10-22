@@ -8,7 +8,7 @@ defmodule Beaver.Pattern do
 
   @doc false
   def insert_pat(cb, ctx, block, name, opts) do
-    mlir ctx: ctx, blk: block do
+    mlir ctx: ctx, ip: block do
       benefit = Keyword.fetch!(opts, :benefit) |> then(&Attribute.integer(Type.i16(), &1))
 
       PDL.pattern benefit: benefit, sym_name: Attribute.string(name) do
@@ -30,7 +30,7 @@ defmodule Beaver.Pattern do
       def unquote(name)(opts \\ [benefit: 1]) do
         &Beaver.Pattern.insert_pat(
           fn pat_block ->
-            mlir ctx: &1, blk: pat_block do
+            mlir ctx: &1, ip: pat_block do
               unquote(block_ast)
             end
           end,
@@ -136,13 +136,13 @@ defmodule Beaver.Pattern do
 
   @doc false
   def gen_pdl(blk, %Beaver.Changeset{context: ctx}, %MLIR.Type{} = type) do
-    mlir blk: blk, ctx: ctx do
+    mlir ip: blk, ctx: ctx do
       Beaver.MLIR.Dialect.PDL.type(constantType: type) >>> ~t{!pdl.type}
     end
   end
 
   def gen_pdl(blk, %Beaver.Changeset{context: ctx}, %MLIR.Attribute{} = attribute) do
-    mlir blk: blk, ctx: ctx do
+    mlir ip: blk, ctx: ctx do
       Beaver.MLIR.Dialect.PDL.attribute(value: attribute) >>>
         ~t{!pdl.attribute}
     end
@@ -177,7 +177,7 @@ defmodule Beaver.Pattern do
         block
       )
       when is_list(attributes) do
-    mlir blk: block, ctx: ctx do
+    mlir ip: block, ctx: ctx do
       results = results |> Enum.map(&gen_pdl(block, changeset, &1))
 
       attribute_names =
@@ -211,7 +211,7 @@ defmodule Beaver.Pattern do
         arguments: arguments,
         results: result_types,
         ctx: ctx,
-        blk: block,
+        ip: block,
         loc: loc
       }) do
     ods_operands =
@@ -263,7 +263,7 @@ defmodule Beaver.Pattern do
 
   defp result(blk, %MLIR.Value{} = v, i)
        when is_integer(i) do
-    mlir blk: blk, ctx: MLIR.context(v) do
+    mlir ip: blk, ctx: MLIR.context(v) do
       PDL.result(v, index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), i)) >>>
         ~t{!pdl.value}
     end

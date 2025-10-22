@@ -386,8 +386,8 @@ defmodule Beaver.MLIR.Attribute do
     @doc """
     calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is #{type_name} attribute
     """
-    def unquote(:"#{helper_name}?")(%__MODULE__{} = t) do
-      unquote(f)(t) |> Beaver.Native.to_term()
+    def unquote(:"#{helper_name}?")(%__MODULE__{} = attr) do
+      unquote(f)(attr) |> Beaver.Native.to_term()
     end
   end
 
@@ -412,17 +412,19 @@ defmodule Beaver.MLIR.Attribute do
     __MODULE__.Accessor.new(attr) |> __MODULE__.Accessor.pop(attr, key)
   end
 
-  defdelegate unwrap_type(type_attr), to: MLIR.CAPI, as: :mlirTypeAttrGetValue
-
-  defdelegate unwrap_string(str_attr), to: MLIR.CAPI, as: :mlirStringAttrGetValue
-
-  def unwrap(%__MODULE__{} = attribute) do
+  @doc """
+  Get the value of the attribute. The return type depends on the attribute type:
+  """
+  def value(%__MODULE__{} = attribute) do
     cond do
-      Beaver.Native.to_term(mlirAttributeIsAType(attribute)) ->
-        unwrap_type(attribute)
+      type?(attribute) ->
+        mlirTypeAttrGetValue(attribute)
 
-      Beaver.Native.to_term(mlirAttributeIsAString(attribute)) ->
-        unwrap_string(attribute)
+      string?(attribute) ->
+        mlirStringAttrGetValue(attribute) |> to_string()
+
+      flat_symbol_ref?(attribute) ->
+        mlirFlatSymbolRefAttrGetValue(attribute) |> to_string()
     end
   end
 

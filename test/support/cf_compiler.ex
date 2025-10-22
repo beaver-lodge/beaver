@@ -39,7 +39,7 @@ defmodule MutCompiler do
     {arg = %MLIR.Value{}, acc} = gen_mlir(arg, acc)
 
     mlir =
-      mlir blk: block, ctx: ctx do
+      mlir ip: block, ctx: ctx do
         Func.return(arg) >>> []
       end
 
@@ -90,7 +90,7 @@ defmodule MutCompiler do
         end
       end
 
-    mlir blk: entry, ctx: ctx do
+    mlir ip: entry, ctx: ctx do
       CF.cond_br(condition, true_branch, false_branch) >>> []
     end
 
@@ -121,7 +121,7 @@ defmodule MutCompiler do
     {right = %MLIR.Value{}, acc} = gen_mlir(right, acc)
 
     less =
-      mlir blk: block, ctx: ctx do
+      mlir ip: block, ctx: ctx do
         Arith.cmpf(left, right, predicate: Arith.cmp_f_predicate(:olt)) >>> Type.i1()
       end
 
@@ -135,7 +135,7 @@ defmodule MutCompiler do
     {right = %MLIR.Value{}, acc} = gen_mlir(right, acc)
     # we only work with float 32 for now
     add =
-      mlir blk: block, ctx: ctx do
+      mlir ip: block, ctx: ctx do
         Arith.mulf(left, right) >>> Type.f32()
       end
 

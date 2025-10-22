@@ -139,9 +139,6 @@ defmodule BlockTest do
   end
 
   test "block in env got popped", %{ctx: ctx} do
-    file = __ENV__.file
-    line = __ENV__.line + 3
-
     mlir ctx: ctx do
       module do
         Func.func some_func(function_type: Type.function([], [Type.i32()])) do
@@ -155,6 +152,8 @@ defmodule BlockTest do
       end
       |> MLIR.verify!()
 
+      file = __ENV__.file
+      line = __ENV__.line + 1
       assert {:not_found, [file: ^file, line: ^line]} = Beaver.Env.block()
     end
   end
@@ -182,7 +181,7 @@ defmodule BlockTest do
   end
 
   test "no block to insert to", %{ctx: ctx} do
-    assert_raise CompileError, "nofile:1: no valid block in the environment", fn ->
+    assert_raise CompileError, "nofile:1: no valid insertion point in the environment", fn ->
       Code.eval_quoted(
         quote do
           mlir ctx: var!(ctx) do

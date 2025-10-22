@@ -34,7 +34,7 @@ defmodule Beaver.MLIR.Dialect.Func do
       |> then(
         &Beaver.MLIR.Operation.create(%Beaver.SSA{
           op: unquote(op),
-          blk: Beaver.Env.block(),
+          ip: Beaver.Env.block(),
           ctx: Beaver.Env.context(),
           arguments: [fn -> unquote(body) end | &1]
         })

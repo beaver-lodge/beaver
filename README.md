@@ -190,7 +190,7 @@ end
 v2 =
  %Beaver.SSA{}
   |> Beaver.SSA.put_arguments(value: ~a{1})
-  |> Beaver.SSA.put_block(Beaver.Env.block())
+  |> Beaver.SSA.put_ip(Beaver.Env.block())
   |> Beaver.SSA.put_ctx(Beaver.Env.context())
   |> Beaver.SSA.put_results(~t<i32>)
   |> Arith.constant()

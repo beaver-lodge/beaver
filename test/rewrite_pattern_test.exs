@@ -43,19 +43,14 @@ defmodule RewritePatternTest do
 
   test "rewrite pattern set create and destroy", %{ctx: ctx} do
     assert set = %MLIR.RewritePatternSet{} = MLIR.RewritePatternSet.create(ctx)
-
-    assert pat =
-             %MLIR.RewritePattern{} =
-             Beaver.MLIR.RewritePattern.create(Arith.constant(), ctx: ctx)
-
+    assert pat = Beaver.MLIR.RewritePattern.create(Arith.constant(), ctx: ctx)
     assert :ok = MLIR.RewritePatternSet.add(set, pat)
     assert :ok = MLIR.RewritePatternSet.destroy(ctx, set)
   end
 
   test "rewrite pattern apply failed to converge", %{ctx: ctx} do
     ir = example_ir(ctx)
-
-    assert set = %MLIR.RewritePatternSet{} = MLIR.RewritePatternSet.create(ctx)
+    assert set = MLIR.RewritePatternSet.create(ctx)
 
     assert pat =
              %MLIR.RewritePattern{} =
@@ -67,13 +62,8 @@ defmodule RewritePatternTest do
                match_and_rewrite: &FailedToConvergeRewritePattern.match_and_rewrite/4
              )
 
-    assert :ok = MLIR.RewritePatternSet.add(set, pat)
-
-    assert :ok =
-             MLIR.RewritePatternSet.add(set, Arith.constant(), FailedToConvergeRewritePattern,
-               ctx: ctx
-             )
-
+    MLIR.RewritePatternSet.add(set, pat)
+    MLIR.RewritePatternSet.add(set, Arith.constant(), FailedToConvergeRewritePattern, ctx: ctx)
     assert frozen_set = %MLIR.FrozenRewritePatternSet{} = MLIR.RewritePatternSet.freeze(set)
 
     assert_raise RuntimeError, "pattern application failed to converge", fn ->
@@ -89,9 +79,9 @@ defmodule RewritePatternTest do
     one = MLIR.Attribute.integer(MLIR.Type.i64(ctx: ctx), 1)
 
     if MLIR.Operation.name(op) == Arith.constant() and MLIR.equal?(op[:value], one) do
-      mlir ctx: ctx, blk: MLIR.RewriterBase.block(base) do
+      mlir ctx: ctx, ip: base do
         v = Arith.constant(value: Attribute.integer(MLIR.Type.i64(), 2)) >>> Type.i64()
-        MLIR.RewriterBase.replace_with(base, MLIR.Operation.result(op, 0), v)
+        MLIR.RewriterBase.replace(base, MLIR.Operation.result(op, 0), v)
       end
 
       {:ok, state}
@@ -106,11 +96,11 @@ defmodule RewritePatternTest do
 
     if MLIR.Operation.name(op) == Arith.constant() and
          MLIR.equal?(op[:value], MLIR.Attribute.integer(MLIR.Type.i64(ctx: ctx), 2)) do
-      mlir ctx: ctx, blk: MLIR.RewriterBase.block(base) do
+      mlir ctx: ctx, ip: rewriter do
         {new_const, _} =
           Arith.constant(value: Attribute.integer(MLIR.Type.i64(), 3)) >>> {:op, Type.i64()}
 
-        MLIR.RewriterBase.replace_with(base, op, new_const)
+        MLIR.RewriterBase.replace(base, op, new_const)
       end
 
       {:ok, state}
