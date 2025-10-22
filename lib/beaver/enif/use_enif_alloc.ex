@@ -5,26 +5,6 @@ defmodule Beaver.ENIF.UseENIFAlloc do
   use MLIR.Pass, on: Func.func()
   import Beaver.Pattern
 
-  defmodule ReplaceLLVMOp do
-    use Beaver.MLIR.RewritePattern
-
-    def construct(nil) do
-      {:ok, nil}
-    end
-
-    def destruct(state) do
-      :ok
-    end
-
-    def match_and_rewrite(_pattern, op, rewriter, state) do
-      if MLIR.Operation.name(op) == LLVM.call() do
-        op[:callee] |> MLIR.Attribute.value() |> dbg
-      end
-
-      {:ok, state}
-    end
-  end
-
   def initialize(ctx, nil) do
     patterns = [
       replace_alloc(),
