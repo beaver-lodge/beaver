@@ -6,8 +6,8 @@ defmodule ENIFStringAsMemRef do
   require Func
   use ENIFSupport
 
-  defp dim0_size_as_i64(%Beaver.SSA{arguments: [m], ctx: ctx, blk: blk}) do
-    mlir ctx: ctx, blk: blk do
+  defp dim0_size_as_i64(%Beaver.SSA{arguments: [m], ctx: ctx, ip: blk}) do
+    mlir ctx: ctx, ip: blk do
       zero = Index.constant(value: Attribute.index(0)) >>> Type.index()
       len = MemRef.dim(m, zero) >>> :infer
       Index.casts(len) >>> ~t<i64>
@@ -43,8 +43,8 @@ defmodule ENIFStringAsMemRef do
 
         msg = "not a binary"
         global = MemRef.global(msg) >>> :infer
-        global_t = MLIR.Attribute.unwrap(global[:type])
-        global_s = MLIR.Attribute.unwrap(global[:sym_name])
+        global_t = MLIR.Attribute.value(global[:type])
+        global_s = MLIR.Attribute.value(global[:sym_name])
 
         Func.func alloc_bin_and_copy(function_type: Type.function([env_t, term_t], [term_t])) do
           region do

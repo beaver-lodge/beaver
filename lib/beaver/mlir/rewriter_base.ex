@@ -17,11 +17,11 @@ defmodule Beaver.MLIR.RewriterBase do
   @doc """
   Syntactic sugar for `replace_all_uses_with/3` and `replace_all_op_uses_with_operation/3`.
   """
-  def replace_with(%__MODULE__{} = rewriter, %MLIR.Value{} = from, %MLIR.Value{} = to) do
+  def replace(%__MODULE__{} = rewriter, %MLIR.Value{} = from, %MLIR.Value{} = to) do
     replace_all_uses_with(rewriter, from, to)
   end
 
-  def replace_with(%__MODULE__{} = rewriter, %MLIR.Operation{} = from, %MLIR.Operation{} = to) do
+  def replace(%__MODULE__{} = rewriter, %MLIR.Operation{} = from, %MLIR.Operation{} = to) do
     replace_all_op_uses_with_operation(rewriter, from, to)
   end
 end

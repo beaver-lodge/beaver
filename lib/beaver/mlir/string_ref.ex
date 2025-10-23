@@ -1,6 +1,8 @@
 defmodule Beaver.MLIR.StringRef do
   @moduledoc """
   This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
+
+  call `Kernel.to_string/1` on a `StringRef` to get its content as Elixir bitstring.
   """
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI

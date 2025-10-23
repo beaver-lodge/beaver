@@ -21,13 +21,16 @@ defmodule Beaver.Deferred do
     opts[:ctx]
   end
 
-  @spec fetch_block(opts :: opts) :: MLIR.Block.t() | Macro.t() | nil
-  def fetch_block(opts) do
-    if opts[:block] do
-      raise ArgumentError, "use :blk instead of :block as key"
+  @spec fetch_insertion_point(opts :: opts) ::
+          MLIR.Block.t() | MLIR.PatternRewriter.t() | MLIR.RewriterBase.t() | Macro.t() | nil
+  def fetch_insertion_point(opts) do
+    for key <- [:block, :blk] do
+      if opts[key] do
+        raise ArgumentError, "use :ip instead of :#{key} as key"
+      end
     end
 
-    opts[:blk]
+    opts[:ip]
   end
 
   defp unwrap_f(f, ctx) do

@@ -39,7 +39,7 @@ defmodule Beaver.ENIF do
   Insert external functions of ENIF into given MLIR block
   """
   def declare_external_functions(ctx, block) do
-    mlir ctx: ctx, blk: block do
+    mlir ctx: ctx, ip: block do
       for {name, arg_types, ret_types} <- signatures(ctx) do
         Func.func _(
                     sym_name: "\"#{name}\"",
@@ -77,8 +77,8 @@ defmodule Beaver.ENIF do
   end
 
   # Insert a function call to an ENIF function into a MLIR block with appropriate return type.
-  defp call(f, %Beaver.SSA{arguments: arguments, results: results, blk: block, ctx: ctx, loc: loc}) do
-    mlir blk: block, ctx: ctx do
+  defp call(f, %Beaver.SSA{arguments: arguments, results: results, ip: block, ctx: ctx, loc: loc}) do
+    mlir ip: block, ctx: ctx do
       t =
         case results do
           [:infer] ->

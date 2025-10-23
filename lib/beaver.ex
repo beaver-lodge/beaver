@@ -12,7 +12,7 @@ defmodule Beaver do
       iex> use Beaver
       iex> {ctx, blk} = {MLIR.Context.create(), MLIR.Block.create()}
       iex> alias Beaver.MLIR.Dialect.Arith
-      iex> const = mlir ctx: ctx, blk: blk do
+      iex> const = mlir ctx: ctx, ip: blk do
       iex>   Arith.constant(value: ~a{64: i32}) >>> ~t{i32}
       iex> end
       iex> const |> MLIR.Value.owner!() |> MLIR.verify!()
@@ -83,14 +83,14 @@ defmodule Beaver do
         end
       end
 
-    block_ast =
-      if block = Beaver.Deferred.fetch_block(opts) do
+    ip_ast =
+      if ip = Beaver.Deferred.fetch_insertion_point(opts) do
         quote do
-          Kernel.var!(beaver_internal_env_block) = unquote(block)
+          Kernel.var!(beaver_internal_env_ip) = unquote(ip)
 
-          match?(%MLIR.Block{}, Kernel.var!(beaver_internal_env_block)) ||
+          Beaver.Env.valid_insertion_point?(Kernel.var!(beaver_internal_env_ip)) ||
             raise CompileError,
-                  Beaver.Env.compile_err_msg(MLIR.Block, unquote(Macro.escape(__CALLER__)))
+                  Beaver.Env.compile_err_msg("insertion point", unquote(Macro.escape(__CALLER__)))
         end
       end
 
@@ -102,7 +102,7 @@ defmodule Beaver do
       import Beaver.MLIR.Dialect.Builtin
 
       unquote(ctx_ast)
-      unquote(block_ast)
+      unquote(ip_ast)
       unquote(dsl_block_ast)
     end
   end
@@ -140,22 +140,22 @@ defmodule Beaver do
   end
 
   @doc false
-  def parent_scope_block_caching(caller) do
-    suppress_warning = quote(do: _ = Kernel.var!(beaver_internal_env_block))
+  def parent_scope_ip_caching(caller) do
+    suppress_warning = quote(do: _ = Kernel.var!(beaver_internal_env_ip))
 
-    if Macro.Env.has_var?(caller, {:beaver_internal_env_block, nil}) do
+    if Macro.Env.has_var?(caller, {:beaver_internal_env_ip, nil}) do
       {quote do
-         beaver_internal_parent_scope_block = Kernel.var!(beaver_internal_env_block)
+         beaver_internal_parent_scope_ip = Kernel.var!(beaver_internal_env_ip)
        end,
        quote do
-         Kernel.var!(beaver_internal_env_block) = beaver_internal_parent_scope_block
+         Kernel.var!(beaver_internal_env_ip) = beaver_internal_parent_scope_ip
          unquote(suppress_warning)
        end}
     else
       {nil,
        quote do
          # erase the block in the environment to prevent unintended accessing
-         Kernel.var!(beaver_internal_env_block) = Beaver.not_found(__ENV__)
+         Kernel.var!(beaver_internal_env_ip) = Beaver.not_found(__ENV__)
          unquote(suppress_warning)
        end}
     end
@@ -187,13 +187,13 @@ defmodule Beaver do
   defmacro block(call, do: body) do
     {b_name, args} = Macro.decompose_call(call)
     if not is_atom(b_name), do: raise("block name must be an atom or underscore")
-    {block_cache, block_restore} = parent_scope_block_caching(__CALLER__)
+    {ip_cache, ip_restore} = parent_scope_ip_caching(__CALLER__)
 
     quote do
-      unquote(block_cache)
+      unquote(ip_cache)
 
-      Kernel.var!(beaver_internal_env_block) =
-        beaver_internal_current_block =
+      Kernel.var!(beaver_internal_env_ip) =
+        beaver_internal_current_ip =
         Beaver.Env.block(unquote({b_name, [], nil})) |> unquote(add_arguments(args))
 
       with region = %Beaver.MLIR.Region{} <- Beaver.Env.region() do
@@ -203,8 +203,8 @@ defmodule Beaver do
       unquote_splicing(arguments_variables(args))
       unquote(body)
       # op uses are across blocks, so op within a block can't use an API like Region.under
-      unquote(block_restore)
-      beaver_internal_current_block
+      unquote(ip_restore)
+      beaver_internal_current_ip
     end
   end
 

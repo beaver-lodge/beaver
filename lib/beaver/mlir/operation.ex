@@ -13,7 +13,7 @@ defmodule Beaver.MLIR.Operation do
 
   def create(%Beaver.SSA{
         op: op_name,
-        blk: block,
+        ip: ip,
         arguments: arguments,
         results: results,
         filler: filler,
@@ -34,13 +34,7 @@ defmodule Beaver.MLIR.Operation do
     |> then(fn changeset -> Enum.reduce(results, changeset, &Changeset.add_result(&2, &1)) end)
     |> State.create()
     |> create()
-    |> tap(
-      &case block do
-        %MLIR.Block{} -> MLIR.Block.append(block, &1)
-        {:not_found, _} -> nil
-        nil -> nil
-      end
-    )
+    |> tap(&Beaver.MLIR.InsertionPoint.insert_operation(ip, &1))
   end
 
   def create(%Changeset{} = c) do

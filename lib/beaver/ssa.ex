@@ -14,7 +14,7 @@ defmodule Beaver.SSA do
           arguments: any(),
           results: any(),
           filler: any(),
-          blk: nil,
+          ip: nil,
           ctx: any(),
           loc: any(),
           evaluator: function()
@@ -23,7 +23,7 @@ defmodule Beaver.SSA do
             arguments: [],
             results: [],
             filler: nil,
-            blk: nil,
+            ip: nil,
             ctx: nil,
             loc: nil,
             evaluator: nil
@@ -58,8 +58,8 @@ defmodule Beaver.SSA do
     %__MODULE__{ssa | filler: filler}
   end
 
-  def put_block(%__MODULE__{} = ssa, block) do
-    %__MODULE__{ssa | blk: block}
+  def put_ip(%__MODULE__{} = ssa, ip) do
+    %__MODULE__{ssa | ip: ip}
   end
 
   def put_ctx(%__MODULE__{} = ssa, %MLIR.Context{} = ctx) do
@@ -98,7 +98,7 @@ defmodule Beaver.SSA do
       |> Beaver.SSA.put_location(loc)
       |> Beaver.SSA.put_arguments(args)
       |> Beaver.SSA.put_results(results)
-      |> Beaver.SSA.put_block(Beaver.Env.block())
+      |> Beaver.SSA.put_ip(Beaver.Env.ip())
       |> Beaver.SSA.put_ctx(Beaver.Env.context())
     end
   end

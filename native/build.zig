@@ -20,9 +20,8 @@ fn generateWrapper(b: *std.Build, generated_dir: []const u8, mlir_include_dir: [
         "sh", "-c", b.fmt(
             \\zig cc -E -Xclang -ast-dump=json "{s}/include/mlir-c/Beaver/wrapper.h" \
             \\  -I include -I "{s}" \
-            \\| tee "{s}/wrapper.h.clang.ast.json" \
-            \\| elixir tools/wrapper/gen.exs --elixir "{s}/capi_functions.ex" --zig "{s}/wrapper.zig"
-        , .{ generated_dir, mlir_include_dir, generated_dir, b.install_path, generated_dir }),
+            \\| elixir tools/wrapper/gen_stub.exs --elixir "{s}/capi_functions.ex" --zig "{s}/wrapper.zig"
+        , .{ generated_dir, mlir_include_dir, b.install_path, generated_dir }),
     });
 }
 
@@ -38,6 +37,7 @@ fn createCMakeStep(b: *std.Build, llvm_cmake_dir: []const u8, mlir_cmake_dir: []
         b.fmt("-DLLVM_DIR={s}", .{llvm_cmake_dir}),
         b.fmt("-DMLIR_DIR={s}", .{mlir_cmake_dir}),
         b.fmt("-DCMAKE_INSTALL_PREFIX={s}", .{b.install_path}),
+        b.fmt("-DCMAKE_INSTALL_MESSAGE={s}", .{"LAZY"}),
         b.fmt("-DCMAKE_BUILD_TYPE={s}", .{switch (optimize) {
             .Debug => "Debug",
             .ReleaseSafe => "RelWithDebInfo",
@@ -45,9 +45,7 @@ fn createCMakeStep(b: *std.Build, llvm_cmake_dir: []const u8, mlir_cmake_dir: []
             .ReleaseSmall => "MinSizeRel",
         }}),
     });
-    const cmake_build_install = b.addSystemCommand(&.{
-        "cmake", "--build", cmake_build_dir, "--target", "install",
-    });
+    const cmake_build_install = b.addSystemCommand(&.{ "cmake", "--build", cmake_build_dir, "--target", "install" });
     step.dependOn(&cmake_build_install.step);
 
     std.fs.accessAbsolute(cmake_cache_path, .{}) catch {
@@ -142,7 +140,7 @@ pub fn build(b: *std.Build) void {
     });
     lib.step.dependOn(cmake_step);
 
-    std.log.info("Building {s}, {any}", .{ lib.name, lib.root_module.optimize });
+    std.log.info("Setting optimization mode for {s}: {any}", .{ lib.name, lib.root_module.optimize });
 
     const kinda = b.dependency("kinda", .{});
     lib.root_module.addImport("kinda", kinda.module("kinda"));
