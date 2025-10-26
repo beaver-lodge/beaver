@@ -14,16 +14,14 @@ pub const Token = struct {
     caller_pid: beam.pid = undefined,
     pub var resource_type: beam.resource_type = undefined;
     pub const resource_name = "Beaver" ++ @typeName(@This());
-    fn wait(self: *@This()) void {
+    pub fn wait_logical(self: *@This()) struct { result: mlir_capi.LogicalResult.T, caller: beam.pid } {
         self.mutex.lock();
         defer self.mutex.unlock();
         while (!self.done) {
             self.cond.wait(&self.mutex);
         }
-    }
-    pub fn wait_logical(self: *@This()) mlir_capi.LogicalResult.T {
-        wait(self);
-        return if (self.logical_success) c.mlirLogicalResultSuccess() else c.mlirLogicalResultFailure();
+        const res = if (self.logical_success) c.mlirLogicalResultSuccess() else c.mlirLogicalResultFailure();
+        return .{ .result = res, .caller = self.caller_pid };
     }
     fn signal(self: *@This(), logical_success: bool) void {
         self.mutex.lock();

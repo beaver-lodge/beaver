@@ -1,14 +1,14 @@
 defmodule Beaver.ENIF.UseENIFAlloc do
-  @moduledoc false
+  @moduledoc """
+  Replace LLVM call ops of `malloc` and `free` with `enif_alloc` and `enif_free`.
+  """
   use Beaver
   alias MLIR.Dialect.LLVM
   use MLIR.Pass, on: LLVM.func()
   import Beaver.Pattern
 
   defmodule ReplaceLLVMOp do
-    @moduledoc """
-    A rewrite pattern that replaces LLVM call ops to enif_alloc and enif_free.
-    """
+    @moduledoc false
     use Beaver.MLIR.RewritePattern
 
     def construct(nil) do

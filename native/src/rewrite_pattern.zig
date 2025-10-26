@@ -74,8 +74,8 @@ const CallbackDispatcher = struct {
             }
             const ret = token.wait_logical();
             // Transfer owner ship to last caller
-            this.handler = token.caller_pid;
-            return ret;
+            this.handler = ret.caller;
+            return ret.result;
         }
     }
 

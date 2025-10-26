@@ -35,7 +35,6 @@ defmodule Beaver.MLIR.RewritePattern do
     [{Registry, keys: :unique, name: @registry}]
   end
 
-  # Updated to start the GenServer
   defp start_worker(name) do
     case Server.start_link(name) do
       {:ok, pid} ->
