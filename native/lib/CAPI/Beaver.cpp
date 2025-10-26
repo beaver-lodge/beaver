@@ -255,7 +255,9 @@ beaverGreedyRewriteDriverConfigGet() {
 MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context,
                                              void (*task)(void *), void *arg) {
   if (unwrap(context)->isMultithreadingEnabled()) {
-    unwrap(context)->getThreadPool().async([task, arg]() { task(arg); });
+    unwrap(mlirContextGetThreadPool(context))->async([task, arg]() {
+      task(arg);
+    });
     return true;
   } else {
     return false;

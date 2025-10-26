@@ -35,16 +35,23 @@ defmodule ToyPassWithInit do
   use MLIR.Pass, on: "builtin.module"
 
   def initialize(ctx, nil) do
-    frozen_pat_set = Beaver.Pattern.compile_patterns(ctx, [ToyPass.replace_add_op(benefit: 2)])
-    {:ok, %{patterns: frozen_pat_set}}
+    {set, pattern_module} =
+      Beaver.MLIR.RewritePatternSet.with_pdl_patterns(
+        [ToyPass.replace_add_op(benefit: 2)],
+        ctx: ctx
+      )
+
+    frozen_set = MLIR.RewritePatternSet.freeze(set)
+    MLIR.Module.destroy(pattern_module)
+    {:ok, %{patterns: frozen_set}}
   end
 
   def destruct(nil) do
     :ok
   end
 
-  def destruct(%{patterns: frozen_pat_set}) do
-    MLIR.CAPI.mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
+  def destruct(%{patterns: frozen_set}) do
+    MLIR.FrozenRewritePatternSet.destroy(frozen_set)
   end
 
   def run(%MLIR.Operation{} = operation, %{patterns: patterns} = state) do

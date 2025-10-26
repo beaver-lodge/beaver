@@ -1,16 +1,19 @@
 defmodule Beaver.MLIR.Debug do
   @moduledoc """
-  Configure MLIR debug options.
+  Configure MLIR global debug options.
   """
   alias Beaver.MLIR
   import MLIR.CAPI
 
-  def enable_global_debug(enable \\ true) do
+  @doc """
+  Enable or disable global debugging.
+  """
+  def enable(enable \\ true) do
     mlirEnableGlobalDebug(enable)
   end
 
-  def disable_global_debug() do
-    enable_global_debug(false)
+  def disable() do
+    enable(false)
   end
 
   @doc """
@@ -18,10 +21,10 @@ defmodule Beaver.MLIR.Debug do
 
   ## Examples
 
-      iex> Beaver.MLIR.Debug.global_debug_enabled?()
+      iex> Beaver.MLIR.Debug.enabled?()
       false
   """
-  def global_debug_enabled?() do
+  def enabled?() do
     mlirIsGlobalDebugEnabled() |> Beaver.Native.to_term()
   end
 

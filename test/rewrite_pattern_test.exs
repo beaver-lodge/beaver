@@ -7,14 +7,13 @@ defmodule RewritePatternTest do
   defmodule FailedToConvergeRewritePattern do
     use Beaver.MLIR.RewritePattern
 
-    def construct(nil) do
-      {:ok, [:init_state]}
+    def construct(:init_state) do
+      [:init_state]
     end
 
     def destruct(state) do
       [:init_state | tail] = Enum.reverse(state)
       Enum.all?(tail, &(:match_and_rewrite == &1)) || raise "State corrupted in destruct"
-      :ok
     end
 
     def match_and_rewrite(_pattern, _op, rewriter, state) do
@@ -44,8 +43,8 @@ defmodule RewritePatternTest do
   test "rewrite pattern set create and destroy", %{ctx: ctx} do
     assert set = %MLIR.RewritePatternSet{} = MLIR.RewritePatternSet.create(ctx)
     assert pat = Beaver.MLIR.RewritePattern.create(Arith.constant(), ctx: ctx)
-    assert :ok = MLIR.RewritePatternSet.add(set, pat)
-    assert :ok = MLIR.RewritePatternSet.destroy(ctx, set)
+    assert set = MLIR.RewritePatternSet.add(set, pat)
+    assert :ok = MLIR.RewritePatternSet.threaded_destroy(ctx, set)
   end
 
   test "rewrite pattern apply failed to converge", %{ctx: ctx} do
@@ -57,20 +56,26 @@ defmodule RewritePatternTest do
              MLIR.RewritePattern.create(Arith.constant(),
                ctx: ctx,
                benefit: 10,
+               init_state: :init_state,
                construct: &FailedToConvergeRewritePattern.construct/1,
                destruct: &FailedToConvergeRewritePattern.destruct/1,
                match_and_rewrite: &FailedToConvergeRewritePattern.match_and_rewrite/4
              )
 
     MLIR.RewritePatternSet.add(set, pat)
-    MLIR.RewritePatternSet.add(set, Arith.constant(), FailedToConvergeRewritePattern, ctx: ctx)
+
+    MLIR.RewritePatternSet.add(set, Arith.constant(), FailedToConvergeRewritePattern,
+      ctx: ctx,
+      init_state: :init_state
+    )
+
     assert frozen_set = %MLIR.FrozenRewritePatternSet{} = MLIR.RewritePatternSet.freeze(set)
 
     assert_raise RuntimeError, "pattern application failed to converge", fn ->
       MLIR.Rewrite.apply_patterns!(ir, frozen_set)
     end
 
-    assert :ok = MLIR.FrozenRewritePatternSet.destroy(ctx, frozen_set)
+    assert :ok = MLIR.FrozenRewritePatternSet.threaded_destroy(ctx, frozen_set)
   end
 
   def constant_1_to_2(_pattern, op, rewriter, state) do

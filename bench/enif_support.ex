@@ -14,17 +14,20 @@ defmodule ENIFSupport do
       defoverridable after_verification: 1
 
       @behaviour ENIFSupport
-      def init(ctx) do
+      def init(ctx, opts \\ []) do
         create(ctx)
+        |> Beaver.ENIF.declare_external_functions()
         |> MLIR.verify!()
         |> after_verification()
-        |> ENIFSupport.lower()
+        |> ENIFSupport.lower(opts)
       end
     end
   end
 
   @print_flag "ENIF_SUPPORT_PRINT_IR"
-  def lower(op) do
+  def lower(op, opts) do
+    use_enif_alloc = Keyword.get(opts, :use_enif_alloc, true)
+
     op
     |> then(&if(System.get_env(@print_flag), do: MLIR.Transform.print_ir(&1), else: &1))
     |> Beaver.Composer.nested("func.func", "llvm-request-c-wrappers")
@@ -32,7 +35,12 @@ defmodule ENIFSupport do
     |> convert_linalg_to_loops()
     |> convert_scf_to_cf
     |> convert_to_llvm()
-    |> Beaver.Composer.nested(MLIR.Dialect.Func.func(), Beaver.ENIF.UseENIFAlloc)
+    |> then(
+      &if(use_enif_alloc,
+        do: Beaver.Composer.nested(&1, MLIR.Dialect.LLVM.func(), Beaver.ENIF.UseENIFAlloc),
+        else: &1
+      )
+    )
     |> then(&if(System.get_env(@print_flag), do: MLIR.Transform.print_ir(&1), else: &1))
     |> reconcile_unrealized_casts
     |> Beaver.Composer.run!()

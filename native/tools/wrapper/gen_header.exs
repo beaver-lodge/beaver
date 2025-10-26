@@ -1,6 +1,6 @@
 {opts, _, _} =
   OptionParser.parse(System.argv(),
-    strict: [mlir_include_dir: :string, output: :string]
+    strict: [mlir_include_dir: :string, output: :string, api_json: :boolean]
   )
 
 mlir_include_dir = Path.expand(Keyword.fetch!(opts, :mlir_include_dir))
@@ -71,7 +71,9 @@ stream =
   )
 
 # Run the stream to execute all tasks
-Stream.run(stream)
+if opts[:api_json] do
+  Stream.run(stream)
+end
 
 files = mlir_headers |> Enum.concat(beaver_headers) |> Enum.sort()
 

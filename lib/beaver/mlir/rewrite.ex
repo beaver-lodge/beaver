@@ -23,27 +23,37 @@ defmodule Beaver.MLIR.Rewrite do
     MLIR.CAPI.beaver_raw_apply_rewrite_pattern_set_with_op(ctx, op, set, cfg)
   end
 
-  defp dispatch_loop() do
+  defp dispatch_loop(timeout \\ 2) do
     receive do
       {{:kind, MLIR.LogicalResult, _} = ret, diagnostics} ->
         {Beaver.Native.check!(ret), diagnostics}
-
-      msg ->
-        try do
-          :ok = MLIR.RewritePattern.handle_cb(msg)
-        rescue
-          exception ->
-            Logger.error(Exception.format(:error, exception, __STACKTRACE__))
-            Logger.flush()
-        end
-
-        dispatch_loop()
+    after
+      timeout * 1_000 ->
+        Logger.error("Timeout waiting for pattern apply, timeout: #{inspect(timeout)}")
+        Logger.flush()
+        dispatch_loop(timeout * 2)
     end
+  end
+
+  @ctx_for_pat_apply __MODULE__.CtxForPatApply
+  @doc false
+  def thread_pool_child_spec() do
+    spec = Agent.child_spec(fn -> MLIR.Context.create() end)
+
+    update_in(spec.start, fn {Agent, :start_link, [fun]} ->
+      opts = [name: @ctx_for_pat_apply]
+      {Agent, :start_link, [fun, opts]}
+    end)
+  end
+
+  def stop_thread_pool() do
+    Agent.get(@ctx_for_pat_apply, &MLIR.Context.destroy/1)
+    Agent.stop(@ctx_for_pat_apply)
   end
 
   def apply_patterns(ir, pattern_set) do
     cfg = MLIR.CAPI.beaverGreedyRewriteDriverConfigGet()
-    ctx = MLIR.context(ir)
+    ctx = Agent.get(@ctx_for_pat_apply, & &1)
     :async = do_apply(ctx, ir, pattern_set, cfg)
     dispatch_loop()
   end
@@ -77,7 +87,7 @@ defmodule Beaver.MLIR.Rewrite do
     try do
       apply_patterns!(ir, frozen_set)
     after
-      MLIR.FrozenRewritePatternSet.destroy(ctx, frozen_set)
+      MLIR.FrozenRewritePatternSet.threaded_destroy(ctx, frozen_set)
     end
   end
 end

@@ -46,31 +46,43 @@ defmodule Beaver.MLIR.PassManager do
     end
   end
 
-  defp dispatch_loop() do
+  defp dispatch_loop(timeout \\ 2) do
     receive do
       {{:kind, MLIR.LogicalResult, _}, diagnostics} = ret when is_list(diagnostics) ->
         Beaver.Native.check!(ret)
 
-      :ok ->
-        :ok
-
       msg ->
         try do
-          :ok = MLIR.Pass.handle_cb(msg)
+          :ok = MLIR.Pass.handle_cb(msg, nil)
         rescue
           exception ->
             Logger.error(Exception.format(:error, exception, __STACKTRACE__))
             Logger.flush()
         end
 
-        dispatch_loop()
+        dispatch_loop(timeout)
+    after
+      timeout * 1_000 ->
+        msg = "Timeout waiting for pass manager callback, timeout: #{inspect(timeout)}"
+
+        if timeout < 16 do
+          Logger.warning(msg)
+        else
+          Logger.error(msg)
+        end
+
+        Logger.flush()
+        dispatch_loop(timeout * 2)
     end
   end
 
   def destroy(%__MODULE__{ref: pm_ref}) do
     case beaver_raw_destroy_pm_async(pm_ref) do
       :async ->
-        dispatch_loop()
+        receive do
+          :pm_destroy_done ->
+            :ok
+        end
 
       ret ->
         Beaver.Native.check!(ret)

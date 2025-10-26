@@ -55,8 +55,18 @@ defmodule Beaver.MLIR.UnrankedMemRefDescriptor do
   allocated by the runtime.
   This is useful when the memory was allocated by a JIT-compiled function
   and needs to be freed after use.
+
+  The `deallocator` parameter specifies the deallocation method:
+    - `:c` - uses standard C `free` function.
+    - `:enif` - uses Erlang NIF's `enif_free` function.
   """
-  def free(%__MODULE__{ref: descriptor}) do
-    MLIR.CAPI.beaver_raw_unranked_memref_descriptor_deallocate(descriptor)
+  def free(%__MODULE__{ref: descriptor}, deallocator \\ :c) do
+    case deallocator do
+      :c ->
+        MLIR.CAPI.beaver_raw_unranked_memref_descriptor_deallocate_with_c(descriptor)
+
+      :enif ->
+        MLIR.CAPI.beaver_raw_unranked_memref_descriptor_deallocate_with_enif(descriptor)
+    end
   end
 end

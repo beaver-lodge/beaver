@@ -4,11 +4,12 @@ defmodule Beaver.MLIR.RewritePattern do
   """
   require Logger
   alias Beaver.MLIR
+  alias __MODULE__.Server
   use Kinda.ResourceKind, forward_module: Beaver.Native
   @type state() :: any()
 
-  @callback construct(state :: state()) :: {:ok, state()} | {:error, state()}
-  @callback destruct(state :: state()) :: :ok
+  @callback construct(state :: state()) :: state()
+  @callback destruct(state :: state()) :: any()
   @callback match_and_rewrite(
               pattern :: MLIR.RewritePattern.t(),
               op :: MLIR.Operation.t(),
@@ -33,8 +34,8 @@ defmodule Beaver.MLIR.RewritePattern do
     [{Registry, keys: :unique, name: @registry}]
   end
 
-  defp start_worker(name) do
-    case Agent.start_link(fn -> nil end, name: name) do
+  defp start_worker(name, init_state) do
+    case Server.start_link(name, init_state) do
       {:ok, pid} ->
         pid
 
@@ -46,75 +47,18 @@ defmodule Beaver.MLIR.RewritePattern do
     end
   end
 
-  defp safe_cast(pid, token_ref, f) do
-    Agent.cast(pid, fn state ->
-      try do
-        f.(state)
-        |> tap(fn _ ->
-          MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, true)
-        end)
-      rescue
-        exception ->
-          Logger.error(Exception.format(:error, exception, __STACKTRACE__))
-          Logger.flush()
-          MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
-          state
-      catch
-        {:rewrite_err, state} ->
-          MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
-          state
-      end
-    end)
-  end
-
   @doc false
-  def handle_cb({:construct, token_ref, construct, id}) do
-    {:via, Registry, {@registry, id}}
-    |> start_worker()
-    |> safe_cast(token_ref, fn state ->
-      case construct.(state) do
-        {:ok, state} ->
-          state
+  def handle_cb({:construct, token_ref, construct, id}, init_state) do
+    pid =
+      {:via, Registry, {@registry, id}}
+      |> start_worker(init_state)
 
-        _ ->
-          raise ArgumentError, "Failed to initialize rewrite pattern"
-      end
-    end)
-  end
-
-  def handle_cb({:destruct, token_ref, destruct, id}) do
-    Registry.dispatch(@registry, id, fn entries ->
-      for {pid, _ctx} <- entries do
-        safe_cast(pid, token_ref, fn state ->
-          :ok = destruct.(state)
-        end)
-
-        :ok = Agent.stop(pid)
-      end
-    end)
-  end
-
-  def handle_cb({:matchAndRewrite, token_ref, match_and_rewrite, id, pattern, op, rewriter}) do
-    Registry.dispatch(@registry, id, fn entries ->
-      for {pid, _ctx} <- entries do
-        kind_args = Enum.map([pattern, op, rewriter], &Beaver.Native.check!/1)
-
-        safe_cast(
-          pid,
-          token_ref,
-          &case apply(match_and_rewrite, kind_args ++ [&1]) do
-            {:ok, state} ->
-              state
-
-            {:error, state} ->
-              throw({:rewrite_err, state})
-          end
-        )
-      end
-    end)
+    # Cast to the GenServer worker to handle construction
+    GenServer.cast(pid, {:construct, token_ref, construct})
   end
 
   def create(root_name, opts) do
+    init_state = opts[:init_state]
     benefit = opts[:benefit] || 1
     ctx = opts[:ctx] || raise ArgumentError, "option :ctx is required"
     construct = opts[:construct] || (&Beaver.FallbackPattern.construct/1)
@@ -134,12 +78,93 @@ defmodule Beaver.MLIR.RewritePattern do
       )
 
     receive do
-      msg -> __MODULE__.handle_cb(msg)
+      msg -> handle_cb(msg, init_state)
     end
 
     receive do
       {:kind, __MODULE__, ref} = msg when is_reference(ref) ->
         msg |> Beaver.Native.check!()
+    end
+  end
+end
+
+defmodule Beaver.MLIR.RewritePattern.Server do
+  @moduledoc false
+  use GenServer
+  require Logger
+  alias Beaver.MLIR
+
+  # Client API
+
+  def start_link(name, state) do
+    GenServer.start_link(__MODULE__, state, name: name)
+  end
+
+  # Server Callbacks
+
+  @impl true
+  def init(initial_state) do
+    {:ok, initial_state}
+  end
+
+  @impl true
+  def handle_cast({:construct, token_ref, construct_fun}, state) do
+    try do
+      new_state = construct_fun.(state)
+      MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, true)
+      {:noreply, new_state}
+    rescue
+      exception ->
+        Logger.error(Exception.format(:error, exception, __STACKTRACE__))
+        Logger.flush()
+        MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
+        {:noreply, state}
+    end
+  end
+
+  @impl true
+  def handle_info(
+        {:matchAndRewrite, token_ref, match_and_rewrite, _id, pattern, op, rewriter},
+        state
+      ) do
+    try do
+      kind_args = Enum.map([pattern, op, rewriter], &Beaver.Native.check!/1)
+
+      case apply(match_and_rewrite, kind_args ++ [state]) do
+        {:ok, new_state} ->
+          MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, true)
+          {:noreply, new_state}
+
+        {:error, new_state} ->
+          # This throw is caught by the `catch` block below
+          throw({:rewrite_err, new_state})
+      end
+    rescue
+      exception ->
+        Logger.error(Exception.format(:error, exception, __STACKTRACE__))
+        Logger.flush()
+        MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
+        {:noreply, state}
+    catch
+      {:rewrite_err, new_state} ->
+        MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
+        # Store the new state, even on rewrite error
+        {:noreply, new_state}
+    end
+  end
+
+  @impl true
+  def handle_info({:destruct, token_ref, destruct, _id}, state) do
+    try do
+      destruct.(state)
+      MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, true)
+      {:stop, :normal, nil}
+    rescue
+      exception ->
+        Logger.error(Exception.format(:error, exception, __STACKTRACE__))
+        Logger.flush()
+        MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
+        {:stop, :normal, nil}
     end
   end
 end

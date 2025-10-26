@@ -19,20 +19,27 @@ defmodule UnrankedMemRefDescriptorTest do
     assert 3 = UnrankedMemRefDescriptor.rank(d)
   end
 
-  test "abi", %{ctx: ctx} do
-    d = UnrankedMemRefDescriptor.empty()
-    opaque_ptr = d |> Beaver.Native.opaque_ptr()
+  describe "abi" do
+    for free <- [:c, :enif] do
+      use_enif_alloc = free == :enif
 
-    TestingUnrankedMemRefABI.init(ctx)
-    |> tap(fn %ENIFSupport{engine: e} ->
-      MLIR.ExecutionEngine.invoke!(e, "assign_meta", [opaque_ptr])
-    end)
+      test "alloc and free with #{free}", %{ctx: ctx} do
+        d = UnrankedMemRefDescriptor.empty()
+        opaque_ptr = d |> Beaver.Native.opaque_ptr()
 
-    assert 2 = UnrankedMemRefDescriptor.rank(d)
-    assert 0 = UnrankedMemRefDescriptor.offset(d)
-    assert [2, 3] = UnrankedMemRefDescriptor.sizes(d)
-    assert [3, 1] = UnrankedMemRefDescriptor.strides(d)
-    assert :ok = UnrankedMemRefDescriptor.free(d)
-    assert :noop = UnrankedMemRefDescriptor.free(d)
+        TestingUnrankedMemRefABI.init(ctx, use_enif_alloc: unquote(use_enif_alloc))
+        |> tap(fn %ENIFSupport{engine: e} ->
+          MLIR.ExecutionEngine.invoke!(e, "assign_meta", [opaque_ptr])
+        end)
+
+        assert 2 = UnrankedMemRefDescriptor.rank(d)
+        assert 0 = UnrankedMemRefDescriptor.offset(d)
+        assert [2, 3] = UnrankedMemRefDescriptor.sizes(d)
+        assert [3, 1] = UnrankedMemRefDescriptor.strides(d)
+        free = unquote(free)
+        assert :ok = UnrankedMemRefDescriptor.free(d, free)
+        assert :noop = UnrankedMemRefDescriptor.free(d, free)
+      end
+    end
   end
 end

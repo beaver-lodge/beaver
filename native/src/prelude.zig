@@ -20,6 +20,6 @@ pub fn nifDirtyIO(comptime name: []const u8, comptime nif_name: ?[]const u8) e.E
 }
 
 const result = @import("kinda").result;
-pub fn beaverRawNIFOfWorker(worker: anytype, comptime field_name: []const u8, comptime arity: usize) e.ErlNifFunc {
+pub fn beaverRawNIF(worker: anytype, comptime field_name: []const u8, comptime arity: usize) e.ErlNifFunc {
     return result.nif("beaver_raw_" ++ field_name, arity, @field(worker, field_name)).entry;
 }

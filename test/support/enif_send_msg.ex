@@ -10,7 +10,6 @@ defmodule ENIFSendMsg do
   def create(ctx) do
     mlir ctx: ctx do
       module do
-        Beaver.ENIF.declare_external_functions(Beaver.Env.context(), Beaver.Env.block())
         env_t = ENIF.Type.env(ctx: ctx)
         term_t = ENIF.Type.term()
         pid_t = ENIF.Type.pid(ctx: ctx)
