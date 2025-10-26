@@ -44,8 +44,8 @@ defmodule RewritePatternTest do
   test "rewrite pattern set create and destroy", %{ctx: ctx} do
     assert set = %MLIR.RewritePatternSet{} = MLIR.RewritePatternSet.create(ctx)
     assert pat = Beaver.MLIR.RewritePattern.create(Arith.constant(), ctx: ctx)
-    assert :ok = MLIR.RewritePatternSet.add(set, pat)
-    assert :ok = MLIR.RewritePatternSet.destroy(ctx, set)
+    assert set = MLIR.RewritePatternSet.add(set, pat)
+    assert :ok = MLIR.RewritePatternSet.threaded_destroy(ctx, set)
   end
 
   test "rewrite pattern apply failed to converge", %{ctx: ctx} do
@@ -70,7 +70,7 @@ defmodule RewritePatternTest do
       MLIR.Rewrite.apply_patterns!(ir, frozen_set)
     end
 
-    assert :ok = MLIR.FrozenRewritePatternSet.destroy(ctx, frozen_set)
+    assert :ok = MLIR.FrozenRewritePatternSet.threaded_destroy(ctx, frozen_set)
   end
 
   def constant_1_to_2(_pattern, op, rewriter, state) do

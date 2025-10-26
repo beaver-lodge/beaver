@@ -1,9 +1,48 @@
 defmodule Beaver.ENIF.UseENIFAlloc do
   @moduledoc false
   use Beaver
-  alias MLIR.Dialect.{LLVM, Func}
-  use MLIR.Pass, on: Func.func()
+  alias MLIR.Dialect.LLVM
+  use MLIR.Pass, on: LLVM.func()
   import Beaver.Pattern
+
+  defmodule ReplaceLLVMOp do
+    @moduledoc """
+    A rewrite pattern that replaces LLVM call ops to enif_alloc and enif_free.
+    """
+    use Beaver.MLIR.RewritePattern
+
+    def construct(nil) do
+      {:ok, :llvm_pat_state}
+    end
+
+    def destruct(_state) do
+      :ok
+    end
+
+    def match_and_rewrite(_pattern, op, rewriter, state) do
+      if MLIR.Operation.name(op) == LLVM.call() and MLIR.Attribute.value(op[:callee]) == "malloc" do
+        ctx = MLIR.context(op)
+        ptr = MLIR.Operation.result(op, 0)
+
+        mlir ctx: ctx, ip: rewriter do
+          new_ptr =
+            LLVM.call(
+              callee_operands: Beaver.Walker.operands(op) |> Enum.to_list(),
+              callee: Attribute.flat_symbol_ref("enif_alloc"),
+              operand_segment_sizes: :infer,
+              op_bundle_sizes: ~a{array<i32>}
+            ) >>> MLIR.Value.type(ptr)
+
+          MLIR.PatternRewriter.replace(rewriter, ptr, new_ptr)
+          MLIR.PatternRewriter.erase_op(rewriter, op)
+        end
+
+        {:ok, state}
+      else
+        {:error, state}
+      end
+    end
+  end
 
   def initialize(ctx, nil) do
     patterns = [
@@ -11,19 +50,30 @@ defmodule Beaver.ENIF.UseENIFAlloc do
       replace_free()
     ]
 
-    frozen_pat_set = Beaver.Pattern.compile_patterns(ctx, patterns)
-    {:ok, %{patterns: frozen_pat_set, owned: true}}
+    set = Beaver.Pattern.compile_patterns(ctx, patterns)
+
+    frozen_set =
+      set
+      |> MLIR.RewritePatternSet.add(LLVM.call(), ReplaceLLVMOp, ctx: ctx)
+      |> MLIR.RewritePatternSet.freeze()
+
+    {:ok, %{patterns: frozen_set, owning: true, ctx: ctx}}
   end
 
-  def clone(%{patterns: frozen_pat_set}) do
-    %{patterns: frozen_pat_set, owned: false}
+  def clone(%{patterns: frozen_set, owning: true}) do
+    %{patterns: frozen_set, owning: false}
   end
 
-  def destruct(%{patterns: frozen_pat_set, owned: true}) do
-    MLIR.CAPI.mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
+  def destruct(%{patterns: frozen_set, owning: true, ctx: ctx}) do
+    MLIR.FrozenRewritePatternSet.threaded_destroy(ctx, frozen_set)
   end
 
-  def destruct(%{owned: false}) do
+  def destruct(%{owning: false}) do
+    :ok
+  end
+
+  # the state is nil when initialization fails
+  def destruct(nil) do
     :ok
   end
 
@@ -62,7 +112,7 @@ defmodule Beaver.ENIF.UseENIFAlloc do
     end
   end
 
-  def run(op, %{patterns: patterns} = state) do
+  def run(op, %{patterns: patterns, owning: false} = state) do
     MLIR.apply!(op, patterns)
     state
   end

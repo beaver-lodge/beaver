@@ -1,6 +1,7 @@
 const std = @import("std");
 const mlir_capi = @import("mlir_capi.zig");
-pub const c = @import("prelude.zig").c;
+const prelude = @import("prelude.zig");
+pub const c = prelude.c;
 const result = @import("kinda").result;
 const kinda = @import("kinda");
 const memref = @import("memref.zig");
@@ -28,20 +29,20 @@ pub const UnrankedMemRefDescriptor = extern struct {
 };
 
 // NIF: Create empty unranked memref
-pub fn unranked_memref_empty(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+pub fn unranked_memref_descriptor_empty(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const rank: i64 = try beam.get(i64, env, args[0]);
     const d = try UnrankedMemRefDescriptor.init(rank);
     return UnrankedMemRefDescriptor.resource.make(env, d);
 }
 
 // NIF: Get rank
-pub fn unranked_memref_get_rank(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+pub fn unranked_memref_descriptor_get_rank(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
     return beam.make_i64(env, d.rank);
 }
 
 // NIF: Get offset
-pub fn unranked_memref_get_offset(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+pub fn unranked_memref_descriptor_get_offset(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
     // Dispatch to cast to the correct type before accessing the field.
     inline for (supported_ranks_including_zero) |R| {
@@ -82,57 +83,62 @@ fn get_ranked_field(env: beam.env, arg: beam.term, comptime field_name: []const 
 }
 
 // NIF: Get sizes as Erlang list
-pub fn unranked_memref_get_sizes(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+pub fn unranked_memref_descriptor_get_sizes(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     return get_ranked_field(env, args[0], "sizes");
 }
 
 // NIF: Get strides as Erlang list
-pub fn unranked_memref_get_strides(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+pub fn unranked_memref_descriptor_get_strides(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     return get_ranked_field(env, args[0], "strides");
 }
 
-// NIF: Free the externally allocated buffer
-pub fn unranked_memref_deallocate(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
-    if (d.rank == 0) {
-        const zero_rank = @as(*memref.RankedMemRefDescriptor(0), @ptrCast(@alignCast(d.descriptor)));
-        if (zero_rank.allocated) |ptr| {
-            // Memory is assumed to be allocated by a C-compatible allocator.
-            std.c.free(ptr);
-            zero_rank.allocated = null;
-            zero_rank.aligned = null;
-            return beam.make_ok(env);
-        } else {
-            return beam.make_atom(env, "noop");
-        }
-    } else {
-        // Dispatch to cast to the correct type before freeing.
-        inline for (supported_ranks_excluding_zero) |R| {
-            if (d.rank == R) {
-                const D = memref.RankedMemRefDescriptor(R);
-                const ranked = @as(*D, @ptrCast(@alignCast(d.descriptor)));
-                if (ranked.allocated) |ptr| {
-                    std.c.free(ptr);
-                    ranked.allocated = null;
-                    ranked.aligned = null;
+fn Deallocator(free: anytype) type {
+    return struct {
+        fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
+            if (d.rank == 0) {
+                const zero_rank = @as(*memref.RankedMemRefDescriptor(0), @ptrCast(@alignCast(d.descriptor)));
+                if (zero_rank.allocated) |ptr| {
+                    free(ptr);
+                    zero_rank.allocated = null;
+                    zero_rank.aligned = null;
                     return beam.make_ok(env);
                 } else {
                     return beam.make_atom(env, "noop");
                 }
+            } else {
+                inline for (supported_ranks_excluding_zero) |R| {
+                    if (d.rank == R) {
+                        const D = memref.RankedMemRefDescriptor(R);
+                        const ranked = @as(*D, @ptrCast(@alignCast(d.descriptor)));
+                        if (ranked.allocated) |ptr| {
+                            free(ptr);
+                            ranked.allocated = null;
+                            ranked.aligned = null;
+                            return beam.make_ok(env);
+                        } else {
+                            return beam.make_atom(env, "noop");
+                        }
+                    }
+                }
+                return error.UnsupportedRank;
             }
         }
-        return error.UnsupportedRank;
-    }
+    };
 }
+
+pub const unranked_memref_descriptor_deallocate_with_c = Deallocator(std.c.free).nif;
+pub const unranked_memref_descriptor_deallocate_with_enif = Deallocator(e.enif_free).nif;
 
 // Export the NIFs
 pub const nifs = .{
-    result.nif("beaver_raw_unranked_memref_descriptor_empty", 1, unranked_memref_empty).entry,
-    result.nif("beaver_raw_unranked_memref_descriptor_get_rank", 1, unranked_memref_get_rank).entry,
-    result.nif("beaver_raw_unranked_memref_descriptor_get_offset", 1, unranked_memref_get_offset).entry,
-    result.nif("beaver_raw_unranked_memref_descriptor_get_sizes", 1, unranked_memref_get_sizes).entry,
-    result.nif("beaver_raw_unranked_memref_descriptor_get_strides", 1, unranked_memref_get_strides).entry,
-    result.nif("beaver_raw_unranked_memref_descriptor_deallocate", 1, unranked_memref_deallocate).entry,
+    prelude.beaverRawNIF(@This(), "unranked_memref_descriptor_empty", 1),
+    prelude.beaverRawNIF(@This(), "unranked_memref_descriptor_get_rank", 1),
+    prelude.beaverRawNIF(@This(), "unranked_memref_descriptor_get_offset", 1),
+    prelude.beaverRawNIF(@This(), "unranked_memref_descriptor_get_sizes", 1),
+    prelude.beaverRawNIF(@This(), "unranked_memref_descriptor_get_strides", 1),
+    prelude.beaverRawNIF(@This(), "unranked_memref_descriptor_deallocate_with_c", 1),
+    prelude.beaverRawNIF(@This(), "unranked_memref_descriptor_deallocate_with_enif", 1),
 } ++ UnrankedMemRefDescriptor.kind.nifs;
 
 // Resource type registration

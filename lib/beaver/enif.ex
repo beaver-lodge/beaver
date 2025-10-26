@@ -53,6 +53,11 @@ defmodule Beaver.ENIF do
     end
   end
 
+  def declare_external_functions(%MLIR.Module{} = mod) do
+    Beaver.ENIF.declare_external_functions(MLIR.context(mod), MLIR.Module.body(mod))
+    mod
+  end
+
   @spec signatures(MLIR.Context.t()) :: [Beaver.ENIF.Type.signature()]
   @doc """
   Retrieve the signatures of all available ENIF functions.

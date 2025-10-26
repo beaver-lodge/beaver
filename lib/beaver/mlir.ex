@@ -284,7 +284,8 @@ defmodule Beaver.MLIR do
 
     {frozen_pat_set, should_destroy} =
       if is_list(patterns) do
-        {Beaver.Pattern.compile_patterns(ctx, patterns, opts), true}
+        {Beaver.Pattern.compile_patterns(ctx, patterns, opts) |> MLIR.RewritePatternSet.freeze(),
+         true}
       else
         {patterns, false}
       end

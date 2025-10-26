@@ -105,8 +105,6 @@ defmodule Beaver.MLIR.Pass do
         safe_cast(pid, token_ref, ctx, fn state ->
           :ok = destruct.(state)
         end)
-
-        :ok = Agent.stop(pid)
       end
     end)
   end

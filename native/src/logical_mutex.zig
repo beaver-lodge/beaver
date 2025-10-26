@@ -11,6 +11,7 @@ pub const Token = struct {
     cond: std.Thread.Condition = .{},
     done: bool = false,
     logical_success: bool = false,
+    caller_pid: beam.pid = undefined,
     pub var resource_type: beam.resource_type = undefined;
     pub const resource_name = "Beaver" ++ @typeName(@This());
     fn wait(self: *@This()) void {
@@ -33,6 +34,7 @@ pub const Token = struct {
     }
     pub fn signal_logical_success(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         var token = try beam.fetch_ptr_resource_wrapped(@This(), env, args[0]);
+        token.caller_pid = try beam.self(env);
         token.signal(beam.get_bool(env, args[1]) catch unreachable);
         return beam.make_ok(env);
     }

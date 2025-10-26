@@ -31,7 +31,6 @@ defmodule AddENIF do
   def create(ctx) do
     mlir ctx: ctx do
       module do
-        Beaver.ENIF.declare_external_functions(Beaver.Env.context(), Beaver.Env.block())
         env_t = ENIF.Type.env()
         term_t = ENIF.Type.term()
 

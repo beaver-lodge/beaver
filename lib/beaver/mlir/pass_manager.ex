@@ -46,12 +46,12 @@ defmodule Beaver.MLIR.PassManager do
     end
   end
 
-  defp dispatch_loop() do
+  defp dispatch_loop(timeout \\ 2) do
     receive do
       {{:kind, MLIR.LogicalResult, _}, diagnostics} = ret when is_list(diagnostics) ->
         Beaver.Native.check!(ret)
 
-      :ok ->
+      :pm_destroy_done ->
         :ok
 
       msg ->
@@ -63,7 +63,12 @@ defmodule Beaver.MLIR.PassManager do
             Logger.flush()
         end
 
-        dispatch_loop()
+        dispatch_loop(timeout)
+    after
+      timeout * 1_000 ->
+        Logger.error("Timeout waiting for pass manager callback, timeout: #{inspect(timeout)}")
+        Logger.flush()
+        dispatch_loop(timeout * 2)
     end
   end
 

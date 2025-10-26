@@ -49,7 +49,7 @@ const CallbackDispatcher = struct {
 
     fn forward_cb_and_consume_env(this: *@This(), comptime callback: []const u8, temp_env: beam.env, args: anytype) !mlir_capi.LogicalResult.T {
         if (e.enif_thread_type() != e.ERL_NIF_THR_UNDEFINED) {
-            @panic("External pattern must be run on non-scheduler thread to prevent deadlock");
+            @panic("External pattern must be run on non-scheduler thread to prevent deadlock. Callback: " ++ callback);
         }
         const cb = @field(this.*.callbacks, callback);
         if (cb == null) {
@@ -72,7 +72,10 @@ const CallbackDispatcher = struct {
             if (!beam.send_advanced(temp_env, this.*.handler, temp_env, msg)) {
                 @panic("Fail to send message to pattern server");
             }
-            return token.wait_logical();
+            const ret = token.wait_logical();
+            // Transfer owner ship to last caller
+            this.handler = token.caller_pid;
+            return ret;
         }
     }
 
@@ -125,7 +128,7 @@ const CallbackDispatcher = struct {
         };
         fn create_and_send(worker: ?*anyopaque) callconv(.c) void {
             if (e.enif_thread_type() != e.ERL_NIF_THR_UNDEFINED) {
-                @panic("External pattern must be run on non-scheduler thread to prevent deadlock");
+                @panic("Must create rewrite pattern on non-scheduler thread to prevent deadlock");
             }
             const this: *@This() = @ptrCast(@alignCast(worker));
             defer this.deinit();
@@ -161,7 +164,7 @@ const CallbackDispatcher = struct {
             const Self = @This();
             fn destroy(worker: ?*anyopaque) callconv(.c) void {
                 if (e.enif_thread_type() != e.ERL_NIF_THR_UNDEFINED) {
-                    @panic("External pattern must be run on non-scheduler thread to prevent deadlock");
+                    @panic("Must destroy pattern on non-scheduler thread to prevent deadlock");
                 }
                 const this: *Self = @ptrCast(@alignCast(worker));
                 @call(.auto, @field(c, "mlir" ++ field_name ++ "Destroy"), .{this.set});
@@ -199,7 +202,7 @@ const CallbackDispatcher = struct {
 
             fn do(worker: ?*anyopaque) callconv(.c) void {
                 if (e.enif_thread_type() != e.ERL_NIF_THR_UNDEFINED) {
-                    @panic("External pattern must be run on non-scheduler thread to prevent deadlock");
+                    @panic("Must apply pattern on non-scheduler thread to prevent deadlock");
                 }
                 const this: *Self = @ptrCast(@alignCast(worker));
                 defer beam.allocator.destroy(this);
@@ -266,9 +269,9 @@ const CallbackDispatcher = struct {
 };
 
 pub const nifs = .{
-    prelude.beaverRawNIFOfWorker(CallbackDispatcher, "create_mlir_rewrite_pattern", 6),
-    prelude.beaverRawNIFOfWorker(CallbackDispatcher, "destroy_frozen_rewrite_pattern_set", 2),
-    prelude.beaverRawNIFOfWorker(CallbackDispatcher, "destroy_rewrite_pattern_set", 2),
-    prelude.beaverRawNIFOfWorker(CallbackDispatcher, "apply_rewrite_pattern_set_with_module", 4),
-    prelude.beaverRawNIFOfWorker(CallbackDispatcher, "apply_rewrite_pattern_set_with_op", 4),
+    prelude.beaverRawNIF(CallbackDispatcher, "create_mlir_rewrite_pattern", 6),
+    prelude.beaverRawNIF(CallbackDispatcher, "destroy_frozen_rewrite_pattern_set", 2),
+    prelude.beaverRawNIF(CallbackDispatcher, "destroy_rewrite_pattern_set", 2),
+    prelude.beaverRawNIF(CallbackDispatcher, "apply_rewrite_pattern_set_with_module", 4),
+    prelude.beaverRawNIF(CallbackDispatcher, "apply_rewrite_pattern_set_with_op", 4),
 };

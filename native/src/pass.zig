@@ -168,17 +168,16 @@ const ManagerRunner = struct {
             return try diagnostic.call_with_diagnostics(env, ctx, mlirPassManagerRunOnOpWrap, .{ env, .{ this.pm, this.op.? } });
         }
     }
-    fn send_ok(this: *@This()) !void {
-        const env = e.enif_alloc_env() orelse return Error.@"fail to allocate BEAM environment";
-        if (!beam.send_advanced(env, this.pid, env, beam.make_ok(env))) {
-            return Error.@"fail to send message to pm caller";
-        }
-    }
+
     fn destroyManager(worker: ?*anyopaque) callconv(.c) void {
         const this: ?*@This() = @ptrCast(@alignCast(worker));
         defer beam.allocator.destroy(this.?);
         c.mlirPassManagerDestroy(this.?.*.pm);
-        send_ok(this.?) catch unreachable;
+        const msg = "pm_destroy_done";
+        const temp_env = e.enif_alloc_env() orelse @panic("fail to allocate BEAM environment: " ++ msg);
+        if (!beam.send_advanced(temp_env, this.?.pid, temp_env, beam.make_atom(temp_env, msg))) {
+            @panic("fail to send message to pm caller: " ++ msg);
+        }
     }
     fn destroy(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         const this = try init(env);
