@@ -33,6 +33,7 @@ defmodule Beaver.MLIR.Pass do
     [{Registry, keys: :unique, name: @registry}]
   end
 
+  @doc false
   def start_worker(name, init_state) do
     case Server.start_link(name, init_state) do
       {:ok, pid} ->
