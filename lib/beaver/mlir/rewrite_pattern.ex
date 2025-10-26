@@ -154,7 +154,7 @@ defmodule Beaver.MLIR.RewritePattern.Server do
   end
 
   @impl true
-  def handle_info({:destruct = _cb, token_ref, destruct, _id}, state) do
+  def handle_info({:destruct, token_ref, destruct, _id}, state) do
     try do
       destruct.(state)
       MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, true)
