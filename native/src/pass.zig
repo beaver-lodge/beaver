@@ -78,7 +78,10 @@ const CallbackDispatcher = struct {
             if (!beam.send_advanced(env, this.*.handler, env, msg)) {
                 return Error.@"Fail to send message to pass server";
             }
-            return token.wait_logical().result;
+            const ret = token.wait_logical();
+            // Transfer owner ship to last caller
+            this.handler = ret.caller;
+            return ret.result;
         }
     }
     fn run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) callconv(.c) void {

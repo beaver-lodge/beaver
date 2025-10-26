@@ -4,8 +4,7 @@ defmodule Beaver.MLIR.RewritePattern do
   """
   require Logger
   alias Beaver.MLIR
-  # Alias the new GenServer worker
-  alias Beaver.MLIR.RewritePattern.Server
+  alias __MODULE__.Server
   use Kinda.ResourceKind, forward_module: Beaver.Native
   @type state() :: any()
 
@@ -159,14 +158,13 @@ defmodule Beaver.MLIR.RewritePattern.Server do
     try do
       destruct.(state)
       MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, true)
-      # State remains unchanged after destruction.
-      {:stop, :normal, state}
+      {:stop, :normal, nil}
     rescue
       exception ->
         Logger.error(Exception.format(:error, exception, __STACKTRACE__))
         Logger.flush()
         MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
-        {:stop, :normal, state}
+        {:stop, :normal, nil}
     end
   end
 end

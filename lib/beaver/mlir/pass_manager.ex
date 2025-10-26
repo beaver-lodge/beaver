@@ -51,12 +51,9 @@ defmodule Beaver.MLIR.PassManager do
       {{:kind, MLIR.LogicalResult, _}, diagnostics} = ret when is_list(diagnostics) ->
         Beaver.Native.check!(ret)
 
-      :pm_destroy_done ->
-        :ok
-
       msg ->
         try do
-          :ok = MLIR.Pass.handle_cb(msg)
+          :ok = MLIR.Pass.handle_cb(msg, nil)
         rescue
           exception ->
             Logger.error(Exception.format(:error, exception, __STACKTRACE__))
@@ -75,7 +72,10 @@ defmodule Beaver.MLIR.PassManager do
   def destroy(%__MODULE__{ref: pm_ref}) do
     case beaver_raw_destroy_pm_async(pm_ref) do
       :async ->
-        dispatch_loop()
+        receive do
+          :pm_destroy_done ->
+            :ok
+        end
 
       ret ->
         Beaver.Native.check!(ret)
