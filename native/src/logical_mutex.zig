@@ -23,17 +23,17 @@ pub const Token = struct {
         const res = if (self.logical_success) c.mlirLogicalResultSuccess() else c.mlirLogicalResultFailure();
         return .{ .result = res, .caller = self.caller_pid };
     }
-    fn signal(self: *@This(), logical_success: bool) void {
+    fn signal(self: *@This(), logical_success: bool, caller_pid: beam.pid) void {
         self.mutex.lock();
         defer self.mutex.unlock();
         self.logical_success = logical_success;
         self.done = true;
+        self.caller_pid = caller_pid;
         self.cond.signal();
     }
     pub fn signal_logical_success(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         var token = try beam.fetch_ptr_resource_wrapped(@This(), env, args[0]);
-        token.caller_pid = try beam.self(env);
-        token.signal(beam.get_bool(env, args[1]) catch unreachable);
+        token.signal(try beam.get_bool(env, args[1]), try beam.self(env));
         return beam.make_ok(env);
     }
 };
