@@ -49,7 +49,7 @@ defmodule Beaver.MLIR.Pass do
 
   @doc false
   def handle_cb({:initialize, token_ref, initialize_fun, id, ctx_ref}, init_state) do
-    ctx = %MLIR.Context{ref: ctx_ref}
+    ctx = Beaver.Native.check!(ctx_ref)
 
     pid =
       {:via, Registry, {@registry, id, ctx}}
@@ -194,7 +194,7 @@ defmodule Beaver.MLIR.Pass.Server do
   end
 
   def handle_info({:run, token_ref, run_fun, _id, op_ref}, state) do
-    op = %MLIR.Operation{ref: op_ref}
+    op = Beaver.Native.check!(op_ref)
     ctx = MLIR.context(op)
 
     try do

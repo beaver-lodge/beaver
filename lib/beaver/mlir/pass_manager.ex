@@ -63,7 +63,14 @@ defmodule Beaver.MLIR.PassManager do
         dispatch_loop(timeout)
     after
       timeout * 1_000 ->
-        Logger.error("Timeout waiting for pass manager callback, timeout: #{inspect(timeout)}")
+        msg = "Timeout waiting for pass manager callback, timeout: #{inspect(timeout)}"
+
+        if timeout < 16 do
+          Logger.warning(msg)
+        else
+          Logger.error(msg)
+        end
+
         Logger.flush()
         dispatch_loop(timeout * 2)
     end

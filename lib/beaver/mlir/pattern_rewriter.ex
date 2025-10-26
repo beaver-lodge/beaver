@@ -8,16 +8,14 @@ defmodule Beaver.MLIR.PatternRewriter do
   defdelegate as_base(pattern), to: MLIR.CAPI, as: :mlirPatternRewriterAsBase
 
   for {helper_name, arity} <- Beaver.MLIR.RewriterBase.helpers() do
-    args = Macro.generate_arguments(arity, __MODULE__)
-    arg0 = hd(args)
+    [_ | args] = Macro.generate_arguments(arity, __MODULE__)
 
     @doc """
     Delegates to `Beaver.MLIR.RewriterBase.#{helper_name}/#{arity}` after converting the first argument as base.
     """
-    def unquote(:"#{helper_name}")(unquote_splicing(args)) do
-      %__MODULE__{} = unquote(arg0)
-      unquote(arg0) = unquote(arg0) |> as_base()
-      MLIR.RewriterBase.unquote(:"#{helper_name}")(unquote_splicing(args))
+    def unquote(:"#{helper_name}")(%__MODULE__{} = rewriter, unquote_splicing(args)) do
+      base = rewriter |> as_base()
+      MLIR.RewriterBase.unquote(:"#{helper_name}")(base, unquote_splicing(args))
     end
   end
 end

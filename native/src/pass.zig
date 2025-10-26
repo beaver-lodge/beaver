@@ -21,16 +21,16 @@ const CallbackDispatcher = struct {
     }
     fn destruct(userData: ?*anyopaque) callconv(.c) void {
         const this: *@This() = @ptrCast(@alignCast(userData));
-        const env = e.enif_alloc_env() orelse unreachable;
-        const res = forward_cb(this, "destruct", env, .{}) catch unreachable;
+        const temp_env = e.enif_alloc_env() orelse unreachable;
+        const res = forward_cb_and_consume_env(this, "destruct", temp_env, .{}) catch unreachable;
         if (c.beaverLogicalResultIsFailure(res)) @panic("Fail to destruct a pass implemented in Elixir");
         e.enif_free_env(this.env);
         beam.allocator.destroy(this);
     }
     fn initialize(ctx: mlir_capi.Context.T, userData: ?*anyopaque) callconv(.c) mlir_capi.LogicalResult.T {
         const this: *@This() = @ptrCast(@alignCast(userData));
-        const env = e.enif_alloc_env() orelse unreachable;
-        const res = forward_cb(this, "initialize", env, .{mlir_capi.Context.resource.make(env, ctx) catch unreachable}) catch return c.mlirLogicalResultFailure();
+        const temp_env = e.enif_alloc_env() orelse unreachable;
+        const res = forward_cb_and_consume_env(this, "initialize", temp_env, .{mlir_capi.Context.resource.make_kind(temp_env, ctx) catch unreachable}) catch return c.mlirLogicalResultFailure();
         if (c.beaverLogicalResultIsFailure(res)) {
             const loc = c.mlirLocationUnknownGet(ctx);
             c.mlirEmitError(loc, "Fail to initialize a pass implemented in Elixir");
@@ -47,35 +47,35 @@ const CallbackDispatcher = struct {
                 @field(new.*.callbacks, f) = e.enif_make_copy(new.*.env, cb.?);
             }
         }
-        const env = e.enif_alloc_env() orelse unreachable;
-        const res = forward_cb(new, "clone", env, .{e.enif_make_copy(new.*.env, this.id)}) catch unreachable;
+        const temp_env = e.enif_alloc_env() orelse unreachable;
+        const res = forward_cb_and_consume_env(new, "clone", temp_env, .{e.enif_make_copy(new.*.env, this.id)}) catch unreachable;
         if (c.beaverLogicalResultIsFailure(res)) @panic("Fail to clone a pass implemented in Elixir");
         return new;
     }
     const Token = @import("logical_mutex.zig").Token;
-    const Error = error{ @"Fail to allocate BEAM environment", @"Fail to send message to pass server", @"Fail to run a pass implemented in Elixir", @"External pass must be run on non-scheduler thread to prevent deadlock" };
-    fn forward_cb(this: *@This(), comptime callback: []const u8, env: beam.env, args: anytype) !mlir_capi.LogicalResult.T {
+    const Error = error{ @"Fail to allocate BEAM environment", @"Fail to send message to pass server", @"Fail to run a pass implemented in Elixir" };
+    fn forward_cb_and_consume_env(this: *@This(), comptime callback: []const u8, temp_env: beam.env, args: anytype) !mlir_capi.LogicalResult.T {
         if (e.enif_thread_type() != e.ERL_NIF_THR_UNDEFINED) {
-            return Error.@"External pass must be run on non-scheduler thread to prevent deadlock";
+            @panic("External pass must be run on non-scheduler thread to prevent deadlock. Callback: " ++ callback);
         }
         const cb = @field(this.*.callbacks, callback);
         if (cb == null) {
-            e.enif_free_env(env);
+            e.enif_free_env(temp_env);
             return c.mlirLogicalResultSuccess();
         } else {
             var token = Token{};
             var buffer = std.array_list.Managed(beam.term).init(beam.allocator);
             defer buffer.deinit();
-            try buffer.append(beam.make_atom(env, callback));
-            try buffer.append(try beam.make_ptr_resource_wrapped(env, &token));
-            try buffer.append(e.enif_make_copy(env, cb.?));
-            try buffer.append(e.enif_make_copy(env, this.id));
+            try buffer.append(beam.make_atom(temp_env, callback));
+            try buffer.append(try beam.make_ptr_resource_wrapped(temp_env, &token));
+            try buffer.append(e.enif_make_copy(temp_env, cb.?));
+            try buffer.append(e.enif_make_copy(temp_env, this.id));
             inline for (args) |arg| {
                 try buffer.append(arg);
             }
-            const msg = beam.make_tuple(env, buffer.items);
-            errdefer e.enif_free_env(env);
-            if (!beam.send_advanced(env, this.*.handler, env, msg)) {
+            const msg = beam.make_tuple(temp_env, buffer.items);
+            errdefer e.enif_free_env(temp_env);
+            if (!beam.send_advanced(temp_env, this.*.handler, temp_env, msg)) {
                 return Error.@"Fail to send message to pass server";
             }
             const ret = token.wait_logical();
@@ -86,9 +86,9 @@ const CallbackDispatcher = struct {
     }
     fn run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) callconv(.c) void {
         const this: *@This() = @ptrCast(@alignCast(userData));
-        const env = e.enif_alloc_env() orelse unreachable;
-        const op_ = mlir_capi.Operation.resource.make(env, op) catch return c.mlirExternalPassSignalFailure(pass);
-        if (forward_cb(this, "run", env, .{op_})) |res| {
+        const temp_env = e.enif_alloc_env() orelse unreachable;
+        const op_kind = mlir_capi.Operation.resource.make_kind(temp_env, op) catch return c.mlirExternalPassSignalFailure(pass);
+        if (forward_cb_and_consume_env(this, "run", temp_env, .{op_kind})) |res| {
             if (c.beaverLogicalResultIsFailure(res)) {
                 c.mlirEmitError(c.mlirOperationGetLocation(op), "Fail to run a pass implemented in Elixir");
                 c.mlirExternalPassSignalFailure(pass);
