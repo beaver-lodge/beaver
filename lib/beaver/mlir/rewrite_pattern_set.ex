@@ -97,17 +97,6 @@ defmodule Beaver.MLIR.RewritePatternSet do
     receive do
       :destroy_done ->
         :ok
-
-      msg ->
-        try do
-          :ok = MLIR.RewritePattern.handle_cb(msg)
-        rescue
-          exception ->
-            Logger.error(Exception.format(:error, exception, __STACKTRACE__))
-            Logger.flush()
-        end
-
-        dispatch_loop(timeout)
     after
       timeout * 1_000 ->
         Logger.error("Timeout waiting for pattern destroy, timeout: #{inspect(timeout)}")

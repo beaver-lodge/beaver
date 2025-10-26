@@ -9,10 +9,10 @@ defmodule Beaver.ENIF.UseENIFAlloc do
 
   defmodule ReplaceLLVMOp do
     @moduledoc false
-    use Beaver.MLIR.RewritePattern
+    use MLIR.RewritePattern
 
     def construct(nil) do
-      {:ok, :llvm_pat_state}
+      :llvm_pat_state
     end
 
     def destruct(_state) do

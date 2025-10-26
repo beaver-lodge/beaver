@@ -7,8 +7,8 @@ defmodule RewritePatternTest do
   defmodule FailedToConvergeRewritePattern do
     use Beaver.MLIR.RewritePattern
 
-    def construct(nil) do
-      {:ok, [:init_state]}
+    def construct(:init_state) do
+      [:init_state]
     end
 
     def destruct(state) do
@@ -57,13 +57,19 @@ defmodule RewritePatternTest do
              MLIR.RewritePattern.create(Arith.constant(),
                ctx: ctx,
                benefit: 10,
+               init_state: :init_state,
                construct: &FailedToConvergeRewritePattern.construct/1,
                destruct: &FailedToConvergeRewritePattern.destruct/1,
                match_and_rewrite: &FailedToConvergeRewritePattern.match_and_rewrite/4
              )
 
     MLIR.RewritePatternSet.add(set, pat)
-    MLIR.RewritePatternSet.add(set, Arith.constant(), FailedToConvergeRewritePattern, ctx: ctx)
+
+    MLIR.RewritePatternSet.add(set, Arith.constant(), FailedToConvergeRewritePattern,
+      ctx: ctx,
+      init_state: :init_state
+    )
+
     assert frozen_set = %MLIR.FrozenRewritePatternSet{} = MLIR.RewritePatternSet.freeze(set)
 
     assert_raise RuntimeError, "pattern application failed to converge", fn ->
