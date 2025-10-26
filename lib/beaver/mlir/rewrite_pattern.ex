@@ -9,8 +9,8 @@ defmodule Beaver.MLIR.RewritePattern do
   use Kinda.ResourceKind, forward_module: Beaver.Native
   @type state() :: any()
 
-  @callback construct(state :: state()) :: {:ok, state()} | {:error, state()}
-  @callback destruct(state :: state()) :: :ok
+  @callback construct(state :: state()) :: state()
+  @callback destruct(state :: state()) :: any()
   @callback match_and_rewrite(
               pattern :: MLIR.RewritePattern.t(),
               op :: MLIR.Operation.t(),
@@ -166,13 +166,13 @@ defmodule Beaver.MLIR.RewritePattern.Server do
       :ok = destruct.(state)
       MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, true)
       # State remains unchanged after destruction.
-      {:noreply, state}
+      {:stop, :normal, state}
     rescue
       exception ->
         Logger.error(Exception.format(:error, exception, __STACKTRACE__))
         Logger.flush()
         MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
-        {:noreply, state}
+        {:stop, :normal, state}
     end
   end
 end
