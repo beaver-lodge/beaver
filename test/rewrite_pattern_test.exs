@@ -14,7 +14,6 @@ defmodule RewritePatternTest do
     def destruct(state) do
       [:init_state | tail] = Enum.reverse(state)
       Enum.all?(tail, &(:match_and_rewrite == &1)) || raise "State corrupted in destruct"
-      :ok
     end
 
     def match_and_rewrite(_pattern, _op, rewriter, state) do
