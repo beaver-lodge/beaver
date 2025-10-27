@@ -38,16 +38,16 @@ defmodule Beaver.Composer do
   end
 
   @doc false
-  def create_pass(%MLIR.Pass{} = pass) do
+  def create_pass(%MLIR.Pass{} = pass, _ctx) do
     pass
   end
 
-  def create_pass({argument, op, run}) when is_function(run) do
+  def create_pass({argument, op, run}, ctx) when is_function(run) do
     description = "beaver generated pass of #{Function.info(run) |> inspect}"
-    MLIR.Pass.create(argument, description, op, run: run)
+    MLIR.Pass.create(argument, description, op, run: run, ctx: ctx)
   end
 
-  def create_pass(pass_module) do
+  def create_pass(pass_module, ctx) do
     description = "beaver generated pass of #{pass_module}"
     op_name = op_name_from_persistent_attributes(pass_module)
     name = Atom.to_string(pass_module)
@@ -56,7 +56,8 @@ defmodule Beaver.Composer do
       destruct: &pass_module.destruct/1,
       initialize: &pass_module.initialize/2,
       clone: &pass_module.clone/1,
-      run: &pass_module.run/2
+      run: &pass_module.run/2,
+      ctx: ctx
     )
   end
 
@@ -86,7 +87,7 @@ defmodule Beaver.Composer do
 
   # nested pm
 
-  defp add_pass(pm, {op_name, passes}) when is_binary(op_name) and is_list(passes) do
+  defp add_pass(pm, {op_name, passes}, ctx) when is_binary(op_name) and is_list(passes) do
     npm =
       case pm do
         %MLIR.PassManager{} ->
@@ -97,18 +98,18 @@ defmodule Beaver.Composer do
       end
 
     for pass <- passes do
-      add_pass(npm, pass)
+      add_pass(npm, pass, ctx)
     end
   end
 
-  defp add_pass(pm, pipeline_str) when is_binary(pipeline_str),
+  defp add_pass(pm, pipeline_str, _ctx) when is_binary(pipeline_str),
     do: add_pipeline(pm, pipeline_str)
 
-  defp add_pass(%MLIR.OpPassManager{} = pm, pass),
-    do: mlirOpPassManagerAddOwnedPass(pm, create_pass(pass))
+  defp add_pass(%MLIR.OpPassManager{} = pm, pass, ctx),
+    do: mlirOpPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
 
-  defp add_pass(%MLIR.PassManager{} = pm, pass),
-    do: mlirPassManagerAddOwnedPass(pm, create_pass(pass))
+  defp add_pass(%MLIR.PassManager{} = pm, pass, ctx),
+    do: mlirPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
 
   defp to_pm(%__MODULE__{passes: passes, op: op, ctx: ctx}) do
     ctx = ctx || MLIR.context(MLIR.Operation.from_module(op))
@@ -116,7 +117,7 @@ defmodule Beaver.Composer do
     pm = mlirPassManagerCreate(ctx)
 
     for pass <- passes do
-      add_pass(pm, pass)
+      add_pass(pm, pass, ctx)
     end
 
     pm

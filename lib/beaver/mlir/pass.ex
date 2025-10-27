@@ -6,12 +6,13 @@ defmodule Beaver.MLIR.Pass do
   alias __MODULE__.Server
   use Kinda.ResourceKind, forward_module: Beaver.Native
   @type state() :: any()
+  @callback construct(state :: state()) :: state()
   @callback run(op :: MLIR.Operation.t(), state :: state()) :: state()
   @callback initialize(ctx :: MLIR.Context.t(), state :: state()) ::
               {:ok, state()} | {:error, state()}
-  @callback destruct(state :: state()) :: :ok
+  @callback destruct(state :: state()) :: any()
   @callback clone(state :: state()) :: state()
-  @optional_callbacks initialize: 2, destruct: 1, clone: 1
+  @optional_callbacks construct: 1, initialize: 2, destruct: 1, clone: 1
   require Logger
 
   defmacro __using__(opts) do
@@ -47,50 +48,64 @@ defmodule Beaver.MLIR.Pass do
     end
   end
 
-  @doc false
-  def handle_cb({:initialize, token_ref, initialize_fun, id, ctx_ref}, init_state) do
-    ctx = Beaver.Native.check!(ctx_ref)
-
-    pid =
-      {:via, Registry, {@registry, id, ctx}}
-      |> start_worker(init_state)
-
-    GenServer.cast(pid, {:initialize, token_ref, initialize_fun, ctx})
+  defp handle_cb({:construct, token_ref, construct_fun, id}, init_state) do
+    {:via, Registry, {@registry, id}}
+    |> start_worker(init_state)
+    |> GenServer.cast({:construct, token_ref, construct_fun})
   end
 
   @doc false
   def registry(), do: @registry
 
-  def create(argument, desc, op, callbacks) do
+  defp normalize_run_fun(run) do
+    cond do
+      is_function(run, 2) ->
+        run
+
+      is_function(run, 1) ->
+        fn op, _ -> run.(op) end
+
+      true ->
+        raise ArgumentError, "Invalid run function"
+    end
+  end
+
+  def create(argument, desc, op, opts) do
     argument_ref = MLIR.StringRef.create(argument).ref
-    destruct = callbacks[:destruct] || (&Beaver.FallbackPass.destruct/1)
-    initialize = callbacks[:initialize] || (&Beaver.FallbackPass.initialize/2)
-    clone = callbacks[:clone] || (&Beaver.FallbackPass.clone/1)
-    run = callbacks[:run] || (&Beaver.FallbackPass.run/2)
+    construct = opts[:construct] || (&Beaver.FallbackPass.construct/1)
+    init_state = opts[:init_state] || nil
+    destruct = opts[:destruct] || (&Beaver.FallbackPass.destruct/1)
+    initialize = opts[:initialize] || (&Beaver.FallbackPass.initialize/2)
+    clone = opts[:clone] || (&Beaver.FallbackPass.clone/1)
+    run = opts[:run] || (&Beaver.FallbackPass.run/2)
+    run = normalize_run_fun(run)
+    %MLIR.Context{ref: ctx} = opts[:ctx] || raise ArgumentError, "option :ctx is required"
 
-    run =
-      cond do
-        is_function(run, 2) ->
-          run
+    :async =
+      MLIR.CAPI.beaver_raw_create_mlir_pass(
+        ctx,
+        argument_ref,
+        argument_ref,
+        MLIR.StringRef.create(desc).ref,
+        MLIR.StringRef.create(op).ref,
+        %{
+          construct: construct,
+          destruct: destruct,
+          initialize: initialize,
+          clone: clone,
+          run: run
+        }
+      )
 
-        is_function(run, 1) ->
-          fn op, _ -> run.(op) end
+    receive do
+      msg ->
+        handle_cb(msg, init_state)
+    end
 
-        true ->
-          raise ArgumentError, "Invalid run function"
-      end
-
-    MLIR.CAPI.beaver_raw_create_mlir_pass(
-      argument_ref,
-      argument_ref,
-      MLIR.StringRef.create(desc).ref,
-      MLIR.StringRef.create(op).ref,
-      destruct,
-      initialize,
-      clone,
-      run
-    )
-    |> Beaver.Native.check!()
+    receive do
+      {:kind, __MODULE__, ref} = msg when is_reference(ref) ->
+        msg |> Beaver.Native.check!()
+    end
   end
 end
 
@@ -100,18 +115,13 @@ defmodule Beaver.MLIR.Pass.Server do
   require Logger
   alias Beaver.MLIR
 
-  #
   # Client API
-  #
 
-  @doc false
   def start_link(name, initial_state) do
     GenServer.start_link(__MODULE__, initial_state, name: name)
   end
 
-  #
   # Server Callbacks
-  #
 
   @impl true
   def init(initial_state) do
@@ -124,11 +134,47 @@ defmodule Beaver.MLIR.Pass.Server do
   end
 
   @impl true
-  def handle_cast({:initialize, token_ref, initialize_fun, ctx}, nil) do
+  def handle_cast({:construct, token_ref, construct_fun}, state) do
     try do
-      case initialize_fun.(ctx, nil) do
+      new_state = construct_fun.(state)
+      MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, true)
+      {:noreply, new_state}
+    rescue
+      exception ->
+        Logger.error(Exception.format(:error, exception, __STACKTRACE__))
+        Logger.flush()
+        MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, false)
+        {:noreply, nil}
+    end
+  end
+
+  def handle_cast({:clone, token_ref, clone_fun, from_state}, :started_by_clone) do
+    try do
+      new_state = clone_fun.(from_state)
+      MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, true)
+      {:noreply, {:started_by_clone, new_state}}
+    rescue
+      exception ->
+        Logger.error(Exception.format(:error, exception, __STACKTRACE__))
+        Logger.flush()
+        MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, false)
+        {:noreply, nil}
+    end
+  end
+
+  # this should only be called if it is a cloned pass
+  @impl true
+  def handle_info({:construct, token_ref, construct_fun, _id}, {:started_by_clone, state}) do
+    handle_cast({:construct, token_ref, construct_fun}, state)
+  end
+
+  def handle_info({:initialize, token_ref, initialize_fun, _id, ctx}, state) do
+    ctx = Beaver.Native.check!(ctx)
+
+    try do
+      case initialize_fun.(ctx, state) do
         {:ok, new_state} ->
-          MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, true)
+          MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, true)
           {:noreply, new_state}
 
         {:error, state} ->
@@ -144,7 +190,7 @@ defmodule Beaver.MLIR.Pass.Server do
         |> MLIR.Diagnostic.emit(Exception.format(:error, exception, __STACKTRACE__))
 
         Logger.flush()
-        MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
+        MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, false)
         {:noreply, nil}
     catch
       {:init_err, state} ->
@@ -152,41 +198,25 @@ defmodule Beaver.MLIR.Pass.Server do
         |> MLIR.Diagnostic.emit("Pass initialization callback returned {:error, state}")
 
         Logger.flush()
-        MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
+        MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, false)
         {:noreply, state}
     end
   end
 
-  @impl true
-  def handle_cast({:clone, token_ref, clone_fun, from_state, ctx}, :expect_to_initialize_by_clone) do
-    try do
-      new_state = clone_fun.(from_state)
-      MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, true)
-      {:noreply, new_state}
-    rescue
-      exception ->
-        MLIR.Location.unknown(ctx: ctx)
-        |> MLIR.Diagnostic.emit(Exception.format(:error, exception, __STACKTRACE__))
-
-        Logger.flush()
-        MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
-        {:noreply, nil}
-    end
-  end
-
-  @impl true
   def handle_info({:clone, token_ref, clone_fun, id, from_id}, state) do
+    this = self()
+
     Registry.dispatch(MLIR.Pass.registry(), from_id, fn entries ->
-      for {from_pid, ctx} <- entries do
-        if from_pid != self() do
+      for from <- entries do
+        {from_pid, nil} = from
+
+        if from_pid != this do
           raise "Should start clone from the original state owner"
         end
 
-        pid =
-          {:via, Registry, {MLIR.Pass.registry(), id, ctx}}
-          |> MLIR.Pass.start_worker(:expect_to_initialize_by_clone)
-
-        GenServer.cast(pid, {:clone, token_ref, clone_fun, state, ctx})
+        {:via, Registry, {MLIR.Pass.registry(), id}}
+        |> MLIR.Pass.start_worker(:started_by_clone)
+        |> GenServer.cast({:clone, token_ref, clone_fun, state})
       end
     end)
 
@@ -198,17 +228,15 @@ defmodule Beaver.MLIR.Pass.Server do
     ctx = MLIR.context(op)
 
     try do
-      # The `run` callback returns the new state
       new_state = run_fun.(op, state)
-      MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, true)
+      MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, true)
       {:noreply, new_state}
     rescue
       exception ->
         MLIR.Location.unknown(ctx: ctx)
         |> MLIR.Diagnostic.emit(Exception.format(:error, exception, __STACKTRACE__))
 
-        Logger.flush()
-        MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
+        MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, false)
         # On failure, keep the old state
         {:noreply, state}
     end
@@ -216,16 +244,15 @@ defmodule Beaver.MLIR.Pass.Server do
 
   def handle_info({:destruct, token_ref, destruct_fun, _id}, state) do
     try do
-      :ok = destruct_fun.(state)
-      MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, true)
-      {:stop, :normal, state}
+      destruct_fun.(state)
+      MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, true)
+      {:stop, :normal, nil}
     rescue
       exception ->
         Logger.error(Exception.format(:error, exception, __STACKTRACE__))
         Logger.flush()
-        MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
-        # Stop the server even on failure
-        {:stop, :normal, state}
+        MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, false)
+        {:stop, :normal, nil}
     end
   end
 end

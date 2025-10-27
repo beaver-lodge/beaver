@@ -278,32 +278,30 @@ defmodule Beaver.MLIR do
   """
   @spec apply_(applicable(), apply_opt) :: {:ok, applicable()} | {:error, String.t()}
 
-  def apply_(op, patterns, opts \\ @apply_default_opts) do
-    if MLIR.null?(op), do: raise("op is null")
-    ctx = MLIR.Operation.from_module(op) |> MLIR.context()
+  def apply_(op, patterns, opts \\ @apply_default_opts)
 
-    {frozen_pat_set, should_destroy} =
-      if is_list(patterns) do
-        {Beaver.Pattern.compile_patterns(ctx, patterns, opts) |> MLIR.RewritePatternSet.freeze(),
-         true}
-      else
-        {patterns, false}
-      end
-
+  def apply_(op, %MLIR.FrozenRewritePatternSet{} = patterns, _opts) do
     MLIR.verify!(op)
 
     {result, diagnostics} =
-      Beaver.MLIR.Rewrite.apply_patterns(op, frozen_pat_set)
-
-    if should_destroy do
-      mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
-    end
+      Beaver.MLIR.Rewrite.apply_patterns(op, patterns)
 
     if MLIR.LogicalResult.success?(result) do
       {:ok, op}
     else
       {:error, MLIR.Diagnostic.format(diagnostics, "failed to apply pattern set.")}
     end
+  end
+
+  def apply_(op, patterns, opts) do
+    ctx = MLIR.Operation.from_module(op) |> MLIR.context()
+    opts = Keyword.put_new(opts, :ctx, ctx)
+    {set, pdl_mod} = MLIR.RewritePatternSet.with_pdl_patterns(patterns, opts)
+    frozen_set = set |> MLIR.RewritePatternSet.freeze()
+
+    apply_(op, frozen_set, opts)
+    |> tap(fn _ -> MLIR.Module.destroy(pdl_mod) end)
+    |> tap(fn _ -> MLIR.FrozenRewritePatternSet.destroy(frozen_set) end)
   end
 end
 

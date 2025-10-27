@@ -40,14 +40,12 @@ defmodule Beaver.MLIR.CAPI do
 
   # stubs for hand-written NIFs
   def beaver_raw_create_mlir_pass(
+        _ctx,
         _name,
         _argument,
         _description,
         _op_name,
-        _destruct,
-        _initialize,
-        _clone,
-        _run
+        _callbacks
       ),
       do: :erlang.nif_error(:not_loaded)
 
@@ -76,8 +74,7 @@ defmodule Beaver.MLIR.CAPI do
   def beaver_raw_run_pm_on_op_async(_pm, _op), do: :erlang.nif_error(:not_loaded)
   def beaver_raw_destroy_pm_async(_pm), do: :erlang.nif_error(:not_loaded)
 
-  def beaver_raw_logical_mutex_token_signal_success(_token, _is_success),
-    do: :erlang.nif_error(:not_loaded)
+  def beaver_raw_logical_mutex_signal(_token, _is_success), do: :erlang.nif_error(:not_loaded)
 
   def beaver_raw_registered_ops(_ctx), do: :erlang.nif_error(:not_loaded)
   def beaver_raw_registered_dialects(_ctx), do: :erlang.nif_error(:not_loaded)

@@ -47,14 +47,10 @@ defmodule Beaver.MLIR.RewritePattern do
     end
   end
 
-  @doc false
-  def handle_cb({:construct, token_ref, construct, id}, init_state) do
-    pid =
-      {:via, Registry, {@registry, id}}
-      |> start_worker(init_state)
-
-    # Cast to the GenServer worker to handle construction
-    GenServer.cast(pid, {:construct, token_ref, construct})
+  defp handle_cb({:construct, token_ref, construct, id}, init_state) do
+    {:via, Registry, {@registry, id}}
+    |> start_worker(init_state)
+    |> GenServer.cast({:construct, token_ref, construct})
   end
 
   def create(root_name, opts) do
@@ -111,13 +107,13 @@ defmodule Beaver.MLIR.RewritePattern.Server do
   def handle_cast({:construct, token_ref, construct_fun}, state) do
     try do
       new_state = construct_fun.(state)
-      MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, true)
+      MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, true)
       {:noreply, new_state}
     rescue
       exception ->
         Logger.error(Exception.format(:error, exception, __STACKTRACE__))
         Logger.flush()
-        MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
+        MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, false)
         {:noreply, state}
     end
   end
@@ -132,7 +128,7 @@ defmodule Beaver.MLIR.RewritePattern.Server do
 
       case apply(match_and_rewrite, kind_args ++ [state]) do
         {:ok, new_state} ->
-          MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, true)
+          MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, true)
           {:noreply, new_state}
 
         {:error, new_state} ->
@@ -143,11 +139,11 @@ defmodule Beaver.MLIR.RewritePattern.Server do
       exception ->
         Logger.error(Exception.format(:error, exception, __STACKTRACE__))
         Logger.flush()
-        MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
+        MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, false)
         {:noreply, state}
     catch
       {:rewrite_err, new_state} ->
-        MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
+        MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, false)
         # Store the new state, even on rewrite error
         {:noreply, new_state}
     end
@@ -157,13 +153,13 @@ defmodule Beaver.MLIR.RewritePattern.Server do
   def handle_info({:destruct, token_ref, destruct, _id}, state) do
     try do
       destruct.(state)
-      MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, true)
+      MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, true)
       {:stop, :normal, nil}
     rescue
       exception ->
         Logger.error(Exception.format(:error, exception, __STACKTRACE__))
         Logger.flush()
-        MLIR.CAPI.beaver_raw_logical_mutex_token_signal_success(token_ref, false)
+        MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, false)
         {:stop, :normal, nil}
     end
   end

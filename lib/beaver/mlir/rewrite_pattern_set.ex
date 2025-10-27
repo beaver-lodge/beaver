@@ -99,7 +99,7 @@ defmodule Beaver.MLIR.RewritePatternSet do
         :ok
     after
       timeout * 1_000 ->
-        Logger.error("Timeout waiting for pattern destroy, timeout: #{inspect(timeout)}")
+        Logger.error("Timeout waiting for pattern destroy, timeout: #{inspect(timeout)}s")
         Logger.flush()
         dispatch_loop(timeout * 2)
     end
