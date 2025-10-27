@@ -7,6 +7,11 @@ const result = kinda.result;
 pub const c = @import("prelude.zig").c;
 const mem = @import("std").mem;
 
+pub fn get_binary_as_string_ref(env: beam.env, term: beam.term) !mlir_capi.StringRef.T {
+    const bin = try beam.get_binary(env, term);
+    return c.mlirStringRefCreate(bin.data, bin.size);
+}
+
 const print_nif_prefix = "beaver_raw_to_string_";
 pub fn PrinterNIF(comptime ResourceKind: type, comptime print_fn: anytype) type {
     return struct {

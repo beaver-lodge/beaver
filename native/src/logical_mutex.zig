@@ -2,7 +2,6 @@ const std = @import("std");
 const mlir_capi = @import("mlir_capi.zig");
 const prelude = @import("prelude.zig");
 const c = prelude.c;
-const result = @import("kinda").result;
 const kinda = @import("kinda");
 const e = kinda.erl_nif;
 const beam = kinda.beam;
@@ -27,7 +26,8 @@ pub const Token = struct {
     fn signal(self: *@This(), logical_success: bool, caller_pid: beam.pid) void {
         self.mutex.lock();
         if (self.done) {
-            @panic("Logical mutex token signaled more than once");
+            std.log.warn("Logical mutex token signaled more than once, will be a noop", .{});
+            return;
         }
         defer self.mutex.unlock();
         self.logical_success = logical_success;

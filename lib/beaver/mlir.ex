@@ -254,10 +254,7 @@ defmodule Beaver.MLIR do
     end
   end
 
-  @type applicable() :: Operation.t() | Module.t()
-  @type apply_opt :: {:debug, boolean()}
   @apply_default_opts [debug: false]
-  @spec apply!(applicable(), apply_opt) :: applicable()
   @doc """
   Apply patterns on a container (region, operation, module).
   It returns the container if it succeeds otherwise it raises.
@@ -276,8 +273,6 @@ defmodule Beaver.MLIR do
   Apply patterns on a container (operation, module).
   It is named `apply_` with a underscore to avoid name collision with `Kernel.apply/2`
   """
-  @spec apply_(applicable(), apply_opt) :: {:ok, applicable()} | {:error, String.t()}
-
   def apply_(op, patterns, opts \\ @apply_default_opts)
 
   def apply_(op, %MLIR.FrozenRewritePatternSet{} = patterns, _opts) do
@@ -299,9 +294,12 @@ defmodule Beaver.MLIR do
     {set, pdl_mod} = MLIR.RewritePatternSet.with_pdl_patterns(patterns, opts)
     frozen_set = set |> MLIR.RewritePatternSet.freeze()
 
-    apply_(op, frozen_set, opts)
-    |> tap(fn _ -> MLIR.Module.destroy(pdl_mod) end)
-    |> tap(fn _ -> MLIR.FrozenRewritePatternSet.destroy(frozen_set) end)
+    try do
+      apply_(op, frozen_set, opts)
+    after
+      MLIR.Module.destroy(pdl_mod)
+      MLIR.FrozenRewritePatternSet.destroy(frozen_set)
+    end
   end
 end
 

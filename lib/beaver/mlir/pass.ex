@@ -71,7 +71,7 @@ defmodule Beaver.MLIR.Pass do
   end
 
   def create(argument, desc, op, opts) do
-    argument_ref = MLIR.StringRef.create(argument).ref
+    name = opts[:name] || "beaver generated pass of #{argument}"
     construct = opts[:construct] || (&Beaver.FallbackPass.construct/1)
     init_state = opts[:init_state] || nil
     destruct = opts[:destruct] || (&Beaver.FallbackPass.destruct/1)
@@ -84,10 +84,10 @@ defmodule Beaver.MLIR.Pass do
     :async =
       MLIR.CAPI.beaver_raw_create_mlir_pass(
         ctx,
-        argument_ref,
-        argument_ref,
-        MLIR.StringRef.create(desc).ref,
-        MLIR.StringRef.create(op).ref,
+        name,
+        argument,
+        desc,
+        op,
         %{
           construct: construct,
           destruct: destruct,
@@ -210,13 +210,13 @@ defmodule Beaver.MLIR.Pass.Server do
       for from <- entries do
         {from_pid, nil} = from
 
-        if from_pid != this do
-          raise "Should start clone from the original state owner"
+        if from_pid == this do
+          {:via, Registry, {MLIR.Pass.registry(), id}}
+          |> MLIR.Pass.start_worker(:started_by_clone)
+          |> GenServer.cast({:clone, token_ref, clone_fun, state})
+        else
+          Logger.error("non-owner is requested clone")
         end
-
-        {:via, Registry, {MLIR.Pass.registry(), id}}
-        |> MLIR.Pass.start_worker(:started_by_clone)
-        |> GenServer.cast({:clone, token_ref, clone_fun, state})
       end
     end)
 
