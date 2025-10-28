@@ -120,6 +120,12 @@ jobs:
       - name: Run smoke tests
         run: |
           mix test --force --only smoke
+      - name: Run smoke tests (with gdb)
+        if: failure()
+        run: |
+          sudo apt update
+          sudo apt install -y gdb
+          bash ../kinda/scripts/gdb.sh test --trace
       - name: Check formatting of Elixir
         if: matrix.elixir != '1.14.0'
         env:

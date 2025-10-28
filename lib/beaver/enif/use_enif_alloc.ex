@@ -50,21 +50,23 @@ defmodule Beaver.ENIF.UseENIFAlloc do
       replace_free()
     ]
 
-    set = Beaver.Pattern.compile_patterns(ctx, patterns)
+    {set, pdl_mod} =
+      Beaver.MLIR.RewritePatternSet.with_pdl_patterns(patterns, ctx: ctx)
 
     frozen_set =
       set
       |> MLIR.RewritePatternSet.add(LLVM.call(), ReplaceLLVMOp, ctx: ctx)
       |> MLIR.RewritePatternSet.freeze()
 
-    {:ok, %{patterns: frozen_set, owning: true, ctx: ctx}}
+    {:ok, %{patterns: frozen_set, pdl_mod: pdl_mod, owning: true, ctx: ctx}}
   end
 
   def clone(%{patterns: frozen_set, owning: true}) do
     %{patterns: frozen_set, owning: false}
   end
 
-  def destruct(%{patterns: frozen_set, owning: true, ctx: ctx}) do
+  def destruct(%{patterns: frozen_set, pdl_mod: pdl_mod, owning: true, ctx: ctx}) do
+    MLIR.Module.destroy(pdl_mod)
     MLIR.FrozenRewritePatternSet.threaded_destroy(ctx, frozen_set)
   end
 

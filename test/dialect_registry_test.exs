@@ -3,6 +3,12 @@ defmodule DialectRegistryTest do
 
   alias Beaver.MLIR.Dialect
 
+  test "dialect name helpers" do
+    for d <- Dialect.Registry.dialects() do
+      assert d == apply(Dialect, String.to_atom(d), [])
+    end
+  end
+
   test "example from upstream with br" do
     assert not Enum.empty?(Dialect.Registry.dialects())
     assert not Enum.empty?(Dialect.Registry.ops("arith"))
@@ -77,5 +83,11 @@ defmodule DialectRegistryTest do
       assert Enum.uniq(ops) == ops
     end)
     |> Enum.to_list()
+  end
+
+  test "handler" do
+    assert Dialect.handler(Dialect.arith())
+    assert Dialect.handler(Dialect.llvm())
+    refute Dialect.handler("foo")
   end
 end

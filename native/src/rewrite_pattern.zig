@@ -8,6 +8,7 @@ const beam = kinda.beam;
 const debug_print = @import("std").debug.print;
 const result = @import("kinda").result;
 const diagnostic = @import("diagnostic.zig");
+const string_ref = @import("string_ref.zig");
 
 const CallbackDispatcher = struct {
     handler: beam.pid,
@@ -146,8 +147,7 @@ const CallbackDispatcher = struct {
             const nGeneratedNames = 0;
             const generatedNames: [*c]mlir_capi.StringRef.T = null;
             const temp_env = e.enif_alloc_env() orelse unreachable;
-            const b = beam.get_binary(temp_env, this.rootName) catch @panic("fail to get root name binary");
-            const rootName = mlir_capi.StringRef.T{ .data = b.data, .length = b.size };
+            const rootName = string_ref.get_binary_as_string_ref(temp_env, this.rootName) catch @panic("fail to get root name binary");
             const pattern: beam.term = @call(.auto, kinda.BangFunc(prelude.allKinds, c, "mlirOpRewritePatternCreate").wrap_ret_call, .{ temp_env, .{ rootName, this.benefit, this.context, StructOfCallbacks, callback_dispatcher, nGeneratedNames, generatedNames } }) catch @panic("fail to create rewrite pattern");
 
             if (!beam.send_advanced(null, this.pid, temp_env, pattern)) {

@@ -254,10 +254,7 @@ defmodule Beaver.MLIR do
     end
   end
 
-  @type applicable() :: Operation.t() | Module.t()
-  @type apply_opt :: {:debug, boolean()}
   @apply_default_opts [debug: false]
-  @spec apply!(applicable(), apply_opt) :: applicable()
   @doc """
   Apply patterns on a container (region, operation, module).
   It returns the container if it succeeds otherwise it raises.
@@ -276,33 +273,32 @@ defmodule Beaver.MLIR do
   Apply patterns on a container (operation, module).
   It is named `apply_` with a underscore to avoid name collision with `Kernel.apply/2`
   """
-  @spec apply_(applicable(), apply_opt) :: {:ok, applicable()} | {:error, String.t()}
+  def apply_(op, patterns, opts \\ @apply_default_opts)
 
-  def apply_(op, patterns, opts \\ @apply_default_opts) do
-    if MLIR.null?(op), do: raise("op is null")
-    ctx = MLIR.Operation.from_module(op) |> MLIR.context()
-
-    {frozen_pat_set, should_destroy} =
-      if is_list(patterns) do
-        {Beaver.Pattern.compile_patterns(ctx, patterns, opts) |> MLIR.RewritePatternSet.freeze(),
-         true}
-      else
-        {patterns, false}
-      end
-
+  def apply_(op, %MLIR.FrozenRewritePatternSet{} = patterns, _opts) do
     MLIR.verify!(op)
 
     {result, diagnostics} =
-      Beaver.MLIR.Rewrite.apply_patterns(op, frozen_pat_set)
-
-    if should_destroy do
-      mlirFrozenRewritePatternSetDestroy(frozen_pat_set)
-    end
+      Beaver.MLIR.Rewrite.apply_patterns(op, patterns)
 
     if MLIR.LogicalResult.success?(result) do
       {:ok, op}
     else
       {:error, MLIR.Diagnostic.format(diagnostics, "failed to apply pattern set.")}
+    end
+  end
+
+  def apply_(op, patterns, opts) do
+    ctx = MLIR.Operation.from_module(op) |> MLIR.context()
+    opts = Keyword.put_new(opts, :ctx, ctx)
+    {set, pdl_mod} = MLIR.RewritePatternSet.with_pdl_patterns(patterns, opts)
+    frozen_set = set |> MLIR.RewritePatternSet.freeze()
+
+    try do
+      apply_(op, frozen_set, opts)
+    after
+      MLIR.Module.destroy(pdl_mod)
+      MLIR.FrozenRewritePatternSet.destroy(frozen_set)
     end
   end
 end

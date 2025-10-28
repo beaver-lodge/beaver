@@ -29,7 +29,7 @@ defmodule Beaver.MLIR.Rewrite do
         {Beaver.Native.check!(ret), diagnostics}
     after
       timeout * 1_000 ->
-        Logger.error("Timeout waiting for pattern apply, timeout: #{inspect(timeout)}")
+        Logger.error("Timeout waiting for pattern set application, timeout: #{inspect(timeout)}s")
         Logger.flush()
         dispatch_loop(timeout * 2)
     end

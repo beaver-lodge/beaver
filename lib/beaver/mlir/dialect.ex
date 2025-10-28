@@ -72,4 +72,29 @@ defmodule Beaver.MLIR.Dialect do
       end
     end
   end
+
+  @doc """
+  Return the dialect handle for the given dialect name.
+
+  Note that no every dialect has a handle function defined in the C API.
+  In that case, `nil` is returned.
+  """
+  def handler(dialect) do
+    f = :"mlirGetDialectHandle__#{dialect}__"
+
+    if {f, 0} in Beaver.MLIR.CAPI.__info__(:functions) do
+      apply(Beaver.MLIR.CAPI, f, [])
+    else
+      nil
+    end
+  end
+
+  for d <- Beaver.MLIR.Dialect.Registry.dialects() do
+    @doc """
+    Return the dialect name `#{d}` as a bitstring.
+    """
+    def unquote(String.to_atom(d))() do
+      unquote(d)
+    end
+  end
 end
