@@ -10,7 +10,7 @@ fn generateWrapper(b: *std.Build, generated_dir: []const u8, mlir_include_dir: [
 
     // Generate header file
     _ = b.run(&.{
-        "elixir",             "tools/wrapper/gen_header.exs",
+        "elixir",             "native/tools/wrapper/gen_header.exs",
         "--mlir-include-dir", mlir_include_dir,
         "--output",           b.pathJoin(&.{ generated_dir, "include", "mlir-c", "Beaver", "wrapper.h" }),
     });
@@ -19,8 +19,8 @@ fn generateWrapper(b: *std.Build, generated_dir: []const u8, mlir_include_dir: [
     _ = b.run(&.{
         "sh", "-c", b.fmt(
             \\zig cc -E -Xclang -ast-dump=json "{s}/include/mlir-c/Beaver/wrapper.h" \
-            \\  -I include -I "{s}" \
-            \\| elixir tools/wrapper/gen_stub.exs --elixir "{s}/capi_functions.ex" --zig "{s}/wrapper.zig"
+            \\  -I native/include -I "{s}" \
+            \\| elixir native/tools/wrapper/gen_stub.exs --elixir "{s}/capi_functions.ex" --zig "{s}/wrapper.zig"
         , .{ generated_dir, mlir_include_dir, b.install_path, generated_dir }),
     });
 }
@@ -32,7 +32,7 @@ fn createCMakeStep(b: *std.Build, llvm_cmake_dir: []const u8, mlir_cmake_dir: []
     const cmake_cache_path = b.pathJoin(&.{ cmake_build_dir, "CMakeCache.txt" });
 
     // cmake_build command
-    const cmake_configure = b.addSystemCommand(&.{ "cmake", "-G", "Ninja", "-B", cmake_build_dir });
+    const cmake_configure = b.addSystemCommand(&.{ "cmake", "-S", "native", "-G", "Ninja", "-B", cmake_build_dir });
     cmake_configure.addArgs(&.{
         b.fmt("-DLLVM_DIR={s}", .{llvm_cmake_dir}),
         b.fmt("-DMLIR_DIR={s}", .{mlir_cmake_dir}),
@@ -71,7 +71,7 @@ fn createODSExtractionStep(b: *std.Build, generated_dir: []const u8, mlir_includ
         "sh",
         "-c",
         b.fmt(
-            \\elixir tools/ods-extract/dump_ods.exs --mlir-include-dir "{s}" \
+            \\elixir native/tools/ods-extract/dump_ods.exs --mlir-include-dir "{s}" \
             \\| xargs "{s}/tools/ods-extract" \
             \\   -I "{s}" \
             \\   -I "{s}/mlir/Dialect/ArmSME/IR" \
@@ -85,7 +85,7 @@ fn createODSExtractionStep(b: *std.Build, generated_dir: []const u8, mlir_includ
     step.dependOn(&dump_ods.step);
 
     const json_to_inspection = b.addSystemCommand(&.{
-        "elixir",   "tools/json_to_inspection.exs",
+        "elixir",   "native/tools/json_to_inspection.exs",
         "--input",  b.pathJoin(&.{ generated_dir, "ods_dump.json" }),
         "--output", b.pathJoin(&.{ b.install_path, "ods_dump.ex" }),
     });
@@ -133,7 +133,7 @@ pub fn build(b: *std.Build) void {
         .name = "BeaverNIF",
         .linkage = .dynamic,
         .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
+            .root_source_file = b.path("native/src/main.zig"),
             .target = target,
             .optimize = optimize,
         }),
@@ -144,7 +144,7 @@ pub fn build(b: *std.Build) void {
 
     const kinda = b.dependency("kinda", .{});
     lib.root_module.addImport("kinda", kinda.module("kinda"));
-    lib.root_module.addIncludePath(.{ .cwd_relative = "include" });
+    lib.root_module.addIncludePath(.{ .cwd_relative = "native/include" });
     // add these to get ZLS working properly
     lib.root_module.addIncludePath(.{ .cwd_relative = mlir_include_dir });
     lib.root_module.addIncludePath(.{ .cwd_relative = b.pathJoin(&.{ generated_dir, "include" }) });

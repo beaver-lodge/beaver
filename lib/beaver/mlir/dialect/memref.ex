@@ -26,7 +26,7 @@ defmodule Beaver.MLIR.Dialect.MemRef do
 
     arguments =
       arguments
-      |> Keyword.put_new(:sym_name, Attribute.string(sym_name))
+      |> Keyword.put_new(MLIR.SymbolTable.attribute_name(), Attribute.string(sym_name))
       |> Keyword.put_new(:initial_value, value)
       |> Keyword.put_new(:type, ~t{memref<#{byte_size(txt)}x#{t}#{width}>})
 

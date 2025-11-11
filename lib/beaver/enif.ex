@@ -42,8 +42,9 @@ defmodule Beaver.ENIF do
     mlir ctx: ctx, ip: block do
       for {name, arg_types, ret_types} <- signatures(ctx) do
         Func.func _(
-                    sym_name: "\"#{name}\"",
-                    sym_visibility: MLIR.Attribute.string("private"),
+                    {MLIR.SymbolTable.attribute_name(), MLIR.Attribute.string(name)},
+                    {MLIR.SymbolTable.visibility_attribute_name(),
+                     MLIR.Attribute.string("private")},
                     function_type: Type.function(arg_types, ret_types)
                   ) do
           region do

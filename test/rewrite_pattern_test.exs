@@ -102,8 +102,8 @@ defmodule RewritePatternTest do
     if MLIR.Operation.name(op) == Arith.constant() and
          MLIR.equal?(op[:value], MLIR.Attribute.integer(MLIR.Type.i64(ctx: ctx), 2)) do
       mlir ctx: ctx, ip: rewriter do
-        {new_const, _} =
-          Arith.constant(value: Attribute.integer(MLIR.Type.i64(), 3)) >>> {:op, Type.i64()}
+        {new_const, [%MLIR.Value{}]} =
+          Arith.constant(value: Attribute.integer(MLIR.Type.i64(), 3)) >>> {:op, [Type.i64()]}
 
         MLIR.RewriterBase.replace(base, op, new_const)
       end

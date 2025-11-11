@@ -43,7 +43,7 @@ defmodule ENIFStringAsMemRef do
         msg = "not a binary"
         global = MemRef.global(msg) >>> :infer
         global_t = MLIR.Attribute.value(global[:type])
-        global_s = MLIR.Attribute.value(global[:sym_name])
+        global_s = MLIR.Attribute.value(global[MLIR.SymbolTable.attribute_name()])
 
         Func.func alloc_bin_and_copy(function_type: Type.function([env_t, term_t], [term_t])) do
           region do

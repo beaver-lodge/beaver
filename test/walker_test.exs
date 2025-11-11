@@ -4,9 +4,10 @@ defmodule WalkerTest do
   test "access", %{ctx: ctx} do
     m = Beaver.Dummy.func_of_3_blocks(ctx)
     f = m |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.at(0)
+    sym_name = MLIR.SymbolTable.attribute_name()
 
-    assert Beaver.Walker.attributes(f)[:sym_name] |> to_string() ==
-             Beaver.Walker.attributes(f)["sym_name"] |> to_string()
+    assert Beaver.Walker.attributes(f)[sym_name] |> to_string() ==
+             Beaver.Walker.attributes(f)[to_string(sym_name)] |> to_string()
 
     assert nil == Beaver.Walker.attributes(f)[:foo]
     r0 = Beaver.Walker.regions(f)[0]

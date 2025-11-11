@@ -29,7 +29,10 @@ defmodule Beaver.MLIR.Dialect.Func do
       unquote(args)
       |> List.wrap()
       |> List.flatten()
-      |> Keyword.put_new(:sym_name, Beaver.MLIR.Attribute.string(unquote(func_name)))
+      |> Keyword.put_new(
+        Beaver.MLIR.SymbolTable.attribute_name(),
+        Beaver.MLIR.Attribute.string(unquote(func_name))
+      )
       |> Keyword.put_new(:loc, Beaver.MLIR.Location.from_env(__ENV__))
       |> then(
         &Beaver.MLIR.Operation.create(%Beaver.SSA{

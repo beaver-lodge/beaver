@@ -81,7 +81,7 @@ jobs:
           method: network
       - name: Check formatting of Zig
         run: |
-          zig fmt --check native/src native/build.zig
+          zig fmt --check native build.zig
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
@@ -146,7 +146,6 @@ jobs:
         run: |
           mix profile.tprof --no-compile profile/enif_add_overhead.exs
       - name: Standalone Zig build
-        working-directory: native
         run: |
           git clean -fdx
           zig build --verbose

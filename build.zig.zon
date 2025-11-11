@@ -4,7 +4,7 @@
     .fingerprint = 0xd04bfcb952b135d6,
     .dependencies = .{
         .kinda = .{
-            .path = "../../kinda",
+            .path = "../kinda",
         },
     },
     .paths = .{""},

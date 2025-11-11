@@ -1,10 +1,10 @@
 native/src/*.zig
-native/build.zig
-native/build.zig.zon
+build.zig
+build.zig.zon
 native/**/CMakeLists.txt
 native/**/*.cmake
 native/**/*.h
 native/**/*.td
 native/**/*.cpp
 native/**/*.exs
-native/Makefile
+Makefile

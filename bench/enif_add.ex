@@ -13,7 +13,7 @@ defmodule AddENIF do
     op
     |> MLIR.Operation.from_module()
     |> MLIR.Operation.with_symbol_table(fn s_table ->
-      found = MLIR.CAPI.mlirSymbolTableLookup(s_table, MLIR.StringRef.create("enif_make_int64"))
+      found = MLIR.SymbolTable.lookup(s_table, "enif_make_int64")
 
       if MLIR.null?(found) do
         raise "Function not found"

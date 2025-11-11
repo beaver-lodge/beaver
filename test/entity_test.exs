@@ -10,6 +10,7 @@ defmodule EntityTest do
   doctest Beaver.Sigils
   doctest Beaver.MLIR.Type
   doctest Beaver.MLIR.Location
+  doctest Beaver.MLIR.SymbolTable
 
   describe "type apis" do
     test "generated", %{ctx: ctx} do
@@ -55,6 +56,21 @@ defmodule EntityTest do
 
       assert MLIR.equal?(Type.none().(ctx), Type.get("none").(ctx))
     end
+  end
+
+  test "function type", %{ctx: ctx} do
+    func_type =
+      Type.function(
+        [Type.i32(ctx: ctx), Type.f32(ctx: ctx)],
+        [Type.f64(ctx: ctx)]
+      ).(ctx)
+
+    assert func_type |> to_string() =~ ~r"i32.+f32.+f64"
+    assert 2 = MLIR.FunctionType.num_inputs(func_type)
+    assert MLIR.equal?(MLIR.FunctionType.input(func_type, 0), Type.i32(ctx: ctx))
+    assert MLIR.equal?(MLIR.FunctionType.input(func_type, 1), Type.f32(ctx: ctx))
+    assert 1 = MLIR.FunctionType.num_results(func_type)
+    assert MLIR.equal?(MLIR.FunctionType.result(func_type, 0), Type.f64(ctx: ctx))
   end
 
   test "checked composition", %{ctx: ctx} do

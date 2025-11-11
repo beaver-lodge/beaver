@@ -30,7 +30,6 @@ defmodule Beaver.MixProject do
           "*.ex"
         ],
         make_args: ~w{-j},
-        make_cwd: "native",
         make_clean: ["clean"]
       ]
   end
