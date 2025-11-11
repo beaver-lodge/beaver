@@ -146,7 +146,6 @@ jobs:
         run: |
           mix profile.tprof --no-compile profile/enif_add_overhead.exs
       - name: Standalone Zig build
-        working-directory: native
         run: |
           git clean -fdx
           zig build --verbose
