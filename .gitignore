@@ -33,3 +33,6 @@ beaver-*.tar.gz
 beaver-*.tar.gz.sha256
 
 .elixir_ls
+
+.zig-cache
+zig-out

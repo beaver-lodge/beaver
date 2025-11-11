@@ -11,7 +11,6 @@ mlir_mods = [
   DiagnosticHandlerID,
   DiagnosticHandler,
   DiagnosticSeverity,
-  SymbolTable,
   ExternalPassCallbacks,
   OpPassManager,
   AsmState,

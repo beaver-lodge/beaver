@@ -45,25 +45,8 @@ defmodule Beaver.MLIR.Operation do
     state |> Beaver.Native.ptr() |> mlirOperationCreate()
   end
 
-  @doc """
-  Normalize the results of the given operation in the following way:
-  - If the operation has no result, return the operation itself.
-  - If the operation has one result, return that result.
-  - If the operation has multiple results, return a list of results.
-  """
   def results(%__MODULE__{} = op) do
-    case mlirOperationGetNumResults(op) |> Beaver.Native.to_term() do
-      0 ->
-        op
-
-      1 ->
-        result(op, 0)
-
-      n when n > 1 ->
-        for i <- 0..(n - 1)//1 do
-          result(op, i)
-        end
-    end
+    Beaver.Walker.results(op)
   end
 
   def results({:deferred, {_func_name, _arguments}} = deferred) do
@@ -90,7 +73,27 @@ defmodule Beaver.MLIR.Operation do
     op
   end
 
-  @doc false
+  defp normalize_results(results) do
+    case Enum.count(results) do
+      0 ->
+        []
+
+      1 ->
+        Enum.at(results, 0)
+
+      n when n > 1 ->
+        Enum.to_list(results)
+    end
+  end
+
+  @doc """
+  Evaluate the SSA and return the operation or its results based on the defined result types.
+
+  Normalize the results of the given operation in the following way:
+  - If the operation has no result, return the operation itself.
+  - If the operation has one result, return that result.
+  - If the operation has multiple results, return a list of results.
+  """
   def eval_ssa(%Beaver.SSA{results: result_types} = ssa) do
     ssa =
       case result_types do
@@ -105,11 +108,20 @@ defmodule Beaver.MLIR.Operation do
     results = op |> results()
 
     case result_types do
+      [{:op, result_types}] when is_list(result_types) ->
+        {op, Enum.to_list(results)}
+
       [{:op, _}] ->
-        {op, results}
+        {op, normalize_results(results)}
 
       _ ->
-        results
+        case Enum.count(results) do
+          0 ->
+            op
+
+          n when n > 0 ->
+            normalize_results(results)
+        end
     end
   end
 

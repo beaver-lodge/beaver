@@ -285,7 +285,7 @@ defmodule Beaver do
   ```
   Foo.bar(a, b) >>> :infer
   ```
-  - To return the op together with the result
+  - To return the op together with the results
   ```
   {op, res} = Foo.bar(a, b) >>> {:op, types}
   ```
