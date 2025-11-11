@@ -81,7 +81,7 @@ jobs:
           method: network
       - name: Check formatting of Zig
         run: |
-          zig fmt --check native/src native/build.zig
+          zig fmt --check native build.zig
       - uses: actions/setup-python@v4
         with:
           python-version: "3.11"
