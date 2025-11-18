@@ -24,7 +24,8 @@ defmodule Beaver.MLIR.ODS.Dump do
   Lookup an operation by name (e.g. "affine.for").
   """
   for %{"operations" => operations} <- @dialects do
-    for %{"name" => name, "operands" => operands} = op <- operations do
+    for %{"name" => name} = op <- operations do
+      operands = op["operands"] || []
       # Transform empty operand names to sequential names (arg0, arg1, etc.)
       {operands, _} =
         Enum.map_reduce(operands, 0, fn operand, index ->
