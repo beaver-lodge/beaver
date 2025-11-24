@@ -285,3 +285,9 @@ MLIR_CAPI_EXPORTED void beaverSetGlobalDebugTypes(const MlirStringRef *types,
   // Call the underlying MLIR function
   mlirSetGlobalDebugTypes(cstrings.data(), n);
 }
+
+#include "mlir/Dialect/GPU/IR/GPUDialect.h"
+
+MLIR_CAPI_EXPORTED MlirStringRef beaverGetNumWorkgroupAttributionsAttrName() {
+  return wrap(gpu::GPUFuncOp::getNumWorkgroupAttributionsAttrName());
+}

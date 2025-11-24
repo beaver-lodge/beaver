@@ -107,6 +107,8 @@ MLIR_CAPI_EXPORTED MlirType beaverDenseElementsAttrGetType(MlirAttribute attr);
 
 MLIR_CAPI_EXPORTED intptr_t beaverShapedTypeGetNumElements(MlirType type);
 
+MLIR_CAPI_EXPORTED MlirStringRef beaverGetNumWorkgroupAttributionsAttrName();
+
 #include "mlir-c/ExecutionEngine.h"
 
 MLIR_CAPI_EXPORTED bool beaverIsNullExecutionEngine(MlirExecutionEngine w);

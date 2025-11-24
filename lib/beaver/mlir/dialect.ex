@@ -27,6 +27,7 @@ defmodule Beaver.MLIR.Dialect do
           func_name = Beaver.MLIR.Dialect.Registry.normalize_op_name(op)
           full_name = Enum.join([dialect, op], ".")
 
+          @file "#{full_name}.ex"
           @doc (case(Beaver.MLIR.ODS.Dump.lookup(full_name)) do
                   {:ok, found} ->
                     Beaver.MLIR.ODS.Dump.gen_doc(found)
@@ -66,6 +67,7 @@ defmodule Beaver.MLIR.Dialect do
       ops = Dialect.Registry.ops(d)
 
       defmodule module_name do
+        @file "#{d}.ex"
         use Beaver.MLIR.Dialect,
           dialect: d,
           ops: ops

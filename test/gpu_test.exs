@@ -2,6 +2,7 @@ defmodule GPUTest do
   use Beaver.Case, async: true
   use Beaver
   alias Beaver.MLIR
+  doctest Beaver.MLIR.Dialect.GPU
 
   @moduletag :cuda
 

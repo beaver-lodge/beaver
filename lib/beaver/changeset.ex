@@ -301,7 +301,7 @@ defmodule Beaver.Changeset do
     # 2. Process defined operands in a single pass (O(M log N))
     # A `for` comprehension clearly expresses the transformation.
     tagged_operands =
-      for %{"name" => operand_name, "kind" => kind} <- op_dump["operands"] do
+      for %{"name" => operand_name, "kind" => kind} <- op_dump["operands"] || [] do
         values =
           Enum.reduce(operands, [], fn {key, values}, acc ->
             if compare_tag(key, operand_name), do: acc ++ List.wrap(values), else: acc
