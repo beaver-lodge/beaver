@@ -12,7 +12,7 @@ defmodule DialectRegistryTest do
   test "example from upstream with br" do
     assert not Enum.empty?(Dialect.Registry.dialects())
     assert not Enum.empty?(Dialect.Registry.ops("arith"))
-    assert Dialect.Registry.ops("cf") == ["switch", "cond_br", "br", "assert"]
+    assert Dialect.Registry.ops("cf") == ["assert", "br", "cond_br", "switch"]
 
     registered =
       for d <- Dialect.Registry.dialects(full: true) do

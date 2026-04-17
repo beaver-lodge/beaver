@@ -64,9 +64,14 @@ defmodule Beaver.MLIR.Dialect.Registry do
   end
 
   def ops(dialect, opts) do
-    ops(:all, opts)
-    |> Stream.filter(&String.starts_with?(&1, "#{dialect}."))
-    |> Enum.map(&String.trim_leading(&1, "#{dialect}."))
+    prefix = "#{dialect}."
+    ops = ops(:all, opts)
+
+    for op <- ops,
+        String.starts_with?(op, prefix) do
+      String.trim_leading(op, prefix)
+    end
+    |> then(&Enum.sort/1)
   end
 
   @doc """
