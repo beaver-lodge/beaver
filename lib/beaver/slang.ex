@@ -262,17 +262,91 @@ defmodule Beaver.Slang do
     end
   end
 
-  defp do_gen_region(:any, block, ctx) do
-    mlir ip: block, ctx: ctx do
-      IRDL.region() >>> ~t{!irdl.region}
-    end
+  defp normalize_region_descriptor(:any) do
+    %{args: nil, size: nil}
   end
 
-  defp do_gen_region({:sized, size}, block, ctx) when is_integer(size) do
-    mlir ip: block, ctx: ctx do
-      IRDL.region(numberOfBlocks: MLIR.Attribute.integer(MLIR.Type.i32(), size)) >>>
-        ~t{!irdl.region}
-    end
+  defp normalize_region_descriptor({:sized, size}) when is_integer(size) and size > 0 do
+    %{args: nil, size: size}
+  end
+
+  defp normalize_region_descriptor({:region, opts}) when is_list(opts) do
+    opts = Keyword.validate!(opts, [:args, :size])
+
+    args =
+      case Keyword.get(opts, :args) do
+        nil -> nil
+        args -> List.wrap(args)
+      end
+
+    size =
+      case Keyword.get(opts, :size) do
+        nil ->
+          nil
+
+        size when is_integer(size) and size > 0 ->
+          size
+
+        size ->
+          raise ArgumentError,
+                "expected region size to be a positive integer, got: #{inspect(size)}"
+      end
+
+    %{args: args, size: size}
+  end
+
+  defp build_region_arguments(%{args: args, size: size}, block, ctx) do
+    constrained_args? = not is_nil(args)
+
+    args =
+      for arg <- args || [] do
+        create_constraint(arg, ip: block, ctx: ctx)
+      end
+
+    attrs =
+      []
+      |> then(fn attrs ->
+        if is_nil(size) do
+          attrs
+        else
+          attrs ++
+            [
+              numberOfBlocks:
+                Beaver.Deferred.create(
+                  MLIR.Attribute.integer(MLIR.Type.i32(), size),
+                  ctx
+                )
+            ]
+        end
+      end)
+      |> then(fn attrs ->
+        if constrained_args? do
+          attrs ++ [constrainedArguments: Beaver.Deferred.create(MLIR.Attribute.unit(), ctx)]
+        else
+          attrs
+        end
+      end)
+
+    args ++ attrs
+  end
+
+  defp do_gen_region(region, block, ctx) do
+    use Beaver
+
+    region_args =
+      region
+      |> normalize_region_descriptor()
+      |> build_region_arguments(block, ctx)
+
+    %Beaver.SSA{
+      arguments: region_args,
+      results: [Beaver.Deferred.create(~t{!irdl.region}, ctx)],
+      ip: block,
+      ctx: ctx,
+      loc: Beaver.Deferred.create(MLIR.Location.unknown(), ctx),
+      evaluator: &MLIR.Operation.eval_ssa/1
+    }
+    |> IRDL.region()
   end
 
   @doc false
@@ -282,6 +356,7 @@ defmodule Beaver.Slang do
     |> Enum.map(&do_gen_region(&1, block, ctx))
   end
 
+  @doc false
   # This function generates the AST for a creator function for an IRDL operation (like `irdl.operation`, `irdl.type`). It uses the transform_defop_pins/1 function to transform the pins, generates the MLIR code for the operation and its arguments, and applies the operation using op_applier/1.
   defp gen_creator(op, args_op, call, do_block, opts) do
     {name, args} = call |> Macro.decompose_call()

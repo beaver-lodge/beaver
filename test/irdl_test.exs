@@ -71,6 +71,14 @@ defmodule IRDLTest do
   end
 
   test "region dialect", %{ctx: ctx} do
-    TestRegion.__slang_dialect__(ctx) |> MLIR.verify!()
+    dialect =
+      TestRegion.__slang_dialect__(ctx)
+      |> MLIR.verify!()
+
+    rendered = MLIR.to_string(dialect)
+
+    assert rendered =~ "irdl.region()"
+    assert rendered =~ "irdl.region(%"
+    assert rendered =~ "with size 2"
   end
 end
