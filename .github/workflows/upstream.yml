@@ -5,24 +5,23 @@ on:
     - cron: "00 05 * * *"
   workflow_dispatch:
     inputs:
-      mlir_wheel_version:
-        description: "mlir wheel version to install"
+      llvm_prebuilt_asset_name:
+        description: "exact llvm/eudsl asset name to install; empty means auto-detect by OS/arch"
         required: false
-        default: "latest"
   push:
     branches:
       - "upstream/*"
 
 concurrency:
-  group: check-upstream-${{ github.ref }}-${{ inputs.mlir_wheel_version }}
+  group: check-upstream-${{ github.ref }}-${{ inputs.llvm_prebuilt_asset_name || 'auto' }}
   cancel-in-progress: true
 
 jobs:
   mlir:
-    name: Latest MLIR
+    name: Prebuilt LLVM
     permissions:
       contents: read
       pull-requests: write
     uses: ./.github/workflows/elixir.yml
     with:
-      mlir_wheel_version: ${{ inputs.mlir_wheel_version || 'latest' }}
+      llvm_prebuilt_asset_name: ${{ inputs.llvm_prebuilt_asset_name }}

@@ -27,13 +27,33 @@ Bindings are the part that provides the interface to the MLIR CAPIs. It is imple
 
 1. Install Elixir, [see installation guide](https://elixir-lang.org/install.html)
 2. Install Zig, [see installation guide](https://ziglang.org/learn/getting-started/#installing-zig)
-3. Install LLVM/MLIR
+3. Clone this repo and `kinda` in the same directory
 
-- Option 1: Install with pip
+```bash
+git clone https://github.com/beaver-lodge/beaver.git
+git clone https://github.com/beaver-lodge/kinda.git
+```
+
+4. Install LLVM/MLIR
+
+- Option 1: Install a prebuilt `llvm/eudsl` tarball
+
+  The helper script resolves the matching `mlir_<os>_<arch>_*.tar.gz` asset for
+  the current machine, downloads it, and extracts the compiled binaries into a
+  local prefix. This replaces the old Python wheel-based setup and only needs a
+  local `python3` runtime.
 
   ```bash
-  python3 -m pip install -r dev-requirements.txt
-  export LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config
+  bash scripts/install-prebuilt-llvm.sh $HOME/.local/llvm-eudsl
+  export LLVM_CONFIG_PATH=$HOME/.local/llvm-eudsl/bin/llvm-config
+  ```
+
+  To pin a specific asset instead of auto-detecting by OS and architecture:
+
+  ```bash
+  LLVM_EUDSL_ASSET_NAME=mlir_macos_arm64_20260416+47b5ad2bd.tar.gz \
+    bash scripts/install-prebuilt-llvm.sh $HOME/.local/llvm-eudsl
+  export LLVM_CONFIG_PATH=$HOME/.local/llvm-eudsl/bin/llvm-config
   ```
 
 - Option 2: Build from source https://mlir.llvm.org/getting_started/
@@ -68,12 +88,7 @@ Bindings are the part that provides the interface to the MLIR CAPIs. It is imple
   - Use `vulkaninfo` and `vkvia` to verify Vulkan is working
   - Add `-DMLIR_ENABLE_VULKAN_RUNNER=ON` in LLVM CMake config command
 
-4. Develop and run tests
-- Clone this repo and `kinda` in the same directory
-  ```bash
-  git clone https://github.com/beaver-lodge/beaver.git
-  git clone https://github.com/beaver-lodge/kinda.git
-  ```
+5. Develop and run tests
 - Make sure LLVM environment variable is set properly, as otherwise it might fail to build
 
   ```bash
@@ -90,7 +105,7 @@ Bindings are the part that provides the interface to the MLIR CAPIs. It is imple
   mix test --only nx
   ```
 
-5. debug
+6. debug
 
 - setting environment variable to control Erlang scheduler number, `ERL_AFLAGS="+S 10:5"`
 - run mix test under LLDB, `scripts/lldb-mix-test`

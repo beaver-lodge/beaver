@@ -95,10 +95,11 @@ jobs:
       - name: Strip dev suffix
         run: sed -i.bak 's/-dev//g' mix.exs && rm -f mix.exs.bak
       - uses: seanmiddleditch/gha-setup-ninja@master
-      - name: Install pre-build LLVM
+      - name: Install prebuilt LLVM
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
-          python3 -m pip install -r dev-requirements.txt
-          echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
+          bash scripts/install-prebuilt-llvm.sh "$RUNNER_TEMP/llvm-prebuilt"
       - name: Production build
         env:
           MIX_ENV: prod
@@ -107,7 +108,6 @@ jobs:
           mix elixir_make.precompile
       - name: Purge artifacts
         run: |
-          python3 -m pip uninstall -y mlir
           mix clean
       - name: Start mock server in the background
         run: |
