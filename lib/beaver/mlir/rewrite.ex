@@ -206,7 +206,8 @@ defmodule Beaver.MLIR.Rewrite do
     end
   end
 
-  def apply_patterns(ir, %MLIR.FrozenRewritePatternSet{} = pattern_set, opts) when is_list(opts) do
+  def apply_patterns(ir, %MLIR.FrozenRewritePatternSet{} = pattern_set, opts)
+      when is_list(opts) do
     apply_patterns(ir, pattern_set, to_config_callback(opts))
   end
 

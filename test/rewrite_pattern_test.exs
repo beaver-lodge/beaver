@@ -168,9 +168,9 @@ defmodule RewritePatternTest do
                    cfg
                    |> MLIR.CAPI.mlirGreedyRewriteDriverConfigGetMaxNumRewrites()
                    |> Beaver.Native.to_term()
-               }
-             end
-           )
+                 }
+               end
+             )
   end
 
   test "with_default_config accepts config callbacks directly" do

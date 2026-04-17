@@ -13,7 +13,7 @@ defmodule Beaver.SSA do
   @type argument_entry() :: Changeset.argument()
   @type op_result_entry() :: {:op, Changeset.result() | [Changeset.result()]}
   @type result_entry() :: Changeset.result() | :infer | op_result_entry()
-  @type filler_fun() :: (() -> term())
+  @type filler_fun() :: (-> term())
   @type insertion_point() ::
           MLIR.Block.t() | MLIR.PatternRewriter.t() | MLIR.RewriterBase.t() | nil
   @type evaluator() :: (t() -> term())
