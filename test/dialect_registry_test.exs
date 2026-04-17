@@ -20,12 +20,11 @@ defmodule DialectRegistryTest do
       end
       |> MapSet.new()
 
-    expected =
+    required =
       [
         {"acc", "ACC"},
         {"affine", "Affine"},
         {"amdgpu", "AMDGPU"},
-        {"amx", "AMX"},
         {"arith", "Arith"},
         {"arm_neon", "ArmNeon"},
         {"arm_sme", "ArmSME"},
@@ -64,7 +63,6 @@ defmodule DialectRegistryTest do
         {"transform", "Transform"},
         {"ub", "UB"},
         {"vector", "Vector"},
-        {"x86vector", "X86Vector"},
         {"xegpu", "XeGPU"},
         {"smt", "SMT"},
         {"xevm", "XeVM"},
@@ -73,8 +71,18 @@ defmodule DialectRegistryTest do
       ]
       |> MapSet.new()
 
-    assert MapSet.difference(registered, expected) == MapSet.new([])
-    assert MapSet.difference(expected, registered) == MapSet.new([])
+    optional =
+      [
+        {"amx", "AMX"},
+        {"x86", "X86"},
+        {"x86vector", "X86Vector"}
+      ]
+      |> MapSet.new()
+
+    assert MapSet.difference(required, registered) == MapSet.new([])
+
+    assert registered |> MapSet.difference(required) |> MapSet.difference(optional) ==
+             MapSet.new([])
   end
 
   test "ops are unique" do

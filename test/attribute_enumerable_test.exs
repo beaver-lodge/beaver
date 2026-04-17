@@ -480,10 +480,10 @@ defmodule AttributeEnumerableTest do
     sum =
       Enum.reduce(dict, 0, fn named_attr, acc ->
         attr = MLIR.NamedAttribute.attribute(named_attr)
-        acc + Beaver.Native.to_term(MLIR.CAPI.mlirIntegerAttrGetValueInt(attr))
+        acc + MLIR.Attribute.value(attr)
       end)
 
-    assert sum == 3
+    assert 3 = sum
 
     # Test slice operations
     assert Enum.slice(dict, 0..1) |> Enum.count() == 2

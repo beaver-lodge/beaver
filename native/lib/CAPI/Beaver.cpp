@@ -249,7 +249,7 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverIRDLGetDefinedAttr(
 
 MLIR_CAPI_EXPORTED MlirGreedyRewriteDriverConfig
 beaverGreedyRewriteDriverConfigGet() {
-  return {};
+  return mlirGreedyRewriteDriverConfigCreate();
 }
 
 MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context,
@@ -290,4 +290,8 @@ MLIR_CAPI_EXPORTED void beaverSetGlobalDebugTypes(const MlirStringRef *types,
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverGetNumWorkgroupAttributionsAttrName() {
   return wrap(gpu::GPUFuncOp::getNumWorkgroupAttributionsAttrName());
+}
+
+MLIR_CAPI_EXPORTED MlirStringRef beaverGetContainerModuleAttrName() {
+  return wrap(gpu::GPUDialect::getContainerModuleAttrName());
 }

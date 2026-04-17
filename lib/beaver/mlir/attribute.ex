@@ -423,6 +423,9 @@ defmodule Beaver.MLIR.Attribute do
       string?(attribute) ->
         mlirStringAttrGetValue(attribute) |> to_string()
 
+      integer?(attribute) ->
+        mlirIntegerAttrGetValueInt(attribute) |> Beaver.Native.to_term()
+
       flat_symbol_ref?(attribute) ->
         mlirFlatSymbolRefAttrGetValue(attribute) |> to_string()
     end

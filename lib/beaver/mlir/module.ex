@@ -4,6 +4,7 @@ defmodule Beaver.MLIR.Module do
   """
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
+  @behaviour Access
 
   @doc """
   Create a MLIR module by parsing string.
@@ -50,4 +51,23 @@ defmodule Beaver.MLIR.Module do
   defdelegate body(module), to: CAPI, as: :mlirModuleGetBody
   defdelegate from_operation(op), to: CAPI, as: :mlirModuleFromOperation
   defdelegate empty(location), to: CAPI, as: :mlirModuleCreateEmpty
+
+  @impl Access
+  def fetch(module, attribute) do
+    MLIR.Operation.fetch(MLIR.Operation.from_module(module), attribute)
+  end
+
+  @impl Access
+  def get_and_update(module, attribute, function) do
+    {attr, _} =
+      MLIR.Operation.get_and_update(MLIR.Operation.from_module(module), attribute, function)
+
+    {attr, module}
+  end
+
+  @impl Access
+  def pop(module, attribute) do
+    {attr, _} = MLIR.Operation.pop(MLIR.Operation.from_module(module), attribute)
+    {attr, module}
+  end
 end

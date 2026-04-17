@@ -1,6 +1,7 @@
 defmodule Beaver.MLIR do
-  alias Beaver.MLIR.{Attribute, Type, Operation}
+  alias Beaver.MLIR.{Attribute, Type, Operation, Rewrite}
   alias Beaver.MLIR
+  alias Beaver.Deferred
   import Beaver.MLIR.CAPI
   alias Beaver.MLIR.CAPI
 
@@ -136,8 +137,10 @@ defmodule Beaver.MLIR do
           | Identifier.t()
 
   @type dump_opts :: [generic: boolean()]
-  @spec dump(printable(), dump_opts()) :: :ok
-  @spec dump!(printable(), dump_opts()) :: any()
+  @type print_opts :: [generic: boolean(), bytecode: boolean(), ctx: Deferred.context_arg()]
+  @type null_safe_result(t) :: t | {:error, String.t()}
+  @spec dump(printable(), dump_opts()) :: null_safe_result(:ok)
+  @spec dump!(printable(), dump_opts()) :: printable()
   @doc """
   Dump MLIR element to stdio.
 
@@ -177,7 +180,8 @@ defmodule Beaver.MLIR do
     end
   end
 
-  @spec to_string(printable(), dump_opts()) :: :ok
+  @spec to_string(printable() | Deferred.contextual(printable()), print_opts()) ::
+          null_safe_result(String.t())
 
   @doc """
   Print MLIR element or StringRef as Elixir binary string.
@@ -222,7 +226,21 @@ defmodule Beaver.MLIR do
   end
 
   @type verifiable() :: Operation.t() | Module.t()
-  @spec verify!(verifiable()) :: :ok
+  @type diagnostic() :: Rewrite.diagnostic()
+  @type diagnostics() :: Rewrite.diagnostics()
+  @type verify_result(t) :: {:ok, t} | :null | {:error, diagnostics()}
+  @type rewrite_pattern_input() ::
+          Rewrite.pattern_list()
+          | MLIR.FrozenRewritePatternSet.t()
+          | MLIR.RewritePatternSet.t()
+
+  @type apply_option() ::
+          {:debug, boolean()} | {:ctx, Deferred.context_arg()} | Rewrite.config_option()
+  @type apply_opts() :: [apply_option()] | Rewrite.config_callback() | nil
+  @type apply_error() :: String.t()
+  @type apply_outcome(t) :: {:ok, t} | {:error, apply_error()}
+
+  @spec verify!(verifiable()) :: verifiable()
   def verify!(op) do
     case verify(op) do
       {:ok, op} ->
@@ -236,7 +254,7 @@ defmodule Beaver.MLIR do
     end
   end
 
-  @spec verify(verifiable()) :: {:ok, verifiable()} | :null | {:error, list()}
+  @spec verify(verifiable()) :: verify_result(verifiable())
   def verify(op) do
     if null?(op) do
       :null
@@ -259,6 +277,7 @@ defmodule Beaver.MLIR do
   Apply patterns on a container (region, operation, module).
   It returns the container if it succeeds otherwise it raises.
   """
+  @spec apply!(verifiable(), rewrite_pattern_input(), apply_opts()) :: verifiable()
   def apply!(op, patterns, opts \\ @apply_default_opts) do
     case apply_(op, patterns, opts) do
       {:ok, module} ->
@@ -273,13 +292,27 @@ defmodule Beaver.MLIR do
   Apply patterns on a container (operation, module).
   It is named `apply_` with a underscore to avoid name collision with `Kernel.apply/2`
   """
+  @spec apply_(verifiable(), rewrite_pattern_input(), apply_opts()) :: apply_outcome(verifiable())
   def apply_(op, patterns, opts \\ @apply_default_opts)
 
-  def apply_(op, %MLIR.FrozenRewritePatternSet{} = patterns, _opts) do
+  def apply_(op, %MLIR.FrozenRewritePatternSet{} = patterns, opts) do
     MLIR.verify!(op)
 
     {result, diagnostics} =
-      Beaver.MLIR.Rewrite.apply_patterns(op, patterns)
+      Beaver.MLIR.Rewrite.apply_patterns(op, patterns, rewrite_config_input(opts))
+
+    if MLIR.LogicalResult.success?(result) do
+      {:ok, op}
+    else
+      {:error, MLIR.Diagnostic.format(diagnostics, "failed to apply pattern set.")}
+    end
+  end
+
+  def apply_(op, %MLIR.RewritePatternSet{} = patterns, opts) do
+    MLIR.verify!(op)
+
+    {result, diagnostics} =
+      Beaver.MLIR.Rewrite.apply_patterns(op, patterns, rewrite_config_input(opts))
 
     if MLIR.LogicalResult.success?(result) do
       {:ok, op}
@@ -300,6 +333,19 @@ defmodule Beaver.MLIR do
       MLIR.Module.destroy(pdl_mod)
       MLIR.FrozenRewritePatternSet.destroy(frozen_set)
     end
+  end
+
+  defp rewrite_config_input(nil), do: nil
+  defp rewrite_config_input(callback) when is_function(callback, 1), do: callback
+
+  defp rewrite_config_input(opts) when is_list(opts) do
+    Keyword.take(opts, [
+      :max_iterations,
+      :max_num_rewrites,
+      :use_top_down_traversal,
+      :enable_folding,
+      :enable_constant_cse
+    ])
   end
 end
 

@@ -7,17 +7,26 @@ defmodule Beaver.SSA do
   To be more specific, the macro system in Beaver will use an SSA and its surrounding environment to construct a operation changeset,
   and then create an operation from it by calling MLIR CAPI.
   """
+  alias Beaver.Changeset
   alias Beaver.MLIR
 
+  @type argument_entry() :: Changeset.argument()
+  @type op_result_entry() :: {:op, Changeset.result() | [Changeset.result()]}
+  @type result_entry() :: Changeset.result() | :infer | op_result_entry()
+  @type filler_fun() :: (() -> term())
+  @type insertion_point() ::
+          MLIR.Block.t() | MLIR.PatternRewriter.t() | MLIR.RewriterBase.t() | nil
+  @type evaluator() :: (t() -> term())
+
   @type t() :: %__MODULE__{
-          op: String.t(),
-          arguments: any(),
-          results: any(),
-          filler: any(),
-          ip: nil,
-          ctx: any(),
-          loc: any(),
-          evaluator: function()
+          op: String.t() | nil,
+          arguments: [argument_entry()],
+          results: :infer | [result_entry()],
+          filler: filler_fun() | nil,
+          ip: insertion_point(),
+          ctx: MLIR.Context.t() | nil,
+          loc: MLIR.Location.t() | nil,
+          evaluator: evaluator() | nil
         }
   defstruct op: nil,
             arguments: [],

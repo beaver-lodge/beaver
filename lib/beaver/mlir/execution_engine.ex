@@ -20,10 +20,12 @@ defmodule Beaver.MLIR.ExecutionEngine do
   @type opt_level :: 0 | 1 | 2 | 3
   @type shared_lib_path :: String.t()
   @type object_dump :: boolean()
+  @type enable_pic :: boolean()
   @type opts :: [
           {:shared_lib_paths, [shared_lib_path]},
           {:opt_level, opt_level},
           {:object_dump, object_dump},
+          {:enable_pic, enable_pic},
           {:dirty, dirty}
         ]
   @spec create!(MLIR.Module.t(), opts()) :: t()
@@ -31,6 +33,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
     shared_lib_paths = Keyword.get(opts, :shared_lib_paths, [])
     opt_level = Keyword.get(opts, :opt_level, 2)
     object_dump = Keyword.get(opts, :object_dump, false)
+    enable_pic = Keyword.get(opts, :enable_pic, false)
 
     shared_lib_paths_ptr =
       shared_lib_paths
@@ -46,7 +49,8 @@ defmodule Beaver.MLIR.ExecutionEngine do
         opt_level,
         length(shared_lib_paths),
         shared_lib_paths_ptr,
-        object_dump
+        object_dump,
+        enable_pic
       )
 
     if MLIR.null?(jit) do

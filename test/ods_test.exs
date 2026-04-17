@@ -50,7 +50,7 @@ defmodule ODSDumpTest do
                       ) do
               region do
                 block _(a >>> Type.i32(), b >>> Type.i32()) do
-                  Arith.addi(a, lhs: a, rhs: b) >>> Type.i32()
+                  Arith.addi(a, rhs: b) >>> Type.i32()
                   Func.return() >>> []
                 end
               end

@@ -9,6 +9,20 @@ defmodule Updater do
                     |> Enum.map(&String.to_atom/1)
   @normal_and_dirty ~w{mlirExecutionEngineInvokePacked}
                     |> Enum.map(&String.to_atom/1)
+  @unsupported_nifs ~w{
+    mlirDynamicOpTraitCreate
+    mlirInferShapedTypeOpInterfaceInferReturnTypes
+    mlirInferTypeOpInterfaceInferReturnTypes
+    mlirMemoryEffectsOpInterfaceAttachFallbackModel
+    mlirOpConversionPatternCreate
+    mlirPatternDescriptorOpInterfaceAttachFallbackModel
+    mlirTransformOpInterfaceAttachFallbackModel
+    mlirTransformStateForEachParam
+    mlirTransformStateForEachPayloadOp
+    mlirTransformStateForEachPayloadValue
+    mlirTypeConverterAddConversion
+  }
+                    |> Enum.map(&String.to_atom/1)
 
   defp dirty_io(name), do: "#{name}_dirty_io" |> String.to_atom()
   defp dirty_cpu(name), do: "#{name}_dirty_cpu" |> String.to_atom()
@@ -138,6 +152,7 @@ defmodule Updater do
 
     apply(json_mod, :decode!, [txt])
     |> traverse()
+    |> Enum.reject(fn {name, _params} -> name in @unsupported_nifs end)
     |> Enum.sort()
   end
 
