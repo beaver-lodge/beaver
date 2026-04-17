@@ -19,4 +19,14 @@ defmodule Beaver.MLIR.Dialect.GPU do
   def number_of_buffers_in_workgroup_attributions_attribute_name do
     MLIR.CAPI.beaverGetNumWorkgroupAttributionsAttrName() |> to_string() |> String.to_atom()
   end
+
+  @doc """
+  Get the name of the attribute used to annotate the modules that contain kernel modules.
+  ## Examples
+    iex> Beaver.MLIR.Dialect.GPU.container_module_attribute_name()
+    :"gpu.container_module"
+  """
+  def container_module_attribute_name do
+    MLIR.CAPI.beaverGetContainerModuleAttrName() |> to_string() |> String.to_atom()
+  end
 end

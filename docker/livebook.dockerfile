@@ -3,13 +3,13 @@ RUN apt-get upgrade -y \
   && apt-get update \
   && apt-get install --no-install-recommends -y \
     ninja-build \
-    python3-pip \
+    python3 \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
 # LLVM
-COPY ./dev-requirements.txt /src/dev-requirements.txt
-RUN python3 -m pip install -r /src/dev-requirements.txt && python3 -m pip cache purge
-RUN ln -s $(python3 -c 'import mlir;print(mlir.__path__[0])') /usr/local/mlir
+COPY ./scripts/install-prebuilt-llvm.sh /usr/local/bin/install-prebuilt-llvm.sh
+RUN bash /usr/local/bin/install-prebuilt-llvm.sh /usr/local/mlir
+ENV LLVM_CONFIG_PATH=/usr/local/mlir/bin/llvm-config
 ENV PATH=/usr/local/mlir/bin:${PATH}
 RUN llvm-config --version
 # Zig

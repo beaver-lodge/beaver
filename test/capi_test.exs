@@ -152,7 +152,7 @@ defmodule MlirTest do
 
     assert mlirOperationVerify(module_op) |> Beaver.Native.to_term()
     pm = mlirPassManagerCreate(ctx)
-    mlirPassManagerAddOwnedPass(pm, mlirCreateTransformsCSE())
+    mlirPassManagerAddOwnedPass(pm, mlirCreateTransformsCSEPass())
     success = mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(module))
 
     assert success
@@ -171,7 +171,7 @@ defmodule MlirTest do
     external = %MLIR.Pass{} = Beaver.Composer.create_pass(TestPass, ctx)
     pm = mlirPassManagerCreate(ctx)
     mlirPassManagerAddOwnedPass(pm, external)
-    mlirPassManagerAddOwnedPass(pm, mlirCreateTransformsCSE())
+    mlirPassManagerAddOwnedPass(pm, mlirCreateTransformsCSEPass())
     {:ok, []} = MLIR.PassManager.run(pm, module)
     :ok = MLIR.PassManager.destroy(pm)
     mlirModuleDestroy(module)

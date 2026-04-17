@@ -48,6 +48,11 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
           RewritePattern
           RewritePatternSet
           RewritePatternCallbacks
+          ConversionTarget
+          ConversionPattern
+          ConversionPatternRewriter
+          TypeConverter
+          ConversionConfig
           ExecutionEngine
           Operation.State
           SymbolTable
@@ -59,8 +64,20 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
           WalkOrder
           BytecodeWriterConfig
           OpPrintingFlags
+          LLVMRawFdOStream
           LLVMThreadPool
           TypeIDAllocator
+          DynamicOpTrait
+          DynamicOpTraitCallbacks
+          DynamicTypeDefinition
+          DynamicAttrDefinition
+          MemoryEffectInstancesList
+          MemoryEffectsOpInterfaceCallbacks
+          TransformResults
+          TransformRewriter
+          TransformState
+          TransformOpInterfaceCallbacks
+          PatternDescriptorOpInterfaceCallbacks
           RewriterBase
           FrozenRewritePatternSet
           PDLPatternModule

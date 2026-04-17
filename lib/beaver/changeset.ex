@@ -1,5 +1,6 @@
 defmodule Beaver.Changeset do
   @moduledoc false
+  alias Beaver.Deferred
   alias Beaver.MLIR
   require Logger
 
@@ -25,12 +26,12 @@ defmodule Beaver.Changeset do
             location: nil,
             context: nil
 
-  @type attribute() :: MLIR.Attribute.t() | (MLIR.Context.t() -> MLIR.Attribute.t())
+  @type attribute() :: Deferred.contextual(MLIR.Attribute.t())
   @type operand() :: MLIR.Value.t()
   @type tagged_operand() :: {atom(), operand() | [operand()]}
   @type operand_argument() :: tagged_operand() | operand() | [operand()]
-  @type type_argument() :: MLIR.Type.t() | (MLIR.Context.t() -> MLIR.Type.t())
-  @type tagged_attribute :: {atom(), type_argument() | attribute()}
+  @type type_argument() :: Deferred.contextual(MLIR.Type.t())
+  @type tagged_attribute :: {atom(), type_argument() | attribute() | String.t() | :infer}
   @type attribute_argument() :: tagged_attribute() | [tagged_attribute()]
   @type branching_argument() :: MLIR.Block.t() | {MLIR.Block.t(), [MLIR.Value.t()]}
   @type region_argument() :: MLIR.Region.t() | (-> [MLIR.Region.t()])
@@ -169,8 +170,9 @@ defmodule Beaver.Changeset do
     """
   end
 
-  @type type() :: MLIR.Type.t() | [MLIR.Type.t()]
-  @type result() :: type() | (MLIR.Context.t() -> type())
+  @type deferred_type() :: {:parametric, term(), term(), term()}
+  @type type() :: MLIR.Type.t() | deferred_type() | [MLIR.Type.t() | deferred_type()]
+  @type result() :: :infer | type() | Deferred.contextual(type())
   @spec add_result(t(), result()) :: t()
 
   def add_result(%__MODULE__{} = changeset, argument) when is_list(argument) do

@@ -12,7 +12,12 @@ defmodule Beaver.MixProject do
       description: description(),
       docs: docs(),
       package: package(),
-      compilers: [:elixir_make] ++ Mix.compilers()
+      compilers: [:elixir_make] ++ Mix.compilers(),
+      dialyzer: [
+        ignore_warnings: ".dialyzer_ignore.exs",
+        plt_core_path: ".dialyzer/core.plt",
+        plt_local_path: ".dialyzer/project.plt"
+      ]
     ] ++
       [
         make_precompiler: {:nif, Kinda.Precompiler},
@@ -115,7 +120,8 @@ defmodule Beaver.MixProject do
       {:kinda, "~> 0.10.8"},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:benchee, "~> 1.0", only: :dev},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]
   end
 end

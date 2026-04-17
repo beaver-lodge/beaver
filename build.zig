@@ -17,7 +17,8 @@ fn generateWrapper(b: *std.Build, generated_dir: []const u8, mlir_include_dir: [
 
     // Generate wrapper files using clang AST
     _ = b.run(&.{
-        "sh", "-c", b.fmt(
+        "sh", "-c",
+        b.fmt(
             \\zig cc -E -Xclang -ast-dump=json "{s}/include/mlir-c/Beaver/wrapper.h" \
             \\  -I native/include -I "{s}" \
             \\| elixir native/tools/wrapper/gen_stub.exs --elixir "{s}/capi_functions.ex" --zig "{s}/wrapper.zig"
@@ -107,7 +108,10 @@ pub fn build(b: *std.Build) void {
     }
 
     // Environment variables and paths
-    const llvm_config_path = b.option([]const u8, "llvm-config", "Path to llvm-config") orelse std.posix.getenv("LLVM_CONFIG_PATH") orelse "llvm-config";
+    const llvm_config_path =
+        b.option([]const u8, "llvm-config", "Path to llvm-config") orelse
+        std.posix.getenv("LLVM_CONFIG_PATH") orelse
+        "llvm-config";
     const generated_dir = b.pathJoin(&.{ b.install_path, "generated" });
 
     const llvm_lib_dir_raw = b.run(&.{ llvm_config_path, "--libdir" });
@@ -163,6 +167,7 @@ pub fn build(b: *std.Build) void {
     }
     if (os == .macos) {
         lib.root_module.addRPathSpecial("@loader_path");
+        lib.linkLibC();
     }
     lib.linkSystemLibrary("MLIRBeaver");
     lib.linker_allow_shlib_undefined = true;

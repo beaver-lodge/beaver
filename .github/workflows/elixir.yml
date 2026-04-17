@@ -9,14 +9,14 @@ on:
 
   workflow_dispatch:
     inputs:
-      mlir_wheel_version:
-        description: "mlir wheel version to install"
+      llvm_prebuilt_asset_name:
+        description: "exact llvm/eudsl asset name to install; empty means auto-detect by OS/arch"
         required: false
 
   workflow_call:
     inputs:
-      mlir_wheel_version:
-        description: "mlir wheel version to install"
+      llvm_prebuilt_asset_name:
+        description: "exact llvm/eudsl asset name to install; empty means auto-detect by OS/arch"
         type: string
         required: false
 
@@ -24,7 +24,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: build-and-test-${{ github.ref }}-${{ inputs.mlir_wheel_version }}
+  group: build-and-test-${{ github.ref }}-${{ inputs.llvm_prebuilt_asset_name || 'auto' }}
   cancel-in-progress: true
 
 jobs:
@@ -94,24 +94,12 @@ jobs:
       - name: Install dependencies
         run: mix deps.get
       - uses: seanmiddleditch/gha-setup-ninja@master
-      - name: Install MLIR (specified version), via ${{ github.event_name }}
-        if: github.event_name == 'workflow_dispatch' && inputs.mlir_wheel_version != 'latest'
+      - name: Install prebuilt LLVM
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LLVM_EUDSL_ASSET_NAME: ${{ inputs.llvm_prebuilt_asset_name }}
         run: |
-          python3 -m pip install mlir=="${{ inputs.mlir_wheel_version }}" -f https://makslevental.github.io/wheels
-          echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
-      - name: Install MLIR (latest), via ${{ github.event_name }}
-        if: inputs.mlir_wheel_version == 'latest' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'use-latest-mlir'))
-        run: |
-          curl -L https://github.com/jackalcooper/mlir-wheels/releases/expanded_assets/latest -o wheels.html
-          elixir --eval 'File.read!("wheels.html") |> String.replace("/jackalcooper/", "https://github.com/jackalcooper/") |> then(&File.write!("wheels.html", &1))'
-          cat wheels.html | grep cuda > wheels.cuda.html
-          python3 -m pip install mlir -f wheels.cuda.html
-          echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
-      - name: Install MLIR (fixed version), via ${{ github.event_name }}
-        if: github.event_name == 'pull_request' && !contains(github.event.pull_request.labels.*.name, 'use-latest-mlir')
-        run: |
-          python3 -m pip install -r dev-requirements.txt
-          echo "LLVM_CONFIG_PATH=$(python3 -c 'import mlir;print(mlir.__path__[0])')/bin/llvm-config" >> "$GITHUB_ENV"
+          bash scripts/install-prebuilt-llvm.sh "$RUNNER_TEMP/llvm-prebuilt"
       - name: Build native library
         env:
           MIX_ENV: test

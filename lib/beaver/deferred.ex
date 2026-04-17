@@ -4,10 +4,15 @@ defmodule Beaver.Deferred do
   """
   alias Beaver.MLIR
 
-  @type opts :: [ctx: MLIR.Context.t()]
-  @type type :: MLIR.Type.t() | (MLIR.Context.t() -> MLIR.Type.t())
-  @type operation :: MLIR.Operation.t() | (MLIR.Context.t() -> MLIR.Operation.t())
-  @type attribute :: MLIR.Attribute.t() | (MLIR.Context.t() -> MLIR.Attribute.t())
+  @type context_arg() :: MLIR.Context.t()
+  @type contextual(t) :: t | (context_arg() -> t)
+  @type deferred(t) :: contextual(t)
+  @type opts :: [ctx: context_arg()]
+  @type type :: contextual(MLIR.Type.t())
+  @type operation :: contextual(MLIR.Operation.t())
+  @type attribute :: contextual(MLIR.Attribute.t())
+
+  @spec from_opts(opts(), (context_arg() -> t)) :: contextual(t) when t: var
   def from_opts(opts, f) do
     if ctx = fetch_context(opts) do
       f.(ctx)
@@ -16,7 +21,7 @@ defmodule Beaver.Deferred do
     end
   end
 
-  @spec fetch_context(opts :: opts) :: MLIR.Context.t() | Macro.t() | nil
+  @spec fetch_context(opts :: opts) :: MLIR.Context.t() | nil
   def fetch_context(opts) do
     opts[:ctx]
   end

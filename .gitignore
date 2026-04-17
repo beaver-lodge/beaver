@@ -33,6 +33,8 @@ beaver-*.tar.gz
 beaver-*.tar.gz.sha256
 
 .elixir_ls
+.dialyzer/
 
 .zig-cache
 zig-out
+docs/compass
