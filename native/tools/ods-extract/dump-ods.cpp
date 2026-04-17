@@ -9,6 +9,7 @@
 #include "mlir/Tools/PDLL/ODS/Context.h"
 #include "mlir/Tools/PDLL/ODS/Dialect.h"
 #include "mlir/Tools/PDLL/ODS/Operation.h"
+#include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
@@ -25,6 +26,24 @@ using namespace mlir::pdll;
 
 namespace parser {
 
+constexpr llvm::StringLiteral kConstraintSuffixSeparator = "__beaver_ods__";
+
+std::string makeConstraintKey(StringRef name, StringRef summary,
+                              StringRef cppClass) {
+  if (name.contains(kConstraintSuffixSeparator))
+    return name.str();
+
+  return llvm::formatv("{0}{1}{2:x}",
+                       name.empty() ? StringRef("anonymous_constraint") : name,
+                       kConstraintSuffixSeparator,
+                       llvm::hash_combine(summary, cppClass))
+      .str();
+}
+
+StringRef displayConstraintName(StringRef name) {
+  return name.split(kConstraintSuffixSeparator).first;
+}
+
 template <typename T>
 SmallVector<T *> sortMapByName(const llvm::StringMap<std::unique_ptr<T>> &map) {
   SmallVector<T *> storage;
@@ -38,6 +57,9 @@ SmallVector<T *> sortMapByName(const llvm::StringMap<std::unique_ptr<T>> &map) {
 
 void printODSContext(raw_ostream &os, const ods::Context &odsContext) {
   using namespace mlir::pdll::ods;
+  auto formatConstraintName = [](const auto &constraint) {
+    return displayConstraintName(constraint.getDemangledName());
+  };
   auto getVariableLengthStr = [](VariableLengthKind kind) -> StringRef {
     switch (kind) {
     case VariableLengthKind::Optional:
@@ -58,11 +80,11 @@ void printODSContext(raw_ostream &os, const ods::Context &odsContext) {
       return;
     j.attributeArray(name, [&] {
       for (const auto &element : elements) {
-        j.object([&] {
-          j.attribute("name", element.getName());
-          j.attribute("constraint", element.getConstraint().getDemangledName());
-          j.attribute("description", element.getConstraint().getSummary());
-          j.attribute("kind",
+          j.object([&] {
+            j.attribute("name", element.getName());
+            j.attribute("constraint", formatConstraintName(element.getConstraint()));
+            j.attribute("description", element.getConstraint().getSummary());
+            j.attribute("kind",
                       getVariableLengthStr(element.getVariableLengthKind()));
         });
       }
@@ -91,7 +113,7 @@ void printODSContext(raw_ostream &os, const ods::Context &odsContext) {
                       j.object([&] {
                         j.attribute("name", attr.getName());
                         j.attribute("constraint",
-                                    attr.getConstraint().getDemangledName());
+                                    formatConstraintName(attr.getConstraint()));
                         j.attribute("description",
                                     attr.getConstraint().getSummary());
                         j.attribute("kind",
@@ -141,9 +163,11 @@ void processTdIncludeRecords(const llvm::RecordKeeper &tdRecords,
 
   auto addTypeConstraint = [&](const tblgen::NamedTypeConstraint &cst)
       -> const ods::TypeConstraint & {
-    return odsContext.insertTypeConstraint(cst.constraint.getUniqueDefName(),
-                                           (cst.constraint.getSummary()),
-                                           cst.constraint.getCppType());
+    return odsContext.insertTypeConstraint(
+        makeConstraintKey(cst.constraint.getUniqueDefName(),
+                          cst.constraint.getSummary(),
+                          cst.constraint.getCppType()),
+        cst.constraint.getSummary(), cst.constraint.getCppType());
   };
 
   // Process the parsed tablegen records to build ODS information.
@@ -167,9 +191,11 @@ void processTdIncludeRecords(const llvm::RecordKeeper &tdRecords,
     for (const tblgen::NamedAttribute &attr : op.getAttributes()) {
       odsOp->appendAttribute(
           attr.name, attr.attr.isOptional(),
-          odsContext.insertAttributeConstraint(attr.attr.getUniqueDefName(),
-                                               attr.attr.getSummary(),
-                                               attr.attr.getStorageType()));
+          odsContext.insertAttributeConstraint(
+              makeConstraintKey(attr.attr.getUniqueDefName(),
+                                attr.attr.getSummary(),
+                                attr.attr.getStorageType()),
+              attr.attr.getSummary(), attr.attr.getStorageType()));
     }
     for (const tblgen::NamedTypeConstraint &operand : op.getOperands()) {
       odsOp->appendOperand(operand.name, getLengthKind(operand),
