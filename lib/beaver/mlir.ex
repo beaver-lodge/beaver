@@ -229,6 +229,7 @@ defmodule Beaver.MLIR do
   @type diagnostic() :: Rewrite.diagnostic()
   @type diagnostics() :: Rewrite.diagnostics()
   @type verify_result(t) :: {:ok, t} | :null | {:error, diagnostics()}
+  @type verify_summary() :: boolean()
   @type rewrite_pattern_input() ::
           Rewrite.pattern_list()
           | MLIR.FrozenRewritePatternSet.t()
@@ -270,6 +271,11 @@ defmodule Beaver.MLIR do
         {:error, diagnostics}
       end
     end
+  end
+
+  @spec verify?(verifiable()) :: verify_summary()
+  def verify?(op) do
+    match?({:ok, _}, verify(op))
   end
 
   @apply_default_opts [debug: false]

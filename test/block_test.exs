@@ -63,6 +63,39 @@ defmodule BlockTest do
             ]} = res
   end
 
+  test "verify? returns a boolean summary of verification status", %{ctx: ctx} do
+    valid_module =
+      mlir ctx: ctx do
+        module do
+          Func.func some_func(function_type: Type.function([], [Type.i32()])) do
+            region do
+              block do
+                v0 = Arith.constant(value: Attribute.integer(Type.i32(), 0)) >>> Type.i32()
+                Func.return(v0) >>> []
+              end
+            end
+          end
+        end
+      end
+
+    invalid_module =
+      mlir ctx: ctx do
+        module do
+          Func.func some_func(function_type: Type.function([], [Type.i32()])) do
+            region do
+              block do
+                v0 = Arith.constant(value: Attribute.integer(Type.i32(), 0)) >>> Type.i32()
+                CF.br({Beaver.Env.block(_bb1), [v0]}) >>> []
+              end
+            end
+          end
+        end
+      end
+
+    assert MLIR.verify?(valid_module)
+    refute MLIR.verify?(invalid_module)
+  end
+
   test "successor of wrong arg type", %{ctx: ctx} do
     {:error, diagnostics} =
       mlir ctx: ctx do
