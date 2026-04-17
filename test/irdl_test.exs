@@ -69,4 +69,8 @@ defmodule IRDLTest do
     use Beaver
     TestVariadic.__slang_dialect__(ctx) |> MLIR.verify!()
   end
+
+  test "region dialect", %{ctx: ctx} do
+    TestRegion.__slang_dialect__(ctx) |> MLIR.verify!()
+  end
 end
