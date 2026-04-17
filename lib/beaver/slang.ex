@@ -171,7 +171,7 @@ defmodule Beaver.Slang do
           op_applier slang_target_op: op, sym_name: "\"#{name}\"" do
             region do
               block _op() do
-                {args, ret} = constrain_f.(ip: Beaver.Env.block(), ctx: ctx)
+                {args, ret} = constrain_f.(Beaver.Env.block(), ctx)
 
                 case strip_variadicity(args) do
                   [] ->
@@ -254,6 +254,109 @@ defmodule Beaver.Slang do
     for {v, i} <- Enum.with_index(args), do: transform_variable(v, i)
   end
 
+  defp build_extra_constraints(extra_constraints) do
+    for {ast, {mod, func}} <- extra_constraints || [] do
+      quote do
+        apply(unquote(mod), unquote(func), [unquote(ast), block, ctx])
+      end
+    end
+  end
+
+  defp normalize_region_descriptor(:any) do
+    %{args: nil, size: nil}
+  end
+
+  defp normalize_region_descriptor({:sized, size}) when is_integer(size) and size > 0 do
+    %{args: nil, size: size}
+  end
+
+  defp normalize_region_descriptor({:region, opts}) when is_list(opts) do
+    opts = Keyword.validate!(opts, [:args, :size])
+
+    args =
+      case Keyword.get(opts, :args) do
+        nil -> nil
+        args -> List.wrap(args)
+      end
+
+    size =
+      case Keyword.get(opts, :size) do
+        nil ->
+          nil
+
+        size when is_integer(size) and size > 0 ->
+          size
+
+        size ->
+          raise ArgumentError,
+                "expected region size to be a positive integer, got: #{inspect(size)}"
+      end
+
+    %{args: args, size: size}
+  end
+
+  defp build_region_arguments(%{args: args, size: size}, block, ctx) do
+    constrained_args? = not is_nil(args)
+
+    args =
+      for arg <- args || [] do
+        create_constraint(arg, ip: block, ctx: ctx)
+      end
+
+    attrs =
+      []
+      |> then(fn attrs ->
+        if is_nil(size) do
+          attrs
+        else
+          attrs ++
+            [
+              numberOfBlocks:
+                Beaver.Deferred.create(
+                  MLIR.Attribute.integer(MLIR.Type.i32(), size),
+                  ctx
+                )
+            ]
+        end
+      end)
+      |> then(fn attrs ->
+        if constrained_args? do
+          attrs ++ [constrainedArguments: Beaver.Deferred.create(MLIR.Attribute.unit(), ctx)]
+        else
+          attrs
+        end
+      end)
+
+    args ++ attrs
+  end
+
+  defp do_gen_region(region, block, ctx) do
+    use Beaver
+
+    region_args =
+      region
+      |> normalize_region_descriptor()
+      |> build_region_arguments(block, ctx)
+
+    %Beaver.SSA{
+      arguments: region_args,
+      results: [Beaver.Deferred.create(~t{!irdl.region}, ctx)],
+      ip: block,
+      ctx: ctx,
+      loc: Beaver.Deferred.create(MLIR.Location.unknown(), ctx),
+      evaluator: &MLIR.Operation.eval_ssa/1
+    }
+    |> IRDL.region()
+  end
+
+  @doc false
+  def gen_region(regions, block, ctx) do
+    regions
+    |> List.wrap()
+    |> Enum.map(&do_gen_region(&1, block, ctx))
+  end
+
+  @doc false
   # This function generates the AST for a creator function for an IRDL operation (like `irdl.operation`, `irdl.type`). It uses the transform_defop_pins/1 function to transform the pins, generates the MLIR code for the operation and its arguments, and applies the operation using op_applier/1.
   defp gen_creator(op, args_op, call, do_block, opts) do
     {name, args} = call |> Macro.decompose_call()
@@ -270,6 +373,8 @@ defmodule Beaver.Slang do
         transform_constraint(ast, i)
       end)
 
+    extra_constraints = build_extra_constraints(opts[:extra_constraints])
+
     quote do
       Module.put_attribute(__MODULE__, unquote(attr_name), unquote(name))
       @__slang__creator__ {unquote(op), __MODULE__, unquote(creator)}
@@ -278,11 +383,12 @@ defmodule Beaver.Slang do
           unquote(name),
           unquote(op),
           unquote(args_op),
-          fn opts ->
+          fn block, ctx ->
             use Beaver
 
-            mlir ip: Beaver.Deferred.fetch_insertion_point(opts), ctx: opts[:ctx] do
+            mlir ip: block, ctx: ctx do
               unquote_splicing(input_constrains)
+              unquote_splicing(extra_constraints)
               {[unquote_splicing(args_var_ast)], unquote(do_block)}
             end
           end,
@@ -362,7 +468,10 @@ defmodule Beaver.Slang do
   defmacro defop(call, block \\ nil) do
     gen_creator(:operation, :operands, call, block[:do],
       return_op: :results,
-      need_variadicity: true
+      need_variadicity: true,
+      extra_constraints: [
+        {block[:regions], {Beaver.Slang, :gen_region}}
+      ]
     )
   end
 

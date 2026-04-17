@@ -40,6 +40,7 @@
     mode: :project,
     frontend: :source,
     paths: ["lib/**/*.ex"],
+    cache_path: ".restraint/reach",
     contract_center_limit: 5,
     locality_limit: 6,
     satellite_limit: 7
