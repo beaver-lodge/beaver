@@ -41,8 +41,6 @@ jobs:
         job:
           - { otp: 24.2, os: ubuntu-22.04, elixir: 1.14 }
           - { otp: 26, os: ubuntu-22.04, elixir: 1.15 }
-          - { otp: 25, os: macos-15-intel, elixir: 1.14 }
-          - { otp: 26, os: macos-15-intel, elixir: 1.15 }
           - { otp: 25, os: macos-15, elixir: 1.14 }
           - { otp: 26, os: macos-15, elixir: 1.15 }
     steps:
