@@ -1,0 +1,29 @@
+#ifndef MLIR_C_BEAVER_CAPI_POLICY_H
+#define MLIR_C_BEAVER_CAPI_POLICY_H
+
+// Compile-time markers that describe how Beaver exposes MLIR C API functions
+// to BEAM. Both Zig's translated-C namespace and the Elixir manifest extractor
+// consume these declarations.
+typedef enum {
+  BeaverCapiPolicyDiagnostics__mlirAttributeParseGet,
+  BeaverCapiPolicyDiagnostics__mlirOperationVerify,
+  BeaverCapiPolicyDiagnostics__mlirTypeParseGet,
+  BeaverCapiPolicyDiagnostics__mlirModuleCreateParse,
+  BeaverCapiPolicyDiagnostics__mlirExecutionEngineCreate,
+
+  BeaverCapiPolicyDirtyCPUAndIO__mlirExecutionEngineInvokePacked,
+
+  BeaverCapiPolicyCallbackBridge__mlirDynamicOpTraitCreate,
+  BeaverCapiPolicyCallbackBridge__mlirInferShapedTypeOpInterfaceInferReturnTypes,
+  BeaverCapiPolicyCallbackBridge__mlirInferTypeOpInterfaceInferReturnTypes,
+  BeaverCapiPolicyCallbackBridge__mlirMemoryEffectsOpInterfaceAttachFallbackModel,
+  BeaverCapiPolicyCallbackBridge__mlirOpConversionPatternCreate,
+  BeaverCapiPolicyCallbackBridge__mlirPatternDescriptorOpInterfaceAttachFallbackModel,
+  BeaverCapiPolicyCallbackBridge__mlirTransformOpInterfaceAttachFallbackModel,
+  BeaverCapiPolicyCallbackBridge__mlirTransformStateForEachParam,
+  BeaverCapiPolicyCallbackBridge__mlirTransformStateForEachPayloadOp,
+  BeaverCapiPolicyCallbackBridge__mlirTransformStateForEachPayloadValue,
+  BeaverCapiPolicyCallbackBridge__mlirTypeConverterAddConversion,
+} BeaverCapiPolicyMarker;
+
+#endif // MLIR_C_BEAVER_CAPI_POLICY_H

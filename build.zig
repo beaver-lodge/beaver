@@ -13,28 +13,51 @@ fn resolveLlvmConfigPath(b: *std.Build) []const u8 {
         }) catch "llvm-config";
 }
 
-fn generateWrapper(b: *std.Build, generated_dir: []const u8, mlir_include_dir: []const u8) void {
-    // Create include directory
-    _ = b.run(&.{
-        "mkdir", "-p", b.pathJoin(&.{ generated_dir, "include", "mlir-c", "Beaver" }),
-    });
+fn createCapiModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, mlir_include_dir: []const u8) *std.Build.Module {
+    const header_generator = b.addSystemCommand(&.{"elixir"});
+    // Header discovery must observe additions and removals in both include trees.
+    header_generator.has_side_effects = true;
+    header_generator.addFileArg(b.path("native/tools/capi/gen_header.exs"));
+    header_generator.addArg("--mlir-include-dir");
+    header_generator.addDirectoryArg(.{ .cwd_relative = mlir_include_dir });
+    header_generator.addArg("--beaver-include-dir");
+    header_generator.addDirectoryArg(b.path("native/include"));
+    header_generator.addArg("--output");
+    const capi_header = header_generator.addOutputFileArg("beaver_capi.h");
 
-    // Generate header file
-    _ = b.run(&.{
-        "elixir",             "native/tools/wrapper/gen_header.exs",
-        "--mlir-include-dir", mlir_include_dir,
-        "--output",           b.pathJoin(&.{ generated_dir, "include", "mlir-c", "Beaver", "wrapper.h" }),
-    });
+    const ast_dump = b.addSystemCommand(&.{ b.graph.zig_exe, "cc", "-E", "-Xclang", "-ast-dump=json", "-x", "c-header" });
+    ast_dump.addArg("-I");
+    ast_dump.addDirectoryArg(b.path("native/include"));
+    ast_dump.addArg("-I");
+    ast_dump.addDirectoryArg(.{ .cwd_relative = mlir_include_dir });
+    ast_dump.addArgs(&.{ "-MD", "-MF" });
+    _ = ast_dump.addDepFileOutputArg("capi_ast.d");
+    ast_dump.addFileArg(capi_header);
+    const capi_ast = ast_dump.captureStdOut(.{ .basename = "capi_ast.json" });
 
-    // Generate wrapper files using clang AST
-    _ = b.run(&.{
-        "sh", "-c",
-        b.fmt(
-            \\zig cc -E -Xclang -ast-dump=json "{s}/include/mlir-c/Beaver/wrapper.h" \
-            \\  -I native/include -I "{s}" \
-            \\| elixir native/tools/wrapper/gen_stub.exs --elixir "{s}/capi_functions.ex" --zig "{s}/wrapper.zig"
-        , .{ generated_dir, mlir_include_dir, b.install_path, generated_dir }),
+    const manifest_generator = b.addSystemCommand(&.{"elixir"});
+    if (b.graph.environ_map.get("JASON_EBIN_PATH")) |jason_ebin_path| {
+        manifest_generator.addArgs(&.{ "-pa", jason_ebin_path });
+    }
+    manifest_generator.addFileArg(b.path("native/tools/capi/gen_manifest.exs"));
+    manifest_generator.addArg("--declaration");
+    const declaration_manifest = manifest_generator.addOutputFileArg("capi_manifest.json");
+    manifest_generator.addArg("--callback-bridge");
+    const callback_bridge_manifest = manifest_generator.addOutputFileArg("capi_callback_bridge.json");
+    manifest_generator.setStdIn(.{ .lazy_path = capi_ast });
+
+    b.getInstallStep().dependOn(&b.addInstallFile(declaration_manifest, "capi_manifest.json").step);
+    b.getInstallStep().dependOn(&b.addInstallFile(callback_bridge_manifest, "capi_callback_bridge.json").step);
+
+    const translate_c = b.addTranslateC(.{
+        .root_source_file = capi_header,
+        .target = target,
+        .optimize = optimize,
     });
+    translate_c.defineCMacro("_NO_CRT_STDIO_INLINE", "1");
+    translate_c.addIncludePath(b.path("native/include"));
+    translate_c.addIncludePath(.{ .cwd_relative = mlir_include_dir });
+    return translate_c.createModule();
 }
 
 fn createCMakeStep(b: *std.Build, llvm_cmake_dir: []const u8, mlir_cmake_dir: []const u8, optimize: std.builtin.OptimizeMode) *std.Build.Step {
@@ -134,7 +157,7 @@ pub fn build(b: *std.Build) void {
     // add install path to search prefixes because CMake will shared this path as its install prefix
     b.addSearchPrefix(b.install_path);
 
-    generateWrapper(b, generated_dir, mlir_include_dir);
+    const capi_module = createCapiModule(b, target, optimize, mlir_include_dir);
     const cmake_step = createCMakeStep(b, llvm_cmake_dir, mlir_cmake_dir, optimize);
     // ODS extraction step (depends on cmake_build)
     const ods_extraction_step = createODSExtractionStep(b, generated_dir, mlir_include_dir, cmake_step);
@@ -156,19 +179,10 @@ pub fn build(b: *std.Build) void {
 
     const kinda = b.dependency("kinda", .{});
     lib.root_module.addImport("kinda", kinda.module("kinda"));
+    lib.root_module.addImport("c_api", capi_module);
     lib.root_module.addIncludePath(.{ .cwd_relative = "native/include" });
     // add these to get ZLS working properly
     lib.root_module.addIncludePath(.{ .cwd_relative = mlir_include_dir });
-    lib.root_module.addIncludePath(.{ .cwd_relative = b.pathJoin(&.{ generated_dir, "include" }) });
-    // add generated wrapper.zig as a module
-    const wrapper_module = b.createModule(.{
-        .root_source_file = .{ .cwd_relative = b.pathJoin(&.{ generated_dir, "wrapper.zig" }) },
-        .target = target,
-        .optimize = optimize,
-    });
-    wrapper_module.addImport("kinda", kinda.module("kinda"));
-    lib.root_module.addImport("wrapper", wrapper_module);
-
     if (os == .linux) {
         lib.root_module.addRPathSpecial("$ORIGIN");
         lib.root_module.link_libc = true;

@@ -167,6 +167,10 @@ To implement a MLIR toolkit, we at least need these group of APIs:
 - Pattern API, in which you declare the transformation of a specific structure of Ops
 
 We implement the IR API and Pass API with the help of the [MLIR C API](https://mlir.llvm.org/docs/CAPI/). There are both lower level APIs generated from the C headers and higher level APIs that are more idiomatic in Elixir.
+Zig's Build System translates the aggregate C API header with `addTranslateC`,
+then Beaver reflects that namespace at comptime to construct the NIF registry.
+The matching Elixir surface is compiled from machine-readable declaration and
+callback-bridge manifests; no Zig or Elixir wrapper source is generated.
 The Pattern API is implemented with the help from the [PDL dialect](https://mlir.llvm.org/docs/Dialects/PDLOps/). We are using the lower level IR APIs to compile your Elixir code to PDL. Another way to look at this is that Elixir/Erlang pattern matching is serving as a frontend alternative to [PDLL](https://mlir.llvm.org/docs/PDLL/).
 
 ## Design principles

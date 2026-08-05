@@ -1,6 +1,6 @@
 defmodule Beaver.MLIR.CAPI.CodeGen do
   @moduledoc false
-  alias Kinda.CodeGen.{DeclarationManifest, KindDecl, NIFDecl}
+  alias Kinda.CodeGen.{DeclarationManifest, KindDecl}
   @behaviour Kinda.CodeGen
 
   @impl Kinda.CodeGen
@@ -134,15 +134,8 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
 
   @impl Kinda.CodeGen
   def declaration_manifest do
-    nif_decls =
-      Application.app_dir(:beaver)
-      |> Path.join("priv/capi_functions.ex")
-      |> Code.eval_file()
-      |> elem(0)
-      |> Enum.map(fn {wrapper_name, params} ->
-        %NIFDecl{wrapper_name: wrapper_name, params: params}
-      end)
-
-    DeclarationManifest.build(nif_decls)
+    Application.app_dir(:beaver)
+    |> Path.join("priv/capi_manifest.json")
+    |> DeclarationManifest.load!()
   end
 end

@@ -21,7 +21,7 @@ Utilities are the helper functions that help to generate or manipulate MLIR IR. 
 ### Bindings
 Modules including `Beaver.MLIR`, `Beaver.MLIR.Dialect`, `Beaver.MLIR.Pass`, `Beaver.MLIR.Transform`, `Beaver.MLIR.ExecutionEngine`
 
-Bindings are the part that provides the interface to the MLIR CAPIs. It is implemented in Zig and is responsible for calling MLIR functions. Note that Beaver's bindings will try not to use `TableGen` and instead try to make use Elixir and Zig's meta-programming features to generate the bindings.
+Bindings are the part that provides the interface to the MLIR CAPIs. They are implemented in Zig and are responsible for calling MLIR functions. Beaver uses Zig comptime reflection over Build System C translation for native registration and a machine-readable declaration manifest for the Elixir surface; it does not generate wrapper source files.
 
 ## Development
 
