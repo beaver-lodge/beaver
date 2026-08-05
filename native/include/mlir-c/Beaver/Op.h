@@ -1,6 +1,9 @@
 #ifndef APPS_BEAVER_CAPI_NATIVE_MLIR_NIF_MET_INCLUDE_MLIR_C_BEAVER_OP_H_
 #define APPS_BEAVER_CAPI_NATIVE_MLIR_NIF_MET_INCLUDE_MLIR_C_BEAVER_OP_H_
 
+#include <stdint.h>
+
+#include "mlir-c/IR.h"
 #include "mlir-c/Pass.h"
 #include "mlir-c/Rewrite.h"
 
@@ -29,6 +32,15 @@ MLIR_CAPI_EXPORTED void beaverContextGetDialects(MlirContext context,
 
 MLIR_CAPI_EXPORTED const char *beaverStringRefGetData(MlirStringRef string_ref);
 MLIR_CAPI_EXPORTED size_t beaverStringRefGetLength(MlirStringRef string_ref);
+
+// Normalize MLIR's platform-sized structural hash to a width that can be
+// represented safely by the BEAM NIF codec on both 32-bit and 64-bit hosts.
+MLIR_CAPI_EXPORTED uint64_t
+beaverOperationStructuralHashValue(MlirOperation op, uint32_t flags);
+
+// MLIR's IRMapping::clear currently clears only value mappings despite the C
+// API documenting all mappings. Keep Beaver's high-level clear contract whole.
+MLIR_CAPI_EXPORTED void beaverIRMappingClear(MlirIRMapping mapping);
 
 MLIR_CAPI_EXPORTED bool beaverIsNullContext(MlirContext context);
 MLIR_CAPI_EXPORTED bool beaverIsNullDialect(MlirDialect dialect);

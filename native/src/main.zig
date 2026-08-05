@@ -14,11 +14,12 @@ const pointer = @import("pointer.zig");
 const string_ref = @import("string_ref.zig");
 const memref = @import("memref.zig");
 const unranked_memref_descriptor = @import("unranked_memref_descriptor.zig");
+const value = @import("value.zig");
 
 const rewrite_pattern = @import("rewrite_pattern.zig");
 const capi_registry = @import("capi_registry.zig");
 const callback_nifs = .{kinda.callback_runtime.ReplyToken.nif("beaver_raw_callback_reply")};
-const handwritten_nifs = capi_registry.nifs ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ diagnostic.nifs ++ pointer.nifs ++ memref.nifs ++ enif_support.nifs ++ callback_nifs ++ unranked_memref_descriptor.nifs ++ rewrite_pattern.nifs;
+const handwritten_nifs = capi_registry.nifs ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ diagnostic.nifs ++ pointer.nifs ++ memref.nifs ++ enif_support.nifs ++ callback_nifs ++ unranked_memref_descriptor.nifs ++ rewrite_pattern.nifs ++ value.nifs;
 
 const num_nifs = handwritten_nifs.len;
 export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs;

@@ -189,7 +189,7 @@ defmodule ElixirAST do
       |> MLIR.to_string()
     end
 
-    defp lookup_var(op, acc) do
+    defp lookup_var(op, acc, rewriter) do
       [val] =
         Beaver.Walker.results(op)[0]
         |> Beaver.Walker.uses()
@@ -197,40 +197,52 @@ defmodule ElixirAST do
 
       case val |> MLIR.CAPI.mlirOpOperandGetOwner() |> MLIR.Operation.name() do
         "ex.bind" ->
-          {op, acc}
+          acc
 
         _ ->
-          {Beaver.Walker.replace(op, acc.variables[extract_var_name(op)]), acc}
+          MLIR.RewriterBase.replace_op(rewriter, op, acc.variables[extract_var_name(op)])
+          acc
+      end
+    end
+
+    defp operations_in_order(operation) do
+      {_, operations} =
+        Beaver.Walker.postwalk(operation, [], fn
+          %MLIR.Operation{} = op, acc -> {op, [op | acc]}
+          element, acc -> {element, acc}
+        end)
+
+      Enum.reverse(operations)
+    end
+
+    defp materialize(op, acc, rewriter) do
+      case MLIR.Operation.name(op) do
+        "ex.bind" ->
+          val = Beaver.Walker.operands(op)[1]
+          1 = Beaver.Walker.uses(val) |> Enum.count()
+
+          var =
+            Beaver.Walker.operands(op)[0]
+            |> MLIR.CAPI.mlirOpResultGetOwner()
+
+          acc = put_in(acc, [:variables, extract_var_name(var)], val)
+          MLIR.RewriterBase.erase_op(rewriter, op)
+          MLIR.RewriterBase.erase_op(rewriter, var)
+          acc
+
+        "ex.var" ->
+          lookup_var(op, acc, rewriter)
+
+        _ ->
+          acc
       end
     end
 
     def run(func, state) do
-      func
-      |> Beaver.Walker.postwalk(%{variables: %{}}, fn
-        %MLIR.Operation{} = op, acc ->
-          case MLIR.Operation.name(op) do
-            "ex.bind" ->
-              val = Beaver.Walker.operands(op)[1]
-              1 = Beaver.Walker.uses(val) |> Enum.count()
+      operations = operations_in_order(func)
 
-              var =
-                Beaver.Walker.operands(op)[0]
-                |> MLIR.CAPI.mlirOpResultGetOwner()
-
-              acc = put_in(acc, [:variables, extract_var_name(var)], val)
-              r = Beaver.Walker.replace(op, val)
-              MLIR.Operation.destroy(var)
-              {r, acc}
-
-            "ex.var" ->
-              lookup_var(op, acc)
-
-            _ ->
-              {op, acc}
-          end
-
-        mlir, acc ->
-          {mlir, acc}
+      MLIR.IRRewriter.with_rewriter(func, fn rewriter ->
+        Enum.reduce(operations, %{variables: %{}}, &materialize(&1, &2, rewriter))
       end)
 
       state

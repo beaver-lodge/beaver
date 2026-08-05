@@ -1,4 +1,5 @@
 #include "mlir/CAPI/Beaver.h"
+#include "mlir/CAPI/IRMapping.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
@@ -64,6 +65,28 @@ beaverStringRefGetData(MlirStringRef string_ref) {
 
 MLIR_CAPI_EXPORTED size_t beaverStringRefGetLength(MlirStringRef string_ref) {
   return string_ref.length;
+}
+
+MLIR_CAPI_EXPORTED uint64_t
+beaverOperationStructuralHashValue(MlirOperation op, uint32_t flags) {
+  return static_cast<uint64_t>(mlirOperationStructuralHashValue(op, flags));
+}
+
+MLIR_CAPI_EXPORTED void beaverIRMappingClear(MlirIRMapping mapping) {
+  IRMapping *cppMapping = unwrap(mapping);
+  SmallVector<Block *> blocks;
+  SmallVector<Operation *> operations;
+
+  for (auto [from, _] : cppMapping->getBlockMap())
+    blocks.push_back(from);
+  for (auto [from, _] : cppMapping->getOperationMap())
+    operations.push_back(from);
+
+  cppMapping->clear();
+  for (Block *block : blocks)
+    cppMapping->erase(block);
+  for (Operation *operation : operations)
+    cppMapping->erase(operation);
 }
 
 MLIR_CAPI_EXPORTED bool beaverIsNullContext(MlirContext w) { return !w.ptr; }

@@ -84,15 +84,28 @@ defmodule RewritePatternTest do
     one = MLIR.Attribute.integer(MLIR.Type.i64(ctx: ctx), 1)
 
     if MLIR.Operation.name(op) == Arith.constant() and MLIR.equal?(op[:value], one) do
-      mlir ctx: ctx, ip: base do
-        v = Arith.constant(value: Attribute.integer(MLIR.Type.i64(), 2)) >>> Type.i64()
-        MLIR.RewriterBase.replace(base, MLIR.Operation.result(op, 0), v)
-      end
+      MLIR.PatternRewriter.with_insertion_point(rewriter, {:before, op}, fn ->
+        replace_with_mapped_value(base, op, ctx)
+      end)
 
       {:ok, state}
     else
       {:error, state}
     end
+  end
+
+  defp replace_with_mapped_value(base, op, ctx) do
+    MLIR.IRMapping.with_mapping(fn mapping ->
+      mlir ctx: ctx, ip: base do
+        v = Arith.constant(value: Attribute.integer(MLIR.Type.i64(), 2)) >>> Type.i64()
+        from = MLIR.Operation.result(op, 0)
+
+        mapping
+        |> MLIR.IRMapping.map(from, v)
+        |> MLIR.IRMapping.lookup(from)
+        |> then(&MLIR.RewriterBase.replace(base, from, &1))
+      end
+    end)
   end
 
   def constant_2_to_3_with_op(_pattern, op, rewriter, state) do
@@ -105,7 +118,7 @@ defmodule RewritePatternTest do
         {new_const, [%MLIR.Value{}]} =
           Arith.constant(value: Attribute.integer(MLIR.Type.i64(), 3)) >>> {:op, [Type.i64()]}
 
-        MLIR.RewriterBase.replace(base, op, new_const)
+        MLIR.RewriterBase.replace_op(base, op, new_const)
       end
 
       {:ok, state}

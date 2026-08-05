@@ -64,6 +64,69 @@ defmodule Beaver.MLIR.Operation do
   defdelegate clone(op), to: MLIR.CAPI, as: :mlirOperationClone
   defdelegate result(op, pos), to: MLIR.CAPI, as: :mlirOperationGetResult
 
+  @typedoc "Options shared by structural equivalence and structural hashing."
+  @type equivalence_option() ::
+          {:ignore_locations, boolean()}
+          | {:ignore_discardable_attributes, boolean()}
+          | {:ignore_properties, boolean()}
+          | {:ignore_commutativity, boolean()}
+
+  @type equivalence_options() :: [equivalence_option()]
+
+  @equivalence_flags %{
+    ignore_locations: 1,
+    ignore_discardable_attributes: 2,
+    ignore_properties: 4,
+    ignore_commutativity: 8
+  }
+
+  @doc """
+  Tests two operations for structural equivalence without printing or parsing.
+
+  The default comparison includes locations, discardable attributes,
+  properties, and commutative operand ordering. Set an option to `true` to
+  ignore that part of the comparison. In particular,
+  `ignore_commutativity: true` makes operand comparison order-sensitive; this
+  mirrors MLIR's `IgnoreCommutativity` flag.
+  """
+  @spec equivalent?(__MODULE__.t(), __MODULE__.t(), equivalence_options()) :: boolean()
+  def equivalent?(%__MODULE__{} = lhs, %__MODULE__{} = rhs, opts \\ []) do
+    mlirOperationIsStructurallyEquivalent(lhs, rhs, encode_equivalence_options(opts))
+    |> Beaver.Native.to_term()
+  end
+
+  @doc """
+  Computes MLIR's structural hash for an operation.
+
+  Use the same options as `equivalent?/3`: operations equivalent under the
+  same options have equal hashes. The converse is not guaranteed. MLIR hashes
+  external operands by identity, omits results, and does not include regions,
+  so this is intended for bucketing before an equivalence check rather than as
+  a complete content digest.
+  """
+  @spec structural_hash(__MODULE__.t(), equivalence_options()) :: non_neg_integer()
+  def structural_hash(%__MODULE__{} = operation, opts \\ []) do
+    beaverOperationStructuralHashValue(operation, encode_equivalence_options(opts))
+    |> Beaver.Native.to_term()
+  end
+
+  defp encode_equivalence_options(opts) do
+    unless Keyword.keyword?(opts) do
+      raise ArgumentError, "operation equivalence options must be a keyword list"
+    end
+
+    Enum.reduce(opts, 0, fn
+      {key, enabled}, flags when is_map_key(@equivalence_flags, key) and is_boolean(enabled) ->
+        if enabled, do: Bitwise.bor(flags, Map.fetch!(@equivalence_flags, key)), else: flags
+
+      {key, enabled}, _flags when is_map_key(@equivalence_flags, key) ->
+        raise ArgumentError, "expected a boolean for #{inspect(key)}, got: #{inspect(enabled)}"
+
+      {key, _enabled}, _flags ->
+        raise ArgumentError, "unsupported operation equivalence option: #{inspect(key)}"
+    end)
+  end
+
   def from_module(%MLIR.Module{} = module) do
     mlirModuleGetOperation(module)
   end

@@ -24,6 +24,7 @@ typedef enum {
   BeaverCapiPolicyCallbackBridge__mlirTransformStateForEachPayloadOp,
   BeaverCapiPolicyCallbackBridge__mlirTransformStateForEachPayloadValue,
   BeaverCapiPolicyCallbackBridge__mlirTypeConverterAddConversion,
+  BeaverCapiPolicyCallbackBridge__mlirValueReplaceUsesWithIf,
 } BeaverCapiPolicyMarker;
 
 #endif // MLIR_C_BEAVER_CAPI_POLICY_H

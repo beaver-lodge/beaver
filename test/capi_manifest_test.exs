@@ -77,6 +77,11 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
 
     assert callback_entries != []
 
+    assert Enum.any?(
+             callback_entries,
+             &(get_in(&1, ["function", "name"]) == "mlirValueReplaceUsesWithIf")
+           )
+
     for entry <- callback_entries do
       name = get_in(entry, ["function", "name"])
       assert get_in(entry, ["callback_bridge", "reason"]) == "callback_bridge_required"

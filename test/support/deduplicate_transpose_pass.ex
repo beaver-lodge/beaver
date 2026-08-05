@@ -22,22 +22,39 @@ defmodule DeduplicateTransposePass do
     MLIR.equal?(attr1, attr2)
   end
 
+  defp operations_in_order(operation) do
+    {_, operations} =
+      Beaver.Walker.postwalk(operation, [], fn
+        %MLIR.Operation{} = op, acc -> {op, [op | acc]}
+        element, acc -> {element, acc}
+      end)
+
+    Enum.reverse(operations)
+  end
+
+  defp remove_redundant_transpose(rewriter, operation) do
+    with "tosa.transpose" <- MLIR.Operation.name(operation),
+         operands <- Beaver.Walker.operands(operation),
+         {:ok, transpose_input_op} <- MLIR.Value.owner(operands[0]),
+         "tosa.transpose" <- MLIR.Operation.name(transpose_input_op),
+         {:ok, transpose_perm_attr} <- extract_perms(operation),
+         {:ok, transpose_input_perm_attr} <- extract_perms(transpose_input_op),
+         true <- redundant?(transpose_perm_attr, transpose_input_perm_attr) do
+      MLIR.RewriterBase.replace_op(
+        rewriter,
+        operation,
+        Beaver.Walker.operands(transpose_input_op)[0]
+      )
+    else
+      _ -> :ok
+    end
+  end
+
   def run(func, state) do
-    func
-    |> Beaver.Walker.prewalk(fn
-      x ->
-        with %MLIR.Operation{} <- x,
-             "tosa.transpose" <- Beaver.MLIR.Operation.name(x),
-             operands <- Beaver.Walker.operands(x),
-             {:ok, transpose_input_op} <- MLIR.Value.owner(operands[0]),
-             "tosa.transpose" <- Beaver.MLIR.Operation.name(transpose_input_op),
-             {:ok, transpose_perm_attr} <- extract_perms(x),
-             {:ok, transpose_input_perm_attr} <- extract_perms(transpose_input_op),
-             true <- redundant?(transpose_perm_attr, transpose_input_perm_attr) do
-          Beaver.Walker.replace(x, Beaver.Walker.operands(transpose_input_op)[0])
-        else
-          _ -> x
-        end
+    operations = operations_in_order(func)
+
+    MLIR.IRRewriter.with_rewriter(func, fn rewriter ->
+      Enum.each(operations, &remove_redundant_transpose(rewriter, &1))
     end)
 
     state

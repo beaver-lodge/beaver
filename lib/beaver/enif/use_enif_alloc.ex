@@ -33,8 +33,7 @@ defmodule Beaver.ENIF.UseENIFAlloc do
               op_bundle_sizes: ~a{array<i32>}
             ) >>> MLIR.Value.type(ptr)
 
-          MLIR.PatternRewriter.replace(rewriter, ptr, new_ptr)
-          MLIR.PatternRewriter.erase_op(rewriter, op)
+          MLIR.PatternRewriter.replace_op(rewriter, op, new_ptr)
         end
 
         {:ok, state}
