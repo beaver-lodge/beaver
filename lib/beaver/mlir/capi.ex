@@ -10,7 +10,7 @@ defmodule Beaver.MLIR.CAPI do
   - `mlirPassManagerRunOnOp`: the MLIR pass implemented in Elixir.
   - `mlirOperationVerify`, `mlirAttributeParseGet`, `mlirTypeParseGet`, `mlirModuleCreateParse`: the diagnostic handler implemented in Elixir.
   """
-  use Kinda.CodeGen, with: Beaver.MLIR.CAPI.CodeGen, root: __MODULE__, forward: Beaver.Native
+  use Kinda.CodeGen, with: Beaver.MLIR.CAPI.CodeGen, root: __MODULE__, codec: Beaver.Native
 
   @on_load :load_nif
 

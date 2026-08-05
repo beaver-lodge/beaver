@@ -2,7 +2,7 @@ defmodule Beaver.MLIR.PassManager do
   @moduledoc """
   This module defines functions working with MLIR PassManager.
   """
-  use Kinda.ResourceKind, forward_module: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
   alias Beaver.MLIR
   import MLIR.CAPI
   require Logger

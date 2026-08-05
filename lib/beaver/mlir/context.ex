@@ -4,7 +4,7 @@ defmodule Beaver.MLIR.Context do
   """
   alias Beaver.MLIR
   import MLIR.CAPI
-  use Kinda.ResourceKind, forward_module: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
 
   @doc """
   Run a function with a registry appended to the context.

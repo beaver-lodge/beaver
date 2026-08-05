@@ -8,7 +8,7 @@ defmodule Beaver.MLIR.Attribute do
   alias Beaver.MLIR
   import Beaver.Sigils
 
-  use Kinda.ResourceKind, forward_module: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
 
   defp raise_with_diagnostics(attr_str, diagnostics) do
     case diagnostics do

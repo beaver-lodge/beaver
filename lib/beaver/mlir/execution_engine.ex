@@ -6,7 +6,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
   alias Beaver.Composer
   import Beaver.MLIR.CAPI
 
-  use Kinda.ResourceKind, forward_module: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
 
   @doc """
   Create a MLIR JIT engine for a module and check if successful. Usually this module should be of LLVM dialect.

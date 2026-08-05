@@ -9,7 +9,7 @@ defmodule Beaver.MLIR.UnrankedMemRefDescriptor do
   primarily as ABI.
   """
   alias Beaver.MLIR
-  use Kinda.ResourceKind, forward_module: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
 
   @doc """
   Creates an empty unranked memref descriptor with the specified rank.

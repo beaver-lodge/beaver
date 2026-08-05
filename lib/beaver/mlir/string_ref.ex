@@ -6,7 +6,7 @@ defmodule Beaver.MLIR.StringRef do
   """
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
-  use Kinda.ResourceKind, forward_module: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
 
   @doc """
   Create a Elixir owned null-terminated C string from a Elixir bitstring and create a `StringRef` from it.

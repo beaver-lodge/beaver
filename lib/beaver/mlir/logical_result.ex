@@ -4,7 +4,7 @@ defmodule Beaver.MLIR.LogicalResult do
   """
   alias Beaver.MLIR
 
-  use Kinda.ResourceKind, forward_module: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
 
   def success?(result) do
     result

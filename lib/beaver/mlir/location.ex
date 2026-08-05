@@ -6,7 +6,7 @@ defmodule Beaver.MLIR.Location do
   alias Beaver.MLIR
   alias Beaver.Deferred
 
-  use Kinda.ResourceKind, forward_module: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
 
   @doc """
   Get a location of file line. Column is zero by default because in Elixir it is usually omitted.

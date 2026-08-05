@@ -5,10 +5,11 @@ defmodule Beaver.Native do
   """
 
   alias Beaver.MLIR.CAPI
+  @behaviour Kinda.Codec
 
   def ptr(%mod{ref: ref}) do
     %__MODULE__.Ptr{
-      ref: apply(CAPI, Module.concat(mod, :ptr), [ref]) |> check!(),
+      ref: apply(CAPI.Raw, Module.concat(mod, :ptr), [ref]) |> normalize(),
       element_kind: mod
     }
   end
@@ -22,7 +23,7 @@ defmodule Beaver.Native do
     maker = Module.concat([mod, :opaque_ptr])
 
     %__MODULE__.OpaquePtr{
-      ref: apply(CAPI, maker, [ref]) |> check!()
+      ref: apply(CAPI.Raw, maker, [ref]) |> normalize()
     }
   end
 
@@ -33,10 +34,10 @@ defmodule Beaver.Native do
     func = if mut, do: "mut_array", else: "array"
 
     ref =
-      apply(CAPI, Module.concat([module, func]), [
+      apply(CAPI.Raw, Module.concat([module, func]), [
         data
       ])
-      |> check!()
+      |> normalize()
 
     %__MODULE__.Array{ref: ref, element_kind: module}
   end
@@ -46,20 +47,22 @@ defmodule Beaver.Native do
     func = if mut, do: "mut_array", else: "array"
 
     ref =
-      apply(CAPI, Module.concat([module, func]), [
+      apply(CAPI.Raw, Module.concat([module, func]), [
         Enum.map(data, &Kinda.unwrap_ref/1)
       ])
-      |> check!()
+      |> normalize()
 
     %__MODULE__.Array{ref: ref, element_kind: module}
   end
 
   def to_term(%__MODULE__.Ptr{ref: ref, element_kind: __MODULE__.OpaquePtr}) do
-    forward(__MODULE__.OpaquePtr, :primitive, [ref])
+    apply(CAPI.Raw, Module.concat(__MODULE__.OpaquePtr, :primitive), [ref])
+    |> normalize()
   end
 
   def to_term(%mod{ref: ref}) do
-    forward(mod, :primitive, [ref])
+    apply(CAPI.Raw, Module.concat(mod, :primitive), [ref])
+    |> normalize()
   end
 
   defp postprocess_diagnostics({severity_i, loc_ref, note, nested}) do
@@ -67,7 +70,8 @@ defmodule Beaver.Native do
      to_string(note), Enum.map(nested, &postprocess_diagnostics/1)}
   end
 
-  def check!(ret) do
+  @impl Kinda.Codec
+  def normalize(ret) do
     case ret do
       {:kind, mod, ref} when is_atom(mod) and is_reference(ref) ->
         try do
@@ -88,17 +92,11 @@ defmodule Beaver.Native do
     end
   end
 
-  def forward(
-        element_kind,
-        kind_func_name,
-        args
-      ) do
-    apply(CAPI, Module.concat(element_kind, kind_func_name), args)
-    |> check!()
-  end
+  def check!(ret), do: normalize(ret)
 
   def dump(%kind{ref: ref}) do
-    Beaver.Native.forward(kind, "dump", [ref])
+    apply(CAPI.Raw, Module.concat(kind, :dump), [ref])
+    |> normalize()
   end
 
   def apply_dirty(fun, args, dirty_flag) do

@@ -3,13 +3,21 @@ defmodule Beaver.Printer do
   This module provides a way to run MLIR CAPI with a string callback and user data.
   """
   alias Beaver.MLIR
+  alias Beaver.MLIR.CAPI
 
-  use Kinda.ResourceKind, forward_module: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
 
   @doc false
   def create() do
-    Beaver.Native.forward(__MODULE__, :make, [])
-    |> then(&{&1, Beaver.Native.forward(__MODULE__, :opaque_ptr, [&1])})
+    printer =
+      apply(CAPI.Raw, Module.concat(__MODULE__, :make), [])
+      |> Beaver.Native.normalize()
+
+    user_data =
+      apply(CAPI.Raw, Module.concat(__MODULE__, :opaque_ptr), [printer])
+      |> Beaver.Native.normalize()
+
+    {printer, user_data}
   end
 
   @doc false
