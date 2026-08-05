@@ -10,13 +10,20 @@ on:
   workflow_dispatch:
     inputs:
       llvm_prebuilt_asset_name:
-        description: "exact llvm/eudsl asset name to install; empty means auto-detect by OS/arch"
+        description: "exact llvm/eudsl asset name to install; empty uses the installer default"
+        required: false
+      llvm_prebuilt_asset_revision:
+        description: "llvm/eudsl asset revision, or latest; empty uses the installer default"
         required: false
 
   workflow_call:
     inputs:
       llvm_prebuilt_asset_name:
-        description: "exact llvm/eudsl asset name to install; empty means auto-detect by OS/arch"
+        description: "exact llvm/eudsl asset name to install; empty uses the installer default"
+        type: string
+        required: false
+      llvm_prebuilt_asset_revision:
+        description: "llvm/eudsl asset revision, or latest; empty uses the installer default"
         type: string
         required: false
 
@@ -29,7 +36,7 @@ env:
   KINDA_REF: "a595f26b67fa3e491add0b4008a4cae63d2eb02e"
 
 concurrency:
-  group: build-and-test-${{ github.ref }}-${{ inputs.llvm_prebuilt_asset_name || 'auto' }}
+  group: build-and-test-${{ github.ref }}-${{ inputs.llvm_prebuilt_asset_name || inputs.llvm_prebuilt_asset_revision || 'default' }}
   cancel-in-progress: true
 
 jobs:
@@ -98,6 +105,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           LLVM_EUDSL_ASSET_NAME: ${{ inputs.llvm_prebuilt_asset_name }}
+          LLVM_EUDSL_ASSET_REVISION: ${{ inputs.llvm_prebuilt_asset_revision }}
         run: |
           bash scripts/install-prebuilt-llvm.sh "$RUNNER_TEMP/llvm-prebuilt"
       - name: Build native library
