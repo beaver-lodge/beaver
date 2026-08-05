@@ -9,6 +9,8 @@ fi
 install_dir="${1:-${LLVM_PREBUILT_DIR:-${RUNNER_TEMP:-${TMPDIR:-/tmp}}/llvm-prebuilt}}"
 repo="${LLVM_EUDSL_REPO:-llvm/eudsl}"
 tag="${LLVM_EUDSL_TAG:-llvm}"
+default_asset_revision="20260804+eb50d8775"
+asset_revision="${LLVM_EUDSL_ASSET_REVISION:-${default_asset_revision}}"
 asset_name="${LLVM_EUDSL_ASSET_NAME:-}"
 asset_url="${LLVM_EUDSL_ASSET_URL:-}"
 resolve_only="${LLVM_EUDSL_RESOLVE_ONLY:-0}"
@@ -68,13 +70,15 @@ if [[ -z "${asset_name}" ]]; then
   read -r detected_asset_os detected_asset_arch < <(detect_platform)
   asset_os="${LLVM_EUDSL_ASSET_OS:-${detected_asset_os}}"
   asset_arch="${LLVM_EUDSL_ASSET_ARCH:-${detected_asset_arch}}"
-  asset_name="$(
-    REPO="${repo}" \
-    TAG="${tag}" \
-    ASSET_OS="${asset_os}" \
-    ASSET_ARCH="${asset_arch}" \
-    GITHUB_TOKEN="${token}" \
-    python3 - <<'PY'
+
+  if [[ "${asset_revision}" == "latest" ]]; then
+    asset_name="$(
+      REPO="${repo}" \
+      TAG="${tag}" \
+      ASSET_OS="${asset_os}" \
+      ASSET_ARCH="${asset_arch}" \
+      GITHUB_TOKEN="${token}" \
+      python3 - <<'PY'
 import json
 import os
 import sys
@@ -128,7 +132,10 @@ if not matches:
 matches.sort(key=lambda asset: (asset.get("updated_at", ""), asset["name"]))
 print(matches[-1]["name"])
 PY
-  )"
+    )"
+  else
+    asset_name="mlir_${asset_os}_${asset_arch}_${asset_revision}.tar.gz"
+  fi
 fi
 
 if [[ -z "${asset_url}" ]]; then
