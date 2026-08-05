@@ -4,7 +4,7 @@ defmodule Beaver.Native.OpaquePtr do
   """
   import Beaver.MLIR.CAPI
 
-  use Kinda.ResourceKind, forward_module: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
 
   @doc """
   read the N bytes starting from the pointer and returns an Erlang binary
@@ -17,7 +17,10 @@ defmodule Beaver.Native.OpaquePtr do
   read the N bytes starting from the pointer and return a resource
   """
   def to_resource(mod, %__MODULE__{ref: ptr_ref}, offset \\ 0) do
-    {ref, size} = Beaver.Native.forward(mod, "make_from_opaque_ptr", [ptr_ref, offset])
+    {ref, size} =
+      apply(Beaver.MLIR.CAPI.Raw, Module.concat(mod, :make_from_opaque_ptr), [ptr_ref, offset])
+      |> Beaver.Native.normalize()
+
     {ref, size}
   end
 

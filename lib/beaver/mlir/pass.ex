@@ -4,7 +4,7 @@ defmodule Beaver.MLIR.Pass do
   """
   alias Beaver.MLIR
   alias __MODULE__.Server
-  use Kinda.ResourceKind, forward_module: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
   @type state() :: any()
   @callback construct(state :: state()) :: state()
   @callback run(op :: MLIR.Operation.t(), state :: state()) :: state()

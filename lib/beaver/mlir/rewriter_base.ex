@@ -2,7 +2,7 @@ defmodule Beaver.MLIR.RewriterBase do
   @moduledoc """
   This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
   """
-  use Kinda.ResourceKind, forward_module: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
   alias Beaver.MLIR
 
   @helpers (for {f, "mlirRewriterBase" <> suffix, arity} <-
