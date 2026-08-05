@@ -97,7 +97,7 @@ fn createCMakeStep(b: *std.Build, llvm_cmake_dir: []const u8, mlir_cmake_dir: []
 /// instead of the extraction_step will lead to premature execution since the dependency
 /// chain is broken.
 fn createODSExtractionStep(b: *std.Build, generated_dir: []const u8, mlir_include_dir: []const u8, cmake_step: *std.Build.Step) *std.Build.Step {
-    const step = b.step("ods_extraction", "Extract ODS information and convert to inspection format");
+    const step = b.step("ods_extraction", "Extract ODS information as JSON");
     const create_include_dir = b.addSystemCommand(&.{
         "mkdir", "-p", generated_dir,
     });
@@ -118,14 +118,6 @@ fn createODSExtractionStep(b: *std.Build, generated_dir: []const u8, mlir_includ
     dump_ods.step.dependOn(cmake_step);
     dump_ods.step.dependOn(&create_include_dir.step);
     step.dependOn(&dump_ods.step);
-
-    const json_to_inspection = b.addSystemCommand(&.{
-        "elixir",   "native/tools/json_to_inspection.exs",
-        "--input",  b.pathJoin(&.{ generated_dir, "ods_dump.json" }),
-        "--output", b.pathJoin(&.{ b.install_path, "ods_dump.ex" }),
-    });
-    json_to_inspection.step.dependOn(&dump_ods.step);
-    step.dependOn(&json_to_inspection.step);
 
     return step;
 }
