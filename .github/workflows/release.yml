@@ -18,6 +18,7 @@ concurrency:
   group: precompiled-${{ github.ref }}
   cancel-in-progress: true
 env:
+  CADDY_VERSION: "2.11.4"
   PRE_BUILT_RELEASE_GITHUB_TOKEN: ${{ secrets.PRE_BUILT_RELEASE_GITHUB_TOKEN }}
   # Remove after Kinda 0.11.0 is published and locked by Mix.
   KINDA_REF: "a595f26b67fa3e491add0b4008a4cae63d2eb02e"
@@ -101,11 +102,32 @@ jobs:
       - name: Purge artifacts
         run: |
           mix clean
-      - name: Start mock server in the background
+      - name: Install Caddy
         run: |
-          python3 -m http.server 8000 --bind 127.0.0.1 --directory . \
-            > "$RUNNER_TEMP/prebuilt-http.log" 2>&1 &
-      - name: Wait for mock server
+          case "${RUNNER_OS}-${RUNNER_ARCH}" in
+            Linux-X64) caddy_platform="linux_amd64" ;;
+            Linux-ARM64) caddy_platform="linux_arm64" ;;
+            macOS-X64) caddy_platform="mac_amd64" ;;
+            macOS-ARM64) caddy_platform="mac_arm64" ;;
+            *) echo "unsupported Caddy platform: ${RUNNER_OS}-${RUNNER_ARCH}" >&2; exit 1 ;;
+          esac
+          caddy_asset="caddy_${CADDY_VERSION}_${caddy_platform}.tar.gz"
+          caddy_release="https://github.com/caddyserver/caddy/releases/download/v${CADDY_VERSION}"
+          curl --fail --location --retry 3 --silent --show-error \
+            "${caddy_release}/${caddy_asset}" \
+            --output "$RUNNER_TEMP/$caddy_asset"
+          curl --fail --location --retry 3 --silent --show-error \
+            "${caddy_release}/caddy_${CADDY_VERSION}_checksums.txt" \
+            | awk -v asset="$caddy_asset" '$2 == asset' \
+            > "$RUNNER_TEMP/caddy.sha512"
+          (cd "$RUNNER_TEMP" && shasum -a 512 --check caddy.sha512)
+          tar -xzf "$RUNNER_TEMP/$caddy_asset" -C "$RUNNER_TEMP" caddy
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+      - name: Host prebuilt package with Caddy
+        run: |
+          caddy file-server --listen 127.0.0.1:8000 --root . \
+            > "$RUNNER_TEMP/caddy.log" 2>&1 &
+      - name: Wait for Caddy
         run: |
           for attempt in {1..15}; do
             if curl --noproxy '*' --fail --silent --show-error \
@@ -114,7 +136,7 @@ jobs:
             fi
             sleep 1
           done
-          cat "$RUNNER_TEMP/prebuilt-http.log"
+          cat "$RUNNER_TEMP/caddy.log"
           exit 1
       - name: Run tests with prebuilt
         env:
