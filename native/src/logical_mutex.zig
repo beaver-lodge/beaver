@@ -7,33 +7,36 @@ const e = kinda.erl_nif;
 const beam = kinda.beam;
 
 pub const Token = struct {
-    mutex: std.Thread.Mutex = .{},
-    cond: std.Thread.Condition = .{},
+    mutex: std.Io.Mutex = .init,
+    cond: std.Io.Condition = .init,
     done: bool = false,
     logical_success: bool = false,
     caller_pid: beam.pid = undefined,
     pub var resource_type: beam.resource_type = undefined;
     pub const resource_name = "Beaver" ++ @typeName(@This());
     pub fn wait_logical(self: *@This()) struct { result: mlir_capi.LogicalResult.T, caller: beam.pid } {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        const io = std.Options.debug_io;
+        self.mutex.lockUncancelable(io);
+        defer self.mutex.unlock(io);
         while (!self.done) {
-            self.cond.wait(&self.mutex);
+            self.cond.waitUncancelable(io, &self.mutex);
         }
         const res = if (self.logical_success) c.mlirLogicalResultSuccess() else c.mlirLogicalResultFailure();
         return .{ .result = res, .caller = self.caller_pid };
     }
     fn signal(self: *@This(), logical_success: bool, caller_pid: beam.pid) void {
-        self.mutex.lock();
+        const io = std.Options.debug_io;
+        self.mutex.lockUncancelable(io);
         if (self.done) {
             std.log.warn("Logical mutex token signaled more than once, will be a noop", .{});
+            self.mutex.unlock(io);
             return;
         }
-        defer self.mutex.unlock();
+        defer self.mutex.unlock(io);
         self.logical_success = logical_success;
         self.done = true;
         self.caller_pid = caller_pid;
-        self.cond.signal();
+        self.cond.signal(io);
     }
     pub fn logical_mutex_signal(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         var token = try beam.fetch_ptr_resource_wrapped(@This(), env, args[0]);

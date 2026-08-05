@@ -34,6 +34,9 @@ defmodule Beaver.MixProject do
           "lib/libMLIRBeaver*",
           "*.ex"
         ],
+        make_env: fn ->
+          %{"KINDA_SOURCE_PATH" => Map.fetch!(Mix.Project.deps_paths(), :kinda)}
+        end,
         make_args: ~w{-j},
         make_clean: ["clean"]
       ]
@@ -117,11 +120,27 @@ defmodule Beaver.MixProject do
   defp deps do
     [
       {:elixir_make, "~> 0.4", runtime: false},
-      {:kinda, "~> 0.10.8"},
+      kinda_dep(),
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:benchee, "~> 1.0", only: :dev},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]
+  end
+
+  defp kinda_dep do
+    case System.get_env("BEAVER_KINDA_PATH") do
+      nil ->
+        {:kinda, "~> 0.11.0"}
+
+      path ->
+        local_kinda = Path.expand(path)
+
+        unless File.dir?(local_kinda) do
+          raise "Kinda checkout not found at #{local_kinda}"
+        end
+
+        {:kinda, path: local_kinda}
+    end
   end
 end

@@ -37,7 +37,21 @@ mlir_mods = [
   TransformState,
   TransformOpInterfaceCallbacks,
   PatternDescriptorOpInterfaceCallbacks,
-  TransformOptions
+  TransformOptions,
+  ConditionallySpeculatableOpInterfaceCallbacks,
+  DominanceInfo,
+  IRMapping,
+  MemoryEffect,
+  MemoryEffectInstance,
+  OpOperandReplaceFilterCallback,
+  PostDominanceInfo,
+  RewriterBaseInsertPoint,
+  SideEffectResource,
+  TypeConverter1ToNConversionCallback,
+  TypeConverter1ToNTargetMaterializationCallback,
+  TypeConverterConversionResults,
+  TypeConverterSourceMaterializationCallback,
+  TypeConverterTargetMaterializationCallback
 ]
 
 for m <- mlir_mods do

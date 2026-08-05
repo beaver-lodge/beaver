@@ -92,6 +92,20 @@ pub const PDLValue = MLIRKind("PDLValue");
 pub const PDLResultList = MLIRKind("PDLResultList");
 pub const PDLRewriteFunction = MLIRKind("PDLRewriteFunction");
 pub const PatternRewriter = MLIRKind("PatternRewriter");
+pub const ConditionallySpeculatableOpInterfaceCallbacks = MLIRKind("ConditionallySpeculatableOpInterfaceCallbacks");
+pub const DominanceInfo = MLIRKind("DominanceInfo");
+pub const IRMapping = MLIRKind("IRMapping");
+pub const MemoryEffect = MLIRKind("MemoryEffect");
+pub const MemoryEffectInstance = MLIRKind("MemoryEffectInstance");
+pub const OpOperandReplaceFilterCallback = MLIRKind("OpOperandReplaceFilterCallback");
+pub const PostDominanceInfo = MLIRKind("PostDominanceInfo");
+pub const RewriterBaseInsertPoint = MLIRKind("RewriterBaseInsertPoint");
+pub const SideEffectResource = MLIRKind("SideEffectResource");
+pub const TypeConverter1ToNTargetMaterializationCallback = MLIRKind("TypeConverter1ToNTargetMaterializationCallback");
+pub const TypeConverter1ToNConversionCallback = MLIRKind("TypeConverter1ToNConversionCallback");
+pub const TypeConverterConversionResults = MLIRKind("TypeConverterConversionResults");
+pub const TypeConverterSourceMaterializationCallback = MLIRKind("TypeConverterSourceMaterializationCallback");
+pub const TypeConverterTargetMaterializationCallback = MLIRKind("TypeConverterTargetMaterializationCallback");
 
 pub const ExternalPass = MLIRKind("ExternalPass");
 pub const ExternalPassCallbacks = MLIRKind("ExternalPassCallbacks");
@@ -117,7 +131,7 @@ pub const PatternDescriptorOpInterfaceCallbacks = MLIRKind("PatternDescriptorOpI
 pub const TransformOptions = MLIRKind("TransformOptions");
 pub const LLVMThreadPool = MLIRKind2("MlirLlvmThreadPool", "LLVMThreadPool");
 pub const OperationState = MLIRKind2("MlirOperationState", "Operation.State");
-pub const allKinds = .{ Pass, LogicalResult, StringRef, Context, Location, ISize, Attribute, OpaquePtr, ShapedTypeComponentsCallback, TypeID, TypesCallback, Bool, Operation, IntegerSet, AffineExpr, StringCallback, DialectHandle, CInt, AffineMap, SparseTensorLevelType, F64, Type, I32, I64, CUInt, DialectRegistry, DiagnosticHandlerID, DiagnosticHandler, DiagnosticHandlerDeleteUserData, Diagnostic, DiagnosticSeverity, F32, U64, U32, U16, I16, U8, I8, USize, UnmanagedDenseResourceElementsAttrGetDeleteCallback, OpaqueArray, StringArray, NamedAttribute, PassManager, RewritePattern, RewritePatternSet, RewritePatternCallbacks, ConversionTarget, ConversionPattern, ConversionPatternRewriter, TypeConverter, ConversionConfig, Region, Module, ExecutionEngine, GenericCallback, ExternalPassConstruct, ExternalPassRun, Identifier, OperationState, SymbolTable, Value, Block, Dialect, ExternalPass, ExternalPassCallbacks, OpPassManager, AffineMapCompressUnusedSymbolsPopulateResult, SymbolTableWalkSymbolTablesCallback, OpOperand, AsmState, OperationWalkCallback, WalkOrder, BytecodeWriterConfig, OpPrintingFlags, LLVMRawFdOStream, LLVMThreadPool, TypeIDAllocator, DynamicOpTrait, DynamicOpTraitCallbacks, DynamicTypeDefinition, DynamicAttrDefinition, MemoryEffectInstancesList, MemoryEffectsOpInterfaceCallbacks, TransformResults, TransformRewriter, TransformState, TransformOpInterfaceCallbacks, PatternDescriptorOpInterfaceCallbacks, TransformOptions, RewriterBase, FrozenRewritePatternSet, PDLPatternModule, GreedyRewriteDriverConfig, string_ref.Printer.ResourceKind, LinalgContractionDimensions, LinalgConvolutionDimensions, PDLValue, PDLResultList, PDLRewriteFunction, PatternRewriter };
+pub const allKinds = .{ Pass, LogicalResult, StringRef, Context, Location, ISize, Attribute, OpaquePtr, ShapedTypeComponentsCallback, TypeID, TypesCallback, Bool, Operation, IntegerSet, AffineExpr, StringCallback, DialectHandle, CInt, AffineMap, SparseTensorLevelType, F64, Type, I32, I64, CUInt, DialectRegistry, DiagnosticHandlerID, DiagnosticHandler, DiagnosticHandlerDeleteUserData, Diagnostic, DiagnosticSeverity, F32, U64, U32, U16, I16, U8, I8, USize, UnmanagedDenseResourceElementsAttrGetDeleteCallback, OpaqueArray, StringArray, NamedAttribute, PassManager, RewritePattern, RewritePatternSet, RewritePatternCallbacks, ConversionTarget, ConversionPattern, ConversionPatternRewriter, TypeConverter, ConversionConfig, Region, Module, ExecutionEngine, GenericCallback, ExternalPassConstruct, ExternalPassRun, Identifier, OperationState, SymbolTable, Value, Block, Dialect, ExternalPass, ExternalPassCallbacks, OpPassManager, AffineMapCompressUnusedSymbolsPopulateResult, SymbolTableWalkSymbolTablesCallback, OpOperand, AsmState, OperationWalkCallback, WalkOrder, BytecodeWriterConfig, OpPrintingFlags, LLVMRawFdOStream, LLVMThreadPool, TypeIDAllocator, DynamicOpTrait, DynamicOpTraitCallbacks, DynamicTypeDefinition, DynamicAttrDefinition, MemoryEffectInstancesList, MemoryEffectsOpInterfaceCallbacks, TransformResults, TransformRewriter, TransformState, TransformOpInterfaceCallbacks, PatternDescriptorOpInterfaceCallbacks, TransformOptions, RewriterBase, FrozenRewritePatternSet, PDLPatternModule, GreedyRewriteDriverConfig, string_ref.Printer.ResourceKind, LinalgContractionDimensions, LinalgConvolutionDimensions, PDLValue, PDLResultList, PDLRewriteFunction, PatternRewriter, ConditionallySpeculatableOpInterfaceCallbacks, DominanceInfo, IRMapping, MemoryEffect, MemoryEffectInstance, OpOperandReplaceFilterCallback, PostDominanceInfo, RewriterBaseInsertPoint, SideEffectResource, TypeConverter1ToNConversionCallback, TypeConverter1ToNTargetMaterializationCallback, TypeConverterConversionResults, TypeConverterSourceMaterializationCallback, TypeConverterTargetMaterializationCallback };
 pub fn open_all(env: beam.env) void {
     inline for (allKinds) |k| {
         k.open_all(env);

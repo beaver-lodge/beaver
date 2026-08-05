@@ -27,12 +27,19 @@ Bindings are the part that provides the interface to the MLIR CAPIs. It is imple
 
 1. Install Elixir, [see installation guide](https://elixir-lang.org/install.html)
 2. Install Zig, [see installation guide](https://ziglang.org/learn/getting-started/#installing-zig)
-3. Clone this repo and `kinda` in the same directory
+3. Clone this repo. To iterate on Beaver and Kinda together, clone both and
+   point Beaver at the Kinda checkout explicitly:
 
 ```bash
 git clone https://github.com/beaver-lodge/beaver.git
 git clone https://github.com/beaver-lodge/kinda.git
+cd beaver
+export BEAVER_KINDA_PATH=../kinda
 ```
+
+Without `BEAVER_KINDA_PATH`, Mix uses the released Kinda version from
+`mix.lock`. During native builds, Beaver passes that resolved Mix dependency to
+Zig as a local package override, so both dependency graphs use the same source.
 
 4. Install LLVM/MLIR
 
@@ -44,16 +51,16 @@ git clone https://github.com/beaver-lodge/kinda.git
   local `python3` runtime.
 
   ```bash
-  bash scripts/install-prebuilt-llvm.sh $HOME/.local/llvm-eudsl
-  export LLVM_CONFIG_PATH=$HOME/.local/llvm-eudsl/bin/llvm-config
+  bash scripts/install-prebuilt-llvm.sh priv/llvm-prebuilt
+  export LLVM_CONFIG_PATH=$PWD/priv/llvm-prebuilt/bin/llvm-config
   ```
 
   To pin a specific asset instead of auto-detecting by OS and architecture:
 
   ```bash
   LLVM_EUDSL_ASSET_NAME=mlir_macos_arm64_20260416+47b5ad2bd.tar.gz \
-    bash scripts/install-prebuilt-llvm.sh $HOME/.local/llvm-eudsl
-  export LLVM_CONFIG_PATH=$HOME/.local/llvm-eudsl/bin/llvm-config
+    bash scripts/install-prebuilt-llvm.sh priv/llvm-prebuilt
+  export LLVM_CONFIG_PATH=$PWD/priv/llvm-prebuilt/bin/llvm-config
   ```
 
 - Option 2: Build from source https://mlir.llvm.org/getting_started/

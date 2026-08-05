@@ -52,7 +52,7 @@ MLIR_CAPI_EXPORTED void beaverContextGetOps(MlirContext context,
 MLIR_CAPI_EXPORTED void beaverContextGetDialects(MlirContext context,
                                                  MlirStringCallback insert,
                                                  void *container) {
-  for (auto dialect : unwrap(context)->getDialectRegistry().getDialectNames()) {
+  for (auto dialect : unwrap(context)->getAvailableDialects()) {
     insert(wrap(dialect), container);
   }
 }
@@ -289,7 +289,7 @@ MLIR_CAPI_EXPORTED void beaverSetGlobalDebugTypes(const MlirStringRef *types,
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverGetNumWorkgroupAttributionsAttrName() {
-  return wrap(gpu::GPUFuncOp::getNumWorkgroupAttributionsAttrName());
+  return wrap(llvm::StringRef("workgroup_attributions"));
 }
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverGetContainerModuleAttrName() {

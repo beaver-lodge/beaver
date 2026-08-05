@@ -267,11 +267,12 @@ const PassCreator = struct {
     }
 };
 
-var mutex: std.Thread.Mutex = .{};
+var mutex: std.Io.Mutex = .init;
 var all_passes_registered = false;
 pub fn register_all_passes() void {
-    mutex.lock();
-    defer mutex.unlock();
+    const io = std.Options.debug_io;
+    mutex.lockUncancelable(io);
+    defer mutex.unlock(io);
     if (!all_passes_registered) {
         all_passes_registered = true;
         c.mlirRegisterAllPasses();

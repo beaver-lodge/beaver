@@ -2,6 +2,17 @@ const std = @import("std");
 const builtin = @import("builtin");
 const os = builtin.os.tag;
 
+fn resolveLlvmConfigPath(b: *std.Build) []const u8 {
+    return b.option([]const u8, "llvm-config", "Path to llvm-config") orelse
+        b.graph.environ_map.get("LLVM_CONFIG_PATH") orelse
+        b.findProgram(&.{"llvm-config"}, &.{
+            b.pathResolve(&.{ "priv", "llvm-prebuilt", "bin" }),
+            "/opt/homebrew/opt/llvm/bin",
+            "/usr/local/opt/llvm/bin",
+            "/opt/local/libexec/llvm/bin",
+        }) catch "llvm-config";
+}
+
 fn generateWrapper(b: *std.Build, generated_dir: []const u8, mlir_include_dir: []const u8) void {
     // Create include directory
     _ = b.run(&.{
@@ -49,7 +60,7 @@ fn createCMakeStep(b: *std.Build, llvm_cmake_dir: []const u8, mlir_cmake_dir: []
     const cmake_build_install = b.addSystemCommand(&.{ "cmake", "--build", cmake_build_dir, "--target", "install" });
     step.dependOn(&cmake_build_install.step);
 
-    std.fs.accessAbsolute(cmake_cache_path, .{}) catch {
+    std.Io.Dir.accessAbsolute(b.graph.io, cmake_cache_path, .{}) catch {
         step.dependOn(&cmake_configure.step);
         cmake_build_install.step.dependOn(&cmake_configure.step);
     };
@@ -99,7 +110,7 @@ fn createODSExtractionStep(b: *std.Build, generated_dir: []const u8, mlir_includ
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     var optimize = b.standardOptimizeOption(.{});
-    if (std.posix.getenv("MIX_ENV")) |env| {
+    if (b.graph.environ_map.get("MIX_ENV")) |env| {
         if (std.mem.eql(u8, env, "test")) {
             optimize = .Debug;
         } else if (std.mem.eql(u8, env, "dev") or std.mem.eql(u8, env, "prod")) {
@@ -108,10 +119,7 @@ pub fn build(b: *std.Build) void {
     }
 
     // Environment variables and paths
-    const llvm_config_path =
-        b.option([]const u8, "llvm-config", "Path to llvm-config") orelse
-        std.posix.getenv("LLVM_CONFIG_PATH") orelse
-        "llvm-config";
+    const llvm_config_path = resolveLlvmConfigPath(b);
     const generated_dir = b.pathJoin(&.{ b.install_path, "generated" });
 
     const llvm_lib_dir_raw = b.run(&.{ llvm_config_path, "--libdir" });
@@ -163,13 +171,13 @@ pub fn build(b: *std.Build) void {
 
     if (os == .linux) {
         lib.root_module.addRPathSpecial("$ORIGIN");
-        lib.linkLibC();
+        lib.root_module.link_libc = true;
     }
     if (os == .macos) {
         lib.root_module.addRPathSpecial("@loader_path");
-        lib.linkLibC();
+        lib.root_module.link_libc = true;
     }
-    lib.linkSystemLibrary("MLIRBeaver");
+    lib.root_module.linkSystemLibrary("MLIRBeaver", .{ .use_pkg_config = .no });
     lib.linker_allow_shlib_undefined = true;
     // copy runtime libs
     b.installDirectory(.{ .source_dir = .{ .cwd_relative = llvm_lib_dir }, .install_dir = .prefix, .install_subdir = "lib", .include_extensions = &.{ ".so", ".dylib", ".dll" } });
