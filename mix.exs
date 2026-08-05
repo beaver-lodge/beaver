@@ -117,11 +117,22 @@ defmodule Beaver.MixProject do
   defp deps do
     [
       {:elixir_make, "~> 0.4", runtime: false},
-      {:kinda, "~> 0.10.8"},
+      kinda_dep(),
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:benchee, "~> 1.0", only: :dev},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: :dev, runtime: false}
     ]
+  end
+
+  defp kinda_dep do
+    local_kinda =
+      System.get_env("BEAVER_KINDA_PATH") || Path.expand("../kinda", __DIR__)
+
+    unless File.dir?(local_kinda) do
+      raise "current Kinda checkout not found at #{local_kinda}; set BEAVER_KINDA_PATH"
+    end
+
+    {:kinda, path: local_kinda}
   end
 end

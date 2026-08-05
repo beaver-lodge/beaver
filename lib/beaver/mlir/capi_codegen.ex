@@ -1,6 +1,6 @@
 defmodule Beaver.MLIR.CAPI.CodeGen do
   @moduledoc false
-  alias Kinda.CodeGen.{KindDecl}
+  alias Kinda.CodeGen.{DeclarationManifest, KindDecl, NIFDecl}
   @behaviour Kinda.CodeGen
 
   @impl Kinda.CodeGen
@@ -89,6 +89,20 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
           PDLResultList
           PDLRewriteFunction
           PatternRewriter
+          ConditionallySpeculatableOpInterfaceCallbacks
+          DominanceInfo
+          IRMapping
+          MemoryEffect
+          MemoryEffectInstance
+          OpOperandReplaceFilterCallback
+          PostDominanceInfo
+          RewriterBaseInsertPoint
+          SideEffectResource
+          TypeConverter1ToNConversionCallback
+          TypeConverter1ToNTargetMaterializationCallback
+          TypeConverterConversionResults
+          TypeConverterSourceMaterializationCallback
+          TypeConverterTargetMaterializationCallback
           UnrankedMemRefDescriptor
         ],
       &%KindDecl{module_name: Module.concat(Beaver.MLIR, &1)}
@@ -119,11 +133,16 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
   end
 
   @impl Kinda.CodeGen
-  def nifs() do
-    Application.app_dir(:beaver)
-    |> Path.join("priv/capi_functions.ex")
-    |> File.read!()
-    |> Code.eval_string()
-    |> elem(0)
+  def declaration_manifest do
+    nif_decls =
+      Application.app_dir(:beaver)
+      |> Path.join("priv/capi_functions.ex")
+      |> Code.eval_file()
+      |> elem(0)
+      |> Enum.map(fn {wrapper_name, params} ->
+        %NIFDecl{wrapper_name: wrapper_name, params: params}
+      end)
+
+    DeclarationManifest.build(nif_decls)
   end
 end

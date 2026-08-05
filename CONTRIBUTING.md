@@ -44,16 +44,16 @@ git clone https://github.com/beaver-lodge/kinda.git
   local `python3` runtime.
 
   ```bash
-  bash scripts/install-prebuilt-llvm.sh $HOME/.local/llvm-eudsl
-  export LLVM_CONFIG_PATH=$HOME/.local/llvm-eudsl/bin/llvm-config
+  bash scripts/install-prebuilt-llvm.sh priv/llvm-prebuilt
+  export LLVM_CONFIG_PATH=$PWD/priv/llvm-prebuilt/bin/llvm-config
   ```
 
   To pin a specific asset instead of auto-detecting by OS and architecture:
 
   ```bash
   LLVM_EUDSL_ASSET_NAME=mlir_macos_arm64_20260416+47b5ad2bd.tar.gz \
-    bash scripts/install-prebuilt-llvm.sh $HOME/.local/llvm-eudsl
-  export LLVM_CONFIG_PATH=$HOME/.local/llvm-eudsl/bin/llvm-config
+    bash scripts/install-prebuilt-llvm.sh priv/llvm-prebuilt
+  export LLVM_CONFIG_PATH=$PWD/priv/llvm-prebuilt/bin/llvm-config
   ```
 
 - Option 2: Build from source https://mlir.llvm.org/getting_started/

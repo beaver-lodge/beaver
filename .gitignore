@@ -34,8 +34,6 @@ beaver-*.tar.gz.sha256
 
 .elixir_ls
 .dialyzer/
-.restraint/
-
 .zig-cache
 zig-out
-docs/compass
+/priv/

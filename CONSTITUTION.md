@@ -29,6 +29,6 @@ This repository is an MLIR/LLVM toolkit for Elixir.
 ## Toolchain
 
 - LLVM is currently expected from `LLVM_CONFIG_PATH`.
-- On this machine the active LLVM install is `/Users/tsai/Downloads/llvm-install`.
-- Prefer `zig@0.15` for now. Zig 0.16 compatibility is a separate migration
-  surface.
+- The default local install is `priv/llvm-prebuilt`, populated from the latest
+  matching `llvm/eudsl` build by `scripts/install-prebuilt-llvm.sh`.
+- The active Zig line is `0.16`.
