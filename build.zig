@@ -14,7 +14,10 @@ fn resolveLlvmConfigPath(b: *std.Build) []const u8 {
 }
 
 fn createCapiModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode, mlir_include_dir: []const u8) *std.Build.Module {
-    const header_generator = b.addSystemCommand(&.{ "elixir", "native/tools/capi/gen_header.exs" });
+    const header_generator = b.addSystemCommand(&.{"elixir"});
+    // Header discovery must observe additions and removals in both include trees.
+    header_generator.has_side_effects = true;
+    header_generator.addFileArg(b.path("native/tools/capi/gen_header.exs"));
     header_generator.addArg("--mlir-include-dir");
     header_generator.addDirectoryArg(.{ .cwd_relative = mlir_include_dir });
     header_generator.addArg("--beaver-include-dir");
@@ -27,6 +30,8 @@ fn createCapiModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
     ast_dump.addDirectoryArg(b.path("native/include"));
     ast_dump.addArg("-I");
     ast_dump.addDirectoryArg(.{ .cwd_relative = mlir_include_dir });
+    ast_dump.addArgs(&.{ "-MD", "-MF" });
+    _ = ast_dump.addDepFileOutputArg("capi_ast.d");
     ast_dump.addFileArg(capi_header);
     const capi_ast = ast_dump.captureStdOut(.{ .basename = "capi_ast.json" });
 
@@ -34,9 +39,7 @@ fn createCapiModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
     if (b.graph.environ_map.get("JASON_EBIN_PATH")) |jason_ebin_path| {
         manifest_generator.addArgs(&.{ "-pa", jason_ebin_path });
     }
-    manifest_generator.addArg("native/tools/capi/gen_manifest.exs");
-    manifest_generator.addArg("--policy");
-    manifest_generator.addFileArg(b.path("native/src/capi_policy.txt"));
+    manifest_generator.addFileArg(b.path("native/tools/capi/gen_manifest.exs"));
     manifest_generator.addArg("--declaration");
     const declaration_manifest = manifest_generator.addOutputFileArg("capi_manifest.json");
     manifest_generator.addArg("--callback-bridge");

@@ -1,14 +1,21 @@
 defmodule Beaver.CAPI.ManifestGenerator do
   @moduledoc false
 
+  @policy_markers [
+    {"BeaverCapiPolicyDiagnostics__", "diagnostics"},
+    {"BeaverCapiPolicyDirtyCPUAndIO__", "dirty_cpu_io"},
+    {"BeaverCapiPolicyCallbackBridge__", "callback_bridge"},
+    {"BeaverCapiPolicyExclude__", "exclude"}
+  ]
+
   def run(argv) do
     {opts, _, _} =
       OptionParser.parse(argv,
-        strict: [policy: :string, declaration: :string, callback_bridge: :string]
+        strict: [declaration: :string, callback_bridge: :string]
       )
 
-    policy = opts |> Keyword.fetch!(:policy) |> read_policy!()
     ast = IO.read(:stdio, :eof) |> decode_json!()
+    policy = policy_from_ast(ast)
 
     functions =
       ast
@@ -28,18 +35,38 @@ defmodule Beaver.CAPI.ManifestGenerator do
     |> write_json!(callback_bridge_manifest)
   end
 
-  defp read_policy!(path) do
-    path
-    |> File.stream!()
-    |> Enum.reduce(%{}, fn raw_line, policy ->
-      line = String.trim(raw_line)
-
-      case String.split(line, ~r/\s+/, parts: 2) do
-        [category, name] when category not in ["", "#"] ->
+  defp policy_from_ast(ast) do
+    ast
+    |> collect_enum_constants()
+    |> Enum.reduce(%{}, fn marker, policy ->
+      case decode_policy_marker(marker) do
+        {category, name} ->
           Map.update(policy, category, MapSet.new([name]), &MapSet.put(&1, name))
 
-        _ ->
+        nil ->
           policy
+      end
+    end)
+  end
+
+  defp collect_enum_constants(nodes) when is_list(nodes),
+    do: Enum.flat_map(nodes, &collect_enum_constants/1)
+
+  defp collect_enum_constants(%{"kind" => "EnumConstantDecl", "name" => name} = node),
+    do: [name | collect_enum_constants(Map.get(node, "inner", []))]
+
+  defp collect_enum_constants(%{} = node),
+    do: collect_enum_constants(Map.get(node, "inner", []))
+
+  defp collect_enum_constants(_node), do: []
+
+  defp decode_policy_marker(marker) do
+    Enum.find_value(@policy_markers, fn {prefix, category} ->
+      if String.starts_with?(marker, prefix) do
+        case String.replace_prefix(marker, prefix, "") do
+          "" -> nil
+          name -> {category, name}
+        end
       end
     end)
   end

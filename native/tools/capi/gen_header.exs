@@ -18,6 +18,7 @@ mlir_headers =
 if mlir_headers == [], do: raise("no MLIR C headers found under #{mlir_include_dir}")
 
 beaver_headers = ~w[
+  mlir-c/Beaver/CAPIPolicy.h
   mlir-c/Beaver/Context.h
   mlir-c/Beaver/Op.h
   mlir-c/Beaver/Pass.h

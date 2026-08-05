@@ -5,31 +5,18 @@ const prelude = @import("prelude.zig");
 const diagnostic = @import("diagnostic.zig");
 const c = prelude.c;
 
-const policy = @embedFile("capi_policy.txt");
 const declarations = @typeInfo(c).@"struct".decls;
 
-fn policyContains(comptime category: []const u8, comptime name: []const u8) bool {
-    var lines = std.mem.splitScalar(u8, policy, '\n');
-    while (lines.next()) |raw_line| {
-        const line = std.mem.trim(u8, raw_line, " \t\r");
-        if (line.len == 0 or line[0] == '#') continue;
-
-        var fields = std.mem.splitScalar(u8, line, ' ');
-        const line_category = fields.next() orelse continue;
-        const line_name = fields.next() orelse continue;
-        if (std.mem.eql(u8, category, line_category) and std.mem.eql(u8, name, line_name)) {
-            return true;
-        }
-    }
-    return false;
+fn hasPolicy(comptime category: []const u8, comptime name: []const u8) bool {
+    return @hasDecl(c, "BeaverCapiPolicy" ++ category ++ "__" ++ name);
 }
 
 fn isCandidate(comptime name: []const u8) bool {
     const has_supported_prefix = std.mem.startsWith(u8, name, "mlir") or
         std.mem.startsWith(u8, name, "beaver");
     return has_supported_prefix and
-        !policyContains("exclude", name) and
-        !policyContains("callback_bridge", name);
+        !hasPolicy("Exclude", name) and
+        !hasPolicy("CallbackBridge", name);
 }
 
 fn isFunction(comptime name: []const u8) bool {
@@ -40,7 +27,7 @@ fn isFunction(comptime name: []const u8) bool {
 }
 
 fn hasDiagnostics(comptime name: []const u8) bool {
-    return policyContains("diagnostics", name) or std.mem.endsWith(u8, name, "GetChecked");
+    return hasPolicy("Diagnostics", name) or std.mem.endsWith(u8, name, "GetChecked");
 }
 
 fn entryCount() usize {
@@ -52,7 +39,7 @@ fn entryCount() usize {
 
         count += if (hasDiagnostics(declaration.name))
             2
-        else if (policyContains("dirty_cpu_io", declaration.name))
+        else if (hasPolicy("DirtyCPUAndIO", declaration.name))
             3
         else
             1;
@@ -76,7 +63,7 @@ pub const nifs = blk: {
         if (hasDiagnostics(name)) {
             entries[index] = diagnostic.WithDiagnosticsNIF(name);
             index += 1;
-        } else if (policyContains("dirty_cpu_io", name)) {
+        } else if (hasPolicy("DirtyCPUAndIO", name)) {
             entries[index] = prelude.nifDirtyCPU(name, name ++ "_dirty_cpu");
             entries[index + 1] = prelude.nifDirtyIO(name, name ++ "_dirty_io");
             index += 2;
