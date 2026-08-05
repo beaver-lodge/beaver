@@ -5,7 +5,7 @@
     .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .kinda = .{
-            .url = "https://codeload.github.com/beaver-lodge/kinda/tar.gz/4afc4e54ad1c780942503d58c5a32c13b76030d5",
+            .url = "https://codeload.github.com/beaver-lodge/kinda/tar.gz/99298bc542b0634444454fc8126bd0e7050cc5e6",
             .hash = "kinda-0.11.0-dev-ghcZCTg0AQBn8qxX7JGrrtGOa16b-9Ksn6VzynRRyaQX",
         },
     },

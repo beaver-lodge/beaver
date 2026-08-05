@@ -21,7 +21,7 @@ env:
   CADDY_VERSION: "2.11.4"
   PRE_BUILT_RELEASE_GITHUB_TOKEN: ${{ secrets.PRE_BUILT_RELEASE_GITHUB_TOKEN }}
   # Remove after Kinda 0.11.0 is published and locked by Mix.
-  KINDA_REF: "4afc4e54ad1c780942503d58c5a32c13b76030d5"
+  KINDA_REF: "99298bc542b0634444454fc8126bd0e7050cc5e6"
 
 jobs:
   generate_id:
