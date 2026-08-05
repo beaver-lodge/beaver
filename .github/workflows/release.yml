@@ -116,7 +116,7 @@ jobs:
           mix test --exclude vulkan --exclude todo
       - name: Publish archives and packages
         uses: softprops/action-gh-release@v2
-        if: ${{ github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != null }}
+        if: ${{ github.event_name != 'pull_request' && github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != '' }}
         with:
           files: |
             *.tar.gz
@@ -124,7 +124,7 @@ jobs:
           token: ${{ secrets.PRE_BUILT_RELEASE_GITHUB_TOKEN }}
           tag_name: ${{ needs.generate_id.outputs.formatted_date }}
       - name: Test dev compile
-        if: ${{ github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != null }}
+        if: ${{ github.event_name != 'pull_request' && github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != '' }}
         env:
           BEAVER_ARTEFACT_URL: "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/${{ needs.generate_id.outputs.formatted_date }}/@{artefact_filename}"
         run: |
@@ -191,7 +191,7 @@ jobs:
         run: docker run --platform ${{ matrix.image.platform }} -e BEAVER_KINDA_PATH=/src/kinda -v $PWD:/src -w /src/beaver ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
       - name: Publish archives and packages
         uses: softprops/action-gh-release@v2
-        if: ${{ github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != null }}
+        if: ${{ github.event_name != 'pull_request' && github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != '' }}
         with:
           files: |
             beaver/*.tar.gz
