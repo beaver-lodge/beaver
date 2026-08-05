@@ -340,28 +340,32 @@ defmodule AnalysisAndRewriteUtilitiesTest do
       |> Enum.fetch!(0)
 
     [first, second, _return] = Enum.to_list(Beaver.Walker.operations(block))
-    rewriter = MLIR.CAPI.mlirIRRewriterCreateFromOp(second)
 
     try do
-      assert MLIR.equal?(second, MLIR.RewriterBase.operation_after_insertion(rewriter))
+      MLIR.IRRewriter.with_rewriter(second, fn rewriter ->
+        assert MLIR.equal?(second, MLIR.RewriterBase.operation_after_insertion(rewriter))
 
-      assert :inside ==
-               MLIR.RewriterBase.with_insertion_point(rewriter, {:start, block}, fn ->
-                 assert MLIR.equal?(first, MLIR.RewriterBase.operation_after_insertion(rewriter))
-                 :inside
-               end)
+        assert :inside ==
+                 MLIR.RewriterBase.with_insertion_point(rewriter, {:start, block}, fn ->
+                   assert MLIR.equal?(
+                            first,
+                            MLIR.RewriterBase.operation_after_insertion(rewriter)
+                          )
 
-      assert MLIR.equal?(second, MLIR.RewriterBase.operation_after_insertion(rewriter))
+                   :inside
+                 end)
 
-      assert_raise RuntimeError, "rewrite failed", fn ->
-        MLIR.RewriterBase.with_insertion_point(rewriter, {:after, second}, fn ->
-          raise "rewrite failed"
-        end)
-      end
+        assert MLIR.equal?(second, MLIR.RewriterBase.operation_after_insertion(rewriter))
 
-      assert MLIR.equal?(second, MLIR.RewriterBase.operation_after_insertion(rewriter))
+        assert_raise RuntimeError, "rewrite failed", fn ->
+          MLIR.RewriterBase.with_insertion_point(rewriter, {:after, second}, fn ->
+            raise "rewrite failed"
+          end)
+        end
+
+        assert MLIR.equal?(second, MLIR.RewriterBase.operation_after_insertion(rewriter))
+      end)
     after
-      MLIR.CAPI.mlirIRRewriterDestroy(rewriter)
       MLIR.Module.destroy(module)
     end
   end

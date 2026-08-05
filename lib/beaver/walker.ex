@@ -14,7 +14,6 @@ alias Beaver.MLIR.{
 
 defmodule Beaver.Walker do
   alias Beaver.MLIR.CAPI
-  alias __MODULE__.OpReplacement
   @behaviour Access
 
   @moduledoc """
@@ -36,10 +35,10 @@ defmodule Beaver.Walker do
   before node).
 
   ### Mutation Support
-  It is possible to modifying the MLIR structure during traversal with CAPIs. It is recommended to use `replace/2` to replace an operation to keep the traversal going.
-
-  ### Pattern-based Transformations
-  You can apply transformation patterns defined using `Beaver.Pattern.defpat/2` to MLIR structures during traversal.
+  Walker callbacks should only traverse and inspect IR. Use
+  `Beaver.MLIR.PatternRewriter` inside rewrite patterns, or collect matches and
+  mutate them afterward with `Beaver.MLIR.IRRewriter`. Keeping traversal and
+  mutation separate prevents callbacks from retaining invalidated operations.
 
   ### Access Syntax
   - Access behavior to provide convenient attribute access:
@@ -52,7 +51,7 @@ defmodule Beaver.Walker do
   operands(op)[0]
   ```
   """
-  @type operation() :: Module.t() | Operation.t() | OpReplacement.t()
+  @type operation() :: Module.t() | Operation.t()
   @type container() :: operation() | Region.t() | Block.t() | NamedAttribute.t()
   @type element() :: operation() | Region.t() | Block.t() | Value.t() | NamedAttribute.t()
   @type element_module() :: Operation | Region | Block | Value | Attribute
@@ -79,15 +78,11 @@ defmodule Beaver.Walker do
 
   # operands, results, attributes of one operation
   defp verify_nesting!(Operation, Value), do: :ok
-  defp verify_nesting!(OpReplacement, Value), do: :ok
   defp verify_nesting!(Operation, {Identifier, Attribute}), do: :ok
-  defp verify_nesting!(OpReplacement, NamedAttribute), do: :ok
   # regions of one operation
   defp verify_nesting!(Operation, Region), do: :ok
-  defp verify_nesting!(OpReplacement, Region), do: :ok
   # successor blocks of one operation
   defp verify_nesting!(Operation, Block), do: :ok
-  defp verify_nesting!(OpReplacement, Block), do: :ok
   # blocks in a region
   defp verify_nesting!(Region, Block), do: :ok
   # operations in a block
@@ -167,10 +162,6 @@ defmodule Beaver.Walker do
   @doc """
   Returns an enumerable of the operands of an `operation()`.
   """
-  def operands(%OpReplacement{operands: operands}) do
-    operands
-  end
-
   def operands(op) do
     new(
       op,
@@ -184,10 +175,6 @@ defmodule Beaver.Walker do
   @doc """
   Returns an enumerable of the results of an `operation()`.
   """
-  def results(%OpReplacement{results: results}) do
-    results
-  end
-
   def results(op) do
     new(
       op,
@@ -201,10 +188,6 @@ defmodule Beaver.Walker do
   @doc """
   Returns an enumerable of the regions of an `operation()`.
   """
-  def regions(%OpReplacement{regions: regions}) do
-    regions
-  end
-
   def regions(op) do
     new(
       op,
@@ -218,10 +201,6 @@ defmodule Beaver.Walker do
   @doc """
   Returns an enumerable of the successor blocks of an `operation()`.
   """
-  def successors(%OpReplacement{successors: successors}) do
-    successors
-  end
-
   def successors(op) do
     new(
       op,
@@ -235,10 +214,6 @@ defmodule Beaver.Walker do
   @doc """
   Returns an enumerable of the attributes of an `operation()`.
   """
-  def attributes(%OpReplacement{attributes: attributes}) do
-    attributes
-  end
-
   def attributes(op) do
     new(
       op,
@@ -367,14 +342,12 @@ defmodule Beaver.Walker do
   @type mlir() :: container() | element()
 
   @doc """
-  Traverse and transform a container in MLIR, it could be a operation, region, block.
+  Traverse a container in MLIR; it can be an operation, region, or block.
   You might expect this function works like `Macro.traverse/4`.
   ### More on manipulating the IR
-  During the traversal, there are generally two choices to manipulate the IR:
-  - Use a pattern defined by macro `Beaver.Pattern.defpat/2` to have the PDL interpreter transform the IR for you.
-  You can use both if it is proper to do so.
-  - Use `Beaver.Walker.replace/2` to replace the operation and return a walker as placeholder if is replaced by value.
-  It could be mind-boggling to think the IR is mutable but not an issue if your approach is very functional. Inappropriate mutation might cause crash or bugs if somewhere else is keeping a reference of the replace op.
+  Keep mutation outside the active traversal. Use a pattern defined by
+  `Beaver.Pattern.defpat/2`, an Elixir `Beaver.MLIR.RewritePattern`, or first
+  collect the operations to change and then use `Beaver.MLIR.IRRewriter`.
   ### Some tips
   - If your matching is very complicated, using `with/1` in Elixir should cover it.
   - Use `defpat` if you want MLIR's greedy pattern application based on benefits instead of implementing something alike yourself.
@@ -429,16 +402,6 @@ defmodule Beaver.Walker do
       |> Enum.map(fn successor -> {:successor, successor} end)
       |> do_traverse(acc, pre, post)
 
-    # operands
-    # mlirOperationSetOperand
-
-    # attributes
-    # mlirOperationSetAttributeByName
-    # mlirOperationRemoveAttributeByName
-
-    # results/regions/successor
-    # replace with new op
-
     post.(operation, acc)
   end
 
@@ -459,9 +422,6 @@ defmodule Beaver.Walker do
 
     {_operations, acc} = operations(block) |> do_traverse(acc, pre, post)
 
-    # Note: Erlang now owns the removed operation. call erase
-    # mlirOperationRemoveFromParent
-    # mlirBlockDestroy
     post.(block, acc)
   end
 
@@ -526,29 +486,6 @@ defmodule Beaver.Walker do
   @spec postwalk(mlir(), any, (mlir(), any -> {mlir(), any})) :: {mlir(), any}
   def postwalk(ast, acc, fun) when is_function(fun, 2) do
     traverse(ast, acc, fn x, a -> {x, a} end, fun)
-  end
-
-  @spec replace(Operation.t(), [Value.t()] | Value.t()) :: OpReplacement.t()
-  @doc """
-  Replace a operation with a value
-  """
-  def replace(%Operation{} = op, %Value{} = value, opts \\ [destroy: true]) do
-    with results <- results(op),
-         1 <- Enum.count(results),
-         result = %Value{} <- results[0] do
-      CAPI.mlirValueReplaceAllUsesOfWith(result, value)
-
-      if opts[:destroy] do
-        MLIR.Operation.destroy(op)
-      end
-
-      %OpReplacement{
-        results: [value]
-      }
-    else
-      _ ->
-        raise "Operation being replace should have one and only result"
-    end
   end
 
   defimpl Enumerable do

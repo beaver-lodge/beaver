@@ -118,7 +118,7 @@ defmodule RewritePatternTest do
         {new_const, [%MLIR.Value{}]} =
           Arith.constant(value: Attribute.integer(MLIR.Type.i64(), 3)) >>> {:op, [Type.i64()]}
 
-        MLIR.RewriterBase.replace(base, op, new_const)
+        MLIR.RewriterBase.replace_op(base, op, new_const)
       end
 
       {:ok, state}

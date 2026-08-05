@@ -17,7 +17,13 @@ defmodule Beaver.MLIR.RewriterBase do
 
   @doc false
   def helpers,
-    do: [{:replace, 3}, {:with_insertion_point, 2}, {:with_insertion_point, 3} | @helpers]
+    do: [
+      {:replace, 3},
+      {:replace_op, 3},
+      {:with_insertion_point, 2},
+      {:with_insertion_point, 3}
+      | @helpers
+    ]
 
   @doc """
   Syntactic sugar for `replace_all_uses_with/3` and `replace_all_op_uses_with_operation/3`.
@@ -29,6 +35,38 @@ defmodule Beaver.MLIR.RewriterBase do
 
   def replace(%__MODULE__{} = rewriter, %MLIR.Operation{} = from, %MLIR.Operation{} = to) do
     replace_all_op_uses_with_operation(rewriter, from, to)
+  end
+
+  @doc """
+  Replaces an operation and erases it through MLIR's rewriter infrastructure.
+
+  A replacement can be another operation, one value, or a list of values. The
+  result counts and types must match before MLIR is called.
+  """
+  @spec replace_op(
+          t(),
+          MLIR.Operation.t(),
+          MLIR.Operation.t() | MLIR.Value.t() | [MLIR.Value.t()]
+        ) :: :ok
+  def replace_op(%__MODULE__{} = rewriter, %MLIR.Operation{} = from, %MLIR.Operation{} = to) do
+    validate_replacement_values!(from, MLIR.Operation.results(to) |> Enum.to_list())
+    replace_op_with_operation(rewriter, from, to)
+  end
+
+  def replace_op(%__MODULE__{} = rewriter, %MLIR.Operation{} = from, %MLIR.Value{} = to) do
+    replace_op(rewriter, from, [to])
+  end
+
+  def replace_op(%__MODULE__{} = rewriter, %MLIR.Operation{} = from, values)
+      when is_list(values) do
+    validate_replacement_values!(from, values)
+
+    replace_op_with_values(
+      rewriter,
+      from,
+      length(values),
+      Beaver.Native.array(values, MLIR.Value)
+    )
   end
 
   @type insertion_position() ::
@@ -96,5 +134,24 @@ defmodule Beaver.MLIR.RewriterBase do
 
   defp set_temporary_insertion_point(_rewriter, position) do
     raise ArgumentError, "unsupported insertion position: #{inspect(position)}"
+  end
+
+  defp validate_replacement_values!(operation, values) do
+    unless Enum.all?(values, &match?(%MLIR.Value{}, &1)) do
+      raise ArgumentError, "operation replacements must be MLIR values"
+    end
+
+    result_types = operation |> MLIR.Operation.results() |> Enum.map(&MLIR.Value.type/1)
+    replacement_types = Enum.map(values, &MLIR.Value.type/1)
+
+    unless length(result_types) == length(replacement_types) and
+             Enum.zip(result_types, replacement_types)
+             |> Enum.all?(fn {result_type, replacement_type} ->
+               MLIR.equal?(result_type, replacement_type)
+             end) do
+      raise ArgumentError, "operation replacement result counts and types must match"
+    end
+
+    :ok
   end
 end
