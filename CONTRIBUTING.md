@@ -45,22 +45,13 @@ Zig as a local package override, so both dependency graphs use the same source.
 
 - Option 1: Install a prebuilt `llvm/eudsl` tarball
 
-  The helper script resolves the matching `mlir_<os>_<arch>_*.tar.gz` asset for
+  The helper script selects the matching `mlir_<os>_<arch>_*.tar.gz` asset for
   the current machine, downloads it, and extracts the compiled binaries into a
   local prefix. This replaces the old Python wheel-based setup and only needs a
   local `python3` runtime.
 
   ```bash
   bash scripts/install-prebuilt-llvm.sh priv/llvm-prebuilt
-  export LLVM_CONFIG_PATH=$PWD/priv/llvm-prebuilt/bin/llvm-config
-  ```
-
-  To pin the latest snapshot verified by Beaver instead of auto-detecting by OS
-  and architecture:
-
-  ```bash
-  LLVM_EUDSL_ASSET_NAME=mlir_macos_arm64_20260804+eb50d8775.tar.gz \
-    bash scripts/install-prebuilt-llvm.sh priv/llvm-prebuilt
   export LLVM_CONFIG_PATH=$PWD/priv/llvm-prebuilt/bin/llvm-config
   ```
 
