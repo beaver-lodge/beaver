@@ -55,10 +55,11 @@ Zig as a local package override, so both dependency graphs use the same source.
   export LLVM_CONFIG_PATH=$PWD/priv/llvm-prebuilt/bin/llvm-config
   ```
 
-  To pin a specific asset instead of auto-detecting by OS and architecture:
+  To pin the latest snapshot verified by Beaver instead of auto-detecting by OS
+  and architecture:
 
   ```bash
-  LLVM_EUDSL_ASSET_NAME=mlir_macos_arm64_20260416+47b5ad2bd.tar.gz \
+  LLVM_EUDSL_ASSET_NAME=mlir_macos_arm64_20260804+eb50d8775.tar.gz \
     bash scripts/install-prebuilt-llvm.sh priv/llvm-prebuilt
   export LLVM_CONFIG_PATH=$PWD/priv/llvm-prebuilt/bin/llvm-config
   ```
