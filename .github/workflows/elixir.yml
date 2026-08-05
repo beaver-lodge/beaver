@@ -131,6 +131,7 @@ jobs:
         run: |
           mix profile.tprof --no-compile profile/enif_add_overhead.exs
       - name: Standalone Zig build
+        if: matrix.elixir == '1.18.0'
         run: |
           git clean -fdx
           zig build --verbose
