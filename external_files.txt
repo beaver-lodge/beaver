@@ -1,4 +1,5 @@
 native/src/*.zig
+native/src/*.txt
 build.zig
 build.zig.zon
 native/**/CMakeLists.txt

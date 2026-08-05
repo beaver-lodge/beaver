@@ -32,10 +32,14 @@ defmodule Beaver.MixProject do
           "lib/libmlir*",
           "lib/libBeaver*",
           "lib/libMLIRBeaver*",
-          "*.ex"
+          "*.ex",
+          "*.json"
         ],
         make_env: fn ->
-          %{"KINDA_SOURCE_PATH" => Map.fetch!(Mix.Project.deps_paths(), :kinda)}
+          %{
+            "KINDA_SOURCE_PATH" => Map.fetch!(Mix.Project.deps_paths(), :kinda),
+            "JASON_EBIN_PATH" => Path.join(Mix.Project.build_path(), "lib/jason/ebin")
+          }
         end,
         make_args: ~w{-j},
         make_clean: ["clean"]

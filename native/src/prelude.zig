@@ -1,7 +1,4 @@
-pub const c = @cImport({
-    @cDefine("_NO_CRT_STDIO_INLINE", "1");
-    @cInclude("mlir-c/Beaver/wrapper.h");
-});
+pub const c = @import("c_api");
 const kinda = @import("kinda");
 const e = kinda.erl_nif;
 const nifPrefix = "Elixir.Beaver.MLIR.CAPI.";

@@ -17,7 +17,8 @@ const unranked_memref_descriptor = @import("unranked_memref_descriptor.zig");
 const logical_mutex = @import("logical_mutex.zig");
 
 const rewrite_pattern = @import("rewrite_pattern.zig");
-const handwritten_nifs = @import("wrapper").nif_entries(prelude, diagnostic) ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ diagnostic.nifs ++ pointer.nifs ++ memref.nifs ++ enif_support.nifs ++ logical_mutex.nifs ++ unranked_memref_descriptor.nifs ++ rewrite_pattern.nifs;
+const capi_registry = @import("capi_registry.zig");
+const handwritten_nifs = capi_registry.nifs ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ diagnostic.nifs ++ pointer.nifs ++ memref.nifs ++ enif_support.nifs ++ logical_mutex.nifs ++ unranked_memref_descriptor.nifs ++ rewrite_pattern.nifs;
 
 const num_nifs = handwritten_nifs.len;
 export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs;
