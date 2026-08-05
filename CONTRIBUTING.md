@@ -117,7 +117,8 @@ Zig as a local package override, so both dependency graphs use the same source.
 
 ### Linux
 
-- Run CI, which generates the new GitHub release uploaded to https://github.com/beaver-lodge/beaver-prebuilt/releases.
+- Run CI, which generates the new GitHub release in https://github.com/beaver-lodge/beaver/releases.
+  Release uploads use the workflow-scoped `GITHUB_TOKEN`; no separate release token is required.
 - Update release url in [`mix.exs`](/mix.exs)
 - Run docker image to build for ARM:
   ```bash

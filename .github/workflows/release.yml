@@ -17,9 +17,12 @@ on:
 concurrency:
   group: precompiled-${{ github.ref }}
   cancel-in-progress: true
+
+permissions:
+  contents: read
+
 env:
   CADDY_VERSION: "2.11.4"
-  PRE_BUILT_RELEASE_GITHUB_TOKEN: ${{ secrets.PRE_BUILT_RELEASE_GITHUB_TOKEN }}
   # Remove after Kinda 0.11.0 is published and locked by Mix.
   KINDA_REF: "99298bc542b0634444454fc8126bd0e7050cc5e6"
 
@@ -38,6 +41,8 @@ jobs:
     needs: [generate_id]
     name: NIF ${{ matrix.job.otp }} - (${{ matrix.job.os }}) (${{ matrix.job.elixir }})
     runs-on: ${{ matrix.job.os }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -146,18 +151,16 @@ jobs:
           mix clean
           mix test --exclude vulkan --exclude todo
       - name: Publish archives and packages
-        uses: softprops/action-gh-release@v2
-        if: ${{ github.event_name != 'pull_request' && github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != '' }}
+        uses: softprops/action-gh-release@v3
+        if: ${{ github.event_name != 'pull_request' && github.repository == 'beaver-lodge/beaver' }}
         with:
           files: |
             *.tar.gz
-          repository: beaver-lodge/beaver-prebuilt
-          token: ${{ secrets.PRE_BUILT_RELEASE_GITHUB_TOKEN }}
           tag_name: ${{ needs.generate_id.outputs.formatted_date }}
       - name: Test dev compile
-        if: ${{ github.event_name != 'pull_request' && github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != '' }}
+        if: ${{ github.event_name != 'pull_request' && github.repository == 'beaver-lodge/beaver' }}
         env:
-          BEAVER_ARTEFACT_URL: "https://github.com/beaver-lodge/beaver-prebuilt/releases/download/${{ needs.generate_id.outputs.formatted_date }}/@{artefact_filename}"
+          BEAVER_ARTEFACT_URL: "https://github.com/beaver-lodge/beaver/releases/download/${{ needs.generate_id.outputs.formatted_date }}/@{artefact_filename}"
         run: |
           mix run bench/enif_add_benchmark.exs
 
@@ -165,6 +168,8 @@ jobs:
     needs: [generate_id]
     runs-on: ubuntu-latest
     name: Docker build ${{ matrix.image.suffix }}
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -237,13 +242,11 @@ jobs:
         if: ${{ matrix.image.platform == 'linux/arm64/v8' && github.event_name != 'pull_request' }}
         run: docker run --platform ${{ matrix.image.platform }} -e BEAVER_KINDA_PATH=/src/kinda -v $PWD:/src -w /src/beaver ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
       - name: Publish archives and packages
-        uses: softprops/action-gh-release@v2
-        if: ${{ github.event_name != 'pull_request' && github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != '' }}
+        uses: softprops/action-gh-release@v3
+        if: ${{ github.event_name != 'pull_request' && github.repository == 'beaver-lodge/beaver' && matrix.image.platform == 'linux/arm64/v8' }}
         with:
           files: |
             beaver/*.tar.gz
-          repository: beaver-lodge/beaver-prebuilt
-          token: ${{ secrets.PRE_BUILT_RELEASE_GITHUB_TOKEN }}
           tag_name: ${{ needs.generate_id.outputs.formatted_date }}
       - name: Build x86
         if: ${{ matrix.image.platform == 'linux/amd64' }}
