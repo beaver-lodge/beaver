@@ -10,135 +10,23 @@ defmodule Beaver.MLIR.CAPI do
   - `mlirPassManagerRunOnOp`: the MLIR pass implemented in Elixir.
   - `mlirOperationVerify`, `mlirAttributeParseGet`, `mlirTypeParseGet`, `mlirModuleCreateParse`: the diagnostic handler implemented in Elixir.
   """
-  use Kinda.CodeGen, with: Beaver.MLIR.CAPI.CodeGen, root: __MODULE__, codec: Beaver.Native
+  use Kinda.CodeGen,
+    with: Beaver.MLIR.CAPI.CodeGen,
+    root: __MODULE__,
+    raw_module: __MODULE__.Raw,
+    codec: Beaver.Native,
+    surface: :public
 
-  @on_load :load_nif
+  # Recompile the Elixir surface only when the generated C API changes. Native
+  # implementation files are tracked independently by the native build.
+  @external_resource Beaver.MLIR.CAPI.CodeGen.declaration_manifest_path()
 
-  def load_nif do
-    nif_file = ~c"#{:code.priv_dir(:beaver)}/lib/libBeaverNIF"
-    dylib = "#{nif_file}.dylib"
+  for {name, arity} <- Beaver.MLIR.CAPI.Handwritten.functions() do
+    args = Macro.generate_arguments(arity, __MODULE__)
+    call = {{:., [], [__MODULE__.Raw, name]}, [], args}
 
-    if File.exists?(dylib) do
-      dylib
-      |> Path.basename()
-      |> File.ln_s("#{nif_file}.so")
-    end
-
-    case :erlang.load_nif(nif_file, 0) do
-      :ok -> :ok
-      {:error, {:reload, _}} -> :ok
-      {:error, reason} -> IO.puts("Failed to load nif: #{inspect(reason)}")
-    end
+    def unquote(name)(unquote_splicing(args)), do: unquote(call)
   end
 
-  # setting up elixir re-compilation triggered by changes in external files
-  for path <-
-        ~w{#{Mix.Project.project_file() |> Path.dirname() |> Path.join("external_files.txt") |> File.read!()}}
-        |> Enum.flat_map(&Path.wildcard/1) do
-    @external_resource path
-  end
-
-  # stubs for hand-written NIFs
-  def beaver_raw_create_mlir_pass(
-        _ctx,
-        _name,
-        _argument,
-        _description,
-        _op_name,
-        _callbacks
-      ),
-      do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_create_mlir_rewrite_pattern(
-        _root_name,
-        _benefit,
-        _context,
-        _construct,
-        _destruct,
-        _match_and_rewrite
-      ),
-      do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_destroy_frozen_rewrite_pattern_set(_ctx, _set),
-    do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_destroy_rewrite_pattern_set(_ctx, _set),
-    do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_apply_rewrite_pattern_set_with_module(_ctx, _mod, _set, _cfg),
-    do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_apply_rewrite_pattern_set_with_op(_ctx, _op, _set, _cfg),
-    do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_run_pm_on_op_async(_pm, _op), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_destroy_pm_async(_pm), do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_callback_reply(_token, _is_success), do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_value_replace_uses_with_if(_from, _replacement, _predicate),
-    do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_registered_ops(_ctx), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_registered_dialects(_ctx), do: :erlang.nif_error(:not_loaded)
-
-  for f <- ~w{
-    StringRef
-    Attribute
-    Type
-    Operation
-    OperationSpecialized
-    OperationGeneric
-    OperationBytecode
-    Value
-    AffineMap
-    Location
-    OpPassManager
-    Identifier
-    Diagnostic
-  } do
-    f = :"beaver_raw_to_string_#{f}"
-    def unquote(f)(_), do: :erlang.nif_error(:not_loaded)
-    {f, 1}
-  end
-
-  def beaver_raw_get_string_ref(_), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_read_opaque_ptr(_, _), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_deallocate_opaque_ptr(_), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_get_null_ptr(), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_context_attach_diagnostic_handler(_, _), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_jit_invoke_with_terms(_jit, _name, _args), do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_jit_invoke_with_terms_cpu_bound(_jit, _name, _args),
-    do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_jit_invoke_with_terms_io_bound(_jit, _name, _args),
-    do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_jit_register_enif(_jit), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_enif_signatures(_ctx), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_enif_functions(), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_mlir_type_of_enif_obj(_ctx, _obj), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_string_printer_callback(), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_string_printer_flush(_sp), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_memref_type_get_strides_and_offset(_type), do: :erlang.nif_error(:not_loaded)
-  def beaver_raw_unranked_memref_descriptor_empty(_rank), do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_unranked_memref_descriptor_get_rank(_unranked_memref_descriptor),
-    do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_unranked_memref_descriptor_get_offset(_unranked_memref_descriptor),
-    do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_unranked_memref_descriptor_get_sizes(_unranked_memref_descriptor),
-    do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_unranked_memref_descriptor_get_strides(_unranked_memref_descriptor),
-    do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_unranked_memref_descriptor_deallocate_with_c(_unranked_memref_descriptor),
-    do: :erlang.nif_error(:not_loaded)
-
-  def beaver_raw_unranked_memref_descriptor_deallocate_with_enif(_unranked_memref_descriptor),
-    do: :erlang.nif_error(:not_loaded)
+  defdelegate load_nif(), to: __MODULE__.Raw
 end

@@ -2,9 +2,16 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
   use ExUnit.Case, async: true
 
   alias Beaver.MLIR.CAPI
-  alias Kinda.CodeGen.DeclarationManifest
+  alias Kinda.CodeGen.{DeclarationManifest, DeclarationSurfaces}
 
   @moduletag :smoke
+
+  test "Elixir CAPI recompilation tracks the generated ABI manifest only" do
+    expected = [CAPI.CodeGen.declaration_manifest_path()]
+
+    assert CAPI.__info__(:attributes)[:external_resource] == expected
+    assert CAPI.Raw.__info__(:attributes)[:external_resource] == expected
+  end
 
   test "declaration manifest matches the generated public and raw surfaces" do
     declaration_manifest = CAPI.CodeGen.declaration_manifest()
@@ -26,6 +33,17 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
     assert MapSet.size(expected) > 2_000
     assert MapSet.subset?(expected, raw)
     assert MapSet.subset?(expected, public)
+
+    resolved_declarations =
+      CAPI.__kinda_declaration_surfaces__()
+      |> DeclarationSurfaces.nif_decls()
+
+    generated = Enum.find(resolved_declarations, &(&1.wrapper_name == :mlirContextCreate))
+    arity = if is_list(generated.params), do: length(generated.params), else: generated.params
+
+    assert generated.nif_name != generated.wrapper_name
+    refute MapSet.member?(raw, {generated.nif_name, arity})
+    refute MapSet.member?(public, {generated.nif_name, arity})
   end
 
   test "declaration manifest preserves signature and wrapper policy metadata" do
