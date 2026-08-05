@@ -76,6 +76,9 @@ defmodule Beaver.MLIR.CAPI do
 
   def beaver_raw_callback_reply(_token, _is_success), do: :erlang.nif_error(:not_loaded)
 
+  def beaver_raw_value_replace_uses_with_if(_from, _replacement, _predicate),
+    do: :erlang.nif_error(:not_loaded)
+
   def beaver_raw_registered_ops(_ctx), do: :erlang.nif_error(:not_loaded)
   def beaver_raw_registered_dialects(_ctx), do: :erlang.nif_error(:not_loaded)
 

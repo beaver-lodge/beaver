@@ -243,6 +243,78 @@ defmodule AnalysisAndRewriteUtilitiesTest do
     end
   end
 
+  test "conditional use replacement dispatches a safe Elixir predicate", %{ctx: ctx} do
+    module =
+      MLIR.Module.create!(
+        """
+        module {
+          func.func @replace_selected_use(%arg: i32) -> i32 {
+            %replacement = arith.constant 7 : i32
+            %selected = arith.addi %arg, %replacement : i32
+            %kept = arith.subi %arg, %selected : i32
+            return %kept : i32
+          }
+        }
+        """,
+        ctx: ctx
+      )
+
+    try do
+      {func, _blocks} = func_and_blocks(module)
+
+      block =
+        func
+        |> Beaver.Walker.regions()
+        |> Enum.fetch!(0)
+        |> Beaver.Walker.blocks()
+        |> Enum.fetch!(0)
+
+      argument = MLIR.Block.get_arg!(block, 0)
+
+      [replacement, selected, kept, _return] =
+        block |> Beaver.Walker.operations() |> Enum.to_list()
+
+      replacement_value = MLIR.Operation.result(replacement, 0)
+      caller = self()
+
+      assert :ok =
+               MLIR.Value.replace_uses_with_if(argument, replacement_value, fn op_operand ->
+                 assert self() == caller
+                 assert MLIR.OpOperand.operand_number(op_operand) == 0
+                 assert MLIR.equal?(MLIR.OpOperand.value(op_operand), argument)
+                 MLIR.OpOperand.owner(op_operand) |> MLIR.Operation.name() == "arith.addi"
+               end)
+
+      [selected_lhs, _selected_rhs] = selected |> Beaver.Walker.operands() |> Enum.to_list()
+      [kept_lhs, _kept_rhs] = kept |> Beaver.Walker.operands() |> Enum.to_list()
+
+      assert MLIR.equal?(selected_lhs, replacement_value)
+      assert MLIR.equal?(kept_lhs, argument)
+    after
+      MLIR.Module.destroy(module)
+    end
+  end
+
+  test "conditional use replacement propagates predicate failures", %{ctx: ctx} do
+    module = control_flow_module(ctx)
+    {_func, [entry | _]} = func_and_blocks(module)
+    argument = MLIR.Block.get_arg!(entry, 1)
+
+    try do
+      assert_raise RuntimeError, "predicate failed", fn ->
+        MLIR.Value.replace_uses_with_if(argument, argument, fn _op_operand ->
+          raise "predicate failed"
+        end)
+      end
+
+      assert_raise ArgumentError, ~r/replacement predicate must return a boolean/, fn ->
+        MLIR.Value.replace_uses_with_if(argument, argument, fn _op_operand -> :replace end)
+      end
+    after
+      MLIR.Module.destroy(module)
+    end
+  end
+
   test "scoped insertion points restore on return and exception", %{ctx: ctx} do
     module =
       MLIR.Module.create!(
