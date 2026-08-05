@@ -1,6 +1,5 @@
 defmodule Beaver.Application do
   use Application
-  require Logger
   alias Beaver.MLIR
   @moduledoc false
   def start(_type, _args) do

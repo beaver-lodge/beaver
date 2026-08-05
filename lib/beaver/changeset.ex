@@ -304,10 +304,7 @@ defmodule Beaver.Changeset do
     # A `for` comprehension clearly expresses the transformation.
     tagged_operands =
       for %{"name" => operand_name, "kind" => kind} <- op_dump["operands"] || [] do
-        values =
-          Enum.reduce(operands, [], fn {key, values}, acc ->
-            if compare_tag(key, operand_name), do: acc ++ List.wrap(values), else: acc
-          end)
+        values = matching_operand_values(operands, operand_name)
 
         # Warn if a required single operand is missing
         if Enum.empty?(values) and kind == "Single" do
@@ -326,5 +323,11 @@ defmodule Beaver.Changeset do
     final_operands = List.flatten(all_values)
 
     {final_operands, segment_sizes}
+  end
+
+  defp matching_operand_values(operands, operand_name) do
+    Enum.reduce(operands, [], fn {key, values}, acc ->
+      if compare_tag(key, operand_name), do: acc ++ List.wrap(values), else: acc
+    end)
   end
 end

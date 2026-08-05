@@ -5,8 +5,6 @@ defmodule TestTOSAPatterns do
   alias MLIR.Type
   alias MLIR.Dialect.{Func, TOSA}
   require Func
-  require TOSA
-  require Type
 
   def gen_ir_module(ctx) do
     mlir ctx: ctx do

@@ -6,7 +6,6 @@ defmodule Beaver.MLIR.Operation do
   alias __MODULE__.State
   alias Beaver.Changeset
   import Beaver.MLIR.CAPI
-  require Logger
   @behaviour Access
 
   use Kinda.ResourceKind, forward_module: Beaver.Native

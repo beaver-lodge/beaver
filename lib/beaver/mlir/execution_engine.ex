@@ -40,8 +40,6 @@ defmodule Beaver.MLIR.ExecutionEngine do
       |> Enum.map(&MLIR.StringRef.create/1)
       |> Beaver.Native.array(MLIR.StringRef)
 
-    require MLIR.Context
-
     {jit, diagnostics} =
       mlirExecutionEngineCreateWithDiagnostics(
         MLIR.context(module),

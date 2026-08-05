@@ -99,8 +99,6 @@ defmodule MlirTest do
   end
 
   test "elixir dialect" do
-    require MLIR.Context
-
     ctx = MLIR.Context.create()
 
     # This api might trigger NDEBUG assert, so run it more

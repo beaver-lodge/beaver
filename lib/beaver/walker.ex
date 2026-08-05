@@ -13,7 +13,6 @@ alias Beaver.MLIR.{
 }
 
 defmodule Beaver.Walker do
-  require Beaver.Pattern
   alias Beaver.MLIR.CAPI
   alias __MODULE__.OpReplacement
   @behaviour Access
@@ -594,12 +593,7 @@ defmodule Beaver.Walker do
         when is_function(get_element, 2) do
       case count(walker) do
         {:ok, count} ->
-          {:ok, count,
-           fn start, length, step ->
-             for pos <- start..(start + length - 1)//step do
-               get_element.(container, pos)
-             end
-           end}
+          {:ok, count, slicing_fun(container, get_element)}
 
         error ->
           error
@@ -609,6 +603,14 @@ defmodule Beaver.Walker do
     def slice(%Beaver.Walker{get_first: get_first, get_next: get_next})
         when is_function(get_first, 1) and is_function(get_next, 1) do
       {:error, __MODULE__}
+    end
+
+    defp slicing_fun(container, get_element) do
+      fn start, length, step ->
+        for pos <- start..(start + length - 1)//step do
+          get_element.(container, pos)
+        end
+      end
     end
 
     @spec reduce(Beaver.Walker.t(), Enumerable.acc(), Enumerable.reducer()) :: Enumerable.result()

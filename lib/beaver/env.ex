@@ -59,7 +59,15 @@ defmodule Beaver.Env do
   """
   defmacro block() do
     quote do
-      Beaver.Env.ip() |> MLIR.InsertionPoint.to_block() || Beaver.not_found(__ENV__)
+      Beaver.Env.block_from_insertion_point(Beaver.Env.ip(), __ENV__)
+    end
+  end
+
+  @doc false
+  def block_from_insertion_point(ip, %Macro.Env{} = env) do
+    case MLIR.InsertionPoint.to_block(ip) do
+      nil -> Beaver.not_found(env)
+      block -> block
     end
   end
 
