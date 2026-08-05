@@ -33,7 +33,8 @@ defmodule Beaver.MixProject do
           "lib/libBeaver*",
           "lib/libMLIRBeaver*",
           "*.ex",
-          "*.json"
+          "*.json",
+          "generated/ods_dump.json"
         ],
         make_env: fn ->
           %{

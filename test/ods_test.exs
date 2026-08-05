@@ -18,6 +18,20 @@ defmodule ODSDumpTest do
     assert {:error, "failed to find ODS dump of \"???\""} = MLIR.ODS.Dump.lookup("???")
   end
 
+  test "loads the canonical JSON dump lazily" do
+    dump_path = Application.app_dir(:beaver, "priv/generated/ods_dump.json")
+    priv_dir = Application.app_dir(:beaver, "priv")
+
+    archived_priv_paths =
+      Mix.Project.config()[:make_precompiler_priv_paths]
+      |> Enum.flat_map(&Path.wildcard(Path.join(priv_dir, &1)))
+
+    assert MLIR.ODS.Dump.__info__(:attributes)[:external_resource] == [dump_path]
+    assert dump_path in archived_priv_paths
+    assert :ok = MLIR.ODS.Dump.clear_cache()
+    assert {:ok, %{"name" => "affine.for"}} = MLIR.ODS.Dump.lookup("affine.for")
+  end
+
   test "tagged operands", %{ctx: ctx} do
     mlir ctx: ctx do
       module do

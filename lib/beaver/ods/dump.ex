@@ -3,57 +3,80 @@ defmodule Beaver.MLIR.ODS.Dump do
   This module provides functionality for working with MLIR ODS (Operation Definition Specification) dumps.
   It allows looking up operation definitions by name and generating documentation for them.
 
-  The module loads ODS dump data at compile time and provides functions to:
+  The module loads ODS dump data on demand and provides functions to:
   - Look up operations by their fully qualified names (e.g. "affine.for")
   - Generate documentation for operations including their attributes, operands, and results
   - Check if an operation supports result type inference
 
   Operations can be looked up using `lookup/1`, and documentation can be generated using `gen_doc/1`.
   """
-  @dump Application.app_dir(:beaver)
-        |> Path.join("priv/ods_dump.ex")
-        |> File.read!()
-        |> Code.eval_string()
-        |> elem(0)
+  @cache_key {__MODULE__, :operations}
+  @external_resource Application.app_dir(:beaver, "priv/generated/ods_dump.json")
 
-  @dialects @dump
-            |> Enum.flat_map(fn {"dialects", dialects} ->
-              dialects
-            end)
+  @on_load :clear_cache
+
+  @doc false
+  def clear_cache do
+    :persistent_term.erase(@cache_key)
+    :ok
+  end
+
   @doc """
   Lookup an operation by name (e.g. "affine.for").
   """
-  for %{"operations" => operations} <- @dialects do
-    for %{"name" => name} = op <- operations do
-      operands = op["operands"] || []
-      # Transform empty operand names to sequential names (arg0, arg1, etc.)
-      {operands, _} =
-        Enum.map_reduce(operands, 0, fn operand, index ->
-          if operand["name"] == "" do
-            {Map.put(operand, "name", "arg#{index}"), index + 1}
-          else
-            {operand, index}
-          end
-        end)
-
-      duplicates =
-        Enum.map(operands, & &1["name"])
-        |> Enum.group_by(& &1)
-        |> Enum.filter(fn {_k, v} -> length(v) > 1 end)
-        |> Enum.map(fn {k, _v} -> k end)
-
-      if duplicates != [] do
-        raise "Duplicate operand names found in ODS dump for operation '#{name}': #{inspect(duplicates)}"
-      end
-
-      def lookup(unquote(name)) do
-        {:ok, unquote(Macro.escape(op))}
-      end
+  def lookup(op) do
+    case Map.fetch(operations(), op) do
+      {:ok, found} -> {:ok, found}
+      :error -> {:error, "failed to find ODS dump of #{inspect(op)}"}
     end
   end
 
-  def lookup(op) do
-    {:error, "failed to find ODS dump of #{inspect(op)}"}
+  defp operations do
+    case :persistent_term.get(@cache_key, :not_loaded) do
+      :not_loaded -> load_operations()
+      operations -> operations
+    end
+  end
+
+  defp load_operations do
+    operations =
+      :beaver
+      |> Application.app_dir("priv/generated/ods_dump.json")
+      |> File.read!()
+      |> Jason.decode!()
+      |> Map.fetch!("dialects")
+      |> Enum.flat_map(&Map.fetch!(&1, "operations"))
+      |> Map.new(fn %{"name" => name} = op ->
+        validate_operand_names!(op)
+        {name, op}
+      end)
+
+    :persistent_term.put(@cache_key, operations)
+    operations
+  end
+
+  defp validate_operand_names!(%{"name" => name} = op) do
+    # Give anonymous operands temporary sequential names so multiple anonymous
+    # operands are not mistaken for duplicate named operands.
+    {operands, _} =
+      Enum.map_reduce(op["operands"] || [], 0, fn operand, index ->
+        if operand["name"] == "" do
+          {Map.put(operand, "name", "arg#{index}"), index + 1}
+        else
+          {operand, index}
+        end
+      end)
+
+    duplicates =
+      operands
+      |> Enum.map(& &1["name"])
+      |> Enum.frequencies()
+      |> Enum.filter(fn {_operand_name, count} -> count > 1 end)
+      |> Enum.map(&elem(&1, 0))
+
+    if duplicates != [] do
+      raise "Duplicate operand names found in ODS dump for operation '#{name}': #{inspect(duplicates)}"
+    end
   end
 
   defp fmt_constraint(constraint) do
