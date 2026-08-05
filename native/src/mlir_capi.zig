@@ -3,7 +3,7 @@ const kinda = @import("kinda");
 const e = kinda.erl_nif;
 const beam = kinda.beam;
 const string_ref = @import("string_ref.zig");
-pub const root_module = "Elixir.Beaver.MLIR.CAPI";
+pub const root_module = "Elixir.Beaver.MLIR.CAPI.Raw";
 fn NativeKind(comptime t: type, comptime n: []const u8) type {
     const nativeModPrefix = "Elixir.Beaver.Native.";
     return kinda.ResourceKind(t, nativeModPrefix ++ n);

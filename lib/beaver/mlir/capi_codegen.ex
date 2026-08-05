@@ -132,10 +132,15 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
       ) ++ [%KindDecl{module_name: Beaver.Printer, kind_functions: [make: 0]}]
   end
 
-  @impl Kinda.CodeGen
-  def declaration_manifest do
+  @doc false
+  def declaration_manifest_path do
     Application.app_dir(:beaver)
     |> Path.join("priv/capi_manifest.json")
+  end
+
+  @impl Kinda.CodeGen
+  def declaration_manifest do
+    declaration_manifest_path()
     |> DeclarationManifest.load!()
   end
 end

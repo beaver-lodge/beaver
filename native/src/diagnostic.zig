@@ -73,7 +73,6 @@ pub fn call_with_diagnostics(env: beam.env, ctx: mlir_capi.Context.T, f: anytype
 
 pub fn WithDiagnosticsNIF(comptime name: anytype) e.ErlNifFunc {
     const bang = kinda.BangFunc(@import("prelude.zig").allKinds, c, name);
-    const nifPrefix = "Elixir.Beaver.MLIR.CAPI.";
     const nifSuffix = "WithDiagnostics";
     const AttachAndRun = struct {
         fn with_diagnostics(env: beam.env, n: c_int, args: [*c]const beam.term) !beam.term {
@@ -81,7 +80,7 @@ pub fn WithDiagnosticsNIF(comptime name: anytype) e.ErlNifFunc {
             return call_with_diagnostics(env, ctx, bang.nif, .{ env, n - 1, args[1..] });
         }
     };
-    return result.nif(nifPrefix ++ name ++ nifSuffix, 1 + bang.arity, AttachAndRun.with_diagnostics).entry;
+    return result.nif(name ++ nifSuffix, 1 + bang.arity, AttachAndRun.with_diagnostics).entry;
 }
 
 pub const nifs = .{};

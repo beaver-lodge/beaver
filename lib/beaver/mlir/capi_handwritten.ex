@@ -1,0 +1,56 @@
+defmodule Beaver.MLIR.CAPI.Handwritten do
+  @moduledoc false
+
+  @functions [
+    beaver_raw_apply_rewrite_pattern_set_with_module: 4,
+    beaver_raw_apply_rewrite_pattern_set_with_op: 4,
+    beaver_raw_callback_reply: 2,
+    beaver_raw_context_attach_diagnostic_handler: 2,
+    beaver_raw_create_mlir_pass: 6,
+    beaver_raw_create_mlir_rewrite_pattern: 6,
+    beaver_raw_deallocate_opaque_ptr: 1,
+    beaver_raw_destroy_frozen_rewrite_pattern_set: 2,
+    beaver_raw_destroy_pm_async: 1,
+    beaver_raw_destroy_rewrite_pattern_set: 2,
+    beaver_raw_enif_functions: 0,
+    beaver_raw_enif_signatures: 1,
+    beaver_raw_get_null_ptr: 0,
+    beaver_raw_get_string_ref: 1,
+    beaver_raw_jit_invoke_with_terms: 3,
+    beaver_raw_jit_invoke_with_terms_cpu_bound: 3,
+    beaver_raw_jit_invoke_with_terms_io_bound: 3,
+    beaver_raw_jit_register_enif: 1,
+    beaver_raw_memref_type_get_strides_and_offset: 1,
+    beaver_raw_mlir_type_of_enif_obj: 2,
+    beaver_raw_read_opaque_ptr: 2,
+    beaver_raw_registered_dialects: 1,
+    beaver_raw_registered_ops: 1,
+    beaver_raw_run_pm_on_op_async: 2,
+    beaver_raw_string_printer_callback: 0,
+    beaver_raw_string_printer_flush: 1,
+    beaver_raw_to_string_AffineMap: 1,
+    beaver_raw_to_string_Attribute: 1,
+    beaver_raw_to_string_Diagnostic: 1,
+    beaver_raw_to_string_Identifier: 1,
+    beaver_raw_to_string_Location: 1,
+    beaver_raw_to_string_OpPassManager: 1,
+    beaver_raw_to_string_Operation: 1,
+    beaver_raw_to_string_OperationBytecode: 1,
+    beaver_raw_to_string_OperationGeneric: 1,
+    beaver_raw_to_string_OperationSpecialized: 1,
+    beaver_raw_to_string_StringRef: 1,
+    beaver_raw_to_string_Type: 1,
+    beaver_raw_to_string_Value: 1,
+    beaver_raw_unranked_memref_descriptor_deallocate_with_c: 1,
+    beaver_raw_unranked_memref_descriptor_deallocate_with_enif: 1,
+    beaver_raw_unranked_memref_descriptor_empty: 1,
+    beaver_raw_unranked_memref_descriptor_get_offset: 1,
+    beaver_raw_unranked_memref_descriptor_get_rank: 1,
+    beaver_raw_unranked_memref_descriptor_get_sizes: 1,
+    beaver_raw_unranked_memref_descriptor_get_strides: 1,
+    beaver_raw_value_replace_uses_with_if: 3
+  ]
+
+  @doc false
+  def functions, do: @functions
+end
