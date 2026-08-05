@@ -23,6 +23,11 @@ on:
 permissions:
   contents: read
 
+# Remove this paired ref after Kinda 0.11.0 is published; Mix will then use the
+# locked Hex dependency without a separate checkout.
+env:
+  KINDA_REF: "a595f26b67fa3e491add0b4008a4cae63d2eb02e"
+
 concurrency:
   group: build-and-test-${{ github.ref }}-${{ inputs.llvm_prebuilt_asset_name || 'auto' }}
   cancel-in-progress: true
@@ -47,23 +52,15 @@ jobs:
             otp: "27.0.1"
             elixir: "1.17.2"
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         name: Check-out beaver
-      - uses: actions/checkout@v3
-        name: Check-out kinda
+      - uses: actions/checkout@v4
+        name: Check out paired Kinda
         with:
           repository: beaver-lodge/kinda
           path: kinda
-      - run: mv kinda ..
-      - uses: actions/checkout@v3
-        name: Check-out Kinda
-        if: contains(github.event.pull_request.labels.*.name, 'checkout_kinda')
-        with:
-          repository: beaver-lodge/kinda
-          path: kinda_local
-          ref: remove-meta
-      - run: echo "BEAVER_KINDA_PATH=${PWD}/kinda_local" >> $GITHUB_ENV
-        if: contains(github.event.pull_request.labels.*.name, 'checkout_kinda')
+          ref: ${{ env.KINDA_REF }}
+      - run: echo "BEAVER_KINDA_PATH=${GITHUB_WORKSPACE}/kinda" >> "$GITHUB_ENV"
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp}}
@@ -89,7 +86,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: deps
-          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+          key: ${{ runner.os }}-mix-${{ env.KINDA_REF }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-
       - name: Install dependencies
         run: mix deps.get
@@ -113,7 +110,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt install -y gdb
-          bash ../kinda/scripts/gdb.sh test --trace
+          bash "$BEAVER_KINDA_PATH/scripts/gdb.sh" test --trace
       - name: Check formatting of Elixir
         if: matrix.elixir != '1.14.0'
         env:
@@ -128,7 +125,7 @@ jobs:
           mix
           mix credo
           mix elixir_make.checksum --only-local --ignore-unavailable --print
-          mix hex.build
+          env -u BEAVER_KINDA_PATH mix hex.build
       - name: Run overhead profiling
         if: matrix.otp == '27.0.1'
         run: |

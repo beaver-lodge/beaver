@@ -19,6 +19,8 @@ concurrency:
   cancel-in-progress: true
 env:
   PRE_BUILT_RELEASE_GITHUB_TOKEN: ${{ secrets.PRE_BUILT_RELEASE_GITHUB_TOKEN }}
+  # Remove after Kinda 0.11.0 is published and locked by Mix.
+  KINDA_REF: "a595f26b67fa3e491add0b4008a4cae63d2eb02e"
 
 jobs:
   generate_id:
@@ -44,23 +46,15 @@ jobs:
           - { otp: 25, os: macos-15, elixir: 1.14 }
           - { otp: 26, os: macos-15, elixir: 1.15 }
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         name: Check-out beaver
-      - uses: actions/checkout@v3
-        name: Check-out kinda
+      - uses: actions/checkout@v4
+        name: Check out paired Kinda
         with:
           repository: beaver-lodge/kinda
           path: kinda
-      - run: mv kinda ..
-      - uses: actions/checkout@v3
-        name: Check-out Kinda
-        if: contains(github.event.pull_request.labels.*.name, 'checkout_kinda')
-        with:
-          repository: beaver-lodge/kinda
-          path: kinda_local
-          ref: remove-meta
-      - run: echo "BEAVER_KINDA_PATH=${PWD}/kinda_local" >> $GITHUB_ENV
-        if: contains(github.event.pull_request.labels.*.name, 'checkout_kinda')
+          ref: ${{ env.KINDA_REF }}
+      - run: echo "BEAVER_KINDA_PATH=${GITHUB_WORKSPACE}/kinda" >> "$GITHUB_ENV"
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
         with:
@@ -86,7 +80,7 @@ jobs:
         uses: actions/cache@v3
         with:
           path: deps
-          key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+          key: ${{ runner.os }}-mix-${{ env.KINDA_REF }}-${{ hashFiles('**/mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-
       - name: Install dependencies
         run: mix deps.get
@@ -177,23 +171,24 @@ jobs:
           file: docker/livebook.dockerfile
           build-args: |
             ZIG_URL=${{ matrix.image.zig }}
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
         name: Check-out beaver
         with:
           repository: beaver-lodge/beaver
           path: beaver
-      - uses: actions/checkout@v3
-        name: Check-out kinda
+      - uses: actions/checkout@v4
+        name: Check out paired Kinda
         with:
           repository: beaver-lodge/kinda
           path: kinda
+          ref: ${{ env.KINDA_REF }}
       - name: Strip dev suffix
         working-directory: beaver
         run: sed -i 's/-dev//g' mix.exs
       - name: Build ARM
         continue-on-error: true
         if: ${{ matrix.image.platform == 'linux/arm64/v8' }}
-        run: docker run --platform ${{ matrix.image.platform }} -v $PWD:/src -w /src/beaver ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
+        run: docker run --platform ${{ matrix.image.platform }} -e BEAVER_KINDA_PATH=/src/kinda -v $PWD:/src -w /src/beaver ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
       - name: Publish archives and packages
         uses: softprops/action-gh-release@v2
         if: ${{ github.repository == 'beaver-lodge/beaver' && env.PRE_BUILT_RELEASE_GITHUB_TOKEN != null }}
@@ -205,4 +200,4 @@ jobs:
           tag_name: ${{ needs.generate_id.outputs.formatted_date }}
       - name: Build x86
         if: ${{ matrix.image.platform == 'linux/amd64' }}
-        run: docker run -v $PWD:/src -w /src/beaver ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
+        run: docker run -e BEAVER_KINDA_PATH=/src/kinda -v $PWD:/src -w /src/beaver ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh

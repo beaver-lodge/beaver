@@ -34,6 +34,9 @@ defmodule Beaver.MixProject do
           "lib/libMLIRBeaver*",
           "*.ex"
         ],
+        make_env: fn ->
+          %{"KINDA_SOURCE_PATH" => Map.fetch!(Mix.Project.deps_paths(), :kinda)}
+        end,
         make_args: ~w{-j},
         make_clean: ["clean"]
       ]
@@ -126,13 +129,18 @@ defmodule Beaver.MixProject do
   end
 
   defp kinda_dep do
-    local_kinda =
-      System.get_env("BEAVER_KINDA_PATH") || Path.expand("../kinda", __DIR__)
+    case System.get_env("BEAVER_KINDA_PATH") do
+      nil ->
+        {:kinda, "~> 0.11.0"}
 
-    unless File.dir?(local_kinda) do
-      raise "current Kinda checkout not found at #{local_kinda}; set BEAVER_KINDA_PATH"
+      path ->
+        local_kinda = Path.expand(path)
+
+        unless File.dir?(local_kinda) do
+          raise "Kinda checkout not found at #{local_kinda}"
+        end
+
+        {:kinda, path: local_kinda}
     end
-
-    {:kinda, path: local_kinda}
   end
 end

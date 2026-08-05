@@ -37,3 +37,4 @@ beaver-*.tar.gz.sha256
 .zig-cache
 zig-out
 /priv/
+/zig-pkg/

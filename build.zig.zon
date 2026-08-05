@@ -2,9 +2,11 @@
     .name = .beaver,
     .version = "0.0.1",
     .fingerprint = 0xd04bfcb952b135d6,
+    .minimum_zig_version = "0.16.0",
     .dependencies = .{
         .kinda = .{
-            .path = "../kinda",
+            .url = "https://codeload.github.com/beaver-lodge/kinda/tar.gz/a595f26b67fa3e491add0b4008a4cae63d2eb02e",
+            .hash = "kinda-0.11.0-dev-ghcZCdMPAQC9KAU-Gw904vr9RukeC3G-2WBpSZFyF-7p",
         },
     },
     .paths = .{""},

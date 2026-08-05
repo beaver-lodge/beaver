@@ -27,12 +27,19 @@ Bindings are the part that provides the interface to the MLIR CAPIs. It is imple
 
 1. Install Elixir, [see installation guide](https://elixir-lang.org/install.html)
 2. Install Zig, [see installation guide](https://ziglang.org/learn/getting-started/#installing-zig)
-3. Clone this repo and `kinda` in the same directory
+3. Clone this repo. To iterate on Beaver and Kinda together, clone both and
+   point Beaver at the Kinda checkout explicitly:
 
 ```bash
 git clone https://github.com/beaver-lodge/beaver.git
 git clone https://github.com/beaver-lodge/kinda.git
+cd beaver
+export BEAVER_KINDA_PATH=../kinda
 ```
+
+Without `BEAVER_KINDA_PATH`, Mix uses the released Kinda version from
+`mix.lock`. During native builds, Beaver passes that resolved Mix dependency to
+Zig as a local package override, so both dependency graphs use the same source.
 
 4. Install LLVM/MLIR
 
