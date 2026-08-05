@@ -8,7 +8,9 @@ RUN apt-get upgrade -y \
   && rm -rf /var/lib/apt/lists/*
 # LLVM
 COPY ./scripts/install-prebuilt-llvm.sh /usr/local/bin/install-prebuilt-llvm.sh
-RUN bash /usr/local/bin/install-prebuilt-llvm.sh /usr/local/mlir
+ARG LLVM_EUDSL_ASSET_NAME
+RUN LLVM_EUDSL_ASSET_NAME="${LLVM_EUDSL_ASSET_NAME}" \
+  bash /usr/local/bin/install-prebuilt-llvm.sh /usr/local/mlir
 ENV LLVM_CONFIG_PATH=/usr/local/mlir/bin/llvm-config
 ENV PATH=/usr/local/mlir/bin:${PATH}
 RUN llvm-config --version

@@ -65,7 +65,9 @@ detect_platform() {
 }
 
 if [[ -z "${asset_name}" ]]; then
-  read -r asset_os asset_arch < <(detect_platform)
+  read -r detected_asset_os detected_asset_arch < <(detect_platform)
+  asset_os="${LLVM_EUDSL_ASSET_OS:-${detected_asset_os}}"
+  asset_arch="${LLVM_EUDSL_ASSET_ARCH:-${detected_asset_arch}}"
   asset_name="$(
     REPO="${repo}" \
     TAG="${tag}" \

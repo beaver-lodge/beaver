@@ -141,14 +141,29 @@ jobs:
           - {
               platform: "linux/arm64/v8",
               suffix: "arm64",
+              llvm_arch: "aarch64",
               zig: "https://ziglang.org/download/0.16.0/zig-aarch64-linux-0.16.0.tar.xz"
             }
           - {
               platform: "linux/amd64",
               suffix: "amd64",
+              llvm_arch: "x86_64",
               zig: "https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz"
             }
     steps:
+      - uses: actions/checkout@v4
+        name: Check out workflow source
+        with:
+          path: workflow-source
+      - name: Resolve prebuilt LLVM asset
+        id: llvm
+        working-directory: workflow-source
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          LLVM_EUDSL_ASSET_ARCH: ${{ matrix.image.llvm_arch }}
+          LLVM_EUDSL_ASSET_OS: manylinux
+          LLVM_EUDSL_RESOLVE_ONLY: 1
+        run: bash scripts/install-prebuilt-llvm.sh >> "$GITHUB_OUTPUT"
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -170,6 +185,7 @@ jobs:
             ${{ matrix.image.platform }}
           file: docker/livebook.dockerfile
           build-args: |
+            LLVM_EUDSL_ASSET_NAME=${{ steps.llvm.outputs.LLVM_PREBUILT_ASSET_NAME }}
             ZIG_URL=${{ matrix.image.zig }}
       - uses: actions/checkout@v4
         name: Check-out beaver
