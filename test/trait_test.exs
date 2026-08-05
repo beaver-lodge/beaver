@@ -2,7 +2,6 @@ defmodule TraitTest do
   use Beaver.Case, async: true
   use Beaver
   alias Beaver.MLIR.Dialect.Func
-  require Func
   @moduletag :smoke
 
   test "terminator?", %{ctx: ctx} do

@@ -75,11 +75,11 @@ defmodule Beaver.MLIR.Attribute do
   defp string_elements?(elements) do
     (Enum.all?(elements, &is_binary/1) or
        Enum.all?(elements, &match?(%MLIR.StringRef{}, &1))) and
-      length(elements) > 0
+      not Enum.empty?(elements)
   end
 
   defp attr_elements?(elements) do
-    Enum.all?(elements, &match?(%MLIR.Attribute{}, &1)) and length(elements) > 0
+    Enum.all?(elements, &match?(%MLIR.Attribute{}, &1)) and not Enum.empty?(elements)
   end
 
   defp int_dense_elements_attr_getter(element_type) do

@@ -1,6 +1,5 @@
 defmodule Beaver do
   alias Beaver.MLIR
-  require Beaver.Env
 
   @moduledoc """
   This module contains top level functions and macros for Beaver DSL for MLIR.
@@ -140,6 +139,13 @@ defmodule Beaver do
   end
 
   @doc false
+  def append_block_to_region(%MLIR.Region{} = region, %MLIR.Block{} = block) do
+    MLIR.CAPI.mlirRegionAppendOwnedBlock(region, block)
+  end
+
+  def append_block_to_region(_region, _block), do: :ok
+
+  @doc false
   def parent_scope_ip_caching(caller) do
     suppress_warning = quote(do: _ = Kernel.var!(beaver_internal_env_ip))
 
@@ -186,7 +192,6 @@ defmodule Beaver do
   """
   defmacro block(call, do: body) do
     {b_name, args} = Macro.decompose_call(call)
-    if not is_atom(b_name), do: raise("block name must be an atom or underscore")
     {ip_cache, ip_restore} = parent_scope_ip_caching(__CALLER__)
 
     quote do
@@ -196,9 +201,7 @@ defmodule Beaver do
         beaver_internal_current_ip =
         Beaver.Env.block(unquote({b_name, [], nil})) |> unquote(add_arguments(args))
 
-      with region = %Beaver.MLIR.Region{} <- Beaver.Env.region() do
-        Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, Beaver.Env.block())
-      end
+      Beaver.append_block_to_region(Beaver.Env.region(), Beaver.Env.block())
 
       unquote_splicing(arguments_variables(args))
       unquote(body)

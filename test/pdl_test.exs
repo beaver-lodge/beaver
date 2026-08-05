@@ -2,13 +2,8 @@ defmodule PDLTest do
   use Beaver.Case, async: true
   use Beaver
   alias Beaver.MLIR
-  alias MLIR.Type
   import MLIR.CAPI
-  alias MLIR.Dialect.{Func, TOSA}
   import MLIR.Transform
-  require Func
-  require TOSA
-  require Type
 
   @moduletag :pdl
 

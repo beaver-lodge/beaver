@@ -1,7 +1,6 @@
 defmodule MutCompiler do
   @moduledoc false
   use Beaver
-  require Beaver.MLIR
   alias Beaver.MLIR.Dialect.{Func, Arith, CF}
   require Func
 

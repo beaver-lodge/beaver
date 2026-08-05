@@ -207,17 +207,7 @@ defmodule Beaver.MLIR.Pass.Server do
     this = self()
 
     Registry.dispatch(MLIR.Pass.registry(), from_id, fn entries ->
-      for from <- entries do
-        {from_pid, nil} = from
-
-        if from_pid == this do
-          {:via, Registry, {MLIR.Pass.registry(), id}}
-          |> MLIR.Pass.start_worker(:started_by_clone)
-          |> GenServer.cast({:clone, token_ref, clone_fun, state})
-        else
-          Logger.error("non-owner is requested clone")
-        end
-      end
+      clone_from_owner(entries, this, id, token_ref, clone_fun, state)
     end)
 
     {:noreply, state}
@@ -254,5 +244,17 @@ defmodule Beaver.MLIR.Pass.Server do
         MLIR.CAPI.beaver_raw_logical_mutex_signal(token_ref, false)
         {:stop, :normal, nil}
     end
+  end
+
+  defp clone_from_owner(entries, owner, id, token_ref, clone_fun, state) do
+    Enum.each(entries, fn {from_pid, nil} ->
+      if from_pid == owner do
+        {:via, Registry, {MLIR.Pass.registry(), id}}
+        |> MLIR.Pass.start_worker(:started_by_clone)
+        |> GenServer.cast({:clone, token_ref, clone_fun, state})
+      else
+        Logger.error("non-owner is requested clone")
+      end
+    end)
   end
 end

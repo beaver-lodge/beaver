@@ -13,17 +13,17 @@ defmodule Beaver.Native do
     }
   end
 
+  def opaque_ptr(%__MODULE__.Array{} = array) do
+    array
+    |> __MODULE__.Array.as_opaque()
+  end
+
   def opaque_ptr(%mod{ref: ref}) do
     maker = Module.concat([mod, :opaque_ptr])
 
     %__MODULE__.OpaquePtr{
       ref: apply(CAPI, maker, [ref]) |> check!()
     }
-  end
-
-  def opaque_ptr(%__MODULE__.Array{} = array) do
-    array
-    |> __MODULE__.Array.as_opaque()
   end
 
   def array(data, module, opts \\ [mut: false])

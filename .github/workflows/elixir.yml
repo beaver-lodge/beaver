@@ -51,6 +51,9 @@ jobs:
           - runs-on: "ubuntu-22.04"
             otp: "27.0.1"
             elixir: "1.17.2"
+          - runs-on: "ubuntu-22.04"
+            otp: "27.3"
+            elixir: "1.20.3"
     steps:
       - uses: actions/checkout@v4
         name: Check-out beaver
@@ -102,6 +105,12 @@ jobs:
           MIX_ENV: test
         run: |
           mix compile.elixir_make
+      - name: Reject compiler warnings
+        if: matrix.elixir == '1.20.3'
+        env:
+          MIX_ENV: test
+        run: |
+          mix compile --force --warnings-as-errors
       - name: Run smoke tests
         run: |
           mix test --force --only smoke
@@ -112,14 +121,18 @@ jobs:
           sudo apt install -y gdb
           bash "$BEAVER_KINDA_PATH/scripts/gdb.sh" test --trace
       - name: Check formatting of Elixir
-        if: matrix.elixir != '1.14.0'
+        if: matrix.elixir == '1.20.3'
         env:
           MIX_ENV: test
         run: |
           mix format --check-formatted
       - name: Run tests
         run: |
-          mix test --exclude vulkan --exclude todo
+          if [[ "${{ matrix.elixir }}" == "1.20.3" ]]; then
+            mix test --warnings-as-errors --exclude vulkan --exclude todo
+          else
+            mix test --exclude vulkan --exclude todo
+          fi
       - name: Run dev build
         run: |
           mix
@@ -131,7 +144,7 @@ jobs:
         run: |
           mix profile.tprof --no-compile profile/enif_add_overhead.exs
       - name: Standalone Zig build
-        if: matrix.elixir == '1.18.0'
+        if: matrix.elixir == '1.20.3'
         run: |
           git clean -fdx
           zig build --verbose

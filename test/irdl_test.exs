@@ -44,9 +44,7 @@ defmodule IRDLTest do
 
   test "cmath dialect", %{ctx: ctx} do
     use Beaver
-    alias Beaver.MLIR.Dialect.Func
     alias Beaver.MLIR.Type
-    require Func
 
     CMath.__slang_dialect__(ctx) |> MLIR.verify!()
     Beaver.Slang.load(ctx, CMath)
