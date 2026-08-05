@@ -6,7 +6,6 @@ pub const c = @import("prelude.zig").c;
 const kinda = @import("kinda");
 const e = kinda.erl_nif;
 const beam = kinda.beam;
-const MutexToken = @import("logical_mutex.zig").Token;
 const result = @import("kinda").result;
 const PrinterNIF = @import("string_ref.zig").PrinterNIF;
 

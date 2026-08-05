@@ -7,91 +7,49 @@ const e = kinda.erl_nif;
 const beam = kinda.beam;
 const diagnostic = @import("diagnostic.zig");
 const callback_names = .{ "construct", "destruct", "initialize", "clone", "run" };
+const RuntimeDispatcher = kinda.callback_runtime.Dispatcher(callback_names);
 const string_ref = @import("string_ref.zig");
 
 threadlocal var typeIDAllocator: ?mlir_capi.TypeIDAllocator.T = null;
 const CallbackDispatcher = struct {
-    handler: beam.pid,
-    env: beam.env,
-    id: beam.term,
-    callbacks: struct { construct: ?beam.term = null, destruct: ?beam.term = null, initialize: ?beam.term = null, clone: ?beam.term = null, run: ?beam.term = null },
     fn construct(userData: ?*anyopaque) callconv(.c) void {
-        const this: *@This() = @ptrCast(@alignCast(userData));
+        const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
         const temp_env = e.enif_alloc_env() orelse unreachable;
-        const res = forward_cb_and_consume_env(this, "construct", temp_env, .{}) catch unreachable;
-        if (c.beaverLogicalResultIsFailure(res)) @panic("Fail to construct a pass implemented in Elixir");
+        const response = this.invoke("construct", temp_env, .{}) catch unreachable;
+        if (!response.success) @panic("Fail to construct a pass implemented in Elixir");
     }
     fn destruct(userData: ?*anyopaque) callconv(.c) void {
-        const this: *@This() = @ptrCast(@alignCast(userData));
+        const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
         const temp_env = e.enif_alloc_env() orelse unreachable;
-        const res = forward_cb_and_consume_env(this, "destruct", temp_env, .{}) catch unreachable;
-        if (c.beaverLogicalResultIsFailure(res)) @panic("Fail to destruct a pass implemented in Elixir");
-        e.enif_free_env(this.env);
-        beam.allocator.destroy(this);
+        const response = this.invoke("destruct", temp_env, .{}) catch unreachable;
+        if (!response.success) @panic("Fail to destruct a pass implemented in Elixir");
+        this.deinit();
     }
     fn initialize(ctx: mlir_capi.Context.T, userData: ?*anyopaque) callconv(.c) mlir_capi.LogicalResult.T {
-        const this: *@This() = @ptrCast(@alignCast(userData));
+        const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
         const temp_env = e.enif_alloc_env() orelse unreachable;
-        const res = forward_cb_and_consume_env(this, "initialize", temp_env, .{mlir_capi.Context.resource.make_kind(temp_env, ctx) catch unreachable}) catch return c.mlirLogicalResultFailure();
-        if (c.beaverLogicalResultIsFailure(res)) {
+        const response = this.invoke("initialize", temp_env, .{mlir_capi.Context.resource.make_kind(temp_env, ctx) catch unreachable}) catch return c.mlirLogicalResultFailure();
+        if (!response.success) {
             const loc = c.mlirLocationUnknownGet(ctx);
             c.mlirEmitError(loc, "Fail to initialize a pass implemented in Elixir");
+            return c.mlirLogicalResultFailure();
         }
-        return res;
+        return c.mlirLogicalResultSuccess();
     }
     fn clone(userData: ?*anyopaque) callconv(.c) ?*anyopaque {
-        const this: *@This() = @ptrCast(@alignCast(userData));
-        const env = e.enif_alloc_env() orelse unreachable;
-        const new_dispatcher = @This().init(env, this.handler) catch unreachable;
-        inline for (callback_names) |f| {
-            const cb: ?beam.term = @field(this.*.callbacks, f);
-            if (cb != null) {
-                @field(new_dispatcher.*.callbacks, f) = e.enif_make_copy(new_dispatcher.*.env, cb.?);
-            }
-        }
+        const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
+        const new_dispatcher = this.clone() catch unreachable;
         const temp_env = e.enif_alloc_env() orelse unreachable;
-        const res = forward_cb_and_consume_env(new_dispatcher, "clone", temp_env, .{e.enif_make_copy(new_dispatcher.*.env, this.id)}) catch unreachable;
-        if (c.beaverLogicalResultIsFailure(res)) @panic("Fail to clone a pass implemented in Elixir");
+        const response = new_dispatcher.invoke("clone", temp_env, .{this.copyId(temp_env)}) catch unreachable;
+        if (!response.success) @panic("Fail to clone a pass implemented in Elixir");
         return new_dispatcher;
     }
-    const Token = @import("logical_mutex.zig").Token;
-    const Error = error{ @"Fail to allocate BEAM environment", @"Fail to send message to pass server", @"Fail to run a pass implemented in Elixir" };
-    fn forward_cb_and_consume_env(this: *@This(), comptime callback: []const u8, temp_env: beam.env, args: anytype) !mlir_capi.LogicalResult.T {
-        if (e.enif_thread_type() != e.ERL_NIF_THR_UNDEFINED) {
-            @panic("External pass must be run on non-scheduler thread to prevent deadlock. Callback: " ++ callback);
-        }
-        const cb = @field(this.*.callbacks, callback);
-        if (cb == null) {
-            e.enif_free_env(temp_env);
-            return c.mlirLogicalResultSuccess();
-        } else {
-            var token = Token{};
-            var buffer = std.array_list.Managed(beam.term).init(beam.allocator);
-            defer buffer.deinit();
-            try buffer.append(beam.make_atom(temp_env, callback));
-            try buffer.append(try beam.make_ptr_resource_wrapped(temp_env, &token));
-            try buffer.append(e.enif_make_copy(temp_env, cb.?));
-            try buffer.append(e.enif_make_copy(temp_env, this.id));
-            inline for (args) |arg| {
-                try buffer.append(arg);
-            }
-            const msg = beam.make_tuple(temp_env, buffer.items);
-            errdefer e.enif_free_env(temp_env);
-            if (!beam.send_advanced(null, this.*.handler, temp_env, msg)) {
-                return Error.@"Fail to send message to pass server";
-            }
-            const ret = token.wait_logical();
-            // Transfer owner ship to last caller
-            this.handler = ret.caller;
-            return ret.result;
-        }
-    }
     fn run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) callconv(.c) void {
-        const this: *@This() = @ptrCast(@alignCast(userData));
+        const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
         const temp_env = e.enif_alloc_env() orelse unreachable;
         const op_kind = mlir_capi.Operation.resource.make_kind(temp_env, op) catch return c.mlirExternalPassSignalFailure(pass);
-        if (forward_cb_and_consume_env(this, "run", temp_env, .{op_kind})) |res| {
-            if (c.beaverLogicalResultIsFailure(res)) {
+        if (this.invoke("run", temp_env, .{op_kind})) |response| {
+            if (!response.success) {
                 c.mlirEmitError(c.mlirOperationGetLocation(op), "Fail to run a pass implemented in Elixir");
                 c.mlirExternalPassSignalFailure(pass);
             }
@@ -99,11 +57,6 @@ const CallbackDispatcher = struct {
             c.mlirEmitError(c.mlirOperationGetLocation(op), @errorName(err));
             c.mlirExternalPassSignalFailure(pass);
         }
-    }
-    fn init(env: beam.env, handler: beam.pid) !*@This() {
-        const this = try beam.allocator.create(@This());
-        this.* = @This(){ .handler = handler, .env = env, .id = e.enif_make_unique_integer(env, e.ERL_NIF_UNIQUE_POSITIVE), .callbacks = .{} };
-        return this;
     }
 };
 
@@ -220,10 +173,10 @@ const PassCreator = struct {
             e.enif_free_env(this.dispatcher_env);
         }
         // the env's ownership will be transferred to dispatcher to make sure string like op_name lives long enough
-        const dispatcher: *CallbackDispatcher = CallbackDispatcher.init(this.dispatcher_env, this.pid) catch @panic("fail to init pass callback dispatcher");
+        const dispatcher = RuntimeDispatcher.initWithEnv(this.dispatcher_env, this.pid) catch @panic("fail to init pass callback dispatcher");
         inline for (callback_names) |f| {
             if (this.cb_map.get(f)) |cb| {
-                @field(dispatcher.callbacks, f) = e.enif_make_copy(dispatcher.env, cb);
+                dispatcher.setCallback(f, cb);
             }
         }
         const pass = kinda.BangFunc(prelude.allKinds, c, "beaverPassCreate").wrap_ret_call(this.dispatcher_env, .{
