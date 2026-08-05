@@ -131,7 +131,7 @@ jobs:
         run: |
           for attempt in {1..15}; do
             if curl --noproxy '*' --fail --silent --show-error \
-              --connect-timeout 2 http://127.0.0.1:8000/ > /dev/null; then
+              --connect-timeout 2 http://127.0.0.1:8000/mix.exs > /dev/null; then
               exit 0
             fi
             sleep 1
