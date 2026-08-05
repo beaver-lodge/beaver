@@ -4,6 +4,12 @@ defmodule Beaver.MLIR.Value do
 
   Values can be either block arguments or operation results. That's why this module provides
   functions to check if a value is an argument or a result (`argument?/1`, `result?/1`), or to get the owner of a result (`owner/1`).
+
+  Conditional use replacement with an Elixir predicate is intentionally not
+  exposed until Kinda provides a callback runtime with explicit scheduler and
+  lifetime guarantees. The underlying C callback API is classified as a
+  callback bridge requirement rather than exposed as an unsafe function
+  pointer.
   """
   alias Beaver.MLIR.CAPI
 
