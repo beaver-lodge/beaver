@@ -30,5 +30,7 @@ This repository is an MLIR/LLVM toolkit for Elixir.
 
 - LLVM is currently expected from `LLVM_CONFIG_PATH`.
 - The default local install is `priv/llvm-prebuilt`, populated from the latest
-  matching `llvm/eudsl` build by `scripts/install-prebuilt-llvm.sh`.
+  matching `llvm/eudsl` build by the `beaver.install_prebuilt_llvm` Mix task
+  (`scripts/install_llvm`; `scripts/install-prebuilt-llvm.sh` is a thin
+  compatibility wrapper).
 - The active Zig line is `0.16`.

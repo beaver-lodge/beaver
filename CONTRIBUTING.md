@@ -45,14 +45,23 @@ Zig as a local package override, so both dependency graphs use the same source.
 
 - Option 1: Install a prebuilt `llvm/eudsl` tarball
 
-  The helper script selects the matching `mlir_<os>_<arch>_*.tar.gz` asset for
-  the current machine, downloads it, and extracts the compiled binaries into a
-  local prefix. This replaces the old Python wheel-based setup and only needs a
-  local `python3` runtime.
+  The `beaver.install_prebuilt_llvm` Mix task selects the matching
+  `mlir_<os>_<arch>_*.tar.gz` asset for the current machine, downloads it, and
+  extracts the compiled binaries into a local prefix. It lives in
+  `scripts/install_llvm`, a tiny standalone Mix project, so running it never
+  compiles Beaver itself.
 
   ```bash
   bash scripts/install-prebuilt-llvm.sh priv/llvm-prebuilt
   export LLVM_CONFIG_PATH=$PWD/priv/llvm-prebuilt/bin/llvm-config
+  ```
+
+  The shell script is only a thin compatibility wrapper; the equivalent direct
+  invocation is:
+
+  ```bash
+  (cd scripts/install_llvm && mix beaver.install_prebuilt_llvm \
+    --install-dir "$PWD/../../priv/llvm-prebuilt")
   ```
 
 - Option 2: Build from source https://mlir.llvm.org/getting_started/
