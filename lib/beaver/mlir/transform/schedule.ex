@@ -2,10 +2,11 @@ defmodule Beaver.MLIR.Transform.Schedule do
   @moduledoc """
   Deterministic discovery and resolution of Transform Tune schedules.
 
-  A resolved schedule is immutable BEAM data: MLIR bytecode, printable text,
-  the active choices, and a stable digest. Resolution writes choices back to
-  `transform.tune.knob` and `transform.tune.alternatives`, so replay does not
-  invoke the resolver or repeat a search.
+  Schedules can be authored using Elixir DSL (`Beaver.MLIR.Transform.Schedule.DSL`)
+  or supplied as raw MLIR modules. A resolved schedule is immutable BEAM data:
+  MLIR bytecode, printable text, the active choices, and a stable digest.
+  Resolution writes choices back to `transform.tune.knob` and `transform.tune.alternatives`,
+  so replay does not invoke the resolver or repeat a search.
   """
 
   alias Beaver.MLIR

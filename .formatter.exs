@@ -8,7 +8,12 @@ locals_without_parens = [
   defalias: 2,
   defconstraint: 2,
   defrewrite: 2,
-  defrewrite: 3
+  defrewrite: 3,
+  defschedule: 1,
+  sequence: 0,
+  sequence: 1,
+  sequence: 2,
+  alternatives: 1
 ]
 
 # Used by "mix format"

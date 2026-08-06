@@ -32,36 +32,68 @@ Tune operations leave choices in Transform IR instead of hiding them in host
 language control flow. This example selects a tile size, tiles a matched
 `linalg.matmul`, and chooses whether to vectorize its enclosing isolated op.
 
-```mlir
-module attributes {transform.with_named_sequence} {
-  transform.named_sequence @__transform_main(
-      %root: !transform.any_op {transform.readonly}) {
-    %tile = transform.tune.knob<"tile_size">
-      options = [8, 16, 32] -> !transform.param<i64>
+```elixir
+defmodule MatmulSchedule do
+  use Beaver.MLIR.Transform.Schedule.DSL
 
-    %matmul = transform.structured.match ops{["linalg.matmul"]} in %root
-      : (!transform.any_op) -> !transform.any_op
+  alias Beaver.MLIR
+  alias Beaver.MLIR.Dialect.Transform
 
-    %tiled, %loop = transform.structured.tile_using_for %matmul
-      tile_sizes [%tile]
-      : (!transform.any_op, !transform.param<i64>)
-        -> (!transform.any_op, !transform.any_op)
+  defschedule tiling_and_vectorization do
+    sequence "__transform_main", [root >>> any_op()] do
+      tile = knob("tile_size", [8, 16, 32], type: param(MLIR.Type.i64()))
 
-    transform.tune.alternatives<"vectorize"> {
-      %func = transform.get_parent_op %tiled {isolated_from_above}
-        : (!transform.any_op) -> !transform.any_op
-      %vectorized =
-        transform.structured.vectorize_children_and_apply_patterns %func
-        : (!transform.any_op) -> !transform.any_op
-      transform.yield
-    }, {
-      transform.yield
-    }
+      operation_names =
+        MLIR.Attribute.array(
+          [MLIR.Attribute.string("linalg.matmul")],
+          ctx: Beaver.Env.context()
+        )
 
-    transform.yield
-  }
-}
+      matmul = Transform.structured_match(target: root, ops: operation_names) >>> any_op()
+
+      static_sizes =
+        MLIR.Attribute.dense_array([-1], Beaver.Native.I64, ctx: Beaver.Env.context())
+
+      scalable_sizes =
+        MLIR.Attribute.dense_array([false], Beaver.Native.Bool, ctx: Beaver.Env.context())
+
+      [tiled, _loop] =
+        Transform.structured_tile_using_for(
+          target: matmul,
+          dynamic_sizes: [tile],
+          static_sizes: static_sizes,
+          scalable_sizes: scalable_sizes
+        ) >>> [any_op(), any_op()]
+
+      alternatives "vectorize" do
+        branch do
+          isolated = MLIR.Attribute.unit(ctx: Beaver.Env.context())
+
+          function =
+            Transform.get_parent_op(target: tiled, isolated_from_above: isolated) >>> any_op()
+
+          _vectorized =
+            Transform.structured_vectorize_children_and_apply_patterns(target: function) >>>
+              any_op()
+        end
+
+        branch do
+          :ok
+        end
+      end
+    end
+  end
+end
+
+schedule_context = Beaver.MLIR.Context.create()
+transform_ir = MatmulSchedule.tiling_and_vectorization(ctx: schedule_context)
 ```
+
+`defschedule` emits and verifies an ordinary `Beaver.MLIR.Module`; it does not
+retain a parallel Elixir choice graph. Each declaration also carries its
+Elixir file and line as an MLIR location. The caller owns `transform_ir` and
+`schedule_context` and must destroy the module before the context after the
+search is complete.
 
 Discovery and enumeration are deterministic. An alternatives choice is visited
 before choices in its regions, and choices from unselected regions do not
