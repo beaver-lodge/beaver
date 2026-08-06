@@ -24,6 +24,8 @@
 #include "triton/Conversion/TritonGPUToLLVM/Passes.h"
 #include "triton/Conversion/TritonToTritonGPU/Passes.h"
 #include "triton/Target/LLVMIR/Passes.h"
+#include "nvidia/include/NVGPUToLLVM/Passes.h"
+#include "nvidia/include/TritonNVIDIAGPUToLLVM/Passes.h"
 
 using namespace mlir;
 using namespace mlir::triton;
@@ -46,9 +48,9 @@ beaverContextRegisterTritonDialects(MlirContext context) {
   DialectRegistry registry;
   mlir::registerAllDialects(registry);
   registry.insert<
-      triton::TritonDialect, gpu::TritonGPUDialect,
-      nvidia_gpu::TritonNvidiaGPUDialect,
-      instrument::TritonInstrumentDialect, gluon::GluonDialect>();
+      triton::TritonDialect, triton::gpu::TritonGPUDialect,
+      triton::nvidia_gpu::TritonNvidiaGPUDialect,
+      triton::instrument::TritonInstrumentDialect, triton::gluon::GluonDialect>();
   registerTritonConversionInterfaces(registry);
   MLIRContext *ctx = unwrap(context);
   ctx->appendDialectRegistry(registry);
@@ -58,19 +60,18 @@ beaverContextRegisterTritonDialects(MlirContext context) {
 
 MLIR_CAPI_EXPORTED bool beaverRegisterTritonPasses() {
   registerTritonPasses();
-  gpu::registerTritonGPUPasses();
-  nvidia_gpu::registerTritonNvidiaGPUPasses();
-  instrument::registerTritonInstrumentPasses();
-  gluon::registerGluonPasses();
+  triton::gpu::registerTritonGPUPasses();
+  triton::nvidia_gpu::registerTritonNvidiaGPUPasses();
+  triton::instrument::registerTritonInstrumentPasses();
+  triton::gluon::registerGluonPasses();
   registerConvertTritonToTritonGPUPass();
   registerRelayoutTritonGPUPass();
-  gpu::registerAllocateSharedMemoryPass();
-  gpu::registerTritonGPUAllocateWarpGroups();
-  gpu::registerTritonGPUGlobalScratchAllocationPass();
-  gpu::registerCanonicalizeLLVMIR();
-  registerConvertWarpSpecializeToLLVM();
-  registerInitializeWSClusterBarriers();
-  registerConvertTritonGPUToLLVMPass();
+  triton::gpu::registerAllocateSharedMemoryPass();
+  triton::gpu::registerTritonGPUAllocateWarpGroups();
+  triton::gpu::registerTritonGPUGlobalScratchAllocationPass();
+  triton::gpu::registerCanonicalizeLLVMIR();
+  mlir::triton::registerTritonNVIDIAGPUToLLVMPasses();
+  mlir::triton::registerNVGPUToLLVMPasses();
   mlir::registerLLVMDIScope();
   mlir::registerLLVMDILocalVariable();
   return true;

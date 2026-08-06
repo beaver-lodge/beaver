@@ -14,12 +14,15 @@ add_mlir_public_c_api_library(
   MLIRDebug)
 
 if(BEAVER_TRITON_PREBUILT_DIR)
-  target_include_directories(MLIRCAPIElixir
-    PUBLIC
-    "${BEAVER_TRITON_PREBUILT_DIR}/include")
-  target_compile_definitions(MLIRCAPIElixir
-    PUBLIC
-    BEAVER_ENABLE_TRITON=1)
+  foreach(_target MLIRCAPIElixir obj.MLIRCAPIElixir)
+    target_include_directories(${_target}
+      PUBLIC
+      "${BEAVER_TRITON_PREBUILT_DIR}/include"
+      "${BEAVER_TRITON_PREBUILT_DIR}/include/third_party")
+    target_compile_definitions(${_target}
+      PUBLIC
+      BEAVER_ENABLE_TRITON=1)
+  endforeach()
   target_link_libraries(MLIRCAPIElixir
     PUBLIC
     "${BEAVER_TRITON_PREBUILT_DIR}/lib/libtriton_core.a")

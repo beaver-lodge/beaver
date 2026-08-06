@@ -40,7 +40,6 @@ defmodule TritonTest do
     assert text =~ "tt.func @load_store"
     assert text =~ "tt.load"
     assert text =~ "tt.store"
-    MLIR.Context.destroy(ctx)
   end
 
   @tag skip: !@enabled
@@ -62,15 +61,66 @@ defmodule TritonTest do
       )
 
     module
-    |> Beaver.Composer.append("convert-triton-to-tritongpu")
-    |> Beaver.Composer.append("convert-tritongpu-to-llvm")
+    |> Beaver.Composer.append("convert-triton-to-tritongpu{target=cuda:90}")
+    |> Beaver.Composer.append("convert-triton-gpu-to-llvm")
+    |> Beaver.Composer.append("canonicalize")
     |> Beaver.Composer.run!()
     |> then(fn lowered ->
       text = MLIR.to_string(lowered)
       assert text =~ "llvm.func"
       lowered
     end)
+  end
 
-    MLIR.Context.destroy(ctx)
+  @tag skip: !@enabled
+  @tag :tmp_dir
+  test "compiles a Triton kernel to PTX on the CPU", %{ctx: ctx, tmp_dir: tmp_dir} do
+    Beaver.Triton.register(ctx)
+
+    module =
+      MLIR.Module.create!(
+        ~S"""
+        module attributes {"ttg.num-warps" = 4 : i32, ttg.target = "cuda:90"} {
+          tt.func @addptr(%ptr: !tt.ptr<f32>, %i: i32) {
+            %0 = tt.addptr %ptr, %i : !tt.ptr<f32>, i32
+            tt.return
+          }
+        }
+        """,
+        ctx: ctx
+      )
+
+    lowered =
+      module
+      |> Beaver.Composer.append("convert-triton-to-tritongpu{target=cuda:90}")
+      |> Beaver.Composer.append("convert-triton-gpu-to-llvm")
+      |> Beaver.Composer.append("canonicalize")
+      |> Beaver.Composer.run!()
+
+    llvm_bin = System.get_env("LLVM_CONFIG_PATH") |> Path.dirname()
+    mlir_path = Path.join(tmp_dir, "lowered.mlir")
+    ll_path = Path.join(tmp_dir, "lowered.ll")
+    ptx_path = Path.join(tmp_dir, "lowered.ptx")
+
+    File.write!(mlir_path, MLIR.to_string(lowered))
+
+    {_, 0} =
+      System.cmd(
+        Path.join(llvm_bin, "mlir-translate"),
+        ["--mlir-to-llvmir", mlir_path, "-o", ll_path],
+        stderr_to_stdout: true
+      )
+
+    {ptx_output, 0} =
+      System.cmd(
+        Path.join(llvm_bin, "llc"),
+        ["-march=nvptx64", "-mcpu=sm_90", ll_path, "-o", ptx_path],
+        stderr_to_stdout: true
+      )
+
+    ptx = File.read!(ptx_path)
+    assert ptx =~ ".visible .entry addptr"
+    assert ptx =~ ".target sm_90"
+    assert ptx_output == ""
   end
 end

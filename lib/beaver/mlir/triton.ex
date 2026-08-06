@@ -19,7 +19,7 @@ defmodule Beaver.Triton do
   def register(%MLIR.Context{} = context) do
     register_passes()
 
-    unless MLIR.CAPI.beaver_raw_triton_register_dialects(context) do
+    unless MLIR.CAPI.beaver_raw_triton_register_dialects(context.ref) do
       raise ArgumentError,
             "Beaver was built without Triton support; rebuild the native " <>
               "library with BEAVER_TRITON_PREBUILT_DIR set"
