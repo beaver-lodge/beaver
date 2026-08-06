@@ -10,6 +10,8 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
     beaver_raw_action_tracing_attach: 5,
     beaver_raw_action_tracing_drain: 1,
     beaver_raw_action_tracing_detach: 1,
+    beaver_raw_triton_register_dialects: 1,
+    beaver_raw_triton_register_passes: 0,
     beaver_raw_external_interface_release: 1,
     beaver_raw_transform_state_payload_ops: 2,
     beaver_raw_transform_state_payload_values: 2,
