@@ -15,6 +15,7 @@ Elixir could actually be a good fit as a MLIR front end. Elixir has SSA, pattern
 
 To build a piece of IR in Beaver:
 
+<!-- beaver:test:dsl -->
 ```elixir
 Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
   region do
@@ -41,12 +42,12 @@ end
 
 And a small example to showcase what it is like to define and run a pass in Beaver (with some monad magic):
 
+<!-- beaver:test:pass -->
 ```elixir
 defmodule ToyPass do
   @moduledoc false
   use Beaver
-  alias MLIR.Dialect.{Func, TOSA}
-  require Func
+  alias MLIR.Dialect.TOSA
   import Beaver.Pattern
   use MLIR.Pass, on: "builtin.module"
 
@@ -186,14 +187,19 @@ Because Erlang/Elixir is SSA by its nature, in Beaver a MLIR Op's creation is ve
 
 One example:
 
+<!-- beaver:test:module -->
 ```elixir
 module do
-  v2 = Arith.constant(1) >>> ~t<i32>
+  _v2 = Arith.constant(value: ~a{1 : i32}) >>> ~t<i32>
 end
-# module/1 is a macro, it will transformed the SSA `v2= Arith.constant..` to:
+```
+
+`module/1` is a macro; it transforms the SSA expression above to:
+
+```elixir
 v2 =
  %Beaver.SSA{}
-  |> Beaver.SSA.put_arguments(value: ~a{1})
+  |> Beaver.SSA.put_arguments(value: ~a{1 : i32})
   |> Beaver.SSA.put_ip(Beaver.Env.block())
   |> Beaver.SSA.put_ctx(Beaver.Env.context())
   |> Beaver.SSA.put_results(~t<i32>)
