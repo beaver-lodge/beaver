@@ -73,6 +73,12 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
 
     assert %{params: [:context | _], dirty: :dirty_cpu} =
              Enum.find(declarations, &(&1.wrapper_name == :mlirOperationVerifyWithDiagnostics))
+
+    assert %{params: [:context | _], dirty: :dirty_cpu} =
+             Enum.find(
+               declarations,
+               &(&1.wrapper_name == :mlirTransformApplyNamedSequenceWithDiagnostics)
+             )
   end
 
   test "callback-heavy declarations remain in the callback bridge manifest" do

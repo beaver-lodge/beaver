@@ -10,6 +10,7 @@ typedef enum {
   BeaverCapiPolicyDiagnostics__mlirTypeParseGet,
   BeaverCapiPolicyDiagnostics__mlirModuleCreateParse,
   BeaverCapiPolicyDiagnostics__mlirExecutionEngineCreate,
+  BeaverCapiPolicyDiagnostics__mlirTransformApplyNamedSequence,
 
   BeaverCapiPolicyDirtyCPUAndIO__mlirExecutionEngineInvokePacked,
 

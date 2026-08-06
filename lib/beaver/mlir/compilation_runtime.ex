@@ -15,6 +15,7 @@ defmodule Beaver.MLIR.CompilationRuntime do
     * source content and structural hash;
     * the LLVM revision used to build Beaver;
     * pass/transform pipeline identity;
+    * resolved Transform schedule identity;
     * target configuration;
     * dynamic dialect/schema version;
     * requested bytecode emit version.
@@ -32,6 +33,8 @@ defmodule Beaver.MLIR.CompilationRuntime do
   alias Beaver.Composer
   alias Beaver.MLIR
   alias MLIR.CompilationCache
+  alias MLIR.Transform
+  alias MLIR.Transform.Schedule, as: TransformSchedule
   alias __MODULE__.{Artifact, CacheKey}
 
   @entry_format 1
@@ -40,6 +43,8 @@ defmodule Beaver.MLIR.CompilationRuntime do
           {:cache, CompilationCache.cache()}
           | {:pipeline, term()}
           | {:pipeline_version, term()}
+          | {:transform_schedule, TransformSchedule.Resolved.t() | binary()}
+          | {:transform_options, keyword()}
           | {:target, term()}
           | {:schema_version, term()}
           | {:desired_emit_version, integer() | nil}
@@ -268,6 +273,8 @@ defmodule Beaver.MLIR.CompilationRuntime do
       source_digest: digest(source_bytes),
       llvm_revision: Keyword.get_lazy(opts, :llvm_revision, &llvm_revision/0),
       pipeline: pipeline_identity(opts),
+      transform_schedule: transform_schedule_identity(opts),
+      transform_options: transform_options_identity(opts),
       target: Keyword.get(opts, :target, %{}),
       schema_version: Keyword.get(opts, :schema_version, :static),
       bytecode_version: Keyword.get(opts, :desired_emit_version, :current)
@@ -278,6 +285,39 @@ defmodule Beaver.MLIR.CompilationRuntime do
     case Keyword.fetch(opts, :pipeline_version) do
       {:ok, version} -> version
       :error -> assert_deterministic_pipeline!(Keyword.get(opts, :pipeline, []))
+    end
+  end
+
+  defp transform_schedule_identity(opts) do
+    case Keyword.get(opts, :transform_schedule) do
+      nil ->
+        :none
+
+      %TransformSchedule.Resolved{} = schedule ->
+        TransformSchedule.cache_identity(schedule)
+
+      schedule when is_binary(schedule) ->
+        TransformSchedule.cache_identity(schedule)
+
+      schedule ->
+        raise ArgumentError,
+              ":transform_schedule must be resolved schedule data or MLIR text/bytecode, got: #{inspect(schedule, limit: 5)}"
+    end
+  end
+
+  defp transform_options_identity(opts) do
+    case Keyword.get(opts, :transform_schedule) do
+      nil ->
+        :none
+
+      _schedule ->
+        transform_options = Keyword.get(opts, :transform_options, [])
+
+        if Keyword.keyword?(transform_options) do
+          Map.new(transform_options)
+        else
+          raise ArgumentError, ":transform_options must be a keyword list"
+        end
     end
   end
 
@@ -303,6 +343,19 @@ defmodule Beaver.MLIR.CompilationRuntime do
   end
 
   defp run_pipeline(module, opts) do
+    module =
+      case Keyword.get(opts, :transform_schedule) do
+        nil ->
+          module
+
+        schedule ->
+          Transform.apply_named_sequence!(
+            module,
+            schedule,
+            Keyword.get(opts, :transform_options, [])
+          )
+      end
+
     case Keyword.get(opts, :pipeline, []) do
       [] ->
         module

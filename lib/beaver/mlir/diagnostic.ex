@@ -21,6 +21,16 @@ defmodule Beaver.MLIR.Diagnostic do
 
   defdelegate detach(ctx, handler_id), to: MLIR.CAPI, as: :mlirContextDetachDiagnosticHandler
 
+  @doc "Converts diagnostic locations to strings so the tree is safe beyond context lifetime."
+  def process(diagnostics) when is_list(diagnostics) do
+    Enum.map(diagnostics, &process_diagnostic/1)
+  end
+
+  defp process_diagnostic({severity, location, message, nested}) do
+    location = if is_binary(location), do: location, else: MLIR.to_string(location)
+    {severity, location, message, Enum.map(nested, &process_diagnostic/1)}
+  end
+
   def walk({_, _, _, []} = diagnostic, acc, fun) do
     fun.(diagnostic, acc)
   end
