@@ -8,6 +8,7 @@ defmodule Beaver.Application do
       MLIR.CompilationCache.Memory.child_spec(name: MLIR.CompilationCache.Memory.default_name()),
       MLIR.Pass.global_registrar_child_specs(),
       MLIR.RewritePattern.global_registrar_child_specs(),
+      MLIR.ExternalInterface.global_registrar_child_specs(),
       MLIR.Rewrite.thread_pool_child_spec()
     ]
     |> List.flatten()

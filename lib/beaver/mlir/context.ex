@@ -88,6 +88,8 @@ defmodule Beaver.MLIR.Context do
     try do
       mlirContextDestroy(ctx)
     after
+      MLIR.ExternalInterface.release_context(ctx)
+
       if ctx.thread_pool_owner do
         MLIR.ThreadPool.checkin(ctx.thread_pool_owner, ctx.thread_pool_lease)
       end

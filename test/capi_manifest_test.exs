@@ -71,7 +71,7 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
                &(&1.wrapper_name == :mlirExecutionEngineInvokePacked_dirty_io)
              )
 
-    assert %{params: [:context | _], dirty: false} =
+    assert %{params: [:context | _], dirty: :dirty_cpu} =
              Enum.find(declarations, &(&1.wrapper_name == :mlirOperationVerifyWithDiagnostics))
   end
 
@@ -117,7 +117,10 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
                "mlirTypeConverterAddConversion",
                "mlirTypeConverterAddSourceMaterialization",
                "mlirTypeConverterAddTargetMaterialization",
-               "mlirConditionallySpeculatableOpInterfaceAttachFallbackModel"
+               "mlirConditionallySpeculatableOpInterfaceAttachFallbackModel",
+               "mlirMemoryEffectsOpInterfaceAttachFallbackModel",
+               "mlirPatternDescriptorOpInterfaceAttachFallbackModel",
+               "mlirTransformOpInterfaceAttachFallbackModel"
              ])
 
     for entry <- pending_entries do
@@ -144,6 +147,18 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
     assert MapSet.member?(
              emitted_names,
              "beaver_raw_conditionally_speculatable_attach_fallback_model"
+           )
+
+    assert MapSet.member?(emitted_names, "beaver_raw_memory_effects_attach_fallback_model")
+
+    assert MapSet.member?(
+             emitted_names,
+             "beaver_raw_pattern_descriptor_op_interface_attach_fallback_model"
+           )
+
+    assert MapSet.member?(
+             emitted_names,
+             "beaver_raw_transform_op_interface_attach_fallback_model"
            )
 
     signature_entries =

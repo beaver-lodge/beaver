@@ -5,6 +5,7 @@ defmodule Beaver.Slang do
   @dynamic_traits [:terminator, :isolated_from_above, :no_terminator]
   @callback __slang_dialect__(ctx :: Beaver.MLIR.Context.t()) :: Beaver.MLIR.Module.t()
   @callback __slang_traits__() :: [{String.t(), [atom()]}]
+  @callback __slang_interfaces__() :: [{String.t(), keyword()}]
   @callback __slang_dialect_name__() :: String.t()
   @moduledoc """
   Defines extensible MLIR dialects in Elixir and compiles their schemas to
@@ -36,6 +37,7 @@ defmodule Beaver.Slang do
       Module.register_attribute(__MODULE__, :__slang__creator__, accumulate: true)
       Module.register_attribute(__MODULE__, :__slang__type__, accumulate: true)
       Module.register_attribute(__MODULE__, :__slang__trait__, accumulate: true)
+      Module.register_attribute(__MODULE__, :__slang__interface__, accumulate: true)
     end
   end
 
@@ -52,6 +54,9 @@ defmodule Beaver.Slang do
 
       @doc false
       def __slang_traits__, do: Enum.reverse(@__slang__trait__)
+
+      @doc false
+      def __slang_interfaces__, do: Enum.reverse(@__slang__interface__)
 
       @doc false
       def __slang_dialect_name__, do: @__slang_dialect_name__
@@ -630,7 +635,14 @@ defmodule Beaver.Slang do
 
     creator_opts =
       opts
-      |> Keyword.drop([:argument_names, :result_names, :attributes, :regions, :traits])
+      |> Keyword.drop([
+        :argument_names,
+        :result_names,
+        :attributes,
+        :regions,
+        :traits,
+        :interfaces
+      ])
       |> Keyword.merge(
         argument_names: argument_names,
         result_names: result_names,
@@ -639,6 +651,7 @@ defmodule Beaver.Slang do
       )
 
     traits = normalize_traits!(opts[:traits])
+    interfaces = normalize_interfaces!(opts[:interfaces])
 
     quote do
       Module.put_attribute(__MODULE__, unquote(attr_name), unquote(name))
@@ -649,6 +662,16 @@ defmodule Beaver.Slang do
         else
           quote do
             @__slang__trait__ {unquote(name), unquote(traits)}
+          end
+        end
+      )
+
+      unquote(
+        if interfaces == [] do
+          quote(do: :ok)
+        else
+          quote do
+            @__slang__interface__ {unquote(name), unquote(interfaces)}
           end
         end
       )
@@ -773,7 +796,8 @@ defmodule Beaver.Slang do
         :operand_names,
         :attributes,
         :regions,
-        :traits
+        :traits,
+        :interfaces
       ])
 
     if Keyword.has_key?(block, :do) and Keyword.has_key?(block, :results) do
@@ -790,6 +814,7 @@ defmodule Beaver.Slang do
       attributes: block[:attributes],
       regions: block[:regions],
       traits: block[:traits],
+      interfaces: block[:interfaces],
       source: %{file: __CALLER__.file, line: __CALLER__.line}
     )
   end
@@ -1036,6 +1061,32 @@ defmodule Beaver.Slang do
     :ok
   end
 
+  @external_interfaces [
+    :memory_effects,
+    :conditionally_speculatable,
+    :transform_op,
+    :pattern_descriptor
+  ]
+
+  defp normalize_interfaces!(nil), do: []
+
+  defp normalize_interfaces!(interfaces) when is_list(interfaces) do
+    unless Keyword.keyword?(interfaces) do
+      raise ArgumentError, ":interfaces must be a keyword list"
+    end
+
+    unsupported = Keyword.keys(interfaces) -- @external_interfaces
+
+    if unsupported != [] do
+      raise ArgumentError, "unsupported Slang interfaces: #{inspect(unsupported)}"
+    end
+
+    interfaces
+  end
+
+  defp normalize_interfaces!(other),
+    do: raise(ArgumentError, ":interfaces must be a keyword list, got: #{inspect(other)}")
+
   @doc """
   This function loads the MLIR dialect into the MLIR context. It invokes the internal function of the provided module to create the dialect's IRDL module and performs additional MLIR transformations and verification.
   """
@@ -1049,6 +1100,12 @@ defmodule Beaver.Slang do
 
     if MLIR.LogicalResult.success?(result) do
       attach_dynamic_traits(ctx, mod.__slang_dialect_name__(), mod.__slang_traits__())
+
+      Beaver.MLIR.ExternalInterface.attach_all(
+        ctx,
+        mod.__slang_dialect_name__(),
+        mod.__slang_interfaces__()
+      )
     end
 
     result
