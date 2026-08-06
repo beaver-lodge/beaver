@@ -43,7 +43,7 @@ defmodule Beaver.MLIR.ODS.Dump do
       :beaver
       |> Application.app_dir("priv/generated/ods_dump.json")
       |> File.read!()
-      |> Jason.decode!()
+      |> JSON.decode!()
       |> Map.fetch!("dialects")
       |> Enum.flat_map(&Map.fetch!(&1, "operations"))
       |> Map.new(fn %{"name" => name} = op ->

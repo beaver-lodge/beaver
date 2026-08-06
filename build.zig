@@ -36,9 +36,6 @@ fn createCapiModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
     const capi_ast = ast_dump.captureStdOut(.{ .basename = "capi_ast.json" });
 
     const manifest_generator = b.addSystemCommand(&.{"elixir"});
-    if (b.graph.environ_map.get("JASON_EBIN_PATH")) |jason_ebin_path| {
-        manifest_generator.addArgs(&.{ "-pa", jason_ebin_path });
-    }
     manifest_generator.addFileArg(b.path("native/tools/capi/gen_manifest.exs"));
     manifest_generator.addArg("--declaration");
     const declaration_manifest = manifest_generator.addOutputFileArg("capi_manifest.json");

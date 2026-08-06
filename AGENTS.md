@@ -21,7 +21,10 @@ rather than introducing another `async: false` module.
 ## Elixir JSON
 
 - Use Elixir's current built-in `JSON` module for JSON encoding and decoding.
-- Do not add, reintroduce, or fallback to `Jason`.
+- Do not add, reintroduce, or fallback to `Jason`; existing Jason call sites
+  must be migrated to the built-in module.
+- Beaver requires Elixir >= 1.18 (the first release with built-in JSON) and
+  declares that floor in `mix.exs` (`elixir: "~> 1.18"`).
 - Prefer direct calls such as `JSON.decode!/1` and `JSON.encode!/1` in repo
   code and tests.
 

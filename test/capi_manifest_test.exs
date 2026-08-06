@@ -82,7 +82,7 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
       priv_dir
       |> Path.join("capi_callback_bridge.json")
       |> File.read!()
-      |> Jason.decode!()
+      |> JSON.decode!()
 
     assert callback_manifest["version"] == 2
     callback_entries = Map.fetch!(callback_manifest, "entries")
@@ -107,7 +107,16 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
 
     assert Enum.map(runtime_entries, &get_in(&1, ["function", "name"])) |> MapSet.new() ==
              MapSet.new([
+               "mlirConversionTargetAddDynamicallyLegalDialect",
+               "mlirConversionTargetAddDynamicallyLegalOp",
+               "mlirConversionTargetMarkOpRecursivelyLegal",
+               "mlirConversionTargetMarkUnknownOpDynamicallyLegal",
+               "mlirOpConversionPatternCreate",
+               "mlirTypeConverterAdd1ToNConversion",
+               "mlirTypeConverterAdd1ToNTargetMaterialization",
                "mlirTypeConverterAddConversion",
+               "mlirTypeConverterAddSourceMaterialization",
+               "mlirTypeConverterAddTargetMaterialization",
                "mlirConditionallySpeculatableOpInterfaceAttachFallbackModel"
              ])
 
@@ -128,7 +137,9 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
       assert bridge["timeout_ms"] == 30_000
     end
 
-    assert MapSet.member?(emitted_names, "beaver_raw_type_converter_create_callback")
+    assert MapSet.member?(emitted_names, "beaver_raw_type_converter_add_conversion")
+    assert MapSet.member?(emitted_names, "beaver_raw_conversion_pattern_add")
+    assert MapSet.member?(emitted_names, "beaver_raw_conversion_target_add_dynamic_op")
 
     assert MapSet.member?(
              emitted_names,
@@ -140,10 +151,7 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
       |> DeclarationManifest.signature_manifest()
       |> Map.fetch!("entries")
 
-    for name <- [
-          "mlirTypeConverterAddConversion",
-          "mlirConditionallySpeculatableOpInterfaceAttachFallbackModel"
-        ] do
+    for name <- Enum.map(runtime_entries, &get_in(&1, ["function", "name"])) do
       entry = Enum.find(signature_entries, &(get_in(&1, ["function", "name"]) == name))
       assert entry["generation_blocker_reason"] == nil
       assert get_in(entry, ["callback_bridge", "runtime_backed"])
