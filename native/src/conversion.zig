@@ -768,14 +768,19 @@ const ConversionPatternState = struct {
                 e.enif_free_env(environment);
                 return c.mlirLogicalResultFailure();
             }
-            ranges[index] = kinda.callback_adapter.handleRange(
-                mlir_capi.Value,
-                environment,
-                operands[offset .. offset + len],
-            ) catch {
-                e.enif_free_env(environment);
-                return c.mlirLogicalResultFailure();
-            };
+            if (len == 0) {
+                const empty = [_]beam.term{};
+                ranges[index] = beam.make_term_list(environment, &empty);
+            } else {
+                ranges[index] = kinda.callback_adapter.handleRange(
+                    mlir_capi.Value,
+                    environment,
+                    operands[offset .. offset + len],
+                ) catch {
+                    e.enif_free_env(environment);
+                    return c.mlirLogicalResultFailure();
+                };
+            }
             offset += len;
         }
         const args = .{
