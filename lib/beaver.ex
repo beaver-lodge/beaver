@@ -146,6 +146,25 @@ defmodule Beaver do
   def append_block_to_region(_region, _block), do: :ok
 
   @doc false
+  def assert_no_dangling_blocks([]), do: :ok
+
+  def assert_no_dangling_blocks(names) do
+    raise ArgumentError,
+          "dangling blocks created but never appended to a region: #{inspect(names)}. " <>
+            "Define each referenced block with `block <name>() do ... end` inside the region, " <>
+            "or prefix the variable with an underscore to opt out of this check."
+  end
+
+  defp dangling_block_removal(b_name, caller) do
+    if Macro.Env.has_var?(caller, {:beaver_internal_env_dangling_blocks, nil}) do
+      quote do
+        Kernel.var!(beaver_internal_env_dangling_blocks) =
+          List.delete(Kernel.var!(beaver_internal_env_dangling_blocks), unquote(b_name))
+      end
+    end
+  end
+
+  @doc false
   def parent_scope_ip_caching(caller) do
     suppress_warning = quote(do: _ = Kernel.var!(beaver_internal_env_ip))
 
@@ -202,6 +221,7 @@ defmodule Beaver do
         Beaver.Env.block(unquote({b_name, [], nil})) |> unquote(add_arguments(args))
 
       Beaver.append_block_to_region(Beaver.Env.region(), Beaver.Env.block())
+      unquote(dangling_block_removal(b_name, __CALLER__))
 
       unquote_splicing(arguments_variables(args))
       unquote(body)
@@ -243,8 +263,10 @@ defmodule Beaver do
 
       Beaver.MLIR.Region.under(region, fn ->
         Kernel.var!(beaver_env_region) = region
+        Kernel.var!(beaver_internal_env_dangling_blocks) = []
         %Beaver.MLIR.Region{} = Kernel.var!(beaver_env_region)
         unquote(body)
+        Beaver.assert_no_dangling_blocks(Kernel.var!(beaver_internal_env_dangling_blocks))
       end)
 
       Kernel.var!(beaver_internal_env_regions) =

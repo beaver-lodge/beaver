@@ -63,6 +63,46 @@ defmodule BlockTest do
             ]} = res
   end
 
+  test "dangling block with a plain name raises at region end", %{ctx: ctx} do
+    assert_raise ArgumentError, ~r/dangling blocks created but never appended to a region/, fn ->
+      mlir ctx: ctx do
+        module do
+          Func.func some_func(function_type: Type.function([], [Type.i32()])) do
+            region do
+              block do
+                v0 = Arith.constant(value: Attribute.integer(Type.i32(), 0)) >>> Type.i32()
+                CF.br({Beaver.Env.block(dangling), [v0]}) >>> []
+                _ = dangling
+              end
+            end
+          end
+        end
+      end
+    end
+  end
+
+  test "assert_no_dangling_blocks validates the tracked names", %{ctx: ctx} do
+    assert :ok = Beaver.assert_no_dangling_blocks([])
+
+    assert_raise ArgumentError, ~r/dangling blocks created but never appended to a region/, fn ->
+      Beaver.assert_no_dangling_blocks([:dangling])
+    end
+
+    mlir ctx: ctx do
+      module do
+        Func.func some_func(function_type: Type.function([], [Type.i32()])) do
+          region do
+            block do
+              v0 = Arith.constant(value: Attribute.integer(Type.i32(), 0)) >>> Type.i32()
+              Func.return(v0) >>> []
+            end
+          end
+        end
+      end
+      |> MLIR.verify!()
+    end
+  end
+
   test "verify? returns a boolean summary of verification status", %{ctx: ctx} do
     valid_module =
       mlir ctx: ctx do

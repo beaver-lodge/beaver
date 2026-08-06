@@ -62,6 +62,7 @@ defmodule Beaver.MixProject do
         "guides/native-rewrite-patterns.md",
         "guides/action-tracing.md",
         "guides/enif-pointer-interop.md",
+        "guides/blocks.md",
         "CONTRIBUTING.md",
         "README.md"
       ],
