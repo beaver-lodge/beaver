@@ -37,11 +37,12 @@ fn createCapiModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
 
     const manifest_generator = b.addSystemCommand(&.{"elixir"});
     manifest_generator.addFileArg(b.path("native/tools/capi/gen_manifest.exs"));
+    manifest_generator.addArg("--ast");
+    manifest_generator.addFileArg(capi_ast);
     manifest_generator.addArg("--declaration");
     const declaration_manifest = manifest_generator.addOutputFileArg("capi_manifest.json");
     manifest_generator.addArg("--callback-bridge");
     const callback_bridge_manifest = manifest_generator.addOutputFileArg("capi_callback_bridge.json");
-    manifest_generator.setStdIn(.{ .lazy_path = capi_ast });
 
     b.getInstallStep().dependOn(&b.addInstallFile(declaration_manifest, "capi_manifest.json").step);
     b.getInstallStep().dependOn(&b.addInstallFile(callback_bridge_manifest, "capi_callback_bridge.json").step);

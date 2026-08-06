@@ -92,10 +92,16 @@ defmodule Beaver.CAPI.ManifestGenerator do
   def run(argv) do
     {opts, _, _} =
       OptionParser.parse(argv,
-        strict: [declaration: :string, callback_bridge: :string]
+        strict: [declaration: :string, callback_bridge: :string, ast: :string]
       )
 
-    ast = IO.read(:stdio, :eof) |> decode_json!()
+    ast =
+      case Keyword.get(opts, :ast) do
+        nil -> IO.binread(:stdio, :eof)
+        path -> File.read!(path)
+      end
+      |> decode_json!()
+
     policy = policy_from_ast(ast)
 
     functions =
