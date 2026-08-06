@@ -1,0 +1,97 @@
+name: Build Triton prebuilt
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: triton-prebuilt-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  KINDA_REF: "cd9dfbf1734f1ee09a544c18a97840d247983257"
+  TRITON_REF: "882eb72e1858bfd588fafa4677b86ce00e9da872"
+
+jobs:
+  build:
+    name: triton-prebuilt-${{ matrix.os }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.runs-on }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu
+            arch: x86_64
+            runs-on: ubuntu-22.04
+          - os: macos
+            arch: arm64
+            runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        name: Check out Beaver
+
+      - uses: actions/checkout@v4
+        name: Check out Triton
+        with:
+          repository: triton-lang/triton
+          path: third_party/triton
+          ref: ${{ env.TRITON_REF }}
+
+      - uses: actions/checkout@v4
+        name: Check out paired Kinda
+        with:
+          repository: beaver-lodge/kinda
+          path: kinda
+          ref: ${{ env.KINDA_REF }}
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27.3"
+          elixir-version: "1.20.3"
+
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.16.0
+
+      - uses: seanmiddleditch/gha-setup-ninja@master
+
+      - name: Install Triton-pinned LLVM prebuilt
+        run: |
+          cd scripts/install_llvm
+          mix beaver.install_prebuilt_llvm --triton --install-dir "$RUNNER_TEMP/llvm-prebuilt"
+
+      - name: Build Triton core libraries
+        env:
+          TRITON_SOURCE_DIR: ${{ github.workspace }}/third_party/triton
+          LLVM_SYSPATH: ${{ runner.temp }}/llvm-prebuilt
+          TRITON_PREBUILT_OUTPUT_DIR: ${{ runner.temp }}/triton-out
+          TRITON_CACHE_PATH: ${{ runner.temp }}/triton-cache
+        run: |
+          bash scripts/build-triton-prebuilt.sh
+
+      - name: Package Triton prebuilt
+        run: |
+          cd "$RUNNER_TEMP/triton-out"
+          tar czf "$RUNNER_TEMP/triton-${{ env.TRITON_REF }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" .
+          ls -lh "$RUNNER_TEMP"/*.tar.gz
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: triton-${{ env.TRITON_REF }}-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/triton-*.tar.gz
+
+      - name: Publish release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag="triton-prebuilt-${{ env.TRITON_REF }}"
+          asset="$RUNNER_TEMP/triton-${{ env.TRITON_REF }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
+          gh release create "${tag}" --repo beaver-lodge/beaver \
+            --title "Triton core prebuilt @ ${{ env.TRITON_REF }}" \
+            --notes "Core Triton dialects/passes/conversions built against the Triton-pinned LLVM." \
+            || true
+          gh release upload "${tag}" "${asset}" --repo beaver-lodge/beaver --clobber
