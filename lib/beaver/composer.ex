@@ -169,9 +169,11 @@ defmodule Beaver.Composer do
   @doc """
   Run the passes on the operation.
 
-  > #### Must be a multi-threaded context if an Elixir pass is in the pipeline {: .info}
+  > #### Elixir callback safety {: .info}
   >
-  > MLIR context's thread pool is used to run the CAPI. If an Elixir pass is in the pipeline, the context must be multi-threaded otherwise there can be a deadlock. Also note that it can be more expensive than a C/C++ implementation due to the overhead of the thread pool.
+  > Native pipelines and Elixir passes use the context's shared elastic LLVM
+  > thread pool outside BEAM scheduler threads. Nested callback work can expand
+  > the pool rather than starving it.
   """
   def run(
         %__MODULE__{op: op} = composer,

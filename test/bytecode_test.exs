@@ -26,4 +26,17 @@ defmodule BytecodeTest do
     Beaver.Dummy.gigantic(ctx)
     |> roundtrip_bytecode
   end
+
+  test "bytecode writer accepts an explicit desired emit version", %{ctx: ctx} do
+    module = MLIR.Module.create!("module {}", ctx: ctx)
+
+    assert {:ok, bytecode} = MLIR.Bytecode.write(module, desired_emit_version: 0)
+    assert String.starts_with?(bytecode, "ML\xEFR")
+
+    roundtripped = MLIR.Bytecode.read!(bytecode, ctx: ctx)
+    assert MLIR.verify?(roundtripped)
+
+    MLIR.Module.destroy(roundtripped)
+    MLIR.Module.destroy(module)
+  end
 end

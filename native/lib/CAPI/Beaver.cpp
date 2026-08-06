@@ -7,9 +7,131 @@
 #include "mlir/Dialect/IRDL/IRDLLoading.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/ExtensibleDialect.h"
+#include "llvm/Config/llvm-config.h"
 #include "llvm/Support/ThreadPool.h"
+#include "llvm/Support/VCSRevision.h"
+#include <algorithm>
+#include <condition_variable>
+#include <deque>
+#include <mutex>
+#include <string>
+#include <thread>
+#include <unordered_map>
+#include <vector>
 
 using namespace mlir;
+
+namespace {
+/// A reusable pool with a nominal MLIR parallelism limit and elastic workers.
+/// MLIR uses `getMaxConcurrency()` to bound ordinary parallel algorithms. The
+/// pool itself may grow past that number when active work synchronously waits
+/// for BEAM callbacks which start nested MLIR work on the same shared pool.
+class BeaverElasticThreadPool final : public llvm::ThreadPoolInterface {
+public:
+  explicit BeaverElasticThreadPool(unsigned maxConcurrency)
+      : maxConcurrency(std::max(1u, maxConcurrency)) {}
+
+  ~BeaverElasticThreadPool() override {
+    {
+      std::unique_lock<std::mutex> lock(mutex);
+      completion.wait(lock, [this]() { return outstanding == 0; });
+      shuttingDown = true;
+    }
+    available.notify_all();
+    for (std::thread &thread : threads)
+      thread.join();
+  }
+
+  void wait() override {
+    std::unique_lock<std::mutex> lock(mutex);
+    completion.wait(lock, [this]() { return outstanding == 0; });
+  }
+
+  void wait(llvm::ThreadPoolTaskGroup &group) override {
+    std::unique_lock<std::mutex> lock(mutex);
+    completion.wait(lock, [this, &group]() {
+      auto it = groupOutstanding.find(&group);
+      return it == groupOutstanding.end() || it->second == 0;
+    });
+  }
+
+  unsigned getMaxConcurrency() const override { return maxConcurrency; }
+
+private:
+  void asyncEnqueue(llvm::unique_function<void()> task,
+                    llvm::ThreadPoolTaskGroup *group) override {
+    std::lock_guard<std::mutex> lock(mutex);
+    assert(!shuttingDown && "queueing work during pool destruction");
+    tasks.emplace_back(std::move(task), group);
+    ++outstanding;
+    if (group)
+      ++groupOutstanding[group];
+
+    const size_t inactiveWorkers = threads.size() - activeWorkers;
+    if (tasks.size() > inactiveWorkers)
+      threads.emplace_back([this]() { workerLoop(); });
+    else
+      available.notify_one();
+  }
+
+  void workerLoop() {
+    while (true) {
+      llvm::unique_function<void()> task;
+      llvm::ThreadPoolTaskGroup *group = nullptr;
+      {
+        std::unique_lock<std::mutex> lock(mutex);
+        available.wait(lock,
+                       [this]() { return shuttingDown || !tasks.empty(); });
+        if (shuttingDown && tasks.empty())
+          return;
+        task = std::move(tasks.front().first);
+        group = tasks.front().second;
+        tasks.pop_front();
+        ++activeWorkers;
+      }
+
+      task();
+
+      {
+        std::lock_guard<std::mutex> lock(mutex);
+        --activeWorkers;
+        --outstanding;
+        if (group) {
+          auto it = groupOutstanding.find(group);
+          if (--it->second == 0)
+            groupOutstanding.erase(it);
+        }
+      }
+      completion.notify_all();
+    }
+  }
+
+  const unsigned maxConcurrency;
+  std::mutex mutex;
+  std::condition_variable available;
+  std::condition_variable completion;
+  std::deque<std::pair<llvm::unique_function<void()>,
+                       llvm::ThreadPoolTaskGroup *>>
+      tasks;
+  std::vector<std::thread> threads;
+  std::unordered_map<llvm::ThreadPoolTaskGroup *, size_t> groupOutstanding;
+  size_t activeWorkers = 0;
+  size_t outstanding = 0;
+  bool shuttingDown = false;
+};
+} // namespace
+
+MLIR_CAPI_EXPORTED MlirLlvmThreadPool
+beaverLlvmThreadPoolCreateElastic(unsigned maxConcurrency) {
+  return wrap(static_cast<llvm::ThreadPoolInterface *>(
+      new BeaverElasticThreadPool(maxConcurrency)));
+}
+
+MLIR_CAPI_EXPORTED MlirStringRef beaverGetLLVMVersion() {
+  static const std::string versionAndRevision =
+      std::string(LLVM_VERSION_STRING) + "@" + LLVM_REVISION;
+  return wrap(llvm::StringRef(versionAndRevision));
+}
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetArgument(MlirPass pass) {
   auto argument = unwrap(pass)->getArgument();
@@ -277,14 +399,15 @@ beaverGreedyRewriteDriverConfigGet() {
 
 MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context,
                                              void (*task)(void *), void *arg) {
-  if (unwrap(context)->isMultithreadingEnabled()) {
-    unwrap(mlirContextGetThreadPool(context))->async([task, arg]() {
-      task(arg);
-    });
-    return true;
-  } else {
+  if (!unwrap(context)->isMultithreadingEnabled())
     return false;
-  }
+
+  // Callback bridges may recursively schedule more bridge work (for example,
+  // an Elixir pass applying an Elixir rewrite pattern). The application-owned
+  // elastic pool can grow when all current workers wait for nested callbacks.
+  unwrap(mlirContextGetThreadPool(context))->async(
+      [task, arg]() { task(arg); });
+  return true;
 }
 
 MLIR_CAPI_EXPORTED MlirType beaverDenseElementsAttrGetType(MlirAttribute attr) {
