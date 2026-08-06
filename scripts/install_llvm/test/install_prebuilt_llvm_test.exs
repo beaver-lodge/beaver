@@ -57,6 +57,20 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
     assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20260804+eb50d8775.tar.gz"
   end
 
+  test "triton suffix maps Beaver platforms to Triton archive names" do
+    assert InstallPrebuiltLlvm.triton_suffix("manylinux", "x86_64") == "ubuntu-x64"
+    assert InstallPrebuiltLlvm.triton_suffix("manylinux", "aarch64") == "ubuntu-arm64"
+    assert InstallPrebuiltLlvm.triton_suffix("macos", "arm64") == "macos-arm64"
+    assert InstallPrebuiltLlvm.triton_suffix("macos", "x86_64") == "macos-x64"
+    assert InstallPrebuiltLlvm.triton_suffix("windows", "amd64") == "windows-x64"
+  end
+
+  test "triton suffix rejects unsupported platforms" do
+    assert_raise Mix.Error, ~r/no Triton LLVM archive/, fn ->
+      InstallPrebuiltLlvm.triton_suffix("windows", "arm64")
+    end
+  end
+
   test "installs a tarball and points LLVM_CONFIG_PATH at it" do
     fixture =
       Path.join(System.tmp_dir!(), "beaver-llvm-install-#{System.unique_integer([:positive])}")
