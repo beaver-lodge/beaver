@@ -6,6 +6,10 @@ add_mlir_public_c_api_library(
   MLIRCAPIBeaver
   DISABLE_INSTALL
   Beaver.cpp
+  BeaverIRDL.cpp
+  BeaverDebug.cpp
+  BeaverGPU.cpp
+  BeaverActionTracing.cpp
   Triton.cpp
   LINK_LIBS
   PUBLIC
