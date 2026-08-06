@@ -217,6 +217,13 @@ pub fn build(b: *std.Build) void {
     const callback_bridge_lib = createNativePartitionLib(b, "beaver_callback_bridge", "native/src/callback_bridge_root.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
     const rewrite_pattern_lib = createNativePartitionLib(b, "beaver_rewrite_pattern", "native/src/rewrite_pattern_root.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
 
+    // Partition libraries link against libMLIRBeaver from the CMake install
+    // prefix; make sure the CMake step runs before they are linked.
+    core_lib.step.dependOn(cmake_step);
+    conversion_lib.step.dependOn(cmake_step);
+    callback_bridge_lib.step.dependOn(cmake_step);
+    rewrite_pattern_lib.step.dependOn(cmake_step);
+
     // Default target: the NIF shim links the partitions and assembles their
     // exported NIF tables into a single library entry at load time.
     const lib = b.addLibrary(.{
