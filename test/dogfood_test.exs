@@ -235,8 +235,6 @@ defmodule DogfoodTest do
           _ -> nil
         end)
 
-      IO.inspect({miss_plan_id, hit_plan_id}, label: "dogfood telemetry debug")
-
       refute is_nil(miss_plan_id)
       refute is_nil(hit_plan_id)
       assert miss_plan_id == hit_plan_id
