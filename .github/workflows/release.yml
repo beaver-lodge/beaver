@@ -24,7 +24,7 @@ permissions:
 env:
   CADDY_VERSION: "2.11.4"
   # Remove after Kinda 0.11.0 is published and locked by Mix.
-  KINDA_REF: "2f78600bb0fe53ea35cbdecd4b8a2c8242fe558d"
+  KINDA_REF: "cd9dfbf1734f1ee09a544c18a97840d247983257"
 
 jobs:
   generate_id:

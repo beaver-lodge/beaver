@@ -33,7 +33,7 @@ permissions:
 # Remove this paired ref after Kinda 0.11.0 is published; Mix will then use the
 # locked Hex dependency without a separate checkout.
 env:
-  KINDA_REF: "2f78600bb0fe53ea35cbdecd4b8a2c8242fe558d"
+  KINDA_REF: "cd9dfbf1734f1ee09a544c18a97840d247983257"
 
 concurrency:
   group: build-and-test-${{ github.ref }}-${{ inputs.llvm_prebuilt_asset_name || inputs.llvm_prebuilt_asset_revision || 'default' }}
