@@ -58,6 +58,7 @@ defmodule Beaver.MixProject do
         "guides/incremental-compilation-runtime.md",
         "guides/slang.md",
         "guides/dialect-conversion.md",
+        "guides/action-tracing.md",
         "CONTRIBUTING.md",
         "README.md"
       ],
@@ -131,7 +132,8 @@ defmodule Beaver.MixProject do
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false},
       {:benchee, "~> 1.0", only: :dev},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:dialyxir, "~> 1.4", only: :dev, runtime: false}
+      {:dialyxir, "~> 1.4", only: :dev, runtime: false},
+      {:telemetry, "~> 1.0"}
     ]
   end
 

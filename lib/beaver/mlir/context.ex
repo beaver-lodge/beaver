@@ -86,6 +86,10 @@ defmodule Beaver.MLIR.Context do
 
   def destroy(%__MODULE__{} = ctx) do
     try do
+      # Detach action tracing sessions while the native context is still alive;
+      # the native session destructor deregisters its action handler on the
+      # context.
+      MLIR.ActionTracing.release_context(ctx)
       mlirContextDestroy(ctx)
     after
       MLIR.ExternalInterface.release_context(ctx)

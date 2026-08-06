@@ -9,6 +9,7 @@ defmodule Beaver.Application do
       MLIR.Pass.global_registrar_child_specs(),
       MLIR.RewritePattern.global_registrar_child_specs(),
       MLIR.ExternalInterface.global_registrar_child_specs(),
+      MLIR.ActionTracing.global_registrar_child_specs(),
       MLIR.Rewrite.thread_pool_child_spec()
     ]
     |> List.flatten()
