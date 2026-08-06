@@ -118,6 +118,10 @@ inspect, serialize, and test without mutating dialect registration. It also
 makes failures attributable to either schema verification or interface
 attachment instead of interleaving the two phases.
 
+Dynamic dialect and trait registration is local to an `MLIR.Context`; it is not
+stored in IRDL or operation bytecode. Call `Beaver.Slang.load/2` once for every
+new context before parsing text or reading bytecode that uses the dialect.
+
 Slang assigns every generated IRDL operation the source location of its
 declaration. Invalid nested constraints therefore report the `deftype`,
 `defattr`, or `defop` line rather than an implementation line inside Slang.

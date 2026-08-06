@@ -103,10 +103,21 @@ defmodule SlangCompleteTest do
       |> MLIR.Module.create!(ctx: ctx)
       |> MLIR.verify!()
 
+    bytecode = MLIR.Bytecode.write!(text_roundtrip)
+    fresh_ctx = MLIR.Context.create()
+    on_exit(fn -> MLIR.Context.destroy(fresh_ctx) end)
+
+    refute MLIR.Context.terminator?(fresh_ctx, "complete_slang.yield")
+
+    assert CompleteSlang
+           |> then(&Beaver.Slang.load(fresh_ctx, &1))
+           |> MLIR.LogicalResult.success?()
+
+    assert MLIR.Context.terminator?(fresh_ctx, "complete_slang.yield")
+
     bytecode_roundtrip =
-      text_roundtrip
-      |> MLIR.Bytecode.write!()
-      |> MLIR.Bytecode.read!(ctx: ctx)
+      bytecode
+      |> MLIR.Bytecode.read!(ctx: fresh_ctx)
       |> MLIR.verify!()
 
     assert MLIR.to_string(bytecode_roundtrip, generic: true) ==
