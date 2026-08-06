@@ -101,10 +101,11 @@ fn createNativePartitionLib(
         .root_module = createNativeModule(b, target, optimize, root, capi_module, kinda_module, mlir_include_dir),
     });
     if (linkage == .dynamic) {
-        // Partition dylibs call the MLIR C API directly. Their undefined
-        // symbols are resolved at runtime from the final NIF library's
-        // dependency on MLIRBeaver, so the partition caches stay valid when
-        // only the C++ aggregate changes.
+        // Partition dylibs call the MLIR C API directly, so link them against
+        // libMLIRBeaver. Resolving those symbols only through the NIF shim's
+        // dependency does not work on Linux: glibc does not put sibling
+        // dependencies in a partition's symbol scope.
+        lib.root_module.linkSystemLibrary("MLIRBeaver", .{ .use_pkg_config = .no });
         lib.linker_allow_shlib_undefined = true;
         lib.root_module.addLibraryPath(.{ .cwd_relative = mlir_lib_dir });
         lib.root_module.addRPathSpecial(if (os == .linux) "$ORIGIN" else "@loader_path");
@@ -219,12 +220,16 @@ pub fn build(b: *std.Build) void {
     const callback_bridge_lib = createNativePartitionLib(b, "beaver_callback_bridge", "native/src/callback_bridge_root.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
     const rewrite_pattern_lib = createNativePartitionLib(b, "beaver_rewrite_pattern", "native/src/rewrite_pattern_root.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
 
-    // Partition libraries link against libMLIRBeaver from the CMake install
-    // prefix; make sure the CMake step runs before they are linked.
-    core_lib.step.dependOn(cmake_step);
-    conversion_lib.step.dependOn(cmake_step);
-    callback_bridge_lib.step.dependOn(cmake_step);
-    rewrite_pattern_lib.step.dependOn(cmake_step);
+    // Partition libraries link against libMLIRBeaver installed by the CMake
+    // step into the install prefix. On Linux, an explicit library path is
+    // required for the DT_NEEDED entry to be recorded (a bare search prefix is
+    // dropped by the linker); the CMake step must also run before they link.
+    const mlir_lib_dir = b.pathJoin(&.{ b.install_path, "lib" });
+
+    for ([_]*std.Build.Step.Compile{ core_lib, conversion_lib, callback_bridge_lib, rewrite_pattern_lib }) |partition| {
+        partition.root_module.addLibraryPath(.{ .cwd_relative = mlir_lib_dir });
+        partition.step.dependOn(cmake_step);
+    }
 
     // Default target: the NIF shim links the partitions and assembles their
     // exported NIF tables into a single library entry at load time.
