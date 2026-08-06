@@ -33,20 +33,22 @@ defmodule AddENIF do
       module do
         env_t = ENIF.Type.env()
         term_t = ENIF.Type.term()
+        ptr_t = Ptr.type()
+        generic_space = Ptr.generic_space()
 
         Func.func add(function_type: Type.function([env_t, term_t, term_t], [term_t])) do
           region do
             block _(env >>> env_t, left >>> term_t, right >>> term_t) do
               left_ptr =
                 MemRef.alloca(operand_segment_sizes: :infer) >>>
-                  Type.memref!([], Type.i64(ctx: ctx), memory_space: ~a{#ptr.generic_space})
+                  Type.memref!([], Type.i64(ctx: ctx), memory_space: generic_space)
 
               right_ptr =
                 MemRef.alloca(operand_segment_sizes: :infer) >>>
-                  Type.memref!([], Type.i64(ctx: ctx), memory_space: ~a{#ptr.generic_space})
+                  Type.memref!([], Type.i64(ctx: ctx), memory_space: generic_space)
 
-              left_ptr_arg = Ptr.to_ptr(left_ptr) >>> ~t{!ptr.ptr<#ptr.generic_space>}
-              right_ptr_arg = Ptr.to_ptr(right_ptr) >>> ~t{!ptr.ptr<#ptr.generic_space>}
+              left_ptr_arg = Ptr.to_ptr(left_ptr) >>> ptr_t
+              right_ptr_arg = Ptr.to_ptr(right_ptr) >>> ptr_t
               ENIF.get_int64(env, left, left_ptr_arg) >>> :infer
               ENIF.get_int64(env, right, right_ptr_arg) >>> :infer
               left = MemRef.load(left_ptr) >>> Type.i64()

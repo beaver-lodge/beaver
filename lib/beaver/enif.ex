@@ -19,6 +19,11 @@ defmodule Beaver.ENIF do
   this ensures the stability of the ABI and clarity of semantics.
   For instance, we should not generate IR to reinterpret a binary buffer to `memref<?xi8>` directly.
   Instead, we provide a function `inspect_binary_as_memref/1` to perform the conversion explicitly.
+  - `!ptr.ptr` is the IR-level native pointer representation. A
+  `Beaver.Native.OpaquePtr` or another BEAM resource remains a host-side owner or handle and must
+  cross only an explicit invocation or supplemental-function boundary; it is not an SSA value.
+  - Use `ptr.to_ptr` to pass memref-backed out-parameter storage to ENIF. Use a typed
+  `ptr.constant #ptr.null` for nullable C arguments instead of an unrealized cast from LLVM IR.
   - These functions and existing ENIF functions will be defined as an MLIR dialect in the future once IRDL is mature enough.
 
   ### Provided Functions

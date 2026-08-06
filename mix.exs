@@ -60,6 +60,7 @@ defmodule Beaver.MixProject do
         "guides/slang.md",
         "guides/dialect-conversion.md",
         "guides/action-tracing.md",
+        "guides/enif-pointer-interop.md",
         "CONTRIBUTING.md",
         "README.md"
       ],

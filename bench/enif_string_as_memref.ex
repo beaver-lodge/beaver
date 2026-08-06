@@ -20,6 +20,8 @@ defmodule ENIFStringAsMemRef do
       module do
         env_t = ENIF.Type.env()
         term_t = ENIF.Type.term()
+        ptr_t = Ptr.type()
+        generic_space = Ptr.generic_space()
 
         Func.func original_str(function_type: Type.function([env_t, term_t], [term_t])) do
           region do
@@ -64,9 +66,9 @@ defmodule ENIFStringAsMemRef do
 
               term_ptr =
                 MemRef.alloca(operand_segment_sizes: :infer) >>>
-                  Type.memref!([], ENIF.Type.term(ctx: ctx), memory_space: ~a{#ptr.generic_space})
+                  Type.memref!([], ENIF.Type.term(ctx: ctx), memory_space: generic_space)
 
-              term_ptr_arg = Ptr.to_ptr(term_ptr) >>> ~t{!ptr.ptr<#ptr.generic_space>}
+              term_ptr_arg = Ptr.to_ptr(term_ptr) >>> ptr_t
               # assign the term and return the pointer to binary data
               m = ENIF.make_new_binary_as_memref(env, size, term_ptr_arg) >>> :infer
               MemRef.copy(source: msg, target: m) >>> []
@@ -82,9 +84,9 @@ defmodule ENIFStringAsMemRef do
 
               term_ptr =
                 MemRef.alloca(operand_segment_sizes: :infer) >>>
-                  Type.memref!([], ENIF.Type.term(ctx: ctx), memory_space: ~a{#ptr.generic_space})
+                  Type.memref!([], ENIF.Type.term(ctx: ctx), memory_space: generic_space)
 
-              term_ptr_arg = Ptr.to_ptr(term_ptr) >>> ~t{!ptr.ptr<#ptr.generic_space>}
+              term_ptr_arg = Ptr.to_ptr(term_ptr) >>> ptr_t
               m2 = ENIF.make_new_binary_as_memref(env, size, term_ptr_arg) >>> :infer
               MemRef.copy(source: m1, target: m2) >>> []
               b = MemRef.load(term_ptr) >>> ENIF.Type.term()
