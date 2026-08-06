@@ -15,11 +15,12 @@ const string_ref = @import("string_ref.zig");
 const memref = @import("memref.zig");
 const unranked_memref_descriptor = @import("unranked_memref_descriptor.zig");
 const value = @import("value.zig");
+const callback_bridge = @import("callback_bridge.zig");
 
 const rewrite_pattern = @import("rewrite_pattern.zig");
 const capi_registry = @import("capi_registry.zig");
 const callback_nifs = .{kinda.callback_runtime.ReplyToken.nif("beaver_raw_callback_reply")};
-const handwritten_nifs = capi_registry.nifs ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ diagnostic.nifs ++ pointer.nifs ++ memref.nifs ++ enif_support.nifs ++ callback_nifs ++ unranked_memref_descriptor.nifs ++ rewrite_pattern.nifs ++ value.nifs;
+const handwritten_nifs = capi_registry.nifs ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ diagnostic.nifs ++ pointer.nifs ++ memref.nifs ++ enif_support.nifs ++ callback_nifs ++ unranked_memref_descriptor.nifs ++ rewrite_pattern.nifs ++ value.nifs ++ callback_bridge.nifs;
 
 const num_nifs = handwritten_nifs.len;
 export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs;
@@ -31,8 +32,20 @@ export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     mlir_capi.open_all(env);
     unranked_memref_descriptor.open_all(env);
     kinda.callback_runtime.ReplyToken.open(env);
+    callback_bridge.open(env);
     return 0;
 }
+
+export fn nif_upgrade(
+    env: beam.env,
+    priv_data: [*c]?*anyopaque,
+    _: [*c]?*anyopaque,
+    load_info: beam.term,
+) c_int {
+    return nif_load(env, priv_data, load_info);
+}
+
+export fn nif_unload(_: beam.env, _: ?*anyopaque) void {}
 
 const entry = e.ErlNifEntry{
     .major = 2,
@@ -41,9 +54,9 @@ const entry = e.ErlNifEntry{
     .num_of_funcs = num_nifs,
     .funcs = &(nifs[0]),
     .load = nif_load,
-    .reload = null, // currently unsupported
-    .upgrade = null, // currently unsupported
-    .unload = null, // currently unsupported
+    .reload = null,
+    .upgrade = nif_upgrade,
+    .unload = nif_unload,
     .vm_variant = "beam.vanilla",
     .options = 1,
     .sizeof_ErlNifResourceTypeInit = @sizeOf(e.ErlNifResourceTypeInit),

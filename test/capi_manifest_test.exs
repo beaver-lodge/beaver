@@ -78,12 +78,14 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
   test "callback-heavy declarations remain in the callback bridge manifest" do
     priv_dir = :beaver |> :code.priv_dir() |> List.to_string()
 
-    callback_entries =
+    callback_manifest =
       priv_dir
       |> Path.join("capi_callback_bridge.json")
       |> File.read!()
       |> Jason.decode!()
-      |> Map.fetch!("entries")
+
+    assert callback_manifest["version"] == 2
+    callback_entries = Map.fetch!(callback_manifest, "entries")
 
     declaration_manifest = CAPI.CodeGen.declaration_manifest()
 
@@ -100,10 +102,52 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
              &(get_in(&1, ["function", "name"]) == "mlirValueReplaceUsesWithIf")
            )
 
-    for entry <- callback_entries do
+    {runtime_entries, pending_entries} =
+      Enum.split_with(callback_entries, &get_in(&1, ["callback_bridge", "runtime_backed"]))
+
+    assert Enum.map(runtime_entries, &get_in(&1, ["function", "name"])) |> MapSet.new() ==
+             MapSet.new([
+               "mlirTypeConverterAddConversion",
+               "mlirConditionallySpeculatableOpInterfaceAttachFallbackModel"
+             ])
+
+    for entry <- pending_entries do
       name = get_in(entry, ["function", "name"])
       assert get_in(entry, ["callback_bridge", "reason"]) == "callback_bridge_required"
       refute MapSet.member?(emitted_names, name)
+    end
+
+    for entry <- runtime_entries do
+      bridge = Map.fetch!(entry, "callback_bridge")
+      assert bridge["reason"] == nil
+      assert bridge["runtime"] == "dispatcher"
+      assert bridge["scheduler"] == "foreign_thread"
+      assert bridge["owner"] == "beam_process"
+      assert bridge["destructor"] == "native_owner"
+      assert bridge["lifetime"] == "native_owner"
+      assert bridge["timeout_ms"] == 30_000
+    end
+
+    assert MapSet.member?(emitted_names, "beaver_raw_type_converter_create_callback")
+
+    assert MapSet.member?(
+             emitted_names,
+             "beaver_raw_conditionally_speculatable_attach_fallback_model"
+           )
+
+    signature_entries =
+      declaration_manifest
+      |> DeclarationManifest.signature_manifest()
+      |> Map.fetch!("entries")
+
+    for name <- [
+          "mlirTypeConverterAddConversion",
+          "mlirConditionallySpeculatableOpInterfaceAttachFallbackModel"
+        ] do
+      entry = Enum.find(signature_entries, &(get_in(&1, ["function", "name"]) == name))
+      assert entry["generation_blocker_reason"] == nil
+      assert get_in(entry, ["callback_bridge", "runtime_backed"])
+      assert [_resolved_variant] = entry["variants"]
     end
   end
 
