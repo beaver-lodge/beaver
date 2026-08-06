@@ -137,7 +137,12 @@ defmodule Beaver.MLIR do
           | Identifier.t()
 
   @type dump_opts :: [generic: boolean()]
-  @type print_opts :: [generic: boolean(), bytecode: boolean(), ctx: Deferred.context_arg()]
+  @type print_opts :: [
+          generic: boolean(),
+          bytecode: boolean(),
+          bytecode_version: integer(),
+          ctx: Deferred.context_arg()
+        ]
   @type null_safe_result(t) :: t | {:error, String.t()}
   @spec dump(printable(), dump_opts()) :: null_safe_result(:ok)
   @spec dump!(printable(), dump_opts()) :: printable()
@@ -192,7 +197,12 @@ defmodule Beaver.MLIR do
   def to_string(mlir, opts \\ [])
 
   def to_string(%Operation{ref: ref}, opts) do
+    operation = %Operation{ref: ref}
+
     cond do
+      opts[:bytecode] == true and opts[:bytecode_version] ->
+        MLIR.Bytecode.write!(operation, desired_emit_version: opts[:bytecode_version])
+
       opts[:bytecode] ->
         :Bytecode
 
@@ -205,7 +215,10 @@ defmodule Beaver.MLIR do
       true ->
         nil
     end
-    |> then(&apply(CAPI, :"beaver_raw_to_string_Operation#{&1}", [ref]))
+    |> then(fn
+      bytecode when is_binary(bytecode) -> bytecode
+      suffix -> apply(CAPI, :"beaver_raw_to_string_Operation#{suffix}", [ref])
+    end)
   end
 
   def to_string(%Beaver.MLIR.Module{} = module, opts) do

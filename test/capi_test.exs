@@ -95,7 +95,7 @@ defmodule MlirTest do
     module_body = mlirModuleGetBody(module)
     mlirBlockInsertOwnedOperation(module_body, 0, func_op)
     MLIR.verify!(module)
-    mlirContextDestroy(ctx)
+    MLIR.Context.destroy(ctx)
   end
 
   test "elixir dialect" do
@@ -159,7 +159,7 @@ defmodule MlirTest do
 
     mlirPassManagerDestroy(pm)
     mlirModuleDestroy(module)
-    mlirContextDestroy(ctx)
+    MLIR.Context.destroy(ctx)
   end
 
   test "Run a generic pass" do
@@ -174,7 +174,7 @@ defmodule MlirTest do
     :ok = MLIR.PassManager.destroy(pm)
     mlirModuleDestroy(module)
     mlirTypeIDAllocatorDestroy(type_id_allocator)
-    mlirContextDestroy(ctx)
+    MLIR.Context.destroy(ctx)
   end
 
   test "Run a func operation pass", %{ctx: ctx} do
@@ -261,7 +261,7 @@ defmodule MlirTest do
 
     MLIR.ExecutionEngine.destroy(jit)
     MLIR.Module.destroy(module)
-    mlirContextDestroy(ctx)
+    MLIR.Context.destroy(ctx)
   end
 
   test "affine expr and map", %{ctx: ctx} do

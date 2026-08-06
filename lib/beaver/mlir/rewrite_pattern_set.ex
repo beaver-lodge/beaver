@@ -106,7 +106,8 @@ defmodule Beaver.MLIR.RewritePatternSet do
   end
 
   @doc """
-  Use thread pool of the given `ctx` to destroy the given `MLIR.RewritePatternSet` or `MLIR.FrozenRewritePatternSet`.
+  Destroy the given `MLIR.RewritePatternSet` or `MLIR.FrozenRewritePatternSet`
+  outside a BEAM scheduler thread.
   """
   def threaded_destroy(ctx, set) do
     do_destroy(ctx, set)

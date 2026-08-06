@@ -26,7 +26,8 @@ defmodule Beaver.MLIR.ExecutionEngine do
           {:opt_level, opt_level},
           {:object_dump, object_dump},
           {:enable_pic, enable_pic},
-          {:dirty, dirty}
+          {:dirty, dirty},
+          {:telemetry, (list(atom()), map(), map() -> any())}
         ]
   @spec create!(MLIR.Module.t(), opts()) :: t()
   def create!(module, opts \\ []) do
@@ -76,15 +77,27 @@ defmodule Beaver.MLIR.ExecutionEngine do
       end
       |> List.wrap()
 
-    Beaver.Native.apply_dirty(
-      :mlirExecutionEngineInvokePacked,
-      [
-        jit,
-        MLIR.StringRef.create(symbol),
-        Beaver.Native.array(arg_ptr_list ++ return_ptr, Beaver.Native.OpaquePtr, mut: true)
-      ],
-      opts[:dirty]
+    {result, duration} =
+      timed(fn ->
+        Beaver.Native.apply_dirty(
+          :mlirExecutionEngineInvokePacked,
+          [
+            jit,
+            MLIR.StringRef.create(symbol),
+            Beaver.Native.array(arg_ptr_list ++ return_ptr, Beaver.Native.OpaquePtr, mut: true)
+          ],
+          opts[:dirty]
+        )
+      end)
+
+    Beaver.MLIR.Telemetry.emit(
+      [:execution],
+      %{duration: duration},
+      %{symbol: to_string(symbol)},
+      opts
     )
+
+    result
     |> then(
       &if MLIR.LogicalResult.success?(&1) do
         return || :ok
@@ -105,10 +118,50 @@ defmodule Beaver.MLIR.ExecutionEngine do
 
   defdelegate destroy(jit), to: MLIR.CAPI, as: :mlirExecutionEngineDestroy
 
+  @doc "Look up a symbol in an execution engine."
+  @spec lookup(t(), String.t() | MLIR.StringRef.t(), keyword()) :: Beaver.Native.OpaquePtr.t()
+  def lookup(jit, symbol, opts \\ []) do
+    function =
+      if Keyword.get(opts, :packed, false),
+        do: :mlirExecutionEngineLookupPacked,
+        else: :mlirExecutionEngineLookup
+
+    apply(MLIR.CAPI, function, [jit, MLIR.StringRef.create(symbol)])
+  end
+
+  @doc "Register a native pointer under a symbol name."
+  @spec register_symbol(t(), String.t() | MLIR.StringRef.t(), Beaver.Native.OpaquePtr.t()) :: t()
+  def register_symbol(jit, symbol, pointer) do
+    mlirExecutionEngineRegisterSymbol(jit, MLIR.StringRef.create(symbol), pointer)
+    jit
+  end
+
+  @doc """
+  Write the object captured by an engine created with `object_dump: true`.
+  """
+  @spec emit_object!(t(), Path.t()) :: Path.t()
+  def emit_object!(jit, path) do
+    path = Path.expand(path)
+    path |> Path.dirname() |> File.mkdir_p!()
+    mlirExecutionEngineDumpToObjectFile(jit, MLIR.StringRef.create(path))
+
+    if File.regular?(path) do
+      path
+    else
+      raise "MLIR execution engine did not emit an object file at #{path}"
+    end
+  end
+
   @doc """
   Get the paths to the runtime libraries provided by MLIR.
   """
   def runtime_libs do
     Path.join([:code.priv_dir(:beaver), "lib", "*"]) |> Path.wildcard()
+  end
+
+  defp timed(fun) do
+    started = System.monotonic_time()
+    result = fun.()
+    {result, System.monotonic_time() - started}
   end
 end

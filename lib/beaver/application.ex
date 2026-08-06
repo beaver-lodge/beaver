@@ -4,6 +4,8 @@ defmodule Beaver.Application do
   @moduledoc false
   def start(_type, _args) do
     [
+      MLIR.ThreadPool.child_spec(name: MLIR.ThreadPool.default_name()),
+      MLIR.CompilationCache.Memory.child_spec(name: MLIR.CompilationCache.Memory.default_name()),
       MLIR.Pass.global_registrar_child_specs(),
       MLIR.RewritePattern.global_registrar_child_specs(),
       MLIR.Rewrite.thread_pool_child_spec()
