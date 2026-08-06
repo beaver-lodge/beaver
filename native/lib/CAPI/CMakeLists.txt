@@ -3,18 +3,16 @@ if(DEFINED ENV{BEAVER_TRITON_PREBUILT_DIR})
 endif()
 
 add_mlir_public_c_api_library(
-  MLIRCAPIElixir
+  MLIRCAPIBeaver
   DISABLE_INSTALL
   Beaver.cpp
-  Elixir.cpp
   Triton.cpp
   LINK_LIBS
   PUBLIC
-  MLIRElixir
   MLIRDebug)
 
 if(BEAVER_TRITON_PREBUILT_DIR)
-  foreach(_target MLIRCAPIElixir obj.MLIRCAPIElixir)
+  foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
     target_include_directories(${_target}
       PUBLIC
       "${BEAVER_TRITON_PREBUILT_DIR}/include"
@@ -23,7 +21,7 @@ if(BEAVER_TRITON_PREBUILT_DIR)
       PUBLIC
       BEAVER_ENABLE_TRITON=1)
   endforeach()
-  target_link_libraries(MLIRCAPIElixir
+  target_link_libraries(MLIRCAPIBeaver
     PUBLIC
     "${BEAVER_TRITON_PREBUILT_DIR}/lib/libtriton_core.a")
 endif()

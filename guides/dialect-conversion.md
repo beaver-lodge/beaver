@@ -1,12 +1,14 @@
 # Lowering a Slang dialect
 
 Beaver exposes MLIR's dialect conversion driver without requiring a native
-pass. The conversion target, type converter, and patterns below are all built
-in Elixir; the driver still runs on the context's native worker pool.
+pass. `Beaver.MLIR.Conversion.Plan` provides a declarative, inspectable, and
+scoped composition layer over conversion targets, type converters, materializations,
+and conversion patterns. The conversion pipeline is declared in Elixir, while
+the conversion driver runs on the context's native worker pool.
 
 This example defines a small Slang operation and lowers it to the `arith`
-dialect. The resulting IR can then use MLIR's standard `arith`-to-LLVM and
-`func`-to-LLVM passes.
+dialect using a `Conversion.Plan`. The resulting IR can then use MLIR's standard
+`arith`-to-LLVM and `func`-to-LLVM passes.
 
 ```elixir
 defmodule Counter do
@@ -34,77 +36,105 @@ module =
     ctx: ctx
   )
 
-target =
-  MLIR.ConversionTarget.create(ctx)
-  |> MLIR.ConversionTarget.add_legal_dialect("builtin")
-  |> MLIR.ConversionTarget.add_legal_dialect("func")
-  |> MLIR.ConversionTarget.add_legal_dialect("arith")
-  |> MLIR.ConversionTarget.add_illegal_dialect("counter")
+# Define a declarative, reusable conversion plan
+plan =
+  MLIR.Conversion.Plan.new(
+    mode: :full,
+    folding_mode: :after_patterns,
+    build_materializations: true
+  )
+  |> MLIR.Conversion.Plan.add_legal_dialect("builtin")
+  |> MLIR.Conversion.Plan.add_legal_dialect("func")
+  |> MLIR.Conversion.Plan.add_legal_dialect("arith")
+  |> MLIR.Conversion.Plan.add_illegal_dialect("counter")
+  |> MLIR.Conversion.Plan.add_conversion(fn type -> type end, version: "1.0")
+  |> MLIR.Conversion.Plan.add_conversion_pattern(
+    "counter.inc",
+    fn operation, [input], rewriter ->
+      context = MLIR.context(operation)
+      base = MLIR.ConversionPatternRewriter.as_base(rewriter)
+      type = MLIR.Value.type(input)
+      location = MLIR.Operation.location(operation)
 
-# Identity conversion keeps i32 unchanged. A callback may instead return a
-# list of types through add_1_to_n_conversion/2.
-converter = MLIR.TypeConverter.create(conversion: fn type -> type end)
-patterns = MLIR.RewritePatternSet.create(ctx)
+      one =
+        %Beaver.Changeset{name: "arith.constant", context: context, location: location}
+        |> Beaver.Changeset.add_argument(value: MLIR.Attribute.integer(type, 1))
+        |> Beaver.Changeset.add_result(type)
+        |> MLIR.Operation.create()
 
-MLIR.ConversionPattern.add(
-  patterns,
-  "counter.inc",
-  converter,
-  fn operation, [input], rewriter ->
-    base = MLIR.ConversionPatternRewriter.as_base(rewriter)
-    type = MLIR.Value.type(input)
-    location = MLIR.Operation.location(operation)
+      add =
+        %Beaver.Changeset{name: "arith.addi", context: context, location: location}
+        |> Beaver.Changeset.add_argument([input, MLIR.Operation.result(one, 0)])
+        |> Beaver.Changeset.add_result(type)
+        |> MLIR.Operation.create()
 
-    one =
-      %Beaver.Changeset{name: "arith.constant", context: ctx, location: location}
-      |> Beaver.Changeset.add_argument(value: MLIR.Attribute.integer(type, 1))
-      |> Beaver.Changeset.add_result(type)
-      |> MLIR.Operation.create()
+      MLIR.RewriterBase.set_insertion_point_before(base, operation)
+      MLIR.RewriterBase.insert(base, one)
+      MLIR.RewriterBase.insert(base, add)
+      MLIR.ConversionPatternRewriter.replace_op(rewriter, operation, add)
+      :ok
+    end,
+    version: "1.0"
+  )
 
-    add =
-      %Beaver.Changeset{name: "arith.addi", context: ctx, location: location}
-      |> Beaver.Changeset.add_argument([input, MLIR.Operation.result(one, 0)])
-      |> Beaver.Changeset.add_result(type)
-      |> MLIR.Operation.create()
+# Execute the plan. Native target, converter, and pattern set are allocated
+# and cleaned up automatically for the duration of the run.
+{:ok, ^module, _diagnostics} = MLIR.Conversion.Plan.run(plan, module)
 
-    MLIR.RewriterBase.set_insertion_point_before(base, operation)
-    MLIR.RewriterBase.insert(base, one)
-    MLIR.RewriterBase.insert(base, add)
-    MLIR.ConversionPatternRewriter.replace_op(rewriter, operation, add)
-    :ok
-  end,
-  ctx: ctx
+# The custom dialect is gone. Continue with upstream conversion passes.
+pass_manager = MLIR.CAPI.mlirPassManagerCreate(ctx)
+
+MLIR.CAPI.mlirPassManagerAddOwnedPass(
+  pass_manager,
+  MLIR.CAPI.mlirCreateConversionArithToLLVMConversionPass()
 )
 
-try do
-  {:ok, ^module, diagnostics} =
-    MLIR.Conversion.full(module, target, patterns,
-      folding_mode: :after_patterns,
-      build_materializations: true
-    )
+MLIR.CAPI.mlirPassManagerAddOwnedPass(
+  pass_manager,
+  MLIR.CAPI.mlirCreateConversionConvertFuncToLLVMPass()
+)
 
-  # The custom dialect is gone. Continue with upstream conversion passes.
-  pass_manager = MLIR.CAPI.mlirPassManagerCreate(ctx)
-
-  MLIR.CAPI.mlirPassManagerAddOwnedPass(
-    pass_manager,
-    MLIR.CAPI.mlirCreateConversionArithToLLVMConversionPass()
-  )
-
-  MLIR.CAPI.mlirPassManagerAddOwnedPass(
-    pass_manager,
-    MLIR.CAPI.mlirCreateConversionConvertFuncToLLVMPass()
-  )
-
-  {:ok, _pass_diagnostics} = MLIR.PassManager.run(pass_manager, module)
-  MLIR.PassManager.destroy(pass_manager)
-after
-  # Destroy the frozen/pattern set before its referenced converter. Passing a
-  # mutable set to Conversion.full/4 does this automatically.
-  MLIR.TypeConverter.destroy(converter)
-  MLIR.ConversionTarget.destroy(target)
-end
+{:ok, _pass_diagnostics} = MLIR.PassManager.run(pass_manager, module)
+MLIR.PassManager.destroy(pass_manager)
 ```
+
+## Plan Inspection and Callback Versioning
+
+`MLIR.Conversion.Plan.declaration/1` returns a deterministic map of plan metadata
+with function closures and runtime state omitted:
+
+```elixir
+decl = MLIR.Conversion.Plan.declaration(plan)
+# => %{
+#   mode: :full,
+#   timeout: 30000,
+#   folding_mode: :after_patterns,
+#   build_materializations: true,
+#   entries: [
+#     %{kind: :add_legal_dialect, dialect: "builtin"},
+#     ...,
+#     %{kind: :add_conversion, version: "1.0"},
+#     %{kind: :add_conversion_pattern, root: "counter.inc", benefit: 1, one_to_n: false, timeout: nil, version: "1.0"}
+#   ]
+# }
+```
+
+Callbacks registered with plan builders accept optional `:version` metadata.
+When `:version` is omitted, the callback is visibly marked `:unversioned`.
+Declaration metadata is only deterministic and reproducible across runs or processes
+when callback versions are explicitly specified.
+
+## Resource Ownership, Borrowing, and Timeout
+
+`Conversion.Plan` structs do not hold native resources; a single plan can be
+safely reused across multiple fresh `MLIR.Context` instances.
+
+When `Plan.run/2` or `Plan.run!/2` executes:
+
+1. Fresh native `MLIR.ConversionTarget`, `MLIR.TypeConverter`, and `MLIR.RewritePatternSet` objects are created.
+2. Target legality rules, conversions, materializations, and patterns are populated in declaration order.
+3. Conversion runs with the specified `:timeout` (default 30,000 ms).
+4. The mutable pattern set is transferred to `Conversion.apply/5`; its native worker releases the frozen set even if the caller terminates. On a normal or error return, the remaining resources are then released in reverse dependency order: pattern set, type converter, conversion target.
 
 ## Dynamic legality
 
@@ -112,13 +142,14 @@ Static legality applies to every instance of an operation or dialect. For an
 instance-dependent decision, register a callback:
 
 ```elixir
-target =
-  MLIR.ConversionTarget.add_dynamically_legal_op(
-    target,
+plan =
+  MLIR.Conversion.Plan.add_dynamically_legal_op(
+    plan,
     "counter.inc",
     fn operation ->
       if safe_to_keep?(operation), do: :legal, else: :no_opinion
-    end
+    end,
+    version: "1.0"
   )
 ```
 
@@ -126,22 +157,55 @@ Callbacks may return `:legal`, `:illegal`, or `:no_opinion`. Exceptions and
 `{:error, reason}` results are preserved in `Beaver.MLIR.Conversion.Error`
 rather than being flattened into a generic MLIR failure.
 
+## Native rewrite descriptors
+
+A plan can include descriptors produced by `Beaver.Pattern.Native.defrewrite/3`:
+
+```elixir
+plan =
+  MLIR.Conversion.Plan.add_pattern(
+    plan,
+    MyNativePatterns.lower_counter(),
+    version: "1.0"
+  )
+```
+
+This composes with the existing callback-backed Native DSL; `Conversion.Plan`
+does not introduce another matching language. Use `add_conversion_pattern/4`
+when a rewrite needs type-converted operand adaptors, and `add_pattern/3` for an
+ordinary Native descriptor. Declaration metadata records the descriptor name,
+root, benefit, and explicit version, but omits its callbacks and runtime state.
+
 ## 1:N conversion and materialization
 
-Use `TypeConverter.add_1_to_n_conversion/2` to return zero, one, or several
+Use `Plan.add_1_to_n_conversion/3` to return zero, one, or several
 target types. A conversion pattern created with `one_to_n: true` receives one
 list of converted values per original operand and can replace each result with
 a value range through
 `ConversionPatternRewriter.replace_op_with_multiple/3`.
 
-Source, target, and 1:N target materializations are registered with
-`add_source_materialization/2`, `add_target_materialization/2`, and
-`add_1_to_n_target_materialization/2`. Their rewriter, values, types, and
+Source, target, and 1:N target materializations are registered on the plan with
+`Plan.add_source_materialization/3`, `Plan.add_target_materialization/3`, and
+`Plan.add_1_to_n_target_materialization/3`. Their rewriter, values, types, and
 locations are scoped to the callback. Do not retain those handles after the
 callback returns.
 
-Targets and type converters are explicit native owners. The native conversion
-worker cleans up its `ConversionConfig` and any mutable pattern set frozen by
-`Conversion.apply/5`, even if the calling process terminates. Standalone
-targets and converters should use `ConversionTarget.with/3`,
-`TypeConverter.with/2`, or an equivalent `try/after` as shown above.
+## Low-Level Escape Hatch
+
+For advanced scenarios requiring manual resource lifecycle management, low-level
+APIs (`MLIR.ConversionTarget`, `MLIR.TypeConverter`, `MLIR.RewritePatternSet`, and
+`MLIR.Conversion.apply/5`) remain fully supported:
+
+```elixir
+target = MLIR.ConversionTarget.create(ctx)
+converter = MLIR.TypeConverter.create(conversion: fn type -> type end)
+patterns = MLIR.RewritePatternSet.create(ctx)
+MLIR.ConversionPattern.add(patterns, "counter.inc", converter, callback, ctx: ctx)
+
+try do
+  {:ok, ^module, _diagnostics} = MLIR.Conversion.full(module, target, patterns)
+after
+  MLIR.TypeConverter.destroy(converter)
+  MLIR.ConversionTarget.destroy(target)
+end
+```

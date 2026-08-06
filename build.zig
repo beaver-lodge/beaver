@@ -57,6 +57,59 @@ fn createCapiModule(b: *std.Build, target: std.Build.ResolvedTarget, optimize: s
     return translate_c.createModule();
 }
 
+fn createNativeModule(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    root: []const u8,
+    capi_module: *std.Build.Module,
+    kinda_module: *std.Build.Module,
+    mlir_include_dir: []const u8,
+) *std.Build.Module {
+    const module = b.createModule(.{
+        .root_source_file = b.path(root),
+        .target = target,
+        .optimize = optimize,
+    });
+    module.addImport("kinda", kinda_module);
+    module.addImport("c_api", capi_module);
+    module.addIncludePath(.{ .cwd_relative = "native/include" });
+    // add these to get ZLS working properly
+    module.addIncludePath(.{ .cwd_relative = mlir_include_dir });
+    if (os == .linux or os == .macos) {
+        module.link_libc = true;
+    }
+    return module;
+}
+
+fn createNativePartitionLib(
+    b: *std.Build,
+    name: []const u8,
+    root: []const u8,
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    capi_module: *std.Build.Module,
+    kinda_module: *std.Build.Module,
+    mlir_include_dir: []const u8,
+    linkage: std.builtin.LinkMode,
+    mlir_lib_dir: []const u8,
+) *std.Build.Step.Compile {
+    const lib = b.addLibrary(.{
+        .name = name,
+        .linkage = linkage,
+        .root_module = createNativeModule(b, target, optimize, root, capi_module, kinda_module, mlir_include_dir),
+    });
+    if (linkage == .dynamic) {
+        // Partition dylibs call the MLIR C API directly and are loaded as
+        // dependencies of the final NIF library.
+        lib.root_module.linkSystemLibrary("MLIRBeaver", .{ .use_pkg_config = .no });
+        lib.linker_allow_shlib_undefined = true;
+        lib.root_module.addLibraryPath(.{ .cwd_relative = mlir_lib_dir });
+        lib.root_module.addRPathSpecial(if (os == .linux) "$ORIGIN" else "@loader_path");
+    }
+    return lib;
+}
+
 fn createCMakeStep(b: *std.Build, llvm_cmake_dir: []const u8, mlir_cmake_dir: []const u8, optimize: std.builtin.OptimizeMode) *std.Build.Step {
     const step = b.step("cmake", "Build and install CMake targets");
 
@@ -152,33 +205,41 @@ pub fn build(b: *std.Build) void {
     const ods_extraction_step = createODSExtractionStep(b, generated_dir, mlir_include_dir, cmake_step);
     b.getInstallStep().dependOn(ods_extraction_step);
 
-    // Default target
+    const kinda = b.dependency("kinda", .{});
+    const kinda_module = kinda.module("kinda");
+
+    // Native source is partitioned into dynamic libraries so each domain is
+    // cached independently: a source edit in one domain only recompiles that
+    // partition and the final shim, instead of forcing the comptime-heavy CAPI
+    // registry and kind surfaces to rebuild.
+    const core_lib = createNativePartitionLib(b, "beaver_core", "native/src/core.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
+    const conversion_lib = createNativePartitionLib(b, "beaver_conversion", "native/src/conversion_root.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
+    const callback_bridge_lib = createNativePartitionLib(b, "beaver_callback_bridge", "native/src/callback_bridge_root.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
+    const rewrite_pattern_lib = createNativePartitionLib(b, "beaver_rewrite_pattern", "native/src/rewrite_pattern_root.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
+
+    // Default target: the NIF shim links the partitions and assembles their
+    // exported NIF tables into a single library entry at load time.
     const lib = b.addLibrary(.{
         .name = "BeaverNIF",
         .linkage = .dynamic,
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("native/src/main.zig"),
-            .target = target,
-            .optimize = optimize,
-        }),
+        .root_module = createNativeModule(b, target, optimize, "native/src/main.zig", capi_module, kinda_module, mlir_include_dir),
     });
+    lib.root_module.linkLibrary(core_lib);
+    lib.root_module.linkLibrary(conversion_lib);
+    lib.root_module.linkLibrary(callback_bridge_lib);
+    lib.root_module.linkLibrary(rewrite_pattern_lib);
+    b.installArtifact(core_lib);
+    b.installArtifact(conversion_lib);
+    b.installArtifact(callback_bridge_lib);
+    b.installArtifact(rewrite_pattern_lib);
     lib.step.dependOn(cmake_step);
 
     std.log.info("Setting optimization mode for {s}: {any}", .{ lib.name, lib.root_module.optimize });
-
-    const kinda = b.dependency("kinda", .{});
-    lib.root_module.addImport("kinda", kinda.module("kinda"));
-    lib.root_module.addImport("c_api", capi_module);
-    lib.root_module.addIncludePath(.{ .cwd_relative = "native/include" });
-    // add these to get ZLS working properly
-    lib.root_module.addIncludePath(.{ .cwd_relative = mlir_include_dir });
     if (os == .linux) {
         lib.root_module.addRPathSpecial("$ORIGIN");
-        lib.root_module.link_libc = true;
     }
     if (os == .macos) {
         lib.root_module.addRPathSpecial("@loader_path");
-        lib.root_module.link_libc = true;
     }
     lib.root_module.linkSystemLibrary("MLIRBeaver", .{ .use_pkg_config = .no });
     lib.linker_allow_shlib_undefined = true;

@@ -9,5 +9,5 @@ endif()
 
 add_mlir_aggregate(MLIRBeaver SHARED
                    PUBLIC_LIBS ${_triton_core_lib}
-                   EMBED_LIBS MLIRCAPIElixir
+                   EMBED_LIBS MLIRCAPIBeaver
                    ${_capi_libraries})
