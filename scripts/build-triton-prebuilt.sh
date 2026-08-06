@@ -57,9 +57,11 @@ ninja -C "${build_dir}" "${core_targets[@]}"
 mkdir -p "${output_dir}/lib" "${output_dir}/include"
 
 echo "Bundling Triton object libraries"
-mapfile -t objects < <(find "${build_dir}/lib" -path '*CMakeFiles/*.dir/*.o')
+mapfile -t objects < <(
+  find "${build_dir}/lib" "${build_dir}/third_party" -path '*CMakeFiles/*.dir/*.o' 2>/dev/null
+)
 if ((${#objects[@]} == 0)); then
-  echo "no Triton object files found under ${build_dir}/lib" >&2
+  echo "no Triton object files found under ${build_dir}" >&2
   exit 1
 fi
 
