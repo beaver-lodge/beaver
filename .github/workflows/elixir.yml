@@ -118,19 +118,6 @@ jobs:
           MIX_ENV: test
         run: |
           mix compile.elixir_make
-      - name: Debug partition dynamic tables
-        if: always()
-        run: |
-          ls -la _build/test/lib/beaver/priv/lib
-          for f in _build/test/lib/beaver/priv/lib/*.so*; do
-            echo "===== $f"
-            readelf -d "$f" 2>&1 | grep -E 'SONAME|NEEDED' || true
-          done
-      - name: Debug NIF dlopen trace
-        if: always()
-        run: |
-          cd _build/test/lib/beaver/priv
-          LD_DEBUG=libs python3 -c "import ctypes; ctypes.CDLL('./lib/libBeaverNIF.so')" 2>&1 | tail -50 || true
       - name: Reject compiler warnings
         if: matrix.elixir == '1.20.3'
         env:
