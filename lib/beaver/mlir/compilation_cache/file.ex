@@ -44,9 +44,9 @@ defmodule Beaver.MLIR.CompilationCache.File do
       temporary = destination <> ".tmp.#{System.unique_integer([:positive])}"
 
       try do
-        with :ok <- File.write(temporary, :erlang.term_to_binary(value, [:deterministic])),
-             :ok <- File.rename(temporary, destination) do
-          :ok
+        case File.write(temporary, :erlang.term_to_binary(value, [:deterministic])) do
+          :ok -> File.rename(temporary, destination)
+          error -> error
         end
       after
         File.rm(temporary)
@@ -66,13 +66,15 @@ defmodule Beaver.MLIR.CompilationCache.File do
   @spec clear(t()) :: :ok | {:error, term()}
   def clear(cache) do
     with {:ok, entries} <- list(cache) do
-      Enum.reduce_while(entries, :ok, fn entry, :ok ->
-        case File.rm(Path.join(cache.root, entry)) do
-          :ok -> {:cont, :ok}
-          {:error, :enoent} -> {:cont, :ok}
-          error -> {:halt, error}
-        end
-      end)
+      Enum.reduce_while(entries, :ok, &remove_entry(cache.root, &1, &2))
+    end
+  end
+
+  defp remove_entry(root, entry, :ok) do
+    case File.rm(Path.join(root, entry)) do
+      :ok -> {:cont, :ok}
+      {:error, :enoent} -> {:cont, :ok}
+      error -> {:halt, error}
     end
   end
 
