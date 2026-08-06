@@ -40,6 +40,23 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
     assert output =~ "LLVM_PREBUILT_URL=https://example.com/llvm.tar.gz"
   end
 
+  test "empty asset-name falls back to the default revision" do
+    output =
+      capture_io(fn ->
+        InstallPrebuiltLlvm.run([
+          "--resolve-only",
+          "--asset-os",
+          "manylinux",
+          "--asset-arch",
+          "x86_64",
+          "--asset-name",
+          ""
+        ])
+      end)
+
+    assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20260804+eb50d8775.tar.gz"
+  end
+
   test "installs a tarball and points LLVM_CONFIG_PATH at it" do
     fixture =
       Path.join(System.tmp_dir!(), "beaver-llvm-install-#{System.unique_integer([:positive])}")

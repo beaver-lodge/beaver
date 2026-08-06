@@ -66,7 +66,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
   @impl Mix.Task
   def run(args) do
     {opts, positional} = OptionParser.parse!(args, strict: @switches)
-    opts = merge_env(opts)
+    opts = opts |> reject_empty() |> merge_env()
 
     install_dir = opts[:install_dir] || List.first(positional) || default_install_dir()
     {os_name, arch} = platform(opts)
@@ -96,11 +96,18 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     |> maybe_resolve_only()
   end
 
+  defp reject_empty(opts) do
+    Enum.reject(opts, fn {_key, value} -> value == "" end)
+  end
+
   defp put_default(opts, key, default, env) do
     if Keyword.has_key?(opts, key) do
       opts
     else
-      Keyword.put(opts, key, System.get_env(env) || default)
+      case System.get_env(env) do
+        value when value in [nil, ""] -> Keyword.put(opts, key, default)
+        value -> Keyword.put(opts, key, value)
+      end
     end
   end
 
@@ -109,7 +116,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
       opts
     else
       case System.get_env(env) do
-        nil -> opts
+        value when value in [nil, ""] -> opts
         value -> Keyword.put(opts, key, value)
       end
     end
