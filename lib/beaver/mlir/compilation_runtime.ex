@@ -20,8 +20,10 @@ defmodule Beaver.MLIR.CompilationRuntime do
     * dynamic dialect/schema version;
     * requested bytecode emit version.
 
-  Custom pass functions are not stable cache identities. Supply an explicit
-  `:pipeline_version` whenever `:pipeline` contains runtime functions.
+  Custom pass functions are not stable cache identities. In the keyword API,
+  supply `:pipeline_version` whenever `:pipeline` contains runtime functions.
+  `Beaver.MLIR.CompilationPlan` instead requires an explicit version on every
+  module- or callback-backed pass step.
 
   ## Telemetry
 
@@ -33,6 +35,7 @@ defmodule Beaver.MLIR.CompilationRuntime do
   alias Beaver.Composer
   alias Beaver.MLIR
   alias MLIR.CompilationCache
+  alias MLIR.CompilationPlan
   alias MLIR.Transform
   alias MLIR.Transform.Schedule, as: TransformSchedule
   alias __MODULE__.{Artifact, CacheKey}
@@ -53,50 +56,134 @@ defmodule Beaver.MLIR.CompilationRuntime do
           | {:llvm_revision, String.t()}
           | {:telemetry, (list(atom()), map(), map() -> any())}
 
+  @type plan_runtime_option ::
+          {:cache, CompilationCache.cache()}
+          | {:context, MLIR.Context.t()}
+          | {:llvm_revision, String.t()}
+          | {:telemetry, (list(atom()), map(), map() -> any())}
+
   @spec llvm_revision() :: String.t()
   def llvm_revision do
     MLIR.CAPI.beaverGetLLVMVersion() |> MLIR.to_string()
   end
 
-  @spec compile(binary() | MLIR.Module.t(), [compile_option()]) ::
+  @spec compile(binary() | MLIR.Module.t(), [compile_option()] | CompilationPlan.t()) ::
           {:ok, Artifact.t()} | {:error, Exception.t()}
-  def compile(source, opts \\ []) do
+  def compile(source, opts_or_plan \\ [])
+
+  def compile(source, %CompilationPlan{} = plan), do: compile(source, plan, [])
+
+  def compile(source, opts) when is_list(opts) do
     {:ok, compile!(source, opts)}
   rescue
     exception -> {:error, exception}
   end
 
-  @spec compile!(binary() | MLIR.Module.t(), [compile_option()]) :: Artifact.t()
-  def compile!(source, opts \\ []) do
+  @spec compile(binary() | MLIR.Module.t(), CompilationPlan.t(), [plan_runtime_option()]) ::
+          {:ok, Artifact.t()} | {:error, Exception.t()}
+  def compile(source, %CompilationPlan{} = plan, runtime_opts) do
+    {:ok, compile!(source, plan, runtime_opts)}
+  rescue
+    exception -> {:error, exception}
+  end
+
+  @spec compile!(binary() | MLIR.Module.t(), [compile_option()] | CompilationPlan.t()) ::
+          Artifact.t()
+  def compile!(source, opts_or_plan \\ [])
+
+  def compile!(source, %CompilationPlan{} = plan), do: compile!(source, plan, [])
+
+  def compile!(source, opts) when is_list(opts) do
+    do_compile!(source, opts, nil)
+  end
+
+  @spec compile!(binary() | MLIR.Module.t(), CompilationPlan.t(), [plan_runtime_option()]) ::
+          Artifact.t()
+  def compile!(source, %CompilationPlan{} = plan, runtime_opts) do
+    {opts, plan_info} = plan_options!(plan, runtime_opts)
+    do_compile!(source, opts, plan_info)
+  end
+
+  defp plan_options!(%CompilationPlan{} = plan, runtime_opts) do
+    validate_plan_runtime_options!(runtime_opts)
+    declaration = CompilationPlan.declaration(plan)
+    plan_id = CompilationPlan.identity(plan)
+
+    plan_opts =
+      [
+        pipeline: CompilationPlan.executable_pipeline(plan),
+        pipeline_version: declaration.pipeline,
+        transform_schedule: plan.transform_schedule,
+        transform_options: plan.transform_options,
+        target: plan.target,
+        schema_version: plan.schema_version,
+        desired_emit_version: plan.desired_emit_version,
+        context_options: plan.context_options
+      ]
+      |> Keyword.reject(fn {key, value} -> key == :desired_emit_version and is_nil(value) end)
+
+    plan_info = %{
+      id: plan_id,
+      declaration: declaration,
+      telemetry_metadata: plan.telemetry_metadata
+    }
+
+    {Keyword.merge(plan_opts, runtime_opts), plan_info}
+  end
+
+  defp validate_plan_runtime_options!(opts) do
+    unless Keyword.keyword?(opts) do
+      raise ArgumentError, "CompilationPlan runtime options must be a keyword list"
+    end
+
+    allowed = [:cache, :context, :telemetry, :llvm_revision]
+    keys = Keyword.keys(opts)
+
+    if length(keys) != length(Enum.uniq(keys)) do
+      raise ArgumentError, "CompilationPlan runtime options must not contain duplicate keys"
+    end
+
+    case keys -- allowed do
+      [] ->
+        :ok
+
+      unsupported ->
+        raise ArgumentError, "unsupported plan runtime options: #{inspect(unsupported)}"
+    end
+  end
+
+  defp do_compile!(source, opts, plan_info) do
     cache = Keyword.get(opts, :cache, :memory)
     {source_bytes, source_context} = source_bytes_and_context(source)
-    inputs = compatibility_inputs(source_bytes, opts)
+    inputs = source_bytes |> compatibility_inputs(opts) |> put_plan_input(plan_info)
     lookup_key = CacheKey.lookup(inputs)
 
     {cached, cache_lookup_duration} = timed(fn -> CompilationCache.get(cache, lookup_key) end)
 
-    MLIR.Telemetry.emit(
+    emit(
       [:cache, :lookup],
       %{duration: cache_lookup_duration},
       %{lookup_key: lookup_key},
-      opts
+      opts,
+      plan_info
     )
 
     case validate_cache_entry(cached, lookup_key, inputs) do
       {:ok, entry} ->
         timings = %{cache_lookup: cache_lookup_duration, parse: 0, transform: 0, serialize: 0}
-        emit_cache_result(:hit, lookup_key, timings, opts)
+        emit_cache_result(:hit, lookup_key, timings, opts, plan_info)
         artifact_from_entry(entry, :hit, timings)
 
       {:miss, reason} ->
         if reason != :not_found do
           CompilationCache.delete(cache, lookup_key)
 
-          MLIR.Telemetry.emit(
+          emit(
             [:cache, :failure],
             %{count: 1},
             %{lookup_key: lookup_key, reason: reason},
-            opts
+            opts,
+            plan_info
           )
         end
 
@@ -107,7 +194,8 @@ defmodule Beaver.MLIR.CompilationRuntime do
           lookup_key,
           cache,
           cache_lookup_duration,
-          opts
+          opts,
+          plan_info
         )
     end
   end
@@ -180,7 +268,8 @@ defmodule Beaver.MLIR.CompilationRuntime do
          lookup_key,
          cache,
          cache_lookup_duration,
-         opts
+         opts,
+         plan_info
        ) do
     {context, owned_context?} = compilation_context(source_context, opts)
 
@@ -211,6 +300,7 @@ defmodule Beaver.MLIR.CompilationRuntime do
             lookup_key: lookup_key,
             artifact_key: artifact_key
           })
+          |> put_plan_artifact_metadata(plan_info)
 
         entry = %{
           format: @entry_format,
@@ -226,11 +316,12 @@ defmodule Beaver.MLIR.CompilationRuntime do
             :ok
 
           {:error, reason} ->
-            MLIR.Telemetry.emit(
+            emit(
               [:cache, :failure],
               %{count: 1},
               %{lookup_key: lookup_key, reason: {:write, reason}},
-              opts
+              opts,
+              plan_info
             )
         end
 
@@ -241,10 +332,10 @@ defmodule Beaver.MLIR.CompilationRuntime do
           serialize: serialize_duration
         }
 
-        emit_stage(:parse, parse_duration, artifact_key, opts)
-        emit_stage(:transform, transform_duration, artifact_key, opts)
-        emit_stage(:serialize, serialize_duration, artifact_key, opts)
-        emit_cache_result(:miss, lookup_key, timings, opts)
+        emit_stage(:parse, parse_duration, artifact_key, opts, plan_info)
+        emit_stage(:transform, transform_duration, artifact_key, opts, plan_info)
+        emit_stage(:serialize, serialize_duration, artifact_key, opts, plan_info)
+        emit_cache_result(:miss, lookup_key, timings, opts, plan_info)
 
         artifact_from_entry(entry, :miss, timings)
       after
@@ -280,6 +371,9 @@ defmodule Beaver.MLIR.CompilationRuntime do
       bytecode_version: Keyword.get(opts, :desired_emit_version, :current)
     }
   end
+
+  defp put_plan_input(inputs, nil), do: inputs
+  defp put_plan_input(inputs, %{id: plan_id}), do: Map.put(inputs, :plan_id, plan_id)
 
   defp pipeline_identity(opts) do
     case Keyword.fetch(opts, :pipeline_version) do
@@ -418,20 +512,53 @@ defmodule Beaver.MLIR.CompilationRuntime do
     Keyword.take(opts, [:shared_lib_paths, :opt_level, :object_dump, :enable_pic, :dirty])
   end
 
-  defp emit_stage(stage, duration, artifact_key, opts) do
-    MLIR.Telemetry.emit([stage], %{duration: duration}, %{artifact_key: artifact_key}, opts)
+  defp put_plan_artifact_metadata(metadata, nil), do: metadata
+
+  defp put_plan_artifact_metadata(metadata, plan_info) do
+    Map.merge(metadata, %{
+      compilation_plan: plan_info.declaration,
+      plan_id: plan_info.id,
+      telemetry_metadata: plan_info.telemetry_metadata
+    })
   end
 
-  defp emit_cache_result(result, lookup_key, timings, opts) do
-    MLIR.Telemetry.emit(
+  defp emit_stage(stage, duration, artifact_key, opts, plan_info) do
+    emit([stage], %{duration: duration}, %{artifact_key: artifact_key}, opts, plan_info)
+  end
+
+  defp emit_cache_result(result, lookup_key, timings, opts, plan_info) do
+    metadata = %{lookup_key: lookup_key, timings: timings}
+
+    emit(
       [:cache, result],
       %{count: 1},
-      %{lookup_key: lookup_key, timings: timings},
-      opts
+      metadata,
+      opts,
+      plan_info
     )
   end
 
-  defp event_metadata(artifact), do: %{artifact_key: artifact.key, cache: artifact.cache}
+  defp emit(event, measurements, metadata, opts, plan_info) do
+    MLIR.Telemetry.emit(event, measurements, telemetry_metadata(metadata, plan_info), opts)
+  end
+
+  defp telemetry_metadata(metadata, nil), do: metadata
+
+  defp telemetry_metadata(metadata, plan_info) do
+    plan_info.telemetry_metadata
+    |> Map.merge(metadata)
+    |> Map.put(:plan_id, plan_info.id)
+  end
+
+  defp event_metadata(artifact) do
+    artifact.metadata
+    |> Map.get(:telemetry_metadata, %{})
+    |> Map.merge(%{artifact_key: artifact.key, cache: artifact.cache})
+    |> maybe_put_plan_id(artifact.metadata)
+  end
+
+  defp maybe_put_plan_id(metadata, %{plan_id: plan_id}), do: Map.put(metadata, :plan_id, plan_id)
+  defp maybe_put_plan_id(metadata, _artifact_metadata), do: metadata
 
   defp digest(binary), do: :crypto.hash(:sha256, binary) |> Base.encode16(case: :lower)
 
