@@ -303,32 +303,40 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
   end
 
   defp download!(url, path) do
-    unless System.find_executable("curl") do
-      Mix.raise("curl is required to download #{url}")
-    end
-
     IO.puts("Downloading #{url}")
 
-    {output, status} =
-      System.cmd(
-        "curl",
-        [
-          "--fail",
-          "--location",
-          "--silent",
-          "--show-error",
-          "--retry",
-          "3",
-          "--output",
-          path,
-          "--url",
+    cond do
+      System.find_executable("curl") ->
+        run_download(
+          [
+            "curl",
+            "--fail",
+            "--location",
+            "--silent",
+            "--show-error",
+            "--retry",
+            "3",
+            "--output",
+            path,
+            "--url",
+            url
+          ],
           url
-        ],
-        stderr_to_stdout: true
-      )
+        )
+
+      System.find_executable("wget") ->
+        run_download(["wget", "--quiet", "--output-document", path, url], url)
+
+      true ->
+        Mix.raise("curl or wget is required to download #{url}")
+    end
+  end
+
+  defp run_download(command, url) do
+    {output, status} = System.cmd(hd(command), tl(command), stderr_to_stdout: true)
 
     unless status == 0 do
-      Mix.raise("curl failed with status #{status}:\n#{output}")
+      Mix.raise("download failed with status #{status} for #{url}:\n#{output}")
     end
 
     :ok
