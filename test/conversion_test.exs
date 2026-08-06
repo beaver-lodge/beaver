@@ -364,17 +364,29 @@ defmodule Beaver.MLIR.ConversionTest do
         )
 
         send(parent, {:conversion_owner_resources, module, target, converter})
-        MLIR.Conversion.full(module, target, patterns, timeout: 100)
+
+        receive do
+          :start_conversion -> MLIR.Conversion.full(module, target, patterns, timeout: 100)
+        end
       end)
 
-    assert_receive {:conversion_owner_resources, module, target, converter}
-    assert_receive :owner_callback_started
-    Process.exit(owner, :kill)
-    assert_receive {:DOWN, ^monitor, :process, ^owner, :killed}
+    try do
+      assert_receive {:conversion_owner_resources, module, target, converter}, 5_000
 
-    assert :ok = eventually_destroy_converter(converter, 100)
-    assert :ok = MLIR.ConversionTarget.destroy(target)
-    MLIR.Module.destroy(module)
+      try do
+        send(owner, :start_conversion)
+        assert_receive :owner_callback_started, 5_000
+        Process.exit(owner, :kill)
+        assert_receive {:DOWN, ^monitor, :process, ^owner, :killed}, 5_000
+      after
+        ensure_process_terminated(owner)
+        assert :ok = eventually_destroy_converter(converter, 500)
+        assert :ok = MLIR.ConversionTarget.destroy(target)
+        MLIR.Module.destroy(module)
+      end
+    after
+      ensure_process_terminated(owner)
+    end
   end
 
   defp legal_builtin_target(ctx) do
@@ -416,6 +428,20 @@ defmodule Beaver.MLIR.ConversionTest do
           10 -> eventually_destroy_converter(converter, attempts - 1)
         end
       end
+  end
+
+  defp ensure_process_terminated(process) do
+    monitor = Process.monitor(process)
+
+    if Process.alive?(process) do
+      Process.exit(process, :kill)
+    end
+
+    receive do
+      {:DOWN, ^monitor, :process, ^process, _reason} -> :ok
+    after
+      5_000 -> raise "timed out terminating conversion owner"
+    end
   end
 
   defp unknown_module(ctx, name \\ "foo.unknown") do
