@@ -95,6 +95,31 @@ defmodule ExternalInterfaceTest do
     assert_receive {:DOWN, ^monitor, :process, _, :normal}, 1_000
   end
 
+  test "the native model outlives an attachment process that exits abnormally", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, ExternalInterfaceSlang)
+
+    module =
+      MLIR.Module.create!(
+        ~S[module { "external_interface_test.detached"() : () -> () }],
+        ctx: ctx
+      )
+
+    attachment =
+      MLIR.MemoryEffects.attach(ctx, "external_interface_test.detached", fn _operation ->
+        :pure
+      end)
+
+    monitor = Process.monitor(attachment.pid)
+    Process.exit(attachment.pid, :kill)
+    assert_receive {:DOWN, ^monitor, :process, _, :killed}, 1_000
+
+    module
+    |> Beaver.Composer.append(MLIR.Transform.canonicalize())
+    |> Beaver.Composer.run!()
+
+    assert MLIR.to_string(module, generic: true) =~ "external_interface_test.detached"
+  end
+
   test "Elixir transform operations map results and inject rewrite patterns", %{ctx: ctx} do
     Beaver.Slang.load(ctx, ExternalInterfaceSlang)
 

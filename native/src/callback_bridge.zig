@@ -50,6 +50,11 @@ fn attachmentTerm(
     dispatcher_id: beam.term,
     state: *State,
 ) beam.term {
+    // Keep the reference returned by enif_alloc_resource for the MLIR model.
+    // enif_make_resource adds an independent BEAM-term reference. If the
+    // attachment process dies and drops that term, the model reference keeps
+    // both this state and its dispatcher alive until the model destructor calls
+    // releaseModel. Do not release the allocation reference here.
     var terms = [_]beam.term{
         dispatcher_id,
         e.enif_make_resource(environment, state),
@@ -304,6 +309,9 @@ const PatternDescriptorState = struct {
 fn destroyState(comptime State: type) fn (beam.env, ?*anyopaque) callconv(.c) void {
     return struct {
         fn destroy(_: beam.env, object: ?*anyopaque) callconv(.c) void {
+            // This runs only after the model-owned reference and every BEAM
+            // term reference are gone, so no native callback can still reach
+            // the dispatcher.
             const self: *State = @ptrCast(@alignCast(object orelse return));
             self.dispatcher.deinit();
         }

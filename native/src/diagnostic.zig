@@ -71,6 +71,11 @@ const DiagnosticAggregator = struct {
         return user_data;
     }
     fn to_list(this: *@This(), destination_env: beam.env) !beam.term {
+        if (std.c.pthread_mutex_lock(&this.mutex) != .SUCCESS)
+            return error.FailedToLockDiagnosticAggregator;
+        defer if (std.c.pthread_mutex_unlock(&this.mutex) != .SUCCESS)
+            @panic("failed to unlock diagnostic aggregator");
+
         return e.enif_make_copy(
             destination_env,
             beam.make_term_list(this.env, this.container.items),

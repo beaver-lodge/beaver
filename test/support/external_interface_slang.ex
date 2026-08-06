@@ -107,6 +107,8 @@ defmodule ExternalInterfaceSlang do
 
   defop write(), interfaces: [memory_effects: &__MODULE__.write_effects/1]
 
+  defop detached()
+
   defop transform(),
     interfaces: [
       transform_op: [
