@@ -182,6 +182,7 @@ defmodule DogfoodTest do
 
     try do
       cache = start_supervised!({CompilationCache.Memory, []})
+      expected_plan_id = CompilationPlan.identity(compilation_plan)
 
       first = CompilationRuntime.compile!(module, compilation_plan, cache: cache)
       second = CompilationRuntime.compile!(module, compilation_plan, cache: cache)
@@ -204,6 +205,11 @@ defmodule DogfoodTest do
           end
         end)
         |> Enum.reject(&is_nil/1)
+
+      # Telemetry handlers are VM-global: other tests compiling in parallel
+      # also emit cache events. Scope to our plan via its deterministic
+      # telemetry marker.
+      telemetry = Enum.filter(telemetry, fn {_event, metadata} -> metadata[:dogfood] == true end)
 
       assert telemetry != []
 
@@ -237,7 +243,8 @@ defmodule DogfoodTest do
 
       refute is_nil(miss_plan_id)
       refute is_nil(hit_plan_id)
-      assert miss_plan_id == hit_plan_id
+      assert miss_plan_id == expected_plan_id
+      assert hit_plan_id == expected_plan_id
 
       assert Enum.any?(telemetry, fn {_event, metadata} ->
                metadata[:dogfood] == true and
