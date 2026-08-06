@@ -12,12 +12,6 @@ Rules for AI agents working in this repository.
 - Use ExUnit's built-in `@tag :tmp_dir` and the test context
   `%{tmp_dir: tmp_dir}` instead of manual `System.tmp_dir!()` and cleanup.
 
-Known exception: `test/expandable_jit/native_heap_global_test.exs` is the only
-sanctioned `async: false` module. It covers the VM-global heap ABI (global GC
-mark bits, dangling-pointer verification), whose semantics cannot hold under
-concurrent execution. New global-heap coverage must be added to that file
-rather than introducing another `async: false` module.
-
 ## Elixir JSON
 
 - Use Elixir's current built-in `JSON` module for JSON encoding and decoding.
