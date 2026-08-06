@@ -58,6 +58,7 @@ defmodule Beaver.MixProject do
         "guides/your-first-beaver-compiler.livemd",
         "guides/incremental-compilation-runtime.md",
         "guides/slang.md",
+        "guides/dialect-conversion.md",
         "CONTRIBUTING.md",
         "README.md"
       ],
