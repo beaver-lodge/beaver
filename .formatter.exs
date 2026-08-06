@@ -3,6 +3,7 @@ locals_without_parens = [
   deftype: 2,
   defattr: 1,
   defattr: 2,
+  defop: 1,
   defop: 2,
   defalias: 2,
   defconstraint: 2
