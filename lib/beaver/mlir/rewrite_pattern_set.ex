@@ -36,20 +36,54 @@ defmodule Beaver.MLIR.RewritePatternSet do
   end
 
   @doc """
-  Add the given `MLIR.RewritePattern` into a `MLIR.RewritePatternSet`.
-  Note that the ownership of the pattern is transferred to the set after this call.
+  Add a rewrite pattern into a `MLIR.RewritePatternSet`.
+
+  The set takes ownership of a raw `MLIR.RewritePattern`. Native descriptors
+  are materialized through the existing callback-backed rewrite bridge before
+  ownership is transferred.
   """
-  def add(set, pattern) do
+  @spec add(t(), MLIR.RewritePattern.t()) :: t()
+  def add(%__MODULE__{} = set, %MLIR.RewritePattern{} = pattern) do
     MLIR.CAPI.mlirRewritePatternSetAdd(set, pattern)
     set
   end
 
-  @doc """
-  Add a rewrite pattern defined by the given module or `match_and_rewrite` function into a `MLIR.RewritePatternSet`.
-  """
-  def add(set, root_name, pat, opts \\ [])
+  @spec add(t(), Beaver.Pattern.Native.Descriptor.t(), keyword()) :: t()
+  def add(%__MODULE__{} = set, %Beaver.Pattern.Native.Descriptor{} = descriptor, opts)
+      when is_list(opts) do
+    ctx = Keyword.get(opts, :ctx) || raise ArgumentError, "option :ctx is required"
+    descriptor = Beaver.Pattern.Native.configure(descriptor, Keyword.delete(opts, :ctx))
 
-  def add(%__MODULE__{} = set, root_name, module, opts) when is_atom(module) do
+    MLIR.RewritePattern.create(descriptor.root,
+      ctx: ctx,
+      benefit: descriptor.benefit,
+      init_state: descriptor.init_state,
+      construct: descriptor.construct,
+      destruct: descriptor.destruct,
+      match_and_rewrite: descriptor.match_and_rewrite
+    )
+    |> then(&add(set, &1))
+  end
+
+  @spec add(t(), term(), module() | function() | Beaver.Pattern.Native.Descriptor.t()) :: t()
+  def add(%__MODULE__{} = set, root_name, pattern) do
+    add(set, root_name, pattern, [])
+  end
+
+  @spec add(t(), term(), module() | function() | Beaver.Pattern.Native.Descriptor.t(), keyword()) ::
+          t()
+  def add(
+        %__MODULE__{} = set,
+        root_name,
+        %Beaver.Pattern.Native.Descriptor{} = descriptor,
+        opts
+      )
+      when is_list(opts) do
+    add(set, descriptor, Keyword.put(opts, :root, root_name))
+  end
+
+  def add(%__MODULE__{} = set, root_name, module, opts)
+      when is_atom(module) and is_list(opts) do
     opts =
       if function_exported?(module, :construct, 1) do
         put_in(opts, [:construct], &module.construct/1)
@@ -71,7 +105,7 @@ defmodule Beaver.MLIR.RewritePatternSet do
   end
 
   def add(%__MODULE__{} = set, root_name, match_and_rewrite, opts)
-      when is_function(match_and_rewrite, 4) do
+      when is_function(match_and_rewrite, 4) and is_list(opts) do
     benefit = opts[:benefit] || 1
     ctx = opts[:ctx] || raise "ctx is required in opts"
 

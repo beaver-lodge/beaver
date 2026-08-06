@@ -59,6 +59,7 @@ defmodule Beaver.MixProject do
         "guides/transform-autotuning.md",
         "guides/slang.md",
         "guides/dialect-conversion.md",
+        "guides/native-rewrite-patterns.md",
         "guides/action-tracing.md",
         "guides/enif-pointer-interop.md",
         "CONTRIBUTING.md",
@@ -74,6 +75,7 @@ defmodule Beaver.MixProject do
           Beaver,
           Beaver.Env,
           Beaver.Pattern,
+          ~r/^Beaver\.Pattern\.Native/,
           Beaver.Slang,
           ~r"Beaver.Exterior.*",
           Beaver.SSA

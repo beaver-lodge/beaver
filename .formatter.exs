@@ -6,7 +6,9 @@ locals_without_parens = [
   defop: 1,
   defop: 2,
   defalias: 2,
-  defconstraint: 2
+  defconstraint: 2,
+  defrewrite: 2,
+  defrewrite: 3
 ]
 
 # Used by "mix format"

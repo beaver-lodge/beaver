@@ -33,11 +33,13 @@ defmodule Beaver.MLIR.Rewrite do
   @type config_input() :: config_opts() | config_callback() | nil
 
   @typedoc "Pattern callback entries accepted by the list-based rewrite surface."
+  @type match_and_rewrite() ::
+          (MLIR.RewritePattern.t(), MLIR.Operation.t(), MLIR.PatternRewriter.t(), any() ->
+             {:ok, any()} | {:error, any()})
+
   @type pattern_entry() ::
-          {root_name :: term(),
-           match_and_rewrite ::
-             (MLIR.RewritePattern.t(), MLIR.Operation.t(), MLIR.PatternRewriter.t(), any() ->
-                {:ok, any()} | {:error, any()})}
+          Beaver.Pattern.Native.Descriptor.t()
+          | {root_name :: term(), match_and_rewrite() | Beaver.Pattern.Native.Descriptor.t()}
 
   @type pattern_list() :: [pattern_entry()]
   @type apply_result() :: {MLIR.LogicalResult.t(), diagnostics()}
@@ -115,6 +117,23 @@ defmodule Beaver.MLIR.Rewrite do
   end
 
   defp noop_config_callback(_cfg), do: :ok
+
+  defp create_pattern_set(ctx, patterns) do
+    set = MLIR.RewritePatternSet.create(ctx)
+
+    Enum.each(patterns, fn
+      %Beaver.Pattern.Native.Descriptor{} = descriptor ->
+        MLIR.RewritePatternSet.add(set, descriptor, ctx: ctx)
+
+      {root, %Beaver.Pattern.Native.Descriptor{} = descriptor} ->
+        MLIR.RewritePatternSet.add(set, root, descriptor, ctx: ctx)
+
+      {root, match_and_rewrite} ->
+        MLIR.RewritePatternSet.add(set, root, match_and_rewrite, ctx: ctx)
+    end)
+
+    set
+  end
 
   @spec to_config_callback(config_input()) :: config_callback()
   def to_config_callback(nil), do: &noop_config_callback/1
@@ -223,12 +242,7 @@ defmodule Beaver.MLIR.Rewrite do
   def apply_patterns(ir, patterns, configure)
       when is_list(patterns) and is_function(configure, 1) do
     ctx = MLIR.context(ir)
-    set = MLIR.RewritePatternSet.create(ctx)
-
-    for {root, match_and_rewrite} <- patterns do
-      MLIR.RewritePatternSet.add(set, root, match_and_rewrite, ctx: ctx)
-    end
-
+    set = create_pattern_set(ctx, patterns)
     frozen_set = %MLIR.FrozenRewritePatternSet{} = MLIR.RewritePatternSet.freeze(set)
 
     try do
@@ -324,12 +338,7 @@ defmodule Beaver.MLIR.Rewrite do
   def apply_patterns!(ir, patterns, configure)
       when is_list(patterns) and is_function(configure, 1) do
     ctx = MLIR.context(ir)
-    set = MLIR.RewritePatternSet.create(ctx)
-
-    for {root, match_and_rewrite} <- patterns do
-      MLIR.RewritePatternSet.add(set, root, match_and_rewrite, ctx: ctx)
-    end
-
+    set = create_pattern_set(ctx, patterns)
     frozen_set = %MLIR.FrozenRewritePatternSet{} = MLIR.RewritePatternSet.freeze(set)
 
     try do
