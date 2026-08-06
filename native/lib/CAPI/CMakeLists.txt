@@ -1,9 +1,7 @@
 add_mlir_public_c_api_library(
-  MLIRCAPIElixir
+  MLIRCAPIBeaver
   DISABLE_INSTALL
   Beaver.cpp
-  Elixir.cpp
   LINK_LIBS
   PUBLIC
-  MLIRElixir
   MLIRDebug)
