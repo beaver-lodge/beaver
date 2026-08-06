@@ -5,8 +5,20 @@ defmodule Beaver.CAPI.ManifestGenerator do
     {"BeaverCapiPolicyDiagnostics__", "diagnostics"},
     {"BeaverCapiPolicyDirtyCPUAndIO__", "dirty_cpu_io"},
     {"BeaverCapiPolicyCallbackBridge__", "callback_bridge"},
+    {"BeaverCapiPolicyCallbackRuntime__", "callback_runtime"},
     {"BeaverCapiPolicyExclude__", "exclude"}
   ]
+
+  @runtime_declarations %{
+    "mlirTypeConverterAddConversion" => %{
+      name: "beaver_raw_type_converter_create_callback",
+      params: ["callback", "timeout_ms"]
+    },
+    "mlirConditionallySpeculatableOpInterfaceAttachFallbackModel" => %{
+      name: "beaver_raw_conditionally_speculatable_attach_fallback_model",
+      params: ["context", "operation_name", "callback", "timeout_ms"]
+    }
+  }
 
   def run(argv) do
     {opts, _, _} =
@@ -99,7 +111,9 @@ defmodule Beaver.CAPI.ManifestGenerator do
   defp callback_bridge_manifest(functions, policy) do
     entries =
       for function <- functions,
-          policy_member?(policy, "callback_bridge", function.name) do
+          callback_bridge?(policy, function.name) do
+        runtime_backed = policy_member?(policy, "callback_runtime", function.name)
+
         %{
           "function" => %{
             "name" => function.name,
@@ -111,19 +125,30 @@ defmodule Beaver.CAPI.ManifestGenerator do
           },
           "callback_bridge" => %{
             "function" => function.name,
-            "reason" => "callback_bridge_required",
-            "unblock_path" => "callback_bridge_runtime",
-            "scheduler" => "unspecified",
-            "facets" => ["beam_callback", "lifetime_contract", "scheduler_contract"]
+            "reason" => if(runtime_backed, do: nil, else: "callback_bridge_required"),
+            "unblock_path" => if(runtime_backed, do: nil, else: "callback_bridge_runtime"),
+            "scheduler" => if(runtime_backed, do: "foreign_thread", else: "unspecified"),
+            "facets" => [
+              "beam_callback",
+              "lifetime_contract",
+              "scheduler_contract",
+              "rich_input_decoder"
+            ],
+            "runtime" => if(runtime_backed, do: "dispatcher", else: "pending"),
+            "runtime_backed" => runtime_backed,
+            "owner" => if(runtime_backed, do: "beam_process", else: "unspecified"),
+            "destructor" => if(runtime_backed, do: "native_owner", else: "unspecified"),
+            "lifetime" => if(runtime_backed, do: "native_owner", else: "unspecified"),
+            "timeout_ms" => if(runtime_backed, do: 30_000, else: nil)
           }
         }
       end
 
-    %{"version" => 1, "entries" => entries}
+    %{"version" => 2, "entries" => entries}
   end
 
   defp signature_entry(function, policy) do
-    %{
+    entry = %{
       "function" => %{
         "name" => function.name,
         "arity" => function.arity,
@@ -135,6 +160,18 @@ defmodule Beaver.CAPI.ManifestGenerator do
       "generation_blocker_reason" => blocker_reason(function.name, policy),
       "variants" => Enum.map(variants(function, policy), &signature_variant(function, &1))
     }
+
+    if callback_bridge?(policy, function.name) do
+      callback_entry =
+        callback_bridge_manifest([function], policy)
+        |> Map.fetch!("entries")
+        |> List.first()
+        |> Map.fetch!("callback_bridge")
+
+      Map.put(entry, "callback_bridge", callback_entry)
+    else
+      entry
+    end
   end
 
   defp blocker_reason(name, policy) do
@@ -149,6 +186,13 @@ defmodule Beaver.CAPI.ManifestGenerator do
     name = function.name
 
     cond do
+      policy_member?(policy, "callback_runtime", name) ->
+        [
+          Map.fetch!(@runtime_declarations, name)
+          |> Map.put(:dirty, false)
+          |> Map.put(:runtime, true)
+        ]
+
       blocker_reason(name, policy) != nil ->
         []
 
@@ -180,14 +224,19 @@ defmodule Beaver.CAPI.ManifestGenerator do
     |> MapSet.member?(name)
   end
 
+  defp callback_bridge?(policy, name) do
+    policy_member?(policy, "callback_bridge", name) or
+      policy_member?(policy, "callback_runtime", name)
+  end
+
   defp nif_decl(function, variant) do
     %{
       "wrapper_name" => variant.name,
       "nif_name" => nil,
       "params" => variant.params,
       "doc" => function.doc,
-      "param_ctypes" => function.param_ctypes,
-      "return_ctype" => function.return_ctype,
+      "param_ctypes" => if(variant[:runtime], do: [], else: function.param_ctypes),
+      "return_ctype" => if(variant[:runtime], do: nil, else: function.return_ctype),
       "param_typespecs" => nil,
       "return_typespec" => nil,
       "dirty" => variant.dirty
