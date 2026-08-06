@@ -112,4 +112,31 @@ defmodule ExConversionTest do
 
     assert {:error, %MLIR.Conversion.Error{}} = Plan.run(Ex.plan(), module)
   end
+
+  test "converts ex term types feeding ex.return", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, ExDialect)
+
+    module =
+      MLIR.Module.create!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "ex.lit"() {value = 1 : i64} : () -> i64
+            %1 = "ex.call"(%0, %0) {callee = "add", arity = 2 : i64, operandSegmentSizes = array<i32: 2>} : (i64, i64) -> !ex.dyn
+            "ex.return"(%1) {operandSegmentSizes = array<i32: 1>} : (!ex.dyn) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx: ctx
+      )
+      |> MLIR.verify!()
+
+    converted = Plan.run!(Ex.plan(), module)
+
+    rendered = MLIR.to_string(converted, generic: true)
+    refute rendered =~ "ex."
+    assert rendered =~ "func.call"
+    assert rendered =~ "func.return"
+  end
 end
