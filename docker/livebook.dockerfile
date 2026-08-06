@@ -1,4 +1,4 @@
-FROM ghcr.io/livebook-dev/livebook:0.14.5
+FROM ghcr.io/livebook-dev/livebook:0.19.9
 RUN apt-get upgrade -y \
   && apt-get update \
   && apt-get install --no-install-recommends -y \
