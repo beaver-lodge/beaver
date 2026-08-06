@@ -62,6 +62,30 @@ defmodule Beaver.CAPI.ManifestGenerator do
     "mlirConditionallySpeculatableOpInterfaceAttachFallbackModel" => %{
       name: "beaver_raw_conditionally_speculatable_attach_fallback_model",
       params: ["context", "operation_name", "callback", "timeout_ms"]
+    },
+    "mlirMemoryEffectsOpInterfaceAttachFallbackModel" => %{
+      name: "beaver_raw_memory_effects_attach_fallback_model",
+      params: ["context", "operation_name", "callback", "timeout_ms"]
+    },
+    "mlirTransformOpInterfaceAttachFallbackModel" => %{
+      name: "beaver_raw_transform_op_interface_attach_fallback_model",
+      params: [
+        "context",
+        "operation_name",
+        "apply_callback",
+        "allows_repeated_handle_operands_callback",
+        "timeout_ms"
+      ]
+    },
+    "mlirPatternDescriptorOpInterfaceAttachFallbackModel" => %{
+      name: "beaver_raw_pattern_descriptor_op_interface_attach_fallback_model",
+      params: [
+        "context",
+        "operation_name",
+        "populate_patterns_callback",
+        "populate_patterns_with_state_callback",
+        "timeout_ms"
+      ]
     }
   }
 
@@ -244,7 +268,11 @@ defmodule Beaver.CAPI.ManifestGenerator do
       diagnostics?(name, policy) ->
         [
           %{name: name, params: function.params, dirty: false},
-          %{name: name <> "WithDiagnostics", params: ["context" | function.params], dirty: false}
+          %{
+            name: name <> "WithDiagnostics",
+            params: ["context" | function.params],
+            dirty: "dirty_cpu"
+          }
         ]
 
       policy_member?(policy, "dirty_cpu_io", name) ->

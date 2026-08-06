@@ -14,6 +14,7 @@ const DiagnosticAggregator = struct {
     const Container = std.array_list.Managed(beam.term);
     env: beam.env,
     container: Container = undefined,
+    mutex: std.c.pthread_mutex_t = std.c.PTHREAD_MUTEX_INITIALIZER,
     fn collectDiagnosticNested(diagnostic: c.MlirDiagnostic, userData: ?*@This()) !beam.term {
         const env = userData.?.env;
         const severity = c.mlirDiagnosticGetSeverity(diagnostic);
@@ -42,32 +43,49 @@ const DiagnosticAggregator = struct {
         return c.mlirLogicalResultSuccess();
     }
     fn errorHandler(diagnostic: c.MlirDiagnostic, userData: ?*anyopaque) callconv(.c) mlir_capi.LogicalResult.T {
-        return collectDiagnosticTopLevel(diagnostic, @ptrCast(@alignCast(userData))) catch return c.mlirLogicalResultFailure();
+        const self: *@This() = @ptrCast(@alignCast(userData orelse return c.mlirLogicalResultFailure()));
+        if (std.c.pthread_mutex_lock(&self.mutex) != .SUCCESS)
+            return c.mlirLogicalResultFailure();
+        defer if (std.c.pthread_mutex_unlock(&self.mutex) != .SUCCESS)
+            @panic("failed to unlock diagnostic aggregator");
+        return collectDiagnosticTopLevel(diagnostic, self) catch return c.mlirLogicalResultFailure();
     }
     fn deleteUserData(userData: ?*anyopaque) callconv(.c) void {
         const this: ?*@This() = @ptrCast(@alignCast(userData));
         this.?.container.deinit();
+        if (std.c.pthread_mutex_destroy(&this.?.mutex) != .SUCCESS)
+            @panic("failed to destroy diagnostic aggregator mutex");
+        e.enif_free_env(this.?.env);
         beam.allocator.destroy(this.?);
     }
-    fn init(env: beam.env) !*@This() {
-        var userData = try beam.allocator.create(DiagnosticAggregator);
-        userData.env = env;
-        userData.container = Container.init(beam.allocator);
-        return userData;
+    fn init() !*@This() {
+        const diagnostic_env = e.enif_alloc_env() orelse
+            return error.FailedToAllocateDiagnosticEnvironment;
+        errdefer e.enif_free_env(diagnostic_env);
+
+        const user_data = try beam.allocator.create(DiagnosticAggregator);
+        user_data.* = .{
+            .env = diagnostic_env,
+            .container = Container.init(beam.allocator),
+        };
+        return user_data;
     }
-    fn to_list(this: *@This()) !beam.term {
-        return beam.make_term_list(this.env, this.container.items);
+    fn to_list(this: *@This(), destination_env: beam.env) !beam.term {
+        return e.enif_make_copy(
+            destination_env,
+            beam.make_term_list(this.env, this.container.items),
+        );
     }
 };
 
 pub fn call_with_diagnostics(env: beam.env, ctx: mlir_capi.Context.T, f: anytype, args: anytype) !beam.term {
-    const userData = try DiagnosticAggregator.init(env);
+    const userData = try DiagnosticAggregator.init();
     const id = c.mlirContextAttachDiagnosticHandler(ctx, DiagnosticAggregator.errorHandler, @ptrCast(@alignCast(userData)), DiagnosticAggregator.deleteUserData);
     defer c.mlirContextDetachDiagnosticHandler(ctx, id);
     var res_slice: []beam.term = try beam.allocator.alloc(beam.term, 2);
     defer beam.allocator.free(res_slice);
     res_slice[0] = try @call(.auto, f, args);
-    res_slice[1] = try DiagnosticAggregator.to_list(userData);
+    res_slice[1] = try DiagnosticAggregator.to_list(userData, env);
     return beam.make_tuple(env, res_slice);
 }
 
@@ -80,7 +98,12 @@ pub fn WithDiagnosticsNIF(comptime name: anytype) e.ErlNifFunc {
             return call_with_diagnostics(env, ctx, bang.nif, .{ env, n - 1, args[1..] });
         }
     };
-    return result.nif(name ++ nifSuffix, 1 + bang.arity, AttachAndRun.with_diagnostics).entry;
+    return result.nif_with_flags(
+        name ++ nifSuffix,
+        1 + bang.arity,
+        AttachAndRun.with_diagnostics,
+        e.ERL_NIF_DIRTY_JOB_CPU_BOUND,
+    ).entry;
 }
 
 pub const nifs = .{};

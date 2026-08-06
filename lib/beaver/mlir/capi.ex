@@ -3,12 +3,15 @@ defmodule Beaver.MLIR.CAPI do
   This module ships MLIR's C API. These NIFs are generated from headers in LLVM repo and this repo's headers providing supplemental functions.
 
   ## MLIR CAPIs might trigger Elixir code execution
-  Some MLIR CAPIs might trigger the execution of Elixir code by sending messages.
-  Their respective NIFs will be created with dirty flag to prevent dead-locking the BEAM VM if the Elixir callback is scheduled to run on the same scheduler. That's why the Elixir callback shouldn't contain any code run on dirty scheduler. Also be aware of the performance of the Elixir callback, because when it is running, the dirty schedulers will be blocked to wait for a mutex.
+  Some MLIR CAPIs might trigger Elixir callbacks through a context worker.
+  Their entry points use an asynchronous or dirty-scheduler boundary so a
+  normal BEAM scheduler never waits for a callback that it must itself run.
+  Callback implementations must not synchronously re-enter the same callback
+  attachment.
 
   Here are the list of these MLIR CAPIs and the Elixir code to execute they might trigger:
   - `mlirPassManagerRunOnOp`: the MLIR pass implemented in Elixir.
-  - `mlirOperationVerify`, `mlirAttributeParseGet`, `mlirTypeParseGet`, `mlirModuleCreateParse`: the diagnostic handler implemented in Elixir.
+  - `mlirOperationVerify`, `mlirAttributeParseGet`, `mlirTypeParseGet`, `mlirModuleCreateParse`: native diagnostic collection and any external operation interface reached during parsing or verification.
   """
   use Kinda.CodeGen,
     with: Beaver.MLIR.CAPI.CodeGen,
