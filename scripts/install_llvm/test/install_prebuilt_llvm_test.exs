@@ -63,6 +63,7 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
 
     tar = fixture <> ".tar.gz"
     dest = fixture <> "-dest"
+    github_env = fixture <> "-env"
 
     try do
       File.mkdir_p!(Path.join(fixture, "bin"))
@@ -83,16 +84,23 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
             "--asset-url",
             "file://#{tar}",
             "--install-dir",
-            dest
+            dest,
+            "--github-env",
+            github_env
           ])
         end)
 
       assert output =~ "LLVM_CONFIG_PATH=#{Path.join(dest, "bin/llvm-config")}"
       assert File.exists?(Path.join(dest, "bin/llvm-config"))
       assert File.read!(Path.join(dest, "bin/llvm-config")) =~ "17.0.0"
+
+      exported = File.read!(github_env)
+      assert exported =~ "LLVM_CONFIG_PATH=#{Path.join(dest, "bin/llvm-config")}"
+      assert exported =~ "LLVM_PREBUILT_DIR=#{dest}"
     after
       File.rm_rf!(fixture)
       File.rm_rf!(dest)
+      File.rm(github_env)
       File.rm(tar)
     end
   end

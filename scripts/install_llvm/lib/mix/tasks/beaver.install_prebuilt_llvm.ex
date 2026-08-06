@@ -35,6 +35,10 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     * `--sha256 DIGEST` / `LLVM_EUDSL_SHA256` — verify the downloaded archive.
     * `--github-token TOKEN` / `GITHUB_TOKEN` or `GH_TOKEN` — used for
       `latest` resolution.
+    * `--github-env PATH` / `GITHUB_ENV` — file to append the exported
+      variables to. Defaults to the `GITHUB_ENV` environment variable; pass an
+      explicit path when running in an environment that sets `GITHUB_ENV` but
+      should not be mutated (e.g. tests).
     * `--resolve-only` / `LLVM_EUDSL_RESOLVE_ONLY=1` — print
       `LLVM_PREBUILT_ASSET_NAME` and `LLVM_PREBUILT_URL` without downloading.
 
@@ -60,6 +64,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     asset_arch: :string,
     sha256: :string,
     github_token: :string,
+    github_env: :string,
     resolve_only: :boolean
   ]
 
@@ -76,7 +81,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
       IO.puts("LLVM_PREBUILT_ASSET_NAME=#{asset_name}")
       IO.puts("LLVM_PREBUILT_URL=#{asset_url}")
     else
-      install!(install_dir, asset_name, asset_url, opts[:sha256])
+      install!(install_dir, asset_name, asset_url, opts[:sha256], opts[:github_env])
     end
   end
 
@@ -91,6 +96,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     |> put_env(:asset_os, "LLVM_EUDSL_ASSET_OS")
     |> put_env(:asset_arch, "LLVM_EUDSL_ASSET_ARCH")
     |> put_env(:sha256, "LLVM_EUDSL_SHA256")
+    |> put_env(:github_env, "GITHUB_ENV")
     |> put_env(:github_token, "GITHUB_TOKEN")
     |> put_env(:github_token, "GH_TOKEN")
     |> maybe_resolve_only()
@@ -255,7 +261,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     {:ok, _} = Application.ensure_all_started(:ssl)
   end
 
-  defp install!(install_dir, asset_name, asset_url, sha256) do
+  defp install!(install_dir, asset_name, asset_url, sha256, github_env) do
     guard_install_dir!(install_dir)
     tmp_root = Path.join(System.tmp_dir!(), "llvm-prebuilt-#{System.unique_integer([:positive])}")
     archive = Path.join(tmp_root, asset_name)
@@ -284,7 +290,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
 
       IO.puts("Installed #{asset_name} into #{install_dir}")
       IO.puts("LLVM_CONFIG_PATH=#{llvm_config_path}")
-      write_github_env!(install_dir, asset_name, asset_url)
+      write_github_env!(install_dir, asset_name, asset_url, github_env)
     after
       File.rm_rf!(tmp_root)
     end
@@ -347,21 +353,6 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     :ok
   end
 
-  defp extract!(archive, extract_dir) do
-    File.mkdir_p!(extract_dir)
-
-    case :erl_tar.extract(String.to_charlist(archive), [
-           :compressed,
-           {:cwd, String.to_charlist(extract_dir)}
-         ]) do
-      :ok ->
-        :ok
-
-      {:error, reason} ->
-        Mix.raise("failed to extract #{archive}: #{inspect(reason)}")
-    end
-  end
-
   defp copy_tree!(src_root, dest_root) do
     File.mkdir_p!(dest_root)
 
@@ -383,8 +374,21 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     end)
   end
 
-  defp write_github_env!(install_dir, asset_name, asset_url) do
-    case System.get_env("GITHUB_ENV") do
+  defp extract!(archive, extract_dir) do
+    File.mkdir_p!(extract_dir)
+
+    {output, status} =
+      System.cmd("tar", ["-xzf", archive, "-C", extract_dir], stderr_to_stdout: true)
+
+    unless status == 0 do
+      Mix.raise("failed to extract #{archive}:\n#{output}")
+    end
+
+    :ok
+  end
+
+  defp write_github_env!(install_dir, asset_name, asset_url, github_env) do
+    case github_env || System.get_env("GITHUB_ENV") do
       nil ->
         :ok
 
