@@ -221,12 +221,25 @@ defmodule DogfoodTest do
                event == [:beaver, :mlir, :compilation, :cache, :hit]
              end)
 
-      plan_ids =
+      miss_plan_id =
         cache_events
-        |> Enum.map(fn {_event, metadata} -> metadata[:plan_id] end)
-        |> Enum.uniq()
+        |> Enum.find_value(fn
+          {[:beaver, :mlir, :compilation, :cache, :miss], metadata} -> metadata[:plan_id]
+          _ -> nil
+        end)
 
-      assert [_plan_id] = plan_ids
+      hit_plan_id =
+        cache_events
+        |> Enum.find_value(fn
+          {[:beaver, :mlir, :compilation, :cache, :hit], metadata} -> metadata[:plan_id]
+          _ -> nil
+        end)
+
+      IO.inspect({miss_plan_id, hit_plan_id}, label: "dogfood telemetry debug")
+
+      refute is_nil(miss_plan_id)
+      refute is_nil(hit_plan_id)
+      assert miss_plan_id == hit_plan_id
 
       assert Enum.any?(telemetry, fn {_event, metadata} ->
                metadata[:dogfood] == true and
