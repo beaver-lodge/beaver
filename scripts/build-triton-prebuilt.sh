@@ -25,6 +25,7 @@ cmake -S "${triton_dir}" -B "${build_dir}" -G Ninja \
   -DTRITON_BUILD_UT=OFF \
   -DTRITON_BUILD_PROTON=OFF \
   -DTRITON_BUILD_WITH_CCACHE="${ccache}" \
+  -DTRITON_CODEGEN_BACKENDS=nvidia \
   -DTRITON_CACHE_PATH="${TRITON_CACHE_PATH:-${HOME}/.triton}" \
   -DLLVM_SYSPATH="${llvm_syspath}" \
   -DMLIR_DIR="${mlir_dir}" \
@@ -48,6 +49,12 @@ core_targets=(
   TritonLLVMIR
   TritonAnalysis
   TritonTools
+  NVGPUIR
+  NVWSIR
+  NVWSTransforms
+  NVGPUToLLVM
+  TritonNVIDIAGPUToLLVM
+  NVHopperTransforms
 )
 
 echo "Building ${#core_targets[@]} Triton core targets"
@@ -80,6 +87,9 @@ esac
 echo "Copying Triton headers"
 cp -R "${triton_dir}/include"/. "${output_dir}/include"/
 cp -R "${build_dir}/include"/. "${output_dir}/include"/
+mkdir -p "${output_dir}/include/third_party"
+cp -R "${triton_dir}/third_party"/. "${output_dir}/include/third_party"/
+cp -R "${build_dir}/third_party"/. "${output_dir}/include/third_party"/
 
 echo "Triton prebuilt at ${output_dir}"
 find "${output_dir}" -maxdepth 2 -type d | head -20
