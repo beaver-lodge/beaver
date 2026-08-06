@@ -16,11 +16,12 @@ const memref = @import("memref.zig");
 const unranked_memref_descriptor = @import("unranked_memref_descriptor.zig");
 const value = @import("value.zig");
 const callback_bridge = @import("callback_bridge.zig");
+const conversion = @import("conversion.zig");
 
 const rewrite_pattern = @import("rewrite_pattern.zig");
 const capi_registry = @import("capi_registry.zig");
 const callback_nifs = .{kinda.callback_runtime.ReplyToken.nif("beaver_raw_callback_reply")};
-const handwritten_nifs = capi_registry.nifs ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ diagnostic.nifs ++ pointer.nifs ++ memref.nifs ++ enif_support.nifs ++ callback_nifs ++ unranked_memref_descriptor.nifs ++ rewrite_pattern.nifs ++ value.nifs ++ callback_bridge.nifs;
+const handwritten_nifs = capi_registry.nifs ++ mlir_capi.EntriesOfKinds ++ pass.nifs ++ registry.nifs ++ string_ref.nifs ++ diagnostic.nifs ++ pointer.nifs ++ memref.nifs ++ enif_support.nifs ++ callback_nifs ++ unranked_memref_descriptor.nifs ++ rewrite_pattern.nifs ++ value.nifs ++ callback_bridge.nifs ++ conversion.nifs;
 
 const num_nifs = handwritten_nifs.len;
 export var nifs: [num_nifs]e.ErlNifFunc = handwritten_nifs;
@@ -33,6 +34,7 @@ export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     unranked_memref_descriptor.open_all(env);
     kinda.callback_runtime.ReplyToken.open(env);
     callback_bridge.open(env);
+    conversion.open(env);
     return 0;
 }
 

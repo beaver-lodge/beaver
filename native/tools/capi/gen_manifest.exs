@@ -11,8 +11,53 @@ defmodule Beaver.CAPI.ManifestGenerator do
 
   @runtime_declarations %{
     "mlirTypeConverterAddConversion" => %{
-      name: "beaver_raw_type_converter_create_callback",
-      params: ["callback", "timeout_ms"]
+      name: "beaver_raw_type_converter_add_conversion",
+      params: ["registration", "callback", "timeout_ms"]
+    },
+    "mlirTypeConverterAdd1ToNConversion" => %{
+      name: "beaver_raw_type_converter_add_1_to_n_conversion",
+      params: ["registration", "callback", "timeout_ms"]
+    },
+    "mlirTypeConverterAddSourceMaterialization" => %{
+      name: "beaver_raw_type_converter_add_source_materialization",
+      params: ["registration", "callback", "timeout_ms"]
+    },
+    "mlirTypeConverterAddTargetMaterialization" => %{
+      name: "beaver_raw_type_converter_add_target_materialization",
+      params: ["registration", "callback", "timeout_ms"]
+    },
+    "mlirTypeConverterAdd1ToNTargetMaterialization" => %{
+      name: "beaver_raw_type_converter_add_1_to_n_target_materialization",
+      params: ["registration", "callback", "timeout_ms"]
+    },
+    "mlirConversionTargetAddDynamicallyLegalOp" => %{
+      name: "beaver_raw_conversion_target_add_dynamic_op",
+      params: ["registration", "operation_name", "callback", "timeout_ms"]
+    },
+    "mlirConversionTargetAddDynamicallyLegalDialect" => %{
+      name: "beaver_raw_conversion_target_add_dynamic_dialect",
+      params: ["registration", "dialect_name", "callback", "timeout_ms"]
+    },
+    "mlirConversionTargetMarkOpRecursivelyLegal" => %{
+      name: "beaver_raw_conversion_target_mark_recursively_legal",
+      params: ["registration", "operation_name", "callback", "timeout_ms"]
+    },
+    "mlirConversionTargetMarkUnknownOpDynamicallyLegal" => %{
+      name: "beaver_raw_conversion_target_mark_unknown_dynamic",
+      params: ["registration", "callback", "timeout_ms"]
+    },
+    "mlirOpConversionPatternCreate" => %{
+      name: "beaver_raw_conversion_pattern_add",
+      params: [
+        "pattern_set",
+        "root_name",
+        "benefit",
+        "context",
+        "type_converter_registration",
+        "callback",
+        "one_to_n",
+        "timeout_ms"
+      ]
     },
     "mlirConditionallySpeculatableOpInterfaceAttachFallbackModel" => %{
       name: "beaver_raw_conditionally_speculatable_attach_fallback_model",

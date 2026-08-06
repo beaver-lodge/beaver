@@ -83,6 +83,13 @@ defmodule Beaver.MLIR.RewritePatternSet do
     |> then(&add(set, &1))
   end
 
+  @doc """
+  Creates a dialect conversion pattern and transfers it into this set.
+  """
+  def add_conversion(set, root_name, converter, match_and_rewrite, opts \\ []) do
+    MLIR.ConversionPattern.add(set, root_name, converter, match_and_rewrite, opts)
+  end
+
   defdelegate destroy(set), to: MLIR.CAPI, as: :mlirRewritePatternSetDestroy
 
   defp do_destroy(%MLIR.Context{ref: ctx}, %__MODULE__{ref: set}) do
