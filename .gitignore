@@ -38,3 +38,4 @@ beaver-*.tar.gz.sha256
 zig-out
 /priv/
 /zig-pkg/
+/scripts/install_llvm/_build/

@@ -1,0 +1,119 @@
+defmodule Beaver.InstallPrebuiltLlvmTest do
+  use ExUnit.Case, async: true
+
+  import ExUnit.CaptureIO
+
+  alias Mix.Tasks.Beaver.InstallPrebuiltLlvm
+
+  setup do
+    Mix.Task.reenable("beaver.install_prebuilt_llvm")
+    :ok
+  end
+
+  test "resolve-only prints the default eudsl asset" do
+    output =
+      capture_io(fn ->
+        InstallPrebuiltLlvm.run([
+          "--resolve-only",
+          "--asset-os",
+          "manylinux",
+          "--asset-arch",
+          "x86_64"
+        ])
+      end)
+
+    assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20260804+eb50d8775.tar.gz"
+    assert output =~ "https://github.com/llvm/eudsl/releases/download/llvm/"
+  end
+
+  test "asset-url overrides GitHub asset resolution" do
+    output =
+      capture_io(fn ->
+        InstallPrebuiltLlvm.run([
+          "--resolve-only",
+          "--asset-url",
+          "https://example.com/llvm.tar.gz"
+        ])
+      end)
+
+    assert output =~ "LLVM_PREBUILT_ASSET_NAME=llvm.tar.gz"
+    assert output =~ "LLVM_PREBUILT_URL=https://example.com/llvm.tar.gz"
+  end
+
+  test "installs a tarball and points LLVM_CONFIG_PATH at it" do
+    fixture =
+      Path.join(System.tmp_dir!(), "beaver-llvm-install-#{System.unique_integer([:positive])}")
+
+    tar = fixture <> ".tar.gz"
+    dest = fixture <> "-dest"
+
+    try do
+      File.mkdir_p!(Path.join(fixture, "bin"))
+      File.write!(Path.join(fixture, "bin/llvm-config"), "#!/bin/sh\necho 17.0.0\n")
+
+      :ok =
+        :erl_tar.create(
+          String.to_charlist(tar),
+          [
+            {~c"bin/llvm-config", File.read!(Path.join(fixture, "bin/llvm-config"))}
+          ],
+          [:compressed]
+        )
+
+      output =
+        capture_io(fn ->
+          InstallPrebuiltLlvm.run([
+            "--asset-url",
+            "file://#{tar}",
+            "--install-dir",
+            dest
+          ])
+        end)
+
+      assert output =~ "LLVM_CONFIG_PATH=#{Path.join(dest, "bin/llvm-config")}"
+      assert File.exists?(Path.join(dest, "bin/llvm-config"))
+      assert File.read!(Path.join(dest, "bin/llvm-config")) =~ "17.0.0"
+    after
+      File.rm_rf!(fixture)
+      File.rm_rf!(dest)
+      File.rm(tar)
+    end
+  end
+
+  test "sha256 mismatch aborts the install" do
+    fixture =
+      Path.join(System.tmp_dir!(), "beaver-llvm-sha-#{System.unique_integer([:positive])}")
+
+    tar = fixture <> ".tar.gz"
+    dest = fixture <> "-dest"
+
+    try do
+      File.mkdir_p!(Path.join(fixture, "bin"))
+      File.write!(Path.join(fixture, "bin/llvm-config"), "#!/bin/sh\n")
+
+      :ok =
+        :erl_tar.create(
+          String.to_charlist(tar),
+          [{~c"bin/llvm-config", "#!/bin/sh\n"}],
+          [:compressed]
+        )
+
+      assert_raise Mix.Error, ~r/sha256 mismatch/, fn ->
+        capture_io(fn ->
+          InstallPrebuiltLlvm.run([
+            "--asset-url",
+            "file://#{tar}",
+            "--sha256",
+            String.duplicate("0", 64),
+            "--install-dir",
+            dest
+          ])
+        end)
+      end
+    after
+      File.rm_rf!(fixture)
+      File.rm_rf!(dest)
+      File.rm(tar)
+    end
+  end
+end
