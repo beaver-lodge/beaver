@@ -78,8 +78,28 @@ defmodule Beaver.Env do
     if Macro.Env.has_var?(__CALLER__, {var_name, nil}) do
       block_var
     else
+      track_dangling =
+        Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_dangling_blocks, nil}) and
+          not String.starts_with?(Atom.to_string(var_name), "_")
+
+      track =
+        if track_dangling do
+          quote do
+            Kernel.var!(beaver_internal_env_dangling_blocks) =
+              Kernel.var!(beaver_internal_env_dangling_blocks) ++ [unquote(var_name)]
+
+            # Mark the rebinding as read; consecutive forward references would
+            # otherwise trigger Elixir's "unused variable with the same name
+            # in the context" warning.
+            _ = Kernel.var!(beaver_internal_env_dangling_blocks)
+          end
+        end
+
       quote do
-        Kernel.var!(unquote(block_var)) = Beaver.MLIR.Block.create()
+        Kernel.var!(beaver_internal_env_block) = Beaver.MLIR.Block.create()
+        Kernel.var!(unquote(block_var)) = Kernel.var!(beaver_internal_env_block)
+        unquote(track)
+        Kernel.var!(beaver_internal_env_block)
       end
     end
   end
