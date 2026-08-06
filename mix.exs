@@ -5,7 +5,7 @@ defmodule Beaver.MixProject do
     [
       app: :beaver,
       version: "0.4.8-dev",
-      elixir: "~> 1.14",
+      elixir: "~> 1.18",
       start_permanent: Mix.env() == :prod,
       elixirc_paths: elixirc_paths(Mix.env()),
       deps: deps(),
@@ -38,8 +38,7 @@ defmodule Beaver.MixProject do
         ],
         make_env: fn ->
           %{
-            "KINDA_SOURCE_PATH" => Map.fetch!(Mix.Project.deps_paths(), :kinda),
-            "JASON_EBIN_PATH" => Path.join(Mix.Project.build_path(), "lib/jason/ebin")
+            "KINDA_SOURCE_PATH" => Map.fetch!(Mix.Project.deps_paths(), :kinda)
           }
         end,
         make_args: ~w{-j},

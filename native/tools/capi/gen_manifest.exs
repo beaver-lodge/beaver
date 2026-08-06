@@ -448,31 +448,11 @@ defmodule Beaver.CAPI.ManifestGenerator do
   defp normalize_doc(text), do: text |> String.replace(~r/[ \t]+/, " ") |> String.trim()
 
   defp decode_json!(json) do
-    cond do
-      Code.ensure_loaded?(JSON) and function_exported?(JSON, :decode!, 1) ->
-        apply(JSON, :decode!, [json])
-
-      Code.ensure_loaded?(Jason) and function_exported?(Jason, :decode!, 1) ->
-        apply(Jason, :decode!, [json])
-
-      true ->
-        raise "JSON decoder unavailable; pass the Jason ebin directory with elixir -pa"
-    end
+    JSON.decode!(json)
   end
 
   defp write_json!(path, data) do
-    encoded =
-      cond do
-        Code.ensure_loaded?(JSON) and function_exported?(JSON, :encode!, 1) ->
-          apply(JSON, :encode!, [data])
-
-        Code.ensure_loaded?(Jason) and function_exported?(Jason, :encode!, 2) ->
-          apply(Jason, :encode!, [data, [pretty: true]])
-
-        true ->
-          raise "JSON encoder unavailable; pass the Jason ebin directory with elixir -pa"
-      end
-
+    encoded = JSON.encode!(data)
     path = Path.expand(path)
     File.mkdir_p!(Path.dirname(path))
     File.write!(path, encoded)

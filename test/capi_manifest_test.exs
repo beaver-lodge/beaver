@@ -82,7 +82,7 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
       priv_dir
       |> Path.join("capi_callback_bridge.json")
       |> File.read!()
-      |> Jason.decode!()
+      |> JSON.decode!()
 
     assert callback_manifest["version"] == 2
     callback_entries = Map.fetch!(callback_manifest, "entries")
