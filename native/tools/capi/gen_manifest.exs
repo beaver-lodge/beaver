@@ -452,7 +452,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
   end
 
   defp write_json!(path, data) do
-    encoded = JSON.encode!(data, pretty: true)
+    encoded = JSON.encode!(data)
     path = Path.expand(path)
     File.mkdir_p!(Path.dirname(path))
     File.write!(path, encoded)

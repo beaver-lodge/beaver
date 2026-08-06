@@ -49,6 +49,9 @@ jobs:
         runs-on: ["ubuntu-22.04"]
         otp: ["25.0", "27.3"]
         elixir: ["1.18.0", "1.20.3"]
+        exclude:
+          - otp: "25.0"
+            elixir: "1.20.3"
         include:
           - runs-on: "ubuntu-22.04"
             otp: "28.4"
