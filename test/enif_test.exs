@@ -55,6 +55,17 @@ defmodule EnifTest do
   end
 
   test "enif send message", %{ctx: ctx} do
+    source =
+      ENIFSendMsg.create(ctx)
+      |> Beaver.ENIF.declare_external_functions()
+      |> MLIR.verify!()
+
+    source_ir = MLIR.to_string(source)
+    assert source_ir =~ "ptr.to_ptr"
+    assert source_ir =~ "ptr.constant #ptr.null"
+    refute source_ir =~ "builtin.unrealized_conversion_cast"
+    MLIR.Module.destroy(source)
+
     ENIFSendMsg.init(ctx)
     |> tap(fn %ENIFSupport{engine: e} ->
       invoker = &Beaver.ENIF.invoke(e, "send", [&1, &2])
