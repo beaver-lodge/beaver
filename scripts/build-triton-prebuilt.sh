@@ -45,7 +45,6 @@ core_targets=(
   GluonTransforms
   TritonToTritonGPU
   TritonGPUToLLVM
-  TritonInstrumentToLLVM
   TritonLLVMIR
   TritonAnalysis
   TritonTools
