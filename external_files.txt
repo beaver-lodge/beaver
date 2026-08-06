@@ -4,7 +4,6 @@ build.zig.zon
 native/**/CMakeLists.txt
 native/**/*.cmake
 native/**/*.h
-native/**/*.td
 native/**/*.cpp
 native/**/*.exs
 Makefile
