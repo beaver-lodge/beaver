@@ -2,6 +2,8 @@ defmodule Beaver.MLIR.Conversion do
   @moduledoc """
   High-level, diagnostic-aware MLIR dialect conversion.
 
+  For a declarative, inspectable, and reusable pipeline, see `Beaver.MLIR.Conversion.Plan`.
+
   `apply/5` runs full or partial conversion outside BEAM scheduler threads and
   services callback-backed targets, type converters, and conversion patterns
   in the calling process. Mutable pattern sets are frozen and cleaned up
