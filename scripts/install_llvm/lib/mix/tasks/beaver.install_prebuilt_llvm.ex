@@ -3,8 +3,9 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
   Installs a prebuilt LLVM/MLIR distribution and prints `LLVM_CONFIG_PATH`.
 
   By default it downloads the matching `llvm/eudsl` nightly build for the
-  current platform. Any URL can be used instead, for example Triton's pinned
-  LLVM archive:
+  current platform. `--triton` installs the exact LLVM archive Triton pins
+  (resolved from `triton-lang/triton`'s `llvm-info.json` at run time). Any URL
+  can be used instead, for example Triton's pinned LLVM archive:
 
       (cd scripts/install_llvm && mix beaver.install_prebuilt_llvm \\
         --asset-url https://oaitriton.blob.core.windows.net/public/llvm-builds/llvm-b010a18d-ubuntu-x64-1.tar.gz \\
@@ -32,6 +33,10 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
       URL (the asset name defaults to the URL basename).
     * `--asset-os OS` / `LLVM_EUDSL_ASSET_OS` and `--asset-arch ARCH` /
       `LLVM_EUDSL_ASSET_ARCH` — override platform detection for asset naming.
+    * `--triton` / `LLVM_TRITON=1` — install the prebuilt LLVM Triton pins
+      (`cmake/llvm-build-info.json` + `cmake/llvm-info.json` from
+      `triton-lang/triton`); the archive URL and sha256 are derived from those
+      files, so the pin tracks Triton's LLVM bumps.
     * `--sha256 DIGEST` / `LLVM_EUDSL_SHA256` — verify the downloaded archive.
     * `--github-token TOKEN` / `GITHUB_TOKEN` or `GH_TOKEN` — used for
       `latest` resolution.
@@ -65,6 +70,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     sha256: :string,
     github_token: :string,
     github_env: :string,
+    triton: :boolean,
     resolve_only: :boolean
   ]
 
@@ -75,13 +81,13 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
 
     install_dir = opts[:install_dir] || List.first(positional) || default_install_dir()
     {os_name, arch} = platform(opts)
-    {asset_name, asset_url} = resolve_asset(opts, os_name, arch)
+    {asset_name, asset_url, sha256} = resolve_asset(opts, os_name, arch)
 
     if opts[:resolve_only] do
       IO.puts("LLVM_PREBUILT_ASSET_NAME=#{asset_name}")
       IO.puts("LLVM_PREBUILT_URL=#{asset_url}")
     else
-      install!(install_dir, asset_name, asset_url, opts[:sha256], opts[:github_env])
+      install!(install_dir, asset_name, asset_url, sha256, opts[:github_env])
     end
   end
 
@@ -100,6 +106,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     |> put_env(:github_token, "GITHUB_TOKEN")
     |> put_env(:github_token, "GH_TOKEN")
     |> maybe_resolve_only()
+    |> maybe_triton()
   end
 
   defp reject_empty(opts) do
@@ -131,6 +138,14 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
   defp maybe_resolve_only(opts) do
     if System.get_env("LLVM_EUDSL_RESOLVE_ONLY") == "1" do
       Keyword.put_new(opts, :resolve_only, true)
+    else
+      opts
+    end
+  end
+
+  defp maybe_triton(opts) do
+    if System.get_env("LLVM_TRITON") == "1" do
+      Keyword.put_new(opts, :triton, true)
     else
       opts
     end
@@ -172,11 +187,14 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
   end
 
   defp resolve_asset(opts, os_name, arch) do
-    case opts[:asset_url] do
-      url when is_binary(url) ->
-        {opts[:asset_name] || Path.basename(url), url}
+    cond do
+      opts[:triton] ->
+        resolve_triton_asset!(opts, os_name, arch)
 
-      nil ->
+      is_binary(opts[:asset_url]) ->
+        {opts[:asset_name] || Path.basename(opts[:asset_url]), opts[:asset_url], opts[:sha256]}
+
+      true ->
         name =
           opts[:asset_name] ||
             case opts[:asset_revision] do
@@ -185,8 +203,45 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
             end
 
         url = "https://github.com/#{opts[:repo]}/releases/download/#{opts[:tag]}/#{name}"
-        {name, url}
+        {name, url, opts[:sha256]}
     end
+  end
+
+  defp resolve_triton_asset!(opts, os_name, arch) do
+    ensure_http!()
+    suffix = triton_suffix(os_name, arch)
+    build_info = triton_json!("cmake/llvm-build-info.json")
+    info = triton_json!("cmake/llvm-info.json")
+
+    hash = info["llvm_hash"] || build_info["llvm_hash"]
+    build_number = info["build_number"] || build_info["build_number"]
+    sha256 = info["sha256sum"][suffix] || opts[:sha256]
+
+    unless is_binary(hash) and is_integer(build_number) do
+      Mix.raise(
+        "invalid Triton LLVM info: hash=#{inspect(hash)} build_number=#{inspect(build_number)}"
+      )
+    end
+
+    name = "llvm-#{String.slice(hash, 0, 8)}-#{suffix}-#{build_number}.tar.gz"
+    url = "https://oaitriton.blob.core.windows.net/public/llvm-builds/#{name}"
+    {name, url, sha256}
+  end
+
+  @doc false
+  def triton_suffix(os_name, arch) do
+    case {os_name, arch} do
+      {"manylinux", "x86_64"} -> "ubuntu-x64"
+      {"manylinux", "aarch64"} -> "ubuntu-arm64"
+      {"macos", "arm64"} -> "macos-arm64"
+      {"macos", "x86_64"} -> "macos-x64"
+      {"windows", "amd64"} -> "windows-x64"
+      other -> Mix.raise("no Triton LLVM archive for #{inspect(other)}")
+    end
+  end
+
+  defp triton_json!(path) do
+    github_get!("https://raw.githubusercontent.com/triton-lang/triton/main/#{path}", nil)
   end
 
   defp resolve_latest_asset!(opts, os_name, arch) do
