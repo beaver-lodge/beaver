@@ -101,9 +101,10 @@ fn createNativePartitionLib(
         .root_module = createNativeModule(b, target, optimize, root, capi_module, kinda_module, mlir_include_dir),
     });
     if (linkage == .dynamic) {
-        // Partition dylibs call the MLIR C API directly and are loaded as
-        // dependencies of the final NIF library.
-        lib.root_module.linkSystemLibrary("MLIRBeaver", .{ .use_pkg_config = .no });
+        // Partition dylibs call the MLIR C API directly. Their undefined
+        // symbols are resolved at runtime from the final NIF library's
+        // dependency on MLIRBeaver, so the partition caches stay valid when
+        // only the C++ aggregate changes.
         lib.linker_allow_shlib_undefined = true;
         lib.root_module.addLibraryPath(.{ .cwd_relative = mlir_lib_dir });
         lib.root_module.addRPathSpecial(if (os == .linux) "$ORIGIN" else "@loader_path");
