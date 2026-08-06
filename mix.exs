@@ -56,6 +56,7 @@ defmodule Beaver.MixProject do
       extras: [
         "guides/your-first-beaver-compiler.livemd",
         "guides/incremental-compilation-runtime.md",
+        "guides/transform-autotuning.md",
         "guides/slang.md",
         "guides/dialect-conversion.md",
         "guides/action-tracing.md",

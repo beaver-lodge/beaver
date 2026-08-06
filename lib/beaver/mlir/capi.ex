@@ -11,6 +11,7 @@ defmodule Beaver.MLIR.CAPI do
 
   Here are the list of these MLIR CAPIs and the Elixir code to execute they might trigger:
   - `mlirPassManagerRunOnOp`: the MLIR pass implemented in Elixir.
+  - `mlirTransformApplyNamedSequence`: Transform operations implemented in Elixir.
   - `mlirOperationVerify`, `mlirAttributeParseGet`, `mlirTypeParseGet`, `mlirModuleCreateParse`: native diagnostic collection and any external operation interface reached during parsing or verification.
   """
   use Kinda.CodeGen,

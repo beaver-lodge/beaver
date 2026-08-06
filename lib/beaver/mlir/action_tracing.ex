@@ -33,6 +33,9 @@ defmodule Beaver.MLIR.ActionTracing do
     automatically. Defaults to `nil` (manual draining).
   - `:telemetry` — optional `(event, measurements, metadata) -> term` callback
     used instead of `:telemetry` events (see `Beaver.MLIR.Telemetry`).
+  - `:metadata` — metadata merged into every emitted action event. Event-owned
+    fields take precedence. This can correlate actions with a higher-level
+    operation such as one Transform autotuning candidate.
   """
 
   use GenServer
@@ -44,7 +47,7 @@ defmodule Beaver.MLIR.ActionTracing do
   defmodule Session do
     @moduledoc "A live context-scoped action tracing session."
     @enforce_keys [:pid, :context]
-    defstruct [:pid, :context, :tags, :locations, :skip, :limit, :drain_interval_ms]
+    defstruct [:pid, :context, :tags, :locations, :skip, :limit, :drain_interval_ms, :metadata]
 
     @type t() :: %__MODULE__{
             pid: pid(),
@@ -53,7 +56,8 @@ defmodule Beaver.MLIR.ActionTracing do
             locations: [String.t()] | nil,
             skip: %{optional(String.t()) => non_neg_integer()},
             limit: %{optional(String.t()) => non_neg_integer()},
-            drain_interval_ms: pos_integer() | nil
+            drain_interval_ms: pos_integer() | nil,
+            metadata: map()
           }
   end
 
@@ -76,6 +80,7 @@ defmodule Beaver.MLIR.ActionTracing do
     locations = normalize_locations!(Keyword.get(opts, :locations))
     skip = normalize_count_map!(Keyword.get(opts, :skip, %{}), :skip)
     limit = normalize_count_map!(Keyword.get(opts, :limit, %{}), :limit)
+    metadata = normalize_metadata!(Keyword.get(opts, :metadata, %{}))
 
     drain_interval_ms =
       case Keyword.get(opts, :drain_interval_ms) do
@@ -104,6 +109,7 @@ defmodule Beaver.MLIR.ActionTracing do
         context: context,
         session: session,
         telemetry: Keyword.get(opts, :telemetry),
+        metadata: metadata,
         drain_interval_ms: drain_interval_ms
       })
 
@@ -114,7 +120,8 @@ defmodule Beaver.MLIR.ActionTracing do
       locations: locations,
       skip: skip,
       limit: limit,
-      drain_interval_ms: drain_interval_ms
+      drain_interval_ms: drain_interval_ms,
+      metadata: metadata
     }
   end
 
@@ -162,7 +169,7 @@ defmodule Beaver.MLIR.ActionTracing do
   @impl true
   def handle_call(:drain, _from, state) do
     events = drain_raw_events(state)
-    emit_events(events, state.telemetry)
+    emit_events(events, state.telemetry, state.metadata)
     {:reply, events, state}
   end
 
@@ -179,7 +186,7 @@ defmodule Beaver.MLIR.ActionTracing do
   @impl true
   def handle_info(:drain_timer, state) do
     events = drain_raw_events(state)
-    emit_events(events, state.telemetry)
+    emit_events(events, state.telemetry, state.metadata)
     schedule_drain(state)
     {:noreply, state}
   end
@@ -244,7 +251,7 @@ defmodule Beaver.MLIR.ActionTracing do
     {event["tag"], event["depth"]}
   end
 
-  defp emit_events(events, telemetry) do
+  defp emit_events(events, telemetry, extra_metadata) do
     events
     |> pair_events()
     |> Enum.each(fn
@@ -254,17 +261,17 @@ defmodule Beaver.MLIR.ActionTracing do
         MLIR.Telemetry.emit(
           [:action, :start],
           %{},
-          start_event,
+          Map.merge(extra_metadata, start_event),
           telemetry: telemetry
         )
 
         MLIR.Telemetry.emit(
           [:action, :stop],
           %{duration: duration},
-          %{
+          Map.merge(extra_metadata, %{
             "tag" => event["tag"],
             "depth" => event["depth"]
-          },
+          }),
           telemetry: telemetry
         )
 
@@ -310,6 +317,11 @@ defmodule Beaver.MLIR.ActionTracing do
 
   defp normalize_count_map!(other, name),
     do: raise(ArgumentError, "invalid #{name}: #{inspect(other)}")
+
+  defp normalize_metadata!(metadata) when is_map(metadata), do: metadata
+
+  defp normalize_metadata!(other),
+    do: raise(ArgumentError, "invalid :metadata: #{inspect(other)}")
 
   defp encode_count_map(map) do
     "{" <> Enum.map_join(map, ",", fn {k, v} -> ~s("#{k}":#{v}) end) <> "}"
