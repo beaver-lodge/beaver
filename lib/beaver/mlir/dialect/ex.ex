@@ -30,6 +30,10 @@ defmodule Beaver.MLIR.Dialect.Ex do
     base("#builtin.string")
   end
 
+  defconstraint cmp_predicate_value do
+    base("#builtin.string")
+  end
+
   defop lit(),
     results: [result: all_of([base("!builtin.integer"), any()])],
     attributes: [value: ^integer_value]
@@ -62,6 +66,19 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop call(args = variadic(any())),
     results: [result: base(dyn())],
     attributes: [callee: ^callee_value, arity: ^integer_value]
+
+  defop cmp(
+          left = all_of([base("!builtin.integer"), any()]),
+          right = all_of([base("!builtin.integer"), any()])
+        ),
+        results: [result: all_of([base("!builtin.integer"), any()])],
+        attributes: [predicate: ^cmp_predicate_value]
+
+  defop if(cond = all_of([base("!builtin.integer"), any()])),
+    results: [result: variadic(any())],
+    regions: [:any, :any]
+
+  defop yield(values = variadic(any())), traits: [:terminator]
 
   defop func(),
     attributes: [sym_name: base("#builtin.string")],
