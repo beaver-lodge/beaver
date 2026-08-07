@@ -127,6 +127,13 @@ jobs:
           files: |
             *.tar.gz
           tag_name: ${{ needs.generate_id.outputs.formatted_date }}
+      - name: Publish archives to version tag
+        uses: softprops/action-gh-release@v3
+        if: ${{ github.event_name != 'pull_request' && github.repository == 'beaver-lodge/beaver' && startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          files: |
+            *.tar.gz
+          tag_name: ${{ github.ref_name }}
       - name: Test dev compile
         if: ${{ github.event_name != 'pull_request' && github.repository == 'beaver-lodge/beaver' }}
         env:
@@ -220,6 +227,13 @@ jobs:
           files: |
             beaver/*.tar.gz
           tag_name: ${{ needs.generate_id.outputs.formatted_date }}
+      - name: Publish archives to version tag
+        uses: softprops/action-gh-release@v3
+        if: ${{ github.event_name != 'pull_request' && github.repository == 'beaver-lodge/beaver' && matrix.image.platform == 'linux/arm64/v8' && startsWith(github.ref, 'refs/tags/v') }}
+        with:
+          files: |
+            beaver/*.tar.gz
+          tag_name: ${{ github.ref_name }}
       - name: Build x86
         if: ${{ matrix.image.platform == 'linux/amd64' }}
         run: docker run -v $PWD:/src -w /src/beaver ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
@@ -236,7 +250,6 @@ jobs:
       contents: read
     env:
       HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
-      BEAVER_ARTEFACT_URL: https://github.com/beaver-lodge/beaver/releases/download/${{ needs.generate_id.outputs.formatted_date }}/@{artefact_filename}
     steps:
       - uses: actions/checkout@v4
         name: Check-out beaver
@@ -248,15 +261,14 @@ jobs:
       - run: mix local.hex --force
       - name: Align version and prebuilt URL
         run: |
-          sed -i.bak 's/-dev//g' mix.exs && rm -f mix.exs.bak
-          sed -i.bak "s#beaver-prebuilt/releases/download/[0-9-]*#beaver/releases/download/${{ needs.generate_id.outputs.formatted_date }}#" mix.exs && rm -f mix.exs.bak
-      - name: Verify tag/version alignment
-        run: |
           set -euo pipefail
+          sed -i.bak 's/-dev//g' mix.exs && rm -f mix.exs.bak
           VERSION="$(
             elixir -e 'source = File.read!("mix.exs"); [v] = Regex.run(~r/version: "([^"]+)"/, source, capture: :all_but_first); IO.puts(v)'
           )"
           test "${{ github.ref_name }}" = "v$VERSION"
+          sed -i.bak "s#beaver-prebuilt/releases/download/[0-9-]*#beaver/releases/download/v${VERSION}#" mix.exs && rm -f mix.exs.bak
+          echo "BEAVER_ARTEFACT_URL=https://github.com/beaver-lodge/beaver/releases/download/v${VERSION}/@{artefact_filename}" >> "$GITHUB_ENV"
       - name: Install dependencies
         run: mix deps.get
       - name: Generate NIF checksums from this release
