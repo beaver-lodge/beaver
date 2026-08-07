@@ -328,11 +328,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
       verify_sha256!(archive, sha256)
       extract!(archive, extract_dir)
 
-      llvm_config =
-        case Path.wildcard(Path.join(extract_dir, "**/bin/llvm-config")) do
-          [path | _] -> path
-          [] -> Mix.raise("could not locate bin/llvm-config in #{asset_name}")
-        end
+      llvm_config = find_llvm_config!(extract_dir, asset_name)
 
       asset_root = llvm_config |> Path.dirname() |> Path.dirname()
 
@@ -340,7 +336,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
       File.mkdir_p!(install_dir)
       copy_tree!(asset_root, install_dir)
 
-      llvm_config_path = Path.join(install_dir, "bin/llvm-config")
+      llvm_config_path = Path.join(install_dir, "bin/#{Path.basename(llvm_config)}")
       File.chmod(llvm_config_path, 0o755)
 
       IO.puts("Installed #{asset_name} into #{install_dir}")
@@ -440,14 +436,56 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
   defp extract!(archive, extract_dir) do
     File.mkdir_p!(extract_dir)
 
-    {output, status} =
-      System.cmd("tar", ["-xzf", archive, "-C", extract_dir], stderr_to_stdout: true)
+    if match?({:win32, _}, :os.type()) do
+      # Windows runners do not guarantee a usable system tar for these
+      # archives, so go through erl_tar for the Windows prebuilt. The Unix
+      # archives cannot use erl_tar: they store negative base-256 mtime fields
+      # (reproducible builds) that erl_tar rejects with :integer_overflow, and
+      # they rely on symlinks that the system tar handles faithfully.
+      case :erl_tar.extract(String.to_charlist(archive), [
+             :compressed,
+             {:cwd, String.to_charlist(extract_dir)}
+           ]) do
+        :ok -> :ok
+        {:error, reason} -> Mix.raise("failed to extract #{archive}: #{inspect(reason)}")
+      end
+    else
+      {output, status} =
+        System.cmd("tar", ["-xzf", archive, "-C", extract_dir], stderr_to_stdout: true)
 
-    unless status == 0 do
-      Mix.raise("failed to extract #{archive}:\n#{output}")
+      unless status == 0 do
+        Mix.raise("failed to extract #{archive}:\n#{output}")
+      end
+
+      :ok
     end
+  end
 
-    :ok
+  # Path.wildcard/1 has Windows-specific separator semantics that are easy to
+  # get wrong for a pattern built from a native path, so locate llvm-config by
+  # walking the extracted tree instead.
+  defp find_llvm_config!(extract_dir, asset_name) do
+    case walk_for_llvm_config(extract_dir) do
+      nil -> Mix.raise("could not locate bin/llvm-config in #{asset_name}")
+      path -> path
+    end
+  end
+
+  defp walk_for_llvm_config(dir) do
+    Enum.find_value(File.ls!(dir), fn entry ->
+      path = Path.join(dir, entry)
+
+      cond do
+        File.dir?(path) ->
+          walk_for_llvm_config(path)
+
+        Path.basename(dir) == "bin" and String.starts_with?(entry, "llvm-config") ->
+          path
+
+        true ->
+          nil
+      end
+    end)
   end
 
   defp write_github_env!(install_dir, asset_name, asset_url, github_env) do

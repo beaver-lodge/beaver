@@ -1,0 +1,29 @@
+# nmake makefile for building Beaver native libraries on Windows.
+# Mirrors Makefile using cmd.exe-compatible commands; elixir_make picks it up
+# automatically when it invokes nmake. elixir_make provides MIX_ENV,
+# MIX_APP_PATH, ERTS_INCLUDE_DIR and KINDA_SOURCE_PATH in the environment, so
+# the defaults below only apply to standalone invocations.
+
+!IFNDEF MIX_ENV
+MIX_ENV = dev
+!ENDIF
+!IFNDEF MIX_APP_PATH
+MIX_APP_PATH = _build\$(MIX_ENV)\lib\beaver
+!ENDIF
+BUILD_PRIV = $(MIX_APP_PATH)\priv
+!IFDEF KINDA_SOURCE_PATH
+KINDA_FORK_ARG = --fork="$(KINDA_SOURCE_PATH)"
+!ELSE
+KINDA_FORK_ARG =
+!ENDIF
+
+all: zig_build
+
+prepare_build_priv:
+	@if not exist "$(BUILD_PRIV)" mkdir "$(BUILD_PRIV)"
+
+zig_build: prepare_build_priv
+	zig build -p "$(BUILD_PRIV)" --search-prefix "$(ERTS_INCLUDE_DIR)\.." $(KINDA_FORK_ARG)
+
+clean:
+	@if exist .zig-cache rmdir /s /q .zig-cache

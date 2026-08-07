@@ -2,6 +2,7 @@ const kinda = @import("kinda");
 const e = kinda.erl_nif;
 const beam = kinda.beam;
 const mlir_capi = @import("mlir_capi.zig");
+const builtin = @import("builtin");
 
 const NifFunc = e.ErlNifFunc;
 
@@ -74,7 +75,7 @@ export fn nif_unload(_: beam.env, _: ?*anyopaque) void {}
 
 var entry: e.ErlNifEntry = undefined;
 
-export fn nif_init() *const e.ErlNifEntry {
+fn nif_init_impl() *const e.ErlNifEntry {
     const nifs = assembleNifs();
     entry = e.ErlNifEntry{
         .major = 2,
@@ -92,4 +93,24 @@ export fn nif_init() *const e.ErlNifEntry {
         .min_erts = "erts-13.0",
     };
     return &entry;
+}
+
+fn nif_init_windows(callbacks: *const e.TWinDynNifCallbacks) callconv(.c) *const e.ErlNifEntry {
+    // Windows NIFs receive the emulator's enif_* function table through
+    // nif_init instead of exported symbols; copy it into the global that the
+    // windows_enif wrappers read.
+    e.WinDynNifCallbacks = callbacks.*;
+    return nif_init_impl();
+}
+
+fn nif_init_unix() callconv(.c) *const e.ErlNifEntry {
+    return nif_init_impl();
+}
+
+comptime {
+    if (builtin.os.tag == .windows) {
+        @export(&nif_init_windows, .{ .name = "nif_init" });
+    } else {
+        @export(&nif_init_unix, .{ .name = "nif_init" });
+    }
 }
