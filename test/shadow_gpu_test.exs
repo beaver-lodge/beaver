@@ -45,7 +45,7 @@ defmodule Beaver.Shadow.GPUTest do
   @payload """
   module {
     gpu.module @kernels {
-      gpu.func @main() {
+      gpu.func @main() kernel {
         gpu.return
       }
     }
