@@ -21,6 +21,14 @@ const mutex = @import("mutex.zig");
 const CudaResult = c_int;
 const CuDevice = *anyopaque;
 
+/// Encodes an opaque pointer (CUDA module/function/device handles) as a BEAM
+/// unsigned 64-bit integer. `beam.make(usize, ...)` is unsuitable here because
+/// it routes through `enif_make_int`, which truncates to 32 bits on 64-bit
+/// platforms.
+fn make_ptr(env: beam.env, ptr: usize) beam.term {
+    return e.enif_make_uint64(env, @intCast(ptr));
+}
+
 const cuInitFn = *const fn (flags: c_uint) callconv(.c) CudaResult;
 const cuDeviceGetCountFn = *const fn (count: *c_int) callconv(.c) CudaResult;
 const cuDeviceGetFn = *const fn (device: *CuDevice, ordinal: c_int) callconv(.c) CudaResult;
@@ -224,7 +232,7 @@ pub fn cuda_module_load(env: beam.env, _: c_int, args: [*c]const beam.term) !bea
     var cu_module: ?*anyopaque = null;
     const result = d.cuModuleLoadData(&cu_module, ptx.ptr);
     if (result != 0) return cuResultError(env, "cuModuleLoadData", result);
-    return beam.make_ok_term(env, try beam.make(usize, env, @intFromPtr(cu_module.?)));
+    return beam.make_ok_term(env, make_ptr(env, @intFromPtr(cu_module.?)));
 }
 
 /// Returns `{:ok, function_handle}` for the kernel `name` in `module_handle`.
@@ -249,7 +257,7 @@ pub fn cuda_module_get_function(env: beam.env, _: c_int, args: [*c]const beam.te
         @ptrCast(name.ptr),
     );
     if (result != 0) return cuResultError(env, "cuModuleGetFunction", result);
-    return beam.make_ok_term(env, try beam.make(usize, env, @intFromPtr(function.?)));
+    return beam.make_ok_term(env, make_ptr(env, @intFromPtr(function.?)));
 }
 
 /// Unloads a CUDA module handle.
@@ -274,7 +282,7 @@ pub fn cuda_mem_alloc(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.
     var ptr: usize = 0;
     const result = d.cuMemAlloc(&ptr, size);
     if (result != 0) return cuResultError(env, "cuMemAlloc", result);
-    return beam.make_ok_term(env, try beam.make(usize, env, ptr));
+    return beam.make_ok_term(env, make_ptr(env, ptr));
 }
 
 /// Frees a device allocation.
