@@ -33,6 +33,13 @@ defmodule Beaver.MixProject do
           "lib/libBeaver*",
           "lib/libbeaver_*",
           "lib/libMLIRBeaver*",
+          # Windows DLLs skip the Unix lib prefix: the NIF itself, the native
+          # partitions, the enif shim, the MLIR aggregate and the prebuilt
+          # LLVM runtime libraries all live in priv/lib as bare *.dll files.
+          "lib/BeaverNIF*",
+          "lib/beaver_*",
+          "lib/MLIRBeaver*",
+          "lib/*.dll",
           "*.ex",
           "*.json",
           "generated/ods_dump.json"
