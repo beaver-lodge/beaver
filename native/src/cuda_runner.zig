@@ -42,6 +42,7 @@ const cuMemFreeFn = *const fn (ptr: usize) callconv(.c) CudaResult;
 const cuMemcpyFn = *const fn (dst: usize, src: usize, size: usize) callconv(.c) CudaResult;
 const cuDevicePrimaryCtxRetainFn = *const fn (pctx: *?*anyopaque, dev: CuDevice) callconv(.c) CudaResult;
 const cuCtxSetCurrentFn = *const fn (ctx: ?*anyopaque) callconv(.c) CudaResult;
+const cuCtxSynchronizeFn = *const fn () callconv(.c) CudaResult;
 const cuLaunchKernelFn = *const fn (
     function: ?*anyopaque,
     grid_x: c_uint,
@@ -71,6 +72,7 @@ const CudaDriver = struct {
     cuMemcpy: cuMemcpyFn,
     cuDevicePrimaryCtxRetain: cuDevicePrimaryCtxRetainFn,
     cuCtxSetCurrent: cuCtxSetCurrentFn,
+    cuCtxSynchronize: cuCtxSynchronizeFn,
     cuLaunchKernel: cuLaunchKernelFn,
     /// Result of `cuInit(0)`, cached so repeated NIF calls do not re-initialize.
     init_result: CudaResult,
@@ -120,6 +122,7 @@ fn loadDriver() ?*const CudaDriver {
         const cuMemcpy = lib.lookup(cuMemcpyFn, "cuMemcpy_v2") orelse lib.lookup(cuMemcpyFn, "cuMemcpy") orelse continue;
         const cuDevicePrimaryCtxRetain = lib.lookup(cuDevicePrimaryCtxRetainFn, "cuDevicePrimaryCtxRetain") orelse continue;
         const cuCtxSetCurrent = lib.lookup(cuCtxSetCurrentFn, "cuCtxSetCurrent") orelse continue;
+        const cuCtxSynchronize = lib.lookup(cuCtxSynchronizeFn, "cuCtxSynchronize") orelse continue;
         const cuLaunchKernel = lib.lookup(cuLaunchKernelFn, "cuLaunchKernel") orelse continue;
 
         const init_result = cuInit(0);
@@ -148,6 +151,7 @@ fn loadDriver() ?*const CudaDriver {
             .cuMemcpy = cuMemcpy,
             .cuDevicePrimaryCtxRetain = cuDevicePrimaryCtxRetain,
             .cuCtxSetCurrent = cuCtxSetCurrent,
+            .cuCtxSynchronize = cuCtxSynchronize,
             .cuLaunchKernel = cuLaunchKernel,
             .init_result = init_result,
             .primary_ctx = primary_ctx,
@@ -316,6 +320,17 @@ pub fn cuda_mem_free(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.t
     return beam.make_ok(env);
 }
 
+/// Blocks until all previously queued work on the current context completes.
+pub fn cuda_synchronize(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
+    const d = switch (requireDriver(env)) {
+        .ok => |ok_driver| ok_driver,
+        .err => |err_term| return err_term,
+    };
+    const result = d.cuCtxSynchronize();
+    if (result != 0) return cuResultError(env, "cuCtxSynchronize", result);
+    return beam.make_ok(env);
+}
+
 /// Copies host `data` into device memory at `device_ptr`.
 pub fn cuda_memcpy_htod(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const d = switch (requireDriver(env)) {
@@ -410,6 +425,7 @@ pub const nifs = .{
     prelude.beaverRawNIF(@This(), "cuda_module_unload", 1),
     prelude.beaverRawNIF(@This(), "cuda_mem_alloc", 1),
     prelude.beaverRawNIF(@This(), "cuda_mem_free", 1),
+    prelude.beaverRawNIF(@This(), "cuda_synchronize", 0),
     prelude.beaverRawNIF(@This(), "cuda_memcpy_htod", 2),
     prelude.beaverRawNIF(@This(), "cuda_memcpy_dtoh", 2),
     prelude.beaverRawNIF(@This(), "cuda_launch_kernel", 9),

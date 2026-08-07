@@ -19,6 +19,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
     beaver_raw_cuda_module_unload: 1,
     beaver_raw_cuda_mem_alloc: 1,
     beaver_raw_cuda_mem_free: 1,
+    beaver_raw_cuda_synchronize: 0,
     beaver_raw_cuda_memcpy_htod: 2,
     beaver_raw_cuda_memcpy_dtoh: 2,
     beaver_raw_cuda_launch_kernel: 9,

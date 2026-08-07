@@ -24,4 +24,22 @@ defmodule Beaver.Shadow.OptimizationTrialTest do
     assert is_binary(result.input_digest) and byte_size(result.input_digest) == 64
     assert result.lowered_to_llvm
   end
+
+  @tag skip: !@triton_enabled or System.get_env("BEAVER_CUDA_TEST") == nil
+  @tag :cuda
+  test "real matmul trial records GPU latency for both variants" do
+    context = MLIR.Context.create(all_dialects: false)
+    on_exit(fn -> MLIR.Context.destroy(context) end)
+    Beaver.Triton.register(context)
+
+    module = MLIR.Module.create!(File.read!(@fixture_path), ctx: context)
+    on_exit(fn -> MLIR.Module.destroy(module) end)
+
+    result = OptimizationTrial.run(module, gpu: true, samples: 5)
+
+    assert is_integer(result.gpu_baseline_ns)
+    assert is_integer(result.gpu_optimized_ns)
+    assert result.gpu_baseline_ns > 0
+    assert result.gpu_optimized_ns > 0
+  end
 end

@@ -91,6 +91,14 @@ defmodule Beaver.MLIR.CUDA do
   def mem_free(device_ptr), do: MLIR.CAPI.beaver_raw_cuda_mem_free(device_ptr)
 
   @doc """
+  Blocks until all previously queued work on the current context completes.
+
+  Use after `launch_kernel/4` when timing kernel execution end to end.
+  """
+  @spec synchronize() :: :ok | {:error, String.t()}
+  def synchronize, do: MLIR.CAPI.beaver_raw_cuda_synchronize()
+
+  @doc """
   Copies host `data` into device memory at `device_ptr`.
   """
   @spec memcpy_htod(non_neg_integer(), binary()) :: :ok | {:error, String.t()}

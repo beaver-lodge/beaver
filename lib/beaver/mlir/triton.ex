@@ -63,33 +63,43 @@ defmodule Beaver.Triton do
   @spec compile_to_llvm(MLIR.Module.t(), keyword()) :: MLIR.Module.t()
   def compile_to_llvm(%MLIR.Module{} = module, opts \\ []) do
     target = Keyword.get(opts, :target, "cuda:80")
+    remove_layouts? = Keyword.get(opts, :remove_layout_conversions, true)
 
-    module
-    |> Beaver.Composer.append("convert-triton-to-tritongpu{target=#{target}}")
-    # make_ttgir: optimize TTGIR before layout conversion elimination
-    |> Beaver.Composer.append("tritongpu-coalesce")
-    |> Beaver.Composer.append("tritongpu-F32DotTC")
-    |> Beaver.Composer.append("triton-nvidia-gpu-plan-cta")
-    |> Beaver.Composer.append("tritongpu-remove-layout-conversions")
-    |> Beaver.Composer.append("tritongpu-optimize-thread-locality")
-    |> Beaver.Composer.append("tritongpu-accelerate-matmul")
-    |> Beaver.Composer.append("tritongpu-remove-layout-conversions")
-    |> Beaver.Composer.append("tritongpu-optimize-dot-operands")
-    |> Beaver.Composer.append("canonicalize")
-    # make_llir: TritonGPU -> LLVM
-    |> Beaver.Composer.append("tritongpu-combine-tensor-select-and-if")
-    |> Beaver.Composer.append("tritongpu-allocate-warp-groups")
-    |> Beaver.Composer.append("convert-scf-to-cf")
-    |> Beaver.Composer.append("allocate-shared-memory-nv")
-    |> Beaver.Composer.append("triton-tensor-memory-allocation")
-    |> Beaver.Composer.append("triton-nvidia-check-matmul-two-cta")
-    |> Beaver.Composer.append("triton-nvidia-gpu-proxy-fence-insertion")
-    |> Beaver.Composer.append("triton-nvidia-gpu-tmem-barrier-insertion")
-    |> Beaver.Composer.append("convert-triton-gpu-to-llvm")
-    |> Beaver.Composer.append("convert-warp-specialize-to-llvm")
-    |> Beaver.Composer.append("convert-nv-gpu-to-llvm")
-    |> Beaver.Composer.append("convert-nvvm-to-llvm")
-    |> Beaver.Composer.append("canonicalize")
+    ttgpu_pipeline =
+      [
+        "convert-triton-to-tritongpu{target=#{target}}",
+        "tritongpu-coalesce",
+        "tritongpu-F32DotTC",
+        "triton-nvidia-gpu-plan-cta",
+        if(remove_layouts?, do: "tritongpu-remove-layout-conversions"),
+        "tritongpu-optimize-thread-locality",
+        "tritongpu-accelerate-matmul",
+        if(remove_layouts?, do: "tritongpu-remove-layout-conversions"),
+        "tritongpu-optimize-dot-operands",
+        "canonicalize"
+      ]
+      |> Enum.reject(&is_nil/1)
+
+    Enum.reduce(ttgpu_pipeline, module, fn pass, acc ->
+      Beaver.Composer.append(acc, pass)
+    end)
+    |> then(fn composer ->
+      composer
+      # make_llir: TritonGPU -> LLVM
+      |> Beaver.Composer.append("tritongpu-combine-tensor-select-and-if")
+      |> Beaver.Composer.append("tritongpu-allocate-warp-groups")
+      |> Beaver.Composer.append("convert-scf-to-cf")
+      |> Beaver.Composer.append("allocate-shared-memory-nv")
+      |> Beaver.Composer.append("triton-tensor-memory-allocation")
+      |> Beaver.Composer.append("triton-nvidia-check-matmul-two-cta")
+      |> Beaver.Composer.append("triton-nvidia-gpu-proxy-fence-insertion")
+      |> Beaver.Composer.append("triton-nvidia-gpu-tmem-barrier-insertion")
+      |> Beaver.Composer.append("convert-triton-gpu-to-llvm")
+      |> Beaver.Composer.append("convert-warp-specialize-to-llvm")
+      |> Beaver.Composer.append("convert-nv-gpu-to-llvm")
+      |> Beaver.Composer.append("convert-nvvm-to-llvm")
+      |> Beaver.Composer.append("canonicalize")
+    end)
     |> Beaver.Composer.run!()
   end
 end
