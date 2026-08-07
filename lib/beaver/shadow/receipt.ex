@@ -1,4 +1,4 @@
-defmodule Beaver.MLIR.Shadow.Receipt do
+defmodule Beaver.Shadow.Receipt do
   @moduledoc """
   A versioned, serializable record of one compilation experiment.
 
@@ -122,7 +122,16 @@ defmodule Beaver.MLIR.Shadow.Receipt do
   @doc "Encodes a receipt as JSON text."
   @spec encode!(t()) :: String.t()
   def encode!(%__MODULE__{} = receipt) do
-    receipt |> to_map() |> JSON.encode!()
+    receipt
+    |> to_map()
+    |> Map.update!(:schedule, fn schedule ->
+      Map.update!(schedule, :bytecode, &Base.encode64/1)
+    end)
+    |> Map.update!(:user_metadata, fn
+      nil -> nil
+      metadata -> Map.update(metadata, :value, nil, &inspect/1)
+    end)
+    |> JSON.encode!()
   end
 
   @doc "Decodes JSON text produced by `encode!/1`."
@@ -149,7 +158,11 @@ defmodule Beaver.MLIR.Shadow.Receipt do
       end)
       |> Map.update!(:status, &deep_atomize_keys/1)
 
-    struct!(__MODULE__, map)
+    map
+    |> Map.update!(:schedule, fn schedule ->
+      Map.update!(schedule, :bytecode, &Base.decode64!/1)
+    end)
+    |> then(&struct!(__MODULE__, &1))
   end
 
   # Candidate choices are user-provided data: their keys must survive JSON
