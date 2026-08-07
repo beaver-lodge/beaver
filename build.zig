@@ -253,6 +253,7 @@ pub fn build(b: *std.Build) void {
     const conversion_lib = createNativePartitionLib(b, "beaver_conversion", "native/src/conversion_root.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
     const callback_bridge_lib = createNativePartitionLib(b, "beaver_callback_bridge", "native/src/callback_bridge_root.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
     const rewrite_pattern_lib = createNativePartitionLib(b, "beaver_rewrite_pattern", "native/src/rewrite_pattern_root.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
+    const cuda_runner_lib = createNativePartitionLib(b, "beaver_cuda", "native/src/cuda_runner.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
 
     // Partition libraries link against libMLIRBeaver installed by the CMake
     // step into the install prefix. On Linux, an explicit library path is
@@ -260,7 +261,7 @@ pub fn build(b: *std.Build) void {
     // dropped by the linker); the CMake step must also run before they link.
     const mlir_lib_dir = b.pathJoin(&.{ b.install_path, "lib" });
 
-    for ([_]*std.Build.Step.Compile{ core_lib, conversion_lib, callback_bridge_lib, rewrite_pattern_lib }) |partition| {
+    for ([_]*std.Build.Step.Compile{ core_lib, conversion_lib, callback_bridge_lib, rewrite_pattern_lib, cuda_runner_lib }) |partition| {
         partition.root_module.addLibraryPath(.{ .cwd_relative = mlir_lib_dir });
         partition.step.dependOn(cmake_step);
     }
@@ -276,10 +277,12 @@ pub fn build(b: *std.Build) void {
     lib.root_module.linkLibrary(conversion_lib);
     lib.root_module.linkLibrary(callback_bridge_lib);
     lib.root_module.linkLibrary(rewrite_pattern_lib);
+    lib.root_module.linkLibrary(cuda_runner_lib);
     installArtifact(b, core_lib);
     installArtifact(b, conversion_lib);
     installArtifact(b, callback_bridge_lib);
     installArtifact(b, rewrite_pattern_lib);
+    installArtifact(b, cuda_runner_lib);
     lib.step.dependOn(cmake_step);
 
     std.log.info("Setting optimization mode for {s}: {any}", .{ lib.name, lib.root_module.optimize });
