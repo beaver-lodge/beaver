@@ -135,10 +135,19 @@ defmodule Beaver.MLIR.Triton.LayoutAudit do
   end
 
   defp convert_layout_fact(operation, index) do
-    [source_result, target_result] = MLIR.Operation.results(operation) |> Enum.to_list()
+    source_type =
+      operation
+      |> Beaver.Walker.operands()
+      |> Enum.fetch!(0)
+      |> MLIR.Value.type()
+      |> MLIR.to_string()
 
-    source_type = source_result |> MLIR.Value.type() |> MLIR.to_string()
-    target_type = target_result |> MLIR.Value.type() |> MLIR.to_string()
+    target_type =
+      operation
+      |> MLIR.Operation.results()
+      |> Enum.fetch!(0)
+      |> MLIR.Value.type()
+      |> MLIR.to_string()
 
     %{
       index: index,
