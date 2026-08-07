@@ -369,4 +369,63 @@ defmodule AnalysisAndRewriteUtilitiesTest do
       MLIR.Module.destroy(module)
     end
   end
+
+  test "saved insertion point round-trips through block creation and insertion", %{ctx: ctx} do
+    module =
+      MLIR.Module.create!(
+        """
+        module {
+          func.func @constants() -> i32 {
+            %0 = arith.constant 1 : i32
+            %1 = arith.constant 2 : i32
+            return %1 : i32
+          }
+        }
+        """,
+        ctx: ctx
+      )
+
+    {_func, [block | _]} = func_and_blocks(module)
+    [first | _] = Enum.to_list(Beaver.Walker.operations(block))
+
+    try do
+      MLIR.IRRewriter.with_rewriter(first, fn rewriter ->
+        assert MLIR.equal?(first, MLIR.RewriterBase.operation_after_insertion(rewriter))
+
+        saved = MLIR.RewriterBase.save_insertion_point(rewriter)
+
+        # Creating a block through the rewriter moves the insertion point to
+        # the end of the freshly created block, which must not invalidate the
+        # saved position.
+        new_block =
+          MLIR.CAPI.mlirRewriterBaseCreateBlockBefore(
+            rewriter,
+            block,
+            0,
+            Beaver.Native.array([], MLIR.Type),
+            Beaver.Native.array([], MLIR.Location)
+          )
+
+        assert MLIR.null?(MLIR.RewriterBase.operation_after_insertion(rewriter))
+
+        constant =
+          %Beaver.Changeset{name: "arith.constant", context: ctx}
+          |> Beaver.Changeset.add_argument(value: MLIR.Attribute.integer(MLIR.Type.i32(), 3))
+          |> Beaver.Changeset.add_result(MLIR.Type.i32())
+          |> MLIR.Operation.create()
+
+        MLIR.RewriterBase.insert(rewriter, constant)
+
+        assert [inserted] = Enum.to_list(Beaver.Walker.operations(new_block))
+        assert MLIR.equal?(constant, inserted)
+
+        MLIR.RewriterBase.restore_insertion_point(rewriter, saved)
+
+        # The insertion point is back exactly where it was saved.
+        assert MLIR.equal?(first, MLIR.RewriterBase.operation_after_insertion(rewriter))
+      end)
+    after
+      MLIR.Module.destroy(module)
+    end
+  end
 end
