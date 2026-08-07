@@ -1,4 +1,4 @@
-defmodule Beaver.MLIR.Experiment.Receipt do
+defmodule Beaver.MLIR.Shadow.Receipt do
   @moduledoc """
   A versioned, serializable record of one compilation experiment.
 
