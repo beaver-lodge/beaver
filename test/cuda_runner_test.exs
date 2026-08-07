@@ -2,6 +2,8 @@ defmodule CudaRunnerTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR.CUDA
 
+  @moduletag :cuda
+
   test "device discovery runs or degrades gracefully" do
     case CUDA.available?() do
       true ->
