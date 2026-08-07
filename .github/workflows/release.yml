@@ -223,3 +223,53 @@ jobs:
       - name: Build x86
         if: ${{ matrix.image.platform == 'linux/amd64' }}
         run: docker run -v $PWD:/src -w /src/beaver ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
+
+  hex_publish:
+    name: Publish to Hex.pm
+    needs: [generate_id, build_release, docker_build]
+    if: >-
+      github.event_name != 'pull_request' &&
+      github.repository == 'beaver-lodge/beaver' &&
+      startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    env:
+      HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
+      BEAVER_ARTEFACT_URL: https://github.com/beaver-lodge/beaver/releases/download/${{ needs.generate_id.outputs.formatted_date }}/@{artefact_filename}
+    steps:
+      - uses: actions/checkout@v4
+        name: Check-out beaver
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          elixir-version: "1.20.3"
+          otp-version: "27.3"
+      - run: mix local.hex --force
+      - name: Align version and prebuilt URL
+        run: |
+          sed -i.bak 's/-dev//g' mix.exs && rm -f mix.exs.bak
+          sed -i.bak "s#beaver-prebuilt/releases/download/[0-9-]*#beaver/releases/download/${{ needs.generate_id.outputs.formatted_date }}#" mix.exs && rm -f mix.exs.bak
+      - name: Verify tag/version alignment
+        run: |
+          set -euo pipefail
+          VERSION="$(
+            elixir -e 'source = File.read!("mix.exs"); [v] = Regex.run(~r/version: "([^"]+)"/, source, capture: :all_but_first); IO.puts(v)'
+          )"
+          test "${{ github.ref_name }}" = "v$VERSION"
+      - name: Install dependencies
+        run: mix deps.get
+      - name: Generate NIF checksums from this release
+        run: mix elixir_make.checksum --all --ignore-unavailable
+      - name: Check whether release already exists
+        id: idempotency
+        run: |
+          VERSION="$(
+            elixir -e 'source = File.read!("mix.exs"); [v] = Regex.run(~r/version: "([^"]+)"/, source, capture: :all_but_first); IO.puts(v)'
+          )"
+          if curl -fsS "https://hex.pm/api/packages/beaver/releases/$VERSION" >/dev/null 2>&1; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Publish to Hex.pm
+        if: steps.idempotency.outputs.skip != 'true'
+        run: mix hex.publish --yes
