@@ -128,7 +128,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ref="$(gh release list --repo beaver-lodge/beaver --limit 10 \
+          ref="$(gh release list --repo beaver-lodge/beaver --limit 50 \
             --json tagName --jq '[.[].tagName | select(startswith("triton-prebuilt-"))][0]')"
           asset="$(gh release view "$ref" --repo beaver-lodge/beaver --json assets \
             --jq '.assets[].name | select(endswith("ubuntu-x86_64.tar.gz"))')"
