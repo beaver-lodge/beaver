@@ -161,6 +161,31 @@ This is the first reproducible, non-trivial optimization evidence produced by
 the Shadow Wavefront loop: the same input, two real pipeline strategies, and a
 structural audit that records the difference without human IR reading.
 
-Known limitation: the Triton prebuilt's `convert-triton-gpu-to-llvm` pass
-segfaults on this matmul TTGIR, so real GPU latency comparison for this
-workload is blocked until the prebuilt/LLVM compatibility is fixed.
+The same kernel also runs end to end on an NVIDIA GPU: `Beaver.Triton.compile_to_llvm/2`
+runs the full NVIDIA pipeline (shared-memory allocation, warp-group allocation,
+warp-specialize lowering, NVGPU lowering) before translating to PTX and loading
+through `Beaver.MLIR.CUDA`. On an RTX 5070 the trial reported ~149μs baseline
+vs ~160μs optimized (speedup ≈ 0.93) for the 64x64 f32 matmul — a useful
+probe, but single-kernel latency is noisy, so treat small speedup deltas as
+measurement noise rather than conclusions.
+
+## External measurement harness
+
+Since M3, the loop has a second role: measuring Triton's layout decisions the
+way upstream reviewers need — structurally, reproducibly, and without reading
+IR by hand. Three pieces support that:
+
+- `Beaver.Shadow.Corpus` pins the fixture set and its structural facts
+  (`ttgir_matmul.mlir`, `ttir_attention.mlir`, `ttgir_convert_layout.mlir`).
+  The attention fixture is a flash-attention-style TTIR (online-softmax
+  accumulators as `scf.for` iter_args + `tt.dot`), and the remat fixture is a
+  TTGIR backward slice that mirrors the triton-lang/triton#11026 pattern.
+- `mix shadow.probe <fixture>` lowers a fixture in a child BEAM and reports
+  `:ok`, `:error`, or `:crash` with the offending pass. Native crashes in the
+  prebuilt (which would kill the caller) become deterministic failure receipts.
+  On the pinned prebuilt, the dot-free remat slice crashes
+  `tritongpu-accelerate-matmul` (exit 139) — a regression probe that flips to
+  `:ok` once the prebuilt is fixed or bumped.
+- `mix shadow.report` measures the whole corpus and prints a Markdown table
+  (baseline/optimized `ttg.convert_layout` counts, lowering capability, probe
+  status, LLVM revision) that can be pasted into upstream issues or PRs.
