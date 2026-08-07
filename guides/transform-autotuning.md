@@ -95,6 +95,34 @@ Elixir file and line as an MLIR location. The caller owns `transform_ir` and
 `schedule_context` and must destroy the module before the context after the
 search is complete.
 
+### Applying patterns with CSE
+
+`transform.apply_patterns` runs a greedy pattern driver on the body of its
+target. The upstream operation carries an `apply_cse` unit attribute: when
+set, common subexpression elimination is interleaved with pattern application
+until a fixpoint, so duplicated subexpressions are folded into a single
+definition. The DSL passes the upstream spelling through unchanged.
+
+```elixir
+defschedule canonicalize_with_cse do
+  sequence "__transform_main", [root >>> any_op()] do
+    apply_cse = MLIR.Attribute.unit(ctx: Beaver.Env.context())
+
+    Transform.apply_patterns(target: root, apply_cse: apply_cse) do
+      region do
+        block do
+          Transform.apply_patterns_canonicalization()
+        end
+      end
+    end >>> []
+  end
+end
+```
+
+Omitting the `apply_cse` attribute runs the same patterns without the CSE
+interleaving. Both variants are ordinary Transform IR, so they round-trip
+through text and bytecode and resolve and execute like any other schedule.
+
 Discovery and enumeration are deterministic. An alternatives choice is visited
 before choices in its regions, and choices from unselected regions do not
 inflate the candidate set.
