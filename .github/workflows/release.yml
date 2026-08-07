@@ -113,6 +113,12 @@ jobs:
             --connect-timeout 2 http://127.0.0.1:8000/mix.exs > /dev/null
           MIX_ENV=prod mix elixir_make.checksum --all --ignore-unavailable --only-local --print
           mix clean
+          # Simulate a fresh user install: drop every build leftover so the
+          # loader can only resolve dependencies from the prebuilt archive
+          # extracted into _build/test (mix clean does not remove the zig
+          # cache, and its relative .zig-cache/o/<hash> entries sit before
+          # $ORIGIN in the NIF's RUNPATH).
+          rm -rf _build/prod _build/test .zig-cache
           mix test --exclude vulkan --exclude todo
       - name: Publish archives and packages
         uses: softprops/action-gh-release@v3
