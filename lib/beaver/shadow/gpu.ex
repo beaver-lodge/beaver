@@ -192,7 +192,13 @@ defmodule Beaver.Shadow.GPU do
       with {:ok, device_ptr} <- backend.mem_alloc(4),
            :ok <- backend.memcpy_htod(device_ptr, <<0, 0, 0, 0>>) do
         try do
-          case backend.launch_kernel(function_handle, grid, block, [{:ptr, device_ptr}], launch_opts) do
+          case backend.launch_kernel(
+                 function_handle,
+                 grid,
+                 block,
+                 [{:ptr, device_ptr}],
+                 launch_opts
+               ) do
             :ok ->
               case backend.memcpy_dtoh(device_ptr, 4) do
                 {:ok, _data} ->
