@@ -14,6 +14,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   The dialect is defined entirely with `Beaver.Slang` and replaces the native
   TableGen `elixir` dialect prototype. Load it into a context with
   `Beaver.Slang.load/2`.
+
+  The `ex.if` op is declared as `defop if(...)`; the parentheses are required
+  by the Slang `defop` DSL and are not an Elixir `if/2` call.
   """
 
   use Beaver.Slang, name: "ex"
@@ -74,6 +77,7 @@ defmodule Beaver.MLIR.Dialect.Ex do
         results: [result: all_of([base("!builtin.integer"), any()])],
         attributes: [predicate: ^cmp_predicate_value]
 
+  # credo:disable-for-next-line Credo.Check.Readability.ParenthesesInCondition
   defop if(cond = all_of([base("!builtin.integer"), any()])),
     results: [result: variadic(any())],
     regions: [:any, :any]
