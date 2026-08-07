@@ -1,7 +1,7 @@
-defmodule Beaver.MLIR.Experiment.ReceiptTest do
+defmodule Beaver.MLIR.Shadow.ReceiptTest do
   use ExUnit.Case, async: true
 
-  alias Beaver.MLIR.Experiment.Receipt
+  alias Beaver.MLIR.Shadow.Receipt
 
   defp receipt(overrides \\ %{}) do
     struct!(
