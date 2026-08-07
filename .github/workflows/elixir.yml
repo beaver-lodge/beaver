@@ -123,6 +123,20 @@ jobs:
           else
             mix beaver.install_prebuilt_llvm --install-dir "$RUNNER_TEMP/llvm-prebuilt"
           fi
+      - name: Install Triton core prebuilt
+        if: matrix.llvm == 'triton' && runner.os == 'Linux'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          ref="$(gh release list --repo beaver-lodge/beaver --limit 10 \
+            --json tagName --jq '[.[].tagName | select(startswith("triton-prebuilt-"))][0]')"
+          asset="$(gh release view "$ref" --repo beaver-lodge/beaver --json assets \
+            --jq '.assets[].name | select(endswith("ubuntu-x86_64.tar.gz"))')"
+          gh release download "$ref" --repo beaver-lodge/beaver \
+            --pattern "$asset" --dir "$RUNNER_TEMP"
+          mkdir -p "$RUNNER_TEMP/triton-prebuilt"
+          tar xzf "$RUNNER_TEMP/$asset" -C "$RUNNER_TEMP/triton-prebuilt"
+          echo "BEAVER_TRITON_PREBUILT_DIR=$RUNNER_TEMP/triton-prebuilt" >> "$GITHUB_ENV"
       - name: Set up MSVC toolchain
         if: runner.os == 'Windows'
         uses: ilammy/msvc-dev-cmd@v1
