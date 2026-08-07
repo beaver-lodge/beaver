@@ -89,16 +89,19 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop clause(guard = optional(any())),
     attributes: [patterns: any()]
 
-  defop tuple(elements = variadic(any())),
+  defop box(value = any()),
     results: [result: base(dyn())]
 
-  defop list(elements = variadic(any())),
+  defop tuple(elements = variadic(base(dyn()))),
     results: [result: base(dyn())]
 
-  defop map(entries = variadic(any())),
+  defop list(elements = variadic(base(dyn()))),
     results: [result: base(dyn())]
 
-  defop binary(segments = variadic(any())),
+  defop map(entries = variadic(base(dyn()))),
+    results: [result: base(dyn())]
+
+  defop binary(segments = variadic(base(dyn()))),
     results: [result: base(dyn())]
 
   defop is_integer(value = any()),

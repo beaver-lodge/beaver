@@ -17,12 +17,17 @@ defmodule Beaver.MLIR.Conversion.Ex do
       types converted)
 
   Term-universe ops (`ex.tuple`/`ex.list`/`ex.map`/`ex.binary` and the
-  `ex.is_*` predicates) are not converted yet: they require the Zig term
-  runtime ABI, which lands in the compiler repo (batata) rather than Beaver.
-  The plan rejects them explicitly instead of silently dropping them.
+  `ex.is_*` predicates) convert to calls into the Zig term runtime ABI, which
+  is implemented in the compiler repo (batata) rather than Beaver. The
+  declaration-first manifest (symbol names and C signatures) is mirrored in
+  `@term_intrinsics`; batata implements exactly these symbols.
 
-  The `ex` term types (`!ex.dyn`/`!ex.bound`/`!ex.unbound`) convert to a scalar
-  word type (`i64`) until the Zig term runtime lands.
+  The `ex` term types (`!ex.dyn`/`!ex.bound`/`!ex.unbound`) convert to a
+  64-bit tagged word (`i64`): low 3 bits hold the tag, the rest the payload.
+  Scalar integers are tagged in-place with `arith.shli` when they cross into
+  a term construction; values that are already term-typed pass through.
+  Containers are built with a fixed-arity cons chain followed by a
+  `*_from_list` intrinsic, so no variadic ABI or stack buffers are needed.
 
   `plan/1` returns a reusable `Beaver.MLIR.Conversion.Plan`; run it with
   `Beaver.MLIR.Conversion.Plan.run/2` and continue with the standard
@@ -70,17 +75,35 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.return", &convert_return/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.var", &convert_var/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.func", &convert_func/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.tuple", &reject_term_op/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.list", &reject_term_op/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.map", &reject_term_op/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.binary", &reject_term_op/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.is_integer", &reject_term_op/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.is_atom", &reject_term_op/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.is_binary", &reject_term_op/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.is_list", &reject_term_op/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.is_tuple", &reject_term_op/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.is_map", &reject_term_op/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.box", &convert_box/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.tuple", &convert_term_tuple/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.list", &convert_term_list/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.map", &convert_term_map/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.binary", &convert_term_binary/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.is_integer", &convert_term_predicate/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.is_atom", &convert_term_predicate/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.is_binary", &convert_term_predicate/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.is_list", &convert_term_predicate/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.is_tuple", &convert_term_predicate/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.is_map", &convert_term_predicate/3, version: "1.0")
   end
+
+  # Declaration-first manifest of the Zig term runtime ABI: batata's
+  # `native/term_runtime.zig` exports exactly these C symbols.
+  @term_intrinsics %{
+    list_cons: "ex.term.list_cons",
+    tuple_from_list: "ex.term.tuple_from_list",
+    map_from_list: "ex.term.map_from_list",
+    binary_from_list: "ex.term.binary_from_list",
+    is_integer: "ex.term.is_integer",
+    is_atom: "ex.term.is_atom",
+    is_binary: "ex.term.is_binary",
+    is_list: "ex.term.is_list",
+    is_tuple: "ex.term.is_tuple",
+    is_map: "ex.term.is_map"
+  }
+
+  @term_types ~w(!ex.dyn !ex.bound !ex.unbound)
 
   @doc """
   Converts an `ex` term type to its scalar word representation.
@@ -235,11 +258,240 @@ defmodule Beaver.MLIR.Conversion.Ex do
     :ok
   end
 
-  defp reject_term_op(operation, _operands, _rewriter) do
-    raise ArgumentError,
-          "#{MLIR.Operation.name(operation)} requires the Zig term runtime ABI and is unsupported " <>
-            "in the scalar conversion plan"
+  defp convert_term_list(operation, operands, rewriter) do
+    base = insertion_point(operation, rewriter)
+    list = build_list(operands, operation, rewriter, base)
+    replace_with(rewriter, operation, list)
   end
+
+  defp convert_term_tuple(operation, operands, rewriter) do
+    base = insertion_point(operation, rewriter)
+    list = build_list(operands, operation, rewriter, base)
+
+    tuple = emit_runtime_call(operation, rewriter, base, @term_intrinsics.tuple_from_list, [list])
+
+    replace_with(rewriter, operation, tuple)
+  end
+
+  defp convert_term_map(operation, operands, rewriter) do
+    base = insertion_point(operation, rewriter)
+
+    if rem(length(operands), 2) != 0 do
+      raise ArgumentError,
+            "ex.map requires an even number of key/value operands, got #{length(operands)}"
+    end
+
+    list = build_list(operands, operation, rewriter, base)
+    map = emit_runtime_call(operation, rewriter, base, @term_intrinsics.map_from_list, [list])
+    replace_with(rewriter, operation, map)
+  end
+
+  defp convert_term_binary(operation, operands, rewriter) do
+    base = insertion_point(operation, rewriter)
+    list = build_list(operands, operation, rewriter, base)
+
+    binary =
+      emit_runtime_call(operation, rewriter, base, @term_intrinsics.binary_from_list, [list])
+
+    replace_with(rewriter, operation, binary)
+  end
+
+  defp convert_term_predicate(operation, [operand], rewriter) do
+    base = insertion_point(operation, rewriter)
+
+    word =
+      case operation |> Walker.operands() |> Enum.to_list() do
+        [original] -> maybe_tag(original, operand, operation, base)
+        _ -> operand
+      end
+
+    intrinsic =
+      operation
+      |> MLIR.Operation.name()
+      |> predicate_intrinsic()
+
+    result = emit_runtime_call(operation, rewriter, base, intrinsic, [word])
+    replace_with(rewriter, operation, result)
+  end
+
+  defp convert_box(operation, [operand], rewriter) do
+    base = insertion_point(operation, rewriter)
+
+    word =
+      case operation |> Walker.operands() |> Enum.to_list() do
+        [original] -> maybe_tag(original, operand, operation, base)
+        _ -> operand
+      end
+
+    replace_with(rewriter, operation, word)
+  end
+
+  defp predicate_intrinsic("ex.is_integer"), do: @term_intrinsics.is_integer
+  defp predicate_intrinsic("ex.is_atom"), do: @term_intrinsics.is_atom
+  defp predicate_intrinsic("ex.is_binary"), do: @term_intrinsics.is_binary
+  defp predicate_intrinsic("ex.is_list"), do: @term_intrinsics.is_list
+  defp predicate_intrinsic("ex.is_tuple"), do: @term_intrinsics.is_tuple
+  defp predicate_intrinsic("ex.is_map"), do: @term_intrinsics.is_map
+
+  defp insertion_point(operation, rewriter) do
+    base = MLIR.ConversionPatternRewriter.as_base(rewriter)
+    MLIR.RewriterBase.set_insertion_point_before(base, operation)
+    base
+  end
+
+  defp replace_with(rewriter, operation, value) do
+    MLIR.ConversionPatternRewriter.replace_op(rewriter, operation, value)
+    :ok
+  end
+
+  defp maybe_tag(original, converted, operation, base) do
+    if term_type?(MLIR.Value.type(original)) do
+      converted
+    else
+      tag_integer(converted, operation, base)
+    end
+  end
+
+  # Tags a scalar i64 as an immediate integer term: word = value << 3 with the
+  # low 3 bits (tag 0b000) left as the integer tag.
+  defp tag_integer(value, operation, base) do
+    three = emit_constant(3, operation, base)
+
+    shl =
+      %Changeset{
+        name: "arith.shli",
+        context: MLIR.context(operation),
+        location: MLIR.Operation.location(operation)
+      }
+      |> Changeset.add_argument([value, MLIR.Operation.result(three, 0)])
+      |> Changeset.add_result(MLIR.Type.i64())
+      |> MLIR.Operation.create()
+
+    MLIR.RewriterBase.insert(base, shl)
+    MLIR.RewriterBase.set_insertion_point_after(base, shl)
+    MLIR.Operation.result(shl, 0)
+  end
+
+  # Builds a proper list word by consing words onto nil. Nil is the atom term
+  # with id 0: tag 0b001 | (0 << 3) = 1.
+  defp build_list([], operation, _rewriter, base) do
+    emit_constant(1, operation, base) |> MLIR.Operation.result(0)
+  end
+
+  defp build_list(words, operation, rewriter, base) do
+    words
+    |> Enum.reverse()
+    |> Enum.reduce(emit_constant(1, operation, base) |> MLIR.Operation.result(0), fn
+      word, tail ->
+        emit_runtime_call(operation, rewriter, base, @term_intrinsics.list_cons, [word, tail])
+    end)
+  end
+
+  defp emit_constant(value, operation, base) do
+    constant =
+      %Changeset{
+        name: "arith.constant",
+        context: MLIR.context(operation),
+        location: MLIR.Operation.location(operation)
+      }
+      |> Changeset.add_argument(value: MLIR.Attribute.integer(MLIR.Type.i64(), value))
+      |> Changeset.add_result(MLIR.Type.i64())
+      |> MLIR.Operation.create()
+
+    MLIR.RewriterBase.insert(base, constant)
+    MLIR.RewriterBase.set_insertion_point_after(base, constant)
+    constant
+  end
+
+  defp emit_runtime_call(operation, rewriter, base, symbol, args) do
+    ensure_intrinsic_declaration(operation, rewriter, symbol)
+    MLIR.RewriterBase.set_insertion_point_before(base, operation)
+
+    call =
+      %Changeset{
+        name: "func.call",
+        context: MLIR.context(operation),
+        location: MLIR.Operation.location(operation)
+      }
+      |> Changeset.add_argument(args)
+      |> Changeset.add_argument(
+        callee: MLIR.Attribute.flat_symbol_ref(symbol, ctx: MLIR.context(operation))
+      )
+      |> Changeset.add_result(MLIR.Type.i64())
+      |> MLIR.Operation.create()
+
+    MLIR.RewriterBase.insert(base, call)
+    MLIR.RewriterBase.set_insertion_point_after(base, call)
+    MLIR.Operation.result(call, 0)
+  end
+
+  # `func.call` requires the callee symbol to exist, so each intrinsic gets a
+  # public `func.func` declaration (no body) at module scope. At link time the
+  # Zig term runtime shared library satisfies the symbols.
+  defp ensure_intrinsic_declaration(operation, rewriter, symbol) do
+    module_op =
+      Stream.iterate(operation, &MLIR.Operation.parent/1)
+      |> Enum.find(fn op -> op |> MLIR.Operation.parent() |> MLIR.null?() end)
+
+    body = module_body(module_op)
+
+    unless declaration_exists?(body, symbol) do
+      base = MLIR.ConversionPatternRewriter.as_base(rewriter)
+      MLIR.RewriterBase.set_insertion_point_to_end(base, body)
+
+      declaration =
+        %Changeset{
+          name: "func.func",
+          context: MLIR.context(operation),
+          location: MLIR.Operation.location(operation)
+        }
+        |> Changeset.add_argument(sym_name: MLIR.Attribute.string(symbol))
+        |> Changeset.add_argument(sym_visibility: MLIR.Attribute.string("private"))
+        |> Changeset.add_argument(function_type: intrinsic_function_type(symbol))
+        |> Changeset.add_argument(MLIR.CAPI.mlirRegionCreate())
+        |> MLIR.Operation.create()
+
+      MLIR.RewriterBase.insert(base, declaration)
+    end
+
+    :ok
+  end
+
+  defp declaration_exists?(body, symbol) do
+    body
+    |> Walker.operations()
+    |> Enum.to_list()
+    |> Enum.any?(fn op ->
+      MLIR.Operation.name(op) == "func.func" and
+        case op |> MLIR.Operation.fetch("sym_name") do
+          {:ok, attribute} ->
+            attribute |> MLIR.CAPI.mlirStringAttrGetValue() |> MLIR.to_string() == symbol
+
+          :error ->
+            false
+        end
+    end)
+  end
+
+  defp module_body(module_op) do
+    module_op
+    |> Walker.regions()
+    |> Enum.to_list()
+    |> hd()
+    |> Walker.blocks()
+    |> Enum.to_list()
+    |> hd()
+  end
+
+  defp intrinsic_function_type("ex.term.list_cons") do
+    MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type(_symbol) do
+    MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp term_type?(type), do: MLIR.to_string(type) in @term_types
 
   defp cmp_i_predicate("eq"), do: cmp_i_predicate_attr(0)
   defp cmp_i_predicate("ne"), do: cmp_i_predicate_attr(1)

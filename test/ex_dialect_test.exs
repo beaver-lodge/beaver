@@ -64,17 +64,19 @@ defmodule ExDialectTest do
     ^bb0:
       %0 = "ex.lit"() {value = 1 : i64} : () -> i64
       %1 = "ex.lit"() {value = 2 : i64} : () -> i64
-      %2 = "ex.tuple"(%0, %1) {operandSegmentSizes = array<i32: 2>} : (i64, i64) -> !ex.dyn
-      %3 = "ex.list"(%0, %1) {operandSegmentSizes = array<i32: 2>} : (i64, i64) -> !ex.dyn
-      %4 = "ex.map"(%0, %1) {operandSegmentSizes = array<i32: 2>} : (i64, i64) -> !ex.dyn
-      %5 = "ex.binary"(%0) {operandSegmentSizes = array<i32: 1>} : (i64) -> !ex.dyn
-      %6 = "ex.is_tuple"(%2) : (!ex.dyn) -> i64
-      %7 = "ex.is_list"(%3) : (!ex.dyn) -> i64
-      %8 = "ex.is_map"(%4) : (!ex.dyn) -> i64
-      %9 = "ex.is_binary"(%5) : (!ex.dyn) -> i64
-      %10 = "ex.is_integer"(%0) : (i64) -> i64
-      %11 = "ex.is_atom"(%0) : (i64) -> i64
-      "ex.return"(%6) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+      %2 = "ex.box"(%0) : (i64) -> !ex.dyn
+      %3 = "ex.box"(%1) : (i64) -> !ex.dyn
+      %4 = "ex.tuple"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
+      %5 = "ex.list"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
+      %6 = "ex.map"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
+      %7 = "ex.binary"(%2) {operandSegmentSizes = array<i32: 1>} : (!ex.dyn) -> !ex.dyn
+      %8 = "ex.is_tuple"(%4) : (!ex.dyn) -> i64
+      %9 = "ex.is_list"(%5) : (!ex.dyn) -> i64
+      %10 = "ex.is_map"(%6) : (!ex.dyn) -> i64
+      %11 = "ex.is_binary"(%7) : (!ex.dyn) -> i64
+      %12 = "ex.is_integer"(%0) : (i64) -> i64
+      %13 = "ex.is_atom"(%0) : (i64) -> i64
+      "ex.return"(%8) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
     }) {sym_name = "main"} : () -> ()
   }
   """
@@ -288,20 +290,28 @@ defmodule ExDialectTest do
                   Ex.lit(value: Attribute.integer(Type.i64(), 2)) >>>
                     Type.i64()
 
+                one_boxed =
+                  Ex.box(value: one) >>>
+                    Ex.dyn()
+
+                two_boxed =
+                  Ex.box(value: two) >>>
+                    Ex.dyn()
+
                 tuple =
-                  Ex.tuple(elements: [one, two], operandSegmentSizes: :infer) >>>
+                  Ex.tuple(elements: [one_boxed, two_boxed], operandSegmentSizes: :infer) >>>
                     Ex.dyn()
 
                 list =
-                  Ex.list(elements: [one, two], operandSegmentSizes: :infer) >>>
+                  Ex.list(elements: [one_boxed, two_boxed], operandSegmentSizes: :infer) >>>
                     Ex.dyn()
 
                 map =
-                  Ex.map(entries: [one, two], operandSegmentSizes: :infer) >>>
+                  Ex.map(entries: [one_boxed, two_boxed], operandSegmentSizes: :infer) >>>
                     Ex.dyn()
 
                 bin =
-                  Ex.binary(segments: [one], operandSegmentSizes: :infer) >>>
+                  Ex.binary(segments: [one_boxed], operandSegmentSizes: :infer) >>>
                     Ex.dyn()
 
                 _is_tuple =
@@ -333,6 +343,7 @@ defmodule ExDialectTest do
       |> MLIR.verify!()
 
     rendered = MLIR.to_string(module, generic: true)
+    assert rendered =~ ~s{"ex.box"}
     assert rendered =~ ~s{"ex.tuple"}
     assert rendered =~ ~s{"ex.list"}
     assert rendered =~ ~s{"ex.map"}
