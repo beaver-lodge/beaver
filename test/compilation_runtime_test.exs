@@ -144,7 +144,9 @@ defmodule CompilationRuntimeTest do
 
     on_exit(fn -> File.rm(object_path) end)
 
-    assert CompilationRuntime.emit_object!(artifact, object_path) == object_path
+    # emit_object! returns the canonicalized (expanded) path; on Windows the
+    # expansion also normalizes drive letter case and separators.
+    assert CompilationRuntime.emit_object!(artifact, object_path) == Path.expand(object_path)
     assert File.stat!(object_path).size > 0
   end
 end

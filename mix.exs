@@ -42,7 +42,8 @@ defmodule Beaver.MixProject do
             "KINDA_SOURCE_PATH" => Map.fetch!(Mix.Project.deps_paths(), :kinda)
           }
         end,
-        make_args: ~w{-j},
+        # NMAKE does not accept the -j flag; GNU make does.
+        make_args: if(match?({:win32, _}, :os.type()), do: [], else: ~w{-j}),
         make_clean: ["clean"]
       ]
   end

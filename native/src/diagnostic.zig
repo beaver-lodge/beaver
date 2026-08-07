@@ -7,6 +7,7 @@ const kinda = @import("kinda");
 const e = kinda.erl_nif;
 const beam = kinda.beam;
 const result = @import("kinda").result;
+const mutex = @import("mutex.zig");
 const PrinterNIF = @import("string_ref.zig").PrinterNIF;
 
 // collect diagnostic as {severity, loc, message, nested_notes}
@@ -14,7 +15,7 @@ const DiagnosticAggregator = struct {
     const Container = std.array_list.Managed(beam.term);
     env: beam.env,
     container: Container = undefined,
-    mutex: std.c.pthread_mutex_t = std.c.PTHREAD_MUTEX_INITIALIZER,
+    mutex: mutex.Mutex = .{},
     fn collectDiagnosticNested(diagnostic: c.MlirDiagnostic, userData: ?*@This()) !beam.term {
         const env = userData.?.env;
         const severity = c.mlirDiagnosticGetSeverity(diagnostic);
@@ -44,17 +45,14 @@ const DiagnosticAggregator = struct {
     }
     fn errorHandler(diagnostic: c.MlirDiagnostic, userData: ?*anyopaque) callconv(.c) mlir_capi.LogicalResult.T {
         const self: *@This() = @ptrCast(@alignCast(userData orelse return c.mlirLogicalResultFailure()));
-        if (std.c.pthread_mutex_lock(&self.mutex) != .SUCCESS)
-            return c.mlirLogicalResultFailure();
-        defer if (std.c.pthread_mutex_unlock(&self.mutex) != .SUCCESS)
-            @panic("failed to unlock diagnostic aggregator");
+        self.mutex.lock();
+        defer self.mutex.unlock();
         return collectDiagnosticTopLevel(diagnostic, self) catch return c.mlirLogicalResultFailure();
     }
     fn deleteUserData(userData: ?*anyopaque) callconv(.c) void {
         const this: ?*@This() = @ptrCast(@alignCast(userData));
         this.?.container.deinit();
-        if (std.c.pthread_mutex_destroy(&this.?.mutex) != .SUCCESS)
-            @panic("failed to destroy diagnostic aggregator mutex");
+        this.?.mutex.destroy();
         e.enif_free_env(this.?.env);
         beam.allocator.destroy(this.?);
     }
@@ -71,10 +69,8 @@ const DiagnosticAggregator = struct {
         return user_data;
     }
     fn to_list(this: *@This(), destination_env: beam.env) !beam.term {
-        if (std.c.pthread_mutex_lock(&this.mutex) != .SUCCESS)
-            return error.FailedToLockDiagnosticAggregator;
-        defer if (std.c.pthread_mutex_unlock(&this.mutex) != .SUCCESS)
-            @panic("failed to unlock diagnostic aggregator");
+        this.mutex.lock();
+        defer this.mutex.unlock();
 
         return e.enif_make_copy(
             destination_env,

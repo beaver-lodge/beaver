@@ -77,10 +77,20 @@ fn createNativeModule(
     module.addIncludePath(.{ .cwd_relative = "native/include" });
     // add these to get ZLS working properly
     module.addIncludePath(.{ .cwd_relative = mlir_include_dir });
-    if (os == .linux or os == .macos) {
+    if (os == .linux or os == .macos or os == .windows) {
         module.link_libc = true;
     }
     return module;
+}
+
+fn installArtifact(b: *std.Build, artifact: *std.Build.Step.Compile) void {
+    if (os == .windows) {
+        // Zig installs DLLs to bin/ by default on Windows; the NIF loader and
+        // the partition DLLs expect everything next to each other in lib/.
+        b.getInstallStep().dependOn(&b.addInstallArtifact(artifact, .{ .dest_dir = .{ .override = .lib } }).step);
+    } else {
+        b.installArtifact(artifact);
+    }
 }
 
 fn createNativePartitionLib(
@@ -118,6 +128,12 @@ fn createCMakeStep(b: *std.Build, llvm_cmake_dir: []const u8, mlir_cmake_dir: []
 
     const cmake_build_dir = b.pathJoin(&.{ b.install_path, "cmake_build" });
     const cmake_cache_path = b.pathJoin(&.{ cmake_build_dir, "CMakeCache.txt" });
+    const cmake_build_type = switch (optimize) {
+        .Debug => "Debug",
+        .ReleaseSafe => "RelWithDebInfo",
+        .ReleaseFast => "Release",
+        .ReleaseSmall => "MinSizeRel",
+    };
 
     // cmake_build command
     const cmake_configure = b.addSystemCommand(&.{ "cmake", "-S", "native", "-G", "Ninja", "-B", cmake_build_dir });
@@ -126,13 +142,18 @@ fn createCMakeStep(b: *std.Build, llvm_cmake_dir: []const u8, mlir_cmake_dir: []
         b.fmt("-DMLIR_DIR={s}", .{mlir_cmake_dir}),
         b.fmt("-DCMAKE_INSTALL_PREFIX={s}", .{b.install_path}),
         b.fmt("-DCMAKE_INSTALL_MESSAGE={s}", .{"LAZY"}),
-        b.fmt("-DCMAKE_BUILD_TYPE={s}", .{switch (optimize) {
-            .Debug => "Debug",
-            .ReleaseSafe => "RelWithDebInfo",
-            .ReleaseFast => "Release",
-            .ReleaseSmall => "MinSizeRel",
-        }}),
+        // The prebuilt LLVM/MLIR archives are Release builds; compiling our
+        // C++ in Debug would mix MSVC runtimes and fail the link with an
+        // _ITERATOR_DEBUG_LEVEL mismatch.
+        b.fmt("-DCMAKE_BUILD_TYPE={s}", .{if (os == .windows) "Release" else cmake_build_type}),
     });
+    if (os == .windows) {
+        // MSVC's link.exe rejects response files whose single line exceeds
+        // 131071 characters (LNK1170), which the hundreds of MLIR static
+        // libraries in the prebuilt archive easily produce. lld-link reads
+        // response files without that limit.
+        cmake_configure.addArg("-DCMAKE_LINKER=lld-link");
+    }
     const cmake_build_install = b.addSystemCommand(&.{ "cmake", "--build", cmake_build_dir, "--target", "install" });
     step.dependOn(&cmake_build_install.step);
 
@@ -210,6 +231,19 @@ pub fn build(b: *std.Build) void {
 
     const kinda = b.dependency("kinda", .{});
     const kinda_module = kinda.module("kinda");
+    if (os == .windows) {
+        // erl_nif.h maps enif_* onto the WinDynNifCallbacks table with macros
+        // that translate-c cannot represent; take the plain extern
+        // declarations instead and forward them through windows_enif.zig.
+        kinda_module.addCMacro("STATIC_ERLANG_NIF", "1");
+        // Zig injects -D_FORTIFY_SOURCE=2 for ReleaseSafe, which activates the
+        // mingw fortify wrappers (wcscat/wcscpy and friends) in string.h.
+        // translate-c emits those bodies with local extern wrappers that go
+        // unreferenced, failing the ReleaseSafe shim build on Windows. The
+        // module -D below comes after the injected define, so it wins and
+        // keeps the header translation on the plain extern declarations.
+        kinda_module.addCMacro("_FORTIFY_SOURCE", "0");
+    }
 
     // Native source is partitioned into dynamic libraries so each domain is
     // cached independently: a source edit in one domain only recompiles that
@@ -242,13 +276,58 @@ pub fn build(b: *std.Build) void {
     lib.root_module.linkLibrary(conversion_lib);
     lib.root_module.linkLibrary(callback_bridge_lib);
     lib.root_module.linkLibrary(rewrite_pattern_lib);
-    b.installArtifact(core_lib);
-    b.installArtifact(conversion_lib);
-    b.installArtifact(callback_bridge_lib);
-    b.installArtifact(rewrite_pattern_lib);
+    installArtifact(b, core_lib);
+    installArtifact(b, conversion_lib);
+    installArtifact(b, callback_bridge_lib);
+    installArtifact(b, rewrite_pattern_lib);
     lib.step.dependOn(cmake_step);
 
     std.log.info("Setting optimization mode for {s}: {any}", .{ lib.name, lib.root_module.optimize });
+    if (os == .windows) {
+        // The emulator does not export enif_* from beam.dll on Windows; the
+        // functions are only reachable through the TWinDynNifCallbacks table
+        // passed to nif_init. windows_enif.zig forwards each enif_* import to
+        // that table, and lives in its own library so the partitions and the
+        // NIF shim all resolve the same symbols and the same table global.
+        const enif_shim = b.addLibrary(.{
+            .name = "beaver_enif_shim",
+            .linkage = .dynamic,
+            .root_module = b.createModule(.{
+                .root_source_file = b.path("native/src/windows_enif.zig"),
+                .target = target,
+                .optimize = optimize,
+            }),
+        });
+        enif_shim.root_module.addImport("kinda", kinda_module);
+        enif_shim.root_module.link_libc = true;
+        installArtifact(b, enif_shim);
+        // The install prefix doubles as a search prefix. Standalone `zig
+        // build` (no -p) does not create it up front, and the shim compile can
+        // otherwise run ahead of the CMake step that materializes it; order
+        // them like the partition libraries below.
+        enif_shim.step.dependOn(cmake_step);
+        // The CMake step installs the aggregate DLL to bin/ (LLVM install
+        // convention); mirror it into lib/ where the partitions and the NIF
+        // resolve their DLL imports from.
+        const copy_mlir_dll = b.addInstallFileWithDir(
+            .{ .cwd_relative = b.pathJoin(&.{ b.install_path, "bin", "MLIRBeaver.dll" }) },
+            .lib,
+            "MLIRBeaver.dll",
+        );
+        b.getInstallStep().dependOn(&copy_mlir_dll.step);
+        copy_mlir_dll.step.dependOn(cmake_step);
+
+        for ([_]*std.Build.Step.Compile{ core_lib, conversion_lib, callback_bridge_lib, rewrite_pattern_lib, lib }) |artifact| {
+            artifact.root_module.linkLibrary(enif_shim);
+        }
+        // resource_sync.zig, compiled into the non-core partitions, calls
+        // core_resource_type_by_name exported by the core partition. DLL
+        // imports need an explicit record, unlike the flat runtime symbol
+        // resolution that dylibs get on Unix.
+        for ([_]*std.Build.Step.Compile{ conversion_lib, callback_bridge_lib, rewrite_pattern_lib }) |partition| {
+            partition.root_module.linkLibrary(core_lib);
+        }
+    }
     if (os == .linux) {
         lib.root_module.addRPathSpecial("$ORIGIN");
     }
@@ -259,7 +338,10 @@ pub fn build(b: *std.Build) void {
     lib.linker_allow_shlib_undefined = true;
     // copy runtime libs
     b.installDirectory(.{ .source_dir = .{ .cwd_relative = llvm_lib_dir }, .install_dir = .prefix, .install_subdir = "lib", .include_extensions = &.{ ".so", ".dylib", ".dll" } });
-    b.installArtifact(lib);
+    // the Windows prebuilt puts its runtime DLLs (LLVM-C, LTO, runner utils)
+    // in bin/ rather than lib/
+    b.installDirectory(.{ .source_dir = .{ .cwd_relative = b.pathJoin(&.{ llvm_install_dir, "bin" }) }, .install_dir = .prefix, .install_subdir = "lib", .include_extensions = &.{".dll"} });
+    installArtifact(b, lib);
     const check = b.step("check", "Check if compiles");
     check.dependOn(b.getInstallStep());
 }

@@ -1,3 +1,4 @@
+const std = @import("std");
 const mlir_capi = @import("mlir_capi.zig");
 pub const c = @import("prelude.zig").c;
 const rt = @import("runtime.zig");
@@ -60,11 +61,44 @@ fn register_jit_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const 
     c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @ptrCast(@constCast(&f)));
 }
 
+fn register_jit_plain_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const u8, comptime f: anytype) void {
+    const name_str_ref = c.MlirStringRef{
+        .data = name.ptr,
+        .length = name.len,
+    };
+    c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @ptrCast(@constCast(&f)));
+}
+
+// Route JIT allocation calls through the same C runtime std.c.free uses for
+// deallocation. On Windows the JIT would otherwise resolve `malloc` from
+// whichever loaded module exports it first, which may back a different heap
+// than Zig's linked C runtime, crashing `free` on the returned pointer.
+fn jit_malloc(size: usize) callconv(.c) ?*anyopaque {
+    return std.c.malloc(size);
+}
+fn jit_free(ptr: ?*anyopaque) callconv(.c) void {
+    std.c.free(ptr);
+}
+fn jit_realloc(ptr: ?*anyopaque, size: usize) callconv(.c) ?*anyopaque {
+    return std.c.realloc(ptr, size);
+}
+fn jit_calloc(num: usize, size: usize) callconv(.c) ?*anyopaque {
+    return std.c.calloc(num, size);
+}
+
 fn beaver_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const jit = try mlir_capi.ExecutionEngine.resource.fetch(env, args[0]);
     inline for (enif_function_names) |name| {
         const f = if (@hasDecl(e, name)) @field(e, name) else @field(rt, name);
         register_jit_symbol(jit, name, f);
+    }
+    inline for (.{
+        .{ "malloc", jit_malloc },
+        .{ "free", jit_free },
+        .{ "realloc", jit_realloc },
+        .{ "calloc", jit_calloc },
+    }) |symbol| {
+        register_jit_plain_symbol(jit, symbol[0], symbol[1]);
     }
     return beam.make_ok(env);
 }
@@ -117,7 +151,10 @@ fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !be
             return ptr_type(env, ctx);
         },
         else => {
-            const is_int = t == c_int or t == c_ulong or t == c_long or t == beam.env or t == usize or t == c_uint or t == i32 or t == u32 or t == i64 or t == u64;
+            const is_int =
+                t == c_int or t == c_uint or t == c_long or t == c_ulong or
+                t == c_longlong or t == c_ulonglong or t == beam.env or
+                t == usize or t == i32 or t == u32 or t == i64 or t == u64;
             const is_float = t == f32 or t == f64;
             const is_struct = t == beam.resource_type or t == e.ErlNifCond;
             if (is_int or is_struct) {
