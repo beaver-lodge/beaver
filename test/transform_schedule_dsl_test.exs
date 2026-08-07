@@ -393,8 +393,7 @@ defmodule Beaver.MLIR.Transform.Schedule.DSLTest do
     module
     |> MLIR.Module.body()
     |> Beaver.Walker.operations()
-    |> Enum.map(&MLIR.to_string/1)
-    |> Enum.join()
+    |> Enum.map_join(&MLIR.to_string/1)
     |> then(&(length(String.split(&1, "arith.addi")) - 1))
   end
 
