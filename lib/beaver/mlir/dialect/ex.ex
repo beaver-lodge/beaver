@@ -89,6 +89,36 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop clause(guard = optional(any())),
     attributes: [patterns: any()]
 
+  defop tuple(elements = variadic(any())),
+    results: [result: base(dyn())]
+
+  defop list(elements = variadic(any())),
+    results: [result: base(dyn())]
+
+  defop map(entries = variadic(any())),
+    results: [result: base(dyn())]
+
+  defop binary(segments = variadic(any())),
+    results: [result: base(dyn())]
+
+  defop is_integer(value = any()),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop is_atom(value = any()),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop is_binary(value = any()),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop is_list(value = any()),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop is_tuple(value = any()),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop is_map(value = any()),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
   defop yield(values = variadic(any())), traits: [:terminator]
 
   defop func(),

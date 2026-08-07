@@ -58,6 +58,27 @@ defmodule ExDialectTest do
   }
   """
 
+  @term_module ~S"""
+  module {
+    "ex.func"() ({
+    ^bb0:
+      %0 = "ex.lit"() {value = 1 : i64} : () -> i64
+      %1 = "ex.lit"() {value = 2 : i64} : () -> i64
+      %2 = "ex.tuple"(%0, %1) {operandSegmentSizes = array<i32: 2>} : (i64, i64) -> !ex.dyn
+      %3 = "ex.list"(%0, %1) {operandSegmentSizes = array<i32: 2>} : (i64, i64) -> !ex.dyn
+      %4 = "ex.map"(%0, %1) {operandSegmentSizes = array<i32: 2>} : (i64, i64) -> !ex.dyn
+      %5 = "ex.binary"(%0) {operandSegmentSizes = array<i32: 1>} : (i64) -> !ex.dyn
+      %6 = "ex.is_tuple"(%2) : (!ex.dyn) -> i64
+      %7 = "ex.is_list"(%3) : (!ex.dyn) -> i64
+      %8 = "ex.is_map"(%4) : (!ex.dyn) -> i64
+      %9 = "ex.is_binary"(%5) : (!ex.dyn) -> i64
+      %10 = "ex.is_integer"(%0) : (i64) -> i64
+      %11 = "ex.is_atom"(%0) : (i64) -> i64
+      "ex.return"(%6) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+    }) {sym_name = "main"} : () -> ()
+  }
+  """
+
   test "emits a named IRDL schema for the scalar subset", %{ctx: ctx} do
     schema = Ex.__slang_dialect__(ctx) |> MLIR.verify!()
     rendered = MLIR.to_string(schema, generic: true)
@@ -250,6 +271,79 @@ defmodule ExDialectTest do
     assert rendered =~ ~s{"ex.clause"}
   end
 
+  test "constructs term ops with the Beaver DSL", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, Ex)
+
+    module =
+      mlir ctx: ctx do
+        module do
+          Ex.func sym_name: Attribute.string("main") do
+            region do
+              block do
+                one =
+                  Ex.lit(value: Attribute.integer(Type.i64(), 1)) >>>
+                    Type.i64()
+
+                two =
+                  Ex.lit(value: Attribute.integer(Type.i64(), 2)) >>>
+                    Type.i64()
+
+                tuple =
+                  Ex.tuple(elements: [one, two], operandSegmentSizes: :infer) >>>
+                    Ex.dyn()
+
+                list =
+                  Ex.list(elements: [one, two], operandSegmentSizes: :infer) >>>
+                    Ex.dyn()
+
+                map =
+                  Ex.map(entries: [one, two], operandSegmentSizes: :infer) >>>
+                    Ex.dyn()
+
+                bin =
+                  Ex.binary(segments: [one], operandSegmentSizes: :infer) >>>
+                    Ex.dyn()
+
+                _is_tuple =
+                  Ex.is_tuple(value: tuple) >>>
+                    Type.i64()
+
+                _is_list =
+                  Ex.is_list(value: list) >>>
+                    Type.i64()
+
+                _is_map =
+                  Ex.is_map(value: map) >>>
+                    Type.i64()
+
+                _is_binary =
+                  Ex.is_binary(value: bin) >>>
+                    Type.i64()
+
+                Ex.return(
+                  Ex.is_integer(value: one) >>>
+                    Type.i64()
+                ) >>>
+                  []
+              end
+            end
+          end >>> []
+        end
+      end
+      |> MLIR.verify!()
+
+    rendered = MLIR.to_string(module, generic: true)
+    assert rendered =~ ~s{"ex.tuple"}
+    assert rendered =~ ~s{"ex.list"}
+    assert rendered =~ ~s{"ex.map"}
+    assert rendered =~ ~s{"ex.binary"}
+    assert rendered =~ ~s{"ex.is_tuple"}
+    assert rendered =~ ~s{"ex.is_list"}
+    assert rendered =~ ~s{"ex.is_map"}
+    assert rendered =~ ~s{"ex.is_binary"}
+    assert rendered =~ ~s{"ex.is_integer"}
+  end
+
   test "rejects invalid attributes and terminator placement", %{ctx: ctx} do
     Beaver.Slang.load(ctx, Ex)
 
@@ -328,6 +422,28 @@ defmodule ExDialectTest do
     Beaver.Slang.load(ctx, Ex)
 
     original = MLIR.Module.create!(@case_module, ctx: ctx) |> MLIR.verify!()
+
+    bytecode = MLIR.Bytecode.write!(original)
+    fresh_ctx = MLIR.Context.create()
+    on_exit(fn -> MLIR.Context.destroy(fresh_ctx) end)
+
+    assert Ex
+           |> then(&Beaver.Slang.load(fresh_ctx, &1))
+           |> MLIR.LogicalResult.success?()
+
+    bytecode_roundtrip =
+      bytecode
+      |> MLIR.Bytecode.read!(ctx: fresh_ctx)
+      |> MLIR.verify!()
+
+    assert MLIR.to_string(bytecode_roundtrip, generic: true) ==
+             MLIR.to_string(original, generic: true)
+  end
+
+  test "round-trips term ops through bytecode", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, Ex)
+
+    original = MLIR.Module.create!(@term_module, ctx: ctx) |> MLIR.verify!()
 
     bytecode = MLIR.Bytecode.write!(original)
     fresh_ctx = MLIR.Context.create()
