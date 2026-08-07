@@ -46,14 +46,14 @@ fn assembleNifs() []NifFunc {
         conversion_nifs_len +
         callback_bridge_nifs_len +
         rewrite_pattern_nifs_len +
-        cuda_runner_nifs_len;
+        if (builtin.os.tag == .linux) cuda_runner_nifs_len else 0;
     if (total > max_nifs) @panic("assembled NIF table exceeds static capacity");
     var index: usize = 0;
     appendNifs(@ptrCast(&core_nifs), core_nifs_len, &index);
     appendNifs(@ptrCast(&conversion_nifs), conversion_nifs_len, &index);
     appendNifs(@ptrCast(&callback_bridge_nifs), callback_bridge_nifs_len, &index);
     appendNifs(@ptrCast(&rewrite_pattern_nifs), rewrite_pattern_nifs_len, &index);
-    appendNifs(@ptrCast(&cuda_runner_nifs), cuda_runner_nifs_len, &index);
+    if (builtin.os.tag == .linux) appendNifs(@ptrCast(&cuda_runner_nifs), cuda_runner_nifs_len, &index);
     assembled_len = index;
     return assembled_nifs[0..assembled_len];
 }
@@ -64,7 +64,7 @@ export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     conversion_open(env);
     callback_bridge_open(env);
     rewrite_pattern_open(env);
-    cuda_runner_open(env);
+    if (builtin.os.tag == .linux) cuda_runner_open(env);
     return 0;
 }
 

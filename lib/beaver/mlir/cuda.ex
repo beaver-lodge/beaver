@@ -139,24 +139,29 @@ defmodule Beaver.MLIR.CUDA do
   end
 
   defp extract_ptx(module) do
-    op =
-      module
-      |> MLIR.Module.body()
-      |> Beaver.Walker.operations()
-      |> Enum.find(&(MLIR.Operation.name(&1) == "gpu.binary"))
-
-    with %MLIR.Operation{} = op,
+    with {:ok, op} <- fetch_gpu_binary(module),
          {:ok, objects} <- MLIR.Operation.fetch(op, "objects"),
          {:ok, object} <- MLIR.Attribute.fetch(objects, 0) do
-      case Regex.run(~r/assembly = "((?:[^"\\]|\\.)*)"/, MLIR.to_string(object)) do
-        [_, escaped] ->
-          {:ok, unescape_mlir_string(escaped)}
-
-        _ ->
-          {:error, "gpu.object has no assembly"}
-      end
+      extract_assembly(object)
     else
       _ -> {:error, "no gpu.binary with objects found"}
+    end
+  end
+
+  defp fetch_gpu_binary(module) do
+    case module
+         |> MLIR.Module.body()
+         |> Beaver.Walker.operations()
+         |> Enum.find(&(MLIR.Operation.name(&1) == "gpu.binary")) do
+      %MLIR.Operation{} = op -> {:ok, op}
+      _ -> {:error, :not_found}
+    end
+  end
+
+  defp extract_assembly(object) do
+    case Regex.run(~r/assembly = "((?:[^"\\]|\\.)*)"/, MLIR.to_string(object)) do
+      [_, escaped] -> {:ok, unescape_mlir_string(escaped)}
+      _ -> {:error, "gpu.object has no assembly"}
     end
   end
 
