@@ -181,8 +181,10 @@ defmodule Beaver.Shadow.GPU do
   # launch the kernel with one pointer argument. Kernels that do not expect a
   # pointer argument can pass `:arg_count`/`:skip_io` options instead.
   defp launch_once(backend, function_handle, grid, block, _module_handle, opts) do
+    launch_opts = [shared_mem: Keyword.get(opts, :shared_mem, 0)]
+
     if Keyword.get(opts, :skip_io, false) do
-      case backend.launch_kernel(function_handle, grid, block, []) do
+      case backend.launch_kernel(function_handle, grid, block, [], launch_opts) do
         :ok -> {:ok, %{launch_native: System.monotonic_time()}}
         {:error, reason} -> {:error, reason}
       end
@@ -190,7 +192,7 @@ defmodule Beaver.Shadow.GPU do
       with {:ok, device_ptr} <- backend.mem_alloc(4),
            :ok <- backend.memcpy_htod(device_ptr, <<0, 0, 0, 0>>) do
         try do
-          case backend.launch_kernel(function_handle, grid, block, [{:ptr, device_ptr}]) do
+          case backend.launch_kernel(function_handle, grid, block, [{:ptr, device_ptr}], launch_opts) do
             :ok ->
               case backend.memcpy_dtoh(device_ptr, 4) do
                 {:ok, _data} ->
