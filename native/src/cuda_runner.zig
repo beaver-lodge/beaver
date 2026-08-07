@@ -36,11 +36,13 @@ const cuDeviceGetNameFn = *const fn (name: [*c]u8, len: c_int, dev: CuDevice) ca
 const cuModuleLoadDataFn = *const fn (module: *?*anyopaque, data: *const anyopaque) callconv(.c) CudaResult;
 const cuModuleGetFunctionFn = *const fn (function: *?*anyopaque, module: ?*anyopaque, name: [*:0]const u8) callconv(.c) CudaResult;
 const cuModuleUnloadFn = *const fn (module: ?*anyopaque) callconv(.c) CudaResult;
+const cuFuncSetAttributeFn = *const fn (function: ?*anyopaque, attribute: c_int, value: c_int) callconv(.c) CudaResult;
 const cuMemAllocFn = *const fn (ptr: *usize, size: usize) callconv(.c) CudaResult;
 const cuMemFreeFn = *const fn (ptr: usize) callconv(.c) CudaResult;
 const cuMemcpyFn = *const fn (dst: usize, src: usize, size: usize) callconv(.c) CudaResult;
 const cuDevicePrimaryCtxRetainFn = *const fn (pctx: *?*anyopaque, dev: CuDevice) callconv(.c) CudaResult;
 const cuCtxSetCurrentFn = *const fn (ctx: ?*anyopaque) callconv(.c) CudaResult;
+const cuCtxSynchronizeFn = *const fn () callconv(.c) CudaResult;
 const cuLaunchKernelFn = *const fn (
     function: ?*anyopaque,
     grid_x: c_uint,
@@ -64,11 +66,13 @@ const CudaDriver = struct {
     cuModuleLoadData: cuModuleLoadDataFn,
     cuModuleGetFunction: cuModuleGetFunctionFn,
     cuModuleUnload: cuModuleUnloadFn,
+    cuFuncSetAttribute: cuFuncSetAttributeFn,
     cuMemAlloc: cuMemAllocFn,
     cuMemFree: cuMemFreeFn,
     cuMemcpy: cuMemcpyFn,
     cuDevicePrimaryCtxRetain: cuDevicePrimaryCtxRetainFn,
     cuCtxSetCurrent: cuCtxSetCurrentFn,
+    cuCtxSynchronize: cuCtxSynchronizeFn,
     cuLaunchKernel: cuLaunchKernelFn,
     /// Result of `cuInit(0)`, cached so repeated NIF calls do not re-initialize.
     init_result: CudaResult,
@@ -108,6 +112,7 @@ fn loadDriver() ?*const CudaDriver {
         const cuModuleLoadData = lib.lookup(cuModuleLoadDataFn, "cuModuleLoadData") orelse continue;
         const cuModuleGetFunction = lib.lookup(cuModuleGetFunctionFn, "cuModuleGetFunction") orelse continue;
         const cuModuleUnload = lib.lookup(cuModuleUnloadFn, "cuModuleUnload") orelse continue;
+        const cuFuncSetAttribute = lib.lookup(cuFuncSetAttributeFn, "cuFuncSetAttribute") orelse continue;
         // CUDA 12+ drivers version the driver API entry points. On CUDA 13.x
         // the plain `cuMemAlloc`/`cuMemFree`/`cuMemcpy` symbols resolve to the
         // legacy entry points that fail with CUDA_ERROR_INVALID_CONTEXT, so
@@ -117,6 +122,7 @@ fn loadDriver() ?*const CudaDriver {
         const cuMemcpy = lib.lookup(cuMemcpyFn, "cuMemcpy_v2") orelse lib.lookup(cuMemcpyFn, "cuMemcpy") orelse continue;
         const cuDevicePrimaryCtxRetain = lib.lookup(cuDevicePrimaryCtxRetainFn, "cuDevicePrimaryCtxRetain") orelse continue;
         const cuCtxSetCurrent = lib.lookup(cuCtxSetCurrentFn, "cuCtxSetCurrent") orelse continue;
+        const cuCtxSynchronize = lib.lookup(cuCtxSynchronizeFn, "cuCtxSynchronize") orelse continue;
         const cuLaunchKernel = lib.lookup(cuLaunchKernelFn, "cuLaunchKernel") orelse continue;
 
         const init_result = cuInit(0);
@@ -139,11 +145,13 @@ fn loadDriver() ?*const CudaDriver {
             .cuModuleLoadData = cuModuleLoadData,
             .cuModuleGetFunction = cuModuleGetFunction,
             .cuModuleUnload = cuModuleUnload,
+            .cuFuncSetAttribute = cuFuncSetAttribute,
             .cuMemAlloc = cuMemAlloc,
             .cuMemFree = cuMemFree,
             .cuMemcpy = cuMemcpy,
             .cuDevicePrimaryCtxRetain = cuDevicePrimaryCtxRetain,
             .cuCtxSetCurrent = cuCtxSetCurrent,
+            .cuCtxSynchronize = cuCtxSynchronize,
             .cuLaunchKernel = cuLaunchKernel,
             .init_result = init_result,
             .primary_ctx = primary_ctx,
@@ -260,6 +268,21 @@ pub fn cuda_module_get_function(env: beam.env, _: c_int, args: [*c]const beam.te
     return beam.make_ok_term(env, make_ptr(env, @intFromPtr(function.?)));
 }
 
+/// Sets a CUDA function attribute, e.g. the dynamic shared memory size in
+/// bytes (`CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES = 0`).
+pub fn cuda_func_set_attribute(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+    const d = switch (requireDriver(env)) {
+        .ok => |ok_driver| ok_driver,
+        .err => |err_term| return err_term,
+    };
+    const function_ptr = try beam.get_u64(env, args[0]);
+    const attribute = try beam.get_i32(env, args[1]);
+    const value = try beam.get_i32(env, args[2]);
+    const result = d.cuFuncSetAttribute(@ptrFromInt(function_ptr), attribute, value);
+    if (result != 0) return cuResultError(env, "cuFuncSetAttribute", result);
+    return beam.make_ok(env);
+}
+
 /// Unloads a CUDA module handle.
 pub fn cuda_module_unload(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const d = switch (requireDriver(env)) {
@@ -294,6 +317,17 @@ pub fn cuda_mem_free(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.t
     const ptr = try beam.get_u64(env, args[0]);
     const result = d.cuMemFree(ptr);
     if (result != 0) return cuResultError(env, "cuMemFree", result);
+    return beam.make_ok(env);
+}
+
+/// Blocks until all previously queued work on the current context completes.
+pub fn cuda_synchronize(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
+    const d = switch (requireDriver(env)) {
+        .ok => |ok_driver| ok_driver,
+        .err => |err_term| return err_term,
+    };
+    const result = d.cuCtxSynchronize();
+    if (result != 0) return cuResultError(env, "cuCtxSynchronize", result);
     return beam.make_ok(env);
 }
 
@@ -344,7 +378,8 @@ pub fn cuda_launch_kernel(env: beam.env, _: c_int, args: [*c]const beam.term) !b
     const block_x = try beam.get_u32(env, args[4]);
     const block_y = try beam.get_u32(env, args[5]);
     const block_z = try beam.get_u32(env, args[6]);
-    const params_bin = try beam.get_binary(env, args[7]);
+    const shared_mem = try beam.get_u32(env, args[7]);
+    const params_bin = try beam.get_binary(env, args[8]);
 
     if (params_bin.size == 0 or params_bin.size % 8 != 0)
         return beam.make_error_binary(env, "kernel params must be packed in 8-byte slots");
@@ -371,7 +406,7 @@ pub fn cuda_launch_kernel(env: beam.env, _: c_int, args: [*c]const beam.term) !b
         block_x,
         block_y,
         block_z,
-        0,
+        shared_mem,
         null,
         params.ptr,
         null,
@@ -386,12 +421,14 @@ pub const nifs = .{
     prelude.beaverRawNIF(@This(), "cuda_device_name", 1),
     prelude.beaverRawNIF(@This(), "cuda_module_load", 1),
     prelude.beaverRawNIF(@This(), "cuda_module_get_function", 2),
+    prelude.beaverRawNIF(@This(), "cuda_func_set_attribute", 3),
     prelude.beaverRawNIF(@This(), "cuda_module_unload", 1),
     prelude.beaverRawNIF(@This(), "cuda_mem_alloc", 1),
     prelude.beaverRawNIF(@This(), "cuda_mem_free", 1),
+    prelude.beaverRawNIF(@This(), "cuda_synchronize", 0),
     prelude.beaverRawNIF(@This(), "cuda_memcpy_htod", 2),
     prelude.beaverRawNIF(@This(), "cuda_memcpy_dtoh", 2),
-    prelude.beaverRawNIF(@This(), "cuda_launch_kernel", 8),
+    prelude.beaverRawNIF(@This(), "cuda_launch_kernel", 9),
 };
 
 export const cuda_runner_nifs: [nifs.len]e.ErlNifFunc = nifs;
