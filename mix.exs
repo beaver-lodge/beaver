@@ -31,6 +31,7 @@ defmodule Beaver.MixProject do
         make_precompiler_priv_paths: [
           "lib/libmlir*",
           "lib/libBeaver*",
+          "lib/libbeaver_*",
           "lib/libMLIRBeaver*",
           "*.ex",
           "*.json",
