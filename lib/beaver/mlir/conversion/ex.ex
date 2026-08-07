@@ -6,9 +6,12 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
     * `ex.lit` -> `arith.constant`
     * `ex.add` -> `arith.addi`
+    * `ex.sub` -> `arith.subi`
+    * `ex.mul` -> `arith.muli`
     * `ex.call` -> `func.call`
     * `ex.return` -> `func.return`
-    * `ex.func` -> `func.func` (body region moved, `ex.return` types converted)
+    * `ex.func` -> `func.func` (body region moved, argument and `ex.return`
+      types converted)
 
   The `ex` term types (`!ex.dyn`/`!ex.bound`/`!ex.unbound`) convert to a scalar
   word type (`i64`) until the Zig term runtime lands.
@@ -50,6 +53,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion(&convert_type/1, version: "1.0")
     |> Plan.add_conversion_pattern("ex.lit", &convert_lit/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.add", &convert_add/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.sub", &convert_sub/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.mul", &convert_mul/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.call", &convert_call/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.return", &convert_return/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.var", &convert_var/3, version: "1.0")
@@ -100,6 +105,18 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp convert_add(operation, [left, right], rewriter) do
+    convert_binary("arith.addi", operation, [left, right], rewriter)
+  end
+
+  defp convert_sub(operation, [left, right], rewriter) do
+    convert_binary("arith.subi", operation, [left, right], rewriter)
+  end
+
+  defp convert_mul(operation, [left, right], rewriter) do
+    convert_binary("arith.muli", operation, [left, right], rewriter)
+  end
+
+  defp convert_binary(arith_op, operation, [left, right], rewriter) do
     context = MLIR.context(operation)
     base = MLIR.ConversionPatternRewriter.as_base(rewriter)
     location = MLIR.Operation.location(operation)
@@ -107,7 +124,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     result_type = result |> MLIR.Value.type() |> convert_type()
 
     add =
-      %Changeset{name: "arith.addi", context: context, location: location}
+      %Changeset{name: arith_op, context: context, location: location}
       |> Changeset.add_argument([left, right])
       |> Changeset.add_result(result_type)
       |> MLIR.Operation.create()
@@ -201,7 +218,13 @@ defmodule Beaver.MLIR.Conversion.Ex do
       |> Enum.to_list()
       |> Enum.map(&(&1 |> MLIR.Value.type() |> convert_type()))
 
-    function_type = MLIR.Type.function([], return_types)
+    arg_types =
+      block
+      |> Walker.arguments()
+      |> Enum.to_list()
+      |> Enum.map(&(&1 |> MLIR.Value.type() |> convert_type()))
+
+    function_type = MLIR.Type.function(arg_types, return_types)
 
     func =
       %Changeset{name: "func.func", context: context, location: location}

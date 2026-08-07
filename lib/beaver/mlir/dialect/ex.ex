@@ -47,13 +47,25 @@ defmodule Beaver.MLIR.Dialect.Ex do
         ),
         results: [result: all_of([base("!builtin.integer"), any()])]
 
+  defop sub(
+          left = all_of([base("!builtin.integer"), any()]),
+          right = all_of([base("!builtin.integer"), any()])
+        ),
+        results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop mul(
+          left = all_of([base("!builtin.integer"), any()]),
+          right = all_of([base("!builtin.integer"), any()])
+        ),
+        results: [result: all_of([base("!builtin.integer"), any()])]
+
   defop call(args = variadic(any())),
     results: [result: base(dyn())],
     attributes: [callee: ^callee_value, arity: ^integer_value]
 
   defop func(),
     attributes: [sym_name: base("#builtin.string")],
-    regions: [body: {:region, args: [], size: 1}],
+    regions: [body: {:region, size: 1}],
     traits: [:isolated_from_above]
 
   defop return(value = optional(any())), traits: [:terminator]

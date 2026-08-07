@@ -139,4 +139,33 @@ defmodule ExConversionTest do
     assert rendered =~ "func.call"
     assert rendered =~ "func.return"
   end
+
+  test "lowers sub/mul and function arguments", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, ExDialect)
+
+    module =
+      MLIR.Module.create!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0(%arg0: i64, %arg1: i64):
+            %0 = "ex.mul"(%arg0, %arg1) : (i64, i64) -> i64
+            %1 = "ex.sub"(%0, %arg0) : (i64, i64) -> i64
+            "ex.return"(%1) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx: ctx
+      )
+      |> MLIR.verify!()
+
+    converted = Plan.run!(Ex.plan(), module)
+
+    rendered = MLIR.to_string(converted, generic: true)
+    refute rendered =~ "ex."
+    assert rendered =~ ~s{function_type = (i64, i64) -> i64, sym_name = "main"}
+    assert rendered =~ "^bb0(%arg0: i64, %arg1: i64)"
+    assert rendered =~ "arith.muli"
+    assert rendered =~ "arith.subi"
+  end
 end
