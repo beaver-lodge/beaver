@@ -80,23 +80,21 @@ defmodule Beaver.Shadow.Report do
       end
 
     probe =
-      case fixture.probe do
-        %Probe.Result{status: :crash} = probe ->
-          "crash (exit #{probe.exit_code}) at `#{probe.detail.last_pass}`"
-
-        %Probe.Result{status: :ok} ->
-          "ok"
-
-        %Probe.Result{status: :error, detail: message} ->
-          "error: `#{message}`"
-
-        nil ->
-          "-"
-      end
+      probe_text(fixture.probe)
 
     "| #{fixture.name} | #{fixture.dialect} | #{fixture.baseline} | #{fixture.optimized} | " <>
       "#{reduction} | #{lowered} | #{probe} |"
   end
+
+  defp probe_text(%Probe.Result{status: :crash} = probe) do
+    "crash (exit #{probe.exit_code}) at `#{probe.detail.last_pass}`"
+  end
+
+  defp probe_text(%Probe.Result{status: :ok}), do: "ok"
+
+  defp probe_text(%Probe.Result{status: :error, detail: message}), do: "error: `#{message}`"
+
+  defp probe_text(nil), do: "-"
 
   defp measure(%{dialect: :ttir} = fixture) do
     context = MLIR.Context.create(all_dialects: false)
