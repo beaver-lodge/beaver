@@ -16,6 +16,11 @@ defmodule Beaver.MLIR.Conversion.Ex do
     * `ex.func` -> `func.func` (body region moved, argument and `ex.return`
       types converted)
 
+  Term-universe ops (`ex.tuple`/`ex.list`/`ex.map`/`ex.binary` and the
+  `ex.is_*` predicates) are not converted yet: they require the Zig term
+  runtime ABI, which lands in the compiler repo (batata) rather than Beaver.
+  The plan rejects them explicitly instead of silently dropping them.
+
   The `ex` term types (`!ex.dyn`/`!ex.bound`/`!ex.unbound`) convert to a scalar
   word type (`i64`) until the Zig term runtime lands.
 
@@ -65,6 +70,16 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.return", &convert_return/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.var", &convert_var/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.func", &convert_func/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.tuple", &reject_term_op/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.list", &reject_term_op/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.map", &reject_term_op/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.binary", &reject_term_op/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.is_integer", &reject_term_op/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.is_atom", &reject_term_op/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.is_binary", &reject_term_op/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.is_list", &reject_term_op/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.is_tuple", &reject_term_op/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.is_map", &reject_term_op/3, version: "1.0")
   end
 
   @doc """
@@ -218,6 +233,12 @@ defmodule Beaver.MLIR.Conversion.Ex do
     MLIR.RewriterBase.insert(base, yield)
     MLIR.ConversionPatternRewriter.replace_op(rewriter, operation, yield)
     :ok
+  end
+
+  defp reject_term_op(operation, _operands, _rewriter) do
+    raise ArgumentError,
+          "#{MLIR.Operation.name(operation)} requires the Zig term runtime ABI and is unsupported " <>
+            "in the scalar conversion plan"
   end
 
   defp cmp_i_predicate("eq"), do: cmp_i_predicate_attr(0)
