@@ -64,10 +64,11 @@ defmodule Beaver.Triton do
   def compile_to_llvm(%MLIR.Module{} = module, opts \\ []) do
     target = Keyword.get(opts, :target, "cuda:80")
     remove_layouts? = Keyword.get(opts, :remove_layout_conversions, true)
+    from_ttgir? = Keyword.get(opts, :from_ttgir, false)
 
     ttgpu_pipeline =
       [
-        "convert-triton-to-tritongpu{target=#{target}}",
+        unless(from_ttgir?, do: "convert-triton-to-tritongpu{target=#{target}}"),
         "tritongpu-coalesce",
         "tritongpu-F32DotTC",
         "triton-nvidia-gpu-plan-cta",
