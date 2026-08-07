@@ -672,7 +672,7 @@ const TypeConverterWorker = struct {
             if (c.mlirTypeIsNull(converted))
                 beam.make_nil(environment)
             else
-            mlir_capi.Type.resource.make_kind(environment, converted) catch beam.make_nil(environment),
+                mlir_capi.Type.resource.make_kind(environment, converted) catch beam.make_nil(environment),
         };
         _ = beam.send_advanced(null, self.recipient, environment, beam.make_tuple(environment, &terms));
     }
