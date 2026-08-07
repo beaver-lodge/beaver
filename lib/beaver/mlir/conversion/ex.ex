@@ -62,14 +62,17 @@ defmodule Beaver.MLIR.Conversion.Ex do
   @spec convert_type(MLIR.Type.t()) :: MLIR.Type.t()
   def convert_type(type) do
     case MLIR.to_string(type) do
-      "!ex.dyn" -> scalar_word()
-      "!ex.bound" -> scalar_word()
-      "!ex.unbound" -> scalar_word()
+      "!ex.dyn" -> scalar_word(type)
+      "!ex.bound" -> scalar_word(type)
+      "!ex.unbound" -> scalar_word(type)
       _ -> type
     end
   end
 
-  defp scalar_word, do: MLIR.Type.i64()
+  defp scalar_word(type) do
+    ctx = MLIR.context(type)
+    MLIR.Type.integer(64, ctx: ctx)
+  end
 
   defp convert_lit(operation, [], rewriter) do
     context = MLIR.context(operation)
