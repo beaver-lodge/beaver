@@ -302,4 +302,28 @@ defmodule ExConversionTest do
       ExpandCase.run!(module)
     end
   end
+
+  test "rejects term-universe ops until the Zig runtime ABI lands", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, ExDialect)
+
+    module =
+      MLIR.Module.create!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "ex.lit"() {value = 1 : i64} : () -> i64
+            %1 = "ex.tuple"(%0) {operandSegmentSizes = array<i32: 1>} : (i64) -> !ex.dyn
+            "ex.return"() {operandSegmentSizes = array<i32: 0>} : () -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx: ctx
+      )
+      |> MLIR.verify!()
+
+    assert {:error, %MLIR.Conversion.Error{} = error} = Plan.run(Ex.plan(), module)
+    assert Exception.message(error) =~ "ex.tuple"
+    assert Exception.message(error) =~ "Zig term runtime"
+  end
 end
