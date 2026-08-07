@@ -124,6 +124,36 @@ defmodule Beaver.MLIR.Transform.Schedule.DSLTest do
     end
   end
 
+  defmodule CseSchedule do
+    use DSL
+
+    defschedule cse_schedule do
+      sequence "__transform_main", [root >>> any_op()] do
+        apply_cse = MLIR.Attribute.unit(ctx: Beaver.Env.context())
+
+        Transform.apply_patterns target: root, apply_cse: apply_cse do
+          region do
+            block do
+              Transform.apply_patterns_canonicalization()
+            end
+          end
+        end >>> []
+      end
+    end
+
+    defschedule plain_patterns_schedule do
+      sequence "__transform_main", [root >>> any_op()] do
+        Transform.apply_patterns target: root do
+          region do
+            block do
+              Transform.apply_patterns_canonicalization()
+            end
+          end
+        end >>> []
+      end
+    end
+  end
+
   defmodule InvalidDeclarations do
     use DSL
 
@@ -155,6 +185,17 @@ defmodule Beaver.MLIR.Transform.Schedule.DSLTest do
     func.func @matmul_op(%A: tensor<16x16xf32>, %B: tensor<16x16xf32>, %C: tensor<16x16xf32>) -> tensor<16x16xf32> {
       %0 = linalg.matmul ins(%A, %B : tensor<16x16xf32>, tensor<16x16xf32>) outs(%C : tensor<16x16xf32>) -> tensor<16x16xf32>
       return %0 : tensor<16x16xf32>
+    }
+  }
+  """
+
+  @cse_payload """
+  module {
+    func.func @duplicated(%a: i32, %b: i32) -> i32 {
+      %0 = arith.addi %a, %b : i32
+      %1 = arith.addi %a, %b : i32
+      %2 = arith.addi %0, %1 : i32
+      return %2 : i32
     }
   }
   """
@@ -346,6 +387,63 @@ defmodule Beaver.MLIR.Transform.Schedule.DSLTest do
     assert first.cache == :miss
     assert second.cache == :hit
     assert first.metadata.transform_schedule == Schedule.cache_identity(resolved)
+  end
+
+  defp count_arith_addi(module) do
+    module
+    |> MLIR.Module.body()
+    |> Beaver.Walker.operations()
+    |> Enum.map_join(&MLIR.to_string/1)
+    |> then(&(length(String.split(&1, "arith.addi")) - 1))
+  end
+
+  test "apply_patterns with apply_cse removes duplicated subexpressions", %{ctx: ctx} do
+    schedule = own(CseSchedule.cse_schedule(ctx: ctx))
+    assert {:ok, resolved} = Schedule.resolve(schedule, %{})
+
+    payload = own(MLIR.Module.create!(@cse_payload, ctx: ctx))
+    assert count_arith_addi(payload) == 3
+
+    assert {:ok, result} = MLIR.Transform.execute(payload, resolved)
+
+    assert count_arith_addi(result.payload) == 2
+
+    # The folded value is reused: the remaining addi feeds itself.
+    assert MLIR.to_string(result.payload) =~ "arith.addi %0, %0"
+  end
+
+  test "apply_patterns without apply_cse keeps duplicated subexpressions", %{ctx: ctx} do
+    schedule = own(CseSchedule.plain_patterns_schedule(ctx: ctx))
+
+    assert {:ok, resolved} = Schedule.resolve(schedule, %{})
+
+    payload = own(MLIR.Module.create!(@cse_payload, ctx: ctx))
+
+    assert {:ok, result} = MLIR.Transform.execute(payload, resolved)
+
+    assert count_arith_addi(result.payload) == 3
+  end
+
+  test "apply_cse schedules round-trip through text and bytecode", %{ctx: ctx} do
+    schedule = own(CseSchedule.cse_schedule(ctx: ctx))
+
+    text = MLIR.to_string(schedule)
+    bytecode = MLIR.Bytecode.write!(schedule)
+    assert text =~ ~s(transform.apply_patterns)
+    assert text =~ "{apply_cse}"
+
+    for round_trip <- [
+          MLIR.Module.create!(text, ctx: ctx),
+          MLIR.Module.create!(bytecode, ctx: ctx)
+        ] do
+      round_trip = own(round_trip)
+      assert {:ok, resolved} = Schedule.resolve(round_trip, %{})
+
+      payload = own(MLIR.Module.create!(@cse_payload, ctx: ctx))
+      assert {:ok, result} = MLIR.Transform.execute(payload, resolved)
+
+      assert count_arith_addi(result.payload) == 2
+    end
   end
 
   defp own(module) do
