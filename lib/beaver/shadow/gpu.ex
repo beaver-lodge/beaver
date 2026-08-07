@@ -180,7 +180,7 @@ defmodule Beaver.Shadow.GPU do
   # Launch with a small round-trip payload: allocate 4 bytes, copy in/out, and
   # launch the kernel with one pointer argument. Kernels that do not expect a
   # pointer argument can pass `:arg_count`/`:skip_io` options instead.
-  defp launch_once(backend, function_handle, grid, block, module_handle, opts) do
+  defp launch_once(backend, function_handle, grid, block, _module_handle, opts) do
     if Keyword.get(opts, :skip_io, false) do
       case backend.launch_kernel(function_handle, grid, block, []) do
         :ok -> {:ok, %{launch_native: System.monotonic_time()}}
