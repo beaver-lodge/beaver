@@ -145,3 +145,22 @@ This stage runs compiler-side only. Layout cost is an explicit, replaceable
 heuristic — it does not claim to equal real GPU performance. Real kernel
 latency arrives with the Zig CUDA runner, and the Triton plugin path will let
 the same loop drive passes inside an actual Triton pipeline.
+
+## Real workload trial
+
+`Beaver.Shadow.OptimizationTrial` is the first consumer that compares two real
+pipeline variants on a real Triton kernel instead of a synthetic fixture. It
+uses the upstream Triton matmul TTGIR (`test/fixtures/triton/ttgir_matmul.mlir`)
+and answers one question: how many `ttg.convert_layout` operations survive?
+
+- baseline: `convert-triton-to-tritongpu` only — 24 conversions;
+- optimized: plus `tritongpu-remove-layout-conversions` — 5 conversions;
+- reduction: 19 conversions eliminated (reproducible on every run).
+
+This is the first reproducible, non-trivial optimization evidence produced by
+the Shadow Wavefront loop: the same input, two real pipeline strategies, and a
+structural audit that records the difference without human IR reading.
+
+Known limitation: the Triton prebuilt's `convert-triton-gpu-to-llvm` pass
+segfaults on this matmul TTGIR, so real GPU latency comparison for this
+workload is blocked until the prebuilt/LLVM compatibility is fixed.

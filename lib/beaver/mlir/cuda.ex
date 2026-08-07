@@ -63,6 +63,16 @@ defmodule Beaver.MLIR.CUDA do
     do: MLIR.CAPI.beaver_raw_cuda_module_get_function(module_handle, name)
 
   @doc """
+  Sets a CUDA function attribute, e.g. the dynamic shared memory size.
+
+  `attribute` is the `CUfunction_attribute` enum value; shared size bytes is
+  `0`. Required for Triton kernels that use `global_smem`.
+  """
+  @spec func_set_attribute(non_neg_integer(), integer(), integer()) :: :ok | {:error, String.t()}
+  def func_set_attribute(function_handle, attribute, value),
+    do: MLIR.CAPI.beaver_raw_cuda_func_set_attribute(function_handle, attribute, value)
+
+  @doc """
   Unloads a CUDA module handle.
   """
   @spec module_unload(non_neg_integer()) :: :ok | {:error, String.t()}
@@ -79,6 +89,14 @@ defmodule Beaver.MLIR.CUDA do
   """
   @spec mem_free(non_neg_integer()) :: :ok | {:error, String.t()}
   def mem_free(device_ptr), do: MLIR.CAPI.beaver_raw_cuda_mem_free(device_ptr)
+
+  @doc """
+  Blocks until all previously queued work on the current context completes.
+
+  Use after `launch_kernel/4` when timing kernel execution end to end.
+  """
+  @spec synchronize() :: :ok | {:error, String.t()}
+  def synchronize, do: MLIR.CAPI.beaver_raw_cuda_synchronize()
 
   @doc """
   Copies host `data` into device memory at `device_ptr`.
@@ -112,7 +130,7 @@ defmodule Beaver.MLIR.CUDA do
           {non_neg_integer(), non_neg_integer(), non_neg_integer()},
           [{:f32, float()} | {:i64, integer()} | {:ptr, non_neg_integer()}]
         ) :: :ok | {:error, String.t()}
-  def launch_kernel(function_handle, grid, block, args) do
+  def launch_kernel(function_handle, grid, block, args, opts \\ []) do
     {grid_x, grid_y, grid_z} = grid
     {block_x, block_y, block_z} = block
 
@@ -124,6 +142,7 @@ defmodule Beaver.MLIR.CUDA do
       block_x,
       block_y,
       block_z,
+      Keyword.get(opts, :shared_mem, 0),
       pack_args(args)
     )
   end

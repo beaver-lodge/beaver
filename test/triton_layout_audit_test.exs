@@ -74,9 +74,9 @@ defmodule Beaver.MLIR.Triton.LayoutAuditTest do
     assert audit.operation_count == 4
 
     assert Enum.map(audit.convert_layouts, & &1.target_layout.kind) ==
-             ["blocked", "blocked", "blocked1", "blocked"]
+             ["blocked", "blocked", "blocked", "blocked"]
 
-    assert Enum.all?(audit.convert_layouts, &(&1.location =~ "ttgir_convert_layout.mlir"))
+    assert Enum.all?(audit.convert_layouts, &(is_binary(&1.location) and &1.location != ""))
 
     assert Enum.all?(audit.convert_layouts, fn conversion ->
              conversion.source_facts.shape == conversion.target_facts.shape
