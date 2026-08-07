@@ -280,6 +280,7 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
+          context: workflow-source
           push: ${{ secrets.DOCKERHUB_TOKEN != '' }}
           tags: ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest
           cache-from: type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest
