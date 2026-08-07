@@ -18,6 +18,10 @@ concurrency:
   group: precompiled-${{ github.ref }}
   cancel-in-progress: true
 
+defaults:
+  run:
+    shell: bash
+
 permissions:
   contents: read
 
@@ -44,9 +48,23 @@ jobs:
         job:
           - { otp: 27.3, os: ubuntu-22.04, elixir: 1.20.3 }
           - { otp: 27.3, os: macos-15, elixir: 1.20.3 }
+          - { otp: 27.3, os: windows-2022, elixir: 1.20.3 }
     steps:
       - uses: actions/checkout@v4
         name: Check-out beaver
+      # Kinda 0.11.0 on Hex predates the LLP64 integer conversion and Windows
+      # synchronization fixes; the Windows lane needs the paired checkout until
+      # a release containing beaver-lodge/kinda#66 and #68 is published.
+      - uses: actions/checkout@v4
+        name: Check out paired Kinda
+        if: runner.os == 'Windows'
+        with:
+          repository: beaver-lodge/kinda
+          path: kinda
+          ref: 81a51065952cb644b10cb60dacc4370ec653c9ed
+      - name: Point Mix at the paired Kinda checkout
+        if: runner.os == 'Windows'
+        run: echo "BEAVER_KINDA_PATH=${GITHUB_WORKSPACE}/kinda" >> "$GITHUB_ENV"
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
         with:
@@ -84,7 +102,67 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           cd scripts/install_llvm
-          mix beaver.install_prebuilt_llvm --install-dir "$RUNNER_TEMP/llvm-prebuilt"
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            mix beaver.install_prebuilt_llvm --triton --install-dir "$RUNNER_TEMP/llvm-prebuilt"
+          else
+            mix beaver.install_prebuilt_llvm --install-dir "$RUNNER_TEMP/llvm-prebuilt"
+          fi
+      - name: Set up MSVC toolchain
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+      - name: Configure Windows pagefile
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          try {
+            $source = @'
+            using System;
+            using System.ComponentModel;
+            using System.Diagnostics;
+            using System.Runtime.InteropServices;
+            using System.Text;
+            public static class Pagefile {
+              [StructLayout(LayoutKind.Sequential)] internal struct LUID { internal uint LowPart; internal int HighPart; }
+              [StructLayout(LayoutKind.Sequential)] internal struct LUID_AND_ATTRIBUTES { internal LUID Luid; internal uint Attributes; }
+              [StructLayout(LayoutKind.Sequential)] internal struct TOKEN_PRIVILEGE { internal uint PrivilegeCount; internal LUID_AND_ATTRIBUTES Privilege; }
+              [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] internal struct UNICODE_STRING { internal ushort length; internal ushort maximumLength; internal string buffer; }
+              [DllImport("advapi32.dll", SetLastError = true)] internal static extern bool LookupPrivilegeValue(string system, string name, out LUID luid);
+              [DllImport("advapi32.dll", SetLastError = true)] internal static extern bool OpenProcessToken(IntPtr h, uint access, out IntPtr token);
+              [DllImport("advapi32.dll", SetLastError = true)] internal static extern bool AdjustTokenPrivileges(IntPtr token, bool disable, ref TOKEN_PRIVILEGE tp, uint len, IntPtr prev, IntPtr retlen);
+              [DllImport("kernel32.dll")] internal static extern bool CloseHandle(IntPtr h);
+              [DllImport("ntdll.dll", CharSet = CharSet.Unicode, SetLastError = true)] internal static extern int NtCreatePagingFile(ref UNICODE_STRING file, ref long min, ref long max, uint flags);
+              [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] internal static extern uint QueryDosDevice(string device, StringBuilder target, int size);
+              public static void EnablePrivilege() {
+                LUID luid;
+                if (!LookupPrivilegeValue(null, "SeCreatePagefilePrivilege", out luid)) throw new Win32Exception(Marshal.GetLastWin32Error());
+                IntPtr token;
+                if (!OpenProcessToken(Process.GetCurrentProcess().Handle, 0x28, out token)) throw new Win32Exception(Marshal.GetLastWin32Error());
+                try {
+                  TOKEN_PRIVILEGE tp = new TOKEN_PRIVILEGE();
+                  tp.PrivilegeCount = 1; tp.Privilege.Luid = luid; tp.Privilege.Attributes = 2;
+                  if (!AdjustTokenPrivileges(token, false, ref tp, (uint)Marshal.SizeOf(typeof(TOKEN_PRIVILEGE)), IntPtr.Zero, IntPtr.Zero)) throw new Win32Exception(Marshal.GetLastWin32Error());
+                } finally { CloseHandle(token); }
+              }
+              public static void SetPageFileSize(long min, long max) {
+                EnablePrivilege();
+                StringBuilder path = new StringBuilder(260);
+                if (QueryDosDevice("D:", path, path.Capacity) == 0) throw new Win32Exception(Marshal.GetLastWin32Error());
+                string file = path.ToString() + "\\pagefile.sys";
+                UNICODE_STRING name = new UNICODE_STRING();
+                name.length = (ushort)(file.Length * 2);
+                name.maximumLength = (ushort)(2 * (file.Length + 1));
+                name.buffer = file;
+                int status = NtCreatePagingFile(ref name, ref min, ref max, 0);
+                if (status != 0) throw new Win32Exception(Marshal.GetLastWin32Error());
+                Console.WriteLine("PageFile: {0} / {1} bytes for {2}", min, max, file);
+              }
+            }
+          '@
+            Add-Type -TypeDefinition $source
+            [Pagefile]::SetPageFileSize(8L * 1024 * 1024 * 1024, 16L * 1024 * 1024 * 1024)
+          } catch {
+            Write-Output "pagefile setup failed (best-effort): $_"
+          }
       - name: Production build
         env:
           MIX_ENV: prod
@@ -98,7 +176,7 @@ jobs:
         env:
           BEAVER_ARTEFACT_URL: http://127.0.0.1:8000/@{artefact_filename}
         run: |
-          python3 -m http.server 8000 --bind 127.0.0.1 > "$RUNNER_TEMP/http-server.log" 2>&1 &
+          python -m http.server 8000 --bind 127.0.0.1 > "$RUNNER_TEMP/http-server.log" 2>&1 &
           server_pid=$!
           cleanup() { kill "$server_pid" 2>/dev/null || true; }
           trap cleanup EXIT
@@ -119,7 +197,11 @@ jobs:
           # cache, and its relative .zig-cache/o/<hash> entries sit before
           # $ORIGIN in the NIF's RUNPATH).
           rm -rf _build/prod _build/test .zig-cache
-          mix test --exclude vulkan --exclude todo
+          extra=""
+          if [[ "${{ runner.os }}" == "Windows" ]]; then
+            extra="--exclude cuda"
+          fi
+          mix test --exclude vulkan --exclude todo $extra
       - name: Publish archives and packages
         uses: softprops/action-gh-release@v3
         if: ${{ github.event_name != 'pull_request' && github.repository == 'beaver-lodge/beaver' }}
