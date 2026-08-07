@@ -280,13 +280,14 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
+          context: workflow-source
           push: ${{ secrets.DOCKERHUB_TOKEN != '' }}
           tags: ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest
           cache-from: type=registry,ref=${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest
           cache-to: type=inline
           platforms: |
             ${{ matrix.image.platform }}
-          file: docker/livebook.dockerfile
+          file: workflow-source/docker/livebook.dockerfile
           build-args: |
             LLVM_EUDSL_ASSET_NAME=${{ steps.llvm.outputs.LLVM_PREBUILT_ASSET_NAME }}
             ZIG_URL=${{ matrix.image.zig }}
