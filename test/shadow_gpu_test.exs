@@ -200,14 +200,14 @@ defmodule Beaver.Shadow.GPUTest do
       )
 
     size = 64 * 64 * 4
-    {:ok, dA} = MLIR.CUDA.mem_alloc(size)
-    {:ok, dB} = MLIR.CUDA.mem_alloc(size)
-    {:ok, dC} = MLIR.CUDA.mem_alloc(size)
+    {:ok, d_a} = MLIR.CUDA.mem_alloc(size)
+    {:ok, d_b} = MLIR.CUDA.mem_alloc(size)
+    {:ok, d_c} = MLIR.CUDA.mem_alloc(size)
 
     on_exit(fn ->
-      MLIR.CUDA.mem_free(dA)
-      MLIR.CUDA.mem_free(dB)
-      MLIR.CUDA.mem_free(dC)
+      MLIR.CUDA.mem_free(d_a)
+      MLIR.CUDA.mem_free(d_b)
+      MLIR.CUDA.mem_free(d_c)
     end)
 
     a_data = for _ <- 1..(64 * 64), do: 1.0
@@ -215,23 +215,23 @@ defmodule Beaver.Shadow.GPUTest do
 
     :ok =
       MLIR.CUDA.memcpy_htod(
-        dA,
+        d_a,
         a_data |> Enum.map(&<<&1::float-32-little>>) |> IO.iodata_to_binary()
       )
 
     :ok =
       MLIR.CUDA.memcpy_htod(
-        dB,
+        d_b,
         b_data |> Enum.map(&<<&1::float-32-little>>) |> IO.iodata_to_binary()
       )
 
-    :ok = MLIR.CUDA.memcpy_htod(dC, :binary.copy(<<0::32>>, 64 * 64))
+    :ok = MLIR.CUDA.memcpy_htod(d_c, :binary.copy(<<0::32>>, 64 * 64))
 
     # row-major strides: A[M,K]=64,1; B[K,N]=64,1; C[M,N]=64,1; M=N=K=64
     args = [
-      {:ptr, dA},
-      {:ptr, dB},
-      {:ptr, dC},
+      {:ptr, d_a},
+      {:ptr, d_b},
+      {:ptr, d_c},
       {:i64, 64},
       {:i64, 64},
       {:i64, 64},
@@ -247,7 +247,7 @@ defmodule Beaver.Shadow.GPUTest do
 
     assert :ok = MLIR.CUDA.launch_kernel(f, {1, 1, 1}, {128, 1, 1}, args, shared_mem: 16_384)
 
-    assert {:ok, data} = MLIR.CUDA.memcpy_dtoh(dC, 64 * 64 * 4)
+    assert {:ok, data} = MLIR.CUDA.memcpy_dtoh(d_c, 64 * 64 * 4)
     floats = for <<f::float-32-little <- data>>, do: f
     assert Enum.all?(floats, &(&1 == 128.0))
   end

@@ -131,17 +131,22 @@ defmodule Beaver.Shadow.OptimizationTrial do
     args = Keyword.get(opts, :args)
     samples = Keyword.get(opts, :samples, 10)
 
+    launch = %{
+      kernel_name: kernel_name,
+      grid: grid,
+      block: block,
+      shared_mem: shared_mem,
+      args: args,
+      samples: samples
+    }
+
     baseline_ns =
       source_text
-      |> compile_and_launch(context, target, kernel_name, grid, block, shared_mem, args, samples,
-        remove_layout_conversions: false
-      )
+      |> compile_and_launch(context, target, launch, remove_layout_conversions: false)
 
     optimized_ns =
       source_text
-      |> compile_and_launch(context, target, kernel_name, grid, block, shared_mem, args, samples,
-        remove_layout_conversions: true
-      )
+      |> compile_and_launch(context, target, launch, remove_layout_conversions: true)
 
     %{
       baseline_ns: baseline_ns,
@@ -150,18 +155,7 @@ defmodule Beaver.Shadow.OptimizationTrial do
     }
   end
 
-  defp compile_and_launch(
-         source_text,
-         context,
-         target,
-         kernel_name,
-         grid,
-         block,
-         shared_mem,
-         args,
-         samples,
-         compile_opts
-       ) do
+  defp compile_and_launch(source_text, context, target, launch, compile_opts) do
     module = MLIR.Module.create!(source_text, ctx: context)
 
     result =
@@ -169,7 +163,7 @@ defmodule Beaver.Shadow.OptimizationTrial do
         llvm = Beaver.Triton.compile_to_llvm(module, Keyword.put(compile_opts, :target, target))
         llvm_text = MLIR.to_string(llvm)
         ptx = llvm_to_ptx(llvm_text)
-        launch_latency_ns(ptx, kernel_name, grid, block, shared_mem, args, samples)
+        launch_latency_ns(ptx, launch)
       rescue
         exception ->
           IO.warn("compile_and_launch failed: #{Exception.message(exception)}")
@@ -214,7 +208,16 @@ defmodule Beaver.Shadow.OptimizationTrial do
     ptx
   end
 
-  defp launch_latency_ns(ptx, kernel_name, grid, block, shared_mem, args, samples) do
+  defp launch_latency_ns(ptx, launch) do
+    %{
+      kernel_name: kernel_name,
+      grid: grid,
+      block: block,
+      shared_mem: shared_mem,
+      args: args,
+      samples: samples
+    } = launch
+
     escaped =
       ptx
       |> String.replace("\\", "\\\\")
@@ -259,31 +262,31 @@ defmodule Beaver.Shadow.OptimizationTrial do
 
   defp with_buffers(nil, fun) do
     size = 64 * 64 * 4
-    {:ok, dA} = MLIR.CUDA.mem_alloc(size)
-    {:ok, dB} = MLIR.CUDA.mem_alloc(size)
-    {:ok, dC} = MLIR.CUDA.mem_alloc(size)
+    {:ok, d_a} = MLIR.CUDA.mem_alloc(size)
+    {:ok, d_b} = MLIR.CUDA.mem_alloc(size)
+    {:ok, d_c} = MLIR.CUDA.mem_alloc(size)
 
     a_data = for _ <- 1..(64 * 64), do: 1.0
     b_data = for _ <- 1..(64 * 64), do: 2.0
 
     :ok =
       MLIR.CUDA.memcpy_htod(
-        dA,
+        d_a,
         a_data |> Enum.map(&<<&1::float-32-little>>) |> IO.iodata_to_binary()
       )
 
     :ok =
       MLIR.CUDA.memcpy_htod(
-        dB,
+        d_b,
         b_data |> Enum.map(&<<&1::float-32-little>>) |> IO.iodata_to_binary()
       )
 
-    :ok = MLIR.CUDA.memcpy_htod(dC, :binary.copy(<<0::32>>, 64 * 64))
+    :ok = MLIR.CUDA.memcpy_htod(d_c, :binary.copy(<<0::32>>, 64 * 64))
 
     args = [
-      {:ptr, dA},
-      {:ptr, dB},
-      {:ptr, dC},
+      {:ptr, d_a},
+      {:ptr, d_b},
+      {:ptr, d_c},
       {:i64, 64},
       {:i64, 64},
       {:i64, 64},
@@ -298,9 +301,9 @@ defmodule Beaver.Shadow.OptimizationTrial do
     ]
 
     result = fun.(args)
-    MLIR.CUDA.mem_free(dA)
-    MLIR.CUDA.mem_free(dB)
-    MLIR.CUDA.mem_free(dC)
+    MLIR.CUDA.mem_free(d_a)
+    MLIR.CUDA.mem_free(d_b)
+    MLIR.CUDA.mem_free(d_c)
     result
   end
 
