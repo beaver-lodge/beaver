@@ -8,6 +8,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
     * `ex.add` -> `arith.addi`
     * `ex.sub` -> `arith.subi`
     * `ex.mul` -> `arith.muli`
+    * `ex.cmp` -> `arith.cmpi`
+    * `ex.if` -> `scf.if`
+    * `ex.yield` -> `scf.yield`
     * `ex.call` -> `func.call`
     * `ex.return` -> `func.return`
     * `ex.func` -> `func.func` (body region moved, argument and `ex.return`
@@ -55,6 +58,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.add", &convert_add/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.sub", &convert_sub/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mul", &convert_mul/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.cmp", &convert_cmp/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.if", &convert_if/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.yield", &convert_yield/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.call", &convert_call/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.return", &convert_return/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.var", &convert_var/3, version: "1.0")
@@ -133,6 +139,104 @@ defmodule Beaver.MLIR.Conversion.Ex do
     MLIR.RewriterBase.insert(base, add)
     MLIR.ConversionPatternRewriter.replace_op(rewriter, operation, MLIR.Operation.result(add, 0))
     :ok
+  end
+
+  defp convert_cmp(operation, [left, right], rewriter) do
+    context = MLIR.context(operation)
+    base = MLIR.ConversionPatternRewriter.as_base(rewriter)
+    location = MLIR.Operation.location(operation)
+    [result] = operation |> Walker.results() |> Enum.to_list()
+    result_type = result |> MLIR.Value.type() |> convert_type()
+
+    predicate =
+      operation
+      |> required_attribute("predicate")
+      |> MLIR.CAPI.mlirStringAttrGetValue()
+      |> MLIR.to_string()
+
+    cmpi =
+      %Changeset{name: "arith.cmpi", context: context, location: location}
+      |> Changeset.add_argument([left, right])
+      |> Changeset.add_argument(predicate: cmp_i_predicate(predicate))
+      |> Changeset.add_result(result_type)
+      |> MLIR.Operation.create()
+
+    MLIR.RewriterBase.set_insertion_point_before(base, operation)
+    MLIR.RewriterBase.insert(base, cmpi)
+    MLIR.ConversionPatternRewriter.replace_op(rewriter, operation, MLIR.Operation.result(cmpi, 0))
+    :ok
+  end
+
+  defp convert_if(operation, [cond], rewriter) do
+    context = MLIR.context(operation)
+    base = MLIR.ConversionPatternRewriter.as_base(rewriter)
+    location = MLIR.Operation.location(operation)
+
+    result_types =
+      operation
+      |> Walker.results()
+      |> Enum.to_list()
+      |> Enum.map(&(&1 |> MLIR.Value.type() |> convert_type()))
+
+    [then_region, else_region] = operation |> Walker.regions() |> Enum.to_list()
+
+    scf_if =
+      %Changeset{name: "scf.if", context: context, location: location}
+      |> Changeset.add_argument(cond)
+      |> Changeset.add_argument(MLIR.CAPI.mlirRegionCreate())
+      |> Changeset.add_argument(MLIR.CAPI.mlirRegionCreate())
+      |> Changeset.add_result(result_types)
+      |> MLIR.Operation.create()
+
+    [new_then, new_else] = scf_if |> Walker.regions() |> Enum.to_list()
+    MLIR.CAPI.mlirRegionTakeBody(new_then, then_region)
+    MLIR.CAPI.mlirRegionTakeBody(new_else, else_region)
+
+    MLIR.RewriterBase.set_insertion_point_before(base, operation)
+    MLIR.RewriterBase.insert(base, scf_if)
+
+    MLIR.ConversionPatternRewriter.replace_op(
+      rewriter,
+      operation,
+      scf_if |> Walker.results() |> Enum.to_list()
+    )
+
+    :ok
+  end
+
+  defp convert_yield(operation, operands, rewriter) do
+    context = MLIR.context(operation)
+    base = MLIR.ConversionPatternRewriter.as_base(rewriter)
+    location = MLIR.Operation.location(operation)
+
+    yield =
+      %Changeset{name: "scf.yield", context: context, location: location}
+      |> Changeset.add_argument(operands)
+      |> MLIR.Operation.create()
+
+    MLIR.RewriterBase.set_insertion_point_before(base, operation)
+    MLIR.RewriterBase.insert(base, yield)
+    MLIR.ConversionPatternRewriter.replace_op(rewriter, operation, yield)
+    :ok
+  end
+
+  defp cmp_i_predicate("eq"), do: cmp_i_predicate_attr(0)
+  defp cmp_i_predicate("ne"), do: cmp_i_predicate_attr(1)
+  defp cmp_i_predicate("slt"), do: cmp_i_predicate_attr(2)
+  defp cmp_i_predicate("sle"), do: cmp_i_predicate_attr(3)
+  defp cmp_i_predicate("sgt"), do: cmp_i_predicate_attr(4)
+  defp cmp_i_predicate("sge"), do: cmp_i_predicate_attr(5)
+  defp cmp_i_predicate("ult"), do: cmp_i_predicate_attr(6)
+  defp cmp_i_predicate("ule"), do: cmp_i_predicate_attr(7)
+  defp cmp_i_predicate("ugt"), do: cmp_i_predicate_attr(8)
+  defp cmp_i_predicate("uge"), do: cmp_i_predicate_attr(9)
+
+  defp cmp_i_predicate(other) do
+    raise ArgumentError, "unsupported ex.cmp predicate: #{inspect(other)}"
+  end
+
+  defp cmp_i_predicate_attr(i) do
+    MLIR.Attribute.integer(MLIR.Type.i64(), i)
   end
 
   defp convert_call(operation, args, rewriter) do

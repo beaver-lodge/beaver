@@ -37,6 +37,23 @@ defmodule ExConversionTest do
   }
   """
 
+  @control_flow_module ~S"""
+  module {
+    "ex.func"() ({
+    ^bb0:
+      %0 = "ex.lit"() {value = 1 : i64} : () -> i64
+      %1 = "ex.lit"() {value = 2 : i64} : () -> i64
+      %2 = "ex.cmp"(%0, %1) {predicate = "slt"} : (i64, i64) -> i64
+      %3 = "ex.if"(%2) ({
+        "ex.yield"(%0) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+      }, {
+        "ex.yield"(%1) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+      }) {operandSegmentSizes = array<i32: 1>} : (i64) -> i64
+      "ex.return"(%3) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+    }) {sym_name = "main"} : () -> ()
+  }
+  """
+
   test "lowers the ex scalar subset to func/arith and llvm", %{ctx: ctx} do
     Beaver.Slang.load(ctx, ExDialect)
 
@@ -167,5 +184,45 @@ defmodule ExConversionTest do
     assert rendered =~ "^bb0(%arg0: i64, %arg1: i64)"
     assert rendered =~ "arith.muli"
     assert rendered =~ "arith.subi"
+  end
+
+  test "lowers ex control flow ops to scf", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, ExDialect)
+
+    module =
+      MLIR.Module.create!(@control_flow_module, ctx: ctx)
+      |> MLIR.verify!()
+
+    converted = Plan.run!(Ex.plan(), module)
+
+    rendered = MLIR.to_string(converted, generic: true)
+    refute rendered =~ "ex."
+    assert rendered =~ "arith.cmpi"
+    assert rendered =~ "scf.if"
+    assert rendered =~ "scf.yield"
+  end
+
+  test "rejects unknown ex.cmp predicates", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, ExDialect)
+
+    module =
+      MLIR.Module.create!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "ex.lit"() {value = 1 : i64} : () -> i64
+            %1 = "ex.lit"() {value = 2 : i64} : () -> i64
+            %2 = "ex.cmp"(%0, %1) {predicate = "bogus"} : (i64, i64) -> i64
+            "ex.return"() {operandSegmentSizes = array<i32: 0>} : () -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx: ctx
+      )
+      |> MLIR.verify!()
+
+    assert {:error, %MLIR.Conversion.Error{} = error} = Plan.run(Ex.plan(), module)
+    assert Exception.message(error) =~ "ex.cmp"
   end
 end
