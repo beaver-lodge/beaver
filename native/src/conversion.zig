@@ -644,10 +644,13 @@ const TypeConverterWorker = struct {
     fn run(self: *@This()) void {
         const registration = self.registration;
         const owned_environment = self.environment;
-        defer e.enif_release_resource(registration);
-        defer e.enif_free_env(owned_environment);
         defer std.heap.smp_allocator.destroy(self);
-        const environment = e.enif_alloc_env() orelse return;
+        const environment = e.enif_alloc_env() orelse {
+            e.enif_free_env(owned_environment);
+            e.enif_release_resource(registration);
+            std.heap.smp_allocator.destroy(self);
+            return;
+        };
         defer e.enif_free_env(environment);
 
         const io = std.Options.debug_io;
@@ -657,9 +660,15 @@ const TypeConverterWorker = struct {
         else
             c.mlirTypeConverterConvertType(self.registration.converter, self.type_);
         self.registration.mutex.unlock(io);
+        // Complete native cleanup before notifying the BEAM: once
+        // `type_converter_done` is delivered the receiver may tear down the
+        // context, so nothing may reference it afterwards.
+        const id_term = e.enif_make_copy(environment, self.id);
+        e.enif_free_env(owned_environment);
+        e.enif_release_resource(registration);
         var terms = [_]beam.term{
             beam.make_atom(environment, "type_converter_done"),
-            e.enif_make_copy(environment, self.id),
+            id_term,
             if (c.mlirTypeIsNull(converted))
                 beam.make_nil(environment)
             else
@@ -885,12 +894,15 @@ const ConversionWorker = struct {
         const owns_patterns = self.owns_patterns;
         var config_owned = true;
         var patterns_owned = owns_patterns;
-        defer e.enif_release_resource(target);
-        defer e.enif_free_env(owned_environment);
-        defer if (config_owned) c.mlirConversionConfigDestroy(config);
-        defer if (patterns_owned) c.mlirFrozenRewritePatternSetDestroy(patterns);
         defer std.heap.smp_allocator.destroy(self);
-        const environment = e.enif_alloc_env() orelse return;
+        const environment = e.enif_alloc_env() orelse {
+            if (patterns_owned) c.mlirFrozenRewritePatternSetDestroy(patterns);
+            if (config_owned) c.mlirConversionConfigDestroy(config);
+            e.enif_free_env(owned_environment);
+            e.enif_release_resource(target);
+            std.heap.smp_allocator.destroy(self);
+            return;
+        };
         defer e.enif_free_env(environment);
 
         const io = std.Options.debug_io;
@@ -916,12 +928,20 @@ const ConversionWorker = struct {
             c.mlirFrozenRewritePatternSetDestroy(patterns);
             patterns_owned = false;
         }
-        c.mlirConversionConfigDestroy(config);
-        config_owned = false;
+        if (config_owned) {
+            c.mlirConversionConfigDestroy(config);
+            config_owned = false;
+        }
+        // Complete native cleanup before notifying the BEAM: once
+        // `conversion_done` is delivered the receiver may destroy the MLIR
+        // context, so nothing may reference it afterwards.
+        const id_term = e.enif_make_copy(environment, self.id);
+        e.enif_free_env(owned_environment);
+        e.enif_release_resource(target);
 
         var terms = [_]beam.term{
             beam.make_atom(environment, "conversion_done"),
-            e.enif_make_copy(environment, self.id),
+            id_term,
             result orelse beam.make_nil(environment),
         };
         _ = beam.send_advanced(null, self.recipient, environment, beam.make_tuple(environment, &terms));
