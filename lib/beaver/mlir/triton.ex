@@ -47,4 +47,49 @@ defmodule Beaver.Triton do
 
     :ok
   end
+
+  @doc """
+  Lowers a TTIR module to LLVM IR through the full NVIDIA Triton pipeline.
+
+  This mirrors Triton's `make_ttgir` + `make_llir` pass chains for a CUDA
+  target. Running `convert-triton-gpu-to-llvm` alone is not sufficient for
+  real kernels: shared-memory allocation, warp-group allocation, SCF-to-CF,
+  warp-specialize lowering, and NVGPU lowering must run first, otherwise
+  kernels with layout conversions either fail verification or crash the
+  process.
+
+  Requires a context with Triton dialects registered (`register/1`).
+  """
+  @spec compile_to_llvm(MLIR.Module.t(), keyword()) :: MLIR.Module.t()
+  def compile_to_llvm(%MLIR.Module{} = module, opts \\ []) do
+    target = Keyword.get(opts, :target, "cuda:80")
+
+    module
+    |> Beaver.Composer.append("convert-triton-to-tritongpu{target=#{target}}")
+    # make_ttgir: optimize TTGIR before layout conversion elimination
+    |> Beaver.Composer.append("tritongpu-coalesce")
+    |> Beaver.Composer.append("tritongpu-F32DotTC")
+    |> Beaver.Composer.append("triton-nvidia-gpu-plan-cta")
+    |> Beaver.Composer.append("tritongpu-remove-layout-conversions")
+    |> Beaver.Composer.append("tritongpu-optimize-thread-locality")
+    |> Beaver.Composer.append("tritongpu-accelerate-matmul")
+    |> Beaver.Composer.append("tritongpu-remove-layout-conversions")
+    |> Beaver.Composer.append("tritongpu-optimize-dot-operands")
+    |> Beaver.Composer.append("canonicalize")
+    # make_llir: TritonGPU -> LLVM
+    |> Beaver.Composer.append("tritongpu-combine-tensor-select-and-if")
+    |> Beaver.Composer.append("tritongpu-allocate-warp-groups")
+    |> Beaver.Composer.append("convert-scf-to-cf")
+    |> Beaver.Composer.append("allocate-shared-memory-nv")
+    |> Beaver.Composer.append("triton-tensor-memory-allocation")
+    |> Beaver.Composer.append("triton-nvidia-check-matmul-two-cta")
+    |> Beaver.Composer.append("triton-nvidia-gpu-proxy-fence-insertion")
+    |> Beaver.Composer.append("triton-nvidia-gpu-tmem-barrier-insertion")
+    |> Beaver.Composer.append("convert-triton-gpu-to-llvm")
+    |> Beaver.Composer.append("convert-warp-specialize-to-llvm")
+    |> Beaver.Composer.append("convert-nv-gpu-to-llvm")
+    |> Beaver.Composer.append("convert-nvvm-to-llvm")
+    |> Beaver.Composer.append("canonicalize")
+    |> Beaver.Composer.run!()
+  end
 end

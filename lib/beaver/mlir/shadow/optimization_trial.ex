@@ -19,13 +19,14 @@ defmodule Beaver.Shadow.OptimizationTrial do
   defmodule Result do
     @moduledoc "The audited outcome of one trial."
     @enforce_keys [:input_digest, :baseline, :optimized, :reduced]
-    defstruct [:input_digest, :baseline, :optimized, :reduced]
+    defstruct [:input_digest, :baseline, :optimized, :reduced, :lowered_to_llvm]
 
     @type t() :: %__MODULE__{
             input_digest: String.t(),
             baseline: non_neg_integer(),
             optimized: non_neg_integer(),
-            reduced: boolean()
+            reduced: boolean(),
+            lowered_to_llvm: boolean()
           }
   end
 
@@ -39,6 +40,8 @@ defmodule Beaver.Shadow.OptimizationTrial do
   @spec run(MLIR.Module.t(), keyword()) :: Result.t()
   def run(%MLIR.Module{} = module, opts \\ []) do
     target = Keyword.get(opts, :target, "cuda:80")
+    source_text = MLIR.to_string(module)
+    context = MLIR.context(module)
 
     baseline =
       module
@@ -54,6 +57,27 @@ defmodule Beaver.Shadow.OptimizationTrial do
 
     optimized_count = audit_count(optimized)
 
+    lowered_to_llvm =
+      try do
+        fresh = MLIR.Module.create!(source_text, ctx: context)
+
+        # `compile_to_llvm` mutates and returns the same module (`fresh`), so
+        # the text must be read before the module is destroyed.
+        result =
+          try do
+            llvm = Beaver.Triton.compile_to_llvm(fresh, target: target)
+            MLIR.to_string(llvm) =~ "llvm.func"
+          after
+            MLIR.Module.destroy(fresh)
+          end
+
+        result
+      rescue
+        exception ->
+          IO.warn("compile_to_llvm failed: #{Exception.message(exception)}")
+          false
+      end
+
     %Result{
       input_digest:
         module
@@ -62,7 +86,8 @@ defmodule Beaver.Shadow.OptimizationTrial do
         |> Base.encode16(case: :lower),
       baseline: baseline_count,
       optimized: optimized_count,
-      reduced: optimized_count < baseline_count
+      reduced: optimized_count < baseline_count,
+      lowered_to_llvm: lowered_to_llvm
     }
   end
 

@@ -22,5 +22,6 @@ defmodule Beaver.Shadow.OptimizationTrialTest do
     assert result.reduced
     assert result.baseline > result.optimized
     assert is_binary(result.input_digest) and byte_size(result.input_digest) == 64
+    assert result.lowered_to_llvm
   end
 end
