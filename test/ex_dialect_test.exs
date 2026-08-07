@@ -38,6 +38,26 @@ defmodule ExDialectTest do
   }
   """
 
+  @case_module ~S"""
+  module {
+    "ex.func"() ({
+    ^bb0:
+      %0 = "ex.lit"() {value = 1 : i64} : () -> i64
+      %1 = "ex.case"(%0) ({
+      ^bb0:
+        "ex.clause"() {patterns = array<i64: 1>} : () -> ()
+        %2 = "ex.lit"() {value = 10 : i64} : () -> i64
+        "ex.yield"(%2) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+      ^bb1:
+        "ex.clause"() {patterns = array<i64: 2>} : () -> ()
+        %3 = "ex.lit"() {value = 20 : i64} : () -> i64
+        "ex.yield"(%3) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+      }) {operandSegmentSizes = array<i32: 1>} : (i64) -> i64
+      "ex.return"(%1) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+    }) {sym_name = "main"} : () -> ()
+  }
+  """
+
   test "emits a named IRDL schema for the scalar subset", %{ctx: ctx} do
     schema = Ex.__slang_dialect__(ctx) |> MLIR.verify!()
     rendered = MLIR.to_string(schema, generic: true)
@@ -54,6 +74,8 @@ defmodule ExDialectTest do
     assert rendered =~ ~s{attributeValueNames = ["value"]}
     assert rendered =~ ~s{attributeValueNames = ["name"]}
     assert rendered =~ ~s{attributeValueNames = ["callee", "arity"]}
+    assert rendered =~ ~s{attributeValueNames = ["predicate"]}
+    assert rendered =~ ~s{attributeValueNames = ["patterns"]}
     assert rendered =~ ~s{attributeValueNames = ["sym_name"]}
     assert rendered =~ ~s{names = ["result"]}
     assert rendered =~ ~s{"irdl.regions"}
@@ -174,6 +196,60 @@ defmodule ExDialectTest do
     assert rendered =~ ~s{"ex.yield"}
   end
 
+  test "constructs case/clause ops with the Beaver DSL", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, Ex)
+
+    module =
+      mlir ctx: ctx do
+        module do
+          Ex.func sym_name: Attribute.string("main") do
+            region do
+              block do
+                scrutinee =
+                  Ex.lit(value: Attribute.integer(Type.i64(), 1)) >>>
+                    Type.i64()
+
+                result =
+                  Ex.case scrutinee: scrutinee, operandSegmentSizes: :infer do
+                    region do
+                      block do
+                        Ex.clause(patterns: Attribute.array([Attribute.integer(Type.i64(), 1)])) >>>
+                          []
+
+                        ten =
+                          Ex.lit(value: Attribute.integer(Type.i64(), 10)) >>>
+                            Type.i64()
+
+                        Ex.yield(values: ten, operandSegmentSizes: :infer) >>> []
+                      end
+
+                      block do
+                        Ex.clause(patterns: Attribute.array([Attribute.integer(Type.i64(), 2)])) >>>
+                          []
+
+                        twenty =
+                          Ex.lit(value: Attribute.integer(Type.i64(), 20)) >>>
+                            Type.i64()
+
+                        Ex.yield(values: twenty, operandSegmentSizes: :infer) >>> []
+                      end
+                    end
+                  end >>>
+                    Type.i64()
+
+                Ex.return(result) >>> []
+              end
+            end
+          end >>> []
+        end
+      end
+      |> MLIR.verify!()
+
+    rendered = MLIR.to_string(module, generic: true)
+    assert rendered =~ ~s{"ex.case"}
+    assert rendered =~ ~s{"ex.clause"}
+  end
+
   test "rejects invalid attributes and terminator placement", %{ctx: ctx} do
     Beaver.Slang.load(ctx, Ex)
 
@@ -230,6 +306,28 @@ defmodule ExDialectTest do
     Beaver.Slang.load(ctx, Ex)
 
     original = MLIR.Module.create!(@control_flow_module, ctx: ctx) |> MLIR.verify!()
+
+    bytecode = MLIR.Bytecode.write!(original)
+    fresh_ctx = MLIR.Context.create()
+    on_exit(fn -> MLIR.Context.destroy(fresh_ctx) end)
+
+    assert Ex
+           |> then(&Beaver.Slang.load(fresh_ctx, &1))
+           |> MLIR.LogicalResult.success?()
+
+    bytecode_roundtrip =
+      bytecode
+      |> MLIR.Bytecode.read!(ctx: fresh_ctx)
+      |> MLIR.verify!()
+
+    assert MLIR.to_string(bytecode_roundtrip, generic: true) ==
+             MLIR.to_string(original, generic: true)
+  end
+
+  test "round-trips case/clause ops through bytecode", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, Ex)
+
+    original = MLIR.Module.create!(@case_module, ctx: ctx) |> MLIR.verify!()
 
     bytecode = MLIR.Bytecode.write!(original)
     fresh_ctx = MLIR.Context.create()

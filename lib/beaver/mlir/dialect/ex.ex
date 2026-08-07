@@ -82,6 +82,13 @@ defmodule Beaver.MLIR.Dialect.Ex do
     results: [result: variadic(any())],
     regions: [:any, :any]
 
+  defop case(scrutinee = any()),
+    results: [result: variadic(any())],
+    regions: [:any]
+
+  defop clause(guard = optional(any())),
+    attributes: [patterns: any()]
+
   defop yield(values = variadic(any())), traits: [:terminator]
 
   defop func(),
