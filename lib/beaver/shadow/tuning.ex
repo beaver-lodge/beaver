@@ -83,13 +83,27 @@ defmodule Beaver.Shadow.Tuning do
 
   defmodule Run do
     @moduledoc "One tuning pass over a config space."
-    @enforce_keys [:kernel_digest, :records, :winner]
-    defstruct [:kernel_digest, :records, :winner]
+    @enforce_keys [:fixture, :kernel_digest, :records, :winner]
+    defstruct [:fixture, :kernel_digest, :records, :winner]
 
     @type t() :: %__MODULE__{
+            fixture: atom(),
             kernel_digest: String.t(),
             records: [Record.t()],
             winner: Record.t() | nil
+          }
+  end
+
+  defmodule Prune do
+    @moduledoc "A structural pruning decision with its audit trail."
+    @enforce_keys [:fixture, :config_space_digest, :decisions, :kept]
+    defstruct [:fixture, :config_space_digest, :decisions, :kept]
+
+    @type t() :: %__MODULE__{
+            fixture: atom(),
+            config_space_digest: String.t(),
+            decisions: [map()],
+            kept: [Config.t()]
           }
   end
 
@@ -159,7 +173,12 @@ defmodule Beaver.Shadow.Tuning do
         if is_function(on_exit), do: on_exit.()
       end
 
-    %Run{kernel_digest: kernel_digest, records: records, winner: pick_winner(records)}
+    %Run{
+      fixture: fixture.name,
+      kernel_digest: kernel_digest,
+      records: records,
+      winner: pick_winner(records)
+    }
   end
 
   @doc "Stable identity of a tuning record; observations are excluded."
@@ -210,11 +229,44 @@ defmodule Beaver.Shadow.Tuning do
     |> List.first()
   end
 
+  @doc """
+  Prunes a config space with the structural proxy and returns an audit trail.
+
+  Configs are ranked by lowering capability first and optimized
+  `ttg.convert_layout` count second; the top `:max_keep` are kept. Every
+  decision records the structural facts that drove it, so the pruning is
+  auditable and regressable without a GPU.
+  """
+  @spec prune_by_structure(atom() | Run.t(), [Config.t()], keyword()) :: Prune.t()
+  def prune_by_structure(fixture_or_run, configs, opts \\ [])
+
+  def prune_by_structure(%Run{} = run, _configs, opts) do
+    max_keep = Keyword.get(opts, :max_keep, 2)
+    decisions = rank_decisions(run.records, max_keep)
+
+    %Prune{
+      fixture: run.fixture,
+      config_space_digest:
+        run.records
+        |> List.first()
+        |> then(&(&1 && &1.config_space_digest)),
+      decisions: decisions,
+      kept: decisions |> Enum.filter(& &1.keep) |> Enum.map(& &1.config)
+    }
+  end
+
+  def prune_by_structure(fixture_name, configs, opts) when is_atom(fixture_name) do
+    fixture_name
+    |> run(configs)
+    |> prune_by_structure(configs, opts)
+  end
+
   @doc "Encodes a tuning run as JSON text."
   @spec encode!(Run.t()) :: String.t()
   def encode!(%Run{} = run) do
     %{
       "format" => @format,
+      "fixture" => run.fixture,
       "kernel_digest" => run.kernel_digest,
       "records" => Enum.map(run.records, &record_to_map/1),
       "winner_index" => if(run.winner, do: run.winner.config.index, else: nil)
@@ -241,7 +293,12 @@ defmodule Beaver.Shadow.Tuning do
     winner =
       Enum.find(records, &(&1.config.index == map["winner_index"]))
 
-    %Run{kernel_digest: map["kernel_digest"], records: records, winner: winner}
+    %Run{
+      fixture: map["fixture"] |> String.to_existing_atom(),
+      kernel_digest: map["kernel_digest"],
+      records: records,
+      winner: winner
+    }
   end
 
   @doc "Builds an AutotuneListener-isomorphic event from a tuning run."
@@ -345,6 +402,46 @@ defmodule Beaver.Shadow.Tuning do
       0 -> nil
       total -> total
     end
+  end
+
+  defp rank_decisions(records, max_keep) do
+    records
+    |> Enum.sort_by(fn record ->
+      proxy = record.structural_proxy
+
+      case proxy do
+        nil -> {true, :infinity, record.config.index}
+        proxy -> {not proxy.lowered_to_llvm, proxy.optimized, record.config.index}
+      end
+    end)
+    |> Enum.with_index()
+    |> Enum.map(fn {record, rank} ->
+      %{
+        config: record.config,
+        structural_proxy: record.structural_proxy,
+        status: record.status,
+        rank: rank,
+        keep: rank < max_keep,
+        reason: prune_reason(record, rank, max_keep)
+      }
+    end)
+  end
+
+  defp prune_reason(record, rank, max_keep) when rank < max_keep do
+    case record.structural_proxy do
+      %{lowered_to_llvm: true, optimized: optimized} ->
+        "rank #{rank}: lowers to LLVM, #{optimized} convert_layouts"
+
+      nil ->
+        "rank #{rank}: no structural facts (failed)"
+
+      %{lowered_to_llvm: false} ->
+        "rank #{rank}: does not lower to LLVM"
+    end
+  end
+
+  defp prune_reason(_record, rank, max_keep) do
+    "pruned: rank #{rank} >= max_keep #{max_keep}"
   end
 
   defp record_to_map(record) do

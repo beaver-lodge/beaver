@@ -78,6 +78,7 @@ defmodule Beaver.Shadow.TuningTest do
   describe "JSON round-trip" do
     test "encode!/decode! preserves the run" do
       run = %Run{
+        fixture: :matmul,
         kernel_digest: String.duplicate("b", 64),
         records: [sample_record()],
         winner: sample_record()
@@ -86,6 +87,7 @@ defmodule Beaver.Shadow.TuningTest do
       decoded = run |> Tuning.encode!() |> Tuning.decode!()
 
       assert decoded.kernel_digest == run.kernel_digest
+      assert decoded.fixture == :matmul
       assert length(decoded.records) == 1
       assert decoded.records |> hd() |> Map.get(:config) |> Map.get(:num_warps) == 4
       assert decoded.winner.config.index == 1
@@ -96,6 +98,7 @@ defmodule Beaver.Shadow.TuningTest do
   describe "AutotuneListener event" do
     test "carries the six upstream fields plus extensions" do
       run = %Run{
+        fixture: :matmul,
         kernel_digest: String.duplicate("c", 64),
         records: [
           sample_record(),
@@ -129,6 +132,44 @@ defmodule Beaver.Shadow.TuningTest do
     end
   end
 
+  describe "prune_by_structure/3" do
+    test "ranks by lowering capability then convert_layout count and audits" do
+      run = %Run{
+        fixture: :matmul,
+        kernel_digest: String.duplicate("d", 64),
+        records: [
+          sample_record(%{
+            config: %Config{index: 0, num_warps: 2},
+            status: :failed,
+            structural_proxy: nil,
+            failure: %{kind: :lowering_failed, reason: "no llvm.func"}
+          }),
+          sample_record(%{
+            config: %Config{index: 1, num_warps: 4},
+            structural_proxy: %{baseline: 24, optimized: 5, reduction: 19, lowered_to_llvm: true}
+          }),
+          sample_record(%{
+            config: %Config{index: 2, num_warps: 8},
+            structural_proxy: %{baseline: 24, optimized: 4, reduction: 20, lowered_to_llvm: true}
+          })
+        ],
+        winner: nil
+      }
+
+      prune = Tuning.prune_by_structure(run, [], max_keep: 2)
+
+      assert prune.fixture == :matmul
+      assert Enum.map(prune.kept, & &1.num_warps) == [8, 4]
+      assert Enum.find(prune.decisions, &(&1.config.num_warps == 8)).keep
+      assert Enum.find(prune.decisions, &(&1.config.num_warps == 4)).keep
+
+      pruned = Enum.find(prune.decisions, &(&1.config.num_warps == 2))
+      refute pruned.keep
+      assert pruned.reason =~ "rank 2 >= max_keep 2"
+      assert pruned.status == :failed
+    end
+  end
+
   @tag :triton
   @tag skip: !@triton_enabled
   test "CPU-only config enumeration produces records and a structural winner" do
@@ -153,5 +194,20 @@ defmodule Beaver.Shadow.TuningTest do
 
     assert Enum.map(run.records, &Tuning.identity/1) ==
              Enum.map(rerun.records, &Tuning.identity/1)
+  end
+
+  @tag :triton
+  @tag skip: !@triton_enabled
+  test "structural pruning is CPU-only and auditable on the corpus" do
+    prune = Tuning.prune_by_structure(:matmul, sample_configs(), max_keep: 2)
+
+    assert prune.config_space_digest == Tuning.configs_digest(sample_configs())
+    assert length(prune.decisions) == 3
+    assert length(prune.kept) == 2
+
+    for decision <- prune.decisions do
+      assert decision.structural_proxy.baseline == 24
+      assert decision.reason =~ "convert_layouts" or decision.reason =~ "pruned"
+    end
   end
 end
