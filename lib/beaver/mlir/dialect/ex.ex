@@ -201,6 +201,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop tuple_length(tuple = base(dyn())),
     results: [result: all_of([base("!builtin.integer"), any()])]
 
+  defop map_length(map = base(dyn())),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
   defop list_head(list = base(dyn())),
     results: [result: base(dyn())]
 
