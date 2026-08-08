@@ -25,6 +25,7 @@ defmodule Beaver.Shadow.Tuning do
   alias Beaver.MLIR
   alias Beaver.Shadow.Corpus
   alias Beaver.Shadow.OptimizationTrial
+  alias Beaver.Shadow.Tuning.GPU
 
   @format 1
 
@@ -155,6 +156,8 @@ defmodule Beaver.Shadow.Tuning do
   def run(fixture_name, configs, opts \\ []) when is_atom(fixture_name) do
     fixture = Corpus.fixture(fixture_name)
     target = Keyword.get(opts, :target, "cuda:80")
+    gpu? = Keyword.get(opts, :gpu, false)
+    launch = Keyword.get(opts, :launch, Map.get(fixture, :launch))
     config_space_digest = configs_digest(configs)
     kernel_digest = kernel_digest(fixture)
 
@@ -166,7 +169,16 @@ defmodule Beaver.Shadow.Tuning do
         Beaver.Triton.register(context)
 
         Enum.map(configs, fn config ->
-          evaluate(fixture, config, context, target, config_space_digest, kernel_digest)
+          evaluate(
+            fixture,
+            config,
+            context,
+            target,
+            config_space_digest,
+            kernel_digest,
+            gpu?,
+            launch
+          )
         end)
       after
         MLIR.Context.destroy(context)
@@ -227,6 +239,43 @@ defmodule Beaver.Shadow.Tuning do
       {not proxy.lowered_to_llvm, proxy.optimized}
     end)
     |> List.first()
+  end
+
+  @doc """
+  Picks the winner by measured GPU latency (lowest median first).
+  """
+  @spec pick_winner_by_latency([Record.t()]) :: Record.t() | nil
+  def pick_winner_by_latency(records) do
+    records
+    |> Enum.filter(&(&1.status == :evaluated and is_number(&1.timings && &1.timings.gpu_ns)))
+    |> Enum.sort_by(& &1.timings.gpu_ns)
+    |> List.first()
+  end
+
+  @doc """
+  Spearman rank correlation between a structural fact and GPU latency.
+
+  `proxy_fun` extracts the structural value and `latency_fun` the latency from
+  each record; only records with both are used. Returns `nil` when fewer than
+  two points are available.
+  """
+  @spec correlation([Record.t()], (Record.t() -> number() | nil), (Record.t() -> number() | nil)) ::
+          float() | nil
+  def correlation(records, proxy_fun, latency_fun) do
+    pairs =
+      records
+      |> Enum.map(fn record ->
+        {proxy_fun.(record), latency_fun.(record)}
+      end)
+      |> Enum.filter(fn {proxy, latency} -> is_number(proxy) and is_number(latency) end)
+
+    if length(pairs) < 2 do
+      nil
+    else
+      {proxy_ranks, _} = rank(pairs |> Enum.map(&elem(&1, 0)))
+      {latency_ranks, _} = rank(pairs |> Enum.map(&elem(&1, 1)))
+      pearson(proxy_ranks, latency_ranks)
+    end
   end
 
   @doc """
@@ -330,11 +379,21 @@ defmodule Beaver.Shadow.Tuning do
     }
   end
 
-  defp evaluate(fixture, config, context, target, config_space_digest, kernel_digest) do
+  defp evaluate(
+         fixture,
+         config,
+         context,
+         target,
+         config_space_digest,
+         kernel_digest,
+         gpu?,
+         launch
+       ) do
     started = System.monotonic_time()
+    source_text = File.read!(Corpus.fixture_path(fixture.name))
 
     try do
-      module = MLIR.Module.create!(File.read!(Corpus.fixture_path(fixture.name)), ctx: context)
+      module = MLIR.Module.create!(source_text, ctx: context)
 
       result =
         OptimizationTrial.run(module,
@@ -342,6 +401,14 @@ defmodule Beaver.Shadow.Tuning do
           num_warps: config.num_warps,
           gpu: false
         )
+
+      gpu_latency =
+        if gpu? and launch do
+          case GPU.evaluate(source_text, context, target, config.num_warps, launch) do
+            {:ok, ns} -> ns
+            {:error, reason} -> reason
+          end
+        end
 
       proxy = %{
         baseline: result.baseline,
@@ -358,13 +425,17 @@ defmodule Beaver.Shadow.Tuning do
         config_space_digest: config_space_digest,
         config: config,
         status: if(result.lowered_to_llvm, do: :evaluated, else: :failed),
+        # GPU latency is an observation, never part of identity/1.
+        timings: %{
+          total_ns: System.monotonic_time() - started,
+          gpu_ns: gpu_latency
+        },
         failure:
           if(result.lowered_to_llvm,
             do: nil,
             else: %{kind: :lowering_failed, reason: "no llvm.func produced"}
           ),
-        structural_proxy: proxy,
-        timings: %{total_ns: System.monotonic_time() - started}
+        structural_proxy: proxy
       }
     rescue
       exception ->
@@ -381,6 +452,36 @@ defmodule Beaver.Shadow.Tuning do
           timings: %{total_ns: System.monotonic_time() - started}
         }
     end
+  end
+
+  defp rank(values) do
+    sorted = values |> Enum.sort() |> Enum.with_index()
+
+    rank_map =
+      sorted |> Enum.group_by(&elem(&1, 0)) |> Map.new(fn {v, idxs} -> {v, avg_rank(idxs)} end)
+
+    {Enum.map(values, &Map.fetch!(rank_map, &1)), sorted}
+  end
+
+  defp avg_rank(idxs) do
+    Enum.map(idxs, &(elem(&1, 1) + 1)) |> Enum.sum() |> Kernel./(length(idxs))
+  end
+
+  defp pearson(xs, ys) do
+    n = length(xs)
+    x_mean = Enum.sum(xs) / n
+    y_mean = Enum.sum(ys) / n
+
+    {sxy, sxx, syy} =
+      xs
+      |> Enum.zip(ys)
+      |> Enum.reduce({0.0, 0.0, 0.0}, fn {x, y}, {sxy, sxx, syy} ->
+        dx = x - x_mean
+        dy = y - y_mean
+        {sxy + dx * dy, sxx + dx * dx, syy + dy * dy}
+      end)
+
+    if sxx == 0.0 or syy == 0.0, do: nil, else: sxy / :math.sqrt(sxx * syy)
   end
 
   defp kernel_digest(fixture) do

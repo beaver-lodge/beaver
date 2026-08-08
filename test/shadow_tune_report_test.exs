@@ -62,6 +62,8 @@ defmodule Beaver.Shadow.TuneReportTest do
         config_space_digest: Tuning.configs_digest(run.records |> Enum.map(& &1.config)),
         records: run.records,
         winner: run.winner,
+        latency_winner: List.last(run.records),
+        structural_vs_latency: -0.5,
         probes: [
           %{
             config: %Config{index: 0, num_warps: 2},
@@ -84,8 +86,10 @@ defmodule Beaver.Shadow.TuneReportTest do
       assert rendered =~ "llvm revision: LLVM version 24.0.0git"
       assert rendered =~ "triton prebuilt dir: `/tmp/prebuilt`"
       assert rendered =~ "| 0 | 2 | - | - |"
-      assert rendered =~ "| 2 | evaluated | 24 | 4 | -20 | true | 1000000 |"
-      assert rendered =~ "### Winner" and rendered =~ "num_warps 8"
+      assert rendered =~ "| 2 | 8 | evaluated | 24 | 4 | -20 | true | 1000000 | - |"
+      assert rendered =~ "### Winner (structural proxy)" and rendered =~ "num_warps 8"
+      assert rendered =~ "### Winner (measured GPU latency)"
+      assert rendered =~ "Spearman(structural optimized count, GPU latency): -0.5"
       assert rendered =~ "| 0 | 2 | ok |"
       assert rendered =~ "| 1 | 4 | crash (exit 139) at `tritongpu-accelerate-matmul` |"
     end
@@ -110,6 +114,32 @@ defmodule Beaver.Shadow.TuneReportTest do
 
     rendered = TuneReport.render(report)
     assert rendered =~ "## Shadow Wavefront: Triton tuning measurement"
-    assert rendered =~ "| 0 | evaluated | 24 | 5 | -19 |"
+    assert rendered =~ "| 0 | 2 | evaluated | 24 | 5 | -19 |"
+  end
+
+  @tag :cuda
+  @tag skip: !@triton_enabled or System.get_env("BEAVER_CUDA_TEST") == nil
+  test "GPU generate/0 reports latency winner and correlation" do
+    configs = [
+      %Config{index: 0, num_warps: 2},
+      %Config{index: 1, num_warps: 4},
+      %Config{index: 2, num_warps: 8}
+    ]
+
+    report = TuneReport.generate(:matmul_1024, configs, gpu: true)
+
+    assert report.latency_winner != nil
+
+    latencies =
+      report.records
+      |> Enum.filter(&is_number(&1.timings && &1.timings.gpu_ns))
+      |> Enum.map(& &1.timings.gpu_ns)
+
+    assert report.latency_winner.timings.gpu_ns == Enum.min(latencies)
+    assert Enum.max(latencies) / Enum.min(latencies) > 1.1
+
+    rendered = TuneReport.render(report)
+    assert rendered =~ "### Winner (measured GPU latency)"
+    assert rendered =~ "Spearman(structural optimized count, GPU latency)"
   end
 end
