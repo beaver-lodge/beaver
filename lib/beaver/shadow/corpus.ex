@@ -63,6 +63,6 @@ defmodule Beaver.Shadow.Corpus do
 
   @spec fixture_path(atom()) :: Path.t()
   def fixture_path(name) do
-    Path.expand("fixtures/triton/#{fixture(name).file}", "test")
+    Path.expand("../../../test/fixtures/triton/#{fixture(name).file}", __DIR__)
   end
 end
