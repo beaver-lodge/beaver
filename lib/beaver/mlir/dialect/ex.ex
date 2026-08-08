@@ -128,6 +128,18 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop to_int(word = base(dyn())),
     results: [result: all_of([base("!builtin.integer"), any()])]
 
+  # Non-local exit (`throw`) and its catch. The body region runs normally; a
+  # throw longjmps back and the catch region matches the thrown value.
+  defop try(),
+    results: [result: any()],
+    regions: [:any, :any]
+
+  defop throw(value = base(dyn())),
+    results: [result: base(dyn())]
+
+  defop catch_value(),
+    results: [result: base(dyn())]
+
   # Constructs a first-class function value (a tagged closure word): the
   # extracted `__fn_*` is referenced by index, and the captured values are
   # stored in the closure's env slots.
