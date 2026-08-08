@@ -95,6 +95,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.binary_length", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_get", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_slice", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.binary_utf8_get", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.binary_utf8_width", &convert_term_read/3, version: "1.0")
   end
 
   # Declaration-first manifest of the Zig term runtime ABI: batata's
@@ -118,7 +120,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
     term_eq: "ex.term.eq",
     binary_length: "ex.term.binary_length",
     binary_get: "ex.term.binary_get",
-    binary_slice: "ex.term.binary_slice"
+    binary_slice: "ex.term.binary_slice",
+    binary_utf8_get: "ex.term.binary_utf8_get",
+    binary_utf8_width: "ex.term.binary_utf8_width"
   }
 
   @term_types ~w(!ex.dyn !ex.bound !ex.unbound)
@@ -390,6 +394,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.binary_length"), do: @term_intrinsics.binary_length
   defp read_intrinsic("ex.binary_get"), do: @term_intrinsics.binary_get
   defp read_intrinsic("ex.binary_slice"), do: @term_intrinsics.binary_slice
+  defp read_intrinsic("ex.binary_utf8_get"), do: @term_intrinsics.binary_utf8_get
+  defp read_intrinsic("ex.binary_utf8_width"), do: @term_intrinsics.binary_utf8_width
 
   defp insertion_point(operation, rewriter) do
     base = MLIR.ConversionPatternRewriter.as_base(rewriter)
@@ -550,7 +556,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
               "ex.term.tuple_get",
               "ex.term.eq",
               "ex.term.binary_get",
-              "ex.term.binary_slice"
+              "ex.term.binary_slice",
+              "ex.term.binary_utf8_get",
+              "ex.term.binary_utf8_width"
             ] do
     MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
   end
