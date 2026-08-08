@@ -62,6 +62,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_legal_dialect("arith")
     |> Plan.add_legal_dialect("cf")
     |> Plan.add_legal_dialect("scf")
+    |> Plan.add_legal_dialect("llvm")
     |> Plan.add_illegal_dialect("ex")
     |> Plan.add_conversion(&convert_type/1, version: "1.0")
     |> Plan.add_conversion_pattern("ex.lit", &convert_lit/3, version: "1.0")
@@ -82,6 +83,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.receive", &convert_receive/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mailbox_clear", &convert_mailbox_clear/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.to_int", &convert_to_int/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.try", &convert_try/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.throw", &convert_throw/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.catch_value", &convert_catch_value/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.make_fun", &convert_make_fun/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.apply", &convert_apply/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.tuple", &convert_term_tuple/3, version: "1.0")
@@ -116,6 +120,12 @@ defmodule Beaver.MLIR.Conversion.Ex do
     receive: "ex.term.receive",
     mailbox_clear: "ex.term.mailbox_clear",
     to_int: "ex.term.to_int",
+    jmp_buf_size: "ex.term.jmp_buf_size",
+    setjmp_addr: "ex.term.setjmp_addr",
+    try_push: "ex.term.try_push",
+    try_pop: "ex.term.try_pop",
+    throw: "ex.term.throw",
+    catch_value: "ex.term.catch_value",
     make_fun: "ex.term.make_fun",
     fun_idx: "ex.term.fun_idx",
     fun_env: "ex.term.fun_env",
@@ -441,6 +451,163 @@ defmodule Beaver.MLIR.Conversion.Ex do
     )
   end
 
+  # `ex.try` lowers to a setjmp/longjmp pair: allocate a jmp_buf on the stack,
+  # push it on the runtime's buffer stack, and call libc `setjmp`. The normal
+  # path runs the body region; a `throw` longjmps back and the catch region
+  # matches the thrown value.
+  defp convert_try(operation, [], rewriter) do
+    context = MLIR.context(operation)
+    base = insertion_point(operation, rewriter)
+    location = MLIR.Operation.location(operation)
+    [body_region, catch_region] = operation |> Walker.regions() |> Enum.to_list()
+
+    size = emit_runtime_call(operation, rewriter, base, @term_intrinsics.jmp_buf_size, [])
+
+    alloca =
+      %Changeset{name: "llvm.alloca", context: context, location: location}
+      |> Changeset.add_argument([size])
+      |> Changeset.add_argument(
+        elem_type: MLIR.Attribute.type(MLIR.Type.integer(8, ctx: context)),
+        alignment: MLIR.Attribute.integer(MLIR.Type.i64(), 8)
+      )
+      |> Changeset.add_result(MLIR.Type.llvm_pointer(ctx: context))
+      |> MLIR.Operation.create()
+
+    MLIR.RewriterBase.insert(base, alloca)
+    buf = MLIR.Operation.result(alloca, 0)
+
+    push = emit_runtime_call(operation, rewriter, base, @term_intrinsics.try_push, [buf])
+    _ = push
+
+    # libc's setjmp is resolved indirectly (the ORC linker does not resolve
+    # libc symbols on its own): the runtime exposes its address.
+    setjmp_addr = emit_runtime_call(operation, rewriter, base, @term_intrinsics.setjmp_addr, [])
+
+    fn_ptr =
+      %Changeset{name: "llvm.inttoptr", context: context, location: location}
+      |> Changeset.add_argument([setjmp_addr])
+      |> Changeset.add_result(MLIR.Type.llvm_pointer(ctx: context))
+      |> MLIR.Operation.create()
+
+    MLIR.RewriterBase.insert(base, fn_ptr)
+
+    setjmp =
+      %Changeset{name: "llvm.call", context: context, location: location}
+      |> Changeset.add_argument([MLIR.Operation.result(fn_ptr, 0), buf])
+      |> Changeset.add_argument(
+        operandSegmentSizes: MLIR.Attribute.dense_array([2, 0], Beaver.Native.I32, ctx: context),
+        op_bundle_sizes: MLIR.Attribute.dense_array([], Beaver.Native.I32, ctx: context)
+      )
+      |> Changeset.add_result(MLIR.Type.i64())
+      |> MLIR.Operation.create()
+
+    MLIR.RewriterBase.insert(base, setjmp)
+    saved = MLIR.Operation.result(setjmp, 0)
+
+    zero = emit_constant(0, operation, base) |> MLIR.Operation.result(0)
+
+    cmp =
+      %Changeset{name: "arith.cmpi", context: context, location: location}
+      |> Changeset.add_argument([saved, zero])
+      |> Changeset.add_argument(predicate: cmp_i_predicate_attr(0))
+      |> Changeset.add_result(MLIR.Type.i1())
+      |> MLIR.Operation.create()
+
+    MLIR.RewriterBase.insert(base, cmp)
+
+    scf_if =
+      %Changeset{name: "scf.if", context: context, location: location}
+      |> Changeset.add_argument(MLIR.Operation.result(cmp, 0))
+      |> Changeset.add_argument(MLIR.CAPI.mlirRegionCreate())
+      |> Changeset.add_argument(MLIR.CAPI.mlirRegionCreate())
+      |> Changeset.add_result([MLIR.Type.i64()])
+      |> MLIR.Operation.create()
+
+    [new_then, new_else] = scf_if |> Walker.regions() |> Enum.to_list()
+    MLIR.CAPI.mlirRegionTakeBody(new_then, body_region)
+    MLIR.CAPI.mlirRegionTakeBody(new_else, catch_region)
+
+    prepend_try_pop(operation, rewriter, new_else)
+    append_try_pop(operation, rewriter, new_then)
+
+    MLIR.RewriterBase.set_insertion_point_before(base, operation)
+    MLIR.RewriterBase.insert(base, scf_if)
+
+    MLIR.ConversionPatternRewriter.replace_op(
+      rewriter,
+      operation,
+      scf_if |> Walker.results() |> Enum.to_list()
+    )
+
+    :ok
+  end
+
+  # The catch path pops the try buffer first: the longjmp returns with the
+  # buffer still pushed.
+  defp prepend_try_pop(operation, rewriter, region) do
+    ensure_intrinsic_declaration(operation, rewriter, @term_intrinsics.try_pop)
+    [block] = region |> Walker.blocks() |> Enum.to_list()
+    base = MLIR.ConversionPatternRewriter.as_base(rewriter)
+    MLIR.RewriterBase.set_insertion_point_to_start(base, block)
+    emit_try_pop_call(operation, rewriter)
+    :ok
+  end
+
+  # The normal path pops the try buffer before leaving the body.
+  defp append_try_pop(operation, rewriter, region) do
+    ensure_intrinsic_declaration(operation, rewriter, @term_intrinsics.try_pop)
+    [block] = region |> Walker.blocks() |> Enum.to_list()
+    terminator = MLIR.CAPI.mlirBlockGetTerminator(block)
+    base = MLIR.ConversionPatternRewriter.as_base(rewriter)
+    MLIR.RewriterBase.set_insertion_point_before(base, terminator)
+    emit_try_pop_call(operation, rewriter)
+    :ok
+  end
+
+  # Builds a func.call to the try_pop intrinsic at the current insertion
+  # point (unlike `emit_runtime_call`, this does not move the insertion
+  # point, so it can be placed inside a region).
+  defp emit_try_pop_call(operation, rewriter) do
+    base = MLIR.ConversionPatternRewriter.as_base(rewriter)
+    symbol = @term_intrinsics.try_pop
+
+    call =
+      %Changeset{
+        name: "func.call",
+        context: MLIR.context(operation),
+        location: MLIR.Operation.location(operation)
+      }
+      |> Changeset.add_argument([])
+      |> Changeset.add_argument(
+        callee: MLIR.Attribute.flat_symbol_ref(symbol, ctx: MLIR.context(operation))
+      )
+      |> Changeset.add_result(MLIR.Type.i64())
+      |> MLIR.Operation.create()
+
+    MLIR.RewriterBase.insert(base, call)
+    MLIR.Operation.result(call, 0)
+  end
+
+  defp convert_throw(operation, [operand], rewriter) do
+    base = insertion_point(operation, rewriter)
+
+    replace_with(
+      rewriter,
+      operation,
+      emit_runtime_call(operation, rewriter, base, @term_intrinsics.throw, [operand])
+    )
+  end
+
+  defp convert_catch_value(operation, [], rewriter) do
+    base = insertion_point(operation, rewriter)
+
+    replace_with(
+      rewriter,
+      operation,
+      emit_runtime_call(operation, rewriter, base, @term_intrinsics.catch_value, [])
+    )
+  end
+
   # Constructs a first-class function value: stores the function index and the
   # captured env words in a closure word allocated by the Zig runtime.
   defp convert_make_fun(operation, operands, rewriter) do
@@ -664,7 +831,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
         }
         |> Changeset.add_argument(sym_name: MLIR.Attribute.string(symbol))
         |> Changeset.add_argument(sym_visibility: MLIR.Attribute.string("private"))
-        |> Changeset.add_argument(function_type: intrinsic_function_type(symbol))
+        |> Changeset.add_argument(
+          function_type: intrinsic_function_type(symbol, MLIR.context(operation))
+        )
         |> Changeset.add_argument(MLIR.CAPI.mlirRegionCreate())
         |> MLIR.Operation.create()
 
@@ -700,35 +869,55 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> hd()
   end
 
-  defp intrinsic_function_type("ex.term.list_cons") do
+  defp intrinsic_function_type("ex.term.list_cons", _ctx) do
     MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
-  defp intrinsic_function_type("ex.term.self") do
+  defp intrinsic_function_type("ex.term.self", _ctx) do
     MLIR.Type.function([], [MLIR.Type.i64()])
   end
 
-  defp intrinsic_function_type("ex.term.send") do
+  defp intrinsic_function_type("ex.term.send", _ctx) do
     MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
-  defp intrinsic_function_type("ex.term.receive") do
+  defp intrinsic_function_type("ex.term.receive", _ctx) do
     MLIR.Type.function([], [MLIR.Type.i64()])
   end
 
-  defp intrinsic_function_type("ex.term.mailbox_clear") do
+  defp intrinsic_function_type("ex.term.mailbox_clear", _ctx) do
     MLIR.Type.function([], [MLIR.Type.i64()])
   end
 
-  defp intrinsic_function_type("ex.term.make_fun") do
+  defp intrinsic_function_type("ex.term.jmp_buf_size", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.setjmp_addr", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.try_push", ctx) do
+    MLIR.Type.function([MLIR.Type.llvm_pointer(ctx: ctx)], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.try_pop", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.catch_value", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.make_fun", _ctx) do
     MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 6), [MLIR.Type.i64()])
   end
 
-  defp intrinsic_function_type("ex.term.fun_env") do
+  defp intrinsic_function_type("ex.term.fun_env", _ctx) do
     MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
-  defp intrinsic_function_type(symbol)
+  defp intrinsic_function_type(symbol, _ctx)
        when symbol in [
               "ex.term.tuple_get",
               "ex.term.eq",
@@ -740,7 +929,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
-  defp intrinsic_function_type(_symbol) do
+  defp intrinsic_function_type(_symbol, _ctx) do
     MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 

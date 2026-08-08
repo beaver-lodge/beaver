@@ -175,8 +175,13 @@ defmodule Beaver.MLIR.Dialect.Ex.ExpandCase do
     block = MLIR.Block.create([], [])
     MLIR.CAPI.mlirRegionAppendOwnedBlock(else_region, block)
 
+    # The else branch is unreachable, but scf.if requires both branches to
+    # yield the same number of results, so yield a zero per result (the
+    # scalar slice yields i64 results only).
     RewriterBase.with_insertion_point(rewriter, {:start, block}, fn ->
-      yield_op = create_yield([], context, location)
+      else_values = List.duplicate(zero, length(result_types))
+
+      yield_op = create_yield(else_values, context, location)
       RewriterBase.insert(rewriter, yield_op)
     end)
 
