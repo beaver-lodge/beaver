@@ -149,6 +149,15 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop binary_slice(binary = base(dyn()), start = all_of([base("!builtin.integer"), any()])),
     results: [result: base(dyn())]
 
+  defop binary_utf8_get(binary = base(dyn()), index = all_of([base("!builtin.integer"), any()])),
+    results: [result: base(dyn())]
+
+  defop binary_utf8_width(
+          binary = base(dyn()),
+          index = all_of([base("!builtin.integer"), any()])
+        ),
+        results: [result: all_of([base("!builtin.integer"), any()])]
+
   defop yield(values = variadic(any())), traits: [:terminator]
 
   defop func(),
