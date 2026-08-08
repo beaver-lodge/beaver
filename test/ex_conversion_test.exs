@@ -352,6 +352,71 @@ defmodule ExConversionTest do
     assert rendered =~ "scf.if"
   end
 
+  test "expands a guarded no-pattern clause before more clauses", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, ExDialect)
+
+    module =
+      MLIR.Module.create!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "ex.lit"() {value = 1 : i64} : () -> i64
+            %1 = "ex.lit"() {value = 1 : i64} : () -> i64
+            %2 = "ex.case"(%0) ({
+            ^bb0:
+              "ex.clause"(%1) {patterns = array<i64>} : (i64) -> ()
+              %3 = "ex.lit"() {value = 10 : i64} : () -> i64
+              "ex.yield"(%3) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+            ^bb1:
+              "ex.clause"() {patterns = array<i64>} : () -> ()
+              %4 = "ex.lit"() {value = 20 : i64} : () -> i64
+              "ex.yield"(%4) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+            }) {operandSegmentSizes = array<i32: 1>} : (i64) -> i64
+            "ex.return"(%2) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx: ctx
+      )
+      |> MLIR.verify!()
+
+    module = ExpandCase.run!(module)
+    expanded = MLIR.to_string(module, generic: true)
+    # a no-pattern clause matches everything, so the condition is the guard
+    assert expanded =~ ~s{predicate = "ne"}
+
+    converted = Plan.run!(Ex.plan(), module)
+    assert MLIR.to_string(converted, generic: true) =~ "scf.if"
+  end
+
+  test "lowers control flow through to LLVM", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, ExDialect)
+
+    module =
+      MLIR.Module.create!(@control_flow_module, ctx: ctx)
+      |> MLIR.verify!()
+      |> then(&ExpandCase.run!/1)
+
+    converted = Plan.run!(Ex.plan(), module)
+
+    pass_manager = MLIR.CAPI.mlirPassManagerCreate(ctx)
+
+    for pass <- [
+          &MLIR.CAPI.mlirCreateConversionArithToLLVMConversionPass/0,
+          &MLIR.CAPI.mlirCreateConversionSCFToControlFlowPass/0,
+          &MLIR.CAPI.mlirCreateConversionConvertControlFlowToLLVMPass/0,
+          &MLIR.CAPI.mlirCreateConversionConvertFuncToLLVMPass/0
+        ] do
+      MLIR.CAPI.mlirPassManagerAddOwnedPass(pass_manager, pass.())
+    end
+
+    assert {:ok, _} = MLIR.PassManager.run(pass_manager, converted)
+    rendered = MLIR.to_string(converted, generic: true)
+    assert rendered =~ "llvm.br"
+    refute rendered =~ "scf.if"
+  end
+
   test "rejects a case without a catch-all clause", %{ctx: ctx} do
     Beaver.Slang.load(ctx, ExDialect)
 
