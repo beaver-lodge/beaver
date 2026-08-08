@@ -20,7 +20,7 @@ defmodule ExConversionTest do
       %0 = "ex.lit"() {value = 1 : i64} : () -> i64
       %1 = "ex.lit"() {value = 2 : i64} : () -> i64
       %2 = "ex.add"(%0, %1) : (i64, i64) -> i64
-      %3 = "ex.call"(%0, %1) {callee = "add", arity = 2 : i64, operandSegmentSizes = array<i32: 2>} : (i64, i64) -> !ex.dyn
+      %3 = "ex.call"(%0, %1) {callee = "add", arity = 2 : i64, operandSegmentSizes = array<i32: 1, 1, 0, 0>} : (i64, i64) -> !ex.dyn
       "ex.return"(%2) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
     }) {sym_name = "main"} : () -> ()
   }
@@ -206,7 +206,7 @@ defmodule ExConversionTest do
           "ex.func"() ({
           ^bb0:
             %0 = "ex.lit"() {value = 1 : i64} : () -> i64
-            %1 = "ex.call"(%0, %0) {callee = "add", arity = 2 : i64, operandSegmentSizes = array<i32: 2>} : (i64, i64) -> !ex.dyn
+            %1 = "ex.call"(%0, %0) {callee = "add", arity = 2 : i64, operandSegmentSizes = array<i32: 1, 1, 0, 0>} : (i64, i64) -> !ex.dyn
             "ex.return"(%1) {operandSegmentSizes = array<i32: 1>} : (!ex.dyn) -> ()
           }) {sym_name = "main"} : () -> ()
         }
@@ -323,7 +323,7 @@ defmodule ExConversionTest do
           "ex.func"() ({
           ^bb0:
             %0 = "ex.lit"() {value = 1 : i64} : () -> i64
-            %1 = "ex.call"(%0) {callee = "id", arity = 1 : i64, operandSegmentSizes = array<i32: 1>} : (i64) -> i64
+            %1 = "ex.call"(%0) {callee = "id", arity = 1 : i64, operandSegmentSizes = array<i32: 1, 0, 0, 0>} : (i64) -> i64
             "ex.return"(%1) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
@@ -336,6 +336,27 @@ defmodule ExConversionTest do
     rendered = MLIR.to_string(module, generic: true)
     assert rendered =~ "func.call"
     refute rendered =~ "!ex.dyn"
+  end
+
+  test "allows heterogeneous-typed ex.call arguments", %{ctx: ctx} do
+    module =
+      term_module!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "ex.lit"() {value = 1 : i64} : () -> i64
+            %1 = "ex.box"(%0) : (i64) -> !ex.dyn
+            %2 = "ex.call"(%1, %0) {callee = "f", arity = 2 : i64, operandSegmentSizes = array<i32: 1, 1, 0, 0>} : (!ex.dyn, i64) -> i64
+            "ex.return"(%2) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx
+      )
+
+    assert {:ok, _module, []} = Plan.run(Ex.plan(), module)
+    assert MLIR.to_string(module, generic: true) =~ "func.call"
   end
 
   test "converts ex.to_word as a pure passthrough", %{ctx: ctx} do

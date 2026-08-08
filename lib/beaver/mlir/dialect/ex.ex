@@ -66,9 +66,17 @@ defmodule Beaver.MLIR.Dialect.Ex do
         ),
         results: [result: all_of([base("!builtin.integer"), any()])]
 
-  defop call(args = variadic(any())),
-    results: [result: any()],
-    attributes: [callee: ^callee_value, arity: ^integer_value]
+  # Each argument is its own optional slot so heterogeneous argument types
+  # (e.g. a term plus a scalar accumulator) verify: IRDL variadic groups are
+  # homogeneous, which would reject mixed-typed calls.
+  defop call(
+          arg0 = optional(any()),
+          arg1 = optional(any()),
+          arg2 = optional(any()),
+          arg3 = optional(any())
+        ),
+        results: [result: any()],
+        attributes: [callee: ^callee_value, arity: ^integer_value]
 
   defop cmp(
           left = all_of([base("!builtin.integer"), any()]),
