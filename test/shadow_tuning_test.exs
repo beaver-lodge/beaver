@@ -170,6 +170,104 @@ defmodule Beaver.Shadow.TuningTest do
     end
   end
 
+  describe "correlation/3" do
+    test "returns ~1.0 for perfectly monotonic negative structural/latency data" do
+      records = [
+        sample_record(%{
+          config: %Config{index: 0, num_warps: 2},
+          structural_proxy: %{baseline: 24, optimized: 8, reduction: 16, lowered_to_llvm: true},
+          timings: %{total_ns: 1, gpu_ns: 100}
+        }),
+        sample_record(%{
+          config: %Config{index: 1, num_warps: 4},
+          structural_proxy: %{baseline: 24, optimized: 5, reduction: 19, lowered_to_llvm: true},
+          timings: %{total_ns: 1, gpu_ns: 200}
+        }),
+        sample_record(%{
+          config: %Config{index: 2, num_warps: 8},
+          structural_proxy: %{baseline: 24, optimized: 3, reduction: 21, lowered_to_llvm: true},
+          timings: %{total_ns: 1, gpu_ns: 300}
+        })
+      ]
+
+      rho =
+        Tuning.correlation(
+          records,
+          fn record ->
+            record.structural_proxy && record.structural_proxy.optimized
+          end,
+          fn record ->
+            record.timings && record.timings.gpu_ns
+          end
+        )
+
+      assert_in_delta rho, -1.0, 0.001
+    end
+
+    test "returns nil with fewer than two paired points" do
+      records = [sample_record()]
+
+      assert Tuning.correlation(records, fn _ -> 1 end, fn _ -> 2 end) == nil
+    end
+
+    test "ignores records missing latency or proxy" do
+      records = [
+        sample_record(%{
+          config: %Config{index: 0, num_warps: 2},
+          timings: %{total_ns: 1, gpu_ns: 100}
+        }),
+        sample_record(%{
+          config: %Config{index: 1, num_warps: 4},
+          structural_proxy: nil,
+          timings: %{total_ns: 1, gpu_ns: 200}
+        }),
+        sample_record(%{
+          config: %Config{index: 2, num_warps: 8},
+          timings: %{total_ns: 1, gpu_ns: nil}
+        }),
+        sample_record(%{
+          config: %Config{index: 3, num_warps: 16},
+          timings: %{total_ns: 1, gpu_ns: 50}
+        })
+      ]
+
+      rho =
+        Tuning.correlation(
+          records,
+          fn record ->
+            record.structural_proxy && record.structural_proxy.optimized
+          end,
+          fn record ->
+            record.timings && record.timings.gpu_ns
+          end
+        )
+
+      # only index 0 and 3 have both; their optimized values are 5 and 5
+      assert rho == nil
+    end
+  end
+
+  describe "pick_winner_by_latency/1" do
+    test "picks the lowest measured latency" do
+      records = [
+        sample_record(%{
+          config: %Config{index: 0, num_warps: 2},
+          timings: %{total_ns: 1, gpu_ns: 300}
+        }),
+        sample_record(%{
+          config: %Config{index: 1, num_warps: 4},
+          timings: %{total_ns: 1, gpu_ns: 100}
+        }),
+        sample_record(%{
+          config: %Config{index: 2, num_warps: 8},
+          timings: %{total_ns: 1, gpu_ns: "cuLaunchKernel failed"}
+        })
+      ]
+
+      assert Tuning.pick_winner_by_latency(records).config.num_warps == 4
+    end
+  end
+
   @tag :triton
   @tag skip: !@triton_enabled
   test "CPU-only config enumeration produces records and a structural winner" do
@@ -209,5 +307,46 @@ defmodule Beaver.Shadow.TuningTest do
       assert decision.structural_proxy.baseline == 24
       assert decision.reason =~ "convert_layouts" or decision.reason =~ "pruned"
     end
+  end
+
+  @tag :triton
+  @tag skip: !@triton_enabled
+  test "1024x1024 matmul reproduces its corpus counts" do
+    fixture = Beaver.Shadow.Corpus.fixture(:matmul_1024)
+    run = Tuning.run(:matmul_1024, sample_configs())
+
+    assert fixture.baseline == 17
+    assert fixture.optimized == 3
+
+    for record <- run.records do
+      assert record.structural_proxy.baseline == 17
+      assert record.structural_proxy.optimized == 3
+      assert record.status == :evaluated
+    end
+  end
+
+  @tag :cuda
+  @tag skip: !@triton_enabled or System.get_env("BEAVER_CUDA_TEST") == nil
+  test "real GPU config space shows nontrivial latency spread and a latency winner" do
+    configs = [
+      %Config{index: 0, num_warps: 2},
+      %Config{index: 1, num_warps: 4},
+      %Config{index: 2, num_warps: 8}
+    ]
+
+    run = Tuning.run(:matmul_1024, configs, gpu: true)
+
+    latencies =
+      run.records
+      |> Enum.filter(&is_number(&1.timings && &1.timings.gpu_ns))
+      |> Enum.map(& &1.timings.gpu_ns)
+
+    assert length(latencies) == 3
+
+    winner = Tuning.pick_winner_by_latency(run.records)
+    assert winner.timings.gpu_ns == Enum.min(latencies)
+
+    # Nontrivial: the config choice moves real latency by more than noise.
+    assert Enum.max(latencies) / Enum.min(latencies) > 1.1
   end
 end

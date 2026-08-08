@@ -40,6 +40,42 @@ defmodule Beaver.Shadow.Corpus do
       baseline: 4,
       optimized: 1,
       lowered_to_llvm: false
+    },
+    %{
+      name: :matmul_1024,
+      file: "ttir_matmul_1024.mlir",
+      dialect: :ttir,
+      baseline: 17,
+      optimized: 3,
+      lowered_to_llvm: true,
+      launch: %{
+        kernel_name: "matmul_kernel",
+        grid: {16, 16, 1},
+        block: {128, 1, 1},
+        shared_mem: 16_384,
+        samples: 10,
+        buffer_sizes: %{
+          a: 1024 * 1024 * 4,
+          b: 1024 * 1024 * 4,
+          c: 1024 * 1024 * 4
+        },
+        args_template: [
+          {:ptr, :a},
+          {:ptr, :b},
+          {:ptr, :c},
+          {:i64, 1024},
+          {:i64, 1024},
+          {:i64, 1024},
+          {:i64, 1024},
+          {:i64, 1},
+          {:i64, 1024},
+          {:i64, 1},
+          {:i64, 1024},
+          {:i64, 1},
+          {:ptr, 0},
+          {:ptr, 0}
+        ]
+      }
     }
   ]
 

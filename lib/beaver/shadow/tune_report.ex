@@ -20,7 +20,9 @@ defmodule Beaver.Shadow.TuneReport do
     :config_space_digest,
     :records,
     :winner,
-    :probes
+    :probes,
+    :latency_winner,
+    :structural_vs_latency
   ]
 
   @type t() :: %__MODULE__{
@@ -32,14 +34,17 @@ defmodule Beaver.Shadow.TuneReport do
           config_space_digest: String.t(),
           records: [Tuning.Record.t()],
           winner: Tuning.Record.t() | nil,
-          probes: [%{config: Tuning.Config.t(), result: Probe.Result.t()}]
+          probes: [%{config: Tuning.Config.t(), result: Probe.Result.t()}],
+          latency_winner: Tuning.Record.t() | nil,
+          structural_vs_latency: float() | nil
         }
 
   @doc "Measures a config space and its crash probes for one corpus fixture."
   @spec generate(atom(), [Tuning.Config.t()], keyword()) :: t()
   def generate(fixture_name, configs, opts \\ []) when is_atom(fixture_name) do
     target = Keyword.get(opts, :target, "cuda:80")
-    run = Tuning.run(fixture_name, configs, target: target)
+    gpu? = Keyword.get(opts, :gpu, false)
+    run = Tuning.run(fixture_name, configs, target: target, gpu: gpu?)
 
     %__MODULE__{
       fixture: fixture_name,
@@ -50,7 +55,18 @@ defmodule Beaver.Shadow.TuneReport do
       config_space_digest: Tuning.configs_digest(configs),
       records: run.records,
       winner: run.winner,
-      probes: Probe.probe_many(fixture_name, configs)
+      probes: Probe.probe_many(fixture_name, configs),
+      latency_winner: Tuning.pick_winner_by_latency(run.records),
+      structural_vs_latency:
+        if(gpu?,
+          do:
+            Tuning.correlation(
+              run.records,
+              fn record -> record.structural_proxy && record.structural_proxy.optimized end,
+              fn record -> record.timings && record.timings.gpu_ns end
+            ),
+          else: nil
+        )
     }
   end
 
@@ -75,13 +91,21 @@ defmodule Beaver.Shadow.TuneReport do
 
     ### Records
 
-    | index | status | baseline convert_layouts | optimized | reduction | lowers to LLVM | total_ns |
-    |---|---|---|---|---|---|---|
+    | index | num_warps | status | baseline | optimized | reduction | lowers to LLVM | total_ns | gpu_ns |
+    |---|---|---|---|---|---|---|---|---|
     #{Enum.map_join(report.records, "\n", &record_row/1)}
 
-    ### Winner
+    ### Winner (structural proxy)
 
     #{winner_text(report.winner)}
+
+    ### Winner (measured GPU latency)
+
+    #{latency_winner_text(report)}
+
+    ### Structural proxy vs latency
+
+    #{correlation_text(report.structural_vs_latency)}
 
     ### Per-config probes
 
@@ -100,11 +124,17 @@ defmodule Beaver.Shadow.TuneReport do
   defp record_row(record) do
     proxy = record.structural_proxy
 
-    "| #{record.config.index} | #{record.status} | #{proxy_field(proxy, :baseline)} | " <>
+    "| #{record.config.index} | #{record.config.num_warps} | #{record.status} | " <>
+      "#{proxy_field(proxy, :baseline)} | " <>
       "#{proxy_field(proxy, :optimized)} | #{reduction(proxy)} | " <>
       "#{proxy_field(proxy, :lowered_to_llvm)} | " <>
-      "#{(record.timings && record.timings.total_ns) || "-"} |"
+      "#{(record.timings && record.timings.total_ns) || "-"} | " <>
+      "#{gpu_ns(record.timings)} |"
   end
+
+  defp gpu_ns(nil), do: "-"
+  defp gpu_ns(%{gpu_ns: ns}) when is_number(ns), do: Integer.to_string(ns)
+  defp gpu_ns(_timings), do: "-"
 
   defp proxy_field(nil, _field), do: "-"
   defp proxy_field(proxy, field), do: Map.get(proxy, field) || "-"
@@ -121,6 +151,28 @@ defmodule Beaver.Shadow.TuneReport do
 
     "config #{winner.config.index} (num_warps #{winner.config.num_warps}) with " <>
       "#{proxy.optimized} convert_layouts after optimization."
+  end
+
+  defp latency_winner_text(%__MODULE__{latency_winner: nil}),
+    do: "no measured latency (GPU unavailable or all configs failed)"
+
+  defp latency_winner_text(%__MODULE__{latency_winner: winner}) do
+    gpu_ns = winner.timings && Map.get(winner.timings, :gpu_ns)
+
+    if is_number(gpu_ns) do
+      "config #{winner.config.index} (num_warps #{winner.config.num_warps}) at #{gpu_ns}ns."
+    else
+      "config #{winner.config.index} (num_warps #{winner.config.num_warps}), latency unknown."
+    end
+  end
+
+  defp correlation_text(nil) do
+    "Spearman(structural optimized count, GPU latency): not computable " <>
+      "(no GPU measurements or no variance in the structural proxy)."
+  end
+
+  defp correlation_text(rho) when is_number(rho) do
+    "Spearman(structural optimized count, GPU latency): #{Float.round(rho, 3)}"
   end
 
   defp probe_row(%{config: config, result: result}) do
