@@ -52,13 +52,16 @@ defmodule Beaver.Shadow.OptimizationTrial do
   @spec run(MLIR.Module.t(), keyword()) :: Result.t()
   def run(%MLIR.Module{} = module, opts \\ []) do
     target = Keyword.get(opts, :target, "cuda:80")
+    num_warps = Keyword.get(opts, :num_warps, 4)
     source_text = MLIR.to_string(module)
     context = MLIR.context(module)
     gpu? = Keyword.get(opts, :gpu, false)
 
     baseline =
       module
-      |> Beaver.Composer.append("convert-triton-to-tritongpu{target=#{target}}")
+      |> Beaver.Composer.append(
+        "convert-triton-to-tritongpu{target=#{target}, num-warps=#{num_warps}}"
+      )
       |> Beaver.Composer.run!()
 
     baseline_count = audit_count(baseline)
