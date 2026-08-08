@@ -514,6 +514,43 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.is_list"
   end
 
+  test "converts term read ops to Zig runtime ABI calls", %{ctx: ctx} do
+    module =
+      term_module!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "ex.lit"() {value = 1 : i64} : () -> i64
+            %1 = "ex.lit"() {value = 2 : i64} : () -> i64
+            %2 = "ex.box"(%0) : (i64) -> !ex.dyn
+            %3 = "ex.box"(%1) : (i64) -> !ex.dyn
+            %4 = "ex.tuple"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
+            %5 = "ex.list"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
+            %6 = "ex.tuple_length"(%4) : (!ex.dyn) -> i64
+            %7 = "ex.tuple_get"(%4, %0) : (!ex.dyn, i64) -> !ex.dyn
+            %8 = "ex.list_length"(%5) : (!ex.dyn) -> i64
+            %9 = "ex.list_head"(%5) : (!ex.dyn) -> !ex.dyn
+            %10 = "ex.list_tail"(%5) : (!ex.dyn) -> !ex.dyn
+            %11 = "ex.term_eq"(%7, %2) : (!ex.dyn, !ex.dyn) -> i64
+            "ex.return"(%11) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx
+      )
+
+    assert {:ok, _module, []} = Plan.run(Ex.plan(), module)
+
+    rendered = MLIR.to_string(module, generic: true)
+    assert rendered =~ "ex.term.tuple_length"
+    assert rendered =~ "ex.term.tuple_get"
+    assert rendered =~ "ex.term.list_length"
+    assert rendered =~ "ex.term.list_head"
+    assert rendered =~ "ex.term.list_tail"
+    assert rendered =~ "ex.term.eq"
+  end
+
   test "passes nested term operands through without re-tagging", %{ctx: ctx} do
     module =
       term_module!(

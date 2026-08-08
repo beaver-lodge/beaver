@@ -86,6 +86,12 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.is_list", &convert_term_predicate/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_tuple", &convert_term_predicate/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_map", &convert_term_predicate/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.tuple_get", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.tuple_length", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.list_head", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.list_tail", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.list_length", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.term_eq", &convert_term_read/3, version: "1.0")
   end
 
   # Declaration-first manifest of the Zig term runtime ABI: batata's
@@ -100,7 +106,13 @@ defmodule Beaver.MLIR.Conversion.Ex do
     is_binary: "ex.term.is_binary",
     is_list: "ex.term.is_list",
     is_tuple: "ex.term.is_tuple",
-    is_map: "ex.term.is_map"
+    is_map: "ex.term.is_map",
+    tuple_get: "ex.term.tuple_get",
+    tuple_length: "ex.term.tuple_length",
+    list_head: "ex.term.list_head",
+    list_tail: "ex.term.list_tail",
+    list_length: "ex.term.list_length",
+    term_eq: "ex.term.eq"
   }
 
   @term_types ~w(!ex.dyn !ex.bound !ex.unbound)
@@ -356,6 +368,20 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp predicate_intrinsic("ex.is_tuple"), do: @term_intrinsics.is_tuple
   defp predicate_intrinsic("ex.is_map"), do: @term_intrinsics.is_map
 
+  defp convert_term_read(operation, operands, rewriter) do
+    base = insertion_point(operation, rewriter)
+    symbol = read_intrinsic(MLIR.Operation.name(operation))
+    result = emit_runtime_call(operation, rewriter, base, symbol, operands)
+    replace_with(rewriter, operation, result)
+  end
+
+  defp read_intrinsic("ex.tuple_get"), do: @term_intrinsics.tuple_get
+  defp read_intrinsic("ex.tuple_length"), do: @term_intrinsics.tuple_length
+  defp read_intrinsic("ex.list_head"), do: @term_intrinsics.list_head
+  defp read_intrinsic("ex.list_tail"), do: @term_intrinsics.list_tail
+  defp read_intrinsic("ex.list_length"), do: @term_intrinsics.list_length
+  defp read_intrinsic("ex.term_eq"), do: @term_intrinsics.term_eq
+
   defp insertion_point(operation, rewriter) do
     base = MLIR.ConversionPatternRewriter.as_base(rewriter)
     MLIR.RewriterBase.set_insertion_point_before(base, operation)
@@ -507,6 +533,11 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp intrinsic_function_type("ex.term.list_cons") do
+    MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type(symbol)
+       when symbol in ["ex.term.tuple_get", "ex.term.eq"] do
     MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
