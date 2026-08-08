@@ -55,7 +55,7 @@ defmodule Beaver.Shadow.ReportTest do
     report = Report.generate()
 
     assert is_binary(report.llvm_revision) and report.llvm_revision != ""
-    assert length(report.fixtures) == 3
+    assert length(report.fixtures) == 4
 
     matmul = Enum.find(report.fixtures, &(&1.name == :matmul))
     assert matmul.baseline == 24
