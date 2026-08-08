@@ -112,7 +112,7 @@ defmodule Beaver.MLIR.Dialect.Ex.ExpandCase do
   defp build_chain([clause | rest], scrutinee, result_types, context, location, rewriter) do
     {patterns, guard} = clause_patterns(clause, rewriter)
 
-    if patterns == [] and rest != [] do
+    if patterns == [] and guard == nil and rest != [] do
       raise ArgumentError,
             "ex.case catch-all clause must be last, got a clause without patterns before more clauses"
     end

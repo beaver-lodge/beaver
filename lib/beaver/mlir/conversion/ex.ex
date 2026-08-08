@@ -196,12 +196,24 @@ defmodule Beaver.MLIR.Conversion.Ex do
       %Changeset{name: "arith.cmpi", context: context, location: location}
       |> Changeset.add_argument([left, right])
       |> Changeset.add_argument(predicate: cmp_i_predicate(predicate))
-      |> Changeset.add_result(result_type)
+      |> Changeset.add_result(MLIR.Type.i1())
       |> MLIR.Operation.create()
 
     MLIR.RewriterBase.set_insertion_point_before(base, operation)
     MLIR.RewriterBase.insert(base, cmpi)
-    MLIR.ConversionPatternRewriter.replace_op(rewriter, operation, MLIR.Operation.result(cmpi, 0))
+
+    # Comparisons produce i1 in arith; widen back to the ex.cmp result's i64
+    # boolean representation so it can feed arithmetic and scf.if conditions.
+    ext =
+      %Changeset{name: "arith.extui", context: context, location: location}
+      |> Changeset.add_argument([MLIR.Operation.result(cmpi, 0)])
+      |> Changeset.add_result(result_type)
+      |> MLIR.Operation.create()
+
+    MLIR.RewriterBase.set_insertion_point_after(base, cmpi)
+    MLIR.RewriterBase.insert(base, ext)
+
+    MLIR.ConversionPatternRewriter.replace_op(rewriter, operation, MLIR.Operation.result(ext, 0))
     :ok
   end
 
@@ -218,9 +230,20 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
     [then_region, else_region] = operation |> Walker.regions() |> Enum.to_list()
 
+    # scf.if conditions are i1 at the LLVM boundary; the ex universe carries
+    # booleans as i64 0/1, so truncate before the branch.
+    cond_i1 =
+      %Changeset{name: "arith.trunci", context: context, location: location}
+      |> Changeset.add_argument([cond])
+      |> Changeset.add_result(MLIR.Type.i1())
+      |> MLIR.Operation.create()
+
+    MLIR.RewriterBase.set_insertion_point_before(base, operation)
+    MLIR.RewriterBase.insert(base, cond_i1)
+
     scf_if =
       %Changeset{name: "scf.if", context: context, location: location}
-      |> Changeset.add_argument(cond)
+      |> Changeset.add_argument(MLIR.Operation.result(cond_i1, 0))
       |> Changeset.add_argument(MLIR.CAPI.mlirRegionCreate())
       |> Changeset.add_argument(MLIR.CAPI.mlirRegionCreate())
       |> Changeset.add_result(result_types)
