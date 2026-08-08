@@ -68,12 +68,17 @@ defmodule Beaver.MLIR.Dialect.Ex do
 
   # Each argument is its own optional slot so heterogeneous argument types
   # (e.g. a term plus a scalar accumulator) verify: IRDL variadic groups are
-  # homogeneous, which would reject mixed-typed calls.
+  # homogeneous, which would reject mixed-typed calls. Eight slots cover the
+  # closure ABI: four captured values plus four application arguments.
   defop call(
           arg0 = optional(any()),
           arg1 = optional(any()),
           arg2 = optional(any()),
-          arg3 = optional(any())
+          arg3 = optional(any()),
+          arg4 = optional(any()),
+          arg5 = optional(any()),
+          arg6 = optional(any()),
+          arg7 = optional(any())
         ),
         results: [result: any()],
         attributes: [callee: ^callee_value, arity: ^integer_value]
@@ -104,6 +109,31 @@ defmodule Beaver.MLIR.Dialect.Ex do
   # type without tagging: the conversion is a pure passthrough.
   defop to_word(value = any()),
     results: [result: base(dyn())]
+
+  # Constructs a first-class function value (a tagged closure word): the
+  # extracted `__fn_*` is referenced by index, and the captured values are
+  # stored in the closure's env slots.
+  defop make_fun(
+          e0 = optional(any()),
+          e1 = optional(any()),
+          e2 = optional(any()),
+          e3 = optional(any())
+        ),
+        results: [result: base(dyn())],
+        attributes: [fn_idx: ^integer_value, env_len: ^integer_value]
+
+  # Applies a first-class function value. The closure is resolved at runtime
+  # to its function index and env slots, then dispatched to the matching
+  # `__fn_*`.
+  defop apply(
+          closure = optional(base(dyn())),
+          a0 = optional(any()),
+          a1 = optional(any()),
+          a2 = optional(any()),
+          a3 = optional(any())
+        ),
+        results: [result: any()],
+        attributes: [arg_count: ^integer_value]
 
   defop tuple(elements = variadic(base(dyn()))),
     results: [result: base(dyn())]
