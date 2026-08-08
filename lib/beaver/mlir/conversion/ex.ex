@@ -76,6 +76,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.var", &convert_var/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.func", &convert_func/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.box", &convert_box/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.to_word", &convert_to_word/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.tuple", &convert_term_tuple/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list", &convert_term_list/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.map", &convert_term_map/3, version: "1.0")
@@ -369,6 +370,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
       end
 
     replace_with(rewriter, operation, word)
+  end
+
+  defp convert_to_word(operation, [operand], rewriter) do
+    replace_with(rewriter, operation, operand)
   end
 
   defp predicate_intrinsic("ex.is_integer"), do: @term_intrinsics.is_integer

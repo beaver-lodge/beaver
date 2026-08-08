@@ -67,7 +67,7 @@ defmodule Beaver.MLIR.Dialect.Ex do
         results: [result: all_of([base("!builtin.integer"), any()])]
 
   defop call(args = variadic(any())),
-    results: [result: base(dyn())],
+    results: [result: any()],
     attributes: [callee: ^callee_value, arity: ^integer_value]
 
   defop cmp(
@@ -90,6 +90,11 @@ defmodule Beaver.MLIR.Dialect.Ex do
     attributes: [patterns: any()]
 
   defop box(value = any()),
+    results: [result: base(dyn())]
+
+  # Lifts an already-tagged word (e.g. a function argument) into the term
+  # type without tagging: the conversion is a pure passthrough.
+  defop to_word(value = any()),
     results: [result: base(dyn())]
 
   defop tuple(elements = variadic(base(dyn()))),

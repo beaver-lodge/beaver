@@ -315,6 +315,53 @@ defmodule ExConversionTest do
     assert rendered =~ "scf.yield"
   end
 
+  test "allows scalar-typed ex.call results", %{ctx: ctx} do
+    module =
+      term_module!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "ex.lit"() {value = 1 : i64} : () -> i64
+            %1 = "ex.call"(%0) {callee = "id", arity = 1 : i64, operandSegmentSizes = array<i32: 1>} : (i64) -> i64
+            "ex.return"(%1) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx
+      )
+
+    assert {:ok, _module, []} = Plan.run(Ex.plan(), module)
+
+    rendered = MLIR.to_string(module, generic: true)
+    assert rendered =~ "func.call"
+    refute rendered =~ "!ex.dyn"
+  end
+
+  test "converts ex.to_word as a pure passthrough", %{ctx: ctx} do
+    module =
+      term_module!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0(%arg0: i64):
+            %0 = "ex.to_word"(%arg0) : (i64) -> !ex.dyn
+            %1 = "ex.is_binary"(%0) : (!ex.dyn) -> i64
+            "ex.return"(%1) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx
+      )
+
+    assert {:ok, _module, []} = Plan.run(Ex.plan(), module)
+
+    rendered = MLIR.to_string(module, generic: true)
+    assert rendered =~ "func.call"
+    assert rendered =~ "ex.term.is_binary"
+    refute rendered =~ "arith.shli"
+  end
+
   test "expands multiple integer patterns per clause into an OR condition", %{ctx: ctx} do
     Beaver.Slang.load(ctx, ExDialect)
 
