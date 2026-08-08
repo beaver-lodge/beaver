@@ -140,6 +140,15 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop term_eq(left = base(dyn()), right = base(dyn())),
     results: [result: all_of([base("!builtin.integer"), any()])]
 
+  defop binary_length(binary = base(dyn())),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop binary_get(binary = base(dyn()), index = all_of([base("!builtin.integer"), any()])),
+    results: [result: base(dyn())]
+
+  defop binary_slice(binary = base(dyn()), start = all_of([base("!builtin.integer"), any()])),
+    results: [result: base(dyn())]
+
   defop yield(values = variadic(any())), traits: [:terminator]
 
   defop func(),
