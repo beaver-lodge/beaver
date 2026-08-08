@@ -122,6 +122,24 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop is_map(value = any()),
     results: [result: all_of([base("!builtin.integer"), any()])]
 
+  defop tuple_get(tuple = base(dyn()), index = all_of([base("!builtin.integer"), any()])),
+    results: [result: base(dyn())]
+
+  defop tuple_length(tuple = base(dyn())),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop list_head(list = base(dyn())),
+    results: [result: base(dyn())]
+
+  defop list_tail(list = base(dyn())),
+    results: [result: base(dyn())]
+
+  defop list_length(list = base(dyn())),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop term_eq(left = base(dyn()), right = base(dyn())),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
   defop yield(values = variadic(any())), traits: [:terminator]
 
   defop func(),
