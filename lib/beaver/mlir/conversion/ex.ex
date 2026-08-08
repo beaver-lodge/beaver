@@ -78,6 +78,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.func", &convert_func/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.box", &convert_box/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.to_word", &convert_to_word/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.unbox", &convert_to_word/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.self", &convert_self/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.send", &convert_send/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.receive", &convert_receive/3, version: "1.0")
@@ -101,8 +102,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.tuple_get", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.tuple_length", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.map_length", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.enumerable_count", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_head", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_tail", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.list_get", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_length", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.term_eq", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_length", &convert_term_read/3, version: "1.0")
@@ -142,8 +145,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
     tuple_get: "ex.term.tuple_get",
     tuple_length: "ex.term.tuple_length",
     map_length: "ex.term.map_length",
+    enumerable_count: "ex.term.enumerable_count",
     list_head: "ex.term.list_head",
     list_tail: "ex.term.list_tail",
+    list_get: "ex.term.list_get",
     list_length: "ex.term.list_length",
     term_eq: "ex.term.eq",
     binary_length: "ex.term.binary_length",
@@ -710,8 +715,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.tuple_get"), do: @term_intrinsics.tuple_get
   defp read_intrinsic("ex.tuple_length"), do: @term_intrinsics.tuple_length
   defp read_intrinsic("ex.map_length"), do: @term_intrinsics.map_length
+  defp read_intrinsic("ex.enumerable_count"), do: @term_intrinsics.enumerable_count
   defp read_intrinsic("ex.list_head"), do: @term_intrinsics.list_head
   defp read_intrinsic("ex.list_tail"), do: @term_intrinsics.list_tail
+  defp read_intrinsic("ex.list_get"), do: @term_intrinsics.list_get
   defp read_intrinsic("ex.list_length"), do: @term_intrinsics.list_length
   defp read_intrinsic("ex.term_eq"), do: @term_intrinsics.term_eq
   defp read_intrinsic("ex.binary_length"), do: @term_intrinsics.binary_length
@@ -923,6 +930,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp intrinsic_function_type(symbol, _ctx)
        when symbol in [
               "ex.term.tuple_get",
+              "ex.term.list_get",
               "ex.term.eq",
               "ex.term.binary_get",
               "ex.term.binary_slice",
