@@ -2,7 +2,7 @@ defmodule Beaver.Shadow.TuningTest do
   use ExUnit.Case, async: true
 
   alias Beaver.Shadow.Tuning
-  alias Beaver.Shadow.Tuning.{Config, Event, Record, Run}
+  alias Beaver.Shadow.Tuning.{Config, Record, Run}
 
   @triton_enabled System.get_env("BEAVER_TRITON_PREBUILT_DIR") != nil
 
