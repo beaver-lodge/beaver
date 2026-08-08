@@ -100,6 +100,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.is_map", &convert_term_predicate/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.tuple_get", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.tuple_length", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.map_length", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_head", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_tail", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_length", &convert_term_read/3, version: "1.0")
@@ -140,6 +141,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     is_map: "ex.term.is_map",
     tuple_get: "ex.term.tuple_get",
     tuple_length: "ex.term.tuple_length",
+    map_length: "ex.term.map_length",
     list_head: "ex.term.list_head",
     list_tail: "ex.term.list_tail",
     list_length: "ex.term.list_length",
@@ -707,6 +709,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp read_intrinsic("ex.tuple_get"), do: @term_intrinsics.tuple_get
   defp read_intrinsic("ex.tuple_length"), do: @term_intrinsics.tuple_length
+  defp read_intrinsic("ex.map_length"), do: @term_intrinsics.map_length
   defp read_intrinsic("ex.list_head"), do: @term_intrinsics.list_head
   defp read_intrinsic("ex.list_tail"), do: @term_intrinsics.list_tail
   defp read_intrinsic("ex.list_length"), do: @term_intrinsics.list_length
