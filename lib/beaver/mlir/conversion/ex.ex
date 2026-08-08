@@ -77,6 +77,11 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.func", &convert_func/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.box", &convert_box/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.to_word", &convert_to_word/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.self", &convert_self/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.send", &convert_send/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.receive", &convert_receive/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.mailbox_clear", &convert_mailbox_clear/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.to_int", &convert_to_int/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.make_fun", &convert_make_fun/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.apply", &convert_apply/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.tuple", &convert_term_tuple/3, version: "1.0")
@@ -106,6 +111,11 @@ defmodule Beaver.MLIR.Conversion.Ex do
   # `native/term_runtime.zig` exports exactly these C symbols.
   @term_intrinsics %{
     list_cons: "ex.term.list_cons",
+    self: "ex.term.self",
+    send: "ex.term.send",
+    receive: "ex.term.receive",
+    mailbox_clear: "ex.term.mailbox_clear",
+    to_int: "ex.term.to_int",
     make_fun: "ex.term.make_fun",
     fun_idx: "ex.term.fun_idx",
     fun_env: "ex.term.fun_env",
@@ -381,6 +391,56 @@ defmodule Beaver.MLIR.Conversion.Ex do
     replace_with(rewriter, operation, operand)
   end
 
+  defp convert_self(operation, [], rewriter) do
+    base = insertion_point(operation, rewriter)
+
+    replace_with(
+      rewriter,
+      operation,
+      emit_runtime_call(operation, rewriter, base, @term_intrinsics.self, [])
+    )
+  end
+
+  defp convert_send(operation, [pid, msg], rewriter) do
+    base = insertion_point(operation, rewriter)
+
+    replace_with(
+      rewriter,
+      operation,
+      emit_runtime_call(operation, rewriter, base, @term_intrinsics.send, [pid, msg])
+    )
+  end
+
+  defp convert_receive(operation, [], rewriter) do
+    base = insertion_point(operation, rewriter)
+
+    replace_with(
+      rewriter,
+      operation,
+      emit_runtime_call(operation, rewriter, base, @term_intrinsics.receive, [])
+    )
+  end
+
+  defp convert_mailbox_clear(operation, [], rewriter) do
+    base = insertion_point(operation, rewriter)
+
+    replace_with(
+      rewriter,
+      operation,
+      emit_runtime_call(operation, rewriter, base, @term_intrinsics.mailbox_clear, [])
+    )
+  end
+
+  defp convert_to_int(operation, [operand], rewriter) do
+    base = insertion_point(operation, rewriter)
+
+    replace_with(
+      rewriter,
+      operation,
+      emit_runtime_call(operation, rewriter, base, @term_intrinsics.to_int, [operand])
+    )
+  end
+
   # Constructs a first-class function value: stores the function index and the
   # captured env words in a closure word allocated by the Zig runtime.
   defp convert_make_fun(operation, operands, rewriter) do
@@ -642,6 +702,22 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp intrinsic_function_type("ex.term.list_cons") do
     MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.self") do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.send") do
+    MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.receive") do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.mailbox_clear") do
+    MLIR.Type.function([], [MLIR.Type.i64()])
   end
 
   defp intrinsic_function_type("ex.term.make_fun") do
