@@ -303,27 +303,118 @@ defmodule ExConversionTest do
     end
   end
 
-  test "rejects term-universe ops until the Zig runtime ABI lands", %{ctx: ctx} do
+  defp term_module!(module_source, ctx) do
     Beaver.Slang.load(ctx, ExDialect)
 
+    MLIR.Module.create!(module_source, ctx: ctx)
+    |> MLIR.verify!()
+  end
+
+  test "converts term construction and predicates to Zig runtime ABI calls", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
+      term_module!(
         ~S"""
         module {
           "ex.func"() ({
           ^bb0:
             %0 = "ex.lit"() {value = 1 : i64} : () -> i64
-            %1 = "ex.tuple"(%0) {operandSegmentSizes = array<i32: 1>} : (i64) -> !ex.dyn
+            %1 = "ex.lit"() {value = 2 : i64} : () -> i64
+            %2 = "ex.box"(%0) : (i64) -> !ex.dyn
+            %3 = "ex.box"(%1) : (i64) -> !ex.dyn
+            %4 = "ex.tuple"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
+            %5 = "ex.is_tuple"(%4) : (!ex.dyn) -> i64
+            "ex.return"(%5) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx
+      )
+
+    assert {:ok, _module, []} = Plan.run(Ex.plan(), module)
+
+    rendered = MLIR.to_string(module, generic: true)
+    assert rendered =~ "ex.term.list_cons"
+    assert rendered =~ "ex.term.tuple_from_list"
+    assert rendered =~ "ex.term.is_tuple"
+    # scalar operands are tagged as immediate integer terms before construction
+    assert rendered =~ "arith.shli"
+  end
+
+  test "converts list, map and binary construction to runtime ABI calls", %{ctx: ctx} do
+    module =
+      term_module!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "ex.lit"() {value = 1 : i64} : () -> i64
+            %1 = "ex.lit"() {value = 2 : i64} : () -> i64
+            %2 = "ex.box"(%0) : (i64) -> !ex.dyn
+            %3 = "ex.box"(%1) : (i64) -> !ex.dyn
+            %4 = "ex.list"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
+            %5 = "ex.map"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
+            %6 = "ex.binary"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
+            %7 = "ex.is_list"(%4) : (!ex.dyn) -> i64
+            "ex.return"(%7) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx
+      )
+
+    assert {:ok, _module, []} = Plan.run(Ex.plan(), module)
+
+    rendered = MLIR.to_string(module, generic: true)
+    assert rendered =~ "ex.term.list_cons"
+    assert rendered =~ "ex.term.map_from_list"
+    assert rendered =~ "ex.term.binary_from_list"
+    assert rendered =~ "ex.term.is_list"
+  end
+
+  test "passes nested term operands through without re-tagging", %{ctx: ctx} do
+    module =
+      term_module!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "ex.lit"() {value = 1 : i64} : () -> i64
+            %1 = "ex.box"(%0) : (i64) -> !ex.dyn
+            %2 = "ex.tuple"(%1) {operandSegmentSizes = array<i32: 1>} : (!ex.dyn) -> !ex.dyn
+            %3 = "ex.tuple"(%2) {operandSegmentSizes = array<i32: 1>} : (!ex.dyn) -> !ex.dyn
+            %4 = "ex.is_tuple"(%3) : (!ex.dyn) -> i64
+            "ex.return"(%4) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx
+      )
+
+    assert {:ok, _module, []} = Plan.run(Ex.plan(), module)
+
+    rendered = MLIR.to_string(module, generic: true)
+    assert rendered =~ "ex.term.tuple_from_list"
+    assert rendered =~ "ex.term.is_tuple"
+  end
+
+  test "rejects ex.map with an odd number of entries", %{ctx: ctx} do
+    module =
+      term_module!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "ex.lit"() {value = 1 : i64} : () -> i64
+            %1 = "ex.box"(%0) : (i64) -> !ex.dyn
+            %2 = "ex.map"(%1) {operandSegmentSizes = array<i32: 1>} : (!ex.dyn) -> !ex.dyn
             "ex.return"() {operandSegmentSizes = array<i32: 0>} : () -> ()
           }) {sym_name = "main"} : () -> ()
         }
         """,
-        ctx: ctx
+        ctx
       )
-      |> MLIR.verify!()
 
     assert {:error, %MLIR.Conversion.Error{} = error} = Plan.run(Ex.plan(), module)
-    assert Exception.message(error) =~ "ex.tuple"
-    assert Exception.message(error) =~ "Zig term runtime"
+    assert Exception.message(error) =~ "even number"
   end
 end
