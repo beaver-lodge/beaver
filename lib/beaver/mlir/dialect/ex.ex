@@ -110,6 +110,12 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop to_word(value = any()),
     results: [result: base(dyn())]
 
+  # Drops the term type annotation without untagging: the conversion is a
+  # pure passthrough, so a term word can cross control-flow regions (whose
+  # types must be legal after conversion) as a scalar i64.
+  defop unbox(word = base(dyn())),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
   # Actor mailbox access: the current execution context is a single actor.
   defop self(),
     results: [result: base(dyn())]
@@ -204,10 +210,16 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop map_length(map = base(dyn())),
     results: [result: all_of([base("!builtin.integer"), any()])]
 
+  defop enumerable_count(word = base(dyn())),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
   defop list_head(list = base(dyn())),
     results: [result: base(dyn())]
 
   defop list_tail(list = base(dyn())),
+    results: [result: base(dyn())]
+
+  defop list_get(list = base(dyn()), index = all_of([base("!builtin.integer"), any()])),
     results: [result: base(dyn())]
 
   defop list_length(list = base(dyn())),
