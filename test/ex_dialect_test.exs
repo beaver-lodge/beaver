@@ -15,7 +15,7 @@ defmodule ExDialectTest do
       %1 = "ex.var"() {name = "x"} : () -> !ex.unbound
       %2 = "ex.bind"(%1, %0) : (!ex.unbound, i64) -> !ex.bound
       %3 = "ex.add"(%0, %0) : (i64, i64) -> i64
-      %4 = "ex.call"(%0, %0) {callee = "add", arity = 2 : i64, operandSegmentSizes = array<i32: 1, 1, 0, 0>} : (i64, i64) -> !ex.dyn
+      %4 = "ex.call"(%0, %0) {callee = "add", arity = 2 : i64, operandSegmentSizes = array<i32: 1, 1, 0, 0, 0, 0, 0, 0>} : (i64, i64) -> !ex.dyn
       "ex.return"(%3) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
     }) {sym_name = "main"} : () -> ()
   }

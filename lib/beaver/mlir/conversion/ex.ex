@@ -77,6 +77,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.func", &convert_func/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.box", &convert_box/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.to_word", &convert_to_word/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.make_fun", &convert_make_fun/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.apply", &convert_apply/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.tuple", &convert_term_tuple/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list", &convert_term_list/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.map", &convert_term_map/3, version: "1.0")
@@ -104,6 +106,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
   # `native/term_runtime.zig` exports exactly these C symbols.
   @term_intrinsics %{
     list_cons: "ex.term.list_cons",
+    make_fun: "ex.term.make_fun",
+    fun_idx: "ex.term.fun_idx",
+    fun_env: "ex.term.fun_env",
     tuple_from_list: "ex.term.tuple_from_list",
     map_from_list: "ex.term.map_from_list",
     binary_from_list: "ex.term.binary_from_list",
@@ -376,6 +381,89 @@ defmodule Beaver.MLIR.Conversion.Ex do
     replace_with(rewriter, operation, operand)
   end
 
+  # Constructs a first-class function value: stores the function index and the
+  # captured env words in a closure word allocated by the Zig runtime.
+  defp convert_make_fun(operation, operands, rewriter) do
+    base = insertion_point(operation, rewriter)
+
+    fn_idx = operation |> required_attribute("fn_idx") |> MLIR.CAPI.mlirIntegerAttrGetValueInt()
+    env_len = operation |> required_attribute("env_len") |> MLIR.CAPI.mlirIntegerAttrGetValueInt()
+    env_len = Beaver.Native.to_term(env_len)
+
+    unless length(operands) == env_len do
+      raise ArgumentError,
+            "ex.make_fun env_len #{env_len} does not match #{length(operands)} operands"
+    end
+
+    idx_const =
+      emit_constant(Beaver.Native.to_term(fn_idx), operation, base) |> MLIR.Operation.result(0)
+
+    len_const = emit_constant(env_len, operation, base) |> MLIR.Operation.result(0)
+
+    pad =
+      List.duplicate(emit_constant(0, operation, base) |> MLIR.Operation.result(0), 4 - env_len)
+
+    closure =
+      emit_runtime_call(
+        operation,
+        rewriter,
+        base,
+        @term_intrinsics.make_fun,
+        [idx_const, len_const] ++ operands ++ pad
+      )
+
+    replace_with(rewriter, operation, closure)
+  end
+
+  # Applies a first-class function value: reads the function index and env
+  # words from the closure, then dispatches to the matching `__fn_*`.
+  defp convert_apply(operation, operands, rewriter) do
+    base = insertion_point(operation, rewriter)
+    ctx = MLIR.context(operation)
+    [closure | args] = operands
+
+    arg_count =
+      operation
+      |> required_attribute("arg_count")
+      |> MLIR.CAPI.mlirIntegerAttrGetValueInt()
+      |> Beaver.Native.to_term()
+
+    unless length(args) == arg_count do
+      raise ArgumentError,
+            "ex.apply arg_count #{arg_count} does not match #{length(args)} arguments"
+    end
+
+    idx = emit_runtime_call(operation, rewriter, base, @term_intrinsics.fun_idx, [closure])
+
+    envs =
+      for i <- 0..3 do
+        index_const = emit_constant(i, operation, base) |> MLIR.Operation.result(0)
+
+        emit_runtime_call(operation, rewriter, base, @term_intrinsics.fun_env, [
+          closure,
+          index_const
+        ])
+      end
+
+    pad =
+      List.duplicate(emit_constant(0, operation, base) |> MLIR.Operation.result(0), 4 - arg_count)
+
+    dispatch =
+      %Changeset{
+        name: "func.call",
+        context: ctx,
+        location: MLIR.Operation.location(operation)
+      }
+      |> Changeset.add_argument([idx] ++ envs ++ args ++ pad)
+      |> Changeset.add_argument(callee: MLIR.Attribute.flat_symbol_ref("__fn_dispatch", ctx: ctx))
+      |> Changeset.add_result(MLIR.Type.i64())
+      |> MLIR.Operation.create()
+
+    MLIR.RewriterBase.insert(base, dispatch)
+    MLIR.RewriterBase.set_insertion_point_after(base, dispatch)
+    replace_with(rewriter, operation, MLIR.Operation.result(dispatch, 0))
+  end
+
   defp predicate_intrinsic("ex.is_integer"), do: @term_intrinsics.is_integer
   defp predicate_intrinsic("ex.is_atom"), do: @term_intrinsics.is_atom
   defp predicate_intrinsic("ex.is_binary"), do: @term_intrinsics.is_binary
@@ -553,6 +641,14 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp intrinsic_function_type("ex.term.list_cons") do
+    MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.make_fun") do
+    MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 6), [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.fun_env") do
     MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
