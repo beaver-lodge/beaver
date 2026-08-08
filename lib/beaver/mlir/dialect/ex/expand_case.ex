@@ -19,9 +19,11 @@ defmodule Beaver.MLIR.Dialect.Ex.ExpandCase do
   after `MaterializeBoundVariables` and before
   `Beaver.MLIR.Conversion.Ex.plan/1`.
 
-  The scalar slice supports single integer literal patterns per clause. Any
-  other pattern form or a guard raises `ArgumentError` explicitly instead of
-  being silently dropped.
+  The scalar slice supports integer literal patterns (multiple per clause,
+  OR-ed together) and an optional guard operand per clause (AND-ed with the
+  pattern match, enabling type-bitmap narrowing such as `ex.is_integer`
+  predicates). Any other pattern form raises `ArgumentError` explicitly
+  instead of being silently dropped.
   """
 
   alias Beaver.Changeset
@@ -87,46 +89,79 @@ defmodule Beaver.MLIR.Dialect.Ex.ExpandCase do
   end
 
   defp build_chain([clause], scrutinee, result_types, context, location, rewriter) do
-    patterns = clause_patterns(clause, rewriter)
+    {patterns, guard} = clause_patterns(clause, rewriter)
 
-    if patterns == [] do
+    if patterns == [] and guard == nil do
       # Catch-all as the only clause: it is a plain body, but still needs a
       # wrapper to carry results, so keep the shape uniform with nested cases.
       build_single_catch_all(clause, result_types, context, location, rewriter)
     else
-      build_if(clause, nil, scrutinee, patterns, result_types, context, location, rewriter)
+      build_if(
+        clause,
+        nil,
+        scrutinee,
+        {patterns, guard},
+        result_types,
+        context,
+        location,
+        rewriter
+      )
     end
   end
 
   defp build_chain([clause | rest], scrutinee, result_types, context, location, rewriter) do
-    patterns = clause_patterns(clause, rewriter)
+    {patterns, guard} = clause_patterns(clause, rewriter)
 
     if patterns == [] and rest != [] do
       raise ArgumentError,
             "ex.case catch-all clause must be last, got a clause without patterns before more clauses"
     end
 
-    build_if(clause, rest, scrutinee, patterns, result_types, context, location, rewriter)
+    build_if(
+      clause,
+      rest,
+      scrutinee,
+      {patterns, guard},
+      result_types,
+      context,
+      location,
+      rewriter
+    )
   end
 
-  defp build_if(clause, rest, scrutinee, patterns, result_types, context, location, rewriter) do
-    case patterns do
-      [pattern] ->
-        cond = build_cond(scrutinee, pattern, context, location, rewriter)
-        then_region = move_clause_body(clause, context, location, rewriter)
+  defp build_if(
+         clause,
+         rest,
+         scrutinee,
+         {patterns, guard},
+         result_types,
+         context,
+         location,
+         rewriter
+       ) do
+    cond =
+      case {patterns, guard} do
+        {[], nil} ->
+          raise ArgumentError, "ex.case clause requires at least one integer pattern or a guard"
 
-        else_region =
-          build_else(rest, scrutinee, result_types, context, location, rewriter)
+        {[], _guard} ->
+          build_guard_cond(guard, context, location, rewriter)
 
-        create_if(cond, then_region, else_region, result_types, context, location)
+        {_patterns, nil} ->
+          build_cond(scrutinee, patterns, context, location, rewriter)
 
-      [] ->
-        raise ArgumentError, "ex.case clause requires exactly one integer pattern"
+        {_patterns, _guard} ->
+          pattern_cond = build_cond(scrutinee, patterns, context, location, rewriter)
+          guard_cond = build_guard_cond(guard, context, location, rewriter)
+          build_andi(pattern_cond, guard_cond, context, location, rewriter)
+      end
 
-      _ ->
-        raise ArgumentError,
-              "ex.case clause with multiple patterns is unsupported in the scalar slice: #{inspect(patterns)}"
-    end
+    then_region = move_clause_body(clause, context, location, rewriter)
+
+    else_region =
+      build_else(rest, scrutinee, result_types, context, location, rewriter)
+
+    create_if(cond, then_region, else_region, result_types, context, location)
   end
 
   defp build_single_catch_all(clause, result_types, context, location, rewriter) do
@@ -157,28 +192,46 @@ defmodule Beaver.MLIR.Dialect.Ex.ExpandCase do
   end
 
   defp build_else([clause], scrutinee, result_types, context, location, rewriter) do
-    patterns = clause_patterns(clause, rewriter)
+    {patterns, guard} = clause_patterns(clause, rewriter)
 
-    if patterns == [] do
+    if patterns == [] and guard == nil do
       move_clause_body(clause, context, location, rewriter)
     else
       inner =
-        build_if(clause, nil, scrutinee, patterns, result_types, context, location, rewriter)
+        build_if(
+          clause,
+          nil,
+          scrutinee,
+          {patterns, guard},
+          result_types,
+          context,
+          location,
+          rewriter
+        )
 
       wrap_region(inner, result_types, context, location, rewriter)
     end
   end
 
   defp build_else([clause | rest], scrutinee, result_types, context, location, rewriter) do
-    patterns = clause_patterns(clause, rewriter)
+    {patterns, guard} = clause_patterns(clause, rewriter)
 
-    if patterns == [] do
+    if patterns == [] and guard == nil do
       raise ArgumentError,
             "ex.case catch-all clause must be last, got a clause without patterns before more clauses"
     end
 
     inner =
-      build_if(clause, rest, scrutinee, patterns, result_types, context, location, rewriter)
+      build_if(
+        clause,
+        rest,
+        scrutinee,
+        {patterns, guard},
+        result_types,
+        context,
+        location,
+        rewriter
+      )
 
     wrap_region(inner, result_types, context, location, rewriter)
   end
@@ -214,20 +267,52 @@ defmodule Beaver.MLIR.Dialect.Ex.ExpandCase do
         attribute -> attribute |> Enum.to_list()
       end
 
-    case clause_op |> Walker.operands() |> Enum.to_list() do
-      [] ->
-        :ok
+    guard =
+      case clause_op |> Walker.operands() |> Enum.to_list() do
+        [] -> nil
+        [guard] -> guard
+      end
 
-      [_guard] ->
-        raise ArgumentError, "ex.case guards are unsupported in the scalar slice"
-    end
-
-    patterns
+    {patterns, guard}
   end
 
-  defp build_cond(scrutinee, pattern, context, location, rewriter) do
+  # The match condition for a clause is the OR of its integer literal
+  # patterns; an optional guard narrows it further (type-bitmap narrowing).
+  defp build_cond(scrutinee, patterns, context, location, rewriter) do
+    patterns
+    |> Enum.map(&build_eq(scrutinee, &1, context, location, rewriter))
+    |> Enum.reduce(fn cond, acc ->
+      build_ori(acc, cond, context, location, rewriter)
+    end)
+  end
+
+  defp build_eq(scrutinee, pattern, context, location, rewriter) do
     lit = build_lit(pattern, context, location, rewriter)
     build_cmp(scrutinee, lit, "eq", context, location, rewriter)
+  end
+
+  defp build_guard_cond(guard, context, location, rewriter) do
+    zero = build_lit(0, context, location, rewriter)
+    build_cmp(guard, zero, "ne", context, location, rewriter)
+  end
+
+  defp build_andi(left, right, context, location, rewriter) do
+    build_bool_op("arith.andi", left, right, context, location, rewriter)
+  end
+
+  defp build_ori(left, right, context, location, rewriter) do
+    build_bool_op("arith.ori", left, right, context, location, rewriter)
+  end
+
+  defp build_bool_op(op_name, left, right, context, location, rewriter) do
+    op =
+      %Changeset{name: op_name, context: context, location: location}
+      |> Changeset.add_argument([left, right])
+      |> Changeset.add_result(MLIR.Type.i64())
+      |> MLIR.Operation.create()
+
+    RewriterBase.insert(rewriter, op)
+    op |> Walker.results() |> Enum.to_list() |> hd()
   end
 
   defp build_lit(value, context, location, rewriter) do

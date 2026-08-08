@@ -79,6 +79,47 @@ defmodule ExConversionTest do
   }
   """
 
+  @multi_pattern_module ~S"""
+  module {
+    "ex.func"() ({
+    ^bb0:
+      %0 = "ex.lit"() {value = 1 : i64} : () -> i64
+      %1 = "ex.case"(%0) ({
+      ^bb0:
+        "ex.clause"() {patterns = array<i64: 1, 2>} : () -> ()
+        %2 = "ex.lit"() {value = 10 : i64} : () -> i64
+        "ex.yield"(%2) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+      ^bb1:
+        "ex.clause"() {patterns = array<i64>} : () -> ()
+        %3 = "ex.lit"() {value = 30 : i64} : () -> i64
+        "ex.yield"(%3) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+      }) {operandSegmentSizes = array<i32: 1>} : (i64) -> i64
+      "ex.return"(%1) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+    }) {sym_name = "main"} : () -> ()
+  }
+  """
+
+  @guard_module ~S"""
+  module {
+    "ex.func"() ({
+    ^bb0:
+      %0 = "ex.lit"() {value = 1 : i64} : () -> i64
+      %1 = "ex.lit"() {value = 1 : i64} : () -> i64
+      %2 = "ex.case"(%0) ({
+      ^bb0:
+        "ex.clause"(%1) {patterns = array<i64: 1>} : (i64) -> ()
+        %3 = "ex.lit"() {value = 10 : i64} : () -> i64
+        "ex.yield"(%3) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+      ^bb1:
+        "ex.clause"() {patterns = array<i64>} : () -> ()
+        %4 = "ex.lit"() {value = 30 : i64} : () -> i64
+        "ex.yield"(%4) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+      }) {operandSegmentSizes = array<i32: 1>} : (i64) -> i64
+      "ex.return"(%2) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+    }) {sym_name = "main"} : () -> ()
+  }
+  """
+
   test "lowers the ex scalar subset to func/arith and llvm", %{ctx: ctx} do
     Beaver.Slang.load(ctx, ExDialect)
 
@@ -272,6 +313,43 @@ defmodule ExConversionTest do
     assert rendered =~ "arith.cmpi"
     assert rendered =~ "scf.if"
     assert rendered =~ "scf.yield"
+  end
+
+  test "expands multiple integer patterns per clause into an OR condition", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, ExDialect)
+
+    module =
+      MLIR.Module.create!(@multi_pattern_module, ctx: ctx)
+      |> MLIR.verify!()
+
+    module = ExpandCase.run!(module)
+    expanded = MLIR.to_string(module, generic: true)
+    refute expanded =~ ~s{"ex.case"}
+    assert expanded =~ "arith.ori"
+
+    converted = Plan.run!(Ex.plan(), module)
+    rendered = MLIR.to_string(converted, generic: true)
+    refute rendered =~ "ex."
+    assert rendered =~ "scf.if"
+    assert rendered =~ "arith.cmpi"
+  end
+
+  test "expands a clause guard into a narrowed AND condition", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, ExDialect)
+
+    module =
+      MLIR.Module.create!(@guard_module, ctx: ctx)
+      |> MLIR.verify!()
+
+    module = ExpandCase.run!(module)
+    expanded = MLIR.to_string(module, generic: true)
+    refute expanded =~ ~s{"ex.case"}
+    assert expanded =~ "arith.andi"
+
+    converted = Plan.run!(Ex.plan(), module)
+    rendered = MLIR.to_string(converted, generic: true)
+    refute rendered =~ "ex."
+    assert rendered =~ "scf.if"
   end
 
   test "rejects a case without a catch-all clause", %{ctx: ctx} do
