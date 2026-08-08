@@ -110,6 +110,24 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop to_word(value = any()),
     results: [result: base(dyn())]
 
+  # Actor mailbox access: the current execution context is a single actor.
+  defop self(),
+    results: [result: base(dyn())]
+
+  defop send(pid = base(dyn()), msg = base(dyn())),
+    results: [result: base(dyn())]
+
+  defop receive(),
+    results: [result: base(dyn())]
+
+  defop mailbox_clear(),
+    results: [result: base(dyn())]
+
+  # Untags an integer term word to its scalar value (a passthrough for
+  # values that are already scalar).
+  defop to_int(word = base(dyn())),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
   # Constructs a first-class function value (a tagged closure word): the
   # extracted `__fn_*` is referenced by index, and the captured values are
   # stored in the closure's env slots.
