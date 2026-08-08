@@ -2,6 +2,7 @@ defmodule Beaver.Shadow.ProbeTest do
   use ExUnit.Case, async: true
 
   alias Beaver.Shadow.Probe
+  alias Beaver.Shadow.Tuning
 
   @triton_enabled System.get_env("BEAVER_TRITON_PREBUILT_DIR") != nil
 
@@ -26,5 +27,43 @@ defmodule Beaver.Shadow.ProbeTest do
     assert result.status == :crash
     assert result.exit_code != 0
     assert result.detail.last_pass == "tritongpu-accelerate-matmul"
+  end
+
+  @tag :triton
+  @tag skip: !@triton_enabled
+  test "probe_many isolates every config in its own child BEAM" do
+    configs = [
+      %Tuning.Config{index: 0, num_warps: 2},
+      %Tuning.Config{index: 1, num_warps: 4},
+      %Tuning.Config{index: 2, num_warps: 8}
+    ]
+
+    results = Probe.probe_many(:matmul, configs)
+
+    assert length(results) == 3
+
+    for %{config: config, result: result} <- results do
+      assert result.status == :ok, "config #{config.num_warps}: #{inspect(result)}"
+      assert result.detail.llvm_func
+    end
+  end
+
+  @tag :triton
+  @tag skip: !@triton_enabled
+  test "probe_many records per-config failure receipts for the remat fixture" do
+    configs = [
+      %Tuning.Config{index: 0, num_warps: 2},
+      %Tuning.Config{index: 1, num_warps: 4}
+    ]
+
+    results = Probe.probe_many(:remat, configs)
+
+    assert length(results) == 2
+
+    for %{config: config, result: result} <- results do
+      assert result.status == :crash, "config #{config.num_warps}: #{inspect(result)}"
+      assert result.exit_code != 0
+      assert result.detail.last_pass == "tritongpu-accelerate-matmul"
+    end
   end
 end
