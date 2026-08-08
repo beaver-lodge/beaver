@@ -393,7 +393,12 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp convert_self(operation, [], rewriter) do
     base = insertion_point(operation, rewriter)
-    replace_with(rewriter, operation, emit_runtime_call(operation, rewriter, base, @term_intrinsics.self, []))
+
+    replace_with(
+      rewriter,
+      operation,
+      emit_runtime_call(operation, rewriter, base, @term_intrinsics.self, [])
+    )
   end
 
   defp convert_send(operation, [pid, msg], rewriter) do
