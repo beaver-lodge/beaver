@@ -249,6 +249,21 @@ defmodule Beaver.MLIR.Dialect.Ex do
         ),
         results: [result: all_of([base("!builtin.integer"), any()])]
 
+  defop binary_utf8_length(binary = base(dyn())),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop binary_encode16(binary = base(dyn())),
+    results: [result: base(dyn())]
+
+  defop binary_decode16(binary = base(dyn())),
+    results: [result: base(dyn())]
+
+  defop int_to_string(word = base(dyn())),
+    results: [result: base(dyn())]
+
+  defop string_to_int(binary = base(dyn())),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
   defop yield(values = variadic(any())), traits: [:terminator]
 
   defop func(),
