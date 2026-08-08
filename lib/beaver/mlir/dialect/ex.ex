@@ -177,6 +177,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop list(elements = variadic(base(dyn()))),
     results: [result: base(dyn())]
 
+  defop list_cons(head = base(dyn()), tail = base(dyn())),
+    results: [result: base(dyn())]
+
   defop map(entries = variadic(base(dyn()))),
     results: [result: base(dyn())]
 

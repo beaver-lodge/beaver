@@ -91,6 +91,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.apply", &convert_apply/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.tuple", &convert_term_tuple/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list", &convert_term_list/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.list_cons", &convert_term_list_cons/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.map", &convert_term_map/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary", &convert_term_binary/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_integer", &convert_term_predicate/3, version: "1.0")
@@ -340,6 +341,15 @@ defmodule Beaver.MLIR.Conversion.Ex do
     base = insertion_point(operation, rewriter)
     list = build_list(operands, operation, rewriter, base)
     replace_with(rewriter, operation, list)
+  end
+
+  defp convert_term_list_cons(operation, [head, tail], rewriter) do
+    base = insertion_point(operation, rewriter)
+
+    result =
+      emit_runtime_call(operation, rewriter, base, @term_intrinsics.list_cons, [head, tail])
+
+    replace_with(rewriter, operation, result)
   end
 
   defp convert_term_tuple(operation, operands, rewriter) do
