@@ -65,7 +65,9 @@ defmodule WasmPackagingTest do
           WebAssembly.instantiate(buf, {}).then(r => console.log(r.instance.exports.add(2, 3)));
           """,
           wasm_path
-        ], stderr_to_stdout: true)
+        ],
+        stderr_to_stdout: true
+      )
 
     assert String.trim(output) == "5"
   end
