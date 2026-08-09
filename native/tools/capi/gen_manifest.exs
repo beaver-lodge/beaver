@@ -6,8 +6,45 @@ defmodule Beaver.CAPI.ManifestGenerator do
     {"BeaverCapiPolicyDirtyCPUAndIO__", "dirty_cpu_io"},
     {"BeaverCapiPolicyCallbackBridge__", "callback_bridge"},
     {"BeaverCapiPolicyCallbackRuntime__", "callback_runtime"},
+    {"BeaverCapiPolicyManualAdapter__", "manual_adapter"},
+    {"BeaverCapiPolicyManualRuntime__", "manual_runtime"},
     {"BeaverCapiPolicyExclude__", "exclude"}
   ]
+
+  @manual_bridges %{
+    "mlirTransformStateForEachPayloadOp" => %{
+      "wrapper_name" => "beaver_raw_transform_state_payload_ops",
+      "runtime" => "native_collector",
+      "scheduler" => "normal",
+      "owner" => "caller",
+      "lifetime" => "nif_call",
+      "destructor" => "stack"
+    },
+    "mlirTransformStateForEachPayloadValue" => %{
+      "wrapper_name" => "beaver_raw_transform_state_payload_values",
+      "runtime" => "native_collector",
+      "scheduler" => "normal",
+      "owner" => "caller",
+      "lifetime" => "nif_call",
+      "destructor" => "stack"
+    },
+    "mlirTransformStateForEachParam" => %{
+      "wrapper_name" => "beaver_raw_transform_state_params",
+      "runtime" => "native_collector",
+      "scheduler" => "normal",
+      "owner" => "caller",
+      "lifetime" => "nif_call",
+      "destructor" => "stack"
+    },
+    "mlirValueReplaceUsesWithIf" => %{
+      "wrapper_name" => "beaver_raw_value_replace_uses_with_if",
+      "runtime" => "manual_async_callback",
+      "scheduler" => "context_worker",
+      "owner" => "beam_process",
+      "lifetime" => "async_operation",
+      "destructor" => "native_owner"
+    }
+  }
 
   @runtime_declarations %{
     "mlirDynamicOpTraitCreate" => %{
@@ -198,7 +235,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
     entries =
       for function <- functions,
           callback_bridge?(policy, function.name) do
-        runtime_backed = policy_member?(policy, "callback_runtime", function.name)
+        bridge = bridge_metadata(function.name, policy)
 
         %{
           "function" => %{
@@ -209,24 +246,23 @@ defmodule Beaver.CAPI.ManifestGenerator do
             "param_ctypes" => function.param_ctypes,
             "return_ctype" => function.return_ctype
           },
-          "callback_bridge" => %{
-            "function" => function.name,
-            "reason" => if(runtime_backed, do: nil, else: "callback_bridge_required"),
-            "unblock_path" => if(runtime_backed, do: nil, else: "callback_bridge_runtime"),
-            "scheduler" => if(runtime_backed, do: "foreign_thread", else: "unspecified"),
-            "facets" => [
-              "beam_callback",
-              "lifetime_contract",
-              "scheduler_contract",
-              "rich_input_decoder"
-            ],
-            "runtime" => if(runtime_backed, do: "dispatcher", else: "pending"),
-            "runtime_backed" => runtime_backed,
-            "owner" => if(runtime_backed, do: "beam_process", else: "unspecified"),
-            "destructor" => if(runtime_backed, do: "native_owner", else: "unspecified"),
-            "lifetime" => if(runtime_backed, do: "native_owner", else: "unspecified"),
-            "timeout_ms" => if(runtime_backed, do: 30_000, else: nil)
-          }
+          "callback_bridge" =>
+            Map.merge(
+              %{
+                "function" => function.name,
+                "reason" => if(bridge, do: nil, else: "callback_bridge_required"),
+                "unblock_path" => if(bridge, do: nil, else: "callback_bridge_runtime"),
+                "runtime" => if(bridge, do: bridge["runtime"], else: "pending"),
+                "runtime_backed" => bridge != nil,
+                "wrapper_name" => if(bridge, do: bridge["wrapper_name"], else: nil),
+                "scheduler" => if(bridge, do: bridge["scheduler"], else: "unspecified"),
+                "owner" => if(bridge, do: bridge["owner"], else: "unspecified"),
+                "destructor" => if(bridge, do: bridge["destructor"], else: "unspecified"),
+                "lifetime" => if(bridge, do: bridge["lifetime"], else: "unspecified"),
+                "timeout_ms" => if(bridge, do: bridge["timeout_ms"], else: nil)
+              },
+              bridge_facets(bridge)
+            )
         }
       end
 
@@ -263,6 +299,8 @@ defmodule Beaver.CAPI.ManifestGenerator do
   defp blocker_reason(name, policy) do
     cond do
       policy_member?(policy, "callback_bridge", name) -> "callback_bridge_required"
+      policy_member?(policy, "manual_adapter", name) -> "manual_adapter"
+      policy_member?(policy, "manual_runtime", name) -> "manual_runtime"
       policy_member?(policy, "exclude", name) -> "consumer_policy"
       true -> nil
     end
@@ -316,7 +354,59 @@ defmodule Beaver.CAPI.ManifestGenerator do
 
   defp callback_bridge?(policy, name) do
     policy_member?(policy, "callback_bridge", name) or
-      policy_member?(policy, "callback_runtime", name)
+      policy_member?(policy, "callback_runtime", name) or
+      policy_member?(policy, "manual_adapter", name) or
+      policy_member?(policy, "manual_runtime", name)
+  end
+
+  defp bridge_metadata(name, policy) do
+    cond do
+      policy_member?(policy, "callback_runtime", name) ->
+        %{
+          "wrapper_name" => Map.fetch!(@runtime_declarations, name).name,
+          "runtime" => "dispatcher",
+          "scheduler" => "foreign_thread",
+          "owner" => "beam_process",
+          "destructor" => "native_owner",
+          "lifetime" => "native_owner",
+          "timeout_ms" => 30_000
+        }
+
+      policy_member?(policy, "manual_adapter", name) or
+          policy_member?(policy, "manual_runtime", name) ->
+        @manual_bridges
+        |> Map.fetch!(name)
+        |> Map.put("timeout_ms", nil)
+
+      true ->
+        nil
+    end
+  end
+
+  defp bridge_facets(nil) do
+    %{
+      "facets" => [
+        "beam_callback",
+        "lifetime_contract",
+        "scheduler_contract",
+        "rich_input_decoder"
+      ]
+    }
+  end
+
+  defp bridge_facets(%{"runtime" => "native_collector"}) do
+    %{"facets" => ["native_collector", "context_owned_handles"]}
+  end
+
+  defp bridge_facets(_bridge) do
+    %{
+      "facets" => [
+        "beam_callback",
+        "lifetime_contract",
+        "scheduler_contract",
+        "rich_input_decoder"
+      ]
+    }
   end
 
   defp nif_decl(function, variant) do
