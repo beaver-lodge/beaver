@@ -98,6 +98,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.mapset_from_list", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mapset_member", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mapset_put", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.file_read", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.file_read_lines", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary", &convert_term_binary/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_integer", &convert_term_predicate/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_atom", &convert_term_predicate/3, version: "1.0")
@@ -166,6 +168,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
     mapset_from_list: "ex.term.mapset_from_list",
     mapset_member: "ex.term.mapset_member",
     mapset_put: "ex.term.mapset_put",
+    file_read: "ex.term.file_read",
+    file_read_lines: "ex.term.file_read_lines",
     binary_from_list: "ex.term.binary_from_list",
     is_integer: "ex.term.is_integer",
     is_atom: "ex.term.is_atom",
@@ -804,6 +808,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.mapset_from_list"), do: @term_intrinsics.mapset_from_list
   defp read_intrinsic("ex.mapset_member"), do: @term_intrinsics.mapset_member
   defp read_intrinsic("ex.mapset_put"), do: @term_intrinsics.mapset_put
+  defp read_intrinsic("ex.file_read"), do: @term_intrinsics.file_read
+  defp read_intrinsic("ex.file_read_lines"), do: @term_intrinsics.file_read_lines
   defp read_intrinsic("ex.enumerable_count"), do: @term_intrinsics.enumerable_count
   defp read_intrinsic("ex.enumerable_to_list"), do: @term_intrinsics.enumerable_to_list
 
