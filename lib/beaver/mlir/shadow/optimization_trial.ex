@@ -164,8 +164,7 @@ defmodule Beaver.Shadow.OptimizationTrial do
     result =
       try do
         llvm = Beaver.Triton.compile_to_llvm(module, Keyword.put(compile_opts, :target, target))
-        llvm_text = MLIR.to_string(llvm)
-        ptx = llvm_to_ptx(llvm_text)
+        ptx = llvm_to_ptx(llvm)
         launch_latency_ns(ptx, launch)
       rescue
         exception ->
@@ -177,14 +176,14 @@ defmodule Beaver.Shadow.OptimizationTrial do
     result
   end
 
-  defp llvm_to_ptx(llvm_text) do
+  defp llvm_to_ptx(llvm) do
     llvm_path =
       Path.join(System.tmp_dir!(), "shadow_trial_#{System.unique_integer([:positive])}.ll")
 
     ptx_path =
       Path.join(System.tmp_dir!(), "shadow_trial_#{System.unique_integer([:positive])}.ptx")
 
-    File.write!(llvm_path, llvm_text)
+    File.write!(llvm_path, Beaver.MLIR.Target.LLVMIR.translate!(llvm))
 
     llvm_bin =
       System.get_env("LLVM_CONFIG_PATH")
@@ -192,21 +191,13 @@ defmodule Beaver.Shadow.OptimizationTrial do
 
     {_, 0} =
       System.cmd(
-        Path.join(llvm_bin, "mlir-translate"),
-        ["--mlir-to-llvmir", llvm_path, "-o", llvm_path <> ".ll"],
-        stderr_to_stdout: true
-      )
-
-    {_, 0} =
-      System.cmd(
         Path.join(llvm_bin, "llc"),
-        ["-march=nvptx64", "-mcpu=sm_80", llvm_path <> ".ll", "-o", ptx_path],
+        ["-march=nvptx64", "-mcpu=sm_80", llvm_path, "-o", ptx_path],
         stderr_to_stdout: true
       )
 
     ptx = File.read!(ptx_path)
     File.rm!(llvm_path)
-    File.rm!(llvm_path <> ".ll")
     File.rm!(ptx_path)
     ptx
   end

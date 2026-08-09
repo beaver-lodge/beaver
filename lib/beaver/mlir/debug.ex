@@ -14,8 +14,8 @@ defmodule Beaver.MLIR.Debug do
   (and a compile unit derived from the module location) to every `llvm.func`.
   After it runs:
 
-    * `mlir-translate --mlir-to-llvmir` emits `!dbg` and `!DILocation` metadata
-      pointing at the original `.exs` files and lines;
+    * `Beaver.MLIR.Target.LLVMIR.translate!/1` emits `!dbg` and `!DILocation`
+      metadata pointing at the original `.exs` files and lines;
     * `Beaver.MLIR.ExecutionEngine.create!(module, debug_info: true)` produces a
       JIT object whose line table is registered with gdb (MLIR's execution
       engine enables its GDB notification listener by default), so

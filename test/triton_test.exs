@@ -98,18 +98,10 @@ defmodule TritonTest do
       |> Beaver.Composer.run!()
 
     llvm_bin = System.get_env("LLVM_CONFIG_PATH") |> Path.dirname()
-    mlir_path = Path.join(tmp_dir, "lowered.mlir")
     ll_path = Path.join(tmp_dir, "lowered.ll")
     ptx_path = Path.join(tmp_dir, "lowered.ptx")
 
-    File.write!(mlir_path, MLIR.to_string(lowered))
-
-    {_, 0} =
-      System.cmd(
-        Path.join(llvm_bin, "mlir-translate"),
-        ["--mlir-to-llvmir", mlir_path, "-o", ll_path],
-        stderr_to_stdout: true
-      )
+    File.write!(ll_path, Beaver.MLIR.Target.LLVMIR.translate!(lowered))
 
     {ptx_output, 0} =
       System.cmd(
