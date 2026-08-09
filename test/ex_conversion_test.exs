@@ -704,11 +704,14 @@ defmodule ExConversionTest do
             %16 = "ex.mailbox_peek"(%0) : (i64) -> !ex.dyn
             %17 = "ex.mailbox_remove"(%0) : (i64) -> i64
             %18 = "ex.nil_word"() : () -> !ex.dyn
-            %19 = "ex.current_entry"() : () -> i64
-            %20 = "ex.process_done"(%0) : (i64) -> i64
-            %21 = "ex.processes_runnable"() : () -> i64
-            %22 = "ex.process_result"(%4) : (!ex.dyn) -> i64
-            "ex.return"(%21) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+            %19 = "ex.monotonic_time"() : () -> i64
+            %20 = "ex.receive_start"() : () -> i64
+            %21 = "ex.receive_start_set"(%0) : (i64) -> i64
+            %22 = "ex.current_entry"() : () -> i64
+            %23 = "ex.process_done"(%0) : (i64) -> i64
+            %24 = "ex.processes_runnable"() : () -> i64
+            %25 = "ex.process_result"(%4) : (!ex.dyn) -> i64
+            "ex.return"(%24) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
         """,
@@ -733,6 +736,9 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.mailbox_peek"
     assert rendered =~ "ex.term.mailbox_remove"
     assert rendered =~ "ex.term.nil"
+    assert rendered =~ "ex.term.monotonic_time"
+    assert rendered =~ "ex.term.receive_start"
+    assert rendered =~ "ex.term.receive_start_set"
     assert rendered =~ "ex.term.current_entry"
     assert rendered =~ "ex.term.process_done"
     assert rendered =~ "ex.term.processes_runnable"

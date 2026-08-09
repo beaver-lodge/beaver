@@ -100,6 +100,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.mailbox_peek", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mailbox_remove", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.nil_word", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.monotonic_time", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.receive_start", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.receive_start_set", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.current_entry", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.process_done", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.processes_runnable", &convert_term_read/3, version: "1.0")
@@ -190,6 +193,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
     mailbox_peek: "ex.term.mailbox_peek",
     mailbox_remove: "ex.term.mailbox_remove",
     nil_word: "ex.term.nil",
+    monotonic_time: "ex.term.monotonic_time",
+    receive_start: "ex.term.receive_start",
+    receive_start_set: "ex.term.receive_start_set",
     current_entry: "ex.term.current_entry",
     process_done: "ex.term.process_done",
     processes_runnable: "ex.term.processes_runnable",
@@ -907,6 +913,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.mailbox_peek"), do: @term_intrinsics.mailbox_peek
   defp read_intrinsic("ex.mailbox_remove"), do: @term_intrinsics.mailbox_remove
   defp read_intrinsic("ex.nil_word"), do: @term_intrinsics.nil_word
+  defp read_intrinsic("ex.monotonic_time"), do: @term_intrinsics.monotonic_time
+  defp read_intrinsic("ex.receive_start"), do: @term_intrinsics.receive_start
+  defp read_intrinsic("ex.receive_start_set"), do: @term_intrinsics.receive_start_set
   defp read_intrinsic("ex.current_entry"), do: @term_intrinsics.current_entry
   defp read_intrinsic("ex.process_done"), do: @term_intrinsics.process_done
   defp read_intrinsic("ex.processes_runnable"), do: @term_intrinsics.processes_runnable
@@ -1156,6 +1165,18 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp intrinsic_function_type("ex.term.nil", _ctx) do
     MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.monotonic_time", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.receive_start", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.receive_start_set", _ctx) do
+    MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
   defp intrinsic_function_type("ex.term.current_entry", _ctx) do
