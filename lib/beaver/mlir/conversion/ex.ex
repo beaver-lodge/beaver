@@ -104,6 +104,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.tuple_length", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.map_length", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.enumerable_count", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.enumerable_to_list", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.enumerable_to_list_range", &convert_term_read/3,
+      version: "1.0"
+    )
     |> Plan.add_conversion_pattern("ex.enumerable_reduce", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.enumerable_reduce_c", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.enumerable_reduce_range", &convert_term_read/3,
@@ -161,6 +165,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
     tuple_length: "ex.term.tuple_length",
     map_length: "ex.term.map_length",
     enumerable_count: "ex.term.enumerable_count",
+    enumerable_to_list: "ex.term.enumerable_to_list",
+    enumerable_to_list_range: "ex.term.enumerable_to_list_range",
     enumerable_reduce: "ex.term.enumerable_reduce",
     enumerable_reduce_c: "ex.term.enumerable_reduce_c",
     enumerable_reduce_range: "ex.term.enumerable_reduce_range",
@@ -772,6 +778,11 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.tuple_length"), do: @term_intrinsics.tuple_length
   defp read_intrinsic("ex.map_length"), do: @term_intrinsics.map_length
   defp read_intrinsic("ex.enumerable_count"), do: @term_intrinsics.enumerable_count
+  defp read_intrinsic("ex.enumerable_to_list"), do: @term_intrinsics.enumerable_to_list
+
+  defp read_intrinsic("ex.enumerable_to_list_range"),
+    do: @term_intrinsics.enumerable_to_list_range
+
   defp read_intrinsic("ex.enumerable_reduce"), do: @term_intrinsics.enumerable_reduce
   defp read_intrinsic("ex.enumerable_reduce_c"), do: @term_intrinsics.enumerable_reduce_c
 
@@ -1013,6 +1024,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
       ],
       [MLIR.Type.i64()]
     )
+  end
+
+  defp intrinsic_function_type("ex.term.enumerable_to_list_range", _ctx) do
+    MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
   defp intrinsic_function_type("ex.term.fun_env", _ctx) do
