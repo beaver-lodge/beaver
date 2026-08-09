@@ -10,9 +10,6 @@ concurrency:
   group: triton-prebuilt-${{ github.ref }}
   cancel-in-progress: true
 
-env:
-  TRITON_REF: "882eb72e1858bfd588fafa4677b86ce00e9da872"
-
 jobs:
   build:
     name: triton-prebuilt-${{ matrix.os }}-${{ matrix.arch }}
@@ -31,12 +28,19 @@ jobs:
       - uses: actions/checkout@v4
         name: Check out Beaver
 
+      - name: Read Triton version
+        id: triton-version
+        run: |
+          ref="$(jq -er '.triton_ref' triton.json)"
+          echo "TRITON_REF=$ref" >> "$GITHUB_ENV"
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
       - uses: actions/checkout@v4
         name: Check out Triton
         with:
           repository: triton-lang/triton
           path: third_party/triton
-          ref: ${{ env.TRITON_REF }}
+          ref: ${{ steps.triton-version.outputs.ref }}
 
       - uses: erlef/setup-beam@v1
         with:
@@ -53,7 +57,8 @@ jobs:
       - name: Install Triton-pinned LLVM prebuilt
         run: |
           cd scripts/install_llvm
-          mix beaver.install_prebuilt_llvm --triton --install-dir "$RUNNER_TEMP/llvm-prebuilt"
+          mix beaver.install_prebuilt_llvm --triton --triton-ref "$TRITON_REF" \
+            --install-dir "$RUNNER_TEMP/llvm-prebuilt"
 
       - name: Build Triton core libraries
         env:
@@ -67,23 +72,23 @@ jobs:
       - name: Package Triton prebuilt
         run: |
           cd "$RUNNER_TEMP/triton-out"
-          tar czf "$RUNNER_TEMP/triton-${{ env.TRITON_REF }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" .
+          tar czf "$RUNNER_TEMP/triton-${TRITON_REF}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz" .
           ls -lh "$RUNNER_TEMP"/*.tar.gz
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: triton-${{ env.TRITON_REF }}-${{ matrix.os }}-${{ matrix.arch }}
+          name: triton-${{ steps.triton-version.outputs.ref }}-${{ matrix.os }}-${{ matrix.arch }}
           path: ${{ runner.temp }}/triton-*.tar.gz
 
       - name: Publish release asset
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="triton-prebuilt-${{ env.TRITON_REF }}"
-          asset="$RUNNER_TEMP/triton-${{ env.TRITON_REF }}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
+          tag="triton-prebuilt-${TRITON_REF}"
+          asset="$RUNNER_TEMP/triton-${TRITON_REF}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
           gh release create "${tag}" --repo beaver-lodge/beaver \
-            --title "Triton core prebuilt @ ${{ env.TRITON_REF }}" \
+            --title "Triton core prebuilt @ ${TRITON_REF}" \
             --notes "Core Triton dialects/passes/conversions built against the Triton-pinned LLVM." \
             || true
           gh release upload "${tag}" "${asset}" --repo beaver-lodge/beaver --clobber
