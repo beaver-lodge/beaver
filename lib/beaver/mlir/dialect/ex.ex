@@ -204,6 +204,12 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop mapset_put(set = base(dyn()), member = base(dyn())),
     results: [result: base(dyn())]
 
+  defop file_read(path = base(dyn())),
+    results: [result: base(dyn())]
+
+  defop file_read_lines(path = base(dyn())),
+    results: [result: base(dyn())]
+
   defop binary(segments = variadic(base(dyn()))),
     results: [result: base(dyn())]
 
