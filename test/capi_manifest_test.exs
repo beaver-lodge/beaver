@@ -114,7 +114,7 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
     runtime_entries = Map.fetch!(entries_by_runtime, "dispatcher")
     collector_entries = Map.fetch!(entries_by_runtime, "native_collector")
     manual_runtime_entries = Map.fetch!(entries_by_runtime, "manual_async_callback")
-    pending_entries = Map.fetch!(entries_by_runtime, "pending")
+    pending_entries = Map.get(entries_by_runtime, "pending", [])
 
     assert Enum.map(runtime_entries, &get_in(&1, ["function", "name"])) |> MapSet.new() ==
              MapSet.new([
@@ -141,16 +141,14 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
       refute MapSet.member?(emitted_names, name)
     end
 
-    assert Enum.map(pending_entries, &get_in(&1, ["function", "name"])) |> MapSet.new() ==
-             MapSet.new([
-               "mlirInferShapedTypeOpInterfaceInferReturnTypes",
-               "mlirInferTypeOpInterfaceInferReturnTypes"
-             ])
+    assert pending_entries == []
 
     assert Enum.map(collector_entries, &get_in(&1, ["callback_bridge", "wrapper_name"]))
            |> MapSet.new() ==
              MapSet.new([
                "beaver_raw_translate_module_to_llvm_ir",
+               "beaver_raw_infer_return_types",
+               "beaver_raw_infer_return_type_components",
                "beaver_raw_transform_state_params",
                "beaver_raw_transform_state_payload_ops",
                "beaver_raw_transform_state_payload_values"
