@@ -109,6 +109,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.enumerable_reduce_range", &convert_term_read/3,
       version: "1.0"
     )
+    |> Plan.add_conversion_pattern("ex.enumerable_reduce_fun", &convert_term_read/3,
+      version: "1.0"
+    )
+    |> Plan.add_conversion_pattern("ex.func_addr", &convert_func_addr/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_head", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_tail", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_get", &convert_term_read/3, version: "1.0")
@@ -160,6 +164,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     enumerable_reduce: "ex.term.enumerable_reduce",
     enumerable_reduce_c: "ex.term.enumerable_reduce_c",
     enumerable_reduce_range: "ex.term.enumerable_reduce_range",
+    enumerable_reduce_fun: "ex.term.enumerable_reduce_fun",
     list_head: "ex.term.list_head",
     list_tail: "ex.term.list_tail",
     list_get: "ex.term.list_get",
@@ -486,6 +491,29 @@ defmodule Beaver.MLIR.Conversion.Ex do
     )
   end
 
+  # `ex.func_addr` resolves a function symbol to its address (an i64 word):
+  # func.constant yields the function value, which func-to-llvm lowers to a
+  # pointer. Used to hand a compiled reducer to the runtime's
+  # arbitrary-closure enumerable reduce.
+  defp convert_func_addr(operation, [], rewriter) do
+    context = MLIR.context(operation)
+    base = insertion_point(operation, rewriter)
+    location = MLIR.Operation.location(operation)
+    {:ok, sym_name_attr} = operation |> MLIR.Operation.fetch(:sym_name)
+    name = sym_name_attr |> MLIR.CAPI.mlirStringAttrGetValue() |> MLIR.to_string()
+
+    func_const =
+      %Changeset{name: "func.constant", context: context, location: location}
+      |> Changeset.add_argument(value: MLIR.Attribute.flat_symbol_ref(name, ctx: context))
+      |> Changeset.add_result(
+        MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
+      )
+      |> MLIR.Operation.create()
+
+    MLIR.RewriterBase.insert(base, func_const)
+    replace_with(rewriter, operation, MLIR.Operation.result(func_const, 0))
+  end
+
   # `ex.try` lowers to a setjmp/longjmp pair: allocate a jmp_buf on the stack,
   # push it on the runtime's buffer stack, and call libc `setjmp`. The normal
   # path runs the body region; a `throw` longjmps back and the catch region
@@ -750,6 +778,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.enumerable_reduce_range"),
     do: @term_intrinsics.enumerable_reduce_range
 
+  defp read_intrinsic("ex.enumerable_reduce_fun"), do: @term_intrinsics.enumerable_reduce_fun
+
   defp read_intrinsic("ex.list_head"), do: @term_intrinsics.list_head
   defp read_intrinsic("ex.list_tail"), do: @term_intrinsics.list_tail
   defp read_intrinsic("ex.list_get"), do: @term_intrinsics.list_get
@@ -972,6 +1002,17 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp intrinsic_function_type("ex.term.enumerable_reduce_range", _ctx) do
     MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 4), [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.enumerable_reduce_fun", _ctx) do
+    MLIR.Type.function(
+      [
+        MLIR.Type.i64(),
+        MLIR.Type.i64(),
+        MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
+      ],
+      [MLIR.Type.i64()]
+    )
   end
 
   defp intrinsic_function_type("ex.term.fun_env", _ctx) do
