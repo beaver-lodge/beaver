@@ -108,8 +108,13 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
              &(get_in(&1, ["function", "name"]) == "mlirValueReplaceUsesWithIf")
            )
 
-    {runtime_entries, pending_entries} =
-      Enum.split_with(callback_entries, &get_in(&1, ["callback_bridge", "runtime_backed"]))
+    entries_by_runtime =
+      Enum.group_by(callback_entries, &get_in(&1, ["callback_bridge", "runtime"]))
+
+    runtime_entries = Map.fetch!(entries_by_runtime, "dispatcher")
+    collector_entries = Map.fetch!(entries_by_runtime, "native_collector")
+    manual_runtime_entries = Map.fetch!(entries_by_runtime, "manual_async_callback")
+    pending_entries = Map.fetch!(entries_by_runtime, "pending")
 
     assert Enum.map(runtime_entries, &get_in(&1, ["function", "name"])) |> MapSet.new() ==
              MapSet.new([
@@ -135,6 +140,42 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
       assert get_in(entry, ["callback_bridge", "reason"]) == "callback_bridge_required"
       refute MapSet.member?(emitted_names, name)
     end
+
+    assert Enum.map(pending_entries, &get_in(&1, ["function", "name"])) |> MapSet.new() ==
+             MapSet.new([
+               "mlirInferShapedTypeOpInterfaceInferReturnTypes",
+               "mlirInferTypeOpInterfaceInferReturnTypes"
+             ])
+
+    assert Enum.map(collector_entries, &get_in(&1, ["callback_bridge", "wrapper_name"]))
+           |> MapSet.new() ==
+             MapSet.new([
+               "beaver_raw_transform_state_params",
+               "beaver_raw_transform_state_payload_ops",
+               "beaver_raw_transform_state_payload_values"
+             ])
+
+    for entry <- collector_entries do
+      bridge = Map.fetch!(entry, "callback_bridge")
+      assert bridge["runtime_backed"]
+      assert bridge["scheduler"] == "normal"
+      assert bridge["owner"] == "caller"
+      assert bridge["destructor"] == "stack"
+      assert bridge["lifetime"] == "nif_call"
+      assert bridge["facets"] == ["native_collector", "context_owned_handles"]
+    end
+
+    assert [manual_runtime] = manual_runtime_entries
+    assert get_in(manual_runtime, ["function", "name"]) == "mlirValueReplaceUsesWithIf"
+
+    assert %{
+             "wrapper_name" => "beaver_raw_value_replace_uses_with_if",
+             "runtime_backed" => true,
+             "scheduler" => "context_worker",
+             "owner" => "beam_process",
+             "destructor" => "native_owner",
+             "lifetime" => "async_operation"
+           } = manual_runtime["callback_bridge"]
 
     for entry <- runtime_entries do
       bridge = Map.fetch!(entry, "callback_bridge")

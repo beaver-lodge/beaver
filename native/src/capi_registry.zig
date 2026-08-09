@@ -17,7 +17,9 @@ fn isCandidate(comptime name: []const u8) bool {
     return has_supported_prefix and
         !hasPolicy("Exclude", name) and
         !hasPolicy("CallbackBridge", name) and
-        !hasPolicy("CallbackRuntime", name);
+        !hasPolicy("CallbackRuntime", name) and
+        !hasPolicy("ManualAdapter", name) and
+        !hasPolicy("ManualRuntime", name);
 }
 
 fn isFunction(comptime name: []const u8) bool {
