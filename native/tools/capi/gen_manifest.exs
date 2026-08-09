@@ -12,6 +12,14 @@ defmodule Beaver.CAPI.ManifestGenerator do
   ]
 
   @manual_bridges %{
+    "beaverTranslateModuleToLLVMIRText" => %{
+      "wrapper_name" => "beaver_raw_translate_module_to_llvm_ir",
+      "runtime" => "native_collector",
+      "scheduler" => "dirty_cpu",
+      "owner" => "caller",
+      "lifetime" => "nif_call",
+      "destructor" => "native_owner"
+    },
     "mlirTransformStateForEachPayloadOp" => %{
       "wrapper_name" => "beaver_raw_transform_state_payload_ops",
       "runtime" => "native_collector",

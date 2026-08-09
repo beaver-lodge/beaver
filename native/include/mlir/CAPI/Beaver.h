@@ -3,6 +3,7 @@
 
 #include "mlir-c/Beaver/Context.h"
 #include "mlir-c/Beaver/Debug.h"
+#include "mlir-c/Beaver/LLVMIR.h"
 #include "mlir-c/Beaver/Op.h"
 #include "mlir-c/Beaver/Pass.h"
 #include "mlir/CAPI/Wrap.h"

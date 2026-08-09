@@ -23,6 +23,7 @@ beaver_headers = ~w[
   mlir-c/Beaver/Op.h
   mlir-c/Beaver/Pass.h
   mlir-c/Beaver/Debug.h
+  mlir-c/Beaver/LLVMIR.h
   mlir-c/Beaver/CallbackTypeDef.h
 ]
 

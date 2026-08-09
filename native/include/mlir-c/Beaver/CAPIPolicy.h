@@ -20,6 +20,7 @@ typedef enum {
   BeaverCapiPolicyManualAdapter__mlirTransformStateForEachParam,
   BeaverCapiPolicyManualAdapter__mlirTransformStateForEachPayloadOp,
   BeaverCapiPolicyManualAdapter__mlirTransformStateForEachPayloadValue,
+  BeaverCapiPolicyManualAdapter__beaverTranslateModuleToLLVMIRText,
 
   BeaverCapiPolicyManualRuntime__mlirValueReplaceUsesWithIf,
 

@@ -16,6 +16,7 @@ const unranked_memref_descriptor = @import("unranked_memref_descriptor.zig");
 const value = @import("value.zig");
 const action_tracing = @import("action_tracing.zig");
 const triton = @import("triton.zig");
+const llvm_ir = @import("llvm_ir.zig");
 const capi_registry = @import("capi_registry.zig");
 
 const callback_nifs = .{kinda.callback_runtime.ReplyToken.nif("beaver_raw_callback_reply")};
@@ -33,6 +34,7 @@ pub const nifs = capi_registry.nifs ++
     unranked_memref_descriptor.nifs ++
     value.nifs ++
     action_tracing.nifs ++
+    llvm_ir.nifs ++
     triton.nifs;
 
 export const core_nifs: [nifs.len]e.ErlNifFunc = nifs;
