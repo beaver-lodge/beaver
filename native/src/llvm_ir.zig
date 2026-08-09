@@ -27,7 +27,7 @@ const Translation = struct {
         defer self.buffer.deinit();
 
         const status = c.beaverTranslateModuleToLLVMIRText(operation, appendString, &self);
-        if (c.mlirLogicalResultIsFailure(status))
+        if (c.beaverLogicalResultIsFailure(status))
             return beam.make_atom(environment, "error");
 
         return beam.make_slice(environment, self.buffer.items);
