@@ -163,7 +163,19 @@ defmodule Beaver.MLIR.Dialect.Ex do
         ),
         results: [result: all_of([base("!builtin.integer"), any()])]
 
+  # Selective-receive scan continuation: unlike a cursor-loop continuation, a
+  # message arrival invalidates it so the scan restarts (epoch wiring).
+  defop receive_cont_save(
+          arg = all_of([base("!builtin.integer"), any()]),
+          acc = all_of([base("!builtin.integer"), any()]),
+          cursor = all_of([base("!builtin.integer"), any()])
+        ),
+        results: [result: all_of([base("!builtin.integer"), any()])]
+
   defop cont_pending(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop cont_active(),
     results: [result: all_of([base("!builtin.integer"), any()])]
 
   defop cont_clear(),
@@ -180,6 +192,18 @@ defmodule Beaver.MLIR.Dialect.Ex do
 
   defop schedule_next(),
     results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop mailbox_len(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop mailbox_peek(cursor = all_of([base("!builtin.integer"), any()])),
+    results: [result: base(dyn())]
+
+  defop mailbox_remove(cursor = all_of([base("!builtin.integer"), any()])),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop nil_word(),
+    results: [result: base(dyn())]
 
   defop current_entry(),
     results: [result: all_of([base("!builtin.integer"), any()])]
