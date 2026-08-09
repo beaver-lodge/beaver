@@ -101,15 +101,21 @@ defmodule LLVMDialectTest do
     assert to_string(legacy) =~ "sourceLanguage = DW_LANG_C"
     refute to_string(legacy) =~ "sourceLanguageDialect"
 
-    dialect =
-      LLVM.di_compile_unit(
-        ctx: ctx,
-        source_language: :c,
-        source_language_dialect: :tile,
-        filename: "kernel.c",
-        producer: "Beaver"
-      )
+    dialect_opts = [
+      ctx: ctx,
+      source_language: :c,
+      source_language_dialect: :tile,
+      filename: "kernel.c",
+      producer: "Beaver"
+    ]
 
-    assert to_string(dialect) =~ "sourceLanguageDialect = DW_LLVM_LANG_DIALECT_tile"
+    if LLVM.di_compile_unit_source_language_dialect_supported?() do
+      dialect = LLVM.di_compile_unit(dialect_opts)
+      assert to_string(dialect) =~ "sourceLanguageDialect = DW_LLVM_LANG_DIALECT_tile"
+    else
+      assert_raise ArgumentError, ~r/does not support DICompileUnit/, fn ->
+        LLVM.di_compile_unit(dialect_opts)
+      end
+    end
   end
 end

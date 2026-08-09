@@ -112,6 +112,16 @@ defmodule Beaver.MLIR.Dialect.LLVM do
     end
   end
 
+  @doc "Whether the installed LLVM exposes source-language dialects on `DICompileUnit`."
+  def di_compile_unit_source_language_dialect_supported? do
+    Code.ensure_loaded?(MLIR.CAPI) and
+      function_exported?(
+        MLIR.CAPI,
+        :mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect,
+        15
+      )
+  end
+
   @doc """
   Build an LLVM `DICompileUnit` attribute.
 
@@ -129,6 +139,12 @@ defmodule Beaver.MLIR.Dialect.LLVM do
         nil -> nil
         value -> debug_enum(value, @debug_language_dialects)
       end
+
+    if source_language_dialect != nil and
+         not di_compile_unit_source_language_dialect_supported?() do
+      raise ArgumentError,
+            "installed LLVM does not support DICompileUnit source-language dialects"
+    end
 
     id =
       Keyword.get_lazy(opts, :id, fn ->
