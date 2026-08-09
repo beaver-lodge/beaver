@@ -66,6 +66,18 @@ defmodule Beaver.MLIR.Dialect.Ex do
         ),
         results: [result: all_of([base("!builtin.integer"), any()])]
 
+  defop div(
+          left = all_of([base("!builtin.integer"), any()]),
+          right = all_of([base("!builtin.integer"), any()])
+        ),
+        results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop rem(
+          left = all_of([base("!builtin.integer"), any()]),
+          right = all_of([base("!builtin.integer"), any()])
+        ),
+        results: [result: all_of([base("!builtin.integer"), any()])]
+
   # Each argument is its own optional slot so heterogeneous argument types
   # (e.g. a term plus a scalar accumulator) verify: IRDL variadic groups are
   # homogeneous, which would reject mixed-typed calls. Eight slots cover the

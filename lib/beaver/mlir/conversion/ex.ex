@@ -69,6 +69,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.add", &convert_add/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.sub", &convert_sub/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mul", &convert_mul/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.div", &convert_div/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.rem", &convert_rem/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.cmp", &convert_cmp/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.if", &convert_if/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.yield", &convert_yield/3, version: "1.0")
@@ -245,6 +247,14 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp convert_mul(operation, [left, right], rewriter) do
     convert_binary("arith.muli", operation, [left, right], rewriter)
+  end
+
+  defp convert_div(operation, [left, right], rewriter) do
+    convert_binary("arith.divsi", operation, [left, right], rewriter)
+  end
+
+  defp convert_rem(operation, [left, right], rewriter) do
+    convert_binary("arith.remsi", operation, [left, right], rewriter)
   end
 
   defp convert_binary(arith_op, operation, [left, right], rewriter) do
