@@ -169,7 +169,7 @@ fn inferTypesWithoutDiagnostics(
         TypeCollector.append,
         &collector,
     );
-    if (c.mlirLogicalResultIsFailure(status)) {
+    if (c.beaverLogicalResultIsFailure(status)) {
         c.mlirEmitError(request.location, "failed to infer operation return types");
         return beam.make_atom(environment, "error");
     }
@@ -199,7 +199,7 @@ fn inferShapedTypesWithoutDiagnostics(
         ShapedTypeCollector.append,
         &collector,
     );
-    if (c.mlirLogicalResultIsFailure(status)) {
+    if (c.beaverLogicalResultIsFailure(status)) {
         c.mlirEmitError(request.location, "failed to infer shaped operation return components");
         return beam.make_atom(environment, "error");
     }
