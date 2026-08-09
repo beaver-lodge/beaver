@@ -18,6 +18,26 @@ defmodule ODSDumpTest do
     assert {:error, "failed to find ODS dump of \"???\""} = MLIR.ODS.Dump.lookup("???")
   end
 
+  test "enriched ODS facts (traits, regions, builders, class, folder)" do
+    assert {:ok, arith_addi} = MLIR.ODS.Dump.lookup("arith.addi")
+    assert arith_addi["native_class_name"] == "::mlir::arith::AddIOp"
+    assert arith_addi["has_folder"] == true
+    assert arith_addi["traits"] |> Enum.any?(&(&1 == "::mlir::OpTrait::IsCommutative"))
+    assert arith_addi["traits"] |> Enum.any?(&(&1 == "InferTypeOpInterface"))
+
+    assert {:ok, scf_for} = MLIR.ODS.Dump.lookup("scf.for")
+    assert scf_for["regions"] == [%{"name" => "region", "variadic" => false}]
+    assert is_list(scf_for["builders"])
+
+    first_builder_parameters =
+      scf_for["builders"] |> List.first() |> Map.fetch!("parameters")
+
+    assert Enum.any?(
+             first_builder_parameters,
+             &(&1["name"] == "lowerBound" and &1["cpp_type"] == "Value")
+           )
+  end
+
   test "loads the canonical JSON dump lazily" do
     dump_path = Application.app_dir(:beaver, "priv/generated/ods_dump.json")
     priv_dir = Application.app_dir(:beaver, "priv")

@@ -3,8 +3,11 @@
 #include "mlir/Support/ToolUtilities.h"
 #include "mlir/TableGen/Argument.h"
 #include "mlir/TableGen/Attribute.h"
+#include "mlir/TableGen/Builder.h"
 #include "mlir/TableGen/Constraint.h"
 #include "mlir/TableGen/Operator.h"
+#include "mlir/TableGen/Region.h"
+#include "mlir/TableGen/Trait.h"
 #include "mlir/Tools/PDLL/ODS/Constraint.h"
 #include "mlir/Tools/PDLL/ODS/Context.h"
 #include "mlir/Tools/PDLL/ODS/Dialect.h"
@@ -55,6 +58,30 @@ SmallVector<T *> sortMapByName(const llvm::StringMap<std::unique_ptr<T>> &map) {
   return storage;
 }
 
+// Extra per-operation facts that the pdll ods::Context does not carry; they
+// are collected from the tblgen::Operator records in
+// processTdIncludeRecords and emitted alongside the context dump.
+struct OdsExtras {
+  struct BuilderInfo {
+    struct Parameter {
+      std::string name;
+      std::string cppType;
+      bool hasDefault;
+    };
+    std::vector<Parameter> parameters;
+    bool deprecated;
+  };
+
+  std::string nativeClassName;
+  std::vector<std::string> traits;
+  std::vector<std::pair<std::string, bool>> regions; // (name, variadic)
+  std::vector<BuilderInfo> builders;
+  std::string assemblyFormat;
+  bool hasFolder;
+};
+
+llvm::StringMap<OdsExtras> g_extras;
+
 void printODSContext(raw_ostream &os, const ods::Context &odsContext) {
   using namespace mlir::pdll::ods;
   auto formatConstraintName = [](const auto &constraint) {
@@ -98,12 +125,60 @@ void printODSContext(raw_ostream &os, const ods::Context &odsContext) {
           j.attribute("name", dialect.getName());
           j.attributeArray("operations", [&] {
             for (const Operation *op : sortMapByName(dialect.getOperations())) {
+              const OdsExtras *extras = nullptr;
+              if (auto it = g_extras.find(op->getName()); it != g_extras.end())
+                extras = &it->second;
+
               j.object([&] {
                 j.attribute("name", op->getName());
                 j.attribute("summary", op->getSummary());
                 j.attribute("description", op->getDescription());
                 j.attribute("result_type_inference",
                             op->hasResultTypeInferrence());
+                j.attribute("native_class_name",
+                            extras ? extras->nativeClassName : "");
+
+                if (extras && !extras->traits.empty()) {
+                  j.attributeArray("traits", [&] {
+                    for (const std::string &trait : extras->traits)
+                      j.value(trait);
+                  });
+                }
+
+                if (extras && !extras->regions.empty()) {
+                  j.attributeArray("regions", [&] {
+                    for (const auto &[name, variadic] : extras->regions) {
+                      j.object([&] {
+                        j.attribute("name", name);
+                        j.attribute("variadic", variadic);
+                      });
+                    }
+                  });
+                }
+
+                if (extras && !extras->builders.empty()) {
+                  j.attributeArray("builders", [&] {
+                    for (const auto &builder : extras->builders) {
+                      j.object([&] {
+                        j.attribute("deprecated", builder.deprecated);
+                        j.attributeArray("parameters", [&] {
+                          for (const auto &param : builder.parameters) {
+                            j.object([&] {
+                              j.attribute("name", param.name);
+                              j.attribute("cpp_type", param.cppType);
+                              j.attribute("has_default", param.hasDefault);
+                            });
+                          }
+                        });
+                      });
+                    }
+                  });
+                }
+
+                if (extras && !extras->assemblyFormat.empty())
+                  j.attribute("assembly_format", extras->assemblyFormat);
+
+                j.attribute("has_folder", extras ? extras->hasFolder : false);
 
                 // Attributes
                 ArrayRef<Attribute> attributes = op->getAttributes();
@@ -151,6 +226,7 @@ std::string processAndFormatDoc(const Twine &doc) {
   }
   return docStr;
 }
+
 void processTdIncludeRecords(const llvm::RecordKeeper &tdRecords,
                              ods::Context &odsContext) {
   // Return the length kind of the given value.
@@ -205,6 +281,46 @@ void processTdIncludeRecords(const llvm::RecordKeeper &tdRecords,
       odsOp->appendResult(result.name, getLengthKind(result),
                           addTypeConstraint(result));
     }
+
+    // Collect the extra facts that the pdll ODS context does not carry.
+    OdsExtras extras;
+    extras.nativeClassName = op.getQualCppClassName();
+    extras.hasFolder = op.hasFolder();
+
+    for (const tblgen::Trait &trait : op.getTraits()) {
+      if (const auto *native = llvm::dyn_cast<tblgen::NativeTrait>(&trait)) {
+        extras.traits.push_back(native->getFullyQualifiedTraitName());
+      } else {
+        // Predicate and internal traits carry anonymous record names; keep
+        // only the ones with a real TableGen name.
+        StringRef name = trait.getDef().getName();
+        if (!name.starts_with("anonymous_"))
+          extras.traits.push_back(name.str());
+      }
+    }
+
+    for (const tblgen::NamedRegion &region : op.getRegions())
+      extras.regions.emplace_back(region.name.str(), region.isVariadic());
+
+    for (const tblgen::Builder &builder : op.getBuilders()) {
+      OdsExtras::BuilderInfo builderInfo;
+      builderInfo.deprecated = builder.getDeprecatedMessage().has_value();
+
+      for (const auto &param : builder.getParameters()) {
+        OdsExtras::BuilderInfo::Parameter parameter;
+        parameter.name = param.getName().value_or("").str();
+        parameter.cppType = param.getCppType().str();
+        parameter.hasDefault = param.getDefaultValue().has_value();
+        builderInfo.parameters.push_back(std::move(parameter));
+      }
+
+      extras.builders.push_back(std::move(builderInfo));
+    }
+
+    if (op.hasAssemblyFormat())
+      extras.assemblyFormat = op.getAssemblyFormat().str();
+
+    g_extras[op.getOperationName()] = std::move(extras);
   }
 }
 
