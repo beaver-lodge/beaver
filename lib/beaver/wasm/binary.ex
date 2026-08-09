@@ -52,7 +52,7 @@ defmodule Beaver.Wasm.Binary do
 
   defp parse_sections(<<id, rest::binary>>, imports, exports) do
     {section_size, payload} = take_uleb(rest)
-    <<section::binary-size(section_size), tail::binary>> = payload
+    <<section::binary-size(^section_size), tail::binary>> = payload
 
     case id do
       2 -> parse_sections(tail, parse_imports(section, []), exports)
@@ -111,7 +111,7 @@ defmodule Beaver.Wasm.Binary do
   # --- primitives ---
   defp take_name(binary) do
     {len, rest} = take_uleb(binary)
-    <<name::binary-size(len), tail::binary>> = rest
+    <<name::binary-size(^len), tail::binary>> = rest
     {name, tail}
   end
 
