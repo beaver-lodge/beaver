@@ -214,6 +214,18 @@ defmodule Beaver.MLIR.Conversion.Ex do
     string_to_int: "ex.term.string_to_int"
   }
 
+  @doc """
+  Returns the term runtime intrinsic symbols emitted by this conversion plan.
+
+  This is the declaration-first anchor for host-boundary manifests (e.g.
+  `Beaver.Wasm.TermABI`): every symbol here must be provided by the term
+  runtime (batata's Zig on native, a wasm host import on wasm).
+  """
+  @spec term_intrinsic_symbols() :: [String.t()]
+  def term_intrinsic_symbols do
+    @term_intrinsics |> Map.values() |> Enum.sort()
+  end
+
   @term_types ~w(!ex.dyn !ex.bound !ex.unbound)
 
   @doc """
