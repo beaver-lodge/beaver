@@ -126,7 +126,8 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
                "mlirConditionallySpeculatableOpInterfaceAttachFallbackModel",
                "mlirMemoryEffectsOpInterfaceAttachFallbackModel",
                "mlirPatternDescriptorOpInterfaceAttachFallbackModel",
-               "mlirTransformOpInterfaceAttachFallbackModel"
+               "mlirTransformOpInterfaceAttachFallbackModel",
+               "mlirDynamicOpTraitCreate"
              ])
 
     for entry <- pending_entries do

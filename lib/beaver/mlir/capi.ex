@@ -33,4 +33,14 @@ defmodule Beaver.MLIR.CAPI do
   end
 
   defdelegate load_nif(), to: __MODULE__.Raw
+
+  @doc false
+  def await_async(:async) do
+    receive do
+      {result, diagnostics} when is_list(diagnostics) ->
+        Beaver.Native.check!({result, diagnostics})
+    end
+  end
+
+  def await_async(result), do: Beaver.Native.check!(result)
 end

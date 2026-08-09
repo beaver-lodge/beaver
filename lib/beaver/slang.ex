@@ -3,7 +3,7 @@ defmodule Beaver.Slang do
   alias Beaver.MLIR.Dialect.IRDL
   @variadic_tags [:variadic, :optional, :single]
   @callback __slang_dialect__(ctx :: Beaver.MLIR.Context.t()) :: Beaver.MLIR.Module.t()
-  @callback __slang_traits__() :: [{String.t(), [atom()]}]
+  @callback __slang_traits__() :: [{String.t(), [Beaver.MLIR.Trait.declaration()]}]
   @callback __slang_interfaces__() :: [{String.t(), keyword()}]
   @callback __slang_dialect_name__() :: String.t()
   @moduledoc """
@@ -13,7 +13,8 @@ defmodule Beaver.Slang do
   Slang supports named type and attribute parameters, named operation operands,
   results, attributes and regions, reusable constraints, `any_of`, `all_of` and
   `base` constraints, and optional or variadic operands and results. Built-in
-  dynamic operation traits can be attached when the dialect is loaded.
+  built-in and callback-backed custom operation traits can be attached when
+  the dialect is loaded.
 
   Schema construction and runtime interface attachment are separate:
   `__slang_dialect__/1` builds the inspectable IRDL module, while `load/2`

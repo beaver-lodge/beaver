@@ -113,6 +113,48 @@ the requested built-in dynamic traits:
 - `:isolated_from_above`
 - `:no_terminator`
 
+Custom dynamic traits attach Elixir verification callbacks under a stable
+identity. The same identity shares one MLIR TypeID across every operation in a
+context:
+
+```elixir
+defmodule MyDialect.ValidOperands do
+end
+
+def verify_operands(operation) do
+  operand_count =
+    Beaver.MLIR.CAPI.mlirOperationGetNumOperands(operation)
+    |> Beaver.Native.to_term()
+
+  if operand_count > 0,
+    do: :ok,
+    else: {:error, :missing_operand}
+end
+
+defop checked(value = optional(any())),
+  traits: [
+    {MyDialect.ValidOperands,
+     verify: &__MODULE__.verify_operands/1}
+  ]
+```
+
+Use `:verify` for ordinary invariants and `:verify_regions` for invariants that
+need access to nested regions. A verifier accepts one borrowed operation and
+returns `:ok`, `true`, `{:ok, value}`, `:error`, `false`, or
+`{:error, reason}`. Failures, exceptions, unavailable callback owners, and
+timeouts become MLIR diagnostics and verification failures.
+
+Each operation attachment has a dedicated callback process. Custom trait
+TypeIDs and callback ownership belong to the MLIR context and are released by
+`Beaver.MLIR.Context.destroy/1`. Context multithreading must remain enabled so
+parse and verification work can run outside BEAM scheduler threads. Direct
+`Beaver.MLIR.Trait.attach_custom/5` calls accept a `:timeout` option, which
+defaults to 30 seconds.
+
+The operation passed to a verifier is borrowed and valid only until the
+callback returns. Do not send it to another process, store it, or use it after
+the callback.
+
 Keeping attachment out of schema construction makes the IRDL module safe to
 inspect, serialize, and test without mutating dialect registration. It also
 makes failures attributable to either schema verification or interface

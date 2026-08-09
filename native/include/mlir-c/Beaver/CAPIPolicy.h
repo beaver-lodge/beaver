@@ -14,7 +14,6 @@ typedef enum {
 
   BeaverCapiPolicyDirtyCPUAndIO__mlirExecutionEngineInvokePacked,
 
-  BeaverCapiPolicyCallbackBridge__mlirDynamicOpTraitCreate,
   BeaverCapiPolicyCallbackBridge__mlirInferShapedTypeOpInterfaceInferReturnTypes,
   BeaverCapiPolicyCallbackBridge__mlirInferTypeOpInterfaceInferReturnTypes,
   BeaverCapiPolicyCallbackBridge__mlirTransformStateForEachParam,
@@ -36,6 +35,7 @@ typedef enum {
   BeaverCapiPolicyCallbackRuntime__mlirMemoryEffectsOpInterfaceAttachFallbackModel,
   BeaverCapiPolicyCallbackRuntime__mlirPatternDescriptorOpInterfaceAttachFallbackModel,
   BeaverCapiPolicyCallbackRuntime__mlirTransformOpInterfaceAttachFallbackModel,
+  BeaverCapiPolicyCallbackRuntime__mlirDynamicOpTraitCreate,
 } BeaverCapiPolicyMarker;
 
 #endif // MLIR_C_BEAVER_CAPI_POLICY_H
