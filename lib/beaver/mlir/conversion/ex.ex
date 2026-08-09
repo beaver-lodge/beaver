@@ -106,6 +106,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.enumerable_count", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.enumerable_reduce", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.enumerable_reduce_c", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.enumerable_reduce_range", &convert_term_read/3,
+      version: "1.0"
+    )
     |> Plan.add_conversion_pattern("ex.list_head", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_tail", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_get", &convert_term_read/3, version: "1.0")
@@ -156,6 +159,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     enumerable_count: "ex.term.enumerable_count",
     enumerable_reduce: "ex.term.enumerable_reduce",
     enumerable_reduce_c: "ex.term.enumerable_reduce_c",
+    enumerable_reduce_range: "ex.term.enumerable_reduce_range",
     list_head: "ex.term.list_head",
     list_tail: "ex.term.list_tail",
     list_get: "ex.term.list_get",
@@ -742,6 +746,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.enumerable_count"), do: @term_intrinsics.enumerable_count
   defp read_intrinsic("ex.enumerable_reduce"), do: @term_intrinsics.enumerable_reduce
   defp read_intrinsic("ex.enumerable_reduce_c"), do: @term_intrinsics.enumerable_reduce_c
+
+  defp read_intrinsic("ex.enumerable_reduce_range"),
+    do: @term_intrinsics.enumerable_reduce_range
+
   defp read_intrinsic("ex.list_head"), do: @term_intrinsics.list_head
   defp read_intrinsic("ex.list_tail"), do: @term_intrinsics.list_tail
   defp read_intrinsic("ex.list_get"), do: @term_intrinsics.list_get
@@ -959,6 +967,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp intrinsic_function_type("ex.term.enumerable_reduce_c", _ctx) do
+    MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 4), [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.enumerable_reduce_range", _ctx) do
     MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 4), [MLIR.Type.i64()])
   end
 
