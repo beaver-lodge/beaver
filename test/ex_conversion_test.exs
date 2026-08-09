@@ -678,6 +678,55 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.binary_utf8_get"
   end
 
+  test "converts spawn and scheduler continuation ops to Zig runtime ABI calls", %{ctx: ctx} do
+    module =
+      term_module!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "ex.lit"() {value = 0 : i64} : () -> i64
+            %1 = "ex.lit"() {value = 1 : i64} : () -> i64
+            %2 = "ex.lit"() {value = 2 : i64} : () -> i64
+            %3 = "ex.box"(%0) : (i64) -> !ex.dyn
+            %4 = "ex.spawn"(%3) : (!ex.dyn) -> !ex.dyn
+            %5 = "ex.process_table_reset"() : () -> i64
+            %6 = "ex.cont_save"(%1, %2, %0) : (i64, i64, i64) -> i64
+            %7 = "ex.cont_pending"() : () -> i64
+            %8 = "ex.cont_clear"() : () -> i64
+            %9 = "ex.cont_load_arg"() : () -> i64
+            %10 = "ex.cont_load_acc"() : () -> i64
+            %11 = "ex.cont_load_cursor"() : () -> i64
+            %12 = "ex.schedule_next"() : () -> i64
+            %13 = "ex.current_entry"() : () -> i64
+            %14 = "ex.process_done"(%0) : (i64) -> i64
+            %15 = "ex.processes_runnable"() : () -> i64
+            %16 = "ex.process_result"(%4) : (!ex.dyn) -> i64
+            "ex.return"(%15) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx
+      )
+
+    assert {:ok, _module, []} = Plan.run(Ex.plan(), module)
+
+    rendered = MLIR.to_string(module, generic: true)
+    assert rendered =~ "ex.term.spawn"
+    assert rendered =~ "ex.term.process_table_reset"
+    assert rendered =~ "ex.term.cont_save"
+    assert rendered =~ "ex.term.cont_pending"
+    assert rendered =~ "ex.term.cont_clear"
+    assert rendered =~ "ex.term.cont_load_arg"
+    assert rendered =~ "ex.term.cont_load_acc"
+    assert rendered =~ "ex.term.cont_load_cursor"
+    assert rendered =~ "ex.term.schedule_next"
+    assert rendered =~ "ex.term.current_entry"
+    assert rendered =~ "ex.term.process_done"
+    assert rendered =~ "ex.term.processes_runnable"
+    assert rendered =~ "ex.term.process_result"
+  end
+
   test "passes nested term operands through without re-tagging", %{ctx: ctx} do
     module =
       term_module!(

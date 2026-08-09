@@ -141,6 +141,58 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop mailbox_clear(),
     results: [result: base(dyn())]
 
+  # Actor process spawn: registers a closure word as a new process entry and
+  # returns its pid. The scheduler driver executes spawned entries.
+  defop spawn(fun = optional(base(dyn()))),
+    results: [result: base(dyn())]
+
+  # Resets the runtime process table to a single fresh initial process; the
+  # scheduler driver calls this at program start.
+  defop process_table_reset(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  # Preemptive scheduler continuation primitives (#35 slice 5): a budgeted
+  # cursor loop saves its (arg, acc, cursor) state before yielding; the
+  # scheduler driver round-robins runnable processes and resumes the saved
+  # continuation. A message arrival bumps the recipient's epoch, so a stale
+  # continuation reads as not pending (restart from the top).
+  defop cont_save(
+          arg = all_of([base("!builtin.integer"), any()]),
+          acc = all_of([base("!builtin.integer"), any()]),
+          cursor = all_of([base("!builtin.integer"), any()])
+        ),
+        results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop cont_pending(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop cont_clear(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop cont_load_arg(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop cont_load_acc(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop cont_load_cursor(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop schedule_next(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop current_entry(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop process_done(result = all_of([base("!builtin.integer"), any()])),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop processes_runnable(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop process_result(pid = base(dyn())),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
   # Untags an integer term word to its scalar value (a passthrough for
   # values that are already scalar).
   defop to_int(word = base(dyn())),

@@ -85,6 +85,19 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.send", &convert_send/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.receive", &convert_receive/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mailbox_clear", &convert_mailbox_clear/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.spawn", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.process_table_reset", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.cont_save", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.cont_pending", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.cont_clear", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.cont_load_arg", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.cont_load_acc", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.cont_load_cursor", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.schedule_next", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.current_entry", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.process_done", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.processes_runnable", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.process_result", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.to_int", &convert_to_int/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.reduction_tick", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.clock_init", &convert_term_read/3, version: "1.0")
@@ -156,6 +169,19 @@ defmodule Beaver.MLIR.Conversion.Ex do
     send: "ex.term.send",
     receive: "ex.term.receive",
     mailbox_clear: "ex.term.mailbox_clear",
+    spawn: "ex.term.spawn",
+    process_table_reset: "ex.term.process_table_reset",
+    cont_save: "ex.term.cont_save",
+    cont_pending: "ex.term.cont_pending",
+    cont_clear: "ex.term.cont_clear",
+    cont_load_arg: "ex.term.cont_load_arg",
+    cont_load_acc: "ex.term.cont_load_acc",
+    cont_load_cursor: "ex.term.cont_load_cursor",
+    schedule_next: "ex.term.schedule_next",
+    current_entry: "ex.term.current_entry",
+    process_done: "ex.term.process_done",
+    processes_runnable: "ex.term.processes_runnable",
+    process_result: "ex.term.process_result",
     to_int: "ex.term.to_int",
     reduction_tick: "ex.term.clock_tick",
     clock_init: "ex.term.clock_init",
@@ -842,6 +868,19 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.reduction_tick"), do: @term_intrinsics.reduction_tick
   defp read_intrinsic("ex.clock_init"), do: @term_intrinsics.clock_init
   defp read_intrinsic("ex.yield_mark"), do: @term_intrinsics.yield_mark
+  defp read_intrinsic("ex.spawn"), do: @term_intrinsics.spawn
+  defp read_intrinsic("ex.process_table_reset"), do: @term_intrinsics.process_table_reset
+  defp read_intrinsic("ex.cont_save"), do: @term_intrinsics.cont_save
+  defp read_intrinsic("ex.cont_pending"), do: @term_intrinsics.cont_pending
+  defp read_intrinsic("ex.cont_clear"), do: @term_intrinsics.cont_clear
+  defp read_intrinsic("ex.cont_load_arg"), do: @term_intrinsics.cont_load_arg
+  defp read_intrinsic("ex.cont_load_acc"), do: @term_intrinsics.cont_load_acc
+  defp read_intrinsic("ex.cont_load_cursor"), do: @term_intrinsics.cont_load_cursor
+  defp read_intrinsic("ex.schedule_next"), do: @term_intrinsics.schedule_next
+  defp read_intrinsic("ex.current_entry"), do: @term_intrinsics.current_entry
+  defp read_intrinsic("ex.process_done"), do: @term_intrinsics.process_done
+  defp read_intrinsic("ex.processes_runnable"), do: @term_intrinsics.processes_runnable
+  defp read_intrinsic("ex.process_result"), do: @term_intrinsics.process_result
   defp read_intrinsic("ex.binary_length"), do: @term_intrinsics.binary_length
   defp read_intrinsic("ex.binary_get"), do: @term_intrinsics.binary_get
   defp read_intrinsic("ex.binary_slice"), do: @term_intrinsics.binary_slice
@@ -1027,6 +1066,58 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp intrinsic_function_type("ex.term.mailbox_clear", _ctx) do
     MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.spawn", _ctx) do
+    MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.process_table_reset", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.cont_save", _ctx) do
+    MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 3), [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.cont_pending", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.cont_clear", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.cont_load_arg", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.cont_load_acc", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.cont_load_cursor", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.schedule_next", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.current_entry", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.process_done", _ctx) do
+    MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.processes_runnable", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.process_result", _ctx) do
+    MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
   defp intrinsic_function_type("ex.term.jmp_buf_size", _ctx) do
