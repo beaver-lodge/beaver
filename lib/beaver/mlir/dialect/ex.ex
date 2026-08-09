@@ -146,6 +146,12 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop to_int(word = base(dyn())),
     results: [result: all_of([base("!builtin.integer"), any()])]
 
+  defop reduction_tick(cost = all_of([base("!builtin.integer"), any()])),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop clock_init(budget = all_of([base("!builtin.integer"), any()])),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
   # Non-local exit (`throw`) and its catch. The body region runs normally; a
   # throw longjmps back and the catch region matches the thrown value.
   defop try(),
