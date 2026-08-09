@@ -95,6 +95,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.list", &convert_term_list/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_cons", &convert_term_list_cons/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.map", &convert_term_map/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.mapset_from_list", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.mapset_member", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.mapset_put", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary", &convert_term_binary/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_integer", &convert_term_predicate/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_atom", &convert_term_predicate/3, version: "1.0")
@@ -157,6 +160,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
     fun_env: "ex.term.fun_env",
     tuple_from_list: "ex.term.tuple_from_list",
     map_from_list: "ex.term.map_from_list",
+    mapset_from_list: "ex.term.mapset_from_list",
+    mapset_member: "ex.term.mapset_member",
+    mapset_put: "ex.term.mapset_put",
     binary_from_list: "ex.term.binary_from_list",
     is_integer: "ex.term.is_integer",
     is_atom: "ex.term.is_atom",
@@ -789,6 +795,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.tuple_get"), do: @term_intrinsics.tuple_get
   defp read_intrinsic("ex.tuple_length"), do: @term_intrinsics.tuple_length
   defp read_intrinsic("ex.map_length"), do: @term_intrinsics.map_length
+  defp read_intrinsic("ex.mapset_from_list"), do: @term_intrinsics.mapset_from_list
+  defp read_intrinsic("ex.mapset_member"), do: @term_intrinsics.mapset_member
+  defp read_intrinsic("ex.mapset_put"), do: @term_intrinsics.mapset_put
   defp read_intrinsic("ex.enumerable_count"), do: @term_intrinsics.enumerable_count
   defp read_intrinsic("ex.enumerable_to_list"), do: @term_intrinsics.enumerable_to_list
 
@@ -1065,7 +1074,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
               "ex.term.binary_get",
               "ex.term.binary_slice",
               "ex.term.binary_utf8_get",
-              "ex.term.binary_utf8_width"
+              "ex.term.binary_utf8_width",
+              "ex.term.mapset_member",
+              "ex.term.mapset_put"
             ] do
     MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
   end

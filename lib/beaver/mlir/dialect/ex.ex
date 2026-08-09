@@ -195,6 +195,15 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop map(entries = variadic(base(dyn()))),
     results: [result: base(dyn())]
 
+  defop mapset_from_list(list = base(dyn())),
+    results: [result: base(dyn())]
+
+  defop mapset_member(set = base(dyn()), member = base(dyn())),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop mapset_put(set = base(dyn()), member = base(dyn())),
+    results: [result: base(dyn())]
+
   defop binary(segments = variadic(base(dyn()))),
     results: [result: base(dyn())]
 
