@@ -28,7 +28,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     * `--repo REPO` / `LLVM_EUDSL_REPO` — defaults to `llvm/eudsl`.
     * `--tag TAG` / `LLVM_EUDSL_TAG` — defaults to `llvm`.
     * `--asset-revision REV` / `LLVM_EUDSL_ASSET_REVISION` — defaults to
-      `20260809+9813315f2`; `latest` resolves the newest asset through the
+      `20260804+eb50d8775`; `latest` resolves the newest asset through the
       GitHub API.
     * `--asset-name NAME` / `LLVM_EUDSL_ASSET_NAME` — exact asset file name.
     * `--asset-url URL` / `LLVM_EUDSL_ASSET_URL` — download from an arbitrary
@@ -60,7 +60,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
 
   @shortdoc "Installs a prebuilt LLVM/MLIR distribution"
 
-  @default_revision "20260809+9813315f2"
+  @default_revision "20260804+eb50d8775"
 
   @switches [
     install_dir: :string,
