@@ -116,6 +116,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.enumerable_reduce_fun", &convert_term_read/3,
       version: "1.0"
     )
+    |> Plan.add_conversion_pattern("ex.enumerable_map_fun", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.func_addr", &convert_func_addr/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_head", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_tail", &convert_term_read/3, version: "1.0")
@@ -171,6 +172,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     enumerable_reduce_c: "ex.term.enumerable_reduce_c",
     enumerable_reduce_range: "ex.term.enumerable_reduce_range",
     enumerable_reduce_fun: "ex.term.enumerable_reduce_fun",
+    enumerable_map_fun: "ex.term.enumerable_map_fun",
     list_head: "ex.term.list_head",
     list_tail: "ex.term.list_tail",
     list_get: "ex.term.list_get",
@@ -507,13 +509,13 @@ defmodule Beaver.MLIR.Conversion.Ex do
     location = MLIR.Operation.location(operation)
     {:ok, sym_name_attr} = operation |> MLIR.Operation.fetch(:sym_name)
     name = sym_name_attr |> MLIR.CAPI.mlirStringAttrGetValue() |> MLIR.to_string()
+    [result] = operation |> Walker.results() |> Enum.to_list()
+    result_type = result |> MLIR.Value.type()
 
     func_const =
       %Changeset{name: "func.constant", context: context, location: location}
       |> Changeset.add_argument(value: MLIR.Attribute.flat_symbol_ref(name, ctx: context))
-      |> Changeset.add_result(
-        MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
-      )
+      |> Changeset.add_result(result_type)
       |> MLIR.Operation.create()
 
     MLIR.RewriterBase.insert(base, func_const)
@@ -790,6 +792,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     do: @term_intrinsics.enumerable_reduce_range
 
   defp read_intrinsic("ex.enumerable_reduce_fun"), do: @term_intrinsics.enumerable_reduce_fun
+  defp read_intrinsic("ex.enumerable_map_fun"), do: @term_intrinsics.enumerable_map_fun
 
   defp read_intrinsic("ex.list_head"), do: @term_intrinsics.list_head
   defp read_intrinsic("ex.list_tail"), do: @term_intrinsics.list_tail
@@ -1021,6 +1024,16 @@ defmodule Beaver.MLIR.Conversion.Ex do
         MLIR.Type.i64(),
         MLIR.Type.i64(),
         MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
+      ],
+      [MLIR.Type.i64()]
+    )
+  end
+
+  defp intrinsic_function_type("ex.term.enumerable_map_fun", _ctx) do
+    MLIR.Type.function(
+      [
+        MLIR.Type.i64(),
+        MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
       ],
       [MLIR.Type.i64()]
     )

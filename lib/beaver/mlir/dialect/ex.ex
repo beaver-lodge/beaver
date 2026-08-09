@@ -255,6 +255,12 @@ defmodule Beaver.MLIR.Dialect.Ex do
         ),
         results: [result: all_of([base("!builtin.integer"), any()])]
 
+  defop enumerable_map_fun(
+          enumerable = base(dyn()),
+          mapper = any()
+        ),
+        results: [result: base(dyn())]
+
   defop func_addr(),
     attributes: [sym_name: base("#builtin.string")],
     results: [result: any()]
