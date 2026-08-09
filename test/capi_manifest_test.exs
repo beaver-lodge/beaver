@@ -79,6 +79,20 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
                declarations,
                &(&1.wrapper_name == :mlirTransformApplyNamedSequenceWithDiagnostics)
              )
+
+    signature_entry =
+      declaration_manifest
+      |> DeclarationManifest.signature_manifest()
+      |> Map.fetch!("entries")
+      |> Enum.find(
+        &(get_in(&1, ["function", "name"]) ==
+            "mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect")
+      )
+
+    assert Enum.at(get_in(signature_entry, ["function", "param_ctypes"]), 5) == %{
+             "kind" => "integer",
+             "spelling" => "unsigned int"
+           }
   end
 
   test "callback-heavy declarations remain in the callback bridge manifest" do

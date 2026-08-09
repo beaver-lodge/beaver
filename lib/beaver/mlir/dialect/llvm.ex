@@ -38,6 +38,11 @@ defmodule Beaver.MLIR.Dialect.LLVM do
     wasm_emscripten_invoke: "wasm_emscripten_invokecc"
   }
 
+  @debug_languages %{c: 0x0002}
+  @debug_language_dialects %{simt: 0x01, tile: 0x02}
+  @debug_emission_kinds %{none: 0, full: 1, line_tables_only: 2, debug_directives_only: 3}
+  @debug_name_table_kinds %{default: 0, gnu: 1, none: 2, apple: 3}
+
   @doc "Build an opaque LLVM pointer type for an address space."
   def pointer, do: pointer(0, [])
   def pointer(opts) when is_list(opts), do: pointer(0, opts)
@@ -104,6 +109,87 @@ defmodule Beaver.MLIR.Dialect.LLVM do
     case @calling_conventions do
       %{^value => spelling} -> MLIR.Attribute.get("#llvm.cconv<#{spelling}>", opts)
       _ -> raise ArgumentError, "unsupported LLVM calling convention: #{inspect(value)}"
+    end
+  end
+
+  @doc """
+  Build an LLVM `DICompileUnit` attribute.
+
+  `:source_language_dialect` is optional. Omitting it uses the established C
+  API; setting it uses the newer ABI while preserving all other defaults.
+  Languages and dialects accept their DWARF integer values. The common `:c`,
+  `:simt`, and `:tile` spellings are also accepted.
+  """
+  def di_compile_unit(opts) when is_list(opts) do
+    ctx = Keyword.fetch!(opts, :ctx)
+    source_language = debug_enum(Keyword.fetch!(opts, :source_language), @debug_languages)
+
+    source_language_dialect =
+      case Keyword.get(opts, :source_language_dialect) do
+        nil -> nil
+        value -> debug_enum(value, @debug_language_dialects)
+      end
+
+    id =
+      Keyword.get_lazy(opts, :id, fn ->
+        MLIR.CAPI.mlirDistinctAttrCreate(MLIR.Attribute.unit(ctx: ctx))
+      end)
+
+    rec_id =
+      Keyword.get_lazy(opts, :rec_id, fn ->
+        MLIR.CAPI.mlirDistinctAttrCreate(MLIR.Attribute.unit(ctx: ctx))
+      end)
+
+    file =
+      Keyword.get_lazy(opts, :file, fn ->
+        MLIR.CAPI.mlirLLVMDIFileAttrGet(
+          ctx,
+          MLIR.Attribute.string(Keyword.fetch!(opts, :filename), ctx: ctx),
+          MLIR.Attribute.string(Keyword.get(opts, :directory, ""), ctx: ctx)
+        )
+      end)
+
+    producer = MLIR.Attribute.string(Keyword.get(opts, :producer, ""), ctx: ctx)
+
+    split_debug_filename =
+      MLIR.Attribute.string(Keyword.get(opts, :split_debug_filename, ""), ctx: ctx)
+
+    imported_entities = Keyword.get(opts, :imported_entities, [])
+    imported_array = Beaver.Native.array(imported_entities, MLIR.Attribute)
+    emission_kind = debug_enum(Keyword.get(opts, :emission_kind, :full), @debug_emission_kinds)
+
+    name_table_kind =
+      debug_enum(Keyword.get(opts, :name_table_kind, :default), @debug_name_table_kinds)
+
+    common = [
+      ctx,
+      rec_id,
+      Keyword.get(opts, :rec_self, false),
+      id,
+      source_language,
+      file,
+      producer,
+      Keyword.get(opts, :optimized, false),
+      emission_kind,
+      Keyword.get(opts, :debug_info_for_profiling, false),
+      name_table_kind,
+      split_debug_filename,
+      length(imported_entities),
+      imported_array
+    ]
+
+    case source_language_dialect do
+      nil ->
+        apply(MLIR.CAPI, :mlirLLVMDICompileUnitAttrGet, common)
+
+      dialect ->
+        [head, rec_id, rec_self, id, language | tail] = common
+
+        apply(
+          MLIR.CAPI,
+          :mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect,
+          [head, rec_id, rec_self, id, language, dialect | tail]
+        )
     end
   end
 
@@ -204,5 +290,14 @@ defmodule Beaver.MLIR.Dialect.LLVM do
 
   defp maybe_i64(arguments, name, value, ctx) when is_integer(value) and value > 0 do
     arguments ++ [{name, MLIR.Attribute.integer(MLIR.Type.i64(ctx: ctx), value)}]
+  end
+
+  defp debug_enum(value, _known) when is_integer(value) and value >= 0, do: value
+
+  defp debug_enum(value, known) when is_atom(value) do
+    case known do
+      %{^value => encoded} -> encoded
+      _ -> raise ArgumentError, "unsupported LLVM debug enum value: #{inspect(value)}"
+    end
   end
 end
