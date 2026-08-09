@@ -244,7 +244,7 @@ defmodule Beaver.MLIR.Operation do
   Check if the operation is a terminator.
   """
   def terminator?(%__MODULE__{} = op) do
-    MLIR.Context.terminator?(MLIR.context(op), name(op))
+    MLIR.Trait.has?(op, :terminator)
   end
 
   def implements_interface?(%__MODULE__{} = op, interface_id) do
