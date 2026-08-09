@@ -87,6 +87,9 @@ defmodule Beaver.Native do
            UndefinedFunctionError -> ref
          end, Enum.map(diagnostics, &postprocess_diagnostics/1)}
 
+      {value, diagnostics} when is_list(diagnostics) ->
+        {normalize(value), Enum.map(diagnostics, &postprocess_diagnostics/1)}
+
       ret ->
         ret
     end

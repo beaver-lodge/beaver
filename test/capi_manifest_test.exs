@@ -150,12 +150,19 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
     assert Enum.map(collector_entries, &get_in(&1, ["callback_bridge", "wrapper_name"]))
            |> MapSet.new() ==
              MapSet.new([
+               "beaver_raw_translate_module_to_llvm_ir",
                "beaver_raw_transform_state_params",
                "beaver_raw_transform_state_payload_ops",
                "beaver_raw_transform_state_payload_values"
              ])
 
-    for entry <- collector_entries do
+    {llvm_ir_entries, transform_collector_entries} =
+      Enum.split_with(
+        collector_entries,
+        &(get_in(&1, ["function", "name"]) == "beaverTranslateModuleToLLVMIRText")
+      )
+
+    for entry <- transform_collector_entries do
       bridge = Map.fetch!(entry, "callback_bridge")
       assert bridge["runtime_backed"]
       assert bridge["scheduler"] == "normal"
@@ -164,6 +171,17 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
       assert bridge["lifetime"] == "nif_call"
       assert bridge["facets"] == ["native_collector", "context_owned_handles"]
     end
+
+    assert [llvm_ir_entry] = llvm_ir_entries
+
+    assert %{
+             "wrapper_name" => "beaver_raw_translate_module_to_llvm_ir",
+             "runtime_backed" => true,
+             "scheduler" => "dirty_cpu",
+             "owner" => "caller",
+             "destructor" => "native_owner",
+             "lifetime" => "nif_call"
+           } = llvm_ir_entry["callback_bridge"]
 
     assert [manual_runtime] = manual_runtime_entries
     assert get_in(manual_runtime, ["function", "name"]) == "mlirValueReplaceUsesWithIf"

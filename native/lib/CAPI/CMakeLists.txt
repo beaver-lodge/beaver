@@ -9,6 +9,7 @@ add_mlir_public_c_api_library(
   BeaverIRDL.cpp
   BeaverDebug.cpp
   BeaverGPU.cpp
+  BeaverLLVMIR.cpp
   BeaverActionTracing.cpp
   Triton.cpp
   LINK_LIBS
