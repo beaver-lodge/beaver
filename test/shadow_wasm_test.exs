@@ -3,7 +3,7 @@ defmodule Beaver.Shadow.WasmTest do
   use Beaver.Case, async: true
 
   alias Beaver.MLIR
-  alias Beaver.Shadow.{Receipt, Runner, Wasm}
+  alias Beaver.Shadow.{Receipt, Wasm}
   alias Beaver.MLIR.Transform.Schedule.DSL
 
   defmodule ClosedLoopSchedule do
