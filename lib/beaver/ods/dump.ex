@@ -8,6 +8,11 @@ defmodule Beaver.MLIR.ODS.Dump do
   - Generate documentation for operations including their attributes, operands, and results
   - Check if an operation supports result type inference
 
+  Each operation record also carries the enriched facts extracted from the
+  TableGen ODS records: `native_class_name`, `traits`, `regions` (name +
+  variadic), `builders` (declared builder parameter types), `assembly_format`,
+  and `has_folder`.
+
   Operations can be looked up using `lookup/1`, and documentation can be generated using `gen_doc/1`.
   """
   @cache_key {__MODULE__, :operations}
