@@ -12,6 +12,22 @@ defmodule Beaver.CAPI.ManifestGenerator do
   ]
 
   @manual_bridges %{
+    "mlirInferTypeOpInterfaceInferReturnTypes" => %{
+      "wrapper_name" => "beaver_raw_infer_return_types",
+      "runtime" => "native_collector",
+      "scheduler" => "normal",
+      "owner" => "caller",
+      "lifetime" => "nif_call",
+      "destructor" => "stack"
+    },
+    "mlirInferShapedTypeOpInterfaceInferReturnTypes" => %{
+      "wrapper_name" => "beaver_raw_infer_return_type_components",
+      "runtime" => "native_collector",
+      "scheduler" => "normal",
+      "owner" => "caller",
+      "lifetime" => "nif_call",
+      "destructor" => "stack"
+    },
     "beaverTranslateModuleToLLVMIRText" => %{
       "wrapper_name" => "beaver_raw_translate_module_to_llvm_ir",
       "runtime" => "native_collector",

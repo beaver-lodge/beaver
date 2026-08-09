@@ -28,6 +28,8 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
     beaver_raw_external_interface_release: 1,
     beaver_raw_module_create_parse_async: 3,
     beaver_raw_operation_verify_async: 2,
+    beaver_raw_infer_return_types: 7,
+    beaver_raw_infer_return_type_components: 7,
     beaver_raw_translate_module_to_llvm_ir: 1,
     beaver_raw_transform_state_payload_ops: 2,
     beaver_raw_transform_state_payload_values: 2,
