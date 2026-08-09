@@ -154,7 +154,7 @@ defmodule Beaver.Wasm.TermABI do
   def render do
     rows =
       Enum.map_join(manifest(), "\n", fn entry ->
-        params = entry.params |> Enum.map(&format_type/1) |> Enum.join(", ")
+        params = Enum.map_join(entry.params, ", ", &format_type/1)
         result = if entry.result == :void, do: "noreturn", else: format_type(entry.result)
         "| `#{entry.symbol}` | `#{entry.import_module}` | `(#{params}) -> #{result}` |"
       end)
