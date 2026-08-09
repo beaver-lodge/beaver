@@ -282,6 +282,12 @@ defmodule Beaver.MLIR.Dialect.Ex do
         ),
         results: [result: base(dyn())]
 
+  defop stream_filter(
+          list = base(dyn()),
+          predicate = any()
+        ),
+        results: [result: base(dyn())]
+
   defop func_addr(),
     attributes: [sym_name: base("#builtin.string")],
     results: [result: any()]
