@@ -241,6 +241,14 @@ jobs:
         if: matrix.otp == '27.3'
         run: |
           mix profile.tprof --no-compile profile/enif_add_overhead.exs
+      - name: Run UseENIFAlloc benchmark
+        if: matrix.otp == '27.3' && matrix.elixir == '1.20.3' && runner.os != 'Windows'
+        env:
+          BENCH_TIME: "0.2"
+          BENCH_WARMUP: "0.1"
+          BENCH_INPUTS: "small_medium"
+        run: |
+          mix run bench/use_enif_alloc_bench.exs
       - name: Standalone Zig build
         if: matrix.elixir == '1.20.3'
         run: |
