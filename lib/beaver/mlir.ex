@@ -192,6 +192,10 @@ defmodule Beaver.MLIR do
   Print MLIR element or StringRef as Elixir binary string.
 
   When printing an operation, it is recommended to use `generic: false` or `generic: true` to explicitly specify the format if your usage requires consistent output. If not specified, the default behavior is subject to change according to the MLIR version.
+
+  Pass `debug_info: true` to include location and debug information (for example
+  the `#llvm.di_subprogram` attributes attached by `Beaver.MLIR.Debug`) in the
+  printed output. The output remains valid, parseable MLIR text.
   """
 
   def to_string(mlir, opts \\ [])
@@ -199,26 +203,43 @@ defmodule Beaver.MLIR do
   def to_string(%Operation{ref: ref}, opts) do
     operation = %Operation{ref: ref}
 
-    cond do
-      opts[:bytecode] == true and opts[:bytecode_version] ->
-        MLIR.Bytecode.write!(operation, desired_emit_version: opts[:bytecode_version])
+    if opts[:debug_info] do
+      flags = CAPI.mlirOpPrintingFlagsCreate()
 
-      opts[:bytecode] ->
-        :Bytecode
+      try do
+        CAPI.mlirOpPrintingFlagsEnableDebugInfo(flags, true, false)
 
-      opts[:generic] == false ->
-        :Specialized
+        {_, text} =
+          Beaver.Printer.run(fn callback, user_data ->
+            CAPI.mlirOperationPrintWithFlags(operation, flags, callback, user_data)
+          end)
 
-      opts[:generic] == true ->
-        :Generic
+        text
+      after
+        CAPI.mlirOpPrintingFlagsDestroy(flags)
+      end
+    else
+      cond do
+        opts[:bytecode] == true and opts[:bytecode_version] ->
+          MLIR.Bytecode.write!(operation, desired_emit_version: opts[:bytecode_version])
 
-      true ->
-        nil
+        opts[:bytecode] ->
+          :Bytecode
+
+        opts[:generic] == false ->
+          :Specialized
+
+        opts[:generic] == true ->
+          :Generic
+
+        true ->
+          nil
+      end
+      |> then(fn
+        bytecode when is_binary(bytecode) -> bytecode
+        suffix -> apply(CAPI, :"beaver_raw_to_string_Operation#{suffix}", [ref])
+      end)
     end
-    |> then(fn
-      bytecode when is_binary(bytecode) -> bytecode
-      suffix -> apply(CAPI, :"beaver_raw_to_string_Operation#{suffix}", [ref])
-    end)
   end
 
   def to_string(%Beaver.MLIR.Module{} = module, opts) do

@@ -11,8 +11,10 @@ defmodule Beaver.MLIR.ExecutionEngine do
   @doc """
   Create a MLIR JIT engine for a module and check if successful. Usually this module should be of LLVM dialect.
   """
-  def create!(%Composer{} = composer_or_op) do
-    Composer.run!(composer_or_op) |> create!()
+  def create!(composer_or_op, opts \\ [])
+
+  def create!(%Composer{} = composer_or_op, opts) do
+    Composer.run!(composer_or_op) |> create!(opts)
   end
 
   @type dirty :: nil | :io_bound | :cpu_bound
@@ -26,15 +28,24 @@ defmodule Beaver.MLIR.ExecutionEngine do
           {:opt_level, opt_level},
           {:object_dump, object_dump},
           {:enable_pic, enable_pic},
+          {:debug_info, boolean()},
           {:dirty, dirty},
           {:telemetry, (list(atom()), map(), map() -> any())}
         ]
   @spec create!(MLIR.Module.t(), opts()) :: t()
-  def create!(module, opts \\ []) do
+  def create!(module, opts) do
     shared_lib_paths = Keyword.get(opts, :shared_lib_paths, [])
     opt_level = Keyword.get(opts, :opt_level, 2)
     object_dump = Keyword.get(opts, :object_dump, false)
     enable_pic = Keyword.get(opts, :enable_pic, false)
+    debug_info = Keyword.get(opts, :debug_info, false)
+
+    module =
+      if debug_info do
+        Beaver.MLIR.Debug.attach_llvm_scopes!(module)
+      else
+        module
+      end
 
     shared_lib_paths_ptr =
       shared_lib_paths
