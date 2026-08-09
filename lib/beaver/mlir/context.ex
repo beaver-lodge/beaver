@@ -92,6 +92,7 @@ defmodule Beaver.MLIR.Context do
       MLIR.ActionTracing.release_context(ctx)
       mlirContextDestroy(ctx)
     after
+      MLIR.Trait.release_context(ctx)
       MLIR.ExternalInterface.release_context(ctx)
 
       if ctx.thread_pool_owner do

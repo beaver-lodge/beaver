@@ -10,6 +10,17 @@ defmodule Beaver.CAPI.ManifestGenerator do
   ]
 
   @runtime_declarations %{
+    "mlirDynamicOpTraitCreate" => %{
+      name: "beaver_raw_dynamic_trait_attach",
+      params: [
+        "context",
+        "operation_name",
+        "type_id",
+        "verify_callback",
+        "verify_regions_callback",
+        "timeout_ms"
+      ]
+    },
     "mlirTypeConverterAddConversion" => %{
       name: "beaver_raw_type_converter_add_conversion",
       params: ["registration", "callback", "timeout_ms"]

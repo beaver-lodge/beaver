@@ -6,16 +6,19 @@ const prelude = @import("prelude.zig");
 const c = prelude.c;
 const mlir_capi = @import("mlir_capi.zig");
 const string_ref = @import("string_ref.zig");
+const diagnostic = @import("diagnostic.zig");
 
 const SpeculatabilityDispatcher = kinda.callback_runtime.Dispatcher(.{"get_speculatability"});
 const MemoryEffectsDispatcher = kinda.callback_runtime.Dispatcher(.{"get_effects"});
 const TransformDispatcher = kinda.callback_runtime.Dispatcher(.{ "apply", "allows_repeated_handle_operands" });
 const PatternDescriptorDispatcher = kinda.callback_runtime.Dispatcher(.{ "populate_patterns", "populate_patterns_with_state" });
+const DynamicTraitDispatcher = kinda.callback_runtime.Dispatcher(.{ "verify", "verify_regions" });
 
 var speculatability_state_type: beam.resource_type = undefined;
 var memory_effects_state_type: beam.resource_type = undefined;
 var transform_state_type: beam.resource_type = undefined;
 var pattern_descriptor_state_type: beam.resource_type = undefined;
+var dynamic_trait_state_type: beam.resource_type = undefined;
 
 fn notifyReleased(recipient: beam.pid) void {
     const environment = e.enif_alloc_env() orelse return;
@@ -306,6 +309,61 @@ const PatternDescriptorState = struct {
     }
 };
 
+const DynamicTraitState = struct {
+    dispatcher: *DynamicTraitDispatcher,
+    model_released: std.atomic.Value(bool) = .init(false),
+
+    fn construct(_: ?*anyopaque) callconv(.c) void {}
+
+    fn destruct(user_data: ?*anyopaque) callconv(.c) void {
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
+        notifyReleased(self.dispatcher.handler);
+        releaseModel(@This(), self);
+    }
+
+    fn invokeVerifier(
+        self: *@This(),
+        comptime callback: []const u8,
+        operation: mlir_capi.Operation.T,
+    ) mlir_capi.LogicalResult.T {
+        if (!self.dispatcher.hasCallback(callback)) return c.mlirLogicalResultSuccess();
+        const environment = e.enif_alloc_env() orelse
+            return callbackFailure(operation);
+        const operation_term = makeHandle(mlir_capi.Operation, environment, operation) orelse
+            return callbackFailure(operation);
+        const response = self.dispatcher.invoke(callback, environment, .{operation_term}) catch
+            return callbackFailure(operation);
+        if (response.status != .replied) return callbackFailure(operation);
+        return if (response.success) c.mlirLogicalResultSuccess() else c.mlirLogicalResultFailure();
+    }
+
+    fn callbackFailure(operation: mlir_capi.Operation.T) mlir_capi.LogicalResult.T {
+        c.mlirEmitError(
+            c.mlirOperationGetLocation(operation),
+            "dynamic trait callback timed out or its owner is unavailable",
+        );
+        return c.mlirLogicalResultFailure();
+    }
+
+    fn verify(
+        operation: mlir_capi.Operation.T,
+        user_data: ?*anyopaque,
+    ) callconv(.c) mlir_capi.LogicalResult.T {
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse
+            return c.mlirLogicalResultFailure()));
+        return self.invokeVerifier("verify", operation);
+    }
+
+    fn verifyRegions(
+        operation: mlir_capi.Operation.T,
+        user_data: ?*anyopaque,
+    ) callconv(.c) mlir_capi.LogicalResult.T {
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse
+            return c.mlirLogicalResultFailure()));
+        return self.invokeVerifier("verify_regions", operation);
+    }
+};
+
 fn destroyState(comptime State: type) fn (beam.env, ?*anyopaque) callconv(.c) void {
     return struct {
         fn destroy(_: beam.env, object: ?*anyopaque) callconv(.c) void {
@@ -460,6 +518,110 @@ fn attachPatternDescriptorFallback(environment: beam.env, _: c_int, args: [*c]co
     );
 }
 
+fn attachDynamicTrait(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+    const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
+    const operation_name = try string_ref.get_binary_as_string_ref(environment, args[1]);
+    const type_id = try mlir_capi.TypeID.resource.fetch(environment, args[2]);
+    const dispatcher = try DynamicTraitDispatcher.initWithOptions(try beam.self(environment), .{
+        .timeout_ms = try timeout(environment, args[5]),
+    });
+    var dispatcher_owned = true;
+    errdefer if (dispatcher_owned) dispatcher.deinit();
+    if (!beam.is_nil2(environment, args[3])) dispatcher.setCallback("verify", args[3]);
+    if (!beam.is_nil2(environment, args[4])) dispatcher.setCallback("verify_regions", args[4]);
+    const state = try allocateState(
+        DynamicTraitState,
+        DynamicTraitDispatcher,
+        dynamic_trait_state_type,
+        dispatcher,
+    );
+    errdefer if (dispatcher_owned) e.enif_release_resource(state);
+    dispatcher_owned = false;
+
+    // Add the BEAM-term reference before handing the allocation reference to
+    // MLIR. A failed insertion destroys the trait synchronously; the term then
+    // keeps the state alive until this NIF returns and its environment clears.
+    const result = attachmentTerm(
+        DynamicTraitState,
+        environment,
+        dispatcher.copyId(environment),
+        state,
+    );
+    const trait = c.mlirDynamicOpTraitCreate(
+        type_id,
+        .{
+            .construct = DynamicTraitState.construct,
+            .destruct = DynamicTraitState.destruct,
+            .verifyTrait = DynamicTraitState.verify,
+            .verifyRegionTrait = DynamicTraitState.verifyRegions,
+        },
+        state,
+    );
+
+    if (!c.mlirDynamicOpTraitAttach(trait, operation_name, context))
+        return error.DynamicTraitAlreadyAttached;
+    return result;
+}
+
+fn AsyncDiagnosticsNIF(comptime name: []const u8) type {
+    const bang = kinda.BangFunc(@import("prelude.zig").allKinds, c, name);
+
+    return struct {
+        const Worker = struct {
+            recipient: beam.pid,
+            environment: beam.env,
+            context: mlir_capi.Context.T,
+            args: [bang.arity]beam.term,
+
+            fn deinit(self: *@This()) void {
+                e.enif_free_env(self.environment);
+                std.heap.smp_allocator.destroy(self);
+            }
+
+            fn run(user_data: ?*anyopaque) callconv(.c) void {
+                const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
+                const result = diagnostic.call_with_diagnostics(
+                    self.environment,
+                    self.context,
+                    bang.nif,
+                    .{ self.environment, bang.arity, &self.args },
+                ) catch {
+                    self.deinit();
+                    return;
+                };
+
+                _ = beam.send_advanced(null, self.recipient, self.environment, result);
+                self.deinit();
+            }
+        };
+
+        fn nif(environment: beam.env, n: c_int, args: [*c]const beam.term) !beam.term {
+            if (n != bang.arity + 1) return error.BadArity;
+            const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
+            const worker = try std.heap.smp_allocator.create(Worker);
+            errdefer std.heap.smp_allocator.destroy(worker);
+            const owned_environment = e.enif_alloc_env() orelse
+                return error.FailedToAllocateDiagnosticEnvironment;
+            errdefer e.enif_free_env(owned_environment);
+
+            worker.* = .{
+                .recipient = try beam.self(environment),
+                .environment = owned_environment,
+                .context = context,
+                .args = undefined,
+            };
+            for (0..bang.arity) |index| {
+                worker.args[index] = e.enif_make_copy(owned_environment, args[index + 1]);
+            }
+
+            if (!c.beaverContextAddWork(context, Worker.run, worker)) {
+                return error.ContextMultithreadingDisabled;
+            }
+            return beam.make_atom(environment, "async");
+        }
+    };
+}
+
 fn releaseStateTerm(
     comptime State: type,
     environment: beam.env,
@@ -479,7 +641,8 @@ fn releaseExternalInterface(environment: beam.env, _: c_int, args: [*c]const bea
         releaseStateTerm(SpeculatabilityState, environment, speculatability_state_type, args[0]) or
         releaseStateTerm(MemoryEffectsState, environment, memory_effects_state_type, args[0]) or
         releaseStateTerm(TransformState, environment, transform_state_type, args[0]) or
-        releaseStateTerm(PatternDescriptorState, environment, pattern_descriptor_state_type, args[0]);
+        releaseStateTerm(PatternDescriptorState, environment, pattern_descriptor_state_type, args[0]) or
+        releaseStateTerm(DynamicTraitState, environment, dynamic_trait_state_type, args[0]);
     if (!released) return error.InvalidExternalInterfaceState;
     return beam.make_ok(environment);
 }
@@ -600,6 +763,11 @@ pub fn open(environment: beam.env) void {
         "Beaver.MLIR.PatternDescriptorOpInterface.FallbackState",
         destroyState(PatternDescriptorState),
     );
+    dynamic_trait_state_type = openResourceType(
+        environment,
+        "Beaver.MLIR.Trait.DynamicState",
+        destroyState(DynamicTraitState),
+    );
 }
 
 pub const nifs = .{
@@ -608,6 +776,9 @@ pub const nifs = .{
     prelude.beaverRawNIF(@This(), "memory_effects_attach_fallback_model", 4),
     prelude.beaverRawNIF(@This(), "transform_op_interface_attach_fallback_model", 5),
     prelude.beaverRawNIF(@This(), "pattern_descriptor_op_interface_attach_fallback_model", 5),
+    prelude.beaverRawNIF(@This(), "dynamic_trait_attach", 6),
+    prelude.beaverRawNIF(@This(), "module_create_parse_async", 3),
+    prelude.beaverRawNIF(@This(), "operation_verify_async", 2),
     prelude.beaverRawNIF(@This(), "transform_state_payload_ops", 2),
     prelude.beaverRawNIF(@This(), "transform_state_payload_values", 2),
     prelude.beaverRawNIF(@This(), "transform_state_params", 2),
@@ -620,6 +791,9 @@ pub const conditionally_speculatable_query_async = querySpeculatabilityAsync;
 pub const memory_effects_attach_fallback_model = attachMemoryEffectsFallback;
 pub const transform_op_interface_attach_fallback_model = attachTransformFallback;
 pub const pattern_descriptor_op_interface_attach_fallback_model = attachPatternDescriptorFallback;
+pub const dynamic_trait_attach = attachDynamicTrait;
+pub const module_create_parse_async = AsyncDiagnosticsNIF("mlirModuleCreateParse").nif;
+pub const operation_verify_async = AsyncDiagnosticsNIF("mlirOperationVerify").nif;
 pub const transform_state_payload_ops = transformStatePayloadOps;
 pub const transform_state_payload_values = transformStatePayloadValues;
 pub const transform_state_params = transformStateParams;

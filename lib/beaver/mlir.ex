@@ -276,7 +276,11 @@ defmodule Beaver.MLIR do
       ctx = MLIR.context(op)
 
       {is_success, diagnostics} =
-        mlirOperationVerifyWithDiagnostics(ctx, MLIR.Operation.from_module(op))
+        Beaver.MLIR.CAPI.beaver_raw_operation_verify_async(
+          ctx.ref,
+          MLIR.Operation.from_module(op).ref
+        )
+        |> Beaver.MLIR.CAPI.await_async()
 
       if Beaver.Native.to_term(is_success) do
         {:ok, op}
