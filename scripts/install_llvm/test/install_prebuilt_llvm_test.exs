@@ -71,6 +71,14 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
     end
   end
 
+  test "triton metadata URL uses the requested ref" do
+    assert InstallPrebuiltLlvm.triton_metadata_url(
+             "882eb72e1858bfd588fafa4677b86ce00e9da872",
+             "cmake/llvm-info.json"
+           ) ==
+             "https://raw.githubusercontent.com/triton-lang/triton/882eb72e1858bfd588fafa4677b86ce00e9da872/cmake/llvm-info.json"
+  end
+
   test "installs a tarball and points LLVM_CONFIG_PATH at it" do
     fixture =
       Path.join(System.tmp_dir!(), "beaver-llvm-install-#{System.unique_integer([:positive])}")

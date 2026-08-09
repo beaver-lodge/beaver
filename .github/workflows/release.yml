@@ -97,13 +97,17 @@ jobs:
       - name: Strip dev suffix
         run: sed -i.bak 's/-dev//g' mix.exs && rm -f mix.exs.bak
       - uses: seanmiddleditch/gha-setup-ninja@master
+      - name: Read Triton version
+        if: runner.os == 'Windows'
+        run: echo "TRITON_REF=$(jq -er '.triton_ref' triton.json)" >> "$GITHUB_ENV"
       - name: Install prebuilt LLVM
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           cd scripts/install_llvm
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            mix beaver.install_prebuilt_llvm --triton --install-dir "$RUNNER_TEMP/llvm-prebuilt"
+            mix beaver.install_prebuilt_llvm --triton --triton-ref "$TRITON_REF" \
+              --install-dir "$RUNNER_TEMP/llvm-prebuilt"
           else
             mix beaver.install_prebuilt_llvm --install-dir "$RUNNER_TEMP/llvm-prebuilt"
           fi

@@ -67,6 +67,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         name: Check-out beaver
+      - name: Read Triton version
+        if: matrix.llvm == 'triton'
+        run: echo "TRITON_REF=$(jq -er '.triton_ref' triton.json)" >> "$GITHUB_ENV"
       # Kinda 0.11.0 on Hex predates the LLP64 integer conversion fix; the
       # Windows lane needs the paired checkout until a release containing
       # beaver-lodge/kinda#68 is published.
@@ -119,7 +122,8 @@ jobs:
         run: |
           cd scripts/install_llvm
           if [ "${{ matrix.llvm }}" == "triton" ]; then
-            mix beaver.install_prebuilt_llvm --triton --install-dir "$RUNNER_TEMP/llvm-prebuilt"
+            mix beaver.install_prebuilt_llvm --triton --triton-ref "$TRITON_REF" \
+              --install-dir "$RUNNER_TEMP/llvm-prebuilt"
           else
             mix beaver.install_prebuilt_llvm --install-dir "$RUNNER_TEMP/llvm-prebuilt"
           fi
@@ -128,10 +132,8 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          ref="$(gh release list --repo beaver-lodge/beaver --limit 50 \
-            --json tagName --jq '[.[].tagName | select(startswith("triton-prebuilt-"))][0]')"
-          asset="$(gh release view "$ref" --repo beaver-lodge/beaver --json assets \
-            --jq '.assets[].name | select(endswith("ubuntu-x86_64.tar.gz"))')"
+          ref="triton-prebuilt-${TRITON_REF}"
+          asset="triton-${TRITON_REF}-ubuntu-x86_64.tar.gz"
           gh release download "$ref" --repo beaver-lodge/beaver \
             --pattern "$asset" --dir "$RUNNER_TEMP"
           mkdir -p "$RUNNER_TEMP/triton-prebuilt"

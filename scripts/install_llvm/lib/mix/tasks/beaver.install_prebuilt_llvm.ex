@@ -4,8 +4,10 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
 
   By default it downloads the matching `llvm/eudsl` nightly build for the
   current platform. `--triton` installs the exact LLVM archive Triton pins
-  (resolved from `triton-lang/triton`'s `llvm-info.json` at run time). Any URL
-  can be used instead, for example Triton's pinned LLVM archive:
+  (resolved from `triton-lang/triton`'s `llvm-info.json` at run time).
+  `--triton-ref` can pin that metadata lookup to the same Triton commit as a
+  separately built Triton library. Any URL can be used instead, for example
+  Triton's pinned LLVM archive:
 
       (cd scripts/install_llvm && mix beaver.install_prebuilt_llvm \\
         --asset-url https://oaitriton.blob.core.windows.net/public/llvm-builds/llvm-b010a18d-ubuntu-x64-1.tar.gz \\
@@ -37,6 +39,8 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
       (`cmake/llvm-build-info.json` + `cmake/llvm-info.json` from
       `triton-lang/triton`); the archive URL and sha256 are derived from those
       files, so the pin tracks Triton's LLVM bumps.
+    * `--triton-ref REF` / `LLVM_TRITON_REF` — Git ref used to resolve Triton
+      LLVM metadata; defaults to `main`.
     * `--sha256 DIGEST` / `LLVM_EUDSL_SHA256` — verify the downloaded archive.
     * `--github-token TOKEN` / `GITHUB_TOKEN` or `GH_TOKEN` — used for
       `latest` resolution.
@@ -71,6 +75,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     github_token: :string,
     github_env: :string,
     triton: :boolean,
+    triton_ref: :string,
     resolve_only: :boolean
   ]
 
@@ -105,6 +110,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     |> put_env(:github_env, "GITHUB_ENV")
     |> put_env(:github_token, "GITHUB_TOKEN")
     |> put_env(:github_token, "GH_TOKEN")
+    |> put_default(:triton_ref, "main", "LLVM_TRITON_REF")
     |> maybe_resolve_only()
     |> maybe_triton()
   end
@@ -210,8 +216,8 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
   defp resolve_triton_asset!(opts, os_name, arch) do
     ensure_http!()
     suffix = triton_suffix(os_name, arch)
-    build_info = triton_json!("cmake/llvm-build-info.json")
-    info = triton_json!("cmake/llvm-info.json")
+    build_info = triton_json!(opts[:triton_ref], "cmake/llvm-build-info.json")
+    info = triton_json!(opts[:triton_ref], "cmake/llvm-info.json")
 
     hash = info["llvm_hash"] || build_info["llvm_hash"]
     build_number = info["build_number"] || build_info["build_number"]
@@ -240,8 +246,13 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     end
   end
 
-  defp triton_json!(path) do
-    github_get!("https://raw.githubusercontent.com/triton-lang/triton/main/#{path}", nil)
+  @doc false
+  def triton_metadata_url(ref, path) do
+    "https://raw.githubusercontent.com/triton-lang/triton/#{ref}/#{path}"
+  end
+
+  defp triton_json!(ref, path) do
+    github_get!(triton_metadata_url(ref, path), nil)
   end
 
   defp resolve_latest_asset!(opts, os_name, arch) do
