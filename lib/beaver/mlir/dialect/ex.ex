@@ -231,6 +231,14 @@ defmodule Beaver.MLIR.Dialect.Ex do
         ),
         results: [result: all_of([base("!builtin.integer"), any()])]
 
+  defop enumerable_reduce_range(
+          start = all_of([base("!builtin.integer"), any()]),
+          stop = all_of([base("!builtin.integer"), any()]),
+          acc = all_of([base("!builtin.integer"), any()]),
+          continuation = all_of([base("!builtin.integer"), any()])
+        ),
+        results: [result: all_of([base("!builtin.integer"), any()])]
+
   defop list_head(list = base(dyn())),
     results: [result: base(dyn())]
 
