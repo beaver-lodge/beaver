@@ -86,6 +86,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.receive", &convert_receive/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mailbox_clear", &convert_mailbox_clear/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.to_int", &convert_to_int/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.reduction_tick", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.clock_init", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.try", &convert_try/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.throw", &convert_throw/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.catch_value", &convert_catch_value/3, version: "1.0")
@@ -154,6 +156,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
     receive: "ex.term.receive",
     mailbox_clear: "ex.term.mailbox_clear",
     to_int: "ex.term.to_int",
+    reduction_tick: "ex.term.clock_tick",
+    clock_init: "ex.term.clock_init",
     jmp_buf_size: "ex.term.jmp_buf_size",
     setjmp_addr: "ex.term.setjmp_addr",
     try_push: "ex.term.try_push",
@@ -833,6 +837,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.list_get"), do: @term_intrinsics.list_get
   defp read_intrinsic("ex.list_length"), do: @term_intrinsics.list_length
   defp read_intrinsic("ex.term_eq"), do: @term_intrinsics.term_eq
+  defp read_intrinsic("ex.reduction_tick"), do: @term_intrinsics.reduction_tick
+  defp read_intrinsic("ex.clock_init"), do: @term_intrinsics.clock_init
   defp read_intrinsic("ex.binary_length"), do: @term_intrinsics.binary_length
   defp read_intrinsic("ex.binary_get"), do: @term_intrinsics.binary_get
   defp read_intrinsic("ex.binary_slice"), do: @term_intrinsics.binary_slice
