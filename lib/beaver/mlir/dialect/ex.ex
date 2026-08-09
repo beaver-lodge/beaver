@@ -205,6 +205,15 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop nil_word(),
     results: [result: base(dyn())]
 
+  defop monotonic_time(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop receive_start(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop receive_start_set(value = all_of([base("!builtin.integer"), any()])),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
   defop current_entry(),
     results: [result: all_of([base("!builtin.integer"), any()])]
 
