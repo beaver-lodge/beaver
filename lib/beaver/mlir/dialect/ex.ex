@@ -288,6 +288,18 @@ defmodule Beaver.MLIR.Dialect.Ex do
         ),
         results: [result: base(dyn())]
 
+  defop stream_take(
+          list = base(dyn()),
+          n = all_of([base("!builtin.integer"), any()])
+        ),
+        results: [result: base(dyn())]
+
+  defop stream_drop(
+          list = base(dyn()),
+          n = all_of([base("!builtin.integer"), any()])
+        ),
+        results: [result: base(dyn())]
+
   defop func_addr(),
     attributes: [sym_name: base("#builtin.string")],
     results: [result: any()]
