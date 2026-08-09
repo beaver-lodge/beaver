@@ -2,7 +2,6 @@ defmodule Beaver.Slang do
   use Beaver
   alias Beaver.MLIR.Dialect.IRDL
   @variadic_tags [:variadic, :optional, :single]
-  @dynamic_traits [:terminator, :isolated_from_above, :no_terminator]
   @callback __slang_dialect__(ctx :: Beaver.MLIR.Context.t()) :: Beaver.MLIR.Module.t()
   @callback __slang_traits__() :: [{String.t(), [atom()]}]
   @callback __slang_interfaces__() :: [{String.t(), keyword()}]
@@ -486,21 +485,6 @@ defmodule Beaver.Slang do
           "operation attributes must be a keyword list, got: #{Macro.to_string(attributes)}"
   end
 
-  defp normalize_traits!(nil), do: []
-
-  defp normalize_traits!(traits) when is_list(traits) do
-    traits = Enum.uniq(traits)
-
-    case traits -- @dynamic_traits do
-      [] -> traits
-      unsupported -> raise ArgumentError, "unsupported Slang traits: #{inspect(unsupported)}"
-    end
-  end
-
-  defp normalize_traits!(traits) do
-    raise ArgumentError, "expected a list of Slang traits, got: #{inspect(traits)}"
-  end
-
   defp normalize_region_descriptor(:any) do
     %{args: nil, size: nil}
   end
@@ -650,7 +634,7 @@ defmodule Beaver.Slang do
         region_names: region_names
       )
 
-    traits = normalize_traits!(opts[:traits])
+    traits = Beaver.MLIR.Trait.normalize!(opts[:traits])
     interfaces = normalize_interfaces!(opts[:interfaces])
 
     quote do
@@ -1037,30 +1021,6 @@ defmodule Beaver.Slang do
     )
   end
 
-  @trait_factories %{
-    terminator: :mlirDynamicOpTraitIsTerminatorCreate,
-    isolated_from_above: :mlirDynamicOpTraitIsIsolatedFromAboveCreate,
-    no_terminator: :mlirDynamicOpTraitNoTerminatorCreate
-  }
-
-  defp attach_dynamic_traits(ctx, dialect, traits) do
-    for {operation, operation_traits} <- traits,
-        trait <- operation_traits do
-      dynamic_trait = apply(MLIR.CAPI, Map.fetch!(@trait_factories, trait), [])
-      operation_name = MLIR.StringRef.create("#{dialect}.#{operation}")
-
-      unless MLIR.CAPI.mlirDynamicOpTraitAttach(dynamic_trait, operation_name, ctx)
-             |> Beaver.Native.to_term() do
-        MLIR.CAPI.mlirDynamicOpTraitDestroy(dynamic_trait)
-
-        raise ArgumentError,
-              "failed to attach #{inspect(trait)} to dynamic operation #{dialect}.#{operation}"
-      end
-    end
-
-    :ok
-  end
-
   @external_interfaces [
     :memory_effects,
     :conditionally_speculatable,
@@ -1091,23 +1051,50 @@ defmodule Beaver.Slang do
   This function loads the MLIR dialect into the MLIR context. It invokes the internal function of the provided module to create the dialect's IRDL module and performs additional MLIR transformations and verification.
   """
   def load(ctx, mod) when is_atom(mod) do
+    dialect_name = mod.__slang_dialect_name__()
+
     result =
-      apply(mod, :__slang_dialect__, [ctx])
-      |> Beaver.MLIR.Transform.canonicalize()
-      |> Beaver.Composer.run!()
-      |> MLIR.verify!()
-      |> Beaver.MLIR.CAPI.mlirLoadIRDLDialects()
+      if dynamic_dialect_loaded?(ctx, dialect_name) do
+        MLIR.CAPI.mlirLogicalResultSuccess()
+      else
+        apply(mod, :__slang_dialect__, [ctx])
+        |> Beaver.MLIR.Transform.canonicalize()
+        |> Beaver.Composer.run!()
+        |> MLIR.verify!()
+        |> Beaver.MLIR.CAPI.mlirLoadIRDLDialects()
+      end
 
     if MLIR.LogicalResult.success?(result) do
-      attach_dynamic_traits(ctx, mod.__slang_dialect_name__(), mod.__slang_traits__())
+      Beaver.MLIR.Trait.attach_all(
+        ctx,
+        dialect_name,
+        mod.__slang_traits__()
+      )
 
       Beaver.MLIR.ExternalInterface.attach_all(
         ctx,
-        mod.__slang_dialect_name__(),
+        dialect_name,
         mod.__slang_interfaces__()
       )
     end
 
     result
+  end
+
+  defp dynamic_dialect_loaded?(ctx, dialect_name) do
+    dialect =
+      MLIR.CAPI.mlirContextGetLoadedDialect(ctx, MLIR.StringRef.create(dialect_name))
+
+    if MLIR.CAPI.beaverIsNullDialect(dialect) |> Beaver.Native.to_term() do
+      false
+    else
+      unless MLIR.CAPI.mlirDialectIsAExtensibleDialect(dialect) |> Beaver.Native.to_term() do
+        raise ArgumentError,
+              "cannot load Slang dialect #{inspect(dialect_name)}: " <>
+                "a non-extensible dialect with that namespace is already loaded"
+      end
+
+      true
+    end
   end
 end

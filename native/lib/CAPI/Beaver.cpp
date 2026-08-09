@@ -157,12 +157,6 @@ beaverPassManagerEnableTiming(MlirPassManager passManager) {
   unwrap(passManager)->enableTiming();
 }
 
-MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
-                                                 MlirContext context) {
-  auto name = OperationName(unwrap(op_name), unwrap(context));
-  return name.isRegistered() && name.mightHaveTrait<OpTrait::IsTerminator>();
-}
-
 MLIR_CAPI_EXPORTED void beaverContextGetOps(MlirContext context,
                                             MlirStringCallback insert,
                                             void *container) {

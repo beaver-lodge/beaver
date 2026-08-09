@@ -19,9 +19,6 @@ extern "C" {
 
 #undef DEFINE_C_API_STRUCT
 
-MLIR_CAPI_EXPORTED bool beaverIsOpNameTerminator(MlirStringRef op_name,
-                                                 MlirContext context);
-
 MLIR_CAPI_EXPORTED void beaverContextGetOps(MlirContext context,
                                             MlirStringCallback insert,
                                             void *container);

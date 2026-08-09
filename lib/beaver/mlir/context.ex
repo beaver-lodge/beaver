@@ -152,7 +152,7 @@ defmodule Beaver.MLIR.Context do
   Check if the op name is terminator
   """
   def terminator?(%__MODULE__{} = ctx, op) do
-    beaverIsOpNameTerminator(MLIR.StringRef.create(op), ctx) |> Beaver.Native.to_term()
+    MLIR.Trait.has?(ctx, op, :terminator)
   end
 
   def implements_interface?(ctx, op, interface_id) do
