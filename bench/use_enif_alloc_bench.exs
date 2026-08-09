@@ -13,6 +13,11 @@
 # malloc/free pairs per function.
 #
 # Run: mix run bench/use_enif_alloc_bench.exs
+#
+# Environment overrides (CI-friendly):
+#   BENCH_TIME     - Benchee time window in seconds (default 2.0)
+#   BENCH_WARMUP   - Benchee warmup in seconds (default 1.0)
+#   BENCH_INPUTS   - "small" | "small_medium" | "large" | "all" (default "all")
 
 defmodule EnifBenchPatterns do
   @moduledoc false
@@ -225,6 +230,41 @@ ctx = MLIR.Context.create()
 build_once = EnifBench.build_once_set(ctx)
 plan = EnifBenchPlan.plan()
 
+bench_time =
+  case System.get_env("BENCH_TIME") do
+    nil -> 2.0
+    value -> value |> Float.parse() |> elem(0)
+  end
+
+bench_warmup =
+  case System.get_env("BENCH_WARMUP") do
+    nil -> 1.0
+    value -> value |> Float.parse() |> elem(0)
+  end
+
+bench_inputs =
+  case System.get_env("BENCH_INPUTS") do
+    "small" ->
+      %{"small: 8 funcs x 2 pairs" => {8, 2}}
+
+    "small_medium" ->
+      %{
+        "small: 8 funcs x 2 pairs" => {8, 2},
+        "medium: 32 funcs x 8 pairs" => {32, 8}
+      }
+
+    "large" ->
+      %{"large: 128 funcs x 32 pairs" => {128, 32}}
+
+    _ ->
+      %{
+        "small: 8 funcs x 2 pairs" => {8, 2},
+        "medium: 32 funcs x 8 pairs" => {32, 8},
+        "large: 128 funcs x 32 pairs" => {128, 32},
+        "xlarge: 512 funcs x 64 pairs" => {512, 64}
+      }
+  end
+
 # warmup + sanity: every variant must actually rewrite malloc -> enif_alloc
 for size <- [{2, 1}, {4, 2}] do
   refute_malloc = fn mod ->
@@ -262,16 +302,11 @@ Benchee.run(
       EnifBench.per_func(ctx, module)
     end
   },
-  inputs: %{
-    "small: 8 funcs x 2 pairs" => {8, 2},
-    "medium: 32 funcs x 8 pairs" => {32, 8},
-    "large: 128 funcs x 32 pairs" => {128, 32},
-    "xlarge: 512 funcs x 64 pairs" => {512, 64}
-  },
+  inputs: bench_inputs,
   before_each: &EnifBench.build_module(ctx, &1),
   after_each: &MLIR.Module.destroy/1,
-  time: 2,
-  warmup: 1
+  time: bench_time,
+  warmup: bench_warmup
 )
 
 MLIR.Module.destroy(elem(build_once, 1))
