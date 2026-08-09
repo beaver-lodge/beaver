@@ -216,6 +216,13 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop enumerable_count(word = base(dyn())),
     results: [result: all_of([base("!builtin.integer"), any()])]
 
+  defop enumerable_reduce(
+          enumerable = base(dyn()),
+          acc = all_of([base("!builtin.integer"), any()]),
+          continuation = all_of([base("!builtin.integer"), any()])
+        ),
+        results: [result: all_of([base("!builtin.integer"), any()])]
+
   defop list_head(list = base(dyn())),
     results: [result: base(dyn())]
 
