@@ -20,6 +20,7 @@ defmodule CompleteSlang do
 
   defop(consume(value = any()))
   defop(consume_token(value = base(token())))
+  defop produce_integer(), results: [value: ^integer_like]
 
   defop sequence(head = any(), tail = variadic(any()), fallback = optional(any())),
     results: [value: optional(any())]
