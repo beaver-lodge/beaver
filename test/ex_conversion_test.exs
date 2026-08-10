@@ -707,11 +707,13 @@ defmodule ExConversionTest do
             %19 = "ex.monotonic_time"() : () -> i64
             %20 = "ex.receive_start"() : () -> i64
             %21 = "ex.receive_start_set"(%0) : (i64) -> i64
-            %22 = "ex.current_entry"() : () -> i64
-            %23 = "ex.process_done"(%0) : (i64) -> i64
-            %24 = "ex.processes_runnable"() : () -> i64
-            %25 = "ex.process_result"(%4) : (!ex.dyn) -> i64
-            "ex.return"(%24) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+            %22 = "ex.native_time"() : () -> i64
+            %23 = "ex.unique_integer"(%0) : (i64) -> i64
+            %24 = "ex.current_entry"() : () -> i64
+            %25 = "ex.process_done"(%0) : (i64) -> i64
+            %26 = "ex.processes_runnable"() : () -> i64
+            %27 = "ex.process_result"(%4) : (!ex.dyn) -> i64
+            "ex.return"(%26) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
         """,
@@ -739,6 +741,8 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.monotonic_time"
     assert rendered =~ "ex.term.receive_start"
     assert rendered =~ "ex.term.receive_start_set"
+    assert rendered =~ "ex.term.native_time"
+    assert rendered =~ "ex.term.unique_integer"
     assert rendered =~ "ex.term.current_entry"
     assert rendered =~ "ex.term.process_done"
     assert rendered =~ "ex.term.processes_runnable"

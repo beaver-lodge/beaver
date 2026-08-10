@@ -45,6 +45,8 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.monotonic_time" => %{params: [], result: :i64},
     "ex.term.receive_start" => %{params: [], result: :i64},
     "ex.term.receive_start_set" => %{params: [:i64], result: :i64},
+    "ex.term.native_time" => %{params: [], result: :i64},
+    "ex.term.unique_integer" => %{params: [:i64], result: :i64},
     "ex.term.mailbox_clear" => %{params: [], result: :i64},
     # process table / scheduler driver
     "ex.term.spawn" => %{params: [:i64], result: :i64},
