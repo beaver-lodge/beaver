@@ -140,6 +140,25 @@ defmodule MlirTest do
     MLIR.Context.destroy(ctx)
   end
 
+  test "LogicalResult helpers cross the ABI through Beaver wrappers" do
+    logical_results = [
+      {mlirLogicalResultSuccess(), mlirLogicalResultFailure()},
+      {beaverLogicalResultSuccess(), beaverLogicalResultFailure()}
+    ]
+
+    for {success, failure} <- logical_results do
+      assert success |> mlirLogicalResultIsSuccess() |> Beaver.Native.to_term()
+      refute success |> mlirLogicalResultIsFailure() |> Beaver.Native.to_term()
+      assert success |> beaverLogicalResultIsSuccess() |> Beaver.Native.to_term()
+      refute success |> beaverLogicalResultIsFailure() |> Beaver.Native.to_term()
+
+      refute failure |> mlirLogicalResultIsSuccess() |> Beaver.Native.to_term()
+      assert failure |> mlirLogicalResultIsFailure() |> Beaver.Native.to_term()
+      refute failure |> beaverLogicalResultIsSuccess() |> Beaver.Native.to_term()
+      assert failure |> beaverLogicalResultIsFailure() |> Beaver.Native.to_term()
+    end
+  end
+
   test "Run a generic pass" do
     ctx = MLIR.Context.create()
     {:ok, module} = create_adder_module(ctx)

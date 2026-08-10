@@ -6,6 +6,10 @@ pub fn nif(comptime name: anytype) e.ErlNifFunc {
     @setEvalBranchQuota(10000);
     return kinda.NIFFunc(allKinds, c, name, .{});
 }
+pub fn nifAs(comptime implementation_name: []const u8, comptime nif_name: []const u8) e.ErlNifFunc {
+    @setEvalBranchQuota(10000);
+    return kinda.NIFFunc(allKinds, c, implementation_name, .{ .nif_name = nif_name.ptr });
+}
 pub fn nifDirtyCPU(comptime name: []const u8, comptime nif_name: ?[]const u8) e.ErlNifFunc {
     @setEvalBranchQuota(10000);
     const exported_name = if (nif_name) |v| v else name;

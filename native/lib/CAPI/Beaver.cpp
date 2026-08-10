@@ -264,6 +264,14 @@ beaverOperationStateGetContext(MlirOperationState state) {
   return mlirLocationGetContext(state.location);
 }
 
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultSuccess() {
+  return mlirLogicalResultSuccess();
+}
+
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultFailure() {
+  return mlirLogicalResultFailure();
+}
+
 MLIR_CAPI_EXPORTED bool beaverLogicalResultIsSuccess(MlirLogicalResult res) {
   return mlirLogicalResultIsSuccess(res);
 }

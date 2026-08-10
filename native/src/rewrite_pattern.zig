@@ -35,7 +35,7 @@ const CallbackDispatcher = struct {
         const op_ = mlir_capi.Operation.resource.make_kind(temp_env, op) catch @panic("failed to make resource for Operation");
         const rewriter_ = mlir_capi.PatternRewriter.resource.make_kind(temp_env, rewriter) catch @panic("failed to make resource for PatternRewriter");
         const response = this.invoke("matchAndRewrite", temp_env, .{ pattern_, op_, rewriter_ }) catch @panic("failed to forward matchAndRewrite callback");
-        return if (response.success) c.mlirLogicalResultSuccess() else c.mlirLogicalResultFailure();
+        return if (response.success) c.beaverLogicalResultSuccess() else c.beaverLogicalResultFailure();
     }
 
     const PatternCreator = struct {

@@ -1056,7 +1056,7 @@ defmodule Beaver.Slang do
 
     result =
       if dynamic_dialect_loaded?(ctx, dialect_name) do
-        MLIR.CAPI.mlirLogicalResultSuccess()
+        MLIR.CAPI.beaverLogicalResultSuccess()
       else
         apply(mod, :__slang_dialect__, [ctx])
         |> Beaver.MLIR.Transform.canonicalize()

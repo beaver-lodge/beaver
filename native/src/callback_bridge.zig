@@ -326,7 +326,7 @@ const DynamicTraitState = struct {
         comptime callback: []const u8,
         operation: mlir_capi.Operation.T,
     ) mlir_capi.LogicalResult.T {
-        if (!self.dispatcher.hasCallback(callback)) return c.mlirLogicalResultSuccess();
+        if (!self.dispatcher.hasCallback(callback)) return c.beaverLogicalResultSuccess();
         const environment = e.enif_alloc_env() orelse
             return callbackFailure(operation);
         const operation_term = makeHandle(mlir_capi.Operation, environment, operation) orelse
@@ -334,7 +334,7 @@ const DynamicTraitState = struct {
         const response = self.dispatcher.invoke(callback, environment, .{operation_term}) catch
             return callbackFailure(operation);
         if (response.status != .replied) return callbackFailure(operation);
-        return if (response.success) c.mlirLogicalResultSuccess() else c.mlirLogicalResultFailure();
+        return if (response.success) c.beaverLogicalResultSuccess() else c.beaverLogicalResultFailure();
     }
 
     fn callbackFailure(operation: mlir_capi.Operation.T) mlir_capi.LogicalResult.T {
@@ -342,7 +342,7 @@ const DynamicTraitState = struct {
             c.mlirOperationGetLocation(operation),
             "dynamic trait callback timed out or its owner is unavailable",
         );
-        return c.mlirLogicalResultFailure();
+        return c.beaverLogicalResultFailure();
     }
 
     fn verify(
@@ -350,7 +350,7 @@ const DynamicTraitState = struct {
         user_data: ?*anyopaque,
     ) callconv(.c) mlir_capi.LogicalResult.T {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse
-            return c.mlirLogicalResultFailure()));
+            return c.beaverLogicalResultFailure()));
         return self.invokeVerifier("verify", operation);
     }
 
@@ -359,7 +359,7 @@ const DynamicTraitState = struct {
         user_data: ?*anyopaque,
     ) callconv(.c) mlir_capi.LogicalResult.T {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse
-            return c.mlirLogicalResultFailure()));
+            return c.beaverLogicalResultFailure()));
         return self.invokeVerifier("verify_regions", operation);
     }
 };

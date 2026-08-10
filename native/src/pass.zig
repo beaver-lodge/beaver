@@ -28,13 +28,13 @@ const CallbackDispatcher = struct {
     fn initialize(ctx: mlir_capi.Context.T, userData: ?*anyopaque) callconv(.c) mlir_capi.LogicalResult.T {
         const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
         const temp_env = e.enif_alloc_env() orelse unreachable;
-        const response = this.invoke("initialize", temp_env, .{mlir_capi.Context.resource.make_kind(temp_env, ctx) catch unreachable}) catch return c.mlirLogicalResultFailure();
+        const response = this.invoke("initialize", temp_env, .{mlir_capi.Context.resource.make_kind(temp_env, ctx) catch unreachable}) catch return c.beaverLogicalResultFailure();
         if (!response.success) {
             const loc = c.mlirLocationUnknownGet(ctx);
             c.mlirEmitError(loc, "Fail to initialize a pass implemented in Elixir");
-            return c.mlirLogicalResultFailure();
+            return c.beaverLogicalResultFailure();
         }
-        return c.mlirLogicalResultSuccess();
+        return c.beaverLogicalResultSuccess();
     }
     fn clone(userData: ?*anyopaque) callconv(.c) ?*anyopaque {
         const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));

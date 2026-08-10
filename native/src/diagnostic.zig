@@ -41,13 +41,13 @@ const DiagnosticAggregator = struct {
 
     fn collectDiagnosticTopLevel(diagnostic: c.MlirDiagnostic, userData: ?*@This()) !mlir_capi.LogicalResult.T {
         try userData.?.container.append(try collectDiagnosticNested(diagnostic, userData));
-        return c.mlirLogicalResultSuccess();
+        return c.beaverLogicalResultSuccess();
     }
     fn errorHandler(diagnostic: c.MlirDiagnostic, userData: ?*anyopaque) callconv(.c) mlir_capi.LogicalResult.T {
-        const self: *@This() = @ptrCast(@alignCast(userData orelse return c.mlirLogicalResultFailure()));
+        const self: *@This() = @ptrCast(@alignCast(userData orelse return c.beaverLogicalResultFailure()));
         self.mutex.lock();
         defer self.mutex.unlock();
-        return collectDiagnosticTopLevel(diagnostic, self) catch return c.mlirLogicalResultFailure();
+        return collectDiagnosticTopLevel(diagnostic, self) catch return c.beaverLogicalResultFailure();
     }
     fn deleteUserData(userData: ?*anyopaque) callconv(.c) void {
         const this: ?*@This() = @ptrCast(@alignCast(userData));
