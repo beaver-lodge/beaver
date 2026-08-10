@@ -97,6 +97,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.cont_load_cursor", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.schedule_next", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.worker_run", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.process_wait", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mailbox_len", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mailbox_peek", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mailbox_remove", &convert_term_read/3, version: "1.0")
@@ -206,6 +207,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     processes_runnable: "ex.term.processes_runnable",
     process_result: "ex.term.process_result",
     worker_run: "ex.term.worker_run",
+    process_wait: "ex.term.process_wait",
     to_int: "ex.term.to_int",
     reduction_tick: "ex.term.clock_tick",
     clock_init: "ex.term.clock_init",
@@ -916,6 +918,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.cont_load_cursor"), do: @term_intrinsics.cont_load_cursor
   defp read_intrinsic("ex.schedule_next"), do: @term_intrinsics.schedule_next
   defp read_intrinsic("ex.worker_run"), do: @term_intrinsics.worker_run
+  defp read_intrinsic("ex.process_wait"), do: @term_intrinsics.process_wait
   defp read_intrinsic("ex.mailbox_len"), do: @term_intrinsics.mailbox_len
   defp read_intrinsic("ex.mailbox_peek"), do: @term_intrinsics.mailbox_peek
   defp read_intrinsic("ex.mailbox_remove"), do: @term_intrinsics.mailbox_remove

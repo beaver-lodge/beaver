@@ -232,6 +232,11 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop process_result(pid = base(dyn())),
     results: [result: all_of([base("!builtin.integer"), any()])]
 
+  # Parks the current actor when its mailbox has no message beyond the
+  # completed selective-receive scan cursor.
+  defop process_wait(cursor = all_of([base("!builtin.integer"), any()])),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
   # Runs the actor scheduler with a fixed worker count. `dispatcher` is a
   # stable native trampoline with the signature `(pid: i64) -> i64`.
   defop worker_run(
