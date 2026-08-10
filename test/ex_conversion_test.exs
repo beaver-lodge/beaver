@@ -713,7 +713,9 @@ defmodule ExConversionTest do
             %25 = "ex.process_done"(%0) : (i64) -> i64
             %26 = "ex.processes_runnable"() : () -> i64
             %27 = "ex.process_result"(%4) : (!ex.dyn) -> i64
-            "ex.return"(%26) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+            %28 = "ex.func_addr"() {sym_name = "actor_step"} : () -> ((i64) -> i64)
+            %29 = "ex.worker_run"(%1, %28) : (i64, (i64) -> i64) -> i64
+            "ex.return"(%29) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
         """,
@@ -747,6 +749,7 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.process_done"
     assert rendered =~ "ex.term.processes_runnable"
     assert rendered =~ "ex.term.process_result"
+    assert rendered =~ "ex.term.worker_run"
   end
 
   test "passes nested term operands through without re-tagging", %{ctx: ctx} do
