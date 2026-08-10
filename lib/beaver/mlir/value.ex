@@ -55,6 +55,26 @@ defmodule Beaver.MLIR.Value do
   """
   defdelegate type(value), to: CAPI, as: :mlirValueGetType
 
+  @doc "Returns the source location carried by this value."
+  defdelegate location(value), to: CAPI, as: :mlirValueGetLocation
+
+  @doc """
+  Sets the location of a block argument and returns the value.
+
+  Operation-result locations are inherited from their defining operation and
+  cannot be set independently.
+  """
+  @spec set_location(t(), MLIR.Location.source()) :: t()
+  def set_location(%__MODULE__{} = value, location) do
+    unless argument?(value) do
+      raise ArgumentError, "only block argument locations can be set"
+    end
+
+    location = MLIR.Location.resolve(location, MLIR.context(value))
+    :ok = CAPI.mlirBlockArgumentSetLocation(value, location)
+    value
+  end
+
   @doc """
   Replaces uses of `value` for which `predicate` returns `true`.
 
