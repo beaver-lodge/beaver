@@ -73,15 +73,11 @@ defmodule Beaver.Slang do
     alias_name = get_alias_name(name)
 
     quote do
-      mlir do
-        opts = [
-          ctx: Beaver.Env.context(),
-          ip: Beaver.Env.block(),
-          loc: Kernel.var!(slang_internal_source_loc)
-        ]
-
-        unquote(alias_name)(opts)
-      end
+      unquote(alias_name)(
+        ctx: Beaver.Env.context(),
+        ip: Beaver.Env.block(),
+        loc: Kernel.var!(slang_internal_source_loc)
+      )
     end
   end
 
@@ -591,6 +587,7 @@ defmodule Beaver.Slang do
     argument_names = normalize_names!(args, opts[:argument_names], Atom.to_string(args_op))
 
     {result_ast, result_names} = normalize_results_ast(do_block, opts[:result_names])
+    result_ast = Macro.postwalk(result_ast, &transform_defop_pins/1)
     {attribute_values, attribute_names} = split_attributes(opts[:attributes])
     {region_values, region_names} = split_named_values(opts[:regions], "region", nil)
 

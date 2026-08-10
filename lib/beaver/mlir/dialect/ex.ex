@@ -37,96 +37,106 @@ defmodule Beaver.MLIR.Dialect.Ex do
     base("#builtin.string")
   end
 
+  # Named constraints keep the generated creator functions compact. Inlining
+  # these expressions repeats their MLIR builder AST in every operation.
+  defconstraint any_value do
+    any()
+  end
+
+  defconstraint integer_like do
+    all_of([base("!builtin.integer"), any()])
+  end
+
   defop lit(),
-    results: [result: all_of([base("!builtin.integer"), any()])],
+    results: [result: ^integer_like],
     attributes: [value: ^integer_value]
 
   defop var(),
     results: [result: base(unbound())],
     attributes: [name: base("#builtin.string")]
 
-  defop bind(variable = base(unbound()), value = any()),
+  defop bind(variable = base(unbound()), value = ^any_value),
     results: [result: base(bound())]
 
   defop add(
-          left = all_of([base("!builtin.integer"), any()]),
-          right = all_of([base("!builtin.integer"), any()])
+          left = ^integer_like,
+          right = ^integer_like
         ),
-        results: [result: all_of([base("!builtin.integer"), any()])]
+        results: [result: ^integer_like]
 
   defop sub(
-          left = all_of([base("!builtin.integer"), any()]),
-          right = all_of([base("!builtin.integer"), any()])
+          left = ^integer_like,
+          right = ^integer_like
         ),
-        results: [result: all_of([base("!builtin.integer"), any()])]
+        results: [result: ^integer_like]
 
   defop mul(
-          left = all_of([base("!builtin.integer"), any()]),
-          right = all_of([base("!builtin.integer"), any()])
+          left = ^integer_like,
+          right = ^integer_like
         ),
-        results: [result: all_of([base("!builtin.integer"), any()])]
+        results: [result: ^integer_like]
 
   defop div(
-          left = all_of([base("!builtin.integer"), any()]),
-          right = all_of([base("!builtin.integer"), any()])
+          left = ^integer_like,
+          right = ^integer_like
         ),
-        results: [result: all_of([base("!builtin.integer"), any()])]
+        results: [result: ^integer_like]
 
   defop rem(
-          left = all_of([base("!builtin.integer"), any()]),
-          right = all_of([base("!builtin.integer"), any()])
+          left = ^integer_like,
+          right = ^integer_like
         ),
-        results: [result: all_of([base("!builtin.integer"), any()])]
+        results: [result: ^integer_like]
 
   # Each argument is its own optional slot so heterogeneous argument types
   # (e.g. a term plus a scalar accumulator) verify: IRDL variadic groups are
   # homogeneous, which would reject mixed-typed calls. Eight slots cover the
   # closure ABI: four captured values plus four application arguments.
   defop call(
-          arg0 = optional(any()),
-          arg1 = optional(any()),
-          arg2 = optional(any()),
-          arg3 = optional(any()),
-          arg4 = optional(any()),
-          arg5 = optional(any()),
-          arg6 = optional(any()),
-          arg7 = optional(any())
+          arg0 = optional(^any_value),
+          arg1 = optional(^any_value),
+          arg2 = optional(^any_value),
+          arg3 = optional(^any_value),
+          arg4 = optional(^any_value),
+          arg5 = optional(^any_value),
+          arg6 = optional(^any_value),
+          arg7 = optional(^any_value)
         ),
-        results: [result: any()],
+        results: [result: ^any_value],
         attributes: [callee: ^callee_value, arity: ^integer_value]
 
   defop cmp(
-          left = all_of([base("!builtin.integer"), any()]),
-          right = all_of([base("!builtin.integer"), any()])
+          left = ^integer_like,
+          right = ^integer_like
         ),
-        results: [result: all_of([base("!builtin.integer"), any()])],
+        results: [result: ^integer_like],
         attributes: [predicate: ^cmp_predicate_value]
 
   # credo:disable-for-next-line Credo.Check.Readability.ParenthesesInCondition
-  defop if(cond = all_of([base("!builtin.integer"), any()])),
-    results: [result: variadic(any())],
+  defop if(cond = ^integer_like),
+    results: [result: variadic(^any_value)],
     regions: [:any, :any]
 
-  defop case(scrutinee = any()),
-    results: [result: variadic(any())],
+  defop case(scrutinee = ^any_value),
+    results: [result: variadic(^any_value)],
     regions: [:any]
 
-  defop clause(guard = optional(any())),
-    attributes: [patterns: any()]
+  defop clause(guard = optional(^any_value)),
+    attributes: [patterns: ^any_value]
 
-  defop box(value = any()),
+  defop box(value = ^any_value),
     results: [result: base(dyn())]
 
   # Lifts an already-tagged word (e.g. a function argument) into the term
   # type without tagging: the conversion is a pure passthrough.
-  defop to_word(value = any()),
+  defop to_word(value = ^any_value),
     results: [result: base(dyn())]
 
   # Drops the term type annotation without untagging: the conversion is a
   # pure passthrough, so a term word can cross control-flow regions (whose
   # types must be legal after conversion) as a scalar i64.
   defop unbox(word = base(dyn())),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   # Actor mailbox access: the current execution context is a single actor.
   defop self(),
@@ -150,21 +160,21 @@ defmodule Beaver.MLIR.Dialect.Ex do
   # each execution its own native state instead of relying on the
   # compatibility runtime associated with the invoking OS thread.
   defop runtime_create(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
-  defop runtime_enter(handle = all_of([base("!builtin.integer"), any()])),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop runtime_enter(handle = ^integer_like),
+    results: [result: ^integer_like]
 
   defop runtime_leave(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
-  defop runtime_destroy(handle = all_of([base("!builtin.integer"), any()])),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop runtime_destroy(handle = ^integer_like),
+    results: [result: ^integer_like]
 
   # Resets the runtime process table to a single fresh initial process with
   # the given capacity; the scheduler driver calls this at program start.
-  defop process_table_reset(cap = all_of([base("!builtin.integer"), any()])),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop process_table_reset(cap = ^integer_like),
+    results: [result: ^integer_like]
 
   # Preemptive scheduler continuation primitives (#35 slice 5): a budgeted
   # cursor loop saves its (arg, acc, cursor) state before yielding; the
@@ -172,74 +182,74 @@ defmodule Beaver.MLIR.Dialect.Ex do
   # continuation. A message arrival bumps the recipient's epoch, so a stale
   # continuation reads as not pending (restart from the top).
   defop cont_save(
-          arg = all_of([base("!builtin.integer"), any()]),
-          acc = all_of([base("!builtin.integer"), any()]),
-          cursor = all_of([base("!builtin.integer"), any()])
+          arg = ^integer_like,
+          acc = ^integer_like,
+          cursor = ^integer_like
         ),
-        results: [result: all_of([base("!builtin.integer"), any()])]
+        results: [result: ^integer_like]
 
   # Selective-receive scan continuation: unlike a cursor-loop continuation, a
   # message arrival invalidates it so the scan restarts (epoch wiring).
   defop receive_cont_save(
-          arg = all_of([base("!builtin.integer"), any()]),
-          acc = all_of([base("!builtin.integer"), any()]),
-          cursor = all_of([base("!builtin.integer"), any()])
+          arg = ^integer_like,
+          acc = ^integer_like,
+          cursor = ^integer_like
         ),
-        results: [result: all_of([base("!builtin.integer"), any()])]
+        results: [result: ^integer_like]
 
   defop cont_pending(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop cont_active(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop cont_clear(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop cont_load_arg(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop cont_load_acc(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop cont_load_cursor(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop schedule_next(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop mailbox_len(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
-  defop mailbox_peek(cursor = all_of([base("!builtin.integer"), any()])),
+  defop mailbox_peek(cursor = ^integer_like),
     results: [result: base(dyn())]
 
-  defop mailbox_remove(cursor = all_of([base("!builtin.integer"), any()])),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop mailbox_remove(cursor = ^integer_like),
+    results: [result: ^integer_like]
 
   defop nil_word(),
     results: [result: base(dyn())]
 
   defop monotonic_time(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop receive_start(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
-  defop receive_start_set(value = all_of([base("!builtin.integer"), any()])),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop receive_start_set(value = ^integer_like),
+    results: [result: ^integer_like]
 
   defop native_time(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
-  defop unique_integer(negative = all_of([base("!builtin.integer"), any()])),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop unique_integer(negative = ^integer_like),
+    results: [result: ^integer_like]
 
   defop current_entry(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
-  defop process_done(result = all_of([base("!builtin.integer"), any()])),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop process_done(result = ^integer_like),
+    results: [result: ^integer_like]
 
   defop process_exit(reason = base(dyn())),
     results: [result: base(dyn())]
@@ -247,8 +257,8 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop process_exit_reason(pid = base(dyn())),
     results: [result: base(dyn())]
 
-  defop process_trap_exit(enabled = all_of([base("!builtin.integer"), any()])),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop process_trap_exit(enabled = ^integer_like),
+    results: [result: ^integer_like]
 
   defop link(
           pid = base(dyn()),
@@ -258,7 +268,7 @@ defmodule Beaver.MLIR.Dialect.Ex do
         results: [result: base(dyn())]
 
   defop unlink(pid = base(dyn())),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop exit(
           pid = base(dyn()),
@@ -277,45 +287,45 @@ defmodule Beaver.MLIR.Dialect.Ex do
         results: [result: base(dyn())]
 
   defop demonitor(reference = base(dyn())),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop processes_runnable(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop process_result(pid = base(dyn())),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   # Parks the current actor when its mailbox has no message beyond the
   # completed selective-receive scan cursor.
-  defop process_wait(cursor = all_of([base("!builtin.integer"), any()])),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop process_wait(cursor = ^integer_like),
+    results: [result: ^integer_like]
 
   # Runs the actor scheduler with a fixed worker count. `dispatcher` is a
   # stable native trampoline with the signature `(pid: i64) -> i64`.
   defop worker_run(
-          worker_count = all_of([base("!builtin.integer"), any()]),
-          dispatcher = any()
+          worker_count = ^integer_like,
+          dispatcher = ^any_value
         ),
-        results: [result: all_of([base("!builtin.integer"), any()])]
+        results: [result: ^integer_like]
 
   # Untags an integer term word to its scalar value (a passthrough for
   # values that are already scalar).
   defop to_int(word = base(dyn())),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
-  defop reduction_tick(cost = all_of([base("!builtin.integer"), any()])),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop reduction_tick(cost = ^integer_like),
+    results: [result: ^integer_like]
 
-  defop clock_init(budget = all_of([base("!builtin.integer"), any()])),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop clock_init(budget = ^integer_like),
+    results: [result: ^integer_like]
 
   defop yield_mark(),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   # Non-local exit (`throw`) and its catch. The body region runs normally; a
   # throw longjmps back and the catch region matches the thrown value.
   defop try(),
-    results: [result: any()],
+    results: [result: ^any_value],
     regions: [:any, :any]
 
   defop throw(value = base(dyn())),
@@ -328,10 +338,10 @@ defmodule Beaver.MLIR.Dialect.Ex do
   # extracted `__fn_*` is referenced by index, and the captured values are
   # stored in the closure's env slots.
   defop make_fun(
-          e0 = optional(any()),
-          e1 = optional(any()),
-          e2 = optional(any()),
-          e3 = optional(any())
+          e0 = optional(^any_value),
+          e1 = optional(^any_value),
+          e2 = optional(^any_value),
+          e3 = optional(^any_value)
         ),
         results: [result: base(dyn())],
         attributes: [fn_idx: ^integer_value, env_len: ^integer_value]
@@ -341,12 +351,12 @@ defmodule Beaver.MLIR.Dialect.Ex do
   # `__fn_*`.
   defop apply(
           closure = optional(base(dyn())),
-          a0 = optional(any()),
-          a1 = optional(any()),
-          a2 = optional(any()),
-          a3 = optional(any())
+          a0 = optional(^any_value),
+          a1 = optional(^any_value),
+          a2 = optional(^any_value),
+          a3 = optional(^any_value)
         ),
-        results: [result: any()],
+        results: [result: ^any_value],
         attributes: [arg_count: ^integer_value]
 
   defop tuple(elements = variadic(base(dyn()))),
@@ -365,7 +375,7 @@ defmodule Beaver.MLIR.Dialect.Ex do
     results: [result: base(dyn())]
 
   defop mapset_member(set = base(dyn()), member = base(dyn())),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop mapset_put(set = base(dyn()), member = base(dyn())),
     results: [result: base(dyn())]
@@ -379,102 +389,102 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop binary(segments = variadic(base(dyn()))),
     results: [result: base(dyn())]
 
-  defop is_integer(value = any()),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop is_integer(value = ^any_value),
+    results: [result: ^integer_like]
 
-  defop is_atom(value = any()),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop is_atom(value = ^any_value),
+    results: [result: ^integer_like]
 
-  defop is_binary(value = any()),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop is_binary(value = ^any_value),
+    results: [result: ^integer_like]
 
-  defop is_list(value = any()),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop is_list(value = ^any_value),
+    results: [result: ^integer_like]
 
-  defop is_tuple(value = any()),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop is_tuple(value = ^any_value),
+    results: [result: ^integer_like]
 
-  defop is_map(value = any()),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+  defop is_map(value = ^any_value),
+    results: [result: ^integer_like]
 
-  defop tuple_get(tuple = base(dyn()), index = all_of([base("!builtin.integer"), any()])),
+  defop tuple_get(tuple = base(dyn()), index = ^integer_like),
     results: [result: base(dyn())]
 
   defop tuple_length(tuple = base(dyn())),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop map_length(map = base(dyn())),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop enumerable_count(word = base(dyn())),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop enumerable_to_list(word = base(dyn())),
     results: [result: base(dyn())]
 
   defop enumerable_to_list_range(
-          start = all_of([base("!builtin.integer"), any()]),
-          stop = all_of([base("!builtin.integer"), any()])
+          start = ^integer_like,
+          stop = ^integer_like
         ),
         results: [result: base(dyn())]
 
   defop enumerable_reduce(
           enumerable = base(dyn()),
-          acc = all_of([base("!builtin.integer"), any()]),
-          continuation = all_of([base("!builtin.integer"), any()])
+          acc = ^integer_like,
+          continuation = ^integer_like
         ),
-        results: [result: all_of([base("!builtin.integer"), any()])]
+        results: [result: ^integer_like]
 
   defop enumerable_reduce_c(
           enumerable = base(dyn()),
-          acc = all_of([base("!builtin.integer"), any()]),
-          continuation = all_of([base("!builtin.integer"), any()]),
-          capture = all_of([base("!builtin.integer"), any()])
+          acc = ^integer_like,
+          continuation = ^integer_like,
+          capture = ^integer_like
         ),
-        results: [result: all_of([base("!builtin.integer"), any()])]
+        results: [result: ^integer_like]
 
   defop enumerable_reduce_range(
-          start = all_of([base("!builtin.integer"), any()]),
-          stop = all_of([base("!builtin.integer"), any()]),
-          acc = all_of([base("!builtin.integer"), any()]),
-          continuation = all_of([base("!builtin.integer"), any()])
+          start = ^integer_like,
+          stop = ^integer_like,
+          acc = ^integer_like,
+          continuation = ^integer_like
         ),
-        results: [result: all_of([base("!builtin.integer"), any()])]
+        results: [result: ^integer_like]
 
   defop enumerable_reduce_fun(
           enumerable = base(dyn()),
-          acc = all_of([base("!builtin.integer"), any()]),
-          reducer = any()
+          acc = ^integer_like,
+          reducer = ^any_value
         ),
-        results: [result: all_of([base("!builtin.integer"), any()])]
+        results: [result: ^integer_like]
 
   defop enumerable_map_fun(
           enumerable = base(dyn()),
-          mapper = any()
+          mapper = ^any_value
         ),
         results: [result: base(dyn())]
 
   defop stream_filter(
           list = base(dyn()),
-          predicate = any()
+          predicate = ^any_value
         ),
         results: [result: base(dyn())]
 
   defop stream_take(
           list = base(dyn()),
-          n = all_of([base("!builtin.integer"), any()])
+          n = ^integer_like
         ),
         results: [result: base(dyn())]
 
   defop stream_drop(
           list = base(dyn()),
-          n = all_of([base("!builtin.integer"), any()])
+          n = ^integer_like
         ),
         results: [result: base(dyn())]
 
   defop func_addr(),
     attributes: [sym_name: base("#builtin.string")],
-    results: [result: any()]
+    results: [result: ^any_value]
 
   defop list_head(list = base(dyn())),
     results: [result: base(dyn())]
@@ -482,35 +492,35 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop list_tail(list = base(dyn())),
     results: [result: base(dyn())]
 
-  defop list_get(list = base(dyn()), index = all_of([base("!builtin.integer"), any()])),
+  defop list_get(list = base(dyn()), index = ^integer_like),
     results: [result: base(dyn())]
 
   defop list_length(list = base(dyn())),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop term_eq(left = base(dyn()), right = base(dyn())),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop binary_length(binary = base(dyn())),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
-  defop binary_get(binary = base(dyn()), index = all_of([base("!builtin.integer"), any()])),
+  defop binary_get(binary = base(dyn()), index = ^integer_like),
     results: [result: base(dyn())]
 
-  defop binary_slice(binary = base(dyn()), start = all_of([base("!builtin.integer"), any()])),
+  defop binary_slice(binary = base(dyn()), start = ^integer_like),
     results: [result: base(dyn())]
 
-  defop binary_utf8_get(binary = base(dyn()), index = all_of([base("!builtin.integer"), any()])),
+  defop binary_utf8_get(binary = base(dyn()), index = ^integer_like),
     results: [result: base(dyn())]
 
   defop binary_utf8_width(
           binary = base(dyn()),
-          index = all_of([base("!builtin.integer"), any()])
+          index = ^integer_like
         ),
-        results: [result: all_of([base("!builtin.integer"), any()])]
+        results: [result: ^integer_like]
 
   defop binary_utf8_length(binary = base(dyn())),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
   defop binary_encode16(binary = base(dyn())),
     results: [result: base(dyn())]
@@ -522,14 +532,14 @@ defmodule Beaver.MLIR.Dialect.Ex do
     results: [result: base(dyn())]
 
   defop string_to_int(binary = base(dyn())),
-    results: [result: all_of([base("!builtin.integer"), any()])]
+    results: [result: ^integer_like]
 
-  defop yield(values = variadic(any())), traits: [:terminator]
+  defop yield(values = variadic(^any_value)), traits: [:terminator]
 
   defop func(),
     attributes: [sym_name: base("#builtin.string")],
     regions: [body: {:region, size: 1}],
     traits: [:isolated_from_above]
 
-  defop return(value = optional(any())), traits: [:terminator]
+  defop return(value = optional(^any_value)), traits: [:terminator]
 end

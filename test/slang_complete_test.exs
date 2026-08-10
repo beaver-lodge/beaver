@@ -23,6 +23,7 @@ defmodule SlangCompleteTest do
     assert rendered =~ ~s{names = ["element"]}
     assert rendered =~ ~s{names = ["item"]}
     assert rendered =~ ~s{names = ["value"]}
+    assert rendered =~ ~s{sym_name = "produce_integer"}
     assert rendered =~ ~s{names = ["head", "tail", "fallback"]}
     assert rendered =~ ~s{names = ["input"]}
     assert rendered =~ ~s{names = ["output"]}
