@@ -20,6 +20,11 @@ defmodule Beaver.Wasm.TermABI do
 
   @import_module "ex_term"
 
+  # These intrinsics coordinate native worker threads and pass a native
+  # function pointer across the ABI. They are intentionally unavailable to
+  # wasm hosts, where scheduling belongs to the host/runtime integration.
+  @native_only_intrinsics ["ex.term.process_wait", "ex.term.worker_run"]
+
   @type param :: :i64 | :ptr
   @type result :: :i64 | :void
 
@@ -172,6 +177,10 @@ defmodule Beaver.Wasm.TermABI do
   @spec symbols() :: [String.t()]
   def symbols, do: @intrinsics |> Map.keys() |> Enum.sort()
 
+  @doc "Term intrinsics intentionally provided only by the native runtime."
+  @spec native_only_symbols() :: [String.t()]
+  def native_only_symbols, do: @native_only_intrinsics
+
   @doc """
   Renders the manifest as a Markdown table (paste-ready for an upstream
   issue or the wasm host documentation).
@@ -197,7 +206,7 @@ defmodule Beaver.Wasm.TermABI do
   @doc false
   @spec coverage() :: %{missing: [String.t()], extra: [String.t()]}
   def coverage do
-    emitted = Ex.term_intrinsic_symbols()
+    emitted = Ex.term_intrinsic_symbols() -- native_only_symbols()
     declared = symbols()
 
     %{

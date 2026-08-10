@@ -9,7 +9,15 @@ defmodule WasmTermABITest do
     assert coverage.extra == []
 
     assert length(TermABI.manifest()) ==
-             length(Beaver.MLIR.Conversion.Ex.term_intrinsic_symbols())
+             length(Beaver.MLIR.Conversion.Ex.term_intrinsic_symbols()) -
+               length(TermABI.native_only_symbols())
+  end
+
+  test "excludes native scheduler intrinsics from the wasm host boundary" do
+    assert TermABI.native_only_symbols() == ["ex.term.process_wait", "ex.term.worker_run"]
+
+    refute TermABI.entry("ex.term.process_wait")
+    refute TermABI.entry("ex.term.worker_run")
   end
 
   test "declares the wasm import module and name" do
