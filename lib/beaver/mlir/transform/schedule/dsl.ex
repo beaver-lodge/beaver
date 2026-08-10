@@ -233,7 +233,9 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
        when is_atom(name) and (is_atom(context) or is_nil(context)) do
     type_builder =
       quote do
-        fn context -> Beaver.Deferred.create(unquote(type), context) end
+        Beaver.Deferred.defer(fn context ->
+          Beaver.Deferred.resolve(unquote(type), context)
+        end)
       end
 
     binding =
@@ -393,8 +395,8 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
 
   defp knob_attribute!(:unit, context), do: MLIR.Attribute.unit(ctx: context)
 
-  defp knob_attribute!(deferred, context) when is_function(deferred, 1) do
-    case deferred.(context) do
+  defp knob_attribute!(%Beaver.Deferred{} = deferred, context) do
+    case Beaver.Deferred.resolve(deferred, context) do
       %MLIR.Attribute{} = attribute -> knob_attribute!(attribute, context)
       value -> unsupported_knob_option!(value)
     end
@@ -596,7 +598,7 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
   def param(type), do: Transform.param_type(type)
 
   defp resolve_type!(type, context, label) do
-    case Beaver.Deferred.create(type, context) do
+    case Beaver.Deferred.resolve(type, context) do
       %MLIR.Type{} = resolved ->
         ensure_same_context!(resolved, context, label)
         resolved

@@ -43,10 +43,10 @@ defmodule SlangCompleteTest do
     assert CompleteSlang |> then(&Beaver.Slang.load(ctx, &1)) |> MLIR.LogicalResult.success?()
     assert MLIR.Context.terminator?(ctx, "complete_slang.yield")
 
-    type = CompleteSlang.box(MLIR.Type.i32()) |> Beaver.Deferred.create(ctx)
+    type = CompleteSlang.box(MLIR.Type.i32()) |> Beaver.Deferred.resolve(ctx)
 
     attribute =
-      CompleteSlang.direction(MLIR.Attribute.string("left")) |> Beaver.Deferred.create(ctx)
+      CompleteSlang.direction(MLIR.Attribute.string("left")) |> Beaver.Deferred.resolve(ctx)
 
     refute MLIR.null?(type)
     refute MLIR.null?(attribute)

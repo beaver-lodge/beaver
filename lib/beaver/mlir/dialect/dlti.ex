@@ -3,7 +3,7 @@ defmodule Beaver.MLIR.Dialect.DLTI do
   Operations and structured attribute builders for MLIR DLTI.
 
   DLTI attributes are contextual, so all builders follow Beaver's deferred
-  convention: pass `ctx:` for eager creation or pass the returned creator to
+  convention: pass `ctx:` for eager creation or pass the returned deferred value to
   another builder or operation.
   """
 
@@ -101,7 +101,7 @@ defmodule Beaver.MLIR.Dialect.DLTI do
 
   defp put_attribute(operation_or_module, name, attribute) do
     operation = MLIR.Operation.from_module(operation_or_module)
-    attribute = Beaver.Deferred.create(attribute, MLIR.context(operation))
+    attribute = Beaver.Deferred.resolve(attribute, MLIR.context(operation))
     MLIR.Operation.get_and_update(operation, name, fn _ -> {nil, attribute} end)
     operation_or_module
   end
@@ -122,7 +122,7 @@ defmodule Beaver.MLIR.Dialect.DLTI do
 
   defp render_entry(entry, ctx) do
     entry
-    |> Beaver.Deferred.create(ctx)
+    |> Beaver.Deferred.resolve(ctx)
     |> to_string()
   end
 
@@ -135,7 +135,7 @@ defmodule Beaver.MLIR.Dialect.DLTI do
 
   defp render_key(key, ctx) do
     key
-    |> Beaver.Deferred.create(ctx)
+    |> Beaver.Deferred.resolve(ctx)
     |> case do
       %MLIR.Type{} = type ->
         to_string(type)
@@ -159,7 +159,7 @@ defmodule Beaver.MLIR.Dialect.DLTI do
 
   defp render_value(value, ctx) do
     value
-    |> Beaver.Deferred.create(ctx)
+    |> Beaver.Deferred.resolve(ctx)
     |> case do
       %MLIR.Attribute{} = attribute -> to_string(attribute)
       %MLIR.Type{} = type -> type |> MLIR.Attribute.type() |> to_string()

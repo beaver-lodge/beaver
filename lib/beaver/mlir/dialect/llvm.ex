@@ -234,7 +234,7 @@ defmodule Beaver.MLIR.Dialect.LLVM do
   def global(%Beaver.SSA{arguments: arguments, ctx: ctx} = ssa) do
     opts = Keyword.new(arguments)
     sym_name = Keyword.fetch!(opts, :sym_name)
-    type = opts |> Keyword.fetch!(:type) |> Beaver.Deferred.create(ctx)
+    type = opts |> Keyword.fetch!(:type) |> Beaver.Deferred.resolve(ctx)
     address_space = Keyword.get(opts, :address_space, 0)
 
     arguments = [
@@ -284,7 +284,7 @@ defmodule Beaver.MLIR.Dialect.LLVM do
 
   defp render_type(type, ctx) do
     type
-    |> Beaver.Deferred.create(ctx)
+    |> Beaver.Deferred.resolve(ctx)
     |> case do
       %MLIR.Type{} = type -> to_string(type)
       other -> raise ArgumentError, "expected an MLIR type, got: #{inspect(other)}"

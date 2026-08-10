@@ -82,14 +82,14 @@ defmodule Beaver.MLIR do
     apply(CAPI, :"mlir#{entity_name}Equal", [a, b]) |> Beaver.Native.to_term()
   end
 
-  def equal?(a, b) when is_function(a, 1) do
+  def equal?(%Deferred{} = a, b) do
     ctx = context(b)
-    equal?(Beaver.Deferred.create(a, ctx), b)
+    equal?(Beaver.Deferred.resolve(a, ctx), b)
   end
 
-  def equal?(a, b) when is_function(b, 1) do
+  def equal?(a, %Deferred{} = b) do
     ctx = context(a)
-    equal?(a, Beaver.Deferred.create(b, ctx))
+    equal?(a, Beaver.Deferred.resolve(b, ctx))
   end
 
   @type nullable() ::
@@ -250,8 +250,8 @@ defmodule Beaver.MLIR do
     pm |> mlirPassManagerGetAsOpPassManager() |> __MODULE__.to_string()
   end
 
-  def to_string(f, opts) when is_function(f) do
-    Beaver.Deferred.create(f, Keyword.fetch!(opts, :ctx)) |> to_string(opts)
+  def to_string(%Deferred{} = deferred, opts) do
+    Deferred.resolve(deferred, Deferred.context(opts)) |> to_string(opts)
   end
 
   def to_string(%m{} = entity, _opts) do

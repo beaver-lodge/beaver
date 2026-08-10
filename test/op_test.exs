@@ -7,7 +7,8 @@ defmodule OpTest do
     const =
       ~m"""
       %0 = arith.constant dense<42> : vector<4xi32>
-      """.(ctx)
+      """
+      |> Beaver.Deferred.resolve(ctx)
       |> MLIR.verify!()
       |> MLIR.Module.body()
       |> Beaver.Walker.operations()
@@ -23,7 +24,10 @@ defmodule OpTest do
 
     # check deferred attribute
     old_attr = const[:value]
-    {attr, op} = get_and_update_in(const[:value], &{&1, ~a{#{attr_str2}}.(ctx)})
+
+    {attr, op} =
+      get_and_update_in(const[:value], &{&1, ~a{#{attr_str2}} |> Beaver.Deferred.resolve(ctx)})
+
     assert MLIR.equal?(attr, old_attr)
     assert MLIR.equal?(op, const)
     assert const |> MLIR.to_string() =~ attr_str2

@@ -42,8 +42,8 @@ defmodule Beaver.SSA do
     %__MODULE__{ssa | arguments: arguments ++ additional_arguments}
   end
 
-  def put_results(%__MODULE__{results: results} = ssa, f) when is_function(f, 1) do
-    %__MODULE__{ssa | results: results ++ [f]}
+  def put_results(%__MODULE__{results: results} = ssa, %Beaver.Deferred{} = deferred) do
+    %__MODULE__{ssa | results: results ++ [deferred]}
   end
 
   def put_results(%__MODULE__{results: results} = ssa, %MLIR.Type{} = single_result) do

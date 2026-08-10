@@ -24,7 +24,11 @@ defmodule Beaver do
   - use `blk` for MLIR block
 
   ## Lazy creation of MLIR entities
-  In Beaver, various functions and sigils might return a function with a signature like `MLIR.Context.t() -> MLIR.Type.t()`, if the context is not provided. When a creator gets passed to a SSA expression, it will be called with the context to create the entity or later the operation. Deferring the creation of the entity until context available is intended to keep the DSL code clean and succinct. For more information, see the docs of module `Beaver.Deferred`.
+  In Beaver, contextual builders and sigils return a `%Beaver.Deferred{}` if a
+  context is not provided. When a deferred value is passed to an SSA
+  expression, Beaver resolves it with the operation's context. Explicit
+  deferred values keep contextual construction distinct from ordinary
+  callbacks. For more information, see `Beaver.Deferred`.
   """
 
   defmacro __using__(_) do
@@ -72,7 +76,7 @@ defmodule Beaver do
     dsl_block_ast = dsl_block |> Beaver.SSA.prewalk(&MLIR.Operation.eval_ssa/1)
 
     ctx_ast =
-      if ctx = Beaver.Deferred.fetch_context(opts) do
+      if ctx = Keyword.get(opts, :ctx) do
         quote do
           Kernel.var!(beaver_internal_env_ctx) = unquote(ctx)
 

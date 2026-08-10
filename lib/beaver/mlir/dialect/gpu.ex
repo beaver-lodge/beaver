@@ -40,7 +40,7 @@ defmodule Beaver.MLIR.Dialect.GPU do
     * `:features` - target features, e.g. `"+ptx80"`
     * `:opt` - optimization level, an integer
 
-  Returns a deferred attribute creator unless `ctx:` is given, following the
+  Returns a deferred attribute value unless `ctx:` is given, following the
   convention of `MLIR.Attribute.get/2`. The resulting attribute can be passed
   to `package_binary!/3` as the target configuration of a `gpu.binary`.
   """
@@ -68,7 +68,7 @@ defmodule Beaver.MLIR.Dialect.GPU do
     * `:opt` - optimization level, an integer (defaults to `2`)
     * `:abi` - ABI version, e.g. `"600"`
 
-  Returns a deferred attribute creator unless `ctx:` is given, following the
+  Returns a deferred attribute value unless `ctx:` is given, following the
   convention of `MLIR.Attribute.get/2`. The resulting attribute can be passed
   to `package_binary!/3` as the target configuration of a `gpu.binary`.
   """

@@ -290,10 +290,10 @@ defmodule Beaver.Slang do
   defp source_location(opts, ctx) do
     case opts[:source] do
       %{file: file, line: line} ->
-        Beaver.Deferred.create(MLIR.Location.file(name: file, line: line), ctx)
+        Beaver.Deferred.resolve(MLIR.Location.file(name: file, line: line), ctx)
 
       _ ->
-        Beaver.Deferred.create(MLIR.Location.unknown(), ctx)
+        Beaver.Deferred.resolve(MLIR.Location.unknown(), ctx)
     end
   end
 
@@ -536,7 +536,7 @@ defmodule Beaver.Slang do
           attrs ++
             [
               numberOfBlocks:
-                Beaver.Deferred.create(
+                Beaver.Deferred.resolve(
                   MLIR.Attribute.integer(MLIR.Type.i32(), size),
                   ctx
                 )
@@ -545,7 +545,7 @@ defmodule Beaver.Slang do
       end)
       |> then(fn attrs ->
         if constrained_args? do
-          attrs ++ [constrainedArguments: Beaver.Deferred.create(MLIR.Attribute.unit(), ctx)]
+          attrs ++ [constrainedArguments: Beaver.Deferred.resolve(MLIR.Attribute.unit(), ctx)]
         else
           attrs
         end
@@ -564,7 +564,7 @@ defmodule Beaver.Slang do
 
     %Beaver.SSA{
       arguments: region_args,
-      results: [Beaver.Deferred.create(~t{!irdl.region}, ctx)],
+      results: [Beaver.Deferred.resolve(~t{!irdl.region}, ctx)],
       ip: block,
       ctx: ctx,
       loc: loc,
@@ -703,7 +703,7 @@ defmodule Beaver.Slang do
     Beaver.Deferred.from_opts(opts, fn ctx ->
       params =
         params
-        |> Enum.map(&Beaver.Deferred.create(&1, ctx))
+        |> Enum.map(&Beaver.Deferred.resolve(&1, ctx))
         |> Enum.map(fn
           %MLIR.Type{} = t -> MLIR.Attribute.type(t)
           %MLIR.Attribute{} = a -> a
@@ -908,7 +908,7 @@ defmodule Beaver.Slang do
       mlir ctx: ctx, ip: Beaver.Deferred.fetch_insertion_point(opts) do
         loc = constraint_location(opts, ctx)
 
-        IRDL.base([loc, base_ref: Beaver.Deferred.create(symbol, ctx)]) >>>
+        IRDL.base([loc, base_ref: Beaver.Deferred.resolve(symbol, ctx)]) >>>
           ~t{!irdl.attribute}
       end
     end)
@@ -982,7 +982,7 @@ defmodule Beaver.Slang do
   @doc false
   # This function creates a parametric attribute for a given value. It generates the code for `irdl.parametric` op.
   def create_parametric({:parametric, symbol, values, _}, opts) do
-    base_type = Beaver.Deferred.from_opts(opts, symbol)
+    base_type = symbol
 
     Beaver.Deferred.from_opts(
       opts,

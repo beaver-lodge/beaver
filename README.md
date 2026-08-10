@@ -84,7 +84,7 @@ module {
     return %0 : tensor<2x3xf32>
   }
 }
-""".(ctx)
+""" |> Beaver.Deferred.resolve(ctx)
 |> Beaver.Composer.append(ToyPass)
 |> canonicalize
 |> Beaver.Composer.run!()
@@ -267,12 +267,14 @@ Each of these sub-ecosystems starts with a seed project/library. Beaver should e
 
 ## MLIR context management
 
-When calling higher-level APIs, it is ideal not to have MLIR context passing around everywhere.
-If no MLIR context provided, an attribute and type getter should return an anonymous function with MLIR context as argument.
-In Erlang, all values are copied, so it is very safe to pass around these anonymous functions.
-When creating an operation, these functions will be called with the MLIR context in an operation state.
-With this approach we achieve both succinctness and modularity, not having a global MLIR context.
-Usually a function accepting a MLIR context to create an operation or type is called a "creator" in Beaver.
+Higher-level builders accept `ctx:` for eager construction. Without it they
+return an explicit `%Beaver.Deferred{}` which can be composed into another
+builder or materialized with `Beaver.Deferred.resolve/2`.
+
+Deferred values are not anonymous callback functions: the distinct type keeps
+contextual construction separate from callback APIs and lets Beaver reject
+cross-context entities before entering MLIR's native boundary. This preserves
+succinct DSL code without introducing a process-global MLIR context.
 
 ## Development
 

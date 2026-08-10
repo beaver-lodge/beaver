@@ -176,12 +176,12 @@ defmodule Beaver.MLIR.Attribute do
       opts,
       fn ctx ->
         shaped_type =
-          case Beaver.Deferred.create(shaped_type, ctx) do
+          case Beaver.Deferred.resolve(shaped_type, ctx) do
             {:ok, %Beaver.MLIR.Type{} = t} -> t
             %Beaver.MLIR.Type{} = t -> t
           end
 
-        elements = elements_or_value |> Enum.map(&Beaver.Deferred.create(&1, ctx))
+        elements = elements_or_value |> Enum.map(&Beaver.Deferred.resolve(&1, ctx))
         num_elements = length(elements)
 
         shaped_type_num_elements =
@@ -201,8 +201,8 @@ defmodule Beaver.MLIR.Attribute do
     Beaver.Deferred.from_opts(
       opts,
       fn ctx ->
-        value = Beaver.Deferred.create(value, ctx)
-        shaped_type = Beaver.Deferred.create(shaped_type, ctx)
+        value = Beaver.Deferred.resolve(value, ctx)
+        shaped_type = Beaver.Deferred.resolve(shaped_type, ctx)
         dense_elements_splat_get(shaped_type, value, ctx)
       end
     )
@@ -216,7 +216,7 @@ defmodule Beaver.MLIR.Attribute do
           ctx,
           length(elements),
           elements
-          |> Enum.map(&Beaver.Deferred.create(&1, ctx))
+          |> Enum.map(&Beaver.Deferred.resolve(&1, ctx))
           |> Beaver.Native.array(MLIR.Attribute)
         )
       end
@@ -270,7 +270,7 @@ defmodule Beaver.MLIR.Attribute do
           ctx,
           length(elements),
           elements
-          |> Enum.map(&Beaver.Deferred.create(&1, ctx))
+          |> Enum.map(&Beaver.Deferred.resolve(&1, ctx))
           |> Beaver.Native.array(MLIR.NamedAttribute)
         )
       end
@@ -284,9 +284,8 @@ defmodule Beaver.MLIR.Attribute do
     )
   end
 
-  def type(t)
-      when is_function(t, 1) do
-    &type(t.(&1))
+  def type(%Beaver.Deferred{} = type) do
+    Beaver.Deferred.defer(&type(Beaver.Deferred.resolve(type, &1)))
   end
 
   def type(%MLIR.Type{} = t) do
@@ -298,7 +297,9 @@ defmodule Beaver.MLIR.Attribute do
     if validate.(t), do: get.(t), else: raise(ArgumentError, "incompatible type #{to_string(t)}")
   end
 
-  defp composite(t, validate, get) when is_function(t, 1), do: &composite(t.(&1), validate, get)
+  defp composite(%Beaver.Deferred{} = type, validate, get) do
+    Beaver.Deferred.defer(&composite(Beaver.Deferred.resolve(type, &1), validate, get))
+  end
 
   def integer(t, value) when is_integer(value) do
     composite(
@@ -327,8 +328,8 @@ defmodule Beaver.MLIR.Attribute do
     )
   end
 
-  def affine_map(map) when is_function(map, 1) do
-    &affine_map(map.(&1))
+  def affine_map(%Beaver.Deferred{} = map) do
+    Beaver.Deferred.defer(&affine_map(Beaver.Deferred.resolve(map, &1)))
   end
 
   def affine_map(%MLIR.AffineMap{} = map) do
@@ -371,7 +372,9 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   def index(value, opts \\ []) when is_integer(value) do
-    Beaver.Deferred.from_opts(opts, ~a{#{value} : index})
+    Beaver.Deferred.from_opts(opts, fn ctx ->
+      Beaver.Deferred.resolve(~a{#{value} : index}, ctx)
+    end)
   end
 
   def null() do

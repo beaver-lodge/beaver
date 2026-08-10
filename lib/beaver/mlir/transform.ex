@@ -186,8 +186,11 @@ defmodule Beaver.MLIR.Transform do
   @doc "Creates a Transform parameter type wrapping an MLIR type."
   def param_type(type) do
     case type do
-      %MLIR.Type{} -> MLIR.CAPI.mlirTransformParamTypeGet(MLIR.context(type), type)
-      deferred when is_function(deferred, 1) -> &param_type(deferred.(&1))
+      %MLIR.Type{} ->
+        MLIR.CAPI.mlirTransformParamTypeGet(MLIR.context(type), type)
+
+      %Beaver.Deferred{} = deferred ->
+        Beaver.Deferred.defer(&param_type(Beaver.Deferred.resolve(deferred, &1)))
     end
   end
 

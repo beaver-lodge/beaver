@@ -6,26 +6,30 @@ defmodule Beaver.MLIR.Block do
 
   use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
 
-  defp do_add_args!(block, ctx, {t, loc}) when is_function(t, 1) or is_function(loc, 1) do
+  defp do_add_args!(block, ctx, {t, loc})
+       when is_struct(t, Beaver.Deferred) or is_struct(loc, Beaver.Deferred) do
     MLIR.CAPI.mlirBlockAddArgument(
       block,
-      t |> Beaver.Deferred.create(ctx),
-      loc |> Beaver.Deferred.create(ctx)
+      t |> Beaver.Deferred.resolve(ctx),
+      loc |> Beaver.Deferred.resolve(ctx)
     )
   end
 
   defp do_add_args!(block, ctx, {t = %Beaver.MLIR.Type{}, loc}) do
-    loc = loc |> Beaver.Deferred.create(ctx)
+    t = t |> Beaver.Deferred.resolve(ctx)
+    loc = loc |> Beaver.Deferred.resolve(ctx)
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
   defp do_add_args!(block, ctx, {t = {:parametric, _, _, _f}, loc}) do
-    t = Beaver.Deferred.create(t, ctx)
+    t = Beaver.Deferred.resolve(t, ctx)
+    loc = Beaver.Deferred.resolve(loc, ctx)
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
   defp do_add_args!(block, ctx, {t, loc}) do
     t = MLIR.CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create(t))
+    loc = Beaver.Deferred.resolve(loc, ctx)
     MLIR.CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
@@ -42,7 +46,7 @@ defmodule Beaver.MLIR.Block do
   """
   def add_args!(block, args, opts \\ []) when is_list(args) do
     ctx =
-      opts[:ctx] ||
+      Beaver.Deferred.context(opts) ||
         Enum.find_value(args, fn
           t = %MLIR.Type{} -> MLIR.context(t)
           {t = %MLIR.Type{}, _} -> MLIR.context(t)

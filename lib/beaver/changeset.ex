@@ -56,9 +56,12 @@ defmodule Beaver.Changeset do
     end
   end
 
-  def add_argument(%__MODULE__{context: context} = changeset, {tag, f})
-      when is_atom(tag) and is_function(f, 1) do
-    add_argument(changeset, {tag, Beaver.Deferred.create(f, context)})
+  def add_argument(
+        %__MODULE__{context: context} = changeset,
+        {tag, %Deferred{} = deferred}
+      )
+      when is_atom(tag) do
+    add_argument(changeset, {tag, Deferred.resolve(deferred, context)})
   end
 
   # f should return regions
@@ -75,14 +78,19 @@ defmodule Beaver.Changeset do
     %__MODULE__{changeset | regions: regions ++ [region]}
   end
 
-  def add_argument(%__MODULE__{} = changeset, {:loc, %Beaver.MLIR.Location{} = location}) do
-    %__MODULE__{changeset | location: location}
+  def add_argument(
+        %__MODULE__{context: context} = changeset,
+        {:loc, %MLIR.Location{} = location}
+      ) do
+    %__MODULE__{changeset | location: Deferred.resolve(location, context)}
   end
 
   def add_argument(
-        %__MODULE__{successors: successors, operands: operands} = changeset,
+        %__MODULE__{context: context, successors: successors, operands: operands} = changeset,
         {%MLIR.Block{} = successor_block, block_args}
       ) do
+    block_args = Enum.map(block_args, &Deferred.resolve(&1, context))
+
     %__MODULE__{
       changeset
       | successors: successors ++ [successor_block],
@@ -111,18 +119,20 @@ defmodule Beaver.Changeset do
   end
 
   def add_argument(
-        %__MODULE__{attributes: attributes} = changeset,
+        %__MODULE__{context: context, attributes: attributes} = changeset,
         {name, %MLIR.Attribute{} = attr}
       )
       when is_atom(name) do
+    attr = Deferred.resolve(attr, context)
     %__MODULE__{changeset | attributes: attributes ++ [{name, attr}]}
   end
 
   def add_argument(
-        %__MODULE__{attributes: attributes} = changeset,
+        %__MODULE__{context: context, attributes: attributes} = changeset,
         {name, %MLIR.Type{} = type}
       )
       when is_atom(name) do
+    type = Deferred.resolve(type, context)
     %__MODULE__{changeset | attributes: attributes ++ [{name, type}]}
   end
 
@@ -135,25 +145,28 @@ defmodule Beaver.Changeset do
   end
 
   def add_argument(
-        %__MODULE__{operands: operands} = changeset,
-        {operand_name, %MLIR.Value{}} = operand
+        %__MODULE__{context: context, operands: operands} = changeset,
+        {operand_name, %MLIR.Value{} = value}
       )
       when is_atom(operand_name) do
+    operand = {operand_name, Deferred.resolve(value, context)}
     %__MODULE__{changeset | operands: operands ++ [operand]}
   end
 
   def add_argument(
-        %__MODULE__{operands: operands} = changeset,
-        {operand_name, variadic_operands} = operand
+        %__MODULE__{context: context, operands: operands} = changeset,
+        {operand_name, variadic_operands}
       )
       when is_atom(operand_name) and is_list(variadic_operands) do
+    operand = {operand_name, Enum.map(variadic_operands, &Deferred.resolve(&1, context))}
     %__MODULE__{changeset | operands: operands ++ [operand]}
   end
 
   def add_argument(
-        %__MODULE__{operands: operands} = changeset,
+        %__MODULE__{context: context, operands: operands} = changeset,
         %MLIR.Value{} = operand
       ) do
+    operand = Deferred.resolve(operand, context)
     %__MODULE__{changeset | operands: operands ++ [operand]}
   end
 
@@ -181,8 +194,8 @@ defmodule Beaver.Changeset do
     end
   end
 
-  def add_result(%__MODULE__{context: context} = changeset, f) when is_function(f, 1) do
-    add_result(changeset, Beaver.Deferred.create(f, context))
+  def add_result(%__MODULE__{context: context} = changeset, %Deferred{} = deferred) do
+    add_result(changeset, Deferred.resolve(deferred, context))
   end
 
   def add_result(%__MODULE__{results: :infer}, type) when type != :infer do
@@ -193,7 +206,11 @@ defmodule Beaver.Changeset do
     %__MODULE__{changeset | results: :infer}
   end
 
-  def add_result(%__MODULE__{results: results} = changeset, %MLIR.Type{} = result_type) do
+  def add_result(
+        %__MODULE__{context: context, results: results} = changeset,
+        %MLIR.Type{} = result_type
+      ) do
+    result_type = Deferred.resolve(result_type, context)
     %__MODULE__{changeset | results: results ++ [result_type]}
   end
 
@@ -264,7 +281,7 @@ defmodule Beaver.Changeset do
           attributes
           |> Keyword.delete(:operand_segment_sizes)
           |> Keyword.delete(:operandSegmentSizes)
-          |> Keyword.put(:operand_segment_sizes, Beaver.Deferred.create(segment_sizes, context))
+          |> Keyword.put(:operand_segment_sizes, Beaver.Deferred.resolve(segment_sizes, context))
 
         _ ->
           attributes

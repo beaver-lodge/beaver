@@ -90,7 +90,7 @@ defmodule Beaver.MLIR.Dialect.Ptr do
       end)
 
     Deferred.from_opts(opts, fn ctx ->
-      pointer_type = Deferred.create(pointer_type, ctx)
+      pointer_type = Deferred.resolve(pointer_type, ctx)
       Attribute.get("#{source} : #{MLIR.to_string(pointer_type)}", ctx: ctx)
     end)
   end
@@ -103,5 +103,5 @@ defmodule Beaver.MLIR.Dialect.Ptr do
   defp materialize_memory_space(address_space, ctx) when is_integer(address_space),
     do: llvm_address_space(address_space, ctx: ctx)
 
-  defp materialize_memory_space(memory_space, ctx), do: Deferred.create(memory_space, ctx)
+  defp materialize_memory_space(memory_space, ctx), do: Deferred.resolve(memory_space, ctx)
 end

@@ -14,7 +14,7 @@ defmodule Beaver.MLIR.AffineMap do
           exprs
           |> Enum.map(fn
             const when is_integer(const) -> MLIR.CAPI.mlirAffineConstantExprGet(ctx, const)
-            f when is_function(f, 1) -> f.(ctx)
+            %Beaver.Deferred{} = deferred -> Beaver.Deferred.resolve(deferred, ctx)
             expr -> expr
           end)
 

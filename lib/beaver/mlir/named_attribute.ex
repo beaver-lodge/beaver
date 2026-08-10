@@ -25,12 +25,15 @@ defmodule Beaver.MLIR.NamedAttribute do
     Beaver.Deferred.from_opts(
       opts,
       fn ctx ->
-        mlirNamedAttributeGet(
+        identifier =
           case name do
             %MLIR.Identifier{} -> name
             s -> MLIR.Identifier.get(s, ctx: ctx)
-          end,
-          Beaver.Deferred.create(attr, ctx)
+          end
+
+        mlirNamedAttributeGet(
+          Beaver.Deferred.resolve(identifier, ctx),
+          Beaver.Deferred.resolve(attr, ctx)
         )
       end
     )

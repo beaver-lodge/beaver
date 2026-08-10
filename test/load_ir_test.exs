@@ -8,7 +8,8 @@ defmodule LoadIRTest do
 
     ~m"""
     #{content}
-    """.(ctx)
+    """
+    |> Beaver.Deferred.resolve(ctx)
     |> MLIR.verify!()
   end
 

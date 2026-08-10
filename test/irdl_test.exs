@@ -30,7 +30,8 @@ defmodule IRDLTest do
           irdl.results(res: %3)
         }
       }
-      """.(ctx)
+      """
+      |> Beaver.Deferred.resolve(ctx)
       |> MLIR.verify!()
 
     assert m
@@ -53,7 +54,7 @@ defmodule IRDLTest do
     CMath.IRExample.gen(ctx)
 
     assert not (CMath.some_attr(Type.f32())
-                |> Beaver.Deferred.create(ctx)
+                |> Beaver.Deferred.resolve(ctx)
                 |> MLIR.null?())
 
     assert not (MLIR.CAPI.mlirContextGetOrLoadDialect(

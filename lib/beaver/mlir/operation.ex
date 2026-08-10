@@ -222,7 +222,7 @@ defmodule Beaver.MLIR.Operation do
         mlirOperationSetAttributeByName(
           operation,
           MLIR.StringRef.create(attribute),
-          Beaver.Deferred.create(new_value, ctx)
+          Beaver.Deferred.resolve(new_value, ctx)
         )
 
       :pop ->

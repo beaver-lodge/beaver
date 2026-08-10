@@ -28,7 +28,7 @@ defmodule CfTest do
         return(base_lr)
       end
 
-    ir = ~m{#{mlir}}.(ctx)
+    ir = ~m{#{mlir}} |> Beaver.Deferred.resolve(ctx)
 
     f = get_func(ir, "get_lr_with_ctrl_flow")
 
