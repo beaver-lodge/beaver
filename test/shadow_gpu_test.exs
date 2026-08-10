@@ -150,21 +150,11 @@ defmodule Beaver.Shadow.GPUTest do
     llvm = Beaver.Triton.compile_to_llvm(module)
 
     # compile LLVM IR to PTX through the prebuilt toolchain
-    tmp_dir = System.tmp_dir!()
-    ll_path = Path.join(tmp_dir, "matmul_test.ll")
-    ptx_path = Path.join(tmp_dir, "matmul_test.ptx")
-    File.write!(ll_path, Beaver.MLIR.Target.LLVMIR.translate!(llvm))
+    ptx =
+      llvm
+      |> Beaver.MLIR.Target.LLVMIR.translate!()
+      |> Beaver.MLIR.Target.LLVMIR.compile_to_ptx!(cpu: "sm_80")
 
-    llvm_bin = Path.dirname(System.get_env("LLVM_CONFIG_PATH"))
-
-    {_, 0} =
-      System.cmd(
-        Path.join(llvm_bin, "llc"),
-        ["-march=nvptx64", "-mcpu=sm_80", ll_path, "-o", ptx_path],
-        stderr_to_stdout: true
-      )
-
-    ptx = File.read!(ptx_path)
     assert ptx =~ ".visible .entry matmul_kernel_"
 
     escaped =

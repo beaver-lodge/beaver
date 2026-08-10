@@ -14,7 +14,12 @@ add_mlir_public_c_api_library(
   Triton.cpp
   LINK_LIBS
   PUBLIC
-  MLIRDebug)
+  MLIRDebug
+  LLVMCore
+  LLVMIRReader
+  LLVMTarget
+  LLVMCodeGen
+  LLVMNVPTXCodeGen)
 
 if(BEAVER_TRITON_PREBUILT_DIR)
   foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)

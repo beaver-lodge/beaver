@@ -31,6 +31,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
     beaver_raw_infer_return_types: 7,
     beaver_raw_infer_return_type_components: 7,
     beaver_raw_translate_module_to_llvm_ir: 1,
+    beaver_raw_compile_llvm_ir_to_ptx: 3,
     beaver_raw_transform_state_payload_ops: 2,
     beaver_raw_transform_state_payload_values: 2,
     beaver_raw_transform_state_params: 2,

@@ -36,6 +36,14 @@ defmodule Beaver.CAPI.ManifestGenerator do
       "lifetime" => "nif_call",
       "destructor" => "native_owner"
     },
+    "beaverCompileLLVMIRToPTX" => %{
+      "wrapper_name" => "beaver_raw_compile_llvm_ir_to_ptx",
+      "runtime" => "native_collector",
+      "scheduler" => "dirty_cpu",
+      "owner" => "caller",
+      "lifetime" => "nif_call",
+      "destructor" => "native_owner"
+    },
     "mlirTransformStateForEachPayloadOp" => %{
       "wrapper_name" => "beaver_raw_transform_state_payload_ops",
       "runtime" => "native_collector",

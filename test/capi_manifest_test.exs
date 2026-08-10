@@ -168,6 +168,7 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
     assert Enum.map(collector_entries, &get_in(&1, ["callback_bridge", "wrapper_name"]))
            |> MapSet.new() ==
              MapSet.new([
+               "beaver_raw_compile_llvm_ir_to_ptx",
                "beaver_raw_translate_module_to_llvm_ir",
                "beaver_raw_infer_return_types",
                "beaver_raw_infer_return_type_components",
@@ -176,10 +177,13 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
                "beaver_raw_transform_state_payload_values"
              ])
 
-    {llvm_ir_entries, transform_collector_entries} =
+    {llvm_entries, transform_collector_entries} =
       Enum.split_with(
         collector_entries,
-        &(get_in(&1, ["function", "name"]) == "beaverTranslateModuleToLLVMIRText")
+        &(get_in(&1, ["function", "name"]) in [
+            "beaverCompileLLVMIRToPTX",
+            "beaverTranslateModuleToLLVMIRText"
+          ])
       )
 
     for entry <- transform_collector_entries do
@@ -192,16 +196,22 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
       assert bridge["facets"] == ["native_collector", "context_owned_handles"]
     end
 
-    assert [llvm_ir_entry] = llvm_ir_entries
+    assert Enum.map(llvm_entries, &get_in(&1, ["callback_bridge", "wrapper_name"]))
+           |> MapSet.new() ==
+             MapSet.new([
+               "beaver_raw_compile_llvm_ir_to_ptx",
+               "beaver_raw_translate_module_to_llvm_ir"
+             ])
 
-    assert %{
-             "wrapper_name" => "beaver_raw_translate_module_to_llvm_ir",
-             "runtime_backed" => true,
-             "scheduler" => "dirty_cpu",
-             "owner" => "caller",
-             "destructor" => "native_owner",
-             "lifetime" => "nif_call"
-           } = llvm_ir_entry["callback_bridge"]
+    for entry <- llvm_entries do
+      assert %{
+               "runtime_backed" => true,
+               "scheduler" => "dirty_cpu",
+               "owner" => "caller",
+               "destructor" => "native_owner",
+               "lifetime" => "nif_call"
+             } = entry["callback_bridge"]
+    end
 
     assert [manual_runtime] = manual_runtime_entries
     assert get_in(manual_runtime, ["function", "name"]) == "mlirValueReplaceUsesWithIf"
