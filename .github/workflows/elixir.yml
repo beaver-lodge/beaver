@@ -70,19 +70,24 @@ jobs:
       - name: Read Triton version
         if: matrix.llvm == 'triton'
         run: echo "TRITON_REF=$(jq -er '.triton_ref' triton.json)" >> "$GITHUB_ENV"
-      # Kinda 0.11.0 on Hex predates the LLP64 integer conversion fix; the
-      # Windows lane needs the paired checkout until a release containing
-      # beaver-lodge/kinda#68 is published.
-      - uses: actions/checkout@v4
-        name: Check out paired Kinda
+      # Kinda 0.11.0 on Hex predates the LLP64 integer conversion fix, so the
+      # Windows lane uses the paired revision pinned in kinda.ref until a
+      # release containing beaver-lodge/kinda#68 is published.
+      - name: Check out paired Kinda
         if: runner.os == 'Windows'
-        with:
-          repository: beaver-lodge/kinda
-          path: kinda
-          ref: 81a51065952cb644b10cb60dacc4370ec653c9ed
-      - name: Point Mix at the paired Kinda checkout
-        if: runner.os == 'Windows'
-        run: echo "BEAVER_KINDA_PATH=${GITHUB_WORKSPACE}/kinda" >> "$GITHUB_ENV"
+        run: |
+          ref="$(awk 'NF && $1 !~ /^#/ {print $1; exit}' kinda.ref 2>/dev/null || true)"
+          if [ -n "$ref" ]; then
+            git clone https://github.com/beaver-lodge/kinda.git kinda
+            if git -C kinda cat-file -e "$ref^{commit}" 2>/dev/null; then
+              git -C kinda checkout "$ref"
+              echo "BEAVER_KINDA_PATH=${GITHUB_WORKSPACE}/kinda" >> "$GITHUB_ENV"
+            else
+              echo "warning: paired kinda ref $ref unavailable, using Hex release" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            echo "no paired kinda ref, using Hex release" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: erlef/setup-beam@v1
         with:
           otp-version: ${{matrix.otp}}
