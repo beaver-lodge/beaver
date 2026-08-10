@@ -1,0 +1,8 @@
+# Paired beaver-lodge/kinda revision to test against while the fixes it
+# contains are not yet published to Hex.
+#
+# Keep this as a single commit SHA per line. CI reads the first non-comment
+# line, probes the revision on beaver-lodge/kinda, and falls back to the Hex
+# release when it is unavailable. Delete this file once the fixes land in a
+# Hex release.
+81a51065952cb644b10cb60dacc4370ec653c9ed
