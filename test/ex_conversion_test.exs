@@ -690,33 +690,37 @@ defmodule ExConversionTest do
             %2 = "ex.lit"() {value = 2 : i64} : () -> i64
             %3 = "ex.box"(%0) : (i64) -> !ex.dyn
             %4 = "ex.spawn"(%3) : (!ex.dyn) -> !ex.dyn
-            %5 = "ex.process_table_reset"(%1) : (i64) -> i64
-            %6 = "ex.cont_save"(%1, %2, %0) : (i64, i64, i64) -> i64
-            %7 = "ex.receive_cont_save"(%1, %2, %0) : (i64, i64, i64) -> i64
-            %8 = "ex.cont_pending"() : () -> i64
-            %9 = "ex.cont_active"() : () -> i64
-            %10 = "ex.cont_clear"() : () -> i64
-            %11 = "ex.cont_load_arg"() : () -> i64
-            %12 = "ex.cont_load_acc"() : () -> i64
-            %13 = "ex.cont_load_cursor"() : () -> i64
-            %14 = "ex.schedule_next"() : () -> i64
-            %15 = "ex.mailbox_len"() : () -> i64
-            %16 = "ex.mailbox_peek"(%0) : (i64) -> !ex.dyn
-            %17 = "ex.mailbox_remove"(%0) : (i64) -> i64
-            %18 = "ex.nil_word"() : () -> !ex.dyn
-            %19 = "ex.monotonic_time"() : () -> i64
-            %20 = "ex.receive_start"() : () -> i64
-            %21 = "ex.receive_start_set"(%0) : (i64) -> i64
-            %22 = "ex.native_time"() : () -> i64
-            %23 = "ex.unique_integer"(%0) : (i64) -> i64
-            %24 = "ex.current_entry"() : () -> i64
-            %25 = "ex.process_done"(%0) : (i64) -> i64
-            %26 = "ex.processes_runnable"() : () -> i64
-            %27 = "ex.process_result"(%4) : (!ex.dyn) -> i64
-            %28 = "ex.func_addr"() {sym_name = "actor_step"} : () -> ((i64) -> i64)
-            %29 = "ex.worker_run"(%1, %28) : (i64, (i64) -> i64) -> i64
-            %30 = "ex.process_wait"(%0) : (i64) -> i64
-            "ex.return"(%29) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+            %5 = "ex.runtime_create"() : () -> i64
+            %6 = "ex.runtime_enter"(%5) : (i64) -> i64
+            %runtime_leave = "ex.runtime_leave"() : () -> i64
+            %runtime_destroy = "ex.runtime_destroy"(%5) : (i64) -> i64
+            %7 = "ex.process_table_reset"(%1) : (i64) -> i64
+            %8 = "ex.cont_save"(%1, %2, %0) : (i64, i64, i64) -> i64
+            %9 = "ex.receive_cont_save"(%1, %2, %0) : (i64, i64, i64) -> i64
+            %10 = "ex.cont_pending"() : () -> i64
+            %11 = "ex.cont_active"() : () -> i64
+            %12 = "ex.cont_clear"() : () -> i64
+            %13 = "ex.cont_load_arg"() : () -> i64
+            %14 = "ex.cont_load_acc"() : () -> i64
+            %15 = "ex.cont_load_cursor"() : () -> i64
+            %16 = "ex.schedule_next"() : () -> i64
+            %17 = "ex.mailbox_len"() : () -> i64
+            %18 = "ex.mailbox_peek"(%0) : (i64) -> !ex.dyn
+            %19 = "ex.mailbox_remove"(%0) : (i64) -> i64
+            %20 = "ex.nil_word"() : () -> !ex.dyn
+            %21 = "ex.monotonic_time"() : () -> i64
+            %22 = "ex.receive_start"() : () -> i64
+            %23 = "ex.receive_start_set"(%0) : (i64) -> i64
+            %24 = "ex.native_time"() : () -> i64
+            %25 = "ex.unique_integer"(%0) : (i64) -> i64
+            %26 = "ex.current_entry"() : () -> i64
+            %27 = "ex.process_done"(%0) : (i64) -> i64
+            %28 = "ex.processes_runnable"() : () -> i64
+            %29 = "ex.process_result"(%4) : (!ex.dyn) -> i64
+            %30 = "ex.func_addr"() {sym_name = "actor_step"} : () -> ((i64) -> i64)
+            %31 = "ex.worker_run"(%1, %30) : (i64, (i64) -> i64) -> i64
+            %32 = "ex.process_wait"(%0) : (i64) -> i64
+            "ex.return"(%31) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
         """,
@@ -727,6 +731,10 @@ defmodule ExConversionTest do
 
     rendered = MLIR.to_string(module, generic: true)
     assert rendered =~ "ex.term.spawn"
+    assert rendered =~ "ex.term.runtime_create"
+    assert rendered =~ "ex.term.runtime_enter"
+    assert rendered =~ "ex.term.runtime_leave"
+    assert rendered =~ "ex.term.runtime_destroy"
     assert rendered =~ "ex.term.process_table_reset"
     assert rendered =~ "ex.term.cont_save"
     assert rendered =~ "ex.term.receive_cont_save"

@@ -86,6 +86,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.receive", &convert_receive/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mailbox_clear", &convert_mailbox_clear/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.spawn", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.runtime_create", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.runtime_enter", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.runtime_leave", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.runtime_destroy", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.process_table_reset", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.cont_save", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.receive_cont_save", &convert_term_read/3, version: "1.0")
@@ -183,6 +187,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
     receive: "ex.term.receive",
     mailbox_clear: "ex.term.mailbox_clear",
     spawn: "ex.term.spawn",
+    runtime_create: "ex.term.runtime_create",
+    runtime_enter: "ex.term.runtime_enter",
+    runtime_leave: "ex.term.runtime_leave",
+    runtime_destroy: "ex.term.runtime_destroy",
     process_table_reset: "ex.term.process_table_reset",
     cont_save: "ex.term.cont_save",
     receive_cont_save: "ex.term.receive_cont_save",
@@ -907,6 +915,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.clock_init"), do: @term_intrinsics.clock_init
   defp read_intrinsic("ex.yield_mark"), do: @term_intrinsics.yield_mark
   defp read_intrinsic("ex.spawn"), do: @term_intrinsics.spawn
+  defp read_intrinsic("ex.runtime_create"), do: @term_intrinsics.runtime_create
+  defp read_intrinsic("ex.runtime_enter"), do: @term_intrinsics.runtime_enter
+  defp read_intrinsic("ex.runtime_leave"), do: @term_intrinsics.runtime_leave
+  defp read_intrinsic("ex.runtime_destroy"), do: @term_intrinsics.runtime_destroy
   defp read_intrinsic("ex.process_table_reset"), do: @term_intrinsics.process_table_reset
   defp read_intrinsic("ex.cont_save"), do: @term_intrinsics.cont_save
   defp read_intrinsic("ex.receive_cont_save"), do: @term_intrinsics.receive_cont_save
@@ -1120,6 +1132,22 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp intrinsic_function_type("ex.term.spawn", _ctx) do
+    MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.runtime_create", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.runtime_enter", _ctx) do
+    MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.runtime_leave", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.runtime_destroy", _ctx) do
     MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
