@@ -58,6 +58,14 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.runtime_enter" => %{params: [:i64], result: :i64},
     "ex.term.runtime_leave" => %{params: [], result: :i64},
     "ex.term.runtime_destroy" => %{params: [:i64], result: :i64},
+    # host result ownership / materialization
+    "ex.term.result_create" => %{params: [:i64, :i64], result: :i64},
+    "ex.term.result_destroy" => %{params: [:i64], result: :i64},
+    "ex.term.result_root_kind" => %{params: [:i64], result: :i64},
+    "ex.term.result_root_word" => %{params: [:i64], result: :i64},
+    "ex.term.result_term_kind" => %{params: [:i64, :i64], result: :i64},
+    "ex.term.result_term_length" => %{params: [:i64, :i64], result: :i64},
+    "ex.term.result_term_get" => %{params: [:i64, :i64, :i64], result: :i64},
     # process table / scheduler driver
     "ex.term.spawn" => %{params: [:i64], result: :i64},
     "ex.term.process_table_reset" => %{params: [:i64], result: :i64},

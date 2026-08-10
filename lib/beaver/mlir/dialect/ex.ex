@@ -171,6 +171,35 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop runtime_destroy(handle = ^integer_like),
     results: [result: ^integer_like]
 
+  # Host-result lifecycle. A result handle keeps the producing runtime alive
+  # while the host materializes an arena-backed term, then releases both
+  # together. Inspection always carries the handle so runtimes can reject
+  # stale or foreign words instead of dereferencing arbitrary tagged i64s.
+  defop result_create(runtime = ^integer_like, word = ^integer_like),
+    results: [result: ^integer_like]
+
+  defop result_destroy(handle = ^integer_like),
+    results: [result: ^integer_like]
+
+  defop result_root_kind(handle = ^integer_like),
+    results: [result: ^integer_like]
+
+  defop result_root_word(handle = ^integer_like),
+    results: [result: ^integer_like]
+
+  defop result_term_kind(handle = ^integer_like, word = ^integer_like),
+    results: [result: ^integer_like]
+
+  defop result_term_length(handle = ^integer_like, word = ^integer_like),
+    results: [result: ^integer_like]
+
+  defop result_term_get(
+          handle = ^integer_like,
+          word = ^integer_like,
+          index = ^integer_like
+        ),
+        results: [result: ^integer_like]
+
   # Resets the runtime process table to a single fresh initial process with
   # the given capacity; the scheduler driver calls this at program start.
   defop process_table_reset(cap = ^integer_like),
