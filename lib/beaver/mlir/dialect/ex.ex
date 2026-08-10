@@ -146,6 +146,21 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop spawn(fun = optional(base(dyn()))),
     results: [result: base(dyn())]
 
+  # Explicit runtime-instance lifecycle. Hosts use these operations to give
+  # each execution its own native state instead of relying on the
+  # compatibility runtime associated with the invoking OS thread.
+  defop runtime_create(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop runtime_enter(handle = all_of([base("!builtin.integer"), any()])),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop runtime_leave(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop runtime_destroy(handle = all_of([base("!builtin.integer"), any()])),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
   # Resets the runtime process table to a single fresh initial process with
   # the given capacity; the scheduler driver calls this at program start.
   defop process_table_reset(cap = all_of([base("!builtin.integer"), any()])),

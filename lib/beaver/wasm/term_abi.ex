@@ -53,6 +53,11 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.native_time" => %{params: [], result: :i64},
     "ex.term.unique_integer" => %{params: [:i64], result: :i64},
     "ex.term.mailbox_clear" => %{params: [], result: :i64},
+    # explicit execution-instance lifecycle
+    "ex.term.runtime_create" => %{params: [], result: :i64},
+    "ex.term.runtime_enter" => %{params: [:i64], result: :i64},
+    "ex.term.runtime_leave" => %{params: [], result: :i64},
+    "ex.term.runtime_destroy" => %{params: [:i64], result: :i64},
     # process table / scheduler driver
     "ex.term.spawn" => %{params: [:i64], result: :i64},
     "ex.term.process_table_reset" => %{params: [:i64], result: :i64},

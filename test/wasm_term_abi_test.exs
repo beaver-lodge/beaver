@@ -31,6 +31,10 @@ defmodule WasmTermABITest do
     assert TermABI.entry("ex.term.list_cons").params == [:i64, :i64]
     assert TermABI.entry("ex.term.list_cons").result == :i64
     assert TermABI.entry("ex.term.send").params == [:i64, :i64]
+    assert TermABI.entry("ex.term.runtime_create").params == []
+    assert TermABI.entry("ex.term.runtime_enter").params == [:i64]
+    assert TermABI.entry("ex.term.runtime_leave").params == []
+    assert TermABI.entry("ex.term.runtime_destroy").params == [:i64]
     assert TermABI.entry("ex.term.clock_tick").params == [:i64]
     assert TermABI.entry("ex.term.stream_filter").params == [:i64, :i64]
     assert TermABI.entry("ex.term.enumerable_reduce_c").params == [:i64, :i64, :i64, :i64]
