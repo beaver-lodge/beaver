@@ -319,6 +319,15 @@ MLIR_CAPI_EXPORTED void beaverLocationPrint(MlirLocation location,
   }
 }
 
+MLIR_CAPI_EXPORTED MlirLocation
+beaverLocationFusedGetLocationAt(MlirLocation location, intptr_t position) {
+  FusedLoc fused = llvm::cast<FusedLoc>(unwrap(location));
+  ArrayRef<Location> locations = fused.getLocations();
+  assert(position >= 0 && static_cast<size_t>(position) < locations.size() &&
+         "fused location index out of bounds");
+  return wrap(locations[position]);
+}
+
 MLIR_CAPI_EXPORTED void mlirIdentifierPrint(MlirIdentifier identifier,
                                             MlirStringCallback callback,
                                             void *userData) {

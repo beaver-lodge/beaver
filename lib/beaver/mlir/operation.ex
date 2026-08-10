@@ -59,6 +59,15 @@ defmodule Beaver.MLIR.Operation do
   end
 
   defdelegate location(op), to: MLIR.CAPI, as: :mlirOperationGetLocation
+
+  @doc "Sets an operation's location and returns the operation."
+  @spec set_location(__MODULE__.t(), MLIR.Location.source()) :: __MODULE__.t()
+  def set_location(%__MODULE__{} = operation, location) do
+    location = MLIR.Location.resolve(location, MLIR.context(operation))
+    :ok = mlirOperationSetLocation(operation, location)
+    operation
+  end
+
   defdelegate parent(op), to: MLIR.CAPI, as: :mlirOperationGetParentOperation
   defdelegate destroy(op), to: MLIR.CAPI, as: :mlirOperationDestroy
   defdelegate clone(op), to: MLIR.CAPI, as: :mlirOperationClone

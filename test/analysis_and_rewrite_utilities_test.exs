@@ -152,7 +152,7 @@ defmodule AnalysisAndRewriteUtilitiesTest do
 
     try do
       new_location = MLIR.Location.file(name: "clone.mlir", line: 7, column: 11, ctx: ctx)
-      :ok = MLIR.CAPI.mlirOperationSetLocation(clone, new_location)
+      assert ^clone = MLIR.Operation.set_location(clone, new_location)
 
       refute MLIR.Operation.equivalent?(func, clone)
       assert MLIR.Operation.equivalent?(func, clone, ignore_locations: true)

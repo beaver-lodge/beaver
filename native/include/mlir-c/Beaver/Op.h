@@ -96,6 +96,11 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverGetReassociationIndicesForReshape(
 MLIR_CAPI_EXPORTED void beaverLocationPrint(MlirLocation location,
                                             MlirStringCallback callback,
                                             void *userData);
+// MLIR's upstream C API exposes fused children through a caller-owned output
+// buffer. An indexed accessor keeps that buffer and its lifetime behind
+// Beaver's native ABI boundary.
+MLIR_CAPI_EXPORTED MlirLocation
+beaverLocationFusedGetLocationAt(MlirLocation location, intptr_t position);
 MLIR_CAPI_EXPORTED void mlirIdentifierPrint(MlirIdentifier identifier,
                                             MlirStringCallback callback,
                                             void *userData);
