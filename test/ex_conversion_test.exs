@@ -762,6 +762,41 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.process_wait"
   end
 
+  test "converts process supervision ops to Zig runtime ABI calls", %{ctx: ctx} do
+    module =
+      term_module!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "ex.lit"() {value = 0 : i64} : () -> i64
+            %1 = "ex.box"(%0) : (i64) -> !ex.dyn
+            %2 = "ex.process_exit"(%1) : (!ex.dyn) -> !ex.dyn
+            %3 = "ex.process_exit_reason"(%1) : (!ex.dyn) -> !ex.dyn
+            %4 = "ex.process_trap_exit"(%0) : (i64) -> i64
+            %5 = "ex.link"(%1, %1, %1) : (!ex.dyn, !ex.dyn, !ex.dyn) -> !ex.dyn
+            %6 = "ex.unlink"(%1) : (!ex.dyn) -> i64
+            %7 = "ex.exit"(%1, %1, %1, %1) : (!ex.dyn, !ex.dyn, !ex.dyn, !ex.dyn) -> !ex.dyn
+            %8 = "ex.monitor"(%1, %1, %1, %1) : (!ex.dyn, !ex.dyn, !ex.dyn, !ex.dyn) -> !ex.dyn
+            %9 = "ex.demonitor"(%8) : (!ex.dyn) -> i64
+            "ex.return"(%9) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx
+      )
+
+    assert {:ok, _module, []} = Plan.run(Ex.plan(), module)
+
+    rendered = MLIR.to_string(module, generic: true)
+
+    for symbol <- ~w(
+      process_exit process_exit_reason process_trap_exit link unlink exit monitor demonitor
+    ) do
+      assert rendered =~ "ex.term.#{symbol}"
+    end
+  end
+
   test "passes nested term operands through without re-tagging", %{ctx: ctx} do
     module =
       term_module!(

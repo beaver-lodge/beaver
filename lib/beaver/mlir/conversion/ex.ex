@@ -113,6 +113,14 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.unique_integer", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.current_entry", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.process_done", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.process_exit", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.process_exit_reason", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.process_trap_exit", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.link", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.unlink", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.exit", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.monitor", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.demonitor", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.processes_runnable", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.process_result", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.to_int", &convert_to_int/3, version: "1.0")
@@ -212,6 +220,14 @@ defmodule Beaver.MLIR.Conversion.Ex do
     unique_integer: "ex.term.unique_integer",
     current_entry: "ex.term.current_entry",
     process_done: "ex.term.process_done",
+    process_exit: "ex.term.process_exit",
+    process_exit_reason: "ex.term.process_exit_reason",
+    process_trap_exit: "ex.term.process_trap_exit",
+    link: "ex.term.link",
+    unlink: "ex.term.unlink",
+    exit: "ex.term.exit",
+    monitor: "ex.term.monitor",
+    demonitor: "ex.term.demonitor",
     processes_runnable: "ex.term.processes_runnable",
     process_result: "ex.term.process_result",
     worker_run: "ex.term.worker_run",
@@ -942,6 +958,14 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.unique_integer"), do: @term_intrinsics.unique_integer
   defp read_intrinsic("ex.current_entry"), do: @term_intrinsics.current_entry
   defp read_intrinsic("ex.process_done"), do: @term_intrinsics.process_done
+  defp read_intrinsic("ex.process_exit"), do: @term_intrinsics.process_exit
+  defp read_intrinsic("ex.process_exit_reason"), do: @term_intrinsics.process_exit_reason
+  defp read_intrinsic("ex.process_trap_exit"), do: @term_intrinsics.process_trap_exit
+  defp read_intrinsic("ex.link"), do: @term_intrinsics.link
+  defp read_intrinsic("ex.unlink"), do: @term_intrinsics.unlink
+  defp read_intrinsic("ex.exit"), do: @term_intrinsics.exit
+  defp read_intrinsic("ex.monitor"), do: @term_intrinsics.monitor
+  defp read_intrinsic("ex.demonitor"), do: @term_intrinsics.demonitor
   defp read_intrinsic("ex.processes_runnable"), do: @term_intrinsics.processes_runnable
   defp read_intrinsic("ex.process_result"), do: @term_intrinsics.process_result
   defp read_intrinsic("ex.binary_length"), do: @term_intrinsics.binary_length
@@ -1232,6 +1256,32 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp intrinsic_function_type("ex.term.process_done", _ctx) do
+    MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type(symbol, _ctx)
+       when symbol in ["ex.term.process_exit", "ex.term.process_exit_reason"] do
+    MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.process_trap_exit", _ctx) do
+    MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.link", _ctx) do
+    MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 3), [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.unlink", _ctx) do
+    MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type(symbol, _ctx)
+       when symbol in ["ex.term.exit", "ex.term.monitor"] do
+    MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 4), [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.demonitor", _ctx) do
     MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
