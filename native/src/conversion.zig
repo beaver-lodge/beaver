@@ -478,46 +478,46 @@ const TypeCallbackState = struct {
         user_data: ?*anyopaque,
     ) callconv(.c) mlir_capi.LogicalResult.T {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse
-            return c.mlirLogicalResultFailure()));
-        const environment = e.enif_alloc_env() orelse return c.mlirLogicalResultFailure();
+            return c.beaverLogicalResultFailure()));
+        const environment = e.enif_alloc_env() orelse return c.beaverLogicalResultFailure();
         const original_term = if (c.mlirTypeIsNull(original_type))
             beam.make_nil(environment)
         else
             kinda.callback_adapter.handle(mlir_capi.Type, environment, original_type) catch {
                 e.enif_free_env(environment);
-                return c.mlirLogicalResultFailure();
+                return c.beaverLogicalResultFailure();
             };
         const args = .{
             kinda.callback_adapter.handle(mlir_capi.RewriterBase, environment, rewriter) catch {
                 e.enif_free_env(environment);
-                return c.mlirLogicalResultFailure();
+                return c.beaverLogicalResultFailure();
             },
             handleSlice(mlir_capi.Type, environment, n_output_types, output_types) catch {
                 e.enif_free_env(environment);
-                return c.mlirLogicalResultFailure();
+                return c.beaverLogicalResultFailure();
             },
             handleSlice(mlir_capi.Value, environment, n_inputs, inputs) catch {
                 e.enif_free_env(environment);
-                return c.mlirLogicalResultFailure();
+                return c.beaverLogicalResultFailure();
             },
             kinda.callback_adapter.handle(mlir_capi.Location, environment, location) catch {
                 e.enif_free_env(environment);
-                return c.mlirLogicalResultFailure();
+                return c.beaverLogicalResultFailure();
             },
             original_term,
         };
         const response = self.dispatcher.invoke("target_materialization_1_to_n", environment, args) catch
-            return c.mlirLogicalResultFailure();
-        if (!response.success) return c.mlirLogicalResultFailure();
+            return c.beaverLogicalResultFailure();
+        if (!response.success) return c.beaverLogicalResultFailure();
         const projection = kinda.callback_adapter.projection(response) orelse
-            return c.mlirLogicalResultFailure();
+            return c.beaverLogicalResultFailure();
         const projected: *HandleProjection(mlir_capi.Value) = @ptrFromInt(projection);
         defer projected.deinit();
         if (projected.values.len != @as(usize, @intCast(n_output_types)))
-            return c.mlirLogicalResultFailure();
+            return c.beaverLogicalResultFailure();
         if (projected.values.len != 0)
             @memcpy(outputs[0..projected.values.len], projected.values);
-        return c.mlirLogicalResultSuccess();
+        return c.beaverLogicalResultSuccess();
     }
 };
 
@@ -730,25 +730,25 @@ const ConversionPatternState = struct {
         user_data: ?*anyopaque,
     ) callconv(.c) mlir_capi.LogicalResult.T {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse
-            return c.mlirLogicalResultFailure()));
-        const environment = e.enif_alloc_env() orelse return c.mlirLogicalResultFailure();
+            return c.beaverLogicalResultFailure()));
+        const environment = e.enif_alloc_env() orelse return c.beaverLogicalResultFailure();
         const args = .{
             kinda.callback_adapter.handle(mlir_capi.Operation, environment, operation) catch {
                 e.enif_free_env(environment);
-                return c.mlirLogicalResultFailure();
+                return c.beaverLogicalResultFailure();
             },
             handleSlice(mlir_capi.Value, environment, n_operands, operands) catch {
                 e.enif_free_env(environment);
-                return c.mlirLogicalResultFailure();
+                return c.beaverLogicalResultFailure();
             },
             kinda.callback_adapter.handle(mlir_capi.ConversionPatternRewriter, environment, rewriter) catch {
                 e.enif_free_env(environment);
-                return c.mlirLogicalResultFailure();
+                return c.beaverLogicalResultFailure();
             },
         };
         const response = self.dispatcher.invoke("conversion_pattern", environment, args) catch
-            return c.mlirLogicalResultFailure();
-        return if (response.success) c.mlirLogicalResultSuccess() else c.mlirLogicalResultFailure();
+            return c.beaverLogicalResultFailure();
+        return if (response.success) c.beaverLogicalResultSuccess() else c.beaverLogicalResultFailure();
     }
 
     fn rewrite1ToN(
@@ -762,12 +762,12 @@ const ConversionPatternState = struct {
         user_data: ?*anyopaque,
     ) callconv(.c) mlir_capi.LogicalResult.T {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse
-            return c.mlirLogicalResultFailure()));
-        const environment = e.enif_alloc_env() orelse return c.mlirLogicalResultFailure();
+            return c.beaverLogicalResultFailure()));
+        const environment = e.enif_alloc_env() orelse return c.beaverLogicalResultFailure();
         const count: usize = @intCast(n_ranges);
         const ranges = beam.allocator.alloc(beam.term, count) catch {
             e.enif_free_env(environment);
-            return c.mlirLogicalResultFailure();
+            return c.beaverLogicalResultFailure();
         };
         defer beam.allocator.free(ranges);
         var offset: usize = 0;
@@ -775,7 +775,7 @@ const ConversionPatternState = struct {
             const len: usize = @intCast(range_sizes[index]);
             if (offset + len > @as(usize, @intCast(n_operands))) {
                 e.enif_free_env(environment);
-                return c.mlirLogicalResultFailure();
+                return c.beaverLogicalResultFailure();
             }
             if (len == 0) {
                 const empty = [_]beam.term{};
@@ -787,7 +787,7 @@ const ConversionPatternState = struct {
                     operands[offset .. offset + len],
                 ) catch {
                     e.enif_free_env(environment);
-                    return c.mlirLogicalResultFailure();
+                    return c.beaverLogicalResultFailure();
                 };
             }
             offset += len;
@@ -795,17 +795,17 @@ const ConversionPatternState = struct {
         const args = .{
             kinda.callback_adapter.handle(mlir_capi.Operation, environment, operation) catch {
                 e.enif_free_env(environment);
-                return c.mlirLogicalResultFailure();
+                return c.beaverLogicalResultFailure();
             },
             beam.make_term_list(environment, ranges),
             kinda.callback_adapter.handle(mlir_capi.ConversionPatternRewriter, environment, rewriter) catch {
                 e.enif_free_env(environment);
-                return c.mlirLogicalResultFailure();
+                return c.beaverLogicalResultFailure();
             },
         };
         const response = self.dispatcher.invoke("conversion_pattern_1_to_n", environment, args) catch
-            return c.mlirLogicalResultFailure();
-        return if (response.success) c.mlirLogicalResultSuccess() else c.mlirLogicalResultFailure();
+            return c.beaverLogicalResultFailure();
+        return if (response.success) c.beaverLogicalResultSuccess() else c.beaverLogicalResultFailure();
     }
 };
 

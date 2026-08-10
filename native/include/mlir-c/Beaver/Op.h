@@ -68,6 +68,8 @@ beaverOperationStateGetNumRegions(MlirOperationState state);
 MLIR_CAPI_EXPORTED intptr_t
 beaverOperationStateGetNumAttributes(MlirOperationState state);
 
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultSuccess(void);
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultFailure(void);
 MLIR_CAPI_EXPORTED bool beaverLogicalResultIsSuccess(MlirLogicalResult res);
 MLIR_CAPI_EXPORTED bool beaverLogicalResultIsFailure(MlirLogicalResult res);
 

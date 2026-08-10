@@ -19,10 +19,12 @@ const triton = @import("triton.zig");
 const llvm_ir = @import("llvm_ir.zig");
 const infer_type = @import("infer_type.zig");
 const capi_registry = @import("capi_registry.zig");
+const logical_result = @import("logical_result.zig");
 
 const callback_nifs = .{kinda.callback_runtime.ReplyToken.nif("beaver_raw_callback_reply")};
 
 pub const nifs = capi_registry.nifs ++
+    logical_result.nifs ++
     mlir_capi.EntriesOfKinds ++
     pass.nifs ++
     registry.nifs ++

@@ -103,6 +103,65 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
     end
   end
 
+  test "LogicalResult helpers keep generated surfaces behind the C ABI firewall" do
+    declaration_manifest = CAPI.CodeGen.declaration_manifest()
+
+    inline_helpers = [
+      "mlirLogicalResultFailure",
+      "mlirLogicalResultIsFailure",
+      "mlirLogicalResultIsSuccess",
+      "mlirLogicalResultSuccess"
+    ]
+
+    signature_entries =
+      declaration_manifest
+      |> DeclarationManifest.signature_manifest()
+      |> Map.fetch!("entries")
+
+    for name <- inline_helpers do
+      entry = Enum.find(signature_entries, &(get_in(&1, ["function", "name"]) == name))
+
+      assert entry["generation_blocker_reason"] == nil
+      assert entry["variants"] != []
+    end
+
+    generated_names =
+      declaration_manifest
+      |> DeclarationManifest.nif_decls()
+      |> Enum.map(&Atom.to_string(&1.wrapper_name))
+      |> MapSet.new()
+
+    for name <-
+          inline_helpers ++
+            [
+              "beaverLogicalResultFailure",
+              "beaverLogicalResultIsFailure",
+              "beaverLogicalResultIsSuccess",
+              "beaverLogicalResultSuccess"
+            ] do
+      assert MapSet.member?(generated_names, name)
+    end
+  end
+
+  test "native Zig sources do not call MLIR's inline LogicalResult helpers" do
+    forbidden = ~r/c\.mlirLogicalResult(?:Success|Failure|IsSuccess|IsFailure)/
+
+    offenders =
+      __DIR__
+      |> Path.join("../native/src/**/*.zig")
+      |> Path.wildcard()
+      |> Enum.flat_map(fn path ->
+        path
+        |> File.stream!()
+        |> Stream.with_index(1)
+        |> Enum.flat_map(fn {line, line_number} ->
+          if Regex.match?(forbidden, line), do: [{path, line_number}], else: []
+        end)
+      end)
+
+    assert offenders == []
+  end
+
   test "callback-heavy declarations remain in the callback bridge manifest" do
     priv_dir = :beaver |> :code.priv_dir() |> List.to_string()
 

@@ -14,6 +14,14 @@ typedef enum {
 
   BeaverCapiPolicyDirtyCPUAndIO__mlirExecutionEngineInvokePacked,
 
+  // MlirLogicalResult is a one-byte struct returned by value. Keep Zig out of
+  // its ABI entirely: the public MLIR names are backed by external C++
+  // wrappers instead of translated-C inline functions.
+  BeaverCapiPolicyNIFAlias__mlirLogicalResultSuccess,
+  BeaverCapiPolicyNIFAlias__mlirLogicalResultFailure,
+  BeaverCapiPolicyNIFAlias__mlirLogicalResultIsSuccess,
+  BeaverCapiPolicyNIFAlias__mlirLogicalResultIsFailure,
+
   BeaverCapiPolicyManualAdapter__mlirInferShapedTypeOpInterfaceInferReturnTypes,
   BeaverCapiPolicyManualAdapter__mlirInferTypeOpInterfaceInferReturnTypes,
   BeaverCapiPolicyManualAdapter__mlirTransformStateForEachParam,

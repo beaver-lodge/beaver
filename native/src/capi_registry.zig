@@ -16,6 +16,7 @@ fn isCandidate(comptime name: []const u8) bool {
         std.mem.startsWith(u8, name, "beaver");
     return has_supported_prefix and
         !hasPolicy("Exclude", name) and
+        !hasPolicy("NIFAlias", name) and
         !hasPolicy("CallbackBridge", name) and
         !hasPolicy("CallbackRuntime", name) and
         !hasPolicy("ManualAdapter", name) and
