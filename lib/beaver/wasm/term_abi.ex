@@ -55,7 +55,7 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.mailbox_clear" => %{params: [], result: :i64},
     # process table / scheduler driver
     "ex.term.spawn" => %{params: [:i64], result: :i64},
-    "ex.term.process_table_reset" => %{params: [], result: :i64},
+    "ex.term.process_table_reset" => %{params: [:i64], result: :i64},
     "ex.term.schedule_next" => %{params: [], result: :i64},
     "ex.term.current_entry" => %{params: [], result: :i64},
     "ex.term.process_done" => %{params: [:i64], result: :i64},

@@ -1124,7 +1124,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp intrinsic_function_type("ex.term.process_table_reset", _ctx) do
-    MLIR.Type.function([], [MLIR.Type.i64()])
+    MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
   defp intrinsic_function_type("ex.term.cont_save", _ctx) do

@@ -146,9 +146,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop spawn(fun = optional(base(dyn()))),
     results: [result: base(dyn())]
 
-  # Resets the runtime process table to a single fresh initial process; the
-  # scheduler driver calls this at program start.
-  defop process_table_reset(),
+  # Resets the runtime process table to a single fresh initial process with
+  # the given capacity; the scheduler driver calls this at program start.
+  defop process_table_reset(cap = all_of([base("!builtin.integer"), any()])),
     results: [result: all_of([base("!builtin.integer"), any()])]
 
   # Preemptive scheduler continuation primitives (#35 slice 5): a budgeted

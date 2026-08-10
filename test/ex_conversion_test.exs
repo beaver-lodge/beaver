@@ -690,7 +690,7 @@ defmodule ExConversionTest do
             %2 = "ex.lit"() {value = 2 : i64} : () -> i64
             %3 = "ex.box"(%0) : (i64) -> !ex.dyn
             %4 = "ex.spawn"(%3) : (!ex.dyn) -> !ex.dyn
-            %5 = "ex.process_table_reset"() : () -> i64
+            %5 = "ex.process_table_reset"(%1) : (i64) -> i64
             %6 = "ex.cont_save"(%1, %2, %0) : (i64, i64, i64) -> i64
             %7 = "ex.receive_cont_save"(%1, %2, %0) : (i64, i64, i64) -> i64
             %8 = "ex.cont_pending"() : () -> i64
