@@ -148,27 +148,19 @@ defmodule Beaver.Shadow.GPUTest do
     on_exit(fn -> MLIR.Module.destroy(module) end)
 
     llvm = Beaver.Triton.compile_to_llvm(module)
-    llvm_text = MLIR.to_string(llvm)
 
-    # translate LLVM IR to PTX through the prebuilt toolchain
+    # compile LLVM IR to PTX through the prebuilt toolchain
     tmp_dir = System.tmp_dir!()
     ll_path = Path.join(tmp_dir, "matmul_test.ll")
     ptx_path = Path.join(tmp_dir, "matmul_test.ptx")
-    File.write!(ll_path, llvm_text)
+    File.write!(ll_path, Beaver.MLIR.Target.LLVMIR.translate!(llvm))
 
     llvm_bin = Path.dirname(System.get_env("LLVM_CONFIG_PATH"))
 
     {_, 0} =
       System.cmd(
-        Path.join(llvm_bin, "mlir-translate"),
-        ["--mlir-to-llvmir", ll_path, "-o", ll_path <> ".ll"],
-        stderr_to_stdout: true
-      )
-
-    {_, 0} =
-      System.cmd(
         Path.join(llvm_bin, "llc"),
-        ["-march=nvptx64", "-mcpu=sm_80", ll_path <> ".ll", "-o", ptx_path],
+        ["-march=nvptx64", "-mcpu=sm_80", ll_path, "-o", ptx_path],
         stderr_to_stdout: true
       )
 

@@ -86,29 +86,9 @@ defmodule DebugTest do
     assert once == twice
   end
 
-  @tag skip: System.get_env("LLVM_CONFIG_PATH") == nil
-  @tag :tmp_dir
-  test "LLVM IR translation emits DILocation metadata for Elixir lines", %{
-    ctx: ctx,
-    tmp_dir: tmp_dir
-  } do
+  test "LLVM IR translation emits DILocation metadata for Elixir lines", %{ctx: ctx} do
     module = ctx |> add_module() |> to_llvm() |> Beaver.MLIR.Debug.attach_llvm_scopes!()
-
-    mlir_path = Path.join(tmp_dir, "debug.mlir")
-    ll_path = Path.join(tmp_dir, "debug.ll")
-    File.write!(mlir_path, MLIR.to_string(module, debug_info: true))
-
-    llvm_bin = System.get_env("LLVM_CONFIG_PATH") |> Path.dirname()
-    mlir_translate = Path.join(llvm_bin, "mlir-translate")
-
-    {output, status} =
-      System.cmd(mlir_translate, ["--mlir-to-llvmir", mlir_path, "-o", ll_path],
-        stderr_to_stdout: true
-      )
-
-    assert status == 0, output
-
-    ir = File.read!(ll_path)
+    ir = Beaver.MLIR.Target.LLVMIR.translate!(module)
     assert ir =~ "!dbg"
     assert ir =~ "!DILocation("
     assert ir =~ ~s{!DIFile(filename: "debug_test.exs"}

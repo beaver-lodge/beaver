@@ -4,10 +4,10 @@ defmodule Beaver.Wasm do
   `gpu.binary` packaging.
 
   `package_binary!/2` lowers a module to LLVM IR (via the `ex` conversion
-  plan and the standard arith/scf/cf-to-llvm passes), translates it with
-  `mlir-translate --mlir-to-llvmir`, compiles it to a wasm binary with the
-  Zig wasm32 target, and returns a `Beaver.Wasm.Binary` carrying the bytes
-  plus the imports/exports manifest parsed from the binary.
+  plan and the standard arith/scf/cf-to-llvm passes), translates it in-process,
+  compiles it to a wasm binary with the Zig wasm32 target, and returns a
+  `Beaver.Wasm.Binary` carrying the bytes plus the imports/exports manifest
+  parsed from the binary.
 
   This is the host-boundary step of the batata WASM preparation (Forgejo
   #37): the manifest names the WASI/import surface that a runtime must
@@ -19,6 +19,7 @@ defmodule Beaver.Wasm do
 
   alias Beaver.MLIR
   alias Beaver.MLIR.Conversion.{Ex, Plan}
+  alias Beaver.MLIR.Target.LLVMIR
 
   @doc """
   Packages an MLIR module into a `Beaver.Wasm.Binary`.
@@ -53,16 +54,7 @@ defmodule Beaver.Wasm do
       |> reconcile_unrealized_casts()
       |> Beaver.Composer.run!()
 
-    mlir_path = tmp_path(".mlir")
-    ll_path = tmp_path(".ll")
-
-    File.write!(mlir_path, MLIR.to_string(llvm))
-
-    run_tool!(mlir_translate(), ["--mlir-to-llvmir", mlir_path, "-o", ll_path])
-
-    ir = File.read!(ll_path)
-    cleanup([mlir_path, ll_path])
-    ir
+    LLVMIR.translate!(llvm)
   end
 
   defp has_ex_ops?(module) do
@@ -98,13 +90,6 @@ defmodule Beaver.Wasm do
 
   defp zig do
     System.find_executable("zig") || raise "zig not found on PATH"
-  end
-
-  defp mlir_translate do
-    case System.get_env("LLVM_CONFIG_PATH") do
-      nil -> System.find_executable("mlir-translate") || raise("mlir-translate not found")
-      config -> Path.join([Path.dirname(config), "mlir-translate"])
-    end
   end
 
   defp run_tool!(executable, args) do
