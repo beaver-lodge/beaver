@@ -214,6 +214,12 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop receive_start_set(value = all_of([base("!builtin.integer"), any()])),
     results: [result: all_of([base("!builtin.integer"), any()])]
 
+  defop native_time(),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop unique_integer(negative = all_of([base("!builtin.integer"), any()])),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
   defop current_entry(),
     results: [result: all_of([base("!builtin.integer"), any()])]
 

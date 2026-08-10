@@ -103,6 +103,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.monotonic_time", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.receive_start", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.receive_start_set", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.native_time", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.unique_integer", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.current_entry", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.process_done", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.processes_runnable", &convert_term_read/3, version: "1.0")
@@ -196,6 +198,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
     monotonic_time: "ex.term.monotonic_time",
     receive_start: "ex.term.receive_start",
     receive_start_set: "ex.term.receive_start_set",
+    native_time: "ex.term.native_time",
+    unique_integer: "ex.term.unique_integer",
     current_entry: "ex.term.current_entry",
     process_done: "ex.term.process_done",
     processes_runnable: "ex.term.processes_runnable",
@@ -916,6 +920,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.monotonic_time"), do: @term_intrinsics.monotonic_time
   defp read_intrinsic("ex.receive_start"), do: @term_intrinsics.receive_start
   defp read_intrinsic("ex.receive_start_set"), do: @term_intrinsics.receive_start_set
+  defp read_intrinsic("ex.native_time"), do: @term_intrinsics.native_time
+  defp read_intrinsic("ex.unique_integer"), do: @term_intrinsics.unique_integer
   defp read_intrinsic("ex.current_entry"), do: @term_intrinsics.current_entry
   defp read_intrinsic("ex.process_done"), do: @term_intrinsics.process_done
   defp read_intrinsic("ex.processes_runnable"), do: @term_intrinsics.processes_runnable
@@ -1176,6 +1182,14 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp intrinsic_function_type("ex.term.receive_start_set", _ctx) do
+    MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.native_time", _ctx) do
+    MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.unique_integer", _ctx) do
     MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
