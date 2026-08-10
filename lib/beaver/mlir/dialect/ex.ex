@@ -241,6 +241,44 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop process_done(result = all_of([base("!builtin.integer"), any()])),
     results: [result: all_of([base("!builtin.integer"), any()])]
 
+  defop process_exit(reason = base(dyn())),
+    results: [result: base(dyn())]
+
+  defop process_exit_reason(pid = base(dyn())),
+    results: [result: base(dyn())]
+
+  defop process_trap_exit(enabled = all_of([base("!builtin.integer"), any()])),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop link(
+          pid = base(dyn()),
+          exit_tag = base(dyn()),
+          normal_tag = base(dyn())
+        ),
+        results: [result: base(dyn())]
+
+  defop unlink(pid = base(dyn())),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
+  defop exit(
+          pid = base(dyn()),
+          reason = base(dyn()),
+          exit_tag = base(dyn()),
+          normal_tag = base(dyn())
+        ),
+        results: [result: base(dyn())]
+
+  defop monitor(
+          pid = base(dyn()),
+          down_tag = base(dyn()),
+          process_tag = base(dyn()),
+          normal_tag = base(dyn())
+        ),
+        results: [result: base(dyn())]
+
+  defop demonitor(reference = base(dyn())),
+    results: [result: all_of([base("!builtin.integer"), any()])]
+
   defop processes_runnable(),
     results: [result: all_of([base("!builtin.integer"), any()])]
 
