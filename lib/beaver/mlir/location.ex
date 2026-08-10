@@ -204,8 +204,8 @@ defmodule Beaver.MLIR.Location do
   def of(%MLIR.Operation{} = operation), do: MLIR.Operation.location(operation)
   def of(%MLIR.Value{} = value), do: MLIR.Value.location(value)
 
-  def of(deferred) when is_function(deferred, 1) do
-    fn ctx -> deferred |> Deferred.create(ctx) |> of() end
+  def of(%Deferred{} = deferred) do
+    Deferred.defer(fn ctx -> deferred |> Deferred.resolve(ctx) |> of() end)
   end
 
   def of(other) do
@@ -216,13 +216,9 @@ defmodule Beaver.MLIR.Location do
   @doc "Resolves a location-bearing value in `ctx` and verifies context ownership."
   @spec resolve(source(), MLIR.Context.t()) :: t()
   def resolve(source, %MLIR.Context{} = ctx) do
-    location = source |> Deferred.create(ctx) |> of()
+    location = source |> Deferred.resolve(ctx) |> of()
 
-    unless MLIR.equal?(MLIR.context(location), ctx) do
-      raise ArgumentError, "location belongs to a different MLIR context"
-    end
-
-    location
+    MLIR.Context.ensure_same!(location, ctx)
   end
 
   @doc "Returns the built-in location kind, or `:other` for dialect-defined locations."
@@ -360,13 +356,9 @@ defmodule Beaver.MLIR.Location do
   defp resolve_metadata(nil, _ctx), do: MLIR.Attribute.null()
 
   defp resolve_metadata(metadata, ctx) do
-    case Deferred.create(metadata, ctx) do
+    case Deferred.resolve(metadata, ctx) do
       %MLIR.Attribute{} = attribute ->
-        unless MLIR.equal?(MLIR.context(attribute), ctx) do
-          raise ArgumentError, "location metadata belongs to a different MLIR context"
-        end
-
-        attribute
+        MLIR.Context.ensure_same!(attribute, ctx)
 
       other ->
         raise ArgumentError, "location metadata must be an MLIR attribute, got: #{inspect(other)}"
@@ -374,7 +366,7 @@ defmodule Beaver.MLIR.Location do
   end
 
   defp infer_context(opts, sources) do
-    case opts[:ctx] || Enum.find_value(sources, &context_of/1) do
+    case Deferred.context(opts) || Enum.find_value(sources, &context_of/1) do
       nil -> opts
       ctx -> Keyword.put(opts, :ctx, ctx)
     end

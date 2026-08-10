@@ -29,15 +29,26 @@ defmodule EntityTest do
       assert MLIR.equal?(Type.i32(opts), Type.i(32, opts))
       assert MLIR.equal?(Type.i64(opts), Type.i(64, opts))
       assert MLIR.equal?(Type.i128(opts), Type.i(128, opts))
-      assert MLIR.equal?(Type.integer(32, opts), ~t{i32}.(ctx))
-      assert MLIR.equal?(Type.integer(64, opts), Type.get("i64").(ctx))
-      assert MLIR.equal?(Type.integer(128, opts), Type.get("i128").(ctx))
-      assert MLIR.equal?(Type.complex(Type.f32()).(ctx), Type.get("complex<f32>").(ctx))
+      assert MLIR.equal?(Type.integer(32, opts), ~t{i32} |> Beaver.Deferred.resolve(ctx))
+      assert MLIR.equal?(Type.integer(64, opts), Type.get("i64") |> Beaver.Deferred.resolve(ctx))
+
+      assert MLIR.equal?(
+               Type.integer(128, opts),
+               Type.get("i128") |> Beaver.Deferred.resolve(ctx)
+             )
+
+      assert MLIR.equal?(
+               Type.complex(Type.f32()) |> Beaver.Deferred.resolve(ctx),
+               Type.get("complex<f32>") |> Beaver.Deferred.resolve(ctx)
+             )
 
       assert Type.unranked_tensor!(Type.complex(Type.f32(ctx: ctx))) |> to_string() ==
                "tensor<*xcomplex<f32>>"
 
-      assert MLIR.equal?(Type.unranked_tensor!(Type.f32(ctx: ctx)), ~t{tensor<*xf32>}.(ctx))
+      assert MLIR.equal?(
+               Type.unranked_tensor!(Type.f32(ctx: ctx)),
+               ~t{tensor<*xf32>} |> Beaver.Deferred.resolve(ctx)
+             )
 
       assert Type.ranked_tensor!([], Type.f32(ctx: ctx)) |> to_string() ==
                "tensor<f32>"
@@ -54,7 +65,10 @@ defmodule EntityTest do
              |> to_string() ==
                "memref<f32>"
 
-      assert MLIR.equal?(Type.none().(ctx), Type.get("none").(ctx))
+      assert MLIR.equal?(
+               Type.none() |> Beaver.Deferred.resolve(ctx),
+               Type.get("none") |> Beaver.Deferred.resolve(ctx)
+             )
     end
   end
 
@@ -63,7 +77,8 @@ defmodule EntityTest do
       Type.function(
         [Type.i32(ctx: ctx), Type.f32(ctx: ctx)],
         [Type.f64(ctx: ctx)]
-      ).(ctx)
+      )
+      |> Beaver.Deferred.resolve(ctx)
 
     assert func_type |> to_string() =~ ~r"i32.+f32.+f64"
     assert 2 = MLIR.FunctionType.num_inputs(func_type)
@@ -91,33 +106,54 @@ defmodule EntityTest do
   end
 
   test "type detection", %{ctx: ctx} do
-    assert Type.tensor?(~t{tensor<*xf32>}.(ctx))
-    assert Type.i(32).(ctx) |> Type.integer?()
-    refute Type.f(32).(ctx) |> Type.integer?()
-    assert Type.f(32).(ctx) |> Type.float?()
+    assert Type.tensor?(~t{tensor<*xf32>} |> Beaver.Deferred.resolve(ctx))
+    assert Type.i(32) |> Beaver.Deferred.resolve(ctx) |> Type.integer?()
+    refute Type.f(32) |> Beaver.Deferred.resolve(ctx) |> Type.integer?()
+    assert Type.f(32) |> Beaver.Deferred.resolve(ctx) |> Type.float?()
     assert Type.memref!([], Type.f32(ctx: ctx)) |> Type.memref?()
   end
 
   describe "attr apis" do
     test "generate", %{ctx: ctx} do
-      assert MLIR.equal?(Attribute.type(Type.f32()).(ctx), Attribute.type(Type.f32()).(ctx))
-      assert MLIR.equal?(Attribute.type(Type.f32()), Attribute.type(Type.f32()).(ctx))
-      assert MLIR.equal?(Attribute.type(Type.f32()).(ctx), Attribute.type(Type.f32()))
+      assert MLIR.equal?(
+               Attribute.type(Type.f32()) |> Beaver.Deferred.resolve(ctx),
+               Attribute.type(Type.f32()) |> Beaver.Deferred.resolve(ctx)
+             )
 
-      assert Attribute.integer(Type.i(32), 1) |> Beaver.Deferred.create(ctx) |> to_string() ==
+      assert MLIR.equal?(
+               Attribute.type(Type.f32()),
+               Attribute.type(Type.f32()) |> Beaver.Deferred.resolve(ctx)
+             )
+
+      assert MLIR.equal?(
+               Attribute.type(Type.f32()) |> Beaver.Deferred.resolve(ctx),
+               Attribute.type(Type.f32())
+             )
+
+      assert Attribute.integer(Type.i(32), 1) |> Beaver.Deferred.resolve(ctx) |> to_string() ==
                "1 : i32"
 
-      assert MLIR.equal?(Attribute.integer(Type.i(32), 0).(ctx), ~a{0}i32.(ctx))
-      assert MLIR.equal?(Attribute.float(Type.f(32), 0.0).(ctx), ~a{0.0}f32.(ctx))
+      assert MLIR.equal?(
+               Attribute.integer(Type.i(32), 0) |> Beaver.Deferred.resolve(ctx),
+               ~a{0}i32 |> Beaver.Deferred.resolve(ctx)
+             )
+
+      assert MLIR.equal?(
+               Attribute.float(Type.f(32), 0.0) |> Beaver.Deferred.resolve(ctx),
+               ~a{0.0}f32 |> Beaver.Deferred.resolve(ctx)
+             )
 
       assert_raise ArgumentError, "incompatible type i32", fn ->
-        Attribute.float(Type.i(32), 0.0).(ctx)
+        Attribute.float(Type.i(32), 0.0) |> Beaver.Deferred.resolve(ctx)
       end
 
-      assert MLIR.equal?(Attribute.integer(Type.index(), 1).(ctx), ~a{1}index.(ctx))
+      assert MLIR.equal?(
+               Attribute.integer(Type.index(), 1) |> Beaver.Deferred.resolve(ctx),
+               ~a{1}index |> Beaver.Deferred.resolve(ctx)
+             )
 
       assert_raise ArgumentError, "incompatible type f32", fn ->
-        Attribute.integer(Type.f32(), 1).(ctx)
+        Attribute.integer(Type.f32(), 1) |> Beaver.Deferred.resolve(ctx)
       end
 
       assert not MLIR.null?(
@@ -126,13 +162,15 @@ defmodule EntityTest do
                    [Type.i(32)],
                    [Type.i(32)]
                  )
-               ).(ctx)
+               )
+               |> Beaver.Deferred.resolve(ctx)
              )
 
       assert Type.function(
                [Type.ranked_tensor!([1, 2, 3, 4], Type.i(32, ctx: ctx))],
                [Type.i(32)]
-             ).(ctx)
+             )
+             |> Beaver.Deferred.resolve(ctx)
              |> to_string() ==
                "(tensor<1x2x3x4xi32>) -> i32"
 
@@ -142,8 +180,9 @@ defmodule EntityTest do
                    [Type.i(32)],
                    [Type.i(32)]
                  )
-               ).(ctx),
-               ~a{(i32) -> (i32)}.(ctx)
+               )
+               |> Beaver.Deferred.resolve(ctx),
+               ~a{(i32) -> (i32)} |> Beaver.Deferred.resolve(ctx)
              )
 
       vec2xi32 = Type.vector!([2], Type.i(32, ctx: ctx))
@@ -151,33 +190,35 @@ defmodule EntityTest do
       i0attr = Attribute.integer(Type.i(32), 0)
 
       assert MLIR.equal?(
-               Attribute.dense_elements([i0attr, i0attr], vec2xi32).(ctx),
-               ~a{dense<0> : vector<2xi32>}.(ctx)
+               Attribute.dense_elements([i0attr, i0attr], vec2xi32)
+               |> Beaver.Deferred.resolve(ctx),
+               ~a{dense<0> : vector<2xi32>} |> Beaver.Deferred.resolve(ctx)
              )
 
       assert MLIR.equal?(
-               Attribute.dense_elements([i0attr], vec2xi32).(ctx),
-               ~a{dense<0> : vector<2xi32>}.(ctx)
+               Attribute.dense_elements([i0attr], vec2xi32) |> Beaver.Deferred.resolve(ctx),
+               ~a{dense<0> : vector<2xi32>} |> Beaver.Deferred.resolve(ctx)
              )
 
       assert MLIR.equal?(
-               Attribute.dense_elements(0, vec2xi32).(ctx),
-               ~a{dense<0> : vector<2xi32>}.(ctx)
+               Attribute.dense_elements(0, vec2xi32) |> Beaver.Deferred.resolve(ctx),
+               ~a{dense<0> : vector<2xi32>} |> Beaver.Deferred.resolve(ctx)
              )
 
       assert MLIR.equal?(
-               Attribute.dense_elements("abcd").(ctx),
-               ~a{dense<[#{?a}, #{?b}, #{?c}, #{?d}]> : tensor<4xi8>}.(ctx)
+               Attribute.dense_elements("abcd") |> Beaver.Deferred.resolve(ctx),
+               ~a{dense<[#{?a}, #{?b}, #{?c}, #{?d}]> : tensor<4xi8>}
+               |> Beaver.Deferred.resolve(ctx)
              )
 
       assert MLIR.equal?(
                MLIR.ODS.operand_segment_sizes([0, 0], ctx: ctx),
-               ~a{array<i32: 0, 0>}.(ctx)
+               ~a{array<i32: 0, 0>} |> Beaver.Deferred.resolve(ctx)
              )
 
       assert MLIR.equal?(
-               MLIR.ODS.operand_segment_sizes([1, 0]).(ctx),
-               ~a{array<i32: 1, 0>}.(ctx)
+               MLIR.ODS.operand_segment_sizes([1, 0]) |> Beaver.Deferred.resolve(ctx),
+               ~a{array<i32: 1, 0>} |> Beaver.Deferred.resolve(ctx)
              )
 
       assert_raise ArgumentError, "number of elements 0 does not match shaped type 3", fn ->
@@ -190,8 +231,8 @@ defmodule EntityTest do
       parallel2 = Attribute.array([parallel, parallel])
 
       assert MLIR.equal?(
-               parallel2.(ctx),
-               ~a{["parallel", "parallel"]}.(ctx)
+               parallel2 |> Beaver.Deferred.resolve(ctx),
+               ~a{["parallel", "parallel"]} |> Beaver.Deferred.resolve(ctx)
              )
     end
 
@@ -238,7 +279,8 @@ defmodule EntityTest do
         Attribute.strided_layout(
           1,
           [1, 2, 3]
-        ).(ctx)
+        )
+        |> Beaver.Deferred.resolve(ctx)
 
       assert not MLIR.null?(strided_attr)
     end

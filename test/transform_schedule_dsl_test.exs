@@ -87,7 +87,9 @@ defmodule Beaver.MLIR.Transform.Schedule.DSLTest do
 
         _attribute =
           knob("attribute", [
-            fn context -> MLIR.Attribute.integer(MLIR.Type.i32(ctx: context), 42) end
+            Beaver.Deferred.defer(fn context ->
+              MLIR.Attribute.integer(MLIR.Type.i32(ctx: context), 42)
+            end)
           ])
       end
     end

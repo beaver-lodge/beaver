@@ -152,8 +152,12 @@ defmodule Beaver.Pattern do
     value
   end
 
-  def gen_pdl(blk, %Beaver.Changeset{context: context} = changeset, f) when is_function(f, 1) do
-    gen_pdl(blk, changeset, Beaver.Deferred.create(f, context))
+  def gen_pdl(
+        blk,
+        %Beaver.Changeset{context: context} = changeset,
+        %Beaver.Deferred{} = deferred
+      ) do
+    gen_pdl(blk, changeset, Beaver.Deferred.resolve(deferred, context))
   end
 
   def gen_pdl(_, _, element) do

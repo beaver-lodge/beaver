@@ -210,7 +210,8 @@ defmodule PDLTest do
             return %0 : tensor<2x3xf32>
           }
         }
-        """.(ctx)
+        """
+        |> Beaver.Deferred.resolve(ctx)
         |> Beaver.Composer.append(unquote(p))
         |> canonicalize
         |> Beaver.Composer.run!()

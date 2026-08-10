@@ -8,11 +8,10 @@ defmodule Beaver.MLIR.Operation.State do
 
   defp prepare(
          %Beaver.Changeset{
-           location: location,
+           location: %MLIR.Location{} = location,
            context: nil
          } = changeset
-       )
-       when not is_nil(location) and not is_function(location) do
+       ) do
     %Beaver.Changeset{changeset | context: MLIR.context(location)}
   end
 
@@ -28,20 +27,20 @@ defmodule Beaver.MLIR.Operation.State do
 
   defp prepare(
          %Beaver.Changeset{
-           location: location,
-           context: context
+           location: %Beaver.Deferred{} = location,
+           context: %MLIR.Context{} = context
          } = changeset
-       )
-       when not is_nil(context) and is_function(location, 1) do
-    %Beaver.Changeset{changeset | location: location.(context)}
+       ) do
+    %Beaver.Changeset{changeset | location: Beaver.Deferred.resolve(location, context)}
   end
 
   defp prepare(
          %Beaver.Changeset{
-           location: %Beaver.MLIR.Location{} = location
+           location: %MLIR.Location{} = location,
+           context: %MLIR.Context{} = context
          } = changeset
        ) do
-    %Beaver.Changeset{changeset | location: location}
+    %Beaver.Changeset{changeset | location: Beaver.Deferred.resolve(location, context)}
   end
 
   defp add_attributes(state, []) do
@@ -116,7 +115,7 @@ defmodule Beaver.MLIR.Operation.State do
 
     array =
       result_types
-      |> Enum.map(&Beaver.Deferred.create(&1, context))
+      |> Enum.map(&Beaver.Deferred.resolve(&1, context))
       |> Enum.map(fn
         t when is_binary(t) ->
           CAPI.mlirTypeParseGet(context, MLIR.StringRef.create(t))

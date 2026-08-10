@@ -30,7 +30,7 @@ defmodule Beaver.MLIR.Dialect.Vector do
   def transfer_read_(%Beaver.SSA{arguments: [base, padding | options], ctx: ctx} = ssa) do
     options = Keyword.new(options)
     indices = Keyword.get(options, :indices, [])
-    map = options |> Keyword.fetch!(:permutation_map) |> Beaver.Deferred.create(ctx)
+    map = options |> Keyword.fetch!(:permutation_map) |> Beaver.Deferred.resolve(ctx)
     bounds = Keyword.get(options, :in_bounds, [])
     mask = Keyword.get(options, :mask)
 

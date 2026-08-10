@@ -15,7 +15,8 @@ defmodule E2ETest do
           return %res : i32
         }
       }
-      """.(ctx)
+      """
+      |> Beaver.Deferred.resolve(ctx)
       |> canonicalize
       |> cse
       |> convert_arith_to_llvm()
@@ -37,7 +38,8 @@ defmodule E2ETest do
                          return %res : i32
                        }
                      }
-                     """.(ctx)
+                     """
+                     |> Beaver.Deferred.resolve(ctx)
                      |> MLIR.ExecutionEngine.create!()
                    end
     end

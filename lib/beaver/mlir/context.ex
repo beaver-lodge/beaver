@@ -101,6 +101,49 @@ defmodule Beaver.MLIR.Context do
     end
   end
 
+  @context_owned_modules [
+    MLIR.AffineExpr,
+    MLIR.AffineMap,
+    MLIR.Attribute,
+    MLIR.Dialect,
+    MLIR.Identifier,
+    MLIR.IntegerSet,
+    MLIR.Location,
+    MLIR.Module,
+    MLIR.Operation,
+    MLIR.Type,
+    MLIR.Value
+  ]
+
+  @doc "Returns whether two handles refer to the same MLIR context."
+  @spec same?(t(), t()) :: boolean()
+  def same?(%__MODULE__{} = left, %__MODULE__{} = right), do: MLIR.equal?(left, right)
+
+  @doc """
+  Verifies that a context-owned MLIR entity belongs to `expected`.
+
+  Context-free values pass through unchanged, which makes this suitable for
+  validating the output of contextual builders at their common boundary.
+  """
+  @spec ensure_same!(term(), t()) :: term()
+  def ensure_same!(%module{} = entity, %__MODULE__{} = expected)
+      when module in @context_owned_modules do
+    if not MLIR.null?(entity) and not same?(MLIR.context(entity), expected) do
+      kind = module |> Module.split() |> List.last() |> Macro.underscore()
+      raise ArgumentError, "#{kind} belongs to a different MLIR context"
+    end
+
+    entity
+  end
+
+  def ensure_same!({:ok, entity}, %__MODULE__{} = expected),
+    do: {:ok, ensure_same!(entity, expected)}
+
+  def ensure_same!(entities, %__MODULE__{} = expected) when is_list(entities),
+    do: Enum.map(entities, &ensure_same!(&1, expected))
+
+  def ensure_same!(entity, %__MODULE__{}), do: entity
+
   defp resolve_thread_pool(_opts, false), do: {nil, nil, nil}
 
   defp resolve_thread_pool(opts, true) do

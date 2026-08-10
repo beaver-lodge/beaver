@@ -76,13 +76,13 @@ defmodule Beaver.MLIR.Dialect.Linalg do
 
   @doc "Build the array attribute used by `linalg.generic` indexing maps."
   def indexing_maps(maps) when is_list(maps) do
-    fn ctx ->
+    Beaver.Deferred.defer(fn ctx ->
       maps
       |> Enum.map(fn map ->
-        map |> Beaver.Deferred.create(ctx) |> MLIR.Attribute.affine_map()
+        map |> Beaver.Deferred.resolve(ctx) |> MLIR.Attribute.affine_map()
       end)
       |> MLIR.Attribute.array(ctx: ctx)
-    end
+    end)
   end
 
   @doc "Build and validate Linalg iterator types."
@@ -97,11 +97,11 @@ defmodule Beaver.MLIR.Dialect.Linalg do
         raise ArgumentError, "unsupported Linalg iterator type: #{inspect(invalid)}"
     end
 
-    fn ctx ->
+    Beaver.Deferred.defer(fn ctx ->
       iterators
       |> Enum.map(&MLIR.Attribute.get("#linalg.iterator_type<#{&1}>", ctx: ctx))
       |> MLIR.Attribute.array(ctx: ctx)
-    end
+    end)
   end
 
   @doc false

@@ -51,7 +51,8 @@ defmodule CMath.IRExample do
       %conorm = "cmath.norm"(%pq) : (!cmath.complex<f32>) -> f32
       return %conorm : f32
     }
-    """.(ctx)
+    """
+    |> Beaver.Deferred.resolve(ctx)
     |> MLIR.verify!()
   end
 end

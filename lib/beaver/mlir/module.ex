@@ -32,10 +32,12 @@ defmodule Beaver.MLIR.Module do
 
   def create!(str, opts \\ []) when is_binary(str) do
     res =
-      Beaver.Deferred.from_opts(opts, fn ctx -> Beaver.Deferred.create(create(str, opts), ctx) end)
+      Beaver.Deferred.from_opts(opts, fn ctx ->
+        Beaver.Deferred.resolve(create(str, opts), ctx)
+      end)
 
     case res do
-      f when is_function(f, 1) ->
+      %Beaver.Deferred{} ->
         raise ArgumentError, "calling a bang function to parse module must be eager"
 
       {:error, diagnostics} ->

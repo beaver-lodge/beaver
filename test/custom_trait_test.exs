@@ -105,6 +105,6 @@ defmodule CustomTraitTest do
 
   defp parse_with(ctx, operation_name) do
     MLIR.Module.create(~s[module { "#{operation_name}"() : () -> () }], ctx: ctx)
-    |> Beaver.Deferred.create(ctx)
+    |> Beaver.Deferred.resolve(ctx)
   end
 end

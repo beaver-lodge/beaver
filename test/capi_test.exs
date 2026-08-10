@@ -117,7 +117,8 @@ defmodule MlirTest do
       %3 = "tosa.transpose"(%1) {perms = array<i32: 2, 0, 1>} : (tensor<2x3x1xi32>) -> (tensor<1x2x3xi32>)
       return
     }
-    """).(ctx)
+    """)
+    |> Beaver.Deferred.resolve(ctx)
   end
 
   test "run a simple pass" do
@@ -186,7 +187,7 @@ defmodule MlirTest do
   end
 
   test "Run pass with patterns", %{ctx: ctx} do
-    {:ok, module} = create_redundant_transpose_module(ctx)
+    module = create_redundant_transpose_module(ctx)
     external = %MLIR.Pass{} = Beaver.Composer.create_pass(TestFuncPass, ctx)
     pm = mlirPassManagerCreate(ctx)
     npm = mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create("func.func"))
@@ -273,7 +274,8 @@ defmodule MlirTest do
     assert map |> MLIR.to_string() == txt
     assert MLIR.Attribute.affine_map(map) |> MLIR.to_string() == "affine_map<#{txt}>"
 
-    assert MLIR.AffineMap.create(3, 3, [MLIR.AffineMap.dim(0), MLIR.AffineMap.symbol(1)]).(ctx)
+    assert MLIR.AffineMap.create(3, 3, [MLIR.AffineMap.dim(0), MLIR.AffineMap.symbol(1)])
+           |> Beaver.Deferred.resolve(ctx)
            |> MLIR.to_string() == txt
   end
 

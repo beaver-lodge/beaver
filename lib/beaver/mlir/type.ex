@@ -43,11 +43,11 @@ defmodule Beaver.MLIR.Type do
 
     Beaver.Deferred.from_opts(opts, fn ctx ->
       inputs =
-        inputs |> Enum.map(&Beaver.Deferred.create(&1, ctx)) |> Beaver.Native.array(__MODULE__)
+        inputs |> Enum.map(&Beaver.Deferred.resolve(&1, ctx)) |> Beaver.Native.array(__MODULE__)
 
       results =
         results
-        |> Enum.map(&Beaver.Deferred.create(&1, ctx))
+        |> Enum.map(&Beaver.Deferred.resolve(&1, ctx))
         |> Beaver.Native.array(__MODULE__)
 
       mlirFunctionTypeGet(ctx, num_inputs, inputs, num_results, results)
@@ -55,7 +55,7 @@ defmodule Beaver.MLIR.Type do
   end
 
   defp checked_composite_type(ctx, getter, args, opts) do
-    loc = opts[:loc] || MLIR.Location.unknown(ctx: ctx)
+    loc = (opts[:loc] || MLIR.Location.unknown(ctx: ctx)) |> Beaver.Deferred.resolve(ctx)
     {t, diagnostics} = apply(getter, [ctx, loc | args])
 
     if MLIR.null?(t) do
@@ -71,7 +71,7 @@ defmodule Beaver.MLIR.Type do
 
   defp bang_composite_type(cb, args) do
     case apply(cb, args) do
-      f when is_function(f, 1) ->
+      %Beaver.Deferred{} ->
         raise ArgumentError, "calling a bang function to compose a type must be eager"
 
       {:ok, t} ->
@@ -86,11 +86,16 @@ defmodule Beaver.MLIR.Type do
 
   def ranked_tensor(
         shape,
-        f,
+        %Beaver.Deferred{} = deferred,
         opts
+      ) do
+    Beaver.Deferred.from_opts(opts, fn ctx ->
+      ranked_tensor(
+        shape,
+        Beaver.Deferred.resolve(deferred, ctx),
+        Keyword.put(opts, :ctx, ctx)
       )
-      when is_function(f, 1) do
-    &ranked_tensor(shape, f.(&1), opts)
+    end)
   end
 
   def ranked_tensor(
@@ -99,9 +104,9 @@ defmodule Beaver.MLIR.Type do
         opts
       )
       when is_list(shape) do
-    ctx = MLIR.context(element_type)
+    ctx = composite_context(element_type, opts)
     rank = length(shape)
-    encoding = opts[:encoding] || mlirAttributeGetNull()
+    encoding = (opts[:encoding] || mlirAttributeGetNull()) |> Beaver.Deferred.resolve(ctx)
 
     shape =
       shape
@@ -122,13 +127,17 @@ defmodule Beaver.MLIR.Type do
 
   def unranked_tensor(element_type, opts \\ [])
 
-  def unranked_tensor(element_type, opts)
-      when is_function(element_type, 1) do
-    &unranked_tensor(element_type.(&1), opts)
+  def unranked_tensor(%Beaver.Deferred{} = element_type, opts) do
+    Beaver.Deferred.from_opts(opts, fn ctx ->
+      unranked_tensor(
+        Beaver.Deferred.resolve(element_type, ctx),
+        Keyword.put(opts, :ctx, ctx)
+      )
+    end)
   end
 
   def unranked_tensor(%__MODULE__{} = element_type, opts) do
-    ctx = MLIR.context(element_type)
+    ctx = composite_context(element_type, opts)
 
     checked_composite_type(
       ctx,
@@ -144,15 +153,19 @@ defmodule Beaver.MLIR.Type do
 
   def unranked_memref(element_type, opts \\ [])
 
-  def unranked_memref(element_type, opts)
-      when is_function(element_type, 1) do
-    &unranked_memref(element_type.(&1), opts)
+  def unranked_memref(%Beaver.Deferred{} = element_type, opts) do
+    Beaver.Deferred.from_opts(opts, fn ctx ->
+      unranked_memref(
+        Beaver.Deferred.resolve(element_type, ctx),
+        Keyword.put(opts, :ctx, ctx)
+      )
+    end)
   end
 
   def unranked_memref(%__MODULE__{} = element_type, opts) do
-    ctx = MLIR.context(element_type)
+    ctx = composite_context(element_type, opts)
     default_null = mlirAttributeGetNull()
-    memory_space = (opts[:memory_space] || default_null) |> Beaver.Deferred.create(ctx)
+    memory_space = (opts[:memory_space] || default_null) |> Beaver.Deferred.resolve(ctx)
 
     checked_composite_type(
       ctx,
@@ -166,8 +179,8 @@ defmodule Beaver.MLIR.Type do
     bang_composite_type(&unranked_memref/2, [element_type, opts])
   end
 
-  def complex(element_type) when is_function(element_type, 1) do
-    &complex(element_type.(&1))
+  def complex(%Beaver.Deferred{} = element_type) do
+    Beaver.Deferred.defer(&complex(Beaver.Deferred.resolve(element_type, &1)))
   end
 
   def complex(%__MODULE__{} = element_type) do
@@ -180,8 +193,14 @@ defmodule Beaver.MLIR.Type do
         opts \\ [layout: nil, memory_space: nil]
       )
 
-  def memref(shape, element_type, opts) when is_function(element_type, 1) do
-    &memref(shape, element_type.(&1), opts)
+  def memref(shape, %Beaver.Deferred{} = element_type, opts) do
+    Beaver.Deferred.from_opts(opts, fn ctx ->
+      memref(
+        shape,
+        Beaver.Deferred.resolve(element_type, ctx),
+        Keyword.put(opts, :ctx, ctx)
+      )
+    end)
   end
 
   def memref(
@@ -190,7 +209,7 @@ defmodule Beaver.MLIR.Type do
         opts
       )
       when is_list(shape) do
-    ctx = MLIR.context(element_type)
+    ctx = composite_context(element_type, opts)
     rank = length(shape)
 
     shape =
@@ -201,10 +220,10 @@ defmodule Beaver.MLIR.Type do
     default_null = mlirAttributeGetNull()
 
     layout =
-      %MLIR.Attribute{} = (opts[:layout] || default_null) |> Beaver.Deferred.create(ctx)
+      %MLIR.Attribute{} = (opts[:layout] || default_null) |> Beaver.Deferred.resolve(ctx)
 
     memory_space =
-      %MLIR.Attribute{} = (opts[:memory_space] || default_null) |> Beaver.Deferred.create(ctx)
+      %MLIR.Attribute{} = (opts[:memory_space] || default_null) |> Beaver.Deferred.resolve(ctx)
 
     checked_composite_type(
       ctx,
@@ -214,12 +233,12 @@ defmodule Beaver.MLIR.Type do
     )
   end
 
-  def memref!(shape, %__MODULE__{} = element_type, opts \\ []) do
+  def memref!(shape, element_type, opts \\ []) do
     bang_composite_type(&memref/3, [shape, element_type, opts])
   end
 
   @doc """
-  Get a vector type creator.
+  Get a vector type or deferred type value.
 
   ## Examples
       iex> ctx = MLIR.Context.create()
@@ -230,12 +249,18 @@ defmodule Beaver.MLIR.Type do
 
   def vector(shape, element_type, opts \\ [])
 
-  def vector(shape, element_type, opts) when is_function(element_type, 1) do
-    &vector(shape, element_type.(&1), opts)
+  def vector(shape, %Beaver.Deferred{} = element_type, opts) do
+    Beaver.Deferred.from_opts(opts, fn ctx ->
+      vector(
+        shape,
+        Beaver.Deferred.resolve(element_type, ctx),
+        Keyword.put(opts, :ctx, ctx)
+      )
+    end)
   end
 
   def vector(shape, %__MODULE__{} = element_type, opts) when is_list(shape) do
-    ctx = MLIR.context(element_type)
+    ctx = composite_context(element_type, opts)
     rank = length(shape)
     shape = shape |> Beaver.Native.array(Beaver.Native.I64)
 
@@ -247,8 +272,15 @@ defmodule Beaver.MLIR.Type do
     )
   end
 
-  def vector!(shape, %__MODULE__{} = element_type, opts \\ []) do
+  def vector!(shape, element_type, opts \\ []) do
     bang_composite_type(&vector/3, [shape, element_type, opts])
+  end
+
+  defp composite_context(%__MODULE__{} = element_type, opts) do
+    case Beaver.Deferred.context(opts) do
+      nil -> MLIR.context(element_type)
+      %MLIR.Context{} = ctx -> element_type |> Beaver.Deferred.resolve(ctx) |> MLIR.context()
+    end
   end
 
   @doc """
@@ -266,7 +298,7 @@ defmodule Beaver.MLIR.Type do
 
       elements =
         elements
-        |> Enum.map(&Beaver.Deferred.create(&1, ctx))
+        |> Enum.map(&Beaver.Deferred.resolve(&1, ctx))
         |> Beaver.Native.array(__MODULE__)
 
       mlirTupleTypeGet(ctx, num_elements, elements)

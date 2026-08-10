@@ -1,32 +1,68 @@
 defmodule Beaver.Deferred do
   @moduledoc """
-  Functions to work with IR entities not eagerly created. Usually it is an attribute/type doesn't get created until there is a MLIR context from block/op state.
+  Explicit, context-bound construction of MLIR entities.
+
+  MLIR types, attributes, locations, and similar entities belong to an
+  `Beaver.MLIR.Context`. Builders return a `%Beaver.Deferred{}` when no `:ctx`
+  option is supplied and return the concrete entity when one is supplied.
+
+  A deferred value is deliberately distinct from an ordinary one-argument
+  callback. Materialize it with `resolve/2`; passing a concrete context-owned
+  entity through `resolve/2` also verifies that it belongs to that context.
   """
   alias Beaver.MLIR
 
+  @enforce_keys [:resolver]
+  defstruct [:resolver]
+
   @type context_arg() :: MLIR.Context.t()
-  @type contextual(t) :: t | (context_arg() -> t)
-  @type deferred(t) :: contextual(t)
+  @opaque t(value) :: %__MODULE__{resolver: (context_arg() -> value)}
+  @type contextual(value) :: value | t(value)
   @type opts :: [ctx: context_arg()]
   @type type :: contextual(MLIR.Type.t())
   @type operation :: contextual(MLIR.Operation.t())
   @type attribute :: contextual(MLIR.Attribute.t())
 
-  @spec from_opts(opts(), (context_arg() -> t)) :: contextual(t) when t: var
-  def from_opts(opts, f) do
-    if ctx = fetch_context(opts) do
-      f.(ctx)
-    else
-      f
+  @doc "Wraps a context resolver as an explicit deferred value."
+  @spec defer((context_arg() -> value)) :: t(value) when value: var
+  def defer(resolver) when is_function(resolver, 1), do: %__MODULE__{resolver: resolver}
+
+  @doc """
+  Runs `resolver` immediately when `opts` contains `:ctx`; otherwise defers it.
+
+  An explicitly supplied `ctx: nil` or any non-context value is rejected rather
+  than being treated as if the option were absent.
+  """
+  @spec from_opts(opts(), (context_arg() -> value)) :: contextual(value) when value: var
+  def from_opts(opts, resolver) when is_list(opts) and is_function(resolver, 1) do
+    case Keyword.fetch(opts, :ctx) do
+      :error ->
+        defer(resolver)
+
+      {:ok, %MLIR.Context{} = ctx} ->
+        resolver.(ctx) |> MLIR.Context.ensure_same!(ctx)
+
+      {:ok, invalid} ->
+        raise ArgumentError, "expected :ctx to be an MLIR context, got: #{inspect(invalid)}"
     end
   end
 
-  @spec fetch_context(opts :: opts) :: MLIR.Context.t() | nil
-  def fetch_context(opts) do
-    opts[:ctx]
+  @doc "Returns the optional context in `opts`, validating an explicitly supplied value."
+  @spec context(opts()) :: context_arg() | nil
+  def context(opts) when is_list(opts) do
+    case Keyword.fetch(opts, :ctx) do
+      :error ->
+        nil
+
+      {:ok, %MLIR.Context{} = ctx} ->
+        ctx
+
+      {:ok, invalid} ->
+        raise ArgumentError, "expected :ctx to be an MLIR context, got: #{inspect(invalid)}"
+    end
   end
 
-  @spec fetch_insertion_point(opts :: opts) ::
+  @spec fetch_insertion_point(keyword()) ::
           MLIR.Block.t() | MLIR.PatternRewriter.t() | MLIR.RewriterBase.t() | Macro.t() | nil
   def fetch_insertion_point(opts) do
     for key <- [:block, :blk] do
@@ -38,27 +74,45 @@ defmodule Beaver.Deferred do
     opts[:ip]
   end
 
-  defp unwrap_f(f, ctx) do
-    case f.(ctx) do
-      {:ok, value} -> value
-      {:error, reason} -> raise ArgumentError, reason
-      entity -> entity
-    end
+  @doc """
+  Materializes a deferred value in `ctx`.
+
+  Concrete context-owned entities pass through unchanged after their context
+  ownership has been checked. Resolvers may return `{:ok, value}` or
+  `{:error, reason}`; success is unwrapped and errors become `ArgumentError`.
+  """
+  @spec resolve(contextual(value), context_arg()) :: value when value: var
+  def resolve(resolver, %MLIR.Context{}) when is_function(resolver, 1) do
+    raise ArgumentError,
+          "bare context resolvers are not deferred values; wrap the function with defer/1"
   end
 
-  def create({:parametric, _, _, f}, ctx) when is_function(f) and not is_nil(ctx) do
-    unwrap_f(f, ctx)
+  def resolve(value, %MLIR.Context{} = ctx) do
+    value
+    |> do_resolve(ctx)
+    |> MLIR.Context.ensure_same!(ctx)
   end
 
-  def create({:parametric, _, _, entity}, _ctx) do
-    entity
+  def resolve(_value, invalid) do
+    raise ArgumentError, "expected an MLIR context, got: #{inspect(invalid)}"
   end
 
-  def create(f, ctx) when is_function(f) do
-    unwrap_f(f, ctx)
+  defp do_resolve({:parametric, _, _, deferred}, ctx), do: do_resolve(deferred, ctx)
+
+  defp do_resolve(%__MODULE__{resolver: resolver}, ctx) do
+    resolver.(ctx)
+    |> unwrap()
+    |> do_resolve(ctx)
   end
 
-  def create(entity, _ctx) do
-    entity
+  defp do_resolve(entity, _ctx), do: entity
+
+  defp unwrap({:ok, value}), do: value
+
+  defp unwrap({:error, reason}) do
+    message = if is_binary(reason), do: reason, else: inspect(reason)
+    raise ArgumentError, message
   end
+
+  defp unwrap(value), do: value
 end

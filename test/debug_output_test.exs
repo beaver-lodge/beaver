@@ -11,7 +11,8 @@ defmodule DebugOutputTest do
       %res = arith.addi %arg0, %arg1 : i32
       return %res : i32
     }
-    """.(ctx)
+    """
+    |> Beaver.Deferred.resolve(ctx)
   end
 
   test "op stats", %{ctx: ctx} do
