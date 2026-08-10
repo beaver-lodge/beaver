@@ -73,8 +73,7 @@ defmodule TritonTest do
   end
 
   @tag skip: !@enabled
-  @tag :tmp_dir
-  test "compiles a Triton kernel to PTX on the CPU", %{ctx: ctx, tmp_dir: tmp_dir} do
+  test "compiles a Triton kernel to PTX on the CPU", %{ctx: ctx} do
     Beaver.Triton.register(ctx)
 
     module =
@@ -97,22 +96,12 @@ defmodule TritonTest do
       |> Beaver.Composer.append("canonicalize")
       |> Beaver.Composer.run!()
 
-    llvm_bin = System.get_env("LLVM_CONFIG_PATH") |> Path.dirname()
-    ll_path = Path.join(tmp_dir, "lowered.ll")
-    ptx_path = Path.join(tmp_dir, "lowered.ptx")
+    ptx =
+      lowered
+      |> Beaver.MLIR.Target.LLVMIR.translate!()
+      |> Beaver.MLIR.Target.LLVMIR.compile_to_ptx!(cpu: "sm_90")
 
-    File.write!(ll_path, Beaver.MLIR.Target.LLVMIR.translate!(lowered))
-
-    {ptx_output, 0} =
-      System.cmd(
-        Path.join(llvm_bin, "llc"),
-        ["-march=nvptx64", "-mcpu=sm_90", ll_path, "-o", ptx_path],
-        stderr_to_stdout: true
-      )
-
-    ptx = File.read!(ptx_path)
     assert ptx =~ ".visible .entry addptr"
     assert ptx =~ ".target sm_90"
-    assert ptx_output == ""
   end
 end

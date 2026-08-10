@@ -106,29 +106,9 @@ defmodule Beaver.Shadow.Tuning.GPU do
   end
 
   defp llvm_to_ptx(llvm) do
-    llvm_path =
-      Path.join(System.tmp_dir!(), "shadow_tune_#{System.unique_integer([:positive])}.ll")
-
-    ptx_path =
-      Path.join(System.tmp_dir!(), "shadow_tune_#{System.unique_integer([:positive])}.ptx")
-
-    File.write!(llvm_path, Beaver.MLIR.Target.LLVMIR.translate!(llvm))
-
-    llvm_bin =
-      System.get_env("LLVM_CONFIG_PATH")
-      |> Path.dirname()
-
-    {_, 0} =
-      System.cmd(
-        Path.join(llvm_bin, "llc"),
-        ["-march=nvptx64", "-mcpu=sm_80", llvm_path, "-o", ptx_path],
-        stderr_to_stdout: true
-      )
-
-    ptx = File.read!(ptx_path)
-    File.rm!(llvm_path)
-    File.rm!(ptx_path)
-    ptx
+    llvm
+    |> Beaver.MLIR.Target.LLVMIR.translate!()
+    |> Beaver.MLIR.Target.LLVMIR.compile_to_ptx!(cpu: "sm_80")
   end
 
   defp alloc_buffers(buffer_sizes) do

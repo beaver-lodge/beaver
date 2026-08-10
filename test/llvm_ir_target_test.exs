@@ -56,4 +56,19 @@ defmodule Beaver.MLIR.Target.LLVMIRTest do
       assert llvm_ir =~ "define void @noop()"
     end
   end
+
+  test "compiles LLVM IR to NVPTX assembly in-process" do
+    llvm_ir = """
+    define void @kernel() {
+      ret void
+    }
+    """
+
+    assert {:ok, ptx} = LLVMIR.compile_to_ptx(llvm_ir, cpu: "sm_80")
+    assert ptx =~ ".target sm_80"
+    assert ptx =~ "kernel"
+
+    assert {:error, message} = LLVMIR.compile_to_ptx("not LLVM IR")
+    assert message != ""
+  end
 end

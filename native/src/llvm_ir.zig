@@ -49,11 +49,64 @@ const Translation = struct {
     }
 };
 
+const PTXCompilation = struct {
+    const Buffer = std.array_list.Managed(u8);
+
+    output: Buffer,
+    error_message: Buffer,
+
+    fn appendOutput(value: mlir_capi.StringRef.T, user_data: ?*anyopaque) callconv(.c) void {
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
+        self.output.appendSlice(value.data[0..value.length]) catch @panic("failed to collect PTX");
+    }
+
+    fn appendError(value: mlir_capi.StringRef.T, user_data: ?*anyopaque) callconv(.c) void {
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
+        self.error_message.appendSlice(value.data[0..value.length]) catch @panic("failed to collect LLVM target diagnostic");
+    }
+
+    fn compile(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+        const llvm_ir = try beam.get_binary(environment, args[0]);
+        const cpu = try beam.get_binary(environment, args[1]);
+        const features = try beam.get_binary(environment, args[2]);
+        var self = @This(){
+            .output = Buffer.init(beam.allocator),
+            .error_message = Buffer.init(beam.allocator),
+        };
+        defer self.output.deinit();
+        defer self.error_message.deinit();
+
+        const status = c.beaverCompileLLVMIRToPTX(
+            c.mlirStringRefCreate(llvm_ir.data, llvm_ir.size),
+            c.mlirStringRefCreate(cpu.data, cpu.size),
+            c.mlirStringRefCreate(features.data, features.size),
+            appendOutput,
+            appendError,
+            &self,
+        );
+        if (c.beaverLogicalResultIsFailure(status)) {
+            const message = if (self.error_message.items.len == 0)
+                "LLVM target compilation failed"
+            else
+                self.error_message.items;
+            return beam.make_error_binary(environment, message);
+        }
+
+        return beam.make_ok_binary(environment, self.output.items);
+    }
+};
+
 pub const nifs = .{
     result.nif_with_flags(
         "beaver_raw_translate_module_to_llvm_ir",
         1,
         Translation.translate,
+        e.ERL_NIF_DIRTY_JOB_CPU_BOUND,
+    ).entry,
+    result.nif_with_flags(
+        "beaver_raw_compile_llvm_ir_to_ptx",
+        3,
+        PTXCompilation.compile,
         e.ERL_NIF_DIRTY_JOB_CPU_BOUND,
     ).entry,
 };

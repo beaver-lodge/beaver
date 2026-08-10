@@ -14,6 +14,14 @@ extern "C" {
 MLIR_CAPI_EXPORTED MlirLogicalResult beaverTranslateModuleToLLVMIRText(
     MlirOperation module, MlirStringCallback callback, void *userData);
 
+/// Compiles textual LLVM IR to NVPTX assembly and streams the result to
+/// outputCallback. Diagnostics are streamed to errorCallback. All temporary
+/// LLVM objects and buffers are owned and released by this call.
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverCompileLLVMIRToPTX(
+    MlirStringRef llvmIR, MlirStringRef cpu, MlirStringRef features,
+    MlirStringCallback outputCallback, MlirStringCallback errorCallback,
+    void *userData);
+
 #ifdef __cplusplus
 }
 #endif

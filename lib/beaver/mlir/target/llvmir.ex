@@ -35,4 +35,26 @@ defmodule Beaver.MLIR.Target.LLVMIR do
               MLIR.Diagnostic.format(diagnostics, "failed to translate module to LLVM IR")
     end
   end
+
+  @doc "Compile textual LLVM IR to NVPTX assembly in-process."
+  @spec compile_to_ptx(binary(), keyword()) :: {:ok, binary()} | {:error, binary()}
+  def compile_to_ptx(llvm_ir, opts \\ []) when is_binary(llvm_ir) and is_list(opts) do
+    cpu = Keyword.get(opts, :cpu, "sm_80")
+    features = Keyword.get(opts, :features, "")
+
+    unless is_binary(cpu) and is_binary(features) do
+      raise ArgumentError, ":cpu and :features must be strings"
+    end
+
+    MLIR.CAPI.beaver_raw_compile_llvm_ir_to_ptx(llvm_ir, cpu, features)
+  end
+
+  @doc "Compile textual LLVM IR to NVPTX assembly, raising on failure."
+  @spec compile_to_ptx!(binary(), keyword()) :: binary()
+  def compile_to_ptx!(llvm_ir, opts \\ []) do
+    case compile_to_ptx(llvm_ir, opts) do
+      {:ok, ptx} -> ptx
+      {:error, message} -> raise ArgumentError, "failed to compile LLVM IR to PTX: #{message}"
+    end
+  end
 end
