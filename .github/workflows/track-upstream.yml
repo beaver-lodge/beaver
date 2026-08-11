@@ -65,13 +65,17 @@ jobs:
               -m "Latest triton-lang/triton main: ${sha}. Latest llvm/eudsl asset: ${asset}. Merging this PR triggers the Build Triton prebuilt workflow (push to main with triton.json) to publish the prebuilt for the new pin."
           git push origin "$branch"
 
+          printf '%s\n' \
+            "Tracks the latest OpenAI LLVM (llvm/eudsl) release and the latest Triton pin." \
+            "" \
+            "- triton_ref: ${sha}" \
+            "- llvm/eudsl latest asset: ${asset}" \
+            "" \
+            "Merging triggers \`Build Triton prebuilt\` (push to main with \`triton.json\`) to publish the prebuilt for the new pin." \
+            > /tmp/pr_body.md
+
           gh pr create --repo beaver-lodge/beaver \
             --base main \
             --head "$branch" \
             --title "chore: bump triton pin to ${sha:0:12}" \
-            --body "Tracks the latest OpenAI LLVM (llvm/eudsl) release and the latest Triton pin.
-
-- triton_ref: ${sha}
-- llvm/eudsl latest asset: ${asset}
-
-Merging triggers \`Build Triton prebuilt\` (push to main with \`triton.json\`) to publish the prebuilt for the new pin."
+            --body-file /tmp/pr_body.md
