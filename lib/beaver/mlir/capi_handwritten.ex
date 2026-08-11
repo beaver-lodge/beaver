@@ -13,6 +13,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
     beaver_raw_cuda_available: 0,
     beaver_raw_cuda_device_count: 0,
     beaver_raw_cuda_device_name: 1,
+    beaver_raw_cuda_device_compute_capability: 1,
     beaver_raw_cuda_module_load: 1,
     beaver_raw_cuda_module_get_function: 2,
     beaver_raw_cuda_func_set_attribute: 3,

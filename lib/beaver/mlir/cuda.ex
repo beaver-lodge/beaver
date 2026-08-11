@@ -39,6 +39,14 @@ defmodule Beaver.MLIR.CUDA do
   def device_name(ordinal), do: MLIR.CAPI.beaver_raw_cuda_device_name(ordinal)
 
   @doc """
+  Returns `{:ok, {major, minor}}` with the CUDA compute capability of the
+  device at `ordinal`, or `{:error, reason}`.
+  """
+  @spec device_compute_capability(integer()) :: {:ok, {non_neg_integer(), non_neg_integer()}} | {:error, String.t()}
+  def device_compute_capability(ordinal),
+    do: MLIR.CAPI.beaver_raw_cuda_device_compute_capability(ordinal)
+
+  @doc """
   Loads the first `gpu.binary` of an MLIR module into CUDA.
 
   The PTX assembly of the first `#gpu.object` (as produced by

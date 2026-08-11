@@ -33,6 +33,7 @@ const cuInitFn = *const fn (flags: c_uint) callconv(.c) CudaResult;
 const cuDeviceGetCountFn = *const fn (count: *c_int) callconv(.c) CudaResult;
 const cuDeviceGetFn = *const fn (device: *CuDevice, ordinal: c_int) callconv(.c) CudaResult;
 const cuDeviceGetNameFn = *const fn (name: [*c]u8, len: c_int, dev: CuDevice) callconv(.c) CudaResult;
+const cuDeviceGetAttributeFn = *const fn (value: *c_int, attribute: c_int, dev: CuDevice) callconv(.c) CudaResult;
 const cuModuleLoadDataFn = *const fn (module: *?*anyopaque, data: *const anyopaque) callconv(.c) CudaResult;
 const cuModuleGetFunctionFn = *const fn (function: *?*anyopaque, module: ?*anyopaque, name: [*:0]const u8) callconv(.c) CudaResult;
 const cuModuleUnloadFn = *const fn (module: ?*anyopaque) callconv(.c) CudaResult;
@@ -63,6 +64,7 @@ const CudaDriver = struct {
     cuDeviceGetCount: cuDeviceGetCountFn,
     cuDeviceGet: cuDeviceGetFn,
     cuDeviceGetName: cuDeviceGetNameFn,
+    cuDeviceGetAttribute: cuDeviceGetAttributeFn,
     cuModuleLoadData: cuModuleLoadDataFn,
     cuModuleGetFunction: cuModuleGetFunctionFn,
     cuModuleUnload: cuModuleUnloadFn,
@@ -90,6 +92,9 @@ const libcuda_candidates = [_][]const u8{
     "/usr/local/cuda/lib64/libcuda.so.1",
 };
 
+const cu_device_attribute_compute_capability_major = 75;
+const cu_device_attribute_compute_capability_minor = 76;
+
 var driver: ?CudaDriver = null;
 var driver_probe_done: bool = false;
 var driver_mutex: mutex.Mutex = .{};
@@ -109,6 +114,7 @@ fn loadDriver() ?*const CudaDriver {
         const cuDeviceGetCount = lib.lookup(cuDeviceGetCountFn, "cuDeviceGetCount") orelse continue;
         const cuDeviceGet = lib.lookup(cuDeviceGetFn, "cuDeviceGet") orelse continue;
         const cuDeviceGetName = lib.lookup(cuDeviceGetNameFn, "cuDeviceGetName") orelse continue;
+        const cuDeviceGetAttribute = lib.lookup(cuDeviceGetAttributeFn, "cuDeviceGetAttribute") orelse continue;
         const cuModuleLoadData = lib.lookup(cuModuleLoadDataFn, "cuModuleLoadData") orelse continue;
         const cuModuleGetFunction = lib.lookup(cuModuleGetFunctionFn, "cuModuleGetFunction") orelse continue;
         const cuModuleUnload = lib.lookup(cuModuleUnloadFn, "cuModuleUnload") orelse continue;
@@ -142,6 +148,7 @@ fn loadDriver() ?*const CudaDriver {
             .cuDeviceGetCount = cuDeviceGetCount,
             .cuDeviceGet = cuDeviceGet,
             .cuDeviceGetName = cuDeviceGetName,
+            .cuDeviceGetAttribute = cuDeviceGetAttribute,
             .cuModuleLoadData = cuModuleLoadData,
             .cuModuleGetFunction = cuModuleGetFunction,
             .cuModuleUnload = cuModuleUnload,
@@ -201,6 +208,32 @@ pub fn cuda_device_name(env: beam.env, _: c_int, args: [*c]const beam.term) !bea
 
     const name_len = std.mem.indexOfScalar(u8, &name_buf, 0) orelse name_buf.len;
     return beam.make_ok_binary(env, name_buf[0..name_len]);
+}
+
+/// Returns `{:ok, {major, minor}}` with the compute capability of the device
+/// at `ordinal`, or `{:error, reason}`.
+pub fn cuda_device_compute_capability(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+    const d = loadDriver() orelse return beam.make_error_binary(env, "libcuda not found");
+    if (d.init_result != 0) return cuResultError(env, "cuInit", d.init_result);
+
+    const ordinal = try beam.get_i32(env, args[0]);
+    var device: CuDevice = undefined;
+    const get_result = d.cuDeviceGet(&device, ordinal);
+    if (get_result != 0) return cuResultError(env, "cuDeviceGet", get_result);
+
+    var major: c_int = 0;
+    const major_result = d.cuDeviceGetAttribute(&major, cu_device_attribute_compute_capability_major, device);
+    if (major_result != 0) return cuResultError(env, "cuDeviceGetAttribute(COMPUTE_CAPABILITY_MAJOR)", major_result);
+
+    var minor: c_int = 0;
+    const minor_result = d.cuDeviceGetAttribute(&minor, cu_device_attribute_compute_capability_minor, device);
+    if (minor_result != 0) return cuResultError(env, "cuDeviceGetAttribute(COMPUTE_CAPABILITY_MINOR)", minor_result);
+
+    var terms = [_]beam.term{
+        try beam.make(i32, env, major),
+        try beam.make(i32, env, minor),
+    };
+    return beam.make_ok_term(env, beam.make_tuple(env, &terms));
 }
 
 const DriverResult = union(enum) {
@@ -419,6 +452,7 @@ pub const nifs = .{
     prelude.beaverRawNIF(@This(), "cuda_available", 0),
     prelude.beaverRawNIF(@This(), "cuda_device_count", 0),
     prelude.beaverRawNIF(@This(), "cuda_device_name", 1),
+    prelude.beaverRawNIF(@This(), "cuda_device_compute_capability", 1),
     prelude.beaverRawNIF(@This(), "cuda_module_load", 1),
     prelude.beaverRawNIF(@This(), "cuda_module_get_function", 2),
     prelude.beaverRawNIF(@This(), "cuda_func_set_attribute", 3),
