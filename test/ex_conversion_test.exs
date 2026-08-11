@@ -694,6 +694,13 @@ defmodule ExConversionTest do
             %6 = "ex.runtime_enter"(%5) : (i64) -> i64
             %runtime_leave = "ex.runtime_leave"() : () -> i64
             %runtime_destroy = "ex.runtime_destroy"(%5) : (i64) -> i64
+            %result_handle = "ex.result_create"(%5, %0) : (i64, i64) -> i64
+            %result_kind = "ex.result_root_kind"(%result_handle) : (i64) -> i64
+            %result_word = "ex.result_root_word"(%result_handle) : (i64) -> i64
+            %term_kind = "ex.result_term_kind"(%result_handle, %result_word) : (i64, i64) -> i64
+            %term_len = "ex.result_term_length"(%result_handle, %result_word) : (i64, i64) -> i64
+            %term_item = "ex.result_term_get"(%result_handle, %result_word, %0) : (i64, i64, i64) -> i64
+            %result_destroy = "ex.result_destroy"(%result_handle) : (i64) -> i64
             %7 = "ex.process_table_reset"(%1) : (i64) -> i64
             %8 = "ex.cont_save"(%1, %2, %0) : (i64, i64, i64) -> i64
             %9 = "ex.receive_cont_save"(%1, %2, %0) : (i64, i64, i64) -> i64
@@ -735,6 +742,17 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.runtime_enter"
     assert rendered =~ "ex.term.runtime_leave"
     assert rendered =~ "ex.term.runtime_destroy"
+    assert rendered =~ "ex.term.result_create"
+    assert rendered =~ "ex.term.result_destroy"
+    assert rendered =~ "ex.term.result_root_kind"
+    assert rendered =~ "ex.term.result_root_word"
+    assert rendered =~ "ex.term.result_term_kind"
+    assert rendered =~ "ex.term.result_term_length"
+    assert rendered =~ "ex.term.result_term_get"
+
+    assert rendered =~
+             ~s|"func.func"() <{function_type = (i64, i64, i64) -> i64, sym_name = "ex.term.result_term_get"|
+
     assert rendered =~ "ex.term.process_table_reset"
     assert rendered =~ "ex.term.cont_save"
     assert rendered =~ "ex.term.receive_cont_save"
