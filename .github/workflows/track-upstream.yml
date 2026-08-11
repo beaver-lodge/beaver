@@ -18,7 +18,12 @@ jobs:
   track:
     runs-on: ubuntu-latest
     env:
-      GH_TOKEN: ${{ github.token }}
+      # The repo blocks Actions-created PRs by default (createPullRequest).
+      # Either set the UPSTREAM_PINS_TOKEN fine-grained PAT (contents: write,
+      # pull requests: write on this repo), or enable Settings > Actions >
+      # General > Workflow permissions > "Allow GitHub Actions to create and
+      # approve pull requests".
+      GH_TOKEN: ${{ secrets.UPSTREAM_PINS_TOKEN || github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
