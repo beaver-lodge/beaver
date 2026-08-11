@@ -66,6 +66,15 @@ defmodule Beaver.Triton do
     num_warps = Keyword.get(opts, :num_warps, 4)
     remove_layouts? = Keyword.get(opts, :remove_layout_conversions, true)
     from_ttgir? = Keyword.get(opts, :from_ttgir, false)
+    # `convert-triton-gpu-to-llvm` (and the NV passes with the same options)
+    # take compute-capability/ptx-version as pass options; driven by name they
+    # default to 80, which breaks fp8 lowering on sm_89+ targets. Derive them
+    # from the target string (cuda:120 -> 120).
+    capability =
+      case Regex.run(~r/cuda:(\d+)/, target) do
+        [_, cc] -> String.to_integer(cc)
+        _ -> 80
+      end
 
     ttgpu_pipeline =
       [
@@ -93,12 +102,16 @@ defmodule Beaver.Triton do
       |> Beaver.Composer.append("tritongpu-combine-tensor-select-and-if")
       |> Beaver.Composer.append("tritongpu-allocate-warp-groups")
       |> Beaver.Composer.append("convert-scf-to-cf")
-      |> Beaver.Composer.append("allocate-shared-memory-nv")
+      |> Beaver.Composer.append(
+        "allocate-shared-memory-nv{compute-capability=#{capability} ptx-version=#{capability}}"
+      )
       |> Beaver.Composer.append("triton-tensor-memory-allocation")
       |> Beaver.Composer.append("triton-nvidia-check-matmul-two-cta")
       |> Beaver.Composer.append("triton-nvidia-gpu-proxy-fence-insertion")
       |> Beaver.Composer.append("triton-nvidia-gpu-tmem-barrier-insertion")
-      |> Beaver.Composer.append("convert-triton-gpu-to-llvm")
+      |> Beaver.Composer.append(
+        "convert-triton-gpu-to-llvm{compute-capability=#{capability} ptx-version=#{capability}}"
+      )
       |> Beaver.Composer.append("convert-warp-specialize-to-llvm")
       |> Beaver.Composer.append("convert-nv-gpu-to-llvm")
       |> Beaver.Composer.append("convert-nvvm-to-llvm")
