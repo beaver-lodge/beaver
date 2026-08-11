@@ -97,6 +97,14 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.result_term_kind", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.result_term_length", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.result_term_get", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.term_export", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.term_import", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.exported_clone", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.exported_destroy", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.exported_length", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.exported_get", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.term_handle_export", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.term_handle_destroy", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.process_table_reset", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.cont_save", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.receive_cont_save", &convert_term_read/3, version: "1.0")
@@ -213,6 +221,14 @@ defmodule Beaver.MLIR.Conversion.Ex do
     result_term_kind: "ex.term.result_term_kind",
     result_term_length: "ex.term.result_term_length",
     result_term_get: "ex.term.result_term_get",
+    term_export: "ex.term.export",
+    term_import: "ex.term.import",
+    exported_clone: "ex.term.exported_clone",
+    exported_destroy: "ex.term.exported_destroy",
+    exported_length: "ex.term.exported_length",
+    exported_get: "ex.term.exported_get",
+    term_handle_export: "ex.term.handle_export",
+    term_handle_destroy: "ex.term.handle_destroy",
     process_table_reset: "ex.term.process_table_reset",
     cont_save: "ex.term.cont_save",
     receive_cont_save: "ex.term.receive_cont_save",
@@ -956,6 +972,14 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.result_term_kind"), do: @term_intrinsics.result_term_kind
   defp read_intrinsic("ex.result_term_length"), do: @term_intrinsics.result_term_length
   defp read_intrinsic("ex.result_term_get"), do: @term_intrinsics.result_term_get
+  defp read_intrinsic("ex.term_export"), do: @term_intrinsics.term_export
+  defp read_intrinsic("ex.term_import"), do: @term_intrinsics.term_import
+  defp read_intrinsic("ex.exported_clone"), do: @term_intrinsics.exported_clone
+  defp read_intrinsic("ex.exported_destroy"), do: @term_intrinsics.exported_destroy
+  defp read_intrinsic("ex.exported_length"), do: @term_intrinsics.exported_length
+  defp read_intrinsic("ex.exported_get"), do: @term_intrinsics.exported_get
+  defp read_intrinsic("ex.term_handle_export"), do: @term_intrinsics.term_handle_export
+  defp read_intrinsic("ex.term_handle_destroy"), do: @term_intrinsics.term_handle_destroy
   defp read_intrinsic("ex.process_table_reset"), do: @term_intrinsics.process_table_reset
   defp read_intrinsic("ex.cont_save"), do: @term_intrinsics.cont_save
   defp read_intrinsic("ex.receive_cont_save"), do: @term_intrinsics.receive_cont_save
@@ -1216,6 +1240,22 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp intrinsic_function_type("ex.term.result_term_get", _ctx) do
     MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 3), [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type(symbol, _ctx)
+       when symbol in ["ex.term.export", "ex.term.import", "ex.term.exported_get"] do
+    MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 2), [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type(symbol, _ctx)
+       when symbol in [
+              "ex.term.exported_clone",
+              "ex.term.exported_destroy",
+              "ex.term.exported_length",
+              "ex.term.handle_export",
+              "ex.term.handle_destroy"
+            ] do
+    MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
   defp intrinsic_function_type("ex.term.process_table_reset", _ctx) do
