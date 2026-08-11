@@ -700,6 +700,14 @@ defmodule ExConversionTest do
             %term_kind = "ex.result_term_kind"(%result_handle, %result_word) : (i64, i64) -> i64
             %term_len = "ex.result_term_length"(%result_handle, %result_word) : (i64, i64) -> i64
             %term_item = "ex.result_term_get"(%result_handle, %result_word, %0) : (i64, i64, i64) -> i64
+            %exported = "ex.term_export"(%result_handle, %result_word) : (i64, i64) -> i64
+            %exported_clone = "ex.exported_clone"(%exported) : (i64) -> i64
+            %exported_len = "ex.exported_length"(%exported) : (i64) -> i64
+            %exported_byte = "ex.exported_get"(%exported, %0) : (i64, i64) -> i64
+            %term_handle = "ex.term_import"(%5, %exported) : (i64, i64) -> i64
+            %exported_again = "ex.term_handle_export"(%term_handle) : (i64) -> i64
+            %term_handle_destroy = "ex.term_handle_destroy"(%term_handle) : (i64) -> i64
+            %exported_destroy = "ex.exported_destroy"(%exported_clone) : (i64) -> i64
             %result_destroy = "ex.result_destroy"(%result_handle) : (i64) -> i64
             %7 = "ex.process_table_reset"(%1) : (i64) -> i64
             %8 = "ex.cont_save"(%1, %2, %0) : (i64, i64, i64) -> i64
@@ -749,6 +757,14 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.result_term_kind"
     assert rendered =~ "ex.term.result_term_length"
     assert rendered =~ "ex.term.result_term_get"
+    assert rendered =~ "ex.term.export"
+    assert rendered =~ "ex.term.import"
+    assert rendered =~ "ex.term.exported_clone"
+    assert rendered =~ "ex.term.exported_destroy"
+    assert rendered =~ "ex.term.exported_length"
+    assert rendered =~ "ex.term.exported_get"
+    assert rendered =~ "ex.term.handle_export"
+    assert rendered =~ "ex.term.handle_destroy"
 
     assert rendered =~
              ~s|"func.func"() <{function_type = (i64, i64, i64) -> i64, sym_name = "ex.term.result_term_get"|

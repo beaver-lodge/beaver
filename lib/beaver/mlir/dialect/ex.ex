@@ -200,6 +200,33 @@ defmodule Beaver.MLIR.Dialect.Ex do
         ),
         results: [result: ^integer_like]
 
+  # Portable host boundary. Exported and imported term handles are opaque
+  # generation-checked capabilities; no operation exposes an arena word to
+  # the host without a validating owner.
+  defop term_export(result_handle = ^integer_like, word = ^integer_like),
+    results: [exported_handle: ^integer_like]
+
+  defop term_import(runtime_handle = ^integer_like, exported_handle = ^integer_like),
+    results: [term_handle: ^integer_like]
+
+  defop exported_clone(handle = ^integer_like),
+    results: [result: ^integer_like]
+
+  defop exported_destroy(handle = ^integer_like),
+    results: [result: ^integer_like]
+
+  defop exported_length(handle = ^integer_like),
+    results: [result: ^integer_like]
+
+  defop exported_get(handle = ^integer_like, index = ^integer_like),
+    results: [result: ^integer_like]
+
+  defop term_handle_export(handle = ^integer_like),
+    results: [exported_handle: ^integer_like]
+
+  defop term_handle_destroy(handle = ^integer_like),
+    results: [result: ^integer_like]
+
   # Resets the runtime process table to a single fresh initial process with
   # the given capacity; the scheduler driver calls this at program start.
   defop process_table_reset(cap = ^integer_like),

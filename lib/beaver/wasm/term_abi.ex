@@ -66,6 +66,15 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.result_term_kind" => %{params: [:i64, :i64], result: :i64},
     "ex.term.result_term_length" => %{params: [:i64, :i64], result: :i64},
     "ex.term.result_term_get" => %{params: [:i64, :i64, :i64], result: :i64},
+    # portable cross-session boundary
+    "ex.term.export" => %{params: [:i64, :i64], result: :i64},
+    "ex.term.import" => %{params: [:i64, :i64], result: :i64},
+    "ex.term.exported_clone" => %{params: [:i64], result: :i64},
+    "ex.term.exported_destroy" => %{params: [:i64], result: :i64},
+    "ex.term.exported_length" => %{params: [:i64], result: :i64},
+    "ex.term.exported_get" => %{params: [:i64, :i64], result: :i64},
+    "ex.term.handle_export" => %{params: [:i64], result: :i64},
+    "ex.term.handle_destroy" => %{params: [:i64], result: :i64},
     # process table / scheduler driver
     "ex.term.spawn" => %{params: [:i64], result: :i64},
     "ex.term.process_table_reset" => %{params: [:i64], result: :i64},
