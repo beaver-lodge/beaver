@@ -566,8 +566,9 @@ defmodule ExConversionTest do
             %5 = "ex.map"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
             %6 = "ex.map_put"(%5, %2, %3) : (!ex.dyn, !ex.dyn, !ex.dyn) -> !ex.dyn
             %7 = "ex.binary"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
-            %8 = "ex.is_list"(%4) : (!ex.dyn) -> i64
-            "ex.return"(%8) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+            %8 = "ex.binary_from_list"(%4) : (!ex.dyn) -> !ex.dyn
+            %9 = "ex.is_list"(%4) : (!ex.dyn) -> i64
+            "ex.return"(%9) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
         """,

@@ -448,6 +448,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop binary(segments = variadic(base(dyn()))),
     results: [result: base(dyn())]
 
+  defop binary_from_list(bytes = base(dyn())),
+    results: [result: base(dyn())]
+
   defop is_integer(value = ^any_value),
     results: [result: ^integer_like]
 
