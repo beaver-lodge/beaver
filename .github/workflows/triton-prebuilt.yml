@@ -2,6 +2,12 @@ name: Build Triton prebuilt
 
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      triton_ref:
+        description: "Triton commit ref to build; defaults to triton.json"
+        type: string
+        required: false
   push:
     branches:
       - main
@@ -36,7 +42,11 @@ jobs:
       - name: Read Triton version
         id: triton-version
         run: |
-          ref="$(jq -er '.triton_ref' triton.json)"
+          if [ -n "${{ inputs.triton_ref }}" ]; then
+            ref="${{ inputs.triton_ref }}"
+          else
+            ref="$(jq -er '.triton_ref' triton.json)"
+          fi
           echo "TRITON_REF=$ref" >> "$GITHUB_ENV"
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
 

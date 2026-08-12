@@ -24,6 +24,12 @@ jobs:
       # General > Workflow permissions > "Allow GitHub Actions to create and
       # approve pull requests".
       GH_TOKEN: ${{ secrets.UPSTREAM_PINS_TOKEN || github.token }}
+    outputs:
+      triton_sha: ${{ steps.triton.outputs.sha }}
+      eudsl_asset: ${{ steps.eudsl.outputs.asset }}
+      current_triton: ${{ steps.current.outputs.triton }}
+      eudsl_current: ${{ steps.current.outputs.eudsl }}
+      llvm_available: ${{ steps.llvm.outputs.available }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,7 +57,7 @@ jobs:
             || curl -fsS "https://raw.githubusercontent.com/triton-lang/triton/${ref}/cmake/llvm-build-info.json")"
           hash="$(echo "$info" | jq -r '.llvm_hash // empty')"
           build="$(echo "$info" | jq -r '.build_number // empty')"
-          if [[ -z "$hash" || "$build" == "null" || -z "$build" ]]; then
+          if [[ -z "$hash" || -z "$build" || "$build" == "null" ]]; then
             echo "available=false" >> "$GITHUB_OUTPUT"
             echo "No LLVM info for ${ref}" >> "$GITHUB_STEP_SUMMARY"
             exit 0
@@ -59,7 +65,6 @@ jobs:
           url="https://oaitriton.blob.core.windows.net/public/llvm-builds/llvm-${hash:0:8}-ubuntu-x64-${build}.tar.gz"
           code="$(curl -s -o /dev/null -w '%{http_code}' -I "$url")"
           echo "llvm_url=$url" >> "$GITHUB_OUTPUT"
-          echo "llvm_code=$code" >> "$GITHUB_OUTPUT"
           echo "available=$([ "$code" = "200" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
           echo "Triton ${ref} LLVM: ${url} -> HTTP ${code}" >> "$GITHUB_STEP_SUMMARY"
 
@@ -69,27 +74,16 @@ jobs:
           echo "triton=$(jq -r .triton_ref triton.json)" >> "$GITHUB_OUTPUT"
           echo "eudsl=$(jq -r .llvm_eudsl_latest upstream-pins.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Update pins, build prebuilt, open PR
-        # Open a PR when the eudsl asset moved, or when the triton pin moved
-        # AND its Triton-pinned LLVM is actually downloadable (OpenAI's LLVM
-        # builds lag Triton main). The elixir CI downloads
-        # triton-prebuilt-<ref>, so the prebuilt must be built and released
-        # BEFORE the pin PR's CI runs; dispatch the build on the pin branch
-        # and wait for it to finish, then open the PR.
+      - name: Create/update pin branch
         if: (steps.eudsl.outputs.asset != steps.current.outputs.eudsl) || (steps.triton.outputs.sha != steps.current.outputs.triton && steps.llvm.outputs.available == 'true')
         run: |
           set -euo pipefail
           sha="${{ steps.triton.outputs.sha }}"
           asset="${{ steps.eudsl.outputs.asset }}"
           triton_changed="false"
-          if [ "$sha" != "${{ steps.current.outputs.triton }}" ]; then
-            triton_changed="true"
-          fi
+          [ "$sha" != "${{ steps.current.outputs.triton }}" ] && triton_changed="true"
           branch="agent/upstream-pins-${sha:0:12}"
 
-          # Always rebuild the pin branch from current main; if the branch
-          # already exists remotely (a previous tracker run), the force-push
-          # replaces it and any open PR updates to the new head.
           git switch -c "$branch"
           if [ "$triton_changed" = "true" ]; then
             jq --arg ref "$sha" '.triton_ref = $ref' triton.json > triton.json.tmp \
@@ -105,14 +99,35 @@ jobs:
               -m "Latest triton-lang/triton main: ${sha}. Latest llvm/eudsl asset: ${asset}."
           git push --force origin "$branch"
 
-          if [ "$triton_changed" = "true" ]; then
-            gh workflow run triton-prebuilt.yml --repo beaver-lodge/beaver --ref "$branch"
-            sleep 10
-            run_id="$(gh run list --repo beaver-lodge/beaver --workflow triton-prebuilt.yml \
-              --branch "$branch" --limit 1 --json databaseId --jq '.[0].databaseId')"
-            echo "Building triton-prebuilt release (run ${run_id})..."
-            gh run watch "$run_id" --repo beaver-lodge/beaver --exit-status --interval 30
-          fi
+  build-prebuilt:
+    needs: track
+    # The pin PR's Elixir CI downloads triton-prebuilt-<ref>, so the prebuilt
+    # must be released BEFORE opening the PR. Only build when the triton pin
+    # moved and its LLVM is actually published (OpenAI's LLVM builds lag
+    # Triton main).
+    if: needs.track.outputs.triton_sha != needs.track.outputs.current_triton && needs.track.outputs.llvm_available == 'true'
+    uses: ./.github/workflows/triton-prebuilt.yml
+    with:
+      triton_ref: ${{ needs.track.outputs.triton_sha }}
+    secrets: inherit
+
+  open-pr:
+    needs: [track, build-prebuilt]
+    if: always() && (needs.track.outputs.eudsl_asset != needs.track.outputs.eudsl_current || (needs.track.outputs.triton_sha != needs.track.outputs.current_triton && needs.track.outputs.llvm_available == 'true')) && (needs.build-prebuilt.result == 'success' || needs.build-prebuilt.result == 'skipped')
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.UPSTREAM_PINS_TOKEN || github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Open or update pin PR
+        run: |
+          set -euo pipefail
+          sha="${{ needs.track.outputs.triton_sha }}"
+          asset="${{ needs.track.outputs.eudsl_asset }}"
+          branch="agent/upstream-pins-${sha:0:12}"
 
           printf '%s\n' \
             "Tracks the latest OpenAI LLVM (llvm/eudsl) release and the latest Triton pin." \
