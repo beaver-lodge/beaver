@@ -52,12 +52,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         name: Check-out beaver
-      # Kinda 0.11.0 on Hex predates the LLP64 integer conversion and Windows
-      # synchronization fixes, so the Windows lane uses the paired revision
-      # pinned in kinda.ref until a release containing beaver-lodge/kinda#66
-      # and #68 is published.
+      # Kinda 0.11.0 on Hex predates the LLP64 integer conversion, Windows
+      # synchronization fixes, and the ResourceSlot registry API, so every
+      # lane uses the paired revision pinned in kinda.ref until a release
+      # containing beaver-lodge/kinda#66, #68 and #87 is published.
       - name: Check out paired Kinda
-        if: runner.os == 'Windows'
         run: |
           ref="$(awk 'NF && $1 !~ /^#/ {print $1; exit}' kinda.ref 2>/dev/null || true)"
           if [ -n "$ref" ]; then
