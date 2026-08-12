@@ -87,6 +87,9 @@ jobs:
           fi
           branch="agent/upstream-pins-${sha:0:12}"
 
+          # Always rebuild the pin branch from current main; if the branch
+          # already exists remotely (a previous tracker run), the force-push
+          # replaces it and any open PR updates to the new head.
           git switch -c "$branch"
           if [ "$triton_changed" = "true" ]; then
             jq --arg ref "$sha" '.triton_ref = $ref' triton.json > triton.json.tmp \
@@ -100,7 +103,7 @@ jobs:
               -c user.email="actions@github.com" \
               commit -m "chore: bump triton pin to ${sha:0:12}" \
               -m "Latest triton-lang/triton main: ${sha}. Latest llvm/eudsl asset: ${asset}."
-          git push origin "$branch"
+          git push --force origin "$branch"
 
           if [ "$triton_changed" = "true" ]; then
             gh workflow run triton-prebuilt.yml --repo beaver-lodge/beaver --ref "$branch"
@@ -120,8 +123,15 @@ jobs:
             "The \`triton-prebuilt-${sha:0:12}\` release was built from this branch before opening the PR, so the Elixir CI can download it. Merging also triggers \`Build Triton prebuilt\` (push to main with \`triton.json\`), which is idempotent." \
             > /tmp/pr_body.md
 
-          gh pr create --repo beaver-lodge/beaver \
-            --base main \
-            --head "$branch" \
-            --title "chore: bump triton pin to ${sha:0:12}" \
-            --body-file /tmp/pr_body.md
+          existing="$(gh pr list --repo beaver-lodge/beaver --head "$branch" \
+            --state open --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            echo "PR #${existing} already exists for ${branch}; branch updated"
+            gh pr edit "$existing" --repo beaver-lodge/beaver --body-file /tmp/pr_body.md
+          else
+            gh pr create --repo beaver-lodge/beaver \
+              --base main \
+              --head "$branch" \
+              --title "chore: bump triton pin to ${sha:0:12}" \
+              --body-file /tmp/pr_body.md
+          fi
