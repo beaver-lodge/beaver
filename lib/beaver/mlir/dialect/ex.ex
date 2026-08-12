@@ -451,7 +451,16 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop binary_from_list(bytes = base(dyn())),
     results: [result: base(dyn())]
 
+  defop float_lit(bits = ^integer_like),
+    results: [result: base(dyn())]
+
+  defop string_to_float(binary = base(dyn())),
+    results: [result: base(dyn())]
+
   defop is_integer(value = ^any_value),
+    results: [result: ^integer_like]
+
+  defop is_float(value = ^any_value),
     results: [result: ^integer_like]
 
   defop is_atom(value = ^any_value),

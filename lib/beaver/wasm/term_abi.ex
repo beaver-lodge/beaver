@@ -108,6 +108,7 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.to_int" => %{params: [:i64], result: :i64},
     "ex.term.eq" => %{params: [:i64, :i64], result: :i64},
     "ex.term.is_integer" => %{params: [:i64], result: :i64},
+    "ex.term.is_float" => %{params: [:i64], result: :i64},
     "ex.term.is_atom" => %{params: [:i64], result: :i64},
     "ex.term.is_binary" => %{params: [:i64], result: :i64},
     "ex.term.is_list" => %{params: [:i64], result: :i64},
@@ -129,6 +130,8 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.mapset_put" => %{params: [:i64, :i64], result: :i64},
     # binary
     "ex.term.binary_from_list" => %{params: [:i64], result: :i64},
+    "ex.term.float_lit" => %{params: [:i64], result: :i64},
+    "ex.term.string_to_float" => %{params: [:i64], result: :i64},
     "ex.term.binary_length" => %{params: [:i64], result: :i64},
     "ex.term.binary_get" => %{params: [:i64, :i64], result: :i64},
     "ex.term.binary_slice" => %{params: [:i64, :i64], result: :i64},

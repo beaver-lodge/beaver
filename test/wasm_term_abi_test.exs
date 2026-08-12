@@ -31,6 +31,9 @@ defmodule WasmTermABITest do
     assert TermABI.entry("ex.term.list_cons").params == [:i64, :i64]
     assert TermABI.entry("ex.term.list_cons").result == :i64
     assert TermABI.entry("ex.term.map_put").params == [:i64, :i64, :i64]
+    assert TermABI.entry("ex.term.float_lit").params == [:i64]
+    assert TermABI.entry("ex.term.is_float").params == [:i64]
+    assert TermABI.entry("ex.term.string_to_float").params == [:i64]
     assert TermABI.entry("ex.term.send").params == [:i64, :i64]
     assert TermABI.entry("ex.term.runtime_create").params == []
     assert TermABI.entry("ex.term.runtime_enter").params == [:i64]
