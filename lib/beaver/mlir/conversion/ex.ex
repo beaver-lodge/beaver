@@ -158,6 +158,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.file_read", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.file_read_lines", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary", &convert_term_binary/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.binary_from_list", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_integer", &convert_term_predicate/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_atom", &convert_term_predicate/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_binary", &convert_term_predicate/3, version: "1.0")
@@ -1017,6 +1018,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.processes_runnable"), do: @term_intrinsics.processes_runnable
   defp read_intrinsic("ex.process_result"), do: @term_intrinsics.process_result
   defp read_intrinsic("ex.binary_length"), do: @term_intrinsics.binary_length
+  defp read_intrinsic("ex.binary_from_list"), do: @term_intrinsics.binary_from_list
   defp read_intrinsic("ex.binary_get"), do: @term_intrinsics.binary_get
   defp read_intrinsic("ex.binary_slice"), do: @term_intrinsics.binary_slice
   defp read_intrinsic("ex.binary_utf8_get"), do: @term_intrinsics.binary_utf8_get
