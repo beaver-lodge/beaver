@@ -451,6 +451,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop binary_from_list(bytes = base(dyn())),
     results: [result: base(dyn())]
 
+  defop iodata_to_binary(iodata = base(dyn())),
+    results: [result: base(dyn())]
+
   defop float_lit(bits = ^integer_like),
     results: [result: base(dyn())]
 

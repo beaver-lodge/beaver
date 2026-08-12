@@ -130,6 +130,7 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.mapset_put" => %{params: [:i64, :i64], result: :i64},
     # binary
     "ex.term.binary_from_list" => %{params: [:i64], result: :i64},
+    "ex.term.iodata_to_binary" => %{params: [:i64], result: :i64},
     "ex.term.float_lit" => %{params: [:i64], result: :i64},
     "ex.term.string_to_float" => %{params: [:i64], result: :i64},
     "ex.term.binary_length" => %{params: [:i64], result: :i64},
