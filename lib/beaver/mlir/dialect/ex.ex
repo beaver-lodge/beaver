@@ -427,6 +427,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop map(entries = variadic(base(dyn()))),
     results: [result: base(dyn())]
 
+  defop map_put(map = base(dyn()), key = base(dyn()), value = base(dyn())),
+    results: [result: base(dyn())]
+
   defop mapset_from_list(list = base(dyn())),
     results: [result: base(dyn())]
 
@@ -443,6 +446,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
     results: [result: base(dyn())]
 
   defop binary(segments = variadic(base(dyn()))),
+    results: [result: base(dyn())]
+
+  defop binary_from_list(bytes = base(dyn())),
     results: [result: base(dyn())]
 
   defop is_integer(value = ^any_value),
