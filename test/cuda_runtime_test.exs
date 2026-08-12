@@ -59,4 +59,19 @@ defmodule CUDARuntimeTest do
       assert is_binary(reason)
     end
   end
+
+  test "query device compute capability" do
+    if CUDA.available?() do
+      assert {:ok, count} = CUDA.device_count()
+      assert count > 0
+
+      assert {:ok, {major, minor}} = CUDA.device_compute_capability(0)
+      assert is_integer(major) and major > 0
+      assert is_integer(minor) and minor >= 0
+    else
+      # No CUDA driver: the runner must degrade instead of crashing.
+      assert {:error, reason} = CUDA.device_compute_capability(0)
+      assert is_binary(reason)
+    end
+  end
 end
