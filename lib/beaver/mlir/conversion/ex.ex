@@ -159,7 +159,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.file_read_lines", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary", &convert_term_binary/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_from_list", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.float_lit", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.string_to_float", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_integer", &convert_term_predicate/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.is_float", &convert_term_predicate/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_atom", &convert_term_predicate/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_binary", &convert_term_predicate/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_list", &convert_term_predicate/3, version: "1.0")
@@ -286,7 +289,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
     file_read: "ex.term.file_read",
     file_read_lines: "ex.term.file_read_lines",
     binary_from_list: "ex.term.binary_from_list",
+    float_lit: "ex.term.float_lit",
+    string_to_float: "ex.term.string_to_float",
     is_integer: "ex.term.is_integer",
+    is_float: "ex.term.is_float",
     is_atom: "ex.term.is_atom",
     is_binary: "ex.term.is_binary",
     is_list: "ex.term.is_list",
@@ -916,6 +922,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp predicate_intrinsic("ex.is_integer"), do: @term_intrinsics.is_integer
+  defp predicate_intrinsic("ex.is_float"), do: @term_intrinsics.is_float
   defp predicate_intrinsic("ex.is_atom"), do: @term_intrinsics.is_atom
   defp predicate_intrinsic("ex.is_binary"), do: @term_intrinsics.is_binary
   defp predicate_intrinsic("ex.is_list"), do: @term_intrinsics.is_list
@@ -932,6 +939,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.tuple_get"), do: @term_intrinsics.tuple_get
   defp read_intrinsic("ex.tuple_length"), do: @term_intrinsics.tuple_length
   defp read_intrinsic("ex.map_length"), do: @term_intrinsics.map_length
+  defp read_intrinsic("ex.float_lit"), do: @term_intrinsics.float_lit
+  defp read_intrinsic("ex.string_to_float"), do: @term_intrinsics.string_to_float
   defp read_intrinsic("ex.map_put"), do: @term_intrinsics.map_put
   defp read_intrinsic("ex.mapset_from_list"), do: @term_intrinsics.mapset_from_list
   defp read_intrinsic("ex.mapset_member"), do: @term_intrinsics.mapset_member
