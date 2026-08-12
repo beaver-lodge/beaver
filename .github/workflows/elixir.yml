@@ -46,12 +46,9 @@ jobs:
       fail-fast: false
       matrix:
         runs-on: ["ubuntu-22.04"]
-        otp: ["25.0", "27.3"]
+        otp: ["27.3"]
         elixir: ["1.18.0", "1.20.3"]
         llvm: ["eudsl"]
-        exclude:
-          - otp: "25.0"
-            elixir: "1.20.3"
         include:
           - runs-on: "ubuntu-22.04"
             otp: "28.4"
@@ -70,11 +67,11 @@ jobs:
       - name: Read Triton version
         if: matrix.llvm == 'triton'
         run: echo "TRITON_REF=$(jq -er '.triton_ref' triton.json)" >> "$GITHUB_ENV"
-      # Kinda 0.11.0 on Hex predates the LLP64 integer conversion fix, so the
-      # Windows lane uses the paired revision pinned in kinda.ref until a
-      # release containing beaver-lodge/kinda#68 is published.
+      # Kinda 0.11.0 on Hex predates the LLP64 integer conversion fix and the
+      # ResourceSlot registry API, so every lane uses the paired revision
+      # pinned in kinda.ref until a release containing beaver-lodge/kinda#68
+      # and beaver-lodge/kinda#87 is published.
       - name: Check out paired Kinda
-        if: runner.os == 'Windows'
         run: |
           ref="$(awk 'NF && $1 !~ /^#/ {print $1; exit}' kinda.ref 2>/dev/null || true)"
           if [ -n "$ref" ]; then

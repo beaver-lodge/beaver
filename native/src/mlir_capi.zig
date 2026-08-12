@@ -132,15 +132,46 @@ pub const TransformOptions = MLIRKind("TransformOptions");
 pub const LLVMThreadPool = MLIRKind2("MlirLlvmThreadPool", "LLVMThreadPool");
 pub const OperationState = MLIRKind2("MlirOperationState", "Operation.State");
 pub const allKinds = .{ Pass, LogicalResult, StringRef, Context, Location, ISize, Attribute, OpaquePtr, ShapedTypeComponentsCallback, TypeID, TypesCallback, Bool, Operation, IntegerSet, AffineExpr, StringCallback, DialectHandle, CInt, AffineMap, SparseTensorLevelType, F64, Type, I32, I64, CUInt, DialectRegistry, DiagnosticHandlerID, DiagnosticHandler, DiagnosticHandlerDeleteUserData, Diagnostic, DiagnosticSeverity, F32, U64, U32, U16, I16, U8, I8, USize, UnmanagedDenseResourceElementsAttrGetDeleteCallback, OpaqueArray, StringArray, NamedAttribute, PassManager, RewritePattern, RewritePatternSet, RewritePatternCallbacks, ConversionTarget, ConversionPattern, ConversionPatternRewriter, TypeConverter, ConversionConfig, Region, Module, ExecutionEngine, GenericCallback, ExternalPassConstruct, ExternalPassRun, Identifier, OperationState, SymbolTable, Value, Block, Dialect, ExternalPass, ExternalPassCallbacks, OpPassManager, AffineMapCompressUnusedSymbolsPopulateResult, SymbolTableWalkSymbolTablesCallback, OpOperand, AsmState, OperationWalkCallback, WalkOrder, BytecodeWriterConfig, OpPrintingFlags, LLVMRawFdOStream, LLVMThreadPool, TypeIDAllocator, DynamicOpTrait, DynamicOpTraitCallbacks, DynamicTypeDefinition, DynamicAttrDefinition, MemoryEffectInstancesList, MemoryEffectsOpInterfaceCallbacks, TransformResults, TransformRewriter, TransformState, TransformOpInterfaceCallbacks, PatternDescriptorOpInterfaceCallbacks, TransformOptions, RewriterBase, FrozenRewritePatternSet, PDLPatternModule, GreedyRewriteDriverConfig, string_ref.Printer.ResourceKind, LinalgContractionDimensions, LinalgConvolutionDimensions, PDLValue, PDLResultList, PDLRewriteFunction, PatternRewriter, ConditionallySpeculatableOpInterfaceCallbacks, DominanceInfo, IRMapping, MemoryEffect, MemoryEffectInstance, OpOperandReplaceFilterCallback, PostDominanceInfo, RewriterBaseInsertPoint, SideEffectResource, TypeConverter1ToNConversionCallback, TypeConverter1ToNTargetMaterializationCallback, TypeConverterConversionResults, TypeConverterSourceMaterializationCallback, TypeConverterTargetMaterializationCallback };
+
+/// Kinds that share ERTS resource types with another kind. The alias target
+/// opens the slot; the alias kind only copies the handle so terms made through
+/// either name fetch the same native data.
+const kindAliases = .{
+    .{ OpaquePtr, kinda.Internal.OpaquePtr },
+    .{ OpaqueArray, kinda.Internal.OpaqueArray },
+    .{ USize, kinda.Internal.USize },
+    .{ DiagnosticHandlerID, U64 },
+    .{ SparseTensorLevelType, U64 },
+};
+
+/// Every resource slot opened by this module, in a stable name order, plus
+/// the shared internal kinds and the callback reply token. The core partition
+/// publishes these handles by name for the leaf partitions; each partition
+/// builds its own registry instance because comptime values do not cross DSO
+/// boundaries, but the slot names and order are identical.
+pub const resourceSlots = blk: {
+    const internal_kinds = .{ kinda.Internal.OpaquePtr, kinda.Internal.OpaqueArray, kinda.Internal.USize, kinda.Internal.OpaqueStruct };
+    var tuple: []const kinda.ResourceSlot = &.{};
+    for (allKinds) |k| {
+        tuple = tuple ++ &k.slots;
+    }
+    for (internal_kinds) |k| {
+        tuple = tuple ++ &k.slots;
+    }
+    const reply_token_slots = [_]kinda.ResourceSlot{
+        .{ .name = kinda.callback_runtime.ReplyToken.resource_name, .t = &kinda.callback_runtime.ReplyToken.resource_type, .dtor = beam.destroy_do_nothing },
+    };
+    tuple = tuple ++ &reply_token_slots;
+    break :blk tuple;
+};
+
 pub fn open_all(env: beam.env) void {
     inline for (allKinds) |k| {
         k.open_all(env);
     }
-    kinda.aliasKind(OpaquePtr, kinda.Internal.OpaquePtr);
-    kinda.aliasKind(OpaqueArray, kinda.Internal.OpaqueArray);
-    kinda.aliasKind(USize, kinda.Internal.USize);
-    kinda.aliasKind(DiagnosticHandlerID, U64);
-    kinda.aliasKind(SparseTensorLevelType, U64);
+    inline for (kindAliases) |pair| {
+        kinda.aliasKind(pair[0], pair[1]);
+    }
 }
 
 const EntriesT = [allKinds.len * kinda.numOfNIFsPerKind]e.ErlNifFunc;

@@ -52,12 +52,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         name: Check-out beaver
-      # Kinda 0.11.0 on Hex predates the LLP64 integer conversion and Windows
-      # synchronization fixes, so the Windows lane uses the paired revision
-      # pinned in kinda.ref until a release containing beaver-lodge/kinda#66
-      # and #68 is published.
+      # Kinda 0.11.0 on Hex predates the LLP64 integer conversion, Windows
+      # synchronization fixes, and the ResourceSlot registry API, so every
+      # lane uses the paired revision pinned in kinda.ref until a release
+      # containing beaver-lodge/kinda#66, #68 and #87 is published.
       - name: Check out paired Kinda
-        if: runner.os == 'Windows'
         run: |
           ref="$(awk 'NF && $1 !~ /^#/ {print $1; exit}' kinda.ref 2>/dev/null || true)"
           if [ -n "$ref" ]; then
@@ -306,13 +305,26 @@ jobs:
         with:
           repository: beaver-lodge/beaver
           path: beaver
+      - name: Check out paired Kinda
+        run: |
+          ref="$(awk 'NF && $1 !~ /^#/ {print $1; exit}' beaver/kinda.ref 2>/dev/null || true)"
+          if [ -n "$ref" ]; then
+            git clone https://github.com/beaver-lodge/kinda.git kinda
+            if git -C kinda cat-file -e "$ref^{commit}" 2>/dev/null; then
+              git -C kinda checkout "$ref"
+            else
+              echo "warning: paired kinda ref $ref unavailable, using Hex release" >> "$GITHUB_STEP_SUMMARY"
+            fi
+          else
+            echo "no paired kinda ref, using Hex release" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Strip dev suffix
         working-directory: beaver
         run: sed -i 's/-dev//g' mix.exs
       - name: Build ARM
         continue-on-error: true
         if: ${{ matrix.image.platform == 'linux/arm64/v8' && github.event_name != 'pull_request' }}
-        run: docker run --platform ${{ matrix.image.platform }} -v $PWD:/src -w /src/beaver ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
+        run: docker run --platform ${{ matrix.image.platform }} -v $PWD:/src -w /src/beaver -e BEAVER_KINDA_PATH=/src/kinda ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
       - name: Publish archives and packages
         uses: softprops/action-gh-release@v3
         if: ${{ github.event_name != 'pull_request' && github.repository == 'beaver-lodge/beaver' && matrix.image.platform == 'linux/arm64/v8' }}
@@ -329,7 +341,7 @@ jobs:
           tag_name: ${{ github.ref_name }}
       - name: Build x86
         if: ${{ matrix.image.platform == 'linux/amd64' }}
-        run: docker run -v $PWD:/src -w /src/beaver ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
+        run: docker run -v $PWD:/src -w /src/beaver -e BEAVER_KINDA_PATH=/src/kinda ${{ vars.DOCKERHUB_USERNAME }}/beaver-livebook-${{ matrix.image.suffix }}:latest bash scripts/build-for-publish.sh
 
   hex_publish:
     name: Publish to Hex.pm

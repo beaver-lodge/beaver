@@ -62,31 +62,11 @@ pub fn register_all_passes() void {
 /// the same resource types: opening the same name twice within one load
 /// creates distinct resource types, so handles must be shared explicitly.
 export fn core_resource_type_by_name(name: [*:0]const u8) ?*anyopaque {
-    inline for (mlir_capi.allKinds) |k| {
-        if (std.mem.eql(u8, std.mem.span(name), k.resource.name)) {
-            return @ptrCast(k.resource.t);
+    const name_slice = std.mem.span(name);
+    inline for (mlir_capi.resourceSlots) |slot| {
+        if (std.mem.eql(u8, name_slice, slot.name)) {
+            return @ptrCast(slot.t.*);
         }
-        if (std.mem.eql(u8, std.mem.span(name), k.Ptr.resource.name)) {
-            return @ptrCast(k.Ptr.resource.t);
-        }
-        if (std.mem.eql(u8, std.mem.span(name), k.Array.resource.name)) {
-            return @ptrCast(k.Array.resource.t);
-        }
-    }
-    if (std.mem.eql(u8, std.mem.span(name), kinda.Internal.OpaquePtr.resource.name)) {
-        return @ptrCast(kinda.Internal.OpaquePtr.resource.t);
-    }
-    if (std.mem.eql(u8, std.mem.span(name), kinda.Internal.OpaqueArray.resource.name)) {
-        return @ptrCast(kinda.Internal.OpaqueArray.resource.t);
-    }
-    if (std.mem.eql(u8, std.mem.span(name), kinda.Internal.USize.resource.name)) {
-        return @ptrCast(kinda.Internal.USize.resource.t);
-    }
-    if (std.mem.eql(u8, std.mem.span(name), kinda.Internal.OpaqueStruct.resource.name)) {
-        return @ptrCast(kinda.Internal.OpaqueStruct.resource.t);
-    }
-    if (std.mem.eql(u8, std.mem.span(name), kinda.callback_runtime.ReplyToken.resource_name)) {
-        return @ptrCast(kinda.callback_runtime.ReplyToken.resource_type);
     }
     return null;
 }
