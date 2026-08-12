@@ -564,9 +564,10 @@ defmodule ExConversionTest do
             %3 = "ex.box"(%1) : (i64) -> !ex.dyn
             %4 = "ex.list"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
             %5 = "ex.map"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
-            %6 = "ex.binary"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
-            %7 = "ex.is_list"(%4) : (!ex.dyn) -> i64
-            "ex.return"(%7) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+            %6 = "ex.map_put"(%5, %2, %3) : (!ex.dyn, !ex.dyn, !ex.dyn) -> !ex.dyn
+            %7 = "ex.binary"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
+            %8 = "ex.is_list"(%4) : (!ex.dyn) -> i64
+            "ex.return"(%8) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
         """,
@@ -578,6 +579,7 @@ defmodule ExConversionTest do
     rendered = MLIR.to_string(module, generic: true)
     assert rendered =~ "ex.term.list_cons"
     assert rendered =~ "ex.term.map_from_list"
+    assert rendered =~ "ex.term.map_put"
     assert rendered =~ "ex.term.binary_from_list"
     assert rendered =~ "ex.term.is_list"
   end

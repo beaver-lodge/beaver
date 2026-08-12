@@ -427,6 +427,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop map(entries = variadic(base(dyn()))),
     results: [result: base(dyn())]
 
+  defop map_put(map = base(dyn()), key = base(dyn()), value = base(dyn())),
+    results: [result: base(dyn())]
+
   defop mapset_from_list(list = base(dyn())),
     results: [result: base(dyn())]
 

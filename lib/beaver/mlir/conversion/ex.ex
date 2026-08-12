@@ -151,6 +151,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.list", &convert_term_list/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_cons", &convert_term_list_cons/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.map", &convert_term_map/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.map_put", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mapset_from_list", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mapset_member", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mapset_put", &convert_term_read/3, version: "1.0")
@@ -205,6 +206,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   # `native/term_runtime.zig` exports exactly these C symbols.
   @term_intrinsics %{
     list_cons: "ex.term.list_cons",
+    map_put: "ex.term.map_put",
     self: "ex.term.self",
     send: "ex.term.send",
     receive: "ex.term.receive",
@@ -929,6 +931,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.tuple_get"), do: @term_intrinsics.tuple_get
   defp read_intrinsic("ex.tuple_length"), do: @term_intrinsics.tuple_length
   defp read_intrinsic("ex.map_length"), do: @term_intrinsics.map_length
+  defp read_intrinsic("ex.map_put"), do: @term_intrinsics.map_put
   defp read_intrinsic("ex.mapset_from_list"), do: @term_intrinsics.mapset_from_list
   defp read_intrinsic("ex.mapset_member"), do: @term_intrinsics.mapset_member
   defp read_intrinsic("ex.mapset_put"), do: @term_intrinsics.mapset_put
@@ -1178,6 +1181,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp intrinsic_function_type("ex.term.list_cons", _ctx) do
     MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.map_put", _ctx) do
+    MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
   defp intrinsic_function_type("ex.term.self", _ctx) do
