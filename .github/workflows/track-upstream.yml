@@ -43,34 +43,73 @@ jobs:
             | sort -k2 | tail -1 | cut -f1)"
           echo "asset=$asset" >> "$GITHUB_OUTPUT"
 
+      - name: Check Triton-pinned LLVM availability
+        id: llvm
+        run: |
+          ref="${{ steps.triton.outputs.sha }}"
+          info="$(curl -fsS "https://raw.githubusercontent.com/triton-lang/triton/${ref}/cmake/llvm-info.json" \
+            || curl -fsS "https://raw.githubusercontent.com/triton-lang/triton/${ref}/cmake/llvm-build-info.json")"
+          hash="$(echo "$info" | jq -r '.llvm_hash // empty')"
+          build="$(echo "$info" | jq -r '.build_number // empty')"
+          if [[ -z "$hash" || "$build" == "null" || -z "$build" ]]; then
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "No LLVM info for ${ref}" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          url="https://oaitriton.blob.core.windows.net/public/llvm-builds/llvm-${hash:0:8}-ubuntu-x64-${build}.tar.gz"
+          code="$(curl -s -o /dev/null -w '%{http_code}' -I "$url")"
+          echo "llvm_url=$url" >> "$GITHUB_OUTPUT"
+          echo "llvm_code=$code" >> "$GITHUB_OUTPUT"
+          echo "available=$([ "$code" = "200" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          echo "Triton ${ref} LLVM: ${url} -> HTTP ${code}" >> "$GITHUB_STEP_SUMMARY"
+
       - name: Read current pins
         id: current
         run: |
           echo "triton=$(jq -r .triton_ref triton.json)" >> "$GITHUB_OUTPUT"
           echo "eudsl=$(jq -r .llvm_eudsl_latest upstream-pins.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Open pin-update PR
-        if: steps.triton.outputs.sha != steps.current.outputs.triton || steps.eudsl.outputs.asset != steps.current.outputs.eudsl
-        env:
-          GH_TOKEN: ${{ github.token }}
+      - name: Update pins, build prebuilt, open PR
+        # Open a PR when the eudsl asset moved, or when the triton pin moved
+        # AND its Triton-pinned LLVM is actually downloadable (OpenAI's LLVM
+        # builds lag Triton main). The elixir CI downloads
+        # triton-prebuilt-<ref>, so the prebuilt must be built and released
+        # BEFORE the pin PR's CI runs; dispatch the build on the pin branch
+        # and wait for it to finish, then open the PR.
+        if: (steps.eudsl.outputs.asset != steps.current.outputs.eudsl) || (steps.triton.outputs.sha != steps.current.outputs.triton && steps.llvm.outputs.available == 'true')
         run: |
+          set -euo pipefail
           sha="${{ steps.triton.outputs.sha }}"
           asset="${{ steps.eudsl.outputs.asset }}"
+          triton_changed="false"
+          if [ "$sha" != "${{ steps.current.outputs.triton }}" ]; then
+            triton_changed="true"
+          fi
           branch="agent/upstream-pins-${sha:0:12}"
 
           git switch -c "$branch"
-          jq --arg ref "$sha" '.triton_ref = $ref' triton.json > triton.json.tmp \
-            && mv triton.json.tmp triton.json
-          jq --arg ref "$sha" --arg asset "$asset" \
-            '.triton_ref = $ref | .llvm_eudsl_latest = $asset' upstream-pins.json \
+          if [ "$triton_changed" = "true" ]; then
+            jq --arg ref "$sha" '.triton_ref = $ref' triton.json > triton.json.tmp \
+              && mv triton.json.tmp triton.json
+          fi
+          jq --arg asset "$asset" '.llvm_eudsl_latest = $asset' upstream-pins.json \
             > upstream-pins.json.tmp && mv upstream-pins.json.tmp upstream-pins.json
 
           git add triton.json upstream-pins.json
           git -c user.name="beaver-upstream-tracker" \
               -c user.email="actions@github.com" \
               commit -m "chore: bump triton pin to ${sha:0:12}" \
-              -m "Latest triton-lang/triton main: ${sha}. Latest llvm/eudsl asset: ${asset}. Merging this PR triggers the Build Triton prebuilt workflow (push to main with triton.json) to publish the prebuilt for the new pin."
+              -m "Latest triton-lang/triton main: ${sha}. Latest llvm/eudsl asset: ${asset}."
           git push origin "$branch"
+
+          if [ "$triton_changed" = "true" ]; then
+            gh workflow run triton-prebuilt.yml --repo beaver-lodge/beaver --ref "$branch"
+            sleep 10
+            run_id="$(gh run list --repo beaver-lodge/beaver --workflow triton-prebuilt.yml \
+              --branch "$branch" --limit 1 --json databaseId --jq '.[0].databaseId')"
+            echo "Building triton-prebuilt release (run ${run_id})..."
+            gh run watch "$run_id" --repo beaver-lodge/beaver --exit-status --interval 30
+          fi
 
           printf '%s\n' \
             "Tracks the latest OpenAI LLVM (llvm/eudsl) release and the latest Triton pin." \
@@ -78,7 +117,7 @@ jobs:
             "- triton_ref: ${sha}" \
             "- llvm/eudsl latest asset: ${asset}" \
             "" \
-            "Merging triggers \`Build Triton prebuilt\` (push to main with \`triton.json\`) to publish the prebuilt for the new pin." \
+            "The \`triton-prebuilt-${sha:0:12}\` release was built from this branch before opening the PR, so the Elixir CI can download it. Merging also triggers \`Build Triton prebuilt\` (push to main with \`triton.json\`), which is idempotent." \
             > /tmp/pr_body.md
 
           gh pr create --repo beaver-lodge/beaver \
