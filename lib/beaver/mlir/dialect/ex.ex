@@ -191,7 +191,7 @@ defmodule Beaver.MLIR.Dialect.Ex do
     results: [result: ^integer_like]
 
   defop result_exception_reason(handle = ^integer_like),
-    results: [result: base(dyn())]
+    results: [result: ^integer_like]
 
   defop result_term_kind(handle = ^integer_like, word = ^integer_like),
     results: [result: ^integer_like]
