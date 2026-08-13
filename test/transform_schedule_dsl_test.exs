@@ -32,8 +32,12 @@ defmodule Beaver.MLIR.Transform.Schedule.DSLTest do
           Transform.structured_tile_using_for(
             target: matmul,
             dynamic_sizes: [tile],
+            interchange: [],
+            packed_tile_sizes: [],
+            packed_interchange: [],
             static_sizes: dynamic_tile,
-            scalable_sizes: scalable_tile
+            scalable_sizes: scalable_tile,
+            operand_segment_sizes: :infer
           ) >>> [any_op(), any_op()]
 
         alternatives "vectorize" do
