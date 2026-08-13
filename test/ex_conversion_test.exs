@@ -551,6 +551,30 @@ defmodule ExConversionTest do
     assert rendered =~ "arith.shli"
   end
 
+  test "converts typed raises to a distinct runtime ABI call", %{ctx: ctx} do
+    module =
+      term_module!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "ex.lit"() {value = 7 : i64} : () -> i64
+            %1 = "ex.box"(%0) : (i64) -> !ex.dyn
+            %2 = "ex.raise"(%1, %0) : (!ex.dyn, i64) -> !ex.dyn
+            "ex.return"(%2) {operandSegmentSizes = array<i32: 1>} : (!ex.dyn) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx
+      )
+
+    assert {:ok, _module, []} = Plan.run(Ex.plan(), module)
+
+    rendered = MLIR.to_string(module, generic: true)
+    assert rendered =~ "ex.term.raise"
+    refute rendered =~ "ex.term.throw"
+  end
+
   test "converts list, map and binary construction to runtime ABI calls", %{ctx: ctx} do
     module =
       term_module!(

@@ -63,6 +63,8 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.result_destroy" => %{params: [:i64], result: :i64},
     "ex.term.result_root_kind" => %{params: [:i64], result: :i64},
     "ex.term.result_root_word" => %{params: [:i64], result: :i64},
+    "ex.term.result_exception_kind" => %{params: [:i64], result: :i64},
+    "ex.term.result_exception_reason" => %{params: [:i64], result: :i64},
     "ex.term.result_term_kind" => %{params: [:i64, :i64], result: :i64},
     "ex.term.result_term_length" => %{params: [:i64, :i64], result: :i64},
     "ex.term.result_term_get" => %{params: [:i64, :i64, :i64], result: :i64},
@@ -172,6 +174,7 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.try_push" => %{params: [:ptr], result: :i64},
     "ex.term.try_pop" => %{params: [], result: :i64},
     "ex.term.throw" => %{params: [:i64], result: :void},
+    "ex.term.raise" => %{params: [:i64, :i64], result: :void},
     "ex.term.catch_value" => %{params: [], result: :i64}
   }
 

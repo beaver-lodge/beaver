@@ -187,6 +187,12 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop result_root_word(handle = ^integer_like),
     results: [result: ^integer_like]
 
+  defop result_exception_kind(handle = ^integer_like),
+    results: [result: ^integer_like]
+
+  defop result_exception_reason(handle = ^integer_like),
+    results: [result: base(dyn())]
+
   defop result_term_kind(handle = ^integer_like, word = ^integer_like),
     results: [result: ^integer_like]
 
@@ -385,6 +391,12 @@ defmodule Beaver.MLIR.Dialect.Ex do
     regions: [:any, :any]
 
   defop throw(value = base(dyn())),
+    results: [result: base(dyn())]
+
+  # Raises a typed runtime exception. Unlike `throw`, this bypasses user catch
+  # regions; `kind` is a runtime-defined integer discriminator and `reason`
+  # carries the exception payload.
+  defop raise(reason = base(dyn()), kind = ^integer_like),
     results: [result: base(dyn())]
 
   defop catch_value(),

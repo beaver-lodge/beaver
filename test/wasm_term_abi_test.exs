@@ -42,6 +42,8 @@ defmodule WasmTermABITest do
     assert TermABI.entry("ex.term.runtime_enter").params == [:i64]
     assert TermABI.entry("ex.term.runtime_leave").params == []
     assert TermABI.entry("ex.term.runtime_destroy").params == [:i64]
+    assert TermABI.entry("ex.term.result_exception_kind").params == [:i64]
+    assert TermABI.entry("ex.term.result_exception_reason").params == [:i64]
     assert TermABI.entry("ex.term.export").params == [:i64, :i64]
     assert TermABI.entry("ex.term.import").params == [:i64, :i64]
     assert TermABI.entry("ex.term.handle_destroy").params == [:i64]
@@ -54,6 +56,8 @@ defmodule WasmTermABITest do
     assert TermABI.entry("ex.term.try_push").params == [:ptr]
     assert TermABI.entry("ex.term.throw").params == [:i64]
     assert TermABI.entry("ex.term.throw").result == :void
+    assert TermABI.entry("ex.term.raise").params == [:i64, :i64]
+    assert TermABI.entry("ex.term.raise").result == :void
     assert TermABI.entry("ex.term.make_fun").params == [:i64, :i64, :i64, :i64, :i64, :i64]
   end
 
@@ -63,5 +67,6 @@ defmodule WasmTermABITest do
     assert rendered =~ "## ex.term.* wasm host imports"
     assert rendered =~ "| `ex.term.list_cons` | `ex_term` | `(i64, i64) -> i64` |"
     assert rendered =~ "| `ex.term.throw` | `ex_term` | `(i64) -> noreturn` |"
+    assert rendered =~ "| `ex.term.raise` | `ex_term` | `(i64, i64) -> noreturn` |"
   end
 end

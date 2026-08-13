@@ -94,6 +94,12 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.result_destroy", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.result_root_kind", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.result_root_word", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.result_exception_kind", &convert_term_read/3,
+      version: "1.0"
+    )
+    |> Plan.add_conversion_pattern("ex.result_exception_reason", &convert_term_read/3,
+      version: "1.0"
+    )
     |> Plan.add_conversion_pattern("ex.result_term_kind", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.result_term_length", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.result_term_get", &convert_term_read/3, version: "1.0")
@@ -144,6 +150,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.yield_mark", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.try", &convert_try/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.throw", &convert_throw/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.raise", &convert_raise/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.catch_value", &convert_catch_value/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.make_fun", &convert_make_fun/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.apply", &convert_apply/3, version: "1.0")
@@ -227,6 +234,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
     result_destroy: "ex.term.result_destroy",
     result_root_kind: "ex.term.result_root_kind",
     result_root_word: "ex.term.result_root_word",
+    result_exception_kind: "ex.term.result_exception_kind",
+    result_exception_reason: "ex.term.result_exception_reason",
     result_term_kind: "ex.term.result_term_kind",
     result_term_length: "ex.term.result_term_length",
     result_term_get: "ex.term.result_term_get",
@@ -280,6 +289,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     try_push: "ex.term.try_push",
     try_pop: "ex.term.try_pop",
     throw: "ex.term.throw",
+    raise: "ex.term.raise",
     catch_value: "ex.term.catch_value",
     make_fun: "ex.term.make_fun",
     fun_idx: "ex.term.fun_idx",
@@ -832,6 +842,16 @@ defmodule Beaver.MLIR.Conversion.Ex do
     )
   end
 
+  defp convert_raise(operation, [reason, kind], rewriter) do
+    base = insertion_point(operation, rewriter)
+
+    replace_with(
+      rewriter,
+      operation,
+      emit_runtime_call(operation, rewriter, base, @term_intrinsics.raise, [reason, kind])
+    )
+  end
+
   defp convert_catch_value(operation, [], rewriter) do
     base = insertion_point(operation, rewriter)
 
@@ -987,6 +1007,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.result_destroy"), do: @term_intrinsics.result_destroy
   defp read_intrinsic("ex.result_root_kind"), do: @term_intrinsics.result_root_kind
   defp read_intrinsic("ex.result_root_word"), do: @term_intrinsics.result_root_word
+  defp read_intrinsic("ex.result_exception_kind"), do: @term_intrinsics.result_exception_kind
+  defp read_intrinsic("ex.result_exception_reason"), do: @term_intrinsics.result_exception_reason
   defp read_intrinsic("ex.result_term_kind"), do: @term_intrinsics.result_term_kind
   defp read_intrinsic("ex.result_term_length"), do: @term_intrinsics.result_term_length
   defp read_intrinsic("ex.result_term_get"), do: @term_intrinsics.result_term_get
@@ -1252,7 +1274,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
        when symbol in [
               "ex.term.result_destroy",
               "ex.term.result_root_kind",
-              "ex.term.result_root_word"
+              "ex.term.result_root_word",
+              "ex.term.result_exception_kind",
+              "ex.term.result_exception_reason"
             ] do
     MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
   end
@@ -1418,6 +1442,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp intrinsic_function_type("ex.term.catch_value", _ctx) do
     MLIR.Type.function([], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.raise", _ctx) do
+    MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
   end
 
   defp intrinsic_function_type("ex.term.make_fun", _ctx) do
