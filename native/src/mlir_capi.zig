@@ -159,7 +159,7 @@ pub const resourceSlots = blk: {
         tuple = tuple ++ &k.slots;
     }
     const reply_token_slots = [_]kinda.ResourceSlot{
-        .{ .name = kinda.callback_runtime.ReplyToken.resource_name, .t = &kinda.callback_runtime.ReplyToken.resource_type, .dtor = beam.destroy_do_nothing },
+        .{ .name = kinda.callback_runtime.ReplyToken.resource_name, .t = &kinda.callback_runtime.ReplyToken.resource.resource_type, .dtor = beam.destroy_do_nothing },
     };
     tuple = tuple ++ &reply_token_slots;
     break :blk tuple;

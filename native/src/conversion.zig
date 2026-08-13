@@ -21,9 +21,6 @@ const PatternDispatcher = kinda.callback_runtime.Dispatcher(.{
     "conversion_pattern_1_to_n",
 });
 
-var target_registration_type: beam.resource_type = undefined;
-var type_converter_registration_type: beam.resource_type = undefined;
-
 fn handleSlice(
     comptime Kind: type,
     environment: beam.env,
@@ -186,22 +183,27 @@ fn destroyTargetRegistration(_: beam.env, object: ?*anyopaque) callconv(.c) void
     _ = registration.close();
 }
 
+const TargetRegistrationResource = kinda.RawResourceType(
+    TargetRegistration,
+    "Beaver.MLIR.ConversionTarget.Registration",
+    destroyTargetRegistration,
+);
+
 fn fetchTargetRegistration(environment: beam.env, term: beam.term) !*TargetRegistration {
-    return beam.fetch_resource_ptr(*TargetRegistration, environment, target_registration_type, term);
+    return TargetRegistrationResource.fetch(environment, term);
 }
 
 fn createTarget(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
-    const memory = e.enif_alloc_resource(target_registration_type, @sizeOf(TargetRegistration)) orelse
+    const registration = TargetRegistrationResource.alloc() catch
         return error.FailedToAllocateConversionTargetRegistration;
-    const registration: *TargetRegistration = @ptrCast(@alignCast(memory));
     registration.* = .{
         .target = c.mlirConversionTargetCreate(context),
         .context = context,
         .callbacks = std.array_list.Managed(*LegalityState).init(std.heap.smp_allocator),
     };
-    const registration_term = e.enif_make_resource(environment, memory);
-    e.enif_release_resource(memory);
+    const registration_term = e.enif_make_resource(environment, registration);
+    TargetRegistrationResource.release(registration);
     var terms = [_]beam.term{
         beam.make_atom(environment, "managed_conversion_target"),
         try mlir_capi.ConversionTarget.resource.make_kind(environment, registration.target),
@@ -549,20 +551,25 @@ fn destroyTypeConverterRegistration(_: beam.env, object: ?*anyopaque) callconv(.
     _ = registration.close();
 }
 
+const TypeConverterRegistrationResource = kinda.RawResourceType(
+    TypeConverterRegistration,
+    "Beaver.MLIR.TypeConverter.Registration",
+    destroyTypeConverterRegistration,
+);
+
 fn fetchTypeConverterRegistration(environment: beam.env, term: beam.term) !*TypeConverterRegistration {
-    return beam.fetch_resource_ptr(*TypeConverterRegistration, environment, type_converter_registration_type, term);
+    return TypeConverterRegistrationResource.fetch(environment, term);
 }
 
 fn createTypeConverter(environment: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
-    const memory = e.enif_alloc_resource(type_converter_registration_type, @sizeOf(TypeConverterRegistration)) orelse
+    const registration = TypeConverterRegistrationResource.alloc() catch
         return error.FailedToAllocateTypeConverterRegistration;
-    const registration: *TypeConverterRegistration = @ptrCast(@alignCast(memory));
     registration.* = .{
         .converter = c.mlirTypeConverterCreate(),
         .callbacks = std.array_list.Managed(*TypeCallbackState).init(std.heap.smp_allocator),
     };
-    const registration_term = e.enif_make_resource(environment, memory);
-    e.enif_release_resource(memory);
+    const registration_term = e.enif_make_resource(environment, registration);
+    TypeConverterRegistrationResource.release(registration);
     var terms = [_]beam.term{
         beam.make_atom(environment, "managed_type_converter"),
         try mlir_capi.TypeConverter.resource.make_kind(environment, registration.converter),
@@ -987,25 +994,8 @@ fn applyConversionAsync(environment: beam.env, _: c_int, args: [*c]const beam.te
 }
 
 pub fn open(environment: beam.env) void {
-    target_registration_type = e.enif_open_resource_type(
-        environment,
-        null,
-        "Beaver.MLIR.ConversionTarget.Registration",
-        destroyTargetRegistration,
-        e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER,
-        null,
-    );
-    if (target_registration_type == null) @panic("failed to open conversion target registration resource");
-
-    type_converter_registration_type = e.enif_open_resource_type(
-        environment,
-        null,
-        "Beaver.MLIR.TypeConverter.Registration",
-        destroyTypeConverterRegistration,
-        e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER,
-        null,
-    );
-    if (type_converter_registration_type == null) @panic("failed to open type converter registration resource");
+    TargetRegistrationResource.open(environment);
+    TypeConverterRegistrationResource.open(environment);
 }
 
 pub const nifs = .{

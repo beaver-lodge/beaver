@@ -79,44 +79,16 @@ export fn nif_upgrade(
 
 export fn nif_unload(_: beam.env, _: ?*anyopaque) void {}
 
-var entry: e.ErlNifEntry = undefined;
-
-fn nif_init_impl() *const e.ErlNifEntry {
-    const nifs = assembleNifs();
-    entry = e.ErlNifEntry{
-        .major = 2,
-        .minor = 16,
-        .name = mlir_capi.root_module,
-        .num_of_funcs = @intCast(nifs.len),
-        .funcs = nifs.ptr,
-        .load = nif_load,
-        .reload = null,
-        .upgrade = nif_upgrade,
-        .unload = nif_unload,
-        .vm_variant = "beam.vanilla",
-        .options = 1,
-        .sizeof_ErlNifResourceTypeInit = @sizeOf(e.ErlNifResourceTypeInit),
-        .min_erts = "erts-13.0",
-    };
-    return &entry;
-}
-
-fn nif_init_windows(callbacks: *const e.TWinDynNifCallbacks) callconv(.c) *const e.ErlNifEntry {
-    // Windows NIFs receive the emulator's enif_* function table through
-    // nif_init instead of exported symbols; copy it into the global that the
-    // windows_enif wrappers read.
-    e.WinDynNifCallbacks = callbacks.*;
-    return nif_init_impl();
-}
-
-fn nif_init_unix() callconv(.c) *const e.ErlNifEntry {
-    return nif_init_impl();
-}
+const entry_exports = kinda.DynamicEntryExports(.{
+    .name = mlir_capi.root_module,
+    .nifs_provider = assembleNifs,
+    .windows_callbacks_target = if (builtin.os.tag == .windows) &e.WinDynNifCallbacks else null,
+    .load = nif_load,
+    .upgrade = nif_upgrade,
+    .unload = nif_unload,
+    .min_erts = "erts-13.0",
+});
 
 comptime {
-    if (builtin.os.tag == .windows) {
-        @export(&nif_init_windows, .{ .name = "nif_init" });
-    } else {
-        @export(&nif_init_unix, .{ .name = "nif_init" });
-    }
+    _ = entry_exports;
 }
