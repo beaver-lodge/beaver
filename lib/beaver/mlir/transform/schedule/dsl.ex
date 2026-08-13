@@ -409,6 +409,70 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
   end
 
   @doc """
+  Packs one or more same-typed Transform parameter handles into one handle.
+
+  This emits `transform.merge_handles` without deduplication, preserving the
+  parameter order. It is useful with operations whose custom syntax accepts a
+  runtime-sized parameter list, such as packed tile sizes or interchange for
+  `transform.structured.tile_using_for`.
+
+  The input handles are consumed by `transform.merge_handles`.
+  """
+  defmacro pack_params(params) do
+    caller = Macro.escape(__CALLER__)
+
+    quote do
+      DSL.__pack_params__(
+        Beaver.Env.context(),
+        Beaver.Env.ip(),
+        unquote(params),
+        unquote(caller)
+      )
+    end
+  end
+
+  @doc false
+  def __pack_params__(context, insertion_point, params, caller) do
+    validate_packed_params!(params, context)
+    result_type = params |> hd() |> MLIR.Value.type()
+
+    operation =
+      %Beaver.SSA{
+        op: "transform.merge_handles",
+        arguments: [handles: params],
+        results: [result_type],
+        ctx: context,
+        ip: insertion_point,
+        loc: source_location(caller, context)
+      }
+      |> MLIR.Operation.create()
+
+    MLIR.Operation.result(operation, 0)
+  end
+
+  defp validate_packed_params!(params, context) when is_list(params) and params != [] do
+    unless Enum.all?(params, &match?(%MLIR.Value{}, &1)) do
+      raise ArgumentError, "pack_params expects a non-empty list of MLIR values"
+    end
+
+    Enum.each(params, &ensure_same_context!(&1, context, "packed parameter"))
+    [first | rest] = Enum.map(params, &MLIR.Value.type/1)
+
+    unless String.starts_with?(MLIR.to_string(first), "!transform.") and
+             String.contains?(MLIR.to_string(first), "param") do
+      raise ArgumentError, "pack_params expects Transform parameter handles"
+    end
+
+    unless Enum.all?(rest, &MLIR.equal?(&1, first)) do
+      raise ArgumentError, "pack_params expects handles with the same Transform parameter type"
+    end
+  end
+
+  defp validate_packed_params!(_params, _context) do
+    raise ArgumentError, "pack_params expects a non-empty list of MLIR values"
+  end
+
+  @doc """
   Creates `transform.tune.alternatives` from explicit `branch` blocks.
 
       alternatives "vectorize" do

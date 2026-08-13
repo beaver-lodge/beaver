@@ -78,6 +78,48 @@ defmodule Beaver.MLIR.Transform.Schedule.DSLTest do
     end
   end
 
+  defmodule PackedTileSchedule do
+    use DSL
+
+    defschedule packed_tiling do
+      sequence "__transform_main", [root >>> any_op()] do
+        tile_m = knob("tile_m", [8, 16], type: param(MLIR.Type.i64()))
+        tile_n = knob("tile_n", [16, 32], type: param(MLIR.Type.i64()))
+        packed_tiles = pack_params([tile_m, tile_n])
+
+        zero =
+          Transform.param_constant(
+            value: MLIR.Attribute.integer(MLIR.Type.i64(ctx: Beaver.Env.context()), 0)
+          ) >>> param(MLIR.Type.i64())
+
+        one =
+          Transform.param_constant(
+            value: MLIR.Attribute.integer(MLIR.Type.i64(ctx: Beaver.Env.context()), 1)
+          ) >>> param(MLIR.Type.i64())
+
+        packed_interchange = pack_params([one, zero])
+
+        operation_names =
+          MLIR.Attribute.array(
+            [MLIR.Attribute.string("linalg.matmul")],
+            ctx: Beaver.Env.context()
+          )
+
+        matmul = Transform.structured_match(target: root, ops: operation_names) >>> any_op()
+
+        [_tiled, _loops] =
+          Transform.structured_tile_using_for(
+            target: matmul,
+            dynamic_sizes: [],
+            interchange: [],
+            packed_tile_sizes: packed_tiles,
+            packed_interchange: packed_interchange,
+            operand_segment_sizes: :infer
+          ) >>> [any_op(), any_op()]
+      end
+    end
+  end
+
   defmodule ScalarSchedule do
     use DSL
 
@@ -231,6 +273,23 @@ defmodule Beaver.MLIR.Transform.Schedule.DSLTest do
 
     resolved = Schedule.resolve!(schedule, %{"tile_size" => 16, "vectorize" => 1})
     assert resolved.choices == %{"tile_size" => 16, "vectorize" => 1}
+  end
+
+  @tag :packed_transform_params
+  test "packed parameters drive runtime-sized tile sizes and interchange", %{ctx: ctx} do
+    schedule = own(PackedTileSchedule.packed_tiling(ctx: ctx))
+    text = MLIR.to_string(schedule)
+
+    assert text =~ "tile_sizes *(%"
+    assert text =~ "interchange = *(%"
+    assert {:ok, candidates} = Schedule.enumerate(schedule)
+    assert length(candidates) == 4
+
+    resolved = Schedule.resolve!(schedule, %{"tile_m" => 8, "tile_n" => 16})
+    payload = own(MLIR.Module.create!(@payload, ctx: ctx))
+
+    assert {:ok, result} = MLIR.Transform.execute(payload, resolved)
+    assert result.payload |> MLIR.to_string() |> String.split("scf.for") |> length() == 3
   end
 
   test "generated IR is deterministic and round-trips through text and bytecode", %{ctx: ctx} do

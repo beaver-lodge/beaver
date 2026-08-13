@@ -11,6 +11,13 @@ exclude =
     exclude
   end
 
+exclude =
+  if String.starts_with?(System.get_env("LLVM_PREBUILT_ASSET_NAME", ""), "llvm-") do
+    exclude ++ [:packed_transform_params]
+  else
+    exclude
+  end
+
 ExUnit.configure(exclude: exclude)
 
 IO.puts("OS PID: #{System.pid()}")
