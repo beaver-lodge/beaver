@@ -14,12 +14,6 @@ const TransformDispatcher = kinda.callback_runtime.Dispatcher(.{ "apply", "allow
 const PatternDescriptorDispatcher = kinda.callback_runtime.Dispatcher(.{ "populate_patterns", "populate_patterns_with_state" });
 const DynamicTraitDispatcher = kinda.callback_runtime.Dispatcher(.{ "verify", "verify_regions" });
 
-var speculatability_state_type: beam.resource_type = undefined;
-var memory_effects_state_type: beam.resource_type = undefined;
-var transform_state_type: beam.resource_type = undefined;
-var pattern_descriptor_state_type: beam.resource_type = undefined;
-var dynamic_trait_state_type: beam.resource_type = undefined;
-
 fn notifyReleased(recipient: beam.pid) void {
     const environment = e.enif_alloc_env() orelse return;
     defer e.enif_free_env(environment);
@@ -364,6 +358,32 @@ const DynamicTraitState = struct {
     }
 };
 
+const SpeculatabilityStateResource = kinda.RawResourceType(
+    SpeculatabilityState,
+    "Beaver.MLIR.ConditionallySpeculatable.FallbackState",
+    destroyState(SpeculatabilityState),
+);
+const MemoryEffectsStateResource = kinda.RawResourceType(
+    MemoryEffectsState,
+    "Beaver.MLIR.MemoryEffects.FallbackState",
+    destroyState(MemoryEffectsState),
+);
+const TransformStateResource = kinda.RawResourceType(
+    TransformState,
+    "Beaver.MLIR.TransformOpInterface.FallbackState",
+    destroyState(TransformState),
+);
+const PatternDescriptorStateResource = kinda.RawResourceType(
+    PatternDescriptorState,
+    "Beaver.MLIR.PatternDescriptorOpInterface.FallbackState",
+    destroyState(PatternDescriptorState),
+);
+const DynamicTraitStateResource = kinda.RawResourceType(
+    DynamicTraitState,
+    "Beaver.MLIR.Trait.DynamicState",
+    destroyState(DynamicTraitState),
+);
+
 fn destroyState(comptime State: type) fn (beam.env, ?*anyopaque) callconv(.c) void {
     return struct {
         fn destroy(_: beam.env, object: ?*anyopaque) callconv(.c) void {
@@ -379,12 +399,10 @@ fn destroyState(comptime State: type) fn (beam.env, ?*anyopaque) callconv(.c) vo
 fn allocateState(
     comptime State: type,
     comptime Dispatcher: type,
-    resource_type: beam.resource_type,
+    comptime Resource: type,
     dispatcher: *Dispatcher,
 ) !*State {
-    const memory = e.enif_alloc_resource(resource_type, @sizeOf(State)) orelse
-        return error.FailedToAllocateExternalInterfaceState;
-    const state: *State = @ptrCast(@alignCast(memory));
+    const state = Resource.alloc() catch return error.FailedToAllocateExternalInterfaceState;
     state.* = .{ .dispatcher = dispatcher };
     return state;
 }
@@ -401,8 +419,8 @@ fn attachSpeculatabilityFallback(environment: beam.env, _: c_int, args: [*c]cons
     var dispatcher_owned = true;
     errdefer if (dispatcher_owned) dispatcher.deinit();
     dispatcher.setCallback("get_speculatability", args[2]);
-    const state = try allocateState(SpeculatabilityState, SpeculatabilityDispatcher, speculatability_state_type, dispatcher);
-    errdefer e.enif_release_resource(state);
+    const state = try allocateState(SpeculatabilityState, SpeculatabilityDispatcher, SpeculatabilityStateResource, dispatcher);
+    errdefer SpeculatabilityStateResource.release(state);
     dispatcher_owned = false;
     c.mlirConditionallySpeculatableOpInterfaceAttachFallbackModel(
         context,
@@ -430,8 +448,8 @@ fn attachMemoryEffectsFallback(environment: beam.env, _: c_int, args: [*c]const 
     var dispatcher_owned = true;
     errdefer if (dispatcher_owned) dispatcher.deinit();
     dispatcher.setCallback("get_effects", args[2]);
-    const state = try allocateState(MemoryEffectsState, MemoryEffectsDispatcher, memory_effects_state_type, dispatcher);
-    errdefer e.enif_release_resource(state);
+    const state = try allocateState(MemoryEffectsState, MemoryEffectsDispatcher, MemoryEffectsStateResource, dispatcher);
+    errdefer MemoryEffectsStateResource.release(state);
     dispatcher_owned = false;
     c.mlirMemoryEffectsOpInterfaceAttachFallbackModel(
         context,
@@ -461,8 +479,8 @@ fn attachTransformFallback(environment: beam.env, _: c_int, args: [*c]const beam
     dispatcher.setCallback("apply", args[2]);
     if (!beam.is_nil2(environment, args[3]))
         dispatcher.setCallback("allows_repeated_handle_operands", args[3]);
-    const state = try allocateState(TransformState, TransformDispatcher, transform_state_type, dispatcher);
-    errdefer e.enif_release_resource(state);
+    const state = try allocateState(TransformState, TransformDispatcher, TransformStateResource, dispatcher);
+    errdefer TransformStateResource.release(state);
     dispatcher_owned = false;
     c.mlirTransformOpInterfaceAttachFallbackModel(
         context,
@@ -493,8 +511,8 @@ fn attachPatternDescriptorFallback(environment: beam.env, _: c_int, args: [*c]co
     dispatcher.setCallback("populate_patterns", args[2]);
     if (!beam.is_nil2(environment, args[3]))
         dispatcher.setCallback("populate_patterns_with_state", args[3]);
-    const state = try allocateState(PatternDescriptorState, PatternDescriptorDispatcher, pattern_descriptor_state_type, dispatcher);
-    errdefer e.enif_release_resource(state);
+    const state = try allocateState(PatternDescriptorState, PatternDescriptorDispatcher, PatternDescriptorStateResource, dispatcher);
+    errdefer PatternDescriptorStateResource.release(state);
     dispatcher_owned = false;
     c.mlirPatternDescriptorOpInterfaceAttachFallbackModel(
         context,
@@ -532,10 +550,10 @@ fn attachDynamicTrait(environment: beam.env, _: c_int, args: [*c]const beam.term
     const state = try allocateState(
         DynamicTraitState,
         DynamicTraitDispatcher,
-        dynamic_trait_state_type,
+        DynamicTraitStateResource,
         dispatcher,
     );
-    errdefer if (dispatcher_owned) e.enif_release_resource(state);
+    errdefer if (dispatcher_owned) DynamicTraitStateResource.release(state);
     dispatcher_owned = false;
 
     // Add the BEAM-term reference before handing the allocation reference to
@@ -624,25 +642,22 @@ fn AsyncDiagnosticsNIF(comptime name: []const u8) type {
 
 fn releaseStateTerm(
     comptime State: type,
+    comptime Resource: type,
     environment: beam.env,
-    resource_type: beam.resource_type,
     term: beam.term,
 ) bool {
-    var object: ?*anyopaque = null;
-    if (e.enif_get_resource(environment, term, resource_type, @ptrCast(&object)) == 0)
-        return false;
-    const state: *State = @ptrCast(@alignCast(object orelse return false));
+    const state: *State = Resource.fetch(environment, term) catch return false;
     releaseModel(State, state);
     return true;
 }
 
 fn releaseExternalInterface(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const released =
-        releaseStateTerm(SpeculatabilityState, environment, speculatability_state_type, args[0]) or
-        releaseStateTerm(MemoryEffectsState, environment, memory_effects_state_type, args[0]) or
-        releaseStateTerm(TransformState, environment, transform_state_type, args[0]) or
-        releaseStateTerm(PatternDescriptorState, environment, pattern_descriptor_state_type, args[0]) or
-        releaseStateTerm(DynamicTraitState, environment, dynamic_trait_state_type, args[0]);
+        releaseStateTerm(SpeculatabilityState, SpeculatabilityStateResource, environment, args[0]) or
+        releaseStateTerm(MemoryEffectsState, MemoryEffectsStateResource, environment, args[0]) or
+        releaseStateTerm(TransformState, TransformStateResource, environment, args[0]) or
+        releaseStateTerm(PatternDescriptorState, PatternDescriptorStateResource, environment, args[0]) or
+        releaseStateTerm(DynamicTraitState, DynamicTraitStateResource, environment, args[0]);
     if (!released) return error.InvalidExternalInterfaceState;
     return beam.make_ok(environment);
 }
@@ -725,49 +740,12 @@ fn transformStateParams(environment: beam.env, _: c_int, args: [*c]const beam.te
     );
 }
 
-fn openResourceType(
-    environment: beam.env,
-    comptime name: [*c]const u8,
-    destructor: e.ErlNifResourceDtor,
-) beam.resource_type {
-    const resource_type = e.enif_open_resource_type(
-        environment,
-        null,
-        name,
-        destructor,
-        e.ERL_NIF_RT_CREATE | e.ERL_NIF_RT_TAKEOVER,
-        null,
-    );
-    if (resource_type == null) @panic("failed to open external interface state resource");
-    return resource_type;
-}
-
 pub fn open(environment: beam.env) void {
-    speculatability_state_type = openResourceType(
-        environment,
-        "Beaver.MLIR.ConditionallySpeculatable.FallbackState",
-        destroyState(SpeculatabilityState),
-    );
-    memory_effects_state_type = openResourceType(
-        environment,
-        "Beaver.MLIR.MemoryEffects.FallbackState",
-        destroyState(MemoryEffectsState),
-    );
-    transform_state_type = openResourceType(
-        environment,
-        "Beaver.MLIR.TransformOpInterface.FallbackState",
-        destroyState(TransformState),
-    );
-    pattern_descriptor_state_type = openResourceType(
-        environment,
-        "Beaver.MLIR.PatternDescriptorOpInterface.FallbackState",
-        destroyState(PatternDescriptorState),
-    );
-    dynamic_trait_state_type = openResourceType(
-        environment,
-        "Beaver.MLIR.Trait.DynamicState",
-        destroyState(DynamicTraitState),
-    );
+    SpeculatabilityStateResource.open(environment);
+    MemoryEffectsStateResource.open(environment);
+    TransformStateResource.open(environment);
+    PatternDescriptorStateResource.open(environment);
+    DynamicTraitStateResource.open(environment);
 }
 
 pub const nifs = .{
