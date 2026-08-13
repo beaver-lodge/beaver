@@ -123,6 +123,7 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.tuple_get" => %{params: [:i64, :i64], result: :i64},
     "ex.term.tuple_length" => %{params: [:i64], result: :i64},
     "ex.term.map_from_list" => %{params: [:i64], result: :i64},
+    "ex.term.map_fetch" => %{params: [:i64, :i64], result: :i64},
     "ex.term.map_put" => %{params: [:i64, :i64, :i64], result: :i64},
     "ex.term.map_length" => %{params: [:i64], result: :i64},
     "ex.term.mapset_from_list" => %{params: [:i64], result: :i64},

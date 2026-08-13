@@ -152,6 +152,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.list_cons", &convert_term_list_cons/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.map", &convert_term_map/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.map_put", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.map_fetch", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mapset_from_list", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mapset_member", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mapset_put", &convert_term_read/3, version: "1.0")
@@ -212,6 +213,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   @term_intrinsics %{
     list_cons: "ex.term.list_cons",
     map_put: "ex.term.map_put",
+    map_fetch: "ex.term.map_fetch",
     self: "ex.term.self",
     send: "ex.term.send",
     receive: "ex.term.receive",
@@ -944,6 +946,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.float_lit"), do: @term_intrinsics.float_lit
   defp read_intrinsic("ex.string_to_float"), do: @term_intrinsics.string_to_float
   defp read_intrinsic("ex.map_put"), do: @term_intrinsics.map_put
+  defp read_intrinsic("ex.map_fetch"), do: @term_intrinsics.map_fetch
   defp read_intrinsic("ex.mapset_from_list"), do: @term_intrinsics.mapset_from_list
   defp read_intrinsic("ex.mapset_member"), do: @term_intrinsics.mapset_member
   defp read_intrinsic("ex.mapset_put"), do: @term_intrinsics.mapset_put
@@ -1488,6 +1491,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
               "ex.term.binary_slice",
               "ex.term.binary_utf8_get",
               "ex.term.binary_utf8_width",
+              "ex.term.map_fetch",
               "ex.term.mapset_member",
               "ex.term.mapset_put",
               "ex.term.stream_take",

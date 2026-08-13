@@ -565,6 +565,7 @@ defmodule ExConversionTest do
             %4 = "ex.list"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
             %5 = "ex.map"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
             %6 = "ex.map_put"(%5, %2, %3) : (!ex.dyn, !ex.dyn, !ex.dyn) -> !ex.dyn
+            %13 = "ex.map_fetch"(%6, %2) : (!ex.dyn, !ex.dyn) -> !ex.dyn
             %7 = "ex.binary"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
             %8 = "ex.binary_from_list"(%4) : (!ex.dyn) -> !ex.dyn
             %12 = "ex.iodata_to_binary"(%4) : (!ex.dyn) -> !ex.dyn
@@ -584,6 +585,7 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.list_cons"
     assert rendered =~ "ex.term.map_from_list"
     assert rendered =~ "ex.term.map_put"
+    assert rendered =~ "ex.term.map_fetch"
     assert rendered =~ "ex.term.binary_from_list"
     assert rendered =~ "ex.term.iodata_to_binary"
     assert rendered =~ "ex.term.float_lit"
