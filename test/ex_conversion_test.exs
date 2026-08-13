@@ -636,7 +636,8 @@ defmodule ExConversionTest do
             %9 = "ex.list_head"(%5) : (!ex.dyn) -> !ex.dyn
             %10 = "ex.list_tail"(%5) : (!ex.dyn) -> !ex.dyn
             %11 = "ex.term_eq"(%7, %2) : (!ex.dyn, !ex.dyn) -> i64
-            "ex.return"(%11) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+            %12 = "ex.string_printable"(%2) : (!ex.dyn) -> i64
+            "ex.return"(%12) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
         """,
@@ -652,6 +653,7 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.list_head"
     assert rendered =~ "ex.term.list_tail"
     assert rendered =~ "ex.term.eq"
+    assert rendered =~ "ex.term.string_printable"
   end
 
   test "converts binary read ops to Zig runtime ABI calls", %{ctx: ctx} do

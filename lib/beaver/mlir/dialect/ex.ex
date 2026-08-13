@@ -611,6 +611,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop binary_utf8_length(binary = base(dyn())),
     results: [result: ^integer_like]
 
+  defop string_printable(binary = base(dyn())),
+    results: [result: ^integer_like]
+
   defop binary_encode16(binary = base(dyn())),
     results: [result: base(dyn())]
 
