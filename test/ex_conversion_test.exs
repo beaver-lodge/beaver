@@ -657,6 +657,10 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.list_tail"
     assert rendered =~ "ex.term.eq"
     assert rendered =~ "ex.term.eq_loose"
+
+    assert rendered =~
+             ~s|function_type = (i64, i64) -> i64, sym_name = "ex.term.eq_loose"|
+
     assert rendered =~ "ex.term.string_printable"
     assert rendered =~ "ex.term.binary_quote"
     assert rendered =~ "ex.term.int_to_hex"

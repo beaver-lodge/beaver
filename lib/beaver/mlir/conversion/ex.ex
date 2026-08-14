@@ -1527,6 +1527,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
               "ex.term.tuple_get",
               "ex.term.list_get",
               "ex.term.eq",
+              "ex.term.eq_loose",
               "ex.term.binary_get",
               "ex.term.binary_slice",
               "ex.term.binary_utf8_get",
