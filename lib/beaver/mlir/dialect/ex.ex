@@ -590,6 +590,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop term_eq(left = base(dyn()), right = base(dyn())),
     results: [result: ^integer_like]
 
+  defop term_eq_loose(left = base(dyn()), right = base(dyn())),
+    results: [result: ^integer_like]
+
   defop binary_length(binary = base(dyn())),
     results: [result: ^integer_like]
 
