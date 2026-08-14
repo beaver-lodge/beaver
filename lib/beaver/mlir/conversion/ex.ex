@@ -210,9 +210,11 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.binary_utf8_width", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_utf8_length", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.string_printable", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.binary_quote", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_encode16", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_decode16", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.int_to_string", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.int_to_hex", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.string_to_int", &convert_term_read/3, version: "1.0")
   end
 
@@ -339,9 +341,11 @@ defmodule Beaver.MLIR.Conversion.Ex do
     binary_utf8_width: "ex.term.binary_utf8_width",
     binary_utf8_length: "ex.term.binary_utf8_length",
     string_printable: "ex.term.string_printable",
+    binary_quote: "ex.term.binary_quote",
     binary_encode16: "ex.term.binary_encode16",
     binary_decode16: "ex.term.binary_decode16",
     int_to_string: "ex.term.int_to_string",
+    int_to_hex: "ex.term.int_to_hex",
     string_to_int: "ex.term.string_to_int"
   }
 
@@ -1064,9 +1068,11 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.binary_utf8_width"), do: @term_intrinsics.binary_utf8_width
   defp read_intrinsic("ex.binary_utf8_length"), do: @term_intrinsics.binary_utf8_length
   defp read_intrinsic("ex.string_printable"), do: @term_intrinsics.string_printable
+  defp read_intrinsic("ex.binary_quote"), do: @term_intrinsics.binary_quote
   defp read_intrinsic("ex.binary_encode16"), do: @term_intrinsics.binary_encode16
   defp read_intrinsic("ex.binary_decode16"), do: @term_intrinsics.binary_decode16
   defp read_intrinsic("ex.int_to_string"), do: @term_intrinsics.int_to_string
+  defp read_intrinsic("ex.int_to_hex"), do: @term_intrinsics.int_to_hex
   defp read_intrinsic("ex.string_to_int"), do: @term_intrinsics.string_to_int
 
   defp insertion_point(operation, rewriter) do

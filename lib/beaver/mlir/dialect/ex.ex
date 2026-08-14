@@ -614,6 +614,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop string_printable(binary = base(dyn())),
     results: [result: ^integer_like]
 
+  defop binary_quote(binary = base(dyn())),
+    results: [result: base(dyn())]
+
   defop binary_encode16(binary = base(dyn())),
     results: [result: base(dyn())]
 
@@ -621,6 +624,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
     results: [result: base(dyn())]
 
   defop int_to_string(word = base(dyn())),
+    results: [result: base(dyn())]
+
+  defop int_to_hex(word = base(dyn())),
     results: [result: base(dyn())]
 
   defop string_to_int(binary = base(dyn())),
