@@ -636,10 +636,11 @@ defmodule ExConversionTest do
             %9 = "ex.list_head"(%5) : (!ex.dyn) -> !ex.dyn
             %10 = "ex.list_tail"(%5) : (!ex.dyn) -> !ex.dyn
             %11 = "ex.term_eq"(%7, %2) : (!ex.dyn, !ex.dyn) -> i64
-            %12 = "ex.string_printable"(%2) : (!ex.dyn) -> i64
-            %13 = "ex.binary_quote"(%2) : (!ex.dyn) -> !ex.dyn
-            %14 = "ex.int_to_hex"(%2) : (!ex.dyn) -> !ex.dyn
-            "ex.return"(%12) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+            %12 = "ex.term_eq_loose"(%7, %2) : (!ex.dyn, !ex.dyn) -> i64
+            %13 = "ex.string_printable"(%2) : (!ex.dyn) -> i64
+            %14 = "ex.binary_quote"(%2) : (!ex.dyn) -> !ex.dyn
+            %15 = "ex.int_to_hex"(%2) : (!ex.dyn) -> !ex.dyn
+            "ex.return"(%13) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
         """,
@@ -655,6 +656,7 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.list_head"
     assert rendered =~ "ex.term.list_tail"
     assert rendered =~ "ex.term.eq"
+    assert rendered =~ "ex.term.eq_loose"
     assert rendered =~ "ex.term.string_printable"
     assert rendered =~ "ex.term.binary_quote"
     assert rendered =~ "ex.term.int_to_hex"
