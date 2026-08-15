@@ -414,6 +414,23 @@ defmodule Beaver.MLIR.Dialect.Ex do
         results: [result: base(dyn())],
         attributes: [fn_idx: ^integer_value, env_len: ^integer_value]
 
+  # Additive closure constructor carrying the function arity. Keep
+  # `ex.make_fun` available while downstream runtimes migrate from the
+  # original six-word ABI.
+  defop make_fun_with_arity(
+          e0 = optional(^any_value),
+          e1 = optional(^any_value),
+          e2 = optional(^any_value),
+          e3 = optional(^any_value)
+        ),
+        results: [result: base(dyn())],
+        attributes: [fn_idx: ^integer_value, arity: ^integer_value, env_len: ^integer_value]
+
+  # Reads a closure's declared arity. Runtimes return -1 for values or legacy
+  # closures which do not carry arity metadata.
+  defop fun_arity(fun = base(dyn())),
+    results: [result: ^integer_like]
+
   # Applies a first-class function value. The closure is resolved at runtime
   # to its function index and env slots, then dispatched to the matching
   # `__fn_*`.
