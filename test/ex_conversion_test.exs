@@ -904,6 +904,34 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.is_tuple"
   end
 
+  test "keeps legacy closure lowering and adds arity-carrying closure reads", %{ctx: ctx} do
+    module =
+      term_module!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "ex.lit"() {value = 7 : i64} : () -> i64
+            %1 = "ex.make_fun"(%0) {fn_idx = 1 : i64, env_len = 1 : i64, operandSegmentSizes = array<i32: 1, 0, 0, 0>} : (i64) -> !ex.dyn
+            %2 = "ex.make_fun_with_arity"(%0) {fn_idx = 2 : i64, arity = 1 : i64, env_len = 1 : i64, operandSegmentSizes = array<i32: 1, 0, 0, 0>} : (i64) -> !ex.dyn
+            %3 = "ex.fun_arity"(%2) : (!ex.dyn) -> i64
+            "ex.return"(%3) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx
+      )
+
+    assert {:ok, _module, []} = Plan.run(Ex.plan(), module)
+
+    rendered = MLIR.to_string(module, generic: true)
+    assert rendered =~ "ex.term.make_fun"
+    assert rendered =~ "ex.term.make_fun_with_arity"
+    assert rendered =~ "ex.term.fun_arity"
+    assert rendered =~ "(i64, i64, i64, i64, i64, i64) -> i64"
+    assert rendered =~ "(i64, i64, i64, i64, i64, i64, i64) -> i64"
+  end
+
   test "rejects ex.map with an odd number of entries", %{ctx: ctx} do
     module =
       term_module!(

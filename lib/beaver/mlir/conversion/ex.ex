@@ -153,6 +153,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.raise", &convert_raise/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.catch_value", &convert_catch_value/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.make_fun", &convert_make_fun/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.make_fun_with_arity", &convert_make_fun_with_arity/3,
+      version: "1.0"
+    )
+    |> Plan.add_conversion_pattern("ex.fun_arity", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.apply", &convert_apply/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.tuple", &convert_term_tuple/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list", &convert_term_list/3, version: "1.0")
@@ -296,6 +300,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
     raise: "ex.term.raise",
     catch_value: "ex.term.catch_value",
     make_fun: "ex.term.make_fun",
+    make_fun_with_arity: "ex.term.make_fun_with_arity",
+    fun_arity: "ex.term.fun_arity",
     fun_idx: "ex.term.fun_idx",
     fun_env: "ex.term.fun_env",
     tuple_from_list: "ex.term.tuple_from_list",
@@ -904,6 +910,48 @@ defmodule Beaver.MLIR.Conversion.Ex do
     replace_with(rewriter, operation, closure)
   end
 
+  # Additive arity-carrying constructor. The legacy conversion above remains
+  # byte-for-byte compatible with runtimes that only export `make_fun/6`.
+  defp convert_make_fun_with_arity(operation, operands, rewriter) do
+    base = insertion_point(operation, rewriter)
+
+    fn_idx = operation |> required_attribute("fn_idx") |> MLIR.CAPI.mlirIntegerAttrGetValueInt()
+    arity = operation |> required_attribute("arity") |> MLIR.CAPI.mlirIntegerAttrGetValueInt()
+    env_len = operation |> required_attribute("env_len") |> MLIR.CAPI.mlirIntegerAttrGetValueInt()
+
+    fn_idx = Beaver.Native.to_term(fn_idx)
+    arity = Beaver.Native.to_term(arity)
+    env_len = Beaver.Native.to_term(env_len)
+
+    unless length(operands) == env_len do
+      raise ArgumentError,
+            "ex.make_fun_with_arity env_len #{env_len} does not match #{length(operands)} operands"
+    end
+
+    unless arity in 0..4 do
+      raise ArgumentError, "ex.make_fun_with_arity supports arities 0..4, got #{arity}"
+    end
+
+    constants =
+      Enum.map([fn_idx, arity, env_len], fn value ->
+        emit_constant(value, operation, base) |> MLIR.Operation.result(0)
+      end)
+
+    pad =
+      List.duplicate(emit_constant(0, operation, base) |> MLIR.Operation.result(0), 4 - env_len)
+
+    closure =
+      emit_runtime_call(
+        operation,
+        rewriter,
+        base,
+        @term_intrinsics.make_fun_with_arity,
+        constants ++ operands ++ pad
+      )
+
+    replace_with(rewriter, operation, closure)
+  end
+
   # Applies a first-class function value: reads the function index and env
   # words from the closure, then dispatches to the matching `__fn_*`.
   defp convert_apply(operation, operands, rewriter) do
@@ -969,6 +1017,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp read_intrinsic("ex.tuple_get"), do: @term_intrinsics.tuple_get
+  defp read_intrinsic("ex.fun_arity"), do: @term_intrinsics.fun_arity
   defp read_intrinsic("ex.tuple_length"), do: @term_intrinsics.tuple_length
   defp read_intrinsic("ex.map_length"), do: @term_intrinsics.map_length
   defp read_intrinsic("ex.float_lit"), do: @term_intrinsics.float_lit
@@ -1462,6 +1511,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp intrinsic_function_type("ex.term.make_fun", _ctx) do
     MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 6), [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.make_fun_with_arity", _ctx) do
+    MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 7), [MLIR.Type.i64()])
   end
 
   defp intrinsic_function_type("ex.term.enumerable_reduce", _ctx) do

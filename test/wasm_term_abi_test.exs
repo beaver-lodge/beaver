@@ -67,6 +67,11 @@ defmodule WasmTermABITest do
     assert TermABI.entry("ex.term.raise").params == [:i64, :i64]
     assert TermABI.entry("ex.term.raise").result == :void
     assert TermABI.entry("ex.term.make_fun").params == [:i64, :i64, :i64, :i64, :i64, :i64]
+
+    assert TermABI.entry("ex.term.make_fun_with_arity").params ==
+             [:i64, :i64, :i64, :i64, :i64, :i64, :i64]
+
+    assert TermABI.entry("ex.term.fun_arity").params == [:i64]
   end
 
   test "renders a paste-ready markdown table" do

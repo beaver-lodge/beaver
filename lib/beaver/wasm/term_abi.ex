@@ -170,6 +170,11 @@ defmodule Beaver.Wasm.TermABI do
       params: [:i64, :i64, :i64, :i64, :i64, :i64],
       result: :i64
     },
+    "ex.term.make_fun_with_arity" => %{
+      params: [:i64, :i64, :i64, :i64, :i64, :i64, :i64],
+      result: :i64
+    },
+    "ex.term.fun_arity" => %{params: [:i64], result: :i64},
     "ex.term.fun_idx" => %{params: [:i64], result: :i64},
     "ex.term.fun_env" => %{params: [:i64, :i64], result: :i64},
     # exception / setjmp
