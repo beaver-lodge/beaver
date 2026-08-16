@@ -8,6 +8,7 @@ RUN apt-get upgrade -y \
   && rm -rf /var/lib/apt/lists/*
 # LLVM
 COPY ./scripts/install_llvm /usr/local/bin/install_llvm
+COPY ./native-deps.json /usr/local/native-deps.json
 COPY ./scripts/install-prebuilt-llvm.sh /usr/local/bin/install-prebuilt-llvm.sh
 ARG LLVM_EUDSL_ASSET_NAME
 RUN LLVM_EUDSL_ASSET_NAME="${LLVM_EUDSL_ASSET_NAME}" \
