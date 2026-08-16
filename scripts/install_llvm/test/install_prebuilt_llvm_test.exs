@@ -5,6 +5,27 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
 
   alias Mix.Tasks.Beaver.InstallPrebuiltLlvm
 
+  test "toolchain metadata is valid and retains the kinda.ref compatibility pin" do
+    metadata = Beaver.ToolchainMetadata.load!()
+
+    kinda_ref =
+      Beaver.ToolchainMetadata.path()
+      |> Path.dirname()
+      |> Path.join("kinda.ref")
+      |> File.stream!()
+      |> Enum.find(&(String.trim(&1) != "" and not String.starts_with?(String.trim(&1), "#")))
+      |> String.trim()
+
+    assert metadata["schema_version"] == 1
+    assert metadata["kinda"]["ref"] == kinda_ref
+    assert metadata["llvm"]["default_revision"] =~ ~r/^\d{8}\+[0-9a-f]+$/
+  end
+
+  test "print-metadata emits the machine-readable toolchain contract" do
+    output = capture_io(fn -> InstallPrebuiltLlvm.run(["--print-metadata"]) end)
+    assert JSON.decode!(output) == Beaver.ToolchainMetadata.load!()
+  end
+
   setup do
     Mix.Task.reenable("beaver.install_prebuilt_llvm")
     :ok
@@ -23,6 +44,7 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
       end)
 
     assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20260815+8024076c7.tar.gz"
+    assert output =~ "LLVM_EUDSL_ASSET_REVISION=20260815+8024076c7"
     assert output =~ "https://github.com/llvm/eudsl/releases/download/llvm/"
   end
 

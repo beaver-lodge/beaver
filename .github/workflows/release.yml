@@ -54,21 +54,18 @@ jobs:
         name: Check-out beaver
       # Kinda 0.11.0 on Hex predates the LLP64 integer conversion, Windows
       # synchronization fixes, and the ResourceSlot registry API, so every
-      # lane uses the paired revision pinned in kinda.ref until a release
+      # lane uses the paired revision pinned in native-deps.json until a release
       # containing beaver-lodge/kinda#66, #68 and #87 is published.
       - name: Check out paired Kinda
         run: |
-          ref="$(awk 'NF && $1 !~ /^#/ {print $1; exit}' kinda.ref 2>/dev/null || true)"
+          ref="$(jq -er '.kinda.ref' native-deps.json)"
           if [ -n "$ref" ]; then
             git clone https://github.com/beaver-lodge/kinda.git kinda
-            if git -C kinda cat-file -e "$ref^{commit}" 2>/dev/null; then
-              git -C kinda checkout "$ref"
-              echo "BEAVER_KINDA_PATH=${GITHUB_WORKSPACE}/kinda" >> "$GITHUB_ENV"
-            else
-              echo "warning: paired kinda ref $ref unavailable, using Hex release" >> "$GITHUB_STEP_SUMMARY"
-            fi
+            git -C kinda checkout "$ref"
+            echo "BEAVER_KINDA_PATH=${GITHUB_WORKSPACE}/kinda" >> "$GITHUB_ENV"
           else
-            echo "no paired kinda ref, using Hex release" >> "$GITHUB_STEP_SUMMARY"
+            echo "native-deps.json contains no paired Kinda ref" >&2
+            exit 1
           fi
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
@@ -307,16 +304,13 @@ jobs:
           path: beaver
       - name: Check out paired Kinda
         run: |
-          ref="$(awk 'NF && $1 !~ /^#/ {print $1; exit}' beaver/kinda.ref 2>/dev/null || true)"
+          ref="$(jq -er '.kinda.ref' beaver/native-deps.json)"
           if [ -n "$ref" ]; then
             git clone https://github.com/beaver-lodge/kinda.git kinda
-            if git -C kinda cat-file -e "$ref^{commit}" 2>/dev/null; then
-              git -C kinda checkout "$ref"
-            else
-              echo "warning: paired kinda ref $ref unavailable, using Hex release" >> "$GITHUB_STEP_SUMMARY"
-            fi
+            git -C kinda checkout "$ref"
           else
-            echo "no paired kinda ref, using Hex release" >> "$GITHUB_STEP_SUMMARY"
+            echo "native-deps.json contains no paired Kinda ref" >&2
+            exit 1
           fi
       - name: Strip dev suffix
         working-directory: beaver

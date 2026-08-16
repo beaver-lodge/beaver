@@ -28,8 +28,8 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     * `--repo REPO` / `LLVM_EUDSL_REPO` — defaults to `llvm/eudsl`.
     * `--tag TAG` / `LLVM_EUDSL_TAG` — defaults to `llvm`.
     * `--asset-revision REV` / `LLVM_EUDSL_ASSET_REVISION` — defaults to
-      `20260815+8024076c7`; `latest` resolves the newest asset through the
-      GitHub API.
+      the revision in `native-deps.json`; `latest` resolves the newest asset
+      through the GitHub API.
     * `--asset-name NAME` / `LLVM_EUDSL_ASSET_NAME` — exact asset file name.
     * `--asset-url URL` / `LLVM_EUDSL_ASSET_URL` — download from an arbitrary
       URL (the asset name defaults to the URL basename).
@@ -49,7 +49,10 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
       explicit path when running in an environment that sets `GITHUB_ENV` but
       should not be mutated (e.g. tests).
     * `--resolve-only` / `LLVM_EUDSL_RESOLVE_ONLY=1` — print
-      `LLVM_PREBUILT_ASSET_NAME` and `LLVM_PREBUILT_URL` without downloading.
+      `LLVM_EUDSL_ASSET_REVISION`, `LLVM_PREBUILT_ASSET_NAME`, and
+      `LLVM_PREBUILT_URL` without downloading.
+    * `--print-metadata` — print Beaver's machine-readable toolchain metadata
+      without resolving or downloading an asset.
 
   When `GITHUB_ENV` is set, `LLVM_CONFIG_PATH`, `LLVM_PREBUILT_DIR`,
   `LLVM_PREBUILT_ASSET_NAME` and `LLVM_PREBUILT_URL` are appended to it so
@@ -59,8 +62,6 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
   use Mix.Task
 
   @shortdoc "Installs a prebuilt LLVM/MLIR distribution"
-
-  @default_revision "20260815+8024076c7"
 
   @switches [
     install_dir: :string,
@@ -76,31 +77,47 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     github_env: :string,
     triton: :boolean,
     triton_ref: :string,
-    resolve_only: :boolean
+    resolve_only: :boolean,
+    print_metadata: :boolean
   ]
 
   @impl Mix.Task
   def run(args) do
     {opts, positional} = OptionParser.parse!(args, strict: @switches)
-    opts = opts |> reject_empty() |> merge_env()
 
-    install_dir = opts[:install_dir] || List.first(positional) || default_install_dir()
-    {os_name, arch} = platform(opts)
-    {asset_name, asset_url, sha256} = resolve_asset(opts, os_name, arch)
-
-    if opts[:resolve_only] do
-      IO.puts("LLVM_PREBUILT_ASSET_NAME=#{asset_name}")
-      IO.puts("LLVM_PREBUILT_URL=#{asset_url}")
+    if opts[:print_metadata] do
+      if positional != [], do: Mix.raise("--print-metadata does not accept positional arguments")
+      IO.puts(Beaver.ToolchainMetadata.encode!())
     else
-      install!(install_dir, asset_name, asset_url, sha256, opts[:github_env])
+      opts = opts |> reject_empty() |> merge_env()
+
+      install_dir = opts[:install_dir] || List.first(positional) || default_install_dir()
+      {os_name, arch} = platform(opts)
+      {asset_name, asset_url, sha256} = resolve_asset(opts, os_name, arch)
+
+      if opts[:resolve_only] do
+        unless opts[:triton] || opts[:asset_url] do
+          IO.puts("LLVM_EUDSL_ASSET_REVISION=#{opts[:asset_revision]}")
+        end
+
+        IO.puts("LLVM_PREBUILT_ASSET_NAME=#{asset_name}")
+        IO.puts("LLVM_PREBUILT_URL=#{asset_url}")
+        if sha256, do: IO.puts("LLVM_EUDSL_SHA256=#{sha256}")
+      else
+        install!(install_dir, asset_name, asset_url, sha256, opts[:github_env])
+      end
     end
   end
 
   defp merge_env(opts) do
     opts
-    |> put_default(:repo, "llvm/eudsl", "LLVM_EUDSL_REPO")
-    |> put_default(:tag, "llvm", "LLVM_EUDSL_TAG")
-    |> put_default(:asset_revision, @default_revision, "LLVM_EUDSL_ASSET_REVISION")
+    |> put_default(:repo, Beaver.ToolchainMetadata.llvm_repo!(), "LLVM_EUDSL_REPO")
+    |> put_default(:tag, Beaver.ToolchainMetadata.llvm_tag!(), "LLVM_EUDSL_TAG")
+    |> put_default(
+      :asset_revision,
+      Beaver.ToolchainMetadata.llvm_revision!(),
+      "LLVM_EUDSL_ASSET_REVISION"
+    )
     |> put_env(:install_dir, "LLVM_PREBUILT_DIR")
     |> put_env(:asset_name, "LLVM_EUDSL_ASSET_NAME")
     |> put_env(:asset_url, "LLVM_EUDSL_ASSET_URL")
