@@ -952,4 +952,28 @@ defmodule ExConversionTest do
     assert {:error, %MLIR.Conversion.Error{} = error} = Plan.run(Ex.plan(), module)
     assert Exception.message(error) =~ "even number"
   end
+
+  test "lowers abstract !ex.term types to scalar words", %{ctx: ctx} do
+    module =
+      term_module!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "ex.lit"() {value = 42 : i64} : () -> i64
+            %1 = "ex.box"(%0) : (i64) -> !ex.term
+            %2 = "ex.tuple"(%1) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> !ex.term
+            %3 = "ex.to_int"(%1) : (!ex.term) -> i64
+            "ex.return"(%3) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx
+      )
+
+    assert {:ok, _module, []} = Plan.run(Ex.plan(), module)
+
+    rendered = MLIR.to_string(module, generic: true)
+    assert rendered =~ "ex.term.tuple_from_list"
+  end
 end
