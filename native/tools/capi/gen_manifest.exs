@@ -68,6 +68,14 @@ defmodule Beaver.CAPI.ManifestGenerator do
       "lifetime" => "nif_call",
       "destructor" => "stack"
     },
+    "beaverMemoryEffectsOpInterfaceGetEffects" => %{
+      "wrapper_name" => "beaver_raw_memory_effects_query_async",
+      "runtime" => "native_collector",
+      "scheduler" => "context_worker",
+      "owner" => "caller",
+      "lifetime" => "async_operation",
+      "destructor" => "stack"
+    },
     "mlirValueReplaceUsesWithIf" => %{
       "wrapper_name" => "beaver_raw_value_replace_uses_with_if",
       "runtime" => "manual_async_callback",
@@ -143,7 +151,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
       name: "beaver_raw_conditionally_speculatable_attach_fallback_model",
       params: ["context", "operation_name", "callback", "timeout_ms"]
     },
-    "mlirMemoryEffectsOpInterfaceAttachFallbackModel" => %{
+    "beaverMemoryEffectsOpInterfaceAttachFallbackModel" => %{
       name: "beaver_raw_memory_effects_attach_fallback_model",
       params: ["context", "operation_name", "callback", "timeout_ms"]
     },

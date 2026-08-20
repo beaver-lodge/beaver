@@ -65,6 +65,66 @@ defmodule ExternalInterfaceTest do
     assert rendered =~ "external_interface_test.write"
   end
 
+  test "queries complete effects from native and dynamic operations", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, ExternalInterfaceSlang)
+
+    module =
+      MLIR.Module.create!(
+        ~S"""
+        module {
+          "external_interface_test.write"() : () -> ()
+          func.func @read(%buffer: memref<4xi32>, %index: index) -> i32 {
+            %value = memref.load %buffer[%index] : memref<4xi32>
+            return %value : i32
+          }
+        }
+        """,
+        ctx: ctx
+      )
+      |> MLIR.verify!()
+
+    operations =
+      module
+      |> MLIR.Operation.from_module()
+      |> Beaver.Walker.prewalk([], fn
+        %MLIR.Operation{} = operation, acc -> {operation, [operation | acc]}
+        element, acc -> {element, acc}
+      end)
+      |> elem(1)
+
+    write = Enum.find(operations, &(MLIR.Operation.name(&1) == "external_interface_test.write"))
+    load = Enum.find(operations, &(MLIR.Operation.name(&1) == "memref.load"))
+
+    assert [{:write, nil, write_opts}] = MLIR.MemoryEffects.get(write)
+    assert write_opts[:stage] == 0
+    refute write_opts[:effect_on_full_region]
+    assert %MLIR.Attribute{} = write_opts[:parameters]
+    assert MLIR.null?(write_opts[:parameters])
+    assert %MLIR.SideEffectResource{} = write_opts[:resource]
+
+    assert [{:read, {:operand, %MLIR.OpOperand{}}, load_opts}] =
+             MLIR.MemoryEffects.get(load)
+
+    assert load_opts[:stage] == 0
+    refute load_opts[:effect_on_full_region]
+    assert %MLIR.SideEffectResource{} = load_opts[:resource]
+  end
+
+  test "rejects querying an operation without MemoryEffectsOpInterface", %{ctx: ctx} do
+    MLIR.Context.allow_unregistered_dialects(ctx)
+    module = MLIR.Module.create!(~S[module { "test.unknown"() : () -> () }], ctx: ctx)
+
+    operation =
+      module
+      |> MLIR.Module.body()
+      |> Beaver.Walker.operations()
+      |> Enum.at(0)
+
+    assert_raise ArgumentError, ~r/does not implement MemoryEffectsOpInterface/, fn ->
+      MLIR.MemoryEffects.get(operation)
+    end
+  end
+
   test "speculatability callbacks are serviced by their attachment process", %{ctx: ctx} do
     Beaver.Slang.load(ctx, ExternalInterfaceSlang)
 

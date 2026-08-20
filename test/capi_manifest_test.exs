@@ -210,7 +210,7 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
                "mlirTypeConverterAddSourceMaterialization",
                "mlirTypeConverterAddTargetMaterialization",
                "mlirConditionallySpeculatableOpInterfaceAttachFallbackModel",
-               "mlirMemoryEffectsOpInterfaceAttachFallbackModel",
+               "beaverMemoryEffectsOpInterfaceAttachFallbackModel",
                "mlirPatternDescriptorOpInterfaceAttachFallbackModel",
                "mlirTransformOpInterfaceAttachFallbackModel",
                "mlirDynamicOpTraitCreate"
@@ -233,7 +233,8 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
                "beaver_raw_infer_return_type_components",
                "beaver_raw_transform_state_params",
                "beaver_raw_transform_state_payload_ops",
-               "beaver_raw_transform_state_payload_values"
+               "beaver_raw_transform_state_payload_values",
+               "beaver_raw_memory_effects_query_async"
              ])
 
     {llvm_entries, transform_collector_entries} =
@@ -244,6 +245,22 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
             "beaverTranslateModuleToLLVMIRText"
           ])
       )
+
+    {memory_effect_entries, transform_collector_entries} =
+      Enum.split_with(
+        transform_collector_entries,
+        &(get_in(&1, ["function", "name"]) == "beaverMemoryEffectsOpInterfaceGetEffects")
+      )
+
+    assert [memory_effect_entry] = memory_effect_entries
+
+    assert %{
+             "runtime_backed" => true,
+             "scheduler" => "context_worker",
+             "owner" => "caller",
+             "destructor" => "stack",
+             "lifetime" => "async_operation"
+           } = memory_effect_entry["callback_bridge"]
 
     for entry <- transform_collector_entries do
       bridge = Map.fetch!(entry, "callback_bridge")

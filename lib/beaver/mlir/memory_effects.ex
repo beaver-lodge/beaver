@@ -72,6 +72,36 @@ defmodule Beaver.MLIR.MemoryEffects do
   def callback!(other),
     do: raise(ArgumentError, "invalid memory effects implementation: #{inspect(other)}")
 
+  @doc """
+  Returns the memory effects declared by an operation.
+
+  The result uses the same declarative specifications accepted by callbacks.
+  Every entry includes `:parameters`, `:stage`, `:effect_on_full_region`, and
+  `:resource` so callers can inspect the complete native effect instance
+  without retaining its callback-scoped handle.
+  """
+  @spec get(MLIR.Operation.t(), keyword()) :: [effect_spec()]
+  def get(%MLIR.Operation{ref: operation_ref}, opts \\ []) do
+    timeout_ms = Keyword.get(opts, :timeout, 30_000)
+
+    unless is_integer(timeout_ms) and timeout_ms >= 0 do
+      raise ArgumentError, ":timeout must be a non-negative integer"
+    end
+
+    :ok = MLIR.CAPI.beaver_raw_memory_effects_query_async(operation_ref)
+
+    receive do
+      {:memory_effects_done, :error} ->
+        raise ArgumentError, "operation does not implement MemoryEffectsOpInterface"
+
+      {:memory_effects_done, instances} when is_list(instances) ->
+        Enum.map(instances, &decode_instance/1)
+    after
+      timeout_ms + 1_000 ->
+        raise "timed out querying MemoryEffectsOpInterface"
+    end
+  end
+
   @doc false
   @spec append(MLIR.MemoryEffectInstancesList.t(), MLIR.Operation.t(), [effect_spec()]) :: :ok
   def append(%MLIR.MemoryEffectInstancesList{} = effects, %MLIR.Operation{} = operation, specs)
@@ -82,30 +112,30 @@ defmodule Beaver.MLIR.MemoryEffects do
 
   @doc "Adds the standard transform-dialect effects for read-only handle operands."
   def only_reads_handle(effects, operands),
-    do: transform_handle_effect(:mlirTransformOnlyReadsHandle, effects, operands)
+    do: transform_handle_effect(:beaverTransformOnlyReadsHandle, effects, operands)
 
   @doc "Adds the standard transform-dialect effects for consumed handle operands."
   def consumes_handle(effects, operands),
-    do: transform_handle_effect(:mlirTransformConsumesHandle, effects, operands)
+    do: transform_handle_effect(:beaverTransformConsumesHandle, effects, operands)
 
   @doc "Adds the standard transform-dialect effects for produced handle results."
   def produces_handle(%MLIR.MemoryEffectInstancesList{} = effects, results) do
     results = List.wrap(results)
     validate_kind_list!(results, MLIR.Value, "transform results")
     array = Beaver.Native.array(results, MLIR.Value, mut: true)
-    MLIR.CAPI.mlirTransformProducesHandle(array, length(results), effects)
+    MLIR.CAPI.beaverTransformProducesHandle(array, length(results), effects)
     :ok
   end
 
   @doc "Marks a transform operation as potentially modifying payload IR."
   def modifies_payload(%MLIR.MemoryEffectInstancesList{} = effects) do
-    MLIR.CAPI.mlirTransformModifiesPayload(effects)
+    MLIR.CAPI.beaverTransformModifiesPayload(effects)
     :ok
   end
 
   @doc "Marks a transform operation as only reading payload IR."
   def only_reads_payload(%MLIR.MemoryEffectInstancesList{} = effects) do
-    MLIR.CAPI.mlirTransformOnlyReadsPayload(effects)
+    MLIR.CAPI.beaverTransformOnlyReadsPayload(effects)
     :ok
   end
 
@@ -159,7 +189,7 @@ defmodule Beaver.MLIR.MemoryEffects do
       )
 
     try do
-      MLIR.CAPI.mlirMemoryEffectInstancesListAppend(effects, instance)
+      MLIR.CAPI.beaverMemoryEffectInstancesListAppend(effects, instance)
     after
       MLIR.CAPI.mlirMemoryEffectInstanceDestroy(instance)
     end
@@ -173,6 +203,34 @@ defmodule Beaver.MLIR.MemoryEffects do
   defp effect_handle(:free), do: MLIR.CAPI.mlirMemoryEffectsFreeGet()
   defp effect_handle(:read), do: MLIR.CAPI.mlirMemoryEffectsReadGet()
   defp effect_handle(:write), do: MLIR.CAPI.mlirMemoryEffectsWriteGet()
+
+  defp decode_instance({kind, target_kind, target, parameters, stage, full_region, resource}) do
+    {
+      decode_effect(kind),
+      decode_target(target_kind, Beaver.Native.normalize(target)),
+      parameters: Beaver.Native.normalize(parameters),
+      stage: stage,
+      effect_on_full_region: full_region,
+      resource: Beaver.Native.normalize(resource)
+    }
+  end
+
+  defp decode_effect(0), do: :allocate
+  defp decode_effect(1), do: :free
+  defp decode_effect(2), do: :read
+  defp decode_effect(3), do: :write
+
+  defp decode_effect(other),
+    do: raise(ArgumentError, "unsupported native memory effect kind: #{inspect(other)}")
+
+  defp decode_target(:none, nil), do: nil
+  defp decode_target(:operand, %MLIR.OpOperand{} = operand), do: {:operand, operand}
+
+  defp decode_target(:value, %MLIR.Value{} = value) do
+    if MLIR.Value.result?(value), do: {:result, value}, else: {:block_argument, value}
+  end
+
+  defp decode_target(:symbol, %MLIR.Attribute{} = symbol), do: {:symbol, symbol}
 
   defp normalize_target(_operation, target) when target in [nil, :operation], do: nil
 
