@@ -12,10 +12,10 @@ exclude =
   end
 
 exclude =
-  if String.starts_with?(System.get_env("LLVM_PREBUILT_ASSET_NAME", ""), "llvm-") do
-    exclude ++ [:packed_transform_params]
-  else
+  if Beaver.MLIR.Transform.packed_params_supported?() do
     exclude
+  else
+    exclude ++ [:packed_transform_params]
   end
 
 ExUnit.configure(exclude: exclude)

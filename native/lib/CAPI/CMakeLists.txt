@@ -17,6 +17,14 @@ check_cxx_source_compiles(
      return 0;
    }"
   BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE)
+check_cxx_source_compiles(
+  "#include <mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h>
+   int main() {
+     auto getter = &mlir::transform::TileUsingForOp::getPackedInterchange;
+     (void)getter;
+     return 0;
+   }"
+  BEAVER_HAS_PACKED_TRANSFORM_PARAMS)
 set(CMAKE_REQUIRED_INCLUDES "${_beaver_saved_required_includes}")
 set(CMAKE_TRY_COMPILE_TARGET_TYPE "${_beaver_saved_try_compile_target_type}")
 
@@ -44,6 +52,14 @@ if(BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE)
     target_compile_definitions(${_target}
       PUBLIC
       BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE=1)
+  endforeach()
+endif()
+
+if(BEAVER_HAS_PACKED_TRANSFORM_PARAMS)
+  foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
+    target_compile_definitions(${_target}
+      PUBLIC
+      BEAVER_HAS_PACKED_TRANSFORM_PARAMS=1)
   endforeach()
 endif()
 

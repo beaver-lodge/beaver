@@ -277,6 +277,7 @@ defmodule Beaver.MLIR.Transform.Schedule.DSLTest do
 
   @tag :packed_transform_params
   test "packed parameters drive runtime-sized tile sizes and interchange", %{ctx: ctx} do
+    assert MLIR.Transform.packed_params_supported?()
     schedule = own(PackedTileSchedule.packed_tiling(ctx: ctx))
     text = MLIR.to_string(schedule)
 

@@ -90,6 +90,13 @@ defmodule Beaver.MLIR.Transform do
           | {:expensive_checks, boolean()}
           | {:enforce_single_top_level_transform_op, boolean()}
 
+  @doc "Whether the linked LLVM supports packed tile-size and interchange parameters."
+  @spec packed_params_supported?() :: boolean()
+  def packed_params_supported? do
+    MLIR.CAPI.beaverTransformPackedParamsSupported()
+    |> Beaver.Native.to_term()
+  end
+
   @doc """
   Applies a named Transform dialect sequence to a payload operation or module.
 

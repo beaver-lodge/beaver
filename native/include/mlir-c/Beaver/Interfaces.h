@@ -87,6 +87,9 @@ MLIR_CAPI_EXPORTED void beaverTransformModifiesPayload(
 MLIR_CAPI_EXPORTED void beaverTransformOnlyReadsPayload(
     MlirBeaverMemoryEffectInstancesList effects);
 
+/// Whether TileUsingForOp accepts packed tile-size and interchange handles.
+MLIR_CAPI_EXPORTED bool beaverTransformPackedParamsSupported(void);
+
 #ifdef __cplusplus
 }
 #endif
