@@ -120,6 +120,38 @@ defmodule Beaver.MLIR.Transform.Schedule.DSLTest do
     end
   end
 
+  defmodule RecentTransformSchedule do
+    use DSL
+
+    defschedule globalize_and_unroll do
+      sequence "__transform_main", [root >>> any_op()] do
+        allocs =
+          Transform.structured_match(
+            target: root,
+            ops:
+              MLIR.Attribute.array(
+                [MLIR.Attribute.string("memref.alloc")],
+                ctx: Beaver.Env.context()
+              )
+          ) >>> operation("memref.alloc")
+
+        [_get_globals, _globals] = alloc_to_global(allocs)
+
+        loops =
+          Transform.structured_match(
+            target: root,
+            ops:
+              MLIR.Attribute.array(
+                [MLIR.Attribute.string("scf.for")],
+                ctx: Beaver.Env.context()
+              )
+          ) >>> operation("scf.for")
+
+        loop_unroll_full(loops)
+      end
+    end
+  end
+
   defmodule ScalarSchedule do
     use DSL
 
@@ -291,6 +323,45 @@ defmodule Beaver.MLIR.Transform.Schedule.DSLTest do
 
     assert {:ok, result} = MLIR.Transform.execute(payload, resolved)
     assert result.payload |> MLIR.to_string() |> String.split("scf.for") |> length() == 3
+  end
+
+  @tag :recent_transform_helpers
+  test "alloc_to_global and loop_unroll_full execute against upstream Transform IR", %{ctx: ctx} do
+    assert DSL.alloc_to_global_supported?()
+    assert DSL.loop_unroll_full_supported?()
+
+    schedule = own(RecentTransformSchedule.globalize_and_unroll(ctx: ctx))
+
+    payload =
+      own(
+        MLIR.Module.create!(
+          ~S"""
+          module {
+            func.func @run() {
+              %c0 = arith.constant 0 : index
+              %c1 = arith.constant 1 : index
+              %c4 = arith.constant 4 : index
+              %value = arith.constant 4 : i32
+              %buffer = memref.alloc() : memref<4xi32>
+              scf.for %i = %c0 to %c4 step %c1 {
+                memref.store %value, %buffer[%i] : memref<4xi32>
+              }
+              memref.dealloc %buffer : memref<4xi32>
+              return
+            }
+          }
+          """,
+          ctx: ctx
+        )
+      )
+
+    assert {:ok, result} = MLIR.Transform.execute(payload, schedule)
+    text = MLIR.to_string(result.payload)
+    assert text =~ "memref.global"
+    assert text =~ "memref.get_global"
+    refute text =~ "memref.alloc"
+    refute text =~ "memref.dealloc"
+    refute text =~ "scf.for"
   end
 
   test "generated IR is deterministic and round-trips through text and bytecode", %{ctx: ctx} do

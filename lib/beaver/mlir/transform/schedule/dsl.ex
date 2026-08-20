@@ -472,6 +472,94 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
     raise ArgumentError, "pack_params expects a non-empty list of MLIR values"
   end
 
+  @doc "Whether the linked LLVM provides `transform.memref.alloc_to_global`."
+  def alloc_to_global_supported? do
+    Code.ensure_loaded?(MLIR.Dialect.Transform) and
+      function_exported?(MLIR.Dialect.Transform, :memref_alloc_to_global, 1)
+  end
+
+  @doc """
+  Replaces the matched `memref.alloc` operations with globals.
+
+  Returns handles for the inserted `memref.get_global` and `memref.global`
+  operations, in that order.
+  """
+  defmacro alloc_to_global(target) do
+    caller = Macro.escape(__CALLER__)
+
+    quote do
+      DSL.__alloc_to_global__(
+        Beaver.Env.context(),
+        Beaver.Env.ip(),
+        unquote(target),
+        unquote(caller)
+      )
+    end
+  end
+
+  @doc false
+  def __alloc_to_global__(context, insertion_point, target, caller) do
+    ensure_transform_helper_supported!(
+      alloc_to_global_supported?(),
+      "transform.memref.alloc_to_global"
+    )
+
+    ensure_transform_handle!(target, context, "alloc_to_global target")
+
+    operation =
+      %Beaver.SSA{
+        op: "transform.memref.alloc_to_global",
+        arguments: [alloc: target],
+        results: [any_op(ctx: context), any_op(ctx: context)],
+        ctx: context,
+        ip: insertion_point,
+        loc: source_location(caller, context)
+      }
+      |> MLIR.Operation.create()
+
+    operation |> MLIR.Operation.results() |> Enum.to_list()
+  end
+
+  @doc "Whether the linked LLVM provides `transform.loop.unroll_full`."
+  def loop_unroll_full_supported? do
+    Code.ensure_loaded?(MLIR.Dialect.Transform) and
+      function_exported?(MLIR.Dialect.Transform, :loop_unroll_full, 1)
+  end
+
+  @doc "Fully unrolls every `scf.for` or `affine.for` associated with `target`."
+  defmacro loop_unroll_full(target) do
+    caller = Macro.escape(__CALLER__)
+
+    quote do
+      DSL.__loop_unroll_full__(
+        Beaver.Env.context(),
+        Beaver.Env.ip(),
+        unquote(target),
+        unquote(caller)
+      )
+    end
+  end
+
+  @doc false
+  def __loop_unroll_full__(context, insertion_point, target, caller) do
+    ensure_transform_helper_supported!(
+      loop_unroll_full_supported?(),
+      "transform.loop.unroll_full"
+    )
+
+    ensure_transform_handle!(target, context, "loop_unroll_full target")
+
+    %Beaver.SSA{
+      op: "transform.loop.unroll_full",
+      arguments: [target: target],
+      results: [],
+      ctx: context,
+      ip: insertion_point,
+      loc: source_location(caller, context)
+    }
+    |> MLIR.Operation.create()
+  end
+
   @doc """
   Creates `transform.tune.alternatives` from explicit `branch` blocks.
 
@@ -676,6 +764,26 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
     unless MLIR.equal?(MLIR.context(entity), context) do
       raise ArgumentError, "#{label} belongs to a different MLIR context"
     end
+  end
+
+  defp ensure_transform_handle!(%MLIR.Value{} = value, context, label) do
+    ensure_same_context!(value, context, label)
+
+    unless value |> MLIR.Value.type() |> MLIR.to_string() |> String.starts_with?("!transform.") do
+      raise ArgumentError, "#{label} must be a Transform handle"
+    end
+
+    value
+  end
+
+  defp ensure_transform_handle!(value, _context, label) do
+    raise ArgumentError, "#{label} must be an MLIR value, got: #{inspect(value)}"
+  end
+
+  defp ensure_transform_helper_supported!(true, _operation), do: :ok
+
+  defp ensure_transform_helper_supported!(false, operation) do
+    raise ArgumentError, "linked LLVM does not support #{operation}"
   end
 
   defp validate_helper_options!(opts, supported, helper) do
