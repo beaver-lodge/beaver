@@ -22,7 +22,6 @@ defmodule Beaver.MLIR.Dialect.Ex do
   use Beaver.Slang, name: "ex"
 
   deftype term()
-  deftype dyn()
   deftype bound()
   deftype unbound()
 
@@ -49,7 +48,7 @@ defmodule Beaver.MLIR.Dialect.Ex do
   end
 
   defconstraint term_like do
-    any_of([base(term()), base(dyn()), base(bound()), base(unbound())])
+    any_of([base(term()), base(bound()), base(unbound())])
   end
 
   defop lit(),

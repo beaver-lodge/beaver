@@ -15,7 +15,7 @@ defmodule ExDialectTest do
       %1 = "ex.var"() {name = "x"} : () -> !ex.unbound
       %2 = "ex.bind"(%1, %0) : (!ex.unbound, i64) -> !ex.bound
       %3 = "ex.add"(%0, %0) : (i64, i64) -> i64
-      %4 = "ex.call"(%0, %0) {callee = "add", arity = 2 : i64, operandSegmentSizes = array<i32: 1, 1, 0, 0, 0, 0, 0, 0>} : (i64, i64) -> !ex.dyn
+      %4 = "ex.call"(%0, %0) {callee = "add", arity = 2 : i64, operandSegmentSizes = array<i32: 1, 1, 0, 0, 0, 0, 0, 0>} : (i64, i64) -> !ex.term
       "ex.return"(%3) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
     }) {sym_name = "main"} : () -> ()
   }
@@ -64,16 +64,16 @@ defmodule ExDialectTest do
     ^bb0:
       %0 = "ex.lit"() {value = 1 : i64} : () -> i64
       %1 = "ex.lit"() {value = 2 : i64} : () -> i64
-      %2 = "ex.box"(%0) : (i64) -> !ex.dyn
-      %3 = "ex.box"(%1) : (i64) -> !ex.dyn
-      %4 = "ex.tuple"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
-      %5 = "ex.list"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
-      %6 = "ex.map"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
-      %7 = "ex.binary"(%2) {operandSegmentSizes = array<i32: 1>} : (!ex.dyn) -> !ex.dyn
-      %8 = "ex.is_tuple"(%4) : (!ex.dyn) -> i64
-      %9 = "ex.is_list"(%5) : (!ex.dyn) -> i64
-      %10 = "ex.is_map"(%6) : (!ex.dyn) -> i64
-      %11 = "ex.is_binary"(%7) : (!ex.dyn) -> i64
+      %2 = "ex.box"(%0) : (i64) -> !ex.term
+      %3 = "ex.box"(%1) : (i64) -> !ex.term
+      %4 = "ex.tuple"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
+      %5 = "ex.list"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
+      %6 = "ex.map"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
+      %7 = "ex.binary"(%2) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> !ex.term
+      %8 = "ex.is_tuple"(%4) : (!ex.term) -> i64
+      %9 = "ex.is_list"(%5) : (!ex.term) -> i64
+      %10 = "ex.is_map"(%6) : (!ex.term) -> i64
+      %11 = "ex.is_binary"(%7) : (!ex.term) -> i64
       %12 = "ex.is_integer"(%0) : (i64) -> i64
       %13 = "ex.is_atom"(%0) : (i64) -> i64
       "ex.return"(%8) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
@@ -92,7 +92,7 @@ defmodule ExDialectTest do
     assert rendered =~ ~s{base_name = "#builtin.string"}
     assert rendered =~ ~s{base_ref = @ex::@unbound}
     assert rendered =~ ~s{base_ref = @ex::@bound}
-    assert rendered =~ ~s{base_ref = @ex::@dyn}
+    assert rendered =~ ~s{base_ref = @ex::@term}
     assert rendered =~ ~s{"irdl.attributes"}
     assert rendered =~ ~s{attributeValueNames = ["value"]}
     assert rendered =~ ~s{attributeValueNames = ["name"]}
@@ -292,27 +292,27 @@ defmodule ExDialectTest do
 
                 one_boxed =
                   Ex.box(value: one) >>>
-                    Ex.dyn()
+                    Ex.term()
 
                 two_boxed =
                   Ex.box(value: two) >>>
-                    Ex.dyn()
+                    Ex.term()
 
                 tuple =
                   Ex.tuple(elements: [one_boxed, two_boxed], operandSegmentSizes: :infer) >>>
-                    Ex.dyn()
+                    Ex.term()
 
                 list =
                   Ex.list(elements: [one_boxed, two_boxed], operandSegmentSizes: :infer) >>>
-                    Ex.dyn()
+                    Ex.term()
 
                 map =
                   Ex.map(entries: [one_boxed, two_boxed], operandSegmentSizes: :infer) >>>
-                    Ex.dyn()
+                    Ex.term()
 
                 bin =
                   Ex.binary(segments: [one_boxed], operandSegmentSizes: :infer) >>>
-                    Ex.dyn()
+                    Ex.term()
 
                 _is_tuple =
                   Ex.is_tuple(value: tuple) >>>

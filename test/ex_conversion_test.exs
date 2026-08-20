@@ -20,7 +20,7 @@ defmodule ExConversionTest do
       %0 = "ex.lit"() {value = 1 : i64} : () -> i64
       %1 = "ex.lit"() {value = 2 : i64} : () -> i64
       %2 = "ex.add"(%0, %1) : (i64, i64) -> i64
-      %3 = "ex.call"(%0, %1) {callee = "add", arity = 2 : i64, operandSegmentSizes = array<i32: 1, 1, 0, 0, 0, 0, 0, 0>} : (i64, i64) -> !ex.dyn
+      %3 = "ex.call"(%0, %1) {callee = "add", arity = 2 : i64, operandSegmentSizes = array<i32: 1, 1, 0, 0, 0, 0, 0, 0>} : (i64, i64) -> !ex.term
       "ex.return"(%2) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
     }) {sym_name = "main"} : () -> ()
   }
@@ -206,8 +206,8 @@ defmodule ExConversionTest do
           "ex.func"() ({
           ^bb0:
             %0 = "ex.lit"() {value = 1 : i64} : () -> i64
-            %1 = "ex.call"(%0, %0) {callee = "add", arity = 2 : i64, operandSegmentSizes = array<i32: 1, 1, 0, 0, 0, 0, 0, 0>} : (i64, i64) -> !ex.dyn
-            "ex.return"(%1) {operandSegmentSizes = array<i32: 1>} : (!ex.dyn) -> ()
+            %1 = "ex.call"(%0, %0) {callee = "add", arity = 2 : i64, operandSegmentSizes = array<i32: 1, 1, 0, 0, 0, 0, 0, 0>} : (i64, i64) -> !ex.term
+            "ex.return"(%1) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> ()
           }) {sym_name = "main"} : () -> ()
         }
         """,
@@ -335,7 +335,7 @@ defmodule ExConversionTest do
 
     rendered = MLIR.to_string(module, generic: true)
     assert rendered =~ "func.call"
-    refute rendered =~ "!ex.dyn"
+    refute rendered =~ "!ex.term"
   end
 
   test "allows heterogeneous-typed ex.call arguments", %{ctx: ctx} do
@@ -346,8 +346,8 @@ defmodule ExConversionTest do
           "ex.func"() ({
           ^bb0:
             %0 = "ex.lit"() {value = 1 : i64} : () -> i64
-            %1 = "ex.box"(%0) : (i64) -> !ex.dyn
-            %2 = "ex.call"(%1, %0) {callee = "f", arity = 2 : i64, operandSegmentSizes = array<i32: 1, 1, 0, 0, 0, 0, 0, 0>} : (!ex.dyn, i64) -> i64
+            %1 = "ex.box"(%0) : (i64) -> !ex.term
+            %2 = "ex.call"(%1, %0) {callee = "f", arity = 2 : i64, operandSegmentSizes = array<i32: 1, 1, 0, 0, 0, 0, 0, 0>} : (!ex.term, i64) -> i64
             "ex.return"(%2) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
@@ -366,8 +366,8 @@ defmodule ExConversionTest do
         module {
           "ex.func"() ({
           ^bb0(%arg0: i64):
-            %0 = "ex.to_word"(%arg0) : (i64) -> !ex.dyn
-            %1 = "ex.is_binary"(%0) : (!ex.dyn) -> i64
+            %0 = "ex.to_word"(%arg0) : (i64) -> !ex.term
+            %1 = "ex.is_binary"(%0) : (!ex.term) -> i64
             "ex.return"(%1) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
@@ -530,10 +530,10 @@ defmodule ExConversionTest do
           ^bb0:
             %0 = "ex.lit"() {value = 1 : i64} : () -> i64
             %1 = "ex.lit"() {value = 2 : i64} : () -> i64
-            %2 = "ex.box"(%0) : (i64) -> !ex.dyn
-            %3 = "ex.box"(%1) : (i64) -> !ex.dyn
-            %4 = "ex.tuple"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
-            %5 = "ex.is_tuple"(%4) : (!ex.dyn) -> i64
+            %2 = "ex.box"(%0) : (i64) -> !ex.term
+            %3 = "ex.box"(%1) : (i64) -> !ex.term
+            %4 = "ex.tuple"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
+            %5 = "ex.is_tuple"(%4) : (!ex.term) -> i64
             "ex.return"(%5) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
@@ -559,9 +559,9 @@ defmodule ExConversionTest do
           "ex.func"() ({
           ^bb0:
             %0 = "ex.lit"() {value = 7 : i64} : () -> i64
-            %1 = "ex.box"(%0) : (i64) -> !ex.dyn
-            %2 = "ex.raise"(%1, %0) : (!ex.dyn, i64) -> !ex.dyn
-            "ex.return"(%2) {operandSegmentSizes = array<i32: 1>} : (!ex.dyn) -> ()
+            %1 = "ex.box"(%0) : (i64) -> !ex.term
+            %2 = "ex.raise"(%1, %0) : (!ex.term, i64) -> !ex.term
+            "ex.return"(%2) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> ()
           }) {sym_name = "main"} : () -> ()
         }
         """,
@@ -584,18 +584,18 @@ defmodule ExConversionTest do
           ^bb0:
             %0 = "ex.lit"() {value = 1 : i64} : () -> i64
             %1 = "ex.lit"() {value = 2 : i64} : () -> i64
-            %2 = "ex.box"(%0) : (i64) -> !ex.dyn
-            %3 = "ex.box"(%1) : (i64) -> !ex.dyn
-            %4 = "ex.list"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
-            %5 = "ex.map"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
-            %6 = "ex.map_put"(%5, %2, %3) : (!ex.dyn, !ex.dyn, !ex.dyn) -> !ex.dyn
-            %13 = "ex.map_fetch"(%6, %2) : (!ex.dyn, !ex.dyn) -> !ex.dyn
-            %7 = "ex.binary"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
-            %8 = "ex.binary_from_list"(%4) : (!ex.dyn) -> !ex.dyn
-            %12 = "ex.iodata_to_binary"(%4) : (!ex.dyn) -> !ex.dyn
-            %9 = "ex.float_lit"(%0) : (i64) -> !ex.dyn
-            %10 = "ex.string_to_float"(%7) : (!ex.dyn) -> !ex.dyn
-            %11 = "ex.is_list"(%4) : (!ex.dyn) -> i64
+            %2 = "ex.box"(%0) : (i64) -> !ex.term
+            %3 = "ex.box"(%1) : (i64) -> !ex.term
+            %4 = "ex.list"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
+            %5 = "ex.map"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
+            %6 = "ex.map_put"(%5, %2, %3) : (!ex.term, !ex.term, !ex.term) -> !ex.term
+            %13 = "ex.map_fetch"(%6, %2) : (!ex.term, !ex.term) -> !ex.term
+            %7 = "ex.binary"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
+            %8 = "ex.binary_from_list"(%4) : (!ex.term) -> !ex.term
+            %12 = "ex.iodata_to_binary"(%4) : (!ex.term) -> !ex.term
+            %9 = "ex.float_lit"(%0) : (i64) -> !ex.term
+            %10 = "ex.string_to_float"(%7) : (!ex.term) -> !ex.term
+            %11 = "ex.is_list"(%4) : (!ex.term) -> i64
             "ex.return"(%11) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
@@ -626,20 +626,20 @@ defmodule ExConversionTest do
           ^bb0:
             %0 = "ex.lit"() {value = 1 : i64} : () -> i64
             %1 = "ex.lit"() {value = 2 : i64} : () -> i64
-            %2 = "ex.box"(%0) : (i64) -> !ex.dyn
-            %3 = "ex.box"(%1) : (i64) -> !ex.dyn
-            %4 = "ex.tuple"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
-            %5 = "ex.list"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
-            %6 = "ex.tuple_length"(%4) : (!ex.dyn) -> i64
-            %7 = "ex.tuple_get"(%4, %0) : (!ex.dyn, i64) -> !ex.dyn
-            %8 = "ex.list_length"(%5) : (!ex.dyn) -> i64
-            %9 = "ex.list_head"(%5) : (!ex.dyn) -> !ex.dyn
-            %10 = "ex.list_tail"(%5) : (!ex.dyn) -> !ex.dyn
-            %11 = "ex.term_eq"(%7, %2) : (!ex.dyn, !ex.dyn) -> i64
-            %12 = "ex.term_eq_loose"(%7, %2) : (!ex.dyn, !ex.dyn) -> i64
-            %13 = "ex.string_printable"(%2) : (!ex.dyn) -> i64
-            %14 = "ex.binary_quote"(%2) : (!ex.dyn) -> !ex.dyn
-            %15 = "ex.int_to_hex"(%2) : (!ex.dyn) -> !ex.dyn
+            %2 = "ex.box"(%0) : (i64) -> !ex.term
+            %3 = "ex.box"(%1) : (i64) -> !ex.term
+            %4 = "ex.tuple"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
+            %5 = "ex.list"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
+            %6 = "ex.tuple_length"(%4) : (!ex.term) -> i64
+            %7 = "ex.tuple_get"(%4, %0) : (!ex.term, i64) -> !ex.term
+            %8 = "ex.list_length"(%5) : (!ex.term) -> i64
+            %9 = "ex.list_head"(%5) : (!ex.term) -> !ex.term
+            %10 = "ex.list_tail"(%5) : (!ex.term) -> !ex.term
+            %11 = "ex.term_eq"(%7, %2) : (!ex.term, !ex.term) -> i64
+            %12 = "ex.term_eq_loose"(%7, %2) : (!ex.term, !ex.term) -> i64
+            %13 = "ex.string_printable"(%2) : (!ex.term) -> i64
+            %14 = "ex.binary_quote"(%2) : (!ex.term) -> !ex.term
+            %15 = "ex.int_to_hex"(%2) : (!ex.term) -> !ex.term
             "ex.return"(%13) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
@@ -675,12 +675,12 @@ defmodule ExConversionTest do
           ^bb0:
             %0 = "ex.lit"() {value = 1 : i64} : () -> i64
             %1 = "ex.lit"() {value = 2 : i64} : () -> i64
-            %2 = "ex.box"(%0) : (i64) -> !ex.dyn
-            %3 = "ex.box"(%1) : (i64) -> !ex.dyn
-            %4 = "ex.binary"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
-            %5 = "ex.binary_length"(%4) : (!ex.dyn) -> i64
-            %6 = "ex.binary_get"(%4, %0) : (!ex.dyn, i64) -> !ex.dyn
-            %7 = "ex.binary_slice"(%4, %1) : (!ex.dyn, i64) -> !ex.dyn
+            %2 = "ex.box"(%0) : (i64) -> !ex.term
+            %3 = "ex.box"(%1) : (i64) -> !ex.term
+            %4 = "ex.binary"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
+            %5 = "ex.binary_length"(%4) : (!ex.term) -> i64
+            %6 = "ex.binary_get"(%4, %0) : (!ex.term, i64) -> !ex.term
+            %7 = "ex.binary_slice"(%4, %1) : (!ex.term, i64) -> !ex.term
             "ex.return"(%5) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
@@ -706,11 +706,11 @@ defmodule ExConversionTest do
             %0 = "ex.lit"() {value = 0 : i64} : () -> i64
             %1 = "ex.lit"() {value = 195 : i64} : () -> i64
             %2 = "ex.lit"() {value = 169 : i64} : () -> i64
-            %3 = "ex.box"(%1) : (i64) -> !ex.dyn
-            %4 = "ex.box"(%2) : (i64) -> !ex.dyn
-            %5 = "ex.binary"(%3, %4) {operandSegmentSizes = array<i32: 2>} : (!ex.dyn, !ex.dyn) -> !ex.dyn
-            %6 = "ex.binary_utf8_width"(%5, %0) : (!ex.dyn, i64) -> i64
-            %7 = "ex.binary_utf8_get"(%5, %0) : (!ex.dyn, i64) -> !ex.dyn
+            %3 = "ex.box"(%1) : (i64) -> !ex.term
+            %4 = "ex.box"(%2) : (i64) -> !ex.term
+            %5 = "ex.binary"(%3, %4) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
+            %6 = "ex.binary_utf8_width"(%5, %0) : (!ex.term, i64) -> i64
+            %7 = "ex.binary_utf8_get"(%5, %0) : (!ex.term, i64) -> !ex.term
             "ex.return"(%6) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
@@ -735,8 +735,8 @@ defmodule ExConversionTest do
             %0 = "ex.lit"() {value = 0 : i64} : () -> i64
             %1 = "ex.lit"() {value = 1 : i64} : () -> i64
             %2 = "ex.lit"() {value = 2 : i64} : () -> i64
-            %3 = "ex.box"(%0) : (i64) -> !ex.dyn
-            %4 = "ex.spawn"(%3) : (!ex.dyn) -> !ex.dyn
+            %3 = "ex.box"(%0) : (i64) -> !ex.term
+            %4 = "ex.spawn"(%3) : (!ex.term) -> !ex.term
             %5 = "ex.runtime_create"() : () -> i64
             %6 = "ex.runtime_enter"(%5) : (i64) -> i64
             %runtime_leave = "ex.runtime_leave"() : () -> i64
@@ -767,9 +767,9 @@ defmodule ExConversionTest do
             %15 = "ex.cont_load_cursor"() : () -> i64
             %16 = "ex.schedule_next"() : () -> i64
             %17 = "ex.mailbox_len"() : () -> i64
-            %18 = "ex.mailbox_peek"(%0) : (i64) -> !ex.dyn
+            %18 = "ex.mailbox_peek"(%0) : (i64) -> !ex.term
             %19 = "ex.mailbox_remove"(%0) : (i64) -> i64
-            %20 = "ex.nil_word"() : () -> !ex.dyn
+            %20 = "ex.nil_word"() : () -> !ex.term
             %21 = "ex.monotonic_time"() : () -> i64
             %22 = "ex.receive_start"() : () -> i64
             %23 = "ex.receive_start_set"(%0) : (i64) -> i64
@@ -778,7 +778,7 @@ defmodule ExConversionTest do
             %26 = "ex.current_entry"() : () -> i64
             %27 = "ex.process_done"(%0) : (i64) -> i64
             %28 = "ex.processes_runnable"() : () -> i64
-            %29 = "ex.process_result"(%4) : (!ex.dyn) -> i64
+            %29 = "ex.process_result"(%4) : (!ex.term) -> i64
             %30 = "ex.func_addr"() {sym_name = "actor_step"} : () -> ((i64) -> i64)
             %31 = "ex.worker_run"(%1, %30) : (i64, (i64) -> i64) -> i64
             %32 = "ex.process_wait"(%0) : (i64) -> i64
@@ -851,15 +851,15 @@ defmodule ExConversionTest do
           "ex.func"() ({
           ^bb0:
             %0 = "ex.lit"() {value = 0 : i64} : () -> i64
-            %1 = "ex.box"(%0) : (i64) -> !ex.dyn
-            %2 = "ex.process_exit"(%1) : (!ex.dyn) -> !ex.dyn
-            %3 = "ex.process_exit_reason"(%1) : (!ex.dyn) -> !ex.dyn
+            %1 = "ex.box"(%0) : (i64) -> !ex.term
+            %2 = "ex.process_exit"(%1) : (!ex.term) -> !ex.term
+            %3 = "ex.process_exit_reason"(%1) : (!ex.term) -> !ex.term
             %4 = "ex.process_trap_exit"(%0) : (i64) -> i64
-            %5 = "ex.link"(%1, %1, %1) : (!ex.dyn, !ex.dyn, !ex.dyn) -> !ex.dyn
-            %6 = "ex.unlink"(%1) : (!ex.dyn) -> i64
-            %7 = "ex.exit"(%1, %1, %1, %1) : (!ex.dyn, !ex.dyn, !ex.dyn, !ex.dyn) -> !ex.dyn
-            %8 = "ex.monitor"(%1, %1, %1, %1) : (!ex.dyn, !ex.dyn, !ex.dyn, !ex.dyn) -> !ex.dyn
-            %9 = "ex.demonitor"(%8) : (!ex.dyn) -> i64
+            %5 = "ex.link"(%1, %1, %1) : (!ex.term, !ex.term, !ex.term) -> !ex.term
+            %6 = "ex.unlink"(%1) : (!ex.term) -> i64
+            %7 = "ex.exit"(%1, %1, %1, %1) : (!ex.term, !ex.term, !ex.term, !ex.term) -> !ex.term
+            %8 = "ex.monitor"(%1, %1, %1, %1) : (!ex.term, !ex.term, !ex.term, !ex.term) -> !ex.term
+            %9 = "ex.demonitor"(%8) : (!ex.term) -> i64
             "ex.return"(%9) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
@@ -886,10 +886,10 @@ defmodule ExConversionTest do
           "ex.func"() ({
           ^bb0:
             %0 = "ex.lit"() {value = 1 : i64} : () -> i64
-            %1 = "ex.box"(%0) : (i64) -> !ex.dyn
-            %2 = "ex.tuple"(%1) {operandSegmentSizes = array<i32: 1>} : (!ex.dyn) -> !ex.dyn
-            %3 = "ex.tuple"(%2) {operandSegmentSizes = array<i32: 1>} : (!ex.dyn) -> !ex.dyn
-            %4 = "ex.is_tuple"(%3) : (!ex.dyn) -> i64
+            %1 = "ex.box"(%0) : (i64) -> !ex.term
+            %2 = "ex.tuple"(%1) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> !ex.term
+            %3 = "ex.tuple"(%2) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> !ex.term
+            %4 = "ex.is_tuple"(%3) : (!ex.term) -> i64
             "ex.return"(%4) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
@@ -912,9 +912,9 @@ defmodule ExConversionTest do
           "ex.func"() ({
           ^bb0:
             %0 = "ex.lit"() {value = 7 : i64} : () -> i64
-            %1 = "ex.make_fun"(%0) {fn_idx = 1 : i64, env_len = 1 : i64, operandSegmentSizes = array<i32: 1, 0, 0, 0>} : (i64) -> !ex.dyn
-            %2 = "ex.make_fun_with_arity"(%0) {fn_idx = 2 : i64, arity = 1 : i64, env_len = 1 : i64, operandSegmentSizes = array<i32: 1, 0, 0, 0>} : (i64) -> !ex.dyn
-            %3 = "ex.fun_arity"(%2) : (!ex.dyn) -> i64
+            %1 = "ex.make_fun"(%0) {fn_idx = 1 : i64, env_len = 1 : i64, operandSegmentSizes = array<i32: 1, 0, 0, 0>} : (i64) -> !ex.term
+            %2 = "ex.make_fun_with_arity"(%0) {fn_idx = 2 : i64, arity = 1 : i64, env_len = 1 : i64, operandSegmentSizes = array<i32: 1, 0, 0, 0>} : (i64) -> !ex.term
+            %3 = "ex.fun_arity"(%2) : (!ex.term) -> i64
             "ex.return"(%3) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
@@ -940,8 +940,8 @@ defmodule ExConversionTest do
           "ex.func"() ({
           ^bb0:
             %0 = "ex.lit"() {value = 1 : i64} : () -> i64
-            %1 = "ex.box"(%0) : (i64) -> !ex.dyn
-            %2 = "ex.map"(%1) {operandSegmentSizes = array<i32: 1>} : (!ex.dyn) -> !ex.dyn
+            %1 = "ex.box"(%0) : (i64) -> !ex.term
+            %2 = "ex.map"(%1) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> !ex.term
             "ex.return"() {operandSegmentSizes = array<i32: 0>} : () -> ()
           }) {sym_name = "main"} : () -> ()
         }
