@@ -18,6 +18,14 @@ exclude =
     exclude ++ [:packed_transform_params]
   end
 
+exclude =
+  if Beaver.MLIR.Transform.Schedule.DSL.alloc_to_global_supported?() and
+       Beaver.MLIR.Transform.Schedule.DSL.loop_unroll_full_supported?() do
+    exclude
+  else
+    exclude ++ [:recent_transform_helpers]
+  end
+
 ExUnit.configure(exclude: exclude)
 
 IO.puts("OS PID: #{System.pid()}")
