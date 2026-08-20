@@ -293,6 +293,14 @@ MLIR_CAPI_EXPORTED void beaverTransformOnlyReadsPayload(
   transform::onlyReadsPayload(*unwrapEffectList(effects));
 }
 
+MLIR_CAPI_EXPORTED bool beaverTransformPackedParamsSupported(void) {
+#ifdef BEAVER_HAS_PACKED_TRANSFORM_PARAMS
+  return true;
+#else
+  return false;
+#endif
+}
+
 MLIR_CAPI_EXPORTED MlirLlvmThreadPool
 beaverLlvmThreadPoolCreateElastic(unsigned maxConcurrency) {
   return wrap(static_cast<llvm::ThreadPoolInterface *>(
