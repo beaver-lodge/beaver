@@ -118,7 +118,10 @@ defmodule Beaver.MLIR.Context do
   Dialects and external interfaces must be registered before entering the
   scope. All IR that refers to types or attributes created inside the scope
   must be destroyed before `fun` returns. The same context cannot host
-  concurrent or nested transient scopes.
+  concurrent or nested transient scopes. Types, attributes, and other
+  non-owning handles created inside the scope become stale when it ends and
+  must not be dereferenced; allowing their wrappers to be garbage-collected
+  afterward is safe.
   """
   @spec with_transient_scope(t(), (t() -> result)) :: result when result: term()
   def with_transient_scope(%__MODULE__{} = ctx, fun) when is_function(fun, 1) do
