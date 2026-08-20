@@ -17,6 +17,7 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 using namespace mlir;
@@ -34,6 +35,11 @@ static MlirBeaverMemoryEffectInstancesList
 wrapEffectList(MemoryEffectList *effects) {
   return {effects};
 }
+
+#ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
+static std::mutex transientScopeMutex;
+static std::unordered_set<MLIRContext *> transientScopeContexts;
+#endif
 
 class BeaverMemoryEffectsOpInterfaceFallbackModel
     : public MemoryEffectOpInterface::FallbackModel<
@@ -537,6 +543,57 @@ MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context,
   unwrap(mlirContextGetThreadPool(context))->async(
       [task, arg]() { task(arg); });
   return true;
+}
+
+MLIR_CAPI_EXPORTED bool beaverContextTransientScopeSupported(void) {
+#ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
+  return true;
+#else
+  return false;
+#endif
+}
+
+MLIR_CAPI_EXPORTED bool
+beaverContextBeginTransientScope(MlirContext context) {
+#ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
+  MLIRContext *unwrapped = unwrap(context);
+  std::lock_guard<std::mutex> lock(transientScopeMutex);
+  if (!transientScopeContexts.insert(unwrapped).second)
+    return false;
+  unwrapped->beginTransientScope();
+  return true;
+#else
+  (void)context;
+  return false;
+#endif
+}
+
+MLIR_CAPI_EXPORTED bool beaverContextEndTransientScope(MlirContext context) {
+#ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
+  MLIRContext *unwrapped = unwrap(context);
+  std::lock_guard<std::mutex> lock(transientScopeMutex);
+  auto active = transientScopeContexts.find(unwrapped);
+  if (active == transientScopeContexts.end())
+    return false;
+  unwrapped->endTransientScope();
+  transientScopeContexts.erase(active);
+  return true;
+#else
+  (void)context;
+  return false;
+#endif
+}
+
+MLIR_CAPI_EXPORTED bool
+beaverContextHasActiveTransientScope(MlirContext context) {
+#ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
+  std::lock_guard<std::mutex> lock(transientScopeMutex);
+  return transientScopeContexts.find(unwrap(context)) !=
+         transientScopeContexts.end();
+#else
+  (void)context;
+  return false;
+#endif
 }
 
 MLIR_CAPI_EXPORTED MlirType beaverDenseElementsAttrGetType(MlirAttribute attr) {

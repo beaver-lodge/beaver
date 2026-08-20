@@ -13,6 +13,16 @@ extern "C" {
 MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context,
                                              void (*task)(void *), void *arg);
 
+/// Stable, capability-gated adapters for LLVM's transient MLIRContext scope.
+/// Begin returns false when unsupported or when the context is already in a
+/// scope; end returns false when no scope was entered through this adapter.
+MLIR_CAPI_EXPORTED bool beaverContextTransientScopeSupported(void);
+MLIR_CAPI_EXPORTED bool
+beaverContextBeginTransientScope(MlirContext context);
+MLIR_CAPI_EXPORTED bool beaverContextEndTransientScope(MlirContext context);
+MLIR_CAPI_EXPORTED bool
+beaverContextHasActiveTransientScope(MlirContext context);
+
 /// Creates a reusable thread pool that grows beyond its reported parallelism
 /// when every worker is blocked by nested synchronous callback work.
 MLIR_CAPI_EXPORTED MlirLlvmThreadPool
