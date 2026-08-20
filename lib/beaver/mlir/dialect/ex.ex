@@ -21,6 +21,7 @@ defmodule Beaver.MLIR.Dialect.Ex do
 
   use Beaver.Slang, name: "ex"
 
+  deftype term()
   deftype dyn()
   deftype bound()
   deftype unbound()
@@ -45,6 +46,10 @@ defmodule Beaver.MLIR.Dialect.Ex do
 
   defconstraint integer_like do
     all_of([base("!builtin.integer"), any()])
+  end
+
+  defconstraint term_like do
+    any_of([base(term()), base(dyn()), base(bound()), base(unbound())])
   end
 
   defop lit(),
@@ -125,36 +130,36 @@ defmodule Beaver.MLIR.Dialect.Ex do
     attributes: [patterns: ^any_value]
 
   defop box(value = ^any_value),
-    results: [result: base(dyn())]
+    results: [result: ^term_like]
 
   # Lifts an already-tagged word (e.g. a function argument) into the term
   # type without tagging: the conversion is a pure passthrough.
   defop to_word(value = ^any_value),
-    results: [result: base(dyn())]
+    results: [result: ^term_like]
 
   # Drops the term type annotation without untagging: the conversion is a
   # pure passthrough, so a term word can cross control-flow regions (whose
   # types must be legal after conversion) as a scalar i64.
-  defop unbox(word = base(dyn())),
+  defop unbox(word = ^term_like),
     results: [result: ^integer_like]
 
   # Actor mailbox access: the current execution context is a single actor.
   defop self(),
-    results: [result: base(dyn())]
+    results: [result: ^term_like]
 
-  defop send(pid = base(dyn()), msg = base(dyn())),
-    results: [result: base(dyn())]
+  defop send(pid = ^term_like, msg = ^term_like),
+    results: [result: ^term_like]
 
   defop receive(),
-    results: [result: base(dyn())]
+    results: [result: ^term_like]
 
   defop mailbox_clear(),
-    results: [result: base(dyn())]
+    results: [result: ^term_like]
 
   # Actor process spawn: registers a closure word as a new process entry and
   # returns its pid. The scheduler driver executes spawned entries.
-  defop spawn(fun = optional(base(dyn()))),
-    results: [result: base(dyn())]
+  defop spawn(fun = optional(^term_like)),
+    results: [result: ^term_like]
 
   # Explicit runtime-instance lifecycle. Hosts use these operations to give
   # each execution its own native state instead of relying on the
@@ -284,13 +289,13 @@ defmodule Beaver.MLIR.Dialect.Ex do
     results: [result: ^integer_like]
 
   defop mailbox_peek(cursor = ^integer_like),
-    results: [result: base(dyn())]
+    results: [result: ^term_like]
 
   defop mailbox_remove(cursor = ^integer_like),
     results: [result: ^integer_like]
 
   defop nil_word(),
-    results: [result: base(dyn())]
+    results: [result: ^term_like]
 
   defop monotonic_time(),
     results: [result: ^integer_like]
@@ -313,48 +318,48 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop process_done(result = ^integer_like),
     results: [result: ^integer_like]
 
-  defop process_exit(reason = base(dyn())),
-    results: [result: base(dyn())]
+  defop process_exit(reason = ^term_like),
+    results: [result: ^term_like]
 
-  defop process_exit_reason(pid = base(dyn())),
-    results: [result: base(dyn())]
+  defop process_exit_reason(pid = ^term_like),
+    results: [result: ^term_like]
 
   defop process_trap_exit(enabled = ^integer_like),
     results: [result: ^integer_like]
 
   defop link(
-          pid = base(dyn()),
-          exit_tag = base(dyn()),
-          normal_tag = base(dyn())
+          pid = ^term_like,
+          exit_tag = ^term_like,
+          normal_tag = ^term_like
         ),
-        results: [result: base(dyn())]
+        results: [result: ^term_like]
 
-  defop unlink(pid = base(dyn())),
+  defop unlink(pid = ^term_like),
     results: [result: ^integer_like]
 
   defop exit(
-          pid = base(dyn()),
-          reason = base(dyn()),
-          exit_tag = base(dyn()),
-          normal_tag = base(dyn())
+          pid = ^term_like,
+          reason = ^term_like,
+          exit_tag = ^term_like,
+          normal_tag = ^term_like
         ),
-        results: [result: base(dyn())]
+        results: [result: ^term_like]
 
   defop monitor(
-          pid = base(dyn()),
-          down_tag = base(dyn()),
-          process_tag = base(dyn()),
-          normal_tag = base(dyn())
+          pid = ^term_like,
+          down_tag = ^term_like,
+          process_tag = ^term_like,
+          normal_tag = ^term_like
         ),
-        results: [result: base(dyn())]
+        results: [result: ^term_like]
 
-  defop demonitor(reference = base(dyn())),
+  defop demonitor(reference = ^term_like),
     results: [result: ^integer_like]
 
   defop processes_runnable(),
     results: [result: ^integer_like]
 
-  defop process_result(pid = base(dyn())),
+  defop process_result(pid = ^term_like),
     results: [result: ^integer_like]
 
   # Parks the current actor when its mailbox has no message beyond the
@@ -372,7 +377,7 @@ defmodule Beaver.MLIR.Dialect.Ex do
 
   # Untags an integer term word to its scalar value (a passthrough for
   # values that are already scalar).
-  defop to_int(word = base(dyn())),
+  defop to_int(word = ^term_like),
     results: [result: ^integer_like]
 
   defop reduction_tick(cost = ^integer_like),
@@ -390,17 +395,17 @@ defmodule Beaver.MLIR.Dialect.Ex do
     results: [result: ^any_value],
     regions: [:any, :any]
 
-  defop throw(value = base(dyn())),
-    results: [result: base(dyn())]
+  defop throw(value = ^term_like),
+    results: [result: ^term_like]
 
   # Raises a typed runtime exception. Unlike `throw`, this bypasses user catch
   # regions; `kind` is a runtime-defined integer discriminator and `reason`
   # carries the exception payload.
-  defop raise(reason = base(dyn()), kind = ^integer_like),
-    results: [result: base(dyn())]
+  defop raise(reason = ^term_like, kind = ^integer_like),
+    results: [result: ^term_like]
 
   defop catch_value(),
-    results: [result: base(dyn())]
+    results: [result: ^term_like]
 
   # Constructs a first-class function value (a tagged closure word): the
   # extracted `__fn_*` is referenced by index, and the captured values are
@@ -411,7 +416,7 @@ defmodule Beaver.MLIR.Dialect.Ex do
           e2 = optional(^any_value),
           e3 = optional(^any_value)
         ),
-        results: [result: base(dyn())],
+        results: [result: ^term_like],
         attributes: [fn_idx: ^integer_value, env_len: ^integer_value]
 
   # Additive closure constructor carrying the function arity. Keep
@@ -423,19 +428,19 @@ defmodule Beaver.MLIR.Dialect.Ex do
           e2 = optional(^any_value),
           e3 = optional(^any_value)
         ),
-        results: [result: base(dyn())],
+        results: [result: ^term_like],
         attributes: [fn_idx: ^integer_value, arity: ^integer_value, env_len: ^integer_value]
 
   # Reads a closure's declared arity. Runtimes return -1 for values or legacy
   # closures which do not carry arity metadata.
-  defop fun_arity(fun = base(dyn())),
+  defop fun_arity(fun = ^term_like),
     results: [result: ^integer_like]
 
   # Applies a first-class function value. The closure is resolved at runtime
   # to its function index and env slots, then dispatched to the matching
   # `__fn_*`.
   defop apply(
-          closure = optional(base(dyn())),
+          closure = optional(^term_like),
           a0 = optional(^any_value),
           a1 = optional(^any_value),
           a2 = optional(^any_value),
@@ -444,53 +449,53 @@ defmodule Beaver.MLIR.Dialect.Ex do
         results: [result: ^any_value],
         attributes: [arg_count: ^integer_value]
 
-  defop tuple(elements = variadic(base(dyn()))),
-    results: [result: base(dyn())]
+  defop tuple(elements = variadic(^term_like)),
+    results: [result: ^term_like]
 
-  defop list(elements = variadic(base(dyn()))),
-    results: [result: base(dyn())]
+  defop list(elements = variadic(^term_like)),
+    results: [result: ^term_like]
 
-  defop list_cons(head = base(dyn()), tail = base(dyn())),
-    results: [result: base(dyn())]
+  defop list_cons(head = ^term_like, tail = ^term_like),
+    results: [result: ^term_like]
 
-  defop map(entries = variadic(base(dyn()))),
-    results: [result: base(dyn())]
+  defop map(entries = variadic(^term_like)),
+    results: [result: ^term_like]
 
-  defop map_put(map = base(dyn()), key = base(dyn()), value = base(dyn())),
-    results: [result: base(dyn())]
+  defop map_put(map = ^term_like, key = ^term_like, value = ^term_like),
+    results: [result: ^term_like]
 
-  defop map_fetch(map = base(dyn()), key = base(dyn())),
-    results: [result: base(dyn())]
+  defop map_fetch(map = ^term_like, key = ^term_like),
+    results: [result: ^term_like]
 
-  defop mapset_from_list(list = base(dyn())),
-    results: [result: base(dyn())]
+  defop mapset_from_list(list = ^term_like),
+    results: [result: ^term_like]
 
-  defop mapset_member(set = base(dyn()), member = base(dyn())),
+  defop mapset_member(set = ^term_like, member = ^term_like),
     results: [result: ^integer_like]
 
-  defop mapset_put(set = base(dyn()), member = base(dyn())),
-    results: [result: base(dyn())]
+  defop mapset_put(set = ^term_like, member = ^term_like),
+    results: [result: ^term_like]
 
-  defop file_read(path = base(dyn())),
-    results: [result: base(dyn())]
+  defop file_read(path = ^term_like),
+    results: [result: ^term_like]
 
-  defop file_read_lines(path = base(dyn())),
-    results: [result: base(dyn())]
+  defop file_read_lines(path = ^term_like),
+    results: [result: ^term_like]
 
-  defop binary(segments = variadic(base(dyn()))),
-    results: [result: base(dyn())]
+  defop binary(segments = variadic(^term_like)),
+    results: [result: ^term_like]
 
-  defop binary_from_list(bytes = base(dyn())),
-    results: [result: base(dyn())]
+  defop binary_from_list(bytes = ^term_like),
+    results: [result: ^term_like]
 
-  defop iodata_to_binary(iodata = base(dyn())),
-    results: [result: base(dyn())]
+  defop iodata_to_binary(iodata = ^term_like),
+    results: [result: ^term_like]
 
   defop float_lit(bits = ^integer_like),
-    results: [result: base(dyn())]
+    results: [result: ^term_like]
 
-  defop string_to_float(binary = base(dyn())),
-    results: [result: base(dyn())]
+  defop string_to_float(binary = ^term_like),
+    results: [result: ^term_like]
 
   defop is_integer(value = ^any_value),
     results: [result: ^integer_like]
@@ -513,36 +518,36 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop is_map(value = ^any_value),
     results: [result: ^integer_like]
 
-  defop tuple_get(tuple = base(dyn()), index = ^integer_like),
-    results: [result: base(dyn())]
+  defop tuple_get(tuple = ^term_like, index = ^integer_like),
+    results: [result: ^term_like]
 
-  defop tuple_length(tuple = base(dyn())),
+  defop tuple_length(tuple = ^term_like),
     results: [result: ^integer_like]
 
-  defop map_length(map = base(dyn())),
+  defop map_length(map = ^term_like),
     results: [result: ^integer_like]
 
-  defop enumerable_count(word = base(dyn())),
+  defop enumerable_count(word = ^term_like),
     results: [result: ^integer_like]
 
-  defop enumerable_to_list(word = base(dyn())),
-    results: [result: base(dyn())]
+  defop enumerable_to_list(word = ^term_like),
+    results: [result: ^term_like]
 
   defop enumerable_to_list_range(
           start = ^integer_like,
           stop = ^integer_like
         ),
-        results: [result: base(dyn())]
+        results: [result: ^term_like]
 
   defop enumerable_reduce(
-          enumerable = base(dyn()),
+          enumerable = ^term_like,
           acc = ^integer_like,
           continuation = ^integer_like
         ),
         results: [result: ^integer_like]
 
   defop enumerable_reduce_c(
-          enumerable = base(dyn()),
+          enumerable = ^term_like,
           acc = ^integer_like,
           continuation = ^integer_like,
           capture = ^integer_like
@@ -558,98 +563,98 @@ defmodule Beaver.MLIR.Dialect.Ex do
         results: [result: ^integer_like]
 
   defop enumerable_reduce_fun(
-          enumerable = base(dyn()),
+          enumerable = ^term_like,
           acc = ^integer_like,
           reducer = ^any_value
         ),
         results: [result: ^integer_like]
 
   defop enumerable_map_fun(
-          enumerable = base(dyn()),
+          enumerable = ^term_like,
           mapper = ^any_value
         ),
-        results: [result: base(dyn())]
+        results: [result: ^term_like]
 
   defop stream_filter(
-          list = base(dyn()),
+          list = ^term_like,
           predicate = ^any_value
         ),
-        results: [result: base(dyn())]
+        results: [result: ^term_like]
 
   defop stream_take(
-          list = base(dyn()),
+          list = ^term_like,
           n = ^integer_like
         ),
-        results: [result: base(dyn())]
+        results: [result: ^term_like]
 
   defop stream_drop(
-          list = base(dyn()),
+          list = ^term_like,
           n = ^integer_like
         ),
-        results: [result: base(dyn())]
+        results: [result: ^term_like]
 
   defop func_addr(),
     attributes: [sym_name: base("#builtin.string")],
     results: [result: ^any_value]
 
-  defop list_head(list = base(dyn())),
-    results: [result: base(dyn())]
+  defop list_head(list = ^term_like),
+    results: [result: ^term_like]
 
-  defop list_tail(list = base(dyn())),
-    results: [result: base(dyn())]
+  defop list_tail(list = ^term_like),
+    results: [result: ^term_like]
 
-  defop list_get(list = base(dyn()), index = ^integer_like),
-    results: [result: base(dyn())]
+  defop list_get(list = ^term_like, index = ^integer_like),
+    results: [result: ^term_like]
 
-  defop list_length(list = base(dyn())),
+  defop list_length(list = ^term_like),
     results: [result: ^integer_like]
 
-  defop term_eq(left = base(dyn()), right = base(dyn())),
+  defop term_eq(left = ^term_like, right = ^term_like),
     results: [result: ^integer_like]
 
-  defop term_eq_loose(left = base(dyn()), right = base(dyn())),
+  defop term_eq_loose(left = ^term_like, right = ^term_like),
     results: [result: ^integer_like]
 
-  defop binary_length(binary = base(dyn())),
+  defop binary_length(binary = ^term_like),
     results: [result: ^integer_like]
 
-  defop binary_get(binary = base(dyn()), index = ^integer_like),
-    results: [result: base(dyn())]
+  defop binary_get(binary = ^term_like, index = ^integer_like),
+    results: [result: ^term_like]
 
-  defop binary_slice(binary = base(dyn()), start = ^integer_like),
-    results: [result: base(dyn())]
+  defop binary_slice(binary = ^term_like, start = ^integer_like),
+    results: [result: ^term_like]
 
-  defop binary_utf8_get(binary = base(dyn()), index = ^integer_like),
-    results: [result: base(dyn())]
+  defop binary_utf8_get(binary = ^term_like, index = ^integer_like),
+    results: [result: ^term_like]
 
   defop binary_utf8_width(
-          binary = base(dyn()),
+          binary = ^term_like,
           index = ^integer_like
         ),
         results: [result: ^integer_like]
 
-  defop binary_utf8_length(binary = base(dyn())),
+  defop binary_utf8_length(binary = ^term_like),
     results: [result: ^integer_like]
 
-  defop string_printable(binary = base(dyn())),
+  defop string_printable(binary = ^term_like),
     results: [result: ^integer_like]
 
-  defop binary_quote(binary = base(dyn())),
-    results: [result: base(dyn())]
+  defop binary_quote(binary = ^term_like),
+    results: [result: ^term_like]
 
-  defop binary_encode16(binary = base(dyn())),
-    results: [result: base(dyn())]
+  defop binary_encode16(binary = ^term_like),
+    results: [result: ^term_like]
 
-  defop binary_decode16(binary = base(dyn())),
-    results: [result: base(dyn())]
+  defop binary_decode16(binary = ^term_like),
+    results: [result: ^term_like]
 
-  defop int_to_string(word = base(dyn())),
-    results: [result: base(dyn())]
+  defop int_to_string(word = ^term_like),
+    results: [result: ^term_like]
 
-  defop int_to_hex(word = base(dyn())),
-    results: [result: base(dyn())]
+  defop int_to_hex(word = ^term_like),
+    results: [result: ^term_like]
 
-  defop string_to_int(binary = base(dyn())),
+  defop string_to_int(binary = ^term_like),
     results: [result: ^integer_like]
 
   defop yield(values = variadic(^any_value)), traits: [:terminator]

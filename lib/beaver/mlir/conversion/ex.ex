@@ -369,7 +369,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     @term_intrinsics |> Map.values() |> Enum.sort()
   end
 
-  @term_types ~w(!ex.dyn !ex.bound !ex.unbound)
+  @term_types ~w(!ex.term !ex.dyn !ex.bound !ex.unbound)
 
   @doc """
   Converts an `ex` term type to its scalar word representation.
@@ -377,6 +377,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   @spec convert_type(MLIR.Type.t()) :: MLIR.Type.t()
   def convert_type(type) do
     case MLIR.to_string(type) do
+      "!ex.term" -> scalar_word(type)
       "!ex.dyn" -> scalar_word(type)
       "!ex.bound" -> scalar_word(type)
       "!ex.unbound" -> scalar_word(type)
