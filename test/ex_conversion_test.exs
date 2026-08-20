@@ -963,8 +963,12 @@ defmodule ExConversionTest do
             %0 = "ex.lit"() {value = 42 : i64} : () -> i64
             %1 = "ex.box"(%0) : (i64) -> !ex.term
             %2 = "ex.tuple"(%1) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> !ex.term
-            %3 = "ex.to_int"(%1) : (!ex.term) -> i64
-            "ex.return"(%3) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+            %3 = "ex.list"(%1) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> !ex.term
+            %4 = "ex.map"(%1, %2) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
+            %5 = "ex.binary"(%1) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> !ex.term
+            %6 = "ex.send"(%1, %2) : (!ex.term, !ex.term) -> !ex.term
+            %7 = "ex.to_int"(%1) : (!ex.term) -> i64
+            "ex.return"(%7) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
         """,
@@ -975,5 +979,8 @@ defmodule ExConversionTest do
 
     rendered = MLIR.to_string(module, generic: true)
     assert rendered =~ "ex.term.tuple_from_list"
+    assert rendered =~ "ex.term.map_from_list"
+    assert rendered =~ "ex.term.binary_from_list"
+    assert rendered =~ "ex.term.send"
   end
 end
