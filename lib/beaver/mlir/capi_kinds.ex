@@ -26,7 +26,6 @@ mlir_mods = [
   DynamicTypeDefinition,
   DynamicAttrDefinition,
   MemoryEffectInstancesList,
-  MemoryEffectsOpInterfaceCallbacks,
   TransformResults,
   TransformRewriter,
   TransformState,

@@ -72,7 +72,6 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
           DynamicTypeDefinition
           DynamicAttrDefinition
           MemoryEffectInstancesList
-          MemoryEffectsOpInterfaceCallbacks
           TransformResults
           TransformRewriter
           TransformState

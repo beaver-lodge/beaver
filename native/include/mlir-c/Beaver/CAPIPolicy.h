@@ -27,6 +27,7 @@ typedef enum {
   BeaverCapiPolicyManualAdapter__mlirTransformStateForEachParam,
   BeaverCapiPolicyManualAdapter__mlirTransformStateForEachPayloadOp,
   BeaverCapiPolicyManualAdapter__mlirTransformStateForEachPayloadValue,
+  BeaverCapiPolicyManualAdapter__beaverMemoryEffectsOpInterfaceGetEffects,
   BeaverCapiPolicyManualAdapter__beaverTranslateModuleToLLVMIRText,
   BeaverCapiPolicyManualAdapter__beaverCompileLLVMIRToPTX,
 
@@ -43,10 +44,22 @@ typedef enum {
   BeaverCapiPolicyCallbackRuntime__mlirConversionTargetMarkUnknownOpDynamicallyLegal,
   BeaverCapiPolicyCallbackRuntime__mlirOpConversionPatternCreate,
   BeaverCapiPolicyCallbackRuntime__mlirConditionallySpeculatableOpInterfaceAttachFallbackModel,
-  BeaverCapiPolicyCallbackRuntime__mlirMemoryEffectsOpInterfaceAttachFallbackModel,
+  BeaverCapiPolicyCallbackRuntime__beaverMemoryEffectsOpInterfaceAttachFallbackModel,
   BeaverCapiPolicyCallbackRuntime__mlirPatternDescriptorOpInterfaceAttachFallbackModel,
   BeaverCapiPolicyCallbackRuntime__mlirTransformOpInterfaceAttachFallbackModel,
   BeaverCapiPolicyCallbackRuntime__mlirDynamicOpTraitCreate,
+
+  // Beaver owns a stable adapter for the MemoryEffects collector ABI. Exclude
+  // both generations of the upstream surface so manifests remain identical
+  // when compiling against Triton LLVM or an LLVM-main eudsl snapshot.
+  BeaverCapiPolicyExclude__mlirMemoryEffectsOpInterfaceAttachFallbackModel,
+  BeaverCapiPolicyExclude__mlirMemoryEffectsOpInterfaceGetEffects,
+  BeaverCapiPolicyExclude__mlirMemoryEffectInstancesListAppend,
+  BeaverCapiPolicyExclude__mlirTransformOnlyReadsHandle,
+  BeaverCapiPolicyExclude__mlirTransformConsumesHandle,
+  BeaverCapiPolicyExclude__mlirTransformProducesHandle,
+  BeaverCapiPolicyExclude__mlirTransformModifiesPayload,
+  BeaverCapiPolicyExclude__mlirTransformOnlyReadsPayload,
 } BeaverCapiPolicyMarker;
 
 #endif // MLIR_C_BEAVER_CAPI_POLICY_H

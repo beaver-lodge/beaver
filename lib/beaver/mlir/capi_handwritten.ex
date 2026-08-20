@@ -7,6 +7,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
     beaver_raw_callback_reply: 2,
     beaver_raw_callback_reply_code: 3,
     beaver_raw_conditionally_speculatable_query_async: 1,
+    beaver_raw_memory_effects_query_async: 1,
     beaver_raw_action_tracing_attach: 5,
     beaver_raw_action_tracing_drain: 1,
     beaver_raw_action_tracing_detach: 1,
