@@ -2,6 +2,24 @@ if(DEFINED ENV{BEAVER_TRITON_PREBUILT_DIR})
   set(BEAVER_TRITON_PREBUILT_DIR "$ENV{BEAVER_TRITON_PREBUILT_DIR}")
 endif()
 
+include(CheckCXXSourceCompiles)
+set(_beaver_saved_required_includes "${CMAKE_REQUIRED_INCLUDES}")
+set(_beaver_saved_try_compile_target_type "${CMAKE_TRY_COMPILE_TARGET_TYPE}")
+set(CMAKE_REQUIRED_INCLUDES "${MLIR_INCLUDE_DIRS}")
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+check_cxx_source_compiles(
+  "#include <mlir-c/IR.h>
+   int main() {
+     auto *begin = &mlirContextBeginTransientScope;
+     auto *end = &mlirContextEndTransientScope;
+     auto *active = &mlirContextIsInTransientScope;
+     (void)begin; (void)end; (void)active;
+     return 0;
+   }"
+  BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE)
+set(CMAKE_REQUIRED_INCLUDES "${_beaver_saved_required_includes}")
+set(CMAKE_TRY_COMPILE_TARGET_TYPE "${_beaver_saved_try_compile_target_type}")
+
 add_mlir_public_c_api_library(
   MLIRCAPIBeaver
   DISABLE_INSTALL
@@ -20,6 +38,14 @@ add_mlir_public_c_api_library(
   LLVMTarget
   LLVMCodeGen
   LLVMNVPTXCodeGen)
+
+if(BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE)
+  foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
+    target_compile_definitions(${_target}
+      PUBLIC
+      BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE=1)
+  endforeach()
+endif()
 
 if(BEAVER_TRITON_PREBUILT_DIR)
   foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
