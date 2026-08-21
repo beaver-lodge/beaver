@@ -158,6 +158,7 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.enumerable_count" => %{params: [:i64], result: :i64},
     "ex.term.enumerable_to_list" => %{params: [:i64], result: :i64},
     "ex.term.enumerable_into_map" => %{params: [:i64, :i64], result: :i64},
+    "ex.term.enumerable_intersperse" => %{params: [:i64, :i64], result: :i64},
     "ex.term.enumerable_to_list_range" => %{params: [:i64, :i64], result: :i64},
     "ex.term.enumerable_reduce" => %{params: [:i64, :i64, :i64], result: :i64},
     "ex.term.enumerable_reduce_c" => %{params: [:i64, :i64, :i64, :i64], result: :i64},
