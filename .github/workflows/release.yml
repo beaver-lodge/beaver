@@ -50,7 +50,7 @@ jobs:
           - { otp: 27.3, os: macos-15, elixir: 1.20.3 }
           - { otp: 27.3, os: windows-2022, elixir: 1.20.3 }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         name: Check-out beaver
       # Kinda 0.11.0 on Hex predates the LLP64 integer conversion, Windows
       # synchronization fixes, and the ResourceSlot registry API, so every
@@ -73,10 +73,8 @@ jobs:
           elixir-version: ${{ matrix.job.elixir }} # Define the elixir version [required]
           otp-version: ${{ matrix.job.otp }} # Define the OTP version [required]
       - run: elixir --eval ":erlang.system_info(:nif_version) |> IO.puts"
-      - name: Set up Zig
-        uses: mlugg/setup-zig@v2
-        with:
-          version: 0.16.0
+      - name: Set up Zig, Ninja, and Python
+        uses: ./.github/actions/setup-native-tools
       - uses: Jimver/cuda-toolkit@master
         id: cuda-toolkit
         if: runner.os == 'Linux'
@@ -85,11 +83,8 @@ jobs:
           log-file-suffix: '${{matrix.job.os}}-${{ matrix.job.otp }}-(${{ matrix.job.elixir }}).txt'
           sub-packages: '["nvcc"]'
           method: network
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
       - name: Restore dependencies cache
-        uses: actions/cache@v3
+        uses: actions/cache@v6
         with:
           path: deps
           key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
@@ -98,7 +93,6 @@ jobs:
         run: mix deps.get
       - name: Strip dev suffix
         run: sed -i.bak 's/-dev//g' mix.exs && rm -f mix.exs.bak
-      - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Read Triton version
         if: runner.os == 'Windows'
         run: echo "TRITON_REF=$(jq -er '.triton_ref' triton.json)" >> "$GITHUB_ENV"
@@ -252,7 +246,7 @@ jobs:
               zig: "https://ziglang.org/download/0.16.0/zig-x86_64-linux-0.16.0.tar.xz"
             }
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         name: Check out workflow source
         with:
           path: workflow-source
@@ -297,7 +291,7 @@ jobs:
           build-args: |
             LLVM_EUDSL_ASSET_NAME=${{ steps.llvm.outputs.LLVM_PREBUILT_ASSET_NAME }}
             ZIG_URL=${{ matrix.image.zig }}
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         name: Check-out beaver
         with:
           repository: beaver-lodge/beaver
@@ -350,7 +344,7 @@ jobs:
     env:
       HEX_API_KEY: ${{ secrets.HEX_API_KEY }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         name: Check-out beaver
       - name: Set up Elixir
         uses: erlef/setup-beam@v1
