@@ -580,6 +580,18 @@ defmodule Beaver.MLIR.Dialect.Ex do
         ),
         results: [result: ^term_like]
 
+  defop enumerable_map_term_fun(
+          enumerable = ^term_like,
+          mapper = ^any_value
+        ),
+        results: [result: ^term_like]
+
+  defop enumerable_flat_map_term_fun(
+          enumerable = ^term_like,
+          mapper = ^any_value
+        ),
+        results: [result: ^term_like]
+
   defop stream_filter(
           list = ^term_like,
           predicate = ^any_value

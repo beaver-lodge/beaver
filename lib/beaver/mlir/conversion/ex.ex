@@ -202,6 +202,12 @@ defmodule Beaver.MLIR.Conversion.Ex do
       version: "1.0"
     )
     |> Plan.add_conversion_pattern("ex.enumerable_map_fun", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.enumerable_map_term_fun", &convert_term_read/3,
+      version: "1.0"
+    )
+    |> Plan.add_conversion_pattern("ex.enumerable_flat_map_term_fun", &convert_term_read/3,
+      version: "1.0"
+    )
     |> Plan.add_conversion_pattern("ex.stream_filter", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.stream_take", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.stream_drop", &convert_term_read/3, version: "1.0")
@@ -340,6 +346,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
     enumerable_reduce_range: "ex.term.enumerable_reduce_range",
     enumerable_reduce_fun: "ex.term.enumerable_reduce_fun",
     enumerable_map_fun: "ex.term.enumerable_map_fun",
+    enumerable_map_term_fun: "ex.term.enumerable_map_term_fun",
+    enumerable_flat_map_term_fun: "ex.term.enumerable_flat_map_term_fun",
     stream_filter: "ex.term.stream_filter",
     stream_take: "ex.term.stream_take",
     stream_drop: "ex.term.stream_drop",
@@ -1053,6 +1061,13 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp read_intrinsic("ex.enumerable_reduce_fun"), do: @term_intrinsics.enumerable_reduce_fun
   defp read_intrinsic("ex.enumerable_map_fun"), do: @term_intrinsics.enumerable_map_fun
+
+  defp read_intrinsic("ex.enumerable_map_term_fun"),
+    do: @term_intrinsics.enumerable_map_term_fun
+
+  defp read_intrinsic("ex.enumerable_flat_map_term_fun"),
+    do: @term_intrinsics.enumerable_flat_map_term_fun
+
   defp read_intrinsic("ex.stream_filter"), do: @term_intrinsics.stream_filter
   defp read_intrinsic("ex.stream_take"), do: @term_intrinsics.stream_take
   defp read_intrinsic("ex.stream_drop"), do: @term_intrinsics.stream_drop
@@ -1559,6 +1574,26 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp intrinsic_function_type("ex.term.enumerable_map_fun", _ctx) do
+    MLIR.Type.function(
+      [
+        MLIR.Type.i64(),
+        MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
+      ],
+      [MLIR.Type.i64()]
+    )
+  end
+
+  defp intrinsic_function_type("ex.term.enumerable_map_term_fun", _ctx) do
+    MLIR.Type.function(
+      [
+        MLIR.Type.i64(),
+        MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
+      ],
+      [MLIR.Type.i64()]
+    )
+  end
+
+  defp intrinsic_function_type("ex.term.enumerable_flat_map_term_fun", _ctx) do
     MLIR.Type.function(
       [
         MLIR.Type.i64(),
