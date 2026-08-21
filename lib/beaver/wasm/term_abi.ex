@@ -165,6 +165,8 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.enumerable_reduce_range" => %{params: [:i64, :i64, :i64, :i64], result: :i64},
     "ex.term.enumerable_reduce_fun" => %{params: [:i64, :i64, :i64], result: :i64},
     "ex.term.enumerable_map_fun" => %{params: [:i64, :i64], result: :i64},
+    "ex.term.enumerable_map_term_fun" => %{params: [:i64, :i64], result: :i64},
+    "ex.term.enumerable_flat_map_term_fun" => %{params: [:i64, :i64], result: :i64},
     "ex.term.stream_filter" => %{params: [:i64, :i64], result: :i64},
     "ex.term.stream_take" => %{params: [:i64, :i64], result: :i64},
     "ex.term.stream_drop" => %{params: [:i64, :i64], result: :i64},
