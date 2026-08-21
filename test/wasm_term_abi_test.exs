@@ -45,6 +45,8 @@ defmodule WasmTermABITest do
     assert TermABI.entry("ex.term.binary_quote").result == :i64
     assert TermABI.entry("ex.term.int_to_hex").params == [:i64]
     assert TermABI.entry("ex.term.int_to_hex").result == :i64
+    assert TermABI.entry("ex.term.int_to_string_base").params == [:i64, :i64]
+    assert TermABI.entry("ex.term.int_to_string_base").result == :i64
     assert TermABI.entry("ex.term.send").params == [:i64, :i64]
     assert TermABI.entry("ex.term.runtime_create").params == []
     assert TermABI.entry("ex.term.runtime_enter").params == [:i64]

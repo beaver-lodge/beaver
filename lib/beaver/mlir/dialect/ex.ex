@@ -650,6 +650,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop int_to_string(word = ^term_like),
     results: [result: ^term_like]
 
+  defop int_to_string_base(word = ^term_like, base = ^integer_like),
+    results: [result: ^term_like]
+
   defop int_to_hex(word = ^term_like),
     results: [result: ^term_like]
 

@@ -148,6 +148,7 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.binary_encode16" => %{params: [:i64], result: :i64},
     "ex.term.binary_decode16" => %{params: [:i64], result: :i64},
     "ex.term.int_to_string" => %{params: [:i64], result: :i64},
+    "ex.term.int_to_string_base" => %{params: [:i64, :i64], result: :i64},
     "ex.term.int_to_hex" => %{params: [:i64], result: :i64},
     "ex.term.string_to_int" => %{params: [:i64], result: :i64},
     # file IO
