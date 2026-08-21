@@ -187,6 +187,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.enumerable_count", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.enumerable_to_list", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.enumerable_into_map", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.enumerable_intersperse", &convert_term_read/3,
+      version: "1.0"
+    )
     |> Plan.add_conversion_pattern("ex.enumerable_to_list_range", &convert_term_read/3,
       version: "1.0"
     )
@@ -330,6 +333,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     enumerable_count: "ex.term.enumerable_count",
     enumerable_to_list: "ex.term.enumerable_to_list",
     enumerable_into_map: "ex.term.enumerable_into_map",
+    enumerable_intersperse: "ex.term.enumerable_intersperse",
     enumerable_to_list_range: "ex.term.enumerable_to_list_range",
     enumerable_reduce: "ex.term.enumerable_reduce",
     enumerable_reduce_c: "ex.term.enumerable_reduce_c",
@@ -1036,6 +1040,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.enumerable_count"), do: @term_intrinsics.enumerable_count
   defp read_intrinsic("ex.enumerable_to_list"), do: @term_intrinsics.enumerable_to_list
   defp read_intrinsic("ex.enumerable_into_map"), do: @term_intrinsics.enumerable_into_map
+  defp read_intrinsic("ex.enumerable_intersperse"), do: @term_intrinsics.enumerable_intersperse
 
   defp read_intrinsic("ex.enumerable_to_list_range"),
     do: @term_intrinsics.enumerable_to_list_range
@@ -1593,6 +1598,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
               "ex.term.binary_utf8_width",
               "ex.term.int_to_string_base",
               "ex.term.enumerable_into_map",
+              "ex.term.enumerable_intersperse",
               "ex.term.map_fetch",
               "ex.term.mapset_member",
               "ex.term.mapset_put",
