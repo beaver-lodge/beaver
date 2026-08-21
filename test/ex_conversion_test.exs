@@ -640,6 +640,7 @@ defmodule ExConversionTest do
             %13 = "ex.string_printable"(%2) : (!ex.term) -> i64
             %14 = "ex.binary_quote"(%2) : (!ex.term) -> !ex.term
             %15 = "ex.int_to_hex"(%2) : (!ex.term) -> !ex.term
+            %16 = "ex.int_to_string_base"(%2, %1) : (!ex.term, i64) -> !ex.term
             "ex.return"(%13) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
@@ -664,6 +665,9 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.string_printable"
     assert rendered =~ "ex.term.binary_quote"
     assert rendered =~ "ex.term.int_to_hex"
+
+    assert rendered =~
+             ~s|function_type = (i64, i64) -> i64, sym_name = "ex.term.int_to_string_base"|
   end
 
   test "converts binary read ops to Zig runtime ABI calls", %{ctx: ctx} do
