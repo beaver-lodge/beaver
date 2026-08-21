@@ -457,6 +457,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop list_cons(head = ^term_like, tail = ^term_like),
     results: [result: ^term_like]
 
+  defop list_flatten(list = ^term_like),
+    results: [result: ^term_like]
+
   defop map(entries = variadic(^term_like)),
     results: [result: ^term_like]
 

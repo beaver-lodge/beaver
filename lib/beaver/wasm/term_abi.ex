@@ -118,6 +118,7 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.is_tuple" => %{params: [:i64], result: :i64},
     "ex.term.is_map" => %{params: [:i64], result: :i64},
     "ex.term.list_cons" => %{params: [:i64, :i64], result: :i64},
+    "ex.term.list_flatten" => %{params: [:i64], result: :i64},
     "ex.term.list_head" => %{params: [:i64], result: :i64},
     "ex.term.list_tail" => %{params: [:i64], result: :i64},
     "ex.term.list_get" => %{params: [:i64, :i64], result: :i64},

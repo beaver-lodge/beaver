@@ -30,6 +30,8 @@ defmodule WasmTermABITest do
   test "declares term signatures" do
     assert TermABI.entry("ex.term.list_cons").params == [:i64, :i64]
     assert TermABI.entry("ex.term.list_cons").result == :i64
+    assert TermABI.entry("ex.term.list_flatten").params == [:i64]
+    assert TermABI.entry("ex.term.list_flatten").result == :i64
     assert TermABI.entry("ex.term.eq_loose").params == [:i64, :i64]
     assert TermABI.entry("ex.term.eq_loose").result == :i64
     assert TermABI.entry("ex.term.map_put").params == [:i64, :i64, :i64]
