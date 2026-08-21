@@ -1,0 +1,50 @@
+name: Set up MSVC
+description: Export the Visual Studio x64 developer environment without a Node.js 20 action
+
+runs:
+  using: composite
+  steps:
+    - name: Enable the Visual Studio developer environment
+      shell: pwsh
+      run: |
+        $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
+        $vswhereArguments = @(
+          "-latest",
+          "-products", "*",
+          "-requires", "Microsoft.VisualStudio.Component.VC.Tools.x86.x64",
+          "-property", "installationPath"
+        )
+        $installationPath = & $vswhere @vswhereArguments
+
+        if (-not $installationPath) {
+          throw "Microsoft Visual Studio with the x64 C++ toolchain was not found"
+        }
+
+        $vcvarsall = Join-Path $installationPath "VC\Auxiliary\Build\vcvarsall.bat"
+        if (-not (Test-Path $vcvarsall)) {
+          throw "vcvarsall.bat was not found at $vcvarsall"
+        }
+
+        $oldEnvironment = @{}
+        Get-ChildItem Env: | ForEach-Object {
+          $oldEnvironment[$_.Name] = $_.Value
+        }
+
+        $command = "call `"$vcvarsall`" x64 >nul && set"
+        $newEnvironment = & $env:ComSpec /d /s /c $command
+        if ($LASTEXITCODE -ne 0) {
+          throw "vcvarsall.bat failed with exit code $LASTEXITCODE"
+        }
+
+        foreach ($line in $newEnvironment) {
+          if ($line -notmatch "^[^=]+=") {
+            continue
+          }
+
+          $name, $value = $line -split "=", 2
+          if (-not $oldEnvironment.ContainsKey($name) -or $oldEnvironment[$name] -ne $value) {
+            "$name=$value" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+          }
+        }
+
+        Write-Host "Configured the MSVC x64 developer environment from $installationPath"

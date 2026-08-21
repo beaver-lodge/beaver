@@ -109,7 +109,7 @@ jobs:
           fi
       - name: Set up MSVC toolchain
         if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ./.github/actions/setup-msvc
       - name: Configure Windows pagefile
         if: runner.os == 'Windows'
         shell: powershell
