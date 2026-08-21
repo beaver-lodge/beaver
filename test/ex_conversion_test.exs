@@ -587,6 +587,7 @@ defmodule ExConversionTest do
             %2 = "ex.box"(%0) : (i64) -> !ex.term
             %3 = "ex.box"(%1) : (i64) -> !ex.term
             %4 = "ex.list"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
+            %19 = "ex.list_flatten"(%4) : (!ex.term) -> !ex.term
             %5 = "ex.map"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
             %6 = "ex.map_put"(%5, %2, %3) : (!ex.term, !ex.term, !ex.term) -> !ex.term
             %13 = "ex.map_fetch"(%6, %2) : (!ex.term, !ex.term) -> !ex.term
@@ -612,6 +613,7 @@ defmodule ExConversionTest do
 
     rendered = MLIR.to_string(module, generic: true)
     assert rendered =~ "ex.term.list_cons"
+    assert rendered =~ "ex.term.list_flatten"
     assert rendered =~ "ex.term.map_from_list"
     assert rendered =~ "ex.term.map_put"
     assert rendered =~ "ex.term.map_fetch"

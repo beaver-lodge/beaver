@@ -161,6 +161,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.tuple", &convert_term_tuple/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list", &convert_term_list/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_cons", &convert_term_list_cons/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.list_flatten", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.map", &convert_term_map/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.map_put", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.map_fetch", &convert_term_read/3, version: "1.0")
@@ -241,6 +242,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   # `native/term_runtime.zig` exports exactly these C symbols.
   @term_intrinsics %{
     list_cons: "ex.term.list_cons",
+    list_flatten: "ex.term.list_flatten",
     map_put: "ex.term.map_put",
     map_fetch: "ex.term.map_fetch",
     self: "ex.term.self",
@@ -1083,6 +1085,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.list_tail"), do: @term_intrinsics.list_tail
   defp read_intrinsic("ex.list_get"), do: @term_intrinsics.list_get
   defp read_intrinsic("ex.list_length"), do: @term_intrinsics.list_length
+  defp read_intrinsic("ex.list_flatten"), do: @term_intrinsics.list_flatten
   defp read_intrinsic("ex.term_eq"), do: @term_intrinsics.term_eq
   defp read_intrinsic("ex.term_eq_loose"), do: @term_intrinsics.term_eq_loose
   defp read_intrinsic("ex.reduction_tick"), do: @term_intrinsics.reduction_tick
