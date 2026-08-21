@@ -593,6 +593,7 @@ defmodule ExConversionTest do
             %14 = "ex.enumerable_into_map"(%4, %6) : (!ex.term, !ex.term) -> !ex.term
             %15 = "ex.enumerable_intersperse"(%4, %3) : (!ex.term, !ex.term) -> !ex.term
             %16 = "ex.enumerable_map_term_fun"(%4, %0) : (!ex.term, i64) -> !ex.term
+            %18 = "ex.enumerable_map_term_fun_c"(%4, %0, %0, %0, %0, %0) : (!ex.term, i64, i64, i64, i64, i64) -> !ex.term
             %17 = "ex.enumerable_flat_map_term_fun"(%4, %0) : (!ex.term, i64) -> !ex.term
             %7 = "ex.binary"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
             %8 = "ex.binary_from_list"(%4) : (!ex.term) -> !ex.term
@@ -617,6 +618,7 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.enumerable_into_map"
     assert rendered =~ "ex.term.enumerable_intersperse"
     assert rendered =~ "ex.term.enumerable_map_term_fun"
+    assert rendered =~ "ex.term.enumerable_map_term_fun_c"
     assert rendered =~ "ex.term.enumerable_flat_map_term_fun"
     assert rendered =~ "ex.term.binary_from_list"
     assert rendered =~ "ex.term.iodata_to_binary"

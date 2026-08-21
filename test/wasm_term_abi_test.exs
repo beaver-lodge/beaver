@@ -38,6 +38,10 @@ defmodule WasmTermABITest do
     assert TermABI.entry("ex.term.enumerable_into_map").params == [:i64, :i64]
     assert TermABI.entry("ex.term.enumerable_intersperse").params == [:i64, :i64]
     assert TermABI.entry("ex.term.enumerable_map_term_fun").params == [:i64, :i64]
+
+    assert TermABI.entry("ex.term.enumerable_map_term_fun_c").params ==
+             [:i64, :i64, :i64, :i64, :i64, :i64]
+
     assert TermABI.entry("ex.term.enumerable_flat_map_term_fun").params == [:i64, :i64]
     assert TermABI.entry("ex.term.iodata_to_binary").params == [:i64]
     assert TermABI.entry("ex.term.float_lit").params == [:i64]

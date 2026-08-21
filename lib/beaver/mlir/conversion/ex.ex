@@ -205,6 +205,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.enumerable_map_term_fun", &convert_term_read/3,
       version: "1.0"
     )
+    |> Plan.add_conversion_pattern("ex.enumerable_map_term_fun_c", &convert_term_read/3,
+      version: "1.0"
+    )
     |> Plan.add_conversion_pattern("ex.enumerable_flat_map_term_fun", &convert_term_read/3,
       version: "1.0"
     )
@@ -347,6 +350,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     enumerable_reduce_fun: "ex.term.enumerable_reduce_fun",
     enumerable_map_fun: "ex.term.enumerable_map_fun",
     enumerable_map_term_fun: "ex.term.enumerable_map_term_fun",
+    enumerable_map_term_fun_c: "ex.term.enumerable_map_term_fun_c",
     enumerable_flat_map_term_fun: "ex.term.enumerable_flat_map_term_fun",
     stream_filter: "ex.term.stream_filter",
     stream_take: "ex.term.stream_take",
@@ -1065,6 +1069,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.enumerable_map_term_fun"),
     do: @term_intrinsics.enumerable_map_term_fun
 
+  defp read_intrinsic("ex.enumerable_map_term_fun_c"),
+    do: @term_intrinsics.enumerable_map_term_fun_c
+
   defp read_intrinsic("ex.enumerable_flat_map_term_fun"),
     do: @term_intrinsics.enumerable_flat_map_term_fun
 
@@ -1589,6 +1596,15 @@ defmodule Beaver.MLIR.Conversion.Ex do
         MLIR.Type.i64(),
         MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
       ],
+      [MLIR.Type.i64()]
+    )
+  end
+
+  defp intrinsic_function_type("ex.term.enumerable_map_term_fun_c", _ctx) do
+    callback = MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 8), [MLIR.Type.i64()])
+
+    MLIR.Type.function(
+      [MLIR.Type.i64(), callback | List.duplicate(MLIR.Type.i64(), 4)],
       [MLIR.Type.i64()]
     )
   end

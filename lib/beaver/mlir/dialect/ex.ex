@@ -586,6 +586,16 @@ defmodule Beaver.MLIR.Dialect.Ex do
         ),
         results: [result: ^term_like]
 
+  defop enumerable_map_term_fun_c(
+          enumerable = ^term_like,
+          mapper = ^any_value,
+          env0 = ^any_value,
+          env1 = ^any_value,
+          env2 = ^any_value,
+          env3 = ^any_value
+        ),
+        results: [result: ^term_like]
+
   defop enumerable_flat_map_term_fun(
           enumerable = ^term_like,
           mapper = ^any_value
