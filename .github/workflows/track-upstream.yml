@@ -31,7 +31,7 @@ jobs:
       eudsl_current: ${{ steps.current.outputs.eudsl }}
       llvm_available: ${{ steps.llvm.outputs.available }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
 
@@ -118,7 +118,7 @@ jobs:
     env:
       GH_TOKEN: ${{ secrets.UPSTREAM_PINS_TOKEN || github.token }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 1
 

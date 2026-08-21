@@ -1,0 +1,29 @@
+name: Set up native build tools
+description: Install the pinned Zig and Ninja toolchains without Node.js 20 actions
+
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v7
+      with:
+        python-version: "3.11"
+        cache: pip
+        cache-dependency-path: .github/actions/setup-native-tools/requirements.txt
+
+    - name: Install Zig and Ninja
+      shell: bash
+      run: |
+        python -m pip install --disable-pip-version-check \
+          -r "${{ github.action_path }}/requirements.txt"
+        python - <<'PY'
+        import os
+        from pathlib import Path
+
+        import ziglang
+
+        with open(os.environ["GITHUB_PATH"], "a", encoding="utf-8") as path_file:
+            print(Path(ziglang.__file__).parent, file=path_file)
+        PY
+        python -m ziglang version
+        ninja --version

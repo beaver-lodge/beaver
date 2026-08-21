@@ -62,7 +62,7 @@ jobs:
             elixir: "1.20.3"
             llvm: "triton"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         name: Check-out beaver
       - name: Read Triton version
         if: matrix.llvm == 'triton'
@@ -86,10 +86,8 @@ jobs:
         with:
           otp-version: ${{matrix.otp}}
           elixir-version: ${{matrix.elixir}}
-      - name: Set up Zig
-        uses: mlugg/setup-zig@v2
-        with:
-          version: 0.16.0
+      - name: Set up Zig, Ninja, and Python
+        uses: ./.github/actions/setup-native-tools
       - uses: Jimver/cuda-toolkit@master
         if: runner.os != 'Windows'
         id: cuda-toolkit
@@ -101,18 +99,14 @@ jobs:
       - name: Check formatting of Zig
         run: |
           zig fmt --check native build.zig
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
       - name: Restore dependencies cache
-        uses: actions/cache@v3
+        uses: actions/cache@v6
         with:
           path: deps
           key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
           restore-keys: ${{ runner.os }}-mix-
       - name: Install dependencies
         run: mix deps.get
-      - uses: seanmiddleditch/gha-setup-ninja@master
       - name: Install prebuilt LLVM
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -140,7 +134,7 @@ jobs:
           echo "BEAVER_TRITON_PREBUILT_DIR=$RUNNER_TEMP/triton-prebuilt" >> "$GITHUB_ENV"
       - name: Set up MSVC toolchain
         if: runner.os == 'Windows'
-        uses: ilammy/msvc-dev-cmd@v1
+        uses: ./.github/actions/setup-msvc
       - name: Configure Windows pagefile
         if: runner.os == 'Windows'
         shell: powershell

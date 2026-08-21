@@ -36,7 +36,7 @@ jobs:
             arch: arm64
             runs-on: macos-14
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         name: Check out Beaver
 
       - name: Read Triton version
@@ -50,7 +50,7 @@ jobs:
           echo "TRITON_REF=$ref" >> "$GITHUB_ENV"
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         name: Check out Triton
         with:
           repository: triton-lang/triton
@@ -62,12 +62,8 @@ jobs:
           otp-version: "27.3"
           elixir-version: "1.20.3"
 
-      - name: Set up Zig
-        uses: mlugg/setup-zig@v2
-        with:
-          version: 0.16.0
-
-      - uses: seanmiddleditch/gha-setup-ninja@master
+      - name: Set up Zig, Ninja, and Python
+        uses: ./.github/actions/setup-native-tools
 
       - name: Install Triton-pinned LLVM prebuilt
         run: |
