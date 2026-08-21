@@ -532,6 +532,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop enumerable_to_list(word = ^term_like),
     results: [result: ^term_like]
 
+  defop enumerable_into_map(enumerable = ^term_like, target = ^term_like),
+    results: [result: ^term_like]
+
   defop enumerable_to_list_range(
           start = ^integer_like,
           stop = ^integer_like
