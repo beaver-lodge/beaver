@@ -175,6 +175,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.iodata_to_binary", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.float_lit", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.string_to_float", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.float_to_binary_short", &convert_term_read/3,
+      version: "1.0"
+    )
     |> Plan.add_conversion_pattern("ex.is_integer", &convert_term_predicate/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_float", &convert_term_predicate/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.is_atom", &convert_term_predicate/3, version: "1.0")
@@ -331,6 +334,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     iodata_to_binary: "ex.term.iodata_to_binary",
     float_lit: "ex.term.float_lit",
     string_to_float: "ex.term.string_to_float",
+    float_to_binary_short: "ex.term.float_to_binary_short",
     is_integer: "ex.term.is_integer",
     is_float: "ex.term.is_float",
     is_atom: "ex.term.is_atom",
@@ -1044,6 +1048,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.map_length"), do: @term_intrinsics.map_length
   defp read_intrinsic("ex.float_lit"), do: @term_intrinsics.float_lit
   defp read_intrinsic("ex.string_to_float"), do: @term_intrinsics.string_to_float
+  defp read_intrinsic("ex.float_to_binary_short"), do: @term_intrinsics.float_to_binary_short
   defp read_intrinsic("ex.map_put"), do: @term_intrinsics.map_put
   defp read_intrinsic("ex.map_fetch"), do: @term_intrinsics.map_fetch
   defp read_intrinsic("ex.mapset_from_list"), do: @term_intrinsics.mapset_from_list

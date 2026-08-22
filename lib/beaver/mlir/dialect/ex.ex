@@ -499,6 +499,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop string_to_float(binary = ^term_like),
     results: [result: ^term_like]
 
+  defop float_to_binary_short(value = ^term_like),
+    results: [result: ^term_like]
+
   defop is_integer(value = ^any_value),
     results: [result: ^integer_like]
 
