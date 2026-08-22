@@ -49,6 +49,8 @@ defmodule WasmTermABITest do
     assert TermABI.entry("ex.term.float_lit").params == [:i64]
     assert TermABI.entry("ex.term.is_float").params == [:i64]
     assert TermABI.entry("ex.term.string_to_float").params == [:i64]
+    assert TermABI.entry("ex.term.float_to_binary_short").params == [:i64]
+    assert TermABI.entry("ex.term.float_to_binary_short").result == :i64
     assert TermABI.entry("ex.term.string_printable").params == [:i64]
     assert TermABI.entry("ex.term.string_printable").result == :i64
     assert TermABI.entry("ex.term.binary_quote").params == [:i64]
