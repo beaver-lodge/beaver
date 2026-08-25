@@ -101,6 +101,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
       version: "1.0"
     )
     |> Plan.add_conversion_pattern("ex.result_term_kind", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.result_atom_name", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.result_term_length", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.result_term_get", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.term_export", &convert_term_read/3, version: "1.0")
@@ -175,6 +176,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.iodata_to_binary", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.float_lit", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.string_to_float", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.string_to_atom", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.float_to_binary_short", &convert_term_read/3,
       version: "1.0"
     )
@@ -264,6 +266,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     result_exception_kind: "ex.term.result_exception_kind",
     result_exception_reason: "ex.term.result_exception_reason",
     result_term_kind: "ex.term.result_term_kind",
+    result_atom_name: "ex.term.result_atom_name",
     result_term_length: "ex.term.result_term_length",
     result_term_get: "ex.term.result_term_get",
     term_export: "ex.term.export",
@@ -334,6 +337,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     iodata_to_binary: "ex.term.iodata_to_binary",
     float_lit: "ex.term.float_lit",
     string_to_float: "ex.term.string_to_float",
+    string_to_atom: "ex.term.string_to_atom",
     float_to_binary_short: "ex.term.float_to_binary_short",
     is_integer: "ex.term.is_integer",
     is_float: "ex.term.is_float",
@@ -1048,6 +1052,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.map_length"), do: @term_intrinsics.map_length
   defp read_intrinsic("ex.float_lit"), do: @term_intrinsics.float_lit
   defp read_intrinsic("ex.string_to_float"), do: @term_intrinsics.string_to_float
+  defp read_intrinsic("ex.string_to_atom"), do: @term_intrinsics.string_to_atom
   defp read_intrinsic("ex.float_to_binary_short"), do: @term_intrinsics.float_to_binary_short
   defp read_intrinsic("ex.map_put"), do: @term_intrinsics.map_put
   defp read_intrinsic("ex.map_fetch"), do: @term_intrinsics.map_fetch
@@ -1108,6 +1113,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.result_exception_kind"), do: @term_intrinsics.result_exception_kind
   defp read_intrinsic("ex.result_exception_reason"), do: @term_intrinsics.result_exception_reason
   defp read_intrinsic("ex.result_term_kind"), do: @term_intrinsics.result_term_kind
+  defp read_intrinsic("ex.result_atom_name"), do: @term_intrinsics.result_atom_name
   defp read_intrinsic("ex.result_term_length"), do: @term_intrinsics.result_term_length
   defp read_intrinsic("ex.result_term_get"), do: @term_intrinsics.result_term_get
   defp read_intrinsic("ex.term_export"), do: @term_intrinsics.term_export
@@ -1384,7 +1390,11 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp intrinsic_function_type(symbol, _ctx)
-       when symbol in ["ex.term.result_term_kind", "ex.term.result_term_length"] do
+       when symbol in [
+              "ex.term.result_term_kind",
+              "ex.term.result_atom_name",
+              "ex.term.result_term_length"
+            ] do
     MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 2), [MLIR.Type.i64()])
   end
 

@@ -200,6 +200,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop result_term_kind(handle = ^integer_like, word = ^integer_like),
     results: [result: ^integer_like]
 
+  defop result_atom_name(handle = ^integer_like, word = ^integer_like),
+    results: [result: ^integer_like]
+
   defop result_term_length(handle = ^integer_like, word = ^integer_like),
     results: [result: ^integer_like]
 
@@ -497,6 +500,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
     results: [result: ^term_like]
 
   defop string_to_float(binary = ^term_like),
+    results: [result: ^term_like]
+
+  defop string_to_atom(binary = ^term_like),
     results: [result: ^term_like]
 
   defop float_to_binary_short(value = ^term_like),
