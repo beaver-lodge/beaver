@@ -602,6 +602,7 @@ defmodule ExConversionTest do
             %9 = "ex.float_lit"(%0) : (i64) -> !ex.term
             %10 = "ex.string_to_float"(%7) : (!ex.term) -> !ex.term
             %21 = "ex.string_to_atom"(%7) : (!ex.term) -> !ex.term
+            %22 = "ex.string_to_existing_atom"(%7) : (!ex.term) -> !ex.term
             %20 = "ex.float_to_binary_short"(%9) : (!ex.term) -> !ex.term
             %11 = "ex.is_list"(%4) : (!ex.term) -> i64
             "ex.return"(%11) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
@@ -629,6 +630,7 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.float_lit"
     assert rendered =~ "ex.term.string_to_float"
     assert rendered =~ "ex.term.string_to_atom"
+    assert rendered =~ "ex.term.string_to_existing_atom"
     assert rendered =~ "ex.term.float_to_binary_short"
     assert rendered =~ "ex.term.is_list"
   end
