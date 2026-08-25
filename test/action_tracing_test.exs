@@ -61,6 +61,22 @@ defmodule ActionTracingTest do
     MLIR.ActionTracing.detach(session)
   end
 
+  test "filtering accepts JSON-sensitive strings before a matching tag", %{ctx: ctx} do
+    session =
+      MLIR.ActionTracing.attach(ctx,
+        tags: ["quoted \"tag\" with \\ and\nnewline", "pass-execution"]
+      )
+
+    module = MLIR.Module.create!("module {}", ctx: ctx)
+    module |> Beaver.Composer.append("canonicalize") |> Beaver.Composer.run!()
+
+    events = MLIR.ActionTracing.drain(session)
+    assert events != []
+    assert Enum.all?(events, &(&1["tag"] == "pass-execution"))
+
+    MLIR.ActionTracing.detach(session)
+  end
+
   test "filtering by source location substring", %{ctx: ctx} do
     module =
       MLIR.Module.create!(
@@ -101,6 +117,22 @@ defmodule ActionTracingTest do
     module |> Beaver.Composer.append("canonicalize") |> Beaver.Composer.run!()
     events = MLIR.ActionTracing.drain(session)
     assert Enum.any?(events, &(&1["tag"] == "pass-execution" and &1["phase"] == "before"))
+
+    MLIR.ActionTracing.detach(session)
+  end
+
+  test "control maps accept JSON-sensitive keys", %{ctx: ctx} do
+    session =
+      MLIR.ActionTracing.attach(ctx,
+        limit: %{"a quoted \"tag\" with \\ and\nnewline" => 1, "pass-execution" => 1}
+      )
+
+    module = MLIR.Module.create!("module {}", ctx: ctx)
+    module |> Beaver.Composer.append("canonicalize") |> Beaver.Composer.run!()
+    assert MLIR.ActionTracing.drain(session) != []
+
+    module |> Beaver.Composer.append("canonicalize") |> Beaver.Composer.run!()
+    assert MLIR.ActionTracing.drain(session) == []
 
     MLIR.ActionTracing.detach(session)
   end
