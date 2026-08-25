@@ -66,6 +66,7 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.result_exception_kind" => %{params: [:i64], result: :i64},
     "ex.term.result_exception_reason" => %{params: [:i64], result: :i64},
     "ex.term.result_term_kind" => %{params: [:i64, :i64], result: :i64},
+    "ex.term.result_atom_name" => %{params: [:i64, :i64], result: :i64},
     "ex.term.result_term_length" => %{params: [:i64, :i64], result: :i64},
     "ex.term.result_term_get" => %{params: [:i64, :i64, :i64], result: :i64},
     # portable cross-session boundary
@@ -138,6 +139,7 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.iodata_to_binary" => %{params: [:i64], result: :i64},
     "ex.term.float_lit" => %{params: [:i64], result: :i64},
     "ex.term.string_to_float" => %{params: [:i64], result: :i64},
+    "ex.term.string_to_atom" => %{params: [:i64], result: :i64},
     "ex.term.float_to_binary_short" => %{params: [:i64], result: :i64},
     "ex.term.binary_length" => %{params: [:i64], result: :i64},
     "ex.term.binary_get" => %{params: [:i64, :i64], result: :i64},

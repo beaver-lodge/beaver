@@ -601,6 +601,7 @@ defmodule ExConversionTest do
             %12 = "ex.iodata_to_binary"(%4) : (!ex.term) -> !ex.term
             %9 = "ex.float_lit"(%0) : (i64) -> !ex.term
             %10 = "ex.string_to_float"(%7) : (!ex.term) -> !ex.term
+            %21 = "ex.string_to_atom"(%7) : (!ex.term) -> !ex.term
             %20 = "ex.float_to_binary_short"(%9) : (!ex.term) -> !ex.term
             %11 = "ex.is_list"(%4) : (!ex.term) -> i64
             "ex.return"(%11) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
@@ -627,6 +628,7 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.iodata_to_binary"
     assert rendered =~ "ex.term.float_lit"
     assert rendered =~ "ex.term.string_to_float"
+    assert rendered =~ "ex.term.string_to_atom"
     assert rendered =~ "ex.term.float_to_binary_short"
     assert rendered =~ "ex.term.is_list"
   end
@@ -763,6 +765,7 @@ defmodule ExConversionTest do
             %result_kind = "ex.result_root_kind"(%result_handle) : (i64) -> i64
             %result_word = "ex.result_root_word"(%result_handle) : (i64) -> i64
             %term_kind = "ex.result_term_kind"(%result_handle, %result_word) : (i64, i64) -> i64
+            %atom_name = "ex.result_atom_name"(%result_handle, %result_word) : (i64, i64) -> i64
             %term_len = "ex.result_term_length"(%result_handle, %result_word) : (i64, i64) -> i64
             %term_item = "ex.result_term_get"(%result_handle, %result_word, %0) : (i64, i64, i64) -> i64
             %exported = "ex.term_export"(%result_handle, %result_word) : (i64, i64) -> i64
@@ -820,6 +823,7 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.result_root_kind"
     assert rendered =~ "ex.term.result_root_word"
     assert rendered =~ "ex.term.result_term_kind"
+    assert rendered =~ "ex.term.result_atom_name"
     assert rendered =~ "ex.term.result_term_length"
     assert rendered =~ "ex.term.result_term_get"
     assert rendered =~ "ex.term.export"

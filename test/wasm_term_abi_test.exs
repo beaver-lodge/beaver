@@ -49,6 +49,8 @@ defmodule WasmTermABITest do
     assert TermABI.entry("ex.term.float_lit").params == [:i64]
     assert TermABI.entry("ex.term.is_float").params == [:i64]
     assert TermABI.entry("ex.term.string_to_float").params == [:i64]
+    assert TermABI.entry("ex.term.string_to_atom").params == [:i64]
+    assert TermABI.entry("ex.term.string_to_atom").result == :i64
     assert TermABI.entry("ex.term.float_to_binary_short").params == [:i64]
     assert TermABI.entry("ex.term.float_to_binary_short").result == :i64
     assert TermABI.entry("ex.term.string_printable").params == [:i64]
@@ -66,6 +68,7 @@ defmodule WasmTermABITest do
     assert TermABI.entry("ex.term.runtime_destroy").params == [:i64]
     assert TermABI.entry("ex.term.result_exception_kind").params == [:i64]
     assert TermABI.entry("ex.term.result_exception_reason").params == [:i64]
+    assert TermABI.entry("ex.term.result_atom_name").params == [:i64, :i64]
     assert TermABI.entry("ex.term.export").params == [:i64, :i64]
     assert TermABI.entry("ex.term.import").params == [:i64, :i64]
     assert TermABI.entry("ex.term.handle_destroy").params == [:i64]
