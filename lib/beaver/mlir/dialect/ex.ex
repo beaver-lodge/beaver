@@ -505,6 +505,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop string_to_atom(binary = ^term_like),
     results: [result: ^term_like]
 
+  defop string_to_existing_atom(binary = ^term_like),
+    results: [result: ^term_like]
+
   defop float_to_binary_short(value = ^term_like),
     results: [result: ^term_like]
 
