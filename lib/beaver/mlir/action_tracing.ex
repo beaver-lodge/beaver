@@ -89,11 +89,10 @@ defmodule Beaver.MLIR.ActionTracing do
         other -> raise ArgumentError, "invalid :drain_interval_ms: #{inspect(other)}"
       end
 
-    filter_json = "[" <> Enum.map_join(tags || [], ",", &JSON.encode!/1) <> "]"
-    location_json = "[" <> Enum.map_join(locations || [], ",", &JSON.encode!/1) <> "]"
-
-    skip_json = encode_count_map(skip)
-    limit_json = encode_count_map(limit)
+    filter_json = JSON.encode!(tags || [])
+    location_json = JSON.encode!(locations || [])
+    skip_json = JSON.encode!(skip)
+    limit_json = JSON.encode!(limit)
 
     session =
       MLIR.CAPI.beaver_raw_action_tracing_attach(
@@ -322,8 +321,4 @@ defmodule Beaver.MLIR.ActionTracing do
 
   defp normalize_metadata!(other),
     do: raise(ArgumentError, "invalid :metadata: #{inspect(other)}")
-
-  defp encode_count_map(map) do
-    "{" <> Enum.map_join(map, ",", fn {k, v} -> ~s("#{k}":#{v}) end) <> "}"
-  end
 end
