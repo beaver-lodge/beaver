@@ -1,8 +1,8 @@
 defmodule CustomTraitTest do
   use Beaver.Case, async: true
+  use Beaver
 
   alias Beaver.MLIR
-  alias Beaver.TestSupport.IR
 
   @moduletag :smoke
 
@@ -101,10 +101,22 @@ defmodule CustomTraitTest do
   end
 
   defp module_with(ctx, operation_name) do
-    ctx |> IR.single_operation_module(operation_name) |> MLIR.verify!()
+    ctx |> operation_module(operation_name) |> MLIR.verify!()
   end
 
   defp verify_with(ctx, operation_name) do
-    ctx |> IR.single_operation_module(operation_name) |> MLIR.verify()
+    ctx |> operation_module(operation_name) |> MLIR.verify()
+  end
+
+  defp operation_module(ctx, operation_name) do
+    operation = fn %Beaver.SSA{} = ssa ->
+      MLIR.Operation.create(%Beaver.SSA{ssa | op: operation_name})
+    end
+
+    mlir ctx: ctx do
+      module do
+        operation.() >>> []
+      end
+    end
   end
 end
