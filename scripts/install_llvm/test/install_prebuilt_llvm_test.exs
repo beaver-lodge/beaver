@@ -43,8 +43,8 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
         ])
       end)
 
-    assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20260815+8024076c7.tar.gz"
-    assert output =~ "LLVM_EUDSL_ASSET_REVISION=20260815+8024076c7"
+    assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20260825+2e3d50b41.tar.gz"
+    assert output =~ "LLVM_EUDSL_ASSET_REVISION=20260825+2e3d50b41"
     assert output =~ "https://github.com/llvm/eudsl/releases/download/llvm/"
   end
 
@@ -76,7 +76,7 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
         ])
       end)
 
-    assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20260815+8024076c7.tar.gz"
+    assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20260825+2e3d50b41.tar.gz"
   end
 
   test "triton suffix maps Beaver platforms to Triton archive names" do

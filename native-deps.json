@@ -7,6 +7,6 @@
   "llvm": {
     "repo": "llvm/eudsl",
     "tag": "llvm",
-    "default_revision": "20260815+8024076c7"
+    "default_revision": "20260825+2e3d50b41"
   }
 }

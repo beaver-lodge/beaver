@@ -111,7 +111,10 @@ defmodule LLVMDialectTest do
 
     if LLVM.di_compile_unit_source_language_dialect_supported?() do
       dialect = LLVM.di_compile_unit(dialect_opts)
-      assert to_string(dialect) =~ "sourceLanguageDialect = DW_LLVM_LANG_DIALECT_tile"
+      printed = to_string(dialect)
+
+      assert printed =~ "DW_LANG_C"
+      assert printed =~ "DW_LLVM_LANG_DIALECT_tile"
     else
       assert_raise ArgumentError, ~r/does not support DICompileUnit/, fn ->
         LLVM.di_compile_unit(dialect_opts)
