@@ -49,6 +49,9 @@ defmodule Beaver.Sigils do
   @doc """
   Create an SSA builder for an operation whose name is known at runtime.
 
+  Prefer an explicitly declared Elixir dialect function when the operation
+  name is stable. This sigil is intended for genuinely dynamic operation names.
+
   A bare operation sigil creates an operation without arguments. Call the
   returned builder with `.()` to pass operands or attributes:
 
@@ -57,7 +60,13 @@ defmodule Beaver.Sigils do
         ~o/\#{operation_name}/.(operand, attribute: value) >>> result_type
       end
   """
-  def sigil_o(operation_name, []), do: MLIR.Operation.builder(operation_name)
+  def sigil_o(operation_name, []), do: operation_builder(operation_name)
+
+  defp operation_builder(operation_name) do
+    fn %Beaver.SSA{evaluator: evaluator} = ssa when is_function(evaluator, 1) ->
+      evaluator.(%Beaver.SSA{ssa | op: operation_name})
+    end
+  end
 
   @doc """
   Create a deferred type value.
