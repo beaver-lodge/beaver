@@ -112,6 +112,19 @@ defmodule Beaver.SSA do
     end
   end
 
+  # A bare operation sigil is a zero-argument runtime operation builder.
+  defp do_transform(
+         {:>>>, line0, [sigil = {:sigil_o, line, _args}, results]},
+         evaluator
+       ) do
+    ssa = construct_ssa({:>>>, line0, [{:operation, line, []}, results]}, evaluator)
+
+    quote do
+      operation = unquote(sigil)
+      operation.(unquote(ssa))
+    end
+  end
+
   # block arguments
   defp do_transform(
          {:>>>, _, [var = {_var_name, _, nil}, type]},

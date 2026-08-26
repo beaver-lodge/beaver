@@ -1,11 +1,14 @@
 defmodule ExConversionTest do
   use Beaver.Case, async: true
+  use Beaver
+
   alias Beaver.MLIR
+  alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Conversion.Ex
   alias Beaver.MLIR.Conversion.Plan
-  alias Beaver.MLIR.Dialect.Ex.MaterializeBoundVariables
-  alias Beaver.MLIR.Dialect.Ex.ExpandCase
   alias Beaver.MLIR.Dialect.Ex, as: ExDialect
+  alias Beaver.MLIR.Dialect.Ex.ExpandCase
+  alias Beaver.MLIR.Dialect.Ex.MaterializeBoundVariables
 
   @moduletag :smoke
 
@@ -636,31 +639,33 @@ defmodule ExConversionTest do
   end
 
   test "reuses the list_cons declaration while lowering a wide binary", %{ctx: ctx} do
-    values =
-      Enum.map_join(0..31, "\n", fn index ->
-        """
-            %v#{index} = "ex.lit"() {value = #{index} : i64} : () -> i64
-            %b#{index} = "ex.box"(%v#{index}) : (i64) -> !ex.term
-        """
-      end)
-
-    operands = Enum.map_join(0..31, ", ", &"%b#{&1}")
-    operand_types = Enum.map_join(0..31, ", ", fn _ -> "!ex.term" end)
+    Beaver.Slang.load(ctx, ExDialect)
 
     module =
-      term_module!(
-        """
-        module {
-          "ex.func"() ({
-          ^bb0:
-        #{values}
-            %binary = "ex.binary"(#{operands}) {operandSegmentSizes = array<i32: 32>} : (#{operand_types}) -> !ex.term
-            "ex.return"(%binary) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> ()
-          }) {sym_name = "wide_binary"} : () -> ()
-        }
-        """,
-        ctx
-      )
+      mlir ctx: ctx do
+        module do
+          ExDialect.func sym_name: ~a/wide_binary/s do
+            region do
+              block do
+                segments =
+                  Enum.map(0..31, fn index ->
+                    value =
+                      ExDialect.lit(value: Attribute.integer(Type.i64(), index)) >>> Type.i64()
+
+                    ExDialect.box(value: value) >>> ExDialect.term()
+                  end)
+
+                binary =
+                  ExDialect.binary(segments: segments, operandSegmentSizes: :infer) >>>
+                    ExDialect.term()
+
+                ExDialect.return(binary) >>> []
+              end
+            end
+          end >>> []
+        end
+      end
+      |> MLIR.verify!()
 
     assert {:ok, _module, []} = Plan.run(Ex.plan(), module)
 

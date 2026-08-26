@@ -252,6 +252,13 @@ defmodule EntityTest do
     test "symbol name", %{ctx: ctx} do
       assert Attribute.string("foo") |> MLIR.to_string(ctx: ctx) == "\"foo\""
       assert Attribute.string(__MODULE__) |> MLIR.to_string(ctx: ctx) == "\"#{__MODULE__}\""
+
+      name = ~s(string with "quotes" and /slashes/)
+
+      assert MLIR.equal?(
+               Attribute.string(name) |> Beaver.Deferred.resolve(ctx),
+               ~a/#{name}/s |> Beaver.Deferred.resolve(ctx)
+             )
     end
 
     test "nested symbol", %{ctx: ctx} do

@@ -1,5 +1,8 @@
 defmodule Beaver.MLIR.Dialect.GPU do
+  alias Beaver.Changeset
+  alias Beaver.Deferred
   alias Beaver.MLIR
+  alias Beaver.MLIR.{Attribute, Block, Operation, StringRef}
   alias Beaver.MLIR.Dialect
 
   @moduledoc """
@@ -28,6 +31,53 @@ defmodule Beaver.MLIR.Dialect.GPU do
   """
   def container_module_attribute_name do
     MLIR.CAPI.beaverGetContainerModuleAttrName() |> to_string() |> String.to_atom()
+  end
+
+  @object_formats %{offload: 1, assembly: 2, binary: 3, fatbin: 4}
+
+  @doc """
+  Builds a `gpu.binary` module from an object value without printing or parsing
+  MLIR text.
+
+  `target` is an NVVM or ROCDL target attribute. `object` remains an Elixir
+  binary all the way into the native `gpu.object` builder, so assembly and
+  binary payloads do not require MLIR string escaping.
+
+  The supported formats are `:offload`, `:assembly`, `:binary`, and `:fatbin`.
+  """
+  @spec binary_module(String.t(), Deferred.attribute(), binary(), keyword()) ::
+          Deferred.contextual(MLIR.Module.t())
+  def binary_module(name, target, object, opts \\ [])
+      when is_binary(name) and is_binary(object) and is_list(opts) do
+    format = opts |> Keyword.get(:format, :fatbin) |> object_format!()
+
+    Deferred.from_opts(opts, fn ctx ->
+      location = MLIR.Location.unknown(ctx: ctx)
+      target = Deferred.resolve(target, ctx)
+
+      object_attribute =
+        MLIR.CAPI.beaverGPUObjectAttrGet(target, format, StringRef.create(object))
+
+      operation =
+        %Changeset{name: "gpu.binary", context: ctx, location: location}
+        |> Changeset.add_argument(sym_name: Attribute.string(name, ctx: ctx))
+        |> Changeset.add_argument(objects: Attribute.array([object_attribute], ctx: ctx))
+        |> Operation.create()
+
+      module = MLIR.Module.empty(location)
+      Block.append(MLIR.Module.body(module), operation)
+      MLIR.verify!(module)
+    end)
+  end
+
+  @doc "Returns the raw object payload stored in a `gpu.object` attribute."
+  @spec object_data(MLIR.Attribute.t()) :: {:ok, binary()} | {:error, String.t()}
+  def object_data(%MLIR.Attribute{} = attribute) do
+    if MLIR.CAPI.beaverAttributeIsAGPUObject(attribute) |> Beaver.Native.to_term() do
+      {:ok, MLIR.CAPI.beaverGPUObjectAttrGetObject(attribute) |> MLIR.to_string()}
+    else
+      {:error, "attribute is not a gpu.object"}
+    end
   end
 
   @doc """
@@ -145,4 +195,12 @@ defmodule Beaver.MLIR.Dialect.GPU do
   end
 
   defp conversion_pass!([]), do: raise(ArgumentError, "at least one target attribute is required")
+
+  defp object_format!(format) when is_map_key(@object_formats, format),
+    do: Map.fetch!(@object_formats, format)
+
+  defp object_format!(format) do
+    raise ArgumentError,
+          "unsupported GPU object format #{inspect(format)}; expected one of #{inspect(Map.keys(@object_formats))}"
+  end
 end

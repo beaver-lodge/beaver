@@ -1,5 +1,6 @@
 defmodule CustomTraitTest do
   use Beaver.Case, async: true
+  use Beaver
 
   alias Beaver.MLIR
 
@@ -20,7 +21,7 @@ defmodule CustomTraitTest do
   test "ordinary verifier failures become MLIR diagnostics", %{ctx: ctx} do
     Beaver.Slang.load(ctx, CustomTraitSlang)
 
-    assert {:error, diagnostics} = parse_with(ctx, "custom_trait_test.invalid")
+    assert {:error, diagnostics} = verify_with(ctx, "custom_trait_test.invalid")
     rendered = MLIR.Diagnostic.format(diagnostics)
     assert rendered =~ "CustomTraitSlang.Validity"
     assert rendered =~ "invalid_operation"
@@ -29,7 +30,7 @@ defmodule CustomTraitTest do
   test "region verifier exceptions become MLIR diagnostics", %{ctx: ctx} do
     Beaver.Slang.load(ctx, CustomTraitSlang)
 
-    assert {:error, diagnostics} = parse_with(ctx, "custom_trait_test.invalid_regions")
+    assert {:error, diagnostics} = verify_with(ctx, "custom_trait_test.invalid_regions")
     rendered = MLIR.Diagnostic.format(diagnostics)
     assert rendered =~ "CustomTraitSlang.RegionValidity"
     assert rendered =~ "invalid regions"
@@ -72,7 +73,7 @@ defmodule CustomTraitTest do
       timeout: 10
     )
 
-    assert {:error, diagnostics} = parse_with(ctx, "custom_trait_test.valid")
+    assert {:error, diagnostics} = verify_with(ctx, "custom_trait_test.valid")
 
     assert MLIR.Diagnostic.format(diagnostics) =~
              "dynamic trait callback timed out or its owner is unavailable"
@@ -93,18 +94,25 @@ defmodule CustomTraitTest do
     Process.exit(attachment.pid, :kill)
     assert_receive {:DOWN, ^monitor, :process, _, :killed}, 1_000
 
-    assert {:error, diagnostics} = parse_with(ctx, "custom_trait_test.valid")
+    assert {:error, diagnostics} = verify_with(ctx, "custom_trait_test.valid")
 
     assert MLIR.Diagnostic.format(diagnostics) =~
              "dynamic trait callback timed out or its owner is unavailable"
   end
 
   defp module_with(ctx, operation_name) do
-    MLIR.Module.create!(~s[module { "#{operation_name}"() : () -> () }], ctx: ctx)
+    ctx |> operation_module(operation_name) |> MLIR.verify!()
   end
 
-  defp parse_with(ctx, operation_name) do
-    MLIR.Module.create(~s[module { "#{operation_name}"() : () -> () }], ctx: ctx)
-    |> Beaver.Deferred.resolve(ctx)
+  defp verify_with(ctx, operation_name) do
+    ctx |> operation_module(operation_name) |> MLIR.verify()
+  end
+
+  defp operation_module(ctx, operation_name) do
+    mlir ctx: ctx do
+      module do
+        ~o/#{operation_name}/ >>> []
+      end
+    end
   end
 end

@@ -41,7 +41,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def create(%State{} = state) do
-    state |> Beaver.Native.ptr() |> mlirOperationCreate()
+    beaverOperationCreate(state)
   end
 
   def results(%__MODULE__{} = op) do

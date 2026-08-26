@@ -1,7 +1,8 @@
 defmodule OpTest do
   use Beaver.Case, async: true
+  use Beaver
+
   alias Beaver.MLIR
-  import Beaver.Sigils
 
   test "get_and_update", %{ctx: ctx} do
     const =
@@ -40,7 +41,6 @@ defmodule OpTest do
   end
 
   test "incorrect argument", %{ctx: ctx} do
-    use Beaver
     alias MLIR.Dialect.MemRef
 
     assert_raise ArgumentError, ~r{Invalid argument.+:not_supported}s, fn ->
@@ -50,5 +50,24 @@ defmodule OpTest do
         end
       end
     end
+  end
+
+  test "builds an operation whose name is known at runtime", %{ctx: ctx} do
+    MLIR.Context.allow_unregistered_dialects(ctx)
+    operation_name = "testing.dynamic"
+
+    module =
+      mlir ctx: ctx do
+        module do
+          value = ~o/#{operation_name}/.(label: ~a/producer/s) >>> ~t{i32}
+          ~o/#{operation_name}/.(value, label: ~a/consumer/s) >>> []
+          ~o/testing.marker/ >>> []
+        end
+      end
+
+    assert Enum.map(Beaver.Walker.operations(MLIR.Module.body(module)), &MLIR.Operation.name/1) ==
+             ~w(testing.dynamic testing.dynamic testing.marker)
+
+    assert MLIR.verify!(module) == module
   end
 end

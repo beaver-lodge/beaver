@@ -1,5 +1,6 @@
 defmodule Beaver.MLIR.ConversionTest do
   use Beaver.Case, async: true
+  use Beaver
 
   alias Beaver.MLIR
 
@@ -446,6 +447,12 @@ defmodule Beaver.MLIR.ConversionTest do
 
   defp unknown_module(ctx, name \\ "foo.unknown") do
     MLIR.Context.allow_unregistered_dialects(ctx)
-    MLIR.Module.create!(~s[module { "#{name}"() : () -> () }], ctx: ctx)
+
+    mlir ctx: ctx do
+      module do
+        ~o/#{name}/ >>> []
+      end
+    end
+    |> MLIR.verify!()
   end
 end

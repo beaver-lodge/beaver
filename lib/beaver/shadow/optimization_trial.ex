@@ -15,6 +15,7 @@ defmodule Beaver.Shadow.OptimizationTrial do
   """
 
   alias Beaver.MLIR
+  alias Beaver.MLIR.Dialect.GPU
 
   defmodule Result do
     @moduledoc "The audited outcome of one trial."
@@ -192,22 +193,11 @@ defmodule Beaver.Shadow.OptimizationTrial do
       samples: samples
     } = launch
 
-    escaped =
-      ptx
-      |> String.replace("\\", "\\\\")
-      |> String.replace("\"", "\\\"")
-      |> String.replace("\n", "\\0A")
-
-    module_text = """
-    module {
-      gpu.binary @kernel [#gpu.object<#nvvm.target<chip = "sm_80">, assembly = "#{escaped}">]
-    }
-    """
-
     context = MLIR.Context.create()
 
     try do
-      module = MLIR.Module.create!(module_text, ctx: context)
+      target = GPU.nvvm_target_attribute(chip: "sm_80", ctx: context)
+      module = GPU.binary_module("kernel", target, ptx, format: :assembly, ctx: context)
       {:ok, mod} = MLIR.CUDA.load_gpu_binary(module)
       {:ok, f} = MLIR.CUDA.module_get_function(mod, kernel_name)
 

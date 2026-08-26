@@ -24,7 +24,8 @@ defmodule Beaver.Sigils do
   @doc """
   Create a deferred attribute value.
 
-  Add a modifier to it as a shortcut to annotate the type
+  Add a modifier to it as a shortcut to annotate the type. The `s` modifier
+  creates a string attribute directly, without parsing MLIR text.
   ## Examples
 
       iex> ctx = MLIR.Context.create()
@@ -32,13 +33,39 @@ defmodule Beaver.Sigils do
       true
       iex> ~a{1 : i32} |> Beaver.Deferred.resolve(ctx) |> MLIR.to_string()
       "1 : i32"
+      iex> value = ~s(string with "quotes")
+      iex> MLIR.equal?(Beaver.Deferred.resolve(~a/\#{value}/s, ctx), Beaver.Deferred.resolve(Attribute.string(value), ctx))
+      true
       iex> MLIR.Context.destroy(ctx)
   """
   def sigil_a(string, []), do: MLIR.Attribute.get(string)
+  def sigil_a(string, [?s]), do: MLIR.Attribute.string(string)
 
   def sigil_a(string, modifier) do
     modifier = modifier |> List.to_string()
     MLIR.Attribute.get("#{string} : #{modifier}")
+  end
+
+  @doc """
+  Create an SSA builder for an operation whose name is known at runtime.
+
+  Prefer an explicitly declared Elixir dialect function when the operation
+  name is stable. This sigil is intended for genuinely dynamic operation names.
+
+  A bare operation sigil creates an operation without arguments. Call the
+  returned builder with `.()` to pass operands or attributes:
+
+      mlir do
+        ~o/\#{operation_name}/ >>> []
+        ~o/\#{operation_name}/.(operand, attribute: value) >>> result_type
+      end
+  """
+  def sigil_o(operation_name, []), do: operation_builder(operation_name)
+
+  defp operation_builder(operation_name) do
+    fn %Beaver.SSA{evaluator: evaluator} = ssa when is_function(evaluator, 1) ->
+      evaluator.(%Beaver.SSA{ssa | op: operation_name})
+    end
   end
 
   @doc """

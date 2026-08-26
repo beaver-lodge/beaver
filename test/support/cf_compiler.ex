@@ -1,7 +1,7 @@
 defmodule MutCompiler do
   @moduledoc false
   use Beaver
-  alias Beaver.MLIR.Dialect.{Func, Arith, CF}
+  alias Beaver.MLIR.Dialect.{Arith, CF, Func}
   require Func
 
   defmodule Acc do
@@ -161,7 +161,7 @@ defmodule MutCompiler do
     mlir ctx: ctx do
       module do
         Func.func some_func(
-                    sym_name: "\"#{name}\"",
+                    sym_name: ~a/#{name}/s,
                     function_type: Type.function(List.duplicate(Type.f(32), 4), [Type.f(32)])
                   ) do
           region do

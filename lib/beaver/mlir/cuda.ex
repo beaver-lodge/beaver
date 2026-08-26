@@ -15,6 +15,7 @@ defmodule Beaver.MLIR.CUDA do
   """
 
   alias Beaver.MLIR
+  alias Beaver.MLIR.Dialect.GPU
 
   @doc """
   Returns `true` when a CUDA driver is loadable and initializable.
@@ -186,27 +187,5 @@ defmodule Beaver.MLIR.CUDA do
     end
   end
 
-  defp extract_assembly(object) do
-    case Regex.run(~r/assembly = "((?:[^"\\]|\\.)*)"/, MLIR.to_string(object)) do
-      [_, escaped] -> {:ok, unescape_mlir_string(escaped)}
-      _ -> {:error, "gpu.object has no assembly"}
-    end
-  end
-
-  # MLIR prints string attrs with C-style escapes: `\\` for backslash, `\"`
-  # for a quote, and `\XX` for non-printable bytes (e.g. `\0A` for newline).
-  defp unescape_mlir_string(escaped), do: do_unescape(String.graphemes(escaped), [])
-
-  defp do_unescape([], acc), do: acc |> Enum.reverse() |> IO.iodata_to_binary()
-
-  defp do_unescape(["\\", "\\" | rest], acc), do: do_unescape(rest, ["\\" | acc])
-  defp do_unescape(["\\", "\"" | rest], acc), do: do_unescape(rest, ["\"" | acc])
-
-  defp do_unescape(["\\", h1, h2 | rest], acc)
-       when h1 in ~w(0 1 2 3 4 5 6 7 8 9 a b c d e f A B C D E F) and
-              h2 in ~w(0 1 2 3 4 5 6 7 8 9 a b c d e f A B C D E F) do
-    do_unescape(rest, [<<String.to_integer(h1 <> h2, 16)>> | acc])
-  end
-
-  defp do_unescape([char | rest], acc), do: do_unescape(rest, [char | acc])
+  defp extract_assembly(object), do: GPU.object_data(object)
 end
