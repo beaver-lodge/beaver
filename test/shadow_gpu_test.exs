@@ -2,8 +2,9 @@ defmodule Beaver.Shadow.GPUTest do
   use ExUnit.Case, async: true
 
   alias Beaver.MLIR
-  alias Beaver.Shadow.{GPU, Receipt, Runner}
+  alias Beaver.MLIR.Dialect.GPU, as: GPUDialect
   alias Beaver.MLIR.Transform.Schedule.DSL
+  alias Beaver.Shadow.{GPU, Receipt, Runner}
 
   defmodule FakeCUDA do
     def available?, do: true
@@ -157,19 +158,11 @@ defmodule Beaver.Shadow.GPUTest do
 
     assert ptx =~ ".visible .entry matmul_kernel_"
 
-    escaped =
-      ptx
-      |> String.replace("\\", "\\\\")
-      |> String.replace("\"", "\\\"")
-      |> String.replace("\n", "\\0A")
+    target = GPUDialect.nvvm_target_attribute(chip: "sm_80", ctx: ctx)
 
-    module_text = """
-    module {
-      gpu.binary @matmul [#gpu.object<#nvvm.target<chip = "sm_80">, assembly = "#{escaped}">]
-    }
-    """
+    binary_module =
+      GPUDialect.binary_module("matmul", target, ptx, format: :assembly, ctx: ctx)
 
-    binary_module = MLIR.Module.create!(module_text, ctx: ctx)
     on_exit(fn -> MLIR.Module.destroy(binary_module) end)
 
     {:ok, mod} = MLIR.CUDA.load_gpu_binary(binary_module)

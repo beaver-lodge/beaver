@@ -45,6 +45,32 @@ defmodule GPUBinaryTest do
     assert full =~ ~s{abi = "500"}
   end
 
+  test "binary_module preserves object bytes without MLIR text escaping", %{ctx: ctx} do
+    payload = <<"quote=\" slash=\\ newline=\n nul=", 0, " tail">>
+    target = GPU.nvvm_target_attribute(chip: "sm_80", ctx: ctx)
+
+    module = GPU.binary_module("kernel", target, payload, format: :assembly, ctx: ctx)
+
+    binary =
+      module
+      |> MLIR.Module.body()
+      |> Beaver.Walker.operations()
+      |> Enum.find(&(MLIR.Operation.name(&1) == "gpu.binary"))
+
+    assert {:ok, objects} = MLIR.Operation.fetch(binary, "objects")
+    assert {:ok, object} = MLIR.Attribute.fetch(objects, 0)
+    assert {:ok, ^payload} = GPU.object_data(object)
+    assert MLIR.verify!(module) == module
+  end
+
+  test "binary_module rejects unknown object formats", %{ctx: ctx} do
+    target = GPU.nvvm_target_attribute(chip: "sm_80", ctx: ctx)
+
+    assert_raise ArgumentError, ~r/unsupported GPU object format/, fn ->
+      GPU.binary_module("kernel", target, "ptx", format: :unknown, ctx: ctx)
+    end
+  end
+
   test "package_binary! produces a gpu.binary with one object per target", %{ctx: ctx} do
     module =
       File.read!("test/gpu-to-cubin.mlir")

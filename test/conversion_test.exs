@@ -2,6 +2,7 @@ defmodule Beaver.MLIR.ConversionTest do
   use Beaver.Case, async: true
 
   alias Beaver.MLIR
+  alias Beaver.TestSupport.IR
 
   test "lowers a Slang dialect with per-instance legality and a 1:N type conversion", %{
     ctx: ctx
@@ -446,6 +447,6 @@ defmodule Beaver.MLIR.ConversionTest do
 
   defp unknown_module(ctx, name \\ "foo.unknown") do
     MLIR.Context.allow_unregistered_dialects(ctx)
-    MLIR.Module.create!(~s[module { "#{name}"() : () -> () }], ctx: ctx)
+    ctx |> IR.single_operation_module(name) |> MLIR.verify!()
   end
 end

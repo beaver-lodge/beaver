@@ -125,6 +125,12 @@ MLIR_CAPI_EXPORTED intptr_t beaverShapedTypeGetNumElements(MlirType type);
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverGetNumWorkgroupAttributionsAttrName();
 MLIR_CAPI_EXPORTED MlirStringRef beaverGetContainerModuleAttrName();
+MLIR_CAPI_EXPORTED MlirAttribute
+beaverGPUObjectAttrGet(MlirAttribute target, int32_t format,
+                       MlirStringRef object);
+MLIR_CAPI_EXPORTED bool beaverAttributeIsAGPUObject(MlirAttribute attribute);
+MLIR_CAPI_EXPORTED MlirStringRef
+beaverGPUObjectAttrGetObject(MlirAttribute attribute);
 
 #include "mlir-c/ExecutionEngine.h"
 

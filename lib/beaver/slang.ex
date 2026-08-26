@@ -210,7 +210,7 @@ defmodule Beaver.Slang do
           op_applier slang_target_op: op,
                      slang_names: [],
                      slang_location: source_loc,
-                     sym_name: "\"#{name}\"" do
+                     sym_name: MLIR.Attribute.string(name) do
             region do
               block _op() do
                 {args, ret, attributes, regions} = constrain_f.(Beaver.Env.block(), ctx)
@@ -1003,7 +1003,7 @@ defmodule Beaver.Slang do
       fn ctx ->
         mlir ctx: ctx do
           module do
-            IRDL.dialect sym_name: "\"#{name}\"" do
+            IRDL.dialect sym_name: MLIR.Attribute.string(name) do
               region do
                 block _dialect() do
                   for {_type, m, f} <- creators do
