@@ -10,6 +10,26 @@ defmodule Beaver.MLIR.Operation do
 
   use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
 
+  @doc """
+  Returns an SSA builder for an operation whose name is known at runtime.
+
+  The builder follows the same evaluator path as generated dialect operation
+  functions, so it can be used with operands, attributes, regions, and result
+  types inside `Beaver.mlir/2`:
+
+      operation = MLIR.Operation.builder(operation_name)
+
+      mlir do
+        operation.(operand, attribute: value) >>> result_type
+      end
+  """
+  @spec builder(String.t()) :: (Beaver.SSA.t() -> term())
+  def builder(operation_name) when is_binary(operation_name) do
+    fn %Beaver.SSA{evaluator: evaluator} = ssa when is_function(evaluator, 1) ->
+      evaluator.(%Beaver.SSA{ssa | op: operation_name})
+    end
+  end
+
   def create(%Beaver.SSA{
         op: op_name,
         ip: ip,

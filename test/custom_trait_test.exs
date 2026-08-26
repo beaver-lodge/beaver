@@ -109,9 +109,7 @@ defmodule CustomTraitTest do
   end
 
   defp operation_module(ctx, operation_name) do
-    operation = fn %Beaver.SSA{} = ssa ->
-      MLIR.Operation.create(%Beaver.SSA{ssa | op: operation_name})
-    end
+    operation = MLIR.Operation.builder(operation_name)
 
     mlir ctx: ctx do
       module do

@@ -448,9 +448,7 @@ defmodule Beaver.MLIR.ConversionTest do
   defp unknown_module(ctx, name \\ "foo.unknown") do
     MLIR.Context.allow_unregistered_dialects(ctx)
 
-    operation = fn %Beaver.SSA{} = ssa ->
-      MLIR.Operation.create(%Beaver.SSA{ssa | op: name})
-    end
+    operation = MLIR.Operation.builder(name)
 
     mlir ctx: ctx do
       module do
