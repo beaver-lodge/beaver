@@ -635,6 +635,42 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.is_list"
   end
 
+  test "reuses the list_cons declaration while lowering a wide binary", %{ctx: ctx} do
+    values =
+      Enum.map_join(0..31, "\n", fn index ->
+        """
+            %v#{index} = "ex.lit"() {value = #{index} : i64} : () -> i64
+            %b#{index} = "ex.box"(%v#{index}) : (i64) -> !ex.term
+        """
+      end)
+
+    operands = Enum.map_join(0..31, ", ", &"%b#{&1}")
+    operand_types = Enum.map_join(0..31, ", ", fn _ -> "!ex.term" end)
+
+    module =
+      term_module!(
+        """
+        module {
+          "ex.func"() ({
+          ^bb0:
+        #{values}
+            %binary = "ex.binary"(#{operands}) {operandSegmentSizes = array<i32: 32>} : (#{operand_types}) -> !ex.term
+            "ex.return"(%binary) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> ()
+          }) {sym_name = "wide_binary"} : () -> ()
+        }
+        """,
+        ctx
+      )
+
+    assert {:ok, _module, []} = Plan.run(Ex.plan(), module)
+
+    rendered = MLIR.to_string(module, generic: true)
+
+    assert length(Regex.scan(~r/sym_name = "ex\.term\.list_cons"/, rendered)) == 1
+    assert length(Regex.scan(~r/callee = @ex\.term\.list_cons/, rendered)) == 32
+    assert MLIR.verify!(module) == module
+  end
+
   test "converts term read ops to Zig runtime ABI calls", %{ctx: ctx} do
     module =
       term_module!(
