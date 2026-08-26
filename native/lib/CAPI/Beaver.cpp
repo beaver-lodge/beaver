@@ -439,6 +439,11 @@ beaverOperationStateGetName(MlirOperationState state) {
   return state.name;
 }
 
+MLIR_CAPI_EXPORTED MlirOperation
+beaverOperationCreate(MlirOperationState state) {
+  return mlirOperationCreate(&state);
+}
+
 MLIR_CAPI_EXPORTED MlirContext
 beaverOperationStateGetContext(MlirOperationState state) {
   return mlirLocationGetContext(state.location);

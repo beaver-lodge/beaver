@@ -55,6 +55,10 @@ MLIR_CAPI_EXPORTED bool beaverIsNullSymbolTable(MlirSymbolTable symbolTable);
 
 MLIR_CAPI_EXPORTED MlirStringRef
 beaverOperationStateGetName(MlirOperationState state);
+// Create from a by-value state so the BEAM resource backing the state remains
+// a live NIF argument for the entire operation creation call.
+MLIR_CAPI_EXPORTED MlirOperation
+beaverOperationCreate(MlirOperationState state);
 MLIR_CAPI_EXPORTED MlirContext
 beaverOperationStateGetContext(MlirOperationState state);
 MLIR_CAPI_EXPORTED MlirLocation
