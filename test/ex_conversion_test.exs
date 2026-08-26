@@ -644,7 +644,7 @@ defmodule ExConversionTest do
     module =
       mlir ctx: ctx do
         module do
-          ExDialect.func sym_name: Attribute.string("wide_binary") do
+          ExDialect.func sym_name: ~a/wide_binary/s do
             region do
               block do
                 segments =

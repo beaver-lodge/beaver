@@ -161,7 +161,7 @@ defmodule MutCompiler do
     mlir ctx: ctx do
       module do
         Func.func some_func(
-                    sym_name: MLIR.Attribute.string(to_string(name)),
+                    sym_name: ~a/#{name}/s,
                     function_type: Type.function(List.duplicate(Type.f(32), 4), [Type.f(32)])
                   ) do
           region do

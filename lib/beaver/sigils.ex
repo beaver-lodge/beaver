@@ -24,7 +24,8 @@ defmodule Beaver.Sigils do
   @doc """
   Create a deferred attribute value.
 
-  Add a modifier to it as a shortcut to annotate the type
+  Add a modifier to it as a shortcut to annotate the type. The `s` modifier
+  creates a string attribute directly, without parsing MLIR text.
   ## Examples
 
       iex> ctx = MLIR.Context.create()
@@ -32,9 +33,13 @@ defmodule Beaver.Sigils do
       true
       iex> ~a{1 : i32} |> Beaver.Deferred.resolve(ctx) |> MLIR.to_string()
       "1 : i32"
+      iex> value = ~s(string with "quotes")
+      iex> MLIR.equal?(Beaver.Deferred.resolve(~a/\#{value}/s, ctx), Beaver.Deferred.resolve(Attribute.string(value), ctx))
+      true
       iex> MLIR.Context.destroy(ctx)
   """
   def sigil_a(string, []), do: MLIR.Attribute.get(string)
+  def sigil_a(string, [?s]), do: MLIR.Attribute.string(string)
 
   def sigil_a(string, modifier) do
     modifier = modifier |> List.to_string()
