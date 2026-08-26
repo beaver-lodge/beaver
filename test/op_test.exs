@@ -54,18 +54,19 @@ defmodule OpTest do
 
   test "builds an operation whose name is known at runtime", %{ctx: ctx} do
     MLIR.Context.allow_unregistered_dialects(ctx)
-    operation = MLIR.Operation.builder("testing.dynamic")
+    operation_name = "testing.dynamic"
 
     module =
       mlir ctx: ctx do
         module do
-          value = operation.(label: ~a/producer/s) >>> ~t{i32}
-          operation.(value, label: ~a/consumer/s) >>> []
+          value = ~o/#{operation_name}/.(label: ~a/producer/s) >>> ~t{i32}
+          ~o/#{operation_name}/.(value, label: ~a/consumer/s) >>> []
+          ~o/testing.marker/ >>> []
         end
       end
 
     assert Enum.map(Beaver.Walker.operations(MLIR.Module.body(module)), &MLIR.Operation.name/1) ==
-             ~w(testing.dynamic testing.dynamic)
+             ~w(testing.dynamic testing.dynamic testing.marker)
 
     assert MLIR.verify!(module) == module
   end

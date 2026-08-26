@@ -109,11 +109,9 @@ defmodule CustomTraitTest do
   end
 
   defp operation_module(ctx, operation_name) do
-    operation = MLIR.Operation.builder(operation_name)
-
     mlir ctx: ctx do
       module do
-        operation.() >>> []
+        ~o/#{operation_name}/ >>> []
       end
     end
   end

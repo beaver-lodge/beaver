@@ -448,11 +448,9 @@ defmodule Beaver.MLIR.ConversionTest do
   defp unknown_module(ctx, name \\ "foo.unknown") do
     MLIR.Context.allow_unregistered_dialects(ctx)
 
-    operation = MLIR.Operation.builder(name)
-
     mlir ctx: ctx do
       module do
-        operation.() >>> []
+        ~o/#{name}/ >>> []
       end
     end
     |> MLIR.verify!()

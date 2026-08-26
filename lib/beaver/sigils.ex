@@ -47,6 +47,19 @@ defmodule Beaver.Sigils do
   end
 
   @doc """
+  Create an SSA builder for an operation whose name is known at runtime.
+
+  A bare operation sigil creates an operation without arguments. Call the
+  returned builder with `.()` to pass operands or attributes:
+
+      mlir do
+        ~o/\#{operation_name}/ >>> []
+        ~o/\#{operation_name}/.(operand, attribute: value) >>> result_type
+      end
+  """
+  def sigil_o(operation_name, []), do: MLIR.Operation.builder(operation_name)
+
+  @doc """
   Create a deferred type value.
 
   Add a modifier to it as a shortcut to make it a higher order type.

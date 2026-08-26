@@ -22,6 +22,9 @@ defmodule Beaver.MLIR.Operation do
       mlir do
         operation.(operand, attribute: value) >>> result_type
       end
+
+  For inline construction, `Beaver.Sigils.sigil_o/2` provides the equivalent
+  `~o/operation.name/` syntax.
   """
   @spec builder(String.t()) :: (Beaver.SSA.t() -> term())
   def builder(operation_name) when is_binary(operation_name) do
