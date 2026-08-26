@@ -1225,11 +1225,14 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp build_list(words, operation, rewriter, base) do
+    ensure_intrinsic_declaration(operation, rewriter, @term_intrinsics.list_cons)
+    MLIR.RewriterBase.set_insertion_point_before(base, operation)
+
     words
     |> Enum.reverse()
     |> Enum.reduce(emit_constant(1, operation, base) |> MLIR.Operation.result(0), fn
       word, tail ->
-        emit_runtime_call(operation, rewriter, base, @term_intrinsics.list_cons, [word, tail])
+        emit_declared_runtime_call(operation, base, @term_intrinsics.list_cons, [word, tail])
     end)
   end
 
@@ -1251,6 +1254,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp emit_runtime_call(operation, rewriter, base, symbol, args) do
     ensure_intrinsic_declaration(operation, rewriter, symbol)
+    emit_declared_runtime_call(operation, base, symbol, args)
+  end
+
+  defp emit_declared_runtime_call(operation, base, symbol, args) do
     MLIR.RewriterBase.set_insertion_point_before(base, operation)
 
     call =
