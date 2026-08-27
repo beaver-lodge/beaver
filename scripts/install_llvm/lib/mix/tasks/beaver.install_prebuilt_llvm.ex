@@ -28,8 +28,8 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     * `--repo REPO` / `LLVM_EUDSL_REPO` — defaults to `llvm/eudsl`.
     * `--tag TAG` / `LLVM_EUDSL_TAG` — defaults to `llvm`.
     * `--asset-revision REV` / `LLVM_EUDSL_ASSET_REVISION` — defaults to
-      the revision in `native-deps.json`; `latest` resolves the newest asset
-      through the GitHub API.
+      the platform-specific revision in `native-deps.json`; `latest` resolves
+      the newest asset through the GitHub API.
     * `--asset-name NAME` / `LLVM_EUDSL_ASSET_NAME` — exact asset file name.
     * `--asset-url URL` / `LLVM_EUDSL_ASSET_URL` — download from an arbitrary
       URL (the asset name defaults to the URL basename).
@@ -93,12 +93,12 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
 
       install_dir = opts[:install_dir] || List.first(positional) || default_install_dir()
       {os_name, arch} = platform(opts)
+      opts = put_default_asset_revision(opts, os_name, arch)
       {asset_name, asset_url, sha256} = resolve_asset(opts, os_name, arch)
 
       if opts[:resolve_only] do
-        unless opts[:triton] || opts[:asset_url] do
-          IO.puts("LLVM_EUDSL_ASSET_REVISION=#{opts[:asset_revision]}")
-        end
+        if opts[:asset_revision],
+          do: IO.puts("LLVM_EUDSL_ASSET_REVISION=#{opts[:asset_revision]}")
 
         IO.puts("LLVM_PREBUILT_ASSET_NAME=#{asset_name}")
         IO.puts("LLVM_PREBUILT_URL=#{asset_url}")
@@ -113,11 +113,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     opts
     |> put_default(:repo, Beaver.ToolchainMetadata.llvm_repo!(), "LLVM_EUDSL_REPO")
     |> put_default(:tag, Beaver.ToolchainMetadata.llvm_tag!(), "LLVM_EUDSL_TAG")
-    |> put_default(
-      :asset_revision,
-      Beaver.ToolchainMetadata.llvm_revision!(),
-      "LLVM_EUDSL_ASSET_REVISION"
-    )
+    |> put_env(:asset_revision, "LLVM_EUDSL_ASSET_REVISION")
     |> put_env(:install_dir, "LLVM_PREBUILT_DIR")
     |> put_env(:asset_name, "LLVM_EUDSL_ASSET_NAME")
     |> put_env(:asset_url, "LLVM_EUDSL_ASSET_URL")
@@ -130,6 +126,17 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
     |> put_default(:triton_ref, "main", "LLVM_TRITON_REF")
     |> maybe_resolve_only()
     |> maybe_triton()
+  end
+
+  defp put_default_asset_revision(opts, os_name, arch) do
+    if Enum.any?(
+         [:asset_revision, :asset_name, :asset_url, :triton],
+         &Keyword.has_key?(opts, &1)
+       ) do
+      opts
+    else
+      Keyword.put(opts, :asset_revision, Beaver.ToolchainMetadata.llvm_revision!(os_name, arch))
+    end
   end
 
   defp reject_empty(opts) do

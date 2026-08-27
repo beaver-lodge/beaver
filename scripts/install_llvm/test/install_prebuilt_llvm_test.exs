@@ -16,9 +16,15 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
       |> Enum.find(&(String.trim(&1) != "" and not String.starts_with?(String.trim(&1), "#")))
       |> String.trim()
 
-    assert metadata["schema_version"] == 1
+    assert metadata["schema_version"] == 2
     assert metadata["kinda"]["ref"] == kinda_ref
-    assert metadata["llvm"]["default_revision"] =~ ~r/^\d{8}\+[0-9a-f]+$/
+
+    assert metadata["llvm"]["default_revisions"] == %{
+             "macos_arm64" => "20260827+6c81b990d",
+             "manylinux_aarch64" => "20260826+6c81b990d",
+             "manylinux_x86_64" => "20260826+6c81b990d",
+             "windows_amd64" => "20260827+6c81b990d"
+           }
   end
 
   test "print-metadata emits the machine-readable toolchain contract" do
@@ -43,8 +49,8 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
         ])
       end)
 
-    assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20260825+2e3d50b41.tar.gz"
-    assert output =~ "LLVM_EUDSL_ASSET_REVISION=20260825+2e3d50b41"
+    assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20260826+6c81b990d.tar.gz"
+    assert output =~ "LLVM_EUDSL_ASSET_REVISION=20260826+6c81b990d"
     assert output =~ "https://github.com/llvm/eudsl/releases/download/llvm/"
   end
 
@@ -76,7 +82,31 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
         ])
       end)
 
-    assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20260825+2e3d50b41.tar.gz"
+    assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20260826+6c81b990d.tar.gz"
+  end
+
+  test "resolves platform-specific revisions from the same LLVM commit" do
+    for {os_name, arch, revision} <- [
+          {"macos", "arm64", "20260827+6c81b990d"},
+          {"manylinux", "aarch64", "20260826+6c81b990d"},
+          {"windows", "amd64", "20260827+6c81b990d"}
+        ] do
+      Mix.Task.reenable("beaver.install_prebuilt_llvm")
+
+      output =
+        capture_io(fn ->
+          InstallPrebuiltLlvm.run([
+            "--resolve-only",
+            "--asset-os",
+            os_name,
+            "--asset-arch",
+            arch
+          ])
+        end)
+
+      assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_#{os_name}_#{arch}_#{revision}.tar.gz"
+      assert output =~ "LLVM_EUDSL_ASSET_REVISION=#{revision}"
+    end
   end
 
   test "triton suffix maps Beaver platforms to Triton archive names" do
