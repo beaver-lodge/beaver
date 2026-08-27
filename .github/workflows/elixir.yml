@@ -234,6 +234,11 @@ jobs:
         if: matrix.otp == '27.3'
         run: |
           mix profile.tprof --no-compile profile/enif_add_overhead.exs
+      - name: Gate Ex conversion profiling overhead
+        if: matrix.otp == '27.3' && matrix.elixir == '1.20.3' && matrix.llvm == 'eudsl' && runner.os == 'Linux'
+        run: |
+          mix run --no-compile profile/ex_conversion_profile.exs -- \
+            --functions 128 --iterations 15 --warmup 4 --max-overhead-percent 5.0
       - name: Run UseENIFAlloc benchmark
         if: matrix.otp == '27.3' && matrix.elixir == '1.20.3' && runner.os != 'Windows'
         env:

@@ -1,4 +1,5 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const kinda = @import("kinda");
 const beam = kinda.beam;
 const e = kinda.erl_nif;
@@ -31,6 +32,61 @@ const ConversionProfile = struct {
             beam.make_u64(environment, self.target_lock_wait_ns),
         };
         return beam.make_tuple(environment, &fields);
+    }
+};
+
+const OperationInventory = struct {
+    operations: u64 = 0,
+    modules: u64 = 0,
+    functions: u64 = 0,
+
+    fn walk(operation: mlir_capi.Operation.T, user_data: ?*anyopaque) callconv(.c) c.MlirWalkResult {
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.MlirWalkResultInterrupt));
+        self.operations += 1;
+
+        const name = c.mlirIdentifierStr(c.mlirOperationGetName(operation));
+        const bytes = name.data[0..name.length];
+        if (std.mem.eql(u8, bytes, "builtin.module")) self.modules += 1;
+        if (std.mem.eql(u8, bytes, "func.func")) self.functions += 1;
+        return c.MlirWalkResultAdvance;
+    }
+
+    pub fn operation_inventory(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+        const operation = try mlir_capi.Operation.resource.fetch(environment, args[0]);
+        var inventory: @This() = .{};
+        c.mlirOperationWalk(operation, walk, &inventory, c.MlirWalkPreOrder);
+
+        var fields = [_]beam.term{
+            beam.make_u64(environment, inventory.operations),
+            beam.make_u64(environment, inventory.modules),
+            beam.make_u64(environment, inventory.functions),
+        };
+        return beam.make_tuple(environment, &fields);
+    }
+};
+
+const ProfileMetrics = struct {
+    pub fn process_cpu_time(environment: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
+        const timestamp_ns = std.Io.Clock.cpu_process.now(std.Options.debug_io).toNanoseconds();
+        const value = std.math.cast(u64, timestamp_ns) orelse 0;
+        return beam.make_u64(environment, value);
+    }
+
+    pub fn peak_rss(environment: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
+        const bytes: u64 = switch (builtin.os.tag) {
+            .windows, .wasi, .freestanding => 0,
+            else => value: {
+                const usage = std.posix.getrusage(std.posix.rusage.SELF);
+                const max_rss: u64 = if (usage.maxrss <= 0) 0 else @intCast(usage.maxrss);
+
+                break :value switch (builtin.os.tag) {
+                    .driverkit, .ios, .maccatalyst, .macos, .tvos, .visionos, .watchos => max_rss,
+                    else => std.math.mul(u64, max_rss, 1024) catch std.math.maxInt(u64),
+                };
+            },
+        };
+
+        return beam.make_u64(environment, bytes);
     }
 };
 
@@ -1127,6 +1183,9 @@ pub const nifs = .{
     prelude.beaverRawNIF(@This(), "type_converter_reply_values", 4),
     prelude.beaverRawNIF(@This(), "conversion_pattern_add", 8),
     prelude.beaverRawNIF(@This(), "apply_conversion_async", 8),
+    prelude.beaverRawNIFDirtyCPU(OperationInventory, "operation_inventory", 1),
+    prelude.beaverRawNIF(ProfileMetrics, "process_cpu_time", 0),
+    prelude.beaverRawNIF(ProfileMetrics, "peak_rss", 0),
 };
 
 pub const conversion_target_create = createTarget;
