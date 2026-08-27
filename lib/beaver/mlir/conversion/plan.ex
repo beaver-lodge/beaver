@@ -269,6 +269,22 @@ defmodule Beaver.MLIR.Conversion.Plan do
   """
   @spec run(t(), MLIR.Conversion.conversion_ir()) :: MLIR.Conversion.result()
   def run(%__MODULE__{} = plan, ir) do
+    execute(plan, ir, false)
+  end
+
+  @doc """
+  Executes the plan with bounded conversion callback profiling.
+
+  The first tuple element is identical to `run/2`; the second is a
+  `Beaver.MLIR.Conversion.Profile` receipt.
+  """
+  @spec profile(t(), MLIR.Conversion.conversion_ir()) ::
+          {MLIR.Conversion.result(), MLIR.Conversion.Profile.receipt()}
+  def profile(%__MODULE__{} = plan, ir) do
+    execute(plan, ir, true)
+  end
+
+  defp execute(plan, ir, profile?) do
     context = MLIR.context(ir)
 
     target_opts = if plan.timeout, do: [timeout: plan.timeout], else: []
@@ -302,7 +318,11 @@ defmodule Beaver.MLIR.Conversion.Plan do
         # to the native worker. Do not rescue around this call and try to destroy
         # the stale mutable handle: apply/5 already releases the owned frozen set
         # if starting the worker fails, and the worker releases it on every exit.
-        MLIR.Conversion.apply(plan.mode, ir, target, patterns, conversion_opts)
+        if profile? do
+          MLIR.Conversion.profile(plan.mode, ir, target, patterns, conversion_opts)
+        else
+          MLIR.Conversion.apply(plan.mode, ir, target, patterns, conversion_opts)
+        end
       after
         MLIR.TypeConverter.destroy(converter)
       end
@@ -319,6 +339,16 @@ defmodule Beaver.MLIR.Conversion.Plan do
     case run(plan, ir) do
       {:ok, converted, _diagnostics} -> converted
       {:error, %MLIR.Conversion.Error{} = error} -> raise error
+    end
+  end
+
+  @doc "Executes a profiled conversion plan, returning the IR and receipt or raising on failure."
+  @spec profile!(t(), MLIR.Conversion.conversion_ir()) ::
+          {MLIR.Conversion.conversion_ir(), MLIR.Conversion.Profile.receipt()}
+  def profile!(%__MODULE__{} = plan, ir) do
+    case profile(plan, ir) do
+      {{:ok, converted, _diagnostics}, receipt} -> {converted, receipt}
+      {{:error, %MLIR.Conversion.Error{} = error}, _receipt} -> raise error
     end
   end
 

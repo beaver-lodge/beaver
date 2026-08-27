@@ -138,6 +138,42 @@ defmodule Beaver.MLIR.ConversionTest do
     MLIR.Module.destroy(full_module)
   end
 
+  test "profiling returns bounded native and BEAM callback aggregates", %{ctx: ctx} do
+    module = unknown_module(ctx, "foo.profiled")
+
+    target =
+      legal_builtin_target(ctx)
+      |> MLIR.ConversionTarget.add_dynamically_legal_op("foo.profiled", fn _ -> :legal end)
+
+    patterns = MLIR.RewritePatternSet.create(ctx)
+
+    assert {{:ok, ^module, []}, receipt} =
+             MLIR.Conversion.profile(:full, module, target, patterns, timeout: 1_000)
+
+    assert receipt["schema_version"] == 1
+    assert receipt["status"] == "ok"
+    assert receipt["duration_ns"] >= receipt["native"]["duration_ns"]
+    assert receipt["native"]["duration_ns"] > 0
+
+    assert receipt["native"]["callback_wait_sum_ns"] >=
+             receipt["native"]["callback_wait_max_ns"]
+
+    assert receipt["native"]["target_lock_wait_ns"] <= receipt["native"]["duration_ns"]
+    assert receipt["native"]["unattributed_residual_ns"] <= receipt["native"]["duration_ns"]
+    assert receipt["ir"]["before"] == receipt["ir"]["after"]
+    assert receipt["ir"]["before"]["operations"] == 2
+    assert receipt["beam"]["reductions"] > 0
+    assert receipt["beam"]["peak_process_memory_bytes"] > 0
+
+    legality = Enum.find(receipt["callbacks"], &(&1["kind"] == "conversion_legality"))
+    assert legality["count"] > 0
+    assert legality["native_wait_sum_ns"] >= legality["beam_service_ns"]
+    assert legality["max_native_wait_ns"] >= legality["max_beam_service_ns"]
+
+    assert :ok = MLIR.ConversionTarget.destroy(target)
+    MLIR.Module.destroy(module)
+  end
+
   test "callback failures are attributed and a dead callback owner fails deterministically", %{
     ctx: ctx
   } do
