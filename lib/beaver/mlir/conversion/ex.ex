@@ -68,13 +68,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_illegal_dialect("ex")
     |> Plan.add_conversion_map(@term_types, "i64")
     |> Plan.add_pattern_population(&populate_native_scalar_patterns/2, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.add", &convert_add/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.sub", &convert_sub/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.mul", &convert_mul/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.div", &convert_div/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.rem", &convert_rem/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.cmp", &convert_cmp/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.if", &convert_if/3, version: "1.0")
+    |> Plan.add_pattern_population(&populate_native_runtime_patterns/2, version: "1.0")
     |> Plan.add_conversion_pattern("ex.call", &convert_call/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.return", &convert_return/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.var", &convert_var/3, version: "1.0")
@@ -169,7 +163,6 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.mapset_put", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.file_read", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.file_read_lines", &convert_term_read/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.binary", &convert_term_binary/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_from_list", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.iodata_to_binary", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.float_lit", &convert_term_read/3, version: "1.0")
@@ -226,7 +219,6 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.list_tail", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_get", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_length", &convert_term_read/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.term_eq", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.term_eq_loose", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_length", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_get", &convert_term_read/3, version: "1.0")
@@ -246,6 +238,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp populate_native_scalar_patterns(patterns, converter) do
     MLIR.CAPI.beaverPopulateExScalarConversionPatterns(patterns.ref, converter.ref)
+  end
+
+  defp populate_native_runtime_patterns(patterns, converter) do
+    MLIR.CAPI.beaverPopulateExRuntimeConversionPatterns(patterns.ref, converter.ref)
   end
 
   # Declaration-first manifest of the Zig term runtime ABI: batata's
@@ -423,131 +419,6 @@ defmodule Beaver.MLIR.Conversion.Ex do
     MLIR.Type.integer(64, ctx: ctx)
   end
 
-  defp convert_add(operation, [left, right], rewriter) do
-    convert_binary("arith.addi", operation, [left, right], rewriter)
-  end
-
-  defp convert_sub(operation, [left, right], rewriter) do
-    convert_binary("arith.subi", operation, [left, right], rewriter)
-  end
-
-  defp convert_mul(operation, [left, right], rewriter) do
-    convert_binary("arith.muli", operation, [left, right], rewriter)
-  end
-
-  defp convert_div(operation, [left, right], rewriter) do
-    convert_binary("arith.divsi", operation, [left, right], rewriter)
-  end
-
-  defp convert_rem(operation, [left, right], rewriter) do
-    convert_binary("arith.remsi", operation, [left, right], rewriter)
-  end
-
-  defp convert_binary(arith_op, operation, [left, right], rewriter) do
-    context = MLIR.context(operation)
-    base = MLIR.ConversionPatternRewriter.as_base(rewriter)
-    location = MLIR.Operation.location(operation)
-    [result] = operation |> Walker.results() |> Enum.to_list()
-    result_type = result |> MLIR.Value.type() |> convert_type()
-
-    add =
-      %Changeset{name: arith_op, context: context, location: location}
-      |> Changeset.add_argument([left, right])
-      |> Changeset.add_result(result_type)
-      |> MLIR.Operation.create()
-
-    MLIR.RewriterBase.set_insertion_point_before(base, operation)
-    MLIR.RewriterBase.insert(base, add)
-    MLIR.ConversionPatternRewriter.replace_op(rewriter, operation, MLIR.Operation.result(add, 0))
-    :ok
-  end
-
-  defp convert_cmp(operation, [left, right], rewriter) do
-    context = MLIR.context(operation)
-    base = MLIR.ConversionPatternRewriter.as_base(rewriter)
-    location = MLIR.Operation.location(operation)
-    [result] = operation |> Walker.results() |> Enum.to_list()
-    result_type = result |> MLIR.Value.type() |> convert_type()
-
-    predicate =
-      operation
-      |> required_attribute("predicate")
-      |> MLIR.CAPI.mlirStringAttrGetValue()
-      |> MLIR.to_string()
-
-    cmpi =
-      %Changeset{name: "arith.cmpi", context: context, location: location}
-      |> Changeset.add_argument([left, right])
-      |> Changeset.add_argument(predicate: cmp_i_predicate(predicate))
-      |> Changeset.add_result(MLIR.Type.i1())
-      |> MLIR.Operation.create()
-
-    MLIR.RewriterBase.set_insertion_point_before(base, operation)
-    MLIR.RewriterBase.insert(base, cmpi)
-
-    # Comparisons produce i1 in arith; widen back to the ex.cmp result's i64
-    # boolean representation so it can feed arithmetic and scf.if conditions.
-    ext =
-      %Changeset{name: "arith.extui", context: context, location: location}
-      |> Changeset.add_argument([MLIR.Operation.result(cmpi, 0)])
-      |> Changeset.add_result(result_type)
-      |> MLIR.Operation.create()
-
-    MLIR.RewriterBase.set_insertion_point_after(base, cmpi)
-    MLIR.RewriterBase.insert(base, ext)
-
-    MLIR.ConversionPatternRewriter.replace_op(rewriter, operation, MLIR.Operation.result(ext, 0))
-    :ok
-  end
-
-  defp convert_if(operation, [cond], rewriter) do
-    context = MLIR.context(operation)
-    base = MLIR.ConversionPatternRewriter.as_base(rewriter)
-    location = MLIR.Operation.location(operation)
-
-    result_types =
-      operation
-      |> Walker.results()
-      |> Enum.to_list()
-      |> Enum.map(&(&1 |> MLIR.Value.type() |> convert_type()))
-
-    [then_region, else_region] = operation |> Walker.regions() |> Enum.to_list()
-
-    # scf.if conditions are i1 at the LLVM boundary; the ex universe carries
-    # booleans as i64 0/1, so truncate before the branch.
-    cond_i1 =
-      %Changeset{name: "arith.trunci", context: context, location: location}
-      |> Changeset.add_argument([cond])
-      |> Changeset.add_result(MLIR.Type.i1())
-      |> MLIR.Operation.create()
-
-    MLIR.RewriterBase.set_insertion_point_before(base, operation)
-    MLIR.RewriterBase.insert(base, cond_i1)
-
-    scf_if =
-      %Changeset{name: "scf.if", context: context, location: location}
-      |> Changeset.add_argument(MLIR.Operation.result(cond_i1, 0))
-      |> Changeset.add_argument(MLIR.CAPI.mlirRegionCreate())
-      |> Changeset.add_argument(MLIR.CAPI.mlirRegionCreate())
-      |> Changeset.add_result(result_types)
-      |> MLIR.Operation.create()
-
-    [new_then, new_else] = scf_if |> Walker.regions() |> Enum.to_list()
-    MLIR.CAPI.mlirRegionTakeBody(new_then, then_region)
-    MLIR.CAPI.mlirRegionTakeBody(new_else, else_region)
-
-    MLIR.RewriterBase.set_insertion_point_before(base, operation)
-    MLIR.RewriterBase.insert(base, scf_if)
-
-    MLIR.ConversionPatternRewriter.replace_op(
-      rewriter,
-      operation,
-      scf_if |> Walker.results() |> Enum.to_list()
-    )
-
-    :ok
-  end
-
   defp convert_term_list(operation, operands, rewriter) do
     base = insertion_point(operation, rewriter)
     list = build_list(operands, operation, rewriter, base)
@@ -583,16 +454,6 @@ defmodule Beaver.MLIR.Conversion.Ex do
     list = build_list(operands, operation, rewriter, base)
     map = emit_runtime_call(operation, rewriter, base, @term_intrinsics.map_from_list, [list])
     replace_with(rewriter, operation, map)
-  end
-
-  defp convert_term_binary(operation, operands, rewriter) do
-    base = insertion_point(operation, rewriter)
-    list = build_list(operands, operation, rewriter, base)
-
-    binary =
-      emit_runtime_call(operation, rewriter, base, @term_intrinsics.binary_from_list, [list])
-
-    replace_with(rewriter, operation, binary)
   end
 
   defp convert_term_predicate(operation, [operand], rewriter) do
@@ -1637,21 +1498,6 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp term_type?(type), do: MLIR.to_string(type) in @term_types
-
-  defp cmp_i_predicate("eq"), do: cmp_i_predicate_attr(0)
-  defp cmp_i_predicate("ne"), do: cmp_i_predicate_attr(1)
-  defp cmp_i_predicate("slt"), do: cmp_i_predicate_attr(2)
-  defp cmp_i_predicate("sle"), do: cmp_i_predicate_attr(3)
-  defp cmp_i_predicate("sgt"), do: cmp_i_predicate_attr(4)
-  defp cmp_i_predicate("sge"), do: cmp_i_predicate_attr(5)
-  defp cmp_i_predicate("ult"), do: cmp_i_predicate_attr(6)
-  defp cmp_i_predicate("ule"), do: cmp_i_predicate_attr(7)
-  defp cmp_i_predicate("ugt"), do: cmp_i_predicate_attr(8)
-  defp cmp_i_predicate("uge"), do: cmp_i_predicate_attr(9)
-
-  defp cmp_i_predicate(other) do
-    raise ArgumentError, "unsupported ex.cmp predicate: #{inspect(other)}"
-  end
 
   defp cmp_i_predicate_attr(i) do
     MLIR.Attribute.integer(MLIR.Type.i64(), i)

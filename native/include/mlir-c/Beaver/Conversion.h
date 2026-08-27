@@ -7,12 +7,18 @@
 extern "C" {
 #endif
 
-/// Adds callback-free conversion patterns for the high-frequency scalar
-/// operations in Beaver's dynamic `ex` dialect. The pattern set retains a
-/// borrowed reference to `typeConverter`; callers must destroy the patterns
-/// before destroying the converter, matching MLIR's normal conversion
-/// lifetime contract.
+/// Adds callback-free conversion patterns for high-frequency scalar and
+/// control-flow operations in Beaver's dynamic `ex` dialect. The pattern set
+/// retains a borrowed reference to `typeConverter`; callers must destroy the
+/// patterns before destroying the converter, matching MLIR's normal
+/// conversion lifetime contract.
 MLIR_CAPI_EXPORTED void beaverPopulateExScalarConversionPatterns(
+    MlirRewritePatternSet patterns, MlirTypeConverter typeConverter);
+
+/// Adds callback-free patterns that construct and query values through the
+/// `ex.term` runtime ABI. Runtime declarations are inserted at module scope
+/// and reused by symbol name.
+MLIR_CAPI_EXPORTED void beaverPopulateExRuntimeConversionPatterns(
     MlirRewritePatternSet patterns, MlirTypeConverter typeConverter);
 
 #ifdef __cplusplus

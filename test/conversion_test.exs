@@ -150,7 +150,7 @@ defmodule Beaver.MLIR.ConversionTest do
     assert {{:ok, ^module, []}, receipt} =
              MLIR.Conversion.profile(:full, module, target, patterns, timeout: 1_000)
 
-    assert receipt["schema_version"] == 1
+    assert receipt["schema_version"] == 2
     assert receipt["status"] == "ok"
     assert receipt["duration_ns"] >= receipt["native"]["duration_ns"]
     assert receipt["native"]["duration_ns"] > 0
@@ -174,7 +174,8 @@ defmodule Beaver.MLIR.ConversionTest do
     assert receipt["hotspots"] ==
              Enum.sort_by(
                receipt["hotspots"],
-               &{-&1["duration_ns"], &1["source"], &1["callback_kind"] || ""}
+               &{-&1["duration_ns"], &1["source"], &1["callback_kind"] || "",
+                &1["callback_root"] || ""}
              )
 
     legality = Enum.find(receipt["callbacks"], &(&1["kind"] == "conversion_legality"))
