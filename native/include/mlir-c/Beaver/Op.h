@@ -69,6 +69,18 @@ beaverSymbolTableGetSymbolVisibility(MlirOperation symbol);
 MLIR_CAPI_EXPORTED void beaverSymbolTableSetSymbolVisibility(
     MlirOperation symbol, MlirBeaverSymbolVisibility visibility);
 
+/// Enumerates attached inherent attributes, including attributes stored in an
+/// operation's properties. These fill the enumeration gap in MLIR's C API.
+MLIR_CAPI_EXPORTED bool beaverOperationHasInherentAttributeByName(
+    MlirOperation operation, MlirStringRef name);
+MLIR_CAPI_EXPORTED MlirAttribute beaverOperationGetInherentAttributeByName(
+    MlirOperation operation, MlirStringRef name);
+MLIR_CAPI_EXPORTED intptr_t
+beaverOperationGetNumInherentAttributes(MlirOperation operation);
+MLIR_CAPI_EXPORTED MlirNamedAttribute
+beaverOperationGetInherentAttribute(MlirOperation operation,
+                                    intptr_t position);
+
 MLIR_CAPI_EXPORTED MlirStringRef
 beaverOperationStateGetName(MlirOperationState state);
 // Create from a by-value state so the BEAM resource backing the state remains

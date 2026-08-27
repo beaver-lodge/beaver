@@ -37,6 +37,24 @@ wrapEffectList(MemoryEffectList *effects) {
   return {effects};
 }
 
+static llvm::SmallVector<NamedAttribute>
+collectInherentAttributes(Operation *operation) {
+  llvm::SmallVector<NamedAttribute> attributes;
+#ifdef BEAVER_HAS_MLIR_INHERENT_ATTRIBUTE_VISITOR
+  operation->getName().walkInherentAttrs(
+      operation, [&](llvm::StringRef name, Attribute &attribute) {
+        if (attribute)
+          attributes.emplace_back(
+              StringAttr::get(operation->getContext(), name), attribute);
+      });
+#else
+  NamedAttrList populated;
+  operation->getName().populateInherentAttrs(operation, populated);
+  attributes.append(populated.begin(), populated.end());
+#endif
+  return attributes;
+}
+
 #ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
 static std::mutex transientScopeMutex;
 static std::unordered_set<MLIRContext *> transientScopeContexts;
@@ -211,6 +229,41 @@ MLIR_CAPI_EXPORTED void beaverSymbolTableSetSymbolVisibility(
     break;
   }
   SymbolTable::setSymbolVisibility(unwrap(symbol), nativeVisibility);
+}
+
+MLIR_CAPI_EXPORTED bool beaverOperationHasInherentAttributeByName(
+    MlirOperation operation, MlirStringRef name) {
+  Operation *op = unwrap(operation);
+  if (op->getName().getOpPropertyByteSize() == 0)
+    return false;
+  return op->getInherentAttr(unwrap(name)).has_value();
+}
+
+MLIR_CAPI_EXPORTED MlirAttribute beaverOperationGetInherentAttributeByName(
+    MlirOperation operation, MlirStringRef name) {
+  Operation *op = unwrap(operation);
+  if (op->getName().getOpPropertyByteSize() == 0)
+    return {};
+  std::optional<Attribute> attribute = op->getInherentAttr(unwrap(name));
+  return attribute ? wrap(*attribute) : MlirAttribute{};
+}
+
+MLIR_CAPI_EXPORTED intptr_t
+beaverOperationGetNumInherentAttributes(MlirOperation operation) {
+  return static_cast<intptr_t>(
+      collectInherentAttributes(unwrap(operation)).size());
+}
+
+MLIR_CAPI_EXPORTED MlirNamedAttribute
+beaverOperationGetInherentAttribute(MlirOperation operation,
+                                    intptr_t position) {
+  llvm::SmallVector<NamedAttribute> attributes =
+      collectInherentAttributes(unwrap(operation));
+  assert(position >= 0 && static_cast<size_t>(position) < attributes.size() &&
+         "inherent attribute position out of bounds");
+  NamedAttribute attribute = attributes[position];
+  return MlirNamedAttribute{wrap(attribute.getName()),
+                            wrap(attribute.getValue())};
 }
 
 MLIR_CAPI_EXPORTED void beaverMemoryEffectsOpInterfaceAttachFallbackModel(

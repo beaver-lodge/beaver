@@ -125,11 +125,7 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
   end
 
   defp put_unit_attribute(operation, name, context) do
-    MLIR.CAPI.mlirOperationSetAttributeByName(
-      operation,
-      MLIR.StringRef.create(name),
-      MLIR.Attribute.unit(ctx: context)
-    )
+    MLIR.Operation.put_attribute(operation, name, MLIR.Attribute.unit(ctx: context))
 
     operation
   end

@@ -740,11 +740,7 @@ defmodule Beaver.MLIR.Transform.Schedule do
 
       case selection_attribute(choice, value, option_attributes, context) do
         {:ok, attribute_name, attribute} ->
-          MLIR.CAPI.mlirOperationSetAttributeByName(
-            operation,
-            MLIR.StringRef.create(attribute_name),
-            attribute
-          )
+          MLIR.Operation.put_inherent_attribute(operation, attribute_name, attribute)
 
           {:cont, :ok}
 

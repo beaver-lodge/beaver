@@ -212,23 +212,73 @@ defmodule Beaver.Walker do
 
   @spec attributes(operation()) :: Enumerable.t()
   @doc """
-  Returns an enumerable of the attributes of an `operation()`.
+  Returns inherent attributes followed by discardable attributes.
+
+  Prefer `inherent_attributes/1` or `discardable_attributes/1` when the
+  distinction is semantically relevant.
   """
   def attributes(op) do
     new(
       op,
       {Identifier, Attribute},
-      get_num: &CAPI.mlirOperationGetNumAttributes/1,
+      get_num: fn operation ->
+        native_integer(CAPI.beaverOperationGetNumInherentAttributes(operation)) +
+          native_integer(CAPI.mlirOperationGetNumDiscardableAttributes(operation))
+      end,
       get_element: fn o, i ->
-        na = CAPI.mlirOperationGetAttribute(o, i)
+        inherent_count = native_integer(CAPI.beaverOperationGetNumInherentAttributes(o))
 
-        {
-          MLIR.NamedAttribute.name(na),
-          MLIR.NamedAttribute.attribute(na)
-        }
+        na =
+          if i < inherent_count do
+            CAPI.beaverOperationGetInherentAttribute(o, i)
+          else
+            CAPI.mlirOperationGetDiscardableAttribute(o, i - inherent_count)
+          end
+
+        named_attribute_tuple(na)
       end
     )
   end
+
+  @spec inherent_attributes(operation()) :: Enumerable.t()
+  @doc "Returns the attached inherent/property attributes of an operation."
+  def inherent_attributes(op) do
+    new(
+      op,
+      {Identifier, Attribute},
+      get_num: &CAPI.beaverOperationGetNumInherentAttributes/1,
+      get_element: fn operation, index ->
+        operation
+        |> CAPI.beaverOperationGetInherentAttribute(index)
+        |> named_attribute_tuple()
+      end
+    )
+  end
+
+  @spec discardable_attributes(operation()) :: Enumerable.t()
+  @doc "Returns the discardable metadata attributes of an operation."
+  def discardable_attributes(op) do
+    new(
+      op,
+      {Identifier, Attribute},
+      get_num: &CAPI.mlirOperationGetNumDiscardableAttributes/1,
+      get_element: fn operation, index ->
+        operation
+        |> CAPI.mlirOperationGetDiscardableAttribute(index)
+        |> named_attribute_tuple()
+      end
+    )
+  end
+
+  defp named_attribute_tuple(named_attribute) do
+    {
+      MLIR.NamedAttribute.name(named_attribute),
+      MLIR.NamedAttribute.attribute(named_attribute)
+    }
+  end
+
+  defp native_integer(value) when is_integer(value), do: value
+  defp native_integer(value), do: Beaver.Native.to_term(value)
 
   @doc """
   Returns an enumerable of the arguments of an `Block.t()`
@@ -492,7 +542,8 @@ defmodule Beaver.Walker do
     @spec count(Beaver.Walker.t()) :: {:ok, non_neg_integer()} | {:error, module()}
     def count(%Beaver.Walker{container: container, get_num: get_num})
         when is_function(get_num, 1) do
-      {:ok, get_num.(container) |> Beaver.Native.to_term()}
+      count = get_num.(container)
+      {:ok, if(is_integer(count), do: count, else: Beaver.Native.to_term(count))}
     end
 
     def count(%Beaver.Walker{}) do

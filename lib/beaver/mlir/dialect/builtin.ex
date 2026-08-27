@@ -32,7 +32,7 @@ defmodule Beaver.MLIR.Dialect.Builtin do
 
         module
         |> Beaver.MLIR.CAPI.mlirModuleGetOperation()
-        |> Beaver.MLIR.CAPI.mlirOperationSetAttributeByName(name, attr)
+        |> Beaver.MLIR.Operation.put_attribute(name, attr)
       end
 
       module_body_block = Beaver.MLIR.Module.body(module)

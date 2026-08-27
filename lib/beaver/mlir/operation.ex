@@ -198,12 +198,9 @@ defmodule Beaver.MLIR.Operation do
 
   @impl Access
   def fetch(operation, attribute) do
-    attr = mlirOperationGetAttributeByName(operation, MLIR.StringRef.create(attribute))
-
-    if MLIR.null?(attr) do
-      :error
-    else
-      {:ok, attr}
+    case attribute(operation, attribute) do
+      nil -> :error
+      %MLIR.Attribute{} = value -> {:ok, value}
     end
   end
 
@@ -217,16 +214,10 @@ defmodule Beaver.MLIR.Operation do
 
     case function.(attr) do
       {_current_value, new_value} ->
-        ctx = MLIR.context(operation)
-
-        mlirOperationSetAttributeByName(
-          operation,
-          MLIR.StringRef.create(attribute),
-          Beaver.Deferred.resolve(new_value, ctx)
-        )
+        put_attribute(operation, attribute, new_value)
 
       :pop ->
-        mlirOperationRemoveAttributeByName(operation, MLIR.StringRef.create(attribute))
+        remove_attribute(operation, attribute)
     end
 
     {attr, operation}
@@ -235,8 +226,106 @@ defmodule Beaver.MLIR.Operation do
   @impl Access
   def pop(operation, attribute) do
     {:ok, attr} = fetch(operation, attribute)
-    mlirOperationRemoveAttributeByName(operation, MLIR.StringRef.create(attribute))
+    remove_attribute(operation, attribute)
     {attr, operation}
+  end
+
+  @doc "Returns whether the operation schema declares an inherent attribute name."
+  @spec inherent_attribute?(t(), String.t() | atom()) :: boolean()
+  def inherent_attribute?(%__MODULE__{} = operation, name) do
+    beaverOperationHasInherentAttributeByName(operation, MLIR.StringRef.create(name))
+    |> Beaver.Native.to_term()
+  end
+
+  @doc "Returns an attached inherent attribute, or `nil` when it is absent."
+  @spec inherent_attribute(t(), String.t() | atom()) :: MLIR.Attribute.t() | nil
+  def inherent_attribute(%__MODULE__{} = operation, name) do
+    operation
+    |> beaverOperationGetInherentAttributeByName(MLIR.StringRef.create(name))
+    |> nil_if_null()
+  end
+
+  @doc "Sets an attribute declared by the operation schema."
+  @spec put_inherent_attribute(t(), String.t() | atom(), term()) :: :ok
+  def put_inherent_attribute(%__MODULE__{} = operation, name, value) do
+    unless inherent_attribute?(operation, name) do
+      raise ArgumentError,
+            "#{inspect(name)} is not an inherent attribute of #{operation |> name()}"
+    end
+
+    mlirOperationSetInherentAttributeByName(
+      operation,
+      MLIR.StringRef.create(name),
+      Beaver.Deferred.resolve(value, MLIR.context(operation))
+    )
+  end
+
+  @doc "Returns a discardable metadata attribute, or `nil` when it is absent."
+  @spec discardable_attribute(t(), String.t() | atom()) :: MLIR.Attribute.t() | nil
+  def discardable_attribute(%__MODULE__{} = operation, name) do
+    operation
+    |> mlirOperationGetDiscardableAttributeByName(MLIR.StringRef.create(name))
+    |> nil_if_null()
+  end
+
+  @doc "Sets discardable metadata, rejecting names owned by the operation schema."
+  @spec put_discardable_attribute(t(), String.t() | atom(), term()) :: :ok
+  def put_discardable_attribute(%__MODULE__{} = operation, name, value) do
+    if inherent_attribute?(operation, name) do
+      raise ArgumentError,
+            "#{inspect(name)} is inherent to #{operation |> name()} and cannot be discardable"
+    end
+
+    mlirOperationSetDiscardableAttributeByName(
+      operation,
+      MLIR.StringRef.create(name),
+      Beaver.Deferred.resolve(value, MLIR.context(operation))
+    )
+  end
+
+  @doc "Removes discardable metadata and reports whether it existed."
+  @spec remove_discardable_attribute(t(), String.t() | atom()) :: boolean()
+  def remove_discardable_attribute(%__MODULE__{} = operation, name) do
+    mlirOperationRemoveDiscardableAttributeByName(operation, MLIR.StringRef.create(name))
+    |> Beaver.Native.to_term()
+  end
+
+  @doc "Reads an attribute through its schema-defined semantic path."
+  @spec attribute(t(), String.t() | atom()) :: MLIR.Attribute.t() | nil
+  def attribute(%__MODULE__{} = operation, name) do
+    if inherent_attribute?(operation, name) do
+      inherent_attribute(operation, name)
+    else
+      discardable_attribute(operation, name)
+    end
+  end
+
+  @doc "Sets an attribute through its schema-defined semantic path."
+  @spec put_attribute(t(), String.t() | atom(), term()) :: :ok
+  def put_attribute(%__MODULE__{} = operation, name, value) do
+    if inherent_attribute?(operation, name) do
+      put_inherent_attribute(operation, name, value)
+    else
+      put_discardable_attribute(operation, name, value)
+    end
+  end
+
+  @doc "Removes an attribute through its schema-defined semantic path."
+  @spec remove_attribute(t(), String.t() | atom()) :: boolean() | :ok
+  def remove_attribute(%__MODULE__{} = operation, name) do
+    if inherent_attribute?(operation, name) do
+      mlirOperationSetInherentAttributeByName(
+        operation,
+        MLIR.StringRef.create(name),
+        MLIR.Attribute.null()
+      )
+    else
+      remove_discardable_attribute(operation, name)
+    end
+  end
+
+  defp nil_if_null(attribute) do
+    if MLIR.null?(attribute), do: nil, else: attribute
   end
 
   def with_symbol_table(%__MODULE__{} = op, fun) do
