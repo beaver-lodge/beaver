@@ -176,7 +176,7 @@ defmodule ExConversionTest do
     assert rendered =~ "func.return"
   end
 
-  test "uses a native type map instead of type-conversion callbacks", %{ctx: ctx} do
+  test "uses native type maps and hot scalar patterns", %{ctx: ctx} do
     Beaver.Slang.load(ctx, ExDialect)
 
     module =
@@ -188,8 +188,16 @@ defmodule ExConversionTest do
 
     refute Enum.any?(receipt["callbacks"], &(&1["kind"] == "convert_type"))
 
-    assert Enum.any?(receipt["callbacks"], fn callback ->
-             callback["kind"] == "conversion_pattern" and callback["count"] > 0
+    assert %{"count" => 2} =
+             Enum.find(receipt["callbacks"], &(&1["kind"] == "conversion_pattern"))
+
+    declaration = Plan.declaration(Ex.plan())
+    assert %{kind: :add_pattern_population, version: "1.0"} in declaration.entries
+
+    moved_roots = ~w(ex.lit ex.box ex.to_word ex.unbox ex.yield)
+
+    refute Enum.any?(declaration.entries, fn entry ->
+             entry[:kind] == :add_conversion_pattern and entry[:root] in moved_roots
            end)
   end
 

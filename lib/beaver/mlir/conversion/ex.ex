@@ -67,7 +67,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_legal_dialect("llvm")
     |> Plan.add_illegal_dialect("ex")
     |> Plan.add_conversion_map(@term_types, "i64")
-    |> Plan.add_conversion_pattern("ex.lit", &convert_lit/3, version: "1.0")
+    |> Plan.add_pattern_population(&populate_native_scalar_patterns/2, version: "1.0")
     |> Plan.add_conversion_pattern("ex.add", &convert_add/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.sub", &convert_sub/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.mul", &convert_mul/3, version: "1.0")
@@ -75,14 +75,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.rem", &convert_rem/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.cmp", &convert_cmp/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.if", &convert_if/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.yield", &convert_yield/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.call", &convert_call/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.return", &convert_return/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.var", &convert_var/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.func", &convert_func/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.box", &convert_box/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.to_word", &convert_to_word/3, version: "1.0")
-    |> Plan.add_conversion_pattern("ex.unbox", &convert_to_word/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.self", &convert_self/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.send", &convert_send/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.receive", &convert_receive/3, version: "1.0")
@@ -246,6 +242,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.int_to_string_base", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.int_to_hex", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.string_to_int", &convert_term_read/3, version: "1.0")
+  end
+
+  defp populate_native_scalar_patterns(patterns, converter) do
+    MLIR.CAPI.beaverPopulateExScalarConversionPatterns(patterns.ref, converter.ref)
   end
 
   # Declaration-first manifest of the Zig term runtime ABI: batata's
@@ -423,31 +423,6 @@ defmodule Beaver.MLIR.Conversion.Ex do
     MLIR.Type.integer(64, ctx: ctx)
   end
 
-  defp convert_lit(operation, [], rewriter) do
-    context = MLIR.context(operation)
-    base = MLIR.ConversionPatternRewriter.as_base(rewriter)
-    location = MLIR.Operation.location(operation)
-    [result] = operation |> Walker.results() |> Enum.to_list()
-    result_type = result |> MLIR.Value.type() |> convert_type()
-
-    constant =
-      %Changeset{name: "arith.constant", context: context, location: location}
-      |> Changeset.add_argument(value: required_attribute(operation, "value"))
-      |> Changeset.add_result(result_type)
-      |> MLIR.Operation.create()
-
-    MLIR.RewriterBase.set_insertion_point_before(base, operation)
-    MLIR.RewriterBase.insert(base, constant)
-
-    MLIR.ConversionPatternRewriter.replace_op(
-      rewriter,
-      operation,
-      MLIR.Operation.result(constant, 0)
-    )
-
-    :ok
-  end
-
   defp convert_add(operation, [left, right], rewriter) do
     convert_binary("arith.addi", operation, [left, right], rewriter)
   end
@@ -573,22 +548,6 @@ defmodule Beaver.MLIR.Conversion.Ex do
     :ok
   end
 
-  defp convert_yield(operation, operands, rewriter) do
-    context = MLIR.context(operation)
-    base = MLIR.ConversionPatternRewriter.as_base(rewriter)
-    location = MLIR.Operation.location(operation)
-
-    yield =
-      %Changeset{name: "scf.yield", context: context, location: location}
-      |> Changeset.add_argument(operands)
-      |> MLIR.Operation.create()
-
-    MLIR.RewriterBase.set_insertion_point_before(base, operation)
-    MLIR.RewriterBase.insert(base, yield)
-    MLIR.ConversionPatternRewriter.replace_op(rewriter, operation, yield)
-    :ok
-  end
-
   defp convert_term_list(operation, operands, rewriter) do
     base = insertion_point(operation, rewriter)
     list = build_list(operands, operation, rewriter, base)
@@ -652,22 +611,6 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
     result = emit_runtime_call(operation, rewriter, base, intrinsic, [word])
     replace_with(rewriter, operation, result)
-  end
-
-  defp convert_box(operation, [operand], rewriter) do
-    base = insertion_point(operation, rewriter)
-
-    word =
-      case operation |> Walker.operands() |> Enum.to_list() do
-        [original] -> maybe_tag(original, operand, operation, base)
-        _ -> operand
-      end
-
-    replace_with(rewriter, operation, word)
-  end
-
-  defp convert_to_word(operation, [operand], rewriter) do
-    replace_with(rewriter, operation, operand)
   end
 
   defp convert_self(operation, [], rewriter) do

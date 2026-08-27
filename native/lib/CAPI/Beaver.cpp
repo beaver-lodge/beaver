@@ -1,13 +1,18 @@
 #include "mlir/CAPI/Beaver.h"
 #include "mlir/CAPI/IRMapping.h"
+#include "mlir/CAPI/Rewrite.h"
+#include "mlir-c/Beaver/Conversion.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
 #include "mlir/CAPI/Rewrite.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/ExtensibleDialect.h"
 #ifdef BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION
 #include "mlir/Transforms/CompositePass.h"
 #endif
+#include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/IR/SymbolTable.h"
 #include "llvm/ADT/SmallVector.h"
@@ -28,6 +33,123 @@
 #include <vector>
 
 using namespace mlir;
+
+namespace {
+
+static bool isExTermType(Type type) {
+  auto dynamicType = dyn_cast<DynamicType>(type);
+  if (!dynamicType)
+    return false;
+
+  StringRef name = dynamicType.getTypeDef()->getName();
+  return name == "term" || name == "bound" || name == "unbound" ||
+         name.ends_with(".term") || name.ends_with(".bound") ||
+         name.ends_with(".unbound");
+}
+
+class ExLiteralConversion final : public ConversionPattern {
+public:
+  ExLiteralConversion(const TypeConverter &converter, MLIRContext *context)
+      : ConversionPattern(converter, "ex.lit", PatternBenefit(1), context) {}
+
+  LogicalResult
+  matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (!operands.empty() || operation->getNumResults() != 1)
+      return failure();
+
+    Attribute value = operation->getAttr("value");
+    Type resultType =
+        getTypeConverter()->convertType(operation->getResult(0).getType());
+    if (!value || !resultType)
+      return failure();
+
+    OperationState state(operation->getLoc(), "arith.constant");
+    state.addAttribute("value", value);
+    state.addTypes(resultType);
+    Operation *constant = rewriter.create(state);
+    rewriter.replaceOp(operation, constant->getResults());
+    return success();
+  }
+};
+
+class ExBoxConversion final : public ConversionPattern {
+public:
+  ExBoxConversion(const TypeConverter &converter, MLIRContext *context)
+      : ConversionPattern(converter, "ex.box", PatternBenefit(1), context) {}
+
+  LogicalResult
+  matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (operands.size() != 1 || operation->getNumOperands() != 1 ||
+        operation->getNumResults() != 1)
+      return failure();
+
+    Value word = operands.front();
+    if (!isExTermType(operation->getOperand(0).getType())) {
+      IntegerType wordType = rewriter.getI64Type();
+
+      OperationState constantState(operation->getLoc(), "arith.constant");
+      constantState.addAttribute("value", rewriter.getI64IntegerAttr(3));
+      constantState.addTypes(wordType);
+      Operation *constant = rewriter.create(constantState);
+
+      OperationState shiftState(operation->getLoc(), "arith.shli");
+      shiftState.addOperands({word, constant->getResult(0)});
+      shiftState.addTypes(wordType);
+      word = rewriter.create(shiftState)->getResult(0);
+    }
+
+    rewriter.replaceOp(operation, word);
+    return success();
+  }
+};
+
+class ExIdentityConversion final : public ConversionPattern {
+public:
+  ExIdentityConversion(const TypeConverter &converter, StringRef rootName,
+                       MLIRContext *context)
+      : ConversionPattern(converter, rootName, PatternBenefit(1), context) {}
+
+  LogicalResult
+  matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    if (operands.size() != 1 || operation->getNumResults() != 1)
+      return failure();
+    rewriter.replaceOp(operation, operands.front());
+    return success();
+  }
+};
+
+class ExYieldConversion final : public ConversionPattern {
+public:
+  ExYieldConversion(const TypeConverter &converter, MLIRContext *context)
+      : ConversionPattern(converter, "ex.yield", PatternBenefit(1), context) {}
+
+  LogicalResult
+  matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
+                  ConversionPatternRewriter &rewriter) const override {
+    OperationState state(operation->getLoc(), "scf.yield");
+    state.addOperands(operands);
+    Operation *yield = rewriter.create(state);
+    rewriter.replaceOp(operation, yield);
+    return success();
+  }
+};
+
+} // namespace
+
+void beaverPopulateExScalarConversionPatterns(
+    MlirRewritePatternSet patterns, MlirTypeConverter typeConverter) {
+  RewritePatternSet *set = unwrap(patterns);
+  TypeConverter *converter = unwrap(typeConverter);
+  MLIRContext *context = set->getContext();
+
+  set->add<ExLiteralConversion, ExBoxConversion, ExYieldConversion>(*converter,
+                                                                    context);
+  set->add<ExIdentityConversion>(*converter, "ex.to_word", context);
+  set->add<ExIdentityConversion>(*converter, "ex.unbox", context);
+}
 
 MLIR_CAPI_EXPORTED void
 beaverOperationDestroyIterative(MlirOperation operation) {

@@ -174,6 +174,48 @@ defmodule Beaver.MLIR.ConversionPlanTest do
     MLIR.Module.destroy(module)
   end
 
+  test "materializes a pattern population callback once per run", %{ctx: ctx} do
+    owner = self()
+
+    plan =
+      Plan.new(mode: :full)
+      |> Plan.add_legal_dialect("builtin")
+      |> Plan.add_pattern_population(
+        fn patterns, converter ->
+          send(owner, {:populated, patterns, converter})
+          :ok
+        end,
+        version: "1.0"
+      )
+
+    module = MLIR.Module.create!("module {}", ctx: ctx)
+    assert {:ok, ^module, []} = Plan.run(plan, module)
+
+    assert_receive {:populated, %MLIR.RewritePatternSet{}, %MLIR.TypeConverter{}}
+
+    assert List.last(Plan.declaration(plan).entries) == %{
+             kind: :add_pattern_population,
+             version: "1.0"
+           }
+
+    MLIR.Module.destroy(module)
+  end
+
+  test "pattern population fails closed on an invalid outcome", %{ctx: ctx} do
+    plan =
+      Plan.new(mode: :full)
+      |> Plan.add_legal_dialect("builtin")
+      |> Plan.add_pattern_population(fn _patterns, _converter -> :ignored end)
+
+    module = MLIR.Module.create!("module {}", ctx: ctx)
+
+    assert_raise ArgumentError, ~r/pattern population must return :ok/, fn ->
+      Plan.run(plan, module)
+    end
+
+    MLIR.Module.destroy(module)
+  end
+
   test "full vs partial mode in Plan", %{ctx: ctx} do
     MLIR.Context.allow_unregistered_dialects(ctx)
 
@@ -511,6 +553,10 @@ defmodule Beaver.MLIR.ConversionPlanTest do
         },
         benefit: 2
       )
+    end
+
+    assert_raise ArgumentError, ~r/unsupported add_pattern_population options/, fn ->
+      Plan.add_pattern_population(plan, fn _, _ -> :ok end, invalid: true)
     end
 
     # Plan.declaration/1 structure assertion

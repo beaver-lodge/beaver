@@ -258,6 +258,25 @@ defmodule Beaver.MLIR.Conversion.Plan do
   end
 
   @doc """
+  Adds a pattern-set population callback to the plan.
+
+  The callback runs once while a fresh plan is materialized and receives the
+  mutable rewrite pattern set and its type converter. It must return `:ok`.
+  This is the composition point for callback-free native pattern groups: the
+  callback only installs patterns and is not invoked by the conversion worker.
+  """
+  @spec add_pattern_population(
+          t(),
+          (MLIR.RewritePatternSet.t(), MLIR.TypeConverter.t() -> :ok),
+          keyword()
+        ) :: t()
+  def add_pattern_population(%__MODULE__{} = plan, callback, opts \\ [])
+      when is_function(callback, 2) do
+    opts = validate_callback_opts!(opts, [:version], "add_pattern_population")
+    append_entry(plan, {:add_pattern_population, callback, opts})
+  end
+
+  @doc """
   Returns deterministic metadata for the given plan.
 
   Function bodies and runtime state are omitted. Callback entries include their
@@ -503,6 +522,10 @@ defmodule Beaver.MLIR.Conversion.Plan do
     }
   end
 
+  defp entry_declaration({:add_pattern_population, _callback, opts}) do
+    %{kind: :add_pattern_population, version: callback_version(opts)}
+  end
+
   defp callback_version(opts) do
     Keyword.get(opts, :version, :unversioned)
   end
@@ -676,6 +699,20 @@ defmodule Beaver.MLIR.Conversion.Plan do
          _timeout
        ),
        do: MLIR.RewritePatternSet.add(patterns, descriptor, ctx: context)
+
+  defp populate_entry(
+         {:add_pattern_population, callback, _opts},
+         _context,
+         _target,
+         converter,
+         patterns,
+         _timeout
+       ) do
+    case callback.(patterns, converter) do
+      :ok -> :ok
+      other -> raise ArgumentError, "pattern population must return :ok, got: #{inspect(other)}"
+    end
+  end
 
   defp conversion_pattern_opts(opts, context, plan_timeout) do
     pattern_opts =
