@@ -32,14 +32,47 @@ defmodule Beaver.MLIR.SymbolTable do
   end
 
   @doc """
-  Returns the name of the attribute used for symbol visibility as atom.
+  Returns the attribute name used by the default symbol visibility
+  implementation as an atom.
+
+  A symbol operation may implement visibility without storing this attribute.
+  Use `visibility/1` and `set_visibility/2` to access its semantic visibility.
 
   ## Examples
-    iex> MLIR.SymbolTable.visibility_attribute_name()
+    iex> MLIR.SymbolTable.default_visibility_attribute_name()
     :sym_visibility
   """
-  def visibility_attribute_name() do
-    mlirSymbolTableGetVisibilityAttributeName() |> to_string() |> String.to_atom()
+  def default_visibility_attribute_name() do
+    beaverSymbolTableGetDefaultVisibilityAttributeName() |> to_string() |> String.to_atom()
+  end
+
+  @type visibility :: :public | :private | :nested
+
+  @doc "Returns a symbol operation's semantic visibility."
+  @spec visibility(MLIR.Operation.t()) :: visibility()
+  def visibility(operation) do
+    operation
+    |> beaverSymbolTableGetSymbolVisibility()
+    |> Beaver.Native.to_term()
+    |> case do
+      0 -> :public
+      1 -> :private
+      2 -> :nested
+    end
+  end
+
+  @doc "Sets a symbol operation's semantic visibility."
+  @spec set_visibility(MLIR.Operation.t(), visibility()) :: :ok
+  def set_visibility(operation, visibility) do
+    encoded =
+      case visibility do
+        :public -> 0
+        :private -> 1
+        :nested -> 2
+        other -> raise ArgumentError, "invalid symbol visibility: #{inspect(other)}"
+      end
+
+    beaverSymbolTableSetSymbolVisibility(operation, encoded)
   end
 
   @doc "Inserts an operation into a symbol table."

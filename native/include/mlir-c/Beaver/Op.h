@@ -53,6 +53,22 @@ MLIR_CAPI_EXPORTED bool beaverIsNullType(MlirType type);
 MLIR_CAPI_EXPORTED bool beaverIsNullAttribute(MlirAttribute attr);
 MLIR_CAPI_EXPORTED bool beaverIsNullSymbolTable(MlirSymbolTable symbolTable);
 
+typedef enum {
+  MlirBeaverSymbolVisibilityPublic = 0,
+  MlirBeaverSymbolVisibilityPrivate = 1,
+  MlirBeaverSymbolVisibilityNested = 2,
+} MlirBeaverSymbolVisibility;
+
+/// Returns the default attribute name used by SymbolOpInterface's default
+/// visibility implementation. Custom symbol operations may store visibility
+/// elsewhere; use the get/set functions below to inspect their visibility.
+MLIR_CAPI_EXPORTED MlirStringRef
+beaverSymbolTableGetDefaultVisibilityAttributeName(void);
+MLIR_CAPI_EXPORTED MlirBeaverSymbolVisibility
+beaverSymbolTableGetSymbolVisibility(MlirOperation symbol);
+MLIR_CAPI_EXPORTED void beaverSymbolTableSetSymbolVisibility(
+    MlirOperation symbol, MlirBeaverSymbolVisibility visibility);
+
 MLIR_CAPI_EXPORTED MlirStringRef
 beaverOperationStateGetName(MlirOperationState state);
 // Create from a by-value state so the BEAM resource backing the state remains

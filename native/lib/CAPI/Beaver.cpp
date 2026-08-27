@@ -4,6 +4,7 @@
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
 #include "mlir/CAPI/Rewrite.h"
+#include "mlir/IR/SymbolTable.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/VCSRevision.h"
@@ -168,6 +169,49 @@ private:
   bool shuttingDown = false;
 };
 } // namespace
+
+MLIR_CAPI_EXPORTED MlirStringRef
+beaverSymbolTableGetDefaultVisibilityAttributeName(void) {
+#ifdef BEAVER_HAS_MLIR_DEFAULT_SYMBOL_VISIBILITY_ATTRIBUTE_NAME
+  return wrap(SymbolOpInterface::getDefaultVisibilityAttrName());
+#else
+  return wrap(SymbolTable::getVisibilityAttrName());
+#endif
+}
+
+MLIR_CAPI_EXPORTED MlirBeaverSymbolVisibility
+beaverSymbolTableGetSymbolVisibility(MlirOperation symbol) {
+  switch (SymbolTable::getSymbolVisibility(unwrap(symbol))) {
+  case SymbolTable::Visibility::Public:
+    return MlirBeaverSymbolVisibilityPublic;
+  case SymbolTable::Visibility::Private:
+    return MlirBeaverSymbolVisibilityPrivate;
+  case SymbolTable::Visibility::Nested:
+    return MlirBeaverSymbolVisibilityNested;
+  }
+  llvm_unreachable("unknown symbol visibility");
+}
+
+MLIR_CAPI_EXPORTED void beaverSymbolTableSetSymbolVisibility(
+    MlirOperation symbol, MlirBeaverSymbolVisibility visibility) {
+  if (visibility < MlirBeaverSymbolVisibilityPublic ||
+      visibility > MlirBeaverSymbolVisibilityNested)
+    llvm_unreachable("unknown Beaver symbol visibility");
+
+  SymbolTable::Visibility nativeVisibility = SymbolTable::Visibility::Public;
+  switch (visibility) {
+  case MlirBeaverSymbolVisibilityPublic:
+    nativeVisibility = SymbolTable::Visibility::Public;
+    break;
+  case MlirBeaverSymbolVisibilityPrivate:
+    nativeVisibility = SymbolTable::Visibility::Private;
+    break;
+  case MlirBeaverSymbolVisibilityNested:
+    nativeVisibility = SymbolTable::Visibility::Nested;
+    break;
+  }
+  SymbolTable::setSymbolVisibility(unwrap(symbol), nativeVisibility);
+}
 
 MLIR_CAPI_EXPORTED void beaverMemoryEffectsOpInterfaceAttachFallbackModel(
     MlirContext context, MlirStringRef operationName,
