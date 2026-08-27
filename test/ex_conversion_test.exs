@@ -200,7 +200,7 @@ defmodule ExConversionTest do
     assert %{kind: :add_pattern_population, version: "1.0"} in declaration.entries
 
     moved_roots =
-      ~w(ex.lit ex.box ex.to_word ex.unbox ex.yield ex.add ex.sub ex.mul ex.div ex.rem ex.cmp ex.if ex.binary ex.term_eq)
+      ~w(ex.lit ex.box ex.to_word ex.unbox ex.yield ex.add ex.sub ex.mul ex.div ex.rem ex.cmp ex.if ex.binary ex.term_eq ex.binary_part)
 
     refute Enum.any?(declaration.entries, fn entry ->
              entry[:kind] == :add_conversion_pattern and entry[:root] in moved_roots
@@ -779,6 +779,7 @@ defmodule ExConversionTest do
             %5 = "ex.binary_length"(%4) : (!ex.term) -> i64
             %6 = "ex.binary_get"(%4, %0) : (!ex.term, i64) -> !ex.term
             %7 = "ex.binary_slice"(%4, %1) : (!ex.term, i64) -> !ex.term
+            %8 = "ex.binary_part"(%4, %2, %3) : (!ex.term, !ex.term, !ex.term) -> !ex.term
             "ex.return"(%5) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
@@ -792,6 +793,10 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.binary_length"
     assert rendered =~ "ex.term.binary_get"
     assert rendered =~ "ex.term.binary_slice"
+    assert rendered =~ "ex.term.binary_part"
+
+    assert rendered =~
+             ~s|function_type = (i64, i64, i64) -> i64, sym_name = "ex.term.binary_part"|
   end
 
   test "converts utf8 binary read ops to Zig runtime ABI calls", %{ctx: ctx} do

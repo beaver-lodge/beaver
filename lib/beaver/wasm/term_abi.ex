@@ -145,6 +145,7 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.binary_length" => %{params: [:i64], result: :i64},
     "ex.term.binary_get" => %{params: [:i64, :i64], result: :i64},
     "ex.term.binary_slice" => %{params: [:i64, :i64], result: :i64},
+    "ex.term.binary_part" => %{params: [:i64, :i64, :i64], result: :i64},
     "ex.term.binary_utf8_get" => %{params: [:i64, :i64], result: :i64},
     "ex.term.binary_utf8_width" => %{params: [:i64, :i64], result: :i64},
     "ex.term.binary_utf8_length" => %{params: [:i64], result: :i64},

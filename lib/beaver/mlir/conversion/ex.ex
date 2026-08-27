@@ -376,6 +376,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     binary_length: "ex.term.binary_length",
     binary_get: "ex.term.binary_get",
     binary_slice: "ex.term.binary_slice",
+    binary_part: "ex.term.binary_part",
     binary_utf8_get: "ex.term.binary_utf8_get",
     binary_utf8_width: "ex.term.binary_utf8_width",
     binary_utf8_length: "ex.term.binary_utf8_length",
@@ -971,6 +972,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.iodata_to_binary"), do: @term_intrinsics.iodata_to_binary
   defp read_intrinsic("ex.binary_get"), do: @term_intrinsics.binary_get
   defp read_intrinsic("ex.binary_slice"), do: @term_intrinsics.binary_slice
+  defp read_intrinsic("ex.binary_part"), do: @term_intrinsics.binary_part
   defp read_intrinsic("ex.binary_utf8_get"), do: @term_intrinsics.binary_utf8_get
   defp read_intrinsic("ex.binary_utf8_width"), do: @term_intrinsics.binary_utf8_width
   defp read_intrinsic("ex.binary_utf8_length"), do: @term_intrinsics.binary_utf8_length
@@ -1469,6 +1471,13 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp intrinsic_function_type("ex.term.fun_env", _ctx) do
     MLIR.Type.function([MLIR.Type.i64(), MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.binary_part", _ctx) do
+    MLIR.Type.function(
+      [MLIR.Type.i64(), MLIR.Type.i64(), MLIR.Type.i64()],
+      [MLIR.Type.i64()]
+    )
   end
 
   defp intrinsic_function_type(symbol, _ctx)
