@@ -162,12 +162,7 @@ defmodule AnalysisAndRewriteUtilitiesTest do
 
       tag = MLIR.Attribute.integer(MLIR.Type.i32(ctx: ctx), 1)
 
-      :ok =
-        MLIR.CAPI.mlirOperationSetDiscardableAttributeByName(
-          clone,
-          MLIR.StringRef.create("test.tag"),
-          tag
-        )
+      :ok = MLIR.Operation.put_discardable_attribute(clone, "test.tag", tag)
 
       refute MLIR.Operation.equivalent?(func, clone, ignore_locations: true)
 

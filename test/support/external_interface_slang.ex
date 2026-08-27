@@ -58,9 +58,9 @@ defmodule ExternalInterfaceSlang do
     |> Enum.each(fn payload ->
       Beaver.MLIR.RewriterBase.start_op_modification(base, payload)
 
-      Beaver.MLIR.CAPI.mlirOperationSetAttributeByName(
+      Beaver.MLIR.Operation.put_discardable_attribute(
         payload,
-        Beaver.MLIR.StringRef.create("external_interface_test.marked"),
+        "external_interface_test.marked",
         Beaver.MLIR.Attribute.unit(ctx: Beaver.MLIR.context(payload))
       )
 
@@ -88,9 +88,9 @@ defmodule ExternalInterfaceSlang do
       base = Beaver.MLIR.PatternRewriter.as_base(rewriter)
       Beaver.MLIR.RewriterBase.start_op_modification(base, operation)
 
-      Beaver.MLIR.CAPI.mlirOperationSetAttributeByName(
+      Beaver.MLIR.Operation.put_discardable_attribute(
         operation,
-        Beaver.MLIR.StringRef.create("external_interface_test.pattern_applied"),
+        "external_interface_test.pattern_applied",
         Beaver.MLIR.Attribute.unit(ctx: Beaver.MLIR.context(operation))
       )
 

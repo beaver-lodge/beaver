@@ -33,6 +33,16 @@ check_cxx_source_compiles(
      return 0;
    }"
   BEAVER_HAS_MLIR_DEFAULT_SYMBOL_VISIBILITY_ATTRIBUTE_NAME)
+check_cxx_source_compiles(
+  "#include <mlir/IR/Operation.h>
+   int main() {
+     mlir::Operation *operation = nullptr;
+     operation->getName().walkInherentAttrs(
+       operation,
+       [](llvm::StringRef, mlir::Attribute &) {});
+     return 0;
+   }"
+  BEAVER_HAS_MLIR_INHERENT_ATTRIBUTE_VISITOR)
 set(CMAKE_REQUIRED_INCLUDES "${_beaver_saved_required_includes}")
 set(CMAKE_TRY_COMPILE_TARGET_TYPE "${_beaver_saved_try_compile_target_type}")
 
@@ -77,6 +87,14 @@ if(BEAVER_HAS_MLIR_DEFAULT_SYMBOL_VISIBILITY_ATTRIBUTE_NAME)
     target_compile_definitions(${_target}
       PUBLIC
       BEAVER_HAS_MLIR_DEFAULT_SYMBOL_VISIBILITY_ATTRIBUTE_NAME=1)
+  endforeach()
+endif()
+
+if(BEAVER_HAS_MLIR_INHERENT_ATTRIBUTE_VISITOR)
+  foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
+    target_compile_definitions(${_target}
+      PUBLIC
+      BEAVER_HAS_MLIR_INHERENT_ATTRIBUTE_VISITOR=1)
   endforeach()
 endif()
 
