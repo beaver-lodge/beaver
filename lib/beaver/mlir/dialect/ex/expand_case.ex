@@ -33,31 +33,39 @@ defmodule Beaver.MLIR.Dialect.Ex.ExpandCase do
 
   @spec run!(MLIR.Module.t() | MLIR.Operation.t()) :: MLIR.Module.t() | MLIR.Operation.t()
   def run!(%MLIR.Module{} = module) do
-    module |> ex_funcs() |> Enum.each(&expand_func/1)
+    expand_cases(module)
     module
   end
 
   def run!(%MLIR.Operation{} = operation) do
-    if(MLIR.Operation.name(operation) == "ex.func",
-      do: [operation],
-      else: ex_funcs(operation)
-    )
-    |> Enum.each(&expand_func/1)
-
+    expand_cases(operation)
     operation
   end
 
-  defp ex_funcs(operation) do
+  # Collect every case in one post-order walk. The previous implementation
+  # first walked the complete input to find ex.func operations and then walked
+  # each function again, multiplying the BEAM/native traversal boundary cost
+  # for large modules. Resolving owners before rewriting preserves the same
+  # nested-case-first order while keeping cases outside ex.func untouched.
+  defp expand_cases(operation) do
     operation
-    |> operations()
-    |> Enum.filter(&(MLIR.Operation.name(&1) == "ex.func"))
-  end
-
-  defp expand_func(ex_func) do
-    ex_func
     |> operations()
     |> Enum.filter(&(MLIR.Operation.name(&1) == "ex.case"))
-    |> Enum.each(&expand_case(&1, ex_func))
+    |> Enum.flat_map(fn ex_case ->
+      case owner_func(ex_case) do
+        nil -> []
+        owner -> [{ex_case, owner}]
+      end
+    end)
+    |> Enum.each(fn {ex_case, owner} -> expand_case(ex_case, owner) end)
+  end
+
+  defp owner_func(operation) do
+    operation
+    |> Stream.iterate(&MLIR.Operation.parent/1)
+    |> Enum.find(fn owner ->
+      not MLIR.null?(owner) and MLIR.Operation.name(owner) == "ex.func"
+    end)
   end
 
   defp expand_case(ex_case, owner) do
