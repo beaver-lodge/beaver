@@ -78,6 +78,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
     beaver_raw_to_string_Type: 1,
     beaver_raw_to_string_Value: 1,
     beaver_raw_type_converter_convert_async: 2,
+    beaver_raw_type_converter_add_conversion_map: 4,
     beaver_raw_type_converter_create: 0,
     beaver_raw_type_converter_destroy: 1,
     beaver_raw_type_converter_reply_callback: 4,

@@ -174,6 +174,22 @@ defmodule Beaver.MLIR.ConversionTest do
     MLIR.Module.destroy(module)
   end
 
+  test "native type maps convert without a BEAM callback", %{ctx: ctx} do
+    i32 = MLIR.Type.i32(ctx: ctx)
+    i64 = MLIR.Type.i64(ctx: ctx)
+    f32 = MLIR.Type.f32(ctx: ctx)
+
+    converter =
+      MLIR.TypeConverter.create()
+      |> MLIR.TypeConverter.add_conversion_map([i32], i64)
+
+    assert {:ok, converted} = MLIR.TypeConverter.convert(converter, i32)
+    assert MLIR.equal?(converted, i64)
+    assert {:ok, unchanged} = MLIR.TypeConverter.convert(converter, f32)
+    assert MLIR.equal?(unchanged, f32)
+    assert :ok = MLIR.TypeConverter.destroy(converter)
+  end
+
   test "callback failures are attributed and a dead callback owner fails deterministically", %{
     ctx: ctx
   } do

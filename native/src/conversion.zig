@@ -557,9 +557,42 @@ const TypeCallbackState = struct {
     }
 };
 
+const TypeMappingState = struct {
+    sources: []mlir_capi.Type.T,
+    target: mlir_capi.Type.T,
+    identity_fallback: bool,
+
+    fn deinit(self: *@This()) void {
+        std.heap.smp_allocator.free(self.sources);
+        std.heap.smp_allocator.destroy(self);
+    }
+
+    fn conversion(
+        type_: mlir_capi.Type.T,
+        converted_type: [*c]mlir_capi.Type.T,
+        user_data: ?*anyopaque,
+    ) callconv(.c) c.MlirTypeConverterConversionStatus {
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse
+            return c.MlirTypeConverterConversionStatusFailure));
+
+        for (self.sources) |source| {
+            if (c.mlirTypeEqual(type_, source)) {
+                converted_type.* = self.target;
+                return c.MlirTypeConverterConversionStatusSuccess;
+            }
+        }
+        if (self.identity_fallback) {
+            converted_type.* = type_;
+            return c.MlirTypeConverterConversionStatusSuccess;
+        }
+        return c.MlirTypeConverterConversionStatusDeclined;
+    }
+};
+
 const TypeConverterRegistration = struct {
     converter: mlir_capi.TypeConverter.T,
     callbacks: std.array_list.Managed(*TypeCallbackState),
+    mappings: std.array_list.Managed(*TypeMappingState),
     mutex: std.Io.Mutex = .init,
     closed: std.atomic.Value(bool) = .init(false),
     pattern_users: std.atomic.Value(usize) = .init(0),
@@ -569,6 +602,8 @@ const TypeConverterRegistration = struct {
         c.mlirTypeConverterDestroy(self.converter);
         for (self.callbacks.items) |callback| callback.deinit();
         self.callbacks.deinit();
+        for (self.mappings.items) |mapping| mapping.deinit();
+        self.mappings.deinit();
         return true;
     }
 
@@ -601,6 +636,7 @@ fn createTypeConverter(environment: beam.env, _: c_int, _: [*c]const beam.term) 
     registration.* = .{
         .converter = c.mlirTypeConverterCreate(),
         .callbacks = std.array_list.Managed(*TypeCallbackState).init(std.heap.smp_allocator),
+        .mappings = std.array_list.Managed(*TypeMappingState).init(std.heap.smp_allocator),
     };
     const registration_term = e.enif_make_resource(environment, registration);
     TypeConverterRegistrationResource.release(registration);
@@ -661,6 +697,30 @@ fn addTypeConversion(environment: beam.env, _: c_int, args: [*c]const beam.term)
 
 fn addTypeConversion1ToN(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     return addTypeCallback(environment, try fetchTypeConverterRegistration(environment, args[0]), args[1], args[2], .conversion_1_to_n);
+}
+
+fn addTypeConversionMap(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+    const registration = try fetchTypeConverterRegistration(environment, args[0]);
+    const io = std.Options.debug_io;
+    registration.mutex.lockUncancelable(io);
+    defer registration.mutex.unlock(io);
+    if (registration.closed.load(.acquire)) return error.TypeConverterClosed;
+
+    const sources = try fetchHandleSlice(mlir_capi.Type, environment, args[1]);
+    errdefer std.heap.smp_allocator.free(sources);
+    if (sources.len == 0) return error.EmptyTypeConversionMap;
+
+    const state = try std.heap.smp_allocator.create(TypeMappingState);
+    errdefer std.heap.smp_allocator.destroy(state);
+    state.* = .{
+        .sources = sources,
+        .target = try mlir_capi.Type.resource.fetch(environment, args[2]),
+        .identity_fallback = try beam.get_bool(environment, args[3]),
+    };
+    errdefer state.deinit();
+    try registration.mappings.append(state);
+    c.mlirTypeConverterAddConversion(registration.converter, TypeMappingState.conversion, state);
+    return beam.make_atom(environment, "ok");
 }
 
 fn addSourceMaterialization(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
@@ -1055,6 +1115,7 @@ pub const nifs = .{
     prelude.beaverRawNIF(@This(), "type_converter_create", 0),
     prelude.beaverRawNIF(@This(), "type_converter_add_conversion", 3),
     prelude.beaverRawNIF(@This(), "type_converter_add_1_to_n_conversion", 3),
+    prelude.beaverRawNIF(@This(), "type_converter_add_conversion_map", 4),
     prelude.beaverRawNIF(@This(), "type_converter_add_source_materialization", 3),
     prelude.beaverRawNIF(@This(), "type_converter_add_target_materialization", 3),
     prelude.beaverRawNIF(@This(), "type_converter_add_1_to_n_target_materialization", 3),
@@ -1078,6 +1139,7 @@ pub const conversion_target_destroy = destroyTarget;
 pub const type_converter_create = createTypeConverter;
 pub const type_converter_add_conversion = addTypeConversion;
 pub const type_converter_add_1_to_n_conversion = addTypeConversion1ToN;
+pub const type_converter_add_conversion_map = addTypeConversionMap;
 pub const type_converter_add_source_materialization = addSourceMaterialization;
 pub const type_converter_add_target_materialization = addTargetMaterialization;
 pub const type_converter_add_1_to_n_target_materialization = addTargetMaterialization1ToN;

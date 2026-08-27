@@ -520,6 +520,7 @@ defmodule Beaver.MLIR.ConversionPlanTest do
       |> Plan.add_illegal_op("foo.bar")
       |> Plan.add_dynamically_legal_op("foo.dynamic", fn _ -> :legal end, version: "2.1")
       |> Plan.add_conversion(fn t -> t end)
+      |> Plan.add_conversion_map(["i32", "index"], "i64")
       |> Plan.add_conversion_pattern("foo.pattern", fn _, _, _ -> :ok end,
         benefit: 2,
         version: "1.0"
@@ -530,7 +531,7 @@ defmodule Beaver.MLIR.ConversionPlanTest do
     assert decl.mode == :full
     assert decl.folding_mode == :before_patterns
     assert decl.timeout == 2_000
-    assert length(decl.entries) == 5
+    assert length(decl.entries) == 6
 
     assert Enum.at(decl.entries, 0) == %{kind: :add_legal_dialect, dialect: "builtin"}
     assert Enum.at(decl.entries, 1) == %{kind: :add_illegal_op, op: "foo.bar"}
@@ -544,6 +545,12 @@ defmodule Beaver.MLIR.ConversionPlanTest do
     assert Enum.at(decl.entries, 3) == %{kind: :add_conversion, version: :unversioned}
 
     assert Enum.at(decl.entries, 4) == %{
+             kind: :add_conversion_map,
+             source_types: ["i32", "index"],
+             target_type: "i64"
+           }
+
+    assert Enum.at(decl.entries, 5) == %{
              kind: :add_conversion_pattern,
              root: "foo.pattern",
              benefit: 2,

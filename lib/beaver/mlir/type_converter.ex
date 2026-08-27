@@ -98,6 +98,45 @@ defmodule Beaver.MLIR.TypeConverter do
     converter
   end
 
+  @doc """
+  Adds a native, callback-free mapping from any source type to one target type.
+
+  All types must belong to the same context used by the conversion. The map is
+  stored by the native converter and does not invoke the BEAM while MLIR asks
+  repeated type-conversion questions. `:fallback` is `:identity` by default;
+  use `:declined` to let a later converter callback handle unmatched types.
+  """
+  @spec add_conversion_map(t(), [MLIR.Type.t()], MLIR.Type.t(), keyword()) :: t()
+  def add_conversion_map(converter, sources, target, opts \\ [])
+
+  def add_conversion_map(
+        %__MODULE__{} = converter,
+        [%MLIR.Type{} | _] = sources,
+        %MLIR.Type{} = target,
+        opts
+      ) do
+    identity_fallback = Keyword.get(opts, :fallback, :identity) == :identity
+
+    unless Keyword.keys(opts) -- [:fallback] == [] and
+             Keyword.get(opts, :fallback, :identity) in [:identity, :declined] do
+      raise ArgumentError, "conversion map :fallback must be :identity or :declined"
+    end
+
+    :ok =
+      MLIR.CAPI.beaver_raw_type_converter_add_conversion_map(
+        converter.registration,
+        Enum.map(sources, & &1.ref),
+        target.ref,
+        identity_fallback
+      )
+
+    converter
+  end
+
+  def add_conversion_map(%__MODULE__{}, sources, %MLIR.Type{}, _opts) when is_list(sources) do
+    raise ArgumentError, "conversion map requires at least one source type"
+  end
+
   @spec add_1_to_n_conversion(t(), (MLIR.Type.t() -> one_to_n_result())) :: t()
   def add_1_to_n_conversion(%__MODULE__{} = converter, callback) when is_function(callback, 1) do
     :ok =

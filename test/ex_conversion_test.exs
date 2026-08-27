@@ -176,6 +176,23 @@ defmodule ExConversionTest do
     assert rendered =~ "func.return"
   end
 
+  test "uses a native type map instead of type-conversion callbacks", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, ExDialect)
+
+    module =
+      MLIR.Module.create!(@bind_module, ctx: ctx)
+      |> MLIR.verify!()
+      |> MaterializeBoundVariables.run!()
+
+    assert {_converted, receipt} = Plan.profile!(Ex.plan(), module)
+
+    refute Enum.any?(receipt["callbacks"], &(&1["kind"] == "convert_type"))
+
+    assert Enum.any?(receipt["callbacks"], fn callback ->
+             callback["kind"] == "conversion_pattern" and callback["count"] > 0
+           end)
+  end
+
   test "fails explicitly on a bare ex.var", %{ctx: ctx} do
     Beaver.Slang.load(ctx, ExDialect)
 
