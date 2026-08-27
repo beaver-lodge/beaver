@@ -411,6 +411,8 @@ void beaverPopulateExRuntimeConversionPatterns(
 
   set->add<ExRuntimeCallConversion>(*converter, "ex.term_eq", "ex.term.eq", 2,
                                     context);
+  set->add<ExRuntimeCallConversion>(*converter, "ex.binary_part",
+                                    "ex.term.binary_part", 3, context);
   set->add<ExTermBinaryConversion>(*converter, context);
 }
 

@@ -666,6 +666,13 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop binary_slice(binary = ^term_like, start = ^integer_like),
     results: [result: ^term_like]
 
+  defop binary_part(
+          binary = ^term_like,
+          start = ^term_like,
+          length = ^term_like
+        ),
+        results: [result: ^term_like]
+
   defop binary_utf8_get(binary = ^term_like, index = ^integer_like),
     results: [result: ^term_like]
 
