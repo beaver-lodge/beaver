@@ -4,12 +4,13 @@ defmodule Beaver.MLIR.Conversion.Profile do
 
   Profiling is explicit: ordinary conversion does not allocate callback
   aggregates or walk the IR inventory. The receipt retains one aggregate per
-  callback kind, never one record per callback invocation.
+  callback kind and conversion-pattern root, never one record per callback
+  invocation.
   """
 
   alias Beaver.MLIR
 
-  @schema_version 1
+  @schema_version 2
   @memory_sample_interval 256
 
   @type receipt() :: map()
@@ -33,9 +34,16 @@ defmodule Beaver.MLIR.Conversion.Profile do
   end
 
   @doc false
-  @spec record_callback(state(), atom(), non_neg_integer(), non_neg_integer()) :: state()
-  def record_callback(state, kind, service_ns, native_wait_ns)
-      when is_atom(kind) and service_ns >= 0 and native_wait_ns >= service_ns do
+  @spec record_callback(
+          state(),
+          atom(),
+          String.t() | nil,
+          non_neg_integer(),
+          non_neg_integer()
+        ) :: state()
+  def record_callback(state, kind, root_name, service_ns, native_wait_ns)
+      when is_atom(kind) and (is_binary(root_name) or is_nil(root_name)) and service_ns >= 0 and
+             native_wait_ns >= service_ns do
     callback_count = state.callback_count + 1
 
     peak_process_memory_bytes =
@@ -56,7 +64,7 @@ defmodule Beaver.MLIR.Conversion.Profile do
     %{
       state
       | callbacks:
-          Map.update(state.callbacks, kind, summary, fn current ->
+          Map.update(state.callbacks, {kind, root_name}, summary, fn current ->
             %{
               count: current.count + 1,
               service_ns: current.service_ns + service_ns,
@@ -143,12 +151,13 @@ defmodule Beaver.MLIR.Conversion.Profile do
   defp callback_summaries(callbacks) do
     callbacks
     |> Map.keys()
-    |> Enum.sort()
-    |> Enum.map(fn kind ->
-      callback = Map.fetch!(callbacks, kind)
+    |> Enum.sort_by(fn {kind, root_name} -> {kind, root_name || ""} end)
+    |> Enum.map(fn {kind, root_name} = key ->
+      callback = Map.fetch!(callbacks, key)
 
       %{
         "kind" => Atom.to_string(kind),
+        "root" => root_name,
         "count" => callback.count,
         "beam_service_ns" => callback.service_ns,
         "max_beam_service_ns" => callback.max_service_ns,
@@ -165,25 +174,38 @@ defmodule Beaver.MLIR.Conversion.Profile do
         kind = callback["kind"]
 
         [
-          hotspot("beam_callback_service", kind, callback["beam_service_ns"]),
-          hotspot("callback_boundary_wait", kind, callback["boundary_overhead_sum_ns"])
+          hotspot(
+            "beam_callback_service",
+            kind,
+            callback["root"],
+            callback["beam_service_ns"]
+          ),
+          hotspot(
+            "callback_boundary_wait",
+            kind,
+            callback["root"],
+            callback["boundary_overhead_sum_ns"]
+          )
         ]
       end)
 
     [
-      hotspot("native_unattributed_residual", nil, native_compute_ns),
-      hotspot("target_lock_wait", nil, target_lock_wait_ns)
+      hotspot("native_unattributed_residual", nil, nil, native_compute_ns),
+      hotspot("target_lock_wait", nil, nil, target_lock_wait_ns)
       | callback_sources
     ]
     |> Enum.reject(&(&1["duration_ns"] == 0))
-    |> Enum.sort_by(&{-&1["duration_ns"], &1["source"], &1["callback_kind"] || ""})
+    |> Enum.sort_by(
+      &{-&1["duration_ns"], &1["source"], &1["callback_kind"] || "", &1["callback_root"] || ""}
+    )
     |> Enum.take(3)
   end
 
-  defp hotspot(source, callback_kind, duration_ns) do
+  defp hotspot(source, callback_kind, callback_root, duration_ns) do
     %{
       "source" => source,
       "callback_kind" => callback_kind,
+      "callback_root" => callback_root,
       "duration_ns" => duration_ns
     }
   end

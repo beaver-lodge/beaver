@@ -188,13 +188,19 @@ defmodule ExConversionTest do
 
     refute Enum.any?(receipt["callbacks"], &(&1["kind"] == "convert_type"))
 
-    assert %{"count" => 2} =
-             Enum.find(receipt["callbacks"], &(&1["kind"] == "conversion_pattern"))
+    pattern_callbacks =
+      Enum.filter(receipt["callbacks"], &(&1["kind"] == "conversion_pattern"))
+
+    assert Enum.map(pattern_callbacks, &{&1["root"], &1["count"]}) == [
+             {"ex.func", 1},
+             {"ex.return", 1}
+           ]
 
     declaration = Plan.declaration(Ex.plan())
     assert %{kind: :add_pattern_population, version: "1.0"} in declaration.entries
 
-    moved_roots = ~w(ex.lit ex.box ex.to_word ex.unbox ex.yield)
+    moved_roots =
+      ~w(ex.lit ex.box ex.to_word ex.unbox ex.yield ex.add ex.sub ex.mul ex.div ex.rem ex.cmp ex.if ex.binary ex.term_eq)
 
     refute Enum.any?(declaration.entries, fn entry ->
              entry[:kind] == :add_conversion_pattern and entry[:root] in moved_roots
@@ -697,7 +703,9 @@ defmodule ExConversionTest do
     rendered = MLIR.to_string(module, generic: true)
 
     assert length(Regex.scan(~r/sym_name = "ex\.term\.list_cons"/, rendered)) == 1
+    assert length(Regex.scan(~r/sym_name = "ex\.term\.binary_from_list"/, rendered)) == 1
     assert length(Regex.scan(~r/callee = @ex\.term\.list_cons/, rendered)) == 32
+    assert length(Regex.scan(~r/callee = @ex\.term\.binary_from_list/, rendered)) == 1
     assert MLIR.verify!(module) == module
   end
 
@@ -742,6 +750,8 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.list_tail"
     assert rendered =~ "ex.term.eq"
     assert rendered =~ "ex.term.eq_loose"
+
+    assert length(Regex.scan(~r/sym_name = "ex\.term\.eq"/, rendered)) == 1
 
     assert rendered =~
              ~s|function_type = (i64, i64) -> i64, sym_name = "ex.term.eq_loose"|

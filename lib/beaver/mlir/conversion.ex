@@ -297,12 +297,24 @@ defmodule Beaver.MLIR.Conversion do
         __MODULE__.Profile.record_callback(
           profile,
           elem(message, 0),
+          callback_root(message),
           service_ns,
           native_wait_ns
         )
       end
 
     await(id, mode, ir, timeout_ms, callback_failure || failure, profile)
+  end
+
+  defp callback_root(message) do
+    case elem(message, 0) do
+      kind when kind in [:conversion_pattern, :conversion_pattern_1_to_n] ->
+        {root_name, _callback} = MLIR.ConversionPattern.unwrap_callback(elem(message, 2))
+        root_name
+
+      _kind ->
+        nil
+    end
   end
 
   defp finish(mode, _ir, nil, callback_failure) do
@@ -399,6 +411,8 @@ defmodule Beaver.MLIR.Conversion.Callbacks do
   end
 
   def handle({:conversion_pattern, token, callback, _id, _sent_at, operation, operands, rewriter}) do
+    {_root_name, callback} = MLIR.ConversionPattern.unwrap_callback(callback)
+
     invoke(
       token,
       fn -> pattern_result(callback.(native(operation), native(operands), native(rewriter))) end,
@@ -409,6 +423,8 @@ defmodule Beaver.MLIR.Conversion.Callbacks do
   def handle(
         {:conversion_pattern_1_to_n, token, callback, _id, _sent_at, operation, ranges, rewriter}
       ) do
+    {_root_name, callback} = MLIR.ConversionPattern.unwrap_callback(callback)
+
     invoke(
       token,
       fn -> pattern_result(callback.(native(operation), native(ranges), native(rewriter))) end,

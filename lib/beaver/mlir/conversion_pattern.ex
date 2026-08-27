@@ -10,6 +10,8 @@ defmodule Beaver.MLIR.ConversionPattern do
 
   alias Beaver.MLIR
 
+  @callback_envelope :beaver_conversion_pattern_callback
+
   @type callback() ::
           (MLIR.Operation.t(),
            [MLIR.Value.t()]
@@ -66,11 +68,19 @@ defmodule Beaver.MLIR.ConversionPattern do
         benefit,
         context_ref,
         registration,
-        callback,
+        {@callback_envelope, to_string(root_name), callback},
         one_to_n,
         timeout_ms
       )
 
     set
   end
+
+  @doc false
+  @spec unwrap_callback(term()) :: {String.t() | nil, callback()}
+  def unwrap_callback({@callback_envelope, root_name, callback})
+      when is_binary(root_name) and is_function(callback, 3),
+      do: {root_name, callback}
+
+  def unwrap_callback(callback) when is_function(callback, 3), do: {nil, callback}
 end
