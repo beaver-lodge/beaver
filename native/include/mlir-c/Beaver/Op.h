@@ -35,6 +35,12 @@ MLIR_CAPI_EXPORTED size_t beaverStringRefGetLength(MlirStringRef string_ref);
 MLIR_CAPI_EXPORTED uint64_t
 beaverOperationStructuralHashValue(MlirOperation op, uint32_t flags);
 
+// Destroys a detached operation tree without recursively descending through
+// nested regions. This keeps deeply nested generated IR from overflowing the
+// native stack during diagnostic cleanup.
+MLIR_CAPI_EXPORTED void
+beaverOperationDestroyIterative(MlirOperation operation);
+
 // MLIR's IRMapping::clear currently clears only value mappings despite the C
 // API documenting all mappings. Keep Beaver's high-level clear contract whole.
 MLIR_CAPI_EXPORTED void beaverIRMappingClear(MlirIRMapping mapping);

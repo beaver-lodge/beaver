@@ -10,6 +10,7 @@
 #endif
 #include "mlir/Transforms/Passes.h"
 #include "mlir/IR/SymbolTable.h"
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/VCSRevision.h"
@@ -27,6 +28,51 @@
 #include <vector>
 
 using namespace mlir;
+
+MLIR_CAPI_EXPORTED void
+beaverOperationDestroyIterative(MlirOperation operation) {
+  Operation *root = unwrap(operation);
+  if (!root)
+    return;
+
+  llvm::SmallVector<Operation *> operations;
+  llvm::SmallVector<Block *> blocks;
+  llvm::SmallVector<Operation *> pending{root};
+
+  while (!pending.empty()) {
+    Operation *current = pending.pop_back_val();
+    operations.push_back(current);
+
+    for (Region &region : current->getRegions()) {
+      for (Block &block : region) {
+        blocks.push_back(&block);
+        for (Operation &nested : block)
+          pending.push_back(&nested);
+      }
+    }
+  }
+
+  // Break SSA and block-argument use lists before unlinking any operation.
+  // Operation::dropAllReferences() cannot be used here because it recursively
+  // visits nested regions, which is precisely the failure mode this API
+  // avoids.
+  for (Operation *current : operations)
+    current->dropAllUses();
+  for (Block *block : blocks)
+    for (BlockArgument argument : block->getArguments())
+      argument.dropAllUses();
+
+  // Pre-order collection guarantees that reverse order destroys every nested
+  // operation before its parent. Each native destructor therefore sees only
+  // empty nested blocks and has bounded recursion depth.
+  for (auto iterator = operations.rbegin(); iterator != operations.rend();
+       ++iterator) {
+    Operation *current = *iterator;
+    if (current->getBlock())
+      current->remove();
+    current->destroy();
+  }
+}
 
 namespace {
 using MemoryEffectList =
