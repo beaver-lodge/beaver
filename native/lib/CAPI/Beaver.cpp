@@ -4,6 +4,11 @@
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
 #include "mlir/CAPI/Rewrite.h"
+#include "mlir/Pass/PassManager.h"
+#ifdef BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION
+#include "mlir/Transforms/CompositePass.h"
+#endif
+#include "mlir/Transforms/Passes.h"
 #include "mlir/IR/SymbolTable.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/ThreadPool.h"
@@ -413,6 +418,57 @@ MLIR_CAPI_EXPORTED MlirStringRef beaverGetLLVMVersion() {
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetArgument(MlirPass pass) {
   auto argument = unwrap(pass)->getArgument();
   return wrap(argument);
+}
+
+MLIR_CAPI_EXPORTED MlirOpPassManager beaverOpPassManagerCreate(void) {
+  return wrap(new OpPassManager());
+}
+
+MLIR_CAPI_EXPORTED void
+beaverOpPassManagerDestroy(MlirOpPassManager passManager) {
+  delete unwrap(passManager);
+}
+
+MLIR_CAPI_EXPORTED bool
+beaverCompositeFixedPointFailureActionSupported(void) {
+#ifdef BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION
+  return true;
+#else
+  return false;
+#endif
+}
+
+MLIR_CAPI_EXPORTED MlirPass beaverCreateCompositeFixedPointPass(
+    MlirStringRef name, MlirOpPassManager innerPipeline,
+    intptr_t maxIterations, MlirBeaverConvergenceFailureAction action) {
+  OpPassManager *source = unwrap(innerPipeline);
+  auto populate = [source](OpPassManager &target) {
+    target = std::move(*source);
+  };
+
+#ifdef BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION
+  ConvergenceFailureAction nativeAction;
+  switch (action) {
+  case MlirBeaverConvergenceFailureWarn:
+    nativeAction = ConvergenceFailureAction::Warn;
+    break;
+  case MlirBeaverConvergenceFailureError:
+    nativeAction = ConvergenceFailureAction::Error;
+    break;
+  case MlirBeaverConvergenceFailureSilent:
+    nativeAction = ConvergenceFailureAction::Silent;
+    break;
+  }
+  return wrap(createCompositeFixedPointPass(unwrap(name).str(), populate,
+                                            maxIterations, nativeAction)
+                  .release());
+#else
+  assert(action == MlirBeaverConvergenceFailureWarn &&
+         "linked LLVM cannot configure composite convergence failure");
+  return wrap(createCompositeFixedPointPass(unwrap(name).str(), populate,
+                                            maxIterations)
+                  .release());
+#endif
 }
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetName(MlirPass pass) {

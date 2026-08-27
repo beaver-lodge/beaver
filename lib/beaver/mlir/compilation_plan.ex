@@ -17,6 +17,7 @@ defmodule Beaver.MLIR.CompilationPlan do
   """
 
   alias Beaver.MLIR.CompilationRuntime.CacheKey
+  alias Beaver.MLIR.Transform.FixedPoint
   alias Beaver.MLIR.Transform.Schedule, as: TransformSchedule
 
   @versioned_step :beaver_compilation_plan_versioned_step
@@ -33,6 +34,7 @@ defmodule Beaver.MLIR.CompilationPlan do
   @type pass_step() ::
           binary()
           | module()
+          | FixedPoint.t()
           | {binary(), [pass_step()]}
           | {binary(), binary(), function()}
           | {:beaver_compilation_plan_versioned_step, term(), term()}
@@ -319,6 +321,16 @@ defmodule Beaver.MLIR.CompilationPlan do
     {:versioned, versioned_pass_declaration!(pass), version}
   end
 
+  defp pass_declaration!(%FixedPoint{} = fixed_point) do
+    {:fixed_point,
+     %{
+       name: fixed_point.name,
+       pipeline: Enum.map(fixed_point.pipeline, &pass_declaration!/1),
+       max_iterations: fixed_point.max_iterations,
+       on_convergence_failure: fixed_point.on_convergence_failure
+     }}
+  end
+
   defp pass_declaration!({operation_name, passes})
        when is_binary(operation_name) and is_list(passes) do
     {:nested, operation_name, Enum.map(passes, &pass_declaration!/1)}
@@ -374,6 +386,10 @@ defmodule Beaver.MLIR.CompilationPlan do
   end
 
   defp executable_pass({@versioned_step, pass, _version}), do: executable_pass(pass)
+
+  defp executable_pass(%FixedPoint{} = fixed_point) do
+    %{fixed_point | pipeline: Enum.map(fixed_point.pipeline, &executable_pass/1)}
+  end
 
   defp executable_pass({operation_name, passes})
        when is_binary(operation_name) and is_list(passes) do
