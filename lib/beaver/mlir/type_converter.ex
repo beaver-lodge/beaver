@@ -181,11 +181,11 @@ defmodule Beaver.MLIR.TypeConverter do
       {:type_converter_done, ^id, result} ->
         finish_conversion(result, callback_failure)
 
-      {:convert_type, _token, _callback, _callback_id, _type} = message ->
+      {:convert_type, _token, _callback, _callback_id, _sent_at, _type} = message ->
         {:handled, failure} = MLIR.Conversion.Callbacks.handle(message)
         await_conversion(id, timeout_ms, callback_failure || failure)
 
-      {:convert_types, _token, _callback, _callback_id, _type} = message ->
+      {:convert_types, _token, _callback, _callback_id, _sent_at, _type} = message ->
         {:handled, failure} = MLIR.Conversion.Callbacks.handle(message)
         await_conversion(id, timeout_ms, callback_failure || failure)
     after

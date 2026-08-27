@@ -37,7 +37,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
     beaver_raw_transform_state_payload_ops: 2,
     beaver_raw_transform_state_payload_values: 2,
     beaver_raw_transform_state_params: 2,
-    beaver_raw_apply_conversion_async: 7,
+    beaver_raw_apply_conversion_async: 8,
     beaver_raw_conversion_target_add_static: 3,
     beaver_raw_conversion_target_create: 1,
     beaver_raw_conversion_target_destroy: 1,

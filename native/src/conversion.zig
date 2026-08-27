@@ -21,6 +21,37 @@ const PatternDispatcher = kinda.callback_runtime.Dispatcher(.{
     "conversion_pattern_1_to_n",
 });
 
+const ConversionProfile = struct {
+    duration_ns: u64 = 0,
+    target_lock_wait_ns: u64 = 0,
+
+    fn makeTerm(self: *const @This(), environment: beam.env) beam.term {
+        var fields = [_]beam.term{
+            beam.make_u64(environment, self.duration_ns),
+            beam.make_u64(environment, self.target_lock_wait_ns),
+        };
+        return beam.make_tuple(environment, &fields);
+    }
+};
+
+fn monotonicTimestamp() std.Io.Timestamp {
+    return std.Io.Clock.awake.now(std.Options.debug_io);
+}
+
+fn elapsedNs(started_at: std.Io.Timestamp) u64 {
+    const duration_ns = started_at.durationTo(monotonicTimestamp()).toNanoseconds();
+    if (duration_ns <= 0) return 0;
+    return std.math.cast(u64, duration_ns) orelse std.math.maxInt(u64);
+}
+
+fn systemNs() i64 {
+    // Native and BEAM monotonic clocks do not expose a portable shared epoch.
+    // Real-clock nanoseconds fit ErlNifTime until 2262. The BEAM rejects a
+    // negative/backwards sample in favour of its local service duration.
+    const timestamp_ns = std.Io.Clock.real.now(std.Options.debug_io).toNanoseconds();
+    return std.math.cast(i64, timestamp_ns) orelse std.math.maxInt(i64);
+}
+
 fn handleSlice(
     comptime Kind: type,
     environment: beam.env,
@@ -149,7 +180,7 @@ const LegalityState = struct {
         const response = self.dispatcher.invoke(
             "conversion_legality",
             environment,
-            .{operation_term},
+            .{ beam.make_i64(environment, systemNs()), operation_term },
         ) catch return c.MLIR_CONVERSION_TARGET_LEGALITY_ILLEGAL;
         return kinda.callback_adapter.scalarResult(
             c.MlirConversionTargetLegality,
@@ -346,7 +377,7 @@ const TypeCallbackState = struct {
             e.enif_free_env(environment);
             return c.MlirTypeConverterConversionStatusFailure;
         };
-        const response = self.dispatcher.invoke("convert_type", environment, .{type_term}) catch
+        const response = self.dispatcher.invoke("convert_type", environment, .{ beam.make_i64(environment, systemNs()), type_term }) catch
             return c.MlirTypeConverterConversionStatusFailure;
         const status = kinda.callback_adapter.scalarResult(
             c.MlirTypeConverterConversionStatus,
@@ -374,7 +405,7 @@ const TypeCallbackState = struct {
             e.enif_free_env(environment);
             return c.MlirTypeConverterConversionStatusFailure;
         };
-        const response = self.dispatcher.invoke("convert_types", environment, .{type_term}) catch
+        const response = self.dispatcher.invoke("convert_types", environment, .{ beam.make_i64(environment, systemNs()), type_term }) catch
             return c.MlirTypeConverterConversionStatusFailure;
         const status = kinda.callback_adapter.scalarResult(
             c.MlirTypeConverterConversionStatus,
@@ -405,6 +436,7 @@ const TypeCallbackState = struct {
             return .{ .ptr = null }));
         const environment = e.enif_alloc_env() orelse return .{ .ptr = null };
         const args = .{
+            beam.make_i64(environment, systemNs()),
             kinda.callback_adapter.handle(mlir_capi.RewriterBase, environment, rewriter) catch {
                 e.enif_free_env(environment);
                 return .{ .ptr = null };
@@ -441,6 +473,7 @@ const TypeCallbackState = struct {
             return .{ .ptr = null }));
         const environment = e.enif_alloc_env() orelse return .{ .ptr = null };
         const args = .{
+            beam.make_i64(environment, systemNs()),
             kinda.callback_adapter.handle(mlir_capi.RewriterBase, environment, rewriter) catch {
                 e.enif_free_env(environment);
                 return .{ .ptr = null };
@@ -490,6 +523,7 @@ const TypeCallbackState = struct {
                 return c.beaverLogicalResultFailure();
             };
         const args = .{
+            beam.make_i64(environment, systemNs()),
             kinda.callback_adapter.handle(mlir_capi.RewriterBase, environment, rewriter) catch {
                 e.enif_free_env(environment);
                 return c.beaverLogicalResultFailure();
@@ -740,6 +774,7 @@ const ConversionPatternState = struct {
             return c.beaverLogicalResultFailure()));
         const environment = e.enif_alloc_env() orelse return c.beaverLogicalResultFailure();
         const args = .{
+            beam.make_i64(environment, systemNs()),
             kinda.callback_adapter.handle(mlir_capi.Operation, environment, operation) catch {
                 e.enif_free_env(environment);
                 return c.beaverLogicalResultFailure();
@@ -800,6 +835,7 @@ const ConversionPatternState = struct {
             offset += len;
         }
         const args = .{
+            beam.make_i64(environment, systemNs()),
             kinda.callback_adapter.handle(mlir_capi.Operation, environment, operation) catch {
                 e.enif_free_env(environment);
                 return c.beaverLogicalResultFailure();
@@ -883,6 +919,7 @@ const ConversionWorker = struct {
     recipient: beam.pid,
     environment: beam.env,
     id: beam.term,
+    profile: bool,
 
     fn apply(environment: beam.env, args: anytype) !beam.term {
         const logical_result = if (args.full)
@@ -912,8 +949,13 @@ const ConversionWorker = struct {
         };
         defer e.enif_free_env(environment);
 
+        var profile: ConversionProfile = .{};
+        const profile_ptr = if (self.profile) &profile else null;
+        const worker_started_at = monotonicTimestamp();
         const io = std.Options.debug_io;
+        const lock_started_at = monotonicTimestamp();
         self.target.mutex.lockUncancelable(io);
+        if (profile_ptr) |enabled| enabled.target_lock_wait_ns = elapsedNs(lock_started_at);
         const result = if (self.target.closed.load(.acquire))
             null
         else
@@ -930,6 +972,7 @@ const ConversionWorker = struct {
                 } },
             ) catch null;
         self.target.mutex.unlock(io);
+        if (profile_ptr) |enabled| enabled.duration_ns = elapsedNs(worker_started_at);
 
         if (patterns_owned) {
             c.mlirFrozenRewritePatternSetDestroy(patterns);
@@ -950,6 +993,7 @@ const ConversionWorker = struct {
             beam.make_atom(environment, "conversion_done"),
             id_term,
             result orelse beam.make_nil(environment),
+            if (profile_ptr) |enabled| enabled.makeTerm(environment) else beam.make_nil(environment),
         };
         _ = beam.send_advanced(null, self.recipient, environment, beam.make_tuple(environment, &terms));
     }
@@ -961,6 +1005,7 @@ fn applyConversionAsync(environment: beam.env, _: c_int, args: [*c]const beam.te
     const owns_patterns = try beam.get_bool(environment, args[4]);
     const folding_mode = try beam.get_i64(environment, args[5]);
     const materializations = try beam.get_i64(environment, args[6]);
+    const profile = try beam.get_bool(environment, args[7]);
     const config = c.mlirConversionConfigCreate();
     var config_owned = true;
     errdefer if (config_owned) c.mlirConversionConfigDestroy(config);
@@ -984,6 +1029,7 @@ fn applyConversionAsync(environment: beam.env, _: c_int, args: [*c]const beam.te
         .recipient = try beam.self(environment),
         .environment = owned_env,
         .id = e.enif_make_copy(owned_env, id),
+        .profile = profile,
     };
     e.enif_keep_resource(target);
     errdefer e.enif_release_resource(target);
@@ -1019,7 +1065,7 @@ pub const nifs = .{
     prelude.beaverRawNIF(@This(), "type_converter_reply_value", 3),
     prelude.beaverRawNIF(@This(), "type_converter_reply_values", 4),
     prelude.beaverRawNIF(@This(), "conversion_pattern_add", 8),
-    prelude.beaverRawNIF(@This(), "apply_conversion_async", 7),
+    prelude.beaverRawNIF(@This(), "apply_conversion_async", 8),
 };
 
 pub const conversion_target_create = createTarget;

@@ -64,9 +64,40 @@ defmodule Beaver.MLIR.Conversion do
         ) :: result()
   def apply(mode, ir, target, patterns, opts \\ [])
 
-  def apply(mode, ir, %MLIR.ConversionTarget{} = target, %MLIR.RewritePatternSet{} = set, opts)
-      when mode in [:full, :partial] do
-    {folding_mode, materializations, timeout_ms} = conversion_options!(opts)
+  def apply(mode, ir, target, patterns, opts) do
+    run(mode, ir, target, patterns, opts, false)
+  end
+
+  @doc """
+  Runs one conversion with bounded callback and native-worker profiling.
+
+  Returns the ordinary conversion result together with a machine-readable
+  `Beaver.MLIR.Conversion.Profile` receipt. Profiling is opt-in so normal
+  conversion keeps its existing callback path and measurement overhead.
+  """
+  @spec profile(
+          mode(),
+          conversion_ir(),
+          MLIR.ConversionTarget.t(),
+          MLIR.RewritePatternSet.t() | MLIR.FrozenRewritePatternSet.t(),
+          keyword()
+        ) :: {result(), Beaver.MLIR.Conversion.Profile.receipt()}
+  def profile(mode, ir, target, patterns, opts \\ []) do
+    run(mode, ir, target, patterns, opts, true)
+  end
+
+  defp run(mode, ir, target, patterns, opts, profile?)
+
+  defp run(
+         mode,
+         ir,
+         %MLIR.ConversionTarget{} = target,
+         %MLIR.RewritePatternSet{} = set,
+         opts,
+         profile?
+       )
+       when mode in [:full, :partial] do
+    conversion_options = conversion_options!(opts)
     frozen = MLIR.RewritePatternSet.freeze(set)
 
     do_apply(
@@ -75,21 +106,21 @@ defmodule Beaver.MLIR.Conversion do
       target,
       frozen,
       true,
-      folding_mode,
-      materializations,
-      timeout_ms
+      conversion_options,
+      profile?
     )
   end
 
-  def apply(
-        mode,
-        ir,
-        %MLIR.ConversionTarget{registration: registration},
-        %MLIR.FrozenRewritePatternSet{ref: patterns_ref},
-        opts
-      )
-      when mode in [:full, :partial] do
-    {folding_mode, materializations, timeout_ms} = conversion_options!(opts)
+  defp run(
+         mode,
+         ir,
+         %MLIR.ConversionTarget{registration: registration},
+         %MLIR.FrozenRewritePatternSet{ref: patterns_ref},
+         opts,
+         profile?
+       )
+       when mode in [:full, :partial] do
+    conversion_options = conversion_options!(opts)
 
     do_apply(
       mode,
@@ -97,9 +128,8 @@ defmodule Beaver.MLIR.Conversion do
       %MLIR.ConversionTarget{registration: registration},
       %MLIR.FrozenRewritePatternSet{ref: patterns_ref},
       false,
-      folding_mode,
-      materializations,
-      timeout_ms
+      conversion_options,
+      profile?
     )
   end
 
@@ -109,12 +139,12 @@ defmodule Beaver.MLIR.Conversion do
          %MLIR.ConversionTarget{registration: registration},
          %MLIR.FrozenRewritePatternSet{ref: patterns_ref},
          owns_patterns,
-         folding_mode,
-         materializations,
-         timeout_ms
+         {folding_mode, materializations, timeout_ms},
+         profile?
        ) do
     operation = operation(ir)
     context = MLIR.context(ir)
+    profile = if profile?, do: __MODULE__.Profile.start(mode, ir)
 
     id =
       try do
@@ -125,7 +155,8 @@ defmodule Beaver.MLIR.Conversion do
           patterns_ref,
           owns_patterns,
           folding_mode,
-          materializations
+          materializations,
+          profile?
         )
       rescue
         exception ->
@@ -139,7 +170,7 @@ defmodule Beaver.MLIR.Conversion do
           reraise exception, __STACKTRACE__
       end
 
-    await(id, mode, ir, timeout_ms, nil)
+    await(id, mode, ir, timeout_ms, nil, profile)
   end
 
   defp conversion_options!(opts) do
@@ -215,40 +246,63 @@ defmodule Beaver.MLIR.Conversion do
   defp operation(%MLIR.Operation{} = operation), do: operation
   defp operation(%MLIR.Module{} = module), do: MLIR.Operation.from_module(module)
 
-  defp await(id, mode, ir, timeout_ms, callback_failure) do
+  defp await(id, mode, ir, timeout_ms, callback_failure, profile) do
     receive do
-      {:conversion_done, ^id, result} ->
-        finish(mode, ir, result, callback_failure)
+      {:conversion_done, ^id, result, native_profile} ->
+        conversion_result = finish(mode, ir, result, callback_failure)
 
-      {name, _token, _callback, _callback_id, _arg} = message
+        if profile do
+          {conversion_result,
+           __MODULE__.Profile.finish(profile, conversion_result, ir, native_profile)}
+        else
+          conversion_result
+        end
+
+      {name, _token, _callback, _callback_id, _sent_at, _arg} = message
       when name in [:conversion_legality, :convert_type, :convert_types] ->
-        handle_and_await(message, id, mode, ir, timeout_ms, callback_failure)
+        handle_and_await(message, id, mode, ir, timeout_ms, callback_failure, profile)
 
-      {name, _token, _callback, _callback_id, _arg1, _arg2, _arg3} = message
+      {name, _token, _callback, _callback_id, _sent_at, _arg1, _arg2, _arg3} = message
       when name in [:conversion_pattern, :conversion_pattern_1_to_n] ->
-        handle_and_await(message, id, mode, ir, timeout_ms, callback_failure)
+        handle_and_await(message, id, mode, ir, timeout_ms, callback_failure, profile)
 
-      {:source_materialization, _token, _callback, _callback_id, _rewriter, _type, _inputs, _loc} =
-          message ->
-        handle_and_await(message, id, mode, ir, timeout_ms, callback_failure)
+      {:source_materialization, _token, _callback, _callback_id, _sent_at, _rewriter, _type,
+       _inputs, _loc} = message ->
+        handle_and_await(message, id, mode, ir, timeout_ms, callback_failure, profile)
 
-      {:target_materialization, _token, _callback, _callback_id, _rewriter, _type, _inputs, _loc,
-       _original_type} = message ->
-        handle_and_await(message, id, mode, ir, timeout_ms, callback_failure)
-
-      {:target_materialization_1_to_n, _token, _callback, _callback_id, _rewriter, _output_types,
+      {:target_materialization, _token, _callback, _callback_id, _sent_at, _rewriter, _type,
        _inputs, _loc, _original_type} = message ->
-        handle_and_await(message, id, mode, ir, timeout_ms, callback_failure)
+        handle_and_await(message, id, mode, ir, timeout_ms, callback_failure, profile)
+
+      {:target_materialization_1_to_n, _token, _callback, _callback_id, _sent_at, _rewriter,
+       _output_types, _inputs, _loc, _original_type} = message ->
+        handle_and_await(message, id, mode, ir, timeout_ms, callback_failure, profile)
     after
       timeout_ms + 1_000 ->
         Logger.warning("still waiting for #{mode} dialect conversion to finish")
-        await(id, mode, ir, timeout_ms, callback_failure)
+        await(id, mode, ir, timeout_ms, callback_failure, profile)
     end
   end
 
-  defp handle_and_await(message, id, mode, ir, timeout_ms, callback_failure) do
+  defp handle_and_await(message, id, mode, ir, timeout_ms, callback_failure, profile) do
+    started_at = System.monotonic_time(:nanosecond)
     {:handled, failure} = __MODULE__.Callbacks.handle(message)
-    await(id, mode, ir, timeout_ms, callback_failure || failure)
+    stopped_at = System.monotonic_time(:nanosecond)
+
+    profile =
+      if profile do
+        service_ns = max(stopped_at - started_at, 0)
+        native_wait_ns = max(System.os_time(:nanosecond) - elem(message, 4), service_ns)
+
+        __MODULE__.Profile.record_callback(
+          profile,
+          elem(message, 0),
+          service_ns,
+          native_wait_ns
+        )
+      end
+
+    await(id, mode, ir, timeout_ms, callback_failure || failure, profile)
   end
 
   defp finish(mode, _ir, nil, callback_failure) do
@@ -278,19 +332,21 @@ defmodule Beaver.MLIR.Conversion.Callbacks do
   alias Beaver.MLIR
   alias Kinda.CallbackRuntime
 
-  def handle({:conversion_legality, token, callback, _id, operation}) do
+  def handle({:conversion_legality, token, callback, _id, _sent_at, operation}) do
     invoke(token, fn -> legality(callback.(native(operation))) end, &reply_legality/2)
   end
 
-  def handle({:convert_type, token, callback, _id, type}) do
+  def handle({:convert_type, token, callback, _id, _sent_at, type}) do
     invoke(token, fn -> converted_type(callback.(native(type))) end, &reply_type/2)
   end
 
-  def handle({:convert_types, token, callback, _id, type}) do
+  def handle({:convert_types, token, callback, _id, _sent_at, type}) do
     invoke(token, fn -> converted_types(callback.(native(type))) end, &reply_types/2)
   end
 
-  def handle({:source_materialization, token, callback, _id, rewriter, type, inputs, loc}) do
+  def handle(
+        {:source_materialization, token, callback, _id, _sent_at, rewriter, type, inputs, loc}
+      ) do
     invoke(
       token,
       fn ->
@@ -301,7 +357,7 @@ defmodule Beaver.MLIR.Conversion.Callbacks do
   end
 
   def handle(
-        {:target_materialization, token, callback, _id, rewriter, type, inputs, loc,
+        {:target_materialization, token, callback, _id, _sent_at, rewriter, type, inputs, loc,
          original_type}
       ) do
     invoke(
@@ -322,8 +378,8 @@ defmodule Beaver.MLIR.Conversion.Callbacks do
   end
 
   def handle(
-        {:target_materialization_1_to_n, token, callback, _id, rewriter, output_types, inputs,
-         loc, original_type}
+        {:target_materialization_1_to_n, token, callback, _id, _sent_at, rewriter, output_types,
+         inputs, loc, original_type}
       ) do
     invoke(
       token,
@@ -342,7 +398,7 @@ defmodule Beaver.MLIR.Conversion.Callbacks do
     )
   end
 
-  def handle({:conversion_pattern, token, callback, _id, operation, operands, rewriter}) do
+  def handle({:conversion_pattern, token, callback, _id, _sent_at, operation, operands, rewriter}) do
     invoke(
       token,
       fn -> pattern_result(callback.(native(operation), native(operands), native(rewriter))) end,
@@ -350,7 +406,9 @@ defmodule Beaver.MLIR.Conversion.Callbacks do
     )
   end
 
-  def handle({:conversion_pattern_1_to_n, token, callback, _id, operation, ranges, rewriter}) do
+  def handle(
+        {:conversion_pattern_1_to_n, token, callback, _id, _sent_at, operation, ranges, rewriter}
+      ) do
     invoke(
       token,
       fn -> pattern_result(callback.(native(operation), native(ranges), native(rewriter))) end,
