@@ -313,6 +313,7 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
     end
 
     assert MapSet.member?(emitted_names, "beaver_raw_type_converter_add_conversion")
+    assert function_exported?(CAPI.Raw, :beaver_raw_type_converter_add_conversion_map, 4)
     assert MapSet.member?(emitted_names, "beaver_raw_conversion_pattern_add")
     assert MapSet.member?(emitted_names, "beaver_raw_conversion_target_add_dynamic_op")
 

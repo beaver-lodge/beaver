@@ -42,6 +42,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
   alias Beaver.MLIR.Conversion.Plan
   alias Beaver.Walker
 
+  @term_types ~w(!ex.term !ex.bound !ex.unbound)
+
   @doc """
   Returns a conversion plan lowering the `ex` scalar subset to `func`/`arith`.
   """
@@ -64,7 +66,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_legal_dialect("scf")
     |> Plan.add_legal_dialect("llvm")
     |> Plan.add_illegal_dialect("ex")
-    |> Plan.add_conversion(&convert_type/1, version: "1.0")
+    |> Plan.add_conversion_map(@term_types, "i64")
     |> Plan.add_conversion_pattern("ex.lit", &convert_lit/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.add", &convert_add/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.sub", &convert_sub/3, version: "1.0")
@@ -402,8 +404,6 @@ defmodule Beaver.MLIR.Conversion.Ex do
   def term_intrinsic_symbols do
     @term_intrinsics |> Map.values() |> Enum.sort()
   end
-
-  @term_types ~w(!ex.term !ex.bound !ex.unbound)
 
   @doc """
   Converts an `ex` term type to its scalar word representation.

@@ -165,6 +165,23 @@ defmodule Beaver.MLIR.Conversion.Plan do
     append_entry(plan, {:add_conversion, callback, opts})
   end
 
+  @doc """
+  Adds a deterministic native type mapping to the plan.
+
+  Type assembly strings are resolved in the plan's context during
+  materialization. Unlike `add_conversion/3`, this entry contains no
+  executable callback and is cache-stable without a version annotation.
+  """
+  @spec add_conversion_map(t(), [String.t()], String.t()) :: t()
+  def add_conversion_map(%__MODULE__{} = plan, source_types, target_type)
+      when is_list(source_types) and is_binary(target_type) do
+    unless source_types != [] and Enum.all?(source_types, &is_binary/1) do
+      raise ArgumentError, "conversion map source types must be a non-empty list of strings"
+    end
+
+    append_entry(plan, {:add_conversion_map, source_types, target_type})
+  end
+
   @spec add_1_to_n_conversion(
           t(),
           (MLIR.Type.t() -> MLIR.TypeConverter.one_to_n_result()),
@@ -445,6 +462,10 @@ defmodule Beaver.MLIR.Conversion.Plan do
     %{kind: :add_conversion, version: callback_version(opts)}
   end
 
+  defp entry_declaration({:add_conversion_map, source_types, target_type}) do
+    %{kind: :add_conversion_map, source_types: source_types, target_type: target_type}
+  end
+
   defp entry_declaration({:add_1_to_n_conversion, _cb, opts}) do
     %{kind: :add_1_to_n_conversion, version: callback_version(opts)}
   end
@@ -580,6 +601,19 @@ defmodule Beaver.MLIR.Conversion.Plan do
          _timeout
        ),
        do: MLIR.TypeConverter.add_conversion(converter, callback)
+
+  defp populate_entry(
+         {:add_conversion_map, source_types, target_type},
+         context,
+         _target,
+         converter,
+         _patterns,
+         _timeout
+       ) do
+    sources = Enum.map(source_types, &MLIR.Type.get(&1, ctx: context))
+    target = MLIR.Type.get(target_type, ctx: context)
+    MLIR.TypeConverter.add_conversion_map(converter, sources, target)
+  end
 
   defp populate_entry(
          {:add_1_to_n_conversion, callback, _opts},
