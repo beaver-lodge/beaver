@@ -19,6 +19,107 @@ defmodule Beaver.MLIR.Transform do
   use Beaver.ComposerGenerator, prefix: "mlirCreateLinalg"
   use Beaver.ComposerGenerator, prefix: "mlirCreateGPU"
 
+  defmodule FixedPoint do
+    @moduledoc """
+    A structured pass pipeline that repeats until its IR fingerprint converges.
+
+    The declaration is inert and owns no native resources. `Beaver.Composer`
+    materializes it inside the target context.
+    """
+
+    @enforce_keys [:name, :pipeline, :max_iterations, :on_convergence_failure]
+    defstruct [:name, :pipeline, :max_iterations, :on_convergence_failure]
+
+    @type failure_action :: :warn | :error | :silent
+    @type t :: %__MODULE__{
+            name: String.t(),
+            pipeline: list(),
+            max_iterations: pos_integer(),
+            on_convergence_failure: failure_action()
+          }
+  end
+
+  @doc """
+  Declares a structured fixed-point pipeline.
+
+  Failure to converge is an error by default. Choose `:warn` or `:silent`
+  explicitly only when continuing with a partially converged IR is intended.
+  """
+  @spec composite_fixed_point(keyword()) :: FixedPoint.t()
+  def composite_fixed_point(opts) when is_list(opts) do
+    opts = validate_fixed_point_options!(opts)
+
+    %FixedPoint{
+      name: opts |> Keyword.get(:name, "CompositeFixedPointPass") |> validate_fixed_point_name!(),
+      pipeline: opts |> Keyword.fetch!(:pipeline) |> validate_fixed_point_pipeline!(),
+      max_iterations:
+        opts |> Keyword.get(:max_iterations, 10) |> validate_fixed_point_max_iterations!(),
+      on_convergence_failure:
+        opts
+        |> Keyword.get(:on_convergence_failure, :error)
+        |> validate_convergence_failure_action!()
+    }
+  end
+
+  def composite_fixed_point(other) do
+    raise ArgumentError, "fixed-point options must be a keyword list, got: #{inspect(other)}"
+  end
+
+  defp validate_fixed_point_options!(opts) do
+    unless Keyword.keyword?(opts) do
+      raise ArgumentError, "fixed-point options must be a keyword list"
+    end
+
+    supported = [:name, :pipeline, :max_iterations, :on_convergence_failure]
+
+    case Keyword.keys(opts) -- supported do
+      [] -> :ok
+      keys -> raise ArgumentError, "unsupported fixed-point options: #{inspect(keys)}"
+    end
+
+    opts
+  end
+
+  defp validate_fixed_point_name!(name) do
+    unless is_binary(name) and name != "" do
+      raise ArgumentError, ":name must be a non-empty string"
+    end
+
+    name
+  end
+
+  defp validate_fixed_point_pipeline!(pipeline) do
+    unless is_list(pipeline) and pipeline != [] do
+      raise ArgumentError, ":pipeline must be a non-empty Composer pass list"
+    end
+
+    pipeline
+  end
+
+  defp validate_fixed_point_max_iterations!(max_iterations) do
+    unless is_integer(max_iterations) and max_iterations > 0 do
+      raise ArgumentError, ":max_iterations must be a positive integer"
+    end
+
+    max_iterations
+  end
+
+  defp validate_convergence_failure_action!(failure_action) do
+    unless failure_action in [:warn, :error, :silent] do
+      raise ArgumentError,
+            ":on_convergence_failure must be :warn, :error, or :silent"
+    end
+
+    failure_action
+  end
+
+  @doc "Returns whether the linked LLVM can configure convergence failure behavior."
+  @spec composite_fixed_point_failure_action_supported?() :: boolean()
+  def composite_fixed_point_failure_action_supported? do
+    MLIR.CAPI.beaverCompositeFixedPointFailureActionSupported()
+    |> Beaver.Native.to_term()
+  end
+
   defmodule Result do
     @moduledoc "The result of successfully applying a named transform sequence."
 

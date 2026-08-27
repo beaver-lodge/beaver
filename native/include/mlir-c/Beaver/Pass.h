@@ -2,6 +2,12 @@
 #define APPS_BEAVER_NATIVE_MLIR_NIF_MET_INCLUDE_MLIR_C_BEAVER_PASS_H_
 
 #include "mlir-c/Pass.h"
+
+typedef enum {
+  MlirBeaverConvergenceFailureWarn = 0,
+  MlirBeaverConvergenceFailureError = 1,
+  MlirBeaverConvergenceFailureSilent = 2,
+} MlirBeaverConvergenceFailureAction;
 #include "mlir-c/Rewrite.h"
 
 #ifdef __cplusplus
@@ -10,6 +16,17 @@ extern "C" {
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetArgument(MlirPass pass);
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetName(MlirPass pass);
+
+/// Builds a structured inner pipeline without requiring callers to serialize
+/// MLIR's textual pass-pipeline grammar.
+MLIR_CAPI_EXPORTED MlirOpPassManager beaverOpPassManagerCreate(void);
+MLIR_CAPI_EXPORTED void
+beaverOpPassManagerDestroy(MlirOpPassManager passManager);
+MLIR_CAPI_EXPORTED bool
+beaverCompositeFixedPointFailureActionSupported(void);
+MLIR_CAPI_EXPORTED MlirPass beaverCreateCompositeFixedPointPass(
+    MlirStringRef name, MlirOpPassManager innerPipeline,
+    intptr_t maxIterations, MlirBeaverConvergenceFailureAction action);
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetDescription(MlirPass pass);
 MLIR_CAPI_EXPORTED MlirContext
 beaverPassManagerGetContext(MlirPassManager passManager);
