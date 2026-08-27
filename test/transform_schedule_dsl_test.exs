@@ -234,6 +234,22 @@ defmodule Beaver.MLIR.Transform.Schedule.DSLTest do
     end
   end
 
+  defmodule SwapExtractSliceWithFillSchedule do
+    use DSL
+
+    defschedule apply_pattern do
+      sequence "__transform_main", [root >>> any_op()] do
+        Transform.apply_patterns target: root do
+          region do
+            block do
+              ~o/transform.apply_patterns.linalg.swap_extract_slice_with_fill/ >>> []
+            end
+          end
+        end >>> []
+      end
+    end
+  end
+
   defmodule InvalidDeclarations do
     use DSL
 
@@ -362,6 +378,23 @@ defmodule Beaver.MLIR.Transform.Schedule.DSLTest do
     refute text =~ "memref.alloc"
     refute text =~ "memref.dealloc"
     refute text =~ "scf.for"
+  end
+
+  @tag :swap_extract_slice_with_fill
+  test "authors the latest linalg apply-pattern operation through the generic DSL", %{ctx: ctx} do
+    schedule = own(SwapExtractSliceWithFillSchedule.apply_pattern(ctx: ctx))
+    text = MLIR.to_string(schedule)
+    bytecode = MLIR.Bytecode.write!(schedule)
+
+    assert text =~ "transform.apply_patterns.linalg.swap_extract_slice_with_fill"
+
+    for source <- [text, bytecode] do
+      round_trip = own(MLIR.Module.create!(source, ctx: ctx))
+      assert {:ok, resolved} = Schedule.resolve(round_trip, %{})
+
+      payload = own(MLIR.Module.create!("module {}", ctx: ctx))
+      assert {:ok, _result} = MLIR.Transform.execute(payload, resolved)
+    end
   end
 
   test "generated IR is deterministic and round-trips through text and bytecode", %{ctx: ctx} do

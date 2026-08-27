@@ -1,5 +1,5 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "kinda": {
     "git_url": "https://github.com/beaver-lodge/kinda.git",
     "ref": "cb5a5021b1f7538ace89936f0449b4ef827c5a71"
@@ -7,6 +7,11 @@
   "llvm": {
     "repo": "llvm/eudsl",
     "tag": "llvm",
-    "default_revision": "20260825+2e3d50b41"
+    "default_revisions": {
+      "macos_arm64": "20260827+6c81b990d",
+      "manylinux_aarch64": "20260826+6c81b990d",
+      "manylinux_x86_64": "20260826+6c81b990d",
+      "windows_amd64": "20260827+6c81b990d"
+    }
   }
 }
