@@ -160,10 +160,22 @@ defmodule Beaver.MLIR.ConversionTest do
 
     assert receipt["native"]["target_lock_wait_ns"] <= receipt["native"]["duration_ns"]
     assert receipt["native"]["unattributed_residual_ns"] <= receipt["native"]["duration_ns"]
+    assert receipt["process_cpu_time_ns"] >= 0
+    assert receipt["rss"]["peak_after_bytes"] >= receipt["rss"]["peak_before_bytes"]
     assert receipt["ir"]["before"] == receipt["ir"]["after"]
     assert receipt["ir"]["before"]["operations"] == 2
     assert receipt["beam"]["reductions"] > 0
     assert receipt["beam"]["peak_process_memory_bytes"] > 0
+    assert receipt["beam"]["callback_count"] > 0
+    assert receipt["beam"]["max_in_flight"] == 1
+    assert receipt["beam"]["memory_sample_interval_callbacks"] == 256
+    assert length(receipt["hotspots"]) in 1..3
+
+    assert receipt["hotspots"] ==
+             Enum.sort_by(
+               receipt["hotspots"],
+               &{-&1["duration_ns"], &1["source"], &1["callback_kind"] || ""}
+             )
 
     legality = Enum.find(receipt["callbacks"], &(&1["kind"] == "conversion_legality"))
     assert legality["count"] > 0

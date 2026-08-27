@@ -70,6 +70,7 @@ defmodule Beaver.MixProject do
         "guides/dialect-conversion.md",
         "guides/native-rewrite-patterns.md",
         "guides/action-tracing.md",
+        "guides/conversion-profiling.md",
         "guides/enif-pointer-interop.md",
         "guides/blocks.md",
         "CONTRIBUTING.md",

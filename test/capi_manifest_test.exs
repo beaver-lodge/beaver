@@ -80,6 +80,11 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
                &(&1.wrapper_name == :mlirTransformApplyNamedSequenceWithDiagnostics)
              )
 
+    assert function_exported?(CAPI.Raw, :beaver_raw_operation_inventory, 1)
+    assert function_exported?(CAPI.Raw, :beaver_raw_peak_rss, 0)
+    assert function_exported?(CAPI.Raw, :beaver_raw_process_cpu_time, 0)
+    assert function_exported?(CAPI.Raw, :beaver_raw_type_converter_add_conversion_map, 4)
+
     signature_entry =
       declaration_manifest
       |> DeclarationManifest.signature_manifest()

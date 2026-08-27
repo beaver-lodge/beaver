@@ -8,9 +8,9 @@ defmodule Beaver.MLIR.Conversion.Profile do
   """
 
   alias Beaver.MLIR
-  alias Beaver.Walker
 
   @schema_version 1
+  @memory_sample_interval 256
 
   @type receipt() :: map()
   @type state() :: map()
@@ -21,11 +21,14 @@ defmodule Beaver.MLIR.Conversion.Profile do
     %{
       mode: mode,
       started_at: monotonic_ns(),
+      process_cpu_time_ns: MLIR.CAPI.beaver_raw_process_cpu_time(),
+      peak_rss_bytes: MLIR.CAPI.beaver_raw_peak_rss(),
       reductions: reductions(),
       process_memory_bytes: process_memory_bytes(),
       peak_process_memory_bytes: process_memory_bytes(),
       ir_before: inventory(ir),
-      callbacks: %{}
+      callbacks: %{},
+      callback_count: 0
     }
   end
 
@@ -33,7 +36,14 @@ defmodule Beaver.MLIR.Conversion.Profile do
   @spec record_callback(state(), atom(), non_neg_integer(), non_neg_integer()) :: state()
   def record_callback(state, kind, service_ns, native_wait_ns)
       when is_atom(kind) and service_ns >= 0 and native_wait_ns >= service_ns do
-    memory_bytes = process_memory_bytes()
+    callback_count = state.callback_count + 1
+
+    peak_process_memory_bytes =
+      if rem(callback_count, @memory_sample_interval) == 0 do
+        max(state.peak_process_memory_bytes, process_memory_bytes())
+      else
+        state.peak_process_memory_bytes
+      end
 
     summary = %{
       count: 1,
@@ -55,7 +65,8 @@ defmodule Beaver.MLIR.Conversion.Profile do
               max_native_wait_ns: max(current.max_native_wait_ns, native_wait_ns)
             }
           end),
-        peak_process_memory_bytes: max(state.peak_process_memory_bytes, memory_bytes)
+        peak_process_memory_bytes: peak_process_memory_bytes,
+        callback_count: callback_count
     }
   end
 
@@ -64,33 +75,55 @@ defmodule Beaver.MLIR.Conversion.Profile do
           receipt()
   def finish(state, result, ir, native_profile) do
     memory_after = process_memory_bytes()
+    process_cpu_time_after_ns = MLIR.CAPI.beaver_raw_process_cpu_time()
+    peak_rss_after_bytes = MLIR.CAPI.beaver_raw_peak_rss()
     native = decode_native_profile(native_profile)
     callbacks = callback_summaries(state.callbacks)
     native_wait_ns = Enum.sum(Enum.map(callbacks, & &1["native_wait_sum_ns"]))
     max_native_wait_ns = Enum.max(Enum.map(callbacks, & &1["max_native_wait_ns"]), fn -> 0 end)
     beam_service_ns = Enum.sum(Enum.map(callbacks, & &1["beam_service_ns"]))
+    boundary_overhead_sum_ns = max(native_wait_ns - beam_service_ns, 0)
+
+    unattributed_residual_ns =
+      max(native.duration_ns - native.target_lock_wait_ns - native_wait_ns, 0)
+
+    hotspots =
+      hotspots(
+        callbacks,
+        unattributed_residual_ns,
+        native.target_lock_wait_ns
+      )
 
     %{
       "schema_version" => @schema_version,
       "mode" => Atom.to_string(state.mode),
       "status" => status(result),
       "duration_ns" => elapsed_ns(state.started_at),
+      "process_cpu_time_ns" => max(process_cpu_time_after_ns - state.process_cpu_time_ns, 0),
+      "rss" => %{
+        "peak_before_bytes" => state.peak_rss_bytes,
+        "peak_after_bytes" => peak_rss_after_bytes,
+        "peak_delta_bytes" => max(peak_rss_after_bytes - state.peak_rss_bytes, 0)
+      },
       "beam" => %{
         "reductions" => max(reductions() - state.reductions, 0),
         "process_memory_before_bytes" => state.process_memory_bytes,
         "process_memory_after_bytes" => memory_after,
         "peak_process_memory_bytes" => max(state.peak_process_memory_bytes, memory_after),
-        "callback_service_ns" => beam_service_ns
+        "memory_sample_interval_callbacks" => @memory_sample_interval,
+        "callback_service_ns" => beam_service_ns,
+        "callback_count" => state.callback_count,
+        "max_in_flight" => if(state.callback_count == 0, do: 0, else: 1)
       },
       "native" => %{
         "duration_ns" => native.duration_ns,
         "target_lock_wait_ns" => native.target_lock_wait_ns,
         "callback_wait_sum_ns" => native_wait_ns,
         "callback_wait_max_ns" => max_native_wait_ns,
-        "unattributed_residual_ns" =>
-          max(native.duration_ns - native.target_lock_wait_ns - native_wait_ns, 0)
+        "unattributed_residual_ns" => unattributed_residual_ns
       },
-      "boundary_overhead_sum_ns" => max(native_wait_ns - beam_service_ns, 0),
+      "boundary_overhead_sum_ns" => boundary_overhead_sum_ns,
+      "hotspots" => hotspots,
       "callbacks" => callbacks,
       "ir" => %{
         "before" => state.ir_before,
@@ -126,29 +159,43 @@ defmodule Beaver.MLIR.Conversion.Profile do
     end)
   end
 
-  defp inventory(ir) do
-    {_ir, counts} =
-      Walker.prewalk(ir, %{operations: 0, modules: 0, functions: 0}, fn
-        %MLIR.Operation{} = operation, counts ->
-          name = MLIR.Operation.name(operation)
+  defp hotspots(callbacks, native_compute_ns, target_lock_wait_ns) do
+    callback_sources =
+      Enum.flat_map(callbacks, fn callback ->
+        kind = callback["kind"]
 
-          counts = %{
-            counts
-            | operations: counts.operations + 1,
-              modules: counts.modules + if(name == "builtin.module", do: 1, else: 0),
-              functions: counts.functions + if(name == "func.func", do: 1, else: 0)
-          }
-
-          {operation, counts}
-
-        other, counts ->
-          {other, counts}
+        [
+          hotspot("beam_callback_service", kind, callback["beam_service_ns"]),
+          hotspot("callback_boundary_wait", kind, callback["boundary_overhead_sum_ns"])
+        ]
       end)
 
+    [
+      hotspot("native_unattributed_residual", nil, native_compute_ns),
+      hotspot("target_lock_wait", nil, target_lock_wait_ns)
+      | callback_sources
+    ]
+    |> Enum.reject(&(&1["duration_ns"] == 0))
+    |> Enum.sort_by(&{-&1["duration_ns"], &1["source"], &1["callback_kind"] || ""})
+    |> Enum.take(3)
+  end
+
+  defp hotspot(source, callback_kind, duration_ns) do
     %{
-      "operations" => counts.operations,
-      "modules" => counts.modules,
-      "functions" => counts.functions
+      "source" => source,
+      "callback_kind" => callback_kind,
+      "duration_ns" => duration_ns
+    }
+  end
+
+  defp inventory(ir) do
+    operation = MLIR.Operation.from_module(ir)
+    {operations, modules, functions} = MLIR.CAPI.beaver_raw_operation_inventory(operation.ref)
+
+    %{
+      "operations" => operations,
+      "modules" => modules,
+      "functions" => functions
     }
   end
 
