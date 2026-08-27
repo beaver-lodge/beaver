@@ -48,7 +48,7 @@ defmodule Beaver.ENIF do
       for {name, arg_types, ret_types} <- signatures(ctx) do
         Func.func _(
                     {MLIR.SymbolTable.attribute_name(), MLIR.Attribute.string(name)},
-                    {MLIR.SymbolTable.visibility_attribute_name(),
+                    {MLIR.SymbolTable.default_visibility_attribute_name(),
                      MLIR.Attribute.string("private")},
                     function_type: Type.function(arg_types, ret_types)
                   ) do

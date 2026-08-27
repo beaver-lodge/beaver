@@ -25,6 +25,14 @@ check_cxx_source_compiles(
      return 0;
    }"
   BEAVER_HAS_PACKED_TRANSFORM_PARAMS)
+check_cxx_source_compiles(
+  "#include <mlir/IR/SymbolTable.h>
+   int main() {
+     auto name = mlir::SymbolOpInterface::getDefaultVisibilityAttrName();
+     (void)name;
+     return 0;
+   }"
+  BEAVER_HAS_MLIR_DEFAULT_SYMBOL_VISIBILITY_ATTRIBUTE_NAME)
 set(CMAKE_REQUIRED_INCLUDES "${_beaver_saved_required_includes}")
 set(CMAKE_TRY_COMPILE_TARGET_TYPE "${_beaver_saved_try_compile_target_type}")
 
@@ -61,6 +69,14 @@ if(BEAVER_HAS_PACKED_TRANSFORM_PARAMS)
     target_compile_definitions(${_target}
       PUBLIC
       BEAVER_HAS_PACKED_TRANSFORM_PARAMS=1)
+  endforeach()
+endif()
+
+if(BEAVER_HAS_MLIR_DEFAULT_SYMBOL_VISIBILITY_ATTRIBUTE_NAME)
+  foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
+    target_compile_definitions(${_target}
+      PUBLIC
+      BEAVER_HAS_MLIR_DEFAULT_SYMBOL_VISIBILITY_ATTRIBUTE_NAME=1)
   endforeach()
 endif()
 
