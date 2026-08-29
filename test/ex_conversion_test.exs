@@ -1020,7 +1020,9 @@ defmodule ExConversionTest do
             %1 = "ex.make_fun"(%0) {fn_idx = 1 : i64, env_len = 1 : i64, operandSegmentSizes = array<i32: 1, 0, 0, 0>} : (i64) -> !ex.term
             %2 = "ex.make_fun_with_arity"(%0) {fn_idx = 2 : i64, arity = 1 : i64, env_len = 1 : i64, operandSegmentSizes = array<i32: 1, 0, 0, 0>} : (i64) -> !ex.term
             %3 = "ex.fun_arity"(%2) : (!ex.term) -> i64
-            "ex.return"(%3) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+            %4 = "ex.make_fun_with_signature"(%0) {fn_idx = 3 : i64, arity = 1 : i64, result_mode = 1 : i64, env_len = 1 : i64, operandSegmentSizes = array<i32: 1, 0, 0, 0>} : (i64) -> !ex.term
+            %5 = "ex.fun_result_mode"(%4) : (!ex.term) -> i64
+            "ex.return"(%5) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
           }) {sym_name = "main"} : () -> ()
         }
         """,
@@ -1032,9 +1034,12 @@ defmodule ExConversionTest do
     rendered = MLIR.to_string(module, generic: true)
     assert rendered =~ "ex.term.make_fun"
     assert rendered =~ "ex.term.make_fun_with_arity"
+    assert rendered =~ "ex.term.make_fun_with_signature"
     assert rendered =~ "ex.term.fun_arity"
+    assert rendered =~ "ex.term.fun_result_mode"
     assert rendered =~ "(i64, i64, i64, i64, i64, i64) -> i64"
     assert rendered =~ "(i64, i64, i64, i64, i64, i64, i64) -> i64"
+    assert rendered =~ "(i64, i64, i64, i64, i64, i64, i64, i64) -> i64"
   end
 
   test "rejects ex.map with an odd number of entries", %{ctx: ctx} do

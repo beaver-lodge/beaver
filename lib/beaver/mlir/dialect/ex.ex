@@ -433,9 +433,29 @@ defmodule Beaver.MLIR.Dialect.Ex do
         results: [result: ^term_like],
         attributes: [fn_idx: ^integer_value, arity: ^integer_value, env_len: ^integer_value]
 
+  # Closure constructor carrying both call arity and result representation.
+  # result_mode is runtime-defined (Batata uses 0 for scalar, 1 for term).
+  defop make_fun_with_signature(
+          e0 = optional(^any_value),
+          e1 = optional(^any_value),
+          e2 = optional(^any_value),
+          e3 = optional(^any_value)
+        ),
+        results: [result: ^term_like],
+        attributes: [
+          fn_idx: ^integer_value,
+          arity: ^integer_value,
+          result_mode: ^integer_value,
+          env_len: ^integer_value
+        ]
+
   # Reads a closure's declared arity. Runtimes return -1 for values or legacy
   # closures which do not carry arity metadata.
   defop fun_arity(fun = ^term_like),
+    results: [result: ^integer_like]
+
+  # Reads the runtime-defined result representation carried by a closure.
+  defop fun_result_mode(fun = ^term_like),
     results: [result: ^integer_like]
 
   # Applies a first-class function value. The closure is resolved at runtime
