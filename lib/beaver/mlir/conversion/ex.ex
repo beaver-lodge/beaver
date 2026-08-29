@@ -149,7 +149,13 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.make_fun_with_arity", &convert_make_fun_with_arity/3,
       version: "1.0"
     )
+    |> Plan.add_conversion_pattern(
+      "ex.make_fun_with_signature",
+      &convert_make_fun_with_signature/3,
+      version: "1.0"
+    )
     |> Plan.add_conversion_pattern("ex.fun_arity", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.fun_result_mode", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.apply", &convert_apply/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.tuple", &convert_term_tuple/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list", &convert_term_list/3, version: "1.0")
@@ -324,7 +330,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
     catch_value: "ex.term.catch_value",
     make_fun: "ex.term.make_fun",
     make_fun_with_arity: "ex.term.make_fun_with_arity",
+    make_fun_with_signature: "ex.term.make_fun_with_signature",
     fun_arity: "ex.term.fun_arity",
+    fun_result_mode: "ex.term.fun_result_mode",
     fun_idx: "ex.term.fun_idx",
     fun_env: "ex.term.fun_env",
     tuple_from_list: "ex.term.tuple_from_list",
@@ -791,6 +799,53 @@ defmodule Beaver.MLIR.Conversion.Ex do
     replace_with(rewriter, operation, closure)
   end
 
+  defp convert_make_fun_with_signature(operation, operands, rewriter) do
+    base = insertion_point(operation, rewriter)
+
+    values =
+      Enum.map(["fn_idx", "arity", "result_mode", "env_len"], fn attribute ->
+        operation
+        |> required_attribute(attribute)
+        |> MLIR.CAPI.mlirIntegerAttrGetValueInt()
+        |> Beaver.Native.to_term()
+      end)
+
+    [fn_idx, arity, result_mode, env_len] = values
+
+    unless length(operands) == env_len do
+      raise ArgumentError,
+            "ex.make_fun_with_signature env_len #{env_len} does not match #{length(operands)} operands"
+    end
+
+    unless arity in 0..4 do
+      raise ArgumentError, "ex.make_fun_with_signature supports arities 0..4, got #{arity}"
+    end
+
+    unless result_mode in 0..1 do
+      raise ArgumentError,
+            "ex.make_fun_with_signature supports result modes 0..1, got #{result_mode}"
+    end
+
+    constants =
+      Enum.map([fn_idx, arity, result_mode, env_len], fn value ->
+        emit_constant(value, operation, base) |> MLIR.Operation.result(0)
+      end)
+
+    pad =
+      List.duplicate(emit_constant(0, operation, base) |> MLIR.Operation.result(0), 4 - env_len)
+
+    closure =
+      emit_runtime_call(
+        operation,
+        rewriter,
+        base,
+        @term_intrinsics.make_fun_with_signature,
+        constants ++ operands ++ pad
+      )
+
+    replace_with(rewriter, operation, closure)
+  end
+
   # Applies a first-class function value: reads the function index and env
   # words from the closure, then dispatches to the matching `__fn_*`.
   defp convert_apply(operation, operands, rewriter) do
@@ -857,6 +912,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp read_intrinsic("ex.tuple_get"), do: @term_intrinsics.tuple_get
   defp read_intrinsic("ex.fun_arity"), do: @term_intrinsics.fun_arity
+  defp read_intrinsic("ex.fun_result_mode"), do: @term_intrinsics.fun_result_mode
   defp read_intrinsic("ex.tuple_length"), do: @term_intrinsics.tuple_length
   defp read_intrinsic("ex.map_length"), do: @term_intrinsics.map_length
   defp read_intrinsic("ex.float_lit"), do: @term_intrinsics.float_lit
@@ -1384,6 +1440,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp intrinsic_function_type("ex.term.make_fun_with_arity", _ctx) do
     MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 7), [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.make_fun_with_signature", _ctx) do
+    MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 8), [MLIR.Type.i64()])
   end
 
   defp intrinsic_function_type("ex.term.enumerable_reduce", _ctx) do
