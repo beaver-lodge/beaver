@@ -10,6 +10,7 @@
 #include "mlir/CAPI/Rewrite.h"
 #include "mlir/IR/BuiltinAttributes.h"
 #include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/ExtensibleDialect.h"
 #include "mlir/IR/SymbolTable.h"
 
 #include <algorithm>
@@ -120,6 +121,35 @@ static MlirLogicalResult valueType(MlirValue value, MlirType *type,
                        "cannot inspect a null value");
 
   *type = mlirValueGetType(value);
+  return mlirLogicalResultSuccess();
+}
+
+static MlirLogicalResult typeIsInteger(
+    MlirType type, unsigned width, int *result,
+    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (mlirTypeIsNull(type) || !result || width == 0 || width > 4096)
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid integer type predicate request");
+
+  *result =
+      mlirTypeIsAInteger(type) && mlirIntegerTypeGetWidth(type) == width ? 1 : 0;
+  return mlirLogicalResultSuccess();
+}
+
+static MlirLogicalResult dynamicTypeName(
+    MlirType type, MlirStringRef *name,
+    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (mlirTypeIsNull(type) || !name)
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid dynamic type name request");
+
+  auto dynamicType = dyn_cast<DynamicType>(unwrap(type));
+  if (!dynamicType)
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "type is not a registered dynamic type");
+
+  llvm::StringRef value = dynamicType.getTypeDef()->getName();
+  *name = mlirStringRefCreate(value.data(), value.size());
   return mlirLogicalResultSuccess();
 }
 
@@ -832,7 +862,9 @@ static const MlirBeaverCompilerKernelHostAPI &hostAPI() {
       functionType,
       typeAttribute,
       createOperationWithRegions,
-      replaceOperationWithRegions};
+      replaceOperationWithRegions,
+      typeIsInteger,
+      dynamicTypeName};
   return api;
 }
 
