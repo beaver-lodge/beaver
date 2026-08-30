@@ -45,17 +45,213 @@ struct ExternalPatternState {
   PatternIdentity identity;
   MlirBeaverCompilerKernelRewriteFn rewrite;
   MlirBeaverCompilerKernelDestroyFn destroy;
+  MlirTypeConverter typeConverter;
   void *userData;
 };
 
 static const MlirBeaverCompilerKernelHostAPI &hostAPI();
+static bool copyStringRef(MlirStringRef value, std::string &output);
 
-static void eraseOperation(MlirConversionPatternRewriter rewriter,
-                           MlirOperation operation) {
+static MlirLogicalResult hostFailure(MlirStringCallback diagnostic,
+                                     void *diagnosticUserData,
+                                     llvm::StringRef message) {
+  if (diagnostic)
+    diagnostic(mlirStringRefCreate(message.data(), message.size()),
+               diagnosticUserData);
+  return mlirLogicalResultFailure();
+}
+
+static MlirRewriterBase rewriterBase(MlirConversionPatternRewriter rewriter) {
   MlirPatternRewriter patternRewriter =
       mlirConversionPatternRewriterAsPatternRewriter(rewriter);
-  mlirRewriterBaseEraseOp(mlirPatternRewriterAsBase(patternRewriter),
-                          operation);
+  return mlirPatternRewriterAsBase(patternRewriter);
+}
+
+static bool sameContext(MlirContext left, MlirContext right) {
+  return left.ptr && right.ptr && mlirContextEqual(left, right);
+}
+
+static MlirLogicalResult operationResult(
+    MlirOperation operation, intptr_t index, MlirValue *result,
+    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!result || mlirOperationIsNull(operation) || index < 0 ||
+      index >= mlirOperationGetNumResults(operation))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "operation result index is out of bounds");
+
+  *result = mlirOperationGetResult(operation, index);
+  return mlirLogicalResultSuccess();
+}
+
+static MlirLogicalResult operationLocation(
+    MlirOperation operation, MlirLocation *location,
+    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!location || mlirOperationIsNull(operation))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "cannot inspect a null operation");
+
+  *location = mlirOperationGetLocation(operation);
+  return mlirLogicalResultSuccess();
+}
+
+static MlirLogicalResult valueType(MlirValue value, MlirType *type,
+                                   MlirStringCallback diagnostic,
+                                   void *diagnosticUserData) {
+  if (!type || mlirValueIsNull(value))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "cannot inspect a null value");
+
+  *type = mlirValueGetType(value);
+  return mlirLogicalResultSuccess();
+}
+
+static MlirLogicalResult convertType(MlirTypeConverter converter,
+                                     MlirType type, MlirType *converted,
+                                     MlirStringCallback diagnostic,
+                                     void *diagnosticUserData) {
+  if (!converter.ptr || mlirTypeIsNull(type) || !converted)
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid type conversion request");
+
+  try {
+    Type result = unwrap(converter)->convertType(unwrap(type));
+    if (!result)
+      return hostFailure(diagnostic, diagnosticUserData,
+                         "type converter rejected the source type");
+
+    *converted = wrap(result);
+    return mlirLogicalResultSuccess();
+  } catch (const std::exception &error) {
+    return hostFailure(diagnostic, diagnosticUserData, error.what());
+  } catch (...) {
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "exception while converting a type");
+  }
+}
+
+static bool validArray(intptr_t size, const void *data) {
+  return size >= 0 && (size == 0 || data != nullptr);
+}
+
+static MlirLogicalResult createOperation(
+    MlirConversionPatternRewriter rewriter,
+    const MlirBeaverCompilerKernelOperation *descriptor,
+    MlirOperation *created, MlirStringCallback diagnostic,
+    void *diagnosticUserData) {
+  if (!rewriter.ptr || !descriptor ||
+      descriptor->structSize < sizeof(MlirBeaverCompilerKernelOperation) ||
+      !created || mlirLocationIsNull(descriptor->location) ||
+      !validArray(descriptor->nOperands, descriptor->operands) ||
+      !validArray(descriptor->nResultTypes, descriptor->resultTypes) ||
+      !validArray(descriptor->nAttributes, descriptor->attributes))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid scalar operation descriptor");
+
+  std::string name;
+  if (!copyStringRef(descriptor->name, name) || name.empty())
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "operation name must be a non-empty string");
+
+  try {
+    MlirRewriterBase base = rewriterBase(rewriter);
+    MlirContext context = mlirRewriterBaseGetContext(base);
+    if (!sameContext(context, mlirLocationGetContext(descriptor->location)))
+      return hostFailure(diagnostic, diagnosticUserData,
+                         "operation location belongs to a foreign context");
+
+    for (intptr_t index = 0; index < descriptor->nOperands; ++index) {
+      MlirValue operand = descriptor->operands[index];
+      if (mlirValueIsNull(operand) ||
+          !sameContext(context,
+                       mlirTypeGetContext(mlirValueGetType(operand))))
+        return hostFailure(diagnostic, diagnosticUserData,
+                           "operation operand belongs to a foreign context");
+    }
+
+    for (intptr_t index = 0; index < descriptor->nResultTypes; ++index) {
+      MlirType resultType = descriptor->resultTypes[index];
+      if (mlirTypeIsNull(resultType) ||
+          !sameContext(context, mlirTypeGetContext(resultType)))
+        return hostFailure(diagnostic, diagnosticUserData,
+                           "operation result type belongs to a foreign context");
+    }
+
+    for (intptr_t index = 0; index < descriptor->nAttributes; ++index) {
+      MlirNamedAttribute attribute = descriptor->attributes[index];
+      if (!attribute.name.ptr || mlirAttributeIsNull(attribute.attribute) ||
+          !sameContext(context, mlirIdentifierGetContext(attribute.name)) ||
+          !sameContext(context, mlirAttributeGetContext(attribute.attribute)))
+        return hostFailure(diagnostic, diagnosticUserData,
+                           "operation attribute belongs to a foreign context");
+    }
+
+    MlirOperationState state =
+        mlirOperationStateGet(descriptor->name, descriptor->location);
+    mlirOperationStateAddOperands(&state, descriptor->nOperands,
+                                  descriptor->operands);
+    mlirOperationStateAddResults(&state, descriptor->nResultTypes,
+                                 descriptor->resultTypes);
+    mlirOperationStateAddAttributes(&state, descriptor->nAttributes,
+                                    descriptor->attributes);
+
+    MlirOperation operation = mlirOperationCreate(&state);
+    if (mlirOperationIsNull(operation))
+      return hostFailure(diagnostic, diagnosticUserData,
+                         "MLIR rejected scalar operation construction");
+
+    *created = mlirRewriterBaseInsert(base, operation);
+    return mlirLogicalResultSuccess();
+  } catch (const std::exception &error) {
+    return hostFailure(diagnostic, diagnosticUserData, error.what());
+  } catch (...) {
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "exception while creating a scalar operation");
+  }
+}
+
+static MlirLogicalResult replaceOperationWithValues(
+    MlirConversionPatternRewriter rewriter, MlirOperation operation,
+    intptr_t nValues, const MlirValue *values,
+    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!rewriter.ptr || mlirOperationIsNull(operation) ||
+      !validArray(nValues, values) ||
+      nValues != mlirOperationGetNumResults(operation))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid operation replacement request");
+
+  MlirRewriterBase base = rewriterBase(rewriter);
+  MlirContext context = mlirRewriterBaseGetContext(base);
+  if (!sameContext(context, mlirOperationGetContext(operation)))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "operation belongs to a foreign context");
+
+  for (intptr_t index = 0; index < nValues; ++index) {
+    if (mlirValueIsNull(values[index]) ||
+        !sameContext(context,
+                     mlirTypeGetContext(mlirValueGetType(values[index]))))
+      return hostFailure(diagnostic, diagnosticUserData,
+                         "replacement value belongs to a foreign context");
+  }
+
+  mlirRewriterBaseReplaceOpWithValues(base, operation, nValues, values);
+  return mlirLogicalResultSuccess();
+}
+
+static MlirLogicalResult eraseOperation(
+    MlirConversionPatternRewriter rewriter, MlirOperation operation,
+    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!rewriter.ptr || mlirOperationIsNull(operation))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid operation erase request");
+
+  MlirRewriterBase base = rewriterBase(rewriter);
+  if (!sameContext(mlirRewriterBaseGetContext(base),
+                   mlirOperationGetContext(operation)))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "operation belongs to a foreign context");
+
+  mlirRewriterBaseEraseOp(base, operation);
+  return mlirLogicalResultSuccess();
 }
 
 static MlirStringRef stringRef(const std::string &value) {
@@ -112,8 +308,8 @@ static MlirLogicalResult externalPatternRewrite(
 
   try {
     MlirLogicalResult result = state->rewrite(
-        &hostAPI(), operation, nOperands, operands, rewriter, state->userData,
-        appendDiagnostic, &diagnostic);
+        &hostAPI(), operation, nOperands, operands, rewriter,
+        state->typeConverter, state->userData, appendDiagnostic, &diagnostic);
 
     if (mlirLogicalResultIsFailure(result) && !diagnostic.empty())
       unwrap(operation)->emitError() << diagnostic;
@@ -195,7 +391,7 @@ static MlirLogicalResult addPattern(
 
     auto state = std::make_unique<ExternalPatternState>(ExternalPatternState{
         identity, descriptor->matchAndRewrite, descriptor->destroy,
-        descriptor->userData});
+        typeConverter, descriptor->userData});
 
     MlirConversionPatternCallbacks callbacks = {
         nullptr, destroyExternalPattern, externalPatternRewrite, nullptr};
@@ -225,7 +421,15 @@ static MlirLogicalResult addPattern(
 static const MlirBeaverCompilerKernelHostAPI &hostAPI() {
   static const MlirBeaverCompilerKernelHostAPI api = {
       MLIR_BEAVER_COMPILER_KERNEL_ABI_VERSION,
-      sizeof(MlirBeaverCompilerKernelHostAPI), addPattern, eraseOperation};
+      sizeof(MlirBeaverCompilerKernelHostAPI),
+      addPattern,
+      operationResult,
+      operationLocation,
+      valueType,
+      convertType,
+      createOperation,
+      replaceOperationWithValues,
+      eraseOperation};
   return api;
 }
 
