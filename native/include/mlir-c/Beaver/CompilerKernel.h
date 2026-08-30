@@ -177,6 +177,35 @@ struct MlirBeaverCompilerKernelHostAPI {
   MlirLogicalResult (*dynamicTypeName)(
       MlirType type, MlirStringRef *name,
       MlirStringCallback diagnostic, void *diagnosticUserData);
+  /// Constructs the opaque LLVM pointer type in `addressSpace` in the
+  /// conversion rewriter's context.
+  MlirLogicalResult (*llvmPointerType)(
+      MlirConversionPatternRewriter rewriter, unsigned addressSpace,
+      MlirType *type, MlirStringCallback diagnostic,
+      void *diagnosticUserData);
+  /// Constructs a dense i32 array attribute in the conversion rewriter's
+  /// context. The values are copied by MLIR before this call returns.
+  MlirLogicalResult (*denseI32ArrayAttribute)(
+      MlirConversionPatternRewriter rewriter, intptr_t count,
+      const int32_t *values, MlirAttribute *attribute,
+      MlirStringCallback diagnostic, void *diagnosticUserData);
+  /// Creates an operation at the start of `block` without changing the
+  /// caller-visible insertion point.
+  MlirLogicalResult (*createOperationAtBlockStart)(
+      MlirConversionPatternRewriter rewriter, MlirBlock block,
+      const MlirBeaverCompilerKernelOperation *operation,
+      MlirOperation *created, MlirStringCallback diagnostic,
+      void *diagnosticUserData);
+  /// Creates an operation immediately before `anchor` without changing the
+  /// caller-visible insertion point.
+  MlirLogicalResult (*createOperationBefore)(
+      MlirConversionPatternRewriter rewriter, MlirOperation anchor,
+      const MlirBeaverCompilerKernelOperation *operation,
+      MlirOperation *created, MlirStringCallback diagnostic,
+      void *diagnosticUserData);
+  MlirLogicalResult (*operationRegionCount)(
+      MlirOperation operation, intptr_t *count,
+      MlirStringCallback diagnostic, void *diagnosticUserData);
 };
 
 typedef uint32_t (*MlirBeaverCompilerKernelABIVersionFn)(void);

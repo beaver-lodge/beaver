@@ -6,6 +6,7 @@
 #include "llvm/Support/JSON.h"
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir-c/BuiltinTypes.h"
+#include "mlir-c/Dialect/LLVM.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Rewrite.h"
 #include "mlir/IR/BuiltinAttributes.h"
@@ -153,6 +154,41 @@ static MlirLogicalResult dynamicTypeName(
   return mlirLogicalResultSuccess();
 }
 
+static MlirLogicalResult llvmPointerType(
+    MlirConversionPatternRewriter rewriter, unsigned addressSpace,
+    MlirType *type, MlirStringCallback diagnostic,
+    void *diagnosticUserData) {
+  if (!rewriter.ptr || !type)
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid LLVM pointer type request");
+
+  MlirContext context = mlirRewriterBaseGetContext(rewriterBase(rewriter));
+  *type = mlirLLVMPointerTypeGet(context, addressSpace);
+  if (mlirTypeIsNull(*type))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "failed to create LLVM pointer type");
+
+  return mlirLogicalResultSuccess();
+}
+
+static MlirLogicalResult denseI32ArrayAttribute(
+    MlirConversionPatternRewriter rewriter, intptr_t count,
+    const int32_t *values, MlirAttribute *attribute,
+    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!rewriter.ptr || !attribute || count < 0 || count > 4096 ||
+      (count != 0 && !values))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid dense i32 array attribute request");
+
+  MlirContext context = mlirRewriterBaseGetContext(rewriterBase(rewriter));
+  *attribute = mlirDenseI32ArrayGet(context, count, values);
+  if (mlirAttributeIsNull(*attribute))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "failed to create dense i32 array attribute");
+
+  return mlirLogicalResultSuccess();
+}
+
 static MlirLogicalResult convertType(MlirTypeConverter converter,
                                      MlirType type, MlirType *converted,
                                      MlirStringCallback diagnostic,
@@ -279,6 +315,62 @@ static MlirLogicalResult createOperationWithRegions(
     void *diagnosticUserData) {
   return createOperationImpl(rewriter, descriptor, nRegions, created,
                              diagnostic, diagnosticUserData);
+}
+
+static MlirLogicalResult createOperationAtBlockStart(
+    MlirConversionPatternRewriter rewriter, MlirBlock block,
+    const MlirBeaverCompilerKernelOperation *descriptor,
+    MlirOperation *created, MlirStringCallback diagnostic,
+    void *diagnosticUserData) {
+  if (!rewriter.ptr || mlirBlockIsNull(block))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid block-start operation request");
+
+  MlirOperation parent = mlirBlockGetParentOperation(block);
+  MlirRewriterBase base = rewriterBase(rewriter);
+  if (mlirOperationIsNull(parent) ||
+      !sameContext(mlirRewriterBaseGetContext(base),
+                   mlirOperationGetContext(parent)))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "block belongs to a foreign context");
+
+  OpBuilder::InsertionGuard guard(*unwrap(rewriter));
+  mlirRewriterBaseSetInsertionPointToStart(base, block);
+  return createOperationImpl(rewriter, descriptor, 0, created, diagnostic,
+                             diagnosticUserData);
+}
+
+static MlirLogicalResult createOperationBefore(
+    MlirConversionPatternRewriter rewriter, MlirOperation anchor,
+    const MlirBeaverCompilerKernelOperation *descriptor,
+    MlirOperation *created, MlirStringCallback diagnostic,
+    void *diagnosticUserData) {
+  if (!rewriter.ptr || mlirOperationIsNull(anchor) ||
+      mlirBlockIsNull(mlirOperationGetBlock(anchor)))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid operation-before request");
+
+  MlirRewriterBase base = rewriterBase(rewriter);
+  if (!sameContext(mlirRewriterBaseGetContext(base),
+                   mlirOperationGetContext(anchor)))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "anchor belongs to a foreign context");
+
+  OpBuilder::InsertionGuard guard(*unwrap(rewriter));
+  mlirRewriterBaseSetInsertionPointBefore(base, anchor);
+  return createOperationImpl(rewriter, descriptor, 0, created, diagnostic,
+                             diagnosticUserData);
+}
+
+static MlirLogicalResult operationRegionCount(
+    MlirOperation operation, intptr_t *count, MlirStringCallback diagnostic,
+    void *diagnosticUserData) {
+  if (mlirOperationIsNull(operation) || !count)
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid operation region count request");
+
+  *count = mlirOperationGetNumRegions(operation);
+  return mlirLogicalResultSuccess();
 }
 
 static MlirLogicalResult replaceOperationWithValues(
@@ -864,7 +956,12 @@ static const MlirBeaverCompilerKernelHostAPI &hostAPI() {
       createOperationWithRegions,
       replaceOperationWithRegions,
       typeIsInteger,
-      dynamicTypeName};
+      dynamicTypeName,
+      llvmPointerType,
+      denseI32ArrayAttribute,
+      createOperationAtBlockStart,
+      createOperationBefore,
+      operationRegionCount};
   return api;
 }
 

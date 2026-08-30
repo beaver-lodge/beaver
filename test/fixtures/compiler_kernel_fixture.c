@@ -102,10 +102,18 @@ static MlirLogicalResult fixture_region_rewrite(
   MlirType sourceResultType;
   MlirType resultType;
   MlirLocation location;
+  MlirType pointerType;
+  const int32_t segments[2] = {2, 0};
+  MlirAttribute segmentsAttribute;
+  MlirNamedAttribute namedSegments;
+  intptr_t regionCount;
 
   if (mlirLogicalResultIsFailure(host->operationAttribute(
           operation, mlirStringRefCreate("arity", 5), &arityAttribute,
           diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->operationRegionCount(
+          operation, &regionCount, diagnostic, diagnosticUserData)) ||
+      regionCount != 1 ||
       mlirLogicalResultIsFailure(host->attributeIntegerValue(
           arityAttribute, &arity, diagnostic, diagnosticUserData)) ||
       arity != 0 ||
@@ -139,7 +147,53 @@ static MlirLogicalResult fixture_region_rewrite(
           typeConverter, sourceResultType, &resultType, diagnostic,
           diagnosticUserData)) ||
       mlirLogicalResultIsFailure(host->operationLocation(
-          operation, &location, diagnostic, diagnosticUserData)))
+          operation, &location, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->llvmPointerType(
+          rewriter, 0, &pointerType, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->denseI32ArrayAttribute(
+#if defined(FIXTURE_CONTROL_BAD_DENSE)
+          rewriter, -1,
+#else
+          rewriter, 2,
+#endif
+          segments, &segmentsAttribute, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->namedAttribute(
+          rewriter, mlirStringRefCreate("segments", 8), segmentsAttribute,
+          &namedSegments, diagnostic, diagnosticUserData)))
+    return mlirLogicalResultFailure();
+
+  MlirBeaverCompilerKernelOperation startDescriptor = {
+      sizeof(MlirBeaverCompilerKernelOperation),
+      mlirStringRefCreate("fixture.control_start",
+                          sizeof("fixture.control_start") - 1),
+      location,
+      0,
+      NULL,
+      1,
+      &pointerType,
+      1,
+      &namedSegments,
+  };
+  MlirBeaverCompilerKernelOperation endDescriptor = {
+      sizeof(MlirBeaverCompilerKernelOperation),
+      mlirStringRefCreate("fixture.control_end",
+                          sizeof("fixture.control_end") - 1),
+      location,
+      0,
+      NULL,
+      0,
+      NULL,
+      0,
+      NULL,
+  };
+  MlirOperation start;
+  MlirOperation end;
+  if (mlirLogicalResultIsFailure(host->createOperationAtBlockStart(
+          rewriter, block, &startDescriptor, &start, diagnostic,
+          diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->createOperationBefore(
+          rewriter, terminator, &endDescriptor, &end, diagnostic,
+          diagnosticUserData)))
     return mlirLogicalResultFailure();
 
   MlirBeaverCompilerKernelOperation descriptor = {
@@ -451,7 +505,9 @@ FIXTURE_EXPORT MlirLogicalResult fixture_populate(
       !host->replaceOperationWithRegions ||
       !host->operationAttribute || !host->valueType || !host->convertType ||
       !host->operationResult || !host->operationLocation ||
-      !host->namedAttribute)
+      !host->namedAttribute || !host->llvmPointerType ||
+      !host->denseI32ArrayAttribute || !host->createOperationAtBlockStart ||
+      !host->createOperationBefore || !host->operationRegionCount)
     return mlirLogicalResultFailure();
 #endif
 

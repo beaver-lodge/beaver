@@ -247,6 +247,8 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
       fixture_add_plan(manifest, artifact)
       |> Plan.add_legal_dialect("scf")
       |> Plan.add_legal_op("fixture.lowered")
+      |> Plan.add_legal_op("fixture.control_start")
+      |> Plan.add_legal_op("fixture.control_end")
       |> Plan.add_illegal_op("scf.execute_region")
 
     module =
@@ -269,6 +271,11 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
     rendered = MLIR.to_string(module, generic: true)
     assert rendered =~ ~s|"fixture.lowered"()|
     assert rendered =~ ~s|signature = () -> i64|
+
+    assert rendered =~
+             ~s|"fixture.control_start"() {segments = array<i32: 2, 0>} : () -> !llvm.ptr|
+
+    assert rendered =~ ~s|"fixture.control_end"() : () -> ()|
     assert rendered =~ ~s|scf.yield|
     refute rendered =~ ~s|"scf.execute_region"()|
     MLIR.Module.destroy(module)
@@ -296,6 +303,8 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
     invalid_ir = MLIR.to_string(invalid, generic: true)
     assert invalid_ir =~ ~s|"scf.execute_region"()|
     refute invalid_ir =~ ~s|"fixture.lowered"()|
+    refute invalid_ir =~ "fixture.control_start"
+    refute invalid_ir =~ "fixture.control_end"
     MLIR.Module.destroy(invalid)
 
     {mismatch_manifest, mismatch_artifact} =
@@ -309,6 +318,8 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
       fixture_add_plan(mismatch_manifest, mismatch_artifact)
       |> Plan.add_legal_dialect("scf")
       |> Plan.add_legal_op("fixture.lowered")
+      |> Plan.add_legal_op("fixture.control_start")
+      |> Plan.add_legal_op("fixture.control_end")
       |> Plan.add_illegal_op("scf.execute_region")
 
     mismatch =
@@ -334,7 +345,40 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
     mismatch_ir = MLIR.to_string(mismatch, generic: true)
     assert mismatch_ir =~ ~s|"scf.execute_region"()|
     refute mismatch_ir =~ ~s|"fixture.lowered"()|
+    refute mismatch_ir =~ "fixture.control_start"
+    refute mismatch_ir =~ "fixture.control_end"
     MLIR.Module.destroy(mismatch)
+
+    {dense_manifest, dense_artifact} =
+      build_fixture!(Path.join(tmp_dir, "bad_dense"),
+        behavior: :control_bad_dense,
+        patterns: patterns,
+        capabilities: ["ir.region.v1", "pattern.register"]
+      )
+
+    dense_plan =
+      fixture_add_plan(dense_manifest, dense_artifact)
+      |> Plan.add_legal_dialect("scf")
+      |> Plan.add_legal_op("fixture.lowered")
+      |> Plan.add_legal_op("fixture.control_start")
+      |> Plan.add_legal_op("fixture.control_end")
+      |> Plan.add_illegal_op("scf.execute_region")
+
+    dense_failure =
+      MLIR.Module.create!(
+        ~s[module { func.func @region() -> i64 { %0 = "scf.execute_region"() ({ %1 = arith.constant 7 : i64 scf.yield %1 : i64 }) {arity = 0 : i64} : () -> i64 func.return %0 : i64 } }],
+        ctx: ctx
+      )
+
+    assert {:error, %MLIR.Conversion.Error{diagnostics: dense_diagnostics}} =
+             Plan.run(dense_plan, dense_failure)
+
+    assert dense_diagnostics != []
+    dense_ir = MLIR.to_string(dense_failure, generic: true)
+    assert dense_ir =~ ~s|"scf.execute_region"()|
+    refute dense_ir =~ "fixture.control_start"
+    refute dense_ir =~ "fixture.control_end"
+    MLIR.Module.destroy(dense_failure)
   end
 
   @tag :tmp_dir
@@ -521,6 +565,9 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
 
   defp behavior_args_for(:region_mismatch),
     do: ["-DFIXTURE_REGION_PATTERN", "-DFIXTURE_REGION_MISMATCH"]
+
+  defp behavior_args_for(:control_bad_dense),
+    do: ["-DFIXTURE_REGION_PATTERN", "-DFIXTURE_CONTROL_BAD_DENSE"]
 
   defp behavior_args_for(:type), do: ["-DFIXTURE_TYPE_PATTERN"]
 
