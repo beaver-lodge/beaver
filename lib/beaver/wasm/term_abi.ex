@@ -138,6 +138,7 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.binary_from_list" => %{params: [:i64], result: :i64},
     "ex.term.iodata_to_binary" => %{params: [:i64], result: :i64},
     "ex.term.float_lit" => %{params: [:i64], result: :i64},
+    "ex.term.bigint_lit" => %{params: [:i64], result: :i64},
     "ex.term.string_to_float" => %{params: [:i64], result: :i64},
     "ex.term.string_to_atom" => %{params: [:i64], result: :i64},
     "ex.term.string_to_existing_atom" => %{params: [:i64], result: :i64},
