@@ -111,6 +111,7 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.to_int" => %{params: [:i64], result: :i64},
     "ex.term.eq" => %{params: [:i64, :i64], result: :i64},
     "ex.term.eq_loose" => %{params: [:i64, :i64], result: :i64},
+    "ex.term.integer_compare" => %{params: [:i64, :i64], result: :i64},
     "ex.term.is_integer" => %{params: [:i64], result: :i64},
     "ex.term.is_float" => %{params: [:i64], result: :i64},
     "ex.term.is_atom" => %{params: [:i64], result: :i64},

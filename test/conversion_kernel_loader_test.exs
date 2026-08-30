@@ -467,8 +467,10 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
       shared_library_args() ++
         [
           "-fPIC",
-          "-I#{@include_dir}",
-          "-I#{llvm_include}",
+          "-I",
+          @include_dir,
+          "-I",
+          llvm_include,
           "-DFIXTURE_ABI_VERSION=#{abi}",
           "-DFIXTURE_IDENTITY=#{inspect(identity)}",
           @fixture

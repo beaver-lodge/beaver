@@ -228,6 +228,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.list_length", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.term_eq", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.term_eq_loose", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.integer_compare", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_length", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_get", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_slice", &convert_term_read/3, version: "1.0")
@@ -381,6 +382,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     list_length: "ex.term.list_length",
     term_eq: "ex.term.eq",
     term_eq_loose: "ex.term.eq_loose",
+    integer_compare: "ex.term.integer_compare",
     binary_length: "ex.term.binary_length",
     binary_get: "ex.term.binary_get",
     binary_slice: "ex.term.binary_slice",
@@ -975,6 +977,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.list_flatten"), do: @term_intrinsics.list_flatten
   defp read_intrinsic("ex.term_eq"), do: @term_intrinsics.term_eq
   defp read_intrinsic("ex.term_eq_loose"), do: @term_intrinsics.term_eq_loose
+  defp read_intrinsic("ex.integer_compare"), do: @term_intrinsics.integer_compare
   defp read_intrinsic("ex.reduction_tick"), do: @term_intrinsics.reduction_tick
   defp read_intrinsic("ex.clock_init"), do: @term_intrinsics.clock_init
   defp read_intrinsic("ex.yield_mark"), do: @term_intrinsics.yield_mark
@@ -1557,6 +1560,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
               "ex.term.list_get",
               "ex.term.eq",
               "ex.term.eq_loose",
+              "ex.term.integer_compare",
               "ex.term.binary_get",
               "ex.term.binary_slice",
               "ex.term.binary_utf8_get",
