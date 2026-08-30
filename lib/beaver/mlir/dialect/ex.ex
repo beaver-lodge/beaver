@@ -527,6 +527,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop float_lit(bits = ^integer_like),
     results: [result: ^term_like]
 
+  defop bigint_lit(decimal = ^term_like),
+    results: [result: ^term_like]
+
   defop string_to_float(binary = ^term_like),
     results: [result: ^term_like]
 

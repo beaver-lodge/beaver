@@ -665,6 +665,7 @@ defmodule ExConversionTest do
             %8 = "ex.binary_from_list"(%4) : (!ex.term) -> !ex.term
             %12 = "ex.iodata_to_binary"(%4) : (!ex.term) -> !ex.term
             %9 = "ex.float_lit"(%0) : (i64) -> !ex.term
+            %23 = "ex.bigint_lit"(%7) : (!ex.term) -> !ex.term
             %10 = "ex.string_to_float"(%7) : (!ex.term) -> !ex.term
             %21 = "ex.string_to_atom"(%7) : (!ex.term) -> !ex.term
             %22 = "ex.string_to_existing_atom"(%7) : (!ex.term) -> !ex.term
@@ -693,6 +694,7 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.binary_from_list"
     assert rendered =~ "ex.term.iodata_to_binary"
     assert rendered =~ "ex.term.float_lit"
+    assert rendered =~ "ex.term.bigint_lit"
     assert rendered =~ "ex.term.string_to_float"
     assert rendered =~ "ex.term.string_to_atom"
     assert rendered =~ "ex.term.string_to_existing_atom"

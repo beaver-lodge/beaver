@@ -172,6 +172,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.binary", &convert_term_binary/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.iodata_to_binary", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.float_lit", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.bigint_lit", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.string_to_float", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.string_to_atom", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.string_to_existing_atom", &convert_term_read/3,
@@ -343,6 +344,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     binary_from_list: "ex.term.binary_from_list",
     iodata_to_binary: "ex.term.iodata_to_binary",
     float_lit: "ex.term.float_lit",
+    bigint_lit: "ex.term.bigint_lit",
     string_to_float: "ex.term.string_to_float",
     string_to_atom: "ex.term.string_to_atom",
     string_to_existing_atom: "ex.term.string_to_existing_atom",
@@ -924,6 +926,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.tuple_length"), do: @term_intrinsics.tuple_length
   defp read_intrinsic("ex.map_length"), do: @term_intrinsics.map_length
   defp read_intrinsic("ex.float_lit"), do: @term_intrinsics.float_lit
+  defp read_intrinsic("ex.bigint_lit"), do: @term_intrinsics.bigint_lit
   defp read_intrinsic("ex.string_to_float"), do: @term_intrinsics.string_to_float
   defp read_intrinsic("ex.string_to_atom"), do: @term_intrinsics.string_to_atom
   defp read_intrinsic("ex.string_to_existing_atom"), do: @term_intrinsics.string_to_existing_atom
