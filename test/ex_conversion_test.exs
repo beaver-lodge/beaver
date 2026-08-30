@@ -5,6 +5,7 @@ defmodule ExConversionTest do
   alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Conversion.Ex
+  alias Beaver.MLIR.Conversion.Ex.Stage0
   alias Beaver.MLIR.Conversion.Plan
   alias Beaver.MLIR.Dialect.Ex, as: ExDialect
   alias Beaver.MLIR.Dialect.Ex.ExpandCase
@@ -200,11 +201,41 @@ defmodule ExConversionTest do
     assert %{kind: :add_pattern_population, version: "1.0"} in declaration.entries
 
     moved_roots =
-      ~w(ex.lit ex.box ex.to_word ex.unbox ex.yield ex.add ex.sub ex.mul ex.div ex.rem ex.cmp ex.if ex.binary ex.term_eq ex.binary_part)
+      ~w(ex.lit ex.box ex.to_word ex.unbox ex.yield ex.add ex.sub ex.mul ex.div ex.rem ex.cmp ex.if)
 
     refute Enum.any?(declaration.entries, fn entry ->
              entry[:kind] == :add_conversion_pattern and entry[:root] in moved_roots
            end)
+  end
+
+  test "freezes the machine-readable C++ Stage 0 boundary" do
+    manifest = Stage0.manifest()
+
+    assert manifest["schema_version"] == 1
+    assert manifest["provider"] == "cpp-bootstrap"
+    assert manifest["entrypoint"] == "beaverPopulateExScalarConversionPatterns"
+    assert manifest["identity_digest"] == Stage0.identity_digest()
+
+    assert Stage0.identity_digest() ==
+             "sha256:6e5d22d6e59047a2875c55104427a343affd23fdfd867a5d988fb34f15e64d4c"
+
+    assert Stage0.roots() ==
+             ~w(ex.add ex.box ex.cmp ex.div ex.if ex.lit ex.mul ex.rem ex.sub ex.to_word ex.unbox ex.yield)
+
+    assert Enum.map(manifest["patterns"], & &1["root"]) == Stage0.roots()
+
+    declaration = Plan.declaration(Ex.plan())
+
+    for root <- ~w(ex.binary ex.binary_part ex.term_eq) do
+      assert Enum.any?(declaration.entries, fn entry ->
+               entry[:kind] == :add_conversion_pattern and entry[:root] == root
+             end)
+    end
+  end
+
+  test "exposes a stable Ex dialect schema identity" do
+    assert ExDialect.schema_digest() ==
+             "sha256:8867066023640d49ec3bb06ec351c643eed3fe2c2b9147b63285194d4d6585a8"
   end
 
   test "fails explicitly on a bare ex.var", %{ctx: ctx} do

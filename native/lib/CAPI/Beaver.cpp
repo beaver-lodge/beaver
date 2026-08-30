@@ -48,49 +48,6 @@ static bool isExTermType(Type type) {
          name.ends_with(".unbound");
 }
 
-static Operation *exRuntimeSymbolTable(Operation *operation) {
-  Operation *scope = operation->getParentOp();
-  while (scope && !scope->hasTrait<OpTrait::SymbolTable>())
-    scope = scope->getParentOp();
-  return scope;
-}
-
-static LogicalResult ensureExRuntimeDeclaration(
-    Operation *operation, ConversionPatternRewriter &rewriter,
-    StringRef symbol, unsigned arity) {
-  Operation *symbolTable = exRuntimeSymbolTable(operation);
-  if (!symbolTable || symbolTable->getNumRegions() != 1 ||
-      symbolTable->getRegion(0).empty())
-    return failure();
-  if (SymbolTable::lookupSymbolIn(symbolTable, symbol))
-    return success();
-
-  SmallVector<Type> inputs(arity, rewriter.getI64Type());
-  SmallVector<Type> results{rewriter.getI64Type()};
-  FunctionType functionType = rewriter.getFunctionType(inputs, results);
-
-  OpBuilder::InsertionGuard guard(rewriter);
-  rewriter.setInsertionPointToEnd(&symbolTable->getRegion(0).front());
-  OperationState state(operation->getLoc(), "func.func");
-  state.addAttribute("sym_name", rewriter.getStringAttr(symbol));
-  state.addAttribute("sym_visibility", rewriter.getStringAttr("private"));
-  state.addAttribute("function_type", TypeAttr::get(functionType));
-  state.addRegion();
-  rewriter.create(state);
-  return success();
-}
-
-static Value createExRuntimeCall(Operation *operation,
-                                 ConversionPatternRewriter &rewriter,
-                                 StringRef symbol, ValueRange operands) {
-  OperationState state(operation->getLoc(), "func.call");
-  state.addOperands(operands);
-  state.addAttribute(
-      "callee", FlatSymbolRefAttr::get(rewriter.getContext(), symbol));
-  state.addTypes(rewriter.getI64Type());
-  return rewriter.create(state)->getResult(0);
-}
-
 class ExLiteralConversion final : public ConversionPattern {
 public:
   ExLiteralConversion(const TypeConverter &converter, MLIRContext *context)
@@ -257,81 +214,6 @@ public:
   }
 };
 
-class ExRuntimeCallConversion final : public ConversionPattern {
-public:
-  ExRuntimeCallConversion(const TypeConverter &converter, StringRef rootName,
-                          StringRef symbol, unsigned arity,
-                          MLIRContext *context)
-      : ConversionPattern(converter, rootName, PatternBenefit(1), context),
-        symbol(symbol.str()), arity(arity) {}
-
-  LogicalResult
-  matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    Type resultType = operation->getNumResults() == 1
-                          ? getTypeConverter()->convertType(
-                                operation->getResult(0).getType())
-                          : Type();
-    if (operands.size() != arity || !resultType ||
-        !resultType.isInteger(64) ||
-        std::any_of(operands.begin(), operands.end(), [](Value value) {
-          return !value.getType().isInteger(64);
-        }) ||
-        failed(ensureExRuntimeDeclaration(operation, rewriter, symbol, arity)))
-      return failure();
-
-    Value result = createExRuntimeCall(operation, rewriter, symbol, operands);
-    rewriter.replaceOp(operation, result);
-    return success();
-  }
-
-private:
-  std::string symbol;
-  unsigned arity;
-};
-
-class ExTermBinaryConversion final : public ConversionPattern {
-public:
-  ExTermBinaryConversion(const TypeConverter &converter, MLIRContext *context)
-      : ConversionPattern(converter, "ex.binary", PatternBenefit(1), context) {}
-
-  LogicalResult
-  matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    Type resultType = operation->getNumResults() == 1
-                          ? getTypeConverter()->convertType(
-                                operation->getResult(0).getType())
-                          : Type();
-    if (!resultType || !resultType.isInteger(64) ||
-        std::any_of(operands.begin(), operands.end(), [](Value value) {
-          return !value.getType().isInteger(64);
-        }) ||
-        failed(ensureExRuntimeDeclaration(operation, rewriter,
-                                          "ex.term.list_cons", 2)) ||
-        failed(ensureExRuntimeDeclaration(operation, rewriter,
-                                          "ex.term.binary_from_list", 1)))
-      return failure();
-
-    OperationState nilState(operation->getLoc(), "arith.constant");
-    nilState.addAttribute("value", rewriter.getI64IntegerAttr(1));
-    nilState.addTypes(rewriter.getI64Type());
-    Value tail = rewriter.create(nilState)->getResult(0);
-
-    for (auto iterator = operands.rbegin(); iterator != operands.rend();
-         ++iterator) {
-      SmallVector<Value> arguments{*iterator, tail};
-      tail = createExRuntimeCall(operation, rewriter, "ex.term.list_cons",
-                                 arguments);
-    }
-
-    SmallVector<Value> arguments{tail};
-    Value binary = createExRuntimeCall(
-        operation, rewriter, "ex.term.binary_from_list", arguments);
-    rewriter.replaceOp(operation, binary);
-    return success();
-  }
-};
-
 class ExIfConversion final : public ConversionPattern {
 public:
   ExIfConversion(const TypeConverter &converter, MLIRContext *context)
@@ -401,19 +283,6 @@ void beaverPopulateExScalarConversionPatterns(
   set->add<ExBinaryConversion>(*converter, "ex.div", "arith.divsi", context);
   set->add<ExBinaryConversion>(*converter, "ex.rem", "arith.remsi", context);
   set->add<ExCmpConversion, ExIfConversion>(*converter, context);
-}
-
-void beaverPopulateExRuntimeConversionPatterns(
-    MlirRewritePatternSet patterns, MlirTypeConverter typeConverter) {
-  RewritePatternSet *set = unwrap(patterns);
-  TypeConverter *converter = unwrap(typeConverter);
-  MLIRContext *context = set->getContext();
-
-  set->add<ExRuntimeCallConversion>(*converter, "ex.term_eq", "ex.term.eq", 2,
-                                    context);
-  set->add<ExRuntimeCallConversion>(*converter, "ex.binary_part",
-                                    "ex.term.binary_part", 3, context);
-  set->add<ExTermBinaryConversion>(*converter, context);
 }
 
 MLIR_CAPI_EXPORTED void

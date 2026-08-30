@@ -19,7 +19,15 @@ defmodule Beaver.MLIR.Dialect.Ex do
   by the Slang `defop` DSL and are not an Elixir `if/2` call.
   """
 
+  @external_resource __ENV__.file
+  @schema_digest "sha256:" <>
+                   Base.encode16(:crypto.hash(:sha256, File.read!(__ENV__.file)), case: :lower)
+
   use Beaver.Slang, name: "ex"
+
+  @doc "Returns the content identity of this Ex dialect schema definition."
+  @spec schema_digest() :: String.t()
+  def schema_digest, do: @schema_digest
 
   deftype term()
   deftype bound()

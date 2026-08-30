@@ -10,6 +10,22 @@ This example defines a small Slang operation and lowers it to the `arith`
 dialect using a `Conversion.Plan`. The resulting IR can then use MLIR's standard
 `arith`-to-LLVM and `func`-to-LLVM passes.
 
+## Ex provider boundary
+
+Beaver owns the `ex` dialect schema and the provider-neutral external
+compiler-kernel ABI. Evolving production lowering belongs to Batata and is
+loaded through `Conversion.Plan.add_external_pattern_population/3`; Beaver
+does not locate or download Batata artifacts.
+
+`Beaver.MLIR.Conversion.Ex.Stage0.manifest/0` describes the only Ex-specific
+C++ implementation retained in Beaver. It is a frozen, versioned bootstrap
+seed for Batata's restricted compiler-kernel source and a differential oracle,
+not a production provider. Runtime and standard-library patterns remain in the
+BEAM reference plan so Stage 0 can close a clean bootstrap without extending
+the C++ seed. A production compiler must select a verified native provider and
+fail before conversion if that artifact cannot be loaded; it must never fall
+back implicitly to Stage 0 or the BEAM callbacks.
+
 ```elixir
 defmodule Counter do
   use Beaver.Slang, name: "counter"
