@@ -3,6 +3,8 @@
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/JSON.h"
+#include "mlir-c/BuiltinAttributes.h"
+#include "mlir-c/BuiltinTypes.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Rewrite.h"
 
@@ -254,6 +256,102 @@ static MlirLogicalResult eraseOperation(
   return mlirLogicalResultSuccess();
 }
 
+static MlirLogicalResult operationAttribute(
+    MlirOperation operation, MlirStringRef name, MlirAttribute *attribute,
+    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  std::string key;
+  if (!attribute || mlirOperationIsNull(operation) ||
+      !copyStringRef(name, key) || key.empty())
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid operation attribute request");
+
+  *attribute = mlirOperationGetAttributeByName(operation, name);
+  if (mlirAttributeIsNull(*attribute))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "operation attribute is missing");
+
+  return mlirLogicalResultSuccess();
+}
+
+static MlirLogicalResult attributeStringValue(
+    MlirAttribute attribute, MlirStringRef *value,
+    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!value || mlirAttributeIsNull(attribute) ||
+      !mlirAttributeIsAString(attribute))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "attribute is not a string");
+
+  *value = mlirStringAttrGetValue(attribute);
+  return mlirLogicalResultSuccess();
+}
+
+static MlirLogicalResult integerType(
+    MlirConversionPatternRewriter rewriter, unsigned width, MlirType *type,
+    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!rewriter.ptr || !type || width == 0 || width > 4096)
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid integer type request");
+
+  MlirContext context = mlirRewriterBaseGetContext(rewriterBase(rewriter));
+  *type = mlirIntegerTypeGet(context, width);
+  if (mlirTypeIsNull(*type))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "failed to create integer type");
+
+  return mlirLogicalResultSuccess();
+}
+
+static MlirLogicalResult integerAttribute(
+    MlirType type, int64_t value, MlirAttribute *attribute,
+    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!attribute || mlirTypeIsNull(type) || !mlirTypeIsAInteger(type))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "integer attribute requires an integer type");
+
+  *attribute = mlirIntegerAttrGet(type, value);
+  if (mlirAttributeIsNull(*attribute))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "failed to create integer attribute");
+
+  return mlirLogicalResultSuccess();
+}
+
+static MlirLogicalResult namedAttribute(
+    MlirConversionPatternRewriter rewriter, MlirStringRef name,
+    MlirAttribute attribute, MlirNamedAttribute *namedAttribute,
+    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  std::string key;
+  if (!rewriter.ptr || !namedAttribute || mlirAttributeIsNull(attribute) ||
+      !copyStringRef(name, key) || key.empty())
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid named attribute request");
+
+  MlirContext context = mlirRewriterBaseGetContext(rewriterBase(rewriter));
+  if (!sameContext(context, mlirAttributeGetContext(attribute)))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "attribute belongs to a foreign context");
+
+  MlirIdentifier identifier = mlirIdentifierGet(context, name);
+  if (!identifier.ptr)
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "failed to create attribute identifier");
+
+  *namedAttribute = mlirNamedAttributeGet(identifier, attribute);
+  return mlirLogicalResultSuccess();
+}
+
+static MlirLogicalResult operationCounts(
+    MlirOperation operation, intptr_t *nOperands, intptr_t *nResults,
+    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (mlirOperationIsNull(operation) || !nOperands || !nResults)
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid operation count request");
+
+  *nOperands = mlirOperationGetNumOperands(operation);
+  *nResults = mlirOperationGetNumResults(operation);
+  return mlirLogicalResultSuccess();
+}
+
 static MlirStringRef stringRef(const std::string &value) {
   return mlirStringRefCreate(value.data(), value.size());
 }
@@ -429,7 +527,13 @@ static const MlirBeaverCompilerKernelHostAPI &hostAPI() {
       convertType,
       createOperation,
       replaceOperationWithValues,
-      eraseOperation};
+      eraseOperation,
+      operationAttribute,
+      attributeStringValue,
+      integerType,
+      integerAttribute,
+      namedAttribute,
+      operationCounts};
   return api;
 }
 

@@ -86,6 +86,82 @@ static MlirLogicalResult fixture_rewrite(
       diagnosticUserData);
 }
 
+#if defined(FIXTURE_ATTRIBUTE_PATTERN)
+static MlirLogicalResult fixture_attribute_rewrite(
+    const MlirBeaverCompilerKernelHostAPI *host, MlirOperation operation,
+    intptr_t nOperands, MlirValue *operands,
+    MlirConversionPatternRewriter rewriter, MlirTypeConverter typeConverter,
+    void *userData, MlirStringCallback diagnostic,
+    void *diagnosticUserData) {
+  (void)operands;
+  (void)typeConverter;
+  (void)userData;
+
+  if (nOperands != 0)
+    return mlirLogicalResultFailure();
+
+  MlirAttribute predicate;
+  MlirStringRef predicateValue;
+  MlirType resultType;
+  MlirAttribute value;
+  MlirNamedAttribute namedValue;
+  MlirLocation location;
+  MlirValue sourceResult;
+  intptr_t sourceOperands;
+  intptr_t sourceResults;
+
+  if (mlirLogicalResultIsFailure(host->operationCounts(
+          operation, &sourceOperands, &sourceResults, diagnostic,
+          diagnosticUserData)) ||
+      sourceOperands != 0 || sourceResults != 1 ||
+      mlirLogicalResultIsFailure(host->operationResult(
+          operation, 0, &sourceResult, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->operationLocation(
+          operation, &location, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->operationAttribute(
+          operation, mlirStringRefCreate("predicate", 9), &predicate,
+          diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->attributeStringValue(
+          predicate, &predicateValue, diagnostic, diagnosticUserData)) ||
+      predicateValue.length != 2 || predicateValue.data[0] != 'e' ||
+      predicateValue.data[1] != 'q' ||
+      mlirLogicalResultIsFailure(host->integerType(
+          rewriter, 64, &resultType, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->integerAttribute(
+          resultType, 42, &value, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->namedAttribute(
+          rewriter, mlirStringRefCreate("value", 5), value, &namedValue,
+          diagnostic, diagnosticUserData)))
+    return mlirLogicalResultFailure();
+
+  MlirBeaverCompilerKernelOperation descriptor = {
+      sizeof(MlirBeaverCompilerKernelOperation),
+      mlirStringRefCreate("arith.constant", sizeof("arith.constant") - 1),
+      location,
+      0,
+      NULL,
+      1,
+      &resultType,
+      1,
+      &namedValue,
+  };
+
+  MlirOperation replacement;
+  MlirValue replacementResult;
+  if (mlirLogicalResultIsFailure(host->createOperation(
+          rewriter, &descriptor, &replacement, diagnostic,
+          diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->operationResult(
+          replacement, 0, &replacementResult, diagnostic,
+          diagnosticUserData)))
+    return mlirLogicalResultFailure();
+
+  return host->replaceOperationWithValues(
+      rewriter, operation, 1, &replacementResult, diagnostic,
+      diagnosticUserData);
+}
+#endif
+
 FIXTURE_EXPORT uint32_t fixture_abi_version(void) {
   return FIXTURE_ABI_VERSION;
 }
@@ -110,6 +186,25 @@ FIXTURE_EXPORT MlirLogicalResult fixture_populate(
       !host->eraseOperation)
     return mlirLogicalResultFailure();
 
+#if defined(FIXTURE_ATTRIBUTE_PATTERN)
+  if (!host->operationAttribute || !host->attributeStringValue ||
+      !host->integerType || !host->integerAttribute || !host->namedAttribute ||
+      !host->operationCounts)
+    return mlirLogicalResultFailure();
+#endif
+
+#if defined(FIXTURE_ATTRIBUTE_PATTERN)
+  MlirBeaverCompilerKernelPattern pattern = {
+      sizeof(MlirBeaverCompilerKernelPattern),
+      mlirStringRefCreate("fixture.attr", sizeof("fixture.attr") - 1),
+      mlirStringRefCreate("fixture.attr", sizeof("fixture.attr") - 1),
+      mlirStringRefCreate("1", sizeof("1") - 1),
+      1,
+      fixture_attribute_rewrite,
+      NULL,
+      NULL,
+  };
+#else
   MlirBeaverCompilerKernelPattern pattern = {
       sizeof(MlirBeaverCompilerKernelPattern),
       mlirStringRefCreate("fixture.add", sizeof("fixture.add") - 1),
@@ -120,6 +215,7 @@ FIXTURE_EXPORT MlirLogicalResult fixture_populate(
       NULL,
       NULL,
   };
+#endif
 
   return host->addPattern(hostContext, patterns, typeConverter, &pattern);
 }
