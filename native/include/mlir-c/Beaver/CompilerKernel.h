@@ -18,14 +18,32 @@ typedef struct MlirBeaverCompilerKernelHostAPI
 /// A callback-free native rewrite entrypoint owned by an external compiler
 /// kernel. The callback runs synchronously on MLIR's conversion worker and
 /// must not enter the BEAM. `diagnostic` may be used to attach a bounded error
-/// message when returning failure.
+/// message when returning failure. All MLIR handles are borrowed for this
+/// invocation and must not be retained or moved to another thread.
 typedef MlirLogicalResult (*MlirBeaverCompilerKernelRewriteFn)(
     const MlirBeaverCompilerKernelHostAPI *host, MlirOperation operation,
     intptr_t nOperands, MlirValue *operands,
-    MlirConversionPatternRewriter rewriter, void *userData,
+    MlirConversionPatternRewriter rewriter, MlirTypeConverter typeConverter,
+    void *userData,
     MlirStringCallback diagnostic, void *diagnosticUserData);
 
 typedef void (*MlirBeaverCompilerKernelDestroyFn)(void *userData);
+
+/// Scalar operation construction request. Every referenced handle is borrowed
+/// for the duration of `createOperation`; the created operation is owned by
+/// the conversion rewriter. Regions and successors are intentionally absent
+/// from ABI v1 so unsupported ownership transfer fails at compile time.
+typedef struct {
+  size_t structSize;
+  MlirStringRef name;
+  MlirLocation location;
+  intptr_t nOperands;
+  const MlirValue *operands;
+  intptr_t nResultTypes;
+  const MlirType *resultTypes;
+  intptr_t nAttributes;
+  const MlirNamedAttribute *attributes;
+} MlirBeaverCompilerKernelOperation;
 
 /// One versioned pattern descriptor. `structSize` must be set to
 /// `sizeof(MlirBeaverCompilerKernelPattern)`. Ownership of `userData` passes
@@ -42,7 +60,9 @@ typedef struct {
 } MlirBeaverCompilerKernelPattern;
 
 /// Append-only host function table passed to compiler-kernel artifacts.
-/// Consumers must gate access by both `abiVersion` and `structSize`.
+/// Consumers must gate access by both `abiVersion` and `structSize`. Every
+/// function executes synchronously on the calling conversion worker; handles
+/// remain borrowed and context-bound, and no function enters the BEAM.
 struct MlirBeaverCompilerKernelHostAPI {
   uint32_t abiVersion;
   size_t structSize;
@@ -50,8 +70,34 @@ struct MlirBeaverCompilerKernelHostAPI {
       void *hostContext, MlirRewritePatternSet patterns,
       MlirTypeConverter typeConverter,
       const MlirBeaverCompilerKernelPattern *pattern);
-  void (*eraseOperation)(MlirConversionPatternRewriter rewriter,
-                         MlirOperation operation);
+  MlirLogicalResult (*operationResult)(MlirOperation operation, intptr_t index,
+                                       MlirValue *result,
+                                       MlirStringCallback diagnostic,
+                                       void *diagnosticUserData);
+  MlirLogicalResult (*operationLocation)(MlirOperation operation,
+                                         MlirLocation *location,
+                                         MlirStringCallback diagnostic,
+                                         void *diagnosticUserData);
+  MlirLogicalResult (*valueType)(MlirValue value, MlirType *type,
+                                 MlirStringCallback diagnostic,
+                                 void *diagnosticUserData);
+  MlirLogicalResult (*convertType)(MlirTypeConverter converter, MlirType type,
+                                   MlirType *converted,
+                                   MlirStringCallback diagnostic,
+                                   void *diagnosticUserData);
+  MlirLogicalResult (*createOperation)(
+      MlirConversionPatternRewriter rewriter,
+      const MlirBeaverCompilerKernelOperation *operation,
+      MlirOperation *created, MlirStringCallback diagnostic,
+      void *diagnosticUserData);
+  MlirLogicalResult (*replaceOperationWithValues)(
+      MlirConversionPatternRewriter rewriter, MlirOperation operation,
+      intptr_t nValues, const MlirValue *values,
+      MlirStringCallback diagnostic, void *diagnosticUserData);
+  MlirLogicalResult (*eraseOperation)(MlirConversionPatternRewriter rewriter,
+                                      MlirOperation operation,
+                                      MlirStringCallback diagnostic,
+                                      void *diagnosticUserData);
 };
 
 typedef uint32_t (*MlirBeaverCompilerKernelABIVersionFn)(void);

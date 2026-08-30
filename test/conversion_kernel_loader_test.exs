@@ -27,13 +27,23 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
     plan =
       Plan.new(mode: :full)
       |> Plan.add_legal_dialect("builtin")
+      |> Plan.add_legal_dialect("func")
+      |> Plan.add_legal_dialect("arith")
+      |> Plan.add_conversion_map(["i64"], "i64")
       |> Plan.add_external_pattern_population(manifest, artifact,
         expected: expected_identities(manifest)
       )
 
-    module = MLIR.Module.create!(~s[module { "fixture.noop"() : () -> () }], ctx: ctx)
+    module =
+      MLIR.Module.create!(
+        ~s[module { func.func @add(%a: i64, %b: i64) -> i64 { %0 = "fixture.add"(%a, %b) : (i64, i64) -> i64 func.return %0 : i64 } }],
+        ctx: ctx
+      )
+
     assert {:ok, ^module, []} = Plan.run(plan, module)
-    refute MLIR.to_string(module) =~ "fixture.noop"
+    rendered = MLIR.to_string(module)
+    refute rendered =~ "fixture.add"
+    assert rendered =~ "arith.addi"
 
     declaration = List.last(Plan.declaration(plan).entries)
     assert declaration.kind == :add_external_pattern_population
@@ -104,6 +114,28 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
              end)
   end
 
+  @tag :tmp_dir
+  test "typed host calls reject invalid access and roll back partial rewrites", %{
+    ctx: ctx,
+    tmp_dir: tmp_dir
+  } do
+    for behavior <- [:bad_result_index, :partial_failure] do
+      {manifest, artifact} =
+        build_fixture!(Path.join(tmp_dir, to_string(behavior)), behavior: behavior)
+
+      plan = fixture_add_plan(manifest, artifact)
+      module = fixture_add_module(ctx)
+
+      assert {:error, %MLIR.Conversion.Error{diagnostics: diagnostics}} = Plan.run(plan, module)
+      assert diagnostics != []
+
+      rendered = MLIR.to_string(module)
+      assert rendered =~ "fixture.add"
+      refute rendered =~ "arith.addi"
+      MLIR.Module.destroy(module)
+    end
+  end
+
   defp run_kernel!(ctx, manifest, artifact) do
     plan =
       Plan.new(mode: :full)
@@ -137,10 +169,8 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
           "-I#{llvm_include}",
           "-DFIXTURE_ABI_VERSION=#{abi}",
           "-DFIXTURE_IDENTITY=#{inspect(identity)}",
-          @fixture,
-          "-o",
-          artifact
-        ]
+          @fixture
+        ] ++ behavior_args(opts) ++ ["-o", artifact]
 
     case System.cmd("zig", ["cc" | args], stderr_to_stdout: true) do
       {_, 0} -> :ok
@@ -158,7 +188,7 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
   defp manifest_map(overrides \\ %{}) do
     overrides =
       overrides
-      |> Map.drop([:abi, :identity])
+      |> Map.drop([:abi, :behavior, :identity])
       |> Map.new(fn {key, value} -> {to_string(key), value} end)
 
     Map.merge(
@@ -172,7 +202,7 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
         "dialect_schema_digest" => @digest,
         "runtime_abi_digest" => "none",
         "patterns" => [
-          %{"name" => "fixture.noop", "root" => "fixture.noop", "version" => "1"}
+          %{"name" => "fixture.add", "root" => "fixture.add", "version" => "1"}
         ],
         "capabilities" => ["pattern.register"],
         "target" => %{"triple" => "host-test", "cpu" => "generic", "features" => []},
@@ -218,6 +248,32 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
       {:unix, :darwin} -> ["-dynamiclib"]
       _ -> ["-shared"]
     end
+  end
+
+  defp behavior_args(opts) do
+    case Keyword.get(opts, :behavior) do
+      nil -> []
+      :bad_result_index -> ["-DFIXTURE_BAD_RESULT_INDEX"]
+      :partial_failure -> ["-DFIXTURE_PARTIAL_FAILURE"]
+    end
+  end
+
+  defp fixture_add_plan(manifest, artifact) do
+    Plan.new(mode: :full)
+    |> Plan.add_legal_dialect("builtin")
+    |> Plan.add_legal_dialect("func")
+    |> Plan.add_legal_dialect("arith")
+    |> Plan.add_conversion_map(["i64"], "i64")
+    |> Plan.add_external_pattern_population(manifest, artifact,
+      expected: expected_identities(manifest)
+    )
+  end
+
+  defp fixture_add_module(ctx) do
+    MLIR.Module.create!(
+      ~s[module { func.func @add(%a: i64, %b: i64) -> i64 { %0 = "fixture.add"(%a, %b) : (i64, i64) -> i64 func.return %0 : i64 } }],
+      ctx: ctx
+    )
   end
 
   defp library_extension do
