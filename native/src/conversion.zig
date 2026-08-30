@@ -1025,6 +1025,24 @@ fn addConversionPattern(environment: beam.env, _: c_int, args: [*c]const beam.te
     return beam.make_atom(environment, "ok");
 }
 
+fn compilerKernelLoadAndPopulate(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+    const patterns = try mlir_capi.RewritePatternSet.resource.fetch(environment, args[0]);
+    const type_converter = try mlir_capi.TypeConverter.resource.fetch(environment, args[1]);
+    const error_message = c.beaverCompilerKernelLoadAndPopulate(
+        patterns,
+        type_converter,
+        try string_ref.get_binary_as_string_ref(environment, args[2]),
+        try string_ref.get_binary_as_string_ref(environment, args[3]),
+        try string_ref.get_binary_as_string_ref(environment, args[4]),
+        try string_ref.get_binary_as_string_ref(environment, args[5]),
+        try string_ref.get_binary_as_string_ref(environment, args[6]),
+        try string_ref.get_binary_as_string_ref(environment, args[7]),
+    );
+
+    if (error_message.length == 0) return beam.make_slice(environment, "");
+    return beam.make_slice(environment, error_message.data[0..error_message.length]);
+}
+
 const ConversionWorker = struct {
     target: *TargetRegistration,
     operation: mlir_capi.Operation.T,
@@ -1182,6 +1200,7 @@ pub const nifs = .{
     prelude.beaverRawNIF(@This(), "type_converter_reply_value", 3),
     prelude.beaverRawNIF(@This(), "type_converter_reply_values", 4),
     prelude.beaverRawNIF(@This(), "conversion_pattern_add", 8),
+    prelude.beaverRawNIFDirtyIO(@This(), "compiler_kernel_load_and_populate", 8),
     prelude.beaverRawNIF(@This(), "apply_conversion_async", 8),
     prelude.beaverRawNIFDirtyCPU(OperationInventory, "operation_inventory", 1),
     prelude.beaverRawNIF(ProfileMetrics, "process_cpu_time", 0),
@@ -1209,4 +1228,5 @@ pub const type_converter_reply_types = replyHandleList(mlir_capi.Type).nif;
 pub const type_converter_reply_value = replyValue;
 pub const type_converter_reply_values = replyHandleList(mlir_capi.Value).nif;
 pub const conversion_pattern_add = addConversionPattern;
+pub const compiler_kernel_load_and_populate = compilerKernelLoadAndPopulate;
 pub const apply_conversion_async = applyConversionAsync;

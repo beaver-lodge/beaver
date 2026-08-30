@@ -21,6 +21,15 @@ defmodule Beaver.MLIR.Conversion.Kernel.Error do
           | :capability_missing
           | :artifact_unreadable
           | :artifact_digest_mismatch
+          | :invalid_artifact_path
+          | :invalid_loader_argument
+          | :loader_error
+          | :missing_symbol
+          | :manifest_identity_mismatch
+          | :pattern_manifest_invalid
+          | :pattern_manifest_mismatch
+          | :population_failed
+          | :native_exception
 
   @type t() :: %__MODULE__{
           code: code(),

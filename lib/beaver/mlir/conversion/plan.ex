@@ -26,6 +26,7 @@ defmodule Beaver.MLIR.Conversion.Plan do
   """
 
   alias Beaver.MLIR
+  alias Beaver.MLIR.Conversion.Kernel, as: ConversionKernel
   alias Beaver.Pattern.Native.Descriptor
 
   defstruct mode: :full,
@@ -274,6 +275,35 @@ defmodule Beaver.MLIR.Conversion.Plan do
       when is_function(callback, 2) do
     opts = validate_callback_opts!(opts, [:version], "add_pattern_population")
     append_entry(plan, {:add_pattern_population, callback, opts})
+  end
+
+  @doc """
+  Adds a provider-neutral external compiler-kernel population to the plan.
+
+  The artifact is verified and loaded while each fresh plan is materialized;
+  its native pattern callbacks then execute directly on MLIR's conversion
+  worker without crossing the BEAM callback bridge. `artifact_path` must be
+  absolute. Use `:expected` to require provider-specific schema, runtime ABI,
+  target, and capability identities.
+  """
+  @spec add_external_pattern_population(
+          t(),
+          ConversionKernel.Manifest.t(),
+          Path.t(),
+          keyword()
+        ) :: t()
+  def add_external_pattern_population(
+        %__MODULE__{} = plan,
+        %ConversionKernel.Manifest{} = manifest,
+        artifact_path,
+        opts \\ []
+      ) do
+    opts =
+      validate_callback_opts!(opts, [:expected], "add_external_pattern_population")
+
+    ConversionKernel.Manifest.validate!(manifest)
+    artifact_path = ConversionKernel.validate_artifact_path!(artifact_path)
+    append_entry(plan, {:add_external_pattern_population, manifest, artifact_path, opts})
   end
 
   @doc """
@@ -526,6 +556,18 @@ defmodule Beaver.MLIR.Conversion.Plan do
     %{kind: :add_pattern_population, version: callback_version(opts)}
   end
 
+  defp entry_declaration({:add_external_pattern_population, manifest, _path, _opts}) do
+    %{
+      kind: :add_external_pattern_population,
+      provider: manifest.provider,
+      manifest_digest: ConversionKernel.Manifest.digest(manifest),
+      identity_digest: ConversionKernel.Manifest.identity_digest(manifest),
+      artifact_sha256: manifest.artifact_sha256,
+      patterns: manifest.patterns,
+      bootstrap: manifest.bootstrap
+    }
+  end
+
   defp callback_version(opts) do
     Keyword.get(opts, :version, :unversioned)
   end
@@ -712,6 +754,19 @@ defmodule Beaver.MLIR.Conversion.Plan do
       :ok -> :ok
       other -> raise ArgumentError, "pattern population must return :ok, got: #{inspect(other)}"
     end
+  end
+
+  defp populate_entry(
+         {:add_external_pattern_population, manifest, artifact_path, opts},
+         _context,
+         _target,
+         converter,
+         patterns,
+         _timeout
+       ) do
+    ConversionKernel.populate!(patterns, converter, manifest, artifact_path,
+      expected: Keyword.get(opts, :expected, [])
+    )
   end
 
   defp conversion_pattern_opts(opts, context, plan_timeout) do

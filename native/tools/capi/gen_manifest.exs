@@ -44,6 +44,14 @@ defmodule Beaver.CAPI.ManifestGenerator do
       "lifetime" => "nif_call",
       "destructor" => "native_owner"
     },
+    "beaverCompilerKernelLoadAndPopulate" => %{
+      "wrapper_name" => "beaver_raw_compiler_kernel_load_and_populate",
+      "runtime" => "native_collector",
+      "scheduler" => "dirty_io",
+      "owner" => "caller",
+      "lifetime" => "nif_call",
+      "destructor" => "stack"
+    },
     "mlirTransformStateForEachPayloadOp" => %{
       "wrapper_name" => "beaver_raw_transform_state_payload_ops",
       "runtime" => "native_collector",
