@@ -32,7 +32,8 @@ typedef void (*MlirBeaverCompilerKernelDestroyFn)(void *userData);
 /// Scalar operation construction request. Every referenced handle is borrowed
 /// for the duration of `createOperation`; the created operation is owned by
 /// the conversion rewriter. Regions and successors are intentionally absent
-/// from ABI v1 so unsupported ownership transfer fails at compile time.
+/// from the descriptor. Regions can only be created and transferred through
+/// the checked region host calls below; successors remain unsupported.
 typedef struct {
   size_t structSize;
   MlirStringRef name;
@@ -126,6 +127,44 @@ struct MlirBeaverCompilerKernelHostAPI {
       MlirOperation anchor, MlirConversionPatternRewriter rewriter,
       MlirStringRef symbol, intptr_t nInputTypes, const MlirType *inputTypes,
       intptr_t nResultTypes, const MlirType *resultTypes,
+      MlirStringCallback diagnostic, void *diagnosticUserData);
+  /// Append-only region/function inspection and construction surface. Region
+  /// ownership transfer is coupled to replacement so an external callback
+  /// cannot return failure after leaving the source operation bodyless.
+  MlirLogicalResult (*operationOperand)(
+      MlirOperation operation, intptr_t index, MlirValue *operand,
+      MlirStringCallback diagnostic, void *diagnosticUserData);
+  MlirLogicalResult (*attributeIntegerValue)(
+      MlirAttribute attribute, int64_t *value, MlirStringCallback diagnostic,
+      void *diagnosticUserData);
+  MlirLogicalResult (*singleRegionBlock)(
+      MlirOperation operation, intptr_t regionIndex, MlirBlock *block,
+      MlirStringCallback diagnostic, void *diagnosticUserData);
+  MlirLogicalResult (*blockArgumentCount)(
+      MlirBlock block, intptr_t *count, MlirStringCallback diagnostic,
+      void *diagnosticUserData);
+  MlirLogicalResult (*blockArgument)(
+      MlirBlock block, intptr_t index, MlirValue *argument,
+      MlirStringCallback diagnostic, void *diagnosticUserData);
+  MlirLogicalResult (*blockTerminator)(
+      MlirBlock block, MlirOperation *terminator,
+      MlirStringCallback diagnostic, void *diagnosticUserData);
+  MlirLogicalResult (*functionType)(
+      MlirConversionPatternRewriter rewriter, intptr_t nInputTypes,
+      const MlirType *inputTypes, intptr_t nResultTypes,
+      const MlirType *resultTypes, MlirType *type,
+      MlirStringCallback diagnostic, void *diagnosticUserData);
+  MlirLogicalResult (*typeAttribute)(
+      MlirType type, MlirAttribute *attribute, MlirStringCallback diagnostic,
+      void *diagnosticUserData);
+  MlirLogicalResult (*createOperationWithRegions)(
+      MlirConversionPatternRewriter rewriter,
+      const MlirBeaverCompilerKernelOperation *operation,
+      intptr_t nRegions, MlirOperation *created,
+      MlirStringCallback diagnostic, void *diagnosticUserData);
+  MlirLogicalResult (*replaceOperationWithRegions)(
+      MlirConversionPatternRewriter rewriter, MlirOperation replacement,
+      MlirOperation source, intptr_t expectedRegions,
       MlirStringCallback diagnostic, void *diagnosticUserData);
 };
 
