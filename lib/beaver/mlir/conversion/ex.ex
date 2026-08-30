@@ -68,7 +68,6 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_illegal_dialect("ex")
     |> Plan.add_conversion_map(@term_types, "i64")
     |> Plan.add_pattern_population(&populate_native_scalar_patterns/2, version: "1.0")
-    |> Plan.add_pattern_population(&populate_native_runtime_patterns/2, version: "1.0")
     |> Plan.add_conversion_pattern("ex.call", &convert_call/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.return", &convert_return/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.var", &convert_var/3, version: "1.0")
@@ -170,6 +169,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.file_read", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.file_read_lines", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_from_list", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.binary", &convert_term_binary/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.iodata_to_binary", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.float_lit", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.string_to_float", &convert_term_read/3, version: "1.0")
@@ -225,10 +225,12 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.list_tail", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_get", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.list_length", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.term_eq", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.term_eq_loose", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_length", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_get", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_slice", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.binary_part", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_utf8_get", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_utf8_width", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.binary_utf8_length", &convert_term_read/3, version: "1.0")
@@ -244,10 +246,6 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp populate_native_scalar_patterns(patterns, converter) do
     MLIR.CAPI.beaverPopulateExScalarConversionPatterns(patterns.ref, converter.ref)
-  end
-
-  defp populate_native_runtime_patterns(patterns, converter) do
-    MLIR.CAPI.beaverPopulateExRuntimeConversionPatterns(patterns.ref, converter.ref)
   end
 
   # Declaration-first manifest of the Zig term runtime ABI: batata's
@@ -432,6 +430,16 @@ defmodule Beaver.MLIR.Conversion.Ex do
     base = insertion_point(operation, rewriter)
     list = build_list(operands, operation, rewriter, base)
     replace_with(rewriter, operation, list)
+  end
+
+  defp convert_term_binary(operation, operands, rewriter) do
+    base = insertion_point(operation, rewriter)
+    list = build_list(operands, operation, rewriter, base)
+
+    binary =
+      emit_runtime_call(operation, rewriter, base, @term_intrinsics.binary_from_list, [list])
+
+    replace_with(rewriter, operation, binary)
   end
 
   defp convert_term_list_cons(operation, [head, tail], rewriter) do
