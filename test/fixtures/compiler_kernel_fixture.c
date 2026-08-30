@@ -75,6 +75,103 @@ static MlirLogicalResult fixture_symbol_rewrite(
 }
 #endif
 
+#if defined(FIXTURE_REGION_PATTERN)
+static MlirLogicalResult fixture_region_rewrite(
+    const MlirBeaverCompilerKernelHostAPI *host, MlirOperation operation,
+    intptr_t nOperands, MlirValue *operands,
+    MlirConversionPatternRewriter rewriter, MlirTypeConverter typeConverter,
+    void *userData, MlirStringCallback diagnostic,
+    void *diagnosticUserData) {
+  (void)operands;
+  (void)userData;
+  if (nOperands != 0)
+    return mlirLogicalResultFailure();
+
+  MlirAttribute arityAttribute;
+  int64_t arity;
+  MlirBlock block;
+  intptr_t blockArguments;
+  MlirOperation terminator;
+  MlirValue returnValue;
+  MlirType returnValueType;
+  MlirType outputType;
+  MlirType signature;
+  MlirAttribute signatureAttribute;
+  MlirNamedAttribute namedSignature;
+  MlirValue sourceResult;
+  MlirType sourceResultType;
+  MlirType resultType;
+  MlirLocation location;
+
+  if (mlirLogicalResultIsFailure(host->operationAttribute(
+          operation, mlirStringRefCreate("arity", 5), &arityAttribute,
+          diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->attributeIntegerValue(
+          arityAttribute, &arity, diagnostic, diagnosticUserData)) ||
+      arity != 0 ||
+      mlirLogicalResultIsFailure(host->singleRegionBlock(
+          operation, 0, &block, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->blockArgumentCount(
+          block, &blockArguments, diagnostic, diagnosticUserData)) ||
+      blockArguments != 0 ||
+      mlirLogicalResultIsFailure(host->blockTerminator(
+          block, &terminator, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->operationOperand(
+          terminator, 0, &returnValue, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->valueType(
+          returnValue, &returnValueType, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->convertType(
+          typeConverter, returnValueType, &outputType, diagnostic,
+          diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->functionType(
+          rewriter, 0, NULL, 1, &outputType, &signature, diagnostic,
+          diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->typeAttribute(
+          signature, &signatureAttribute, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->namedAttribute(
+          rewriter, mlirStringRefCreate("signature", 9), signatureAttribute,
+          &namedSignature, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->operationResult(
+          operation, 0, &sourceResult, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->valueType(
+          sourceResult, &sourceResultType, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->convertType(
+          typeConverter, sourceResultType, &resultType, diagnostic,
+          diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->operationLocation(
+          operation, &location, diagnostic, diagnosticUserData)))
+    return mlirLogicalResultFailure();
+
+  MlirBeaverCompilerKernelOperation descriptor = {
+      sizeof(MlirBeaverCompilerKernelOperation),
+      mlirStringRefCreate("fixture.lowered", sizeof("fixture.lowered") - 1),
+      location,
+      0,
+      NULL,
+      1,
+      &resultType,
+      1,
+      &namedSignature,
+  };
+
+  MlirOperation replacement;
+#if defined(FIXTURE_REGION_MISMATCH)
+  const intptr_t replacementRegions = 2;
+#else
+  const intptr_t replacementRegions = 1;
+#endif
+  if (mlirLogicalResultIsFailure(host->createOperationWithRegions(
+          rewriter, &descriptor, replacementRegions, &replacement, diagnostic,
+          diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->replaceOperationWithRegions(
+          rewriter, replacement, operation, 1, diagnostic,
+          diagnosticUserData)))
+    return mlirLogicalResultFailure();
+
+  return mlirLogicalResultSuccess();
+}
+#endif
+
 #ifndef FIXTURE_IDENTITY
 #error "FIXTURE_IDENTITY must be defined"
 #endif
@@ -270,6 +367,19 @@ FIXTURE_EXPORT MlirLogicalResult fixture_populate(
     return mlirLogicalResultFailure();
 #endif
 
+#if defined(FIXTURE_REGION_PATTERN)
+  if (!host->operationOperand || !host->attributeIntegerValue ||
+      !host->singleRegionBlock || !host->blockArgumentCount ||
+      !host->blockArgument ||
+      !host->blockTerminator || !host->functionType || !host->typeAttribute ||
+      !host->createOperationWithRegions ||
+      !host->replaceOperationWithRegions ||
+      !host->operationAttribute || !host->valueType || !host->convertType ||
+      !host->operationResult || !host->operationLocation ||
+      !host->namedAttribute)
+    return mlirLogicalResultFailure();
+#endif
+
 #if defined(FIXTURE_ATTRIBUTE_PATTERN)
   MlirBeaverCompilerKernelPattern pattern = {
       sizeof(MlirBeaverCompilerKernelPattern),
@@ -289,6 +399,18 @@ FIXTURE_EXPORT MlirLogicalResult fixture_populate(
       mlirStringRefCreate("1", sizeof("1") - 1),
       1,
       fixture_symbol_rewrite,
+      NULL,
+      NULL,
+  };
+#elif defined(FIXTURE_REGION_PATTERN)
+  MlirBeaverCompilerKernelPattern pattern = {
+      sizeof(MlirBeaverCompilerKernelPattern),
+      mlirStringRefCreate("fixture.region", sizeof("fixture.region") - 1),
+      mlirStringRefCreate("scf.execute_region",
+                          sizeof("scf.execute_region") - 1),
+      mlirStringRefCreate("1", sizeof("1") - 1),
+      1,
+      fixture_region_rewrite,
       NULL,
       NULL,
   };

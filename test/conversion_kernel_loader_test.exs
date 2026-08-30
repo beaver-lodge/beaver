@@ -223,6 +223,120 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
     MLIR.Module.destroy(mismatched)
   end
 
+  @tag :tmp_dir
+  test "typed host region calls transfer one owned body atomically", %{
+    ctx: ctx,
+    tmp_dir: tmp_dir
+  } do
+    patterns = [
+      %{
+        "name" => "fixture.region",
+        "root" => "scf.execute_region",
+        "version" => "1"
+      }
+    ]
+
+    {manifest, artifact} =
+      build_fixture!(tmp_dir,
+        behavior: :region,
+        patterns: patterns,
+        capabilities: ["ir.region.v1", "pattern.register"]
+      )
+
+    plan =
+      fixture_add_plan(manifest, artifact)
+      |> Plan.add_legal_dialect("scf")
+      |> Plan.add_legal_op("fixture.lowered")
+      |> Plan.add_illegal_op("scf.execute_region")
+
+    module =
+      MLIR.Module.create!(
+        """
+        module {
+          func.func @region() -> i64 {
+            %0 = "scf.execute_region"() ({
+              %1 = arith.constant 7 : i64
+              scf.yield %1 : i64
+            }) {arity = 0 : i64} : () -> i64
+            func.return %0 : i64
+          }
+        }
+        """,
+        ctx: ctx
+      )
+
+    assert {:ok, ^module, []} = Plan.run(plan, module)
+    rendered = MLIR.to_string(module, generic: true)
+    assert rendered =~ ~s|"fixture.lowered"()|
+    assert rendered =~ ~s|signature = () -> i64|
+    assert rendered =~ ~s|scf.yield|
+    refute rendered =~ ~s|"scf.execute_region"()|
+    MLIR.Module.destroy(module)
+
+    invalid =
+      MLIR.Module.create!(
+        """
+        module {
+          func.func @region() -> i64 {
+            %0 = "scf.execute_region"() ({
+              %1 = arith.constant 7 : i64
+              scf.yield %1 : i64
+            }) : () -> i64
+            func.return %0 : i64
+          }
+        }
+        """,
+        ctx: ctx
+      )
+
+    assert {:error, %MLIR.Conversion.Error{diagnostics: diagnostics}} =
+             Plan.run(plan, invalid)
+
+    assert diagnostics != []
+    invalid_ir = MLIR.to_string(invalid, generic: true)
+    assert invalid_ir =~ ~s|"scf.execute_region"()|
+    refute invalid_ir =~ ~s|"fixture.lowered"()|
+    MLIR.Module.destroy(invalid)
+
+    {mismatch_manifest, mismatch_artifact} =
+      build_fixture!(Path.join(tmp_dir, "mismatch"),
+        behavior: :region_mismatch,
+        patterns: patterns,
+        capabilities: ["ir.region.v1", "pattern.register"]
+      )
+
+    mismatch_plan =
+      fixture_add_plan(mismatch_manifest, mismatch_artifact)
+      |> Plan.add_legal_dialect("scf")
+      |> Plan.add_legal_op("fixture.lowered")
+      |> Plan.add_illegal_op("scf.execute_region")
+
+    mismatch =
+      MLIR.Module.create!(
+        """
+        module {
+          func.func @region() -> i64 {
+            %0 = "scf.execute_region"() ({
+              %1 = arith.constant 7 : i64
+              scf.yield %1 : i64
+            }) {arity = 0 : i64} : () -> i64
+            func.return %0 : i64
+          }
+        }
+        """,
+        ctx: ctx
+      )
+
+    assert {:error, %MLIR.Conversion.Error{diagnostics: mismatch_diagnostics}} =
+             Plan.run(mismatch_plan, mismatch)
+
+    assert mismatch_diagnostics != []
+    mismatch_ir = MLIR.to_string(mismatch, generic: true)
+    assert mismatch_ir =~ ~s|"scf.execute_region"()|
+    refute mismatch_ir =~ ~s|"fixture.lowered"()|
+    MLIR.Module.destroy(mismatch)
+  end
+
   defp run_kernel!(ctx, manifest, artifact) do
     plan =
       Plan.new(mode: :full)
@@ -344,6 +458,8 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
       :partial_failure -> ["-DFIXTURE_PARTIAL_FAILURE"]
       :attribute -> ["-DFIXTURE_ATTRIBUTE_PATTERN"]
       :symbol -> ["-DFIXTURE_SYMBOL_PATTERN"]
+      :region -> ["-DFIXTURE_REGION_PATTERN"]
+      :region_mismatch -> ["-DFIXTURE_REGION_PATTERN", "-DFIXTURE_REGION_MISMATCH"]
     end
   end
 
