@@ -136,6 +136,49 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
     end
   end
 
+  @tag :tmp_dir
+  test "typed host attribute calls inspect and construct scalar attributes", %{
+    ctx: ctx,
+    tmp_dir: tmp_dir
+  } do
+    patterns = [%{"name" => "fixture.attr", "root" => "fixture.attr", "version" => "1"}]
+
+    {manifest, artifact} =
+      build_fixture!(tmp_dir,
+        behavior: :attribute,
+        patterns: patterns,
+        capabilities: ["ir.attribute.v1", "pattern.register"]
+      )
+
+    plan = fixture_add_plan(manifest, artifact)
+
+    module =
+      MLIR.Module.create!(
+        ~s[module { func.func @attribute() -> i64 { %0 = "fixture.attr"() {predicate = "eq"} : () -> i64 func.return %0 : i64 } }],
+        ctx: ctx
+      )
+
+    assert {:ok, ^module, []} = Plan.run(plan, module)
+    rendered = MLIR.to_string(module)
+    assert rendered =~ "arith.constant 42"
+    refute rendered =~ "fixture.attr"
+    MLIR.Module.destroy(module)
+
+    for attributes <- ["", " {predicate = 1 : i64}"] do
+      invalid =
+        MLIR.Module.create!(
+          ~s[module { func.func @attribute() -> i64 { %0 = "fixture.attr"()#{attributes} : () -> i64 func.return %0 : i64 } }],
+          ctx: ctx
+        )
+
+      assert {:error, %MLIR.Conversion.Error{diagnostics: diagnostics}} = Plan.run(plan, invalid)
+      assert diagnostics != []
+      assert MLIR.to_string(invalid) =~ "fixture.attr"
+      refute MLIR.to_string(invalid) =~ "arith.constant"
+      MLIR.Module.destroy(invalid)
+    end
+  end
+
   defp run_kernel!(ctx, manifest, artifact) do
     plan =
       Plan.new(mode: :full)
@@ -255,6 +298,7 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
       nil -> []
       :bad_result_index -> ["-DFIXTURE_BAD_RESULT_INDEX"]
       :partial_failure -> ["-DFIXTURE_PARTIAL_FAILURE"]
+      :attribute -> ["-DFIXTURE_ATTRIBUTE_PATTERN"]
     end
   end
 
