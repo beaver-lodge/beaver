@@ -34,6 +34,8 @@ defmodule WasmTermABITest do
     assert TermABI.entry("ex.term.list_flatten").result == :i64
     assert TermABI.entry("ex.term.eq_loose").params == [:i64, :i64]
     assert TermABI.entry("ex.term.eq_loose").result == :i64
+    assert TermABI.entry("ex.term.integer_compare").params == [:i64, :i64]
+    assert TermABI.entry("ex.term.integer_compare").result == :i64
     assert TermABI.entry("ex.term.map_put").params == [:i64, :i64, :i64]
     assert TermABI.entry("ex.term.map_fetch").params == [:i64, :i64]
     assert TermABI.entry("ex.term.map_fetch").result == :i64

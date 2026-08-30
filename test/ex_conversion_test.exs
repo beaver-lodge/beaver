@@ -235,7 +235,7 @@ defmodule ExConversionTest do
 
   test "exposes a stable Ex dialect schema identity" do
     assert ExDialect.schema_digest() ==
-             "sha256:85c2d4304a510fdf7f37902a4a9a30c28a21bea48d98c11ec47f9db909d86abf"
+             "sha256:9b5eb181fad56599635a88248b1e8ab64b608b9895bae1aa2914d995afa99c50"
   end
 
   test "fails explicitly on a bare ex.var", %{ctx: ctx} do
@@ -762,6 +762,7 @@ defmodule ExConversionTest do
             %10 = "ex.list_tail"(%5) : (!ex.term) -> !ex.term
             %11 = "ex.term_eq"(%7, %2) : (!ex.term, !ex.term) -> i64
             %12 = "ex.term_eq_loose"(%7, %2) : (!ex.term, !ex.term) -> i64
+            %17 = "ex.integer_compare"(%2, %3) : (!ex.term, !ex.term) -> i64
             %13 = "ex.string_printable"(%2) : (!ex.term) -> i64
             %14 = "ex.binary_quote"(%2) : (!ex.term) -> !ex.term
             %15 = "ex.int_to_hex"(%2) : (!ex.term) -> !ex.term
@@ -778,6 +779,7 @@ defmodule ExConversionTest do
     rendered = MLIR.to_string(module, generic: true)
     assert rendered =~ "ex.term.tuple_length"
     assert rendered =~ "ex.term.tuple_get"
+    assert rendered =~ "ex.term.integer_compare"
     assert rendered =~ "ex.term.list_length"
     assert rendered =~ "ex.term.list_head"
     assert rendered =~ "ex.term.list_tail"

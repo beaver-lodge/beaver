@@ -688,6 +688,12 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop term_eq_loose(left = ^term_like, right = ^term_like),
     results: [result: ^integer_like]
 
+  # Exact integer ordering over tagged immediate or boxed integer terms.
+  # The runtime returns -1, 0, or 1; callers retain responsibility for
+  # validating that both operands are integers when guard semantics require it.
+  defop integer_compare(left = ^term_like, right = ^term_like),
+    results: [result: ^integer_like]
+
   defop binary_length(binary = ^term_like),
     results: [result: ^integer_like]
 
