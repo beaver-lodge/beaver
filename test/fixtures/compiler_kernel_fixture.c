@@ -4,6 +4,77 @@
 #define FIXTURE_ABI_VERSION MLIR_BEAVER_COMPILER_KERNEL_ABI_VERSION
 #endif
 
+#if defined(FIXTURE_SYMBOL_PATTERN)
+static MlirLogicalResult fixture_symbol_rewrite(
+    const MlirBeaverCompilerKernelHostAPI *host, MlirOperation operation,
+    intptr_t nOperands, MlirValue *operands,
+    MlirConversionPatternRewriter rewriter, MlirTypeConverter typeConverter,
+    void *userData, MlirStringCallback diagnostic,
+    void *diagnosticUserData) {
+  (void)userData;
+  if (nOperands != 2)
+    return mlirLogicalResultFailure();
+
+  MlirValue sourceResult;
+  MlirType sourceResultType;
+  MlirType resultType;
+  MlirType inputTypes[2];
+  MlirLocation location;
+  MlirAttribute callee;
+  MlirNamedAttribute namedCallee;
+
+  if (mlirLogicalResultIsFailure(host->operationResult(
+          operation, 0, &sourceResult, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->valueType(
+          sourceResult, &sourceResultType, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->convertType(
+          typeConverter, sourceResultType, &resultType, diagnostic,
+          diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->valueType(
+          operands[0], &inputTypes[0], diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->valueType(
+          operands[1], &inputTypes[1], diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->operationLocation(
+          operation, &location, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->ensureFunctionDeclaration(
+          operation, rewriter, mlirStringRefCreate("fixture.runtime", 15), 2,
+          inputTypes, 1, &resultType, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->flatSymbolRefAttribute(
+          rewriter, mlirStringRefCreate("fixture.runtime", 15), &callee,
+          diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->namedAttribute(
+          rewriter, mlirStringRefCreate("callee", 6), callee, &namedCallee,
+          diagnostic, diagnosticUserData)))
+    return mlirLogicalResultFailure();
+
+  MlirBeaverCompilerKernelOperation descriptor = {
+      sizeof(MlirBeaverCompilerKernelOperation),
+      mlirStringRefCreate("func.call", sizeof("func.call") - 1),
+      location,
+      nOperands,
+      operands,
+      1,
+      &resultType,
+      1,
+      &namedCallee,
+  };
+
+  MlirOperation replacement;
+  MlirValue replacementResult;
+  if (mlirLogicalResultIsFailure(host->createOperation(
+          rewriter, &descriptor, &replacement, diagnostic,
+          diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->operationResult(
+          replacement, 0, &replacementResult, diagnostic,
+          diagnosticUserData)))
+    return mlirLogicalResultFailure();
+
+  return host->replaceOperationWithValues(
+      rewriter, operation, 1, &replacementResult, diagnostic,
+      diagnosticUserData);
+}
+#endif
+
 #ifndef FIXTURE_IDENTITY
 #error "FIXTURE_IDENTITY must be defined"
 #endif
@@ -193,6 +264,12 @@ FIXTURE_EXPORT MlirLogicalResult fixture_populate(
     return mlirLogicalResultFailure();
 #endif
 
+#if defined(FIXTURE_SYMBOL_PATTERN)
+  if (!host->flatSymbolRefAttribute || !host->ensureFunctionDeclaration ||
+      !host->namedAttribute)
+    return mlirLogicalResultFailure();
+#endif
+
 #if defined(FIXTURE_ATTRIBUTE_PATTERN)
   MlirBeaverCompilerKernelPattern pattern = {
       sizeof(MlirBeaverCompilerKernelPattern),
@@ -201,6 +278,17 @@ FIXTURE_EXPORT MlirLogicalResult fixture_populate(
       mlirStringRefCreate("1", sizeof("1") - 1),
       1,
       fixture_attribute_rewrite,
+      NULL,
+      NULL,
+  };
+#elif defined(FIXTURE_SYMBOL_PATTERN)
+  MlirBeaverCompilerKernelPattern pattern = {
+      sizeof(MlirBeaverCompilerKernelPattern),
+      mlirStringRefCreate("fixture.call", sizeof("fixture.call") - 1),
+      mlirStringRefCreate("fixture.call", sizeof("fixture.call") - 1),
+      mlirStringRefCreate("1", sizeof("1") - 1),
+      1,
+      fixture_symbol_rewrite,
       NULL,
       NULL,
   };

@@ -179,6 +179,50 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
     end
   end
 
+  @tag :tmp_dir
+  test "typed host symbol calls create and reuse exact function declarations", %{
+    ctx: ctx,
+    tmp_dir: tmp_dir
+  } do
+    patterns = [%{"name" => "fixture.call", "root" => "fixture.call", "version" => "1"}]
+
+    {manifest, artifact} =
+      build_fixture!(tmp_dir,
+        behavior: :symbol,
+        patterns: patterns,
+        capabilities: ["ir.symbol.v1", "pattern.register"]
+      )
+
+    plan = fixture_add_plan(manifest, artifact)
+
+    module =
+      MLIR.Module.create!(
+        ~s[module { func.func @calls(%a: i64, %b: i64) -> i64 { %0 = "fixture.call"(%a, %b) : (i64, i64) -> i64 %1 = "fixture.call"(%0, %b) : (i64, i64) -> i64 func.return %1 : i64 } }],
+        ctx: ctx
+      )
+
+    assert {:ok, ^module, []} = Plan.run(plan, module)
+    rendered = MLIR.to_string(module)
+    assert length(Regex.scan(~r/\bcall @fixture\.runtime/, rendered)) == 2
+    assert length(Regex.scan(~r/func\.func private/, rendered)) == 1
+    assert length(String.split(rendered, "fixture.runtime")) - 1 == 3
+    refute rendered =~ "fixture.call"
+    MLIR.Module.destroy(module)
+
+    mismatched =
+      MLIR.Module.create!(
+        ~s[module { func.func private @"fixture.runtime"(i64) -> i64 func.func @call(%a: i64, %b: i64) -> i64 { %0 = "fixture.call"(%a, %b) : (i64, i64) -> i64 func.return %0 : i64 } }],
+        ctx: ctx
+      )
+
+    assert {:error, %MLIR.Conversion.Error{diagnostics: diagnostics}} =
+             Plan.run(plan, mismatched)
+
+    assert diagnostics != []
+    assert MLIR.to_string(mismatched) =~ "fixture.call"
+    MLIR.Module.destroy(mismatched)
+  end
+
   defp run_kernel!(ctx, manifest, artifact) do
     plan =
       Plan.new(mode: :full)
@@ -299,6 +343,7 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
       :bad_result_index -> ["-DFIXTURE_BAD_RESULT_INDEX"]
       :partial_failure -> ["-DFIXTURE_PARTIAL_FAILURE"]
       :attribute -> ["-DFIXTURE_ATTRIBUTE_PATTERN"]
+      :symbol -> ["-DFIXTURE_SYMBOL_PATTERN"]
     end
   end
 

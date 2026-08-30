@@ -118,6 +118,15 @@ struct MlirBeaverCompilerKernelHostAPI {
   MlirLogicalResult (*operationCounts)(
       MlirOperation operation, intptr_t *nOperands, intptr_t *nResults,
       MlirStringCallback diagnostic, void *diagnosticUserData);
+  MlirLogicalResult (*flatSymbolRefAttribute)(
+      MlirConversionPatternRewriter rewriter, MlirStringRef symbol,
+      MlirAttribute *attribute, MlirStringCallback diagnostic,
+      void *diagnosticUserData);
+  MlirLogicalResult (*ensureFunctionDeclaration)(
+      MlirOperation anchor, MlirConversionPatternRewriter rewriter,
+      MlirStringRef symbol, intptr_t nInputTypes, const MlirType *inputTypes,
+      intptr_t nResultTypes, const MlirType *resultTypes,
+      MlirStringCallback diagnostic, void *diagnosticUserData);
 };
 
 typedef uint32_t (*MlirBeaverCompilerKernelABIVersionFn)(void);

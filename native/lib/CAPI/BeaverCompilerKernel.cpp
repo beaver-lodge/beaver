@@ -1,5 +1,6 @@
 #include "mlir-c/Beaver/CompilerKernel.h"
 
+#include "llvm/ADT/SmallVector.h"
 #include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/JSON.h"
@@ -7,6 +8,9 @@
 #include "mlir-c/BuiltinTypes.h"
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Rewrite.h"
+#include "mlir/IR/BuiltinAttributes.h"
+#include "mlir/IR/BuiltinTypes.h"
+#include "mlir/IR/SymbolTable.h"
 
 #include <algorithm>
 #include <cstddef>
@@ -352,6 +356,92 @@ static MlirLogicalResult operationCounts(
   return mlirLogicalResultSuccess();
 }
 
+static MlirLogicalResult flatSymbolRefAttribute(
+    MlirConversionPatternRewriter rewriter, MlirStringRef symbol,
+    MlirAttribute *attribute, MlirStringCallback diagnostic,
+    void *diagnosticUserData) {
+  std::string name;
+  if (!rewriter.ptr || !attribute || !copyStringRef(symbol, name) ||
+      name.empty())
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid flat symbol reference request");
+
+  MLIRContext *context = unwrap(rewriter)->getContext();
+  *attribute = wrap(FlatSymbolRefAttr::get(context, name));
+  return mlirLogicalResultSuccess();
+}
+
+static MlirLogicalResult ensureFunctionDeclaration(
+    MlirOperation anchor, MlirConversionPatternRewriter rewriter,
+    MlirStringRef symbol, intptr_t nInputTypes, const MlirType *inputTypes,
+    intptr_t nResultTypes, const MlirType *resultTypes,
+    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  std::string name;
+  if (mlirOperationIsNull(anchor) || !rewriter.ptr ||
+      !copyStringRef(symbol, name) || name.empty() ||
+      !validArray(nInputTypes, inputTypes) ||
+      !validArray(nResultTypes, resultTypes))
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "invalid function declaration request");
+
+  try {
+    Operation *source = unwrap(anchor);
+    Operation *symbolTable = source->getParentWithTrait<OpTrait::SymbolTable>();
+    if (!symbolTable || symbolTable->getNumRegions() != 1 ||
+        symbolTable->getRegion(0).empty())
+      return hostFailure(diagnostic, diagnosticUserData,
+                         "operation has no enclosing symbol table");
+
+    MLIRContext *context = unwrap(rewriter)->getContext();
+    SmallVector<Type> inputs;
+    SmallVector<Type> results;
+    inputs.reserve(nInputTypes);
+    results.reserve(nResultTypes);
+
+    for (intptr_t index = 0; index < nInputTypes; ++index) {
+      if (mlirTypeIsNull(inputTypes[index]) ||
+          unwrap(inputTypes[index]).getContext() != context)
+        return hostFailure(diagnostic, diagnosticUserData,
+                           "function input type belongs to a foreign context");
+      inputs.push_back(unwrap(inputTypes[index]));
+    }
+
+    for (intptr_t index = 0; index < nResultTypes; ++index) {
+      if (mlirTypeIsNull(resultTypes[index]) ||
+          unwrap(resultTypes[index]).getContext() != context)
+        return hostFailure(diagnostic, diagnosticUserData,
+                           "function result type belongs to a foreign context");
+      results.push_back(unwrap(resultTypes[index]));
+    }
+
+    FunctionType functionType = FunctionType::get(context, inputs, results);
+    if (Operation *existing = SymbolTable::lookupSymbolIn(symbolTable, name)) {
+      auto existingType = existing->getAttrOfType<TypeAttr>("function_type");
+      if (existing->getName().getStringRef() != "func.func" || !existingType ||
+          existingType.getValue() != functionType)
+        return hostFailure(diagnostic, diagnosticUserData,
+                           "existing function declaration has a different ABI");
+      return mlirLogicalResultSuccess();
+    }
+
+    ConversionPatternRewriter &nativeRewriter = *unwrap(rewriter);
+    OpBuilder::InsertionGuard guard(nativeRewriter);
+    nativeRewriter.setInsertionPointToEnd(&symbolTable->getRegion(0).front());
+    OperationState state(source->getLoc(), "func.func");
+    state.addAttribute("sym_name", nativeRewriter.getStringAttr(name));
+    state.addAttribute("sym_visibility", nativeRewriter.getStringAttr("private"));
+    state.addAttribute("function_type", TypeAttr::get(functionType));
+    state.addRegion();
+    nativeRewriter.create(state);
+    return mlirLogicalResultSuccess();
+  } catch (const std::exception &error) {
+    return hostFailure(diagnostic, diagnosticUserData, error.what());
+  } catch (...) {
+    return hostFailure(diagnostic, diagnosticUserData,
+                       "exception while ensuring a function declaration");
+  }
+}
+
 static MlirStringRef stringRef(const std::string &value) {
   return mlirStringRefCreate(value.data(), value.size());
 }
@@ -533,7 +623,9 @@ static const MlirBeaverCompilerKernelHostAPI &hostAPI() {
       integerType,
       integerAttribute,
       namedAttribute,
-      operationCounts};
+      operationCounts,
+      flatSymbolRefAttribute,
+      ensureFunctionDeclaration};
   return api;
 }
 
