@@ -31,3 +31,9 @@ pub fn beaverRawNIFDirtyCPU(worker: anytype, comptime field_name: []const u8, co
     entry.flags = e.ERL_NIF_DIRTY_JOB_CPU_BOUND;
     return entry;
 }
+
+pub fn beaverRawNIFDirtyIO(worker: anytype, comptime field_name: []const u8, comptime arity: usize) e.ErlNifFunc {
+    var entry = beaverRawNIF(worker, field_name, arity);
+    entry.flags = e.ERL_NIF_DIRTY_JOB_IO_BOUND;
+    return entry;
+}

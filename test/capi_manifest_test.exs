@@ -233,6 +233,7 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
            |> MapSet.new() ==
              MapSet.new([
                "beaver_raw_compile_llvm_ir_to_ptx",
+               "beaver_raw_compiler_kernel_load_and_populate",
                "beaver_raw_translate_module_to_llvm_ir",
                "beaver_raw_infer_return_types",
                "beaver_raw_infer_return_type_components",
@@ -266,6 +267,22 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
              "destructor" => "stack",
              "lifetime" => "async_operation"
            } = memory_effect_entry["callback_bridge"]
+
+    {compiler_kernel_entries, transform_collector_entries} =
+      Enum.split_with(
+        transform_collector_entries,
+        &(get_in(&1, ["function", "name"]) == "beaverCompilerKernelLoadAndPopulate")
+      )
+
+    assert [compiler_kernel_entry] = compiler_kernel_entries
+
+    assert %{
+             "runtime_backed" => true,
+             "scheduler" => "dirty_io",
+             "owner" => "caller",
+             "destructor" => "stack",
+             "lifetime" => "nif_call"
+           } = compiler_kernel_entry["callback_bridge"]
 
     for entry <- transform_collector_entries do
       bridge = Map.fetch!(entry, "callback_bridge")

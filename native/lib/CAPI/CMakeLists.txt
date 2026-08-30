@@ -62,6 +62,7 @@ add_mlir_public_c_api_library(
   MLIRCAPIBeaver
   DISABLE_INSTALL
   Beaver.cpp
+  BeaverCompilerKernel.cpp
   BeaverIRDL.cpp
   BeaverDebug.cpp
   BeaverGPU.cpp
@@ -77,6 +78,17 @@ add_mlir_public_c_api_library(
   LLVMTarget
   LLVMCodeGen
   LLVMNVPTXCodeGen)
+
+# External providers may be built with C++ exceptions enabled. Keep the
+# exception barrier local to the compiler-kernel boundary while the rest of
+# MLIR/Beaver remains compiled with LLVM's normal -fno-exceptions policy.
+if(MSVC)
+  set_source_files_properties(BeaverCompilerKernel.cpp
+    PROPERTIES COMPILE_OPTIONS "/EHsc")
+else()
+  set_source_files_properties(BeaverCompilerKernel.cpp
+    PROPERTIES COMPILE_OPTIONS "-fexceptions")
+endif()
 
 if(BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE)
   foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
