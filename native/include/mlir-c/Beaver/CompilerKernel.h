@@ -166,6 +166,17 @@ struct MlirBeaverCompilerKernelHostAPI {
       MlirConversionPatternRewriter rewriter, MlirOperation replacement,
       MlirOperation source, intptr_t expectedRegions,
       MlirStringCallback diagnostic, void *diagnosticUserData);
+  /// Returns whether `type` is an integer type of exactly `width` bits. A
+  /// valid non-integer type is a successful query with `result` set to zero.
+  MlirLogicalResult (*typeIsInteger)(
+      MlirType type, unsigned width, int *result,
+      MlirStringCallback diagnostic, void *diagnosticUserData);
+  /// Returns the registered definition name of an MLIR dynamic type. A valid
+  /// non-dynamic type fails instead of being conflated with an unknown term
+  /// representation.
+  MlirLogicalResult (*dynamicTypeName)(
+      MlirType type, MlirStringRef *name,
+      MlirStringCallback diagnostic, void *diagnosticUserData);
 };
 
 typedef uint32_t (*MlirBeaverCompilerKernelABIVersionFn)(void);

@@ -337,6 +337,63 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
     MLIR.Module.destroy(mismatch)
   end
 
+  @tag :tmp_dir
+  test "typed host type predicates distinguish exact integer widths and fail closed", %{
+    ctx: ctx,
+    tmp_dir: tmp_dir
+  } do
+    assert ctx
+           |> Beaver.Slang.load(Beaver.MLIR.Dialect.Ex)
+           |> MLIR.LogicalResult.success?()
+
+    patterns = [%{"name" => "fixture.type", "root" => "fixture.type", "version" => "1"}]
+
+    {manifest, artifact} =
+      build_fixture!(tmp_dir,
+        behavior: :type,
+        patterns: patterns,
+        capabilities: ["ir.type.v1", "pattern.register"]
+      )
+
+    plan = fixture_add_plan(manifest, artifact)
+
+    module =
+      MLIR.Module.create!(
+        ~s[module { func.func @types(%integer: i64, %term: !ex.term) -> i64 { %0 = "fixture.type"(%integer) : (i64) -> i64 %1 = "fixture.type"(%term) : (!ex.term) -> i64 %2 = arith.addi %0, %1 : i64 func.return %2 : i64 } }],
+        ctx: ctx
+      )
+
+    assert {:ok, ^module, []} = Plan.run(plan, module)
+    rendered = MLIR.to_string(module)
+    assert rendered =~ "arith.constant 1"
+    assert rendered =~ "arith.constant 0"
+    refute rendered =~ "fixture.type"
+    MLIR.Module.destroy(module)
+
+    {invalid_manifest, invalid_artifact} =
+      build_fixture!(Path.join(tmp_dir, "invalid"),
+        behavior: :type_bad_width,
+        patterns: patterns,
+        capabilities: ["ir.type.v1", "pattern.register"]
+      )
+
+    invalid_plan = fixture_add_plan(invalid_manifest, invalid_artifact)
+
+    invalid =
+      MLIR.Module.create!(
+        ~s[module { func.func @type(%integer: i64) -> i64 { %0 = "fixture.type"(%integer) : (i64) -> i64 func.return %0 : i64 } }],
+        ctx: ctx
+      )
+
+    assert {:error, %MLIR.Conversion.Error{diagnostics: diagnostics}} =
+             Plan.run(invalid_plan, invalid)
+
+    assert diagnostics != []
+    assert MLIR.to_string(invalid) =~ "fixture.type"
+    refute MLIR.to_string(invalid) =~ "arith.constant"
+    MLIR.Module.destroy(invalid)
+  end
+
   defp run_kernel!(ctx, manifest, artifact) do
     plan =
       Plan.new(mode: :full)
@@ -452,16 +509,23 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
   end
 
   defp behavior_args(opts) do
-    case Keyword.get(opts, :behavior) do
-      nil -> []
-      :bad_result_index -> ["-DFIXTURE_BAD_RESULT_INDEX"]
-      :partial_failure -> ["-DFIXTURE_PARTIAL_FAILURE"]
-      :attribute -> ["-DFIXTURE_ATTRIBUTE_PATTERN"]
-      :symbol -> ["-DFIXTURE_SYMBOL_PATTERN"]
-      :region -> ["-DFIXTURE_REGION_PATTERN"]
-      :region_mismatch -> ["-DFIXTURE_REGION_PATTERN", "-DFIXTURE_REGION_MISMATCH"]
-    end
+    opts |> Keyword.get(:behavior) |> behavior_args_for()
   end
+
+  defp behavior_args_for(nil), do: []
+  defp behavior_args_for(:bad_result_index), do: ["-DFIXTURE_BAD_RESULT_INDEX"]
+  defp behavior_args_for(:partial_failure), do: ["-DFIXTURE_PARTIAL_FAILURE"]
+  defp behavior_args_for(:attribute), do: ["-DFIXTURE_ATTRIBUTE_PATTERN"]
+  defp behavior_args_for(:symbol), do: ["-DFIXTURE_SYMBOL_PATTERN"]
+  defp behavior_args_for(:region), do: ["-DFIXTURE_REGION_PATTERN"]
+
+  defp behavior_args_for(:region_mismatch),
+    do: ["-DFIXTURE_REGION_PATTERN", "-DFIXTURE_REGION_MISMATCH"]
+
+  defp behavior_args_for(:type), do: ["-DFIXTURE_TYPE_PATTERN"]
+
+  defp behavior_args_for(:type_bad_width),
+    do: ["-DFIXTURE_TYPE_PATTERN", "-DFIXTURE_TYPE_BAD_WIDTH"]
 
   defp fixture_add_plan(manifest, artifact) do
     Plan.new(mode: :full)

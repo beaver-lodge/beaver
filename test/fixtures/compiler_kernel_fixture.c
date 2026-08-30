@@ -172,6 +172,81 @@ static MlirLogicalResult fixture_region_rewrite(
 }
 #endif
 
+#if defined(FIXTURE_TYPE_PATTERN)
+static MlirLogicalResult fixture_type_rewrite(
+    const MlirBeaverCompilerKernelHostAPI *host, MlirOperation operation,
+    intptr_t nOperands, MlirValue *operands,
+    MlirConversionPatternRewriter rewriter, MlirTypeConverter typeConverter,
+    void *userData, MlirStringCallback diagnostic,
+    void *diagnosticUserData) {
+  (void)typeConverter;
+  (void)userData;
+  if (nOperands != 1)
+    return mlirLogicalResultFailure();
+
+  MlirType operandType;
+  int isI64;
+  MlirStringRef dynamicName;
+  MlirType resultType;
+  MlirAttribute value;
+  MlirNamedAttribute namedValue;
+  MlirLocation location;
+
+#if defined(FIXTURE_TYPE_BAD_WIDTH)
+  const unsigned width = 0;
+#else
+  const unsigned width = 64;
+#endif
+
+  if (mlirLogicalResultIsFailure(host->valueType(
+          operands[0], &operandType, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->typeIsInteger(
+          operandType, width, &isI64, diagnostic, diagnosticUserData)) ||
+      (!isI64 &&
+       (mlirLogicalResultIsFailure(host->dynamicTypeName(
+            operandType, &dynamicName, diagnostic, diagnosticUserData)) ||
+        dynamicName.length != 4 || dynamicName.data[0] != 't' ||
+        dynamicName.data[1] != 'e' || dynamicName.data[2] != 'r' ||
+        dynamicName.data[3] != 'm')) ||
+      mlirLogicalResultIsFailure(host->integerType(
+          rewriter, 64, &resultType, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->integerAttribute(
+          resultType, isI64, &value, diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->namedAttribute(
+          rewriter, mlirStringRefCreate("value", 5), value, &namedValue,
+          diagnostic, diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->operationLocation(
+          operation, &location, diagnostic, diagnosticUserData)))
+    return mlirLogicalResultFailure();
+
+  MlirBeaverCompilerKernelOperation descriptor = {
+      sizeof(MlirBeaverCompilerKernelOperation),
+      mlirStringRefCreate("arith.constant", sizeof("arith.constant") - 1),
+      location,
+      0,
+      NULL,
+      1,
+      &resultType,
+      1,
+      &namedValue,
+  };
+
+  MlirOperation replacement;
+  MlirValue replacementResult;
+  if (mlirLogicalResultIsFailure(host->createOperation(
+          rewriter, &descriptor, &replacement, diagnostic,
+          diagnosticUserData)) ||
+      mlirLogicalResultIsFailure(host->operationResult(
+          replacement, 0, &replacementResult, diagnostic,
+          diagnosticUserData)))
+    return mlirLogicalResultFailure();
+
+  return host->replaceOperationWithValues(
+      rewriter, operation, 1, &replacementResult, diagnostic,
+      diagnosticUserData);
+}
+#endif
+
 #ifndef FIXTURE_IDENTITY
 #error "FIXTURE_IDENTITY must be defined"
 #endif
@@ -380,6 +455,14 @@ FIXTURE_EXPORT MlirLogicalResult fixture_populate(
     return mlirLogicalResultFailure();
 #endif
 
+#if defined(FIXTURE_TYPE_PATTERN)
+  if (!host->typeIsInteger || !host->dynamicTypeName || !host->valueType ||
+      !host->integerType || !host->integerAttribute || !host->namedAttribute ||
+      !host->operationLocation || !host->createOperation ||
+      !host->operationResult || !host->replaceOperationWithValues)
+    return mlirLogicalResultFailure();
+#endif
+
 #if defined(FIXTURE_ATTRIBUTE_PATTERN)
   MlirBeaverCompilerKernelPattern pattern = {
       sizeof(MlirBeaverCompilerKernelPattern),
@@ -411,6 +494,17 @@ FIXTURE_EXPORT MlirLogicalResult fixture_populate(
       mlirStringRefCreate("1", sizeof("1") - 1),
       1,
       fixture_region_rewrite,
+      NULL,
+      NULL,
+  };
+#elif defined(FIXTURE_TYPE_PATTERN)
+  MlirBeaverCompilerKernelPattern pattern = {
+      sizeof(MlirBeaverCompilerKernelPattern),
+      mlirStringRefCreate("fixture.type", sizeof("fixture.type") - 1),
+      mlirStringRefCreate("fixture.type", sizeof("fixture.type") - 1),
+      mlirStringRefCreate("1", sizeof("1") - 1),
+      1,
+      fixture_type_rewrite,
       NULL,
       NULL,
   };
