@@ -497,6 +497,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop list_flatten(list = ^term_like),
     results: [result: ^term_like]
 
+  defop list_insert_at(list = ^term_like, index = ^integer_like, value = ^term_like),
+    results: [result: ^term_like]
+
   defop map(entries = variadic(^term_like)),
     results: [result: ^term_like]
 

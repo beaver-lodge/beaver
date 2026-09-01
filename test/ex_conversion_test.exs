@@ -235,7 +235,7 @@ defmodule ExConversionTest do
 
   test "exposes a stable Ex dialect schema identity" do
     assert ExDialect.schema_digest() ==
-             "sha256:2146673ade29b0a14b743542f517ee6db54cb03d60c4aac06b7393e736aaa5d1"
+             "sha256:86f6e42a47a8a062fba31ccc75afaeb8c7b7e749c0df57419a518fd2a3fc5e67"
   end
 
   test "fails explicitly on a bare ex.var", %{ctx: ctx} do
@@ -653,6 +653,7 @@ defmodule ExConversionTest do
             %3 = "ex.box"(%1) : (i64) -> !ex.term
             %4 = "ex.list"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
             %19 = "ex.list_flatten"(%4) : (!ex.term) -> !ex.term
+            %24 = "ex.list_insert_at"(%4, %0, %3) : (!ex.term, i64, !ex.term) -> !ex.term
             %5 = "ex.map"(%2, %3) {operandSegmentSizes = array<i32: 2>} : (!ex.term, !ex.term) -> !ex.term
             %6 = "ex.map_put"(%5, %2, %3) : (!ex.term, !ex.term, !ex.term) -> !ex.term
             %13 = "ex.map_fetch"(%6, %2) : (!ex.term, !ex.term) -> !ex.term
@@ -683,6 +684,7 @@ defmodule ExConversionTest do
     rendered = MLIR.to_string(module, generic: true)
     assert rendered =~ "ex.term.list_cons"
     assert rendered =~ "ex.term.list_flatten"
+    assert rendered =~ "ex.term.list_insert_at"
     assert rendered =~ "ex.term.map_from_list"
     assert rendered =~ "ex.term.map_put"
     assert rendered =~ "ex.term.map_fetch"
