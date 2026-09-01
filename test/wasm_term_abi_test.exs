@@ -37,6 +37,8 @@ defmodule WasmTermABITest do
     assert TermABI.entry("ex.term.integer_compare").params == [:i64, :i64]
     assert TermABI.entry("ex.term.integer_compare").result == :i64
     assert TermABI.entry("ex.term.map_put").params == [:i64, :i64, :i64]
+    assert TermABI.entry("ex.term.process_dictionary_get").params == [:i64, :i64]
+    assert TermABI.entry("ex.term.process_dictionary_put").params == [:i64, :i64]
     assert TermABI.entry("ex.term.map_fetch").params == [:i64, :i64]
     assert TermABI.entry("ex.term.map_fetch").result == :i64
     assert TermABI.entry("ex.term.enumerable_into_map").params == [:i64, :i64]

@@ -87,6 +87,8 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.process_exit" => %{params: [:i64], result: :i64},
     "ex.term.process_exit_reason" => %{params: [:i64], result: :i64},
     "ex.term.process_trap_exit" => %{params: [:i64], result: :i64},
+    "ex.term.process_dictionary_get" => %{params: [:i64, :i64], result: :i64},
+    "ex.term.process_dictionary_put" => %{params: [:i64, :i64], result: :i64},
     "ex.term.link" => %{params: [:i64, :i64, :i64], result: :i64},
     "ex.term.unlink" => %{params: [:i64], result: :i64},
     "ex.term.exit" => %{params: [:i64, :i64, :i64, :i64], result: :i64},
