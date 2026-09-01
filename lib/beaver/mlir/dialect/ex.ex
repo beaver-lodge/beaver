@@ -337,6 +337,12 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop process_trap_exit(enabled = ^integer_like),
     results: [result: ^integer_like]
 
+  defop process_dictionary_get(key = ^term_like, default = ^term_like),
+    results: [result: ^term_like]
+
+  defop process_dictionary_put(key = ^term_like, value = ^term_like),
+    results: [result: ^term_like]
+
   defop link(
           pid = ^term_like,
           exit_tag = ^term_like,

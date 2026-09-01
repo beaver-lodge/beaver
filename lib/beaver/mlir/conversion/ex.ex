@@ -129,6 +129,12 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.process_exit", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.process_exit_reason", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.process_trap_exit", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.process_dictionary_get", &convert_term_read/3,
+      version: "1.0"
+    )
+    |> Plan.add_conversion_pattern("ex.process_dictionary_put", &convert_term_read/3,
+      version: "1.0"
+    )
     |> Plan.add_conversion_pattern("ex.link", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.unlink", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.exit", &convert_term_read/3, version: "1.0")
@@ -308,6 +314,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
     process_exit: "ex.term.process_exit",
     process_exit_reason: "ex.term.process_exit_reason",
     process_trap_exit: "ex.term.process_trap_exit",
+    process_dictionary_get: "ex.term.process_dictionary_get",
+    process_dictionary_put: "ex.term.process_dictionary_put",
     link: "ex.term.link",
     unlink: "ex.term.unlink",
     exit: "ex.term.exit",
@@ -1030,6 +1038,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.process_exit"), do: @term_intrinsics.process_exit
   defp read_intrinsic("ex.process_exit_reason"), do: @term_intrinsics.process_exit_reason
   defp read_intrinsic("ex.process_trap_exit"), do: @term_intrinsics.process_trap_exit
+  defp read_intrinsic("ex.process_dictionary_get"), do: @term_intrinsics.process_dictionary_get
+  defp read_intrinsic("ex.process_dictionary_put"), do: @term_intrinsics.process_dictionary_put
   defp read_intrinsic("ex.link"), do: @term_intrinsics.link
   defp read_intrinsic("ex.unlink"), do: @term_intrinsics.unlink
   defp read_intrinsic("ex.exit"), do: @term_intrinsics.exit
@@ -1397,6 +1407,11 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
   defp intrinsic_function_type("ex.term.process_trap_exit", _ctx) do
     MLIR.Type.function([MLIR.Type.i64()], [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type(symbol, _ctx)
+       when symbol in ["ex.term.process_dictionary_get", "ex.term.process_dictionary_put"] do
+    MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 2), [MLIR.Type.i64()])
   end
 
   defp intrinsic_function_type("ex.term.link", _ctx) do
