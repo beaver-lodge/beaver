@@ -461,7 +461,7 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
     identity = Keyword.get(opts, :identity, Manifest.identity_digest(draft))
     abi = Keyword.get(opts, :abi, Manifest.abi_version())
     artifact = Path.join(directory, "compiler_kernel_fixture" <> library_extension())
-    llvm_include = llvm_include_dir!()
+    llvm_include = stage_llvm_headers!(directory)
 
     args =
       shared_library_args() ++
@@ -537,14 +537,48 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
   end
 
   defp llvm_include_dir! do
-    llvm_config =
-      System.get_env("LLVM_CONFIG_PATH") || System.find_executable("llvm-config") ||
-        raise "LLVM_CONFIG_PATH or llvm-config is required for compiler-kernel fixture tests"
+    case System.get_env("LLVM_PREBUILT_DIR") do
+      root when is_binary(root) and root != "" ->
+        validate_llvm_include_dir!(Path.join(root, "include"))
 
-    case System.cmd(llvm_config, ["--includedir"], stderr_to_stdout: true) do
-      {include_dir, 0} -> String.trim(include_dir)
-      {output, status} -> raise "llvm-config --includedir failed (#{status}): #{output}"
+      _other ->
+        llvm_config =
+          System.get_env("LLVM_CONFIG_PATH") || System.find_executable("llvm-config") ||
+            raise "LLVM_CONFIG_PATH or llvm-config is required for compiler-kernel fixture tests"
+
+        case System.cmd(llvm_config, ["--includedir"], stderr_to_stdout: true) do
+          {include_dir, 0} -> validate_llvm_include_dir!(String.trim(include_dir))
+          {output, status} -> raise "llvm-config --includedir failed (#{status}): #{output}"
+        end
     end
+  end
+
+  defp validate_llvm_include_dir!(include_dir) do
+    rewrite_header = Path.join([include_dir, "mlir-c", "Rewrite.h"])
+
+    if include_dir != "" and File.regular?(rewrite_header) do
+      include_dir
+    else
+      raise "LLVM include directory does not contain mlir-c/Rewrite.h: #{inspect(include_dir)}"
+    end
+  end
+
+  defp stage_llvm_headers!(directory) do
+    source = llvm_include_dir!()
+    staged = Path.join(directory, "llvm-include")
+
+    for relative <- [
+          "mlir-c/IR.h",
+          "mlir-c/Rewrite.h",
+          "mlir-c/Support.h",
+          "mlir/Config/mlir-config.h"
+        ] do
+      destination = Path.join(staged, relative)
+      File.mkdir_p!(Path.dirname(destination))
+      File.cp!(Path.join(source, relative), destination)
+    end
+
+    staged
   end
 
   defp shared_library_args do
