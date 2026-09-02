@@ -300,8 +300,21 @@ defmodule Beaver.MLIR.Dialect.Ex.ExpandCase do
   end
 
   defp build_eq(scrutinee, pattern, context, location, rewriter) do
-    lit = build_lit(pattern, context, location, rewriter)
-    build_cmp(scrutinee, lit, "eq", context, location, rewriter)
+    scrutinee_type = MLIR.Value.type(scrutinee)
+
+    cond do
+      MLIR.equal?(scrutinee_type, MLIR.Type.i64(ctx: context)) ->
+        lit = build_lit(pattern, context, location, rewriter)
+        build_cmp(scrutinee, lit, "eq", context, location, rewriter)
+
+      MLIR.equal?(scrutinee_type, MLIR.Type.get("!ex.term", ctx: context)) ->
+        pattern_term = build_term_lit(pattern, context, location, rewriter)
+        build_term_eq(scrutinee, pattern_term, context, location, rewriter)
+
+      true ->
+        raise ArgumentError,
+              "ex.case integer patterns require an i64 or !ex.term scrutinee, got: #{MLIR.to_string(scrutinee_type)}"
+    end
   end
 
   defp build_guard_cond(guard, context, location, rewriter) do
@@ -337,6 +350,30 @@ defmodule Beaver.MLIR.Dialect.Ex.ExpandCase do
 
     RewriterBase.insert(rewriter, lit_op)
     lit_op |> Walker.results() |> Enum.to_list() |> hd()
+  end
+
+  defp build_term_lit(value, context, location, rewriter) do
+    scalar = build_lit(value, context, location, rewriter)
+
+    box_op =
+      %Changeset{name: "ex.box", context: context, location: location}
+      |> Changeset.add_argument(scalar)
+      |> Changeset.add_result(MLIR.Type.get("!ex.term", ctx: context))
+      |> MLIR.Operation.create()
+
+    RewriterBase.insert(rewriter, box_op)
+    box_op |> Walker.results() |> Enum.to_list() |> hd()
+  end
+
+  defp build_term_eq(left, right, context, location, rewriter) do
+    term_eq_op =
+      %Changeset{name: "ex.term_eq", context: context, location: location}
+      |> Changeset.add_argument([left, right])
+      |> Changeset.add_result(MLIR.Type.i64(ctx: context))
+      |> MLIR.Operation.create()
+
+    RewriterBase.insert(rewriter, term_eq_op)
+    term_eq_op |> Walker.results() |> Enum.to_list() |> hd()
   end
 
   defp build_cmp(left, right, predicate, context, location, rewriter) do

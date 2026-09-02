@@ -103,6 +103,35 @@ defmodule ExConversionTest do
   }
   """
 
+  @term_case_module ~S"""
+  module {
+    "ex.func"() ({
+    ^bb0:
+      %0 = "ex.lit"() {value = -1 : i64} : () -> i64
+      %1 = "ex.box"(%0) : (i64) -> !ex.term
+      %2 = "ex.case"(%1) ({
+      ^bb0:
+        "ex.clause"() {patterns = array<i64: 0>} : () -> ()
+        %3 = "ex.lit"() {value = 10 : i64} : () -> i64
+        "ex.yield"(%3) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+      ^bb1:
+        "ex.clause"() {patterns = array<i64: 1>} : () -> ()
+        %4 = "ex.lit"() {value = 20 : i64} : () -> i64
+        "ex.yield"(%4) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+      ^bb2:
+        "ex.clause"() {patterns = array<i64: -1>} : () -> ()
+        %5 = "ex.lit"() {value = 30 : i64} : () -> i64
+        "ex.yield"(%5) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+      ^bb3:
+        "ex.clause"() {patterns = array<i64>} : () -> ()
+        %6 = "ex.lit"() {value = 40 : i64} : () -> i64
+        "ex.yield"(%6) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+      }) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> i64
+      "ex.return"(%2) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+    }) {sym_name = "main"} : () -> ()
+  }
+  """
+
   @guard_module ~S"""
   module {
     "ex.func"() ({
@@ -465,6 +494,56 @@ defmodule ExConversionTest do
     refute rendered =~ "ex."
     assert rendered =~ "scf.if"
     assert rendered =~ "arith.cmpi"
+  end
+
+  test "expands integer patterns against a term scrutinee with strict term equality", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, ExDialect)
+
+    module =
+      MLIR.Module.create!(@term_case_module, ctx: ctx)
+      |> MLIR.verify!()
+      |> ExpandCase.run!()
+      |> MLIR.verify!()
+
+    expanded = MLIR.to_string(module, generic: true)
+    assert length(Regex.scan(~r/"ex\.term_eq"/, expanded)) == 3
+    refute expanded =~ ~r/"ex\.cmp"\([^\n]*\) : \(!ex\.term, i64\)/
+
+    converted = Plan.run!(Ex.plan(), module)
+    assert MLIR.verify?(converted)
+
+    rendered = MLIR.to_string(converted, generic: true)
+    refute rendered =~ ~s{"ex.term_eq"}
+    assert rendered =~ "ex.term.eq"
+  end
+
+  test "rejects integer patterns against an unsupported scrutinee type", %{ctx: ctx} do
+    Beaver.Slang.load(ctx, ExDialect)
+
+    module =
+      MLIR.Module.create!(
+        ~S"""
+        module {
+          "ex.func"() ({
+          ^bb0:
+            %0 = "arith.constant"() {value = 1.0 : f64} : () -> f64
+            %1 = "ex.case"(%0) ({
+            ^bb0:
+              "ex.clause"() {patterns = array<i64: 1>} : () -> ()
+              %2 = "ex.lit"() {value = 10 : i64} : () -> i64
+              "ex.yield"(%2) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+            }) {operandSegmentSizes = array<i32: 1>} : (f64) -> i64
+            "ex.return"(%1) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+          }) {sym_name = "main"} : () -> ()
+        }
+        """,
+        ctx: ctx
+      )
+      |> MLIR.verify!()
+
+    assert_raise ArgumentError,
+                 "ex.case integer patterns require an i64 or !ex.term scrutinee, got: f64",
+                 fn -> ExpandCase.run!(module) end
   end
 
   test "expands a clause guard into a narrowed AND condition", %{ctx: ctx} do
