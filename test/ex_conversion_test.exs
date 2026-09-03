@@ -264,7 +264,7 @@ defmodule ExConversionTest do
 
   test "exposes a stable Ex dialect schema identity" do
     assert ExDialect.schema_digest() ==
-             "sha256:89530dd5896af501f8f2dced8eb36bd8eb77d87c697fd82db7f538cdaaa14157"
+             "sha256:8a866f45cf92a685b089047b9113c0301ddff3c414f3c79268f1083d8bd6116c"
   end
 
   test "fails explicitly on a bare ex.var", %{ctx: ctx} do
@@ -971,6 +971,7 @@ defmodule ExConversionTest do
             %runtime_leave = "ex.runtime_leave"() : () -> i64
             %runtime_destroy = "ex.runtime_destroy"(%5) : (i64) -> i64
             %result_handle = "ex.result_create"(%5, %0) : (i64, i64) -> i64
+            %term_result_handle = "ex.result_create_term"(%5, %0) : (i64, i64) -> i64
             %result_kind = "ex.result_root_kind"(%result_handle) : (i64) -> i64
             %result_word = "ex.result_root_word"(%result_handle) : (i64) -> i64
             %term_kind = "ex.result_term_kind"(%result_handle, %result_word) : (i64, i64) -> i64
@@ -1028,6 +1029,7 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.runtime_leave"
     assert rendered =~ "ex.term.runtime_destroy"
     assert rendered =~ "ex.term.result_create"
+    assert rendered =~ "ex.term.result_create_term"
     assert rendered =~ "ex.term.result_destroy"
     assert rendered =~ "ex.term.result_root_kind"
     assert rendered =~ "ex.term.result_root_word"
