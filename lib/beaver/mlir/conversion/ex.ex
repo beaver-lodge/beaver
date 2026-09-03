@@ -82,6 +82,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     |> Plan.add_conversion_pattern("ex.runtime_leave", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.runtime_destroy", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.result_create", &convert_term_read/3, version: "1.0")
+    |> Plan.add_conversion_pattern("ex.result_create_term", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.result_destroy", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.result_root_kind", &convert_term_read/3, version: "1.0")
     |> Plan.add_conversion_pattern("ex.result_root_word", &convert_term_read/3, version: "1.0")
@@ -280,6 +281,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     runtime_leave: "ex.term.runtime_leave",
     runtime_destroy: "ex.term.runtime_destroy",
     result_create: "ex.term.result_create",
+    result_create_term: "ex.term.result_create_term",
     result_destroy: "ex.term.result_destroy",
     result_root_kind: "ex.term.result_root_kind",
     result_root_word: "ex.term.result_root_word",
@@ -1013,6 +1015,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp read_intrinsic("ex.runtime_leave"), do: @term_intrinsics.runtime_leave
   defp read_intrinsic("ex.runtime_destroy"), do: @term_intrinsics.runtime_destroy
   defp read_intrinsic("ex.result_create"), do: @term_intrinsics.result_create
+  defp read_intrinsic("ex.result_create_term"), do: @term_intrinsics.result_create_term
   defp read_intrinsic("ex.result_destroy"), do: @term_intrinsics.result_destroy
   defp read_intrinsic("ex.result_root_kind"), do: @term_intrinsics.result_root_kind
   defp read_intrinsic("ex.result_root_word"), do: @term_intrinsics.result_root_word
@@ -1292,6 +1295,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp intrinsic_function_type("ex.term.result_create", _ctx) do
+    MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 2), [MLIR.Type.i64()])
+  end
+
+  defp intrinsic_function_type("ex.term.result_create_term", _ctx) do
     MLIR.Type.function(List.duplicate(MLIR.Type.i64(), 2), [MLIR.Type.i64()])
   end
 

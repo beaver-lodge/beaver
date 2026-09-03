@@ -60,6 +60,7 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.runtime_destroy" => %{params: [:i64], result: :i64},
     # host result ownership / materialization
     "ex.term.result_create" => %{params: [:i64, :i64], result: :i64},
+    "ex.term.result_create_term" => %{params: [:i64, :i64], result: :i64},
     "ex.term.result_destroy" => %{params: [:i64], result: :i64},
     "ex.term.result_root_kind" => %{params: [:i64], result: :i64},
     "ex.term.result_root_word" => %{params: [:i64], result: :i64},

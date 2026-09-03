@@ -190,6 +190,12 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop result_create(runtime = ^integer_like, word = ^integer_like),
     results: [result: ^integer_like]
 
+  # Retains a result whose unboxed i64 is known to carry an `!ex.term` word.
+  # The explicit operation avoids guessing whether an immediate integer word
+  # is a legacy scalar root at the host boundary.
+  defop result_create_term(runtime = ^integer_like, word = ^integer_like),
+    results: [result: ^integer_like]
+
   defop result_destroy(handle = ^integer_like),
     results: [result: ^integer_like]
 
