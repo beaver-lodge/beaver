@@ -156,4 +156,18 @@ defmodule Beaver.MLIR.Triton.PipelinePlanTest do
       end
     end
   end
+
+  test "locates the first pass or digest divergence" do
+    common = %{index: 0, id: :coalesce, ir_sha256: "same"}
+    left = [common, %{index: 1, id: :legacy_canonicalize, ir_sha256: "left"}]
+    right = [common, %{index: 1, id: :f32_dot_tc, ir_sha256: "right"}]
+
+    assert {:ok, %{index: 1, left: left_record, right: right_record}} =
+             Beaver.Triton.first_trace_divergence(left, right)
+
+    assert left_record == Enum.at(left, 1)
+    assert right_record == Enum.at(right, 1)
+    assert Beaver.Triton.first_trace_divergence(left, left) == :none
+    assert Beaver.Triton.first_trace_divergence([], []) == :none
+  end
 end
