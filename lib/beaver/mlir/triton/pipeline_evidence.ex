@@ -228,25 +228,30 @@ defmodule Beaver.MLIR.Triton.PipelineEvidence do
     do: :PARITY_PROFILE_FAILED
 
   defp resource_classification(legacy, candidate) do
-    candidate_resources = candidate.resources
-    legacy_resources = legacy.resources
-
     cond do
-      candidate_resources.registers_per_thread <= @register_limit and
-        candidate.shared_memory_bytes <= @shared_memory_limit and
-          zero_stack_and_spill?(candidate_resources) ->
+      resource_viable?(candidate) ->
         :RESOURCE_VIABLE
 
-      candidate_resources.registers_per_thread > legacy_resources.registers_per_thread or
-        candidate.shared_memory_bytes > legacy.shared_memory_bytes or
-        candidate_resources.stack_frame_bytes > legacy_resources.stack_frame_bytes or
-        candidate_resources.spill_store_bytes > legacy_resources.spill_store_bytes or
-          candidate_resources.spill_load_bytes > legacy_resources.spill_load_bytes ->
+      resource_regressed?(legacy, candidate) ->
         :RESOURCE_REGRESSED
 
       true ->
         :RESOURCE_UNCHANGED
     end
+  end
+
+  defp resource_viable?(candidate) do
+    candidate.resources.registers_per_thread <= @register_limit and
+      candidate.shared_memory_bytes <= @shared_memory_limit and
+      zero_stack_and_spill?(candidate.resources)
+  end
+
+  defp resource_regressed?(legacy, candidate) do
+    candidate.resources.registers_per_thread > legacy.resources.registers_per_thread or
+      candidate.shared_memory_bytes > legacy.shared_memory_bytes or
+      candidate.resources.stack_frame_bytes > legacy.resources.stack_frame_bytes or
+      candidate.resources.spill_store_bytes > legacy.resources.spill_store_bytes or
+      candidate.resources.spill_load_bytes > legacy.resources.spill_load_bytes
   end
 
   defp zero_stack_and_spill?(resources) do
