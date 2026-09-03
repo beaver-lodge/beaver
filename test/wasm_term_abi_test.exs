@@ -38,6 +38,13 @@ defmodule WasmTermABITest do
     assert TermABI.entry("ex.term.eq_loose").result == :i64
     assert TermABI.entry("ex.term.integer_compare").params == [:i64, :i64]
     assert TermABI.entry("ex.term.integer_compare").result == :i64
+
+    for operation <- ~w(add sub mul div rem) do
+      entry = TermABI.entry("ex.term.integer_#{operation}")
+      assert entry.params == [:i64, :i64]
+      assert entry.result == :i64
+    end
+
     assert TermABI.entry("ex.term.map_put").params == [:i64, :i64, :i64]
     assert TermABI.entry("ex.term.process_dictionary_get").params == [:i64, :i64]
     assert TermABI.entry("ex.term.process_dictionary_put").params == [:i64, :i64]

@@ -264,7 +264,7 @@ defmodule ExConversionTest do
 
   test "exposes a stable Ex dialect schema identity" do
     assert ExDialect.schema_digest() ==
-             "sha256:86f6e42a47a8a062fba31ccc75afaeb8c7b7e749c0df57419a518fd2a3fc5e67"
+             "sha256:89530dd5896af501f8f2dced8eb36bd8eb77d87c697fd82db7f538cdaaa14157"
   end
 
   test "fails explicitly on a bare ex.var", %{ctx: ctx} do
@@ -844,6 +844,11 @@ defmodule ExConversionTest do
             %11 = "ex.term_eq"(%7, %2) : (!ex.term, !ex.term) -> i64
             %12 = "ex.term_eq_loose"(%7, %2) : (!ex.term, !ex.term) -> i64
             %17 = "ex.integer_compare"(%2, %3) : (!ex.term, !ex.term) -> i64
+            %18 = "ex.integer_add"(%2, %3) : (!ex.term, !ex.term) -> !ex.term
+            %19 = "ex.integer_sub"(%2, %3) : (!ex.term, !ex.term) -> !ex.term
+            %20 = "ex.integer_mul"(%2, %3) : (!ex.term, !ex.term) -> !ex.term
+            %21 = "ex.integer_div"(%2, %3) : (!ex.term, !ex.term) -> !ex.term
+            %22 = "ex.integer_rem"(%2, %3) : (!ex.term, !ex.term) -> !ex.term
             %13 = "ex.string_printable"(%2) : (!ex.term) -> i64
             %14 = "ex.binary_quote"(%2) : (!ex.term) -> !ex.term
             %15 = "ex.int_to_hex"(%2) : (!ex.term) -> !ex.term
@@ -861,6 +866,11 @@ defmodule ExConversionTest do
     assert rendered =~ "ex.term.tuple_length"
     assert rendered =~ "ex.term.tuple_get"
     assert rendered =~ "ex.term.integer_compare"
+    assert rendered =~ "ex.term.integer_add"
+    assert rendered =~ "ex.term.integer_sub"
+    assert rendered =~ "ex.term.integer_mul"
+    assert rendered =~ "ex.term.integer_div"
+    assert rendered =~ "ex.term.integer_rem"
     assert rendered =~ "ex.term.list_length"
     assert rendered =~ "ex.term.list_head"
     assert rendered =~ "ex.term.list_tail"

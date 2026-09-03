@@ -703,6 +703,24 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defop integer_compare(left = ^term_like, right = ^term_like),
     results: [result: ^integer_like]
 
+  # Representation-preserving integer arithmetic. Unlike the scalar ex.add/
+  # sub/mul/div/rem operations, these accept tagged immediate or boxed integer
+  # terms and return a term so arbitrary precision is not narrowed through i64.
+  defop integer_add(left = ^term_like, right = ^term_like),
+    results: [result: ^term_like]
+
+  defop integer_sub(left = ^term_like, right = ^term_like),
+    results: [result: ^term_like]
+
+  defop integer_mul(left = ^term_like, right = ^term_like),
+    results: [result: ^term_like]
+
+  defop integer_div(left = ^term_like, right = ^term_like),
+    results: [result: ^term_like]
+
+  defop integer_rem(left = ^term_like, right = ^term_like),
+    results: [result: ^term_like]
+
   defop binary_length(binary = ^term_like),
     results: [result: ^integer_like]
 
