@@ -81,7 +81,10 @@ defmodule Beaver.MLIR.Triton.PipelinePlanTest do
              triton_identity: "7d0817d08273d205",
              source_path: "third_party/nvidia/backend/compiler.py",
              source_symbol: "CUDABackend.make_ttgir",
-             source_sha256: "d2b6c6b79146143fa56107133ddceec6369812d29e74cb362a7d400476765be8"
+             source_sha256: "d2b6c6b79146143fa56107133ddceec6369812d29e74cb362a7d400476765be8",
+             pass_replacements: %{
+               "triton-nvidia-gpu-plan-cta" => "triton-nvidia-gpu-assign-cga-layouts"
+             }
            }
 
     assert PipelinePlan.digest(plan) == PipelinePlan.digest(plan)
@@ -120,7 +123,7 @@ defmodule Beaver.MLIR.Triton.PipelinePlanTest do
              "convert-triton-to-tritongpu{target=cuda:120, num-warps=8}",
              "tritongpu-coalesce",
              "tritongpu-F32DotTC",
-             "triton-nvidia-gpu-plan-cta",
+             "triton-nvidia-gpu-assign-cga-layouts",
              "tritongpu-remove-layout-conversions",
              "tritongpu-optimize-thread-locality",
              "tritongpu-accelerate-matmul",

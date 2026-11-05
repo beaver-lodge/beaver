@@ -3,9 +3,9 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
   Pure, auditable pass plans for Beaver's NVIDIA Triton lowering.
 
   `:legacy` preserves Beaver's historical lowering and remains the default.
-  `:pinned_nvidia_sm100` freezes the `make_ttgir` order used by the pinned
-  Triton prebuilt for CUDA capabilities 100 and newer.  The frozen profile is
-  deliberately opt-in until a downstream GPU qualification admits it.
+  `:pinned_nvidia_sm100` freezes the historical `make_ttgir` order for CUDA
+  capabilities 100 and newer, with upstream pass replacements recorded in its
+  provenance. The profile remains opt-in until downstream GPU qualification.
 
   This module contains data only.  In particular, it never imports or parses
   Triton's Python compiler at runtime.
@@ -20,7 +20,8 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
     triton_identity: "7d0817d08273d205",
     source_path: "third_party/nvidia/backend/compiler.py",
     source_symbol: "CUDABackend.make_ttgir",
-    source_sha256: "d2b6c6b79146143fa56107133ddceec6369812d29e74cb362a7d400476765be8"
+    source_sha256: "d2b6c6b79146143fa56107133ddceec6369812d29e74cb362a7d400476765be8",
+    pass_replacements: %{"triton-nvidia-gpu-plan-cta" => "triton-nvidia-gpu-assign-cga-layouts"}
   }
 
   @enforce_keys ~w(schema profile target capability num_warps num_stages provenance passes)a
@@ -99,7 +100,7 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
       ),
       pass(:coalesce, :ttgir, "tritongpu-coalesce"),
       pass(:f32_dot_tc, :ttgir, "tritongpu-F32DotTC"),
-      pass(:plan_cta, :ttgir, "triton-nvidia-gpu-plan-cta"),
+      pass(:plan_cta, :ttgir, "triton-nvidia-gpu-assign-cga-layouts"),
       if(remove_layouts?, do: pass(:remove_layout_conversions_pre, :ttgir, "tritongpu-remove-layout-conversions")),
       pass(:optimize_thread_locality, :ttgir, "tritongpu-optimize-thread-locality"),
       pass(:accelerate_matmul, :ttgir, "tritongpu-accelerate-matmul"),
@@ -123,7 +124,7 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
       ),
       pass(:coalesce, :ttgir, "tritongpu-coalesce"),
       pass(:f32_dot_tc, :ttgir, "tritongpu-F32DotTC{emu-tf32=true}"),
-      pass(:plan_cta, :ttgir, "triton-nvidia-gpu-plan-cta"),
+      pass(:plan_cta, :ttgir, "triton-nvidia-gpu-assign-cga-layouts"),
       pass(:remove_layout_conversions_pre, :ttgir, "tritongpu-remove-layout-conversions"),
       pass(:optimize_thread_locality, :ttgir, "tritongpu-optimize-thread-locality"),
       pass(:accelerate_matmul, :ttgir, "tritongpu-accelerate-matmul"),
