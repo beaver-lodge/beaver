@@ -2,7 +2,7 @@
   "schema_version": 2,
   "kinda": {
     "git_url": "https://github.com/beaver-lodge/kinda.git",
-    "ref": "00ec0b708f79f566c0f1273050078f76149a5fad"
+    "ref": "9f1596902ec1d1bb5277d6336c0078b0dfcf4841"
   },
   "llvm": {
     "repo": "llvm/eudsl",
