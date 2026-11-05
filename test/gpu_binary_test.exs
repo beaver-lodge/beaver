@@ -24,8 +24,9 @@ defmodule GPUBinaryTest do
   end
 
   test "rocdl_target_attribute builds a target attribute from data", %{ctx: ctx} do
-    assert MLIR.to_string(GPU.rocdl_target_attribute(chip: "gfx90a", ctx: ctx)) ==
-             ~s{#rocdl.target<chip = "gfx90a">}
+    target = GPU.rocdl_target_attribute(chip: "gfx90a", ctx: ctx)
+    assert MLIR.to_string(target) == ~s{#rocdl.target<chip = "gfx90a">}
+    assert target |> MLIR.CAPI.beaverROCDLTargetAttrGetChip() |> MLIR.to_string() == "gfx90a"
 
     full =
       GPU.rocdl_target_attribute(

@@ -2,6 +2,7 @@
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Support.h"
 #include "mlir-c/BuiltinAttributes.h"
+#include "mlir/Dialect/IRDL/IR/IRDL.h"
 #include "mlir/Dialect/IRDL/IRDLLoading.h"
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -9,13 +10,23 @@
 
 using namespace mlir;
 
+MLIR_CAPI_EXPORTED MlirAttribute beaverIRDLVariadicityArrayAttrGet(MlirContext context, intptr_t size,
+                                                                   const int32_t *values) {
+  if (size < 0 || (size && !values)) return wrap(Attribute{});
+  SmallVector<irdl::VariadicityAttr> tags;
+  for (intptr_t i = 0; i < size; ++i) {
+    auto tag = irdl::symbolizeVariadicity(values[i]);
+    if (!tag) return wrap(Attribute{});
+    tags.push_back(irdl::VariadicityAttr::get(unwrap(context), *tag));
+  }
+  return wrap(irdl::VariadicityArrayAttr::get(unwrap(context), tags));
+}
+
 MLIR_CAPI_EXPORTED MlirAttribute beaverGetReassociationIndicesForReshape(MlirType sourceType, MlirType targetType) {
   auto indices = mlir::getReassociationIndicesForReshape(mlir::cast<RankedTensorType>(unwrap(sourceType)),
                                                          mlir::cast<RankedTensorType>(unwrap(targetType)));
   OpBuilder b{unwrap(sourceType).getContext()};
-  if (!indices) {
-    return wrap(Attribute{});
-  }
+  if (!indices) return wrap(Attribute{});
   return wrap(getReassociationIndicesAttribute(b, *indices));
 }
 

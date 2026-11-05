@@ -119,6 +119,9 @@ MLIR_CAPI_EXPORTED void beaverOperationPrintGenericOpForm(MlirOperation op, Mlir
                                                           void *userData);
 MLIR_CAPI_EXPORTED void beaverOperationDumpGeneric(MlirOperation op);
 MLIR_CAPI_EXPORTED MlirType beaverIRDLGetDefinedType(MlirStringRef dialect, MlirStringRef type, MlirAttribute params);
+// Construct variadicity directly; its textual enum format differs across LLVM revisions.
+MLIR_CAPI_EXPORTED MlirAttribute beaverIRDLVariadicityArrayAttrGet(MlirContext context, intptr_t size,
+                                                                   const int32_t *values);
 MLIR_CAPI_EXPORTED MlirAttribute beaverIRDLGetDefinedAttr(MlirStringRef dialect, MlirStringRef attr,
                                                           MlirAttribute params);
 
@@ -129,6 +132,7 @@ MLIR_CAPI_EXPORTED intptr_t beaverShapedTypeGetNumElements(MlirType type);
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverGetNumWorkgroupAttributionsAttrName();
 MLIR_CAPI_EXPORTED MlirStringRef beaverGetContainerModuleAttrName();
+MLIR_CAPI_EXPORTED MlirStringRef beaverROCDLTargetAttrGetChip(MlirAttribute target);
 MLIR_CAPI_EXPORTED MlirAttribute beaverGPUObjectAttrGet(MlirAttribute target, int32_t format, MlirStringRef object);
 MLIR_CAPI_EXPORTED bool beaverAttributeIsAGPUObject(MlirAttribute attribute);
 MLIR_CAPI_EXPORTED MlirStringRef beaverGPUObjectAttrGetObject(MlirAttribute attribute);

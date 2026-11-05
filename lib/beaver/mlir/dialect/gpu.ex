@@ -89,18 +89,7 @@ defmodule Beaver.MLIR.Dialect.GPU do
   convention of `MLIR.Attribute.get/2`. The resulting attribute can be passed
   to `package_binary!/3` as the target configuration of a `gpu.binary`.
   """
-  def nvvm_target_attribute(opts \\ []) do
-    params =
-      opts
-      |> Keyword.take([:chip, :triple, :features, :opt])
-      |> Enum.map(fn
-        {:opt, value} -> "O = #{value}"
-        {name, value} when is_binary(value) -> ~s{#{name} = "#{value}"}
-        {name, value} -> "#{name} = #{value}"
-      end)
-
-    MLIR.Attribute.get("#nvvm.target<#{Enum.join(params, ", ")}>", opts)
-  end
+  def nvvm_target_attribute(opts \\ []), do: target_attribute("nvvm", opts, [:chip, :triple, :features, :opt])
 
   @doc """
   Construct a ROCDL target attribute from Elixir data.
@@ -117,17 +106,17 @@ defmodule Beaver.MLIR.Dialect.GPU do
   convention of `MLIR.Attribute.get/2`. The resulting attribute can be passed
   to `package_binary!/3` as the target configuration of a `gpu.binary`.
   """
-  def rocdl_target_attribute(opts \\ []) do
+  def rocdl_target_attribute(opts \\ []), do: target_attribute("rocdl", opts, [:chip, :triple, :features, :opt, :abi])
+
+  defp target_attribute(dialect, opts, keys) do
     params =
-      opts
-      |> Keyword.take([:chip, :triple, :features, :opt, :abi])
-      |> Enum.map(fn
+      Enum.map_join(Keyword.take(opts, keys), ", ", fn
         {:opt, value} -> "O = #{value}"
         {name, value} when is_binary(value) -> ~s{#{name} = "#{value}"}
         {name, value} -> "#{name} = #{value}"
       end)
 
-    MLIR.Attribute.get("#rocdl.target<#{Enum.join(params, ", ")}>", opts)
+    MLIR.Attribute.get("##{dialect}.target<#{params}>", opts)
   end
 
   @doc """
@@ -179,12 +168,11 @@ defmodule Beaver.MLIR.Dialect.GPU do
   end
 
   defp conversion_pass!([target | _]) do
-    case target
-         |> CAPI.mlirAttributeGetDialect()
-         |> CAPI.mlirDialectGetNamespace()
-         |> MLIR.to_string() do
+    dialect = target |> CAPI.mlirAttributeGetDialect() |> CAPI.mlirDialectGetNamespace() |> MLIR.to_string()
+
+    case dialect do
       "nvvm" -> "convert-gpu-to-nvvm"
-      "rocdl" -> "convert-gpu-to-rocdl"
+      "rocdl" -> "convert-gpu-to-rocdl{chipset=#{MLIR.to_string(CAPI.beaverROCDLTargetAttrGetChip(target))}}"
       other -> raise ArgumentError, "unsupported GPU target attribute dialect: #{other}"
     end
   end

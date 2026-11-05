@@ -2,8 +2,13 @@
 #include "mlir/CAPI/IR.h"
 #include "mlir/CAPI/Support.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
+#include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 
 using namespace mlir;
+
+MLIR_CAPI_EXPORTED MlirStringRef beaverROCDLTargetAttrGetChip(MlirAttribute target) {
+  return wrap(cast<ROCDL::ROCDLTargetAttr>(unwrap(target)).getChip());
+}
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverGetNumWorkgroupAttributionsAttrName() {
   return wrap(llvm::StringRef("workgroup_attributions"));

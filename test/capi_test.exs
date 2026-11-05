@@ -5,6 +5,23 @@ defmodule MlirTest do
   import Beaver.MLIR.CAPI
 
   @moduletag :smoke
+
+  test "IRDL variadicity arrays preserve enum values and reject invalid input", %{ctx: ctx} do
+    for {values, expected} <- [{[], []}, {[0, 1, 2], ~w(single optional variadic)}] do
+      data = Beaver.Native.array(values, Beaver.Native.I32)
+      attr = beaverIRDLVariadicityArrayAttrGet(ctx, length(values), data)
+      refute MLIR.null?(attr)
+
+      assert Regex.scan(~r/\b(single|optional|variadic)\b/, MLIR.to_string(attr), capture: :first)
+             |> List.flatten() == expected
+    end
+
+    for {values, size} <- [{[3], 1}, {[-1], 1}, {[0], -1}] do
+      data = Beaver.Native.array(values, Beaver.Native.I32)
+      assert MLIR.null?(beaverIRDLVariadicityArrayAttrGet(ctx, size, data))
+    end
+  end
+
   test "call wrapped apis" do
     ctx = MLIR.Context.create()
 

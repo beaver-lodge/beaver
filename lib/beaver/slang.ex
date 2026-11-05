@@ -1,5 +1,5 @@
 alias Beaver.MLIR.{Attribute, CAPI, StringRef}
-alias Beaver.Deferred
+alias Beaver.{Deferred, Native}
 
 defmodule Beaver.Slang do
   use Beaver
@@ -150,20 +150,15 @@ defmodule Beaver.Slang do
 
   # This function determines the variadicity of the given values based on the provided options. It generates the variadicity attribute for the values if needed.
   defp get_variadicity(values, opts) do
-    use Beaver
-
     if opts[:need_variadicity] do
       tags =
-        values
-        |> List.wrap()
-        |> Enum.map_join(",", fn
-          {variadic_tag, _} when variadic_tag in @variadic_tags -> variadic_tag |> Atom.to_string()
-          _ -> "single"
+        Enum.map(List.wrap(values), fn
+          {tag, _} when tag in @variadic_tags -> %{single: 0, optional: 1, variadic: 2}[tag]
+          _ -> 0
         end)
 
-      [
-        variadicity: ~a{#irdl<variadicity_array[#{tags}]>}
-      ]
+      data = Native.array(tags, Native.I32)
+      [variadicity: Deferred.defer(&CAPI.beaverIRDLVariadicityArrayAttrGet(&1, length(tags), data))]
     else
       []
     end
