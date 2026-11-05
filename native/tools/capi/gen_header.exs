@@ -10,7 +10,8 @@ mlir_headers =
   |> then(&Path.join(mlir_include_dir, &1))
   |> Path.wildcard()
   |> Stream.reject(&String.contains?(&1, "mlir-c/Bindings/Python"))
-  |> Stream.reject(&String.contains?(&1, "mlir-c/Target/LLVMIR.h"))
+  # LLVMIR uses Beaver's adapter; Remarks needs an adapter for callback-scoped handles.
+  |> Stream.reject(&String.ends_with?(&1, ~w[mlir-c/Target/LLVMIR.h mlir-c/Remarks.h]))
   |> Enum.map(&Path.relative_to(&1, mlir_include_dir))
 
 if mlir_headers == [], do: raise("no MLIR C headers found under #{mlir_include_dir}")
