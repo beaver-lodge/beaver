@@ -1,23 +1,25 @@
+alias Beaver.MLIR.CAPI
+
 defmodule Beaver.MLIR.SymbolTable do
-  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
+  use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
 
   @moduledoc """
   This module provides utilities for MLIR symbol table.
   """
   alias Beaver.MLIR
-  import MLIR.CAPI
+  import CAPI
 
   @doc """
   Creates a new symbol table and attaches it to the given operation.
   The operation is expected to have the `SymbolTable` trait.
   """
-  defdelegate create(operation), to: MLIR.CAPI, as: :mlirSymbolTableCreate
+  defdelegate create(operation), to: CAPI, as: :mlirSymbolTableCreate
 
   @doc "Destroys the given symbol table."
-  defdelegate destroy(symbol_table), to: MLIR.CAPI, as: :mlirSymbolTableDestroy
+  defdelegate destroy(symbol_table), to: CAPI, as: :mlirSymbolTableDestroy
 
   @doc "Erases a symbol from the given symbol table."
-  defdelegate erase(symbol_table, operation), to: MLIR.CAPI, as: :mlirSymbolTableErase
+  defdelegate erase(symbol_table, operation), to: CAPI, as: :mlirSymbolTableErase
 
   @doc """
   Returns the name of the attribute used for symbol names as atom.
@@ -27,9 +29,7 @@ defmodule Beaver.MLIR.SymbolTable do
     :sym_name
   """
 
-  def attribute_name() do
-    mlirSymbolTableGetSymbolAttributeName() |> to_string() |> String.to_atom()
-  end
+  def attribute_name(), do: mlirSymbolTableGetSymbolAttributeName() |> to_string() |> String.to_atom()
 
   @doc """
   Returns the attribute name used by the default symbol visibility
@@ -42,16 +42,15 @@ defmodule Beaver.MLIR.SymbolTable do
     iex> MLIR.SymbolTable.default_visibility_attribute_name()
     :sym_visibility
   """
-  def default_visibility_attribute_name() do
-    beaverSymbolTableGetDefaultVisibilityAttributeName() |> to_string() |> String.to_atom()
-  end
+  def default_visibility_attribute_name(),
+    do: beaverSymbolTableGetDefaultVisibilityAttributeName() |> to_string() |> String.to_atom()
 
   @type visibility :: :public | :private | :nested
 
   @doc "Returns a symbol operation's semantic visibility."
   @spec visibility(MLIR.Operation.t()) :: visibility()
-  def visibility(operation) do
-    operation
+  def visibility(op) do
+    op
     |> beaverSymbolTableGetSymbolVisibility()
     |> Beaver.Native.to_term()
     |> case do
@@ -63,7 +62,7 @@ defmodule Beaver.MLIR.SymbolTable do
 
   @doc "Sets a symbol operation's semantic visibility."
   @spec set_visibility(MLIR.Operation.t(), visibility()) :: :ok
-  def set_visibility(operation, visibility) do
+  def set_visibility(op, visibility) do
     encoded =
       case visibility do
         :public -> 0
@@ -72,19 +71,18 @@ defmodule Beaver.MLIR.SymbolTable do
         other -> raise ArgumentError, "invalid symbol visibility: #{inspect(other)}"
       end
 
-    beaverSymbolTableSetSymbolVisibility(operation, encoded)
+    beaverSymbolTableSetSymbolVisibility(op, encoded)
   end
 
   @doc "Inserts an operation into a symbol table."
-  defdelegate insert(symbol_table, operation), to: MLIR.CAPI, as: :mlirSymbolTableInsert
+  defdelegate insert(symbol_table, operation), to: CAPI, as: :mlirSymbolTableInsert
 
   @doc "Looks up a symbol with the given name in the symbol table."
-  def lookup(symbol_table, name) do
-    mlirSymbolTableLookup(symbol_table, MLIR.StringRef.create(name))
-  end
+  def lookup(symbol_table, name),
+    do: mlirSymbolTableLookup(symbol_table, MLIR.StringRef.create(name))
 
   @doc "Replaces all uses of a symbol with another symbol."
   defdelegate replace_all_symbol_uses(old_symbol, new_symbol, from),
-    to: MLIR.CAPI,
+    to: CAPI,
     as: :mlirSymbolTableReplaceAllSymbolUses
 end

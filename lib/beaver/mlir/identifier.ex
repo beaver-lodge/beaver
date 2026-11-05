@@ -7,11 +7,6 @@ defmodule Beaver.MLIR.Identifier do
   alias Beaver.MLIR
 
   def get(str, opts) do
-    Beaver.Deferred.from_opts(
-      opts,
-      fn ctx ->
-        MLIR.CAPI.mlirIdentifierGet(ctx, MLIR.StringRef.create(str))
-      end
-    )
+    Beaver.Deferred.from_opts(opts, fn ctx -> MLIR.CAPI.mlirIdentifierGet(ctx, MLIR.StringRef.create(str)) end)
   end
 end

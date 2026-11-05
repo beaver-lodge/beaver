@@ -1,3 +1,5 @@
+alias Beaver.MLIR.Location
+
 defmodule Beaver.SSA do
   @moduledoc """
   Storing MLIR IR structure with a Elixir struct. Macros like `Beaver.mlir/1` will generate SSA structs defined by this module.
@@ -25,7 +27,7 @@ defmodule Beaver.SSA do
           filler: filler_fun() | nil,
           ip: insertion_point(),
           ctx: MLIR.Context.t() | nil,
-          loc: MLIR.Location.t() | nil,
+          loc: Location.t() | nil,
           evaluator: evaluator() | nil
         }
   defstruct op: nil,
@@ -37,49 +39,30 @@ defmodule Beaver.SSA do
             loc: nil,
             evaluator: nil
 
-  def put_arguments(%__MODULE__{arguments: arguments} = ssa, additional_arguments)
-      when is_list(additional_arguments) do
-    %__MODULE__{ssa | arguments: arguments ++ additional_arguments}
-  end
+  def put_arguments(%__MODULE__{arguments: arguments} = ssa, additional_arguments) when is_list(additional_arguments),
+    do: %__MODULE__{ssa | arguments: arguments ++ additional_arguments}
 
-  def put_results(%__MODULE__{results: results} = ssa, %Beaver.Deferred{} = deferred) do
-    %__MODULE__{ssa | results: results ++ [deferred]}
-  end
+  def put_results(%__MODULE__{results: results} = ssa, %Beaver.Deferred{} = deferred),
+    do: %__MODULE__{ssa | results: results ++ [deferred]}
 
-  def put_results(%__MODULE__{results: results} = ssa, %MLIR.Type{} = single_result) do
-    %__MODULE__{ssa | results: results ++ [single_result]}
-  end
+  def put_results(%__MODULE__{results: results} = ssa, %MLIR.Type{} = single_result),
+    do: %__MODULE__{ssa | results: results ++ [single_result]}
 
-  def put_results(%__MODULE__{results: results} = ssa, additional_results)
-      when is_list(additional_results) do
-    %__MODULE__{ssa | results: results ++ additional_results}
-  end
+  def put_results(%__MODULE__{results: results} = ssa, additional_results) when is_list(additional_results),
+    do: %__MODULE__{ssa | results: results ++ additional_results}
 
-  def put_results(%__MODULE__{} = ssa, :infer = infer) do
-    %__MODULE__{ssa | results: infer}
-  end
+  def put_results(%__MODULE__{} = ssa, :infer = infer), do: %__MODULE__{ssa | results: infer}
 
-  def put_location(%__MODULE__{} = ssa, %MLIR.Location{} = loc) do
-    %__MODULE__{ssa | loc: loc}
-  end
+  def put_location(%__MODULE__{} = ssa, %Location{} = loc), do: %__MODULE__{ssa | loc: loc}
 
-  def put_filler(%__MODULE__{} = ssa, filler) when is_function(filler, 0) do
-    %__MODULE__{ssa | filler: filler}
-  end
+  def put_filler(%__MODULE__{} = ssa, filler) when is_function(filler, 0), do: %__MODULE__{ssa | filler: filler}
 
-  def put_ip(%__MODULE__{} = ssa, ip) do
-    %__MODULE__{ssa | ip: ip}
-  end
+  def put_ip(%__MODULE__{} = ssa, ip), do: %__MODULE__{ssa | ip: ip}
 
-  def put_ctx(%__MODULE__{} = ssa, %MLIR.Context{} = ctx) do
-    %__MODULE__{ssa | ctx: ctx}
-  end
+  def put_ctx(%__MODULE__{} = ssa, %MLIR.Context{} = ctx), do: %__MODULE__{ssa | ctx: ctx}
 
   # construct ssa by injecting MLIR context and block in the environment
-  defp construct_ssa(
-         {:>>>, _line, [{_call, line, args}, results]},
-         evaluator
-       ) do
+  defp construct_ssa({:>>>, _line, [{_call, line, args}, results]}, evaluator) do
     quote do
       args = unquote(args) |> List.wrap() |> List.flatten()
       results = unquote(results) |> List.wrap() |> List.flatten()
@@ -87,21 +70,12 @@ defmodule Beaver.SSA do
       {loc, args} =
         Enum.reduce(args, {nil, []}, fn arg, {loc, args} ->
           case arg do
-            %MLIR.Location{} = loc ->
-              {loc, args}
-
-            a ->
-              {loc, args ++ [a]}
+            %Location{} = loc -> {loc, args}
+            a -> {loc, args ++ [a]}
           end
         end)
 
-      loc =
-        loc ||
-          Beaver.MLIR.Location.file(
-            name: __ENV__.file,
-            line: Keyword.get(unquote(line), :line),
-            ctx: Beaver.Env.context()
-          )
+      loc = loc || Location.file(name: __ENV__.file, line: Keyword.get(unquote(line), :line), ctx: Beaver.Env.context())
 
       %Beaver.SSA{evaluator: unquote(evaluator)}
       |> Beaver.SSA.put_location(loc)
@@ -113,10 +87,7 @@ defmodule Beaver.SSA do
   end
 
   # A bare operation sigil is a zero-argument runtime operation builder.
-  defp do_transform(
-         {:>>>, line0, [sigil = {:sigil_o, line, _args}, results]},
-         evaluator
-       ) do
+  defp do_transform({:>>>, line0, [sigil = {:sigil_o, line, _args}, results]}, evaluator) do
     ssa = construct_ssa({:>>>, line0, [{:operation, line, []}, results]}, evaluator)
 
     quote do
@@ -126,27 +97,16 @@ defmodule Beaver.SSA do
   end
 
   # block arguments
-  defp do_transform(
-         {:>>>, _, [var = {_var_name, _, nil}, type]},
-         _evaluator
-       ) do
+  defp do_transform({:>>>, _, [var = {_var_name, _, nil}, type]}, _evaluator) do
     quote do
       {unquote(var), unquote(type)}
     end
   end
 
   # with do block
-  defp do_transform(
-         {:>>>, line0, [{call, line, [args, [do: ast_block]]}, results]},
-         evaluator
-       ) do
+  defp do_transform({:>>>, line0, [{call, line, [args, [do: ast_block]]}, results]}, evaluator) do
     quote do
-      unquote(
-        construct_ssa(
-          {:>>>, line0, [{call, line, args}, results]},
-          evaluator
-        )
-      )
+      unquote(construct_ssa({:>>>, line0, [{call, line, args}, results]}, evaluator))
       |> Beaver.SSA.put_filler(fn ->
         Kernel.var!(beaver_internal_env_regions) = []
         unquote(ast_block)
@@ -156,27 +116,17 @@ defmodule Beaver.SSA do
   end
 
   # op creation
-  defp do_transform(
-         {:>>>, _line, [{call, line, _args}, _results]} = ast,
-         evaluator
-       ) do
+  defp do_transform({:>>>, _line, [{call, line, _args}, _results]} = ast, evaluator) do
     quote do
-      unquote(construct_ssa(ast, evaluator))
-      |> unquote({call, line, []})
+      unquote(construct_ssa(ast, evaluator)) |> unquote({call, line, []})
     end
   end
 
   defp do_transform(ast, _evaluator), do: ast
 
-  def prewalk(ast, evaluator) when is_function(evaluator, 1) do
-    Macro.prewalk(ast, &do_transform(&1, evaluator))
-  end
+  def prewalk(ast, evaluator) when is_function(evaluator, 1), do: Macro.prewalk(ast, &do_transform(&1, evaluator))
 
-  def postwalk(ast, evaluator) when is_function(evaluator, 1) do
-    Macro.postwalk(ast, &do_transform(&1, evaluator))
-  end
+  def postwalk(ast, evaluator) when is_function(evaluator, 1), do: Macro.postwalk(ast, &do_transform(&1, evaluator))
 
-  def eval(%__MODULE__{evaluator: evaluator} = ssa) do
-    evaluator.(ssa)
-  end
+  def eval(%__MODULE__{evaluator: evaluator} = ssa), do: evaluator.(ssa)
 end

@@ -53,9 +53,7 @@ const CallbackDispatcher = struct {
             const this = try beam.allocator.create(@This());
             errdefer beam.allocator.destroy(this);
             var pid: beam.pid = undefined;
-            if (e.enif_self(env, &pid) == null) {
-                return error.FailToGetSelfPid;
-            }
+            if (e.enif_self(env, &pid) == null) return error.FailToGetSelfPid;
             const persistent_env = e.enif_alloc_env() orelse return error.FailToAllocateEnvironment;
             errdefer e.enif_free_env(persistent_env);
             var cb_map = std.StringHashMap(beam.term).init(beam.allocator);
@@ -141,9 +139,7 @@ const CallbackDispatcher = struct {
                 const set = try PatternSetType.resource.fetch(env, args[1]);
                 const destroyer = try beam.allocator.create(@This());
                 destroyer.* = @This(){ .set = set };
-                if (e.enif_self(env, &destroyer.pid) == null) {
-                    return error.FailToGetSelfPid;
-                }
+                if (e.enif_self(env, &destroyer.pid) == null) return error.FailToGetSelfPid;
                 if (c.beaverContextAddWork(context, destroy, @ptrCast(@constCast(destroyer)))) {
                     return beam.make_atom(env, "async");
                 } else {
@@ -202,9 +198,7 @@ const CallbackDispatcher = struct {
                 const cfg = try mlir_capi.GreedyRewriteDriverConfig.resource.fetch(env, args[3]);
                 const doer = try beam.allocator.create(@This());
                 doer.* = @This(){ .set = set, .ir = ir, .cfg = cfg };
-                if (e.enif_self(env, &doer.pid) == null) {
-                    return error.FailToGetSelfPid;
-                }
+                if (e.enif_self(env, &doer.pid) == null) return error.FailToGetSelfPid;
                 if (c.beaverContextAddWork(context, do, @ptrCast(@constCast(doer)))) {
                     return beam.make_atom(env, "async");
                 } else {

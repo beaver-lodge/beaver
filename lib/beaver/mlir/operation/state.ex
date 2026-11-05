@@ -1,53 +1,29 @@
+alias Beaver.MLIR.{Location, Operation, StringRef, Type}
+alias Beaver.{Changeset, Deferred, Native}
+
 defmodule Beaver.MLIR.Operation.State do
   @moduledoc false
 
-  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Native
 
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  defp prepare(
-         %Beaver.Changeset{
-           location: %MLIR.Location{} = location,
-           context: nil
-         } = changeset
-       ) do
-    %Beaver.Changeset{changeset | context: MLIR.context(location)}
-  end
+  defp prepare(%Changeset{location: %Location{} = loc, context: nil} = changeset),
+    do: %Changeset{changeset | context: MLIR.context(loc)}
 
-  defp prepare(
-         %Beaver.Changeset{
-           location: nil,
-           context: context
-         } = changeset
-       )
-       when not is_nil(context) do
-    %Beaver.Changeset{changeset | location: MLIR.Location.unknown(ctx: context)}
-  end
+  defp prepare(%Changeset{location: nil, context: ctx} = changeset) when not is_nil(ctx),
+    do: %Changeset{changeset | location: Location.unknown(ctx: ctx)}
 
-  defp prepare(
-         %Beaver.Changeset{
-           location: %Beaver.Deferred{} = location,
-           context: %MLIR.Context{} = context
-         } = changeset
-       ) do
-    %Beaver.Changeset{changeset | location: Beaver.Deferred.resolve(location, context)}
-  end
+  defp prepare(%Changeset{location: %Deferred{} = loc, context: %MLIR.Context{} = ctx} = changeset),
+    do: %Changeset{changeset | location: Deferred.resolve(loc, ctx)}
 
-  defp prepare(
-         %Beaver.Changeset{
-           location: %MLIR.Location{} = location,
-           context: %MLIR.Context{} = context
-         } = changeset
-       ) do
-    %Beaver.Changeset{changeset | location: Beaver.Deferred.resolve(location, context)}
-  end
+  defp prepare(%Changeset{location: %Location{} = loc, context: %MLIR.Context{} = ctx} = changeset),
+    do: %Changeset{changeset | location: Deferred.resolve(loc, ctx)}
 
-  defp add_attributes(state, []) do
-    state
-  end
+  defp add_attributes(state, []), do: state
 
-  defp add_attributes(%MLIR.Operation.State{} = state, attr_kw)
+  defp add_attributes(%Operation.State{} = state, attr_kw)
        when is_list(attr_kw) do
     ctx = CAPI.beaverOperationStateGetContext(state)
 
@@ -55,117 +31,79 @@ defmodule Beaver.MLIR.Operation.State do
       for {k, v} <- attr_kw do
         attr =
           case v do
-            v when is_binary(v) ->
-              CAPI.mlirAttributeParseGet(ctx, MLIR.StringRef.create(v))
-
-            %Beaver.MLIR.Type{} = type ->
-              Beaver.MLIR.Attribute.type(type)
-
-            %Beaver.MLIR.Attribute{} ->
-              v
-
-            _ ->
-              raise "attribute not supported: #{inspect({k, v})}"
+            v when is_binary(v) -> CAPI.mlirAttributeParseGet(ctx, StringRef.create(v))
+            %Type{} = type -> Beaver.MLIR.Attribute.type(type)
+            %Beaver.MLIR.Attribute{} -> v
+            _ -> raise "attribute not supported: #{inspect({k, v})}"
           end
 
-        if MLIR.null?(attr) do
-          raise "attribute can't be null, #{inspect({k, v})}"
-        end
+        if MLIR.null?(attr), do: raise("attribute can't be null, #{inspect({k, v})}")
 
-        CAPI.mlirNamedAttributeGet(
-          CAPI.mlirIdentifierGet(
-            ctx,
-            MLIR.StringRef.create(Atom.to_string(k))
-          ),
-          attr
-        )
+        CAPI.mlirNamedAttributeGet(CAPI.mlirIdentifierGet(ctx, StringRef.create(Atom.to_string(k))), attr)
       end
 
     CAPI.mlirOperationStateAddAttributes(
-      Beaver.Native.ptr(state),
+      Native.ptr(state),
       length(attr_list),
-      Beaver.Native.array(attr_list, MLIR.NamedAttribute)
+      Native.array(attr_list, MLIR.NamedAttribute)
     )
 
     state
   end
 
-  defp add_operands(%MLIR.Operation.State{} = state, []) do
+  defp add_operands(%Operation.State{} = state, []), do: state
+
+  defp add_operands(%Operation.State{} = state, operands) do
+    array = operands |> Native.array(MLIR.Value)
+
+    CAPI.mlirOperationStateAddOperands(Native.ptr(state), length(operands), array)
     state
   end
 
-  defp add_operands(%MLIR.Operation.State{} = state, operands) do
-    array = operands |> Beaver.Native.array(MLIR.Value)
+  defp add_results(%Operation.State{} = state, []), do: state
 
-    CAPI.mlirOperationStateAddOperands(Beaver.Native.ptr(state), length(operands), array)
-    state
-  end
+  defp add_results(%Operation.State{} = state, :infer),
+    do: state |> tap(&CAPI.mlirOperationStateEnableResultTypeInference(Native.ptr(&1)))
 
-  defp add_results(%MLIR.Operation.State{} = state, []) do
-    state
-  end
-
-  defp add_results(%MLIR.Operation.State{} = state, :infer) do
-    state |> tap(&CAPI.mlirOperationStateEnableResultTypeInference(Beaver.Native.ptr(&1)))
-  end
-
-  defp add_results(%MLIR.Operation.State{} = state, result_types)
-       when is_list(result_types) do
+  defp add_results(%Operation.State{} = state, types)
+       when is_list(types) do
     context = CAPI.beaverOperationStateGetContext(state)
 
     array =
-      result_types
-      |> Enum.map(&Beaver.Deferred.resolve(&1, context))
+      types
+      |> Enum.map(&Deferred.resolve(&1, context))
       |> Enum.map(fn
-        t when is_binary(t) ->
-          CAPI.mlirTypeParseGet(context, MLIR.StringRef.create(t))
-
-        %MLIR.Type{} = t ->
-          t
+        t when is_binary(t) -> CAPI.mlirTypeParseGet(context, StringRef.create(t))
+        %Type{} = t -> t
       end)
-      |> Beaver.Native.array(MLIR.Type)
+      |> Native.array(Type)
 
-    CAPI.mlirOperationStateAddResults(Beaver.Native.ptr(state), length(result_types), array)
+    CAPI.mlirOperationStateAddResults(Native.ptr(state), length(types), array)
     state
   end
 
-  defp add_regions(%MLIR.Operation.State{} = state, empty) when empty in [[], nil] do
-    state
-  end
+  defp add_regions(%Operation.State{} = state, empty) when empty in [[], nil], do: state
 
-  defp add_regions(%MLIR.Operation.State{} = state, regions) when is_list(regions) do
+  defp add_regions(%Operation.State{} = state, regions) when is_list(regions) do
     Enum.each(regions, fn
-      %MLIR.Region{} ->
-        :ok
-
-      other ->
-        raise "not a region: #{inspect(other)}"
+      %MLIR.Region{} -> :ok
+      other -> raise "not a region: #{inspect(other)}"
     end)
 
-    array_ptr = regions |> Beaver.Native.array(MLIR.Region)
+    array_ptr = regions |> Native.array(MLIR.Region)
 
-    CAPI.mlirOperationStateAddOwnedRegions(
-      Beaver.Native.ptr(state),
-      length(regions),
-      array_ptr
-    )
+    CAPI.mlirOperationStateAddOwnedRegions(Native.ptr(state), length(regions), array_ptr)
 
     state
   end
 
-  defp add_successors(state, []) do
-    state
-  end
+  defp add_successors(state, []), do: state
 
-  defp add_successors(%MLIR.Operation.State{} = state, successors)
+  defp add_successors(%Operation.State{} = state, successors)
        when is_list(successors) do
-    array_ptr = successors |> Beaver.Native.array(MLIR.Block)
+    array_ptr = successors |> Native.array(MLIR.Block)
 
-    CAPI.mlirOperationStateAddSuccessors(
-      Beaver.Native.ptr(state),
-      length(successors),
-      array_ptr
-    )
+    CAPI.mlirOperationStateAddSuccessors(Native.ptr(state), length(successors), array_ptr)
 
     state
   end
@@ -173,8 +111,8 @@ defmodule Beaver.MLIR.Operation.State do
   @doc """
   Create a new operation state in MLIR CAPI.
   """
-  def create(%Beaver.Changeset{} = changeset) do
-    %Beaver.Changeset{
+  def create(%Changeset{} = changeset) do
+    %Changeset{
       name: name,
       attributes: attributes,
       operands: operands,
@@ -183,10 +121,10 @@ defmodule Beaver.MLIR.Operation.State do
       regions: regions,
       location: location,
       context: _context
-    } = changeset |> Beaver.Changeset.reorder_operands() |> prepare()
+    } = changeset |> Changeset.reorder_operands() |> prepare()
 
     name
-    |> MLIR.StringRef.create()
+    |> StringRef.create()
     |> CAPI.mlirOperationStateGet(location)
     |> add_attributes(attributes)
     |> add_operands(operands)

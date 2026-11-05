@@ -1,3 +1,5 @@
+alias Beaver.MLIR.NamedAttribute
+
 defimpl Enumerable, for: Beaver.MLIR.Attribute do
   alias Beaver.MLIR
   defstruct num_elements: nil, get_element: nil, index: 0
@@ -11,9 +13,7 @@ defimpl Enumerable, for: Beaver.MLIR.Attribute do
     }
   end
 
-  def count(attr) do
-    {:ok, new(attr).num_elements}
-  end
+  def count(attr), do: {:ok, new(attr).num_elements}
 
   defguardp is_term_element(a, b)
             when (is_integer(a) and is_integer(b)) or (is_float(a) and is_float(b)) or
@@ -25,16 +25,13 @@ defimpl Enumerable, for: Beaver.MLIR.Attribute do
     {:ok,
      Enum.any?(0..(num_elements - 1), fn pos ->
        case {get_element.(pos), element} do
-         {%MLIR.NamedAttribute{} = a, %MLIR.NamedAttribute{} = b} ->
-           MLIR.equal?(MLIR.NamedAttribute.name(a), MLIR.NamedAttribute.name(b)) and
-             MLIR.equal?(MLIR.NamedAttribute.attribute(a), MLIR.NamedAttribute.attribute(b))
+         {%NamedAttribute{} = a, %NamedAttribute{} = b} ->
+           MLIR.equal?(NamedAttribute.name(a), NamedAttribute.name(b)) and
+             MLIR.equal?(NamedAttribute.attribute(a), NamedAttribute.attribute(b))
 
-         {%MLIR.NamedAttribute{} = na, {name, attr}} ->
-           MLIR.equal?(
-             MLIR.NamedAttribute.name(na),
-             MLIR.Identifier.get(name, ctx: MLIR.context(attr))
-           ) and
-             MLIR.equal?(MLIR.NamedAttribute.attribute(na), attr)
+         {%NamedAttribute{} = na, {name, attr}} ->
+           MLIR.equal?(NamedAttribute.name(na), MLIR.Identifier.get(name, ctx: MLIR.context(attr))) and
+             MLIR.equal?(NamedAttribute.attribute(na), attr)
 
          {%m{} = a, %m{} = b} ->
            MLIR.equal?(a, b)
@@ -48,8 +45,7 @@ defimpl Enumerable, for: Beaver.MLIR.Attribute do
   def do_reduce(%__MODULE__{}, {:halt, acc}, _fun), do: {:halted, acc}
   def do_reduce(_attr, {:halt, acc}, _fun), do: {:halted, acc}
 
-  def do_reduce(%__MODULE__{} = enum, {:suspend, acc}, fun),
-    do: {:suspended, acc, &do_reduce(enum, &1, fun)}
+  def do_reduce(%__MODULE__{} = enum, {:suspend, acc}, fun), do: {:suspended, acc, &do_reduce(enum, &1, fun)}
 
   def do_reduce(attr, {:suspend, acc}, fun), do: {:suspended, acc, &do_reduce(attr, &1, fun)}
 
@@ -66,9 +62,7 @@ defimpl Enumerable, for: Beaver.MLIR.Attribute do
     end
   end
 
-  def reduce(attr, {:cont, acc}, fun) do
-    do_reduce(new(attr), {:cont, acc}, fun)
-  end
+  def reduce(attr, {:cont, acc}, fun), do: do_reduce(new(attr), {:cont, acc}, fun)
 
   def slice(attr) do
     %__MODULE__{num_elements: num_elements, get_element: get_element} = new(attr)

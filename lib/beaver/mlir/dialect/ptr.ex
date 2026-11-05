@@ -23,31 +23,21 @@ defmodule Beaver.MLIR.Dialect.Ptr do
 
   use Dialect, dialect: "ptr", ops: Dialect.Registry.ops("ptr")
 
-  @type memory_space ::
-          :generic
-          | non_neg_integer()
-          | {:llvm, non_neg_integer()}
-          | Deferred.attribute()
+  @type memory_space :: :generic | non_neg_integer() | {:llvm, non_neg_integer()} | Deferred.attribute()
 
   @doc "Return the upstream Ptr generic-memory-space attribute."
   @spec generic_space(keyword()) :: Deferred.attribute()
-  def generic_space(opts \\ []) do
-    Attribute.get("#ptr.generic_space", opts)
-  end
+  def generic_space(opts \\ []), do: Attribute.get("#ptr.generic_space", opts)
 
   @doc "Return an LLVM address-space attribute for a non-negative address-space number."
   @spec llvm_address_space(non_neg_integer(), keyword()) :: Deferred.attribute()
   def llvm_address_space(address_space, opts \\ [])
 
-  def llvm_address_space(address_space, opts)
-      when is_integer(address_space) and address_space >= 0 do
-    Attribute.get("#llvm.address_space<#{address_space}>", opts)
-  end
+  def llvm_address_space(address_space, opts) when is_integer(address_space) and address_space >= 0,
+    do: Attribute.get("#llvm.address_space<#{address_space}>", opts)
 
-  def llvm_address_space(address_space, _opts) do
-    raise ArgumentError,
-          "address space must be a non-negative integer, got: #{inspect(address_space)}"
-  end
+  def llvm_address_space(address_space, _opts),
+    do: raise(ArgumentError, "address space must be a non-negative integer, got: #{inspect(address_space)}")
 
   @doc """
   Return a `!ptr.ptr` type.
@@ -67,27 +57,20 @@ defmodule Beaver.MLIR.Dialect.Ptr do
 
   @doc "Return a typed `#ptr.null` attribute for `ptr.constant`."
   @spec null(keyword()) :: Deferred.attribute()
-  def null(opts \\ []) do
-    constant_attribute("#ptr.null", opts)
-  end
+  def null(opts \\ []), do: constant_attribute("#ptr.null", opts)
 
   @doc "Return a typed `#ptr.address` attribute for `ptr.constant`."
   @spec address(non_neg_integer(), keyword()) :: Deferred.attribute()
   def address(value, opts \\ [])
 
-  def address(value, opts) when is_integer(value) and value >= 0 do
-    constant_attribute("#ptr.address<#{value}>", opts)
-  end
+  def address(value, opts) when is_integer(value) and value >= 0, do: constant_attribute("#ptr.address<#{value}>", opts)
 
-  def address(value, _opts) do
-    raise ArgumentError, "pointer address must be a non-negative integer, got: #{inspect(value)}"
-  end
+  def address(value, _opts),
+    do: raise(ArgumentError, "pointer address must be a non-negative integer, got: #{inspect(value)}")
 
   defp constant_attribute(source, opts) do
     pointer_type =
-      Keyword.get_lazy(opts, :type, fn ->
-        type(memory_space: Keyword.get(opts, :memory_space, :generic))
-      end)
+      Keyword.get_lazy(opts, :type, fn -> type(memory_space: Keyword.get(opts, :memory_space, :generic)) end)
 
     Deferred.from_opts(opts, fn ctx ->
       pointer_type = Deferred.resolve(pointer_type, ctx)
@@ -97,8 +80,7 @@ defmodule Beaver.MLIR.Dialect.Ptr do
 
   defp materialize_memory_space(:generic, ctx), do: generic_space(ctx: ctx)
 
-  defp materialize_memory_space({:llvm, address_space}, ctx),
-    do: llvm_address_space(address_space, ctx: ctx)
+  defp materialize_memory_space({:llvm, address_space}, ctx), do: llvm_address_space(address_space, ctx: ctx)
 
   defp materialize_memory_space(address_space, ctx) when is_integer(address_space),
     do: llvm_address_space(address_space, ctx: ctx)

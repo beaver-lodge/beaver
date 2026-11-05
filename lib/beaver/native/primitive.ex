@@ -20,8 +20,6 @@ for m <-
   full = Module.concat(Beaver.Native, m)
 
   defmodule full do
-    use Kinda.ResourceKind,
-      raw_module: Beaver.MLIR.CAPI.Raw,
-      codec: Beaver.Native
+    use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
   end
 end

@@ -1,3 +1,5 @@
+alias Beaver.MLIR.Attribute
+
 defmodule Beaver.Shadow.GPU.ArtifactCache do
   @moduledoc """
   Deterministic caching of packaged GPU binaries (`gpu.binary`).
@@ -19,14 +21,14 @@ defmodule Beaver.Shadow.GPU.ArtifactCache do
   @namespace "beaver_gpu_artifact"
 
   @doc "Looks up a packaged GPU binary for `source` and `target`."
-  @spec get(CompilationCache.cache(), String.t(), MLIR.Attribute.t(), MLIR.Context.t()) ::
+  @spec get(CompilationCache.cache(), String.t(), Attribute.t(), MLIR.Context.t()) ::
           {:ok, MLIR.Module.t()} | :miss | {:error, term()}
-  def get(cache, source_key, %MLIR.Attribute{} = target, %MLIR.Context{} = context) do
+  def get(cache, source_key, %Attribute{} = target, %MLIR.Context{} = ctx) do
     key = key(source_key, target)
 
     case CompilationCache.get(cache, key) do
       {:ok, %{bytecode: bytecode}} ->
-        module = MLIR.Module.create!(bytecode, ctx: context)
+        module = MLIR.Module.create!(bytecode, ctx: ctx)
         {:ok, module}
 
       :miss ->
@@ -38,16 +40,16 @@ defmodule Beaver.Shadow.GPU.ArtifactCache do
   end
 
   @doc "Stores the packaged GPU binary for `source` and `target`."
-  @spec put(CompilationCache.cache(), String.t(), MLIR.Attribute.t(), MLIR.Module.t()) ::
+  @spec put(CompilationCache.cache(), String.t(), Attribute.t(), MLIR.Module.t()) ::
           :ok | {:error, term()}
-  def put(cache, source_key, %MLIR.Attribute{} = target, %MLIR.Module{} = packaged) do
+  def put(cache, source_key, %Attribute{} = target, %MLIR.Module{} = packaged) do
     key = key(source_key, target)
     CompilationCache.put(cache, key, %{bytecode: MLIR.Bytecode.write!(packaged)})
   end
 
   @doc "Computes the stable cache key from a source key and target."
-  @spec key(String.t(), MLIR.Attribute.t()) :: String.t()
-  def key(source_key, %MLIR.Attribute{} = target) when is_binary(source_key) do
+  @spec key(String.t(), Attribute.t()) :: String.t()
+  def key(source_key, %Attribute{} = target) when is_binary(source_key) do
     target_text = target |> MLIR.to_string()
 
     CacheKey.digest({@namespace, source_key, target_text})

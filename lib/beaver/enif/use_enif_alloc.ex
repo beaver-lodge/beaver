@@ -1,3 +1,5 @@
+alias Beaver.MLIR.RewritePatternSet
+
 defmodule Beaver.ENIF.UseENIFAlloc do
   @moduledoc """
   Replace LLVM call ops of `malloc` and `free` with `enif_alloc` and `enif_free`.
@@ -11,13 +13,9 @@ defmodule Beaver.ENIF.UseENIFAlloc do
     @moduledoc false
     use MLIR.RewritePattern
 
-    def construct(nil) do
-      :llvm_pat_state
-    end
+    def construct(nil), do: :llvm_pat_state
 
-    def destruct(_state) do
-      :ok
-    end
+    def destruct(_state), do: :ok
 
     def match_and_rewrite(_pattern, op, rewriter, state) do
       if MLIR.Operation.name(op) == LLVM.call() and MLIR.Attribute.value(op[:callee]) == "malloc" do
@@ -49,34 +47,24 @@ defmodule Beaver.ENIF.UseENIFAlloc do
       replace_free()
     ]
 
-    {set, pdl_mod} =
-      Beaver.MLIR.RewritePatternSet.with_pdl_patterns(patterns, ctx: ctx)
+    {set, pdl_mod} = RewritePatternSet.with_pdl_patterns(patterns, ctx: ctx)
 
-    frozen_set =
-      set
-      |> MLIR.RewritePatternSet.add(LLVM.call(), ReplaceLLVMOp, ctx: ctx)
-      |> MLIR.RewritePatternSet.freeze()
+    frozen_set = set |> RewritePatternSet.add(LLVM.call(), ReplaceLLVMOp, ctx: ctx) |> RewritePatternSet.freeze()
 
     {:ok, %{patterns: frozen_set, pdl_mod: pdl_mod, owning: true, ctx: ctx}}
   end
 
-  def clone(%{patterns: frozen_set, owning: true}) do
-    %{patterns: frozen_set, owning: false}
-  end
+  def clone(%{patterns: frozen_set, owning: true}), do: %{patterns: frozen_set, owning: false}
 
   def destruct(%{patterns: frozen_set, pdl_mod: pdl_mod, owning: true, ctx: ctx}) do
     MLIR.Module.destroy(pdl_mod)
     MLIR.FrozenRewritePatternSet.threaded_destroy(ctx, frozen_set)
   end
 
-  def destruct(%{owning: false}) do
-    :ok
-  end
+  def destruct(%{owning: false}), do: :ok
 
   # the state is nil when initialization fails
-  def destruct(nil) do
-    :ok
-  end
+  def destruct(nil), do: :ok
 
   defpat replace_alloc(benefit: 10) do
     size = value()

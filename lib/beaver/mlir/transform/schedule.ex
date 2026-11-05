@@ -1,3 +1,5 @@
+alias Beaver.MLIR.{Attribute, Context, Operation}
+
 defmodule Beaver.MLIR.Transform.Schedule do
   @moduledoc """
   Deterministic discovery and resolution of Transform Tune schedules.
@@ -73,16 +75,7 @@ defmodule Beaver.MLIR.Transform.Schedule do
   defmodule Resolved do
     @moduledoc "An immutable, cache-addressable, replayable Transform schedule."
     @enforce_keys [:format, :sequence, :bytecode, :text, :choices, :constraints, :digest]
-    defstruct [
-      :format,
-      :sequence,
-      :bytecode,
-      :text,
-      :choices,
-      :constraints,
-      :digest,
-      :solver_metadata
-    ]
+    defstruct ~w(format sequence bytecode text choices constraints digest solver_metadata)a
 
     @type t() :: %__MODULE__{
             format: pos_integer(),
@@ -96,13 +89,7 @@ defmodule Beaver.MLIR.Transform.Schedule do
           }
   end
 
-  @type input() ::
-          MLIR.Module.t()
-          | MLIR.Operation.t()
-          | binary()
-          | {:text, binary()}
-          | {:bytecode, binary()}
-          | Resolved.t()
+  @type input() :: MLIR.Module.t() | Operation.t() | binary() | {:text, binary()} | {:bytecode, binary()} | Resolved.t()
 
   @doc "Returns the entry-point symbol carried by a resolved schedule."
   def sequence(%Resolved{sequence: sequence}), do: sequence
@@ -194,25 +181,21 @@ defmodule Beaver.MLIR.Transform.Schedule do
 
   @doc "Returns the stable identity included in incremental compilation cache keys."
   @spec cache_identity(Resolved.t() | binary()) :: tuple()
-  def cache_identity(%Resolved{format: format, digest: digest, sequence: sequence}) do
-    {:beaver_transform_schedule, format, sequence, digest}
-  end
+  def cache_identity(%Resolved{format: format, digest: digest, sequence: sequence}),
+    do: {:beaver_transform_schedule, format, sequence, digest}
 
-  def cache_identity(schedule) when is_binary(schedule) do
-    {:beaver_transform_schedule, @format, @default_sequence, digest(schedule)}
-  end
+  def cache_identity(schedule) when is_binary(schedule),
+    do: {:beaver_transform_schedule, @format, @default_sequence, digest(schedule)}
 
   @doc false
   def snapshot(input, opts \\ []) do
-    with_analysis_module(input, opts, fn module, sequence ->
-      {:ok, {MLIR.Bytecode.write!(module), sequence}}
-    end)
+    with_analysis_module(input, opts, fn module, sequence -> {:ok, {MLIR.Bytecode.write!(module), sequence}} end)
   end
 
   @doc false
-  def with_module(input, %MLIR.Context{} = context, fun) when is_function(fun, 1) do
+  def with_module(input, %Context{} = ctx, fun) when is_function(fun, 1) do
     with {:ok, bytes} <- source_bytes(input),
-         {:ok, module} <- parse_module(bytes, context) do
+         {:ok, module} <- parse_module(bytes, ctx) do
       try do
         case MLIR.verify(module) do
           {:ok, _module} -> fun.(module)
@@ -224,8 +207,7 @@ defmodule Beaver.MLIR.Transform.Schedule do
       end
     end
   rescue
-    exception in [ArgumentError] ->
-      {:error, invalid_error(Exception.message(exception))}
+    exception in [ArgumentError] -> {:error, invalid_error(Exception.message(exception))}
   end
 
   @doc false
@@ -233,8 +215,7 @@ defmodule Beaver.MLIR.Transform.Schedule do
     module
     |> operations()
     |> Enum.find(fn operation ->
-      MLIR.Operation.name(operation) == "transform.named_sequence" and
-        attribute_value(operation, "sym_name") == sequence
+      Operation.name(operation) == "transform.named_sequence" and attribute_value(operation, "sym_name") == sequence
     end)
     |> case do
       nil -> {:error, invalid_error({:sequence_not_found, sequence})}
@@ -250,41 +231,40 @@ defmodule Beaver.MLIR.Transform.Schedule do
         with_module(input, context, &fun.(&1, sequence))
 
       :owned ->
-        context = MLIR.Context.create()
+        context = Context.create()
 
         try do
           with_module(input, context, &fun.(&1, sequence))
         after
-          MLIR.Context.destroy(context)
+          Context.destroy(context)
         end
     end
   end
 
   defp input_context(input, opts) do
     case Keyword.get(opts, :ctx) do
-      %MLIR.Context{} = context -> {:borrowed, context}
+      %Context{} = context -> {:borrowed, context}
       nil -> source_context(input)
     end
   end
 
   defp source_context(%MLIR.Module{} = module), do: {:borrowed, MLIR.context(module)}
-  defp source_context(%MLIR.Operation{} = operation), do: {:borrowed, MLIR.context(operation)}
+  defp source_context(%Operation{} = op), do: {:borrowed, MLIR.context(op)}
   defp source_context(_input), do: :owned
 
   defp source_bytes(%Resolved{bytecode: bytecode}), do: {:ok, bytecode}
 
-  defp source_bytes({format, bytes}) when format in [:text, :bytecode] and is_binary(bytes),
-    do: {:ok, bytes}
+  defp source_bytes({format, bytes}) when format in [:text, :bytecode] and is_binary(bytes), do: {:ok, bytes}
 
   defp source_bytes(bytes) when is_binary(bytes), do: {:ok, bytes}
   defp source_bytes(%MLIR.Module{} = module), do: {:ok, MLIR.Bytecode.write!(module)}
 
-  defp source_bytes(%MLIR.Operation{} = operation) do
-    case enclosing_module(operation) do
+  defp source_bytes(%Operation{} = op) do
+    case enclosing_module(op) do
       nil ->
         text =
           "module attributes {transform.with_named_sequence} {\n" <>
-            MLIR.to_string(operation, generic: false) <> "\n}"
+            MLIR.to_string(op, generic: false) <> "\n}"
 
         {:ok, text}
 
@@ -295,24 +275,21 @@ defmodule Beaver.MLIR.Transform.Schedule do
 
   defp source_bytes(input), do: {:error, invalid_error({:unsupported_schedule_input, input})}
 
-  defp parse_module(bytes, context) do
-    case MLIR.Module.create(bytes, ctx: context) do
+  defp parse_module(bytes, ctx) do
+    case MLIR.Module.create(bytes, ctx: ctx) do
       {:ok, module} -> {:ok, module}
       {:error, diagnostics} -> {:error, invalid_error(:parse_failed, diagnostics)}
     end
   end
 
-  defp enclosing_module(operation) do
-    if MLIR.Operation.name(operation) == "builtin.module",
-      do: operation,
-      else: enclosing_module_parent(MLIR.Operation.parent(operation))
-  end
+  defp enclosing_module(op),
+    do: if(Operation.name(op) == "builtin.module", do: op, else: enclosing_module_parent(Operation.parent(op)))
 
-  defp enclosing_module_parent(operation) do
+  defp enclosing_module_parent(op) do
     cond do
-      MLIR.null?(operation) -> nil
-      MLIR.Operation.name(operation) == "builtin.module" -> operation
-      true -> enclosing_module_parent(MLIR.Operation.parent(operation))
+      MLIR.null?(op) -> nil
+      Operation.name(op) == "builtin.module" -> op
+      true -> enclosing_module_parent(Operation.parent(op))
     end
   end
 
@@ -326,70 +303,60 @@ defmodule Beaver.MLIR.Transform.Schedule do
       entries = Enum.reverse(entries)
 
       case duplicate_choice_names(choices) do
-        [] ->
-          {:ok, %Analysis{sequence: sequence, choices: choices, constraints: constraints},
-           entries}
-
-        duplicates ->
-          {:error, invalid_error({:duplicate_choice_names, duplicates})}
+        [] -> {:ok, %Analysis{sequence: sequence, choices: choices, constraints: constraints}, entries}
+        duplicates -> {:error, invalid_error({:duplicate_choice_names, duplicates})}
       end
     end
   end
 
-  defp scan_operation(operation, path, guards, {choices, constraints, entries} = acc) do
-    case MLIR.Operation.name(operation) do
+  defp scan_operation(op, path, guards, {choices, constraints, entries} = acc) do
+    case Operation.name(op) do
       "transform.tune.knob" ->
-        {choice, option_attributes} = knob_choice(operation, path, guards)
+        {choice, option_attributes} = knob_choice(op, path, guards)
 
-        acc =
-          {[choice | choices], constraints, [{choice, operation, option_attributes} | entries]}
+        acc = {[choice | choices], constraints, [{choice, op, option_attributes} | entries]}
 
-        scan_children(operation, path, guards, acc)
+        scan_children(op, path, guards, acc)
 
       "transform.tune.alternatives" ->
-        choice = alternatives_choice(operation, path, guards)
-        acc = {[choice | choices], constraints, [{choice, operation, []} | entries]}
-        scan_alternatives(operation, path, guards, choice.name, acc)
+        choice = alternatives_choice(op, path, guards)
+        acc = {[choice | choices], constraints, [{choice, op, []} | entries]}
+        scan_alternatives(op, path, guards, choice.name, acc)
 
       "transform.smt.constrain_params" ->
         constraint = %Constraint{
-          ir: MLIR.to_string(operation, generic: true),
+          ir: MLIR.to_string(op, generic: true),
           path: path,
           guards: guards,
-          operands: Enum.count(Beaver.Walker.operands(operation)),
-          results: Enum.count(Beaver.Walker.results(operation))
+          operands: Enum.count(Beaver.Walker.operands(op)),
+          results: Enum.count(Beaver.Walker.results(op))
         }
 
-        scan_children(operation, path, guards, {choices, [constraint | constraints], entries})
+        scan_children(op, path, guards, {choices, [constraint | constraints], entries})
 
       _other ->
-        scan_children(operation, path, guards, acc)
+        scan_children(op, path, guards, acc)
     end
   end
 
-  defp scan_children(operation, path, guards, acc) do
-    operation
+  defp scan_children(op, path, guards, acc) do
+    op
     |> Beaver.Walker.regions()
     |> Enum.with_index()
     |> Enum.reduce(acc, fn {region, region_index}, acc ->
       scan_region(region, path ++ [{:region, region_index}], guards, acc)
     end)
-    |> then(&{operation, &1})
+    |> then(&{op, &1})
   end
 
-  defp scan_alternatives(operation, path, guards, choice_name, acc) do
-    operation
+  defp scan_alternatives(op, path, guards, choice_name, acc) do
+    op
     |> Beaver.Walker.regions()
     |> Enum.with_index()
     |> Enum.reduce(acc, fn {region, region_index}, acc ->
-      scan_region(
-        region,
-        path ++ [{:region, region_index}],
-        guards ++ [{choice_name, region_index}],
-        acc
-      )
+      scan_region(region, path ++ [{:region, region_index}], guards ++ [{choice_name, region_index}], acc)
     end)
-    |> then(&{operation, &1})
+    |> then(&{op, &1})
   end
 
   defp scan_region(region, path, guards, acc) do
@@ -402,30 +369,23 @@ defmodule Beaver.MLIR.Transform.Schedule do
       |> Enum.with_index()
       |> Enum.reduce(acc, fn {operation, operation_index}, acc ->
         {_operation, acc} =
-          scan_operation(
-            operation,
-            path ++ [{:block, block_index}, {:operation, operation_index}],
-            guards,
-            acc
-          )
+          scan_operation(operation, path ++ [{:block, block_index}, {:operation, operation_index}], guards, acc)
 
         acc
       end)
     end)
   end
 
-  defp knob_choice(operation, path, guards) do
-    name = required_attribute_value!(operation, "name")
-    options_attribute = required_attribute!(operation, "options")
-    selected_attribute = optional_attribute(operation, "selected")
+  defp knob_choice(op, path, guards) do
+    name = required_attribute_value!(op, "name")
+    options_attribute = required_attribute!(op, "options")
+    selected_attribute = optional_attribute(op, "selected")
 
-    if MLIR.Attribute.array?(options_attribute) do
+    if Attribute.array?(options_attribute) do
       option_attributes = Enum.to_list(options_attribute)
 
       options =
-        option_attributes
-        |> Enum.with_index()
-        |> Enum.map(fn {attribute, index} -> option(attribute, index) end)
+        option_attributes |> Enum.with_index() |> Enum.map(fn {attribute, index} -> option(attribute, index) end)
 
       selected = if selected_attribute, do: public_attribute_value(selected_attribute)
 
@@ -453,28 +413,22 @@ defmodule Beaver.MLIR.Transform.Schedule do
     end
   end
 
-  defp alternatives_choice(operation, path, guards) do
-    name = required_attribute_value!(operation, "name")
-    count = Enum.count(Beaver.Walker.regions(operation))
-    parameter_selected? = not Enum.empty?(Beaver.Walker.operands(operation))
+  defp alternatives_choice(op, path, guards) do
+    name = required_attribute_value!(op, "name")
+    count = Enum.count(Beaver.Walker.regions(op))
+    parameter_selected? = not Enum.empty?(Beaver.Walker.operands(op))
 
     selected =
       cond do
-        parameter_selected? ->
-          :parameter
-
-        attribute = optional_attribute(operation, "selected_region_attr") ->
-          MLIR.Attribute.value(attribute)
-
-        true ->
-          nil
+        parameter_selected? -> :parameter
+        attribute = optional_attribute(op, "selected_region_attr") -> Attribute.value(attribute)
+        true -> nil
       end
 
     %Choice{
       name: name,
       kind: :alternatives,
-      options:
-        for(index <- 0..(count - 1), do: %Option{index: index, value: index, mlir: "#{index}"}),
+      options: for(index <- 0..(count - 1), do: %Option{index: index, value: index, mlir: "#{index}"}),
       selected: selected,
       domain: "regions:#{count}",
       path: path,
@@ -483,41 +437,34 @@ defmodule Beaver.MLIR.Transform.Schedule do
     }
   end
 
-  defp option(attribute, index) do
-    %Option{
-      index: index,
-      value: public_attribute_value(attribute),
-      mlir: MLIR.to_string(attribute)
-    }
-  end
+  defp option(attribute, index),
+    do: %Option{index: index, value: public_attribute_value(attribute), mlir: MLIR.to_string(attribute)}
 
   defp public_attribute_value(attribute) do
-    value = MLIR.Attribute.value(attribute)
+    value = Attribute.value(attribute)
     if is_nil(value), do: MLIR.to_string(attribute), else: value
   end
 
-  defp required_attribute!(operation, name) do
-    case optional_attribute(operation, name) do
-      nil -> raise ArgumentError, "#{MLIR.Operation.name(operation)} is missing #{name}"
+  defp required_attribute!(op, name) do
+    case optional_attribute(op, name) do
+      nil -> raise ArgumentError, "#{Operation.name(op)} is missing #{name}"
       attribute -> attribute
     end
   end
 
-  defp required_attribute_value!(operation, name) do
-    operation |> required_attribute!(name) |> MLIR.Attribute.value()
-  end
+  defp required_attribute_value!(op, name), do: op |> required_attribute!(name) |> Attribute.value()
 
-  defp optional_attribute(operation, name) do
-    case MLIR.Operation.fetch(operation, name) do
+  defp optional_attribute(op, name) do
+    case Operation.fetch(op, name) do
       {:ok, attribute} -> attribute
       :error -> nil
     end
   end
 
-  defp attribute_value(operation, name) do
-    case optional_attribute(operation, name) do
+  defp attribute_value(op, name) do
+    case optional_attribute(op, name) do
       nil -> nil
-      attribute -> MLIR.Attribute.value(attribute)
+      attribute -> Attribute.value(attribute)
     end
   end
 
@@ -535,8 +482,7 @@ defmodule Beaver.MLIR.Transform.Schedule do
     end)
   end
 
-  defp enumerate_choice(%Choice{selected: :parameter}, candidates, _max_candidates),
-    do: {:cont, {:ok, candidates}}
+  defp enumerate_choice(%Choice{selected: :parameter}, candidates, _max_candidates), do: {:cont, {:ok, candidates}}
 
   defp enumerate_choice(choice, candidates, max_candidates) do
     cond do
@@ -560,11 +506,9 @@ defmodule Beaver.MLIR.Transform.Schedule do
 
     candidates =
       Enum.flat_map(candidates, fn candidate ->
-        if active?(choice.guards, candidate) do
-          Enum.map(values, &Map.put(candidate, choice.name, &1))
-        else
-          [candidate]
-        end
+        if active?(choice.guards, candidate),
+          do: Enum.map(values, &Map.put(candidate, choice.name, &1)),
+          else: [candidate]
       end)
 
     if length(candidates) > max_candidates do
@@ -578,9 +522,7 @@ defmodule Beaver.MLIR.Transform.Schedule do
   defp active_for_any?(choice, candidates), do: Enum.any?(candidates, &active?(choice.guards, &1))
 
   defp active?(guards, selections) do
-    Enum.all?(guards, fn {name, selected_region} ->
-      Map.get(selections, name) == selected_region
-    end)
+    Enum.all?(guards, fn {name, selected_region} -> Map.get(selections, name) == selected_region end)
   end
 
   defp resolve_entries(entries, resolver) do
@@ -591,19 +533,13 @@ defmodule Beaver.MLIR.Transform.Schedule do
     end)
   end
 
-  defp resolve_entry(
-         {%Choice{selected: :parameter}, _operation, _attributes},
-         {:ok, selections, state},
-         _resolver
-       ),
-       do: {:cont, {:ok, selections, state}}
+  defp resolve_entry({%Choice{selected: :parameter}, _operation, _attributes}, {:ok, selections, state}, _resolver),
+    do: {:cont, {:ok, selections, state}}
 
   defp resolve_entry({choice, _operation, _attributes}, {:ok, selections, state}, resolver) do
-    if active?(choice.guards, selections) do
-      resolve_active_choice(choice, selections, resolver, state)
-    else
-      {:cont, {:ok, selections, state}}
-    end
+    if active?(choice.guards, selections),
+      do: resolve_active_choice(choice, selections, resolver, state),
+      else: {:cont, {:ok, selections, state}}
   end
 
   defp resolve_active_choice(choice, selections, resolver, state) do
@@ -632,11 +568,8 @@ defmodule Beaver.MLIR.Transform.Schedule do
 
   defp record_selection(choice, value, selections, state) do
     case validate_selection(choice, value) do
-      {:ok, normalized} ->
-        {:cont, {:ok, Map.put(selections, choice.name, normalized), state}}
-
-      {:error, reason} ->
-        {:halt, {:error, invalid_error(reason)}}
+      {:ok, normalized} -> {:cont, {:ok, Map.put(selections, choice.name, normalized), state}}
+      {:error, reason} -> {:halt, {:error, invalid_error(reason)}}
     end
   end
 
@@ -651,17 +584,14 @@ defmodule Beaver.MLIR.Transform.Schedule do
     end
   end
 
-  defp resolve_choice(resolver, choice, state) when is_function(resolver, 1) do
-    normalize_resolver_result(resolver.(choice), state)
-  end
+  defp resolve_choice(resolver, choice, state) when is_function(resolver, 1),
+    do: normalize_resolver_result(resolver.(choice), state)
 
-  defp resolve_choice(resolver, choice, state) when is_function(resolver, 2) do
-    normalize_resolver_result(resolver.(choice, state), state)
-  end
+  defp resolve_choice(resolver, choice, state) when is_function(resolver, 2),
+    do: normalize_resolver_result(resolver.(choice, state), state)
 
-  defp resolve_choice({:module, module}, choice, state) do
-    normalize_resolver_result(module.resolve(choice, state), state)
-  end
+  defp resolve_choice({:module, module}, choice, state),
+    do: normalize_resolver_result(module.resolve(choice, state), state)
 
   defp normalize_resolver_result({:ok, value, state}, _old_state), do: {:ok, value, state}
   defp normalize_resolver_result({:ok, value}, state), do: {:ok, value, state}
@@ -673,11 +603,8 @@ defmodule Beaver.MLIR.Transform.Schedule do
 
   defp map_fetch_choice(map, name) do
     case Map.fetch(map, name) do
-      {:ok, value} ->
-        {:ok, value}
-
-      :error ->
-        map_fetch_atom_choice(map, name)
+      {:ok, value} -> {:ok, value}
+      :error -> map_fetch_atom_choice(map, name)
     end
   end
 
@@ -688,18 +615,14 @@ defmodule Beaver.MLIR.Transform.Schedule do
     end)
   end
 
-  defp atom_choice(key, value, name) do
-    if Atom.to_string(key) == name, do: {:ok, value}
-  end
+  defp atom_choice(key, value, name), do: if(Atom.to_string(key) == name, do: {:ok, value})
 
   defp validate_selection(%Choice{kind: :alternatives, options: options, name: name}, value) do
     value = if match?(%Option{}, value), do: value.value, else: value
 
-    if is_integer(value) and Enum.any?(options, &(&1.value == value)) do
-      {:ok, value}
-    else
-      {:error, {:invalid_alternative, name, value}}
-    end
+    if is_integer(value) and Enum.any?(options, &(&1.value == value)),
+      do: {:ok, value},
+      else: {:error, {:invalid_alternative, name, value}}
   end
 
   defp validate_selection(%Choice{kind: :knob, enumerable?: true} = choice, {:option, index})
@@ -710,9 +633,8 @@ defmodule Beaver.MLIR.Transform.Schedule do
     end
   end
 
-  defp validate_selection(%Choice{kind: :knob, enumerable?: true} = choice, %Option{} = option) do
-    validate_selection(choice, {:option, option.index})
-  end
+  defp validate_selection(%Choice{kind: :knob, enumerable?: true} = choice, %Option{} = option),
+    do: validate_selection(choice, {:option, option.index})
 
   defp validate_selection(%Choice{kind: :knob, enumerable?: true} = choice, value) do
     case Enum.find(choice.options, fn option -> option.value == value or option.mlir == value end) do
@@ -721,26 +643,21 @@ defmodule Beaver.MLIR.Transform.Schedule do
     end
   end
 
-  defp validate_selection(%Choice{kind: :knob, enumerable?: false}, value)
-       when is_binary(value),
-       do: {:ok, value}
+  defp validate_selection(%Choice{kind: :knob, enumerable?: false}, value) when is_binary(value), do: {:ok, value}
 
-  defp validate_selection(%Choice{name: name}, value),
-    do: {:error, {:invalid_knob_option, name, value}}
+  defp validate_selection(%Choice{name: name}, value), do: {:error, {:invalid_knob_option, name, value}}
 
-  defp rewrite_entries(entries, selections, context) do
-    Enum.reduce_while(entries, :ok, fn entry, :ok ->
-      rewrite_entry(entry, selections, context)
-    end)
+  defp rewrite_entries(entries, selections, ctx) do
+    Enum.reduce_while(entries, :ok, fn entry, :ok -> rewrite_entry(entry, selections, ctx) end)
   end
 
-  defp rewrite_entry({choice, operation, option_attributes}, selections, context) do
+  defp rewrite_entry({choice, op, option_attributes}, selections, ctx) do
     if active?(choice.guards, selections) and Map.has_key?(selections, choice.name) do
       value = Map.fetch!(selections, choice.name)
 
-      case selection_attribute(choice, value, option_attributes, context) do
+      case selection_attribute(choice, value, option_attributes, ctx) do
         {:ok, attribute_name, attribute} ->
-          MLIR.Operation.put_inherent_attribute(operation, attribute_name, attribute)
+          Operation.put_inherent_attribute(op, attribute_name, attribute)
 
           {:cont, :ok}
 
@@ -752,29 +669,23 @@ defmodule Beaver.MLIR.Transform.Schedule do
     end
   end
 
-  defp selection_attribute(%Choice{kind: :alternatives}, value, _options, context) do
-    {:ok, "selected_region_attr", MLIR.Attribute.integer(MLIR.Type.i64(ctx: context), value)}
-  end
+  defp selection_attribute(%Choice{kind: :alternatives}, value, _options, ctx),
+    do: {:ok, "selected_region_attr", Attribute.integer(MLIR.Type.i64(ctx: ctx), value)}
 
   defp selection_attribute(%Choice{kind: :knob, enumerable?: true} = choice, value, attrs, _ctx) do
-    case Enum.find_index(choice.options, fn option ->
-           option.value == value or option.mlir == value
-         end) do
+    case Enum.find_index(choice.options, fn option -> option.value == value or option.mlir == value end) do
       nil -> {:error, {:invalid_knob_option, choice.name, value}}
       index -> {:ok, "selected", Enum.at(attrs, index)}
     end
   end
 
-  defp selection_attribute(%Choice{kind: :knob, enumerable?: false}, value, _attrs, context) do
-    {:ok, "selected", MLIR.Attribute.get(value, ctx: context)}
+  defp selection_attribute(%Choice{kind: :knob, enumerable?: false}, value, _attrs, ctx) do
+    {:ok, "selected", Attribute.get(value, ctx: ctx)}
   rescue
-    exception in [ArgumentError] ->
-      {:error, {:invalid_attribute, value, Exception.message(exception)}}
+    exception in [ArgumentError] -> {:error, {:invalid_attribute, value, Exception.message(exception)}}
   end
 
-  defp active_constraints(constraints, selections) do
-    Enum.filter(constraints, &active?(&1.guards, selections))
-  end
+  defp active_constraints(constraints, selections), do: Enum.filter(constraints, &active?(&1.guards, selections))
 
   defp solve_constraints([], _selections, _solver), do: {:ok, nil}
   defp solve_constraints(_constraints, _selections, nil), do: {:ok, nil}
@@ -791,25 +702,21 @@ defmodule Beaver.MLIR.Transform.Schedule do
     kind, reason -> {:error, constraint_error({:solver_failure, kind, reason})}
   end
 
-  defp call_solver(fun, constraints, selections, _state) when is_function(fun, 2),
-    do: fun.(constraints, selections)
+  defp call_solver(fun, constraints, selections, _state) when is_function(fun, 2), do: fun.(constraints, selections)
 
   defp call_solver(fun, constraints, selections, state) when is_function(fun, 3),
     do: fun.(constraints, selections, state)
 
-  defp call_solver({:module, module}, constraints, selections, state),
-    do: module.solve(constraints, selections, state)
+  defp call_solver({:module, module}, constraints, selections, state), do: module.solve(constraints, selections, state)
 
   defp normalize_solver_result(:ok), do: {:ok, nil}
   defp normalize_solver_result({:ok, metadata}), do: {:ok, metadata}
   defp normalize_solver_result({:ok, metadata, _new_state}), do: {:ok, metadata}
   defp normalize_solver_result({:error, reason}), do: {:error, constraint_error(reason)}
 
-  defp normalize_solver_result({:error, reason, _new_state}),
-    do: {:error, constraint_error(reason)}
+  defp normalize_solver_result({:error, reason, _new_state}), do: {:error, constraint_error(reason)}
 
-  defp normalize_solver_result(other),
-    do: {:error, constraint_error({:invalid_solver_result, other})}
+  defp normalize_solver_result(other), do: {:error, constraint_error({:invalid_solver_result, other})}
 
   defp solver_and_state({module, state}) when is_atom(module), do: {{:module, module}, state}
   defp solver_and_state(module) when is_atom(module), do: {{:module, module}, nil}
@@ -818,26 +725,17 @@ defmodule Beaver.MLIR.Transform.Schedule do
   defp operations(module) do
     {_module, operations} =
       Beaver.Walker.prewalk(module, [], fn
-        %MLIR.Operation{} = operation, acc -> {operation, [operation | acc]}
+        %Operation{} = operation, acc -> {operation, [operation | acc]}
         entity, acc -> {entity, acc}
       end)
 
     Enum.reverse(operations)
   end
 
-  defp invalid_error(reason, diagnostics \\ []) do
-    %Transform.Error{
-      kind: :invalid_schedule,
-      reason: reason,
-      diagnostics: MLIR.Diagnostic.process(diagnostics)
-    }
-  end
+  defp invalid_error(reason, diagnostics \\ []),
+    do: %Transform.Error{kind: :invalid_schedule, reason: reason, diagnostics: MLIR.Diagnostic.process(diagnostics)}
 
-  defp constraint_error(reason) do
-    %Transform.Error{kind: :constraint_failure, reason: reason}
-  end
+  defp constraint_error(reason), do: %Transform.Error{kind: :constraint_failure, reason: reason}
 
-  defp digest(bytes) do
-    :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
-  end
+  defp digest(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
 end

@@ -1,3 +1,5 @@
+alias Beaver.MLIR.{CAPI, Context}
+
 defmodule Beaver.MLIR.ConversionTarget do
   @moduledoc """
   An owning, callback-safe MLIR dialect conversion target.
@@ -7,66 +9,46 @@ defmodule Beaver.MLIR.ConversionTarget do
   the context's native worker pool.
   """
 
-  use Kinda.ResourceKind,
-    raw_module: Beaver.MLIR.CAPI.Raw,
-    codec: Beaver.Native,
-    fields: [registration: nil, timeout_ms: 30_000]
+  use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native, fields: [registration: nil, timeout_ms: 30_000]
 
   alias Beaver.MLIR
 
   @type legality() :: :legal | :illegal | :no_opinion | boolean()
   @type legality_callback() :: (MLIR.Operation.t() -> legality())
 
-  @spec create(MLIR.Context.t(), keyword()) :: t()
-  def create(%MLIR.Context{ref: context_ref}, opts \\ []) do
+  @spec create(Context.t(), keyword()) :: t()
+  def create(%Context{ref: context_ref}, opts \\ []) do
     case Keyword.keys(opts) -- [:timeout] do
-      [] ->
-        :ok
-
-      unsupported ->
-        raise ArgumentError, "unsupported ConversionTarget options: #{inspect(unsupported)}"
+      [] -> :ok
+      unsupported -> raise ArgumentError, "unsupported ConversionTarget options: #{inspect(unsupported)}"
     end
 
     timeout_ms = Keyword.get(opts, :timeout, 30_000)
 
-    unless is_integer(timeout_ms) and timeout_ms >= 0 do
-      raise ArgumentError, ":timeout must be a non-negative integer"
-    end
+    unless is_integer(timeout_ms) and timeout_ms >= 0,
+      do: raise(ArgumentError, ":timeout must be a non-negative integer")
 
-    {:managed_conversion_target, target_term, registration} =
-      MLIR.CAPI.beaver_raw_conversion_target_create(context_ref)
+    {:managed_conversion_target, target_term, registration} = CAPI.beaver_raw_conversion_target_create(context_ref)
 
     %__MODULE__{ref: ref} = Beaver.Native.check!(target_term)
     %__MODULE__{ref: ref, registration: registration, timeout_ms: timeout_ms}
   end
 
   @spec add_legal_op(t(), String.Chars.t()) :: t()
-  def add_legal_op(%__MODULE__{} = target, name) do
-    add_static(target, name, 0)
-  end
+  def add_legal_op(%__MODULE__{} = target, name), do: add_static(target, name, 0)
 
   @spec add_illegal_op(t(), String.Chars.t()) :: t()
-  def add_illegal_op(%__MODULE__{} = target, name) do
-    add_static(target, name, 1)
-  end
+  def add_illegal_op(%__MODULE__{} = target, name), do: add_static(target, name, 1)
 
   @spec add_legal_dialect(t(), String.Chars.t()) :: t()
-  def add_legal_dialect(%__MODULE__{} = target, name) do
-    add_static(target, name, 2)
-  end
+  def add_legal_dialect(%__MODULE__{} = target, name), do: add_static(target, name, 2)
 
   @spec add_illegal_dialect(t(), String.Chars.t()) :: t()
-  def add_illegal_dialect(%__MODULE__{} = target, name) do
-    add_static(target, name, 3)
-  end
+  def add_illegal_dialect(%__MODULE__{} = target, name), do: add_static(target, name, 3)
 
   defp add_static(%__MODULE__{} = target, name, kind) do
     :ok =
-      MLIR.CAPI.beaver_raw_conversion_target_add_static(
-        target.registration,
-        to_string(name),
-        kind
-      )
+      CAPI.beaver_raw_conversion_target_add_static(target.registration, to_string(name), kind)
 
     target
   end
@@ -75,7 +57,7 @@ defmodule Beaver.MLIR.ConversionTarget do
   def add_dynamically_legal_op(%__MODULE__{} = target, name, callback)
       when is_function(callback, 1) do
     :ok =
-      MLIR.CAPI.beaver_raw_conversion_target_add_dynamic_op(
+      CAPI.beaver_raw_conversion_target_add_dynamic_op(
         target.registration,
         to_string(name),
         callback,
@@ -89,7 +71,7 @@ defmodule Beaver.MLIR.ConversionTarget do
   def add_dynamically_legal_dialect(%__MODULE__{} = target, name, callback)
       when is_function(callback, 1) do
     :ok =
-      MLIR.CAPI.beaver_raw_conversion_target_add_dynamic_dialect(
+      CAPI.beaver_raw_conversion_target_add_dynamic_dialect(
         target.registration,
         to_string(name),
         callback,
@@ -103,7 +85,7 @@ defmodule Beaver.MLIR.ConversionTarget do
   def mark_recursively_legal(%__MODULE__{} = target, name, callback \\ nil)
       when is_nil(callback) or is_function(callback, 1) do
     :ok =
-      MLIR.CAPI.beaver_raw_conversion_target_mark_recursively_legal(
+      CAPI.beaver_raw_conversion_target_mark_recursively_legal(
         target.registration,
         to_string(name),
         callback,
@@ -117,28 +99,16 @@ defmodule Beaver.MLIR.ConversionTarget do
   def mark_unknown_dynamically_legal(%__MODULE__{} = target, callback)
       when is_function(callback, 1) do
     :ok =
-      MLIR.CAPI.beaver_raw_conversion_target_mark_unknown_dynamic(
-        target.registration,
-        callback,
-        target.timeout_ms
-      )
+      CAPI.beaver_raw_conversion_target_mark_unknown_dynamic(target.registration, callback, target.timeout_ms)
 
     target
   end
 
   @spec destroy(t()) :: :ok
-  def destroy(%__MODULE__{registration: registration}) do
-    MLIR.CAPI.beaver_raw_conversion_target_destroy(registration)
-  end
+  def destroy(%__MODULE__{registration: registration}),
+    do: CAPI.beaver_raw_conversion_target_destroy(registration)
 
-  @spec with(MLIR.Context.t(), keyword(), (t() -> result)) :: result when result: var
-  def with(ctx, opts \\ [], fun) when is_function(fun, 1) do
-    target = create(ctx, opts)
-
-    try do
-      fun.(target)
-    after
-      destroy(target)
-    end
-  end
+  @spec with(Context.t(), keyword(), (t() -> result)) :: result when result: var
+  def with(ctx, opts \\ [], fun) when is_function(fun, 1),
+    do: Beaver.Native.with_resource(create(ctx, opts), &destroy/1, fun)
 end

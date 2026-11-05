@@ -12,8 +12,7 @@ defmodule Beaver.MLIR.Inference.Request do
     operands = Map.get(request, :operands, [])
     regions = Map.get(request, :regions, [])
 
-    attributes =
-      Map.get_lazy(request, :attributes, fn -> MLIR.Attribute.dictionary([], ctx: context) end)
+    attributes = Map.get_lazy(request, :attributes, fn -> MLIR.Attribute.dictionary([], ctx: context) end)
 
     properties = Map.get(request, :properties)
 
@@ -23,11 +22,9 @@ defmodule Beaver.MLIR.Inference.Request do
               "operation-specific property storage cannot safely cross the NIF boundary"
     end
 
-    unless match?(%MLIR.Context{}, context),
-      do: raise(ArgumentError, ":context must be a Beaver.MLIR.Context")
+    unless match?(%MLIR.Context{}, context), do: raise(ArgumentError, ":context must be a Beaver.MLIR.Context")
 
-    unless match?(%MLIR.Location{}, location),
-      do: raise(ArgumentError, ":location must be a Beaver.MLIR.Location")
+    unless match?(%MLIR.Location{}, location), do: raise(ArgumentError, ":location must be a Beaver.MLIR.Location")
 
     unless match?(%MLIR.Attribute{}, attributes),
       do: raise(ArgumentError, ":attributes must be a dictionary Beaver.MLIR.Attribute")
@@ -49,11 +46,9 @@ defmodule Beaver.MLIR.Inference.Request do
     ]
   end
 
-  defp normalize_operation(operation) when is_binary(operation), do: operation
-  defp normalize_operation(operation) when is_atom(operation), do: Atom.to_string(operation)
+  defp normalize_operation(op) when is_binary(op), do: op
+  defp normalize_operation(op) when is_atom(op), do: Atom.to_string(op)
 
-  defp normalize_operation(operation) do
-    raise ArgumentError,
-          ":operation must be a canonical operation name, got: #{inspect(operation)}"
-  end
+  defp normalize_operation(op),
+    do: raise(ArgumentError, ":operation must be a canonical operation name, got: #{inspect(op)}")
 end

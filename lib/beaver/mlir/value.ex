@@ -1,3 +1,5 @@
+alias Beaver.Native
+
 defmodule Beaver.MLIR.Value do
   @moduledoc """
   This module handles MLIR values, which represent SSA (Static Single Assignment) values in the IR.
@@ -13,40 +15,29 @@ defmodule Beaver.MLIR.Value do
   alias Beaver.MLIR
   alias Kinda.CallbackRuntime
 
-  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Native
 
-  def argument?(%__MODULE__{} = value) do
-    CAPI.mlirValueIsABlockArgument(value) |> Beaver.Native.to_term()
-  end
+  def argument?(%__MODULE__{} = value), do: CAPI.mlirValueIsABlockArgument(value) |> Native.to_term()
 
   @doc """
   Returns true if the value is a result of an operation.
   """
-  def result?(%__MODULE__{} = value) do
-    CAPI.mlirValueIsAOpResult(value) |> Beaver.Native.to_term()
-  end
+  def result?(%__MODULE__{} = value),
+    do: CAPI.mlirValueIsAOpResult(value) |> Native.to_term()
 
   @doc """
   Return the defining op of this value if this value is a result
   """
-  def owner(%__MODULE__{} = value) do
-    if result?(value) do
-      {:ok, CAPI.mlirOpResultGetOwner(value)}
-    else
-      {:error, "not a result"}
-    end
-  end
+  def owner(%__MODULE__{} = value),
+    do: if(result?(value), do: {:ok, CAPI.mlirOpResultGetOwner(value)}, else: {:error, "not a result"})
 
   @doc """
   Return the defining op of this value. Raises if this value is not a result
   """
   def owner!(value) do
     case owner(value) do
-      {:ok, op} ->
-        op
-
-      {:error, msg} ->
-        raise ArgumentError, msg
+      {:ok, op} -> op
+      {:error, msg} -> raise ArgumentError, msg
     end
   end
 
@@ -65,13 +56,11 @@ defmodule Beaver.MLIR.Value do
   cannot be set independently.
   """
   @spec set_location(t(), MLIR.Location.source()) :: t()
-  def set_location(%__MODULE__{} = value, location) do
-    unless argument?(value) do
-      raise ArgumentError, "only block argument locations can be set"
-    end
+  def set_location(%__MODULE__{} = value, loc) do
+    unless argument?(value), do: raise(ArgumentError, "only block argument locations can be set")
 
-    location = MLIR.Location.resolve(location, MLIR.context(value))
-    :ok = CAPI.mlirBlockArgumentSetLocation(value, location)
+    loc = MLIR.Location.resolve(loc, MLIR.context(value))
+    :ok = CAPI.mlirBlockArgumentSetLocation(value, loc)
     value
   end
 
@@ -88,15 +77,11 @@ defmodule Beaver.MLIR.Value do
   accepted before an exception remain applied.
   """
   @spec replace_uses_with_if(t(), t(), (MLIR.OpOperand.t() -> boolean())) :: :ok
-  def replace_uses_with_if(
-        %__MODULE__{ref: from},
-        %__MODULE__{ref: replacement},
-        predicate
-      )
+  def replace_uses_with_if(%__MODULE__{ref: from}, %__MODULE__{ref: replacement}, predicate)
       when is_function(predicate, 1) do
     case CAPI.beaver_raw_value_replace_uses_with_if(from, replacement, predicate) do
       {:async, id} -> await_conditional_replacement(id, nil)
-      other -> Beaver.Native.check!(other)
+      other -> Native.check!(other)
     end
   end
 
@@ -123,21 +108,15 @@ defmodule Beaver.MLIR.Value do
   end
 
   defp invoke_replace_predicate(_predicate, _op_operand_ref, exception)
-       when not is_nil(exception),
-       do: {:error, :aborted}
+       when not is_nil(exception), do: {:error, :aborted}
 
   defp invoke_replace_predicate(predicate, op_operand_ref, nil) do
-    op_operand = Beaver.Native.check!(op_operand_ref)
+    op_operand = Native.check!(op_operand_ref)
 
     case predicate.(op_operand) do
-      true ->
-        {:ok, :replace}
-
-      false ->
-        {:error, :keep}
-
-      other ->
-        raise ArgumentError, "replacement predicate must return a boolean, got: #{inspect(other)}"
+      true -> {:ok, :replace}
+      false -> {:error, :keep}
+      other -> raise ArgumentError, "replacement predicate must return a boolean, got: #{inspect(other)}"
     end
   end
 
@@ -146,7 +125,6 @@ defmodule Beaver.MLIR.Value do
 
   defp finish_conditional_replacement(nil), do: :ok
 
-  defp finish_conditional_replacement({:exception, kind, reason, stacktrace}) do
-    :erlang.raise(kind, reason, stacktrace)
-  end
+  defp finish_conditional_replacement({:exception, kind, reason, stacktrace}),
+    do: :erlang.raise(kind, reason, stacktrace)
 end

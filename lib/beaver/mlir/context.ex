@@ -1,3 +1,6 @@
+alias Beaver.MLIR.StringRef
+alias Beaver.Native
+
 defmodule Beaver.MLIR.Context do
   @moduledoc """
   This module defines functions creating or destroying MLIR context.
@@ -7,7 +10,7 @@ defmodule Beaver.MLIR.Context do
 
   use Kinda.ResourceKind,
     raw_module: Beaver.MLIR.CAPI.Raw,
-    codec: Beaver.Native,
+    codec: Native,
     fields: [thread_pool_owner: nil, thread_pool_lease: nil]
 
   @doc """
@@ -50,9 +53,8 @@ defmodule Beaver.MLIR.Context do
     all_dialects = Keyword.get(opts, :all_dialects, true)
     threading = Keyword.get(opts, :threading, true)
 
-    if not threading and Keyword.has_key?(opts, :thread_pool) do
-      raise ArgumentError, ":thread_pool cannot be used with threading: false"
-    end
+    if not threading and Keyword.has_key?(opts, :thread_pool),
+      do: raise(ArgumentError, ":thread_pool cannot be used with threading: false")
 
     {pool, owner, lease} = resolve_thread_pool(opts, threading)
     ctx = mlirContextCreate()
@@ -67,10 +69,7 @@ defmodule Beaver.MLIR.Context do
 
       if not threading, do: mlirContextEnableMultithreading(ctx, false)
 
-      opts
-      |> Keyword.get(:registry, [])
-      |> List.wrap()
-      |> Enum.each(&mlirContextAppendDialectRegistry(ctx, &1))
+      opts |> Keyword.get(:registry, []) |> List.wrap() |> Enum.each(&mlirContextAppendDialectRegistry(ctx, &1))
 
       if all_dialects, do: load_all_dialects(ctx)
       mlirContextSetAllowUnregisteredDialects(ctx, allow_unregistered)
@@ -85,9 +84,8 @@ defmodule Beaver.MLIR.Context do
   end
 
   def destroy(%__MODULE__{} = ctx) do
-    if beaverContextHasActiveTransientScope(ctx) |> Beaver.Native.to_term() do
-      raise ArgumentError, "cannot destroy a context with an active transient scope"
-    end
+    if beaverContextHasActiveTransientScope(ctx) |> Native.to_term(),
+      do: raise(ArgumentError, "cannot destroy a context with an active transient scope")
 
     try do
       # Detach action tracing sessions while the native context is still alive;
@@ -99,18 +97,15 @@ defmodule Beaver.MLIR.Context do
       MLIR.Trait.release_context(ctx)
       MLIR.ExternalInterface.release_context(ctx)
 
-      if ctx.thread_pool_owner do
-        MLIR.ThreadPool.checkin(ctx.thread_pool_owner, ctx.thread_pool_lease)
-      end
+      if ctx.thread_pool_owner,
+        do: MLIR.ThreadPool.checkin(ctx.thread_pool_owner, ctx.thread_pool_lease)
     end
   end
 
   @doc "Returns whether the linked LLVM supports resettable transient context scopes."
   @spec transient_scope_supported?() :: boolean()
-  def transient_scope_supported? do
-    beaverContextTransientScopeSupported()
-    |> Beaver.Native.to_term()
-  end
+  def transient_scope_supported?,
+    do: beaverContextTransientScopeSupported() |> Native.to_term()
 
   @doc """
   Runs `fun` inside a resettable transient allocation scope.
@@ -125,20 +120,17 @@ defmodule Beaver.MLIR.Context do
   """
   @spec with_transient_scope(t(), (t() -> result)) :: result when result: term()
   def with_transient_scope(%__MODULE__{} = ctx, fun) when is_function(fun, 1) do
-    unless transient_scope_supported?() do
-      raise ArgumentError, "linked LLVM does not support transient context scopes"
-    end
+    unless transient_scope_supported?(),
+      do: raise(ArgumentError, "linked LLVM does not support transient context scopes")
 
-    unless beaverContextBeginTransientScope(ctx) |> Beaver.Native.to_term() do
-      raise ArgumentError, "context already has an active transient scope"
-    end
+    unless beaverContextBeginTransientScope(ctx) |> Native.to_term(),
+      do: raise(ArgumentError, "context already has an active transient scope")
 
     try do
       fun.(ctx)
     after
-      unless beaverContextEndTransientScope(ctx) |> Beaver.Native.to_term() do
-        raise "transient context scope ended unexpectedly"
-      end
+      unless beaverContextEndTransientScope(ctx) |> Native.to_term(),
+        do: raise("transient context scope ended unexpectedly")
     end
   end
 
@@ -177,8 +169,7 @@ defmodule Beaver.MLIR.Context do
     entity
   end
 
-  def ensure_same!({:ok, entity}, %__MODULE__{} = expected),
-    do: {:ok, ensure_same!(entity, expected)}
+  def ensure_same!({:ok, entity}, %__MODULE__{} = expected), do: {:ok, ensure_same!(entity, expected)}
 
   def ensure_same!(entities, %__MODULE__{} = expected) when is_list(entities),
     do: Enum.map(entities, &ensure_same!(&1, expected))
@@ -189,37 +180,24 @@ defmodule Beaver.MLIR.Context do
 
   defp resolve_thread_pool(opts, true) do
     case Keyword.get(opts, :thread_pool, :application) do
-      nil ->
-        {nil, nil, nil}
-
-      %MLIR.LLVMThreadPool{} = pool ->
-        {pool, nil, nil}
-
-      :application ->
-        checkout_if_running(MLIR.ThreadPool.default_name())
-
-      owner when is_atom(owner) or is_pid(owner) or is_tuple(owner) ->
-        checkout(owner)
+      nil -> {nil, nil, nil}
+      %MLIR.LLVMThreadPool{} = pool -> {pool, nil, nil}
+      :application -> checkout_if_running(MLIR.ThreadPool.default_name())
+      owner when is_atom(owner) or is_pid(owner) or is_tuple(owner) -> checkout(owner)
     end
   end
 
   defp checkout_if_running(owner) do
     case GenServer.whereis(owner) do
-      nil ->
-        {nil, nil, nil}
-
-      _pid ->
-        checkout(owner)
+      nil -> {nil, nil, nil}
+      _pid -> checkout(owner)
     end
   end
 
   defp checkout(owner) do
     case MLIR.ThreadPool.checkout(owner) do
-      {%MLIR.LLVMThreadPool{} = pool, lease} ->
-        {pool, owner, lease}
-
-      {:error, :closing} ->
-        raise ArgumentError, "the selected MLIR thread pool is closing"
+      {%MLIR.LLVMThreadPool{} = pool, lease} -> {pool, owner, lease}
+      {:error, :closing} -> raise ArgumentError, "the selected MLIR thread pool is closing"
     end
   end
 
@@ -236,20 +214,14 @@ defmodule Beaver.MLIR.Context do
   @doc """
   Check if the op name is terminator
   """
-  def terminator?(%__MODULE__{} = ctx, op) do
-    MLIR.Trait.has?(ctx, op, :terminator)
-  end
+  def terminator?(%__MODULE__{} = ctx, op), do: MLIR.Trait.has?(ctx, op, :terminator)
 
-  def implements_interface?(ctx, op, interface_id) do
-    mlirOperationImplementsInterfaceStatic(MLIR.StringRef.create(op), ctx, interface_id)
-    |> Beaver.Native.to_term()
-  end
+  def implements_interface?(ctx, op, interface_id),
+    do: mlirOperationImplementsInterfaceStatic(StringRef.create(op), ctx, interface_id) |> Native.to_term()
 
-  def infer_type?(%__MODULE__{} = ctx, op) do
-    implements_interface?(ctx, MLIR.StringRef.create(op), mlirInferTypeOpInterfaceTypeID())
-  end
+  def infer_type?(%__MODULE__{} = ctx, op),
+    do: implements_interface?(ctx, StringRef.create(op), mlirInferTypeOpInterfaceTypeID())
 
-  def infer_shaped?(%__MODULE__{} = ctx, op) do
-    implements_interface?(ctx, MLIR.StringRef.create(op), mlirInferShapedTypeOpInterfaceTypeID())
-  end
+  def infer_shaped?(%__MODULE__{} = ctx, op),
+    do: implements_interface?(ctx, StringRef.create(op), mlirInferShapedTypeOpInterfaceTypeID())
 end

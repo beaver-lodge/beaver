@@ -65,11 +65,7 @@ defmodule Beaver.MLIR.ODS.Dump do
     # operands are not mistaken for duplicate named operands.
     {operands, _} =
       Enum.map_reduce(op["operands"] || [], 0, fn operand, index ->
-        if operand["name"] == "" do
-          {Map.put(operand, "name", "arg#{index}"), index + 1}
-        else
-          {operand, index}
-        end
+        if operand["name"] == "", do: {Map.put(operand, "name", "arg#{index}"), index + 1}, else: {operand, index}
       end)
 
     duplicates =
@@ -79,18 +75,12 @@ defmodule Beaver.MLIR.ODS.Dump do
       |> Enum.filter(fn {_operand_name, count} -> count > 1 end)
       |> Enum.map(&elem(&1, 0))
 
-    if duplicates != [] do
-      raise "Duplicate operand names found in ODS dump for operation '#{name}': #{inspect(duplicates)}"
-    end
+    if duplicates != [],
+      do: raise("Duplicate operand names found in ODS dump for operation '#{name}': #{inspect(duplicates)}")
   end
 
-  defp fmt_constraint(constraint) do
-    if String.contains?(constraint, "anonymous") do
-      "anonymous/composite constraint"
-    else
-      "`#{constraint}`"
-    end
-  end
+  defp fmt_constraint(constraint),
+    do: if(String.contains?(constraint, "anonymous"), do: "anonymous/composite constraint", else: "`#{constraint}`")
 
   defp fmt_name(""), do: "anonymous"
   defp fmt_name(name), do: "`#{name}`"
@@ -111,27 +101,18 @@ defmodule Beaver.MLIR.ODS.Dump do
 
   @doc false
 
-  def gen_doc(
-        %{
-          "name" => name
-        } = op
-      ) do
+  def gen_doc(%{"name" => name} = op) do
     summary = op["summary"]
 
     description = op["description"]
 
-    description =
-      Regex.replace(~r{\(\.\./(.+?)\.md}, description, "(https://mlir.llvm.org/docs/\\1")
+    description = Regex.replace(~r{\(\.\./(.+?)\.md}, description, "(https://mlir.llvm.org/docs/\\1")
 
-    description =
-      Regex.replace(~r{\(\.\./(.+?)\/\#}, description, "(https://mlir.llvm.org/docs/\\1")
+    description = Regex.replace(~r{\(\.\./(.+?)\/\#}, description, "(https://mlir.llvm.org/docs/\\1")
 
-    description =
-      Regex.replace(~r{\((.+?)\.md}, description, "(https://mlir.llvm.org/docs/Dialects/\\1")
+    description = Regex.replace(~r{\((.+?)\.md}, description, "(https://mlir.llvm.org/docs/Dialects/\\1")
 
-    description =
-      description
-      |> String.replace("(Builtin/#", "(https://mlir.llvm.org/docs/Dialects/Builtin/#")
+    description = description |> String.replace("(Builtin/#", "(https://mlir.llvm.org/docs/Dialects/Builtin/#")
 
     summary = if summary != "", do: " - #{summary}", else: ""
 
@@ -144,11 +125,7 @@ defmodule Beaver.MLIR.ODS.Dump do
         else: ""
 
     result_type_inference =
-      if result_type_inference?(op) do
-        "This op has support for result type inference."
-      else
-        ""
-      end
+      if result_type_inference?(op), do: "This op has support for result type inference.", else: ""
 
     """
     `#{name}`#{summary}
@@ -163,25 +140,17 @@ defmodule Beaver.MLIR.ODS.Dump do
 
   def gen_doc(op) do
     case lookup(op) do
-      {:ok, %{} = found} ->
-        gen_doc(found)
-
-      _ ->
-        false
+      {:ok, %{} = found} -> gen_doc(found)
+      _ -> false
     end
   end
 
-  def result_type_inference?(%{"result_type_inference" => result_type_inference}) do
-    result_type_inference
-  end
+  def result_type_inference?(%{"result_type_inference" => result_type_inference}), do: result_type_inference
 
   def result_type_inference?(op) do
     case lookup(op) do
-      {:ok, %{} = found} ->
-        result_type_inference?(found)
-
-      _ ->
-        false
+      {:ok, %{} = found} -> result_type_inference?(found)
+      _ -> false
     end
   end
 end

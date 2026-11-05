@@ -1,3 +1,5 @@
+alias Beaver.MLIR.{Block, Location, Region, Type, Value}
+
 defmodule Beaver.Changeset do
   @moduledoc false
   alias Beaver.Deferred
@@ -14,7 +16,7 @@ defmodule Beaver.Changeset do
           attributes: list(),
           name: String.t(),
           regions: list(),
-          location: MLIR.Location.t(),
+          location: Location.t(),
           context: MLIR.Context.t()
         }
   defstruct operands: [],
@@ -27,22 +29,18 @@ defmodule Beaver.Changeset do
             context: nil
 
   @type attribute() :: Deferred.contextual(MLIR.Attribute.t())
-  @type operand() :: MLIR.Value.t()
+  @type operand() :: Value.t()
   @type tagged_operand() :: {atom(), operand() | [operand()]}
   @type operand_argument() :: tagged_operand() | operand() | [operand()]
-  @type type_argument() :: Deferred.contextual(MLIR.Type.t())
+  @type type_argument() :: Deferred.contextual(Type.t())
   @type tagged_attribute :: {atom(), type_argument() | attribute() | String.t() | :infer}
   @type attribute_argument() :: tagged_attribute() | [tagged_attribute()]
-  @type branching_argument() :: MLIR.Block.t() | {MLIR.Block.t(), [MLIR.Value.t()]}
-  @type region_argument() :: MLIR.Region.t() | (-> [MLIR.Region.t()])
-  @type loc_argument() :: MLIR.Location.t() | {:loc, MLIR.Location.t()}
+  @type branching_argument() :: Block.t() | {Block.t(), [Value.t()]}
+  @type region_argument() :: Region.t() | (-> [Region.t()])
+  @type loc_argument() :: Location.t() | {:loc, Location.t()}
 
   @type argument() ::
-          operand_argument()
-          | attribute_argument()
-          | branching_argument()
-          | region_argument()
-          | loc_argument()
+          operand_argument() | attribute_argument() | branching_argument() | region_argument() | loc_argument()
 
   @spec add_argument(t(), argument()) :: t()
 
@@ -56,40 +54,28 @@ defmodule Beaver.Changeset do
     end
   end
 
-  def add_argument(
-        %__MODULE__{context: context} = changeset,
-        {tag, %Deferred{} = deferred}
-      )
-      when is_atom(tag) do
-    add_argument(changeset, {tag, Deferred.resolve(deferred, context)})
-  end
+  def add_argument(%__MODULE__{context: ctx} = changeset, {tag, %Deferred{} = deferred})
+      when is_atom(tag), do: add_argument(changeset, {tag, Deferred.resolve(deferred, ctx)})
 
   # f should return regions
-  def add_argument(%__MODULE__{} = changeset, f) when is_function(f, 0) do
-    add_argument(changeset, f.())
-  end
+  def add_argument(%__MODULE__{} = changeset, f) when is_function(f, 0),
+    do: add_argument(changeset, f.())
 
   # If the context is not set, we extract it from the argument
-  def add_argument(%__MODULE__{context: nil} = changeset, %{} = argument) do
-    add_argument(%__MODULE__{changeset | context: MLIR.context(argument)}, argument)
-  end
+  def add_argument(%__MODULE__{context: nil} = changeset, %{} = argument),
+    do: add_argument(%__MODULE__{changeset | context: MLIR.context(argument)}, argument)
 
-  def add_argument(%__MODULE__{regions: regions} = changeset, %MLIR.Region{} = region) do
-    %__MODULE__{changeset | regions: regions ++ [region]}
-  end
+  def add_argument(%__MODULE__{regions: regions} = changeset, %Region{} = region),
+    do: %__MODULE__{changeset | regions: regions ++ [region]}
 
-  def add_argument(
-        %__MODULE__{context: context} = changeset,
-        {:loc, %MLIR.Location{} = location}
-      ) do
-    %__MODULE__{changeset | location: Deferred.resolve(location, context)}
-  end
+  def add_argument(%__MODULE__{context: ctx} = changeset, {:loc, %Location{} = loc}),
+    do: %__MODULE__{changeset | location: Deferred.resolve(loc, ctx)}
 
   def add_argument(
-        %__MODULE__{context: context, successors: successors, operands: operands} = changeset,
-        {%MLIR.Block{} = successor_block, block_args}
+        %__MODULE__{context: ctx, successors: successors, operands: operands} = changeset,
+        {%Block{} = successor_block, block_args}
       ) do
-    block_args = Enum.map(block_args, &Deferred.resolve(&1, context))
+    block_args = Enum.map(block_args, &Deferred.resolve(&1, ctx))
 
     %__MODULE__{
       changeset
@@ -98,75 +84,42 @@ defmodule Beaver.Changeset do
     }
   end
 
-  def add_argument(
-        %__MODULE__{successors: successors} = changeset,
-        %MLIR.Block{} = successor
-      ) do
-    %__MODULE__{changeset | successors: successors ++ [successor]}
-  end
+  def add_argument(%__MODULE__{successors: successors} = changeset, %Block{} = successor),
+    do: %__MODULE__{changeset | successors: successors ++ [successor]}
 
-  def add_argument(
-        %__MODULE__{attributes: attributes} = changeset,
-        {name, :infer}
-      )
-      when name in [
-             :operand_segment_sizes,
-             :operandSegmentSizes,
-             :result_segment_sizes,
-             :resultSegmentSizes
-           ] do
-    %__MODULE__{changeset | attributes: attributes ++ [{name, :infer}]}
-  end
+  def add_argument(%__MODULE__{attributes: attributes} = changeset, {name, :infer})
+      when name in ~w(operand_segment_sizes operandSegmentSizes result_segment_sizes resultSegmentSizes)a,
+      do: %__MODULE__{changeset | attributes: attributes ++ [{name, :infer}]}
 
-  def add_argument(
-        %__MODULE__{context: context, attributes: attributes} = changeset,
-        {name, %MLIR.Attribute{} = attr}
-      )
+  def add_argument(%__MODULE__{context: ctx, attributes: attributes} = changeset, {name, %MLIR.Attribute{} = attr})
       when is_atom(name) do
-    attr = Deferred.resolve(attr, context)
+    attr = Deferred.resolve(attr, ctx)
     %__MODULE__{changeset | attributes: attributes ++ [{name, attr}]}
   end
 
-  def add_argument(
-        %__MODULE__{context: context, attributes: attributes} = changeset,
-        {name, %MLIR.Type{} = type}
-      )
+  def add_argument(%__MODULE__{context: ctx, attributes: attributes} = changeset, {name, %Type{} = type})
       when is_atom(name) do
-    type = Deferred.resolve(type, context)
+    type = Deferred.resolve(type, ctx)
     %__MODULE__{changeset | attributes: attributes ++ [{name, type}]}
   end
 
-  def add_argument(
-        %__MODULE__{attributes: attributes} = changeset,
-        {name, attr}
-      )
-      when is_atom(name) and is_binary(attr) do
-    %__MODULE__{changeset | attributes: attributes ++ [{name, attr}]}
-  end
+  def add_argument(%__MODULE__{attributes: attributes} = changeset, {name, attr})
+      when is_atom(name) and is_binary(attr), do: %__MODULE__{changeset | attributes: attributes ++ [{name, attr}]}
 
-  def add_argument(
-        %__MODULE__{context: context, operands: operands} = changeset,
-        {operand_name, %MLIR.Value{} = value}
-      )
+  def add_argument(%__MODULE__{context: ctx, operands: operands} = changeset, {operand_name, %Value{} = value})
       when is_atom(operand_name) do
-    operand = {operand_name, Deferred.resolve(value, context)}
+    operand = {operand_name, Deferred.resolve(value, ctx)}
     %__MODULE__{changeset | operands: operands ++ [operand]}
   end
 
-  def add_argument(
-        %__MODULE__{context: context, operands: operands} = changeset,
-        {operand_name, variadic_operands}
-      )
+  def add_argument(%__MODULE__{context: ctx, operands: operands} = changeset, {operand_name, variadic_operands})
       when is_atom(operand_name) and is_list(variadic_operands) do
-    operand = {operand_name, Enum.map(variadic_operands, &Deferred.resolve(&1, context))}
+    operand = {operand_name, Enum.map(variadic_operands, &Deferred.resolve(&1, ctx))}
     %__MODULE__{changeset | operands: operands ++ [operand]}
   end
 
-  def add_argument(
-        %__MODULE__{context: context, operands: operands} = changeset,
-        %MLIR.Value{} = operand
-      ) do
-    operand = Deferred.resolve(operand, context)
+  def add_argument(%__MODULE__{context: ctx, operands: operands} = changeset, %Value{} = operand) do
+    operand = Deferred.resolve(operand, ctx)
     %__MODULE__{changeset | operands: operands ++ [operand]}
   end
 
@@ -184,7 +137,7 @@ defmodule Beaver.Changeset do
   end
 
   @type deferred_type() :: {:parametric, term(), term(), term()}
-  @type type() :: MLIR.Type.t() | deferred_type() | [MLIR.Type.t() | deferred_type()]
+  @type type() :: Type.t() | deferred_type() | [Type.t() | deferred_type()]
   @type result() :: :infer | type() | Deferred.contextual(type())
   @spec add_result(t(), result()) :: t()
 
@@ -194,29 +147,21 @@ defmodule Beaver.Changeset do
     end
   end
 
-  def add_result(%__MODULE__{context: context} = changeset, %Deferred{} = deferred) do
-    add_result(changeset, Deferred.resolve(deferred, context))
-  end
+  def add_result(%__MODULE__{context: ctx} = changeset, %Deferred{} = deferred),
+    do: add_result(changeset, Deferred.resolve(deferred, ctx))
 
-  def add_result(%__MODULE__{results: :infer}, type) when type != :infer do
-    raise ArgumentError, "already set to infer the result types"
-  end
+  def add_result(%__MODULE__{results: :infer}, type) when type != :infer,
+    do: raise(ArgumentError, "already set to infer the result types")
 
-  def add_result(%__MODULE__{} = changeset, :infer) do
-    %__MODULE__{changeset | results: :infer}
-  end
+  def add_result(%__MODULE__{} = changeset, :infer), do: %__MODULE__{changeset | results: :infer}
 
-  def add_result(
-        %__MODULE__{context: context, results: results} = changeset,
-        %MLIR.Type{} = result_type
-      ) do
-    result_type = Deferred.resolve(result_type, context)
+  def add_result(%__MODULE__{context: ctx, results: results} = changeset, %Type{} = result_type) do
+    result_type = Deferred.resolve(result_type, ctx)
     %__MODULE__{changeset | results: results ++ [result_type]}
   end
 
-  def add_result(%__MODULE__{results: results} = changeset, {:parametric, _, _, _f} = result_type) do
-    %__MODULE__{changeset | results: results ++ [result_type]}
-  end
+  def add_result(%__MODULE__{results: results} = changeset, {:parametric, _, _, _f} = result_type),
+    do: %__MODULE__{changeset | results: results ++ [result_type]}
 
   def add_result(%__MODULE__{}, result) do
     raise ArgumentError, """
@@ -230,19 +175,16 @@ defmodule Beaver.Changeset do
   end
 
   @doc false
-  def reorder_operands(
-        %__MODULE__{operands: operands, name: name, attributes: attributes, context: context} =
-          changeset
-      ) do
+  def reorder_operands(%__MODULE__{operands: operands, name: name, attributes: attributes, context: ctx} = changeset) do
     case {should_reorder?(operands), MLIR.ODS.Dump.lookup(name)} do
       {true, {:ok, op_dump}} ->
         {operands, segment_sizes} = process_operands_with_dump(changeset.operands, op_dump)
-        update_changeset_with_operands(changeset, operands, segment_sizes, attributes, context)
+        update_changeset_with_operands(changeset, operands, segment_sizes, attributes, ctx)
 
       {true, _} ->
         # Extract unique operand keys and group values by key
         {operands, segment_sizes} = process_operands_with_keys(changeset.operands)
-        update_changeset_with_operands(changeset, operands, segment_sizes, attributes, context)
+        update_changeset_with_operands(changeset, operands, segment_sizes, attributes, ctx)
 
       _ ->
         changeset
@@ -253,9 +195,7 @@ defmodule Beaver.Changeset do
     # Check for duplicate keys
     keys = Keyword.keys(operands)
 
-    if length(keys) != length(Enum.uniq(keys)) do
-      raise "Duplicate keys found in operands: #{inspect(keys)}"
-    end
+    if length(keys) != length(Enum.uniq(keys)), do: raise("Duplicate keys found in operands: #{inspect(keys)}")
 
     # Extract all values in order
     grouped_values = Keyword.values(operands) |> Enum.map(&List.wrap/1)
@@ -265,13 +205,7 @@ defmodule Beaver.Changeset do
     {all_values, MLIR.ODS.segment_sizes(segment_sizes)}
   end
 
-  defp update_changeset_with_operands(
-         %__MODULE__{} = changeset,
-         operands,
-         segment_sizes,
-         attributes,
-         context
-       ) do
+  defp update_changeset_with_operands(%__MODULE__{} = changeset, operands, segment_sizes, attributes, ctx) do
     operand_segment_sizes =
       attributes[:operand_segment_sizes] || attributes[:operandSegmentSizes]
 
@@ -281,7 +215,7 @@ defmodule Beaver.Changeset do
           attributes
           |> Keyword.delete(:operand_segment_sizes)
           |> Keyword.delete(:operandSegmentSizes)
-          |> Keyword.put(:operand_segment_sizes, Beaver.Deferred.resolve(segment_sizes, context))
+          |> Keyword.put(:operand_segment_sizes, Beaver.Deferred.resolve(segment_sizes, ctx))
 
         _ ->
           attributes
@@ -290,19 +224,14 @@ defmodule Beaver.Changeset do
     %__MODULE__{changeset | operands: operands, attributes: attributes}
   end
 
-  defp should_reorder?([]) do
-    true
-  end
+  defp should_reorder?([]), do: true
 
   defp should_reorder?(operands) do
     {tagged, untagged} = Enum.split_with(operands, &match?({_atom, _value}, &1))
     has_tagged = not Enum.empty?(tagged)
     has_untagged = not Enum.empty?(untagged)
 
-    if has_tagged and has_untagged do
-      raise ArgumentError,
-            "Cannot mix tagged and untagged operands"
-    end
+    if has_tagged and has_untagged, do: raise(ArgumentError, "Cannot mix tagged and untagged operands")
 
     has_tagged
   end
@@ -324,11 +253,8 @@ defmodule Beaver.Changeset do
         values = matching_operand_values(operands, operand_name)
 
         # Warn if a required single operand is missing
-        if Enum.empty?(values) and kind == "Single" do
-          Logger.warning(
-            "Single operand '#{operand_name}' not set when creating operation #{op_name}"
-          )
-        end
+        if Enum.empty?(values) and kind == "Single",
+          do: Logger.warning("Single operand '#{operand_name}' not set when creating operation #{op_name}")
 
         {String.to_atom(operand_name), values}
       end

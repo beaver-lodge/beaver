@@ -1,22 +1,21 @@
+alias Beaver.MLIR.{CAPI, Operation, RewriterBase, Value}
+alias Beaver.Native
+
 defmodule Beaver.MLIR.ConversionPatternRewriter do
   @moduledoc """
   A conversion-aware pattern rewriter, including 1:N operation replacement.
   """
 
-  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
+  use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
 
   alias Beaver.MLIR
 
-  defdelegate as_pattern_rewriter(rewriter),
-    to: MLIR.CAPI,
-    as: :mlirConversionPatternRewriterAsPatternRewriter
+  defdelegate as_pattern_rewriter(rewriter), to: CAPI, as: :mlirConversionPatternRewriterAsPatternRewriter
 
-  def as_base(%__MODULE__{} = rewriter) do
-    rewriter |> as_pattern_rewriter() |> MLIR.PatternRewriter.as_base()
-  end
+  def as_base(%__MODULE__{} = rewriter), do: rewriter |> as_pattern_rewriter() |> MLIR.PatternRewriter.as_base()
 
   defdelegate convert_region_types(rewriter, region, converter),
-    to: MLIR.CAPI,
+    to: CAPI,
     as: :mlirConversionPatternRewriterConvertRegionTypes
 
   @doc """
@@ -26,44 +25,28 @@ defmodule Beaver.MLIR.ConversionPatternRewriter do
   the original result types because the pattern's type converter defines the
   legal mapping.
   """
-  def replace_op(%__MODULE__{} = rewriter, %MLIR.Operation{} = operation, replacement) do
+  def replace_op(%__MODULE__{} = rewriter, %Operation{} = op, replacement) do
     values =
       case replacement do
-        %MLIR.Operation{} = replacement_op ->
-          replacement_op |> MLIR.Operation.results() |> Enum.to_list()
-
-        %MLIR.Value{} = value ->
-          [value]
-
-        values when is_list(values) ->
-          values
-
-        other ->
-          raise ArgumentError, "unsupported operation replacement: #{inspect(other)}"
+        %Operation{} = replacement_op -> replacement_op |> Operation.results() |> Enum.to_list()
+        %Value{} = value -> [value]
+        values when is_list(values) -> values
+        other -> raise ArgumentError, "unsupported operation replacement: #{inspect(other)}"
       end
 
-    unless Enum.all?(values, &match?(%MLIR.Value{}, &1)) do
-      raise ArgumentError, "operation replacements must be MLIR values"
-    end
+    unless Enum.all?(values, &match?(%Value{}, &1)),
+      do: raise(ArgumentError, "operation replacements must be MLIR values")
 
-    MLIR.RewriterBase.replace_op_with_values(
-      as_base(rewriter),
-      operation,
-      length(values),
-      Beaver.Native.array(values, MLIR.Value)
-    )
+    RewriterBase.replace_op_with_values(as_base(rewriter), op, length(values), Native.array(values, Value))
   end
 
-  @spec replace_op_with_multiple(t(), MLIR.Operation.t(), [[MLIR.Value.t()]]) :: :ok
-  def replace_op_with_multiple(%__MODULE__{} = rewriter, %MLIR.Operation{} = operation, ranges)
+  @spec replace_op_with_multiple(t(), Operation.t(), [[Value.t()]]) :: :ok
+  def replace_op_with_multiple(%__MODULE__{} = rewriter, %Operation{} = op, ranges)
       when is_list(ranges) do
-    unless Enum.all?(ranges, fn range ->
-             is_list(range) and Enum.all?(range, &match?(%MLIR.Value{}, &1))
-           end) do
-      raise ArgumentError, "1:N replacements must be lists of MLIR values"
-    end
+    unless Enum.all?(ranges, fn range -> is_list(range) and Enum.all?(range, &match?(%Value{}, &1)) end),
+      do: raise(ArgumentError, "1:N replacements must be lists of MLIR values")
 
-    result_count = operation |> MLIR.Operation.results() |> Enum.count()
+    result_count = op |> Operation.results() |> Enum.count()
 
     if length(ranges) != result_count do
       raise ArgumentError,
@@ -73,21 +56,20 @@ defmodule Beaver.MLIR.ConversionPatternRewriter do
     sizes = Enum.map(ranges, &length/1)
     values = List.flatten(ranges)
 
-    MLIR.CAPI.mlirConversionPatternRewriterReplaceOpWithMultiple(
+    CAPI.mlirConversionPatternRewriterReplaceOpWithMultiple(
       rewriter,
-      operation,
+      op,
       length(ranges),
-      Beaver.Native.array(sizes, Beaver.Native.ISize, mut: true),
-      Beaver.Native.array(values, MLIR.Value, mut: true)
+      Native.array(sizes, Native.ISize, mut: true),
+      Native.array(values, Value, mut: true)
     )
   end
 
-  for {helper_name, arity} <- Beaver.MLIR.RewriterBase.helpers(),
+  for {helper_name, arity} <- RewriterBase.helpers(),
       helper_name not in [:replace_op, "replace_op"] do
     [_ | args] = Macro.generate_arguments(arity, __MODULE__)
 
-    def unquote(:"#{helper_name}")(%__MODULE__{} = rewriter, unquote_splicing(args)) do
-      MLIR.RewriterBase.unquote(:"#{helper_name}")(as_base(rewriter), unquote_splicing(args))
-    end
+    def unquote(:"#{helper_name}")(%__MODULE__{} = rewriter, unquote_splicing(args)),
+      do: RewriterBase.unquote(:"#{helper_name}")(as_base(rewriter), unquote_splicing(args))
   end
 end

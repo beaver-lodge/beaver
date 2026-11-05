@@ -27,9 +27,7 @@ fn read_opaque_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.ter
     const ptr = try mlir_capi.OpaquePtr.resource.fetch(env, args[0]);
     const len = try mlir_capi.USize.resource.fetch(env, args[1]);
     const Error = error{NullPointer};
-    if (ptr == null) {
-        return Error.NullPointer;
-    }
+    if (ptr == null) return Error.NullPointer;
     const slice = @as(mlir_capi.U8.Array.T, @ptrCast(ptr))[0..len];
     return beam.make_slice(env, slice);
 }

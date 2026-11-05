@@ -1,22 +1,19 @@
+alias Beaver.MLIR.Attribute
+
 defmodule Beaver.MLIR.Dialect.Vector do
   @moduledoc "Operations and transfer helpers for the MLIR Vector dialect."
 
   alias Beaver.MLIR
 
-  use Beaver.MLIR.Dialect,
-    dialect: "vector",
-    ops: Beaver.MLIR.Dialect.Registry.ops("vector")
+  use Beaver.MLIR.Dialect, dialect: "vector", ops: Beaver.MLIR.Dialect.Registry.ops("vector")
 
   @doc "Build the boolean array attribute used by vector transfer bounds."
   def in_bounds(bounds, opts \\ []) when is_list(bounds) do
-    unless Enum.all?(bounds, &is_boolean/1) do
-      raise ArgumentError, "vector in_bounds entries must be booleans"
-    end
+    unless Enum.all?(bounds, &is_boolean/1),
+      do: raise(ArgumentError, "vector in_bounds entries must be booleans")
 
     Beaver.Deferred.from_opts(opts, fn ctx ->
-      bounds
-      |> Enum.map(&MLIR.Attribute.bool(&1, ctx: ctx))
-      |> MLIR.Attribute.array(ctx: ctx)
+      bounds |> Enum.map(&Attribute.bool(&1, ctx: ctx)) |> Attribute.array(ctx: ctx)
     end)
   end
 
@@ -39,7 +36,7 @@ defmodule Beaver.MLIR.Dialect.Vector do
       {:indices, indices},
       {:padding, padding},
       {:mask, List.wrap(mask)},
-      {:permutation_map, MLIR.Attribute.affine_map(map)},
+      {:permutation_map, Attribute.affine_map(map)},
       {:in_bounds, in_bounds(bounds, ctx: ctx)},
       {:operand_segment_sizes, :infer}
     ]

@@ -64,9 +64,7 @@ pub fn register_all_passes() void {
 export fn core_resource_type_by_name(name: [*:0]const u8) ?*anyopaque {
     const name_slice = std.mem.span(name);
     inline for (mlir_capi.resourceSlots) |slot| {
-        if (std.mem.eql(u8, name_slice, slot.name)) {
-            return @ptrCast(slot.t.*);
-        }
+        if (std.mem.eql(u8, name_slice, slot.name)) return @ptrCast(slot.t.*);
     }
     return null;
 }

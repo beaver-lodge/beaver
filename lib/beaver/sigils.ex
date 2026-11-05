@@ -1,3 +1,5 @@
+alias Beaver.MLIR.Attribute
+
 defmodule Beaver.Sigils do
   @moduledoc """
   Sigils return explicit `Beaver.Deferred` values that parse MLIR elements in a context.
@@ -38,12 +40,12 @@ defmodule Beaver.Sigils do
       true
       iex> MLIR.Context.destroy(ctx)
   """
-  def sigil_a(string, []), do: MLIR.Attribute.get(string)
-  def sigil_a(string, [?s]), do: MLIR.Attribute.string(string)
+  def sigil_a(string, []), do: Attribute.get(string)
+  def sigil_a(string, [?s]), do: Attribute.string(string)
 
   def sigil_a(string, modifier) do
     modifier = modifier |> List.to_string()
-    MLIR.Attribute.get("#{string} : #{modifier}")
+    Attribute.get("#{string} : #{modifier}")
   end
 
   @doc """
@@ -60,11 +62,11 @@ defmodule Beaver.Sigils do
         ~o/\#{operation_name}/.(operand, attribute: value) >>> result_type
       end
   """
-  def sigil_o(operation_name, []), do: operation_builder(operation_name)
+  def sigil_o(op_name, []), do: operation_builder(op_name)
 
-  defp operation_builder(operation_name) do
+  defp operation_builder(op_name) do
     fn %Beaver.SSA{evaluator: evaluator} = ssa when is_function(evaluator, 1) ->
-      evaluator.(%Beaver.SSA{ssa | op: operation_name})
+      evaluator.(%Beaver.SSA{ssa | op: op_name})
     end
   end
 

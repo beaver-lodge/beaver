@@ -79,29 +79,18 @@ const ConditionalUseReplacer = struct {
         const from = try mlir_capi.Value.resource.fetch(env, args[0]);
         const replacement = try mlir_capi.Value.resource.fetch(env, args[1]);
 
-        self.* = .{
-            .dispatcher = dispatcher,
-            .from = from,
-            .replacement = replacement,
-        };
+        self.* = .{ .dispatcher = dispatcher, .from = from, .replacement = replacement };
         self.dispatcher.setCallback("filter", args[2]);
 
         const context = c.mlirValueGetContext(self.from);
         if (!c.mlirContextEqual(context, c.mlirValueGetContext(self.replacement))) {
             return error.ValuesFromDifferentContexts;
         }
-        if (!c.beaverContextAddWork(context, run, self)) {
-            return error.ContextMultithreadingDisabled;
-        }
+        if (!c.beaverContextAddWork(context, run, self)) return error.ContextMultithreadingDisabled;
 
-        var result = [_]beam.term{
-            beam.make_atom(env, "async"),
-            self.dispatcher.copyId(env),
-        };
+        var result = [_]beam.term{ beam.make_atom(env, "async"), self.dispatcher.copyId(env) };
         return beam.make_tuple(env, &result);
     }
 };
 
-pub const nifs = .{
-    prelude.beaverRawNIF(ConditionalUseReplacer, "value_replace_uses_with_if", 3),
-};
+pub const nifs = .{prelude.beaverRawNIF(ConditionalUseReplacer, "value_replace_uses_with_if", 3)};

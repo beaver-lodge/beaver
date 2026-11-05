@@ -31,30 +31,20 @@ namespace parser {
 
 constexpr llvm::StringLiteral kConstraintSuffixSeparator = "__beaver_ods__";
 
-std::string makeConstraintKey(StringRef name, StringRef summary,
-                              StringRef cppClass) {
-  if (name.contains(kConstraintSuffixSeparator))
-    return name.str();
+std::string makeConstraintKey(StringRef name, StringRef summary, StringRef cppClass) {
+  if (name.contains(kConstraintSuffixSeparator)) return name.str();
 
-  return llvm::formatv("{0}{1}{2:x}",
-                       name.empty() ? StringRef("anonymous_constraint") : name,
-                       kConstraintSuffixSeparator,
-                       llvm::hash_combine(summary, cppClass))
+  return llvm::formatv("{0}{1}{2:x}", name.empty() ? StringRef("anonymous_constraint") : name,
+                       kConstraintSuffixSeparator, llvm::hash_combine(summary, cppClass))
       .str();
 }
 
-StringRef displayConstraintName(StringRef name) {
-  return name.split(kConstraintSuffixSeparator).first;
-}
+StringRef displayConstraintName(StringRef name) { return name.split(kConstraintSuffixSeparator).first; }
 
-template <typename T>
-SmallVector<T *> sortMapByName(const llvm::StringMap<std::unique_ptr<T>> &map) {
+template <typename T> SmallVector<T *> sortMapByName(const llvm::StringMap<std::unique_ptr<T>> &map) {
   SmallVector<T *> storage;
-  for (auto &entry : map)
-    storage.push_back(entry.second.get());
-  llvm::sort(storage, [](const auto &lhs, const auto &rhs) {
-    return lhs->getName() < rhs->getName();
-  });
+  for (auto &entry : map) storage.push_back(entry.second.get());
+  llvm::sort(storage, [](const auto &lhs, const auto &rhs) { return lhs->getName() < rhs->getName(); });
   return storage;
 }
 
@@ -101,18 +91,15 @@ void printODSContext(raw_ostream &os, const ods::Context &odsContext) {
 
   llvm::json::OStream j(os, 2);
 
-  auto printOperandsOrResults = [&](StringRef name,
-                                    ArrayRef<OperandOrResult> elements) {
-    if (elements.empty())
-      return;
+  auto printOperandsOrResults = [&](StringRef name, ArrayRef<OperandOrResult> elements) {
+    if (elements.empty()) return;
     j.attributeArray(name, [&] {
       for (const auto &element : elements) {
-          j.object([&] {
-            j.attribute("name", element.getName());
-            j.attribute("constraint", formatConstraintName(element.getConstraint()));
-            j.attribute("description", element.getConstraint().getSummary());
-            j.attribute("kind",
-                      getVariableLengthStr(element.getVariableLengthKind()));
+        j.object([&] {
+          j.attribute("name", element.getName());
+          j.attribute("constraint", formatConstraintName(element.getConstraint()));
+          j.attribute("description", element.getConstraint().getSummary());
+          j.attribute("kind", getVariableLengthStr(element.getVariableLengthKind()));
         });
       }
     });
@@ -126,22 +113,18 @@ void printODSContext(raw_ostream &os, const ods::Context &odsContext) {
           j.attributeArray("operations", [&] {
             for (const Operation *op : sortMapByName(dialect.getOperations())) {
               const OdsExtras *extras = nullptr;
-              if (auto it = g_extras.find(op->getName()); it != g_extras.end())
-                extras = &it->second;
+              if (auto it = g_extras.find(op->getName()); it != g_extras.end()) extras = &it->second;
 
               j.object([&] {
                 j.attribute("name", op->getName());
                 j.attribute("summary", op->getSummary());
                 j.attribute("description", op->getDescription());
-                j.attribute("result_type_inference",
-                            op->hasResultTypeInferrence());
-                j.attribute("native_class_name",
-                            extras ? extras->nativeClassName : "");
+                j.attribute("result_type_inference", op->hasResultTypeInferrence());
+                j.attribute("native_class_name", extras ? extras->nativeClassName : "");
 
                 if (extras && !extras->traits.empty()) {
                   j.attributeArray("traits", [&] {
-                    for (const std::string &trait : extras->traits)
-                      j.value(trait);
+                    for (const std::string &trait : extras->traits) j.value(trait);
                   });
                 }
 
@@ -175,8 +158,7 @@ void printODSContext(raw_ostream &os, const ods::Context &odsContext) {
                   });
                 }
 
-                if (extras && !extras->assemblyFormat.empty())
-                  j.attribute("assembly_format", extras->assemblyFormat);
+                if (extras && !extras->assemblyFormat.empty()) j.attribute("assembly_format", extras->assemblyFormat);
 
                 j.attribute("has_folder", extras ? extras->hasFolder : false);
 
@@ -187,15 +169,10 @@ void printODSContext(raw_ostream &os, const ods::Context &odsContext) {
                     for (const Attribute &attr : attributes) {
                       j.object([&] {
                         j.attribute("name", attr.getName());
-                        j.attribute("constraint",
-                                    formatConstraintName(attr.getConstraint()));
-                        j.attribute("description",
-                                    attr.getConstraint().getSummary());
-                        j.attribute("kind",
-                                    getVariableLengthStr(
-                                        attr.isOptional()
-                                            ? VariableLengthKind::Optional
-                                            : VariableLengthKind::Single));
+                        j.attribute("constraint", formatConstraintName(attr.getConstraint()));
+                        j.attribute("description", attr.getConstraint().getSummary());
+                        j.attribute("kind", getVariableLengthStr(attr.isOptional() ? VariableLengthKind::Optional
+                                                                                   : VariableLengthKind::Single));
                       });
                     }
                   });
@@ -221,28 +198,21 @@ std::string processAndFormatDoc(const Twine &doc) {
   {
     llvm::raw_string_ostream docOS(docStr);
     std::string tmpDocStr = doc.str();
-    raw_indented_ostream(docOS).printReindented(
-        StringRef(tmpDocStr).rtrim(" 	"));
+    raw_indented_ostream(docOS).printReindented(StringRef(tmpDocStr).rtrim(" 	"));
   }
   return docStr;
 }
 
-void processTdIncludeRecords(const llvm::RecordKeeper &tdRecords,
-                             ods::Context &odsContext) {
+void processTdIncludeRecords(const llvm::RecordKeeper &tdRecords, ods::Context &odsContext) {
   // Return the length kind of the given value.
   auto getLengthKind = [](const auto &value) {
-    if (value.isOptional())
-      return ods::VariableLengthKind::Optional;
-    return value.isVariadic() ? ods::VariableLengthKind::Variadic
-                              : ods::VariableLengthKind::Single;
+    if (value.isOptional()) return ods::VariableLengthKind::Optional;
+    return value.isVariadic() ? ods::VariableLengthKind::Variadic : ods::VariableLengthKind::Single;
   };
 
-  auto addTypeConstraint = [&](const tblgen::NamedTypeConstraint &cst)
-      -> const ods::TypeConstraint & {
+  auto addTypeConstraint = [&](const tblgen::NamedTypeConstraint &cst) -> const ods::TypeConstraint & {
     return odsContext.insertTypeConstraint(
-        makeConstraintKey(cst.constraint.getUniqueDefName(),
-                          cst.constraint.getSummary(),
-                          cst.constraint.getCppType()),
+        makeConstraintKey(cst.constraint.getUniqueDefName(), cst.constraint.getSummary(), cst.constraint.getCppType()),
         cst.constraint.getSummary(), cst.constraint.getCppType());
   };
 
@@ -252,34 +222,27 @@ void processTdIncludeRecords(const llvm::RecordKeeper &tdRecords,
     tblgen::Operator op(def);
 
     // Check to see if this operation is known to support type inferrence.
-    bool supportsResultTypeInferrence =
-        op.getTrait("::mlir::InferTypeOpInterface::Trait");
+    bool supportsResultTypeInferrence = op.getTrait("::mlir::InferTypeOpInterface::Trait");
 
-    auto [odsOp, inserted] = odsContext.insertOperation(
-        op.getOperationName(), op.getSummary(),
-        processAndFormatDoc(op.getDescription()), op.getQualCppClassName(),
-        supportsResultTypeInferrence, op.getLoc().front());
+    auto [odsOp, inserted] =
+        odsContext.insertOperation(op.getOperationName(), op.getSummary(), processAndFormatDoc(op.getDescription()),
+                                   op.getQualCppClassName(), supportsResultTypeInferrence, op.getLoc().front());
 
     // Ignore operations that have already been added.
-    if (!inserted)
-      continue;
+    if (!inserted) continue;
 
     for (const tblgen::NamedAttribute &attr : op.getAttributes()) {
       odsOp->appendAttribute(
           attr.name, attr.attr.isOptional(),
           odsContext.insertAttributeConstraint(
-              makeConstraintKey(attr.attr.getUniqueDefName(),
-                                attr.attr.getSummary(),
-                                attr.attr.getStorageType()),
+              makeConstraintKey(attr.attr.getUniqueDefName(), attr.attr.getSummary(), attr.attr.getStorageType()),
               attr.attr.getSummary(), attr.attr.getStorageType()));
     }
     for (const tblgen::NamedTypeConstraint &operand : op.getOperands()) {
-      odsOp->appendOperand(operand.name, getLengthKind(operand),
-                           addTypeConstraint(operand));
+      odsOp->appendOperand(operand.name, getLengthKind(operand), addTypeConstraint(operand));
     }
     for (const tblgen::NamedTypeConstraint &result : op.getResults()) {
-      odsOp->appendResult(result.name, getLengthKind(result),
-                          addTypeConstraint(result));
+      odsOp->appendResult(result.name, getLengthKind(result), addTypeConstraint(result));
     }
 
     // Collect the extra facts that the pdll ODS context does not carry.
@@ -294,8 +257,7 @@ void processTdIncludeRecords(const llvm::RecordKeeper &tdRecords,
         // Predicate and internal traits carry anonymous record names; keep
         // only the ones with a real TableGen name.
         StringRef name = trait.getDef().getName();
-        if (!name.starts_with("anonymous_"))
-          extras.traits.push_back(name.str());
+        if (!name.starts_with("anonymous_")) extras.traits.push_back(name.str());
       }
     }
 
@@ -317,22 +279,19 @@ void processTdIncludeRecords(const llvm::RecordKeeper &tdRecords,
       extras.builders.push_back(std::move(builderInfo));
     }
 
-    if (op.hasAssemblyFormat())
-      extras.assemblyFormat = op.getAssemblyFormat().str();
+    if (op.hasAssemblyFormat()) extras.assemblyFormat = op.getAssemblyFormat().str();
 
     g_extras[op.getOperationName()] = std::move(extras);
   }
 }
 
-LogicalResult parseTdInclude(
-    ods::Context &odsContext, StringRef filename, llvm::SourceMgr &parserSrcMgr,
-    function_ref<LogicalResult(llvm::SMRange, const Twine &)> emitError) {
+LogicalResult parseTdInclude(ods::Context &odsContext, StringRef filename, llvm::SourceMgr &parserSrcMgr,
+                             function_ref<LogicalResult(llvm::SMRange, const Twine &)> emitError) {
   // Use the source manager to open the file, but don't yet add it.
   std::string includedFile;
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> includeBuffer =
       parserSrcMgr.OpenIncludeFile(filename.str(), includedFile);
-  if (!includeBuffer)
-    return emitError({}, "could not open file '" + filename + "'");
+  if (!includeBuffer) return emitError({}, "could not open file '" + filename + "'");
 
   // Setup the source manager for parsing the tablegen file.
   llvm::SourceMgr tdSrcMgr;
@@ -343,18 +302,15 @@ LogicalResult parseTdInclude(
   // Set the diagnostic handler for the tablegen source manager.
   tdSrcMgr.setDiagHandler(
       [](const llvm::SMDiagnostic &diag, void *rawHandlerContext) {
-        const std::string *filenamePtr =
-            static_cast<const std::string *>(rawHandlerContext);
-        llvm::errs() << llvm::formatv(
-            "error while processing include file `{0}`: {1}\n",
-            filenamePtr ? *filenamePtr : "<unknown>", diag.getMessage());
+        const std::string *filenamePtr = static_cast<const std::string *>(rawHandlerContext);
+        llvm::errs() << llvm::formatv("error while processing include file `{0}`: {1}\n",
+                                      filenamePtr ? *filenamePtr : "<unknown>", diag.getMessage());
       },
       &filename);
 
   // Parse the tablegen file.
   llvm::RecordKeeper tdRecords;
-  if (llvm::TableGenParseFile(tdSrcMgr, tdRecords))
-    return failure();
+  if (llvm::TableGenParseFile(tdSrcMgr, tdRecords)) return failure();
 
   // Process the parsed records.
   processTdIncludeRecords(tdRecords, odsContext);
@@ -368,21 +324,16 @@ int main(int argc, char **argv) {
   // options as static variables.. some of which overlap with our options.
   llvm::cl::ResetCommandLineParser();
 
-  llvm::cl::list<std::string> inputFilenames(llvm::cl::Positional,
-                                             llvm::cl::desc("<input files>"),
+  llvm::cl::list<std::string> inputFilenames(llvm::cl::Positional, llvm::cl::desc("<input files>"),
                                              llvm::cl::value_desc("filename"));
 
-  llvm::cl::opt<std::string> outputFilename(
-      "o", llvm::cl::desc("Output filename"), llvm::cl::value_desc("filename"),
-      llvm::cl::init("-"));
+  llvm::cl::opt<std::string> outputFilename("o", llvm::cl::desc("Output filename"), llvm::cl::value_desc("filename"),
+                                            llvm::cl::init("-"));
 
-  llvm::cl::list<std::string> includeDirs(
-      "I", llvm::cl::desc("Directory of include files"),
-      llvm::cl::value_desc("directory"), llvm::cl::Prefix);
+  llvm::cl::list<std::string> includeDirs("I", llvm::cl::desc("Directory of include files"),
+                                          llvm::cl::value_desc("directory"), llvm::cl::Prefix);
 
-  llvm::cl::opt<bool> writeIfChanged(
-      "write-if-changed",
-      llvm::cl::desc("Only write to the output file if it changed"));
+  llvm::cl::opt<bool> writeIfChanged("write-if-changed", llvm::cl::desc("Only write to the output file if it changed"));
 
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "PDLL Frontend");
@@ -394,12 +345,10 @@ int main(int argc, char **argv) {
 
   for (const auto &inputFilename : inputFilenames) {
     // Process the .td file directly
-    if (failed(parser::parseTdInclude(odsContext, inputFilename, sourceMgr,
-                                      [](llvm::SMRange loc, const Twine &msg) {
-                                        llvm::errs()
-                                            << "error: " << msg << "\n";
-                                        return failure();
-                                      }))) {
+    if (failed(parser::parseTdInclude(odsContext, inputFilename, sourceMgr, [](llvm::SMRange loc, const Twine &msg) {
+          llvm::errs() << "error: " << msg << "\n";
+          return failure();
+        }))) {
       return 1;
     }
   }
@@ -414,17 +363,14 @@ int main(int argc, char **argv) {
     // Only update the real output file if there are any differences. This
     // prevents recompilation of all the files depending on it if there aren't
     // any.
-    if (auto existingOrErr =
-            llvm::MemoryBuffer::getFile(outputFilename, /*IsText=*/true))
-      if (std::move(existingOrErr.get())->getBuffer() == outputStr)
-        shouldWriteOutput = false;
+    if (auto existingOrErr = llvm::MemoryBuffer::getFile(outputFilename, /*IsText=*/true))
+      if (std::move(existingOrErr.get())->getBuffer() == outputStr) shouldWriteOutput = false;
   }
 
   // Populate the output file if necessary.
   if (shouldWriteOutput) {
     std::string errorMessage;
-    std::unique_ptr<llvm::ToolOutputFile> outputFile =
-        openOutputFile(outputFilename, &errorMessage);
+    std::unique_ptr<llvm::ToolOutputFile> outputFile = openOutputFile(outputFilename, &errorMessage);
     if (!outputFile) {
       llvm::errs() << errorMessage << "\n";
       return 1;

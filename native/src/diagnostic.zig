@@ -62,20 +62,14 @@ const DiagnosticAggregator = struct {
         errdefer e.enif_free_env(diagnostic_env);
 
         const user_data = try beam.allocator.create(DiagnosticAggregator);
-        user_data.* = .{
-            .env = diagnostic_env,
-            .container = Container.init(beam.allocator),
-        };
+        user_data.* = .{ .env = diagnostic_env, .container = Container.init(beam.allocator) };
         return user_data;
     }
     fn to_list(this: *@This(), destination_env: beam.env) !beam.term {
         this.mutex.lock();
         defer this.mutex.unlock();
 
-        return e.enif_make_copy(
-            destination_env,
-            beam.make_term_list(this.env, this.container.items),
-        );
+        return e.enif_make_copy(destination_env, beam.make_term_list(this.env, this.container.items));
     }
 };
 

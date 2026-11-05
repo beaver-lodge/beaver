@@ -26,15 +26,12 @@ defmodule Mix.Tasks.Shadow.TuneReport do
     |> IO.puts()
   end
 
-  def run(_) do
-    IO.puts("usage: mix shadow.tune_report <fixture>")
-  end
+  def run(_), do: IO.puts("usage: mix shadow.tune_report <fixture>")
 
-  defp default_configs do
-    [
+  defp default_configs,
+    do: [
       %Beaver.Shadow.Tuning.Config{index: 0, num_warps: 2},
       %Beaver.Shadow.Tuning.Config{index: 1, num_warps: 4},
       %Beaver.Shadow.Tuning.Config{index: 2, num_warps: 8}
     ]
-  end
 end

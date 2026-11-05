@@ -1,3 +1,5 @@
+alias Beaver.MLIR.Type
+
 defmodule Beaver.ENIF.Type do
   @moduledoc """
   Query the MLIR type of an Erlang term or environment.
@@ -11,20 +13,18 @@ defmodule Beaver.ENIF.Type do
   - A list of argument MLIR types.
   - A list of return MLIR types.
   """
-  @type signature() :: {atom(), [MLIR.Type.t()], [MLIR.Type.t()]}
+  @type signature() :: {atom(), [Type.t()], [Type.t()]}
   defp query_type(obj, opts) do
     Beaver.Deferred.from_opts(
       opts,
       fn %MLIR.Context{ref: ref} ->
         ref = MLIR.CAPI.beaver_raw_mlir_type_of_enif_obj(ref, obj)
-        %MLIR.Type{ref: ref}
+        %Type{ref: ref}
       end
     )
   end
 
   for t <- ~w{env term binary pid} do
-    def unquote(:"#{t}")(opts \\ []) do
-      query_type(unquote(:"#{t}"), opts)
-    end
+    def unquote(:"#{t}")(opts \\ []), do: query_type(unquote(:"#{t}"), opts)
   end
 end

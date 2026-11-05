@@ -52,11 +52,8 @@ defmodule Beaver.Shadow.Wasm do
     runner = Keyword.get(opts, :runner, "node")
 
     case runner_available?(runner) do
-      false ->
-        {:error, {:wasm_unavailable, "no #{runner} runtime on PATH"}}
-
-      true ->
-        evaluate_with_runtime(source, resolved, candidate, runner, opts)
+      false -> {:error, {:wasm_unavailable, "no #{runner} runtime on PATH"}}
+      true -> evaluate_with_runtime(source, resolved, candidate, runner, opts)
     end
   end
 
@@ -79,9 +76,7 @@ defmodule Beaver.Shadow.Wasm do
 
   defp compile_source!(%MLIR.Module{} = module, _context), do: module
 
-  defp compile_source!(source, context) when is_binary(source) do
-    MLIR.Module.create!(source, ctx: context)
-  end
+  defp compile_source!(source, ctx) when is_binary(source), do: MLIR.Module.create!(source, ctx: ctx)
 
   defp package_and_run(module, resolved, candidate, runner, opts) do
     entry = Keyword.get(opts, :entry, "main")
@@ -91,13 +86,7 @@ defmodule Beaver.Shadow.Wasm do
 
     started = System.monotonic_time()
 
-    binary =
-      Wasm.package_binary!(
-        module,
-        target: target,
-        entry: entry,
-        nostdlib: nostdlib
-      )
+    binary = Wasm.package_binary!(module, target: target, entry: entry, nostdlib: nostdlib)
 
     {outcome, node_ms} = run_in_runtime(binary, entry, args, runner)
     duration = System.monotonic_time() - started
@@ -213,7 +202,6 @@ defmodule Beaver.Shadow.Wasm do
     _ -> %{runner: runner, version: nil}
   end
 
-  defp tmp_wasm_path do
-    Path.join(System.tmp_dir!(), "shadow_wasm_#{System.unique_integer([:positive])}.wasm")
-  end
+  defp tmp_wasm_path,
+    do: Path.join(System.tmp_dir!(), "shadow_wasm_#{System.unique_integer([:positive])}.wasm")
 end

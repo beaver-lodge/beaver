@@ -1,3 +1,6 @@
+alias Beaver.MLIR.CAPI
+alias Beaver.Native
+
 defmodule Beaver.MLIR.RewritePattern do
   @moduledoc """
   This module defines functions working with MLIR Rewrite Patterns.
@@ -5,7 +8,7 @@ defmodule Beaver.MLIR.RewritePattern do
   require Logger
   alias Beaver.MLIR
   alias __MODULE__.Server
-  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
+  use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
   @type state() :: any()
 
   @callback construct(state :: state()) :: state()
@@ -30,27 +33,18 @@ defmodule Beaver.MLIR.RewritePattern do
 
   @registry __MODULE__.Registry
   @doc false
-  def global_registrar_child_specs() do
-    [{Registry, keys: :unique, name: @registry}]
-  end
+  def global_registrar_child_specs(), do: [{Registry, keys: :unique, name: @registry}]
 
   defp start_worker(name, init_state) do
     case Server.start_link(name, init_state) do
-      {:ok, pid} ->
-        pid
-
-      {:error, {:already_started, pid}} ->
-        pid
-
-      {:error, reason} ->
-        raise reason
+      {:ok, pid} -> pid
+      {:error, {:already_started, pid}} -> pid
+      {:error, reason} -> raise reason
     end
   end
 
   defp handle_cb({:construct, token_ref, construct, id}, init_state) do
-    {:via, Registry, {@registry, id}}
-    |> start_worker(init_state)
-    |> GenServer.cast({:construct, token_ref, construct})
+    {:via, Registry, {@registry, id}} |> start_worker(init_state) |> GenServer.cast({:construct, token_ref, construct})
   end
 
   def create(root_name, opts) do
@@ -60,26 +54,17 @@ defmodule Beaver.MLIR.RewritePattern do
     construct = opts[:construct] || (&Beaver.FallbackPattern.construct/1)
     destruct = opts[:destruct] || (&Beaver.FallbackPattern.destruct/1)
 
-    match_and_rewrite =
-      opts[:match_and_rewrite] || (&Beaver.FallbackPattern.match_and_rewrite/4)
+    match_and_rewrite = opts[:match_and_rewrite] || (&Beaver.FallbackPattern.match_and_rewrite/4)
 
     :async =
-      MLIR.CAPI.beaver_raw_create_mlir_rewrite_pattern(
-        root_name,
-        benefit,
-        ctx.ref,
-        construct,
-        destruct,
-        match_and_rewrite
-      )
+      CAPI.beaver_raw_create_mlir_rewrite_pattern(root_name, benefit, ctx.ref, construct, destruct, match_and_rewrite)
 
     receive do
       msg -> handle_cb(msg, init_state)
     end
 
     receive do
-      {:kind, __MODULE__, ref} = msg when is_reference(ref) ->
-        msg |> Beaver.Native.check!()
+      {:kind, __MODULE__, ref} = msg when is_reference(ref) -> msg |> Native.check!()
     end
   end
 end
@@ -93,37 +78,27 @@ defmodule Beaver.MLIR.RewritePattern.Server do
 
   # Client API
 
-  def start_link(name, state) do
-    GenServer.start_link(__MODULE__, state, name: name)
-  end
+  def start_link(name, state), do: GenServer.start_link(__MODULE__, state, name: name)
 
   # Server Callbacks
 
   @impl true
-  def init(initial_state) do
-    {:ok, initial_state}
-  end
+  def init(initial_state), do: {:ok, initial_state}
 
   @impl true
   def handle_cast({:construct, token_ref, construct_fun}, state) do
     case invoke(token_ref, fn -> {:ok, construct_fun.(state)} end, &log_exception/1) do
-      {:ok, new_state} ->
-        {:noreply, new_state}
-
-      {:exception, _kind, _reason, _stacktrace} ->
-        {:noreply, state}
+      {:ok, new_state} -> {:noreply, new_state}
+      {:exception, _kind, _reason, _stacktrace} -> {:noreply, state}
     end
   end
 
   @impl true
-  def handle_info(
-        {:matchAndRewrite, token_ref, match_and_rewrite, _id, pattern, op, rewriter},
-        state
-      ) do
+  def handle_info({:matchAndRewrite, token_ref, match_and_rewrite, _id, pattern, op, rewriter}, state) do
     case invoke(
            token_ref,
            fn ->
-             kind_args = Enum.map([pattern, op, rewriter], &Beaver.Native.check!/1)
+             kind_args = Enum.map([pattern, op, rewriter], &Native.check!/1)
              apply(match_and_rewrite, kind_args ++ [state])
            end,
            &log_exception/1
@@ -143,22 +118,13 @@ defmodule Beaver.MLIR.RewritePattern.Server do
   @impl true
   def handle_info({:destruct, token_ref, destruct, _id}, state) do
     case invoke(token_ref, fn -> {:ok, destruct.(state)} end, &log_exception/1) do
-      {:ok, _result} ->
-        {:stop, :normal, nil}
-
-      {:exception, _kind, _reason, _stacktrace} ->
-        {:stop, :normal, nil}
+      {:ok, _result} -> {:stop, :normal, nil}
+      {:exception, _kind, _reason, _stacktrace} -> {:stop, :normal, nil}
     end
   end
 
-  defp invoke(token_ref, callback, before_reply) do
-    CallbackRuntime.invoke(
-      token_ref,
-      callback,
-      &MLIR.CAPI.beaver_raw_callback_reply/2,
-      before_reply
-    )
-  end
+  defp invoke(token_ref, callback, before_reply),
+    do: CallbackRuntime.invoke(token_ref, callback, &CAPI.beaver_raw_callback_reply/2, before_reply)
 
   defp log_exception({:exception, kind, reason, stacktrace}) do
     Logger.error(Exception.format(kind, reason, stacktrace))

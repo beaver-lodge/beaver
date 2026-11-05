@@ -34,28 +34,23 @@ defmodule Beaver.MLIR.InferShapedType do
     |> then(&apply(MLIR.CAPI, :beaver_raw_infer_return_type_components, &1))
     |> Beaver.Native.check!()
     |> case do
-      {components, _diagnostics} when is_list(components) ->
-        {:ok, Enum.map(components, &normalize_component/1)}
-
-      {:error, diagnostics} ->
-        {:error, diagnostics}
+      {components, _diagnostics} when is_list(components) -> {:ok, Enum.map(components, &normalize_component/1)}
+      {:error, diagnostics} -> {:error, diagnostics}
     end
   end
 
-  defp normalize_component({shape, element_type, encoding}) do
-    %Component{
+  defp normalize_component({shape, element_type, encoding}),
+    do: %Component{
       shape: normalize_shape(shape),
       element_type: normalize_optional_handle(element_type),
       encoding: normalize_optional_handle(encoding)
     }
-  end
 
   defp normalize_optional_handle(nil), do: nil
   defp normalize_optional_handle(handle), do: Beaver.Native.check!(handle)
 
   defp normalize_shape(:unranked), do: :unranked
 
-  defp normalize_shape(shape) do
-    Enum.map(shape, &MLIR.ShapedType.cast_dynamic_magic_number(&1, :size))
-  end
+  defp normalize_shape(shape),
+    do: Enum.map(shape, &MLIR.ShapedType.cast_dynamic_magic_number(&1, :size))
 end

@@ -40,18 +40,14 @@ static std::string printLocation(Location loc) {
 static llvm::json::Object serializeIRUnit(const IRUnit &unit) {
   if (isa<Operation *>(unit)) {
     auto *op = cast<Operation *>(unit);
-    return llvm::json::Object{{"kind", "operation"},
-                              {"name", op->getName().getStringRef().str()},
-                              {"loc", printLocation(op->getLoc())}};
+    return llvm::json::Object{
+        {"kind", "operation"}, {"name", op->getName().getStringRef().str()}, {"loc", printLocation(op->getLoc())}};
   }
-  if (isa<Region *>(unit))
-    return llvm::json::Object{{"kind", "region"}};
-  if (isa<Block *>(unit))
-    return llvm::json::Object{{"kind", "block"}};
+  if (isa<Region *>(unit)) return llvm::json::Object{{"kind", "region"}};
+  if (isa<Block *>(unit)) return llvm::json::Object{{"kind", "block"}};
   if (isa<Value>(unit)) {
     Value value = cast<Value>(unit);
-    return llvm::json::Object{{"kind", "value"},
-                              {"loc", printLocation(value.getLoc())}};
+    return llvm::json::Object{{"kind", "value"}, {"loc", printLocation(value.getLoc())}};
   }
   return llvm::json::Object{{"kind", "unknown"}};
 }
@@ -60,31 +56,24 @@ static llvm::json::Object serializeIRUnit(const IRUnit &unit) {
 static llvm::json::Array serializeIRUnits(ArrayRef<IRUnit> units) {
   llvm::json::Array result;
   result.reserve(units.size());
-  for (const IRUnit &unit : units)
-    result.emplace_back(serializeIRUnit(unit));
+  for (const IRUnit &unit : units) result.emplace_back(serializeIRUnit(unit));
   return result;
 }
 
 class ActionTracingSession {
 public:
-  ActionTracingSession(MLIRContext *context, std::string filterJson,
-                       std::string locationJson, std::string skipJson,
+  ActionTracingSession(MLIRContext *context, std::string filterJson, std::string locationJson, std::string skipJson,
                        std::string limitJson)
-      : context(context), filterTags(parseTagList(filterJson)),
-        filterLocations(parseStringList(locationJson)),
+      : context(context), filterTags(parseTagList(filterJson)), filterLocations(parseStringList(locationJson)),
         skipCounts(parseCountMap(skipJson)), limits(parseCountMap(limitJson)),
-        controlCallback([this](const ActionActiveStack *stack) {
-          return controlAction(stack);
-        }),
+        controlCallback([this](const ActionActiveStack *stack) { return controlAction(stack); }),
         executionContext(controlCallback) {
     // Breakpoints make the control callback run: ExecutionContext only invokes
     // the callback when a breakpoint matches the action. Tags named in
     // :skip/:limit therefore get a breakpoint so their first occurrences can be
     // skipped or limited.
-    for (const auto &entry : skipCounts)
-      tagBreakpoints.addBreakpoint(entry.first);
-    for (const auto &entry : limits)
-      tagBreakpoints.addBreakpoint(entry.first);
+    for (const auto &entry : skipCounts) tagBreakpoints.addBreakpoint(entry.first);
+    for (const auto &entry : limits) tagBreakpoints.addBreakpoint(entry.first);
     executionContext.addBreakpointManager(&tagBreakpoints);
   }
 
@@ -97,9 +86,7 @@ public:
 
   void attach() {
     context->registerActionHandler(
-        [this](function_ref<void()> transform, const Action &action) {
-          executionContext(transform, action);
-        });
+        [this](function_ref<void()> transform, const Action &action) { executionContext(transform, action); });
     executionContext.registerObserver(&observer);
   }
 
@@ -111,8 +98,7 @@ public:
     }
     llvm::json::Array payload;
     payload.reserve(drained.size());
-    for (auto &event : drained)
-      payload.emplace_back(std::move(event));
+    for (auto &event : drained) payload.emplace_back(std::move(event));
 
     std::string buffer;
     llvm::raw_string_ostream os(buffer);
@@ -130,35 +116,29 @@ private:
 
     ActionTracingSession *session;
 
-    void beforeExecute(const ActionActiveStack *stack, Breakpoint *,
-                       bool willExecute) override {
-      if (!willExecute)
-        return;
+    void beforeExecute(const ActionActiveStack *stack, Breakpoint *, bool willExecute) override {
+      if (!willExecute) return;
       const Action &action = stack->getAction();
-      if (!session->shouldObserve(action))
-        return;
+      if (!session->shouldObserve(action)) return;
       std::string description;
       llvm::raw_string_ostream os(description);
       action.print(os);
       os.flush();
-      session->push(llvm::json::Object{
-          {"phase", "before"},
-          {"tag", action.getTag().str()},
-          {"depth", static_cast<uint64_t>(stack->getDepth())},
-          {"description", std::move(description)},
-          {"ir_units", serializeIRUnits(action.getContextIRUnits())},
-          {"t_ns", nowNs()}});
+      session->push(llvm::json::Object{{"phase", "before"},
+                                       {"tag", action.getTag().str()},
+                                       {"depth", static_cast<uint64_t>(stack->getDepth())},
+                                       {"description", std::move(description)},
+                                       {"ir_units", serializeIRUnits(action.getContextIRUnits())},
+                                       {"t_ns", nowNs()}});
     }
 
     void afterExecute(const ActionActiveStack *stack) override {
       const Action &action = stack->getAction();
-      if (!session->shouldObserve(action))
-        return;
-      session->push(llvm::json::Object{
-          {"phase", "after"},
-          {"tag", action.getTag().str()},
-          {"depth", static_cast<uint64_t>(stack->getDepth())},
-          {"t_ns", nowNs()}});
+      if (!session->shouldObserve(action)) return;
+      session->push(llvm::json::Object{{"phase", "after"},
+                                       {"tag", action.getTag().str()},
+                                       {"depth", static_cast<uint64_t>(stack->getDepth())},
+                                       {"t_ns", nowNs()}});
     }
   };
 
@@ -178,8 +158,7 @@ private:
 
     auto limitIt = limits.find(tag);
     if (limitIt != limits.end()) {
-      if (limitIt->second == 0)
-        return ExecutionContext::Skip;
+      if (limitIt->second == 0) return ExecutionContext::Skip;
       limitIt->second--;
     }
 
@@ -189,9 +168,7 @@ private:
   bool shouldObserve(const Action &action) const {
     if (!filterTags.empty()) {
       std::string tag = action.getTag().str();
-      if (std::find(filterTags.begin(), filterTags.end(), tag) ==
-          filterTags.end())
-        return false;
+      if (std::find(filterTags.begin(), filterTags.end(), tag) == filterTags.end()) return false;
     }
     if (!filterLocations.empty()) {
       bool found = false;
@@ -201,8 +178,7 @@ private:
           loc = cast<Operation *>(unit)->getLoc();
         else if (isa<Value>(unit))
           loc = cast<Value>(unit).getLoc();
-        if (!loc)
-          continue;
+        if (!loc) continue;
         std::string printed = printLocation(*loc);
         for (const std::string &needle : filterLocations) {
           if (printed.find(needle) != std::string::npos) {
@@ -210,11 +186,9 @@ private:
             break;
           }
         }
-        if (found)
-          break;
+        if (found) break;
       }
-      if (!found)
-        return false;
+      if (!found) return false;
     }
     return true;
   }
@@ -224,59 +198,49 @@ private:
     events.push_back(std::move(event));
   }
 
-  static std::vector<std::string> parseTagList(llvm::StringRef json) {
-    return parseStringList(json);
-  }
+  static std::vector<std::string> parseTagList(llvm::StringRef json) { return parseStringList(json); }
 
   static std::vector<std::string> parseStringList(llvm::StringRef json) {
-    if (json.empty())
-      return {};
+    if (json.empty()) return {};
     auto value = llvm::json::parse(json);
     if (!value) {
       llvm::consumeError(value.takeError());
       return {};
     }
     const auto *array = value->getAsArray();
-    if (!array)
-      return {};
+    if (!array) return {};
 
     std::vector<std::string> result;
     result.reserve(array->size());
     for (const auto &element : *array) {
       auto string = element.getAsString();
-      if (!string)
-        return {};
+      if (!string) return {};
       result.push_back(string->str());
     }
     return result;
   }
 
-  static std::unordered_map<std::string, uint64_t>
-  parseCountMap(llvm::StringRef json) {
+  static std::unordered_map<std::string, uint64_t> parseCountMap(llvm::StringRef json) {
     std::unordered_map<std::string, uint64_t> result;
-    if (json.empty())
-      return result;
+    if (json.empty()) return result;
     auto value = llvm::json::parse(json);
     if (!value) {
       llvm::consumeError(value.takeError());
       return result;
     }
     const auto *object = value->getAsObject();
-    if (!object)
-      return result;
+    if (!object) return result;
 
     for (const auto &entry : *object) {
       auto count = entry.second.getAsUINT64();
-      if (!count)
-        return {};
+      if (!count) return {};
       result.emplace(entry.first.str(), *count);
     }
     return result;
   }
 
   static uint64_t nowNs() {
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(
-               std::chrono::steady_clock::now().time_since_epoch())
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())
         .count();
   }
 
@@ -285,8 +249,7 @@ private:
   std::vector<std::string> filterLocations;
   std::unordered_map<std::string, uint64_t> skipCounts;
   std::unordered_map<std::string, uint64_t> limits;
-  std::function<ExecutionContext::Control(const ActionActiveStack *)>
-      controlCallback;
+  std::function<ExecutionContext::Control(const ActionActiveStack *)> controlCallback;
   tracing::TagBreakpointManager tagBreakpoints;
   ExecutionContext executionContext;
   Observer observer{this};
@@ -296,30 +259,25 @@ private:
 
 } // namespace
 
-MLIR_CAPI_EXPORTED MlirBeaverActionTracing mlirBeaverActionTracingAttach(
-    MlirContext context, MlirStringRef filter_json, MlirStringRef location_json,
-    MlirStringRef skip_json, MlirStringRef limit_json) {
-  auto *session = new ActionTracingSession(
-      unwrap(context),
-      llvm::StringRef(filter_json.data, filter_json.length).str(),
-      llvm::StringRef(location_json.data, location_json.length).str(),
-      llvm::StringRef(skip_json.data, skip_json.length).str(),
-      llvm::StringRef(limit_json.data, limit_json.length).str());
+MLIR_CAPI_EXPORTED MlirBeaverActionTracing mlirBeaverActionTracingAttach(MlirContext context, MlirStringRef filter_json,
+                                                                         MlirStringRef location_json,
+                                                                         MlirStringRef skip_json,
+                                                                         MlirStringRef limit_json) {
+  auto *session = new ActionTracingSession(unwrap(context), llvm::StringRef(filter_json.data, filter_json.length).str(),
+                                           llvm::StringRef(location_json.data, location_json.length).str(),
+                                           llvm::StringRef(skip_json.data, skip_json.length).str(),
+                                           llvm::StringRef(limit_json.data, limit_json.length).str());
   session->attach();
   return MlirBeaverActionTracing{session};
 }
 
-MLIR_CAPI_EXPORTED bool
-mlirBeaverActionTracingDrain(MlirBeaverActionTracing tracing,
-                             MlirBeaverActionEventsCallback callback,
-                             void *user_data) {
+MLIR_CAPI_EXPORTED bool mlirBeaverActionTracingDrain(MlirBeaverActionTracing tracing,
+                                                     MlirBeaverActionEventsCallback callback, void *user_data) {
   auto *session = static_cast<ActionTracingSession *>(tracing.ptr);
-  if (!session)
-    return false;
+  if (!session) return false;
   return session->drain(callback, user_data);
 }
 
-MLIR_CAPI_EXPORTED void
-mlirBeaverActionTracingDetach(MlirBeaverActionTracing tracing) {
+MLIR_CAPI_EXPORTED void mlirBeaverActionTracingDetach(MlirBeaverActionTracing tracing) {
   delete static_cast<ActionTracingSession *>(tracing.ptr);
 }

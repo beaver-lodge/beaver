@@ -23,31 +23,18 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   @seed_kinds ~w(cpp-bootstrap previous-native native-kernel beam-reference)
   @stages ~w(stage0 stage1 stage2)
   @top_level_keys ~w(
-    schema_version compiler_kernel_abi_version provider compiler_revision
-    beaver_revision llvm_revision dialect_schema_digest runtime_abi_digest
-    patterns capabilities target artifact_sha256 entrypoints bootstrap
+    schema_version compiler_kernel_abi_version provider compiler_revision beaver_revision llvm_revision
+    dialect_schema_digest runtime_abi_digest patterns capabilities target artifact_sha256 entrypoints bootstrap
   )
   @target_keys ~w(triple cpu features)
   @entrypoint_keys ~w(abi_version populate manifest)
   @bootstrap_keys ~w(stage seed provenance)
   @pattern_keys ~w(name root version)
 
-  @enforce_keys [
-    :schema_version,
-    :compiler_kernel_abi_version,
-    :provider,
-    :compiler_revision,
-    :beaver_revision,
-    :llvm_revision,
-    :dialect_schema_digest,
-    :runtime_abi_digest,
-    :patterns,
-    :capabilities,
-    :target,
-    :artifact_sha256,
-    :entrypoints,
-    :bootstrap
-  ]
+  @enforce_keys ~w(
+    schema_version compiler_kernel_abi_version provider compiler_revision beaver_revision llvm_revision
+    dialect_schema_digest runtime_abi_digest patterns capabilities target artifact_sha256 entrypoints bootstrap
+  )a
   defstruct @enforce_keys
 
   @type pattern() :: %{required(String.t()) => String.t()}
@@ -82,13 +69,9 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   @doc "Decodes and validates a JSON manifest."
   @spec decode!(iodata()) :: t()
   def decode!(json) do
-    json
-    |> IO.iodata_to_binary()
-    |> JSON.decode!()
-    |> new!()
+    json |> IO.iodata_to_binary() |> JSON.decode!() |> new!()
   rescue
-    error in JSON.DecodeError ->
-      reject!(:invalid_manifest, %{reason: Exception.message(error)})
+    error in JSON.DecodeError -> reject!(:invalid_manifest, %{reason: Exception.message(error)})
   end
 
   @doc "Builds and validates a manifest from a string-keyed map."
@@ -147,8 +130,8 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
 
   @doc "Returns the normalized string-keyed map used for transport and receipts."
   @spec to_map(t()) :: map()
-  def to_map(%__MODULE__{} = manifest) do
-    %{
+  def to_map(%__MODULE__{} = manifest),
+    do: %{
       "schema_version" => manifest.schema_version,
       "compiler_kernel_abi_version" => manifest.compiler_kernel_abi_version,
       "provider" => manifest.provider,
@@ -164,19 +147,16 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
       "entrypoints" => manifest.entrypoints,
       "bootstrap" => manifest.bootstrap
     }
-  end
 
   @doc "Encodes the canonical JSON representation used by `digest/1`."
   @spec encode!(t()) :: binary()
-  def encode!(%__MODULE__{} = manifest) do
-    manifest |> validate!() |> to_map() |> canonical_json()
-  end
+  def encode!(%__MODULE__{} = manifest),
+    do: manifest |> validate!() |> to_map() |> canonical_json()
 
   @doc "Returns the canonical manifest digest as a `sha256:` identity."
   @spec digest(t()) :: String.t()
-  def digest(%__MODULE__{} = manifest) do
-    "sha256:" <> Base.encode16(:crypto.hash(:sha256, encode!(manifest)), case: :lower)
-  end
+  def digest(%__MODULE__{} = manifest),
+    do: "sha256:" <> Base.encode16(:crypto.hash(:sha256, encode!(manifest)), case: :lower)
 
   @doc """
   Returns the semantic identity embedded by a compiler-kernel artifact.
@@ -219,15 +199,10 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   def verify_compatible!(%__MODULE__{} = manifest, expected) do
     expected = expected_map!(expected)
 
-    allowed = [
-      :compiler_kernel_abi_version,
-      :beaver_revision,
-      :llvm_revision,
-      :dialect_schema_digest,
-      :runtime_abi_digest,
-      :target,
-      :capabilities
-    ]
+    allowed = ~w(
+      compiler_kernel_abi_version beaver_revision llvm_revision dialect_schema_digest runtime_abi_digest target
+      capabilities
+    )a
 
     case Map.keys(expected) -- allowed do
       [] -> :ok
@@ -282,8 +257,7 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
     require_exact_keys!(entrypoints, @entrypoint_keys, "entrypoints")
     values = Enum.map(@entrypoint_keys, &fetch!(entrypoints, &1))
 
-    Enum.zip(@entrypoint_keys, values)
-    |> Enum.each(fn {key, value} -> require_symbol!(value, key) end)
+    Enum.zip(@entrypoint_keys, values) |> Enum.each(fn {key, value} -> require_symbol!(value, key) end)
 
     require_unique!(values, :entrypoints)
   end
@@ -300,33 +274,24 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   defp require_exact_keys!(map, expected, label) when is_map(map) do
     keys = Map.keys(map)
 
-    unless Enum.all?(keys, &is_binary/1) do
-      reject!(:invalid_manifest, %{field: label, reason: "keys must be strings"})
-    end
+    unless Enum.all?(keys, &is_binary/1),
+      do: reject!(:invalid_manifest, %{field: label, reason: "keys must be strings"})
 
     missing = expected -- keys
     unknown = keys -- expected
 
-    if missing != [] or unknown != [] do
-      reject!(:invalid_manifest, %{
-        field: label,
-        missing: Enum.sort(missing),
-        unknown: Enum.sort(unknown)
-      })
-    end
+    if missing != [] or unknown != [],
+      do: reject!(:invalid_manifest, %{field: label, missing: Enum.sort(missing), unknown: Enum.sort(unknown)})
   end
 
   defp require_exact_keys!(value, _expected, label),
     do: reject!(:invalid_manifest, %{field: label, expected: "map", got: value})
 
-  defp require_version!(actual, expected, _code) when is_integer(actual) and actual == expected,
-    do: :ok
+  defp require_version!(actual, expected, _code) when is_integer(actual) and actual == expected, do: :ok
 
-  defp require_version!(actual, expected, code),
-    do: reject!(code, %{expected: expected, actual: actual})
+  defp require_version!(actual, expected, code), do: reject!(code, %{expected: expected, actual: actual})
 
-  defp require_non_empty_string!(value, _field) when is_binary(value) and byte_size(value) > 0,
-    do: :ok
+  defp require_non_empty_string!(value, _field) when is_binary(value) and byte_size(value) > 0, do: :ok
 
   defp require_non_empty_string!(value, field),
     do: reject!(:invalid_manifest, %{field: field, expected: "non-empty string", got: value})
@@ -334,14 +299,12 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   defp require_symbol!(value, field) do
     require_non_empty_string!(value, field)
 
-    unless Regex.match?(~r/^[A-Za-z_][A-Za-z0-9_]*$/, value) do
-      reject!(:invalid_manifest, %{field: field, expected: "C symbol", got: value})
-    end
+    unless Regex.match?(~r/^[A-Za-z_][A-Za-z0-9_]*$/, value),
+      do: reject!(:invalid_manifest, %{field: field, expected: "C symbol", got: value})
   end
 
-  defp require_digest!(value, field) when is_binary(value) do
-    if Regex.match?(@digest_pattern, value), do: :ok, else: reject_digest!(value, field)
-  end
+  defp require_digest!(value, field) when is_binary(value),
+    do: if(Regex.match?(@digest_pattern, value), do: :ok, else: reject_digest!(value, field))
 
   defp require_digest!(value, field),
     do: reject!(:invalid_manifest, %{field: field, expected: "sha256 digest", got: value})
@@ -350,45 +313,32 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   defp require_digest_or_none!(value, field), do: require_digest!(value, field)
 
   defp reject_digest!(value, field),
-    do:
-      reject!(:invalid_manifest, %{
-        field: field,
-        expected: "sha256:<64 lowercase hex>",
-        got: value
-      })
+    do: reject!(:invalid_manifest, %{field: field, expected: "sha256:<64 lowercase hex>", got: value})
 
-  defp require_member!(value, allowed, field) do
-    unless value in allowed do
-      reject!(:invalid_manifest, %{field: field, allowed: allowed, got: value})
-    end
-  end
+  defp require_member!(value, allowed, field),
+    do: unless(value in allowed, do: reject!(:invalid_manifest, %{field: field, allowed: allowed, got: value}))
 
   defp require_sorted_unique_strings!(values, field, opts) when is_list(values) do
-    unless Enum.all?(values, &(is_binary(&1) and byte_size(&1) > 0)) do
-      reject!(:invalid_manifest, %{field: field, expected: "list of non-empty strings"})
-    end
+    unless Enum.all?(values, &(is_binary(&1) and byte_size(&1) > 0)),
+      do: reject!(:invalid_manifest, %{field: field, expected: "list of non-empty strings"})
 
-    if Keyword.fetch!(opts, :non_empty) and values == [] do
-      reject!(:invalid_manifest, %{field: field, expected: "non-empty list"})
-    end
+    if Keyword.fetch!(opts, :non_empty) and values == [],
+      do: reject!(:invalid_manifest, %{field: field, expected: "non-empty list"})
 
-    if values != Enum.sort(values) or length(values) != MapSet.size(MapSet.new(values)) do
-      reject!(:invalid_manifest, %{field: field, reason: "must be sorted and unique"})
-    end
+    if values != Enum.sort(values) or length(values) != MapSet.size(MapSet.new(values)),
+      do: reject!(:invalid_manifest, %{field: field, reason: "must be sorted and unique"})
   end
 
   defp require_sorted_unique_strings!(value, field, _opts),
     do: reject!(:invalid_manifest, %{field: field, expected: "list of strings", got: value})
 
   defp require_unique!(values, field) do
-    if length(values) != MapSet.size(MapSet.new(values)) do
-      reject!(:invalid_manifest, %{field: field, reason: "must be unique"})
-    end
+    if length(values) != MapSet.size(MapSet.new(values)),
+      do: reject!(:invalid_manifest, %{field: field, reason: "must be unique"})
   end
 
-  defp require_identity!(actual, expected, code) do
-    if actual != expected, do: reject!(code, %{expected: expected, actual: actual})
-  end
+  defp require_identity!(actual, expected, code),
+    do: if(actual != expected, do: reject!(code, %{expected: expected, actual: actual}))
 
   defp expected_map!(expected) when is_list(expected) do
     if Keyword.keyword?(expected),
@@ -414,13 +364,11 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
     |> then(&("{" <> &1 <> "}"))
   end
 
-  defp canonical_json(value) when is_list(value) do
-    value |> Enum.map_join(",", &canonical_json/1) |> then(&("[" <> &1 <> "]"))
-  end
+  defp canonical_json(value) when is_list(value),
+    do: value |> Enum.map_join(",", &canonical_json/1) |> then(&("[" <> &1 <> "]"))
 
-  defp canonical_json(value)
-       when is_binary(value) or is_integer(value) or is_boolean(value) or is_nil(value),
-       do: JSON.encode!(value)
+  defp canonical_json(value) when is_binary(value) or is_integer(value) or is_boolean(value) or is_nil(value),
+    do: JSON.encode!(value)
 
   defp canonical_json(value),
     do: reject!(:invalid_manifest, %{reason: "value is not JSON-compatible", got: inspect(value)})

@@ -1,3 +1,5 @@
+alias Beaver.Native
+
 defmodule Beaver.MLIR.Dialect.Tensor do
   @moduledoc """
   This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect.
@@ -9,31 +11,24 @@ defmodule Beaver.MLIR.Dialect.Tensor do
     defstruct [:offsets, :sizes, :strides]
   end
 
-  use Beaver.MLIR.Dialect,
-    dialect: "tensor",
-    ops: Beaver.MLIR.Dialect.Registry.ops("tensor")
+  use Beaver.MLIR.Dialect, dialect: "tensor", ops: Beaver.MLIR.Dialect.Registry.ops("tensor")
 
   def reassociation(list) do
     for grouping <- list do
-      grouping
-      |> Enum.map(&Attribute.integer(Type.i64(), &1))
-      |> Attribute.array()
+      grouping |> Enum.map(&Attribute.integer(Type.i64(), &1)) |> Attribute.array()
     end
     |> Attribute.array()
   end
 
-  def reassociation_for_reshape(src, target) do
-    Beaver.MLIR.CAPI.beaverGetReassociationIndicesForReshape(src, target)
-  end
+  def reassociation_for_reshape(src, target), do: Beaver.MLIR.CAPI.beaverGetReassociationIndicesForReshape(src, target)
 
   @doc "Build a validated mixed static/dynamic tensor slice specification."
   def slice(offsets, sizes, strides)
       when is_list(offsets) and is_list(sizes) and is_list(strides) do
     rank = length(offsets)
 
-    unless length(sizes) == rank and length(strides) == rank do
-      raise ArgumentError, "tensor slice offsets, sizes, and strides must have equal lengths"
-    end
+    unless length(sizes) == rank and length(strides) == rank,
+      do: raise(ArgumentError, "tensor slice offsets, sizes, and strides must have equal lengths")
 
     %Slice{offsets: offsets, sizes: sizes, strides: strides}
   end
@@ -56,8 +51,7 @@ defmodule Beaver.MLIR.Dialect.Tensor do
     Beaver.MLIR.Operation.eval_ssa(%Beaver.SSA{
       ssa
       | op: insert_slice(),
-        arguments:
-          [{:source, source}, {:dest, dest} | arguments] ++ [operand_segment_sizes: :infer]
+        arguments: [{:source, source}, {:dest, dest} | arguments] ++ [operand_segment_sizes: :infer]
     })
   end
 
@@ -70,9 +64,9 @@ defmodule Beaver.MLIR.Dialect.Tensor do
       {:offsets, offsets},
       {:sizes, sizes},
       {:strides, strides},
-      {:static_offsets, Attribute.dense_array(static_offsets, Beaver.Native.I64, ctx: ctx)},
-      {:static_sizes, Attribute.dense_array(static_sizes, Beaver.Native.I64, ctx: ctx)},
-      {:static_strides, Attribute.dense_array(static_strides, Beaver.Native.I64, ctx: ctx)}
+      {:static_offsets, Attribute.dense_array(static_offsets, Native.I64, ctx: ctx)},
+      {:static_sizes, Attribute.dense_array(static_sizes, Native.I64, ctx: ctx)},
+      {:static_strides, Attribute.dense_array(static_strides, Native.I64, ctx: ctx)}
     ]
   end
 

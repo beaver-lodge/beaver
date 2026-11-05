@@ -7,18 +7,11 @@ defmodule Beaver.MLIR.Dialect.Bufferization do
   deallocation pipeline.
   """
 
-  use Beaver.MLIR.Dialect,
-    dialect: "bufferization",
-    ops: Beaver.MLIR.Dialect.Registry.ops("bufferization")
+  use Beaver.MLIR.Dialect, dialect: "bufferization", ops: Beaver.MLIR.Dialect.Registry.ops("bufferization")
 
   @boolean_options ~w(
-    allow_return_allocs_from_loops
-    allow_unknown_ops
-    bufferize_function_boundaries
-    check_parallel_regions
-    copy_before_write
-    must_infer_memory_space
-    use_encoding_for_memory_space
+    allow_return_allocs_from_loops allow_unknown_ops bufferize_function_boundaries check_parallel_regions
+    copy_before_write must_infer_memory_space use_encoding_for_memory_space
   )a
 
   @scalar_options ~w(analysis_heuristic buffer_alignment)a
@@ -53,11 +46,9 @@ defmodule Beaver.MLIR.Dialect.Bufferization do
 
     if Keyword.get(opts, :deallocate, false) do
       deallocation =
-        if Keyword.get(opts, :private_function_dynamic_ownership, false) do
-          "buffer-deallocation-pipeline{private-function-dynamic-ownership=true}"
-        else
-          "buffer-deallocation-pipeline"
-        end
+        if Keyword.get(opts, :private_function_dynamic_ownership, false),
+          do: "buffer-deallocation-pipeline{private-function-dynamic-ownership=true}",
+          else: "buffer-deallocation-pipeline"
 
       Beaver.Composer.append(composer, deallocation)
     else
@@ -66,30 +57,20 @@ defmodule Beaver.MLIR.Dialect.Bufferization do
   end
 
   @doc "Run One-Shot Bufferization and return diagnostics without raising."
-  def one_shot(operation_or_module, opts \\ []) do
-    operation_or_module
-    |> pipeline(opts)
-    |> Beaver.Composer.run(Keyword.get(opts, :run, []))
-  end
+  def one_shot(operation_or_module, opts \\ []),
+    do: operation_or_module |> pipeline(opts) |> Beaver.Composer.run(Keyword.get(opts, :run, []))
 
   @doc "Run One-Shot Bufferization, raising with formatted MLIR diagnostics on failure."
-  def one_shot!(operation_or_module, opts \\ []) do
-    operation_or_module
-    |> pipeline(opts)
-    |> Beaver.Composer.run!(Keyword.get(opts, :run, []))
-  end
+  def one_shot!(operation_or_module, opts \\ []),
+    do: operation_or_module |> pipeline(opts) |> Beaver.Composer.run!(Keyword.get(opts, :run, []))
 
   defp validate_options!(opts) do
-    unless Keyword.keyword?(opts) do
-      raise ArgumentError, "bufferization options must be a keyword list"
-    end
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, "bufferization options must be a keyword list")
 
     case Keyword.keys(opts) -- @supported_options do
-      [] ->
-        :ok
-
-      [unsupported | _] ->
-        raise ArgumentError, "unsupported bufferization option: #{inspect(unsupported)}"
+      [] -> :ok
+      [unsupported | _] -> raise ArgumentError, "unsupported bufferization option: #{inspect(unsupported)}"
     end
 
     Enum.each(
@@ -124,8 +105,7 @@ defmodule Beaver.MLIR.Dialect.Bufferization do
     end
   end
 
-  defp render_option({name, value}) when name in @boolean_options,
-    do: "#{pass_name(name)}=#{value}"
+  defp render_option({name, value}) when name in @boolean_options, do: "#{pass_name(name)}=#{value}"
 
   defp render_option({name, values}) when name in @list_options and is_list(values),
     do: "#{pass_name(name)}=#{Enum.map_join(values, ",", &to_string/1)}"
@@ -137,15 +117,12 @@ defmodule Beaver.MLIR.Dialect.Bufferization do
     end
   end
 
-  defp render_option({:analysis_heuristic, value})
-       when value in [:bottom_up, :top_down, :bottom_up_from_terminators],
-       do: "analysis-heuristic=#{value |> to_string() |> String.replace("_", "-")}"
+  defp render_option({:analysis_heuristic, value}) when value in [:bottom_up, :top_down, :bottom_up_from_terminators],
+    do: "analysis-heuristic=#{value |> to_string() |> String.replace("_", "-")}"
 
-  defp render_option({:buffer_alignment, value}) when is_integer(value) and value > 0,
-    do: "buffer-alignment=#{value}"
+  defp render_option({:buffer_alignment, value}) when is_integer(value) and value > 0, do: "buffer-alignment=#{value}"
 
-  defp render_option({name, value}),
-    do: raise(ArgumentError, "invalid bufferization option #{name}: #{inspect(value)}")
+  defp render_option({name, value}), do: raise(ArgumentError, "invalid bufferization option #{name}: #{inspect(value)}")
 
   defp pass_name(name), do: name |> to_string() |> String.replace("_", "-")
 end

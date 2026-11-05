@@ -3,12 +3,7 @@ defmodule Beaver.ComposerGenerator do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  def normalized_name(original) do
-    original
-    |> String.replace("-", "_")
-    |> Macro.underscore()
-    |> String.to_atom()
-  end
+  def normalized_name(original), do: original |> String.replace("-", "_") |> Macro.underscore() |> String.to_atom()
 
   defmacro __using__(prefix: prefix) do
     quote bind_quoted: [prefix: prefix] do
@@ -22,15 +17,9 @@ defmodule Beaver.ComposerGenerator do
           name |> Atom.to_string() |> String.starts_with?(prefix) do
         pass = apply(CAPI, name, [])
 
-        arg_name =
-          pass
-          |> CAPI.beaverPassGetArgument()
-          |> MLIR.to_string()
+        arg_name = pass |> CAPI.beaverPassGetArgument() |> MLIR.to_string()
 
-        pass_name =
-          pass
-          |> CAPI.beaverPassGetName()
-          |> MLIR.to_string()
+        pass_name = pass |> CAPI.beaverPassGetName() |> MLIR.to_string()
 
         normalized_name = Beaver.ComposerGenerator.normalized_name(arg_name)
 
@@ -43,9 +32,7 @@ defmodule Beaver.ComposerGenerator do
         ### Pass name in TableGen
         `#{pass_name}`
         """
-        def unquote(normalized_name)() do
-          CAPI.unquote(name)()
-        end
+        def unquote(normalized_name)(), do: CAPI.unquote(name)()
 
         def unquote(normalized_name)(composer_or_op) do
           pass = CAPI.unquote(name)()

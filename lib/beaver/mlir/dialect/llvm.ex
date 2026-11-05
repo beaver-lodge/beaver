@@ -1,3 +1,6 @@
+alias Beaver.MLIR.{Attribute, CAPI, Type}
+alias Beaver.Deferred
+
 defmodule Beaver.MLIR.Dialect.LLVM do
   @moduledoc """
   Operations and ABI-oriented builders for the MLIR LLVM dialect.
@@ -9,9 +12,7 @@ defmodule Beaver.MLIR.Dialect.LLVM do
 
   alias Beaver.MLIR
 
-  use Beaver.MLIR.Dialect,
-    dialect: "llvm",
-    ops: Beaver.MLIR.Dialect.Registry.ops("llvm")
+  use Beaver.MLIR.Dialect, dialect: "llvm", ops: Beaver.MLIR.Dialect.Registry.ops("llvm")
 
   @linkages ~w(external available_externally linkonce linkonce_odr weak weak_odr appending internal private extern_weak common)a
 
@@ -50,14 +51,14 @@ defmodule Beaver.MLIR.Dialect.LLVM do
 
   def pointer(address_space, opts) when is_integer(address_space) and address_space >= 0 do
     suffix = if address_space == 0, do: "", else: "<#{address_space}>"
-    MLIR.Type.get("!llvm.ptr#{suffix}", opts)
+    Type.get("!llvm.ptr#{suffix}", opts)
   end
 
   @doc "Build an LLVM array type."
   def array(element_type, count, opts \\ []) when is_integer(count) and count >= 0 do
     contextual_type(opts, fn ctx ->
       element_type = render_type(element_type, ctx)
-      MLIR.Type.get("!llvm.array<#{count} x #{element_type}>", ctx: ctx)
+      Type.get("!llvm.array<#{count} x #{element_type}>", ctx: ctx)
     end)
   end
 
@@ -66,7 +67,7 @@ defmodule Beaver.MLIR.Dialect.LLVM do
     contextual_type(opts, fn ctx ->
       fields = Enum.map_join(field_types, ", ", &render_type(&1, ctx))
       packed = if Keyword.get(opts, :packed, false), do: "packed ", else: ""
-      MLIR.Type.get("!llvm.struct<#{packed}(#{fields})>", ctx: ctx)
+      Type.get("!llvm.struct<#{packed}(#{fields})>", ctx: ctx)
     end)
   end
 
@@ -77,9 +78,8 @@ defmodule Beaver.MLIR.Dialect.LLVM do
   to the parameter list.
   """
   def function_type(params, results, opts \\ []) when is_list(params) and is_list(results) do
-    if length(results) > 1 do
-      raise ArgumentError, "LLVM function types support at most one result"
-    end
+    if length(results) > 1,
+      do: raise(ArgumentError, "LLVM function types support at most one result")
 
     contextual_type(opts, fn ctx ->
       params = Enum.map(params, &render_type(&1, ctx))
@@ -91,35 +91,29 @@ defmodule Beaver.MLIR.Dialect.LLVM do
           [type] -> render_type(type, ctx)
         end
 
-      MLIR.Type.get("!llvm.func<#{result} (#{Enum.join(params, ", ")})>", ctx: ctx)
+      Type.get("!llvm.func<#{result} (#{Enum.join(params, ", ")})>", ctx: ctx)
     end)
   end
 
   @doc "Build a validated `#llvm.linkage` attribute."
   def linkage(value, opts \\ []) when is_atom(value) do
-    unless value in @linkages do
-      raise ArgumentError, "unsupported LLVM linkage: #{inspect(value)}"
-    end
+    unless value in @linkages,
+      do: raise(ArgumentError, "unsupported LLVM linkage: #{inspect(value)}")
 
-    MLIR.Attribute.get("#llvm.linkage<#{value}>", opts)
+    Attribute.get("#llvm.linkage<#{value}>", opts)
   end
 
   @doc "Build a validated `#llvm.cconv` attribute for a common calling convention."
   def calling_convention(value, opts \\ []) when is_atom(value) do
     case @calling_conventions do
-      %{^value => spelling} -> MLIR.Attribute.get("#llvm.cconv<#{spelling}>", opts)
+      %{^value => spelling} -> Attribute.get("#llvm.cconv<#{spelling}>", opts)
       _ -> raise ArgumentError, "unsupported LLVM calling convention: #{inspect(value)}"
     end
   end
 
   @doc "Whether the installed LLVM exposes source-language dialects on `DICompileUnit`."
   def di_compile_unit_source_language_dialect_supported? do
-    Code.ensure_loaded?(MLIR.CAPI) and
-      function_exported?(
-        MLIR.CAPI,
-        :mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect,
-        15
-      )
+    Code.ensure_loaded?(CAPI) and function_exported?(CAPI, :mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect, 15)
   end
 
   @doc """
@@ -140,42 +134,31 @@ defmodule Beaver.MLIR.Dialect.LLVM do
         value -> debug_enum(value, @debug_language_dialects)
       end
 
-    if source_language_dialect != nil and
-         not di_compile_unit_source_language_dialect_supported?() do
-      raise ArgumentError,
-            "installed LLVM does not support DICompileUnit source-language dialects"
-    end
+    if source_language_dialect != nil and not di_compile_unit_source_language_dialect_supported?(),
+      do: raise(ArgumentError, "installed LLVM does not support DICompileUnit source-language dialects")
 
-    id =
-      Keyword.get_lazy(opts, :id, fn ->
-        MLIR.CAPI.mlirDistinctAttrCreate(MLIR.Attribute.unit(ctx: ctx))
-      end)
+    id = Keyword.get_lazy(opts, :id, fn -> CAPI.mlirDistinctAttrCreate(Attribute.unit(ctx: ctx)) end)
 
-    rec_id =
-      Keyword.get_lazy(opts, :rec_id, fn ->
-        MLIR.CAPI.mlirDistinctAttrCreate(MLIR.Attribute.unit(ctx: ctx))
-      end)
+    rec_id = Keyword.get_lazy(opts, :rec_id, fn -> CAPI.mlirDistinctAttrCreate(Attribute.unit(ctx: ctx)) end)
 
     file =
       Keyword.get_lazy(opts, :file, fn ->
-        MLIR.CAPI.mlirLLVMDIFileAttrGet(
+        CAPI.mlirLLVMDIFileAttrGet(
           ctx,
-          MLIR.Attribute.string(Keyword.fetch!(opts, :filename), ctx: ctx),
-          MLIR.Attribute.string(Keyword.get(opts, :directory, ""), ctx: ctx)
+          Attribute.string(Keyword.fetch!(opts, :filename), ctx: ctx),
+          Attribute.string(Keyword.get(opts, :directory, ""), ctx: ctx)
         )
       end)
 
-    producer = MLIR.Attribute.string(Keyword.get(opts, :producer, ""), ctx: ctx)
+    producer = Attribute.string(Keyword.get(opts, :producer, ""), ctx: ctx)
 
-    split_debug_filename =
-      MLIR.Attribute.string(Keyword.get(opts, :split_debug_filename, ""), ctx: ctx)
+    split_debug_filename = Attribute.string(Keyword.get(opts, :split_debug_filename, ""), ctx: ctx)
 
     imported_entities = Keyword.get(opts, :imported_entities, [])
-    imported_array = Beaver.Native.array(imported_entities, MLIR.Attribute)
+    imported_array = Beaver.Native.array(imported_entities, Attribute)
     emission_kind = debug_enum(Keyword.get(opts, :emission_kind, :full), @debug_emission_kinds)
 
-    name_table_kind =
-      debug_enum(Keyword.get(opts, :name_table_kind, :default), @debug_name_table_kinds)
+    name_table_kind = debug_enum(Keyword.get(opts, :name_table_kind, :default), @debug_name_table_kinds)
 
     common = [
       ctx,
@@ -196,13 +179,13 @@ defmodule Beaver.MLIR.Dialect.LLVM do
 
     case source_language_dialect do
       nil ->
-        apply(MLIR.CAPI, :mlirLLVMDICompileUnitAttrGet, common)
+        apply(CAPI, :mlirLLVMDICompileUnitAttrGet, common)
 
       dialect ->
         [head, rec_id, rec_self, id, language | tail] = common
 
         apply(
-          MLIR.CAPI,
+          CAPI,
           :mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect,
           [head, rec_id, rec_self, id, language, dialect | tail]
         )
@@ -216,11 +199,7 @@ defmodule Beaver.MLIR.Dialect.LLVM do
     quote do
       require Beaver.MLIR.Dialect.Func
 
-      Beaver.MLIR.Dialect.Func.func_like(
-        unquote(call),
-        Beaver.MLIR.Dialect.LLVM.func(),
-        unquote(opts)
-      )
+      Beaver.MLIR.Dialect.Func.func_like(unquote(call), Beaver.MLIR.Dialect.LLVM.func(), unquote(opts))
     end
   end
 
@@ -234,14 +213,14 @@ defmodule Beaver.MLIR.Dialect.LLVM do
   def global(%Beaver.SSA{arguments: arguments, ctx: ctx} = ssa) do
     opts = Keyword.new(arguments)
     sym_name = Keyword.fetch!(opts, :sym_name)
-    type = opts |> Keyword.fetch!(:type) |> Beaver.Deferred.resolve(ctx)
+    type = opts |> Keyword.fetch!(:type) |> Deferred.resolve(ctx)
     address_space = Keyword.get(opts, :address_space, 0)
 
     arguments = [
-      global_type: MLIR.Attribute.type(type),
-      sym_name: MLIR.Attribute.string(to_string(sym_name), ctx: ctx),
+      global_type: Attribute.type(type),
+      sym_name: Attribute.string(to_string(sym_name), ctx: ctx),
       linkage: normalize_linkage(Keyword.get(opts, :linkage, :external), ctx),
-      addr_space: MLIR.Attribute.integer(MLIR.Type.i32(ctx: ctx), address_space)
+      addr_space: Attribute.integer(Type.i32(ctx: ctx), address_space)
     ]
 
     arguments =
@@ -249,7 +228,7 @@ defmodule Beaver.MLIR.Dialect.LLVM do
       |> maybe_attribute(:value, Keyword.get(opts, :value))
       |> maybe_unit(:constant, Keyword.get(opts, :constant, false), ctx)
       |> maybe_i64(:alignment, Keyword.get(opts, :alignment), ctx)
-      |> Kernel.++([fn -> [MLIR.CAPI.mlirRegionCreate()] end])
+      |> Kernel.++([fn -> [CAPI.mlirRegionCreate()] end])
 
     MLIR.Operation.eval_ssa(%Beaver.SSA{ssa | op: mlir_global(), arguments: arguments})
   end
@@ -267,31 +246,26 @@ defmodule Beaver.MLIR.Dialect.LLVM do
     arguments = [
       {:callee_operands, operands},
       {:op_bundle_operands, []},
-      {:callee, MLIR.Attribute.flat_symbol_ref(callee, ctx: ctx)},
+      {:callee, Attribute.flat_symbol_ref(callee, ctx: ctx)},
       {:operand_segment_sizes, :infer},
-      {:op_bundle_sizes, MLIR.Attribute.dense_array([], Beaver.Native.I32, ctx: ctx)}
-      | options
+      {:op_bundle_sizes, Attribute.dense_array([], Beaver.Native.I32, ctx: ctx)} | options
     ]
 
-    MLIR.Operation.eval_ssa(%Beaver.SSA{
-      ssa
-      | op: call(),
-        arguments: arguments
-    })
+    MLIR.Operation.eval_ssa(%Beaver.SSA{ssa | op: call(), arguments: arguments})
   end
 
-  defp contextual_type(opts, fun), do: Beaver.Deferred.from_opts(opts, fun)
+  defp contextual_type(opts, fun), do: Deferred.from_opts(opts, fun)
 
   defp render_type(type, ctx) do
     type
-    |> Beaver.Deferred.resolve(ctx)
+    |> Deferred.resolve(ctx)
     |> case do
-      %MLIR.Type{} = type -> to_string(type)
+      %Type{} = type -> to_string(type)
       other -> raise ArgumentError, "expected an MLIR type, got: #{inspect(other)}"
     end
   end
 
-  defp normalize_linkage(%MLIR.Attribute{} = linkage, _ctx), do: linkage
+  defp normalize_linkage(%Attribute{} = linkage, _ctx), do: linkage
   defp normalize_linkage(linkage, ctx) when is_atom(linkage), do: linkage(linkage, ctx: ctx)
 
   defp maybe_attribute(arguments, _name, nil), do: arguments
@@ -299,14 +273,12 @@ defmodule Beaver.MLIR.Dialect.LLVM do
 
   defp maybe_unit(arguments, _name, false, _ctx), do: arguments
 
-  defp maybe_unit(arguments, name, true, ctx),
-    do: arguments ++ [{name, MLIR.Attribute.unit(ctx: ctx)}]
+  defp maybe_unit(arguments, name, true, ctx), do: arguments ++ [{name, Attribute.unit(ctx: ctx)}]
 
   defp maybe_i64(arguments, _name, nil, _ctx), do: arguments
 
-  defp maybe_i64(arguments, name, value, ctx) when is_integer(value) and value > 0 do
-    arguments ++ [{name, MLIR.Attribute.integer(MLIR.Type.i64(ctx: ctx), value)}]
-  end
+  defp maybe_i64(arguments, name, value, ctx) when is_integer(value) and value > 0,
+    do: arguments ++ [{name, Attribute.integer(Type.i64(ctx: ctx), value)}]
 
   defp debug_enum(value, _known) when is_integer(value) and value >= 0, do: value
 

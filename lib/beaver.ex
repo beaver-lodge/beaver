@@ -1,3 +1,5 @@
+alias Beaver.MLIR.{Block, Region}
+
 defmodule Beaver do
   alias Beaver.MLIR
 
@@ -114,7 +116,7 @@ defmodule Beaver do
   defp arguments_variables(args) do
     for {{var, _type}, index} <- Enum.with_index(args) do
       quote do
-        unquote(var) = Beaver.Env.block() |> Beaver.MLIR.Block.get_arg!(unquote(index))
+        unquote(var) = Beaver.Env.block() |> Block.get_arg!(unquote(index))
       end
     end
   end
@@ -127,25 +129,16 @@ defmodule Beaver do
       end
 
     quote do
-      tap(
-        &Beaver.MLIR.Block.add_args!(
-          &1,
-          unquote(arg_loc_pairs),
-          ctx: Beaver.Env.context()
-        )
-      )
+      tap(&Block.add_args!(&1, unquote(arg_loc_pairs), ctx: Beaver.Env.context()))
     end
   end
 
   @doc false
-  def not_found(%Macro.Env{} = env) do
-    {:not_found, [file: env.file, line: env.line]}
-  end
+  def not_found(%Macro.Env{} = env), do: {:not_found, [file: env.file, line: env.line]}
 
   @doc false
-  def append_block_to_region(%MLIR.Region{} = region, %MLIR.Block{} = block) do
-    MLIR.CAPI.mlirRegionAppendOwnedBlock(region, block)
-  end
+  def append_block_to_region(%Region{} = region, %Block{} = block),
+    do: MLIR.CAPI.mlirRegionAppendOwnedBlock(region, block)
 
   def append_block_to_region(_region, _block), do: :ok
 
@@ -221,8 +214,7 @@ defmodule Beaver do
       unquote(ip_cache)
 
       Kernel.var!(beaver_internal_env_ip) =
-        beaver_internal_current_ip =
-        Beaver.Env.block(unquote({b_name, [], nil})) |> unquote(add_arguments(args))
+        beaver_internal_current_ip = Beaver.Env.block(unquote({b_name, [], nil})) |> unquote(add_arguments(args))
 
       Beaver.append_block_to_region(Beaver.Env.region(), Beaver.Env.block())
       unquote(dangling_block_removal(b_name, __CALLER__))
@@ -265,17 +257,15 @@ defmodule Beaver do
       region = Beaver.MLIR.CAPI.mlirRegionCreate()
       unquote(regions)
 
-      Beaver.MLIR.Region.under(region, fn ->
+      Region.under(region, fn ->
         Kernel.var!(beaver_env_region) = region
         Kernel.var!(beaver_internal_env_dangling_blocks) = []
-        %Beaver.MLIR.Region{} = Kernel.var!(beaver_env_region)
+        %Region{} = Kernel.var!(beaver_env_region)
         unquote(body)
         Beaver.assert_no_dangling_blocks(Kernel.var!(beaver_internal_env_dangling_blocks))
       end)
 
-      Kernel.var!(beaver_internal_env_regions) =
-        Kernel.var!(beaver_internal_env_regions) ++
-          [region]
+      Kernel.var!(beaver_internal_env_regions) = Kernel.var!(beaver_internal_env_regions) ++ [region]
 
       Kernel.var!(beaver_internal_env_regions)
     end

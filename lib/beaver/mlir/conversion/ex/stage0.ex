@@ -33,16 +33,12 @@ defmodule Beaver.MLIR.Conversion.Ex.Stage0 do
                       Integer.to_string(@schema_version),
                       @entrypoint,
                       Enum.map_join(@patterns, "\n", fn pattern ->
-                        Enum.join(
-                          [pattern["name"], pattern["root"], pattern["version"]],
-                          "\0"
-                        )
+                        Enum.join([pattern["name"], pattern["root"], pattern["version"]], "\0")
                       end)
                     ]
                     |> Enum.join("\n")
 
-  @identity_digest "sha256:" <>
-                     Base.encode16(:crypto.hash(:sha256, @identity_payload), case: :lower)
+  @identity_digest "sha256:" <> Base.encode16(:crypto.hash(:sha256, @identity_payload), case: :lower)
 
   @manifest %{
     "schema_version" => @schema_version,

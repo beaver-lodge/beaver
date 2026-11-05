@@ -1,3 +1,6 @@
+alias Beaver.MLIR.StringRef
+alias Beaver.Native
+
 defmodule Beaver.MLIR.Debug do
   @moduledoc """
   Configure MLIR global debug options and attach LLVM debug information so
@@ -32,13 +35,9 @@ defmodule Beaver.MLIR.Debug do
   @doc """
   Enable or disable global debugging.
   """
-  def enable(enable \\ true) do
-    mlirEnableGlobalDebug(enable)
-  end
+  def enable(enable \\ true), do: mlirEnableGlobalDebug(enable)
 
-  def disable() do
-    enable(false)
-  end
+  def disable(), do: enable(false)
 
   @doc """
   Check if global debugging is enabled.
@@ -48,9 +47,7 @@ defmodule Beaver.MLIR.Debug do
       iex> Beaver.MLIR.Debug.enabled?()
       false
   """
-  def enabled?() do
-    mlirIsGlobalDebugEnabled() |> Beaver.Native.to_term()
-  end
+  def enabled?(), do: mlirIsGlobalDebugEnabled() |> Native.to_term()
 
   @doc """
   Set debug type(s).
@@ -66,16 +63,12 @@ defmodule Beaver.MLIR.Debug do
       :ok
   """
   def set_debug_type(type) when is_binary(type) do
-    type_str = MLIR.StringRef.create(type) |> MLIR.StringRef.data()
+    type_str = StringRef.create(type) |> StringRef.data()
     mlirSetGlobalDebugType(type_str)
   end
 
-  def set_debug_type(types) when is_list(types) do
-    types
-    |> Enum.map(&MLIR.StringRef.create/1)
-    |> Beaver.Native.array(MLIR.StringRef)
-    |> beaverSetGlobalDebugTypes(length(types))
-  end
+  def set_debug_type(types) when is_list(types),
+    do: types |> Enum.map(&StringRef.create/1) |> Native.array(StringRef) |> beaverSetGlobalDebugTypes(length(types))
 
   @doc """
   Check if a specific debug type is currently enabled.
@@ -86,8 +79,8 @@ defmodule Beaver.MLIR.Debug do
       true
   """
   def is_current_debug_type?(type) when is_binary(type) do
-    type_str = MLIR.StringRef.create(type) |> MLIR.StringRef.data()
-    mlirIsCurrentDebugType(type_str) |> Beaver.Native.to_term()
+    type_str = StringRef.create(type) |> StringRef.data()
+    mlirIsCurrentDebugType(type_str) |> Native.to_term()
   end
 
   @doc """

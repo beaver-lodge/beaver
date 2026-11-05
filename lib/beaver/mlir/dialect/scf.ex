@@ -7,9 +7,7 @@ defmodule Beaver.MLIR.Dialect.SCF do
   argument, result, and `scf.yield` construction.
   """
 
-  use Beaver.MLIR.Dialect,
-    dialect: "scf",
-    ops: Beaver.MLIR.Dialect.Registry.ops("scf")
+  use Beaver.MLIR.Dialect, dialect: "scf", ops: Beaver.MLIR.Dialect.Registry.ops("scf")
 
   @doc """
   Build an `scf.if` with implicit regions and yields.
@@ -28,26 +26,19 @@ defmodule Beaver.MLIR.Dialect.SCF do
 
   An else branch is required when the operation has results.
   """
-  defmacro if_(condition, branches) do
-    build_if(condition, [], branches)
-  end
+  defmacro if_(condition, branches), do: build_if(condition, [], branches)
 
-  defmacro if_(condition, opts, branches) do
-    build_if(condition, opts, branches)
-  end
+  defmacro if_(condition, opts, branches), do: build_if(condition, opts, branches)
 
   defp build_if(condition, opts, branches) do
     then_body = Keyword.fetch!(branches, :do)
     else_body = Keyword.get(branches, :else)
     result_types = Keyword.get(opts, :result_types, [])
 
-    if else_body == nil and result_types != [] do
-      raise ArgumentError, "SCF.if_ requires an else branch when result_types is not empty"
-    end
+    if else_body == nil and result_types != [],
+      do: raise(ArgumentError, "SCF.if_ requires an else branch when result_types is not empty")
 
-    regions =
-      [branch_region(then_body)] ++
-        if else_body == nil, do: [], else: [branch_region(else_body)]
+    regions = [branch_region(then_body)] ++ if else_body == nil, do: [], else: [branch_region(else_body)]
 
     quote do
       Beaver.mlir do
@@ -76,9 +67,7 @@ defmodule Beaver.MLIR.Dialect.SCF do
   defmacro for_(lower, upper, step, opts, do: body) do
     iter_args = Keyword.get(opts, :iter_args, [])
 
-    unless is_list(iter_args) do
-      raise ArgumentError, "SCF.for_/5 expects :iter_args to be a list"
-    end
+    unless is_list(iter_args), do: raise(ArgumentError, "SCF.for_/5 expects :iter_args to be a list")
 
     iv = Macro.var(:scf_iv, nil)
 
@@ -100,9 +89,7 @@ defmodule Beaver.MLIR.Dialect.SCF do
 
     result_types =
       Keyword.get_lazy(opts, :result_types, fn ->
-        Enum.map(iter_args, fn initial ->
-          quote(do: Beaver.MLIR.Value.type(unquote(initial)))
-        end)
+        Enum.map(iter_args, fn initial -> quote(do: Beaver.MLIR.Value.type(unquote(initial))) end)
       end)
 
     quote do

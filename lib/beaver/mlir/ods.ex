@@ -9,12 +9,8 @@ defmodule Beaver.MLIR.ODS do
   @doc """
   Generate attribute for operand_segment_sizes
   """
-  def segment_sizes(sizes, opts \\ []) when is_list(sizes) do
-    Beaver.Deferred.from_opts(
-      opts,
-      &Attribute.dense_array(sizes, Beaver.Native.I32, ctx: &1)
-    )
-  end
+  def segment_sizes(sizes, opts \\ []) when is_list(sizes),
+    do: Beaver.Deferred.from_opts(opts, &Attribute.dense_array(sizes, Beaver.Native.I32, ctx: &1))
 
   defdelegate result_segment_sizes(sizes, opts \\ []), to: __MODULE__, as: :segment_sizes
   defdelegate operand_segment_sizes(sizes, opts \\ []), to: __MODULE__, as: :segment_sizes

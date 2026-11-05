@@ -1,27 +1,22 @@
+alias Beaver.MLIR.Context
+
 defmodule Beaver.MLIR.Dialect.Registry do
   @moduledoc """
   This module defines functions to query MLIR dialect registry.
   """
 
   alias Beaver.MLIR.CAPI
-  alias Beaver.MLIR
 
   defp pre_process(op_name) do
     case op_name do
-      "tilezero" ->
-        "x86_tilezero"
-
-      "tile_zero" ->
-        "tile_zero"
-
-      _ ->
-        op_name
+      "tilezero" -> "x86_tilezero"
+      "tile_zero" -> "tile_zero"
+      _ -> op_name
     end
   end
 
-  def normalize_op_name(op_name) do
-    pre_process(op_name) |> String.replace(".", "_") |> Macro.underscore() |> String.to_atom()
-  end
+  def normalize_op_name(op_name),
+    do: pre_process(op_name) |> String.replace(".", "_") |> Macro.underscore() |> String.to_atom()
 
   def normalize_dialect_name(to_upcase)
       when to_upcase in ~w{tosa gpu nvgpu omp nvvm llvm cf pdl rocdl spirv amx amdgpu scf acc dlti smt},
@@ -44,13 +39,13 @@ defmodule Beaver.MLIR.Dialect.Registry do
 
   defp unwrap_ctx_then(opts, cb) do
     if ctx = opts[:ctx] do
-      %MLIR.Context{ref: ref} = ctx
+      %Context{ref: ref} = ctx
 
       cb.(ref)
     else
-      ctx = %MLIR.Context{ref: ref} = MLIR.Context.create()
+      ctx = %Context{ref: ref} = Context.create()
       ret = cb.(ref)
-      MLIR.Context.destroy(ctx)
+      Context.destroy(ctx)
       ret
     end
   end
@@ -58,17 +53,14 @@ defmodule Beaver.MLIR.Dialect.Registry do
   def ops(dialect, opts \\ [])
 
   def ops(:all, opts) do
-    unwrap_ctx_then(opts, fn ref ->
-      CAPI.beaver_raw_registered_ops(ref)
-    end)
+    unwrap_ctx_then(opts, fn ref -> CAPI.beaver_raw_registered_ops(ref) end)
   end
 
   def ops(dialect, opts) do
     prefix = "#{dialect}."
     ops = ops(:all, opts)
 
-    for op <- ops,
-        String.starts_with?(op, prefix) do
+    for op <- ops, String.starts_with?(op, prefix) do
       String.trim_leading(op, prefix)
     end
     |> then(&Enum.sort/1)
@@ -78,10 +70,6 @@ defmodule Beaver.MLIR.Dialect.Registry do
   Get dialects registered
   """
   def dialects(opts \\ []) do
-    unwrap_ctx_then(opts, fn ref ->
-      CAPI.beaver_raw_registered_dialects(ref)
-      |> Enum.uniq()
-      |> Enum.sort()
-    end)
+    unwrap_ctx_then(opts, fn ref -> CAPI.beaver_raw_registered_dialects(ref) |> Enum.uniq() |> Enum.sort() end)
   end
 end

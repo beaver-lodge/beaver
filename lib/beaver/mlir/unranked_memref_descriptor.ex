@@ -1,3 +1,5 @@
+alias Beaver.MLIR.CAPI
+
 defmodule Beaver.MLIR.UnrankedMemRefDescriptor do
   @moduledoc """
   This module defines functions working with MLIR UnrankedMemRefDescriptor runtime ABI.
@@ -8,47 +10,41 @@ defmodule Beaver.MLIR.UnrankedMemRefDescriptor do
   of a ctypes/libffi equivalent in Elixir, in Beaver we use unranked memref descriptors
   primarily as ABI.
   """
-  alias Beaver.MLIR
-  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
+  use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
 
   @doc """
   Creates an empty unranked memref descriptor with the specified rank.
   """
-  def empty(rank \\ 0) when is_integer(rank) and rank >= 0 do
-    %__MODULE__{ref: MLIR.CAPI.beaver_raw_unranked_memref_descriptor_empty(rank)}
-  end
+  def empty(rank \\ 0) when is_integer(rank) and rank >= 0,
+    do: %__MODULE__{ref: CAPI.beaver_raw_unranked_memref_descriptor_empty(rank)}
 
   @doc """
   Gets the rank of the unranked memref descriptor.
   """
-  def rank(%__MODULE__{ref: descriptor}) do
-    MLIR.CAPI.beaver_raw_unranked_memref_descriptor_get_rank(descriptor)
-  end
+  def rank(%__MODULE__{ref: descriptor}),
+    do: CAPI.beaver_raw_unranked_memref_descriptor_get_rank(descriptor)
 
   @doc """
   Gets the offset of the unranked memref descriptor.
   """
-  def offset(%__MODULE__{ref: descriptor}) do
-    MLIR.CAPI.beaver_raw_unranked_memref_descriptor_get_offset(descriptor)
-  end
+  def offset(%__MODULE__{ref: descriptor}),
+    do: CAPI.beaver_raw_unranked_memref_descriptor_get_offset(descriptor)
 
   @doc """
   Gets the sizes of the unranked memref descriptor as a list.
 
   For rank 0 descriptors, returns an empty list.
   """
-  def sizes(%__MODULE__{ref: descriptor}) do
-    MLIR.CAPI.beaver_raw_unranked_memref_descriptor_get_sizes(descriptor)
-  end
+  def sizes(%__MODULE__{ref: descriptor}),
+    do: CAPI.beaver_raw_unranked_memref_descriptor_get_sizes(descriptor)
 
   @doc """
   Gets the strides of the unranked memref descriptor as a list.
 
   For rank 0 descriptors, returns an empty list.
   """
-  def strides(%__MODULE__{ref: descriptor}) do
-    MLIR.CAPI.beaver_raw_unranked_memref_descriptor_get_strides(descriptor)
-  end
+  def strides(%__MODULE__{ref: descriptor}),
+    do: CAPI.beaver_raw_unranked_memref_descriptor_get_strides(descriptor)
 
   @doc """
   Frees the memory allocated for the unranked memref descriptor if it was
@@ -62,11 +58,8 @@ defmodule Beaver.MLIR.UnrankedMemRefDescriptor do
   """
   def free(%__MODULE__{ref: descriptor}, deallocator \\ :c) do
     case deallocator do
-      :c ->
-        MLIR.CAPI.beaver_raw_unranked_memref_descriptor_deallocate_with_c(descriptor)
-
-      :enif ->
-        MLIR.CAPI.beaver_raw_unranked_memref_descriptor_deallocate_with_enif(descriptor)
+      :c -> CAPI.beaver_raw_unranked_memref_descriptor_deallocate_with_c(descriptor)
+      :enif -> CAPI.beaver_raw_unranked_memref_descriptor_deallocate_with_enif(descriptor)
     end
   end
 end
