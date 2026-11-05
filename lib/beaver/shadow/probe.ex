@@ -161,7 +161,7 @@ defmodule Beaver.Shadow.Probe do
       convert,
       "tritongpu-coalesce",
       "tritongpu-F32DotTC",
-      "triton-nvidia-gpu-plan-cta",
+      "triton-nvidia-gpu-assign-cga-layouts",
       "tritongpu-remove-layout-conversions",
       "tritongpu-optimize-thread-locality",
       "tritongpu-accelerate-matmul",

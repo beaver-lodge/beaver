@@ -138,8 +138,7 @@ if(BEAVER_TRITON_PREBUILT_DIR)
       "${BEAVER_TRITON_PREBUILT_DIR}/include/third_party")
     # Triton's public headers require C++20 concepts.
     target_compile_features(${_target} PUBLIC cxx_std_20)
-    target_compile_definitions(${_target}
-      PUBLIC BEAVER_ENABLE_TRITON=1)
+    target_compile_definitions(${_target} PUBLIC BEAVER_ENABLE_TRITON=1)
   endforeach()
   target_link_libraries(MLIRCAPIBeaver
     PUBLIC
