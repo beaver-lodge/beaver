@@ -17,7 +17,5 @@ defmodule Beaver.Application do
     |> Supervisor.start_link(strategy: :one_for_one)
   end
 
-  def stop([]) do
-    MLIR.Rewrite.stop_thread_pool()
-  end
+  def stop([]), do: MLIR.Rewrite.stop_thread_pool()
 end

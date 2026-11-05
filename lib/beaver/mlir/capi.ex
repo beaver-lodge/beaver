@@ -37,8 +37,7 @@ defmodule Beaver.MLIR.CAPI do
   @doc false
   def await_async(:async) do
     receive do
-      {result, diagnostics} when is_list(diagnostics) ->
-        Beaver.Native.check!({result, diagnostics})
+      {result, diagnostics} when is_list(diagnostics) -> Beaver.Native.check!({result, diagnostics})
     end
   end
 

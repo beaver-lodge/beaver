@@ -17,22 +17,8 @@ defmodule Beaver.Shadow.Corpus do
   """
 
   @fixtures [
-    %{
-      name: :matmul,
-      file: "ttgir_matmul.mlir",
-      dialect: :ttir,
-      baseline: 24,
-      optimized: 5,
-      lowered_to_llvm: true
-    },
-    %{
-      name: :attention,
-      file: "ttir_attention.mlir",
-      dialect: :ttir,
-      baseline: 34,
-      optimized: 5,
-      lowered_to_llvm: true
-    },
+    %{name: :matmul, file: "ttgir_matmul.mlir", dialect: :ttir, baseline: 24, optimized: 5, lowered_to_llvm: true},
+    %{name: :attention, file: "ttir_attention.mlir", dialect: :ttir, baseline: 34, optimized: 5, lowered_to_llvm: true},
     %{
       name: :remat,
       file: "ttgir_convert_layout.mlir",
@@ -54,11 +40,7 @@ defmodule Beaver.Shadow.Corpus do
         block: {128, 1, 1},
         shared_mem: 16_384,
         samples: 10,
-        buffer_sizes: %{
-          a: 1024 * 1024 * 4,
-          b: 1024 * 1024 * 4,
-          c: 1024 * 1024 * 4
-        },
+        buffer_sizes: %{a: 1024 * 1024 * 4, b: 1024 * 1024 * 4, c: 1024 * 1024 * 4},
         args_template: [
           {:ptr, :a},
           {:ptr, :b},
@@ -92,13 +74,10 @@ defmodule Beaver.Shadow.Corpus do
   def fixtures, do: @fixtures
 
   @spec fixture(atom()) :: fixture()
-  def fixture(name) when is_atom(name) do
-    Enum.find(@fixtures, &(&1.name == name)) ||
-      raise ArgumentError, "unknown corpus fixture: #{inspect(name)}"
-  end
+  def fixture(name) when is_atom(name),
+    do: Enum.find(@fixtures, &(&1.name == name)) || raise(ArgumentError, "unknown corpus fixture: #{inspect(name)}")
 
   @spec fixture_path(atom()) :: Path.t()
-  def fixture_path(name) do
-    Path.expand("../../../test/fixtures/triton/#{fixture(name).file}", __DIR__)
-  end
+  def fixture_path(name),
+    do: Path.expand("../../../test/fixtures/triton/#{fixture(name).file}", __DIR__)
 end

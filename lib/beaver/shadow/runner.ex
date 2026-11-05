@@ -32,9 +32,8 @@ defmodule Beaver.Shadow.Runner do
           }
   end
 
-  @type evaluator() ::
-          (Schedule.Resolved.t(), %{index: non_neg_integer(), choices: map()} ->
-             {:ok, term(), term()} | {:ok, term()} | {:error, term()})
+  @type evaluator() :: (Schedule.Resolved.t(), %{index: non_neg_integer(), choices: map()} ->
+                          {:ok, term(), term()} | {:ok, term()} | {:error, term()})
 
   @doc """
   Runs one experiment over all candidates of `schedule` against `input`.
@@ -53,10 +52,7 @@ defmodule Beaver.Shadow.Runner do
     evaluator = Keyword.get(opts, :evaluator, &default_evaluator/2)
 
     {:ok, candidates} =
-      Schedule.enumerate(schedule,
-        sequence: sequence,
-        max_candidates: Keyword.get(opts, :max_candidates, 10_000)
-      )
+      Schedule.enumerate(schedule, sequence: sequence, max_candidates: Keyword.get(opts, :max_candidates, 10_000))
 
     input_digest = input |> source_bytes() |> digest()
 
@@ -69,9 +65,7 @@ defmodule Beaver.Shadow.Runner do
         evaluate_and_record(input, resolved, candidate, evaluator)
       end)
 
-    winner =
-      receipts
-      |> Enum.find(&(&1.status == :ok))
+    winner = receipts |> Enum.find(&(&1.status == :ok))
 
     %Run{input_digest: input_digest, receipts: receipts, winner: winner}
   end
@@ -79,8 +73,7 @@ defmodule Beaver.Shadow.Runner do
   @doc "Replays a receipt's winner bytecode against a payload module."
   @spec replay(Receipt.t(), MLIR.Module.t(), keyword()) ::
           {:ok, MLIR.Transform.Result.t()} | {:error, Transform.Error.t()}
-  def replay(%Receipt{schedule: %{bytecode: bytecode}} = receipt, payload, opts \\ [])
-      when is_binary(bytecode) do
+  def replay(%Receipt{schedule: %{bytecode: bytecode}} = receipt, payload, opts \\ []) when is_binary(bytecode) do
     MLIR.Transform.execute(payload, bytecode,
       sequence: receipt.schedule.sequence,
       expensive_checks: Keyword.get(opts, :expensive_checks, false)
@@ -99,10 +92,7 @@ defmodule Beaver.Shadow.Runner do
           record(input, resolved, candidate, :ok, value, %{}, started, nil)
 
         {:error, reason} ->
-          record(input, resolved, candidate, :failed, nil, %{}, started, %{
-            kind: :evaluation_failure,
-            reason: reason
-          })
+          record(input, resolved, candidate, :failed, nil, %{}, started, %{kind: :evaluation_failure, reason: reason})
       end
     rescue
       exception ->
@@ -123,8 +113,7 @@ defmodule Beaver.Shadow.Runner do
       bytecode: resolved.bytecode
     }
 
-    artifact =
-      Map.get(user_metadata, :artifact, %{cache: nil, lookup_key: nil, artifact_key: nil})
+    artifact = Map.get(user_metadata, :artifact, %{cache: nil, lookup_key: nil, artifact_key: nil})
 
     trace =
       Map.get(user_metadata, :trace, %{
@@ -138,8 +127,7 @@ defmodule Beaver.Shadow.Runner do
       format: Receipt.format(),
       source_digest: digest(source_bytes(input)),
       source_structural_hash: Map.get(user_metadata, :structural_hash),
-      llvm_revision:
-        Map.get(user_metadata, :llvm_revision, MLIR.CompilationRuntime.llvm_revision()),
+      llvm_revision: Map.get(user_metadata, :llvm_revision, MLIR.CompilationRuntime.llvm_revision()),
       target: Map.get(user_metadata, :target),
       schema_version: Map.get(user_metadata, :schema_version),
       schedule: schedule_record,
@@ -159,12 +147,7 @@ defmodule Beaver.Shadow.Runner do
     {:ok, {resolved.digest, candidate.choices},
      %{
        artifact: %{cache: :miss, lookup_key: resolved.digest, artifact_key: resolved.digest},
-       trace: %{
-         action_count: 0,
-         tags: [],
-         candidate_index: candidate.index,
-         schedule_digest: resolved.digest
-       }
+       trace: %{action_count: 0, tags: [], candidate_index: candidate.index, schedule_digest: resolved.digest}
      }}
   end
 

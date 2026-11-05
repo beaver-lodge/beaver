@@ -1,3 +1,5 @@
+alias Beaver.Native
+
 defmodule Beaver.Printer do
   @moduledoc """
   This module provides a way to run MLIR CAPI with a string callback and user data.
@@ -5,30 +7,24 @@ defmodule Beaver.Printer do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Native
 
   @doc false
   def create() do
     printer =
       apply(CAPI.Raw, Module.concat(__MODULE__, :make), [])
-      |> Beaver.Native.normalize()
+      |> Native.normalize()
 
-    user_data =
-      apply(CAPI.Raw, Module.concat(__MODULE__, :opaque_ptr), [printer])
-      |> Beaver.Native.normalize()
+    user_data = apply(CAPI.Raw, Module.concat(__MODULE__, :opaque_ptr), [printer]) |> Native.normalize()
 
     {printer, user_data}
   end
 
   @doc false
-  def callback() do
-    %MLIR.StringCallback{ref: MLIR.CAPI.beaver_raw_string_printer_callback()}
-  end
+  def callback(), do: %MLIR.StringCallback{ref: MLIR.CAPI.beaver_raw_string_printer_callback()}
 
   @doc false
-  def flush(sp) do
-    MLIR.CAPI.beaver_raw_string_printer_flush(sp)
-  end
+  def flush(sp), do: MLIR.CAPI.beaver_raw_string_printer_flush(sp)
 
   @doc """
   Run the given function with a string callback and user data.

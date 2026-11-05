@@ -6,9 +6,6 @@ defmodule Beaver.MLIR.LogicalResult do
 
   use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
 
-  def success?(result) do
-    result
-    |> MLIR.CAPI.beaverLogicalResultIsSuccess()
-    |> Beaver.Native.to_term()
-  end
+  def success?(result),
+    do: result |> MLIR.CAPI.beaverLogicalResultIsSuccess() |> Beaver.Native.to_term()
 end

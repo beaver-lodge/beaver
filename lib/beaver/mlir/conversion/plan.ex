@@ -1,3 +1,5 @@
+alias Beaver.MLIR.{ConversionTarget, RewritePatternSet, Type, TypeConverter}
+
 defmodule Beaver.MLIR.Conversion.Plan do
   @moduledoc """
   An inspectable, declarative, scoped composition layer for MLIR dialect conversion.
@@ -29,11 +31,7 @@ defmodule Beaver.MLIR.Conversion.Plan do
   alias Beaver.MLIR.Conversion.Kernel, as: ConversionKernel
   alias Beaver.Pattern.Native.Descriptor
 
-  defstruct mode: :full,
-            timeout: 30_000,
-            folding_mode: nil,
-            build_materializations: nil,
-            entries: []
+  defstruct mode: :full, timeout: 30_000, folding_mode: nil, build_materializations: nil, entries: []
 
   @type mode() :: :full | :partial
   @type option() ::
@@ -67,10 +65,7 @@ defmodule Beaver.MLIR.Conversion.Plan do
     timeout = opts |> Keyword.get(:timeout, 30_000) |> validate_plan_timeout!()
     folding_mode = opts |> Keyword.get(:folding_mode) |> validate_folding_mode!()
 
-    build_materializations =
-      opts
-      |> Keyword.get(:build_materializations)
-      |> validate_build_materializations!()
+    build_materializations = opts |> Keyword.get(:build_materializations) |> validate_build_materializations!()
 
     %__MODULE__{
       mode: mode,
@@ -82,55 +77,37 @@ defmodule Beaver.MLIR.Conversion.Plan do
   end
 
   @spec add_legal_op(t(), String.Chars.t()) :: t()
-  def add_legal_op(%__MODULE__{} = plan, name) do
-    append_entry(plan, {:add_legal_op, to_string(name)})
-  end
+  def add_legal_op(%__MODULE__{} = plan, name),
+    do: append_entry(plan, {:add_legal_op, to_string(name)})
 
   @spec add_illegal_op(t(), String.Chars.t()) :: t()
-  def add_illegal_op(%__MODULE__{} = plan, name) do
-    append_entry(plan, {:add_illegal_op, to_string(name)})
-  end
+  def add_illegal_op(%__MODULE__{} = plan, name),
+    do: append_entry(plan, {:add_illegal_op, to_string(name)})
 
   @spec add_legal_dialect(t(), String.Chars.t()) :: t()
-  def add_legal_dialect(%__MODULE__{} = plan, name) do
-    append_entry(plan, {:add_legal_dialect, to_string(name)})
-  end
+  def add_legal_dialect(%__MODULE__{} = plan, name),
+    do: append_entry(plan, {:add_legal_dialect, to_string(name)})
 
   @spec add_illegal_dialect(t(), String.Chars.t()) :: t()
-  def add_illegal_dialect(%__MODULE__{} = plan, name) do
-    append_entry(plan, {:add_illegal_dialect, to_string(name)})
-  end
+  def add_illegal_dialect(%__MODULE__{} = plan, name),
+    do: append_entry(plan, {:add_illegal_dialect, to_string(name)})
 
-  @spec add_dynamically_legal_op(
-          t(),
-          String.Chars.t(),
-          MLIR.ConversionTarget.legality_callback(),
-          keyword()
-        ) :: t()
+  @spec add_dynamically_legal_op(t(), String.Chars.t(), ConversionTarget.legality_callback(), keyword()) :: t()
   def add_dynamically_legal_op(%__MODULE__{} = plan, name, callback, opts \\ [])
       when is_function(callback, 1) do
     opts = validate_callback_opts!(opts, [:version], "add_dynamically_legal_op")
     append_entry(plan, {:add_dynamically_legal_op, to_string(name), callback, opts})
   end
 
-  @spec add_dynamically_legal_dialect(
-          t(),
-          String.Chars.t(),
-          MLIR.ConversionTarget.legality_callback(),
-          keyword()
-        ) :: t()
+  @spec add_dynamically_legal_dialect(t(), String.Chars.t(), ConversionTarget.legality_callback(), keyword()) :: t()
   def add_dynamically_legal_dialect(%__MODULE__{} = plan, name, callback, opts \\ [])
       when is_function(callback, 1) do
     opts = validate_callback_opts!(opts, [:version], "add_dynamically_legal_dialect")
     append_entry(plan, {:add_dynamically_legal_dialect, to_string(name), callback, opts})
   end
 
-  @spec mark_recursively_legal(
-          t(),
-          String.Chars.t(),
-          MLIR.ConversionTarget.legality_callback() | nil | keyword(),
-          keyword()
-        ) :: t()
+  @spec mark_recursively_legal(t(), String.Chars.t(), ConversionTarget.legality_callback() | nil | keyword(), keyword()) ::
+          t()
   def mark_recursively_legal(plan, name, callback_or_opts \\ nil, opts \\ [])
 
   def mark_recursively_legal(%__MODULE__{} = plan, name, opts, []) when is_list(opts) do
@@ -144,22 +121,16 @@ defmodule Beaver.MLIR.Conversion.Plan do
     append_entry(plan, {:mark_recursively_legal, to_string(name), callback, opts})
   end
 
-  @spec mark_unknown_dynamically_legal(
-          t(),
-          MLIR.ConversionTarget.legality_callback(),
-          keyword()
-        ) :: t()
+  @spec mark_unknown_dynamically_legal(t(), ConversionTarget.legality_callback(), keyword()) ::
+          t()
   def mark_unknown_dynamically_legal(%__MODULE__{} = plan, callback, opts \\ [])
       when is_function(callback, 1) do
     opts = validate_callback_opts!(opts, [:version], "mark_unknown_dynamically_legal")
     append_entry(plan, {:mark_unknown_dynamically_legal, callback, opts})
   end
 
-  @spec add_conversion(
-          t(),
-          (MLIR.Type.t() -> MLIR.TypeConverter.conversion_result()),
-          keyword()
-        ) :: t()
+  @spec add_conversion(t(), (Type.t() -> TypeConverter.conversion_result()), keyword()) ::
+          t()
   def add_conversion(%__MODULE__{} = plan, callback, opts \\ [])
       when is_function(callback, 1) do
     opts = validate_callback_opts!(opts, [:version], "add_conversion")
@@ -176,18 +147,14 @@ defmodule Beaver.MLIR.Conversion.Plan do
   @spec add_conversion_map(t(), [String.t()], String.t()) :: t()
   def add_conversion_map(%__MODULE__{} = plan, source_types, target_type)
       when is_list(source_types) and is_binary(target_type) do
-    unless source_types != [] and Enum.all?(source_types, &is_binary/1) do
-      raise ArgumentError, "conversion map source types must be a non-empty list of strings"
-    end
+    unless source_types != [] and Enum.all?(source_types, &is_binary/1),
+      do: raise(ArgumentError, "conversion map source types must be a non-empty list of strings")
 
     append_entry(plan, {:add_conversion_map, source_types, target_type})
   end
 
-  @spec add_1_to_n_conversion(
-          t(),
-          (MLIR.Type.t() -> MLIR.TypeConverter.one_to_n_result()),
-          keyword()
-        ) :: t()
+  @spec add_1_to_n_conversion(t(), (Type.t() -> TypeConverter.one_to_n_result()), keyword()) ::
+          t()
   def add_1_to_n_conversion(%__MODULE__{} = plan, callback, opts \\ [])
       when is_function(callback, 1) do
     opts = validate_callback_opts!(opts, [:version], "add_1_to_n_conversion")
@@ -215,39 +182,25 @@ defmodule Beaver.MLIR.Conversion.Plan do
     append_entry(plan, {:add_1_to_n_target_materialization, callback, opts})
   end
 
-  @spec add_conversion_pattern(
-          t(),
-          String.Chars.t(),
-          MLIR.ConversionPattern.callback(),
-          keyword()
-        ) :: t()
+  @spec add_conversion_pattern(t(), String.Chars.t(), MLIR.ConversionPattern.callback(), keyword()) :: t()
   def add_conversion_pattern(%__MODULE__{} = plan, root_name, callback, opts \\ [])
       when is_function(callback, 3) do
     opts =
-      validate_callback_opts!(
-        opts,
-        [:version, :benefit, :one_to_n, :timeout],
-        "add_conversion_pattern"
-      )
+      validate_callback_opts!(opts, [:version, :benefit, :one_to_n, :timeout], "add_conversion_pattern")
 
     benefit = Keyword.get(opts, :benefit, 1)
 
-    unless is_integer(benefit) and benefit >= 0 do
-      raise ArgumentError, ":benefit must be a non-negative integer, got: #{inspect(benefit)}"
-    end
+    unless is_integer(benefit) and benefit >= 0,
+      do: raise(ArgumentError, ":benefit must be a non-negative integer, got: #{inspect(benefit)}")
 
     one_to_n = Keyword.get(opts, :one_to_n, false)
 
-    unless is_boolean(one_to_n) do
-      raise ArgumentError, ":one_to_n must be boolean, got: #{inspect(one_to_n)}"
-    end
+    unless is_boolean(one_to_n), do: raise(ArgumentError, ":one_to_n must be boolean, got: #{inspect(one_to_n)}")
 
     timeout = Keyword.get(opts, :timeout)
 
-    if timeout != nil and not (is_integer(timeout) and timeout >= 0) do
-      raise ArgumentError,
-            ":timeout must be a non-negative integer or nil, got: #{inspect(timeout)}"
-    end
+    if timeout != nil and not (is_integer(timeout) and timeout >= 0),
+      do: raise(ArgumentError, ":timeout must be a non-negative integer or nil, got: #{inspect(timeout)}")
 
     append_entry(plan, {:add_conversion_pattern, to_string(root_name), callback, opts})
   end
@@ -266,11 +219,8 @@ defmodule Beaver.MLIR.Conversion.Plan do
   This is the composition point for callback-free native pattern groups: the
   callback only installs patterns and is not invoked by the conversion worker.
   """
-  @spec add_pattern_population(
-          t(),
-          (MLIR.RewritePatternSet.t(), MLIR.TypeConverter.t() -> :ok),
-          keyword()
-        ) :: t()
+  @spec add_pattern_population(t(), (RewritePatternSet.t(), TypeConverter.t() -> :ok), keyword()) ::
+          t()
   def add_pattern_population(%__MODULE__{} = plan, callback, opts \\ [])
       when is_function(callback, 2) do
     opts = validate_callback_opts!(opts, [:version], "add_pattern_population")
@@ -286,12 +236,8 @@ defmodule Beaver.MLIR.Conversion.Plan do
   absolute. Use `:expected` to require provider-specific schema, runtime ABI,
   target, and capability identities.
   """
-  @spec add_external_pattern_population(
-          t(),
-          ConversionKernel.Manifest.t(),
-          Path.t(),
-          keyword()
-        ) :: t()
+  @spec add_external_pattern_population(t(), ConversionKernel.Manifest.t(), Path.t(), keyword()) ::
+          t()
   def add_external_pattern_population(
         %__MODULE__{} = plan,
         %ConversionKernel.Manifest{} = manifest,
@@ -316,15 +262,14 @@ defmodule Beaver.MLIR.Conversion.Plan do
   > or runs when all callback versions are explicitly specified.
   """
   @spec declaration(t()) :: map()
-  def declaration(%__MODULE__{} = plan) do
-    %{
+  def declaration(%__MODULE__{} = plan),
+    do: %{
       mode: plan.mode,
       timeout: plan.timeout,
       folding_mode: plan.folding_mode,
       build_materializations: plan.build_materializations,
       entries: Enum.map(plan.entries, &entry_declaration/1)
     }
-  end
 
   @doc """
   Executes the conversion plan on the given IR (`MLIR.Module` or `MLIR.Operation`).
@@ -334,9 +279,7 @@ defmodule Beaver.MLIR.Conversion.Plan do
   Returns `MLIR.Conversion.result()`.
   """
   @spec run(t(), MLIR.Conversion.conversion_ir()) :: MLIR.Conversion.result()
-  def run(%__MODULE__{} = plan, ir) do
-    execute(plan, ir, false)
-  end
+  def run(%__MODULE__{} = plan, ir), do: execute(plan, ir, false)
 
   @doc """
   Executes the plan with bounded conversion callback profiling.
@@ -346,54 +289,39 @@ defmodule Beaver.MLIR.Conversion.Plan do
   """
   @spec profile(t(), MLIR.Conversion.conversion_ir()) ::
           {MLIR.Conversion.result(), MLIR.Conversion.Profile.receipt()}
-  def profile(%__MODULE__{} = plan, ir) do
-    execute(plan, ir, true)
-  end
+  def profile(%__MODULE__{} = plan, ir), do: execute(plan, ir, true)
 
   defp execute(plan, ir, profile?) do
     context = MLIR.context(ir)
 
     target_opts = if plan.timeout, do: [timeout: plan.timeout], else: []
-    target = MLIR.ConversionTarget.create(context, target_opts)
+    target = ConversionTarget.create(context, target_opts)
 
     try do
       converter_opts = if plan.timeout, do: [timeout: plan.timeout], else: []
-      converter = MLIR.TypeConverter.create(converter_opts)
+      converter = TypeConverter.create(converter_opts)
 
       try do
-        patterns = MLIR.RewritePatternSet.create(context)
+        patterns = RewritePatternSet.create(context)
 
-        populate_or_destroy!(
-          plan.entries,
-          context,
-          target,
-          converter,
-          patterns,
-          plan.timeout
-        )
+        populate_or_destroy!(plan.entries, context, target, converter, patterns, plan.timeout)
 
         conversion_opts =
-          [
-            timeout: plan.timeout,
-            folding_mode: plan.folding_mode,
-            build_materializations: plan.build_materializations
-          ]
+          [timeout: plan.timeout, folding_mode: plan.folding_mode, build_materializations: plan.build_materializations]
           |> Enum.reject(fn {_k, v} -> is_nil(v) end)
 
         # Conversion.apply/5 freezes the mutable set and transfers its ownership
         # to the native worker. Do not rescue around this call and try to destroy
         # the stale mutable handle: apply/5 already releases the owned frozen set
         # if starting the worker fails, and the worker releases it on every exit.
-        if profile? do
-          MLIR.Conversion.profile(plan.mode, ir, target, patterns, conversion_opts)
-        else
-          MLIR.Conversion.apply(plan.mode, ir, target, patterns, conversion_opts)
-        end
+        if profile?,
+          do: MLIR.Conversion.profile(plan.mode, ir, target, patterns, conversion_opts),
+          else: MLIR.Conversion.apply(plan.mode, ir, target, patterns, conversion_opts)
       after
-        MLIR.TypeConverter.destroy(converter)
+        TypeConverter.destroy(converter)
       end
     after
-      MLIR.ConversionTarget.destroy(target)
+      ConversionTarget.destroy(target)
     end
   end
 
@@ -418,14 +346,11 @@ defmodule Beaver.MLIR.Conversion.Plan do
     end
   end
 
-  defp append_entry(%__MODULE__{entries: entries} = plan, entry) do
-    %{plan | entries: entries ++ [entry]}
-  end
+  defp append_entry(%__MODULE__{entries: entries} = plan, entry), do: %{plan | entries: entries ++ [entry]}
 
   defp validate_plan_options!(opts) do
-    unless Keyword.keyword?(opts) do
-      raise ArgumentError, "Plan options must be a keyword list, got: #{inspect(opts)}"
-    end
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, "Plan options must be a keyword list, got: #{inspect(opts)}")
 
     case Keyword.keys(opts) -- [:mode, :timeout, :folding_mode, :build_materializations] do
       [] -> :ok
@@ -435,104 +360,64 @@ defmodule Beaver.MLIR.Conversion.Plan do
 
   defp validate_mode!(mode) when mode in [:full, :partial], do: mode
 
-  defp validate_mode!(mode) do
-    raise ArgumentError, ":mode must be :full or :partial, got: #{inspect(mode)}"
-  end
+  defp validate_mode!(mode), do: raise(ArgumentError, ":mode must be :full or :partial, got: #{inspect(mode)}")
 
   defp validate_plan_timeout!(nil), do: nil
   defp validate_plan_timeout!(timeout) when is_integer(timeout) and timeout >= 0, do: timeout
 
-  defp validate_plan_timeout!(timeout) do
-    raise ArgumentError,
-          ":timeout must be a non-negative integer or nil, got: #{inspect(timeout)}"
-  end
+  defp validate_plan_timeout!(timeout),
+    do: raise(ArgumentError, ":timeout must be a non-negative integer or nil, got: #{inspect(timeout)}")
 
-  defp validate_folding_mode!(mode)
-       when mode in [nil, :never, :before_patterns, :after_patterns],
-       do: mode
+  defp validate_folding_mode!(mode) when mode in [nil, :never, :before_patterns, :after_patterns], do: mode
 
-  defp validate_folding_mode!(mode) do
-    raise ArgumentError, "unsupported conversion folding mode: #{inspect(mode)}"
-  end
+  defp validate_folding_mode!(mode), do: raise(ArgumentError, "unsupported conversion folding mode: #{inspect(mode)}")
 
   defp validate_build_materializations!(value) when is_boolean(value) or is_nil(value), do: value
 
-  defp validate_build_materializations!(value) do
-    raise ArgumentError,
-          "build_materializations must be boolean or nil, got: #{inspect(value)}"
-  end
+  defp validate_build_materializations!(value),
+    do: raise(ArgumentError, "build_materializations must be boolean or nil, got: #{inspect(value)}")
 
   defp validate_callback_opts!(opts, allowed, label) do
-    unless Keyword.keyword?(opts) do
-      raise ArgumentError, "#{label} options must be a keyword list, got: #{inspect(opts)}"
-    end
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, "#{label} options must be a keyword list, got: #{inspect(opts)}")
 
     case Keyword.keys(opts) -- allowed do
-      [] ->
-        opts
-
-      unsupported ->
-        raise ArgumentError, "unsupported #{label} options: #{inspect(unsupported)}"
+      [] -> opts
+      unsupported -> raise ArgumentError, "unsupported #{label} options: #{inspect(unsupported)}"
     end
   end
 
   defp entry_declaration({:add_legal_op, name}), do: %{kind: :add_legal_op, op: name}
   defp entry_declaration({:add_illegal_op, name}), do: %{kind: :add_illegal_op, op: name}
 
-  defp entry_declaration({:add_legal_dialect, name}),
-    do: %{kind: :add_legal_dialect, dialect: name}
+  defp entry_declaration({:add_legal_dialect, name}), do: %{kind: :add_legal_dialect, dialect: name}
 
-  defp entry_declaration({:add_illegal_dialect, name}),
-    do: %{kind: :add_illegal_dialect, dialect: name}
+  defp entry_declaration({:add_illegal_dialect, name}), do: %{kind: :add_illegal_dialect, dialect: name}
 
-  defp entry_declaration({:add_dynamically_legal_op, name, _cb, opts}) do
-    %{kind: :add_dynamically_legal_op, op: name, version: callback_version(opts)}
-  end
+  defp entry_declaration({:add_dynamically_legal_op, name, _cb, opts}),
+    do: %{kind: :add_dynamically_legal_op, op: name, version: callback_version(opts)}
 
-  defp entry_declaration({:add_dynamically_legal_dialect, name, _cb, opts}) do
-    %{kind: :add_dynamically_legal_dialect, dialect: name, version: callback_version(opts)}
-  end
+  defp entry_declaration({:add_dynamically_legal_dialect, name, _cb, opts}),
+    do: %{kind: :add_dynamically_legal_dialect, dialect: name, version: callback_version(opts)}
 
   defp entry_declaration({:mark_recursively_legal, name, cb, opts}) do
     base = %{kind: :mark_recursively_legal, op: name}
 
-    if cb != nil do
-      Map.put(base, :version, callback_version(opts))
-    else
-      base
-    end
+    if cb != nil, do: Map.put(base, :version, callback_version(opts)), else: base
   end
 
-  defp entry_declaration({:mark_unknown_dynamically_legal, _cb, opts}) do
-    %{kind: :mark_unknown_dynamically_legal, version: callback_version(opts)}
-  end
+  defp entry_declaration({kind, _callback, opts})
+       when kind in ~w(
+         mark_unknown_dynamically_legal add_conversion add_1_to_n_conversion add_source_materialization
+         add_target_materialization add_1_to_n_target_materialization add_pattern_population
+       )a,
+       do: %{kind: kind, version: callback_version(opts)}
 
-  defp entry_declaration({:add_conversion, _cb, opts}) do
-    %{kind: :add_conversion, version: callback_version(opts)}
-  end
+  defp entry_declaration({:add_conversion_map, source_types, target_type}),
+    do: %{kind: :add_conversion_map, source_types: source_types, target_type: target_type}
 
-  defp entry_declaration({:add_conversion_map, source_types, target_type}) do
-    %{kind: :add_conversion_map, source_types: source_types, target_type: target_type}
-  end
-
-  defp entry_declaration({:add_1_to_n_conversion, _cb, opts}) do
-    %{kind: :add_1_to_n_conversion, version: callback_version(opts)}
-  end
-
-  defp entry_declaration({:add_source_materialization, _cb, opts}) do
-    %{kind: :add_source_materialization, version: callback_version(opts)}
-  end
-
-  defp entry_declaration({:add_target_materialization, _cb, opts}) do
-    %{kind: :add_target_materialization, version: callback_version(opts)}
-  end
-
-  defp entry_declaration({:add_1_to_n_target_materialization, _cb, opts}) do
-    %{kind: :add_1_to_n_target_materialization, version: callback_version(opts)}
-  end
-
-  defp entry_declaration({:add_conversion_pattern, root, _cb, opts}) do
-    %{
+  defp entry_declaration({:add_conversion_pattern, root, _cb, opts}),
+    do: %{
       kind: :add_conversion_pattern,
       root: root,
       benefit: Keyword.get(opts, :benefit, 1),
@@ -540,24 +425,18 @@ defmodule Beaver.MLIR.Conversion.Plan do
       timeout: Keyword.get(opts, :timeout),
       version: callback_version(opts)
     }
-  end
 
-  defp entry_declaration({:add_pattern, descriptor, opts}) do
-    %{
+  defp entry_declaration({:add_pattern, descriptor, opts}),
+    do: %{
       kind: :add_pattern,
       name: descriptor.name,
       root: descriptor.root,
       benefit: descriptor.benefit,
       version: callback_version(opts)
     }
-  end
 
-  defp entry_declaration({:add_pattern_population, _callback, opts}) do
-    %{kind: :add_pattern_population, version: callback_version(opts)}
-  end
-
-  defp entry_declaration({:add_external_pattern_population, manifest, _path, _opts}) do
-    %{
+  defp entry_declaration({:add_external_pattern_population, manifest, _path, _opts}),
+    do: %{
       kind: :add_external_pattern_population,
       provider: manifest.provider,
       manifest_digest: ConversionKernel.Manifest.digest(manifest),
@@ -566,220 +445,81 @@ defmodule Beaver.MLIR.Conversion.Plan do
       patterns: manifest.patterns,
       bootstrap: manifest.bootstrap
     }
-  end
 
-  defp callback_version(opts) do
-    Keyword.get(opts, :version, :unversioned)
-  end
+  defp callback_version(opts), do: Keyword.get(opts, :version, :unversioned)
 
-  defp populate_or_destroy!(entries, context, target, converter, patterns, plan_timeout) do
-    populate(entries, context, target, converter, patterns, plan_timeout)
+  defp populate_or_destroy!(entries, ctx, target, converter, patterns, plan_timeout) do
+    populate(entries, ctx, target, converter, patterns, plan_timeout)
   rescue
     exception ->
-      MLIR.RewritePatternSet.threaded_destroy(context, patterns)
+      RewritePatternSet.threaded_destroy(ctx, patterns)
       reraise exception, __STACKTRACE__
   catch
     kind, reason ->
-      MLIR.RewritePatternSet.threaded_destroy(context, patterns)
+      RewritePatternSet.threaded_destroy(ctx, patterns)
       :erlang.raise(kind, reason, __STACKTRACE__)
   end
 
-  defp populate([], _context, _target, _converter, _patterns, _plan_timeout), do: :ok
+  defp populate(entries, ctx, target, converter, patterns, timeout) do
+    resources = %{context: ctx, target: target, converter: converter, patterns: patterns, timeout: timeout}
 
-  defp populate([entry | rest], context, target, converter, patterns, plan_timeout) do
-    populate_entry(entry, context, target, converter, patterns, plan_timeout)
-    populate(rest, context, target, converter, patterns, plan_timeout)
+    Enum.each(entries, &populate_entry(&1, resources))
   end
 
-  defp populate_entry({:add_legal_op, name}, _context, target, _converter, _patterns, _timeout),
-    do: MLIR.ConversionTarget.add_legal_op(target, name)
+  defp populate_entry({kind, name}, %{target: target})
+       when kind in [:add_legal_op, :add_illegal_op, :add_legal_dialect, :add_illegal_dialect],
+       do: apply(ConversionTarget, kind, [target, name])
 
-  defp populate_entry({:add_illegal_op, name}, _context, target, _converter, _patterns, _timeout),
-    do: MLIR.ConversionTarget.add_illegal_op(target, name)
+  defp populate_entry({kind, name, callback, _opts}, %{target: target})
+       when kind in [:add_dynamically_legal_op, :add_dynamically_legal_dialect, :mark_recursively_legal],
+       do: apply(ConversionTarget, kind, [target, name, callback])
 
-  defp populate_entry(
-         {:add_legal_dialect, name},
-         _context,
-         target,
-         _converter,
-         _patterns,
-         _timeout
-       ),
-       do: MLIR.ConversionTarget.add_legal_dialect(target, name)
+  defp populate_entry({:mark_unknown_dynamically_legal, callback, _opts}, %{target: target}),
+    do: ConversionTarget.mark_unknown_dynamically_legal(target, callback)
 
-  defp populate_entry(
-         {:add_illegal_dialect, name},
-         _context,
-         target,
-         _converter,
-         _patterns,
-         _timeout
-       ),
-       do: MLIR.ConversionTarget.add_illegal_dialect(target, name)
+  defp populate_entry({kind, callback, _opts}, %{converter: converter})
+       when kind in ~w(
+         add_conversion add_1_to_n_conversion add_source_materialization add_target_materialization
+         add_1_to_n_target_materialization
+       )a,
+       do: apply(TypeConverter, kind, [converter, callback])
 
-  defp populate_entry(
-         {:add_dynamically_legal_op, name, callback, _opts},
-         _context,
-         target,
-         _converter,
-         _patterns,
-         _timeout
-       ),
-       do: MLIR.ConversionTarget.add_dynamically_legal_op(target, name, callback)
-
-  defp populate_entry(
-         {:add_dynamically_legal_dialect, name, callback, _opts},
-         _context,
-         target,
-         _converter,
-         _patterns,
-         _timeout
-       ),
-       do: MLIR.ConversionTarget.add_dynamically_legal_dialect(target, name, callback)
-
-  defp populate_entry(
-         {:mark_recursively_legal, name, callback, _opts},
-         _context,
-         target,
-         _converter,
-         _patterns,
-         _timeout
-       ),
-       do: MLIR.ConversionTarget.mark_recursively_legal(target, name, callback)
-
-  defp populate_entry(
-         {:mark_unknown_dynamically_legal, callback, _opts},
-         _context,
-         target,
-         _converter,
-         _patterns,
-         _timeout
-       ),
-       do: MLIR.ConversionTarget.mark_unknown_dynamically_legal(target, callback)
-
-  defp populate_entry(
-         {:add_conversion, callback, _opts},
-         _context,
-         _target,
-         converter,
-         _patterns,
-         _timeout
-       ),
-       do: MLIR.TypeConverter.add_conversion(converter, callback)
-
-  defp populate_entry(
-         {:add_conversion_map, source_types, target_type},
-         context,
-         _target,
-         converter,
-         _patterns,
-         _timeout
-       ) do
-    sources = Enum.map(source_types, &MLIR.Type.get(&1, ctx: context))
-    target = MLIR.Type.get(target_type, ctx: context)
-    MLIR.TypeConverter.add_conversion_map(converter, sources, target)
+  defp populate_entry({:add_conversion_map, source_types, target_type}, resources) do
+    sources = Enum.map(source_types, &Type.get(&1, ctx: resources.context))
+    target = Type.get(target_type, ctx: resources.context)
+    TypeConverter.add_conversion_map(resources.converter, sources, target)
   end
 
-  defp populate_entry(
-         {:add_1_to_n_conversion, callback, _opts},
-         _context,
-         _target,
-         converter,
-         _patterns,
-         _timeout
-       ),
-       do: MLIR.TypeConverter.add_1_to_n_conversion(converter, callback)
-
-  defp populate_entry(
-         {:add_source_materialization, callback, _opts},
-         _context,
-         _target,
-         converter,
-         _patterns,
-         _timeout
-       ),
-       do: MLIR.TypeConverter.add_source_materialization(converter, callback)
-
-  defp populate_entry(
-         {:add_target_materialization, callback, _opts},
-         _context,
-         _target,
-         converter,
-         _patterns,
-         _timeout
-       ),
-       do: MLIR.TypeConverter.add_target_materialization(converter, callback)
-
-  defp populate_entry(
-         {:add_1_to_n_target_materialization, callback, _opts},
-         _context,
-         _target,
-         converter,
-         _patterns,
-         _timeout
-       ),
-       do: MLIR.TypeConverter.add_1_to_n_target_materialization(converter, callback)
-
-  defp populate_entry(
-         {:add_conversion_pattern, root_name, callback, opts},
-         context,
-         _target,
-         converter,
-         patterns,
-         plan_timeout
-       ) do
-    pattern_opts = conversion_pattern_opts(opts, context, plan_timeout)
-    MLIR.ConversionPattern.add(patterns, root_name, converter, callback, pattern_opts)
+  defp populate_entry({:add_conversion_pattern, root_name, callback, opts}, resources) do
+    opts = conversion_pattern_opts(opts, resources.context, resources.timeout)
+    MLIR.ConversionPattern.add(resources.patterns, root_name, resources.converter, callback, opts)
   end
 
-  defp populate_entry(
-         {:add_pattern, descriptor, _opts},
-         context,
-         _target,
-         _converter,
-         patterns,
-         _timeout
-       ),
-       do: MLIR.RewritePatternSet.add(patterns, descriptor, ctx: context)
+  defp populate_entry({:add_pattern, descriptor, _opts}, resources),
+    do: RewritePatternSet.add(resources.patterns, descriptor, ctx: resources.context)
 
-  defp populate_entry(
-         {:add_pattern_population, callback, _opts},
-         _context,
-         _target,
-         converter,
-         patterns,
-         _timeout
-       ) do
-    case callback.(patterns, converter) do
+  defp populate_entry({:add_pattern_population, callback, _opts}, resources) do
+    case callback.(resources.patterns, resources.converter) do
       :ok -> :ok
       other -> raise ArgumentError, "pattern population must return :ok, got: #{inspect(other)}"
     end
   end
 
-  defp populate_entry(
-         {:add_external_pattern_population, manifest, artifact_path, opts},
-         _context,
-         _target,
-         converter,
-         patterns,
-         _timeout
-       ) do
-    ConversionKernel.populate!(patterns, converter, manifest, artifact_path,
+  defp populate_entry({:add_external_pattern_population, manifest, artifact_path, opts}, resources) do
+    ConversionKernel.populate!(resources.patterns, resources.converter, manifest, artifact_path,
       expected: Keyword.get(opts, :expected, [])
     )
   end
 
-  defp conversion_pattern_opts(opts, context, plan_timeout) do
+  defp conversion_pattern_opts(opts, ctx, plan_timeout) do
     pattern_opts =
       opts
       |> Keyword.take([:benefit, :one_to_n, :timeout])
       |> Keyword.reject(fn {key, value} -> key == :timeout and is_nil(value) end)
-      |> Keyword.put(:ctx, context)
+      |> Keyword.put(:ctx, ctx)
 
-    if plan_timeout && not Keyword.has_key?(pattern_opts, :timeout) do
-      Keyword.put(pattern_opts, :timeout, plan_timeout)
-    else
-      pattern_opts
-    end
+    if plan_timeout && not Keyword.has_key?(pattern_opts, :timeout),
+      do: Keyword.put(pattern_opts, :timeout, plan_timeout),
+      else: pattern_opts
   end
 end

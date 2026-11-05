@@ -61,11 +61,8 @@ defmodule Beaver.Wasm do
     module
     |> MLIR.Module.body()
     |> Beaver.Walker.prewalk(false, fn
-      %MLIR.Operation{} = op, acc ->
-        {op, acc or String.starts_with?(MLIR.Operation.name(op), "ex.")}
-
-      other, acc ->
-        {other, acc}
+      %MLIR.Operation{} = op, acc -> {op, acc or String.starts_with?(MLIR.Operation.name(op), "ex.")}
+      other, acc -> {other, acc}
     end)
     |> elem(1)
   end
@@ -88,28 +85,17 @@ defmodule Beaver.Wasm do
     bytes
   end
 
-  defp zig do
-    System.find_executable("zig") || raise "zig not found on PATH"
-  end
+  defp zig, do: System.find_executable("zig") || raise("zig not found on PATH")
 
   defp run_tool!(executable, args) do
     {output, status} = System.cmd(executable, args, stderr_to_stdout: true)
 
-    unless status == 0 do
-      raise "#{executable} failed (#{status}): #{String.slice(output, -1000, 1000)}"
-    end
+    unless status == 0, do: raise("#{executable} failed (#{status}): #{String.slice(output, -1000, 1000)}")
 
     :ok
   end
 
-  defp tmp_path(suffix) do
-    Path.join(
-      System.tmp_dir!(),
-      "beaver_wasm_#{System.unique_integer([:positive])}#{suffix}"
-    )
-  end
+  defp tmp_path(suffix), do: Path.join(System.tmp_dir!(), "beaver_wasm_#{System.unique_integer([:positive])}#{suffix}")
 
-  defp cleanup(paths) do
-    Enum.each(paths, &File.rm/1)
-  end
+  defp cleanup(paths), do: Enum.each(paths, &File.rm/1)
 end

@@ -1,25 +1,25 @@
+alias Beaver.MLIR.{Type, TypeConverter}
+
 defmodule Beaver.MLIR.TypeConverter.Callback do
   @moduledoc """
   Compatibility facade for a `Beaver.MLIR.TypeConverter` with one 1:1
   conversion callback. New code can use `Beaver.MLIR.TypeConverter` directly.
   """
 
-  alias Beaver.MLIR
-
   defstruct [:converter, :registration, :callback, timeout_ms: 30_000]
 
   @type callback_result() ::
-          MLIR.Type.t() | {:ok, MLIR.Type.t()} | :declined | {:error, term()}
+          Type.t() | {:ok, Type.t()} | :declined | {:error, term()}
   @type t() :: %__MODULE__{
-          converter: MLIR.TypeConverter.t(),
+          converter: TypeConverter.t(),
           registration: reference(),
-          callback: (MLIR.Type.t() -> callback_result()),
+          callback: (Type.t() -> callback_result()),
           timeout_ms: non_neg_integer()
         }
 
-  @spec create((MLIR.Type.t() -> callback_result()), keyword()) :: t()
+  @spec create((Type.t() -> callback_result()), keyword()) :: t()
   def create(callback, opts \\ []) when is_function(callback, 1) do
-    converter = MLIR.TypeConverter.create(Keyword.put(opts, :conversion, callback))
+    converter = TypeConverter.create(Keyword.put(opts, :conversion, callback))
 
     %__MODULE__{
       converter: converter,
@@ -29,10 +29,10 @@ defmodule Beaver.MLIR.TypeConverter.Callback do
     }
   end
 
-  @spec convert(t(), MLIR.Type.t()) :: {:ok, MLIR.Type.t()} | {:error, term()}
+  @spec convert(t(), Type.t()) :: {:ok, Type.t()} | {:error, term()}
   def convert(%__MODULE__{converter: converter}, type),
-    do: MLIR.TypeConverter.convert(converter, type)
+    do: TypeConverter.convert(converter, type)
 
   @spec destroy(t()) :: :ok
-  def destroy(%__MODULE__{converter: converter}), do: MLIR.TypeConverter.destroy(converter)
+  def destroy(%__MODULE__{converter: converter}), do: TypeConverter.destroy(converter)
 end

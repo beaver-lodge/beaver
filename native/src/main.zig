@@ -68,12 +68,7 @@ export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     return 0;
 }
 
-export fn nif_upgrade(
-    env: beam.env,
-    priv_data: [*c]?*anyopaque,
-    _: [*c]?*anyopaque,
-    load_info: beam.term,
-) c_int {
+export fn nif_upgrade(env: beam.env, priv_data: [*c]?*anyopaque, _: [*c]?*anyopaque, load_info: beam.term) c_int {
     return nif_load(env, priv_data, load_info);
 }
 

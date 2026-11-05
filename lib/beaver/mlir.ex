@@ -1,3 +1,6 @@
+alias Beaver.MLIR.{Diagnostic, RewritePatternSet}
+alias Beaver.Native
+
 defmodule Beaver.MLIR do
   alias Beaver.MLIR.{Attribute, Type, Operation, Rewrite}
   alias Beaver.MLIR
@@ -79,7 +82,7 @@ defmodule Beaver.MLIR do
   """
   def equal?(%m{} = a, %m{} = b) do
     entity_name = extract_entity_name(m)
-    apply(CAPI, :"mlir#{entity_name}Equal", [a, b]) |> Beaver.Native.to_term()
+    apply(CAPI, :"mlir#{entity_name}Equal", [a, b]) |> Native.to_term()
   end
 
   def equal?(%Deferred{} = a, b) do
@@ -111,17 +114,13 @@ defmodule Beaver.MLIR do
   def null?(%m{} = entity) do
     entity_name = extract_entity_name(m)
     f = :"beaverIsNull#{entity_name}"
-    function_exported?(CAPI, f, 1) && apply(CAPI, f, [entity]) |> Beaver.Native.to_term()
+    function_exported?(CAPI, f, 1) && apply(CAPI, f, [entity]) |> Native.to_term()
   end
 
   defp not_null_run(%m{} = entity, dumper) do
     entity_name = extract_entity_name(m)
 
-    if null?(entity) do
-      {:error, "#{entity_name} is null"}
-    else
-      dumper.(entity)
-    end
+    if null?(entity), do: {:error, "#{entity_name} is null"}, else: dumper.(entity)
   end
 
   @type printable() ::
@@ -153,16 +152,12 @@ defmodule Beaver.MLIR do
   """
   def dump(mlir, opts \\ [])
 
-  def dump(%Beaver.MLIR.Module{} = mlir, opts) do
-    mlirModuleGetOperation(mlir) |> dump(opts)
-  end
+  def dump(%Beaver.MLIR.Module{} = mlir, opts), do: mlirModuleGetOperation(mlir) |> dump(opts)
 
   def dump(%Operation{} = mlir, opts) do
-    if opts[:generic] do
-      not_null_run(mlir, &beaverOperationDumpGeneric/1)
-    else
-      not_null_run(mlir, &mlirOperationDump/1)
-    end
+    if opts[:generic],
+      do: not_null_run(mlir, &beaverOperationDumpGeneric/1),
+      else: not_null_run(mlir, &mlirOperationDump/1)
   end
 
   def dump(%m{} = entity, _opts) do
@@ -177,16 +172,12 @@ defmodule Beaver.MLIR do
 
   def dump!(mlir, opts) do
     case dump(mlir, opts) do
-      :ok ->
-        mlir
-
-      {:error, msg} ->
-        raise msg
+      :ok -> mlir
+      {:error, msg} -> raise msg
     end
   end
 
-  @spec to_string(printable() | Deferred.contextual(printable()), print_opts()) ::
-          null_safe_result(String.t())
+  @spec to_string(printable() | Deferred.contextual(printable()), print_opts()) :: null_safe_result(String.t())
 
   @doc """
   Print MLIR element or StringRef as Elixir binary string.
@@ -242,17 +233,11 @@ defmodule Beaver.MLIR do
     end
   end
 
-  def to_string(%Beaver.MLIR.Module{} = module, opts) do
-    module |> Operation.from_module() |> to_string(opts)
-  end
+  def to_string(%Beaver.MLIR.Module{} = module, opts), do: module |> Operation.from_module() |> to_string(opts)
 
-  def to_string(%PassManager{} = pm, _opts) do
-    pm |> mlirPassManagerGetAsOpPassManager() |> __MODULE__.to_string()
-  end
+  def to_string(%PassManager{} = pm, _opts), do: pm |> mlirPassManagerGetAsOpPassManager() |> __MODULE__.to_string()
 
-  def to_string(%Deferred{} = deferred, opts) do
-    Deferred.resolve(deferred, Deferred.context(opts)) |> to_string(opts)
-  end
+  def to_string(%Deferred{} = deferred, opts), do: Deferred.resolve(deferred, Deferred.context(opts)) |> to_string(opts)
 
   def to_string(%m{} = entity, _opts) do
     entity_name = extract_entity_name(m)
@@ -267,7 +252,7 @@ defmodule Beaver.MLIR do
   @type rewrite_pattern_input() ::
           Rewrite.pattern_list()
           | MLIR.FrozenRewritePatternSet.t()
-          | MLIR.RewritePatternSet.t()
+          | RewritePatternSet.t()
 
   @type apply_option() ::
           {:debug, boolean()} | {:ctx, Deferred.context_arg()} | Rewrite.config_option()
@@ -285,7 +270,7 @@ defmodule Beaver.MLIR do
         raise "MLIR operation verification failed because the operation is null. Maybe it is parsed from an ill-formed text format? Please have a look at the diagnostic output above by MLIR C++"
 
       {:error, diagnostics} ->
-        raise MLIR.Diagnostic.format(diagnostics, "MLIR operation verification failed")
+        raise Diagnostic.format(diagnostics, "MLIR operation verification failed")
     end
   end
 
@@ -297,24 +282,15 @@ defmodule Beaver.MLIR do
       ctx = MLIR.context(op)
 
       {is_success, diagnostics} =
-        Beaver.MLIR.CAPI.beaver_raw_operation_verify_async(
-          ctx.ref,
-          MLIR.Operation.from_module(op).ref
-        )
+        Beaver.MLIR.CAPI.beaver_raw_operation_verify_async(ctx.ref, MLIR.Operation.from_module(op).ref)
         |> Beaver.MLIR.CAPI.await_async()
 
-      if Beaver.Native.to_term(is_success) do
-        {:ok, op}
-      else
-        {:error, diagnostics}
-      end
+      if Native.to_term(is_success), do: {:ok, op}, else: {:error, diagnostics}
     end
   end
 
   @spec verify?(verifiable()) :: verify_summary()
-  def verify?(op) do
-    match?({:ok, _}, verify(op))
-  end
+  def verify?(op), do: match?({:ok, _}, verify(op))
 
   @apply_default_opts [debug: false]
   @doc """
@@ -324,11 +300,8 @@ defmodule Beaver.MLIR do
   @spec apply!(verifiable(), rewrite_pattern_input(), apply_opts()) :: verifiable()
   def apply!(op, patterns, opts \\ @apply_default_opts) do
     case apply_(op, patterns, opts) do
-      {:ok, module} ->
-        module
-
-      {:error, msg} ->
-        raise msg
+      {:ok, module} -> module
+      {:error, msg} -> raise msg
     end
   end
 
@@ -342,34 +315,28 @@ defmodule Beaver.MLIR do
   def apply_(op, %MLIR.FrozenRewritePatternSet{} = patterns, opts) do
     MLIR.verify!(op)
 
-    {result, diagnostics} =
-      Beaver.MLIR.Rewrite.apply_patterns(op, patterns, rewrite_config_input(opts))
+    {result, diagnostics} = Beaver.MLIR.Rewrite.apply_patterns(op, patterns, rewrite_config_input(opts))
 
-    if MLIR.LogicalResult.success?(result) do
-      {:ok, op}
-    else
-      {:error, MLIR.Diagnostic.format(diagnostics, "failed to apply pattern set.")}
-    end
+    if MLIR.LogicalResult.success?(result),
+      do: {:ok, op},
+      else: {:error, Diagnostic.format(diagnostics, "failed to apply pattern set.")}
   end
 
-  def apply_(op, %MLIR.RewritePatternSet{} = patterns, opts) do
+  def apply_(op, %RewritePatternSet{} = patterns, opts) do
     MLIR.verify!(op)
 
-    {result, diagnostics} =
-      Beaver.MLIR.Rewrite.apply_patterns(op, patterns, rewrite_config_input(opts))
+    {result, diagnostics} = Beaver.MLIR.Rewrite.apply_patterns(op, patterns, rewrite_config_input(opts))
 
-    if MLIR.LogicalResult.success?(result) do
-      {:ok, op}
-    else
-      {:error, MLIR.Diagnostic.format(diagnostics, "failed to apply pattern set.")}
-    end
+    if MLIR.LogicalResult.success?(result),
+      do: {:ok, op},
+      else: {:error, Diagnostic.format(diagnostics, "failed to apply pattern set.")}
   end
 
   def apply_(op, patterns, opts) do
     ctx = MLIR.Operation.from_module(op) |> MLIR.context()
     opts = Keyword.put_new(opts, :ctx, ctx)
-    {set, pdl_mod} = MLIR.RewritePatternSet.with_pdl_patterns(patterns, opts)
-    frozen_set = set |> MLIR.RewritePatternSet.freeze()
+    {set, pdl_mod} = RewritePatternSet.with_pdl_patterns(patterns, opts)
+    frozen_set = set |> RewritePatternSet.freeze()
 
     try do
       apply_(op, frozen_set, opts)
@@ -383,13 +350,7 @@ defmodule Beaver.MLIR do
   defp rewrite_config_input(callback) when is_function(callback, 1), do: callback
 
   defp rewrite_config_input(opts) when is_list(opts) do
-    Keyword.take(opts, [
-      :max_iterations,
-      :max_num_rewrites,
-      :use_top_down_traversal,
-      :enable_folding,
-      :enable_constant_cse
-    ])
+    Keyword.take(opts, ~w(max_iterations max_num_rewrites use_top_down_traversal enable_folding enable_constant_cse)a)
   end
 end
 
@@ -404,7 +365,7 @@ for m <- [
       Beaver.MLIR.OpPassManager,
       Beaver.MLIR.PassManager,
       Beaver.MLIR.Identifier,
-      Beaver.MLIR.Diagnostic,
+      Diagnostic,
       Beaver.MLIR.StringRef
     ] do
   defimpl String.Chars, for: m do

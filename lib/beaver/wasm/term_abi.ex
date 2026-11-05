@@ -183,27 +183,15 @@ defmodule Beaver.Wasm.TermABI do
     "ex.term.enumerable_reduce_fun" => %{params: [:i64, :i64, :i64], result: :i64},
     "ex.term.enumerable_map_fun" => %{params: [:i64, :i64], result: :i64},
     "ex.term.enumerable_map_term_fun" => %{params: [:i64, :i64], result: :i64},
-    "ex.term.enumerable_map_term_fun_c" => %{
-      params: [:i64, :i64, :i64, :i64, :i64, :i64],
-      result: :i64
-    },
+    "ex.term.enumerable_map_term_fun_c" => %{params: [:i64, :i64, :i64, :i64, :i64, :i64], result: :i64},
     "ex.term.enumerable_flat_map_term_fun" => %{params: [:i64, :i64], result: :i64},
     "ex.term.stream_filter" => %{params: [:i64, :i64], result: :i64},
     "ex.term.stream_take" => %{params: [:i64, :i64], result: :i64},
     "ex.term.stream_drop" => %{params: [:i64, :i64], result: :i64},
     # closures / callbacks
-    "ex.term.make_fun" => %{
-      params: [:i64, :i64, :i64, :i64, :i64, :i64],
-      result: :i64
-    },
-    "ex.term.make_fun_with_arity" => %{
-      params: [:i64, :i64, :i64, :i64, :i64, :i64, :i64],
-      result: :i64
-    },
-    "ex.term.make_fun_with_signature" => %{
-      params: [:i64, :i64, :i64, :i64, :i64, :i64, :i64, :i64],
-      result: :i64
-    },
+    "ex.term.make_fun" => %{params: [:i64, :i64, :i64, :i64, :i64, :i64], result: :i64},
+    "ex.term.make_fun_with_arity" => %{params: [:i64, :i64, :i64, :i64, :i64, :i64, :i64], result: :i64},
+    "ex.term.make_fun_with_signature" => %{params: [:i64, :i64, :i64, :i64, :i64, :i64, :i64, :i64], result: :i64},
     "ex.term.fun_arity" => %{params: [:i64], result: :i64},
     "ex.term.fun_result_mode" => %{params: [:i64], result: :i64},
     "ex.term.fun_idx" => %{params: [:i64], result: :i64},
@@ -228,11 +216,7 @@ defmodule Beaver.Wasm.TermABI do
   @spec manifest() :: [entry()]
   def manifest do
     Enum.map(@intrinsics, fn {symbol, signature} ->
-      Map.merge(signature, %{
-        symbol: symbol,
-        import_module: @import_module,
-        import_name: symbol
-      })
+      Map.merge(signature, %{symbol: symbol, import_module: @import_module, import_name: symbol})
     end)
   end
 
@@ -240,15 +224,8 @@ defmodule Beaver.Wasm.TermABI do
   @spec entry(String.t()) :: entry() | nil
   def entry(symbol) when is_binary(symbol) do
     case Map.fetch(@intrinsics, symbol) do
-      {:ok, signature} ->
-        Map.merge(signature, %{
-          symbol: symbol,
-          import_module: @import_module,
-          import_name: symbol
-        })
-
-      :error ->
-        nil
+      {:ok, signature} -> Map.merge(signature, %{symbol: symbol, import_module: @import_module, import_name: symbol})
+      :error -> nil
     end
   end
 
@@ -288,10 +265,7 @@ defmodule Beaver.Wasm.TermABI do
     emitted = Ex.term_intrinsic_symbols() -- native_only_symbols()
     declared = symbols()
 
-    %{
-      missing: emitted -- declared,
-      extra: declared -- emitted
-    }
+    %{missing: emitted -- declared, extra: declared -- emitted}
   end
 
   defp format_type(:i64), do: "i64"

@@ -58,9 +58,7 @@ pub fn unranked_memref_descriptor_get_offset(env: beam.env, _: c_int, args: [*c]
 // Helper function to get either sizes or strides using @field
 fn get_ranked_field(env: beam.env, arg: beam.term, comptime field_name: []const u8) !beam.term {
     const d = try UnrankedMemRefDescriptor.resource.fetch(env, arg);
-    if (d.rank == 0) {
-        return beam.make_term_list(env, &[_]beam.term{});
-    }
+    if (d.rank == 0) return beam.make_term_list(env, &[_]beam.term{});
     // Dispatch to handle the specific RankedDescriptor(R) type.
     inline for (supported_ranks_excluding_zero) |R| {
         if (d.rank == R) {

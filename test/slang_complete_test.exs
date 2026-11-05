@@ -27,8 +27,13 @@ defmodule SlangCompleteTest do
     assert rendered =~ ~s{names = ["head", "tail", "fallback"]}
     assert rendered =~ ~s{names = ["input"]}
     assert rendered =~ ~s{names = ["output"]}
-    assert rendered =~ ~s{variadicity_array[single, variadic, optional]}
-    assert rendered =~ ~s{variadicity_array[optional]}
+
+    assert rendered =~ ~s{variadicity_array[single, variadic, optional]} or
+             rendered =~ ~s{variadicity_array[<single>, <variadic>, <optional>]}
+
+    assert rendered =~ ~s{variadicity_array[optional]} or
+             rendered =~ ~s{variadicity_array[<optional>]}
+
     assert rendered =~ ~s{"irdl.attributes"}
     assert rendered =~ ~s{attributeValueNames = ["label"]}
     assert rendered =~ ~s{"irdl.regions"}

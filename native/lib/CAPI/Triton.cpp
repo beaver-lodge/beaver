@@ -43,14 +43,11 @@ void registerTritonConversionInterfaces(DialectRegistry &registry) {
 
 } // namespace
 
-MLIR_CAPI_EXPORTED bool
-beaverContextRegisterTritonDialects(MlirContext context) {
+MLIR_CAPI_EXPORTED bool beaverContextRegisterTritonDialects(MlirContext context) {
   DialectRegistry registry;
   mlir::registerAllDialects(registry);
-  registry.insert<
-      triton::TritonDialect, triton::gpu::TritonGPUDialect,
-      triton::nvidia_gpu::TritonNvidiaGPUDialect,
-      triton::instrument::TritonInstrumentDialect, triton::gluon::GluonDialect>();
+  registry.insert<triton::TritonDialect, triton::gpu::TritonGPUDialect, triton::nvidia_gpu::TritonNvidiaGPUDialect,
+                  triton::instrument::TritonInstrumentDialect, triton::gluon::GluonDialect>();
   registerTritonConversionInterfaces(registry);
   MLIRContext *ctx = unwrap(context);
   ctx->appendDialectRegistry(registry);
@@ -79,10 +76,7 @@ MLIR_CAPI_EXPORTED bool beaverRegisterTritonPasses() {
 
 #else
 
-MLIR_CAPI_EXPORTED bool
-beaverContextRegisterTritonDialects(MlirContext context) {
-  return false;
-}
+MLIR_CAPI_EXPORTED bool beaverContextRegisterTritonDialects(MlirContext context) { return false; }
 
 MLIR_CAPI_EXPORTED bool beaverRegisterTritonPasses() { return false; }
 

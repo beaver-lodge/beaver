@@ -1,3 +1,5 @@
+alias Beaver.MLIR.{Operation, RewriterBase}
+
 defmodule Beaver.MLIR.Dialect.Ex.MaterializeBoundVariables do
   @moduledoc """
   Erases `ex.var`/`ex.bind` pairs into SSA before dialect conversion.
@@ -13,39 +15,32 @@ defmodule Beaver.MLIR.Dialect.Ex.MaterializeBoundVariables do
   alias Beaver.MLIR
   alias Beaver.Walker
 
-  @spec run!(MLIR.Module.t() | MLIR.Operation.t()) :: MLIR.Module.t() | MLIR.Operation.t()
+  @spec run!(MLIR.Module.t() | Operation.t()) :: MLIR.Module.t() | Operation.t()
   def run!(%MLIR.Module{} = module) do
     module |> ex_funcs() |> Enum.each(&materialize_func/1)
     module
   end
 
-  def run!(%MLIR.Operation{} = operation) do
-    if(MLIR.Operation.name(operation) == "ex.func",
-      do: [operation],
-      else: ex_funcs(operation)
-    )
+  def run!(%Operation{} = op) do
+    if(Operation.name(op) == "ex.func", do: [op], else: ex_funcs(op))
     |> Enum.each(&materialize_func/1)
 
-    operation
+    op
   end
 
-  defp ex_funcs(operation) do
-    operation
-    |> operations()
-    |> Enum.filter(&(MLIR.Operation.name(&1) == "ex.func"))
-  end
+  defp ex_funcs(op), do: op |> operations() |> Enum.filter(&(Operation.name(&1) == "ex.func"))
 
   defp materialize_func(ex_func) do
     ex_func
     |> operations()
-    |> Enum.filter(&(MLIR.Operation.name(&1) == "ex.bind"))
+    |> Enum.filter(&(Operation.name(&1) == "ex.bind"))
     |> Enum.each(&materialize_bind(&1, ex_func))
   end
 
   defp operations(operation) do
     {_, operations} =
       Walker.postwalk(operation, [], fn
-        %MLIR.Operation{} = op, acc -> {op, [op | acc]}
+        %Operation{} = op, acc -> {op, [op | acc]}
         element, acc -> {element, acc}
       end)
 
@@ -56,16 +51,15 @@ defmodule Beaver.MLIR.Dialect.Ex.MaterializeBoundVariables do
     [variable, value] = bind |> Walker.operands() |> Enum.to_list()
     variable_op = variable |> MLIR.CAPI.mlirOpResultGetOwner()
 
-    unless MLIR.Operation.name(variable_op) == "ex.var" do
-      raise ArgumentError, "ex.bind first operand must be produced by ex.var"
-    end
+    unless Operation.name(variable_op) == "ex.var",
+      do: raise(ArgumentError, "ex.bind first operand must be produced by ex.var")
 
     [bind_result] = bind |> Walker.results() |> Enum.to_list()
 
     MLIR.IRRewriter.with_rewriter(ex_func, fn rewriter ->
-      MLIR.RewriterBase.replace_all_uses_with(rewriter, bind_result, value)
-      MLIR.RewriterBase.erase_op(rewriter, bind)
-      MLIR.RewriterBase.erase_op(rewriter, variable_op)
+      RewriterBase.replace_all_uses_with(rewriter, bind_result, value)
+      RewriterBase.erase_op(rewriter, bind)
+      RewriterBase.erase_op(rewriter, variable_op)
     end)
 
     :ok

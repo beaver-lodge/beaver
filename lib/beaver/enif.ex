@@ -1,3 +1,5 @@
+alias Beaver.MLIR.{CAPI, Context}
+
 defmodule Beaver.ENIF do
   @erlang_doc_enif_url "https://www.erlang.org/doc/apps/erts/erl_nif.html"
   @make_new_binary_as_memref "call [`enif_make_new_binary`](#{@erlang_doc_enif_url}#enif_make_new_binary) and save the data pointer and size to a `memref<?xi8>`"
@@ -36,9 +38,7 @@ defmodule Beaver.ENIF do
   alias Beaver.MLIR.Dialect.Func
   alias MLIR.{Type, Attribute}
 
-  defp wrap_mlir_t({ref, _size}) when is_reference(ref) do
-    %MLIR.Type{ref: ref}
-  end
+  defp wrap_mlir_t({ref, _size}) when is_reference(ref), do: %MLIR.Type{ref: ref}
 
   @doc """
   Insert external functions of ENIF into given MLIR block
@@ -48,8 +48,7 @@ defmodule Beaver.ENIF do
       for {name, arg_types, ret_types} <- signatures(ctx) do
         Func.func _(
                     {MLIR.SymbolTable.attribute_name(), MLIR.Attribute.string(name)},
-                    {MLIR.SymbolTable.default_visibility_attribute_name(),
-                     MLIR.Attribute.string("private")},
+                    {MLIR.SymbolTable.default_visibility_attribute_name(), MLIR.Attribute.string("private")},
                     function_type: Type.function(arg_types, ret_types)
                   ) do
           region do
@@ -64,23 +63,23 @@ defmodule Beaver.ENIF do
     mod
   end
 
-  @spec signatures(MLIR.Context.t()) :: [Beaver.ENIF.Type.signature()]
+  @spec signatures(Context.t()) :: [Beaver.ENIF.Type.signature()]
   @doc """
   Retrieve the signatures of all available ENIF functions.
   """
-  def signatures(%MLIR.Context{ref: ref}) do
-    signatures = MLIR.CAPI.beaver_raw_enif_signatures(ref)
+  def signatures(%Context{ref: ref}) do
+    signatures = CAPI.beaver_raw_enif_signatures(ref)
 
     for {name, arg_types, ret_types} <- signatures do
       {name, Enum.map(arg_types, &wrap_mlir_t/1), Enum.map(ret_types, &wrap_mlir_t/1)}
     end
   end
 
-  @spec signature(MLIR.Context.t(), atom()) :: nil | Beaver.ENIF.Type.signature()
+  @spec signature(Context.t(), atom()) :: nil | Beaver.ENIF.Type.signature()
   @doc """
   Query the signature of an ENIF function.
   """
-  def signature(%MLIR.Context{} = ctx, name) do
+  def signature(%Context{} = ctx, name) do
     for {^name, arg_types, ret_types} <- signatures(ctx) do
       {arg_types, ret_types}
     end
@@ -105,15 +104,13 @@ defmodule Beaver.ENIF do
     end
   end
 
-  for f <- MLIR.CAPI.beaver_raw_enif_functions() do
+  for f <- CAPI.beaver_raw_enif_functions() do
     case to_string(f) do
       "enif_" <> op ->
         @doc """
         function call to [`#{f}`](#{@erlang_doc_enif_url}##{f})
         """
-        def unquote(String.to_atom(op))(ssa) do
-          call(unquote(f), ssa)
-        end
+        def unquote(String.to_atom(op))(ssa), do: call(unquote(f), ssa)
 
       _ ->
         @doc (case f do
@@ -132,43 +129,31 @@ defmodule Beaver.ENIF do
                   function call to #{f}
                   """
               end)
-        def unquote(f)(ssa) do
-          call(unquote(f), ssa)
-        end
+        def unquote(f)(ssa), do: call(unquote(f), ssa)
     end
   end
 
-  defdelegate functions(), to: MLIR.CAPI, as: :beaver_raw_enif_functions
+  defdelegate functions(), to: CAPI, as: :beaver_raw_enif_functions
 
   @doc """
   Register ENIF functions in the given `Beaver.MLIR.ExecutionEngine`.
   """
   def register_symbols(%MLIR.ExecutionEngine{ref: ref} = e) do
-    MLIR.CAPI.beaver_raw_jit_register_enif(ref)
+    CAPI.beaver_raw_jit_register_enif(ref)
     e
   end
 
-  @spec invoke(
-          MLIR.ExecutionEngine.t(),
-          String.t(),
-          list(),
-          MLIR.ExecutionEngine.invoke_opts()
-        ) ::
+  @spec invoke(MLIR.ExecutionEngine.t(), String.t(), list(), MLIR.ExecutionEngine.invoke_opts()) ::
           term()
   @doc """
   Invoke a function in the given `Beaver.MLIR.ExecutionEngine` with arguments and return all have type `Beaver.ENIF.Type.term/1`.
   """
   def invoke(%MLIR.ExecutionEngine{ref: ref}, function, arguments, opts \\ []) do
     case opts[:dirty] do
-      :cpu_bound ->
-        :beaver_raw_jit_invoke_with_terms_cpu_bound
-
-      :io_bound ->
-        :beaver_raw_jit_invoke_with_terms_io_bound
-
-      nil ->
-        :beaver_raw_jit_invoke_with_terms
+      :cpu_bound -> :beaver_raw_jit_invoke_with_terms_cpu_bound
+      :io_bound -> :beaver_raw_jit_invoke_with_terms_io_bound
+      nil -> :beaver_raw_jit_invoke_with_terms
     end
-    |> then(&apply(MLIR.CAPI, &1, [ref, function, arguments]))
+    |> then(&apply(CAPI, &1, [ref, function, arguments]))
   end
 end

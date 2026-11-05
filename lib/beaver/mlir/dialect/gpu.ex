@@ -1,3 +1,5 @@
+alias Beaver.MLIR.CAPI
+
 defmodule Beaver.MLIR.Dialect.GPU do
   alias Beaver.Changeset
   alias Beaver.Deferred
@@ -9,9 +11,7 @@ defmodule Beaver.MLIR.Dialect.GPU do
   This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect.
   """
 
-  use Beaver.MLIR.Dialect,
-    dialect: "gpu",
-    ops: Dialect.Registry.ops("gpu")
+  use Beaver.MLIR.Dialect, dialect: "gpu", ops: Dialect.Registry.ops("gpu")
 
   @doc """
   Returns the name of the attribute containing the number of buffers located in the workgroup memory.
@@ -19,9 +19,8 @@ defmodule Beaver.MLIR.Dialect.GPU do
     iex> Beaver.MLIR.Dialect.GPU.number_of_buffers_in_workgroup_attributions_attribute_name()
     :workgroup_attributions
   """
-  def number_of_buffers_in_workgroup_attributions_attribute_name do
-    MLIR.CAPI.beaverGetNumWorkgroupAttributionsAttrName() |> to_string() |> String.to_atom()
-  end
+  def number_of_buffers_in_workgroup_attributions_attribute_name,
+    do: CAPI.beaverGetNumWorkgroupAttributionsAttrName() |> to_string() |> String.to_atom()
 
   @doc """
   Get the name of the attribute used to annotate the modules that contain kernel modules.
@@ -29,9 +28,8 @@ defmodule Beaver.MLIR.Dialect.GPU do
     iex> Beaver.MLIR.Dialect.GPU.container_module_attribute_name()
     :"gpu.container_module"
   """
-  def container_module_attribute_name do
-    MLIR.CAPI.beaverGetContainerModuleAttrName() |> to_string() |> String.to_atom()
-  end
+  def container_module_attribute_name,
+    do: CAPI.beaverGetContainerModuleAttrName() |> to_string() |> String.to_atom()
 
   @object_formats %{offload: 1, assembly: 2, binary: 3, fatbin: 4}
 
@@ -55,8 +53,7 @@ defmodule Beaver.MLIR.Dialect.GPU do
       location = MLIR.Location.unknown(ctx: ctx)
       target = Deferred.resolve(target, ctx)
 
-      object_attribute =
-        MLIR.CAPI.beaverGPUObjectAttrGet(target, format, StringRef.create(object))
+      object_attribute = CAPI.beaverGPUObjectAttrGet(target, format, StringRef.create(object))
 
       operation =
         %Changeset{name: "gpu.binary", context: ctx, location: location}
@@ -73,11 +70,9 @@ defmodule Beaver.MLIR.Dialect.GPU do
   @doc "Returns the raw object payload stored in a `gpu.object` attribute."
   @spec object_data(MLIR.Attribute.t()) :: {:ok, binary()} | {:error, String.t()}
   def object_data(%MLIR.Attribute{} = attribute) do
-    if MLIR.CAPI.beaverAttributeIsAGPUObject(attribute) |> Beaver.Native.to_term() do
-      {:ok, MLIR.CAPI.beaverGPUObjectAttrGetObject(attribute) |> MLIR.to_string()}
-    else
-      {:error, "attribute is not a gpu.object"}
-    end
+    if CAPI.beaverAttributeIsAGPUObject(attribute) |> Beaver.Native.to_term(),
+      do: {:ok, CAPI.beaverGPUObjectAttrGetObject(attribute) |> MLIR.to_string()},
+      else: {:error, "attribute is not a gpu.object"}
   end
 
   @doc """
@@ -94,18 +89,7 @@ defmodule Beaver.MLIR.Dialect.GPU do
   convention of `MLIR.Attribute.get/2`. The resulting attribute can be passed
   to `package_binary!/3` as the target configuration of a `gpu.binary`.
   """
-  def nvvm_target_attribute(opts \\ []) do
-    params =
-      opts
-      |> Keyword.take([:chip, :triple, :features, :opt])
-      |> Enum.map(fn
-        {:opt, value} -> "O = #{value}"
-        {name, value} when is_binary(value) -> ~s{#{name} = "#{value}"}
-        {name, value} -> "#{name} = #{value}"
-      end)
-
-    MLIR.Attribute.get("#nvvm.target<#{Enum.join(params, ", ")}>", opts)
-  end
+  def nvvm_target_attribute(opts \\ []), do: target_attribute("nvvm", opts, [:chip, :triple, :features, :opt])
 
   @doc """
   Construct a ROCDL target attribute from Elixir data.
@@ -122,17 +106,17 @@ defmodule Beaver.MLIR.Dialect.GPU do
   convention of `MLIR.Attribute.get/2`. The resulting attribute can be passed
   to `package_binary!/3` as the target configuration of a `gpu.binary`.
   """
-  def rocdl_target_attribute(opts \\ []) do
+  def rocdl_target_attribute(opts \\ []), do: target_attribute("rocdl", opts, [:chip, :triple, :features, :opt, :abi])
+
+  defp target_attribute(dialect, opts, keys) do
     params =
-      opts
-      |> Keyword.take([:chip, :triple, :features, :opt, :abi])
-      |> Enum.map(fn
+      Enum.map_join(Keyword.take(opts, keys), ", ", fn
         {:opt, value} -> "O = #{value}"
         {name, value} when is_binary(value) -> ~s{#{name} = "#{value}"}
         {name, value} -> "#{name} = #{value}"
       end)
 
-    MLIR.Attribute.get("#rocdl.target<#{Enum.join(params, ", ")}>", opts)
+    MLIR.Attribute.get("##{dialect}.target<#{params}>", opts)
   end
 
   @doc """
@@ -184,20 +168,18 @@ defmodule Beaver.MLIR.Dialect.GPU do
   end
 
   defp conversion_pass!([target | _]) do
-    case target
-         |> MLIR.CAPI.mlirAttributeGetDialect()
-         |> MLIR.CAPI.mlirDialectGetNamespace()
-         |> MLIR.to_string() do
+    dialect = target |> CAPI.mlirAttributeGetDialect() |> CAPI.mlirDialectGetNamespace() |> MLIR.to_string()
+
+    case dialect do
       "nvvm" -> "convert-gpu-to-nvvm"
-      "rocdl" -> "convert-gpu-to-rocdl"
+      "rocdl" -> "convert-gpu-to-rocdl{chipset=#{MLIR.to_string(CAPI.beaverROCDLTargetAttrGetChip(target))}}"
       other -> raise ArgumentError, "unsupported GPU target attribute dialect: #{other}"
     end
   end
 
   defp conversion_pass!([]), do: raise(ArgumentError, "at least one target attribute is required")
 
-  defp object_format!(format) when is_map_key(@object_formats, format),
-    do: Map.fetch!(@object_formats, format)
+  defp object_format!(format) when is_map_key(@object_formats, format), do: Map.fetch!(@object_formats, format)
 
   defp object_format!(format) do
     raise ArgumentError,

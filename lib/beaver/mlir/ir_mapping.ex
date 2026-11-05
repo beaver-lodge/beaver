@@ -1,3 +1,6 @@
+alias Beaver.MLIR.{Block, Operation, Value}
+alias Beaver.Native
+
 defmodule Beaver.MLIR.IRMapping do
   @moduledoc """
   An owned mapping between values, blocks, and operations in two pieces of IR.
@@ -32,9 +35,9 @@ defmodule Beaver.MLIR.IRMapping do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Native
 
-  @type entity() :: MLIR.Value.t() | MLIR.Block.t() | MLIR.Operation.t()
+  @type entity() :: Value.t() | Block.t() | Operation.t()
   @type rewriter() :: MLIR.RewriterBase.t() | MLIR.PatternRewriter.t()
 
   @doc "Creates an empty owned IR mapping."
@@ -47,89 +50,41 @@ defmodule Beaver.MLIR.IRMapping do
 
   @doc "Runs `fun` with a new mapping and always destroys it."
   @spec with_mapping((t() -> result)) :: result when result: var
-  def with_mapping(fun) when is_function(fun, 1) do
-    mapping = create()
+  def with_mapping(fun) when is_function(fun, 1),
+    do: Beaver.Native.with_resource(create(), &destroy/1, fun)
 
-    try do
-      fun.(mapping)
-    after
-      destroy(mapping)
-    end
+  @entity_kinds [Value, Block, Operation]
+  for kind <- @entity_kinds, verb <- ~w(Map LookupOrNull LookupOrDefault Contains Erase) do
+    defp mapping_function(unquote(kind), unquote(verb)),
+      do: unquote(:"mlirIRMapping#{verb}#{List.last(Module.split(kind))}")
   end
 
   @doc "Adds or replaces a value, block, or operation mapping."
   @spec map(t(), entity(), entity()) :: t()
-  def map(%__MODULE__{} = mapping, %MLIR.Value{} = from, %MLIR.Value{} = to) do
-    :ok = CAPI.mlirIRMappingMapValue(mapping, from, to)
-    mapping
-  end
-
-  def map(%__MODULE__{} = mapping, %MLIR.Block{} = from, %MLIR.Block{} = to) do
-    :ok = CAPI.mlirIRMappingMapBlock(mapping, from, to)
-    mapping
-  end
-
-  def map(%__MODULE__{} = mapping, %MLIR.Operation{} = from, %MLIR.Operation{} = to) do
-    :ok = CAPI.mlirIRMappingMapOperation(mapping, from, to)
+  def map(%__MODULE__{} = mapping, %kind{} = from, %kind{} = to) when kind in @entity_kinds do
+    :ok = apply(CAPI, mapping_function(kind, "Map"), [mapping, from, to])
     mapping
   end
 
   @doc "Looks up a mapped entity, returning `nil` when no mapping exists."
   @spec lookup(t(), entity()) :: entity() | nil
-  def lookup(%__MODULE__{} = mapping, %MLIR.Value{} = from) do
-    mapping |> CAPI.mlirIRMappingLookupOrNullValue(from) |> nil_if_null()
-  end
-
-  def lookup(%__MODULE__{} = mapping, %MLIR.Block{} = from) do
-    mapping |> CAPI.mlirIRMappingLookupOrNullBlock(from) |> nil_if_null()
-  end
-
-  def lookup(%__MODULE__{} = mapping, %MLIR.Operation{} = from) do
-    mapping |> CAPI.mlirIRMappingLookupOrNullOperation(from) |> nil_if_null()
-  end
+  def lookup(%__MODULE__{} = mapping, %kind{} = from) when kind in @entity_kinds,
+    do: apply(CAPI, mapping_function(kind, "LookupOrNull"), [mapping, from]) |> nil_if_null()
 
   @doc "Looks up a mapped entity, returning the input entity when absent."
   @spec lookup_or_default(t(), entity()) :: entity()
-  def lookup_or_default(%__MODULE__{} = mapping, %MLIR.Value{} = from) do
-    CAPI.mlirIRMappingLookupOrDefaultValue(mapping, from)
-  end
-
-  def lookup_or_default(%__MODULE__{} = mapping, %MLIR.Block{} = from) do
-    CAPI.mlirIRMappingLookupOrDefaultBlock(mapping, from)
-  end
-
-  def lookup_or_default(%__MODULE__{} = mapping, %MLIR.Operation{} = from) do
-    CAPI.mlirIRMappingLookupOrDefaultOperation(mapping, from)
-  end
+  def lookup_or_default(%__MODULE__{} = mapping, %kind{} = from) when kind in @entity_kinds,
+    do: apply(CAPI, mapping_function(kind, "LookupOrDefault"), [mapping, from])
 
   @doc "Returns whether a mapping exists for a value, block, or operation."
   @spec contains?(t(), entity()) :: boolean()
-  def contains?(%__MODULE__{} = mapping, %MLIR.Value{} = entity) do
-    CAPI.mlirIRMappingContainsValue(mapping, entity) |> Beaver.Native.to_term()
-  end
-
-  def contains?(%__MODULE__{} = mapping, %MLIR.Block{} = entity) do
-    CAPI.mlirIRMappingContainsBlock(mapping, entity) |> Beaver.Native.to_term()
-  end
-
-  def contains?(%__MODULE__{} = mapping, %MLIR.Operation{} = entity) do
-    CAPI.mlirIRMappingContainsOperation(mapping, entity) |> Beaver.Native.to_term()
-  end
+  def contains?(%__MODULE__{} = mapping, %kind{} = entity) when kind in @entity_kinds,
+    do: apply(CAPI, mapping_function(kind, "Contains"), [mapping, entity]) |> Native.to_term()
 
   @doc "Erases a value, block, or operation mapping and returns `mapping`."
   @spec erase(t(), entity()) :: t()
-  def erase(%__MODULE__{} = mapping, %MLIR.Value{} = entity) do
-    :ok = CAPI.mlirIRMappingEraseValue(mapping, entity)
-    mapping
-  end
-
-  def erase(%__MODULE__{} = mapping, %MLIR.Block{} = entity) do
-    :ok = CAPI.mlirIRMappingEraseBlock(mapping, entity)
-    mapping
-  end
-
-  def erase(%__MODULE__{} = mapping, %MLIR.Operation{} = entity) do
-    :ok = CAPI.mlirIRMappingEraseOperation(mapping, entity)
+  def erase(%__MODULE__{} = mapping, %kind{} = entity) when kind in @entity_kinds do
+    :ok = apply(CAPI, mapping_function(kind, "Erase"), [mapping, entity])
     mapping
   end
 
@@ -141,30 +96,17 @@ defmodule Beaver.MLIR.IRMapping do
   end
 
   @doc "Clones `operation` as a detached caller-owned operation and updates `mapping`."
-  @spec clone(t(), MLIR.Operation.t()) :: MLIR.Operation.t()
-  def clone(%__MODULE__{} = mapping, %MLIR.Operation{} = operation) do
-    CAPI.mlirOperationCloneWithMapping(operation, mapping)
-  end
+  @spec clone(t(), Operation.t()) :: Operation.t()
+  def clone(%__MODULE__{} = mapping, %Operation{} = op),
+    do: CAPI.mlirOperationCloneWithMapping(op, mapping)
 
   @doc "Clones and inserts `operation` through `rewriter`, updating `mapping`."
-  @spec clone(t(), MLIR.Operation.t(), rewriter()) :: MLIR.Operation.t()
-  def clone(
-        %__MODULE__{} = mapping,
-        %MLIR.Operation{} = operation,
-        %MLIR.PatternRewriter{} = rewriter
-      ) do
-    clone(mapping, operation, MLIR.PatternRewriter.as_base(rewriter))
-  end
+  @spec clone(t(), Operation.t(), rewriter()) :: Operation.t()
+  def clone(%__MODULE__{} = mapping, %Operation{} = op, %MLIR.PatternRewriter{} = rewriter),
+    do: clone(mapping, op, MLIR.PatternRewriter.as_base(rewriter))
 
-  def clone(
-        %__MODULE__{} = mapping,
-        %MLIR.Operation{} = operation,
-        %MLIR.RewriterBase{} = rewriter
-      ) do
-    CAPI.mlirRewriterBaseCloneWithMapping(rewriter, operation, mapping)
-  end
+  def clone(%__MODULE__{} = mapping, %Operation{} = op, %MLIR.RewriterBase{} = rewriter),
+    do: CAPI.mlirRewriterBaseCloneWithMapping(rewriter, op, mapping)
 
-  defp nil_if_null(entity) do
-    if MLIR.null?(entity), do: nil, else: entity
-  end
+  defp nil_if_null(entity), do: if(MLIR.null?(entity), do: nil, else: entity)
 end

@@ -1,3 +1,5 @@
+alias Beaver.MLIR.Context
+
 defmodule Beaver.Shadow.Tuning.GPU do
   @moduledoc """
   Real-kernel latency evaluation for tuning configs.
@@ -26,17 +28,14 @@ defmodule Beaver.Shadow.Tuning.GPU do
   Evaluates one config: lowers `source_text` with `num_warps`, launches on the
   GPU and returns `{:ok, median_ns}` or `{:error, reason}`.
   """
-  @spec evaluate(String.t(), MLIR.Context.t(), String.t(), pos_integer(), launch()) ::
+  @spec evaluate(String.t(), Context.t(), String.t(), pos_integer(), launch()) ::
           {:ok, non_neg_integer()} | {:error, term()}
-  def evaluate(source_text, context, target, num_warps, launch) do
-    module = MLIR.Module.create!(source_text, ctx: context)
+  def evaluate(source_text, ctx, target, num_warps, launch) do
+    module = MLIR.Module.create!(source_text, ctx: ctx)
 
     try do
       llvm =
-        Beaver.Triton.compile_to_llvm(module,
-          target: target,
-          num_warps: num_warps
-        )
+        Beaver.Triton.compile_to_llvm(module, target: target, num_warps: num_warps)
 
       ptx = llvm_to_ptx(llvm)
       {:ok, launch_latency_ns(ptx, launch, num_warps)}
@@ -61,7 +60,7 @@ defmodule Beaver.Shadow.Tuning.GPU do
     # threads, so num_warps warps map to 32 * num_warps threads.
     block = {32 * num_warps, 1, 1}
 
-    context = MLIR.Context.create()
+    context = Context.create()
 
     try do
       target = GPU.nvvm_target_attribute(chip: "sm_80", ctx: context)
@@ -91,15 +90,12 @@ defmodule Beaver.Shadow.Tuning.GPU do
         Enum.each(buffers, fn {_name, ptr} -> MLIR.CUDA.mem_free(ptr) end)
       end
     after
-      MLIR.Context.destroy(context)
+      Context.destroy(context)
     end
   end
 
-  defp llvm_to_ptx(llvm) do
-    llvm
-    |> Beaver.MLIR.Target.LLVMIR.translate!()
-    |> Beaver.MLIR.Target.LLVMIR.compile_to_ptx!(cpu: "sm_80")
-  end
+  defp llvm_to_ptx(llvm),
+    do: llvm |> Beaver.MLIR.Target.LLVMIR.translate!() |> Beaver.MLIR.Target.LLVMIR.compile_to_ptx!(cpu: "sm_80")
 
   defp alloc_buffers(buffer_sizes) do
     Enum.reduce_while(buffer_sizes, {:ok, %{}}, fn {name, size}, {:ok, acc} ->

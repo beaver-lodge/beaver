@@ -1,3 +1,5 @@
+alias Beaver.MLIR.{CAPI, Operation}
+
 defmodule Beaver.MLIR.CUDA do
   @moduledoc """
   A minimal Zig-based CUDA runner bootstrap.
@@ -24,20 +26,20 @@ defmodule Beaver.MLIR.CUDA do
   instead of raising.
   """
   @spec available?() :: boolean()
-  def available?, do: MLIR.CAPI.beaver_raw_cuda_available()
+  def available?, do: CAPI.beaver_raw_cuda_available()
 
   @doc """
   Returns `{:ok, count}` with the number of CUDA devices, or `{:error, reason}`
   when the driver is unavailable or a CUDA call fails.
   """
   @spec device_count() :: {:ok, non_neg_integer()} | {:error, String.t()}
-  def device_count, do: MLIR.CAPI.beaver_raw_cuda_device_count()
+  def device_count, do: CAPI.beaver_raw_cuda_device_count()
 
   @doc """
   Returns `{:ok, name}` for the device at `ordinal`, or `{:error, reason}`.
   """
   @spec device_name(integer()) :: {:ok, String.t()} | {:error, String.t()}
-  def device_name(ordinal), do: MLIR.CAPI.beaver_raw_cuda_device_name(ordinal)
+  def device_name(ordinal), do: CAPI.beaver_raw_cuda_device_name(ordinal)
 
   @doc """
   Returns `{:ok, {major, minor}}` with the CUDA compute capability of the
@@ -46,7 +48,7 @@ defmodule Beaver.MLIR.CUDA do
   @spec device_compute_capability(integer()) ::
           {:ok, {non_neg_integer(), non_neg_integer()}} | {:error, String.t()}
   def device_compute_capability(ordinal),
-    do: MLIR.CAPI.beaver_raw_cuda_device_compute_capability(ordinal)
+    do: CAPI.beaver_raw_cuda_device_compute_capability(ordinal)
 
   @doc """
   Loads the first `gpu.binary` of an MLIR module into CUDA.
@@ -60,7 +62,7 @@ defmodule Beaver.MLIR.CUDA do
   @spec load_gpu_binary(MLIR.Module.t()) :: {:ok, non_neg_integer()} | {:error, String.t()}
   def load_gpu_binary(%MLIR.Module{} = module) do
     with {:ok, ptx} <- extract_ptx(module) do
-      MLIR.CAPI.beaver_raw_cuda_module_load(ptx)
+      CAPI.beaver_raw_cuda_module_load(ptx)
     end
   end
 
@@ -70,7 +72,7 @@ defmodule Beaver.MLIR.CUDA do
   @spec module_get_function(non_neg_integer(), String.t()) ::
           {:ok, non_neg_integer()} | {:error, String.t()}
   def module_get_function(module_handle, name),
-    do: MLIR.CAPI.beaver_raw_cuda_module_get_function(module_handle, name)
+    do: CAPI.beaver_raw_cuda_module_get_function(module_handle, name)
 
   @doc """
   Sets a CUDA function attribute, e.g. the dynamic shared memory size.
@@ -80,25 +82,25 @@ defmodule Beaver.MLIR.CUDA do
   """
   @spec func_set_attribute(non_neg_integer(), integer(), integer()) :: :ok | {:error, String.t()}
   def func_set_attribute(function_handle, attribute, value),
-    do: MLIR.CAPI.beaver_raw_cuda_func_set_attribute(function_handle, attribute, value)
+    do: CAPI.beaver_raw_cuda_func_set_attribute(function_handle, attribute, value)
 
   @doc """
   Unloads a CUDA module handle.
   """
   @spec module_unload(non_neg_integer()) :: :ok | {:error, String.t()}
-  def module_unload(module_handle), do: MLIR.CAPI.beaver_raw_cuda_module_unload(module_handle)
+  def module_unload(module_handle), do: CAPI.beaver_raw_cuda_module_unload(module_handle)
 
   @doc """
   Allocates `size` bytes of device memory. Returns `{:ok, device_ptr}`.
   """
   @spec mem_alloc(non_neg_integer()) :: {:ok, non_neg_integer()} | {:error, String.t()}
-  def mem_alloc(size), do: MLIR.CAPI.beaver_raw_cuda_mem_alloc(size)
+  def mem_alloc(size), do: CAPI.beaver_raw_cuda_mem_alloc(size)
 
   @doc """
   Frees a device allocation.
   """
   @spec mem_free(non_neg_integer()) :: :ok | {:error, String.t()}
-  def mem_free(device_ptr), do: MLIR.CAPI.beaver_raw_cuda_mem_free(device_ptr)
+  def mem_free(device_ptr), do: CAPI.beaver_raw_cuda_mem_free(device_ptr)
 
   @doc """
   Blocks until all previously queued work on the current context completes.
@@ -106,13 +108,13 @@ defmodule Beaver.MLIR.CUDA do
   Use after `launch_kernel/4` when timing kernel execution end to end.
   """
   @spec synchronize() :: :ok | {:error, String.t()}
-  def synchronize, do: MLIR.CAPI.beaver_raw_cuda_synchronize()
+  def synchronize, do: CAPI.beaver_raw_cuda_synchronize()
 
   @doc """
   Copies host `data` into device memory at `device_ptr`.
   """
   @spec memcpy_htod(non_neg_integer(), binary()) :: :ok | {:error, String.t()}
-  def memcpy_htod(device_ptr, data), do: MLIR.CAPI.beaver_raw_cuda_memcpy_htod(device_ptr, data)
+  def memcpy_htod(device_ptr, data), do: CAPI.beaver_raw_cuda_memcpy_htod(device_ptr, data)
 
   @doc """
   Copies `size` bytes from device memory at `device_ptr` into a host binary.
@@ -120,7 +122,7 @@ defmodule Beaver.MLIR.CUDA do
   @spec memcpy_dtoh(non_neg_integer(), non_neg_integer()) ::
           {:ok, binary()} | {:error, String.t()}
   def memcpy_dtoh(device_ptr, size),
-    do: MLIR.CAPI.beaver_raw_cuda_memcpy_dtoh(device_ptr, size)
+    do: CAPI.beaver_raw_cuda_memcpy_dtoh(device_ptr, size)
 
   @doc """
   Launches a kernel.
@@ -144,7 +146,7 @@ defmodule Beaver.MLIR.CUDA do
     {grid_x, grid_y, grid_z} = grid
     {block_x, block_y, block_z} = block
 
-    MLIR.CAPI.beaver_raw_cuda_launch_kernel(
+    CAPI.beaver_raw_cuda_launch_kernel(
       function_handle,
       grid_x,
       grid_y,
@@ -169,7 +171,7 @@ defmodule Beaver.MLIR.CUDA do
 
   defp extract_ptx(module) do
     with {:ok, op} <- fetch_gpu_binary(module),
-         {:ok, objects} <- MLIR.Operation.fetch(op, "objects"),
+         {:ok, objects} <- Operation.fetch(op, "objects"),
          {:ok, object} <- MLIR.Attribute.fetch(objects, 0) do
       extract_assembly(object)
     else
@@ -181,8 +183,8 @@ defmodule Beaver.MLIR.CUDA do
     case module
          |> MLIR.Module.body()
          |> Beaver.Walker.operations()
-         |> Enum.find(&(MLIR.Operation.name(&1) == "gpu.binary")) do
-      %MLIR.Operation{} = op -> {:ok, op}
+         |> Enum.find(&(Operation.name(&1) == "gpu.binary")) do
+      %Operation{} = op -> {:ok, op}
       _ -> {:error, :not_found}
     end
   end

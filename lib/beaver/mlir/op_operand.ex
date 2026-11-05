@@ -17,9 +17,6 @@ defmodule Beaver.MLIR.OpOperand do
 
   @doc "Returns the operand position within the owner operation."
   @spec operand_number(t()) :: non_neg_integer()
-  def operand_number(op_operand) do
-    op_operand
-    |> CAPI.mlirOpOperandGetOperandNumber()
-    |> Beaver.Native.to_term()
-  end
+  def operand_number(op_operand),
+    do: op_operand |> CAPI.mlirOpOperandGetOperandNumber() |> Beaver.Native.to_term()
 end

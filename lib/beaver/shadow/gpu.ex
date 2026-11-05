@@ -63,11 +63,8 @@ defmodule Beaver.Shadow.GPU do
     backend = Keyword.get(opts, :backend, MLIR.CUDA)
 
     case backend.available?() do
-      false ->
-        {:error, {:cuda_unavailable, "no loadable CUDA driver (libcuda)"}}
-
-      true ->
-        evaluate_with_cuda(source, resolved, candidate, backend, opts)
+      false -> {:error, {:cuda_unavailable, "no loadable CUDA driver (libcuda)"}}
+      true -> evaluate_with_cuda(source, resolved, candidate, backend, opts)
     end
   end
 
@@ -90,17 +87,11 @@ defmodule Beaver.Shadow.GPU do
 
   defp compile_source!(%MLIR.Module{} = module, _context), do: module
 
-  defp compile_source!(source, context) when is_binary(source) do
-    MLIR.Module.create!(source, ctx: context)
-  end
+  defp compile_source!(source, ctx) when is_binary(source), do: MLIR.Module.create!(source, ctx: ctx)
 
   defp package_and_launch(module, resolved, candidate, backend, opts) do
     target =
-      Keyword.get(
-        opts,
-        :target,
-        GPUDialect.nvvm_target_attribute(chip: "sm_80", ctx: MLIR.context(module))
-      )
+      Keyword.get(opts, :target, GPUDialect.nvvm_target_attribute(chip: "sm_80", ctx: MLIR.context(module)))
 
     grid = Keyword.get(opts, :grid, {1, 1, 1})
     block = Keyword.get(opts, :block, {1, 1, 1})
@@ -156,8 +147,7 @@ defmodule Beaver.Shadow.GPU do
   defp packaged_binary(module, source_key, target, opts) do
     case Keyword.get(opts, :cache) do
       nil ->
-        {GPUDialect.package_binary!(module, target, format: Keyword.get(opts, :format, :isa)),
-         :miss}
+        {GPUDialect.package_binary!(module, target, format: Keyword.get(opts, :format, :isa)), :miss}
 
       cache ->
         case ArtifactCache.get(cache, source_key, target, MLIR.context(module)) do
@@ -192,24 +182,11 @@ defmodule Beaver.Shadow.GPU do
       with {:ok, device_ptr} <- backend.mem_alloc(4),
            :ok <- backend.memcpy_htod(device_ptr, <<0, 0, 0, 0>>) do
         try do
-          case backend.launch_kernel(
-                 function_handle,
-                 grid,
-                 block,
-                 [{:ptr, device_ptr}],
-                 launch_opts
-               ) do
+          case backend.launch_kernel(function_handle, grid, block, [{:ptr, device_ptr}], launch_opts) do
             :ok ->
               case backend.memcpy_dtoh(device_ptr, 4) do
-                {:ok, _data} ->
-                  {:ok,
-                   %{
-                     launch_native: System.monotonic_time(),
-                     bytes: 4
-                   }}
-
-                {:error, reason} ->
-                  {:error, reason}
+                {:ok, _data} -> {:ok, %{launch_native: System.monotonic_time(), bytes: 4}}
+                {:error, reason} -> {:error, reason}
               end
 
             {:error, reason} ->
@@ -223,8 +200,7 @@ defmodule Beaver.Shadow.GPU do
   end
 
   defp device_facts(backend) do
-    with {:ok, count} <- backend.device_count(),
-         {:ok, name} <- backend.device_name(0) do
+    with {:ok, count} <- backend.device_count(), {:ok, name} <- backend.device_name(0) do
       %{device_count: count, device_name: name}
     else
       {:error, reason} -> %{device_error: reason}

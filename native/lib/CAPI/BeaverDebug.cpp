@@ -3,8 +3,7 @@
 
 #include <vector>
 
-MLIR_CAPI_EXPORTED void beaverSetGlobalDebugTypes(const MlirStringRef *types,
-                                                  intptr_t n) {
+MLIR_CAPI_EXPORTED void beaverSetGlobalDebugTypes(const MlirStringRef *types, intptr_t n) {
   // Convert MlirStringRef array to array of C strings
   std::vector<const char *> cstrings;
   cstrings.reserve(n);

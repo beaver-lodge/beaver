@@ -1,3 +1,5 @@
+alias Beaver.MLIR.CAPI
+
 defmodule Beaver.MLIR.ThreadPool do
   @moduledoc """
   Owns an LLVM thread pool that can be shared by multiple MLIR contexts.
@@ -32,14 +34,13 @@ defmodule Beaver.MLIR.ThreadPool do
   end
 
   @spec child_spec(keyword()) :: Supervisor.child_spec()
-  def child_spec(opts) do
-    %{
+  def child_spec(opts),
+    do: %{
       id: Keyword.get(opts, :name, __MODULE__),
       start: {__MODULE__, :start_link, [opts]},
       restart: :transient,
       type: :worker
     }
-  end
 
   @spec checkout(GenServer.server()) ::
           {MLIR.LLVMThreadPool.t(), reference()} | {:error, :closing}
@@ -57,18 +58,17 @@ defmodule Beaver.MLIR.ThreadPool do
 
   @doc "Create a caller-owned native pool for use with `MLIR.Context.create/1`."
   @spec create() :: MLIR.LLVMThreadPool.t()
-  def create, do: MLIR.CAPI.mlirLlvmThreadPoolCreate()
+  def create, do: CAPI.mlirLlvmThreadPoolCreate()
 
   @doc "Destroy a caller-owned native pool after all attached contexts are gone."
   @spec destroy(MLIR.LLVMThreadPool.t()) :: :ok
-  defdelegate destroy(pool), to: MLIR.CAPI, as: :mlirLlvmThreadPoolDestroy
+  defdelegate destroy(pool), to: CAPI, as: :mlirLlvmThreadPoolDestroy
 
   @spec max_concurrency(GenServer.server() | MLIR.LLVMThreadPool.t()) :: non_neg_integer()
   def max_concurrency(owner \\ @default_name)
 
-  def max_concurrency(%MLIR.LLVMThreadPool{} = pool) do
-    MLIR.CAPI.mlirLlvmThreadPoolGetMaxConcurrency(pool) |> Beaver.Native.to_term()
-  end
+  def max_concurrency(%MLIR.LLVMThreadPool{} = pool),
+    do: CAPI.mlirLlvmThreadPoolGetMaxConcurrency(pool) |> Beaver.Native.to_term()
 
   def max_concurrency(owner), do: owner |> pool() |> max_concurrency()
 
@@ -82,20 +82,17 @@ defmodule Beaver.MLIR.ThreadPool do
   def init(opts) do
     concurrency = Keyword.get(opts, :concurrency, System.schedulers_online())
 
-    unless is_integer(concurrency) and concurrency > 0 do
-      raise ArgumentError, ":concurrency must be a positive integer"
-    end
+    unless is_integer(concurrency) and concurrency > 0,
+      do: raise(ArgumentError, ":concurrency must be a positive integer")
 
-    pool = MLIR.CAPI.beaverLlvmThreadPoolCreateElastic(concurrency)
+    pool = CAPI.beaverLlvmThreadPoolCreateElastic(concurrency)
     {:ok, %{pool: pool, leases: MapSet.new(), closing?: false}}
   end
 
   @impl GenServer
   def handle_call(:pool, _from, state), do: {:reply, state.pool, state}
 
-  def handle_call(:checkout, _from, %{closing?: true} = state) do
-    {:reply, {:error, :closing}, state}
-  end
+  def handle_call(:checkout, _from, %{closing?: true} = state), do: {:reply, {:error, :closing}, state}
 
   def handle_call(:checkout, _from, state) do
     lease = make_ref()
@@ -103,29 +100,21 @@ defmodule Beaver.MLIR.ThreadPool do
   end
 
   def handle_call(:close, _from, %{leases: leases} = state) do
-    if MapSet.size(leases) == 0 do
-      {:stop, :normal, :ok, state}
-    else
-      {:reply, :deferred, %{state | closing?: true}}
-    end
+    if MapSet.size(leases) == 0, do: {:stop, :normal, :ok, state}, else: {:reply, :deferred, %{state | closing?: true}}
   end
 
   @impl GenServer
   def handle_cast({:checkin, lease}, state) do
     state = %{state | leases: MapSet.delete(state.leases, lease)}
 
-    if state.closing? and MapSet.size(state.leases) == 0 do
-      {:stop, :normal, state}
-    else
-      {:noreply, state}
-    end
+    if state.closing? and MapSet.size(state.leases) == 0,
+      do: {:stop, :normal, state},
+      else: {:noreply, state}
   end
 
   @impl GenServer
   def terminate(_reason, state) do
-    if MapSet.size(state.leases) == 0 do
-      destroy(state.pool)
-    end
+    if MapSet.size(state.leases) == 0, do: destroy(state.pool)
 
     :ok
   end

@@ -600,7 +600,7 @@ defmodule Beaver.MLIR.Transform.Schedule.DSLTest do
     text = MLIR.to_string(schedule)
     bytecode = MLIR.Bytecode.write!(schedule)
     assert text =~ ~s(transform.apply_patterns)
-    assert text =~ "{apply_cse}"
+    assert text =~ ~r/(?:\{apply_cse\}|\}\s+apply_cse\s*:)/
 
     for round_trip <- [
           MLIR.Module.create!(text, ctx: ctx),

@@ -40,10 +40,10 @@ defmodule Beaver.Triton do
   Registers Triton passes and dialects, then loads the dialects on `context`.
   """
   @spec register(MLIR.Context.t()) :: :ok
-  def register(%MLIR.Context{} = context) do
+  def register(%MLIR.Context{} = ctx) do
     register_passes()
 
-    unless MLIR.CAPI.beaver_raw_triton_register_dialects(context.ref) do
+    unless MLIR.CAPI.beaver_raw_triton_register_dialects(ctx.ref) do
       raise ArgumentError,
             "Beaver was built without Triton support; rebuild the native " <>
               "library with BEAVER_TRITON_PREBUILT_DIR set"
@@ -85,11 +85,8 @@ defmodule Beaver.Triton do
   Requires a context with Triton dialects registered (`register/1`).
   """
   @spec compile_to_llvm(MLIR.Module.t(), keyword()) :: MLIR.Module.t()
-  def compile_to_llvm(%MLIR.Module{} = module, opts \\ []) do
-    opts
-    |> PipelinePlan.build()
-    |> execute(module)
-  end
+  def compile_to_llvm(%MLIR.Module{} = module, opts \\ []),
+    do: opts |> PipelinePlan.build() |> execute(module)
 
   @doc """
   Lowers a Triton module one pass at a time and returns an auditable prefix trace.
@@ -113,11 +110,9 @@ defmodule Beaver.Triton do
   def first_trace_divergence(left, right) when is_list(left) and is_list(right) do
     max_length = max(length(left), length(right))
 
-    if max_length == 0 do
-      :none
-    else
-      Enum.find_value(0..(max_length - 1), :none, &trace_divergence_at(left, right, &1))
-    end
+    if max_length == 0,
+      do: :none,
+      else: Enum.find_value(0..(max_length - 1), :none, &trace_divergence_at(left, right, &1))
   end
 
   defp trace_divergence_at(left, right, index) do
@@ -130,9 +125,7 @@ defmodule Beaver.Triton do
   end
 
   defp execute(%PipelinePlan{} = plan, module) do
-    Enum.reduce(plan.passes, module, fn pass, acc ->
-      Beaver.Composer.append(acc, pass.pipeline)
-    end)
+    Enum.reduce(plan.passes, module, fn pass, acc -> Beaver.Composer.append(acc, pass.pipeline) end)
     |> Beaver.Composer.run!()
   end
 
@@ -159,12 +152,7 @@ defmodule Beaver.Triton do
       rescue
         exception ->
           pipeline_error =
-            PipelineError.exception(
-              domain: failure_domain(exception),
-              pass: pass,
-              index: index,
-              cause: exception
-            )
+            PipelineError.exception(domain: failure_domain(exception), pass: pass, index: index, cause: exception)
 
           reraise pipeline_error, __STACKTRACE__
       end
@@ -180,10 +168,6 @@ defmodule Beaver.Triton do
 
   defp failure_domain(_exception), do: :prefix_verification_failed
 
-  defp ir_digest(module) do
-    module
-    |> MLIR.to_string(generic: true)
-    |> then(&:crypto.hash(:sha256, &1))
-    |> Base.encode16(case: :lower)
-  end
+  defp ir_digest(module),
+    do: module |> MLIR.to_string(generic: true) |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower)
 end

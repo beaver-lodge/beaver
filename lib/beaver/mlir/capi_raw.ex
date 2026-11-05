@@ -1,11 +1,7 @@
 defmodule Beaver.MLIR.CAPI.Raw do
   @moduledoc false
 
-  use Kinda.CodeGen,
-    with: Beaver.MLIR.CAPI.CodeGen,
-    root: Beaver.MLIR.CAPI,
-    codec: Beaver.Native,
-    surface: :raw
+  use Kinda.CodeGen, with: Beaver.MLIR.CAPI.CodeGen, root: Beaver.MLIR.CAPI, codec: Beaver.Native, surface: :raw
 
   @external_resource Beaver.MLIR.CAPI.CodeGen.declaration_manifest_path()
 
@@ -51,11 +47,7 @@ defmodule Beaver.MLIR.CAPI.Raw do
         nif_file = String.to_charlist(base)
         dylib = "#{base}.dylib"
 
-        if File.exists?(dylib) do
-          dylib
-          |> Path.basename()
-          |> File.ln_s("#{base}.so")
-        end
+        if File.exists?(dylib), do: dylib |> Path.basename() |> File.ln_s("#{base}.so")
 
         nif_file
     end
@@ -65,8 +57,7 @@ defmodule Beaver.MLIR.CAPI.Raw do
     path = System.get_env("PATH") || ""
     sep = if match?({:win32, _}, :os.type()), do: ";", else: ":"
 
-    unless path |> String.split(sep) |> Enum.any?(&(&1 == dir)) do
-      System.put_env("PATH", dir <> sep <> path)
-    end
+    unless path |> String.split(sep) |> Enum.any?(&(&1 == dir)),
+      do: System.put_env("PATH", dir <> sep <> path)
   end
 end

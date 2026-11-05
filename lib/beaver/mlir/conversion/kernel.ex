@@ -50,23 +50,13 @@ defmodule Beaver.MLIR.Conversion.Kernel do
   `Manifest.verify_compatible!/2`. The linked compiler-kernel ABI and LLVM
   revision are always checked and cannot be relaxed by the caller.
   """
-  @spec populate!(
-          MLIR.RewritePatternSet.t(),
-          MLIR.TypeConverter.t(),
-          Manifest.t(),
-          Path.t(),
-          keyword()
-        ) :: :ok
+  @spec populate!(MLIR.RewritePatternSet.t(), MLIR.TypeConverter.t(), Manifest.t(), Path.t(), keyword()) :: :ok
   def populate!(patterns, converter, %Manifest{} = manifest, artifact_path, opts \\ []) do
-    unless match?(%MLIR.RewritePatternSet{}, patterns) and
-             match?(%MLIR.TypeConverter{}, converter) do
-      raise ArgumentError,
-            "external kernel population requires pattern-set and type-converter handles"
-    end
+    unless match?(%MLIR.RewritePatternSet{}, patterns) and match?(%MLIR.TypeConverter{}, converter),
+      do: raise(ArgumentError, "external kernel population requires pattern-set and type-converter handles")
 
-    unless Keyword.keyword?(opts) and Keyword.keys(opts) -- [:expected] == [] do
-      raise ArgumentError, "unsupported compiler-kernel population options: #{inspect(opts)}"
-    end
+    unless Keyword.keyword?(opts) and Keyword.keys(opts) -- [:expected] == [],
+      do: raise(ArgumentError, "unsupported compiler-kernel population options: #{inspect(opts)}")
 
     artifact_path = validate_artifact_path!(artifact_path)
 
@@ -102,18 +92,12 @@ defmodule Beaver.MLIR.Conversion.Kernel do
     end
   end
 
-  defp normalize_expected!(expected) when is_list(expected) do
-    if Keyword.keyword?(expected) do
-      expected
-    else
-      raise ArgumentError, ":expected must be a keyword list"
-    end
-  end
+  defp normalize_expected!(expected) when is_list(expected),
+    do: if(Keyword.keyword?(expected), do: expected, else: raise(ArgumentError, ":expected must be a keyword list"))
 
   defp normalize_expected!(expected) when is_map(expected), do: Map.to_list(expected)
 
-  defp normalize_expected!(_expected),
-    do: raise(ArgumentError, ":expected must be a keyword or map")
+  defp normalize_expected!(_expected), do: raise(ArgumentError, ":expected must be a keyword or map")
 
   defp raise_native_error!(native_error, artifact_path) do
     {native_code, message} =

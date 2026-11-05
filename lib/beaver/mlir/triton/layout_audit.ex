@@ -1,3 +1,5 @@
+alias Beaver.MLIR.Operation
+
 defmodule Beaver.MLIR.Triton.LayoutAudit do
   @moduledoc """
   Structural audit of `ttg.convert_layout` operations in Triton GPU IR.
@@ -20,11 +22,7 @@ defmodule Beaver.MLIR.Triton.LayoutAudit do
 
   alias Beaver.MLIR
 
-  @type layout() :: %{
-          kind: String.t(),
-          params: String.t() | nil,
-          raw: String.t()
-        }
+  @type layout() :: %{kind: String.t(), params: String.t() | nil, raw: String.t()}
 
   @type convert_layout() :: %{
           index: non_neg_integer(),
@@ -35,10 +33,7 @@ defmodule Beaver.MLIR.Triton.LayoutAudit do
           target_layout: layout()
         }
 
-  @type t() :: %__MODULE__{
-          operation_count: non_neg_integer(),
-          convert_layouts: [convert_layout()]
-        }
+  @type t() :: %__MODULE__{operation_count: non_neg_integer(), convert_layouts: [convert_layout()]}
 
   defstruct [:operation_count, :convert_layouts]
 
@@ -54,12 +49,10 @@ defmodule Beaver.MLIR.Triton.LayoutAudit do
       module
       |> MLIR.Module.body()
       |> Beaver.Walker.prewalk([], fn
-        %MLIR.Operation{} = operation, acc ->
-          if MLIR.Operation.name(operation) == @convert_layout_op do
-            {operation, [convert_layout_fact(operation, length(acc)) | acc]}
-          else
-            {operation, acc}
-          end
+        %Operation{} = operation, acc ->
+          if Operation.name(operation) == @convert_layout_op,
+            do: {operation, [convert_layout_fact(operation, length(acc)) | acc]},
+            else: {operation, acc}
 
         other, acc ->
           {other, acc}
@@ -77,11 +70,8 @@ defmodule Beaver.MLIR.Triton.LayoutAudit do
 
   @doc "Returns the distinct layout kinds seen by the audit, in first-seen order."
   @spec layout_kinds(t()) :: [String.t()]
-  def layout_kinds(%__MODULE__{convert_layouts: convert_layouts}) do
-    convert_layouts
-    |> Enum.flat_map(&[&1.source_layout.kind, &1.target_layout.kind])
-    |> Enum.uniq()
-  end
+  def layout_kinds(%__MODULE__{convert_layouts: convert_layouts}),
+    do: convert_layouts |> Enum.flat_map(&[&1.source_layout.kind, &1.target_layout.kind]) |> Enum.uniq()
 
   @doc """
   Parses a `#ttg.<kind><{params}>` layout encoding from a tensor type text.
@@ -91,14 +81,9 @@ defmodule Beaver.MLIR.Triton.LayoutAudit do
   @spec parse_layout(String.t()) :: layout()
   def parse_layout(type_text) when is_binary(type_text) do
     case Regex.run(~r/#ttg\.([a-z_]+)(<\{.*\}>)?/, type_text) do
-      [_, kind, params] ->
-        %{kind: kind, params: params, raw: "#ttg.#{kind}#{params}"}
-
-      [_, kind] ->
-        %{kind: kind, params: nil, raw: "#ttg.#{kind}"}
-
-      _ ->
-        %{kind: "unknown", params: nil, raw: type_text}
+      [_, kind, params] -> %{kind: kind, params: params, raw: "#ttg.#{kind}#{params}"}
+      [_, kind] -> %{kind: kind, params: nil, raw: "#ttg.#{kind}"}
+      _ -> %{kind: "unknown", params: nil, raw: type_text}
     end
   end
 
@@ -122,11 +107,8 @@ defmodule Beaver.MLIR.Triton.LayoutAudit do
     case Regex.run(~r/^tensor<(.+?)(?:, .+)?>$/s, type_text) do
       [_, inner] ->
         case Regex.named_captures(~r/^(?<shape>\d+(?:x\d+)*)x(?<element>.+)$/, inner) do
-          %{"shape" => shape, "element" => element} ->
-            %{shape: shape, element_type: element}
-
-          _ ->
-            %{shape: nil, element_type: inner}
+          %{"shape" => shape, "element" => element} -> %{shape: shape, element_type: element}
+          _ -> %{shape: nil, element_type: inner}
         end
 
       _ ->
@@ -134,24 +116,19 @@ defmodule Beaver.MLIR.Triton.LayoutAudit do
     end
   end
 
-  defp convert_layout_fact(operation, index) do
+  defp convert_layout_fact(op, index) do
     source_type =
-      operation
+      op
       |> Beaver.Walker.operands()
       |> Enum.fetch!(0)
       |> MLIR.Value.type()
       |> MLIR.to_string()
 
-    target_type =
-      operation
-      |> MLIR.Operation.results()
-      |> Enum.fetch!(0)
-      |> MLIR.Value.type()
-      |> MLIR.to_string()
+    target_type = op |> Operation.results() |> Enum.fetch!(0) |> MLIR.Value.type() |> MLIR.to_string()
 
     %{
       index: index,
-      location: operation |> MLIR.location() |> MLIR.to_string(),
+      location: op |> MLIR.location() |> MLIR.to_string(),
       source_type: source_type,
       target_type: target_type,
       source_layout: extract_layout(source_type),

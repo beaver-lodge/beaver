@@ -103,8 +103,12 @@ defmodule ExDialectTest do
     assert rendered =~ ~s{names = ["result"]}
     assert rendered =~ ~s{"irdl.regions"}
     assert rendered =~ ~s{names = ["body"]}
-    assert rendered =~ ~s{variadicity_array[variadic]}
-    assert rendered =~ ~s{variadicity_array[optional]}
+
+    assert rendered =~ ~s{variadicity_array[variadic]} or
+             rendered =~ ~s{variadicity_array[<variadic>]}
+
+    assert rendered =~ ~s{variadicity_array[optional]} or
+             rendered =~ ~s{variadicity_array[<optional>]}
   end
 
   test "loads the dialect and attaches dynamic traits", %{ctx: ctx} do

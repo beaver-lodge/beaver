@@ -22,31 +22,23 @@ void initializeNVPTX() {
   });
 }
 
-void emitString(MlirStringCallback callback, void *userData,
-                const char *message) {
-  if (callback && message)
-    callback(mlirStringRefCreate(message, std::strlen(message)), userData);
+void emitString(MlirStringCallback callback, void *userData, const char *message) {
+  if (callback && message) callback(mlirStringRefCreate(message, std::strlen(message)), userData);
 }
 
-MlirLogicalResult failWithMessage(MlirStringCallback callback, void *userData,
-                                  char *message) {
-  emitString(callback, userData,
-             message ? message : "LLVM target compilation failed");
-  if (message)
-    LLVMDisposeMessage(message);
+MlirLogicalResult failWithMessage(MlirStringCallback callback, void *userData, char *message) {
+  emitString(callback, userData, message ? message : "LLVM target compilation failed");
+  if (message) LLVMDisposeMessage(message);
   return mlirLogicalResultFailure();
 }
 
 } // namespace
 
-MlirLogicalResult beaverTranslateModuleToLLVMIRText(
-    MlirOperation module, MlirStringCallback callback, void *userData) {
-  if (!module.ptr || !callback)
-    return mlirLogicalResultFailure();
+MlirLogicalResult beaverTranslateModuleToLLVMIRText(MlirOperation module, MlirStringCallback callback, void *userData) {
+  if (!module.ptr || !callback) return mlirLogicalResultFailure();
 
   LLVMContextRef llvmContext = LLVMContextCreate();
-  if (!llvmContext)
-    return mlirLogicalResultFailure();
+  if (!llvmContext) return mlirLogicalResultFailure();
 
   LLVMModuleRef llvmModule = mlirTranslateModuleToLLVMIR(module, llvmContext);
   if (!llvmModule) {
@@ -68,23 +60,19 @@ MlirLogicalResult beaverTranslateModuleToLLVMIRText(
   return mlirLogicalResultSuccess();
 }
 
-MlirLogicalResult beaverCompileLLVMIRToPTX(
-    MlirStringRef llvmIR, MlirStringRef cpu, MlirStringRef features,
-    MlirStringCallback outputCallback, MlirStringCallback errorCallback,
-    void *userData) {
-  if (!llvmIR.data || !outputCallback)
-    return mlirLogicalResultFailure();
+MlirLogicalResult beaverCompileLLVMIRToPTX(MlirStringRef llvmIR, MlirStringRef cpu, MlirStringRef features,
+                                           MlirStringCallback outputCallback, MlirStringCallback errorCallback,
+                                           void *userData) {
+  if (!llvmIR.data || !outputCallback) return mlirLogicalResultFailure();
 
   initializeNVPTX();
 
   const std::string triple = "nvptx64-nvidia-cuda";
   const std::string cpuString(cpu.data ? cpu.data : "", cpu.length);
-  const std::string featureString(features.data ? features.data : "",
-                                  features.length);
+  const std::string featureString(features.data ? features.data : "", features.length);
 
   LLVMContextRef context = LLVMContextCreate();
-  LLVMMemoryBufferRef input = LLVMCreateMemoryBufferWithMemoryRangeCopy(
-      llvmIR.data, llvmIR.length, "beaver.ll");
+  LLVMMemoryBufferRef input = LLVMCreateMemoryBufferWithMemoryRangeCopy(llvmIR.data, llvmIR.length, "beaver.ll");
   LLVMModuleRef module = nullptr;
   char *message = nullptr;
 
@@ -102,9 +90,9 @@ MlirLogicalResult beaverCompileLLVMIRToPTX(
     return failWithMessage(errorCallback, userData, message);
   }
 
-  LLVMTargetMachineRef machine = LLVMCreateTargetMachine(
-      target, triple.c_str(), cpuString.c_str(), featureString.c_str(),
-      LLVMCodeGenLevelDefault, LLVMRelocDefault, LLVMCodeModelDefault);
+  LLVMTargetMachineRef machine =
+      LLVMCreateTargetMachine(target, triple.c_str(), cpuString.c_str(), featureString.c_str(), LLVMCodeGenLevelDefault,
+                              LLVMRelocDefault, LLVMCodeModelDefault);
   if (!machine) {
     LLVMDisposeModule(module);
     LLVMContextDispose(context);
@@ -118,17 +106,14 @@ MlirLogicalResult beaverCompileLLVMIRToPTX(
   LLVMDisposeTargetData(layout);
 
   LLVMMemoryBufferRef output = nullptr;
-  if (LLVMTargetMachineEmitToMemoryBuffer(machine, module, LLVMAssemblyFile,
-                                          &message, &output)) {
+  if (LLVMTargetMachineEmitToMemoryBuffer(machine, module, LLVMAssemblyFile, &message, &output)) {
     LLVMDisposeTargetMachine(machine);
     LLVMDisposeModule(module);
     LLVMContextDispose(context);
     return failWithMessage(errorCallback, userData, message);
   }
 
-  outputCallback(mlirStringRefCreate(LLVMGetBufferStart(output),
-                                     LLVMGetBufferSize(output)),
-                 userData);
+  outputCallback(mlirStringRefCreate(LLVMGetBufferStart(output), LLVMGetBufferSize(output)), userData);
   LLVMDisposeMemoryBuffer(output);
   LLVMDisposeTargetMachine(machine);
   LLVMDisposeModule(module);

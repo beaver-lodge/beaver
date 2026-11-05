@@ -1,3 +1,5 @@
+alias Beaver.MLIR.CAPI
+
 defmodule Beaver.MLIR.Conversion.Profile do
   @moduledoc """
   Builds a bounded receipt for one dialect conversion.
@@ -18,12 +20,12 @@ defmodule Beaver.MLIR.Conversion.Profile do
 
   @doc false
   @spec start(MLIR.Conversion.mode(), MLIR.Conversion.conversion_ir()) :: state()
-  def start(mode, ir) do
-    %{
+  def start(mode, ir),
+    do: %{
       mode: mode,
       started_at: monotonic_ns(),
-      process_cpu_time_ns: MLIR.CAPI.beaver_raw_process_cpu_time(),
-      peak_rss_bytes: MLIR.CAPI.beaver_raw_peak_rss(),
+      process_cpu_time_ns: CAPI.beaver_raw_process_cpu_time(),
+      peak_rss_bytes: CAPI.beaver_raw_peak_rss(),
       reductions: reductions(),
       process_memory_bytes: process_memory_bytes(),
       peak_process_memory_bytes: process_memory_bytes(),
@@ -31,27 +33,19 @@ defmodule Beaver.MLIR.Conversion.Profile do
       callbacks: %{},
       callback_count: 0
     }
-  end
 
   @doc false
-  @spec record_callback(
-          state(),
-          atom(),
-          String.t() | nil,
-          non_neg_integer(),
-          non_neg_integer()
-        ) :: state()
+  @spec record_callback(state(), atom(), String.t() | nil, non_neg_integer(), non_neg_integer()) ::
+          state()
   def record_callback(state, kind, root_name, service_ns, native_wait_ns)
       when is_atom(kind) and (is_binary(root_name) or is_nil(root_name)) and service_ns >= 0 and
              native_wait_ns >= service_ns do
     callback_count = state.callback_count + 1
 
     peak_process_memory_bytes =
-      if rem(callback_count, @memory_sample_interval) == 0 do
-        max(state.peak_process_memory_bytes, process_memory_bytes())
-      else
-        state.peak_process_memory_bytes
-      end
+      if rem(callback_count, @memory_sample_interval) == 0,
+        do: max(state.peak_process_memory_bytes, process_memory_bytes()),
+        else: state.peak_process_memory_bytes
 
     summary = %{
       count: 1,
@@ -83,8 +77,8 @@ defmodule Beaver.MLIR.Conversion.Profile do
           receipt()
   def finish(state, result, ir, native_profile) do
     memory_after = process_memory_bytes()
-    process_cpu_time_after_ns = MLIR.CAPI.beaver_raw_process_cpu_time()
-    peak_rss_after_bytes = MLIR.CAPI.beaver_raw_peak_rss()
+    process_cpu_time_after_ns = CAPI.beaver_raw_process_cpu_time()
+    peak_rss_after_bytes = CAPI.beaver_raw_peak_rss()
     native = decode_native_profile(native_profile)
     callbacks = callback_summaries(state.callbacks)
     native_wait_ns = Enum.sum(Enum.map(callbacks, & &1["native_wait_sum_ns"]))
@@ -92,15 +86,9 @@ defmodule Beaver.MLIR.Conversion.Profile do
     beam_service_ns = Enum.sum(Enum.map(callbacks, & &1["beam_service_ns"]))
     boundary_overhead_sum_ns = max(native_wait_ns - beam_service_ns, 0)
 
-    unattributed_residual_ns =
-      max(native.duration_ns - native.target_lock_wait_ns - native_wait_ns, 0)
+    unattributed_residual_ns = max(native.duration_ns - native.target_lock_wait_ns - native_wait_ns, 0)
 
-    hotspots =
-      hotspots(
-        callbacks,
-        unattributed_residual_ns,
-        native.target_lock_wait_ns
-      )
+    hotspots = hotspots(callbacks, unattributed_residual_ns, native.target_lock_wait_ns)
 
     %{
       "schema_version" => @schema_version,
@@ -133,20 +121,13 @@ defmodule Beaver.MLIR.Conversion.Profile do
       "boundary_overhead_sum_ns" => boundary_overhead_sum_ns,
       "hotspots" => hotspots,
       "callbacks" => callbacks,
-      "ir" => %{
-        "before" => state.ir_before,
-        "after" => inventory(ir)
-      }
+      "ir" => %{"before" => state.ir_before, "after" => inventory(ir)}
     }
   end
 
   defp decode_native_profile({duration_ns, target_lock_wait_ns})
-       when is_integer(duration_ns) and is_integer(target_lock_wait_ns) do
-    %{
-      duration_ns: duration_ns,
-      target_lock_wait_ns: target_lock_wait_ns
-    }
-  end
+       when is_integer(duration_ns) and is_integer(target_lock_wait_ns),
+       do: %{duration_ns: duration_ns, target_lock_wait_ns: target_lock_wait_ns}
 
   defp callback_summaries(callbacks) do
     callbacks
@@ -174,18 +155,8 @@ defmodule Beaver.MLIR.Conversion.Profile do
         kind = callback["kind"]
 
         [
-          hotspot(
-            "beam_callback_service",
-            kind,
-            callback["root"],
-            callback["beam_service_ns"]
-          ),
-          hotspot(
-            "callback_boundary_wait",
-            kind,
-            callback["root"],
-            callback["boundary_overhead_sum_ns"]
-          )
+          hotspot("beam_callback_service", kind, callback["root"], callback["beam_service_ns"]),
+          hotspot("callback_boundary_wait", kind, callback["root"], callback["boundary_overhead_sum_ns"])
         ]
       end)
 
@@ -195,30 +166,23 @@ defmodule Beaver.MLIR.Conversion.Profile do
       | callback_sources
     ]
     |> Enum.reject(&(&1["duration_ns"] == 0))
-    |> Enum.sort_by(
-      &{-&1["duration_ns"], &1["source"], &1["callback_kind"] || "", &1["callback_root"] || ""}
-    )
+    |> Enum.sort_by(&{-&1["duration_ns"], &1["source"], &1["callback_kind"] || "", &1["callback_root"] || ""})
     |> Enum.take(3)
   end
 
-  defp hotspot(source, callback_kind, callback_root, duration_ns) do
-    %{
+  defp hotspot(source, callback_kind, callback_root, duration_ns),
+    do: %{
       "source" => source,
       "callback_kind" => callback_kind,
       "callback_root" => callback_root,
       "duration_ns" => duration_ns
     }
-  end
 
   defp inventory(ir) do
     operation = MLIR.Operation.from_module(ir)
-    {operations, modules, functions} = MLIR.CAPI.beaver_raw_operation_inventory(operation.ref)
+    {operations, modules, functions} = CAPI.beaver_raw_operation_inventory(operation.ref)
 
-    %{
-      "operations" => operations,
-      "modules" => modules,
-      "functions" => functions
-    }
+    %{"operations" => operations, "modules" => modules, "functions" => functions}
   end
 
   defp status({:ok, _ir, _diagnostics}), do: "ok"

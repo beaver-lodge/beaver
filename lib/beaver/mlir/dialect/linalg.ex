@@ -1,3 +1,6 @@
+alias Beaver.MLIR.Attribute
+alias Beaver.Deferred
+
 defmodule Beaver.MLIR.Dialect.Linalg do
   @moduledoc """
   Operations and structured-compute builders for the MLIR Linalg dialect.
@@ -6,9 +9,7 @@ defmodule Beaver.MLIR.Dialect.Linalg do
   alias Beaver.MLIR
   alias Beaver.MLIR.Dialect.Bufferization
 
-  use Beaver.MLIR.Dialect,
-    dialect: "linalg",
-    ops: Beaver.MLIR.Dialect.Registry.ops("linalg")
+  use Beaver.MLIR.Dialect, dialect: "linalg", ops: Beaver.MLIR.Dialect.Registry.ops("linalg")
 
   @doc """
   Build a `linalg.generic` with structured inputs, outputs, maps, iterators,
@@ -32,10 +33,8 @@ defmodule Beaver.MLIR.Dialect.Linalg do
     maps = Keyword.fetch!(opts, :indexing_maps)
     iterators = Keyword.fetch!(opts, :iterators)
 
-    unless is_list(inputs) and is_list(outputs) and is_list(maps) and is_list(iterators) do
-      raise ArgumentError,
-            "linalg.generic inputs, outputs, indexing_maps, and iterators must be lists"
-    end
+    unless is_list(inputs) and is_list(outputs) and is_list(maps) and is_list(iterators),
+      do: raise(ArgumentError, "linalg.generic inputs, outputs, indexing_maps, and iterators must be lists")
 
     input_vars = scalar_vars(:linalg_input, length(inputs))
     output_vars = scalar_vars(:linalg_output, length(outputs))
@@ -53,20 +52,13 @@ defmodule Beaver.MLIR.Dialect.Linalg do
       Beaver.mlir do
         Beaver.MLIR.Dialect.Linalg.generic inputs: unquote(inputs),
                                            outputs: unquote(outputs),
-                                           indexing_maps:
-                                             Beaver.MLIR.Dialect.Linalg.indexing_maps(
-                                               unquote(maps)
-                                             ),
+                                           indexing_maps: Beaver.MLIR.Dialect.Linalg.indexing_maps(unquote(maps)),
                                            iterator_types:
-                                             Beaver.MLIR.Dialect.Linalg.iterator_types(
-                                               unquote(iterators)
-                                             ),
+                                             Beaver.MLIR.Dialect.Linalg.iterator_types(unquote(iterators)),
                                            operand_segment_sizes: :infer do
           region do
             block unquote(block_call) do
-              Beaver.MLIR.Dialect.Linalg.yield(
-                unquote(body).(unquote(input_vars), unquote(output_vars))
-              ) >>> []
+              Beaver.MLIR.Dialect.Linalg.yield(unquote(body).(unquote(input_vars), unquote(output_vars))) >>> []
             end
           end
         end >>> Beaver.MLIR.Dialect.Linalg.result_types(unquote(outputs))
@@ -76,12 +68,10 @@ defmodule Beaver.MLIR.Dialect.Linalg do
 
   @doc "Build the array attribute used by `linalg.generic` indexing maps."
   def indexing_maps(maps) when is_list(maps) do
-    Beaver.Deferred.defer(fn ctx ->
+    Deferred.defer(fn ctx ->
       maps
-      |> Enum.map(fn map ->
-        map |> Beaver.Deferred.resolve(ctx) |> MLIR.Attribute.affine_map()
-      end)
-      |> MLIR.Attribute.array(ctx: ctx)
+      |> Enum.map(fn map -> map |> Deferred.resolve(ctx) |> Attribute.affine_map() end)
+      |> Attribute.array(ctx: ctx)
     end)
   end
 
@@ -90,17 +80,12 @@ defmodule Beaver.MLIR.Dialect.Linalg do
     allowed = [:parallel, :reduction, :window]
 
     case iterators -- allowed do
-      [] ->
-        :ok
-
-      [invalid | _] ->
-        raise ArgumentError, "unsupported Linalg iterator type: #{inspect(invalid)}"
+      [] -> :ok
+      [invalid | _] -> raise ArgumentError, "unsupported Linalg iterator type: #{inspect(invalid)}"
     end
 
-    Beaver.Deferred.defer(fn ctx ->
-      iterators
-      |> Enum.map(&MLIR.Attribute.get("#linalg.iterator_type<#{&1}>", ctx: ctx))
-      |> MLIR.Attribute.array(ctx: ctx)
+    Deferred.defer(fn ctx ->
+      iterators |> Enum.map(&Attribute.get("#linalg.iterator_type<#{&1}>", ctx: ctx)) |> Attribute.array(ctx: ctx)
     end)
   end
 
@@ -111,11 +96,8 @@ defmodule Beaver.MLIR.Dialect.Linalg do
   end
 
   @doc false
-  def result_types(outputs) do
-    outputs
-    |> Enum.map(&MLIR.Value.type/1)
-    |> Enum.filter(&MLIR.Type.tensor?/1)
-  end
+  def result_types(outputs),
+    do: outputs |> Enum.map(&MLIR.Value.type/1) |> Enum.filter(&MLIR.Type.tensor?/1)
 
   @doc "Build a Linalg → Bufferization → LLVM lowering composer."
   def llvm_pipeline(operation_or_module, opts \\ []) do
@@ -140,11 +122,8 @@ defmodule Beaver.MLIR.Dialect.Linalg do
   end
 
   @doc "Run the Linalg → Bufferization → LLVM lowering pipeline."
-  def lower_to_llvm!(operation_or_module, opts \\ []) do
-    operation_or_module
-    |> llvm_pipeline(opts)
-    |> Beaver.Composer.run!(Keyword.get(opts, :run, []))
-  end
+  def lower_to_llvm!(operation_or_module, opts \\ []),
+    do: operation_or_module |> llvm_pipeline(opts) |> Beaver.Composer.run!(Keyword.get(opts, :run, []))
 
   defp scalar_vars(prefix, count) do
     for index <- 0..(count - 1)//1, do: Macro.var(:"#{prefix}_#{index}", nil)

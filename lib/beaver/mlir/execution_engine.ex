@@ -1,21 +1,22 @@
+alias Beaver.MLIR.{CAPI, StringRef}
+alias Beaver.Native
+
 defmodule Beaver.MLIR.ExecutionEngine do
   @moduledoc """
   This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
   """
   alias Beaver.MLIR
   alias Beaver.Composer
-  import Beaver.MLIR.CAPI
+  import CAPI
 
-  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
+  use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
 
   @doc """
   Create a MLIR JIT engine for a module and check if successful. Usually this module should be of LLVM dialect.
   """
   def create!(composer_or_op, opts \\ [])
 
-  def create!(%Composer{} = composer_or_op, opts) do
-    Composer.run!(composer_or_op) |> create!(opts)
-  end
+  def create!(%Composer{} = composer_or_op, opts), do: Composer.run!(composer_or_op) |> create!(opts)
 
   @type dirty :: nil | :io_bound | :cpu_bound
 
@@ -40,17 +41,9 @@ defmodule Beaver.MLIR.ExecutionEngine do
     enable_pic = Keyword.get(opts, :enable_pic, false)
     debug_info = Keyword.get(opts, :debug_info, false)
 
-    module =
-      if debug_info do
-        Beaver.MLIR.Debug.attach_llvm_scopes!(module)
-      else
-        module
-      end
+    module = if debug_info, do: Beaver.MLIR.Debug.attach_llvm_scopes!(module), else: module
 
-    shared_lib_paths_ptr =
-      shared_lib_paths
-      |> Enum.map(&MLIR.StringRef.create/1)
-      |> Beaver.Native.array(MLIR.StringRef)
+    shared_lib_paths_ptr = shared_lib_paths |> Enum.map(&StringRef.create/1) |> Native.array(StringRef)
 
     {jit, diagnostics} =
       mlirExecutionEngineCreateWithDiagnostics(
@@ -63,9 +56,8 @@ defmodule Beaver.MLIR.ExecutionEngine do
         enable_pic
       )
 
-    if MLIR.null?(jit) do
-      raise ArgumentError, MLIR.Diagnostic.format(diagnostics, "Execution engine creation failed")
-    end
+    if MLIR.null?(jit),
+      do: raise(ArgumentError, MLIR.Diagnostic.format(diagnostics, "Execution engine creation failed"))
 
     jit
   end
@@ -76,46 +68,25 @@ defmodule Beaver.MLIR.ExecutionEngine do
   @type invoke_opts :: [
           {:dirty, dirty}
         ]
-  @spec invoke!(t(), String.t() | MLIR.StringRef.t(), list(), any(), invoke_opts()) :: :ok
+  @spec invoke!(t(), String.t() | StringRef.t(), list(), any(), invoke_opts()) :: :ok
   def invoke!(jit, symbol, args \\ [], return \\ nil, opts \\ []) when is_list(args) do
-    arg_ptr_list = args |> Enum.map(&Beaver.Native.opaque_ptr/1)
+    arg_ptr_list = args |> Enum.map(&Native.opaque_ptr/1)
 
-    return_ptr =
-      if return do
-        return |> Beaver.Native.opaque_ptr()
-      else
-        []
-      end
-      |> List.wrap()
+    return_ptr = if(return, do: return |> Native.opaque_ptr(), else: []) |> List.wrap()
 
     {result, duration} =
       timed(fn ->
-        Beaver.Native.apply_dirty(
+        Native.apply_dirty(
           :mlirExecutionEngineInvokePacked,
-          [
-            jit,
-            MLIR.StringRef.create(symbol),
-            Beaver.Native.array(arg_ptr_list ++ return_ptr, Beaver.Native.OpaquePtr, mut: true)
-          ],
+          [jit, StringRef.create(symbol), Native.array(arg_ptr_list ++ return_ptr, Native.OpaquePtr, mut: true)],
           opts[:dirty]
         )
       end)
 
-    Beaver.MLIR.Telemetry.emit(
-      [:execution],
-      %{duration: duration},
-      %{symbol: to_string(symbol)},
-      opts
-    )
+    Beaver.MLIR.Telemetry.emit([:execution], %{duration: duration}, %{symbol: to_string(symbol)}, opts)
 
     result
-    |> then(
-      &if MLIR.LogicalResult.success?(&1) do
-        return || :ok
-      else
-        raise "Execution engine invoke failed"
-      end
-    )
+    |> then(&if MLIR.LogicalResult.success?(&1), do: return || :ok, else: raise("Execution engine invoke failed"))
   end
 
   @doc """
@@ -123,27 +94,25 @@ defmodule Beaver.MLIR.ExecutionEngine do
 
   If not already initialized, this will be called implicitly when first invocation happens.
   """
-  def init(jit) do
-    tap(jit, &MLIR.CAPI.mlirExecutionEngineInitialize/1)
-  end
+  def init(jit), do: tap(jit, &CAPI.mlirExecutionEngineInitialize/1)
 
-  defdelegate destroy(jit), to: MLIR.CAPI, as: :mlirExecutionEngineDestroy
+  defdelegate destroy(jit), to: CAPI, as: :mlirExecutionEngineDestroy
 
   @doc "Look up a symbol in an execution engine."
-  @spec lookup(t(), String.t() | MLIR.StringRef.t(), keyword()) :: Beaver.Native.OpaquePtr.t()
+  @spec lookup(t(), String.t() | StringRef.t(), keyword()) :: Native.OpaquePtr.t()
   def lookup(jit, symbol, opts \\ []) do
     function =
       if Keyword.get(opts, :packed, false),
         do: :mlirExecutionEngineLookupPacked,
         else: :mlirExecutionEngineLookup
 
-    apply(MLIR.CAPI, function, [jit, MLIR.StringRef.create(symbol)])
+    apply(CAPI, function, [jit, StringRef.create(symbol)])
   end
 
   @doc "Register a native pointer under a symbol name."
-  @spec register_symbol(t(), String.t() | MLIR.StringRef.t(), Beaver.Native.OpaquePtr.t()) :: t()
+  @spec register_symbol(t(), String.t() | StringRef.t(), Native.OpaquePtr.t()) :: t()
   def register_symbol(jit, symbol, pointer) do
-    mlirExecutionEngineRegisterSymbol(jit, MLIR.StringRef.create(symbol), pointer)
+    mlirExecutionEngineRegisterSymbol(jit, StringRef.create(symbol), pointer)
     jit
   end
 
@@ -154,21 +123,17 @@ defmodule Beaver.MLIR.ExecutionEngine do
   def emit_object!(jit, path) do
     path = Path.expand(path)
     path |> Path.dirname() |> File.mkdir_p!()
-    mlirExecutionEngineDumpToObjectFile(jit, MLIR.StringRef.create(path))
+    mlirExecutionEngineDumpToObjectFile(jit, StringRef.create(path))
 
-    if File.regular?(path) do
-      path
-    else
-      raise "MLIR execution engine did not emit an object file at #{path}"
-    end
+    if File.regular?(path),
+      do: path,
+      else: raise("MLIR execution engine did not emit an object file at #{path}")
   end
 
   @doc """
   Get the paths to the runtime libraries provided by MLIR.
   """
-  def runtime_libs do
-    Path.join([:code.priv_dir(:beaver), "lib", "*"]) |> Path.wildcard()
-  end
+  def runtime_libs, do: Path.join([:code.priv_dir(:beaver), "lib", "*"]) |> Path.wildcard()
 
   defp timed(fun) do
     started = System.monotonic_time()

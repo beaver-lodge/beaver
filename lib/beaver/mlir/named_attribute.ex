@@ -1,10 +1,13 @@
+alias Beaver.MLIR.CAPI
+alias Beaver.Deferred
+
 defmodule Beaver.MLIR.NamedAttribute do
   @moduledoc """
   This module defines a wrapper struct of NamedAttribute in MLIR
   """
   alias Beaver.MLIR
-  import MLIR.CAPI
-  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
+  import CAPI
+  use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
 
   @doc """
   create named attribute.
@@ -13,16 +16,12 @@ defmodule Beaver.MLIR.NamedAttribute do
   """
   def get(name, attr, opts \\ [])
 
-  def get(%MLIR.Identifier{} = name, attr, []) do
-    get(name, attr, ctx: MLIR.context(name))
-  end
+  def get(%MLIR.Identifier{} = name, attr, []), do: get(name, attr, ctx: MLIR.context(name))
 
-  def get(name, %MLIR.Attribute{} = attr, []) do
-    get(name, attr, ctx: MLIR.context(attr))
-  end
+  def get(name, %MLIR.Attribute{} = attr, []), do: get(name, attr, ctx: MLIR.context(attr))
 
   def get(name, attr, opts) do
-    Beaver.Deferred.from_opts(
+    Deferred.from_opts(
       opts,
       fn ctx ->
         identifier =
@@ -31,14 +30,11 @@ defmodule Beaver.MLIR.NamedAttribute do
             s -> MLIR.Identifier.get(s, ctx: ctx)
           end
 
-        mlirNamedAttributeGet(
-          Beaver.Deferred.resolve(identifier, ctx),
-          Beaver.Deferred.resolve(attr, ctx)
-        )
+        mlirNamedAttributeGet(Deferred.resolve(identifier, ctx), Deferred.resolve(attr, ctx))
       end
     )
   end
 
-  defdelegate name(named_attribute), to: MLIR.CAPI, as: :beaverNamedAttributeGetName
-  defdelegate attribute(named_attribute), to: MLIR.CAPI, as: :beaverNamedAttributeGetAttribute
+  defdelegate name(named_attribute), to: CAPI, as: :beaverNamedAttributeGetName
+  defdelegate attribute(named_attribute), to: CAPI, as: :beaverNamedAttributeGetAttribute
 end

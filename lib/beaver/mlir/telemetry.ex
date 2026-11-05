@@ -6,9 +6,7 @@ defmodule Beaver.MLIR.Telemetry do
   def emit(event_suffix, measurements, metadata, opts \\ []) do
     event = @prefix ++ event_suffix
 
-    if function_exported?(:telemetry, :execute, 3) do
-      apply(:telemetry, :execute, [event, measurements, metadata])
-    end
+    if function_exported?(:telemetry, :execute, 3), do: apply(:telemetry, :execute, [event, measurements, metadata])
 
     case Keyword.get(opts, :telemetry) do
       callback when is_function(callback, 3) -> callback.(event, measurements, metadata)
