@@ -39,13 +39,11 @@ namespace {
 
 static bool isExTermType(Type type) {
   auto dynamicType = dyn_cast<DynamicType>(type);
-  if (!dynamicType)
-    return false;
+  if (!dynamicType) return false;
 
   StringRef name = dynamicType.getTypeDef()->getName();
-  return name == "term" || name == "bound" || name == "unbound" ||
-         name.ends_with(".term") || name.ends_with(".bound") ||
-         name.ends_with(".unbound");
+  return name == "term" || name == "bound" || name == "unbound" || name.ends_with(".term") ||
+         name.ends_with(".bound") || name.ends_with(".unbound");
 }
 
 class ExLiteralConversion final : public ConversionPattern {
@@ -53,17 +51,13 @@ public:
   ExLiteralConversion(const TypeConverter &converter, MLIRContext *context)
       : ConversionPattern(converter, "ex.lit", PatternBenefit(1), context) {}
 
-  LogicalResult
-  matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    if (!operands.empty() || operation->getNumResults() != 1)
-      return failure();
+  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
+                                ConversionPatternRewriter &rewriter) const override {
+    if (!operands.empty() || operation->getNumResults() != 1) return failure();
 
     Attribute value = operation->getAttr("value");
-    Type resultType =
-        getTypeConverter()->convertType(operation->getResult(0).getType());
-    if (!value || !resultType)
-      return failure();
+    Type resultType = getTypeConverter()->convertType(operation->getResult(0).getType());
+    if (!value || !resultType) return failure();
 
     OperationState state(operation->getLoc(), "arith.constant");
     state.addAttribute("value", value);
@@ -79,12 +73,9 @@ public:
   ExBoxConversion(const TypeConverter &converter, MLIRContext *context)
       : ConversionPattern(converter, "ex.box", PatternBenefit(1), context) {}
 
-  LogicalResult
-  matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    if (operands.size() != 1 || operation->getNumOperands() != 1 ||
-        operation->getNumResults() != 1)
-      return failure();
+  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
+                                ConversionPatternRewriter &rewriter) const override {
+    if (operands.size() != 1 || operation->getNumOperands() != 1 || operation->getNumResults() != 1) return failure();
 
     Value word = operands.front();
     if (!isExTermType(operation->getOperand(0).getType())) {
@@ -108,15 +99,12 @@ public:
 
 class ExIdentityConversion final : public ConversionPattern {
 public:
-  ExIdentityConversion(const TypeConverter &converter, StringRef rootName,
-                       MLIRContext *context)
+  ExIdentityConversion(const TypeConverter &converter, StringRef rootName, MLIRContext *context)
       : ConversionPattern(converter, rootName, PatternBenefit(1), context) {}
 
-  LogicalResult
-  matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    if (operands.size() != 1 || operation->getNumResults() != 1)
-      return failure();
+  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
+                                ConversionPatternRewriter &rewriter) const override {
+    if (operands.size() != 1 || operation->getNumResults() != 1) return failure();
     rewriter.replaceOp(operation, operands.front());
     return success();
   }
@@ -124,21 +112,15 @@ public:
 
 class ExBinaryConversion final : public ConversionPattern {
 public:
-  ExBinaryConversion(const TypeConverter &converter, StringRef rootName,
-                     StringRef targetName, MLIRContext *context)
-      : ConversionPattern(converter, rootName, PatternBenefit(1), context),
-        targetName(targetName.str()) {}
+  ExBinaryConversion(const TypeConverter &converter, StringRef rootName, StringRef targetName, MLIRContext *context)
+      : ConversionPattern(converter, rootName, PatternBenefit(1), context), targetName(targetName.str()) {}
 
-  LogicalResult
-  matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    if (operands.size() != 2 || operation->getNumResults() != 1)
-      return failure();
+  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
+                                ConversionPatternRewriter &rewriter) const override {
+    if (operands.size() != 2 || operation->getNumResults() != 1) return failure();
 
-    Type resultType =
-        getTypeConverter()->convertType(operation->getResult(0).getType());
-    if (!resultType)
-      return failure();
+    Type resultType = getTypeConverter()->convertType(operation->getResult(0).getType());
+    if (!resultType) return failure();
 
     OperationState state(operation->getLoc(), targetName);
     state.addOperands(operands);
@@ -183,24 +165,18 @@ public:
   ExCmpConversion(const TypeConverter &converter, MLIRContext *context)
       : ConversionPattern(converter, "ex.cmp", PatternBenefit(1), context) {}
 
-  LogicalResult
-  matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    if (operands.size() != 2 || operation->getNumResults() != 1)
-      return failure();
+  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
+                                ConversionPatternRewriter &rewriter) const override {
+    if (operands.size() != 2 || operation->getNumResults() != 1) return failure();
 
     StringAttr predicate = operation->getAttrOfType<StringAttr>("predicate");
-    Type resultType =
-        getTypeConverter()->convertType(operation->getResult(0).getType());
+    Type resultType = getTypeConverter()->convertType(operation->getResult(0).getType());
     int64_t predicateCode;
-    if (!predicate || !resultType ||
-        !exCmpPredicateCode(predicate.getValue(), predicateCode))
-      return failure();
+    if (!predicate || !resultType || !exCmpPredicateCode(predicate.getValue(), predicateCode)) return failure();
 
     OperationState compareState(operation->getLoc(), "arith.cmpi");
     compareState.addOperands(operands);
-    compareState.addAttribute("predicate",
-                              rewriter.getI64IntegerAttr(predicateCode));
+    compareState.addAttribute("predicate", rewriter.getI64IntegerAttr(predicateCode));
     compareState.addTypes(rewriter.getI1Type());
     Operation *compare = rewriter.create(compareState);
 
@@ -219,16 +195,12 @@ public:
   ExIfConversion(const TypeConverter &converter, MLIRContext *context)
       : ConversionPattern(converter, "ex.if", PatternBenefit(1), context) {}
 
-  LogicalResult
-  matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    if (operands.size() != 1 || operation->getNumRegions() != 2)
-      return failure();
+  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
+                                ConversionPatternRewriter &rewriter) const override {
+    if (operands.size() != 1 || operation->getNumRegions() != 2) return failure();
 
     SmallVector<Type> resultTypes;
-    if (failed(getTypeConverter()->convertTypes(operation->getResultTypes(),
-                                                resultTypes)))
-      return failure();
+    if (failed(getTypeConverter()->convertTypes(operation->getResultTypes(), resultTypes))) return failure();
 
     OperationState truncateState(operation->getLoc(), "arith.trunci");
     truncateState.addOperands(operands.front());
@@ -254,9 +226,8 @@ public:
   ExYieldConversion(const TypeConverter &converter, MLIRContext *context)
       : ConversionPattern(converter, "ex.yield", PatternBenefit(1), context) {}
 
-  LogicalResult
-  matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
+                                ConversionPatternRewriter &rewriter) const override {
     OperationState state(operation->getLoc(), "scf.yield");
     state.addOperands(operands);
     Operation *yield = rewriter.create(state);
@@ -267,14 +238,12 @@ public:
 
 } // namespace
 
-void beaverPopulateExScalarConversionPatterns(
-    MlirRewritePatternSet patterns, MlirTypeConverter typeConverter) {
+void beaverPopulateExScalarConversionPatterns(MlirRewritePatternSet patterns, MlirTypeConverter typeConverter) {
   RewritePatternSet *set = unwrap(patterns);
   TypeConverter *converter = unwrap(typeConverter);
   MLIRContext *context = set->getContext();
 
-  set->add<ExLiteralConversion, ExBoxConversion, ExYieldConversion>(*converter,
-                                                                    context);
+  set->add<ExLiteralConversion, ExBoxConversion, ExYieldConversion>(*converter, context);
   set->add<ExIdentityConversion>(*converter, "ex.to_word", context);
   set->add<ExIdentityConversion>(*converter, "ex.unbox", context);
   set->add<ExBinaryConversion>(*converter, "ex.add", "arith.addi", context);
@@ -285,11 +254,9 @@ void beaverPopulateExScalarConversionPatterns(
   set->add<ExCmpConversion, ExIfConversion>(*converter, context);
 }
 
-MLIR_CAPI_EXPORTED void
-beaverOperationDestroyIterative(MlirOperation operation) {
+MLIR_CAPI_EXPORTED void beaverOperationDestroyIterative(MlirOperation operation) {
   Operation *root = unwrap(operation);
-  if (!root)
-    return;
+  if (!root) return;
 
   llvm::SmallVector<Operation *> operations;
   llvm::SmallVector<Block *> blocks;
@@ -302,8 +269,7 @@ beaverOperationDestroyIterative(MlirOperation operation) {
     for (Region &region : current->getRegions()) {
       for (Block &block : region) {
         blocks.push_back(&block);
-        for (Operation &nested : block)
-          pending.push_back(&nested);
+        for (Operation &nested : block) pending.push_back(&nested);
       }
     }
   }
@@ -312,48 +278,35 @@ beaverOperationDestroyIterative(MlirOperation operation) {
   // Operation::dropAllReferences() cannot be used here because it recursively
   // visits nested regions, which is precisely the failure mode this API
   // avoids.
-  for (Operation *current : operations)
-    current->dropAllUses();
+  for (Operation *current : operations) current->dropAllUses();
   for (Block *block : blocks)
-    for (BlockArgument argument : block->getArguments())
-      argument.dropAllUses();
+    for (BlockArgument argument : block->getArguments()) argument.dropAllUses();
 
   // Pre-order collection guarantees that reverse order destroys every nested
   // operation before its parent. Each native destructor therefore sees only
   // empty nested blocks and has bounded recursion depth.
-  for (auto iterator = operations.rbegin(); iterator != operations.rend();
-       ++iterator) {
+  for (auto iterator = operations.rbegin(); iterator != operations.rend(); ++iterator) {
     Operation *current = *iterator;
-    if (current->getBlock())
-      current->remove();
+    if (current->getBlock()) current->remove();
     current->destroy();
   }
 }
 
 namespace {
-using MemoryEffectList =
-    llvm::SmallVectorImpl<MemoryEffects::EffectInstance>;
+using MemoryEffectList = llvm::SmallVectorImpl<MemoryEffects::EffectInstance>;
 
-static MemoryEffectList *
-unwrapEffectList(MlirBeaverMemoryEffectInstancesList effects) {
+static MemoryEffectList *unwrapEffectList(MlirBeaverMemoryEffectInstancesList effects) {
   return static_cast<MemoryEffectList *>(effects.ptr);
 }
 
-static MlirBeaverMemoryEffectInstancesList
-wrapEffectList(MemoryEffectList *effects) {
-  return {effects};
-}
+static MlirBeaverMemoryEffectInstancesList wrapEffectList(MemoryEffectList *effects) { return {effects}; }
 
-static llvm::SmallVector<NamedAttribute>
-collectInherentAttributes(Operation *operation) {
+static llvm::SmallVector<NamedAttribute> collectInherentAttributes(Operation *operation) {
   llvm::SmallVector<NamedAttribute> attributes;
 #ifdef BEAVER_HAS_MLIR_INHERENT_ATTRIBUTE_VISITOR
-  operation->getName().walkInherentAttrs(
-      operation, [&](llvm::StringRef name, Attribute &attribute) {
-        if (attribute)
-          attributes.emplace_back(
-              StringAttr::get(operation->getContext(), name), attribute);
-      });
+  operation->getName().walkInherentAttrs(operation, [&](llvm::StringRef name, Attribute &attribute) {
+    if (attribute) attributes.emplace_back(StringAttr::get(operation->getContext(), name), attribute);
+  });
 #else
   NamedAttrList populated;
   operation->getName().populateInherentAttrs(operation, populated);
@@ -368,28 +321,21 @@ static std::unordered_set<MLIRContext *> transientScopeContexts;
 #endif
 
 class BeaverMemoryEffectsOpInterfaceFallbackModel
-    : public MemoryEffectOpInterface::FallbackModel<
-          BeaverMemoryEffectsOpInterfaceFallbackModel> {
+    : public MemoryEffectOpInterface::FallbackModel<BeaverMemoryEffectsOpInterfaceFallbackModel> {
 public:
-  void setCallbacks(MlirBeaverMemoryEffectsOpInterfaceCallbacks value) {
-    callbacks = value;
-  }
+  void setCallbacks(MlirBeaverMemoryEffectsOpInterfaceCallbacks value) { callbacks = value; }
 
   ~BeaverMemoryEffectsOpInterfaceFallbackModel() {
-    if (callbacks.destruct)
-      callbacks.destruct(callbacks.userData);
+    if (callbacks.destruct) callbacks.destruct(callbacks.userData);
   }
 
-  static TypeID getInterfaceID() {
-    return MemoryEffectOpInterface::getInterfaceID();
-  }
+  static TypeID getInterfaceID() { return MemoryEffectOpInterface::getInterfaceID(); }
 
   static bool classof(const MemoryEffectOpInterface::Concept *) { return true; }
 
   void getEffects(Operation *operation, MemoryEffectList &effects) const {
     assert(callbacks.getEffects && "getEffects callback not set");
-    callbacks.getEffects(wrap(operation), wrapEffectList(&effects),
-                         callbacks.userData);
+    callbacks.getEffects(wrap(operation), wrapEffectList(&effects), callbacks.userData);
   }
 
 private:
@@ -402,8 +348,7 @@ private:
 /// for BEAM callbacks which start nested MLIR work on the same shared pool.
 class BeaverElasticThreadPool final : public llvm::ThreadPoolInterface {
 public:
-  explicit BeaverElasticThreadPool(unsigned maxConcurrency)
-      : maxConcurrency(std::max(1u, maxConcurrency)) {}
+  explicit BeaverElasticThreadPool(unsigned maxConcurrency) : maxConcurrency(std::max(1u, maxConcurrency)) {}
 
   ~BeaverElasticThreadPool() override {
     {
@@ -412,8 +357,7 @@ public:
       shuttingDown = true;
     }
     available.notify_all();
-    for (std::thread &thread : threads)
-      thread.join();
+    for (std::thread &thread : threads) thread.join();
   }
 
   void wait() override {
@@ -432,14 +376,12 @@ public:
   unsigned getMaxConcurrency() const override { return maxConcurrency; }
 
 private:
-  void asyncEnqueue(llvm::unique_function<void()> task,
-                    llvm::ThreadPoolTaskGroup *group) override {
+  void asyncEnqueue(llvm::unique_function<void()> task, llvm::ThreadPoolTaskGroup *group) override {
     std::lock_guard<std::mutex> lock(mutex);
     assert(!shuttingDown && "queueing work during pool destruction");
     tasks.emplace_back(std::move(task), group);
     ++outstanding;
-    if (group)
-      ++groupOutstanding[group];
+    if (group) ++groupOutstanding[group];
 
     const size_t inactiveWorkers = threads.size() - activeWorkers;
     if (tasks.size() > inactiveWorkers)
@@ -454,10 +396,8 @@ private:
       llvm::ThreadPoolTaskGroup *group = nullptr;
       {
         std::unique_lock<std::mutex> lock(mutex);
-        available.wait(lock,
-                       [this]() { return shuttingDown || !tasks.empty(); });
-        if (shuttingDown && tasks.empty())
-          return;
+        available.wait(lock, [this]() { return shuttingDown || !tasks.empty(); });
+        if (shuttingDown && tasks.empty()) return;
         task = std::move(tasks.front().first);
         group = tasks.front().second;
         tasks.pop_front();
@@ -472,8 +412,7 @@ private:
         --outstanding;
         if (group) {
           auto it = groupOutstanding.find(group);
-          if (--it->second == 0)
-            groupOutstanding.erase(it);
+          if (--it->second == 0) groupOutstanding.erase(it);
         }
       }
       completion.notify_all();
@@ -484,9 +423,7 @@ private:
   std::mutex mutex;
   std::condition_variable available;
   std::condition_variable completion;
-  std::deque<std::pair<llvm::unique_function<void()>,
-                       llvm::ThreadPoolTaskGroup *>>
-      tasks;
+  std::deque<std::pair<llvm::unique_function<void()>, llvm::ThreadPoolTaskGroup *>> tasks;
   std::vector<std::thread> threads;
   std::unordered_map<llvm::ThreadPoolTaskGroup *, size_t> groupOutstanding;
   size_t activeWorkers = 0;
@@ -495,8 +432,7 @@ private:
 };
 } // namespace
 
-MLIR_CAPI_EXPORTED MlirStringRef
-beaverSymbolTableGetDefaultVisibilityAttributeName(void) {
+MLIR_CAPI_EXPORTED MlirStringRef beaverSymbolTableGetDefaultVisibilityAttributeName(void) {
 #ifdef BEAVER_HAS_MLIR_DEFAULT_SYMBOL_VISIBILITY_ATTRIBUTE_NAME
   return wrap(SymbolOpInterface::getDefaultVisibilityAttrName());
 #else
@@ -504,8 +440,7 @@ beaverSymbolTableGetDefaultVisibilityAttributeName(void) {
 #endif
 }
 
-MLIR_CAPI_EXPORTED MlirBeaverSymbolVisibility
-beaverSymbolTableGetSymbolVisibility(MlirOperation symbol) {
+MLIR_CAPI_EXPORTED MlirBeaverSymbolVisibility beaverSymbolTableGetSymbolVisibility(MlirOperation symbol) {
   switch (SymbolTable::getSymbolVisibility(unwrap(symbol))) {
   case SymbolTable::Visibility::Public:
     return MlirBeaverSymbolVisibilityPublic;
@@ -517,10 +452,9 @@ beaverSymbolTableGetSymbolVisibility(MlirOperation symbol) {
   llvm_unreachable("unknown symbol visibility");
 }
 
-MLIR_CAPI_EXPORTED void beaverSymbolTableSetSymbolVisibility(
-    MlirOperation symbol, MlirBeaverSymbolVisibility visibility) {
-  if (visibility < MlirBeaverSymbolVisibilityPublic ||
-      visibility > MlirBeaverSymbolVisibilityNested)
+MLIR_CAPI_EXPORTED void beaverSymbolTableSetSymbolVisibility(MlirOperation symbol,
+                                                             MlirBeaverSymbolVisibility visibility) {
+  if (visibility < MlirBeaverSymbolVisibilityPublic || visibility > MlirBeaverSymbolVisibilityNested)
     llvm_unreachable("unknown Beaver symbol visibility");
 
   SymbolTable::Visibility nativeVisibility = SymbolTable::Visibility::Public;
@@ -538,162 +472,130 @@ MLIR_CAPI_EXPORTED void beaverSymbolTableSetSymbolVisibility(
   SymbolTable::setSymbolVisibility(unwrap(symbol), nativeVisibility);
 }
 
-MLIR_CAPI_EXPORTED bool beaverOperationHasInherentAttributeByName(
-    MlirOperation operation, MlirStringRef name) {
+MLIR_CAPI_EXPORTED bool beaverOperationHasInherentAttributeByName(MlirOperation operation, MlirStringRef name) {
   Operation *op = unwrap(operation);
-  if (op->getName().getOpPropertyByteSize() == 0)
-    return false;
+  if (op->getName().getOpPropertyByteSize() == 0) return false;
   return op->getInherentAttr(unwrap(name)).has_value();
 }
 
-MLIR_CAPI_EXPORTED MlirAttribute beaverOperationGetInherentAttributeByName(
-    MlirOperation operation, MlirStringRef name) {
+MLIR_CAPI_EXPORTED MlirAttribute beaverOperationGetInherentAttributeByName(MlirOperation operation,
+                                                                           MlirStringRef name) {
   Operation *op = unwrap(operation);
-  if (op->getName().getOpPropertyByteSize() == 0)
-    return {};
+  if (op->getName().getOpPropertyByteSize() == 0) return {};
   std::optional<Attribute> attribute = op->getInherentAttr(unwrap(name));
   return attribute ? wrap(*attribute) : MlirAttribute{};
 }
 
-MLIR_CAPI_EXPORTED intptr_t
-beaverOperationGetNumInherentAttributes(MlirOperation operation) {
-  return static_cast<intptr_t>(
-      collectInherentAttributes(unwrap(operation)).size());
+MLIR_CAPI_EXPORTED intptr_t beaverOperationGetNumInherentAttributes(MlirOperation operation) {
+  return static_cast<intptr_t>(collectInherentAttributes(unwrap(operation)).size());
 }
 
-MLIR_CAPI_EXPORTED MlirNamedAttribute
-beaverOperationGetInherentAttribute(MlirOperation operation,
-                                    intptr_t position) {
-  llvm::SmallVector<NamedAttribute> attributes =
-      collectInherentAttributes(unwrap(operation));
+MLIR_CAPI_EXPORTED MlirNamedAttribute beaverOperationGetInherentAttribute(MlirOperation operation, intptr_t position) {
+  llvm::SmallVector<NamedAttribute> attributes = collectInherentAttributes(unwrap(operation));
   assert(position >= 0 && static_cast<size_t>(position) < attributes.size() &&
          "inherent attribute position out of bounds");
   NamedAttribute attribute = attributes[position];
-  return MlirNamedAttribute{wrap(attribute.getName()),
-                            wrap(attribute.getValue())};
+  return MlirNamedAttribute{wrap(attribute.getName()), wrap(attribute.getValue())};
 }
 
-MLIR_CAPI_EXPORTED void beaverMemoryEffectsOpInterfaceAttachFallbackModel(
-    MlirContext context, MlirStringRef operationName,
-    MlirBeaverMemoryEffectsOpInterfaceCallbacks callbacks) {
+MLIR_CAPI_EXPORTED void
+beaverMemoryEffectsOpInterfaceAttachFallbackModel(MlirContext context, MlirStringRef operationName,
+                                                  MlirBeaverMemoryEffectsOpInterfaceCallbacks callbacks) {
   std::optional<RegisteredOperationName> operation =
       RegisteredOperationName::lookup(unwrap(operationName), unwrap(context));
   assert(operation.has_value() && "operation not found in context");
 
-  operation
-      ->attachInterface<BeaverMemoryEffectsOpInterfaceFallbackModel>();
+  operation->attachInterface<BeaverMemoryEffectsOpInterfaceFallbackModel>();
   auto *model = cast<BeaverMemoryEffectsOpInterfaceFallbackModel>(
       operation->getInterface<BeaverMemoryEffectsOpInterfaceFallbackModel>());
   assert(model && "failed to get Beaver MemoryEffects fallback model");
   model->setCallbacks(callbacks);
 }
 
-MLIR_CAPI_EXPORTED void beaverMemoryEffectInstancesListAppend(
-    MlirBeaverMemoryEffectInstancesList effects,
-    MlirMemoryEffectInstance instance) {
+MLIR_CAPI_EXPORTED void beaverMemoryEffectInstancesListAppend(MlirBeaverMemoryEffectInstancesList effects,
+                                                              MlirMemoryEffectInstance instance) {
   unwrapEffectList(effects)->push_back(*unwrap(instance));
 }
 
-MLIR_CAPI_EXPORTED bool beaverMemoryEffectsOpInterfaceGetEffects(
-    MlirOperation operation, MlirBeaverMemoryEffectInstancesCallback callback,
-    void *userData) {
+MLIR_CAPI_EXPORTED bool beaverMemoryEffectsOpInterfaceGetEffects(MlirOperation operation,
+                                                                 MlirBeaverMemoryEffectInstancesCallback callback,
+                                                                 void *userData) {
   auto interface = dyn_cast<MemoryEffectOpInterface>(unwrap(operation));
-  if (!interface)
-    return false;
+  if (!interface) return false;
 
   llvm::SmallVector<MemoryEffects::EffectInstance> effects;
   interface.getEffects(effects);
   llvm::SmallVector<MlirMemoryEffectInstance> wrappedEffects;
   wrappedEffects.reserve(effects.size());
-  for (MemoryEffects::EffectInstance &effect : effects)
-    wrappedEffects.push_back(wrap(&effect));
+  for (MemoryEffects::EffectInstance &effect : effects) wrappedEffects.push_back(wrap(&effect));
   callback(wrappedEffects.size(), wrappedEffects.data(), userData);
   return true;
 }
 
-MLIR_CAPI_EXPORTED MlirBeaverMemoryEffectKind
-beaverMemoryEffectInstanceGetKind(MlirMemoryEffectInstance instance) {
+MLIR_CAPI_EXPORTED MlirBeaverMemoryEffectKind beaverMemoryEffectInstanceGetKind(MlirMemoryEffectInstance instance) {
   MemoryEffects::Effect *effect = unwrap(instance)->getEffect();
-  if (effect == MemoryEffects::Allocate::get())
-    return MlirBeaverMemoryEffectAllocate;
-  if (effect == MemoryEffects::Free::get())
-    return MlirBeaverMemoryEffectFree;
-  if (effect == MemoryEffects::Read::get())
-    return MlirBeaverMemoryEffectRead;
-  if (effect == MemoryEffects::Write::get())
-    return MlirBeaverMemoryEffectWrite;
+  if (effect == MemoryEffects::Allocate::get()) return MlirBeaverMemoryEffectAllocate;
+  if (effect == MemoryEffects::Free::get()) return MlirBeaverMemoryEffectFree;
+  if (effect == MemoryEffects::Read::get()) return MlirBeaverMemoryEffectRead;
+  if (effect == MemoryEffects::Write::get()) return MlirBeaverMemoryEffectWrite;
   return MlirBeaverMemoryEffectUnknown;
 }
 
-MLIR_CAPI_EXPORTED MlirSideEffectResource
-beaverMemoryEffectInstanceGetResource(MlirMemoryEffectInstance instance) {
+MLIR_CAPI_EXPORTED MlirSideEffectResource beaverMemoryEffectInstanceGetResource(MlirMemoryEffectInstance instance) {
   return wrap(unwrap(instance)->getResource());
 }
 
-MLIR_CAPI_EXPORTED int
-beaverMemoryEffectInstanceGetStage(MlirMemoryEffectInstance instance) {
+MLIR_CAPI_EXPORTED int beaverMemoryEffectInstanceGetStage(MlirMemoryEffectInstance instance) {
   return unwrap(instance)->getStage();
 }
 
-MLIR_CAPI_EXPORTED bool beaverMemoryEffectInstanceGetEffectOnFullRegion(
-    MlirMemoryEffectInstance instance) {
+MLIR_CAPI_EXPORTED bool beaverMemoryEffectInstanceGetEffectOnFullRegion(MlirMemoryEffectInstance instance) {
   return unwrap(instance)->getEffectOnFullRegion();
 }
 
-MLIR_CAPI_EXPORTED MlirAttribute
-beaverMemoryEffectInstanceGetParameters(MlirMemoryEffectInstance instance) {
+MLIR_CAPI_EXPORTED MlirAttribute beaverMemoryEffectInstanceGetParameters(MlirMemoryEffectInstance instance) {
   return wrap(unwrap(instance)->getParameters());
 }
 
-MLIR_CAPI_EXPORTED MlirOpOperand
-beaverMemoryEffectInstanceGetOpOperand(MlirMemoryEffectInstance instance) {
+MLIR_CAPI_EXPORTED MlirOpOperand beaverMemoryEffectInstanceGetOpOperand(MlirMemoryEffectInstance instance) {
   return wrap(unwrap(instance)->getEffectValue<OpOperand *>());
 }
 
-MLIR_CAPI_EXPORTED MlirValue
-beaverMemoryEffectInstanceGetValue(MlirMemoryEffectInstance instance) {
+MLIR_CAPI_EXPORTED MlirValue beaverMemoryEffectInstanceGetValue(MlirMemoryEffectInstance instance) {
   return wrap(unwrap(instance)->getValue());
 }
 
-MLIR_CAPI_EXPORTED MlirAttribute
-beaverMemoryEffectInstanceGetSymbolRef(MlirMemoryEffectInstance instance) {
+MLIR_CAPI_EXPORTED MlirAttribute beaverMemoryEffectInstanceGetSymbolRef(MlirMemoryEffectInstance instance) {
   return wrap(unwrap(instance)->getSymbolRef());
 }
 
-MLIR_CAPI_EXPORTED void beaverTransformOnlyReadsHandle(
-    MlirOpOperand *operands, intptr_t numOperands,
-    MlirBeaverMemoryEffectInstancesList effects) {
+MLIR_CAPI_EXPORTED void beaverTransformOnlyReadsHandle(MlirOpOperand *operands, intptr_t numOperands,
+                                                       MlirBeaverMemoryEffectInstancesList effects) {
   MutableArrayRef<OpOperand> unwrapped;
-  if (numOperands != 0)
-    unwrapped = MutableArrayRef<OpOperand>(unwrap(*operands), numOperands);
+  if (numOperands != 0) unwrapped = MutableArrayRef<OpOperand>(unwrap(*operands), numOperands);
   transform::onlyReadsHandle(unwrapped, *unwrapEffectList(effects));
 }
 
-MLIR_CAPI_EXPORTED void beaverTransformConsumesHandle(
-    MlirOpOperand *operands, intptr_t numOperands,
-    MlirBeaverMemoryEffectInstancesList effects) {
+MLIR_CAPI_EXPORTED void beaverTransformConsumesHandle(MlirOpOperand *operands, intptr_t numOperands,
+                                                      MlirBeaverMemoryEffectInstancesList effects) {
   MutableArrayRef<OpOperand> unwrapped;
-  if (numOperands != 0)
-    unwrapped = MutableArrayRef<OpOperand>(unwrap(*operands), numOperands);
+  if (numOperands != 0) unwrapped = MutableArrayRef<OpOperand>(unwrap(*operands), numOperands);
   transform::consumesHandle(unwrapped, *unwrapEffectList(effects));
 }
 
-MLIR_CAPI_EXPORTED void beaverTransformProducesHandle(
-    MlirValue *results, intptr_t numResults,
-    MlirBeaverMemoryEffectInstancesList effects) {
+MLIR_CAPI_EXPORTED void beaverTransformProducesHandle(MlirValue *results, intptr_t numResults,
+                                                      MlirBeaverMemoryEffectInstancesList effects) {
   for (intptr_t index = 0; index < numResults; ++index) {
     auto result = cast<OpResult>(unwrap(results[index]));
     transform::producesHandle(ResultRange(result), *unwrapEffectList(effects));
   }
 }
 
-MLIR_CAPI_EXPORTED void beaverTransformModifiesPayload(
-    MlirBeaverMemoryEffectInstancesList effects) {
+MLIR_CAPI_EXPORTED void beaverTransformModifiesPayload(MlirBeaverMemoryEffectInstancesList effects) {
   transform::modifiesPayload(*unwrapEffectList(effects));
 }
 
-MLIR_CAPI_EXPORTED void beaverTransformOnlyReadsPayload(
-    MlirBeaverMemoryEffectInstancesList effects) {
+MLIR_CAPI_EXPORTED void beaverTransformOnlyReadsPayload(MlirBeaverMemoryEffectInstancesList effects) {
   transform::onlyReadsPayload(*unwrapEffectList(effects));
 }
 
@@ -705,15 +607,12 @@ MLIR_CAPI_EXPORTED bool beaverTransformPackedParamsSupported(void) {
 #endif
 }
 
-MLIR_CAPI_EXPORTED MlirLlvmThreadPool
-beaverLlvmThreadPoolCreateElastic(unsigned maxConcurrency) {
-  return wrap(static_cast<llvm::ThreadPoolInterface *>(
-      new BeaverElasticThreadPool(maxConcurrency)));
+MLIR_CAPI_EXPORTED MlirLlvmThreadPool beaverLlvmThreadPoolCreateElastic(unsigned maxConcurrency) {
+  return wrap(static_cast<llvm::ThreadPoolInterface *>(new BeaverElasticThreadPool(maxConcurrency)));
 }
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverGetLLVMVersion() {
-  static const std::string versionAndRevision =
-      std::string(LLVM_VERSION_STRING) + "@" + LLVM_REVISION;
+  static const std::string versionAndRevision = std::string(LLVM_VERSION_STRING) + "@" + LLVM_REVISION;
   return wrap(llvm::StringRef(versionAndRevision));
 }
 
@@ -722,17 +621,11 @@ MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetArgument(MlirPass pass) {
   return wrap(argument);
 }
 
-MLIR_CAPI_EXPORTED MlirOpPassManager beaverOpPassManagerCreate(void) {
-  return wrap(new OpPassManager());
-}
+MLIR_CAPI_EXPORTED MlirOpPassManager beaverOpPassManagerCreate(void) { return wrap(new OpPassManager()); }
 
-MLIR_CAPI_EXPORTED void
-beaverOpPassManagerDestroy(MlirOpPassManager passManager) {
-  delete unwrap(passManager);
-}
+MLIR_CAPI_EXPORTED void beaverOpPassManagerDestroy(MlirOpPassManager passManager) { delete unwrap(passManager); }
 
-MLIR_CAPI_EXPORTED bool
-beaverCompositeFixedPointFailureActionSupported(void) {
+MLIR_CAPI_EXPORTED bool beaverCompositeFixedPointFailureActionSupported(void) {
 #ifdef BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION
   return true;
 #else
@@ -740,13 +633,11 @@ beaverCompositeFixedPointFailureActionSupported(void) {
 #endif
 }
 
-MLIR_CAPI_EXPORTED MlirPass beaverCreateCompositeFixedPointPass(
-    MlirStringRef name, MlirOpPassManager innerPipeline,
-    intptr_t maxIterations, MlirBeaverConvergenceFailureAction action) {
+MLIR_CAPI_EXPORTED MlirPass beaverCreateCompositeFixedPointPass(MlirStringRef name, MlirOpPassManager innerPipeline,
+                                                                intptr_t maxIterations,
+                                                                MlirBeaverConvergenceFailureAction action) {
   OpPassManager *source = unwrap(innerPipeline);
-  auto populate = [source](OpPassManager &target) {
-    target = std::move(*source);
-  };
+  auto populate = [source](OpPassManager &target) { target = std::move(*source); };
 
 #ifdef BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION
   ConvergenceFailureAction nativeAction;
@@ -761,15 +652,10 @@ MLIR_CAPI_EXPORTED MlirPass beaverCreateCompositeFixedPointPass(
     nativeAction = ConvergenceFailureAction::Silent;
     break;
   }
-  return wrap(createCompositeFixedPointPass(unwrap(name).str(), populate,
-                                            maxIterations, nativeAction)
-                  .release());
+  return wrap(createCompositeFixedPointPass(unwrap(name).str(), populate, maxIterations, nativeAction).release());
 #else
-  assert(action == MlirBeaverConvergenceFailureWarn &&
-         "linked LLVM cannot configure composite convergence failure");
-  return wrap(createCompositeFixedPointPass(unwrap(name).str(), populate,
-                                            maxIterations)
-                  .release());
+  assert(action == MlirBeaverConvergenceFailureWarn && "linked LLVM cannot configure composite convergence failure");
+  return wrap(createCompositeFixedPointPass(unwrap(name).str(), populate, maxIterations).release());
 #endif
 }
 
@@ -782,44 +668,31 @@ MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetDescription(MlirPass pass) {
   return wrap(unwrap(pass)->getDescription());
 }
 
-MLIR_CAPI_EXPORTED MlirContext
-beaverPassManagerGetContext(MlirPassManager passManager) {
+MLIR_CAPI_EXPORTED MlirContext beaverPassManagerGetContext(MlirPassManager passManager) {
   return wrap(unwrap(passManager)->getContext());
 }
 
-MLIR_CAPI_EXPORTED void
-beaverPassManagerEnableTiming(MlirPassManager passManager) {
+MLIR_CAPI_EXPORTED void beaverPassManagerEnableTiming(MlirPassManager passManager) {
   unwrap(passManager)->enableTiming();
 }
 
-MLIR_CAPI_EXPORTED void beaverContextGetOps(MlirContext context,
-                                            MlirStringCallback insert,
-                                            void *container) {
-  for (const RegisteredOperationName &op :
-       unwrap(context)->getRegisteredOperations()) {
+MLIR_CAPI_EXPORTED void beaverContextGetOps(MlirContext context, MlirStringCallback insert, void *container) {
+  for (const RegisteredOperationName &op : unwrap(context)->getRegisteredOperations()) {
     insert(wrap(op.getStringRef()), container);
   }
 }
 
-MLIR_CAPI_EXPORTED void beaverContextGetDialects(MlirContext context,
-                                                 MlirStringCallback insert,
-                                                 void *container) {
+MLIR_CAPI_EXPORTED void beaverContextGetDialects(MlirContext context, MlirStringCallback insert, void *container) {
   for (auto dialect : unwrap(context)->getAvailableDialects()) {
     insert(wrap(dialect), container);
   }
 }
 
-MLIR_CAPI_EXPORTED const char *
-beaverStringRefGetData(MlirStringRef string_ref) {
-  return string_ref.data;
-}
+MLIR_CAPI_EXPORTED const char *beaverStringRefGetData(MlirStringRef string_ref) { return string_ref.data; }
 
-MLIR_CAPI_EXPORTED size_t beaverStringRefGetLength(MlirStringRef string_ref) {
-  return string_ref.length;
-}
+MLIR_CAPI_EXPORTED size_t beaverStringRefGetLength(MlirStringRef string_ref) { return string_ref.length; }
 
-MLIR_CAPI_EXPORTED uint64_t
-beaverOperationStructuralHashValue(MlirOperation op, uint32_t flags) {
+MLIR_CAPI_EXPORTED uint64_t beaverOperationStructuralHashValue(MlirOperation op, uint32_t flags) {
   return static_cast<uint64_t>(mlirOperationStructuralHashValue(op, flags));
 }
 
@@ -828,188 +701,121 @@ MLIR_CAPI_EXPORTED void beaverIRMappingClear(MlirIRMapping mapping) {
   SmallVector<Block *> blocks;
   SmallVector<Operation *> operations;
 
-  for (auto [from, _] : cppMapping->getBlockMap())
-    blocks.push_back(from);
-  for (auto [from, _] : cppMapping->getOperationMap())
-    operations.push_back(from);
+  for (auto [from, _] : cppMapping->getBlockMap()) blocks.push_back(from);
+  for (auto [from, _] : cppMapping->getOperationMap()) operations.push_back(from);
 
   cppMapping->clear();
-  for (Block *block : blocks)
-    cppMapping->erase(block);
-  for (Operation *operation : operations)
-    cppMapping->erase(operation);
+  for (Block *block : blocks) cppMapping->erase(block);
+  for (Operation *operation : operations) cppMapping->erase(operation);
 }
 
 MLIR_CAPI_EXPORTED bool beaverIsNullContext(MlirContext w) { return !w.ptr; }
 MLIR_CAPI_EXPORTED bool beaverIsNullDialect(MlirDialect w) { return !w.ptr; }
-MLIR_CAPI_EXPORTED bool beaverIsNullDialectRegistry(MlirDialectRegistry w) {
-  return !w.ptr;
-}
+MLIR_CAPI_EXPORTED bool beaverIsNullDialectRegistry(MlirDialectRegistry w) { return !w.ptr; }
 MLIR_CAPI_EXPORTED bool beaverIsNullLocation(MlirLocation w) { return !w.ptr; }
 MLIR_CAPI_EXPORTED bool beaverIsNullModule(MlirModule w) { return !w.ptr; }
-MLIR_CAPI_EXPORTED bool beaverIsNullOperation(MlirOperation w) {
-  return !w.ptr;
-}
+MLIR_CAPI_EXPORTED bool beaverIsNullOperation(MlirOperation w) { return !w.ptr; }
 MLIR_CAPI_EXPORTED bool beaverIsNullRegion(MlirRegion w) { return !w.ptr; }
 MLIR_CAPI_EXPORTED bool beaverIsNullBlock(MlirBlock w) { return !w.ptr; }
 MLIR_CAPI_EXPORTED bool beaverIsNullValue(MlirValue w) { return !w.ptr; }
 MLIR_CAPI_EXPORTED bool beaverIsNullType(MlirType w) { return !w.ptr; }
-MLIR_CAPI_EXPORTED bool beaverIsNullAttribute(MlirAttribute w) {
-  return !w.ptr;
-}
-MLIR_CAPI_EXPORTED bool beaverIsNullSymbolTable(MlirSymbolTable w) {
-  return !w.ptr;
-}
-MLIR_CAPI_EXPORTED bool beaverIsNullExecutionEngine(MlirExecutionEngine w) {
-  return !w.ptr;
-}
+MLIR_CAPI_EXPORTED bool beaverIsNullAttribute(MlirAttribute w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverIsNullSymbolTable(MlirSymbolTable w) { return !w.ptr; }
+MLIR_CAPI_EXPORTED bool beaverIsNullExecutionEngine(MlirExecutionEngine w) { return !w.ptr; }
 
-MLIR_CAPI_EXPORTED MlirLocation
-beaverOperationStateGetLocation(MlirOperationState state) {
-  return state.location;
-}
+MLIR_CAPI_EXPORTED MlirLocation beaverOperationStateGetLocation(MlirOperationState state) { return state.location; }
 
-MLIR_CAPI_EXPORTED intptr_t
-beaverOperationStateGetNumResults(MlirOperationState state) {
-  return state.nResults;
-}
+MLIR_CAPI_EXPORTED intptr_t beaverOperationStateGetNumResults(MlirOperationState state) { return state.nResults; }
 
-MLIR_CAPI_EXPORTED intptr_t
-beaverOperationStateGetNumOperands(MlirOperationState state) {
-  return state.nOperands;
-}
+MLIR_CAPI_EXPORTED intptr_t beaverOperationStateGetNumOperands(MlirOperationState state) { return state.nOperands; }
 
-MLIR_CAPI_EXPORTED intptr_t
-beaverOperationStateGetNumRegions(MlirOperationState state) {
-  return state.nRegions;
-}
+MLIR_CAPI_EXPORTED intptr_t beaverOperationStateGetNumRegions(MlirOperationState state) { return state.nRegions; }
 
-MLIR_CAPI_EXPORTED intptr_t
-beaverOperationStateGetNumAttributes(MlirOperationState state) {
-  return state.nAttributes;
-}
+MLIR_CAPI_EXPORTED intptr_t beaverOperationStateGetNumAttributes(MlirOperationState state) { return state.nAttributes; }
 
-MLIR_CAPI_EXPORTED MlirStringRef
-beaverOperationStateGetName(MlirOperationState state) {
-  return state.name;
-}
+MLIR_CAPI_EXPORTED MlirStringRef beaverOperationStateGetName(MlirOperationState state) { return state.name; }
 
-MLIR_CAPI_EXPORTED MlirOperation
-beaverOperationCreate(MlirOperationState state) {
-  return mlirOperationCreate(&state);
-}
+MLIR_CAPI_EXPORTED MlirOperation beaverOperationCreate(MlirOperationState state) { return mlirOperationCreate(&state); }
 
-MLIR_CAPI_EXPORTED MlirContext
-beaverOperationStateGetContext(MlirOperationState state) {
+MLIR_CAPI_EXPORTED MlirContext beaverOperationStateGetContext(MlirOperationState state) {
   return mlirLocationGetContext(state.location);
 }
 
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultSuccess() {
-  return mlirLogicalResultSuccess();
-}
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultSuccess() { return mlirLogicalResultSuccess(); }
 
-MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultFailure() {
-  return mlirLogicalResultFailure();
-}
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverLogicalResultFailure() { return mlirLogicalResultFailure(); }
 
-MLIR_CAPI_EXPORTED bool beaverLogicalResultIsSuccess(MlirLogicalResult res) {
-  return mlirLogicalResultIsSuccess(res);
-}
+MLIR_CAPI_EXPORTED bool beaverLogicalResultIsSuccess(MlirLogicalResult res) { return mlirLogicalResultIsSuccess(res); }
 
-MLIR_CAPI_EXPORTED bool beaverLogicalResultIsFailure(MlirLogicalResult res) {
-  return mlirLogicalResultIsFailure(res);
-}
+MLIR_CAPI_EXPORTED bool beaverLogicalResultIsFailure(MlirLogicalResult res) { return mlirLogicalResultIsFailure(res); }
 
 MLIR_CAPI_EXPORTED
-MlirIdentifier beaverNamedAttributeGetName(MlirNamedAttribute na) {
-  return na.name;
-}
+MlirIdentifier beaverNamedAttributeGetName(MlirNamedAttribute na) { return na.name; }
 
 MLIR_CAPI_EXPORTED
-MlirAttribute beaverNamedAttributeGetAttribute(MlirNamedAttribute na) {
-  return na.attribute;
+MlirAttribute beaverNamedAttributeGetAttribute(MlirNamedAttribute na) { return na.attribute; }
+
+MLIR_CAPI_EXPORTED MlirPass beaverPassCreate(void (*construct)(void *userData), void (*destruct)(void *userData),
+                                             MlirLogicalResult (*initialize)(MlirContext ctx, void *userData),
+                                             void *(*clone)(void *userData),
+                                             void (*run)(MlirOperation op, MlirExternalPass pass, void *userData),
+                                             MlirTypeID passID, MlirStringRef name, MlirStringRef argument,
+                                             MlirStringRef description, MlirStringRef opName,
+                                             intptr_t nDependentDialects, MlirDialectHandle *dependentDialects,
+                                             void *userData) {
+  return mlirCreateExternalPass(passID, name, argument, description, opName, nDependentDialects, dependentDialects,
+                                MlirExternalPassCallbacks{construct, destruct, initialize, clone, run}, userData);
 }
 
-MLIR_CAPI_EXPORTED MlirPass beaverPassCreate(
-    void (*construct)(void *userData), void (*destruct)(void *userData),
-    MlirLogicalResult (*initialize)(MlirContext ctx, void *userData),
-    void *(*clone)(void *userData),
-    void (*run)(MlirOperation op, MlirExternalPass pass, void *userData),
-    MlirTypeID passID, MlirStringRef name, MlirStringRef argument,
-    MlirStringRef description, MlirStringRef opName,
-    intptr_t nDependentDialects, MlirDialectHandle *dependentDialects,
-    void *userData) {
-  return mlirCreateExternalPass(
-      passID, name, argument, description, opName, nDependentDialects,
-      dependentDialects,
-      MlirExternalPassCallbacks{construct, destruct, initialize, clone, run},
-      userData);
-}
-
-MLIR_CAPI_EXPORTED void beaverLocationPrint(MlirLocation location,
-                                            MlirStringCallback callback,
-                                            void *userData) {
+MLIR_CAPI_EXPORTED void beaverLocationPrint(MlirLocation location, MlirStringCallback callback, void *userData) {
   if (auto loc = mlir::dyn_cast<FileLineColLoc>(unwrap(location))) {
-    std::string s = loc.getFilename().str() + ":" +
-                    std::to_string(loc.getLine()) + ":" +
-                    std::to_string(loc.getColumn());
+    std::string s =
+        loc.getFilename().str() + ":" + std::to_string(loc.getLine()) + ":" + std::to_string(loc.getColumn());
     callback(wrap(s), userData);
   } else {
     mlirLocationPrint(location, callback, userData);
   }
 }
 
-MLIR_CAPI_EXPORTED MlirLocation
-beaverLocationFusedGetLocationAt(MlirLocation location, intptr_t position) {
+MLIR_CAPI_EXPORTED MlirLocation beaverLocationFusedGetLocationAt(MlirLocation location, intptr_t position) {
   FusedLoc fused = llvm::cast<FusedLoc>(unwrap(location));
   ArrayRef<Location> locations = fused.getLocations();
-  assert(position >= 0 && static_cast<size_t>(position) < locations.size() &&
-         "fused location index out of bounds");
+  assert(position >= 0 && static_cast<size_t>(position) < locations.size() && "fused location index out of bounds");
   return wrap(locations[position]);
 }
 
-MLIR_CAPI_EXPORTED void mlirIdentifierPrint(MlirIdentifier identifier,
-                                            MlirStringCallback callback,
-                                            void *userData) {
+MLIR_CAPI_EXPORTED void mlirIdentifierPrint(MlirIdentifier identifier, MlirStringCallback callback, void *userData) {
   callback(mlirIdentifierStr(identifier), userData);
 }
 
-MLIR_CAPI_EXPORTED void beaverOperationPrintSpecializedFrom(
-    MlirOperation op, MlirStringCallback callback, void *userData) {
-  mlirOperationPrintWithFlags(
-      op, wrap(&OpPrintingFlags().useLocalScope().printGenericOpForm(false)),
-      callback, userData);
+MLIR_CAPI_EXPORTED void beaverOperationPrintSpecializedFrom(MlirOperation op, MlirStringCallback callback,
+                                                            void *userData) {
+  mlirOperationPrintWithFlags(op, wrap(&OpPrintingFlags().useLocalScope().printGenericOpForm(false)), callback,
+                              userData);
 }
 
-MLIR_CAPI_EXPORTED void
-beaverOperationPrintGenericOpForm(MlirOperation op, MlirStringCallback callback,
-                                  void *userData) {
-  mlirOperationPrintWithFlags(
-      op, wrap(&OpPrintingFlags().useLocalScope().printGenericOpForm(true)),
-      callback, userData);
+MLIR_CAPI_EXPORTED void beaverOperationPrintGenericOpForm(MlirOperation op, MlirStringCallback callback,
+                                                          void *userData) {
+  mlirOperationPrintWithFlags(op, wrap(&OpPrintingFlags().useLocalScope().printGenericOpForm(true)), callback,
+                              userData);
 }
 
 MLIR_CAPI_EXPORTED void beaverOperationDumpGeneric(MlirOperation op) {
-  unwrap(op)->print(llvm::errs(),
-                    OpPrintingFlags().useLocalScope().printGenericOpForm());
+  unwrap(op)->print(llvm::errs(), OpPrintingFlags().useLocalScope().printGenericOpForm());
   llvm::errs() << "\n";
 }
 
-MLIR_CAPI_EXPORTED MlirGreedyRewriteDriverConfig
-beaverGreedyRewriteDriverConfigGet() {
+MLIR_CAPI_EXPORTED MlirGreedyRewriteDriverConfig beaverGreedyRewriteDriverConfigGet() {
   return mlirGreedyRewriteDriverConfigCreate();
 }
 
-MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context,
-                                             void (*task)(void *), void *arg) {
-  if (!unwrap(context)->isMultithreadingEnabled())
-    return false;
+MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context, void (*task)(void *), void *arg) {
+  if (!unwrap(context)->isMultithreadingEnabled()) return false;
 
   // Callback bridges may recursively schedule more bridge work (for example,
   // an Elixir pass applying an Elixir rewrite pattern). The application-owned
   // elastic pool can grow when all current workers wait for nested callbacks.
-  unwrap(mlirContextGetThreadPool(context))->async(
-      [task, arg]() { task(arg); });
+  unwrap(mlirContextGetThreadPool(context))->async([task, arg]() { task(arg); });
   return true;
 }
 
@@ -1021,13 +827,11 @@ MLIR_CAPI_EXPORTED bool beaverContextTransientScopeSupported(void) {
 #endif
 }
 
-MLIR_CAPI_EXPORTED bool
-beaverContextBeginTransientScope(MlirContext context) {
+MLIR_CAPI_EXPORTED bool beaverContextBeginTransientScope(MlirContext context) {
 #ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
   MLIRContext *unwrapped = unwrap(context);
   std::lock_guard<std::mutex> lock(transientScopeMutex);
-  if (!transientScopeContexts.insert(unwrapped).second)
-    return false;
+  if (!transientScopeContexts.insert(unwrapped).second) return false;
   unwrapped->beginTransientScope();
   return true;
 #else
@@ -1041,8 +845,7 @@ MLIR_CAPI_EXPORTED bool beaverContextEndTransientScope(MlirContext context) {
   MLIRContext *unwrapped = unwrap(context);
   std::lock_guard<std::mutex> lock(transientScopeMutex);
   auto active = transientScopeContexts.find(unwrapped);
-  if (active == transientScopeContexts.end())
-    return false;
+  if (active == transientScopeContexts.end()) return false;
   unwrapped->endTransientScope();
   transientScopeContexts.erase(active);
   return true;
@@ -1052,12 +855,10 @@ MLIR_CAPI_EXPORTED bool beaverContextEndTransientScope(MlirContext context) {
 #endif
 }
 
-MLIR_CAPI_EXPORTED bool
-beaverContextHasActiveTransientScope(MlirContext context) {
+MLIR_CAPI_EXPORTED bool beaverContextHasActiveTransientScope(MlirContext context) {
 #ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
   std::lock_guard<std::mutex> lock(transientScopeMutex);
-  return transientScopeContexts.find(unwrap(context)) !=
-         transientScopeContexts.end();
+  return transientScopeContexts.find(unwrap(context)) != transientScopeContexts.end();
 #else
   (void)context;
   return false;

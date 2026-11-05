@@ -1,10 +1,12 @@
+alias Beaver.MLIR.CAPI
+
 defmodule Beaver.MLIR.Dialect do
   @moduledoc """
   This module defines macro to generate code for an MLIR dialect.
   You might override `eval_ssa/1` function to introduce your custom op generation
   """
 
-  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
+  use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
 
   @callback eval_ssa(Beaver.SSA.t()) :: any()
   defmacro __using__(opts) do
@@ -14,9 +16,7 @@ defmodule Beaver.MLIR.Dialect do
     quote(bind_quoted: [dialect: dialect, ops: ops]) do
       @behaviour Beaver.MLIR.Dialect
       @doc false
-      def eval_ssa(%Beaver.SSA{evaluator: evaluator} = ssa) do
-        evaluator.(ssa)
-      end
+      def eval_ssa(%Beaver.SSA{evaluator: evaluator} = ssa), do: evaluator.(ssa)
 
       defoverridable eval_ssa: 1
 
@@ -29,32 +29,24 @@ defmodule Beaver.MLIR.Dialect do
 
           @file "#{full_name}.ex"
           @doc (case(Beaver.MLIR.ODS.Dump.lookup(full_name)) do
-                  {:ok, found} ->
-                    Beaver.MLIR.ODS.Dump.gen_doc(found)
-
-                  _ ->
-                    "`#{full_name}`"
+                  {:ok, found} -> Beaver.MLIR.ODS.Dump.gen_doc(found)
+                  _ -> "`#{full_name}`"
                 end)
 
-          def unquote(func_name)(%Beaver.SSA{} = ssa) do
-            eval_ssa(%Beaver.SSA{ssa | op: unquote(full_name)})
-          end
+          def unquote(func_name)(%Beaver.SSA{} = ssa), do: eval_ssa(%Beaver.SSA{ssa | op: unquote(full_name)})
 
           @doc """
           Return op name `#{full_name}` as a bitstring.
           """
-          def unquote(func_name)() do
-            unquote(full_name)
-          end
+          def unquote(func_name)(), do: unquote(full_name)
 
           defoverridable [{func_name, 1}]
 
           func_name
         end
 
-      if length(func_names) != MapSet.size(MapSet.new(func_names)) do
-        raise "duplicate op name found in dialect: #{dialect}"
-      end
+      if length(func_names) != MapSet.size(MapSet.new(func_names)),
+        do: raise("duplicate op name found in dialect: #{dialect}")
     end
   end
 
@@ -84,19 +76,13 @@ defmodule Beaver.MLIR.Dialect do
   def handler(dialect) do
     f = :"mlirGetDialectHandle__#{dialect}__"
 
-    if {f, 0} in Beaver.MLIR.CAPI.__info__(:functions) do
-      apply(Beaver.MLIR.CAPI, f, [])
-    else
-      nil
-    end
+    if {f, 0} in CAPI.__info__(:functions), do: apply(CAPI, f, []), else: nil
   end
 
   for d <- Beaver.MLIR.Dialect.Registry.dialects() do
     @doc """
     Return the dialect name `#{d}` as a bitstring.
     """
-    def unquote(String.to_atom(d))() do
-      unquote(d)
-    end
+    def unquote(String.to_atom(d))(), do: unquote(d)
   end
 end

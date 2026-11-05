@@ -50,17 +50,10 @@ defmodule Beaver.MLIR.CompilationPlan do
           telemetry_metadata: map()
         }
 
-  @valid_options [
-    :pipeline,
-    :transform_schedule,
-    :transform_options,
-    :target,
-    :schema_version,
-    :desired_emit_version,
-    :bytecode_version,
-    :context_options,
-    :telemetry_metadata
-  ]
+  @valid_options ~w(
+    pipeline transform_schedule transform_options target schema_version desired_emit_version bytecode_version
+    context_options telemetry_metadata
+  )a
 
   @doc "Creates and validates a compilation plan without constructing native resources."
   @spec new(keyword()) :: t()
@@ -87,13 +80,9 @@ defmodule Beaver.MLIR.CompilationPlan do
 
   @doc "Wraps one Composer pass payload with an explicit stable version."
   @spec versioned(term(), term()) :: pass_step()
-  def versioned(pass, version) when not is_nil(version) do
-    {@versioned_step, pass, version}
-  end
+  def versioned(pass, version) when not is_nil(version), do: {@versioned_step, pass, version}
 
-  def versioned(_pass, nil) do
-    raise ArgumentError, "a versioned pass requires a non-nil :version"
-  end
+  def versioned(_pass, nil), do: raise(ArgumentError, "a versioned pass requires a non-nil :version")
 
   @doc "Appends one Composer-compatible pass, optionally with `:version`."
   @spec add_pass(t(), term(), keyword()) :: t()
@@ -112,19 +101,15 @@ defmodule Beaver.MLIR.CompilationPlan do
 
   @doc "Appends a nested Composer pass scope."
   @spec nested(t(), binary(), [pass_step()]) :: t()
-  def nested(%__MODULE__{} = plan, operation_name, passes)
-      when is_binary(operation_name) and is_list(passes) do
-    %{plan | pipeline: plan.pipeline ++ [{operation_name, normalize_pipeline(passes)}]}
-    |> validate!()
-  end
+  def nested(%__MODULE__{} = plan, op_name, passes) when is_binary(op_name) and is_list(passes),
+    do: %{plan | pipeline: plan.pipeline ++ [{op_name, normalize_pipeline(passes)}]} |> validate!()
 
   @doc "Sets the Transform schedule and its execution options."
   @spec set_transform_schedule(t(), TransformSchedule.Resolved.t() | binary() | nil, keyword()) ::
           t()
   def set_transform_schedule(%__MODULE__{} = plan, schedule, opts \\ []) do
-    unless Keyword.keyword?(opts) do
-      raise ArgumentError, ":transform_options must be a keyword list"
-    end
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, ":transform_options must be a keyword list")
 
     %{plan | transform_schedule: schedule, transform_options: opts}
     |> validate!()
@@ -136,15 +121,13 @@ defmodule Beaver.MLIR.CompilationPlan do
 
   @doc "Sets the dynamic dialect/schema identity."
   @spec set_schema_version(t(), term()) :: t()
-  def set_schema_version(%__MODULE__{} = plan, version) do
-    validate!(%{plan | schema_version: version})
-  end
+  def set_schema_version(%__MODULE__{} = plan, version),
+    do: validate!(%{plan | schema_version: version})
 
   @doc "Sets the desired MLIR bytecode emission version."
   @spec set_bytecode_version(t(), integer() | :current | nil) :: t()
-  def set_bytecode_version(%__MODULE__{} = plan, version) do
-    validate!(%{plan | desired_emit_version: validate_bytecode_version!(version)})
-  end
+  def set_bytecode_version(%__MODULE__{} = plan, version),
+    do: validate!(%{plan | desired_emit_version: validate_bytecode_version!(version)})
 
   @doc "Sets options used when the compilation runtime creates an MLIR context."
   @spec set_context_options(t(), keyword()) :: t()
@@ -157,9 +140,8 @@ defmodule Beaver.MLIR.CompilationPlan do
 
   @doc "Sets deterministic metadata attached to compilation and artifact telemetry."
   @spec set_telemetry_metadata(t(), map() | keyword()) :: t()
-  def set_telemetry_metadata(%__MODULE__{} = plan, metadata) do
-    validate!(%{plan | telemetry_metadata: metadata_map!(metadata)})
-  end
+  def set_telemetry_metadata(%__MODULE__{} = plan, metadata),
+    do: validate!(%{plan | telemetry_metadata: metadata_map!(metadata)})
 
   @doc "Returns the deterministic, callback-free declaration represented by a plan."
   @spec declaration(t()) :: map()
@@ -182,15 +164,13 @@ defmodule Beaver.MLIR.CompilationPlan do
 
   @doc "Returns the stable SHA-256 identity of `declaration/1`."
   @spec identity(t()) :: binary()
-  def identity(%__MODULE__{} = plan) do
-    CacheKey.lookup(%{compilation_plan: {1, declaration(plan)}})
-  end
+  def identity(%__MODULE__{} = plan),
+    do: CacheKey.lookup(%{compilation_plan: {1, declaration(plan)}})
 
   @doc false
   @spec executable_pipeline(t()) :: list()
-  def executable_pipeline(%__MODULE__{pipeline: pipeline}) do
-    Enum.map(pipeline, &executable_pass/1)
-  end
+  def executable_pipeline(%__MODULE__{pipeline: pipeline}),
+    do: Enum.map(pipeline, &executable_pass/1)
 
   @doc "Validates a plan and returns it unchanged."
   @spec validate!(t()) :: t()
@@ -199,10 +179,8 @@ defmodule Beaver.MLIR.CompilationPlan do
     plan
   end
 
-  def validate!(other) do
-    raise ArgumentError,
-          "defcompiler must return a Beaver.MLIR.CompilationPlan, got: #{inspect(other, limit: 5)}"
-  end
+  def validate!(other),
+    do: raise(ArgumentError, "defcompiler must return a Beaver.MLIR.CompilationPlan, got: #{inspect(other, limit: 5)}")
 
   @doc "Defines a zero-arity function that returns a validated compilation plan."
   defmacro defcompiler(call, opts_or_block) do
@@ -220,10 +198,7 @@ defmodule Beaver.MLIR.CompilationPlan do
       end
 
     quote do
-      def unquote(call) do
-        unquote(body)
-        |> unquote(plan_module).validate!()
-      end
+      def unquote(call), do: unquote(body) |> unquote(plan_module).validate!()
     end
   end
 
@@ -236,11 +211,7 @@ defmodule Beaver.MLIR.CompilationPlan do
         left = validate_bytecode_version!(left)
         right = validate_bytecode_version!(right)
 
-        if left == right do
-          left
-        else
-          raise ArgumentError, ":desired_emit_version and :bytecode_version disagree"
-        end
+        if left == right, do: left, else: raise(ArgumentError, ":desired_emit_version and :bytecode_version disagree")
 
       {{:ok, value}, _} ->
         validate_bytecode_version!(value)
@@ -256,48 +227,36 @@ defmodule Beaver.MLIR.CompilationPlan do
   defp validate_bytecode_version!(:current), do: nil
   defp validate_bytecode_version!(value) when is_integer(value) or is_nil(value), do: value
 
-  defp validate_bytecode_version!(value) do
-    raise ArgumentError, ":desired_emit_version must be an integer or nil, got: #{inspect(value)}"
-  end
+  defp validate_bytecode_version!(value),
+    do: raise(ArgumentError, ":desired_emit_version must be an integer or nil, got: #{inspect(value)}")
 
   defp keyword_value!(opts, key, default) do
     value = Keyword.get(opts, key, default)
 
-    unless Keyword.keyword?(value) do
-      raise ArgumentError, "#{inspect(key)} must be a keyword list"
-    end
+    unless Keyword.keyword?(value), do: raise(ArgumentError, "#{inspect(key)} must be a keyword list")
 
     value
   end
 
-  defp metadata_value!(opts) do
-    opts |> Keyword.get(:telemetry_metadata, %{}) |> metadata_map!()
-  end
+  defp metadata_value!(opts), do: opts |> Keyword.get(:telemetry_metadata, %{}) |> metadata_map!()
 
   defp metadata_map!(metadata) when is_map(metadata), do: metadata
 
   defp metadata_map!(metadata) when is_list(metadata) do
-    if Keyword.keyword?(metadata) do
-      Map.new(metadata)
-    else
-      raise ArgumentError, ":telemetry_metadata must be a map or keyword list"
-    end
+    if Keyword.keyword?(metadata),
+      do: Map.new(metadata),
+      else: raise(ArgumentError, ":telemetry_metadata must be a map or keyword list")
   end
 
-  defp metadata_map!(_metadata) do
-    raise ArgumentError, ":telemetry_metadata must be a map or keyword list"
-  end
+  defp metadata_map!(_metadata), do: raise(ArgumentError, ":telemetry_metadata must be a map or keyword list")
 
   defp validate_keyword!(opts, allowed, label) do
-    unless Keyword.keyword?(opts) do
-      raise ArgumentError, "#{label} must be a keyword list, got: #{inspect(opts)}"
-    end
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, "#{label} must be a keyword list, got: #{inspect(opts)}")
 
     keys = Keyword.keys(opts)
 
-    if length(keys) != length(Enum.uniq(keys)) do
-      raise ArgumentError, "#{label} must not contain duplicate keys"
-    end
+    if length(keys) != length(Enum.uniq(keys)), do: raise(ArgumentError, "#{label} must not contain duplicate keys")
 
     case keys -- allowed do
       [] -> :ok
@@ -307,10 +266,8 @@ defmodule Beaver.MLIR.CompilationPlan do
 
   defp normalize_pipeline(pipeline), do: Enum.map(pipeline, &normalize_pass_step/1)
 
-  defp normalize_pass_step({operation_name, passes})
-       when is_binary(operation_name) and is_list(passes) do
-    {operation_name, normalize_pipeline(passes)}
-  end
+  defp normalize_pass_step({op_name, passes}) when is_binary(op_name) and is_list(passes),
+    do: {op_name, normalize_pipeline(passes)}
 
   defp normalize_pass_step({pass, [version: version]}), do: versioned(pass, version)
   defp normalize_pass_step({@versioned_step, pass, version}), do: versioned(pass, version)
@@ -331,82 +288,56 @@ defmodule Beaver.MLIR.CompilationPlan do
      }}
   end
 
-  defp pass_declaration!({operation_name, passes})
-       when is_binary(operation_name) and is_list(passes) do
-    {:nested, operation_name, Enum.map(passes, &pass_declaration!/1)}
-  end
+  defp pass_declaration!({op_name, passes}) when is_binary(op_name) and is_list(passes),
+    do: {:nested, op_name, Enum.map(passes, &pass_declaration!/1)}
 
   defp pass_declaration!(pipeline) when is_binary(pipeline), do: {:pipeline, pipeline}
 
-  defp pass_declaration!(module) when is_atom(module) do
-    raise ArgumentError,
-          "module pass #{inspect(module)} requires an explicit :version"
-  end
+  defp pass_declaration!(module) when is_atom(module),
+    do: raise(ArgumentError, "module pass #{inspect(module)} requires an explicit :version")
 
-  defp pass_declaration!({_argument, _operation_name, callback}) when is_function(callback) do
-    raise ArgumentError, "callback-backed pass requires an explicit :version"
-  end
+  defp pass_declaration!({_argument, _operation_name, callback}) when is_function(callback),
+    do: raise(ArgumentError, "callback-backed pass requires an explicit :version")
 
-  defp pass_declaration!(callback) when is_function(callback) do
-    raise ArgumentError,
-          "callback-backed pass requires an explicit :version and a Composer pass tuple"
-  end
+  defp pass_declaration!(callback) when is_function(callback),
+    do: raise(ArgumentError, "callback-backed pass requires an explicit :version and a Composer pass tuple")
 
-  defp pass_declaration!(pass) do
-    raise ArgumentError,
-          "unsupported or non-deterministic Composer pass: #{inspect(pass, limit: 5)}"
-  end
+  defp pass_declaration!(pass),
+    do: raise(ArgumentError, "unsupported or non-deterministic Composer pass: #{inspect(pass, limit: 5)}")
 
-  defp versioned_pass_declaration!(module) when is_atom(module) do
-    {:module, Atom.to_string(module)}
-  end
+  defp versioned_pass_declaration!(module) when is_atom(module), do: {:module, Atom.to_string(module)}
 
-  defp versioned_pass_declaration!({argument, operation_name, callback})
-       when is_function(callback) do
-    {:callback, ensure_deterministic!(argument, "pass argument"),
-     ensure_deterministic!(operation_name, "pass operation")}
-  end
+  defp versioned_pass_declaration!({argument, op_name, callback}) when is_function(callback),
+    do: {:callback, ensure_deterministic!(argument, "pass argument"), ensure_deterministic!(op_name, "pass operation")}
 
-  defp versioned_pass_declaration!({operation_name, passes})
-       when is_binary(operation_name) and is_list(passes) do
-    {:nested, operation_name, Enum.map(passes, &pass_declaration!/1)}
-  end
+  defp versioned_pass_declaration!({op_name, passes}) when is_binary(op_name) and is_list(passes),
+    do: {:nested, op_name, Enum.map(passes, &pass_declaration!/1)}
 
-  defp versioned_pass_declaration!(pipeline) when is_binary(pipeline),
-    do: {:pipeline, pipeline}
+  defp versioned_pass_declaration!(pipeline) when is_binary(pipeline), do: {:pipeline, pipeline}
 
-  defp versioned_pass_declaration!(callback) when is_function(callback) do
-    raise ArgumentError,
-          "a callback Composer pass must be {argument, operation_name, callback}"
-  end
+  defp versioned_pass_declaration!(callback) when is_function(callback),
+    do: raise(ArgumentError, "a callback Composer pass must be {argument, operation_name, callback}")
 
-  defp versioned_pass_declaration!(pass) do
-    raise ArgumentError,
-          "unsupported Composer pass payload: #{inspect(pass, limit: 5)}"
-  end
+  defp versioned_pass_declaration!(pass),
+    do: raise(ArgumentError, "unsupported Composer pass payload: #{inspect(pass, limit: 5)}")
 
   defp executable_pass({@versioned_step, pass, _version}), do: executable_pass(pass)
 
-  defp executable_pass(%FixedPoint{} = fixed_point) do
-    %{fixed_point | pipeline: Enum.map(fixed_point.pipeline, &executable_pass/1)}
-  end
+  defp executable_pass(%FixedPoint{} = fixed_point),
+    do: %{fixed_point | pipeline: Enum.map(fixed_point.pipeline, &executable_pass/1)}
 
-  defp executable_pass({operation_name, passes})
-       when is_binary(operation_name) and is_list(passes) do
-    {operation_name, Enum.map(passes, &executable_pass/1)}
-  end
+  defp executable_pass({op_name, passes}) when is_binary(op_name) and is_list(passes),
+    do: {op_name, Enum.map(passes, &executable_pass/1)}
 
   defp executable_pass(pass), do: pass
 
   defp transform_schedule_declaration!(nil), do: :none
 
-  defp transform_schedule_declaration!(%TransformSchedule.Resolved{} = schedule) do
-    TransformSchedule.cache_identity(schedule)
-  end
+  defp transform_schedule_declaration!(%TransformSchedule.Resolved{} = schedule),
+    do: TransformSchedule.cache_identity(schedule)
 
-  defp transform_schedule_declaration!(schedule) when is_binary(schedule) do
-    TransformSchedule.cache_identity(schedule)
-  end
+  defp transform_schedule_declaration!(schedule) when is_binary(schedule),
+    do: TransformSchedule.cache_identity(schedule)
 
   defp transform_schedule_declaration!(schedule) do
     raise ArgumentError,
@@ -415,9 +346,8 @@ defmodule Beaver.MLIR.CompilationPlan do
 
   defp transform_options_declaration!(%__MODULE__{transform_schedule: nil}), do: :none
 
-  defp transform_options_declaration!(%__MODULE__{transform_options: opts}) do
-    opts |> canonical_keyword!(:transform_options) |> Map.new()
-  end
+  defp transform_options_declaration!(%__MODULE__{transform_options: opts}),
+    do: opts |> canonical_keyword!(:transform_options) |> Map.new()
 
   defp canonical_keyword!(opts, label) do
     unless Keyword.keyword?(opts),
@@ -425,9 +355,8 @@ defmodule Beaver.MLIR.CompilationPlan do
 
     keys = Keyword.keys(opts)
 
-    if length(keys) != length(Enum.uniq(keys)) do
-      raise ArgumentError, "#{inspect(label)} must not contain duplicate keys"
-    end
+    if length(keys) != length(Enum.uniq(keys)),
+      do: raise(ArgumentError, "#{inspect(label)} must not contain duplicate keys")
 
     Enum.sort(opts)
   end
@@ -438,15 +367,12 @@ defmodule Beaver.MLIR.CompilationPlan do
     unless Keyword.keyword?(plan.transform_options),
       do: raise(ArgumentError, ":transform_options must be a keyword list")
 
-    unless Keyword.keyword?(plan.context_options),
-      do: raise(ArgumentError, ":context_options must be a keyword list")
+    unless Keyword.keyword?(plan.context_options), do: raise(ArgumentError, ":context_options must be a keyword list")
 
-    unless is_map(plan.telemetry_metadata),
-      do: raise(ArgumentError, ":telemetry_metadata must be a map")
+    unless is_map(plan.telemetry_metadata), do: raise(ArgumentError, ":telemetry_metadata must be a map")
 
-    unless is_integer(plan.desired_emit_version) or is_nil(plan.desired_emit_version) do
-      raise ArgumentError, ":desired_emit_version must be an integer or nil"
-    end
+    unless is_integer(plan.desired_emit_version) or is_nil(plan.desired_emit_version),
+      do: raise(ArgumentError, ":desired_emit_version must be an integer or nil")
 
     :ok
   end
@@ -461,8 +387,7 @@ defmodule Beaver.MLIR.CompilationPlan do
               __STACKTRACE__
   end
 
-  defp stable_version!(nil),
-    do: raise(ArgumentError, "a versioned pass requires a non-nil :version")
+  defp stable_version!(nil), do: raise(ArgumentError, "a versioned pass requires a non-nil :version")
 
   defp stable_version!(version), do: ensure_deterministic!(version, "pass version")
 end

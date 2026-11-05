@@ -1,3 +1,6 @@
+alias Beaver.MLIR.{Block, Operation}
+alias Beaver.Native
+
 defmodule Beaver.MLIR.PostDominanceInfo do
   @moduledoc """
   High-level access to MLIR post-dominance analysis.
@@ -11,15 +14,13 @@ defmodule Beaver.MLIR.PostDominanceInfo do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Native
 
-  @type analyzed_ir() :: MLIR.Module.t() | MLIR.Operation.t()
+  @type analyzed_ir() :: MLIR.Module.t() | Operation.t()
 
   @doc "Creates an owned post-dominance analysis for an operation or module."
   @spec create(analyzed_ir()) :: t()
-  def create(ir) do
-    ir |> MLIR.Operation.from_module() |> CAPI.mlirPostDominanceInfoCreate()
-  end
+  def create(ir), do: ir |> Operation.from_module() |> CAPI.mlirPostDominanceInfoCreate()
 
   @doc "Destroys an owned post-dominance analysis."
   @spec destroy(t()) :: :ok
@@ -27,48 +28,26 @@ defmodule Beaver.MLIR.PostDominanceInfo do
 
   @doc "Runs `fun` with a new post-dominance analysis and always destroys it."
   @spec with_info(analyzed_ir(), (t() -> result)) :: result when result: var
-  def with_info(ir, fun) when is_function(fun, 1) do
-    info = create(ir)
-
-    try do
-      fun.(info)
-    after
-      destroy(info)
-    end
-  end
+  def with_info(ir, fun) when is_function(fun, 1),
+    do: Beaver.Native.with_resource(create(ir), &destroy/1, fun)
 
   @doc "Returns whether `a` post-dominates `b`."
-  @spec post_dominates?(t(), MLIR.Operation.t(), MLIR.Operation.t()) :: boolean()
-  @spec post_dominates?(t(), MLIR.Block.t(), MLIR.Block.t()) :: boolean()
-  def post_dominates?(%__MODULE__{} = info, %MLIR.Operation{} = a, %MLIR.Operation{} = b) do
-    CAPI.mlirPostDominanceInfoPostDominatesOperation(info, a, b)
-    |> Beaver.Native.to_term()
-  end
+  @spec post_dominates?(t(), Operation.t(), Operation.t()) :: boolean()
+  @spec post_dominates?(t(), Block.t(), Block.t()) :: boolean()
+  def post_dominates?(%__MODULE__{} = info, %Operation{} = a, %Operation{} = b),
+    do: CAPI.mlirPostDominanceInfoPostDominatesOperation(info, a, b) |> Native.to_term()
 
-  def post_dominates?(%__MODULE__{} = info, %MLIR.Block{} = a, %MLIR.Block{} = b) do
-    CAPI.mlirPostDominanceInfoPostDominatesBlock(info, a, b) |> Beaver.Native.to_term()
-  end
+  def post_dominates?(%__MODULE__{} = info, %Block{} = a, %Block{} = b),
+    do: CAPI.mlirPostDominanceInfoPostDominatesBlock(info, a, b) |> Native.to_term()
 
   @doc "Returns whether `a` properly post-dominates `b` (excluding equality)."
-  @spec properly_post_dominates?(t(), MLIR.Operation.t(), MLIR.Operation.t()) :: boolean()
-  @spec properly_post_dominates?(t(), MLIR.Block.t(), MLIR.Block.t()) :: boolean()
-  def properly_post_dominates?(
-        %__MODULE__{} = info,
-        %MLIR.Operation{} = a,
-        %MLIR.Operation{} = b
-      ) do
-    CAPI.mlirPostDominanceInfoProperlyPostDominatesOperation(info, a, b)
-    |> Beaver.Native.to_term()
-  end
+  @spec properly_post_dominates?(t(), Operation.t(), Operation.t()) :: boolean()
+  @spec properly_post_dominates?(t(), Block.t(), Block.t()) :: boolean()
+  def properly_post_dominates?(%__MODULE__{} = info, %Operation{} = a, %Operation{} = b),
+    do: CAPI.mlirPostDominanceInfoProperlyPostDominatesOperation(info, a, b) |> Native.to_term()
 
-  def properly_post_dominates?(
-        %__MODULE__{} = info,
-        %MLIR.Block{} = a,
-        %MLIR.Block{} = b
-      ) do
-    CAPI.mlirPostDominanceInfoProperlyPostDominatesBlock(info, a, b)
-    |> Beaver.Native.to_term()
-  end
+  def properly_post_dominates?(%__MODULE__{} = info, %Block{} = a, %Block{} = b),
+    do: CAPI.mlirPostDominanceInfoProperlyPostDominatesBlock(info, a, b) |> Native.to_term()
 
   @doc "Invalidates all cached post-dominance information and returns `info`."
   @spec invalidate(t()) :: t()

@@ -8,12 +8,7 @@ defmodule Beaver.MLIR.CompilationCache do
 
   alias __MODULE__.{File, Memory}
 
-  @type cache ::
-          :memory
-          | {:memory, GenServer.server()}
-          | {:file, Path.t()}
-          | GenServer.server()
-          | File.t()
+  @type cache :: :memory | {:memory, GenServer.server()} | {:file, Path.t()} | GenServer.server() | File.t()
 
   @spec get(cache(), String.t()) :: {:ok, map()} | :miss | {:error, term()}
   def get(cache, key), do: dispatch(cache, :get, [key])
@@ -27,8 +22,7 @@ defmodule Beaver.MLIR.CompilationCache do
   @spec clear(cache()) :: :ok | {:error, term()}
   def clear(cache), do: dispatch(cache, :clear, [])
 
-  defp dispatch(:memory, function, args),
-    do: apply(Memory, function, [Memory.default_name() | args])
+  defp dispatch(:memory, function, args), do: apply(Memory, function, [Memory.default_name() | args])
 
   defp dispatch({:memory, server}, function, args), do: apply(Memory, function, [server | args])
   defp dispatch({:file, root}, function, args), do: apply(File, function, [File.new(root) | args])

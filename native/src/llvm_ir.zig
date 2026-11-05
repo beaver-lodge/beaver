@@ -17,11 +17,7 @@ const Translation = struct {
         self.buffer.appendSlice(value.data[0..value.length]) catch @panic("failed to collect LLVM IR");
     }
 
-    fn translateWithoutDiagnostics(
-        environment: beam.env,
-        _: c_int,
-        args: [*c]const beam.term,
-    ) !beam.term {
+    fn translateWithoutDiagnostics(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         const operation = try mlir_capi.Operation.resource.fetch(environment, args[0]);
         var self = @This(){ .buffer = Buffer.init(beam.allocator) };
         defer self.buffer.deinit();
@@ -33,11 +29,7 @@ const Translation = struct {
         return beam.make_slice(environment, self.buffer.items);
     }
 
-    fn translate(
-        environment: beam.env,
-        argc: c_int,
-        args: [*c]const beam.term,
-    ) !beam.term {
+    fn translate(environment: beam.env, argc: c_int, args: [*c]const beam.term) !beam.term {
         const operation = try mlir_capi.Operation.resource.fetch(environment, args[0]);
         const context = c.mlirOperationGetContext(operation);
         return diagnostic.call_with_diagnostics(

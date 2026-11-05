@@ -12,13 +12,9 @@ typedef void (*MlirDiagnosticHandlerDeleteUserData)(void *);
 typedef void *(*MlirExternalPassConstruct)(void *);
 typedef void (*MlirExternalPassRun)(MlirOperation, MlirExternalPass, void *);
 typedef MlirLogicalResult (*MlirGenericCallback)(MlirContext, void *);
-typedef void (*MlirUnmanagedDenseResourceElementsAttrGetDeleteCallback)(
-    void *, const void *, size_t, size_t);
-typedef void (*MlirAffineMapCompressUnusedSymbolsPopulateResult)(void *,
-                                                                 intptr_t,
-                                                                 MlirAffineMap);
-typedef void (*MlirSymbolTableWalkSymbolTablesCallback)(MlirOperation, bool,
-                                                        void *);
+typedef void (*MlirUnmanagedDenseResourceElementsAttrGetDeleteCallback)(void *, const void *, size_t, size_t);
+typedef void (*MlirAffineMapCompressUnusedSymbolsPopulateResult)(void *, intptr_t, MlirAffineMap);
+typedef void (*MlirSymbolTableWalkSymbolTablesCallback)(MlirOperation, bool, void *);
 
 #ifdef __cplusplus
 }

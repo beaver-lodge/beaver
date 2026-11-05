@@ -37,8 +37,7 @@ struct PatternIdentity {
   std::string version;
 
   bool operator==(const PatternIdentity &other) const {
-    return std::tie(name, root, version) ==
-           std::tie(other.name, other.root, other.version);
+    return std::tie(name, root, version) == std::tie(other.name, other.root, other.version);
   }
 };
 
@@ -60,18 +59,13 @@ struct ExternalPatternState {
 static const MlirBeaverCompilerKernelHostAPI &hostAPI();
 static bool copyStringRef(MlirStringRef value, std::string &output);
 
-static MlirLogicalResult hostFailure(MlirStringCallback diagnostic,
-                                     void *diagnosticUserData,
-                                     llvm::StringRef message) {
-  if (diagnostic)
-    diagnostic(mlirStringRefCreate(message.data(), message.size()),
-               diagnosticUserData);
+static MlirLogicalResult hostFailure(MlirStringCallback diagnostic, void *diagnosticUserData, llvm::StringRef message) {
+  if (diagnostic) diagnostic(mlirStringRefCreate(message.data(), message.size()), diagnosticUserData);
   return mlirLogicalResultFailure();
 }
 
 static MlirRewriterBase rewriterBase(MlirConversionPatternRewriter rewriter) {
-  MlirPatternRewriter patternRewriter =
-      mlirConversionPatternRewriterAsPatternRewriter(rewriter);
+  MlirPatternRewriter patternRewriter = mlirConversionPatternRewriterAsPatternRewriter(rewriter);
   return mlirPatternRewriterAsBase(patternRewriter);
 }
 
@@ -79,187 +73,140 @@ static bool sameContext(MlirContext left, MlirContext right) {
   return left.ptr && right.ptr && mlirContextEqual(left, right);
 }
 
-static MlirLogicalResult operationResult(
-    MlirOperation operation, intptr_t index, MlirValue *result,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
-  if (!result || mlirOperationIsNull(operation) || index < 0 ||
-      index >= mlirOperationGetNumResults(operation))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "operation result index is out of bounds");
+static MlirLogicalResult operationResult(MlirOperation operation, intptr_t index, MlirValue *result,
+                                         MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!result || mlirOperationIsNull(operation) || index < 0 || index >= mlirOperationGetNumResults(operation))
+    return hostFailure(diagnostic, diagnosticUserData, "operation result index is out of bounds");
 
   *result = mlirOperationGetResult(operation, index);
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult operationOperand(
-    MlirOperation operation, intptr_t index, MlirValue *operand,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
-  if (!operand || mlirOperationIsNull(operation) || index < 0 ||
-      index >= mlirOperationGetNumOperands(operation))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "operation operand index is out of bounds");
+static MlirLogicalResult operationOperand(MlirOperation operation, intptr_t index, MlirValue *operand,
+                                          MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!operand || mlirOperationIsNull(operation) || index < 0 || index >= mlirOperationGetNumOperands(operation))
+    return hostFailure(diagnostic, diagnosticUserData, "operation operand index is out of bounds");
 
   *operand = mlirOperationGetOperand(operation, index);
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult operationLocation(
-    MlirOperation operation, MlirLocation *location,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
+static MlirLogicalResult operationLocation(MlirOperation operation, MlirLocation *location,
+                                           MlirStringCallback diagnostic, void *diagnosticUserData) {
   if (!location || mlirOperationIsNull(operation))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "cannot inspect a null operation");
+    return hostFailure(diagnostic, diagnosticUserData, "cannot inspect a null operation");
 
   *location = mlirOperationGetLocation(operation);
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult valueType(MlirValue value, MlirType *type,
-                                   MlirStringCallback diagnostic,
+static MlirLogicalResult valueType(MlirValue value, MlirType *type, MlirStringCallback diagnostic,
                                    void *diagnosticUserData) {
   if (!type || mlirValueIsNull(value))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "cannot inspect a null value");
+    return hostFailure(diagnostic, diagnosticUserData, "cannot inspect a null value");
 
   *type = mlirValueGetType(value);
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult typeIsInteger(
-    MlirType type, unsigned width, int *result,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
+static MlirLogicalResult typeIsInteger(MlirType type, unsigned width, int *result, MlirStringCallback diagnostic,
+                                       void *diagnosticUserData) {
   if (mlirTypeIsNull(type) || !result || width == 0 || width > 4096)
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid integer type predicate request");
+    return hostFailure(diagnostic, diagnosticUserData, "invalid integer type predicate request");
 
-  *result =
-      mlirTypeIsAInteger(type) && mlirIntegerTypeGetWidth(type) == width ? 1 : 0;
+  *result = mlirTypeIsAInteger(type) && mlirIntegerTypeGetWidth(type) == width ? 1 : 0;
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult dynamicTypeName(
-    MlirType type, MlirStringRef *name,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
+static MlirLogicalResult dynamicTypeName(MlirType type, MlirStringRef *name, MlirStringCallback diagnostic,
+                                         void *diagnosticUserData) {
   if (mlirTypeIsNull(type) || !name)
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid dynamic type name request");
+    return hostFailure(diagnostic, diagnosticUserData, "invalid dynamic type name request");
 
   auto dynamicType = dyn_cast<DynamicType>(unwrap(type));
-  if (!dynamicType)
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "type is not a registered dynamic type");
+  if (!dynamicType) return hostFailure(diagnostic, diagnosticUserData, "type is not a registered dynamic type");
 
   llvm::StringRef value = dynamicType.getTypeDef()->getName();
   *name = mlirStringRefCreate(value.data(), value.size());
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult llvmPointerType(
-    MlirConversionPatternRewriter rewriter, unsigned addressSpace,
-    MlirType *type, MlirStringCallback diagnostic,
-    void *diagnosticUserData) {
-  if (!rewriter.ptr || !type)
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid LLVM pointer type request");
+static MlirLogicalResult llvmPointerType(MlirConversionPatternRewriter rewriter, unsigned addressSpace, MlirType *type,
+                                         MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!rewriter.ptr || !type) return hostFailure(diagnostic, diagnosticUserData, "invalid LLVM pointer type request");
 
   MlirContext context = mlirRewriterBaseGetContext(rewriterBase(rewriter));
   *type = mlirLLVMPointerTypeGet(context, addressSpace);
-  if (mlirTypeIsNull(*type))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "failed to create LLVM pointer type");
+  if (mlirTypeIsNull(*type)) return hostFailure(diagnostic, diagnosticUserData, "failed to create LLVM pointer type");
 
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult denseI32ArrayAttribute(
-    MlirConversionPatternRewriter rewriter, intptr_t count,
-    const int32_t *values, MlirAttribute *attribute,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
-  if (!rewriter.ptr || !attribute || count < 0 || count > 4096 ||
-      (count != 0 && !values))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid dense i32 array attribute request");
+static MlirLogicalResult denseI32ArrayAttribute(MlirConversionPatternRewriter rewriter, intptr_t count,
+                                                const int32_t *values, MlirAttribute *attribute,
+                                                MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!rewriter.ptr || !attribute || count < 0 || count > 4096 || (count != 0 && !values))
+    return hostFailure(diagnostic, diagnosticUserData, "invalid dense i32 array attribute request");
 
   MlirContext context = mlirRewriterBaseGetContext(rewriterBase(rewriter));
   *attribute = mlirDenseI32ArrayGet(context, count, values);
   if (mlirAttributeIsNull(*attribute))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "failed to create dense i32 array attribute");
+    return hostFailure(diagnostic, diagnosticUserData, "failed to create dense i32 array attribute");
 
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult convertType(MlirTypeConverter converter,
-                                     MlirType type, MlirType *converted,
-                                     MlirStringCallback diagnostic,
-                                     void *diagnosticUserData) {
+static MlirLogicalResult convertType(MlirTypeConverter converter, MlirType type, MlirType *converted,
+                                     MlirStringCallback diagnostic, void *diagnosticUserData) {
   if (!converter.ptr || mlirTypeIsNull(type) || !converted)
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid type conversion request");
+    return hostFailure(diagnostic, diagnosticUserData, "invalid type conversion request");
 
   try {
     Type result = unwrap(converter)->convertType(unwrap(type));
-    if (!result)
-      return hostFailure(diagnostic, diagnosticUserData,
-                         "type converter rejected the source type");
+    if (!result) return hostFailure(diagnostic, diagnosticUserData, "type converter rejected the source type");
 
     *converted = wrap(result);
     return mlirLogicalResultSuccess();
   } catch (const std::exception &error) {
     return hostFailure(diagnostic, diagnosticUserData, error.what());
   } catch (...) {
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "exception while converting a type");
+    return hostFailure(diagnostic, diagnosticUserData, "exception while converting a type");
   }
 }
 
-static bool validArray(intptr_t size, const void *data) {
-  return size >= 0 && (size == 0 || data != nullptr);
-}
+static bool validArray(intptr_t size, const void *data) { return size >= 0 && (size == 0 || data != nullptr); }
 
-static MlirLogicalResult createOperationImpl(
-    MlirConversionPatternRewriter rewriter,
-    const MlirBeaverCompilerKernelOperation *descriptor,
-    intptr_t nRegions,
-    MlirOperation *created, MlirStringCallback diagnostic,
-    void *diagnosticUserData) {
-  if (!rewriter.ptr || !descriptor ||
-      descriptor->structSize < sizeof(MlirBeaverCompilerKernelOperation) ||
-      !created || mlirLocationIsNull(descriptor->location) ||
-      nRegions < 0 || nRegions > 64 ||
+static MlirLogicalResult createOperationImpl(MlirConversionPatternRewriter rewriter,
+                                             const MlirBeaverCompilerKernelOperation *descriptor, intptr_t nRegions,
+                                             MlirOperation *created, MlirStringCallback diagnostic,
+                                             void *diagnosticUserData) {
+  if (!rewriter.ptr || !descriptor || descriptor->structSize < sizeof(MlirBeaverCompilerKernelOperation) || !created ||
+      mlirLocationIsNull(descriptor->location) || nRegions < 0 || nRegions > 64 ||
       !validArray(descriptor->nOperands, descriptor->operands) ||
       !validArray(descriptor->nResultTypes, descriptor->resultTypes) ||
       !validArray(descriptor->nAttributes, descriptor->attributes))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid operation descriptor");
+    return hostFailure(diagnostic, diagnosticUserData, "invalid operation descriptor");
 
   std::string name;
   if (!copyStringRef(descriptor->name, name) || name.empty())
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "operation name must be a non-empty string");
+    return hostFailure(diagnostic, diagnosticUserData, "operation name must be a non-empty string");
 
   try {
     MlirRewriterBase base = rewriterBase(rewriter);
     MlirContext context = mlirRewriterBaseGetContext(base);
     if (!sameContext(context, mlirLocationGetContext(descriptor->location)))
-      return hostFailure(diagnostic, diagnosticUserData,
-                         "operation location belongs to a foreign context");
+      return hostFailure(diagnostic, diagnosticUserData, "operation location belongs to a foreign context");
 
     for (intptr_t index = 0; index < descriptor->nOperands; ++index) {
       MlirValue operand = descriptor->operands[index];
-      if (mlirValueIsNull(operand) ||
-          !sameContext(context,
-                       mlirTypeGetContext(mlirValueGetType(operand))))
-        return hostFailure(diagnostic, diagnosticUserData,
-                           "operation operand belongs to a foreign context");
+      if (mlirValueIsNull(operand) || !sameContext(context, mlirTypeGetContext(mlirValueGetType(operand))))
+        return hostFailure(diagnostic, diagnosticUserData, "operation operand belongs to a foreign context");
     }
 
     for (intptr_t index = 0; index < descriptor->nResultTypes; ++index) {
       MlirType resultType = descriptor->resultTypes[index];
-      if (mlirTypeIsNull(resultType) ||
-          !sameContext(context, mlirTypeGetContext(resultType)))
-        return hostFailure(diagnostic, diagnosticUserData,
-                           "operation result type belongs to a foreign context");
+      if (mlirTypeIsNull(resultType) || !sameContext(context, mlirTypeGetContext(resultType)))
+        return hostFailure(diagnostic, diagnosticUserData, "operation result type belongs to a foreign context");
     }
 
     for (intptr_t index = 0; index < descriptor->nAttributes; ++index) {
@@ -267,18 +214,13 @@ static MlirLogicalResult createOperationImpl(
       if (!attribute.name.ptr || mlirAttributeIsNull(attribute.attribute) ||
           !sameContext(context, mlirIdentifierGetContext(attribute.name)) ||
           !sameContext(context, mlirAttributeGetContext(attribute.attribute)))
-        return hostFailure(diagnostic, diagnosticUserData,
-                           "operation attribute belongs to a foreign context");
+        return hostFailure(diagnostic, diagnosticUserData, "operation attribute belongs to a foreign context");
     }
 
-    MlirOperationState state =
-        mlirOperationStateGet(descriptor->name, descriptor->location);
-    mlirOperationStateAddOperands(&state, descriptor->nOperands,
-                                  descriptor->operands);
-    mlirOperationStateAddResults(&state, descriptor->nResultTypes,
-                                 descriptor->resultTypes);
-    mlirOperationStateAddAttributes(&state, descriptor->nAttributes,
-                                    descriptor->attributes);
+    MlirOperationState state = mlirOperationStateGet(descriptor->name, descriptor->location);
+    mlirOperationStateAddOperands(&state, descriptor->nOperands, descriptor->operands);
+    mlirOperationStateAddResults(&state, descriptor->nResultTypes, descriptor->resultTypes);
+    mlirOperationStateAddAttributes(&state, descriptor->nAttributes, descriptor->attributes);
     for (intptr_t index = 0; index < nRegions; ++index) {
       MlirRegion region = mlirRegionCreate();
       mlirOperationStateAddOwnedRegions(&state, 1, &region);
@@ -286,430 +228,328 @@ static MlirLogicalResult createOperationImpl(
 
     MlirOperation operation = mlirOperationCreate(&state);
     if (mlirOperationIsNull(operation))
-      return hostFailure(diagnostic, diagnosticUserData,
-                         "MLIR rejected operation construction");
+      return hostFailure(diagnostic, diagnosticUserData, "MLIR rejected operation construction");
 
     *created = mlirRewriterBaseInsert(base, operation);
     return mlirLogicalResultSuccess();
   } catch (const std::exception &error) {
     return hostFailure(diagnostic, diagnosticUserData, error.what());
   } catch (...) {
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "exception while creating an operation");
+    return hostFailure(diagnostic, diagnosticUserData, "exception while creating an operation");
   }
 }
 
-static MlirLogicalResult createOperation(
-    MlirConversionPatternRewriter rewriter,
-    const MlirBeaverCompilerKernelOperation *descriptor,
-    MlirOperation *created, MlirStringCallback diagnostic,
-    void *diagnosticUserData) {
-  return createOperationImpl(rewriter, descriptor, 0, created, diagnostic,
-                             diagnosticUserData);
+static MlirLogicalResult createOperation(MlirConversionPatternRewriter rewriter,
+                                         const MlirBeaverCompilerKernelOperation *descriptor, MlirOperation *created,
+                                         MlirStringCallback diagnostic, void *diagnosticUserData) {
+  return createOperationImpl(rewriter, descriptor, 0, created, diagnostic, diagnosticUserData);
 }
 
-static MlirLogicalResult createOperationWithRegions(
-    MlirConversionPatternRewriter rewriter,
-    const MlirBeaverCompilerKernelOperation *descriptor,
-    intptr_t nRegions, MlirOperation *created, MlirStringCallback diagnostic,
-    void *diagnosticUserData) {
-  return createOperationImpl(rewriter, descriptor, nRegions, created,
-                             diagnostic, diagnosticUserData);
+static MlirLogicalResult createOperationWithRegions(MlirConversionPatternRewriter rewriter,
+                                                    const MlirBeaverCompilerKernelOperation *descriptor,
+                                                    intptr_t nRegions, MlirOperation *created,
+                                                    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  return createOperationImpl(rewriter, descriptor, nRegions, created, diagnostic, diagnosticUserData);
 }
 
-static MlirLogicalResult createOperationAtBlockStart(
-    MlirConversionPatternRewriter rewriter, MlirBlock block,
-    const MlirBeaverCompilerKernelOperation *descriptor,
-    MlirOperation *created, MlirStringCallback diagnostic,
-    void *diagnosticUserData) {
+static MlirLogicalResult createOperationAtBlockStart(MlirConversionPatternRewriter rewriter, MlirBlock block,
+                                                     const MlirBeaverCompilerKernelOperation *descriptor,
+                                                     MlirOperation *created, MlirStringCallback diagnostic,
+                                                     void *diagnosticUserData) {
   if (!rewriter.ptr || mlirBlockIsNull(block))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid block-start operation request");
+    return hostFailure(diagnostic, diagnosticUserData, "invalid block-start operation request");
 
   MlirOperation parent = mlirBlockGetParentOperation(block);
   MlirRewriterBase base = rewriterBase(rewriter);
-  if (mlirOperationIsNull(parent) ||
-      !sameContext(mlirRewriterBaseGetContext(base),
-                   mlirOperationGetContext(parent)))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "block belongs to a foreign context");
+  if (mlirOperationIsNull(parent) || !sameContext(mlirRewriterBaseGetContext(base), mlirOperationGetContext(parent)))
+    return hostFailure(diagnostic, diagnosticUserData, "block belongs to a foreign context");
 
   OpBuilder::InsertionGuard guard(*unwrap(rewriter));
   mlirRewriterBaseSetInsertionPointToStart(base, block);
-  return createOperationImpl(rewriter, descriptor, 0, created, diagnostic,
-                             diagnosticUserData);
+  return createOperationImpl(rewriter, descriptor, 0, created, diagnostic, diagnosticUserData);
 }
 
-static MlirLogicalResult createOperationBefore(
-    MlirConversionPatternRewriter rewriter, MlirOperation anchor,
-    const MlirBeaverCompilerKernelOperation *descriptor,
-    MlirOperation *created, MlirStringCallback diagnostic,
-    void *diagnosticUserData) {
-  if (!rewriter.ptr || mlirOperationIsNull(anchor) ||
-      mlirBlockIsNull(mlirOperationGetBlock(anchor)))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid operation-before request");
+static MlirLogicalResult createOperationBefore(MlirConversionPatternRewriter rewriter, MlirOperation anchor,
+                                               const MlirBeaverCompilerKernelOperation *descriptor,
+                                               MlirOperation *created, MlirStringCallback diagnostic,
+                                               void *diagnosticUserData) {
+  if (!rewriter.ptr || mlirOperationIsNull(anchor) || mlirBlockIsNull(mlirOperationGetBlock(anchor)))
+    return hostFailure(diagnostic, diagnosticUserData, "invalid operation-before request");
 
   MlirRewriterBase base = rewriterBase(rewriter);
-  if (!sameContext(mlirRewriterBaseGetContext(base),
-                   mlirOperationGetContext(anchor)))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "anchor belongs to a foreign context");
+  if (!sameContext(mlirRewriterBaseGetContext(base), mlirOperationGetContext(anchor)))
+    return hostFailure(diagnostic, diagnosticUserData, "anchor belongs to a foreign context");
 
   OpBuilder::InsertionGuard guard(*unwrap(rewriter));
   mlirRewriterBaseSetInsertionPointBefore(base, anchor);
-  return createOperationImpl(rewriter, descriptor, 0, created, diagnostic,
-                             diagnosticUserData);
+  return createOperationImpl(rewriter, descriptor, 0, created, diagnostic, diagnosticUserData);
 }
 
-static MlirLogicalResult operationRegionCount(
-    MlirOperation operation, intptr_t *count, MlirStringCallback diagnostic,
-    void *diagnosticUserData) {
+static MlirLogicalResult operationRegionCount(MlirOperation operation, intptr_t *count, MlirStringCallback diagnostic,
+                                              void *diagnosticUserData) {
   if (mlirOperationIsNull(operation) || !count)
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid operation region count request");
+    return hostFailure(diagnostic, diagnosticUserData, "invalid operation region count request");
 
   *count = mlirOperationGetNumRegions(operation);
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult replaceOperationWithValues(
-    MlirConversionPatternRewriter rewriter, MlirOperation operation,
-    intptr_t nValues, const MlirValue *values,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
-  if (!rewriter.ptr || mlirOperationIsNull(operation) ||
-      !validArray(nValues, values) ||
+static MlirLogicalResult replaceOperationWithValues(MlirConversionPatternRewriter rewriter, MlirOperation operation,
+                                                    intptr_t nValues, const MlirValue *values,
+                                                    MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!rewriter.ptr || mlirOperationIsNull(operation) || !validArray(nValues, values) ||
       nValues != mlirOperationGetNumResults(operation))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid operation replacement request");
+    return hostFailure(diagnostic, diagnosticUserData, "invalid operation replacement request");
 
   MlirRewriterBase base = rewriterBase(rewriter);
   MlirContext context = mlirRewriterBaseGetContext(base);
   if (!sameContext(context, mlirOperationGetContext(operation)))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "operation belongs to a foreign context");
+    return hostFailure(diagnostic, diagnosticUserData, "operation belongs to a foreign context");
 
   for (intptr_t index = 0; index < nValues; ++index) {
-    if (mlirValueIsNull(values[index]) ||
-        !sameContext(context,
-                     mlirTypeGetContext(mlirValueGetType(values[index]))))
-      return hostFailure(diagnostic, diagnosticUserData,
-                         "replacement value belongs to a foreign context");
+    if (mlirValueIsNull(values[index]) || !sameContext(context, mlirTypeGetContext(mlirValueGetType(values[index]))))
+      return hostFailure(diagnostic, diagnosticUserData, "replacement value belongs to a foreign context");
   }
 
   mlirRewriterBaseReplaceOpWithValues(base, operation, nValues, values);
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult eraseOperation(
-    MlirConversionPatternRewriter rewriter, MlirOperation operation,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
+static MlirLogicalResult eraseOperation(MlirConversionPatternRewriter rewriter, MlirOperation operation,
+                                        MlirStringCallback diagnostic, void *diagnosticUserData) {
   if (!rewriter.ptr || mlirOperationIsNull(operation))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid operation erase request");
+    return hostFailure(diagnostic, diagnosticUserData, "invalid operation erase request");
 
   MlirRewriterBase base = rewriterBase(rewriter);
-  if (!sameContext(mlirRewriterBaseGetContext(base),
-                   mlirOperationGetContext(operation)))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "operation belongs to a foreign context");
+  if (!sameContext(mlirRewriterBaseGetContext(base), mlirOperationGetContext(operation)))
+    return hostFailure(diagnostic, diagnosticUserData, "operation belongs to a foreign context");
 
   mlirRewriterBaseEraseOp(base, operation);
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult operationAttribute(
-    MlirOperation operation, MlirStringRef name, MlirAttribute *attribute,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
+static MlirLogicalResult operationAttribute(MlirOperation operation, MlirStringRef name, MlirAttribute *attribute,
+                                            MlirStringCallback diagnostic, void *diagnosticUserData) {
   std::string key;
-  if (!attribute || mlirOperationIsNull(operation) ||
-      !copyStringRef(name, key) || key.empty())
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid operation attribute request");
+  if (!attribute || mlirOperationIsNull(operation) || !copyStringRef(name, key) || key.empty())
+    return hostFailure(diagnostic, diagnosticUserData, "invalid operation attribute request");
 
   *attribute = mlirOperationGetAttributeByName(operation, name);
   if (mlirAttributeIsNull(*attribute))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "operation attribute is missing");
+    return hostFailure(diagnostic, diagnosticUserData, "operation attribute is missing");
 
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult attributeStringValue(
-    MlirAttribute attribute, MlirStringRef *value,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
-  if (!value || mlirAttributeIsNull(attribute) ||
-      !mlirAttributeIsAString(attribute))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "attribute is not a string");
+static MlirLogicalResult attributeStringValue(MlirAttribute attribute, MlirStringRef *value,
+                                              MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!value || mlirAttributeIsNull(attribute) || !mlirAttributeIsAString(attribute))
+    return hostFailure(diagnostic, diagnosticUserData, "attribute is not a string");
 
   *value = mlirStringAttrGetValue(attribute);
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult attributeIntegerValue(
-    MlirAttribute attribute, int64_t *value, MlirStringCallback diagnostic,
-    void *diagnosticUserData) {
-  if (!value || mlirAttributeIsNull(attribute) ||
-      !mlirAttributeIsAInteger(attribute))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "attribute is not an integer");
+static MlirLogicalResult attributeIntegerValue(MlirAttribute attribute, int64_t *value, MlirStringCallback diagnostic,
+                                               void *diagnosticUserData) {
+  if (!value || mlirAttributeIsNull(attribute) || !mlirAttributeIsAInteger(attribute))
+    return hostFailure(diagnostic, diagnosticUserData, "attribute is not an integer");
 
   *value = mlirIntegerAttrGetValueInt(attribute);
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult integerType(
-    MlirConversionPatternRewriter rewriter, unsigned width, MlirType *type,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
+static MlirLogicalResult integerType(MlirConversionPatternRewriter rewriter, unsigned width, MlirType *type,
+                                     MlirStringCallback diagnostic, void *diagnosticUserData) {
   if (!rewriter.ptr || !type || width == 0 || width > 4096)
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid integer type request");
+    return hostFailure(diagnostic, diagnosticUserData, "invalid integer type request");
 
   MlirContext context = mlirRewriterBaseGetContext(rewriterBase(rewriter));
   *type = mlirIntegerTypeGet(context, width);
-  if (mlirTypeIsNull(*type))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "failed to create integer type");
+  if (mlirTypeIsNull(*type)) return hostFailure(diagnostic, diagnosticUserData, "failed to create integer type");
 
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult integerAttribute(
-    MlirType type, int64_t value, MlirAttribute *attribute,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
+static MlirLogicalResult integerAttribute(MlirType type, int64_t value, MlirAttribute *attribute,
+                                          MlirStringCallback diagnostic, void *diagnosticUserData) {
   if (!attribute || mlirTypeIsNull(type) || !mlirTypeIsAInteger(type))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "integer attribute requires an integer type");
+    return hostFailure(diagnostic, diagnosticUserData, "integer attribute requires an integer type");
 
   *attribute = mlirIntegerAttrGet(type, value);
   if (mlirAttributeIsNull(*attribute))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "failed to create integer attribute");
+    return hostFailure(diagnostic, diagnosticUserData, "failed to create integer attribute");
 
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult namedAttribute(
-    MlirConversionPatternRewriter rewriter, MlirStringRef name,
-    MlirAttribute attribute, MlirNamedAttribute *namedAttribute,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
+static MlirLogicalResult namedAttribute(MlirConversionPatternRewriter rewriter, MlirStringRef name,
+                                        MlirAttribute attribute, MlirNamedAttribute *namedAttribute,
+                                        MlirStringCallback diagnostic, void *diagnosticUserData) {
   std::string key;
-  if (!rewriter.ptr || !namedAttribute || mlirAttributeIsNull(attribute) ||
-      !copyStringRef(name, key) || key.empty())
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid named attribute request");
+  if (!rewriter.ptr || !namedAttribute || mlirAttributeIsNull(attribute) || !copyStringRef(name, key) || key.empty())
+    return hostFailure(diagnostic, diagnosticUserData, "invalid named attribute request");
 
   MlirContext context = mlirRewriterBaseGetContext(rewriterBase(rewriter));
   if (!sameContext(context, mlirAttributeGetContext(attribute)))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "attribute belongs to a foreign context");
+    return hostFailure(diagnostic, diagnosticUserData, "attribute belongs to a foreign context");
 
   MlirIdentifier identifier = mlirIdentifierGet(context, name);
-  if (!identifier.ptr)
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "failed to create attribute identifier");
+  if (!identifier.ptr) return hostFailure(diagnostic, diagnosticUserData, "failed to create attribute identifier");
 
   *namedAttribute = mlirNamedAttributeGet(identifier, attribute);
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult operationCounts(
-    MlirOperation operation, intptr_t *nOperands, intptr_t *nResults,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
+static MlirLogicalResult operationCounts(MlirOperation operation, intptr_t *nOperands, intptr_t *nResults,
+                                         MlirStringCallback diagnostic, void *diagnosticUserData) {
   if (mlirOperationIsNull(operation) || !nOperands || !nResults)
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid operation count request");
+    return hostFailure(diagnostic, diagnosticUserData, "invalid operation count request");
 
   *nOperands = mlirOperationGetNumOperands(operation);
   *nResults = mlirOperationGetNumResults(operation);
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult singleRegionBlock(
-    MlirOperation operation, intptr_t regionIndex, MlirBlock *block,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
+static MlirLogicalResult singleRegionBlock(MlirOperation operation, intptr_t regionIndex, MlirBlock *block,
+                                           MlirStringCallback diagnostic, void *diagnosticUserData) {
   if (!block || mlirOperationIsNull(operation) || regionIndex < 0 ||
       regionIndex >= mlirOperationGetNumRegions(operation))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "operation region index is out of bounds");
+    return hostFailure(diagnostic, diagnosticUserData, "operation region index is out of bounds");
 
   MlirRegion region = mlirOperationGetRegion(operation, regionIndex);
   MlirBlock first = mlirRegionGetFirstBlock(region);
-  if (mlirBlockIsNull(first) ||
-      !mlirBlockIsNull(mlirBlockGetNextInRegion(first)))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "operation region must contain exactly one block");
+  if (mlirBlockIsNull(first) || !mlirBlockIsNull(mlirBlockGetNextInRegion(first)))
+    return hostFailure(diagnostic, diagnosticUserData, "operation region must contain exactly one block");
 
   *block = first;
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult blockArgument(
-    MlirBlock block, intptr_t index, MlirValue *argument,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
-  if (!argument || mlirBlockIsNull(block) || index < 0 ||
-      index >= mlirBlockGetNumArguments(block))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "block argument index is out of bounds");
+static MlirLogicalResult blockArgument(MlirBlock block, intptr_t index, MlirValue *argument,
+                                       MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!argument || mlirBlockIsNull(block) || index < 0 || index >= mlirBlockGetNumArguments(block))
+    return hostFailure(diagnostic, diagnosticUserData, "block argument index is out of bounds");
 
   *argument = mlirBlockGetArgument(block, index);
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult blockArgumentCount(
-    MlirBlock block, intptr_t *count, MlirStringCallback diagnostic,
-    void *diagnosticUserData) {
+static MlirLogicalResult blockArgumentCount(MlirBlock block, intptr_t *count, MlirStringCallback diagnostic,
+                                            void *diagnosticUserData) {
   if (!count || mlirBlockIsNull(block))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "cannot inspect a null block");
+    return hostFailure(diagnostic, diagnosticUserData, "cannot inspect a null block");
 
   *count = mlirBlockGetNumArguments(block);
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult blockTerminator(
-    MlirBlock block, MlirOperation *terminator,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
+static MlirLogicalResult blockTerminator(MlirBlock block, MlirOperation *terminator, MlirStringCallback diagnostic,
+                                         void *diagnosticUserData) {
   if (!terminator || mlirBlockIsNull(block))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "cannot inspect a null block");
+    return hostFailure(diagnostic, diagnosticUserData, "cannot inspect a null block");
 
   *terminator = mlirBlockGetTerminator(block);
-  if (mlirOperationIsNull(*terminator))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "block has no terminator");
+  if (mlirOperationIsNull(*terminator)) return hostFailure(diagnostic, diagnosticUserData, "block has no terminator");
 
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult functionType(
-    MlirConversionPatternRewriter rewriter, intptr_t nInputTypes,
-    const MlirType *inputTypes, intptr_t nResultTypes,
-    const MlirType *resultTypes, MlirType *type,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
-  if (!rewriter.ptr || !type || !validArray(nInputTypes, inputTypes) ||
-      !validArray(nResultTypes, resultTypes))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid function type request");
+static MlirLogicalResult functionType(MlirConversionPatternRewriter rewriter, intptr_t nInputTypes,
+                                      const MlirType *inputTypes, intptr_t nResultTypes, const MlirType *resultTypes,
+                                      MlirType *type, MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!rewriter.ptr || !type || !validArray(nInputTypes, inputTypes) || !validArray(nResultTypes, resultTypes))
+    return hostFailure(diagnostic, diagnosticUserData, "invalid function type request");
 
   MlirContext context = mlirRewriterBaseGetContext(rewriterBase(rewriter));
   for (intptr_t index = 0; index < nInputTypes; ++index) {
-    if (mlirTypeIsNull(inputTypes[index]) ||
-        !sameContext(context, mlirTypeGetContext(inputTypes[index])))
-      return hostFailure(diagnostic, diagnosticUserData,
-                         "function input type belongs to a foreign context");
+    if (mlirTypeIsNull(inputTypes[index]) || !sameContext(context, mlirTypeGetContext(inputTypes[index])))
+      return hostFailure(diagnostic, diagnosticUserData, "function input type belongs to a foreign context");
   }
 
   for (intptr_t index = 0; index < nResultTypes; ++index) {
-    if (mlirTypeIsNull(resultTypes[index]) ||
-        !sameContext(context, mlirTypeGetContext(resultTypes[index])))
-      return hostFailure(diagnostic, diagnosticUserData,
-                         "function result type belongs to a foreign context");
+    if (mlirTypeIsNull(resultTypes[index]) || !sameContext(context, mlirTypeGetContext(resultTypes[index])))
+      return hostFailure(diagnostic, diagnosticUserData, "function result type belongs to a foreign context");
   }
 
-  *type = mlirFunctionTypeGet(context, nInputTypes, inputTypes, nResultTypes,
-                              resultTypes);
-  if (mlirTypeIsNull(*type))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "failed to create function type");
+  *type = mlirFunctionTypeGet(context, nInputTypes, inputTypes, nResultTypes, resultTypes);
+  if (mlirTypeIsNull(*type)) return hostFailure(diagnostic, diagnosticUserData, "failed to create function type");
 
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult typeAttribute(
-    MlirType type, MlirAttribute *attribute, MlirStringCallback diagnostic,
-    void *diagnosticUserData) {
+static MlirLogicalResult typeAttribute(MlirType type, MlirAttribute *attribute, MlirStringCallback diagnostic,
+                                       void *diagnosticUserData) {
   if (!attribute || mlirTypeIsNull(type))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid type attribute request");
+    return hostFailure(diagnostic, diagnosticUserData, "invalid type attribute request");
 
   *attribute = mlirTypeAttrGet(type);
   if (mlirAttributeIsNull(*attribute))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "failed to create type attribute");
+    return hostFailure(diagnostic, diagnosticUserData, "failed to create type attribute");
 
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult replaceOperationWithRegions(
-    MlirConversionPatternRewriter rewriter, MlirOperation replacement,
-    MlirOperation source, intptr_t expectedRegions,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
-  if (!rewriter.ptr || mlirOperationIsNull(replacement) ||
-      mlirOperationIsNull(source) || replacement.ptr == source.ptr ||
-      expectedRegions < 0 || expectedRegions > 64 ||
+static MlirLogicalResult replaceOperationWithRegions(MlirConversionPatternRewriter rewriter, MlirOperation replacement,
+                                                     MlirOperation source, intptr_t expectedRegions,
+                                                     MlirStringCallback diagnostic, void *diagnosticUserData) {
+  if (!rewriter.ptr || mlirOperationIsNull(replacement) || mlirOperationIsNull(source) ||
+      replacement.ptr == source.ptr || expectedRegions < 0 || expectedRegions > 64 ||
       mlirOperationGetNumRegions(replacement) != expectedRegions ||
       mlirOperationGetNumRegions(source) != expectedRegions ||
-      mlirOperationGetNumResults(replacement) !=
-          mlirOperationGetNumResults(source))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid region replacement request");
+      mlirOperationGetNumResults(replacement) != mlirOperationGetNumResults(source))
+    return hostFailure(diagnostic, diagnosticUserData, "invalid region replacement request");
 
   MlirContext context = mlirRewriterBaseGetContext(rewriterBase(rewriter));
   if (!sameContext(context, mlirOperationGetContext(replacement)) ||
       !sameContext(context, mlirOperationGetContext(source)))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "region replacement belongs to a foreign context");
+    return hostFailure(diagnostic, diagnosticUserData, "region replacement belongs to a foreign context");
 
   for (intptr_t index = 0; index < expectedRegions; ++index) {
-    MlirRegion replacementRegion =
-        mlirOperationGetRegion(replacement, index);
+    MlirRegion replacementRegion = mlirOperationGetRegion(replacement, index);
     if (!mlirBlockIsNull(mlirRegionGetFirstBlock(replacementRegion)))
-      return hostFailure(diagnostic, diagnosticUserData,
-                         "region replacement target must be empty");
+      return hostFailure(diagnostic, diagnosticUserData, "region replacement target must be empty");
   }
 
   for (intptr_t index = 0; index < expectedRegions; ++index)
-    mlirRegionTakeBody(mlirOperationGetRegion(replacement, index),
-                       mlirOperationGetRegion(source, index));
+    mlirRegionTakeBody(mlirOperationGetRegion(replacement, index), mlirOperationGetRegion(source, index));
 
   SmallVector<MlirValue> values;
   values.reserve(mlirOperationGetNumResults(replacement));
-  for (intptr_t index = 0; index < mlirOperationGetNumResults(replacement);
-       ++index)
+  for (intptr_t index = 0; index < mlirOperationGetNumResults(replacement); ++index)
     values.push_back(mlirOperationGetResult(replacement, index));
 
-  mlirRewriterBaseReplaceOpWithValues(rewriterBase(rewriter), source,
-                                      values.size(), values.data());
+  mlirRewriterBaseReplaceOpWithValues(rewriterBase(rewriter), source, values.size(), values.data());
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult flatSymbolRefAttribute(
-    MlirConversionPatternRewriter rewriter, MlirStringRef symbol,
-    MlirAttribute *attribute, MlirStringCallback diagnostic,
-    void *diagnosticUserData) {
+static MlirLogicalResult flatSymbolRefAttribute(MlirConversionPatternRewriter rewriter, MlirStringRef symbol,
+                                                MlirAttribute *attribute, MlirStringCallback diagnostic,
+                                                void *diagnosticUserData) {
   std::string name;
-  if (!rewriter.ptr || !attribute || !copyStringRef(symbol, name) ||
-      name.empty())
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid flat symbol reference request");
+  if (!rewriter.ptr || !attribute || !copyStringRef(symbol, name) || name.empty())
+    return hostFailure(diagnostic, diagnosticUserData, "invalid flat symbol reference request");
 
   MLIRContext *context = unwrap(rewriter)->getContext();
   *attribute = wrap(FlatSymbolRefAttr::get(context, name));
   return mlirLogicalResultSuccess();
 }
 
-static MlirLogicalResult ensureFunctionDeclaration(
-    MlirOperation anchor, MlirConversionPatternRewriter rewriter,
-    MlirStringRef symbol, intptr_t nInputTypes, const MlirType *inputTypes,
-    intptr_t nResultTypes, const MlirType *resultTypes,
-    MlirStringCallback diagnostic, void *diagnosticUserData) {
+static MlirLogicalResult ensureFunctionDeclaration(MlirOperation anchor, MlirConversionPatternRewriter rewriter,
+                                                   MlirStringRef symbol, intptr_t nInputTypes,
+                                                   const MlirType *inputTypes, intptr_t nResultTypes,
+                                                   const MlirType *resultTypes, MlirStringCallback diagnostic,
+                                                   void *diagnosticUserData) {
   std::string name;
-  if (mlirOperationIsNull(anchor) || !rewriter.ptr ||
-      !copyStringRef(symbol, name) || name.empty() ||
-      !validArray(nInputTypes, inputTypes) ||
-      !validArray(nResultTypes, resultTypes))
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "invalid function declaration request");
+  if (mlirOperationIsNull(anchor) || !rewriter.ptr || !copyStringRef(symbol, name) || name.empty() ||
+      !validArray(nInputTypes, inputTypes) || !validArray(nResultTypes, resultTypes))
+    return hostFailure(diagnostic, diagnosticUserData, "invalid function declaration request");
 
   try {
     Operation *source = unwrap(anchor);
     Operation *symbolTable = source->getParentWithTrait<OpTrait::SymbolTable>();
-    if (!symbolTable || symbolTable->getNumRegions() != 1 ||
-        symbolTable->getRegion(0).empty())
-      return hostFailure(diagnostic, diagnosticUserData,
-                         "operation has no enclosing symbol table");
+    if (!symbolTable || symbolTable->getNumRegions() != 1 || symbolTable->getRegion(0).empty())
+      return hostFailure(diagnostic, diagnosticUserData, "operation has no enclosing symbol table");
 
     MLIRContext *context = unwrap(rewriter)->getContext();
     SmallVector<Type> inputs;
@@ -718,28 +558,22 @@ static MlirLogicalResult ensureFunctionDeclaration(
     results.reserve(nResultTypes);
 
     for (intptr_t index = 0; index < nInputTypes; ++index) {
-      if (mlirTypeIsNull(inputTypes[index]) ||
-          unwrap(inputTypes[index]).getContext() != context)
-        return hostFailure(diagnostic, diagnosticUserData,
-                           "function input type belongs to a foreign context");
+      if (mlirTypeIsNull(inputTypes[index]) || unwrap(inputTypes[index]).getContext() != context)
+        return hostFailure(diagnostic, diagnosticUserData, "function input type belongs to a foreign context");
       inputs.push_back(unwrap(inputTypes[index]));
     }
 
     for (intptr_t index = 0; index < nResultTypes; ++index) {
-      if (mlirTypeIsNull(resultTypes[index]) ||
-          unwrap(resultTypes[index]).getContext() != context)
-        return hostFailure(diagnostic, diagnosticUserData,
-                           "function result type belongs to a foreign context");
+      if (mlirTypeIsNull(resultTypes[index]) || unwrap(resultTypes[index]).getContext() != context)
+        return hostFailure(diagnostic, diagnosticUserData, "function result type belongs to a foreign context");
       results.push_back(unwrap(resultTypes[index]));
     }
 
     FunctionType functionType = FunctionType::get(context, inputs, results);
     if (Operation *existing = SymbolTable::lookupSymbolIn(symbolTable, name)) {
       auto existingType = existing->getAttrOfType<TypeAttr>("function_type");
-      if (existing->getName().getStringRef() != "func.func" || !existingType ||
-          existingType.getValue() != functionType)
-        return hostFailure(diagnostic, diagnosticUserData,
-                           "existing function declaration has a different ABI");
+      if (existing->getName().getStringRef() != "func.func" || !existingType || existingType.getValue() != functionType)
+        return hostFailure(diagnostic, diagnosticUserData, "existing function declaration has a different ABI");
       return mlirLogicalResultSuccess();
     }
 
@@ -756,14 +590,11 @@ static MlirLogicalResult ensureFunctionDeclaration(
   } catch (const std::exception &error) {
     return hostFailure(diagnostic, diagnosticUserData, error.what());
   } catch (...) {
-    return hostFailure(diagnostic, diagnosticUserData,
-                       "exception while ensuring a function declaration");
+    return hostFailure(diagnostic, diagnosticUserData, "exception while ensuring a function declaration");
   }
 }
 
-static MlirStringRef stringRef(const std::string &value) {
-  return mlirStringRefCreate(value.data(), value.size());
-}
+static MlirStringRef stringRef(const std::string &value) { return mlirStringRefCreate(value.data(), value.size()); }
 
 static MlirStringRef succeed() {
   lastCompilerKernelError.clear();
@@ -773,15 +604,13 @@ static MlirStringRef succeed() {
 static MlirStringRef fail(llvm::StringRef code, llvm::StringRef message) {
   lastCompilerKernelError = (code + "|" + message).str();
 
-  if (lastCompilerKernelError.size() > maxErrorLength)
-    lastCompilerKernelError.resize(maxErrorLength);
+  if (lastCompilerKernelError.size() > maxErrorLength) lastCompilerKernelError.resize(maxErrorLength);
 
   return stringRef(lastCompilerKernelError);
 }
 
 static bool copyStringRef(MlirStringRef value, std::string &output) {
-  if (value.length != 0 && value.data == nullptr)
-    return false;
+  if (value.length != 0 && value.data == nullptr) return false;
 
   output.assign(value.data == nullptr ? "" : value.data, value.length);
   return output.find('\0') == std::string::npos;
@@ -789,47 +618,38 @@ static bool copyStringRef(MlirStringRef value, std::string &output) {
 
 static void appendDiagnostic(MlirStringRef chunk, void *userData) {
   auto *message = static_cast<std::string *>(userData);
-  if (!message || !chunk.data || chunk.length == 0 ||
-      message->size() >= maxErrorLength)
-    return;
+  if (!message || !chunk.data || chunk.length == 0 || message->size() >= maxErrorLength) return;
 
   size_t remaining = maxErrorLength - message->size();
   message->append(chunk.data, std::min(chunk.length, remaining));
 }
 
 static void setPopulationError(PopulationState &state, llvm::StringRef error) {
-  if (state.error.empty())
-    state.error = error.take_front(maxErrorLength).str();
+  if (state.error.empty()) state.error = error.take_front(maxErrorLength).str();
 }
 
-static MlirLogicalResult externalPatternRewrite(
-    MlirConversionPattern, MlirOperation operation, intptr_t nOperands,
-    MlirValue *operands, MlirConversionPatternRewriter rewriter,
-    void *userData) {
+static MlirLogicalResult externalPatternRewrite(MlirConversionPattern, MlirOperation operation, intptr_t nOperands,
+                                                MlirValue *operands, MlirConversionPatternRewriter rewriter,
+                                                void *userData) {
   auto *state = static_cast<ExternalPatternState *>(userData);
 
-  if (!state || !state->rewrite)
-    return mlirLogicalResultFailure();
+  if (!state || !state->rewrite) return mlirLogicalResultFailure();
 
   std::string diagnostic;
 
   try {
-    MlirLogicalResult result = state->rewrite(
-        &hostAPI(), operation, nOperands, operands, rewriter,
-        state->typeConverter, state->userData, appendDiagnostic, &diagnostic);
+    MlirLogicalResult result = state->rewrite(&hostAPI(), operation, nOperands, operands, rewriter,
+                                              state->typeConverter, state->userData, appendDiagnostic, &diagnostic);
 
-    if (mlirLogicalResultIsFailure(result) && !diagnostic.empty())
-      unwrap(operation)->emitError() << diagnostic;
+    if (mlirLogicalResultIsFailure(result) && !diagnostic.empty()) unwrap(operation)->emitError() << diagnostic;
 
     return result;
   } catch (const std::exception &error) {
-    unwrap(operation)->emitError()
-        << "external compiler-kernel pattern '" << state->identity.name
-        << "' threw across its C ABI boundary: " << error.what();
+    unwrap(operation)->emitError() << "external compiler-kernel pattern '" << state->identity.name
+                                   << "' threw across its C ABI boundary: " << error.what();
   } catch (...) {
-    unwrap(operation)->emitError()
-        << "external compiler-kernel pattern '" << state->identity.name
-        << "' threw across its C ABI boundary";
+    unwrap(operation)->emitError() << "external compiler-kernel pattern '" << state->identity.name
+                                   << "' threw across its C ABI boundary";
   }
 
   return mlirLogicalResultFailure();
@@ -837,12 +657,10 @@ static MlirLogicalResult externalPatternRewrite(
 
 static void destroyExternalPattern(void *userData) {
   auto *state = static_cast<ExternalPatternState *>(userData);
-  if (!state)
-    return;
+  if (!state) return;
 
   try {
-    if (state->destroy)
-      state->destroy(state->userData);
+    if (state->destroy) state->destroy(state->userData);
   } catch (...) {
     // Destructors cannot report through MLIR and must never unwind across the
     // C ABI. The pattern-owned state is still released below.
@@ -851,42 +669,35 @@ static void destroyExternalPattern(void *userData) {
   delete state;
 }
 
-static MlirLogicalResult addPattern(
-    void *hostContext, MlirRewritePatternSet patterns,
-    MlirTypeConverter typeConverter,
-    const MlirBeaverCompilerKernelPattern *descriptor) {
+static MlirLogicalResult addPattern(void *hostContext, MlirRewritePatternSet patterns, MlirTypeConverter typeConverter,
+                                    const MlirBeaverCompilerKernelPattern *descriptor) {
   auto *population = static_cast<PopulationState *>(hostContext);
   bool recordedIdentity = false;
 
   try {
-    if (!population || patterns.ptr != population->patterns.ptr ||
-        typeConverter.ptr != population->typeConverter.ptr) {
-      if (population)
-        setPopulationError(*population, "foreign pattern-set or type-converter handle");
+    if (!population || patterns.ptr != population->patterns.ptr || typeConverter.ptr != population->typeConverter.ptr) {
+      if (population) setPopulationError(*population, "foreign pattern-set or type-converter handle");
       return mlirLogicalResultFailure();
     }
 
-    if (!descriptor ||
-        descriptor->structSize < sizeof(MlirBeaverCompilerKernelPattern) ||
+    if (!descriptor || descriptor->structSize < sizeof(MlirBeaverCompilerKernelPattern) ||
         !descriptor->matchAndRewrite) {
       setPopulationError(*population, "invalid external pattern descriptor");
       return mlirLogicalResultFailure();
     }
 
     PatternIdentity identity;
-    if (!copyStringRef(descriptor->name, identity.name) ||
-        !copyStringRef(descriptor->root, identity.root) ||
-        !copyStringRef(descriptor->version, identity.version) ||
-        identity.name.empty() || identity.root.empty() || identity.version.empty()) {
+    if (!copyStringRef(descriptor->name, identity.name) || !copyStringRef(descriptor->root, identity.root) ||
+        !copyStringRef(descriptor->version, identity.version) || identity.name.empty() || identity.root.empty() ||
+        identity.version.empty()) {
       setPopulationError(*population, "invalid external pattern identity");
       return mlirLogicalResultFailure();
     }
 
-    auto duplicate = std::find_if(
-        population->actualPatterns.begin(), population->actualPatterns.end(),
-        [&](const PatternIdentity &existing) {
-          return existing.name == identity.name || existing.root == identity.root;
-        });
+    auto duplicate = std::find_if(population->actualPatterns.begin(), population->actualPatterns.end(),
+                                  [&](const PatternIdentity &existing) {
+                                    return existing.name == identity.name || existing.root == identity.root;
+                                  });
 
     if (duplicate != population->actualPatterns.end()) {
       setPopulationError(*population, "duplicate external pattern name or root");
@@ -897,101 +708,85 @@ static MlirLogicalResult addPattern(
     recordedIdentity = true;
 
     auto state = std::make_unique<ExternalPatternState>(ExternalPatternState{
-        identity, descriptor->matchAndRewrite, descriptor->destroy,
-        typeConverter, descriptor->userData});
+        identity, descriptor->matchAndRewrite, descriptor->destroy, typeConverter, descriptor->userData});
 
-    MlirConversionPatternCallbacks callbacks = {
-        nullptr, destroyExternalPattern, externalPatternRewrite, nullptr};
+    MlirConversionPatternCallbacks callbacks = {nullptr, destroyExternalPattern, externalPatternRewrite, nullptr};
     MlirContext context = wrap(unwrap(patterns)->getContext());
-    MlirConversionPattern pattern = mlirOpConversionPatternCreate(
-        descriptor->root, descriptor->benefit, context, typeConverter,
-        callbacks, state.get(), 0, nullptr);
-    mlirRewritePatternSetAdd(patterns,
-                             mlirConversionPatternAsRewritePattern(pattern));
+    MlirConversionPattern pattern = mlirOpConversionPatternCreate(descriptor->root, descriptor->benefit, context,
+                                                                  typeConverter, callbacks, state.get(), 0, nullptr);
+    mlirRewritePatternSetAdd(patterns, mlirConversionPatternAsRewritePattern(pattern));
     state.release();
     return mlirLogicalResultSuccess();
   } catch (const std::exception &error) {
-    if (population && recordedIdentity)
-      population->actualPatterns.pop_back();
-    if (population)
-      setPopulationError(*population, error.what());
+    if (population && recordedIdentity) population->actualPatterns.pop_back();
+    if (population) setPopulationError(*population, error.what());
   } catch (...) {
-    if (population && recordedIdentity)
-      population->actualPatterns.pop_back();
-    if (population)
-      setPopulationError(*population, "exception while registering external pattern");
+    if (population && recordedIdentity) population->actualPatterns.pop_back();
+    if (population) setPopulationError(*population, "exception while registering external pattern");
   }
 
   return mlirLogicalResultFailure();
 }
 
 static const MlirBeaverCompilerKernelHostAPI &hostAPI() {
-  static const MlirBeaverCompilerKernelHostAPI api = {
-      MLIR_BEAVER_COMPILER_KERNEL_ABI_VERSION,
-      sizeof(MlirBeaverCompilerKernelHostAPI),
-      addPattern,
-      operationResult,
-      operationLocation,
-      valueType,
-      convertType,
-      createOperation,
-      replaceOperationWithValues,
-      eraseOperation,
-      operationAttribute,
-      attributeStringValue,
-      integerType,
-      integerAttribute,
-      namedAttribute,
-      operationCounts,
-      flatSymbolRefAttribute,
-      ensureFunctionDeclaration,
-      operationOperand,
-      attributeIntegerValue,
-      singleRegionBlock,
-      blockArgumentCount,
-      blockArgument,
-      blockTerminator,
-      functionType,
-      typeAttribute,
-      createOperationWithRegions,
-      replaceOperationWithRegions,
-      typeIsInteger,
-      dynamicTypeName,
-      llvmPointerType,
-      denseI32ArrayAttribute,
-      createOperationAtBlockStart,
-      createOperationBefore,
-      operationRegionCount};
+  static const MlirBeaverCompilerKernelHostAPI api = {MLIR_BEAVER_COMPILER_KERNEL_ABI_VERSION,
+                                                      sizeof(MlirBeaverCompilerKernelHostAPI),
+                                                      addPattern,
+                                                      operationResult,
+                                                      operationLocation,
+                                                      valueType,
+                                                      convertType,
+                                                      createOperation,
+                                                      replaceOperationWithValues,
+                                                      eraseOperation,
+                                                      operationAttribute,
+                                                      attributeStringValue,
+                                                      integerType,
+                                                      integerAttribute,
+                                                      namedAttribute,
+                                                      operationCounts,
+                                                      flatSymbolRefAttribute,
+                                                      ensureFunctionDeclaration,
+                                                      operationOperand,
+                                                      attributeIntegerValue,
+                                                      singleRegionBlock,
+                                                      blockArgumentCount,
+                                                      blockArgument,
+                                                      blockTerminator,
+                                                      functionType,
+                                                      typeAttribute,
+                                                      createOperationWithRegions,
+                                                      replaceOperationWithRegions,
+                                                      typeIsInteger,
+                                                      dynamicTypeName,
+                                                      llvmPointerType,
+                                                      denseI32ArrayAttribute,
+                                                      createOperationAtBlockStart,
+                                                      createOperationBefore,
+                                                      operationRegionCount};
   return api;
 }
 
-static llvm::Expected<std::vector<PatternIdentity>>
-parseExpectedPatterns(llvm::StringRef json) {
+static llvm::Expected<std::vector<PatternIdentity>> parseExpectedPatterns(llvm::StringRef json) {
   auto parsed = llvm::json::parse(json);
-  if (!parsed)
-    return parsed.takeError();
+  if (!parsed) return parsed.takeError();
 
   auto *array = parsed->getAsArray();
-  if (!array)
-    return llvm::createStringError(llvm::inconvertibleErrorCode(),
-                                   "expected pattern manifest array");
+  if (!array) return llvm::createStringError(llvm::inconvertibleErrorCode(), "expected pattern manifest array");
 
   std::vector<PatternIdentity> patterns;
   patterns.reserve(array->size());
 
   for (const llvm::json::Value &value : *array) {
     auto *object = value.getAsObject();
-    if (!object)
-      return llvm::createStringError(llvm::inconvertibleErrorCode(),
-                                     "expected pattern manifest object");
+    if (!object) return llvm::createStringError(llvm::inconvertibleErrorCode(), "expected pattern manifest object");
 
     auto name = object->getString("name");
     auto root = object->getString("root");
     auto version = object->getString("version");
     if (!name || !root || !version)
-      return llvm::createStringError(
-          llvm::inconvertibleErrorCode(),
-          "expected pattern manifest name, root, and version strings");
+      return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                     "expected pattern manifest name, root, and version strings");
 
     patterns.push_back({name->str(), root->str(), version->str()});
   }
@@ -999,19 +794,16 @@ parseExpectedPatterns(llvm::StringRef json) {
   return patterns;
 }
 
-template <typename Function>
-static Function symbol(llvm::sys::DynamicLibrary &library,
-                       const std::string &name) {
+template <typename Function> static Function symbol(llvm::sys::DynamicLibrary &library, const std::string &name) {
   return reinterpret_cast<Function>(library.getAddressOfSymbol(name.c_str()));
 }
 
 } // namespace
 
-MlirStringRef beaverCompilerKernelLoadAndPopulate(
-    MlirRewritePatternSet patterns, MlirTypeConverter typeConverter,
-    MlirStringRef artifactPath, MlirStringRef abiVersionSymbol,
-    MlirStringRef manifestSymbol, MlirStringRef populateSymbol,
-    MlirStringRef expectedIdentity, MlirStringRef expectedPatternsJSON) {
+MlirStringRef beaverCompilerKernelLoadAndPopulate(MlirRewritePatternSet patterns, MlirTypeConverter typeConverter,
+                                                  MlirStringRef artifactPath, MlirStringRef abiVersionSymbol,
+                                                  MlirStringRef manifestSymbol, MlirStringRef populateSymbol,
+                                                  MlirStringRef expectedIdentity, MlirStringRef expectedPatternsJSON) {
   try {
     std::string path;
     std::string abiName;
@@ -1020,61 +812,44 @@ MlirStringRef beaverCompilerKernelLoadAndPopulate(
     std::string identity;
     std::string patternsJSON;
 
-    if (!patterns.ptr || !typeConverter.ptr ||
-        !copyStringRef(artifactPath, path) || path.empty() ||
-        !copyStringRef(abiVersionSymbol, abiName) || abiName.empty() ||
-        !copyStringRef(manifestSymbol, manifestName) || manifestName.empty() ||
-        !copyStringRef(populateSymbol, populateName) || populateName.empty() ||
+    if (!patterns.ptr || !typeConverter.ptr || !copyStringRef(artifactPath, path) || path.empty() ||
+        !copyStringRef(abiVersionSymbol, abiName) || abiName.empty() || !copyStringRef(manifestSymbol, manifestName) ||
+        manifestName.empty() || !copyStringRef(populateSymbol, populateName) || populateName.empty() ||
         !copyStringRef(expectedIdentity, identity) || identity.empty() ||
         !copyStringRef(expectedPatternsJSON, patternsJSON))
       return fail("E_INVALID_ARGUMENT", "invalid loader argument");
 
     auto expectedPatterns = parseExpectedPatterns(patternsJSON);
-    if (!expectedPatterns)
-      return fail("E_PATTERN_MANIFEST_INVALID",
-                  llvm::toString(expectedPatterns.takeError()));
+    if (!expectedPatterns) return fail("E_PATTERN_MANIFEST_INVALID", llvm::toString(expectedPatterns.takeError()));
 
     std::string loadError;
-    llvm::sys::DynamicLibrary library =
-        llvm::sys::DynamicLibrary::getPermanentLibrary(path.c_str(), &loadError);
-    if (!library.isValid())
-      return fail("E_DLOPEN", loadError);
+    llvm::sys::DynamicLibrary library = llvm::sys::DynamicLibrary::getPermanentLibrary(path.c_str(), &loadError);
+    if (!library.isValid()) return fail("E_DLOPEN", loadError);
 
     auto abi = symbol<MlirBeaverCompilerKernelABIVersionFn>(library, abiName);
-    auto embeddedManifest =
-        symbol<MlirBeaverCompilerKernelManifestFn>(library, manifestName);
-    auto populate =
-        symbol<MlirBeaverCompilerKernelPopulateFn>(library, populateName);
+    auto embeddedManifest = symbol<MlirBeaverCompilerKernelManifestFn>(library, manifestName);
+    auto populate = symbol<MlirBeaverCompilerKernelPopulateFn>(library, populateName);
 
-    if (!abi)
-      return fail("E_MISSING_SYMBOL", abiName);
-    if (!embeddedManifest)
-      return fail("E_MISSING_SYMBOL", manifestName);
-    if (!populate)
-      return fail("E_MISSING_SYMBOL", populateName);
+    if (!abi) return fail("E_MISSING_SYMBOL", abiName);
+    if (!embeddedManifest) return fail("E_MISSING_SYMBOL", manifestName);
+    if (!populate) return fail("E_MISSING_SYMBOL", populateName);
 
     if (abi() != MLIR_BEAVER_COMPILER_KERNEL_ABI_VERSION)
       return fail("E_ABI_MISMATCH", "artifact returned an unsupported ABI version");
 
     std::string embeddedIdentity;
-    if (!copyStringRef(embeddedManifest(), embeddedIdentity) ||
-        embeddedIdentity != identity)
-      return fail("E_MANIFEST_IDENTITY_MISMATCH",
-                  "artifact identity does not match its sidecar manifest");
+    if (!copyStringRef(embeddedManifest(), embeddedIdentity) || embeddedIdentity != identity)
+      return fail("E_MANIFEST_IDENTITY_MISMATCH", "artifact identity does not match its sidecar manifest");
 
     PopulationState population{patterns, typeConverter, {}, {}};
     MlirLogicalResult populated =
-        populate(patterns, typeConverter, &hostAPI(), &population,
-                 appendDiagnostic, &population.error);
+        populate(patterns, typeConverter, &hostAPI(), &population, appendDiagnostic, &population.error);
 
     if (mlirLogicalResultIsFailure(populated) || !population.error.empty())
-      return fail("E_POPULATE_FAILED",
-                  population.error.empty() ? "artifact rejected population"
-                                           : population.error);
+      return fail("E_POPULATE_FAILED", population.error.empty() ? "artifact rejected population" : population.error);
 
     if (population.actualPatterns != *expectedPatterns)
-      return fail("E_PATTERN_MANIFEST_MISMATCH",
-                  "registered patterns differ from the sidecar manifest");
+      return fail("E_PATTERN_MANIFEST_MISMATCH", "registered patterns differ from the sidecar manifest");
 
     return succeed();
   } catch (const std::exception &error) {

@@ -22,11 +22,8 @@ defmodule Beaver.MLIR.InferType do
     |> then(&apply(MLIR.CAPI, :beaver_raw_infer_return_types, &1))
     |> Beaver.Native.check!()
     |> case do
-      {types, _diagnostics} when is_list(types) ->
-        {:ok, Enum.map(types, &Beaver.Native.check!/1)}
-
-      {:error, diagnostics} ->
-        {:error, diagnostics}
+      {types, _diagnostics} when is_list(types) -> {:ok, Enum.map(types, &Beaver.Native.check!/1)}
+      {:error, diagnostics} -> {:error, diagnostics}
     end
   end
 end

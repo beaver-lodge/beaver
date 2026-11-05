@@ -28,11 +28,9 @@ defmodule Beaver.MLIR.CompilationCache.Memory do
     end
   end
 
-  def handle_call({:put, key, value}, _from, state),
-    do: {:reply, :ok, Map.put(state, key, value)}
+  def handle_call({:put, key, value}, _from, state), do: {:reply, :ok, Map.put(state, key, value)}
 
-  def handle_call({:delete, key}, _from, state),
-    do: {:reply, :ok, Map.delete(state, key)}
+  def handle_call({:delete, key}, _from, state), do: {:reply, :ok, Map.delete(state, key)}
 
   def handle_call(:clear, _from, _state), do: {:reply, :ok, %{}}
 

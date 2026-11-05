@@ -1,3 +1,6 @@
+alias Beaver.MLIR.{Attribute, Block, CAPI, Operation, Type, Value}
+alias Beaver.Deferred
+
 defmodule Beaver.MLIR.Transform.Schedule.DSL do
   @moduledoc """
   An Elixir authoring frontend for upstream Transform dialect schedules.
@@ -73,10 +76,8 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
   defp schedule_function_name!({name, _, args}) when is_atom(name) and args in [[], nil], do: name
   defp schedule_function_name!(name) when is_atom(name), do: name
 
-  defp schedule_function_name!(other) do
-    raise ArgumentError,
-          "defschedule expects a zero-arity function name, got: #{Macro.to_string(other)}"
-  end
+  defp schedule_function_name!(other),
+    do: raise(ArgumentError, "defschedule expects a zero-arity function name, got: #{Macro.to_string(other)}")
 
   @doc false
   def __build_schedule__(opts, caller, build_body) when is_function(build_body, 2) do
@@ -86,7 +87,7 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
 
     try do
       module
-      |> MLIR.Operation.from_module()
+      |> Operation.from_module()
       |> put_unit_attribute("transform.with_named_sequence", context)
 
       build_body.(context, MLIR.Module.body(module))
@@ -104,9 +105,8 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
   end
 
   defp schedule_context!(opts) do
-    unless Keyword.keyword?(opts) do
-      raise ArgumentError, "schedule options must be a keyword list, got: #{inspect(opts)}"
-    end
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, "schedule options must be a keyword list, got: #{inspect(opts)}")
 
     case Keyword.keys(opts) -- [:ctx] do
       [] -> :ok
@@ -124,10 +124,10 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
     end
   end
 
-  defp put_unit_attribute(operation, name, context) do
-    MLIR.Operation.put_attribute(operation, name, MLIR.Attribute.unit(ctx: context))
+  defp put_unit_attribute(op, name, ctx) do
+    Operation.put_attribute(op, name, Attribute.unit(ctx: ctx))
 
-    operation
+    op
   end
 
   defp ensure_named_sequence!(module) do
@@ -135,7 +135,7 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
       module
       |> MLIR.Module.body()
       |> Beaver.Walker.operations()
-      |> Enum.any?(&(MLIR.Operation.name(&1) == "transform.named_sequence"))
+      |> Enum.any?(&(Operation.name(&1) == "transform.named_sequence"))
 
     unless found?, do: raise(ArgumentError, "defschedule must declare at least one sequence")
   end
@@ -155,14 +155,12 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
   end
 
   @doc "Declares the default `__transform_main` sequence with one `any_op` root handle."
-  defmacro sequence(do: body) do
-    build_sequence_ast("__transform_main", default_root_argument(), body, __CALLER__)
-  end
+  defmacro sequence(do: body),
+    do: build_sequence_ast("__transform_main", default_root_argument(), body, __CALLER__)
 
   @doc "Declares a named sequence with one default `any_op` root handle."
-  defmacro sequence(name, do: body) do
-    build_sequence_ast(literal_name!(name, "sequence"), default_root_argument(), body, __CALLER__)
-  end
+  defmacro sequence(name, do: body),
+    do: build_sequence_ast(literal_name!(name, "sequence"), default_root_argument(), body, __CALLER__)
 
   @doc """
   Declares a named sequence with typed handle arguments.
@@ -172,8 +170,18 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
   are intentionally expressed by ordinary Transform SSA operations and
   `yield/1`; this helper currently declares result-free entry points.
   """
-  defmacro sequence(name, arguments, do: body) do
-    build_sequence_ast(literal_name!(name, "sequence"), arguments, body, __CALLER__)
+  defmacro sequence(name, arguments, do: body),
+    do: build_sequence_ast(literal_name!(name, "sequence"), arguments, body, __CALLER__)
+
+  defp helper_ast(function, arguments, caller) do
+    quote do
+      DSL.unquote(function)(
+        Beaver.Env.context(),
+        Beaver.Env.ip(),
+        unquote_splicing(arguments),
+        unquote(Macro.escape(caller))
+      )
+    end
   end
 
   defp default_root_argument do
@@ -214,10 +222,8 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
 
   defp sequence_arguments!([]), do: {[], []}
 
-  defp sequence_arguments!(other) do
-    raise ArgumentError,
-          "sequence arguments must be a literal list, got: #{Macro.to_string(other)}"
-  end
+  defp sequence_arguments!(other),
+    do: raise(ArgumentError, "sequence arguments must be a literal list, got: #{Macro.to_string(other)}")
 
   # The surrounding `Beaver.mlir` prewalk lowers `name >>> type` to this tuple
   # before the nested `sequence` macro expands. Accept the original spelling as
@@ -229,19 +235,17 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
        when is_atom(name) and (is_atom(context) or is_nil(context)) do
     type_builder =
       quote do
-        Beaver.Deferred.defer(fn context ->
-          Beaver.Deferred.resolve(unquote(type), context)
-        end)
+        Deferred.defer(fn context -> Deferred.resolve(unquote(type), context) end)
       end
 
     binding =
       if name |> Atom.to_string() |> String.starts_with?("_") do
         quote do
-          unquote(variable) = Beaver.MLIR.Block.get_arg!(sequence_block, unquote(index))
+          unquote(variable) = Block.get_arg!(sequence_block, unquote(index))
         end
       else
         quote do
-          unquote(variable) = Beaver.MLIR.Block.get_arg!(sequence_block, unquote(index))
+          unquote(variable) = Block.get_arg!(sequence_block, unquote(index))
           _ = unquote(variable)
         end
       end
@@ -249,55 +253,46 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
     {type_builder, binding}
   end
 
-  defp sequence_argument!(invalid, _index) do
-    raise ArgumentError,
-          "sequence arguments must use `name >>> transform_type`, got: " <>
-            Macro.to_string(invalid)
-  end
+  defp sequence_argument!(invalid, _index),
+    do: raise(ArgumentError, "sequence arguments must use `name >>> transform_type`, got: " <> Macro.to_string(invalid))
 
   @doc false
-  def __build_sequence__(context, insertion_point, name, type_builders, caller, body)
+  def __build_sequence__(ctx, ip, name, type_builders, caller, body)
       when is_function(body, 2) do
-    location = source_location(caller, context)
-    argument_types = Enum.map(type_builders, &resolve_type!(&1, context, "sequence argument"))
-    region = MLIR.CAPI.mlirRegionCreate()
+    location = source_location(caller, ctx)
+    argument_types = Enum.map(type_builders, &resolve_type!(&1, ctx, "sequence argument"))
+    region = CAPI.mlirRegionCreate()
 
     try do
-      block = MLIR.Block.create(Enum.map(argument_types, &{&1, location}))
-      MLIR.CAPI.mlirRegionAppendOwnedBlock(region, block)
-      body.(context, block)
-      ensure_yield(block, context, location)
+      block = Block.create(Enum.map(argument_types, &{&1, location}))
+      CAPI.mlirRegionAppendOwnedBlock(region, block)
+      body.(ctx, block)
+      ensure_yield(block, ctx, location)
 
-      readonly =
-        MLIR.Attribute.dictionary(
-          [{"transform.readonly", MLIR.Attribute.unit(ctx: context)}],
-          ctx: context
-        )
+      readonly = Attribute.dictionary([{"transform.readonly", Attribute.unit(ctx: ctx)}], ctx: ctx)
 
       %Beaver.SSA{
         op: "transform.named_sequence",
         arguments: [
           region,
-          sym_name: MLIR.Attribute.string(name, ctx: context),
-          function_type:
-            MLIR.Attribute.type(MLIR.Type.function(argument_types, [], ctx: context)),
-          arg_attrs:
-            MLIR.Attribute.array(List.duplicate(readonly, length(argument_types)), ctx: context),
-          res_attrs: MLIR.Attribute.array([], ctx: context)
+          sym_name: Attribute.string(name, ctx: ctx),
+          function_type: Attribute.type(Type.function(argument_types, [], ctx: ctx)),
+          arg_attrs: Attribute.array(List.duplicate(readonly, length(argument_types)), ctx: ctx),
+          res_attrs: Attribute.array([], ctx: ctx)
         ],
         results: [],
-        ctx: context,
-        ip: insertion_point,
+        ctx: ctx,
+        ip: ip,
         loc: location
       }
-      |> MLIR.Operation.create()
+      |> Operation.create()
     rescue
       exception ->
-        MLIR.CAPI.mlirRegionDestroy(region)
+        CAPI.mlirRegionDestroy(region)
         reraise exception, __STACKTRACE__
     catch
       kind, reason ->
-        MLIR.CAPI.mlirRegionDestroy(region)
+        CAPI.mlirRegionDestroy(region)
         :erlang.raise(kind, reason, __STACKTRACE__)
     end
   end
@@ -310,99 +305,72 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
   `!transform.param<i64>`; other domains default to `!transform.any_param`.
   Pass `:type` to select an explicit Transform parameter type.
   """
-  defmacro knob(name, options, opts \\ []) do
-    caller = Macro.escape(__CALLER__)
-
-    quote do
-      DSL.__build_knob__(
-        Beaver.Env.context(),
-        Beaver.Env.ip(),
-        unquote(name),
-        unquote(options),
-        unquote(opts),
-        unquote(caller)
-      )
-    end
-  end
+  defmacro knob(name, options, opts \\ []),
+    do: helper_ast(:__build_knob__, [name, options, opts], __CALLER__)
 
   @doc false
-  def __build_knob__(context, insertion_point, name, options, opts, caller) do
+  def __build_knob__(ctx, ip, name, options, opts, caller) do
     name = runtime_name!(name, "knob")
     validate_knob_options!(options)
     validate_helper_options!(opts, [:type], "knob")
-    location = source_location(caller, context)
-    attributes = Enum.map(options, &knob_attribute!(&1, context))
+    location = source_location(caller, ctx)
+    attributes = Enum.map(options, &knob_attribute!(&1, ctx))
 
     result_type =
       case Keyword.fetch(opts, :type) do
-        {:ok, type} -> resolve_type!(type, context, "knob result")
-        :error -> default_knob_type(options, context)
+        {:ok, type} -> resolve_type!(type, ctx, "knob result")
+        :error -> default_knob_type(options, ctx)
       end
 
     operation =
-      %Beaver.SSA{
-        op: "transform.tune.knob",
-        arguments: [
-          name: MLIR.Attribute.string(name, ctx: context),
-          options: MLIR.Attribute.array(attributes, ctx: context)
-        ],
-        results: [result_type],
-        ctx: context,
-        ip: insertion_point,
-        loc: location
-      }
-      |> MLIR.Operation.create()
+      create_operation(
+        "transform.tune.knob",
+        [name: Attribute.string(name, ctx: ctx), options: Attribute.array(attributes, ctx: ctx)],
+        [result_type],
+        ctx,
+        ip,
+        location
+      )
 
-    MLIR.Operation.result(operation, 0)
+    Operation.result(operation, 0)
   end
 
   defp validate_knob_options!(options) when is_list(options) and options != [], do: :ok
 
   defp validate_knob_options!([]), do: raise(ArgumentError, "knob options cannot be empty")
 
-  defp validate_knob_options!(other) do
-    raise ArgumentError, "knob options must be a non-empty list, got: #{inspect(other)}"
-  end
+  defp validate_knob_options!(other),
+    do: raise(ArgumentError, "knob options must be a non-empty list, got: #{inspect(other)}")
 
-  defp default_knob_type(options, context) do
-    if Enum.all?(options, &is_integer/1) do
-      param(MLIR.Type.i64(ctx: context))
-    else
-      any_param(ctx: context)
-    end
-  end
+  defp default_knob_type(options, ctx),
+    do: if(Enum.all?(options, &is_integer/1), do: param(Type.i64(ctx: ctx)), else: any_param(ctx: ctx))
 
-  defp knob_attribute!(%MLIR.Attribute{} = attribute, context) do
-    ensure_same_context!(attribute, context, "knob option")
+  defp knob_attribute!(%Attribute{} = attribute, ctx) do
+    ensure_same_context!(attribute, ctx, "knob option")
     attribute
   end
 
-  defp knob_attribute!(value, context) when is_integer(value),
-    do: MLIR.Attribute.integer(MLIR.Type.i64(ctx: context), value)
+  defp knob_attribute!(value, ctx) when is_integer(value), do: Attribute.integer(Type.i64(ctx: ctx), value)
 
-  defp knob_attribute!(value, context) when is_float(value),
-    do: MLIR.Attribute.float(MLIR.Type.f64(ctx: context), value)
+  defp knob_attribute!(value, ctx) when is_float(value), do: Attribute.float(Type.f64(ctx: ctx), value)
 
-  defp knob_attribute!(value, context) when is_boolean(value),
-    do: MLIR.Attribute.bool(value, ctx: context)
+  defp knob_attribute!(value, ctx) when is_boolean(value), do: Attribute.bool(value, ctx: ctx)
 
-  defp knob_attribute!(value, context) when is_binary(value),
-    do: MLIR.Attribute.string(value, ctx: context)
+  defp knob_attribute!(value, ctx) when is_binary(value), do: Attribute.string(value, ctx: ctx)
 
-  defp knob_attribute!(:unit, context), do: MLIR.Attribute.unit(ctx: context)
+  defp knob_attribute!(:unit, ctx), do: Attribute.unit(ctx: ctx)
 
-  defp knob_attribute!(%Beaver.Deferred{} = deferred, context) do
-    case Beaver.Deferred.resolve(deferred, context) do
-      %MLIR.Attribute{} = attribute -> knob_attribute!(attribute, context)
+  defp knob_attribute!(%Deferred{} = deferred, ctx) do
+    case Deferred.resolve(deferred, ctx) do
+      %Attribute{} = attribute -> knob_attribute!(attribute, ctx)
       value -> unsupported_knob_option!(value)
     end
   end
 
   defp knob_attribute!(value, _context), do: unsupported_knob_option!(value)
 
-  defp unsupported_knob_option!(value) do
-    raise ArgumentError, "unsupported scalar or attribute in knob options: #{inspect(value)}"
-  end
+  defp unsupported_knob_option!(value),
+    do: raise(ArgumentError, "unsupported scalar or attribute in knob options: #{inspect(value)}")
 
   @doc """
   Packs one or more same-typed Transform parameter handles into one handle.
@@ -414,59 +382,43 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
 
   The input handles are consumed by `transform.merge_handles`.
   """
-  defmacro pack_params(params) do
-    caller = Macro.escape(__CALLER__)
-
-    quote do
-      DSL.__pack_params__(
-        Beaver.Env.context(),
-        Beaver.Env.ip(),
-        unquote(params),
-        unquote(caller)
-      )
-    end
-  end
+  defmacro pack_params(params), do: helper_ast(:__pack_params__, [params], __CALLER__)
 
   @doc false
-  def __pack_params__(context, insertion_point, params, caller) do
-    validate_packed_params!(params, context)
-    result_type = params |> hd() |> MLIR.Value.type()
+  def __pack_params__(ctx, ip, params, caller) do
+    validate_packed_params!(params, ctx)
+    result_type = params |> hd() |> Value.type()
 
     operation =
-      %Beaver.SSA{
-        op: "transform.merge_handles",
-        arguments: [handles: params],
-        results: [result_type],
-        ctx: context,
-        ip: insertion_point,
-        loc: source_location(caller, context)
-      }
-      |> MLIR.Operation.create()
+      create_operation(
+        "transform.merge_handles",
+        [handles: params],
+        [result_type],
+        ctx,
+        ip,
+        source_location(caller, ctx)
+      )
 
-    MLIR.Operation.result(operation, 0)
+    Operation.result(operation, 0)
   end
 
-  defp validate_packed_params!(params, context) when is_list(params) and params != [] do
-    unless Enum.all?(params, &match?(%MLIR.Value{}, &1)) do
-      raise ArgumentError, "pack_params expects a non-empty list of MLIR values"
-    end
+  defp validate_packed_params!(params, ctx) when is_list(params) and params != [] do
+    unless Enum.all?(params, &match?(%Value{}, &1)),
+      do: raise(ArgumentError, "pack_params expects a non-empty list of MLIR values")
 
-    Enum.each(params, &ensure_same_context!(&1, context, "packed parameter"))
-    [first | rest] = Enum.map(params, &MLIR.Value.type/1)
+    Enum.each(params, &ensure_same_context!(&1, ctx, "packed parameter"))
+    [first | rest] = Enum.map(params, &Value.type/1)
 
     unless String.starts_with?(MLIR.to_string(first), "!transform.") and
-             String.contains?(MLIR.to_string(first), "param") do
-      raise ArgumentError, "pack_params expects Transform parameter handles"
-    end
+             String.contains?(MLIR.to_string(first), "param"),
+           do: raise(ArgumentError, "pack_params expects Transform parameter handles")
 
-    unless Enum.all?(rest, &MLIR.equal?(&1, first)) do
-      raise ArgumentError, "pack_params expects handles with the same Transform parameter type"
-    end
+    unless Enum.all?(rest, &MLIR.equal?(&1, first)),
+      do: raise(ArgumentError, "pack_params expects handles with the same Transform parameter type")
   end
 
-  defp validate_packed_params!(_params, _context) do
-    raise ArgumentError, "pack_params expects a non-empty list of MLIR values"
-  end
+  defp validate_packed_params!(_params, _context),
+    do: raise(ArgumentError, "pack_params expects a non-empty list of MLIR values")
 
   @doc "Whether the linked LLVM provides `transform.memref.alloc_to_global`."
   def alloc_to_global_supported? do
@@ -480,80 +432,41 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
   Returns handles for the inserted `memref.get_global` and `memref.global`
   operations, in that order.
   """
-  defmacro alloc_to_global(target) do
-    caller = Macro.escape(__CALLER__)
-
-    quote do
-      DSL.__alloc_to_global__(
-        Beaver.Env.context(),
-        Beaver.Env.ip(),
-        unquote(target),
-        unquote(caller)
-      )
-    end
-  end
+  defmacro alloc_to_global(target), do: helper_ast(:__alloc_to_global__, [target], __CALLER__)
 
   @doc false
-  def __alloc_to_global__(context, insertion_point, target, caller) do
-    ensure_transform_helper_supported!(
-      alloc_to_global_supported?(),
-      "transform.memref.alloc_to_global"
-    )
+  def __alloc_to_global__(ctx, ip, target, caller) do
+    ensure_transform_helper_supported!(alloc_to_global_supported?(), "transform.memref.alloc_to_global")
 
-    ensure_transform_handle!(target, context, "alloc_to_global target")
+    ensure_transform_handle!(target, ctx, "alloc_to_global target")
 
     operation =
-      %Beaver.SSA{
-        op: "transform.memref.alloc_to_global",
-        arguments: [alloc: target],
-        results: [any_op(ctx: context), any_op(ctx: context)],
-        ctx: context,
-        ip: insertion_point,
-        loc: source_location(caller, context)
-      }
-      |> MLIR.Operation.create()
+      create_operation(
+        "transform.memref.alloc_to_global",
+        [alloc: target],
+        [any_op(ctx: ctx), any_op(ctx: ctx)],
+        ctx,
+        ip,
+        source_location(caller, ctx)
+      )
 
-    operation |> MLIR.Operation.results() |> Enum.to_list()
+    operation |> Operation.results() |> Enum.to_list()
   end
 
   @doc "Whether the linked LLVM provides `transform.loop.unroll_full`."
-  def loop_unroll_full_supported? do
-    Code.ensure_loaded?(MLIR.Dialect.Transform) and
-      function_exported?(MLIR.Dialect.Transform, :loop_unroll_full, 1)
-  end
+  def loop_unroll_full_supported?,
+    do: Code.ensure_loaded?(MLIR.Dialect.Transform) and function_exported?(MLIR.Dialect.Transform, :loop_unroll_full, 1)
 
   @doc "Fully unrolls every `scf.for` or `affine.for` associated with `target`."
-  defmacro loop_unroll_full(target) do
-    caller = Macro.escape(__CALLER__)
-
-    quote do
-      DSL.__loop_unroll_full__(
-        Beaver.Env.context(),
-        Beaver.Env.ip(),
-        unquote(target),
-        unquote(caller)
-      )
-    end
-  end
+  defmacro loop_unroll_full(target), do: helper_ast(:__loop_unroll_full__, [target], __CALLER__)
 
   @doc false
-  def __loop_unroll_full__(context, insertion_point, target, caller) do
-    ensure_transform_helper_supported!(
-      loop_unroll_full_supported?(),
-      "transform.loop.unroll_full"
-    )
+  def __loop_unroll_full__(ctx, ip, target, caller) do
+    ensure_transform_helper_supported!(loop_unroll_full_supported?(), "transform.loop.unroll_full")
 
-    ensure_transform_handle!(target, context, "loop_unroll_full target")
+    ensure_transform_handle!(target, ctx, "loop_unroll_full target")
 
-    %Beaver.SSA{
-      op: "transform.loop.unroll_full",
-      arguments: [target: target],
-      results: [],
-      ctx: context,
-      ip: insertion_point,
-      loc: source_location(caller, context)
-    }
-    |> MLIR.Operation.create()
+    create_operation("transform.loop.unroll_full", [target: target], [], ctx, ip, source_location(caller, ctx))
   end
 
   @doc """
@@ -590,8 +503,7 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
   defp branch_builders(do: block), do: branch_builders_from_block!(block)
   defp branch_builders(other), do: other
 
-  defp branch_builders_from_block!({:branch, _, [[do: body]]}),
-    do: [branch_builder(body)]
+  defp branch_builders_from_block!({:branch, _, [[do: body]]}), do: [branch_builder(body)]
 
   defp branch_builders_from_block!({:__block__, _, expressions}) do
     Enum.map(expressions, fn
@@ -605,10 +517,8 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
     end)
   end
 
-  defp branch_builders_from_block!(invalid) do
-    raise ArgumentError,
-          "alternatives expects `branch do ... end`, got: #{Macro.to_string(invalid)}"
-  end
+  defp branch_builders_from_block!(invalid),
+    do: raise(ArgumentError, "alternatives expects `branch do ... end`, got: #{Macro.to_string(invalid)}")
 
   defp branch_builder(body) do
     quote do
@@ -622,112 +532,84 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
 
   @doc false
   @spec __build_alternatives__(term(), term(), term(), term(), term()) :: term()
-  def __build_alternatives__(context, insertion_point, name, branches, caller) do
+  def __build_alternatives__(ctx, ip, name, branches, caller) do
     name = runtime_name!(name, "alternatives")
     validate_branches!(branches)
 
-    location = source_location(caller, context)
-    regions = build_branch_regions(branches, context, location, [])
+    location = source_location(caller, ctx)
+    regions = build_branch_regions(branches, ctx, location, [])
 
     try do
       %Beaver.SSA{
         op: "transform.tune.alternatives",
-        arguments: [name: MLIR.Attribute.string(name, ctx: context)],
+        arguments: [name: Attribute.string(name, ctx: ctx)],
         results: [],
         filler: fn -> regions end,
-        ctx: context,
-        ip: insertion_point,
+        ctx: ctx,
+        ip: ip,
         loc: location
       }
-      |> MLIR.Operation.create()
+      |> Operation.create()
     rescue
       exception ->
-        Enum.each(regions, &MLIR.CAPI.mlirRegionDestroy/1)
+        Enum.each(regions, &CAPI.mlirRegionDestroy/1)
         reraise exception, __STACKTRACE__
     catch
       kind, reason ->
-        Enum.each(regions, &MLIR.CAPI.mlirRegionDestroy/1)
+        Enum.each(regions, &CAPI.mlirRegionDestroy/1)
         :erlang.raise(kind, reason, __STACKTRACE__)
     end
   end
 
   defp validate_branches!(branches) do
-    unless is_list(branches) and branches != [] and Enum.all?(branches, &is_function(&1, 2)) do
-      raise ArgumentError,
-            "invalid branch layout for alternatives: expected one or more branch blocks"
-    end
+    unless is_list(branches) and branches != [] and Enum.all?(branches, &is_function(&1, 2)),
+      do: raise(ArgumentError, "invalid branch layout for alternatives: expected one or more branch blocks")
   end
 
   defp build_branch_regions([], _context, _location, built), do: Enum.reverse(built)
 
-  defp build_branch_regions([branch | rest], context, location, built) do
-    region = MLIR.CAPI.mlirRegionCreate()
+  defp build_branch_regions([branch | rest], ctx, loc, built) do
+    region = CAPI.mlirRegionCreate()
 
     region =
       try do
-        block = MLIR.Block.create()
-        MLIR.CAPI.mlirRegionAppendOwnedBlock(region, block)
-        branch.(context, block)
-        ensure_yield(block, context, location)
+        block = Block.create()
+        CAPI.mlirRegionAppendOwnedBlock(region, block)
+        branch.(ctx, block)
+        ensure_yield(block, ctx, loc)
         region
       rescue
         exception ->
-          MLIR.CAPI.mlirRegionDestroy(region)
-          Enum.each(built, &MLIR.CAPI.mlirRegionDestroy/1)
+          CAPI.mlirRegionDestroy(region)
+          Enum.each(built, &CAPI.mlirRegionDestroy/1)
           reraise exception, __STACKTRACE__
       catch
         kind, reason ->
-          MLIR.CAPI.mlirRegionDestroy(region)
-          Enum.each(built, &MLIR.CAPI.mlirRegionDestroy/1)
+          CAPI.mlirRegionDestroy(region)
+          Enum.each(built, &CAPI.mlirRegionDestroy/1)
           :erlang.raise(kind, reason, __STACKTRACE__)
       end
 
     # Keep the recursive call outside the cleanup scope above. A deeper
     # failure already destroys every region in `built`, including this one.
-    build_branch_regions(rest, context, location, [region | built])
+    build_branch_regions(rest, ctx, loc, [region | built])
   end
 
   @doc "Creates `transform.yield` with zero or more yielded handles."
-  defmacro yield(operands \\ []) do
-    caller = Macro.escape(__CALLER__)
-
-    quote do
-      DSL.__build_yield__(
-        Beaver.Env.context(),
-        Beaver.Env.ip(),
-        unquote(operands),
-        unquote(caller)
-      )
-    end
-  end
+  defmacro yield(operands \\ []), do: helper_ast(:__build_yield__, [operands], __CALLER__)
 
   @doc false
-  def __build_yield__(context, insertion_point, operands, caller) do
-    %Beaver.SSA{
-      op: "transform.yield",
-      arguments: List.wrap(operands),
-      results: [],
-      ctx: context,
-      ip: insertion_point,
-      loc: source_location(caller, context)
-    }
-    |> MLIR.Operation.create()
-  end
+  def __build_yield__(ctx, ip, operands, caller),
+    do: create_operation("transform.yield", List.wrap(operands), [], ctx, ip, source_location(caller, ctx))
 
-  defp ensure_yield(block, context, location) do
+  defp create_operation(name, arguments, results, ctx, ip, loc),
+    do: %Beaver.SSA{op: name, arguments: arguments, results: results, ctx: ctx, ip: ip, loc: loc} |> Operation.create()
+
+  defp ensure_yield(block, ctx, loc) do
     terminator = block |> Beaver.Walker.operations() |> Enum.to_list() |> List.last()
 
-    if is_nil(terminator) or MLIR.Operation.name(terminator) != "transform.yield" do
-      %Beaver.SSA{
-        op: "transform.yield",
-        arguments: [],
-        results: [],
-        ctx: context,
-        ip: block,
-        loc: location
-      }
-      |> MLIR.Operation.create()
-    end
+    if is_nil(terminator) or Operation.name(terminator) != "transform.yield",
+      do: create_operation("transform.yield", [], [], ctx, block, loc)
   end
 
   @doc "Returns a deferred `!transform.any_op` type."
@@ -745,10 +627,10 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
   @doc "Returns a Transform parameter type wrapping an MLIR type."
   def param(type), do: Transform.param_type(type)
 
-  defp resolve_type!(type, context, label) do
-    case Beaver.Deferred.resolve(type, context) do
-      %MLIR.Type{} = resolved ->
-        ensure_same_context!(resolved, context, label)
+  defp resolve_type!(type, ctx, label) do
+    case Deferred.resolve(type, ctx) do
+      %Type{} = resolved ->
+        ensure_same_context!(resolved, ctx, label)
         resolved
 
       value ->
@@ -756,36 +638,30 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
     end
   end
 
-  defp ensure_same_context!(entity, context, label) do
-    unless MLIR.equal?(MLIR.context(entity), context) do
-      raise ArgumentError, "#{label} belongs to a different MLIR context"
-    end
+  defp ensure_same_context!(entity, ctx, label) do
+    unless MLIR.equal?(MLIR.context(entity), ctx),
+      do: raise(ArgumentError, "#{label} belongs to a different MLIR context")
   end
 
-  defp ensure_transform_handle!(%MLIR.Value{} = value, context, label) do
-    ensure_same_context!(value, context, label)
+  defp ensure_transform_handle!(%Value{} = value, ctx, label) do
+    ensure_same_context!(value, ctx, label)
 
-    unless value |> MLIR.Value.type() |> MLIR.to_string() |> String.starts_with?("!transform.") do
-      raise ArgumentError, "#{label} must be a Transform handle"
-    end
+    unless value |> Value.type() |> MLIR.to_string() |> String.starts_with?("!transform."),
+      do: raise(ArgumentError, "#{label} must be a Transform handle")
 
     value
   end
 
-  defp ensure_transform_handle!(value, _context, label) do
-    raise ArgumentError, "#{label} must be an MLIR value, got: #{inspect(value)}"
-  end
+  defp ensure_transform_handle!(value, _context, label),
+    do: raise(ArgumentError, "#{label} must be an MLIR value, got: #{inspect(value)}")
 
   defp ensure_transform_helper_supported!(true, _operation), do: :ok
 
-  defp ensure_transform_helper_supported!(false, operation) do
-    raise ArgumentError, "linked LLVM does not support #{operation}"
-  end
+  defp ensure_transform_helper_supported!(false, op), do: raise(ArgumentError, "linked LLVM does not support #{op}")
 
   defp validate_helper_options!(opts, supported, helper) do
-    unless Keyword.keyword?(opts) do
-      raise ArgumentError, "#{helper} options must be a keyword list, got: #{inspect(opts)}"
-    end
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, "#{helper} options must be a keyword list, got: #{inspect(opts)}")
 
     case Keyword.keys(opts) -- supported do
       [] -> :ok
@@ -796,19 +672,15 @@ defmodule Beaver.MLIR.Transform.Schedule.DSL do
   defp literal_name!(name, _label) when is_binary(name) and name != "", do: name
   defp literal_name!(name, label) when is_atom(name), do: runtime_name!(name, label)
 
-  defp literal_name!(name, label) do
-    raise ArgumentError,
-          "#{label} name must be a literal non-empty string or atom, got: #{Macro.to_string(name)}"
-  end
+  defp literal_name!(name, label),
+    do: raise(ArgumentError, "#{label} name must be a literal non-empty string or atom, got: #{Macro.to_string(name)}")
 
   defp runtime_name!(name, _label) when is_binary(name) and name != "", do: name
   defp runtime_name!(name, _label) when is_atom(name), do: Atom.to_string(name)
 
-  defp runtime_name!(name, label) do
-    raise ArgumentError, "#{label} name must be a non-empty string or atom, got: #{inspect(name)}"
-  end
+  defp runtime_name!(name, label),
+    do: raise(ArgumentError, "#{label} name must be a non-empty string or atom, got: #{inspect(name)}")
 
-  defp source_location(caller, context) do
-    MLIR.Location.file(name: caller.file, line: caller.line, ctx: context)
-  end
+  defp source_location(caller, ctx),
+    do: MLIR.Location.file(name: caller.file, line: caller.line, ctx: ctx)
 end

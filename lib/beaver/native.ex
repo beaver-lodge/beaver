@@ -7,17 +7,21 @@ defmodule Beaver.Native do
   alias Beaver.MLIR.CAPI
   @behaviour Kinda.Codec
 
-  def ptr(%mod{ref: ref}) do
-    %__MODULE__.Ptr{
-      ref: apply(CAPI.Raw, Module.concat(mod, :ptr), [ref]) |> normalize(),
-      element_kind: mod
-    }
+  @doc false
+  @spec with_resource(resource, (resource -> term()), (resource -> result)) :: result
+        when resource: var, result: var
+  def with_resource(resource, destroy, fun) do
+    try do
+      fun.(resource)
+    after
+      destroy.(resource)
+    end
   end
 
-  def opaque_ptr(%__MODULE__.Array{} = array) do
-    array
-    |> __MODULE__.Array.as_opaque()
-  end
+  def ptr(%mod{ref: ref}),
+    do: %__MODULE__.Ptr{ref: apply(CAPI.Raw, Module.concat(mod, :ptr), [ref]) |> normalize(), element_kind: mod}
+
+  def opaque_ptr(%__MODULE__.Array{} = array), do: array |> __MODULE__.Array.as_opaque()
 
   def opaque_ptr(%mod{ref: ref}) do
     maker = Module.concat([mod, :opaque_ptr])
@@ -29,45 +33,21 @@ defmodule Beaver.Native do
 
   def array(data, module, opts \\ [mut: false])
 
-  def array(data, module, opts) when is_binary(data) do
-    mut = Keyword.get(opts, :mut) || false
-    func = if mut, do: "mut_array", else: "array"
-
-    ref =
-      apply(CAPI.Raw, Module.concat([module, func]), [
-        data
-      ])
-      |> normalize()
-
+  def array(data, module, opts) when is_binary(data) or is_list(data) do
+    data = if is_list(data), do: Enum.map(data, &Kinda.unwrap_ref/1), else: data
+    func = if Keyword.get(opts, :mut) || false, do: "mut_array", else: "array"
+    ref = apply(CAPI.Raw, Module.concat([module, func]), [data]) |> normalize()
     %__MODULE__.Array{ref: ref, element_kind: module}
   end
 
-  def array(data, module, opts) when is_list(data) do
-    mut = Keyword.get(opts, :mut) || false
-    func = if mut, do: "mut_array", else: "array"
+  def to_term(%__MODULE__.Ptr{ref: ref, element_kind: __MODULE__.OpaquePtr}),
+    do: apply(CAPI.Raw, Module.concat(__MODULE__.OpaquePtr, :primitive), [ref]) |> normalize()
 
-    ref =
-      apply(CAPI.Raw, Module.concat([module, func]), [
-        Enum.map(data, &Kinda.unwrap_ref/1)
-      ])
-      |> normalize()
-
-    %__MODULE__.Array{ref: ref, element_kind: module}
-  end
-
-  def to_term(%__MODULE__.Ptr{ref: ref, element_kind: __MODULE__.OpaquePtr}) do
-    apply(CAPI.Raw, Module.concat(__MODULE__.OpaquePtr, :primitive), [ref])
-    |> normalize()
-  end
-
-  def to_term(%mod{ref: ref}) do
-    apply(CAPI.Raw, Module.concat(mod, :primitive), [ref])
-    |> normalize()
-  end
+  def to_term(%mod{ref: ref}), do: apply(CAPI.Raw, Module.concat(mod, :primitive), [ref]) |> normalize()
 
   defp postprocess_diagnostics({severity_i, loc_ref, note, nested}) do
-    {Beaver.MLIR.Diagnostic.severity(severity_i), %Beaver.MLIR.Location{ref: loc_ref},
-     to_string(note), Enum.map(nested, &postprocess_diagnostics/1)}
+    {Beaver.MLIR.Diagnostic.severity(severity_i), %Beaver.MLIR.Location{ref: loc_ref}, to_string(note),
+     Enum.map(nested, &postprocess_diagnostics/1)}
   end
 
   @impl Kinda.Codec
@@ -97,22 +77,14 @@ defmodule Beaver.Native do
 
   def check!(ret), do: normalize(ret)
 
-  def dump(%kind{ref: ref}) do
-    apply(CAPI.Raw, Module.concat(kind, :dump), [ref])
-    |> normalize()
-  end
+  def dump(%kind{ref: ref}), do: apply(CAPI.Raw, Module.concat(kind, :dump), [ref]) |> normalize()
 
   def apply_dirty(fun, args, dirty_flag) do
     f =
       case dirty_flag do
-        :io_bound ->
-          :"#{fun}_dirty_io"
-
-        :cpu_bound ->
-          :"#{fun}_dirty_cpu"
-
-        nil ->
-          fun
+        :io_bound -> :"#{fun}_dirty_io"
+        :cpu_bound -> :"#{fun}_dirty_cpu"
+        nil -> fun
       end
 
     apply(CAPI, f, args)

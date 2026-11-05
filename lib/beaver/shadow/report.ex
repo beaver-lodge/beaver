@@ -1,3 +1,5 @@
+alias Beaver.MLIR.Context
+
 defmodule Beaver.Shadow.Report do
   @moduledoc """
   Gathers Shadow Wavefront measurement facts for the Triton corpus and renders
@@ -38,14 +40,13 @@ defmodule Beaver.Shadow.Report do
   Requires a Triton-enabled native build (`BEAVER_TRITON_PREBUILT_DIR`).
   """
   @spec generate() :: t()
-  def generate do
-    %__MODULE__{
+  def generate,
+    do: %__MODULE__{
       generated_at: DateTime.utc_now(),
       llvm_revision: llvm_revision(),
       prebuilt_dir: System.get_env("BEAVER_TRITON_PREBUILT_DIR"),
       fixtures: Enum.map(Corpus.fixtures(), &measure/1)
     }
-  end
 
   @doc "Renders the collected facts as a Markdown report."
   @spec render(t()) :: String.t()
@@ -79,16 +80,14 @@ defmodule Beaver.Shadow.Report do
         nil -> "-"
       end
 
-    probe =
-      probe_text(fixture.probe)
+    probe = probe_text(fixture.probe)
 
     "| #{fixture.name} | #{fixture.dialect} | #{fixture.baseline} | #{fixture.optimized} | " <>
       "#{reduction} | #{lowered} | #{probe} |"
   end
 
-  defp probe_text(%Probe.Result{status: :crash} = probe) do
-    "crash (exit #{probe.exit_code}) at `#{probe.detail.last_pass}`"
-  end
+  defp probe_text(%Probe.Result{status: :crash} = probe),
+    do: "crash (exit #{probe.exit_code}) at `#{probe.detail.last_pass}`"
 
   defp probe_text(%Probe.Result{status: :ok}), do: "ok"
 
@@ -97,7 +96,7 @@ defmodule Beaver.Shadow.Report do
   defp probe_text(nil), do: "-"
 
   defp measure(%{dialect: :ttir} = fixture) do
-    context = MLIR.Context.create(all_dialects: false)
+    context = Context.create(all_dialects: false)
 
     result =
       try do
@@ -115,14 +114,14 @@ defmodule Beaver.Shadow.Report do
           probe: nil
         }
       after
-        MLIR.Context.destroy(context)
+        Context.destroy(context)
       end
 
     result
   end
 
   defp measure(%{dialect: :ttgir} = fixture) do
-    context = MLIR.Context.create(all_dialects: false)
+    context = Context.create(all_dialects: false)
 
     counts =
       try do
@@ -140,7 +139,7 @@ defmodule Beaver.Shadow.Report do
 
         {baseline, optimized}
       after
-        MLIR.Context.destroy(context)
+        Context.destroy(context)
       end
 
     {baseline, optimized} = counts

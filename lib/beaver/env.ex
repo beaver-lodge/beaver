@@ -1,3 +1,5 @@
+alias Beaver.MLIR.{Block, Context, Region}
+
 defmodule Beaver.Env do
   @moduledoc """
   This module defines macros to getting MLIR context, region, block within the do block of mlir/1. It works like __MODULE__/0, __CALLER__/0 of Elixir special forms.
@@ -10,14 +12,14 @@ defmodule Beaver.Env do
   defmacro context() do
     if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_ctx, nil}) do
       quote do
-        match?(%Beaver.MLIR.Context{}, Kernel.var!(beaver_internal_env_ctx)) ||
+        match?(%Context{}, Kernel.var!(beaver_internal_env_ctx)) ||
           raise CompileError,
-                Beaver.Env.compile_err_msg(Beaver.MLIR.Context, unquote(Macro.escape(__CALLER__)))
+                Beaver.Env.compile_err_msg(Context, unquote(Macro.escape(__CALLER__)))
 
         Kernel.var!(beaver_internal_env_ctx)
       end
     else
-      raise CompileError, Beaver.Env.compile_err_msg(Beaver.MLIR.Context, __CALLER__)
+      raise CompileError, Beaver.Env.compile_err_msg(Context, __CALLER__)
     end
   end
 
@@ -27,9 +29,9 @@ defmodule Beaver.Env do
   defmacro region() do
     if Macro.Env.has_var?(__CALLER__, {:beaver_env_region, nil}) do
       quote do
-        match?(%Beaver.MLIR.Region{}, Kernel.var!(beaver_env_region)) ||
+        match?(%Region{}, Kernel.var!(beaver_env_region)) ||
           raise CompileError,
-                Beaver.Env.compile_err_msg(Beaver.MLIR.Region, unquote(Macro.escape(__CALLER__)))
+                Beaver.Env.compile_err_msg(Region, unquote(Macro.escape(__CALLER__)))
 
         Kernel.var!(beaver_env_region)
       end
@@ -96,7 +98,7 @@ defmodule Beaver.Env do
         end
 
       quote do
-        Kernel.var!(beaver_internal_env_block) = Beaver.MLIR.Block.create()
+        Kernel.var!(beaver_internal_env_block) = Block.create()
         Kernel.var!(unquote(block_var)) = Kernel.var!(beaver_internal_env_block)
         unquote(track)
         Kernel.var!(beaver_internal_env_block)
@@ -105,19 +107,18 @@ defmodule Beaver.Env do
   end
 
   @doc false
-  def compile_err_msg(entity, %Macro.Env{} = env) when is_bitstring(entity) do
-    [file: env.file, line: env.line, description: "no valid #{entity} in the environment"]
-  end
+  def compile_err_msg(entity, %Macro.Env{} = env) when is_bitstring(entity),
+    do: [file: env.file, line: env.line, description: "no valid #{entity} in the environment"]
 
   def compile_err_msg(entity, %Macro.Env{} = env)
-      when entity in [MLIR.Context, MLIR.Region, MLIR.Block] do
+      when entity in [Context, Region, Block] do
     m = Module.split(entity) |> List.last() |> String.downcase()
     compile_err_msg(m, env)
   end
 
   def valid_insertion_point?(ip) do
     case ip do
-      %MLIR.Block{} -> true
+      %Block{} -> true
       %MLIR.PatternRewriter{} -> true
       %MLIR.RewriterBase{} -> true
       _ -> false

@@ -1,16 +1,8 @@
+alias Beaver.Native
+
 alias Beaver.MLIR
 
-alias Beaver.MLIR.{
-  Value,
-  Operation,
-  OpOperand,
-  Region,
-  Module,
-  Attribute,
-  Block,
-  NamedAttribute,
-  Identifier
-}
+alias Beaver.MLIR.{Value, Operation, OpOperand, Region, Module, Attribute, Block, NamedAttribute, Identifier}
 
 defmodule Beaver.Walker do
   alias Beaver.MLIR.CAPI
@@ -58,13 +50,13 @@ defmodule Beaver.Walker do
   @type t :: %__MODULE__{
           container: container(),
           element_module: element_module(),
-          get_num: (container() -> Beaver.Native.I64.t() | integer()) | nil,
+          get_num: (container() -> Native.I64.t() | integer()) | nil,
           get_element: (container(), integer() -> element()) | nil,
           get_first: (container() -> element()) | nil,
           get_next: (element() -> element()) | nil,
           get_parent: (element() -> container()) | nil,
-          parent_equal: (element(), element() -> Beaver.Native.Bool.t() | bool()) | nil,
-          is_null: (element() -> Beaver.Native.Bool.t() | bool()) | nil,
+          parent_equal: (element(), element() -> Native.Bool.t() | bool()) | nil,
+          is_null: (element() -> Native.Bool.t() | bool()) | nil,
           this: element() | non_neg_integer() | nil,
           num: non_neg_integer() | nil
         }
@@ -96,9 +88,7 @@ defmodule Beaver.Walker do
   end
 
   # Extract a container could be traversed by walker from an `Beaver.MLIR.Operation` or a `Beaver.MLIR.Module`.
-  defp extract_container(%Module{} = module) do
-    Operation.from_module(module)
-  end
+  defp extract_container(%Module{} = module), do: Operation.from_module(module)
 
   defp extract_container(%{
          operands: %Beaver.Walker{container: container},
@@ -106,20 +96,12 @@ defmodule Beaver.Walker do
          results: %Beaver.Walker{container: container},
          successors: %Beaver.Walker{container: container},
          regions: %Beaver.Walker{container: container}
-       }) do
-    container
-  end
+       }),
+       do: container
 
-  defp extract_container(container) do
-    container
-  end
+  defp extract_container(container), do: container
 
-  defp new(
-         container,
-         element_module,
-         get_num: get_num,
-         get_element: get_element
-       )
+  defp new(container, element_module, get_num: get_num, get_element: get_element)
        when is_function(get_num, 1) and
               is_function(get_element, 2) do
     container = %container_module{} = extract_container(container)
@@ -133,9 +115,7 @@ defmodule Beaver.Walker do
     }
   end
 
-  defp new(
-         container,
-         element_module,
+  defp new(container, element_module,
          get_first: get_first,
          get_next: get_next,
          get_parent: get_parent,
@@ -162,53 +142,29 @@ defmodule Beaver.Walker do
   @doc """
   Returns an enumerable of the operands of an `operation()`.
   """
-  def operands(op) do
-    new(
-      op,
-      Value,
-      get_num: &CAPI.mlirOperationGetNumOperands/1,
-      get_element: &CAPI.mlirOperationGetOperand/2
-    )
-  end
+  def operands(op),
+    do: new(op, Value, get_num: &CAPI.mlirOperationGetNumOperands/1, get_element: &CAPI.mlirOperationGetOperand/2)
 
   @spec results(operation()) :: Enumerable.t()
   @doc """
   Returns an enumerable of the results of an `operation()`.
   """
-  def results(op) do
-    new(
-      op,
-      Value,
-      get_num: &CAPI.mlirOperationGetNumResults/1,
-      get_element: &CAPI.mlirOperationGetResult/2
-    )
-  end
+  def results(op),
+    do: new(op, Value, get_num: &CAPI.mlirOperationGetNumResults/1, get_element: &CAPI.mlirOperationGetResult/2)
 
   @spec regions(operation()) :: Enumerable.t()
   @doc """
   Returns an enumerable of the regions of an `operation()`.
   """
-  def regions(op) do
-    new(
-      op,
-      Region,
-      get_num: &CAPI.mlirOperationGetNumRegions/1,
-      get_element: &CAPI.mlirOperationGetRegion/2
-    )
-  end
+  def regions(op),
+    do: new(op, Region, get_num: &CAPI.mlirOperationGetNumRegions/1, get_element: &CAPI.mlirOperationGetRegion/2)
 
   @spec successors(operation()) :: Enumerable.t()
   @doc """
   Returns an enumerable of the successor blocks of an `operation()`.
   """
-  def successors(op) do
-    new(
-      op,
-      Block,
-      get_num: &CAPI.mlirOperationGetNumSuccessors/1,
-      get_element: &CAPI.mlirOperationGetSuccessor/2
-    )
-  end
+  def successors(op),
+    do: new(op, Block, get_num: &CAPI.mlirOperationGetNumSuccessors/1, get_element: &CAPI.mlirOperationGetSuccessor/2)
 
   @spec attributes(operation()) :: Enumerable.t()
   @doc """
@@ -229,11 +185,9 @@ defmodule Beaver.Walker do
         inherent_count = native_integer(CAPI.beaverOperationGetNumInherentAttributes(o))
 
         na =
-          if i < inherent_count do
-            CAPI.beaverOperationGetInherentAttribute(o, i)
-          else
-            CAPI.mlirOperationGetDiscardableAttribute(o, i - inherent_count)
-          end
+          if i < inherent_count,
+            do: CAPI.beaverOperationGetInherentAttribute(o, i),
+            else: CAPI.mlirOperationGetDiscardableAttribute(o, i - inherent_count)
 
         named_attribute_tuple(na)
       end
@@ -243,14 +197,10 @@ defmodule Beaver.Walker do
   @spec inherent_attributes(operation()) :: Enumerable.t()
   @doc "Returns the attached inherent/property attributes of an operation."
   def inherent_attributes(op) do
-    new(
-      op,
-      {Identifier, Attribute},
+    new(op, {Identifier, Attribute},
       get_num: &CAPI.beaverOperationGetNumInherentAttributes/1,
       get_element: fn operation, index ->
-        operation
-        |> CAPI.beaverOperationGetInherentAttribute(index)
-        |> named_attribute_tuple()
+        operation |> CAPI.beaverOperationGetInherentAttribute(index) |> named_attribute_tuple()
       end
     )
   end
@@ -258,49 +208,33 @@ defmodule Beaver.Walker do
   @spec discardable_attributes(operation()) :: Enumerable.t()
   @doc "Returns the discardable metadata attributes of an operation."
   def discardable_attributes(op) do
-    new(
-      op,
-      {Identifier, Attribute},
+    new(op, {Identifier, Attribute},
       get_num: &CAPI.mlirOperationGetNumDiscardableAttributes/1,
       get_element: fn operation, index ->
-        operation
-        |> CAPI.mlirOperationGetDiscardableAttribute(index)
-        |> named_attribute_tuple()
+        operation |> CAPI.mlirOperationGetDiscardableAttribute(index) |> named_attribute_tuple()
       end
     )
   end
 
-  defp named_attribute_tuple(named_attribute) do
-    {
-      MLIR.NamedAttribute.name(named_attribute),
-      MLIR.NamedAttribute.attribute(named_attribute)
-    }
-  end
+  defp named_attribute_tuple(named_attribute),
+    do: {MLIR.NamedAttribute.name(named_attribute), MLIR.NamedAttribute.attribute(named_attribute)}
 
   defp native_integer(value) when is_integer(value), do: value
-  defp native_integer(value), do: Beaver.Native.to_term(value)
+  defp native_integer(value), do: Native.to_term(value)
 
   @doc """
   Returns an enumerable of the arguments of an `Block.t()`
   """
   @spec arguments(Block.t()) :: Enumerable.t()
-  def arguments(%Block{} = block) do
-    new(
-      block,
-      Value,
-      get_num: &CAPI.mlirBlockGetNumArguments/1,
-      get_element: &CAPI.mlirBlockGetArgument/2
-    )
-  end
+  def arguments(%Block{} = block),
+    do: new(block, Value, get_num: &CAPI.mlirBlockGetNumArguments/1, get_element: &CAPI.mlirBlockGetArgument/2)
 
   @spec operations(Block.t()) :: Enumerable.t()
   @doc """
   Returns an enumerable of the operations of an `Block.t()`
   """
   def operations(%Block{} = block) do
-    new(
-      block,
-      Operation,
+    new(block, Operation,
       get_first: &CAPI.mlirBlockGetFirstOperation/1,
       get_next: &CAPI.mlirOperationGetNextInBlock/1,
       get_parent: &CAPI.mlirOperationGetBlock/1,
@@ -313,9 +247,7 @@ defmodule Beaver.Walker do
   Returns an enumerable of the blocks of an `Region.t()`
   """
   def blocks(%Region{} = region) do
-    new(
-      region,
-      Block,
+    new(region, Block,
       get_first: &CAPI.mlirRegionGetFirstBlock/1,
       get_next: &CAPI.mlirBlockGetNextInRegion/1,
       get_parent: &CAPI.mlirBlockGetParentRegion/1,
@@ -328,13 +260,11 @@ defmodule Beaver.Walker do
   Returns an enumerable of the uses of an `Value.t()`
   """
   def uses(%Value{} = value) do
-    new(
-      value,
-      OpOperand,
+    new(value, OpOperand,
       get_first: &CAPI.mlirValueGetFirstUse/1,
       get_next: &CAPI.mlirOpOperandGetNextUse/1,
       get_parent: &CAPI.mlirOpOperandGetValue/1,
-      is_null: fn x -> CAPI.mlirOpOperandIsNull(x) |> Beaver.Native.to_term() end
+      is_null: fn x -> CAPI.mlirOpOperandIsNull(x) |> Native.to_term() end
     )
   end
 
@@ -356,10 +286,7 @@ defmodule Beaver.Walker do
   def fetch(%__MODULE__{element_module: {Identifier, Attribute}} = walker, key) do
     walker
     |> Enum.find(fn {name, _attribute} ->
-      with name_str <-
-             name
-             |> MLIR.CAPI.mlirIdentifierStr()
-             |> MLIR.to_string() do
+      with name_str <- name |> MLIR.CAPI.mlirIdentifierStr() |> MLIR.to_string() do
         name_str == to_string(key)
       end
     end)
@@ -380,14 +307,10 @@ defmodule Beaver.Walker do
   end
 
   @impl Access
-  def get_and_update(_data, _key, _function) do
-    raise "get_and_update not supported"
-  end
+  def get_and_update(_data, _key, _function), do: raise("get_and_update not supported")
 
   @impl Access
-  def pop(_data, _key) do
-    raise "pop not supported"
-  end
+  def pop(_data, _key), do: raise("pop not supported")
 
   @type mlir() :: container() | element()
 
@@ -403,12 +326,7 @@ defmodule Beaver.Walker do
   - Use `defpat` if you want MLIR's greedy pattern application based on benefits instead of implementing something alike yourself.
   - You can run traversals in a MLIR pass by calling them in `run/1` so that it joins the general MLIR pass manager's orchestration and will be run in parallel when possible.
   """
-  @spec traverse(
-          mlir(),
-          any(),
-          (mlir(), any() -> {mlir(), any()}),
-          (mlir(), any() -> {mlir(), any()})
-        ) ::
+  @spec traverse(mlir(), any(), (mlir(), any() -> {mlir(), any()}), (mlir(), any() -> {mlir(), any()})) ::
           {mlir(), any()}
   def traverse(mlir, acc, pre, post) when is_function(pre, 2) and is_function(post, 2) do
     mlir = extract_container(mlir)
@@ -416,43 +334,28 @@ defmodule Beaver.Walker do
   end
 
   # traverse the nested with the walker
-  defp do_traverse(%__MODULE__{} = walker, acc, pre, post) do
-    do_traverse(Enum.to_list(walker), acc, pre, post)
-  end
+  defp do_traverse(%__MODULE__{} = walker, acc, pre, post),
+    do: do_traverse(Enum.to_list(walker), acc, pre, post)
 
   defp do_traverse(list, acc, pre, post) when is_list(list) do
-    :lists.mapfoldl(
-      fn x, acc ->
-        do_traverse(x, acc, pre, post)
-      end,
-      acc,
-      list
-    )
+    :lists.mapfoldl(fn x, acc -> do_traverse(x, acc, pre, post) end, acc, list)
   end
 
-  defp do_traverse(%Operation{} = operation, acc, pre, post) do
-    {operation, acc} = pre.(operation, acc)
+  defp do_traverse(%Operation{} = op, acc, pre, post) do
+    {op, acc} = pre.(op, acc)
 
-    {_operands, acc} =
-      operands(operation)
-      |> Enum.map(fn value -> {:operand, value} end)
-      |> do_traverse(acc, pre, post)
+    {_operands, acc} = operands(op) |> Enum.map(fn value -> {:operand, value} end) |> do_traverse(acc, pre, post)
 
-    {_attributes, acc} = attributes(operation) |> do_traverse(acc, pre, post)
+    {_attributes, acc} = attributes(op) |> do_traverse(acc, pre, post)
 
-    {_results, acc} =
-      results(operation)
-      |> Enum.map(fn value -> {:result, value} end)
-      |> do_traverse(acc, pre, post)
+    {_results, acc} = results(op) |> Enum.map(fn value -> {:result, value} end) |> do_traverse(acc, pre, post)
 
-    {_regions, acc} = regions(operation) |> do_traverse(acc, pre, post)
+    {_regions, acc} = regions(op) |> do_traverse(acc, pre, post)
 
     {_successors, acc} =
-      successors(operation)
-      |> Enum.map(fn successor -> {:successor, successor} end)
-      |> do_traverse(acc, pre, post)
+      successors(op) |> Enum.map(fn successor -> {:successor, successor} end) |> do_traverse(acc, pre, post)
 
-    post.(operation, acc)
+    post.(op, acc)
   end
 
   defp do_traverse(%Region{} = region, acc, pre, post) do
@@ -465,10 +368,7 @@ defmodule Beaver.Walker do
   defp do_traverse(%Block{} = block, acc, pre, post) do
     {block, acc} = pre.(block, acc)
 
-    {_arguments, acc} =
-      arguments(block)
-      |> Enum.map(fn value -> {:argument, value} end)
-      |> do_traverse(acc, pre, post)
+    {_arguments, acc} = arguments(block) |> Enum.map(fn value -> {:argument, value} end) |> do_traverse(acc, pre, post)
 
     {_operations, acc} = operations(block) |> do_traverse(acc, pre, post)
 
@@ -496,12 +396,7 @@ defmodule Beaver.Walker do
     {named_attribute, acc}
   end
 
-  defp do_traverse(
-         {%Identifier{} = name, %Attribute{} = attribute},
-         acc,
-         pre,
-         post
-       ) do
+  defp do_traverse({%Identifier{} = name, %Attribute{} = attribute}, acc, pre, post) do
     {{name, attribute}, acc} = pre.({name, attribute}, acc)
     post.({name, attribute}, acc)
   end
@@ -543,21 +438,15 @@ defmodule Beaver.Walker do
     def count(%Beaver.Walker{container: container, get_num: get_num})
         when is_function(get_num, 1) do
       count = get_num.(container)
-      {:ok, if(is_integer(count), do: count, else: Beaver.Native.to_term(count))}
+      {:ok, if(is_integer(count), do: count, else: Native.to_term(count))}
     end
 
-    def count(%Beaver.Walker{}) do
-      {:error, __MODULE__}
-    end
+    def count(%Beaver.Walker{}), do: {:error, __MODULE__}
 
     @spec member?(Beaver.Walker.t(), Beaver.Walker.element()) ::
             {:ok, boolean()} | {:error, module()}
-    def member?(
-          %Beaver.Walker{element_module: element_module} = walker,
-          %element_module{} = element
-        ) do
-      {:ok, Enum.any?(walker, &MLIR.equal?(&1, element))}
-    end
+    def member?(%Beaver.Walker{element_module: element_module} = walker, %element_module{} = element),
+      do: {:ok, Enum.any?(walker, &MLIR.equal?(&1, element))}
 
     @spec member?(Beaver.Walker.t(), Beaver.Walker.element()) ::
             {:ok, boolean()} | {:error, module()}
@@ -571,7 +460,7 @@ defmodule Beaver.Walker do
           %element_module{} = element
         )
         when is_function(get_parent, 1) and is_function(parent_equal, 2) do
-      is_member = parent_equal.(container, get_parent.(element)) |> Beaver.Native.to_term()
+      is_member = parent_equal.(container, get_parent.(element)) |> Native.to_term()
       {:ok, is_member}
     end
 
@@ -580,18 +469,13 @@ defmodule Beaver.Walker do
     def slice(walker = %Beaver.Walker{container: container, get_element: get_element})
         when is_function(get_element, 2) do
       case count(walker) do
-        {:ok, count} ->
-          {:ok, count, slicing_fun(container, get_element)}
-
-        error ->
-          error
+        {:ok, count} -> {:ok, count, slicing_fun(container, get_element)}
+        error -> error
       end
     end
 
     def slice(%Beaver.Walker{get_first: get_first, get_next: get_next})
-        when is_function(get_first, 1) and is_function(get_next, 1) do
-      {:error, __MODULE__}
-    end
+        when is_function(get_first, 1) and is_function(get_next, 1), do: {:error, __MODULE__}
 
     defp slicing_fun(container, get_element) do
       fn start, length, step ->
@@ -606,22 +490,14 @@ defmodule Beaver.Walker do
     # Do nothing special receiving :halt or :suspend
     def reduce(_walker, {:halt, acc}, _fun), do: {:halted, acc}
 
-    def reduce(walker, {:suspend, acc}, fun),
-      do: {:suspended, acc, &reduce(walker, &1, fun)}
+    def reduce(walker, {:suspend, acc}, fun), do: {:suspended, acc, &reduce(walker, &1, fun)}
 
     # Reduce by index
-    def reduce(
-          %Beaver.Walker{get_element: get_element, this: nil, num: nil} = walker,
-          {:cont, acc},
-          fun
-        )
+    def reduce(%Beaver.Walker{get_element: get_element, this: nil, num: nil} = walker, {:cont, acc}, fun)
         when is_function(get_element, 2) do
       case count(walker) do
-        {:ok, count} ->
-          reduce(%Beaver.Walker{walker | this: 0, num: count}, {:cont, acc}, fun)
-
-        error ->
-          error
+        {:ok, count} -> reduce(%Beaver.Walker{walker | this: 0, num: count}, {:cont, acc}, fun)
+        error -> error
       end
     end
 
@@ -685,14 +561,11 @@ defmodule Beaver.Walker do
 
     defp expect_element!(%module{} = element, module), do: element
 
-    defp expect_element!(%module{}, expected) do
-      raise "Expected element module #{expected}, got #{module}"
-    end
+    defp expect_element!(%module{}, expected), do: raise("Expected element module #{expected}, got #{module}")
 
     defp expect_element!({%module_a{}, %module_b{}} = element, {module_a, module_b}), do: element
 
-    defp expect_element!({%module_a{}, %module_b{}}, expected) do
-      raise "Expected element module #{inspect(expected)}, got #{inspect({module_a, module_b})}"
-    end
+    defp expect_element!({%module_a{}, %module_b{}}, expected),
+      do: raise("Expected element module #{inspect(expected)}, got #{inspect({module_a, module_b})}")
   end
 end

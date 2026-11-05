@@ -11,19 +11,10 @@ defmodule Beaver.Shadow.TuneReport do
   alias Beaver.Shadow.Probe
   alias Beaver.Shadow.Tuning
 
-  defstruct [
-    :fixture,
-    :generated_at,
-    :llvm_revision,
-    :prebuilt_dir,
-    :target,
-    :config_space_digest,
-    :records,
-    :winner,
-    :probes,
-    :latency_winner,
-    :structural_vs_latency
-  ]
+  defstruct ~w(
+    fixture generated_at llvm_revision prebuilt_dir target config_space_digest records winner probes
+    latency_winner structural_vs_latency
+  )a
 
   @type t() :: %__MODULE__{
           fixture: atom(),
@@ -117,9 +108,8 @@ defmodule Beaver.Shadow.TuneReport do
     |> Kernel.<>("\n")
   end
 
-  defp config_row(config) do
-    "| #{config.index} | #{config.num_warps} | #{config.num_stages || "-"} | #{config.num_ctas || "-"} |"
-  end
+  defp config_row(config),
+    do: "| #{config.index} | #{config.num_warps} | #{config.num_stages || "-"} | #{config.num_ctas || "-"} |"
 
   defp record_row(record) do
     proxy = record.structural_proxy
@@ -139,8 +129,7 @@ defmodule Beaver.Shadow.TuneReport do
   defp proxy_field(nil, _field), do: "-"
   defp proxy_field(proxy, field), do: Map.get(proxy, field) || "-"
 
-  defp reduction(%{baseline: baseline, optimized: optimized}) when baseline > 0,
-    do: "-#{baseline - optimized}"
+  defp reduction(%{baseline: baseline, optimized: optimized}) when baseline > 0, do: "-#{baseline - optimized}"
 
   defp reduction(_proxy), do: "-"
 
@@ -159,11 +148,9 @@ defmodule Beaver.Shadow.TuneReport do
   defp latency_winner_text(%__MODULE__{latency_winner: winner}) do
     gpu_ns = winner.timings && Map.get(winner.timings, :gpu_ns)
 
-    if is_number(gpu_ns) do
-      "config #{winner.config.index} (num_warps #{winner.config.num_warps}) at #{gpu_ns}ns."
-    else
-      "config #{winner.config.index} (num_warps #{winner.config.num_warps}), latency unknown."
-    end
+    if is_number(gpu_ns),
+      do: "config #{winner.config.index} (num_warps #{winner.config.num_warps}) at #{gpu_ns}ns.",
+      else: "config #{winner.config.index} (num_warps #{winner.config.num_warps}), latency unknown."
   end
 
   defp correlation_text(nil) do
@@ -171,9 +158,8 @@ defmodule Beaver.Shadow.TuneReport do
       "(no GPU measurements or no variance in the structural proxy)."
   end
 
-  defp correlation_text(rho) when is_number(rho) do
-    "Spearman(structural optimized count, GPU latency): #{Float.round(rho, 3)}"
-  end
+  defp correlation_text(rho) when is_number(rho),
+    do: "Spearman(structural optimized count, GPU latency): #{Float.round(rho, 3)}"
 
   defp probe_row(%{config: config, result: result}) do
     text =

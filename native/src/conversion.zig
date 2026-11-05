@@ -17,10 +17,7 @@ const TypeDispatcher = kinda.callback_runtime.Dispatcher(.{
     "target_materialization",
     "target_materialization_1_to_n",
 });
-const PatternDispatcher = kinda.callback_runtime.Dispatcher(.{
-    "conversion_pattern",
-    "conversion_pattern_1_to_n",
-});
+const PatternDispatcher = kinda.callback_runtime.Dispatcher(.{ "conversion_pattern", "conversion_pattern_1_to_n" });
 
 const ConversionProfile = struct {
     duration_ns: u64 = 0,
@@ -108,12 +105,7 @@ fn systemNs() i64 {
     return std.math.cast(i64, timestamp_ns) orelse std.math.maxInt(i64);
 }
 
-fn handleSlice(
-    comptime Kind: type,
-    environment: beam.env,
-    count: isize,
-    values: [*c]Kind.T,
-) !beam.term {
+fn handleSlice(comptime Kind: type, environment: beam.env, count: isize, values: [*c]Kind.T) !beam.term {
     const len: usize = @intCast(count);
     if (len == 0) {
         const empty = [_]beam.term{};
@@ -225,8 +217,7 @@ const LegalityState = struct {
     }
 
     fn callback(operation: mlir_capi.Operation.T, user_data: ?*anyopaque) callconv(.c) c.MlirConversionTargetLegality {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse
-            return c.MLIR_CONVERSION_TARGET_LEGALITY_ILLEGAL));
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.MLIR_CONVERSION_TARGET_LEGALITY_ILLEGAL));
         const environment = e.enif_alloc_env() orelse
             return c.MLIR_CONVERSION_TARGET_LEGALITY_ILLEGAL;
         const operation_term = kinda.callback_adapter.handle(mlir_capi.Operation, environment, operation) catch {
@@ -319,15 +310,8 @@ fn addLegality(
     else
         mlir_capi.StringRef.T{ .data = null, .length = 0 };
 
-    if (kind == .recursively_legal and callback_term != null and
-        beam.is_nil2(environment, callback_term.?))
-    {
-        c.mlirConversionTargetMarkOpRecursivelyLegal(
-            registration.target,
-            name,
-            null,
-            null,
-        );
+    if (kind == .recursively_legal and callback_term != null and beam.is_nil2(environment, callback_term.?)) {
+        c.mlirConversionTargetMarkOpRecursivelyLegal(registration.target, name, null, null);
         return beam.make_atom(environment, "ok");
     }
 
@@ -425,8 +409,7 @@ const TypeCallbackState = struct {
         converted_type: [*c]mlir_capi.Type.T,
         user_data: ?*anyopaque,
     ) callconv(.c) c.MlirTypeConverterConversionStatus {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse
-            return c.MlirTypeConverterConversionStatusFailure));
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.MlirTypeConverterConversionStatusFailure));
         const environment = e.enif_alloc_env() orelse
             return c.MlirTypeConverterConversionStatusFailure;
         const type_term = kinda.callback_adapter.handle(mlir_capi.Type, environment, type_) catch {
@@ -453,8 +436,7 @@ const TypeCallbackState = struct {
         results: mlir_capi.TypeConverterConversionResults.T,
         user_data: ?*anyopaque,
     ) callconv(.c) c.MlirTypeConverterConversionStatus {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse
-            return c.MlirTypeConverterConversionStatusFailure));
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.MlirTypeConverterConversionStatusFailure));
         const environment = e.enif_alloc_env() orelse
             return c.MlirTypeConverterConversionStatusFailure;
         const type_term = kinda.callback_adapter.handle(mlir_capi.Type, environment, type_) catch {
@@ -488,8 +470,7 @@ const TypeCallbackState = struct {
         location: mlir_capi.Location.T,
         user_data: ?*anyopaque,
     ) callconv(.c) mlir_capi.Value.T {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse
-            return .{ .ptr = null }));
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse return .{ .ptr = null }));
         const environment = e.enif_alloc_env() orelse return .{ .ptr = null };
         const args = .{
             beam.make_i64(environment, systemNs()),
@@ -525,8 +506,7 @@ const TypeCallbackState = struct {
         original_type: mlir_capi.Type.T,
         user_data: ?*anyopaque,
     ) callconv(.c) mlir_capi.Value.T {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse
-            return .{ .ptr = null }));
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse return .{ .ptr = null }));
         const environment = e.enif_alloc_env() orelse return .{ .ptr = null };
         const args = .{
             beam.make_i64(environment, systemNs()),
@@ -568,8 +548,7 @@ const TypeCallbackState = struct {
         outputs: [*c]mlir_capi.Value.T,
         user_data: ?*anyopaque,
     ) callconv(.c) mlir_capi.LogicalResult.T {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse
-            return c.beaverLogicalResultFailure()));
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.beaverLogicalResultFailure()));
         const environment = e.enif_alloc_env() orelse return c.beaverLogicalResultFailure();
         const original_term = if (c.mlirTypeIsNull(original_type))
             beam.make_nil(environment)
@@ -628,8 +607,7 @@ const TypeMappingState = struct {
         converted_type: [*c]mlir_capi.Type.T,
         user_data: ?*anyopaque,
     ) callconv(.c) c.MlirTypeConverterConversionStatus {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse
-            return c.MlirTypeConverterConversionStatusFailure));
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.MlirTypeConverterConversionStatusFailure));
 
         for (self.sources) |source| {
             if (c.mlirTypeEqual(type_, source)) {
@@ -886,8 +864,7 @@ const ConversionPatternState = struct {
         rewriter: mlir_capi.ConversionPatternRewriter.T,
         user_data: ?*anyopaque,
     ) callconv(.c) mlir_capi.LogicalResult.T {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse
-            return c.beaverLogicalResultFailure()));
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.beaverLogicalResultFailure()));
         const environment = e.enif_alloc_env() orelse return c.beaverLogicalResultFailure();
         const args = .{
             beam.make_i64(environment, systemNs()),
@@ -919,8 +896,7 @@ const ConversionPatternState = struct {
         rewriter: mlir_capi.ConversionPatternRewriter.T,
         user_data: ?*anyopaque,
     ) callconv(.c) mlir_capi.LogicalResult.T {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse
-            return c.beaverLogicalResultFailure()));
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.beaverLogicalResultFailure()));
         const environment = e.enif_alloc_env() orelse return c.beaverLogicalResultFailure();
         const count: usize = @intCast(n_ranges);
         const ranges = beam.allocator.alloc(beam.term, count) catch {

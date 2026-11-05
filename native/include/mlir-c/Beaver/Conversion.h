@@ -13,8 +13,8 @@ extern "C" {
 /// borrowed reference to `typeConverter`; callers must destroy the patterns
 /// before destroying the converter, matching MLIR's normal conversion
 /// lifetime contract.
-MLIR_CAPI_EXPORTED void beaverPopulateExScalarConversionPatterns(
-    MlirRewritePatternSet patterns, MlirTypeConverter typeConverter);
+MLIR_CAPI_EXPORTED void beaverPopulateExScalarConversionPatterns(MlirRewritePatternSet patterns,
+                                                                 MlirTypeConverter typeConverter);
 
 #ifdef __cplusplus
 }

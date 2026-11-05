@@ -1,3 +1,6 @@
+alias Beaver.MLIR.Value
+alias Beaver.Changeset
+
 defmodule Beaver.Pattern do
   @moduledoc """
   Beaver pattern DSL for MLIR, a PDL frontend in Elixir.
@@ -54,8 +57,7 @@ defmodule Beaver.Pattern do
   defmacro attribute(a) do
     quote do
       mlir do
-        Beaver.MLIR.Dialect.PDL.attribute(value: unquote(a)) >>>
-          ~t{!pdl.attribute}
+        Beaver.MLIR.Dialect.PDL.attribute(value: unquote(a)) >>> ~t{!pdl.attribute}
       end
     end
   end
@@ -107,62 +109,43 @@ defmodule Beaver.Pattern do
         repl = opts |> Keyword.fetch!(:with)
 
         pdl_handler =
-          case MLIR.Value.owner(repl) do
-            {:ok, owner} ->
-              owner |> Beaver.MLIR.Operation.name()
-
-            _ ->
-              raise "not a pdl handler"
+          case Value.owner(repl) do
+            {:ok, owner} -> owner |> Beaver.MLIR.Operation.name()
+            _ -> raise "not a pdl handler"
           end
 
         case pdl_handler do
           "pdl.result" ->
-            Beaver.MLIR.Dialect.PDL.replace(
-              opValue: unquote(root),
-              replValues: repl,
-              operand_segment_sizes: :infer
-            ) >>> []
+            Beaver.MLIR.Dialect.PDL.replace(opValue: unquote(root), replValues: repl, operand_segment_sizes: :infer) >>>
+              []
 
           "pdl.operation" ->
-            Beaver.MLIR.Dialect.PDL.replace(
-              opValue: unquote(root),
-              replOperation: repl,
-              operandSegmentSizes: :infer
-            ) >>> []
+            Beaver.MLIR.Dialect.PDL.replace(opValue: unquote(root), replOperation: repl, operandSegmentSizes: :infer) >>>
+              []
         end
       end
     end
   end
 
   @doc false
-  def gen_pdl(blk, %Beaver.Changeset{context: ctx}, %MLIR.Type{} = type) do
+  def gen_pdl(blk, %Changeset{context: ctx}, %MLIR.Type{} = type) do
     mlir ip: blk, ctx: ctx do
       Beaver.MLIR.Dialect.PDL.type(constantType: type) >>> ~t{!pdl.type}
     end
   end
 
-  def gen_pdl(blk, %Beaver.Changeset{context: ctx}, %MLIR.Attribute{} = attribute) do
+  def gen_pdl(blk, %Changeset{context: ctx}, %MLIR.Attribute{} = attribute) do
     mlir ip: blk, ctx: ctx do
-      Beaver.MLIR.Dialect.PDL.attribute(value: attribute) >>>
-        ~t{!pdl.attribute}
+      Beaver.MLIR.Dialect.PDL.attribute(value: attribute) >>> ~t{!pdl.attribute}
     end
   end
 
-  def gen_pdl(_, _, %MLIR.Value{} = value) do
-    value
-  end
+  def gen_pdl(_, _, %Value{} = value), do: value
 
-  def gen_pdl(
-        blk,
-        %Beaver.Changeset{context: context} = changeset,
-        %Beaver.Deferred{} = deferred
-      ) do
-    gen_pdl(blk, changeset, Beaver.Deferred.resolve(deferred, context))
-  end
+  def gen_pdl(blk, %Changeset{context: ctx} = changeset, %Beaver.Deferred{} = deferred),
+    do: gen_pdl(blk, changeset, Beaver.Deferred.resolve(deferred, ctx))
 
-  def gen_pdl(_, _, element) do
-    raise "fail to generate pdl handle for element: #{inspect(element)}"
-  end
+  def gen_pdl(_, _, element), do: raise("fail to generate pdl handle for element: #{inspect(element)}")
 
   @doc """
   The difference between a pdl.operation creation in a match body and a rewrite body:
@@ -170,7 +153,7 @@ defmodule Beaver.Pattern do
   - in a rewrite body, all variables are considered bound before creation pdl ops
   """
   def create_operation(
-        %Beaver.Changeset{
+        %Changeset{
           name: op_name,
           attributes: attributes,
           operands: operands,
@@ -195,8 +178,7 @@ defmodule Beaver.Pattern do
         end
         |> Enum.map(&gen_pdl(block, changeset, &1))
 
-      Beaver.MLIR.Dialect.PDL.operation(
-        loc,
+      Beaver.MLIR.Dialect.PDL.operation(loc,
         operand_values: operands,
         attributeValues: attributes,
         typeValues: results,
@@ -210,14 +192,7 @@ defmodule Beaver.Pattern do
   @doc """
   Evaluate SSA as ops in a rewrite block. Note that function is only public so that it could be used in a AST.
   """
-  def eval_rewrite(%Beaver.SSA{
-        op: op_name,
-        arguments: arguments,
-        results: result_types,
-        ctx: ctx,
-        ip: block,
-        loc: loc
-      }) do
+  def eval_rewrite(%Beaver.SSA{op: op_name, arguments: arguments, results: result_types, ctx: ctx, ip: block, loc: loc}) do
     ods_operands =
       case MLIR.ODS.Dump.lookup(op_name) do
         {:ok, op_dump} -> Enum.map(op_dump["operands"], & &1["name"])
@@ -227,16 +202,10 @@ defmodule Beaver.Pattern do
     {operands, attributes} =
       Enum.split_with(arguments, fn
         {k, _v} -> Atom.to_string(k) in ods_operands
-        %MLIR.Value{} -> true
+        %Value{} -> true
       end)
 
-    changeset = %Beaver.Changeset{
-      name: op_name,
-      attributes: attributes,
-      operands: operands,
-      location: loc,
-      context: ctx
-    }
+    changeset = %Changeset{name: op_name, attributes: attributes, operands: operands, location: loc, context: ctx}
 
     result_types_unwrap =
       case result_types do
@@ -246,30 +215,21 @@ defmodule Beaver.Pattern do
       end
       |> Enum.map(&gen_pdl(block, changeset, &1))
 
-    op =
-      %Beaver.Changeset{changeset | results: result_types_unwrap}
-      |> Beaver.Changeset.reorder_operands()
-      |> create_operation(block)
+    op = %Changeset{changeset | results: result_types_unwrap} |> Changeset.reorder_operands() |> create_operation(block)
 
-    results =
-      result_types_unwrap |> Enum.with_index() |> Enum.map(fn {_, i} -> result(block, op, i) end)
+    results = result_types_unwrap |> Enum.with_index() |> Enum.map(fn {_, i} -> result(block, op, i) end)
 
     results = if length(results) == 1, do: List.first(results), else: results
 
     case result_types do
-      [{:op, _types}] ->
-        {op, results}
-
-      _ ->
-        results
+      [{:op, _types}] -> {op, results}
+      _ -> results
     end
   end
 
-  defp result(blk, %MLIR.Value{} = v, i)
-       when is_integer(i) do
+  defp result(blk, %Value{} = v, i) when is_integer(i) do
     mlir ip: blk, ctx: MLIR.context(v) do
-      PDL.result(v, index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), i)) >>>
-        ~t{!pdl.value}
+      PDL.result(v, index: Beaver.MLIR.Attribute.integer(Beaver.MLIR.Type.i32(), i)) >>> ~t{!pdl.value}
     end
   end
 end

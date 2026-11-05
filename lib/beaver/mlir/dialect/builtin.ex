@@ -16,12 +16,7 @@ defmodule Beaver.MLIR.Dialect.Builtin do
       ctx = Beaver.Env.context()
 
       location =
-        Keyword.get(unquote(attrs), :loc) ||
-          Beaver.MLIR.Location.file(
-            name: __ENV__.file,
-            line: __ENV__.line,
-            ctx: ctx
-          )
+        Keyword.get(unquote(attrs), :loc) || Beaver.MLIR.Location.file(name: __ENV__.file, line: __ENV__.line, ctx: ctx)
 
       module = Beaver.MLIR.CAPI.mlirModuleCreateEmpty(location)
 

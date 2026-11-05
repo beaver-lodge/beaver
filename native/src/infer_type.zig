@@ -146,11 +146,7 @@ const ShapedTypeCollector = struct {
     }
 };
 
-fn inferTypesWithoutDiagnostics(
-    environment: beam.env,
-    _: c_int,
-    args: [*c]const beam.term,
-) !beam.term {
+fn inferTypesWithoutDiagnostics(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     var request = try Request.init(environment, args);
     defer request.deinit();
     var collector = TypeCollector.init();
@@ -176,11 +172,7 @@ fn inferTypesWithoutDiagnostics(
     return collector.toTerm(environment);
 }
 
-fn inferShapedTypesWithoutDiagnostics(
-    environment: beam.env,
-    _: c_int,
-    args: [*c]const beam.term,
-) !beam.term {
+fn inferShapedTypesWithoutDiagnostics(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     var request = try Request.init(environment, args);
     defer request.deinit();
     var collector = ShapedTypeCollector.init();
@@ -210,12 +202,7 @@ fn withDiagnostics(comptime inference: anytype) type {
     return struct {
         fn run(environment: beam.env, argc: c_int, args: [*c]const beam.term) !beam.term {
             const context = try mlir_capi.Context.resource.fetch(environment, args[1]);
-            return diagnostic.call_with_diagnostics(
-                environment,
-                context,
-                inference,
-                .{ environment, argc, args },
-            );
+            return diagnostic.call_with_diagnostics(environment, context, inference, .{ environment, argc, args });
         }
     };
 }

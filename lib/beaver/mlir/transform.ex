@@ -1,3 +1,6 @@
+alias Beaver.MLIR.{CAPI, Operation}
+alias Beaver.Deferred
+
 defmodule Beaver.MLIR.Transform do
   @moduledoc """
   Transform dialect execution and transformations MLIR provides by default.
@@ -52,8 +55,7 @@ defmodule Beaver.MLIR.Transform do
     %FixedPoint{
       name: opts |> Keyword.get(:name, "CompositeFixedPointPass") |> validate_fixed_point_name!(),
       pipeline: opts |> Keyword.fetch!(:pipeline) |> validate_fixed_point_pipeline!(),
-      max_iterations:
-        opts |> Keyword.get(:max_iterations, 10) |> validate_fixed_point_max_iterations!(),
+      max_iterations: opts |> Keyword.get(:max_iterations, 10) |> validate_fixed_point_max_iterations!(),
       on_convergence_failure:
         opts
         |> Keyword.get(:on_convergence_failure, :error)
@@ -61,14 +63,12 @@ defmodule Beaver.MLIR.Transform do
     }
   end
 
-  def composite_fixed_point(other) do
-    raise ArgumentError, "fixed-point options must be a keyword list, got: #{inspect(other)}"
-  end
+  def composite_fixed_point(other),
+    do: raise(ArgumentError, "fixed-point options must be a keyword list, got: #{inspect(other)}")
 
   defp validate_fixed_point_options!(opts) do
-    unless Keyword.keyword?(opts) do
-      raise ArgumentError, "fixed-point options must be a keyword list"
-    end
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, "fixed-point options must be a keyword list")
 
     supported = [:name, :pipeline, :max_iterations, :on_convergence_failure]
 
@@ -81,44 +81,37 @@ defmodule Beaver.MLIR.Transform do
   end
 
   defp validate_fixed_point_name!(name) do
-    unless is_binary(name) and name != "" do
-      raise ArgumentError, ":name must be a non-empty string"
-    end
+    unless is_binary(name) and name != "",
+      do: raise(ArgumentError, ":name must be a non-empty string")
 
     name
   end
 
   defp validate_fixed_point_pipeline!(pipeline) do
-    unless is_list(pipeline) and pipeline != [] do
-      raise ArgumentError, ":pipeline must be a non-empty Composer pass list"
-    end
+    unless is_list(pipeline) and pipeline != [],
+      do: raise(ArgumentError, ":pipeline must be a non-empty Composer pass list")
 
     pipeline
   end
 
   defp validate_fixed_point_max_iterations!(max_iterations) do
-    unless is_integer(max_iterations) and max_iterations > 0 do
-      raise ArgumentError, ":max_iterations must be a positive integer"
-    end
+    unless is_integer(max_iterations) and max_iterations > 0,
+      do: raise(ArgumentError, ":max_iterations must be a positive integer")
 
     max_iterations
   end
 
   defp validate_convergence_failure_action!(failure_action) do
-    unless failure_action in [:warn, :error, :silent] do
-      raise ArgumentError,
-            ":on_convergence_failure must be :warn, :error, or :silent"
-    end
+    unless failure_action in [:warn, :error, :silent],
+      do: raise(ArgumentError, ":on_convergence_failure must be :warn, :error, or :silent")
 
     failure_action
   end
 
   @doc "Returns whether the linked LLVM can configure convergence failure behavior."
   @spec composite_fixed_point_failure_action_supported?() :: boolean()
-  def composite_fixed_point_failure_action_supported? do
-    MLIR.CAPI.beaverCompositeFixedPointFailureActionSupported()
-    |> Beaver.Native.to_term()
-  end
+  def composite_fixed_point_failure_action_supported?,
+    do: CAPI.beaverCompositeFixedPointFailureActionSupported() |> Beaver.Native.to_term()
 
   defmodule Result do
     @moduledoc "The result of successfully applying a named transform sequence."
@@ -127,7 +120,7 @@ defmodule Beaver.MLIR.Transform do
     defstruct [:payload, :sequence, :diagnostics]
 
     @type t() :: %__MODULE__{
-            payload: MLIR.Module.t() | MLIR.Operation.t(),
+            payload: MLIR.Module.t() | Operation.t(),
             sequence: String.t(),
             diagnostics: [term()]
           }
@@ -139,18 +132,9 @@ defmodule Beaver.MLIR.Transform do
     defexception [:kind, :reason, diagnostics: [], sequence: nil]
 
     @type kind() ::
-            :invalid_schedule
-            | :silenceable_failure
-            | :definite_failure
-            | :evaluation_failure
-            | :constraint_failure
+            :invalid_schedule | :silenceable_failure | :definite_failure | :evaluation_failure | :constraint_failure
 
-    @type t() :: %__MODULE__{
-            kind: kind(),
-            reason: term(),
-            diagnostics: [term()],
-            sequence: String.t() | nil
-          }
+    @type t() :: %__MODULE__{kind: kind(), reason: term(), diagnostics: [term()], sequence: String.t() | nil}
 
     @impl true
     def message(%__MODULE__{} = error) do
@@ -163,40 +147,25 @@ defmodule Beaver.MLIR.Transform do
           :constraint_failure -> "transform schedule constraints failed"
         end
 
-      prefix =
-        if error.sequence do
-          prefix <> " (#{error.sequence})"
-        else
-          prefix
-        end
+      prefix = if error.sequence, do: prefix <> " (#{error.sequence})", else: prefix
 
       details = if is_nil(error.reason), do: prefix, else: prefix <> ": " <> inspect(error.reason)
 
-      if error.diagnostics == [] do
-        details
-      else
-        MLIR.Diagnostic.format(error.diagnostics, details)
-      end
+      if error.diagnostics == [],
+        do: details,
+        else: MLIR.Diagnostic.format(error.diagnostics, details)
     end
   end
 
-  @type schedule_input() ::
-          MLIR.Module.t()
-          | MLIR.Operation.t()
-          | binary()
-          | Schedule.Resolved.t()
+  @type schedule_input() :: MLIR.Module.t() | Operation.t() | binary() | Schedule.Resolved.t()
 
   @type execution_option() ::
-          {:sequence, String.t()}
-          | {:expensive_checks, boolean()}
-          | {:enforce_single_top_level_transform_op, boolean()}
+          {:sequence, String.t()} | {:expensive_checks, boolean()} | {:enforce_single_top_level_transform_op, boolean()}
 
   @doc "Whether the linked LLVM supports packed tile-size and interchange parameters."
   @spec packed_params_supported?() :: boolean()
-  def packed_params_supported? do
-    MLIR.CAPI.beaverTransformPackedParamsSupported()
-    |> Beaver.Native.to_term()
-  end
+  def packed_params_supported?,
+    do: CAPI.beaverTransformPackedParamsSupported() |> Beaver.Native.to_term()
 
   @doc """
   Applies a named Transform dialect sequence to a payload operation or module.
@@ -205,14 +174,11 @@ defmodule Beaver.MLIR.Transform do
   and single-top-level-transform enforcement both default to `true` and can be
   configured independently.
   """
-  @spec apply_named_sequence(
-          MLIR.Module.t() | MLIR.Operation.t(),
-          schedule_input(),
-          [execution_option()]
-        ) :: {:ok, Result.t()} | {:error, Error.t()}
+  @spec apply_named_sequence(MLIR.Module.t() | Operation.t(), schedule_input(), [execution_option()]) ::
+          {:ok, Result.t()} | {:error, Error.t()}
   def apply_named_sequence(payload, schedule, opts \\ []) do
     with :ok <- validate_execution_options(opts),
-         payload_operation <- MLIR.Operation.from_module(payload),
+         payload_operation <- Operation.from_module(payload),
          context <- MLIR.context(payload_operation) do
       Schedule.with_module(schedule, context, fn schedule_module ->
         execute_loaded_schedule(payload, payload_operation, schedule, schedule_module, opts)
@@ -221,11 +187,7 @@ defmodule Beaver.MLIR.Transform do
   rescue
     exception in [ArgumentError] ->
       {:error,
-       %Error{
-         kind: :invalid_schedule,
-         reason: Exception.message(exception),
-         sequence: Keyword.get(opts, :sequence)
-       }}
+       %Error{kind: :invalid_schedule, reason: Exception.message(exception), sequence: Keyword.get(opts, :sequence)}}
   end
 
   defp execute_loaded_schedule(payload, payload_operation, schedule, schedule_module, opts) do
@@ -233,14 +195,7 @@ defmodule Beaver.MLIR.Transform do
 
     case Schedule.find_sequence(schedule_module, sequence) do
       {:ok, transform_root} ->
-        apply_with_options(
-          payload,
-          payload_operation,
-          schedule_module,
-          transform_root,
-          sequence,
-          opts
-        )
+        apply_with_options(payload, payload_operation, schedule_module, transform_root, sequence, opts)
 
       {:error, error} ->
         {:error, error}
@@ -248,11 +203,8 @@ defmodule Beaver.MLIR.Transform do
   end
 
   @doc "Bang variant of `apply_named_sequence/3`."
-  @spec apply_named_sequence!(
-          MLIR.Module.t() | MLIR.Operation.t(),
-          schedule_input(),
-          [execution_option()]
-        ) :: MLIR.Module.t() | MLIR.Operation.t()
+  @spec apply_named_sequence!(MLIR.Module.t() | Operation.t(), schedule_input(), [execution_option()]) ::
+          MLIR.Module.t() | Operation.t()
   def apply_named_sequence!(payload, schedule, opts \\ []) do
     case apply_named_sequence(payload, schedule, opts) do
       {:ok, %Result{payload: transformed}} -> transformed
@@ -267,97 +219,72 @@ defmodule Beaver.MLIR.Transform do
   def execute!(payload, schedule, opts \\ []), do: apply_named_sequence!(payload, schedule, opts)
 
   @doc "Creates Transform dialect's `!transform.any_op` type."
-  def any_op_type(opts \\ []) do
-    Beaver.Deferred.from_opts(opts, &MLIR.CAPI.mlirTransformAnyOpTypeGet/1)
-  end
+  def any_op_type(opts \\ []),
+    do: Deferred.from_opts(opts, &CAPI.mlirTransformAnyOpTypeGet/1)
 
   @doc "Creates Transform dialect's `!transform.any_value` type."
-  def any_value_type(opts \\ []) do
-    Beaver.Deferred.from_opts(opts, &MLIR.CAPI.mlirTransformAnyValueTypeGet/1)
-  end
+  def any_value_type(opts \\ []),
+    do: Deferred.from_opts(opts, &CAPI.mlirTransformAnyValueTypeGet/1)
 
   @doc "Creates Transform dialect's `!transform.any_param` type."
-  def any_param_type(opts \\ []) do
-    Beaver.Deferred.from_opts(opts, &MLIR.CAPI.mlirTransformAnyParamTypeGet/1)
-  end
+  def any_param_type(opts \\ []),
+    do: Deferred.from_opts(opts, &CAPI.mlirTransformAnyParamTypeGet/1)
 
   @doc "Creates an operation-specific Transform handle type."
-  def operation_type(operation_name, opts \\ []) when is_binary(operation_name) do
-    Beaver.Deferred.from_opts(opts, fn context ->
-      MLIR.CAPI.mlirTransformOperationTypeGet(
-        context,
-        MLIR.StringRef.create(operation_name)
-      )
+  def operation_type(op_name, opts \\ []) when is_binary(op_name) do
+    Deferred.from_opts(opts, fn context ->
+      CAPI.mlirTransformOperationTypeGet(context, MLIR.StringRef.create(op_name))
     end)
   end
 
   @doc "Creates a Transform parameter type wrapping an MLIR type."
   def param_type(type) do
     case type do
-      %MLIR.Type{} ->
-        MLIR.CAPI.mlirTransformParamTypeGet(MLIR.context(type), type)
-
-      %Beaver.Deferred{} = deferred ->
-        Beaver.Deferred.defer(&param_type(Beaver.Deferred.resolve(deferred, &1)))
+      %MLIR.Type{} -> CAPI.mlirTransformParamTypeGet(MLIR.context(type), type)
+      %Deferred{} = deferred -> Deferred.defer(&param_type(Deferred.resolve(deferred, &1)))
     end
   end
 
-  defp apply_with_options(
-         payload,
-         payload_operation,
-         schedule_module,
-         transform_root,
-         sequence,
-         opts
-       ) do
+  defp apply_with_options(payload, payload_operation, schedule_module, transform_root, sequence, opts) do
     context = MLIR.context(payload_operation)
-    transform_options = MLIR.CAPI.mlirTransformOptionsCreate()
+    transform_options = CAPI.mlirTransformOptionsCreate()
 
     try do
-      MLIR.CAPI.mlirTransformOptionsEnableExpensiveChecks(
-        transform_options,
-        Keyword.get(opts, :expensive_checks, true)
-      )
+      CAPI.mlirTransformOptionsEnableExpensiveChecks(transform_options, Keyword.get(opts, :expensive_checks, true))
 
-      MLIR.CAPI.mlirTransformOptionsEnforceSingleTopLevelTransformOp(
+      CAPI.mlirTransformOptionsEnforceSingleTopLevelTransformOp(
         transform_options,
         Keyword.get(opts, :enforce_single_top_level_transform_op, true)
       )
 
       {logical_result, diagnostics} =
-        MLIR.CAPI.mlirTransformApplyNamedSequenceWithDiagnostics(
+        CAPI.mlirTransformApplyNamedSequenceWithDiagnostics(
           context,
           payload_operation,
           transform_root,
-          MLIR.Operation.from_module(schedule_module),
+          Operation.from_module(schedule_module),
           transform_options
         )
 
       diagnostics = MLIR.Diagnostic.process(diagnostics)
 
-      if MLIR.LogicalResult.success?(logical_result) do
-        {:ok, %Result{payload: payload, sequence: sequence, diagnostics: diagnostics}}
-      else
-        {:error,
-         %Error{
-           kind: classify_failure(diagnostics),
-           reason: :transform_application_failed,
-           diagnostics: diagnostics,
-           sequence: sequence
-         }}
-      end
+      if MLIR.LogicalResult.success?(logical_result),
+        do: {:ok, %Result{payload: payload, sequence: sequence, diagnostics: diagnostics}},
+        else:
+          {:error,
+           %Error{
+             kind: classify_failure(diagnostics),
+             reason: :transform_application_failed,
+             diagnostics: diagnostics,
+             sequence: sequence
+           }}
     after
-      MLIR.CAPI.mlirTransformOptionsDestroy(transform_options)
+      CAPI.mlirTransformOptionsDestroy(transform_options)
     end
   end
 
-  defp classify_failure(diagnostics) do
-    if Enum.any?(diagnostics, &definite_diagnostic?/1) do
-      :definite_failure
-    else
-      :silenceable_failure
-    end
-  end
+  defp classify_failure(diagnostics),
+    do: if(Enum.any?(diagnostics, &definite_diagnostic?/1), do: :definite_failure, else: :silenceable_failure)
 
   # The upstream C entry point intentionally flattens DiagnosedSilenceableFailure
   # to LogicalResult. Definite failures retain stable diagnostic wording; all
@@ -374,15 +301,10 @@ defmodule Beaver.MLIR.Transform do
   end
 
   defp validate_execution_options(opts) do
-    unless Keyword.keyword?(opts) do
-      raise ArgumentError, "transform execution options must be a keyword list"
-    end
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, "transform execution options must be a keyword list")
 
-    supported = [
-      :sequence,
-      :expensive_checks,
-      :enforce_single_top_level_transform_op
-    ]
+    supported = [:sequence, :expensive_checks, :enforce_single_top_level_transform_op]
 
     case Keyword.keys(opts) -- supported do
       [] ->
@@ -393,11 +315,8 @@ defmodule Beaver.MLIR.Transform do
         end
 
         case Keyword.get(opts, :sequence, "__transform_main") do
-          sequence when is_binary(sequence) and sequence != "" ->
-            :ok
-
-          sequence ->
-            raise ArgumentError, ":sequence must be a non-empty string, got: #{inspect(sequence)}"
+          sequence when is_binary(sequence) and sequence != "" -> :ok
+          sequence -> raise ArgumentError, ":sequence must be a non-empty string, got: #{inspect(sequence)}"
         end
 
       unsupported ->

@@ -1,3 +1,5 @@
+alias Beaver.MLIR.{CAPI, Context}
+
 defmodule Beaver.MLIR.ActionTracing do
   @moduledoc """
   Exposes MLIR Action Tracing through Elixir telemetry.
@@ -51,7 +53,7 @@ defmodule Beaver.MLIR.ActionTracing do
 
     @type t() :: %__MODULE__{
             pid: pid(),
-            context: MLIR.Context.t(),
+            context: Context.t(),
             tags: [String.t()] | nil,
             locations: [String.t()] | nil,
             skip: %{optional(String.t()) => non_neg_integer()},
@@ -62,9 +64,7 @@ defmodule Beaver.MLIR.ActionTracing do
   end
 
   @doc false
-  def global_registrar_child_specs do
-    [{Registry, keys: :duplicate, name: @registry}]
-  end
+  def global_registrar_child_specs, do: [{Registry, keys: :duplicate, name: @registry}]
 
   @doc """
   Attaches an action tracing session to `context`.
@@ -74,8 +74,8 @@ defmodule Beaver.MLIR.ActionTracing do
   `detach/1` when done. The session is detached automatically when the context
   is destroyed.
   """
-  @spec attach(MLIR.Context.t(), keyword()) :: Session.t()
-  def attach(%MLIR.Context{} = context, opts \\ []) do
+  @spec attach(Context.t(), keyword()) :: Session.t()
+  def attach(%Context{} = ctx, opts \\ []) do
     tags = normalize_tags!(Keyword.get(opts, :tags))
     locations = normalize_locations!(Keyword.get(opts, :locations))
     skip = normalize_count_map!(Keyword.get(opts, :skip, %{}), :skip)
@@ -94,18 +94,11 @@ defmodule Beaver.MLIR.ActionTracing do
     skip_json = JSON.encode!(skip)
     limit_json = JSON.encode!(limit)
 
-    session =
-      MLIR.CAPI.beaver_raw_action_tracing_attach(
-        context.ref,
-        filter_json,
-        location_json,
-        skip_json,
-        limit_json
-      )
+    session = CAPI.beaver_raw_action_tracing_attach(ctx.ref, filter_json, location_json, skip_json, limit_json)
 
     {:ok, pid} =
       GenServer.start(__MODULE__, %{
-        context: context,
+        context: ctx,
         session: session,
         telemetry: Keyword.get(opts, :telemetry),
         metadata: metadata,
@@ -114,7 +107,7 @@ defmodule Beaver.MLIR.ActionTracing do
 
     %Session{
       pid: pid,
-      context: context,
+      context: ctx,
       tags: tags,
       locations: locations,
       skip: skip,
@@ -138,7 +131,7 @@ defmodule Beaver.MLIR.ActionTracing do
   def detach(pid) when is_pid(pid), do: GenServer.call(pid, :detach, 5_000)
 
   @doc false
-  def release_context(%MLIR.Context{ref: context_ref}) do
+  def release_context(%Context{ref: context_ref}) do
     if Process.whereis(@registry) do
       Registry.dispatch(@registry, context_ref, fn entries ->
         Enum.each(entries, fn {pid, nil} ->
@@ -159,8 +152,7 @@ defmodule Beaver.MLIR.ActionTracing do
   def init(state) do
     {:ok, _} = Registry.register(@registry, state.context.ref, nil)
 
-    if state.drain_interval_ms,
-      do: Process.send_after(self(), :drain_timer, state.drain_interval_ms)
+    if state.drain_interval_ms, do: Process.send_after(self(), :drain_timer, state.drain_interval_ms)
 
     {:ok, state}
   end
@@ -192,19 +184,13 @@ defmodule Beaver.MLIR.ActionTracing do
 
   defp schedule_drain(%{drain_interval_ms: nil}), do: :ok
 
-  defp schedule_drain(%{drain_interval_ms: ms}) do
-    Process.send_after(self(), :drain_timer, ms)
-  end
+  defp schedule_drain(%{drain_interval_ms: ms}), do: Process.send_after(self(), :drain_timer, ms)
 
-  defp drain_raw_events(state) do
-    state.session
-    |> MLIR.CAPI.beaver_raw_action_tracing_drain()
-    |> JSON.decode!()
-  end
+  defp drain_raw_events(state), do: state.session |> CAPI.beaver_raw_action_tracing_drain() |> JSON.decode!()
 
   defp detach_session(state) do
     try do
-      MLIR.CAPI.beaver_raw_action_tracing_detach(state.session)
+      CAPI.beaver_raw_action_tracing_detach(state.session)
     catch
       :exit, _ -> :ok
     end
@@ -236,19 +222,14 @@ defmodule Beaver.MLIR.ActionTracing do
 
   defp duration(event, %{"t_ns" => before_ns}) do
     case event do
-      %{"t_ns" => after_ns} when is_integer(after_ns) and is_integer(before_ns) ->
-        max(after_ns - before_ns, 0)
-
-      _ ->
-        nil
+      %{"t_ns" => after_ns} when is_integer(after_ns) and is_integer(before_ns) -> max(after_ns - before_ns, 0)
+      _ -> nil
     end
   end
 
   defp duration(_event, _start), do: nil
 
-  defp event_key(event) do
-    {event["tag"], event["depth"]}
-  end
+  defp event_key(event), do: {event["tag"], event["depth"]}
 
   defp emit_events(events, telemetry, extra_metadata) do
     events
@@ -257,20 +238,12 @@ defmodule Beaver.MLIR.ActionTracing do
       {:stop, start, event, duration} ->
         start_event = start || %{"tag" => event["tag"], "depth" => event["depth"]}
 
-        MLIR.Telemetry.emit(
-          [:action, :start],
-          %{},
-          Map.merge(extra_metadata, start_event),
-          telemetry: telemetry
-        )
+        MLIR.Telemetry.emit([:action, :start], %{}, Map.merge(extra_metadata, start_event), telemetry: telemetry)
 
         MLIR.Telemetry.emit(
           [:action, :stop],
           %{duration: duration},
-          Map.merge(extra_metadata, %{
-            "tag" => event["tag"],
-            "depth" => event["depth"]
-          }),
+          Map.merge(extra_metadata, %{"tag" => event["tag"], "depth" => event["depth"]}),
           telemetry: telemetry
         )
 
@@ -284,9 +257,8 @@ defmodule Beaver.MLIR.ActionTracing do
   defp normalize_tags!(nil), do: nil
 
   defp normalize_tags!(tags) when is_list(tags) do
-    unless Enum.all?(tags, &is_binary/1) do
-      raise ArgumentError, ":tags must be a list of strings"
-    end
+    unless Enum.all?(tags, &is_binary/1),
+      do: raise(ArgumentError, ":tags must be a list of strings")
 
     tags
   end
@@ -296,26 +268,22 @@ defmodule Beaver.MLIR.ActionTracing do
   defp normalize_locations!(nil), do: nil
 
   defp normalize_locations!(locations) when is_list(locations) do
-    unless Enum.all?(locations, &is_binary/1) do
-      raise ArgumentError, ":locations must be a list of strings"
-    end
+    unless Enum.all?(locations, &is_binary/1),
+      do: raise(ArgumentError, ":locations must be a list of strings")
 
     locations
   end
 
-  defp normalize_locations!(other),
-    do: raise(ArgumentError, "invalid :locations: #{inspect(other)}")
+  defp normalize_locations!(other), do: raise(ArgumentError, "invalid :locations: #{inspect(other)}")
 
   defp normalize_count_map!(map, _name) when is_map(map) do
-    unless Enum.all?(map, fn {k, v} -> is_binary(k) and is_integer(v) and v >= 0 end) do
-      raise ArgumentError, "count map values must be non-negative integers"
-    end
+    unless Enum.all?(map, fn {k, v} -> is_binary(k) and is_integer(v) and v >= 0 end),
+      do: raise(ArgumentError, "count map values must be non-negative integers")
 
     map
   end
 
-  defp normalize_count_map!(other, name),
-    do: raise(ArgumentError, "invalid #{name}: #{inspect(other)}")
+  defp normalize_count_map!(other, name), do: raise(ArgumentError, "invalid #{name}: #{inspect(other)}")
 
   defp normalize_metadata!(metadata) when is_map(metadata), do: metadata
 

@@ -44,9 +44,7 @@ fn beaver_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const bea
     var invocation = Invocation{};
     try invocation.init(env, args[2]);
     defer invocation.deinit();
-    if (c.beaverLogicalResultIsFailure(invocation.invoke(jit, name, env))) {
-        return Error.JITFunctionCallFailure;
-    }
+    if (c.beaverLogicalResultIsFailure(invocation.invoke(jit, name, env))) return Error.JITFunctionCallFailure;
     return invocation.res_term;
 }
 
@@ -54,18 +52,12 @@ const enif_function_names = @import("enif_list.zig").functions ++ rt.exported;
 
 fn register_jit_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const u8, comptime f: anytype) void {
     const prefixed_name = "_mlir_ciface_" ++ name;
-    const name_str_ref = c.MlirStringRef{
-        .data = prefixed_name.ptr,
-        .length = prefixed_name.len,
-    };
+    const name_str_ref = c.MlirStringRef{ .data = prefixed_name.ptr, .length = prefixed_name.len };
     c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @ptrCast(@constCast(&f)));
 }
 
 fn register_jit_plain_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const u8, comptime f: anytype) void {
-    const name_str_ref = c.MlirStringRef{
-        .data = name.ptr,
-        .length = name.len,
-    };
+    const name_str_ref = c.MlirStringRef{ .data = name.ptr, .length = name.len };
     c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @ptrCast(@constCast(&f)));
 }
 

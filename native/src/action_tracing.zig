@@ -41,11 +41,7 @@ fn destroyTracingState(_: beam.env, object: ?*anyopaque) callconv(.c) void {
     }
 }
 
-const TracingStateResource = kinda.RawResourceType(
-    TracingState,
-    "Beaver.MLIR.ActionTracing",
-    destroyTracingState,
-);
+const TracingStateResource = kinda.RawResourceType(TracingState, "Beaver.MLIR.ActionTracing", destroyTracingState);
 
 fn makeStringRef(env: beam.env, term: beam.term) !mlir_capi.StringRef.T {
     const bin = try beam.get_binary(env, term);

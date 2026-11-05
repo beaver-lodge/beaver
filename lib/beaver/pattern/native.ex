@@ -20,10 +20,7 @@ defmodule Beaver.Pattern.Native.Descriptor do
 
   @type outcome(state) :: {:ok, state} | {:error, state}
   @type callback(state) ::
-          (Beaver.MLIR.RewritePattern.t(),
-           Beaver.MLIR.Operation.t(),
-           Beaver.MLIR.PatternRewriter.t(),
-           state ->
+          (Beaver.MLIR.RewritePattern.t(), Beaver.MLIR.Operation.t(), Beaver.MLIR.PatternRewriter.t(), state ->
              outcome(state))
 
   @type t(state) :: %__MODULE__{
@@ -57,16 +54,7 @@ defmodule Beaver.Pattern.Native do
   alias Beaver.Pattern.Native.Descriptor
   alias Beaver.Walker
 
-  @declaration_options [
-    :root,
-    :operands,
-    :results,
-    :attributes,
-    :benefit,
-    :init_state,
-    :construct,
-    :destruct
-  ]
+  @declaration_options ~w(root operands results attributes benefit init_state construct destruct)a
   @builder_options [:root, :benefit, :init_state, :construct, :destruct]
 
   defmacro __using__(_opts) do
@@ -94,9 +82,7 @@ defmodule Beaver.Pattern.Native do
     validate_keyword!(declaration, [:do | @declaration_options], "defrewrite declaration")
     {body, declaration} = Keyword.pop!(declaration, :do)
 
-    unless Keyword.has_key?(declaration, :root) do
-      raise ArgumentError, "defrewrite requires the :root option"
-    end
+    unless Keyword.has_key?(declaration, :root), do: raise(ArgumentError, "defrewrite requires the :root option")
 
     {operands_pattern, declaration} = Keyword.pop(declaration, :operands)
     {results_pattern, declaration} = Keyword.pop(declaration, :results)
@@ -164,17 +150,13 @@ defmodule Beaver.Pattern.Native do
     construct = Keyword.get(opts, :construct, &Beaver.FallbackPattern.construct/1)
     destruct = Keyword.get(opts, :destruct, &Beaver.FallbackPattern.destruct/1)
 
-    unless is_integer(benefit) and benefit >= 0 do
-      raise ArgumentError, "native rewrite :benefit must be a non-negative integer"
-    end
+    unless is_integer(benefit) and benefit >= 0,
+      do: raise(ArgumentError, "native rewrite :benefit must be a non-negative integer")
 
-    unless is_function(construct, 1) do
-      raise ArgumentError, "native rewrite :construct must be a function of arity 1"
-    end
+    unless is_function(construct, 1),
+      do: raise(ArgumentError, "native rewrite :construct must be a function of arity 1")
 
-    unless is_function(destruct, 1) do
-      raise ArgumentError, "native rewrite :destruct must be a function of arity 1"
-    end
+    unless is_function(destruct, 1), do: raise(ArgumentError, "native rewrite :destruct must be a function of arity 1")
 
     %Descriptor{
       name: name,
@@ -206,26 +188,20 @@ defmodule Beaver.Pattern.Native do
   def normalize_outcome({:ok, new_state}, _state, _name), do: {:ok, new_state}
   def normalize_outcome({:error, new_state}, _state, _name), do: {:error, new_state}
 
-  def normalize_outcome(other, _state, name) do
-    raise RuntimeError,
-          "unsupported outcome #{inspect(other)} returned by native rewrite pattern #{inspect(name)}"
-  end
+  def normalize_outcome(other, _state, name),
+    do: raise(RuntimeError, "unsupported outcome #{inspect(other)} returned by native rewrite pattern #{inspect(name)}")
 
   @doc false
   @spec invoke_body((-> term()), state, atom()) :: Descriptor.outcome(state) when state: var
-  def invoke_body(body, state, name) when is_function(body, 0) do
-    body.() |> normalize_outcome(state, name)
-  end
+  def invoke_body(body, state, name) when is_function(body, 0),
+    do: body.() |> normalize_outcome(state, name)
 
   defp merge_declaration!(opts_or_block, nil), do: opts_or_block
 
-  defp merge_declaration!(opts, block) when is_list(opts) and is_list(block) do
-    Keyword.merge(opts, block)
-  end
+  defp merge_declaration!(opts, block) when is_list(opts) and is_list(block), do: Keyword.merge(opts, block)
 
-  defp merge_declaration!(_opts, _block) do
-    raise ArgumentError, "defrewrite expects a keyword declaration followed by a do block"
-  end
+  defp merge_declaration!(_opts, _block),
+    do: raise(ArgumentError, "defrewrite expects a keyword declaration followed by a do block")
 
   defp decompose_call!(call) do
     case Macro.decompose_call(call) do
@@ -239,19 +215,14 @@ defmodule Beaver.Pattern.Native do
     end
   end
 
-  defp validate_callback_variable!({name, _meta, context})
-       when is_atom(name) and (is_atom(context) or is_nil(context)),
-       do: :ok
+  defp validate_callback_variable!({name, _meta, ctx}) when is_atom(name) and (is_atom(ctx) or is_nil(ctx)), do: :ok
 
-  defp validate_callback_variable!(_other) do
-    raise ArgumentError,
-          "defrewrite callback arguments must be variables; destructure state inside the body"
-  end
+  defp validate_callback_variable!(_other),
+    do: raise(ArgumentError, "defrewrite callback arguments must be variables; destructure state inside the body")
 
   defp validate_keyword!(opts, allowed, description) do
-    unless Keyword.keyword?(opts) do
-      raise ArgumentError, "#{description} must be a keyword list"
-    end
+    unless Keyword.keyword?(opts),
+      do: raise(ArgumentError, "#{description} must be a keyword list")
 
     keys = Keyword.keys(opts)
 
@@ -261,20 +232,16 @@ defmodule Beaver.Pattern.Native do
     end
 
     case keys -- allowed do
-      [] ->
-        opts
-
-      unsupported ->
-        raise ArgumentError, "unsupported #{description} keys: #{inspect(unsupported)}"
+      [] -> opts
+      unsupported -> raise ArgumentError, "unsupported #{description} keys: #{inspect(unsupported)}"
     end
   end
 
   defp validate_list_pattern!(_name, nil), do: :ok
   defp validate_list_pattern!(_name, pattern) when is_list(pattern), do: :ok
 
-  defp validate_list_pattern!(name, _pattern) do
-    raise ArgumentError, "defrewrite :#{name} must be a literal list pattern"
-  end
+  defp validate_list_pattern!(name, _pattern),
+    do: raise(ArgumentError, "defrewrite :#{name} must be a literal list pattern")
 
   defp validate_attributes_pattern!(nil), do: []
 
@@ -289,48 +256,31 @@ defmodule Beaver.Pattern.Native do
 
     names = Enum.map(pairs, &elem(&1, 0))
 
-    if length(names) != length(Enum.uniq(names)) do
-      raise ArgumentError, "defrewrite :attributes contains duplicate names"
-    end
+    if length(names) != length(Enum.uniq(names)),
+      do: raise(ArgumentError, "defrewrite :attributes contains duplicate names")
 
     pairs
   end
 
-  defp validate_attributes_pattern!(_other) do
-    raise ArgumentError,
-          "defrewrite :attributes must be a list of {literal_name, pattern} pairs"
-  end
+  defp validate_attributes_pattern!(_other),
+    do: raise(ArgumentError, "defrewrite :attributes must be a list of {literal_name, pattern} pairs")
 
   defp normalize_root!(root) when is_function(root, 0), do: root.() |> normalize_root!()
   defp normalize_root!(root) when is_atom(root), do: root |> Atom.to_string() |> normalize_root!()
   defp normalize_root!(root) when is_binary(root) and root != "", do: root
 
-  defp normalize_root!(_root) do
-    raise ArgumentError, "native rewrite :root must resolve to a non-empty operation name"
-  end
+  defp normalize_root!(_root),
+    do: raise(ArgumentError, "native rewrite :root must resolve to a non-empty operation name")
 
-  defp build_match_body(
-         operation,
-         state,
-         operands_pattern,
-         results_pattern,
-         attribute_pairs,
-         body,
-         name
-       ) do
+  defp build_match_body(operation, state, operands_pattern, results_pattern, attribute_pairs, body, name) do
     native_module = __MODULE__
 
     normalized_body =
       quote do
-        unquote(native_module).invoke_body(
-          fn -> unquote(body) end,
-          unquote(state),
-          unquote(name)
-        )
+        unquote(native_module).invoke_body(fn -> unquote(body) end, unquote(state), unquote(name))
       end
 
-    attributes_matched =
-      build_attributes_match(operation, state, attribute_pairs, normalized_body)
+    attributes_matched = build_attributes_match(operation, state, attribute_pairs, normalized_body)
 
     results_matched =
       build_list_match(

@@ -1,3 +1,5 @@
+alias Beaver.MLIR.Context
+
 defmodule Beaver.Shadow.OptimizationTrial do
   @moduledoc """
   A reproducible compiler-side optimization trial on real Triton IR.
@@ -20,16 +22,7 @@ defmodule Beaver.Shadow.OptimizationTrial do
   defmodule Result do
     @moduledoc "The audited outcome of one trial."
     @enforce_keys [:input_digest, :baseline, :optimized, :reduced]
-    defstruct [
-      :input_digest,
-      :baseline,
-      :optimized,
-      :reduced,
-      :lowered_to_llvm,
-      :gpu_baseline_ns,
-      :gpu_optimized_ns,
-      :gpu_speedup
-    ]
+    defstruct ~w(input_digest baseline optimized reduced lowered_to_llvm gpu_baseline_ns gpu_optimized_ns gpu_speedup)a
 
     @type t() :: %__MODULE__{
             input_digest: String.t(),
@@ -60,17 +53,12 @@ defmodule Beaver.Shadow.OptimizationTrial do
 
     baseline =
       module
-      |> Beaver.Composer.append(
-        "convert-triton-to-tritongpu{target=#{target}, num-warps=#{num_warps}}"
-      )
+      |> Beaver.Composer.append("convert-triton-to-tritongpu{target=#{target}, num-warps=#{num_warps}}")
       |> Beaver.Composer.run!()
 
     baseline_count = audit_count(baseline)
 
-    optimized =
-      baseline
-      |> Beaver.Composer.append("tritongpu-remove-layout-conversions")
-      |> Beaver.Composer.run!()
+    optimized = baseline |> Beaver.Composer.append("tritongpu-remove-layout-conversions") |> Beaver.Composer.run!()
 
     optimized_count = audit_count(optimized)
 
@@ -96,11 +84,9 @@ defmodule Beaver.Shadow.OptimizationTrial do
       end
 
     gpu_results =
-      if gpu? and lowered_to_llvm do
-        gpu_latency_compare(source_text, context, target, opts)
-      else
-        %{baseline_ns: nil, optimized_ns: nil, speedup: nil}
-      end
+      if gpu? and lowered_to_llvm,
+        do: gpu_latency_compare(source_text, context, target, opts),
+        else: %{baseline_ns: nil, optimized_ns: nil, speedup: nil}
 
     %Result{
       input_digest:
@@ -126,8 +112,8 @@ defmodule Beaver.Shadow.OptimizationTrial do
   to PTX, loaded through `Beaver.MLIR.CUDA`, and launched several times. The
   median launch time in nanoseconds is reported for each variant.
   """
-  @spec gpu_latency_compare(String.t(), MLIR.Context.t(), String.t(), keyword()) :: map()
-  def gpu_latency_compare(source_text, context, target, opts) do
+  @spec gpu_latency_compare(String.t(), Context.t(), String.t(), keyword()) :: map()
+  def gpu_latency_compare(source_text, ctx, target, opts) do
     kernel_name = Keyword.get(opts, :kernel_name, matmul_kernel_name())
     grid = Keyword.get(opts, :grid, {1, 1, 1})
     block = Keyword.get(opts, :block, {128, 1, 1})
@@ -135,32 +121,17 @@ defmodule Beaver.Shadow.OptimizationTrial do
     args = Keyword.get(opts, :args)
     samples = Keyword.get(opts, :samples, 10)
 
-    launch = %{
-      kernel_name: kernel_name,
-      grid: grid,
-      block: block,
-      shared_mem: shared_mem,
-      args: args,
-      samples: samples
-    }
+    launch = %{kernel_name: kernel_name, grid: grid, block: block, shared_mem: shared_mem, args: args, samples: samples}
 
-    baseline_ns =
-      source_text
-      |> compile_and_launch(context, target, launch, remove_layout_conversions: false)
+    baseline_ns = source_text |> compile_and_launch(ctx, target, launch, remove_layout_conversions: false)
 
-    optimized_ns =
-      source_text
-      |> compile_and_launch(context, target, launch, remove_layout_conversions: true)
+    optimized_ns = source_text |> compile_and_launch(ctx, target, launch, remove_layout_conversions: true)
 
-    %{
-      baseline_ns: baseline_ns,
-      optimized_ns: optimized_ns,
-      speedup: speedup(baseline_ns, optimized_ns)
-    }
+    %{baseline_ns: baseline_ns, optimized_ns: optimized_ns, speedup: speedup(baseline_ns, optimized_ns)}
   end
 
-  defp compile_and_launch(source_text, context, target, launch, compile_opts) do
-    module = MLIR.Module.create!(source_text, ctx: context)
+  defp compile_and_launch(source_text, ctx, target, launch, compile_opts) do
+    module = MLIR.Module.create!(source_text, ctx: ctx)
 
     result =
       try do
@@ -177,23 +148,13 @@ defmodule Beaver.Shadow.OptimizationTrial do
     result
   end
 
-  defp llvm_to_ptx(llvm) do
-    llvm
-    |> Beaver.MLIR.Target.LLVMIR.translate!()
-    |> Beaver.MLIR.Target.LLVMIR.compile_to_ptx!(cpu: "sm_80")
-  end
+  defp llvm_to_ptx(llvm),
+    do: llvm |> Beaver.MLIR.Target.LLVMIR.translate!() |> Beaver.MLIR.Target.LLVMIR.compile_to_ptx!(cpu: "sm_80")
 
   defp launch_latency_ns(ptx, launch) do
-    %{
-      kernel_name: kernel_name,
-      grid: grid,
-      block: block,
-      shared_mem: shared_mem,
-      args: args,
-      samples: samples
-    } = launch
+    %{kernel_name: kernel_name, grid: grid, block: block, shared_mem: shared_mem, args: args, samples: samples} = launch
 
-    context = MLIR.Context.create()
+    context = Context.create()
 
     try do
       target = GPU.nvvm_target_attribute(chip: "sm_80", ctx: context)
@@ -220,7 +181,7 @@ defmodule Beaver.Shadow.OptimizationTrial do
       MLIR.Module.destroy(module)
       Enum.at(durations, div(length(durations), 2))
     after
-      MLIR.Context.destroy(context)
+      Context.destroy(context)
     end
   end
 
@@ -233,17 +194,9 @@ defmodule Beaver.Shadow.OptimizationTrial do
     a_data = for _ <- 1..(64 * 64), do: 1.0
     b_data = for _ <- 1..(64 * 64), do: 2.0
 
-    :ok =
-      MLIR.CUDA.memcpy_htod(
-        d_a,
-        a_data |> Enum.map(&<<&1::float-32-little>>) |> IO.iodata_to_binary()
-      )
+    :ok = MLIR.CUDA.memcpy_htod(d_a, a_data |> Enum.map(&<<&1::float-32-little>>) |> IO.iodata_to_binary())
 
-    :ok =
-      MLIR.CUDA.memcpy_htod(
-        d_b,
-        b_data |> Enum.map(&<<&1::float-32-little>>) |> IO.iodata_to_binary()
-      )
+    :ok = MLIR.CUDA.memcpy_htod(d_b, b_data |> Enum.map(&<<&1::float-32-little>>) |> IO.iodata_to_binary())
 
     :ok = MLIR.CUDA.memcpy_htod(d_c, :binary.copy(<<0::32>>, 64 * 64))
 
@@ -277,13 +230,9 @@ defmodule Beaver.Shadow.OptimizationTrial do
   defp speedup(_, nil), do: nil
   defp speedup(baseline, optimized) when baseline > 0, do: baseline / optimized
 
-  defp matmul_kernel_name do
-    "matmul_kernel__Pfp32_Pfp32_Pfp32_i32_i32_i32_i32_i32_i32_i32_i32_i32__12c64_13c64_14c64_15c8"
-  end
+  defp matmul_kernel_name,
+    do: "matmul_kernel__Pfp32_Pfp32_Pfp32_i32_i32_i32_i32_i32_i32_i32_i32_i32__12c64_13c64_14c64_15c8"
 
-  defp audit_count(module) do
-    module
-    |> MLIR.Triton.LayoutAudit.audit()
-    |> Map.fetch!(:operation_count)
-  end
+  defp audit_count(module),
+    do: module |> MLIR.Triton.LayoutAudit.audit() |> Map.fetch!(:operation_count)
 end

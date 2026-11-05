@@ -68,9 +68,7 @@ const ManagerRunner = struct {
     op: ?mlir_capi.Operation.T = null,
     fn init(env: beam.env) !*@This() {
         const this = try beam.allocator.create(@This());
-        if (e.enif_self(env, &this.*.pid) == null) {
-            return Error.@"fail get caller's self pid";
-        }
+        if (e.enif_self(env, &this.*.pid) == null) return Error.@"fail get caller's self pid";
         return this;
     }
     fn run_with_diagnostics(this: @This()) !void {

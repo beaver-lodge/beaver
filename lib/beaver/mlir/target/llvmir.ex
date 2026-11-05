@@ -42,9 +42,7 @@ defmodule Beaver.MLIR.Target.LLVMIR do
     cpu = Keyword.get(opts, :cpu, "sm_80")
     features = Keyword.get(opts, :features, "")
 
-    unless is_binary(cpu) and is_binary(features) do
-      raise ArgumentError, ":cpu and :features must be strings"
-    end
+    unless is_binary(cpu) and is_binary(features), do: raise(ArgumentError, ":cpu and :features must be strings")
 
     MLIR.CAPI.beaver_raw_compile_llvm_ir_to_ptx(llvm_ir, cpu, features)
   end

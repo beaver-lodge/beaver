@@ -10,9 +10,7 @@ defmodule Beaver.MLIR.Dialect.WasmSSA do
   documentation come from the ODS dump.
   """
 
-  use Beaver.MLIR.Dialect,
-    dialect: "wasmssa",
-    ops: Dialect.Registry.ops("wasmssa")
+  use Beaver.MLIR.Dialect, dialect: "wasmssa", ops: Dialect.Registry.ops("wasmssa")
 
   @doc """
   Syntax sugar for `WasmSSA.func` SSA expression, mirroring `Func.func`.
@@ -24,10 +22,7 @@ defmodule Beaver.MLIR.Dialect.WasmSSA do
       unquote(args)
       |> List.wrap()
       |> List.flatten()
-      |> Keyword.put_new(
-        Beaver.MLIR.SymbolTable.attribute_name(),
-        Beaver.MLIR.Attribute.string(unquote(func_name))
-      )
+      |> Keyword.put_new(Beaver.MLIR.SymbolTable.attribute_name(), Beaver.MLIR.Attribute.string(unquote(func_name)))
       |> Keyword.put_new(:loc, Beaver.MLIR.Location.from_env(__ENV__))
       |> then(
         &Beaver.MLIR.Operation.create(%Beaver.SSA{

@@ -1,3 +1,5 @@
+alias Beaver.MLIR.{CAPI, Type}
+
 defmodule Beaver.MLIR.Dialect.MemRef do
   use Beaver
   alias Beaver.MLIR.Attribute
@@ -7,9 +9,7 @@ defmodule Beaver.MLIR.Dialect.MemRef do
   This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect.
   """
 
-  use Beaver.MLIR.Dialect,
-    dialect: "memref",
-    ops: Dialect.Registry.ops("memref")
+  use Beaver.MLIR.Dialect, dialect: "memref", ops: Dialect.Registry.ops("memref")
 
   @global "memref.global"
   @doc """
@@ -33,48 +33,38 @@ defmodule Beaver.MLIR.Dialect.MemRef do
     %Beaver.SSA{ssa | op: @global, arguments: arguments, results: []} |> Beaver.SSA.eval()
   end
 
-  def global(%Beaver.SSA{} = ssa) do
-    Beaver.SSA.eval(%Beaver.SSA{ssa | op: @global})
+  def global(%Beaver.SSA{} = ssa), do: Beaver.SSA.eval(%Beaver.SSA{ssa | op: @global})
+
+  def layout(%Type{} = memref_type) do
+    if not Type.memref?(memref_type),
+      do: raise(ArgumentError, "only ranked memref has layout")
+
+    CAPI.mlirMemRefTypeGetLayout(memref_type)
   end
 
-  def layout(%MLIR.Type{} = memref_type) do
-    if not MLIR.Type.memref?(memref_type) do
-      raise ArgumentError, "only ranked memref has layout"
-    end
+  def strides_and_offset(%Type{ref: ref} = memref_type) do
+    if not Type.memref?(memref_type),
+      do: raise(ArgumentError, "only ranked memref has strides and offset")
 
-    MLIR.CAPI.mlirMemRefTypeGetLayout(memref_type)
-  end
-
-  def strides_and_offset(%MLIR.Type{ref: ref} = memref_type) do
-    if not MLIR.Type.memref?(memref_type) do
-      raise ArgumentError, "only ranked memref has strides and offset"
-    end
-
-    {strides, offset} = MLIR.CAPI.beaver_raw_memref_type_get_strides_and_offset(ref)
+    {strides, offset} = CAPI.beaver_raw_memref_type_get_strides_and_offset(ref)
     {Enum.map(strides, &MLIR.ShapedType.cast_dynamic_magic_number(&1, :stride)), offset}
   end
 
-  def memory_space(%MLIR.Type{} = memref_type) do
+  def memory_space(%Type{} = memref_type) do
     s =
       cond do
-        MLIR.Type.memref?(memref_type) ->
-          MLIR.CAPI.mlirMemRefTypeGetMemorySpace(memref_type)
-
-        MLIR.Type.unranked_memref?(memref_type) ->
-          MLIR.CAPI.mlirUnrankedMemrefGetMemorySpace(memref_type)
-
-        true ->
-          raise ArgumentError, "only memref and unranked memref has memory space"
+        Type.memref?(memref_type) -> CAPI.mlirMemRefTypeGetMemorySpace(memref_type)
+        Type.unranked_memref?(memref_type) -> CAPI.mlirUnrankedMemrefGetMemorySpace(memref_type)
+        true -> raise ArgumentError, "only memref and unranked memref has memory space"
       end
 
     if not MLIR.null?(s), do: s
   end
 
-  def affine_map(%MLIR.Type{} = memref_type) do
-    if not MLIR.Type.memref?(memref_type) do
-      raise ArgumentError, "only ranked memref has affine map"
-    end
+  def affine_map(%Type{} = memref_type) do
+    if not Type.memref?(memref_type),
+      do: raise(ArgumentError, "only ranked memref has affine map")
 
-    MLIR.CAPI.mlirMemRefTypeGetAffineMap(memref_type)
+    CAPI.mlirMemRefTypeGetAffineMap(memref_type)
   end
 end

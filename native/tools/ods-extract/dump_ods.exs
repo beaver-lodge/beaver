@@ -1,7 +1,4 @@
-{opts, _, _} =
-  OptionParser.parse(System.argv(),
-    strict: [mlir_include_dir: :string]
-  )
+{opts, _, _} = OptionParser.parse(System.argv(), strict: [mlir_include_dir: :string])
 
 mlir_include_dir = Path.expand(Keyword.fetch!(opts, :mlir_include_dir))
 

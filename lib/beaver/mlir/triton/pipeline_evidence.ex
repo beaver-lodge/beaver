@@ -14,26 +14,11 @@ defmodule Beaver.MLIR.Triton.PipelineEvidence do
   @shared_memory_limit 16_384
 
   @legacy_reference %{
-    ttir: %{
-      bytes: 10_063,
-      digest: "52fa4ff7f135828ac91dec834dfca5dc319b96e3ae5315d416a16fd4c0111243"
-    },
-    ttgir: %{
-      bytes: 14_495,
-      digest: "7fe8cf171e750c8d26661aa6e101ef871563a956f66a7abbbcc7a604651a0f39"
-    },
-    lowered_mlir: %{
-      bytes: 219_691,
-      digest: "6ff831c7c843ae8dc7b48f187905ec7d167e36ae8837404a125d63006357aa32"
-    },
-    llvm_ir: %{
-      bytes: 160_807,
-      digest: "561afbfe7b2f9b84e2571a8626ea76aa30e72e31f0c10728c931f9536aa8ebe1"
-    },
-    ptx: %{
-      bytes: 36_182,
-      digest: "562cccb7551773ed42c97c47c2aba07828449f9056c9235800ed04a5d84c2d38"
-    },
+    ttir: %{bytes: 10_063, digest: "52fa4ff7f135828ac91dec834dfca5dc319b96e3ae5315d416a16fd4c0111243"},
+    ttgir: %{bytes: 14_495, digest: "7fe8cf171e750c8d26661aa6e101ef871563a956f66a7abbbcc7a604651a0f39"},
+    lowered_mlir: %{bytes: 219_691, digest: "6ff831c7c843ae8dc7b48f187905ec7d167e36ae8837404a125d63006357aa32"},
+    llvm_ir: %{bytes: 160_807, digest: "561afbfe7b2f9b84e2571a8626ea76aa30e72e31f0c10728c931f9536aa8ebe1"},
+    ptx: %{bytes: 36_182, digest: "562cccb7551773ed42c97c47c2aba07828449f9056c9235800ed04a5d84c2d38"},
     shared_memory_bytes: 32_768,
     registers_per_thread: 170,
     stack_frame_bytes: 0,
@@ -41,25 +26,12 @@ defmodule Beaver.MLIR.Triton.PipelineEvidence do
     spill_load_bytes: 0
   }
 
-  @mismatch_domains [
-    :plan_golden_mismatch,
-    :plan_provenance_missing,
-    :unsupported_pipeline_profile,
-    :invalid_num_stages,
-    :num_stages_injection_missing,
-    :pass_registration_missing,
-    :profile_compile_failed,
-    :prefix_verification_failed,
-    :legacy_digest_drift,
-    :smoke_dot_spurious,
-    :native_tensor_missing,
-    :resource_viable,
-    :resource_unchanged,
-    :resource_regressed,
-    :artifact_incomplete,
-    :classification_inconclusive,
-    :seal_invalid
-  ]
+  @mismatch_domains ~w(
+    plan_golden_mismatch plan_provenance_missing unsupported_pipeline_profile invalid_num_stages
+    num_stages_injection_missing pass_registration_missing profile_compile_failed prefix_verification_failed
+    legacy_digest_drift smoke_dot_spurious native_tensor_missing resource_viable resource_unchanged
+    resource_regressed artifact_incomplete classification_inconclusive seal_invalid
+  )a
 
   @doc "Returns the immutable #291 legacy artifact reference."
   @spec legacy_reference() :: map()
@@ -107,8 +79,7 @@ defmodule Beaver.MLIR.Triton.PipelineEvidence do
         pipeline_classification: pipeline_classification,
         resource_classification: resource_classification,
         downstream_authorized:
-          pipeline_classification == :PARITY_PROFILE_GO and
-            resource_classification == :RESOURCE_VIABLE,
+          pipeline_classification == :PARITY_PROFILE_GO and resource_classification == :RESOURCE_VIABLE,
         attempt_ledger: attempt_ledger,
         mismatch_domains: @mismatch_domains
       }
@@ -123,11 +94,8 @@ defmodule Beaver.MLIR.Triton.PipelineEvidence do
 
   @doc "Verifies the content-addressed seal without trusting its classifications."
   @spec verify(map()) :: :ok | {:error, :seal_invalid | :artifact_incomplete}
-  def verify(%{seal_digest: seal_digest} = evidence) when is_binary(seal_digest) do
-    if digest(Map.delete(evidence, :seal_digest)) == seal_digest,
-      do: :ok,
-      else: {:error, :seal_invalid}
-  end
+  def verify(%{seal_digest: seal_digest} = evidence) when is_binary(seal_digest),
+    do: if(digest(Map.delete(evidence, :seal_digest)) == seal_digest, do: :ok, else: {:error, :seal_invalid})
 
   def verify(_evidence), do: {:error, :artifact_incomplete}
 
@@ -154,17 +122,11 @@ defmodule Beaver.MLIR.Triton.PipelineEvidence do
 
   @doc "Canonical digest compatible with the Accendium #291 evidence format."
   @spec digest(term()) :: String.t()
-  def digest(value) do
-    value
-    |> encode()
-    |> then(&:crypto.hash(:sha256, &1))
-    |> Base.encode16(case: :lower)
-  end
+  def digest(value),
+    do: value |> encode() |> then(&:crypto.hash(:sha256, &1)) |> Base.encode16(case: :lower)
 
-  defp fixture_record(%{ttir: ttir, ttgir: ttgir})
-       when is_binary(ttir) and is_binary(ttgir) do
-    {:ok, %{ttir: artifact(ttir), ttgir: artifact(ttgir)}}
-  end
+  defp fixture_record(%{ttir: ttir, ttgir: ttgir}) when is_binary(ttir) and is_binary(ttgir),
+    do: {:ok, %{ttir: artifact(ttir), ttgir: artifact(ttgir)}}
 
   defp fixture_record(_fixture), do: {:error, :artifact_incomplete}
 
@@ -178,28 +140,22 @@ defmodule Beaver.MLIR.Triton.PipelineEvidence do
        })
        when is_binary(lowered_mlir) and is_binary(llvm_ir) and is_binary(ptx) and
               is_integer(shared_memory_bytes) and is_map(resources) and is_list(trace) do
-    required_resources = [
-      :registers_per_thread,
-      :stack_frame_bytes,
-      :spill_store_bytes,
-      :spill_load_bytes
-    ]
+    required_resources = ~w(registers_per_thread stack_frame_bytes spill_store_bytes spill_load_bytes)a
 
-    if Enum.all?(required_resources, &is_integer(resources[&1])) and complete_trace?(trace) do
-      {:ok,
-       %{
-         lowered_mlir: artifact(lowered_mlir),
-         llvm_ir: artifact(llvm_ir),
-         ptx: artifact(ptx),
-         shared_memory_bytes: shared_memory_bytes,
-         resources: Map.take(resources, required_resources),
-         native_tensor: String.contains?(ptx, "mma.sync"),
-         trace: trace,
-         trace_digest: digest(trace)
-       }}
-    else
-      {:error, :artifact_incomplete}
-    end
+    if Enum.all?(required_resources, &is_integer(resources[&1])) and complete_trace?(trace),
+      do:
+        {:ok,
+         %{
+           lowered_mlir: artifact(lowered_mlir),
+           llvm_ir: artifact(llvm_ir),
+           ptx: artifact(ptx),
+           shared_memory_bytes: shared_memory_bytes,
+           resources: Map.take(resources, required_resources),
+           native_tensor: String.contains?(ptx, "mma.sync"),
+           trace: trace,
+           trace_digest: digest(trace)
+         }},
+      else: {:error, :artifact_incomplete}
   end
 
   defp artifact_record(_artifact), do: {:error, :artifact_incomplete}
@@ -207,43 +163,30 @@ defmodule Beaver.MLIR.Triton.PipelineEvidence do
   defp artifact(content), do: %{bytes: byte_size(content), digest: digest(content)}
 
   defp legacy_match?(fixture, legacy) do
-    fixture.ttir == @legacy_reference.ttir and
-      fixture.ttgir == @legacy_reference.ttgir and
-      legacy.lowered_mlir == @legacy_reference.lowered_mlir and
-      legacy.llvm_ir == @legacy_reference.llvm_ir and
-      legacy.ptx == @legacy_reference.ptx and
-      legacy.shared_memory_bytes == @legacy_reference.shared_memory_bytes and
+    fixture.ttir == @legacy_reference.ttir and fixture.ttgir == @legacy_reference.ttgir and
+      legacy.lowered_mlir == @legacy_reference.lowered_mlir and legacy.llvm_ir == @legacy_reference.llvm_ir and
+      legacy.ptx == @legacy_reference.ptx and legacy.shared_memory_bytes == @legacy_reference.shared_memory_bytes and
       Enum.all?(legacy.resources, fn {key, value} -> @legacy_reference[key] == value end)
   end
 
   defp pipeline_classification(plan, true, %{native_tensor: true, trace: trace}) do
-    if plan.profile == :pinned_nvidia_sm100 and
-         plan.provenance == PipelinePlan.pinned_provenance() and
-         trace_matches_plan?(trace, plan),
-       do: :PARITY_PROFILE_GO,
-       else: :PARITY_PROFILE_FAILED
+    if plan.profile == :pinned_nvidia_sm100 and plan.provenance == PipelinePlan.pinned_provenance() and
+         trace_matches_plan?(trace, plan), do: :PARITY_PROFILE_GO, else: :PARITY_PROFILE_FAILED
   end
 
-  defp pipeline_classification(_plan, _legacy_match?, _candidate),
-    do: :PARITY_PROFILE_FAILED
+  defp pipeline_classification(_plan, _legacy_match?, _candidate), do: :PARITY_PROFILE_FAILED
 
   defp resource_classification(legacy, candidate) do
     cond do
-      resource_viable?(candidate) ->
-        :RESOURCE_VIABLE
-
-      resource_regressed?(legacy, candidate) ->
-        :RESOURCE_REGRESSED
-
-      true ->
-        :RESOURCE_UNCHANGED
+      resource_viable?(candidate) -> :RESOURCE_VIABLE
+      resource_regressed?(legacy, candidate) -> :RESOURCE_REGRESSED
+      true -> :RESOURCE_UNCHANGED
     end
   end
 
   defp resource_viable?(candidate) do
     candidate.resources.registers_per_thread <= @register_limit and
-      candidate.shared_memory_bytes <= @shared_memory_limit and
-      zero_stack_and_spill?(candidate.resources)
+      candidate.shared_memory_bytes <= @shared_memory_limit and zero_stack_and_spill?(candidate.resources)
   end
 
   defp resource_regressed?(legacy, candidate) do
@@ -254,10 +197,8 @@ defmodule Beaver.MLIR.Triton.PipelineEvidence do
       candidate.resources.spill_load_bytes > legacy.resources.spill_load_bytes
   end
 
-  defp zero_stack_and_spill?(resources) do
-    resources.stack_frame_bytes == 0 and resources.spill_store_bytes == 0 and
-      resources.spill_load_bytes == 0
-  end
+  defp zero_stack_and_spill?(resources),
+    do: resources.stack_frame_bytes == 0 and resources.spill_store_bytes == 0 and resources.spill_load_bytes == 0
 
   defp complete_trace?(trace) do
     trace
@@ -310,19 +251,12 @@ defmodule Beaver.MLIR.Triton.PipelineEvidence do
   defp encode(value) when is_float(value), do: ["f", :erlang.float_to_binary(value), ";"]
   defp encode(value) when is_atom(value), do: encode(Atom.to_string(value))
 
-  defp encode(value) when is_binary(value),
-    do: ["s", Integer.to_string(byte_size(value)), ":", value]
+  defp encode(value) when is_binary(value), do: ["s", Integer.to_string(byte_size(value)), ":", value]
 
-  defp encode(value) when is_list(value),
-    do: ["l", Integer.to_string(length(value)), ":", Enum.map(value, &encode/1)]
+  defp encode(value) when is_list(value), do: ["l", Integer.to_string(length(value)), ":", Enum.map(value, &encode/1)]
 
   defp encode(value) when is_tuple(value),
-    do: [
-      "t",
-      Integer.to_string(tuple_size(value)),
-      ":",
-      value |> Tuple.to_list() |> Enum.map(&encode/1)
-    ]
+    do: ["t", Integer.to_string(tuple_size(value)), ":", value |> Tuple.to_list() |> Enum.map(&encode/1)]
 
   defp encode(%_struct{} = value), do: value |> Map.from_struct() |> encode()
 

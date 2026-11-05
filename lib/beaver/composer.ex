@@ -1,3 +1,5 @@
+alias Beaver.MLIR.{Operation, StringRef}
+
 defmodule Beaver.Composer do
   import Beaver.MLIR.CAPI
   alias Beaver.MLIR
@@ -7,7 +9,7 @@ defmodule Beaver.Composer do
   This module provide functions to compose and run passes.
   """
   defstruct passes: [], op: nil, ctx: nil
-  @type operation :: MLIR.Module.t() | MLIR.Operation.t()
+  @type operation :: MLIR.Module.t() | Operation.t()
   @type t :: %__MODULE__{passes: list(any()), op: operation}
 
   def new(ctx: ctx), do: %__MODULE__{ctx: ctx}
@@ -15,21 +17,15 @@ defmodule Beaver.Composer do
 
   def new(op), do: %__MODULE__{op: op}
 
-  def append(%op_or_mod{} = composer_or_op, pass)
-      when op_or_mod in [MLIR.Module, MLIR.Operation] do
-    new(composer_or_op) |> append(pass)
-  end
+  def append(%op_or_mod{} = composer_or_op, pass) when op_or_mod in [MLIR.Module, Operation],
+    do: new(composer_or_op) |> append(pass)
 
-  def append(%__MODULE__{passes: passes} = composer, pass),
-    do: %__MODULE__{composer | passes: passes ++ [pass]}
+  def append(%__MODULE__{passes: passes} = composer, pass), do: %__MODULE__{composer | passes: passes ++ [pass]}
 
-  def nested(composer_or_op, op_name, passes) when is_bitstring(op_name) and is_list(passes) do
-    composer_or_op |> append({op_name, passes})
-  end
+  def nested(composer_or_op, op_name, passes) when is_bitstring(op_name) and is_list(passes),
+    do: composer_or_op |> append({op_name, passes})
 
-  def nested(composer_or_op, op_name, pass) do
-    nested(composer_or_op, op_name, [pass])
-  end
+  def nested(composer_or_op, op_name, pass), do: nested(composer_or_op, op_name, [pass])
 
   defp op_name_from_persistent_attributes(pass_module) do
     op_name = pass_module.__info__(:attributes)[:root_op] || []
@@ -38,9 +34,7 @@ defmodule Beaver.Composer do
   end
 
   @doc false
-  def create_pass(%MLIR.Pass{} = pass, _ctx) do
-    pass
-  end
+  def create_pass(%MLIR.Pass{} = pass, _ctx), do: pass
 
   def create_pass(%MLIR.Transform.FixedPoint{} = fixed_point, ctx) do
     if fixed_point.on_convergence_failure != :warn and
@@ -56,7 +50,7 @@ defmodule Beaver.Composer do
       Enum.each(fixed_point.pipeline, &add_pass(inner_pipeline, &1, ctx))
 
       beaverCreateCompositeFixedPointPass(
-        MLIR.StringRef.create(fixed_point.name),
+        StringRef.create(fixed_point.name),
         inner_pipeline,
         fixed_point.max_iterations,
         encode_convergence_failure_action(fixed_point.on_convergence_failure)
@@ -88,37 +82,23 @@ defmodule Beaver.Composer do
   defp add_pipeline(%MLIR.OpPassManager{} = pm, pipeline_str)
        when is_binary(pipeline_str) do
     {res, err} =
-      Beaver.Printer.run(
-        &mlirOpPassManagerAddPipeline(
-          pm,
-          MLIR.StringRef.create(pipeline_str),
-          &1,
-          &2
-        )
-      )
+      Beaver.Printer.run(&mlirOpPassManagerAddPipeline(pm, StringRef.create(pipeline_str), &1, &2))
 
-    if not MLIR.LogicalResult.success?(res) do
-      raise "Unexpected failure parsing pipeline: #{pipeline_str}, #{err}"
-    end
+    if not MLIR.LogicalResult.success?(res), do: raise("Unexpected failure parsing pipeline: #{pipeline_str}, #{err}")
 
     pm
   end
 
-  defp add_pipeline(%MLIR.PassManager{} = pm, pipeline_str)
-       when is_binary(pipeline_str) do
-    pm |> mlirPassManagerGetAsOpPassManager() |> add_pipeline(pipeline_str)
-  end
+  defp add_pipeline(%MLIR.PassManager{} = pm, pipeline_str) when is_binary(pipeline_str),
+    do: pm |> mlirPassManagerGetAsOpPassManager() |> add_pipeline(pipeline_str)
 
   # nested pm
 
   defp add_pass(pm, {op_name, passes}, ctx) when is_binary(op_name) and is_list(passes) do
     npm =
       case pm do
-        %MLIR.PassManager{} ->
-          mlirPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
-
-        %MLIR.OpPassManager{} ->
-          mlirOpPassManagerGetNestedUnder(pm, MLIR.StringRef.create(op_name))
+        %MLIR.PassManager{} -> mlirPassManagerGetNestedUnder(pm, StringRef.create(op_name))
+        %MLIR.OpPassManager{} -> mlirOpPassManagerGetNestedUnder(pm, StringRef.create(op_name))
       end
 
     for pass <- passes do
@@ -126,25 +106,20 @@ defmodule Beaver.Composer do
     end
   end
 
-  defp add_pass(pm, pipeline_str, _ctx) when is_binary(pipeline_str),
-    do: add_pipeline(pm, pipeline_str)
+  defp add_pass(pm, pipeline_str, _ctx) when is_binary(pipeline_str), do: add_pipeline(pm, pipeline_str)
 
-  defp add_pass(%MLIR.OpPassManager{} = pm, pass, ctx),
-    do: mlirOpPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
+  defp add_pass(%MLIR.OpPassManager{} = pm, pass, ctx), do: mlirOpPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
 
-  defp add_pass(%MLIR.PassManager{} = pm, pass, ctx),
-    do: mlirPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
+  defp add_pass(%MLIR.PassManager{} = pm, pass, ctx), do: mlirPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
 
-  defp mlir_op_pass_manager_create do
-    beaverOpPassManagerCreate()
-  end
+  defp mlir_op_pass_manager_create, do: beaverOpPassManagerCreate()
 
   defp encode_convergence_failure_action(:warn), do: 0
   defp encode_convergence_failure_action(:error), do: 1
   defp encode_convergence_failure_action(:silent), do: 2
 
   defp to_pm(%__MODULE__{passes: passes, op: op, ctx: ctx}) do
-    ctx = ctx || MLIR.context(MLIR.Operation.from_module(op))
+    ctx = ctx || MLIR.context(Operation.from_module(op))
 
     pm = mlirPassManagerCreate(ctx)
 
@@ -174,18 +149,13 @@ defmodule Beaver.Composer do
   @spec run!(composer) :: operation
   @spec run!(composer, [run_option]) :: operation
 
-  def run!(
-        composer,
-        opts \\ @run_default_opts
-      ) do
+  def run!(composer, opts \\ @run_default_opts) do
     case run(composer, opts) do
       {:ok, op, []} ->
         op
 
       {:ok, op, diagnostics} ->
-        Logger.warning(
-          "Passes completed with diagnostics:\n" <> MLIR.Diagnostic.format(diagnostics)
-        )
+        Logger.warning("Passes completed with diagnostics:\n" <> MLIR.Diagnostic.format(diagnostics))
 
         op
 
@@ -207,12 +177,9 @@ defmodule Beaver.Composer do
   > thread pool outside BEAM scheduler threads. Nested callback work can expand
   > the pool rather than starving it.
   """
-  def run(
-        %__MODULE__{op: op} = composer,
-        opts \\ @run_default_opts
-      ) do
+  def run(%__MODULE__{op: op} = composer, opts \\ @run_default_opts) do
     print = Keyword.get(opts, :print)
-    ctx = MLIR.context(MLIR.Operation.from_module(op))
+    ctx = MLIR.context(Operation.from_module(op))
     pm = init(composer, opts)
 
     if print do
@@ -222,9 +189,7 @@ defmodule Beaver.Composer do
 
     res = MLIR.PassManager.run(pm, op)
 
-    if print do
-      mlirContextEnableMultithreading(ctx, true)
-    end
+    if print, do: mlirContextEnableMultithreading(ctx, true)
 
     MLIR.PassManager.destroy(pm)
 
@@ -234,18 +199,13 @@ defmodule Beaver.Composer do
     end
   end
 
-  def init(
-        %__MODULE__{} = composer,
-        opts \\ @run_default_opts
-      ) do
+  def init(%__MODULE__{} = composer, opts \\ @run_default_opts) do
     timing = Keyword.get(opts, :timing)
     debug = Keyword.get(opts, :debug)
     verifier = !!Keyword.get(opts, :verifier)
     pm = to_pm(composer)
 
-    if timing do
-      pm |> beaverPassManagerEnableTiming()
-    end
+    if timing, do: pm |> beaverPassManagerEnableTiming()
 
     :ok = MLIR.PassManager.enable_verifier(pm, verifier)
 

@@ -39,9 +39,7 @@ defmodule Beaver.MLIR.Transform.Tuner do
     end
 
     @spec cancel(t()) :: :ok
-    def cancel(%__MODULE__{state: state}) do
-      :ok = :atomics.put(state, 1, 1)
-    end
+    def cancel(%__MODULE__{state: state}), do: :ok = :atomics.put(state, 1, 1)
 
     @spec cancelled?(t()) :: boolean()
     def cancelled?(%__MODULE__{state: state}), do: :atomics.get(state, 1) == 1
@@ -52,13 +50,7 @@ defmodule Beaver.MLIR.Transform.Tuner do
     @enforce_keys [:index, :choices, :status, :duration]
     defstruct [:index, :choices, :status, :schedule, :value, :metadata, :reason, :duration]
 
-    @type status() ::
-            :ok
-            | :evaluation_failure
-            | :invalid_schedule
-            | :constraint_failure
-            | :timeout
-            | :cancelled
+    @type status() :: :ok | :evaluation_failure | :invalid_schedule | :constraint_failure | :timeout | :cancelled
 
     @type t() :: %__MODULE__{
             index: non_neg_integer(),
@@ -122,15 +114,7 @@ defmodule Beaver.MLIR.Transform.Tuner do
 
       MLIR.Telemetry.emit([:autotuning, :start], %{}, search_metadata, opts)
 
-      records =
-        evaluate_candidates(
-          choices,
-          snapshot,
-          sequence,
-          runtime,
-          max_concurrency,
-          timeout
-        )
+      records = evaluate_candidates(choices, snapshot, sequence, runtime, max_concurrency, timeout)
 
       result = %Result{
         candidates: records,
@@ -150,19 +134,11 @@ defmodule Beaver.MLIR.Transform.Tuner do
     end
   end
 
-  defp evaluate_candidates(
-         choices,
-         snapshot,
-         sequence,
-         runtime,
-         max_concurrency,
-         timeout
-       ) do
+  defp evaluate_candidates(choices, snapshot, sequence, runtime, max_concurrency, timeout) do
     indexed = Enum.with_index(choices, fn choices, index -> {index, choices} end)
 
     indexed
-    |> Task.async_stream(
-      &evaluate_candidate(&1, snapshot, sequence, runtime),
+    |> Task.async_stream(&evaluate_candidate(&1, snapshot, sequence, runtime),
       max_concurrency: max_concurrency,
       ordered: true,
       timeout: timeout,
@@ -172,20 +148,10 @@ defmodule Beaver.MLIR.Transform.Tuner do
     |> Enum.map(&candidate_record(&1, sequence, timeout, runtime.telemetry_opts))
   end
 
-  defp candidate_record(
-         {{:ok, %Candidate{} = candidate}, _indexed},
-         _sequence,
-         _timeout,
-         _telemetry_opts
-       ),
-       do: candidate
+  defp candidate_record({{:ok, %Candidate{} = candidate}, _indexed}, _sequence, _timeout, _telemetry_opts),
+    do: candidate
 
-  defp candidate_record(
-         {{:exit, reason}, {index, choices}},
-         sequence,
-         timeout,
-         telemetry_opts
-       ) do
+  defp candidate_record({{:exit, reason}, {index, choices}}, sequence, timeout, telemetry_opts) do
     status = if timeout_exit?(reason), do: :timeout, else: :evaluation_failure
 
     candidate = %Candidate{
@@ -211,24 +177,15 @@ defmodule Beaver.MLIR.Transform.Tuner do
 
   @doc "Passes successful records to an application-defined selection function."
   @spec select(Result.t(), ([Candidate.t()] -> term())) :: term()
-  def select(%Result{candidates: candidates}, selector) when is_function(selector, 1) do
-    candidates
-    |> Enum.filter(&(&1.status == :ok))
-    |> selector.()
-  end
+  def select(%Result{candidates: candidates}, selector) when is_function(selector, 1),
+    do: candidates |> Enum.filter(&(&1.status == :ok)) |> selector.()
 
   defp candidate_choices(schedule, sequence, opts) do
     case Keyword.fetch(opts, :candidates) do
       {:ok, candidates} when is_list(candidates) ->
-        if Enum.all?(candidates, &is_map/1) do
-          {:ok, candidates}
-        else
-          {:error,
-           %Transform.Error{
-             kind: :invalid_schedule,
-             reason: {:invalid_candidates, candidates}
-           }}
-        end
+        if Enum.all?(candidates, &is_map/1),
+          do: {:ok, candidates},
+          else: {:error, %Transform.Error{kind: :invalid_schedule, reason: {:invalid_candidates, candidates}}}
 
       {:ok, candidates} ->
         {:error,
@@ -238,19 +195,11 @@ defmodule Beaver.MLIR.Transform.Tuner do
          }}
 
       :error ->
-        Schedule.enumerate(schedule,
-          sequence: sequence,
-          max_candidates: Keyword.get(opts, :max_candidates, 10_000)
-        )
+        Schedule.enumerate(schedule, sequence: sequence, max_candidates: Keyword.get(opts, :max_candidates, 10_000))
     end
   end
 
-  defp evaluate_candidate(
-         {index, choices},
-         snapshot,
-         sequence,
-         runtime
-       ) do
+  defp evaluate_candidate({index, choices}, snapshot, sequence, runtime) do
     started = System.monotonic_time()
 
     MLIR.Telemetry.emit(
@@ -262,11 +211,9 @@ defmodule Beaver.MLIR.Transform.Tuner do
 
     candidate =
       try do
-        if Cancellation.cancelled?(runtime.cancellation) do
-          candidate(index, choices, :cancelled, started, reason: :cancelled)
-        else
-          resolve_and_evaluate(index, choices, snapshot, sequence, runtime, started)
-        end
+        if Cancellation.cancelled?(runtime.cancellation),
+          do: candidate(index, choices, :cancelled, started, reason: :cancelled),
+          else: resolve_and_evaluate(index, choices, snapshot, sequence, runtime, started)
       rescue
         exception ->
           candidate(index, choices, :evaluation_failure, started,
@@ -283,52 +230,20 @@ defmodule Beaver.MLIR.Transform.Tuner do
     candidate
   end
 
-  defp resolve_and_evaluate(
-         index,
-         choices,
-         snapshot,
-         sequence,
-         runtime,
-         started
-       ) do
-    case Schedule.resolve({:bytecode, snapshot}, choices,
-           sequence: sequence,
-           solver: runtime.solver
-         ) do
-      {:ok, resolved} ->
-        continue_evaluation(index, choices, resolved, sequence, runtime, started)
-
-      {:error, %Transform.Error{} = error} ->
-        candidate(index, choices, error_status(error), started, reason: error)
+  defp resolve_and_evaluate(index, choices, snapshot, sequence, runtime, started) do
+    case Schedule.resolve({:bytecode, snapshot}, choices, sequence: sequence, solver: runtime.solver) do
+      {:ok, resolved} -> continue_evaluation(index, choices, resolved, sequence, runtime, started)
+      {:error, %Transform.Error{} = error} -> candidate(index, choices, error_status(error), started, reason: error)
     end
   end
 
-  defp continue_evaluation(
-         index,
-         choices,
-         resolved,
-         sequence,
-         runtime,
-         started
-       ) do
-    if Cancellation.cancelled?(runtime.cancellation) do
-      candidate(index, choices, :cancelled, started,
-        schedule: resolved,
-        reason: :cancelled
-      )
-    else
-      evaluate_resolved(index, choices, resolved, sequence, runtime, started)
-    end
+  defp continue_evaluation(index, choices, resolved, sequence, runtime, started) do
+    if Cancellation.cancelled?(runtime.cancellation),
+      do: candidate(index, choices, :cancelled, started, schedule: resolved, reason: :cancelled),
+      else: evaluate_resolved(index, choices, resolved, sequence, runtime, started)
   end
 
-  defp evaluate_resolved(
-         index,
-         choices,
-         resolved,
-         sequence,
-         runtime,
-         started
-       ) do
+  defp evaluate_resolved(index, choices, resolved, sequence, runtime, started) do
     context = %{
       index: index,
       choices: choices,
@@ -336,23 +251,15 @@ defmodule Beaver.MLIR.Transform.Tuner do
       cancelled?: fn -> Cancellation.cancelled?(runtime.cancellation) end,
       telemetry: Keyword.get(runtime.telemetry_opts, :telemetry),
       telemetry_metadata:
-        candidate_metadata(index, choices, sequence)
-        |> Map.put(:transform_schedule_digest, resolved.digest)
+        candidate_metadata(index, choices, sequence) |> Map.put(:transform_schedule_digest, resolved.digest)
     }
 
     case call_evaluator(runtime.evaluator, resolved, context) do
       {:ok, value, metadata} ->
-        candidate(index, choices, :ok, started,
-          schedule: resolved,
-          value: value,
-          metadata: metadata
-        )
+        candidate(index, choices, :ok, started, schedule: resolved, value: value, metadata: metadata)
 
       {:error, reason} ->
-        candidate(index, choices, :evaluation_failure, started,
-          schedule: resolved,
-          reason: reason
-        )
+        candidate(index, choices, :evaluation_failure, started, schedule: resolved, reason: reason)
     end
   end
 
@@ -360,17 +267,14 @@ defmodule Beaver.MLIR.Transform.Tuner do
   defp evaluator_and_state(module) when is_atom(module), do: {{:module, module}, nil}
   defp evaluator_and_state(evaluator), do: {evaluator, nil}
 
-  defp call_evaluator({evaluator, state}, resolved, _context) when is_function(evaluator, 1) do
-    normalize_evaluation(evaluator.(resolved), state)
-  end
+  defp call_evaluator({evaluator, state}, resolved, _context) when is_function(evaluator, 1),
+    do: normalize_evaluation(evaluator.(resolved), state)
 
-  defp call_evaluator({evaluator, state}, resolved, context) when is_function(evaluator, 2) do
-    normalize_evaluation(evaluator.(resolved, context), state)
-  end
+  defp call_evaluator({evaluator, state}, resolved, ctx) when is_function(evaluator, 2),
+    do: normalize_evaluation(evaluator.(resolved, ctx), state)
 
-  defp call_evaluator({{:module, module}, state}, resolved, context) do
-    normalize_evaluation(module.evaluate(resolved, context, state), state)
-  end
+  defp call_evaluator({{:module, module}, state}, resolved, ctx),
+    do: normalize_evaluation(module.evaluate(resolved, ctx, state), state)
 
   defp normalize_evaluation({:ok, value, metadata}, _state), do: {:ok, value, metadata}
   defp normalize_evaluation({:ok, value}, state), do: {:ok, value, state}
@@ -381,12 +285,7 @@ defmodule Beaver.MLIR.Transform.Tuner do
     struct!(
       Candidate,
       Keyword.merge(
-        [
-          index: index,
-          choices: choices,
-          status: status,
-          duration: System.monotonic_time() - started
-        ],
+        [index: index, choices: choices, status: status, duration: System.monotonic_time() - started],
         fields
       )
     )
@@ -402,9 +301,7 @@ defmodule Beaver.MLIR.Transform.Tuner do
   defp timeout_duration(:infinity), do: 0
   defp timeout_duration(timeout), do: System.convert_time_unit(timeout, :millisecond, :native)
 
-  defp candidate_metadata(index, choices, sequence) do
-    %{candidate_index: index, choices: choices, sequence: sequence}
-  end
+  defp candidate_metadata(index, choices, sequence), do: %{candidate_index: index, choices: choices, sequence: sequence}
 
   defp emit_candidate_stop(candidate, sequence, telemetry_opts) do
     metadata =
@@ -412,12 +309,7 @@ defmodule Beaver.MLIR.Transform.Tuner do
       |> Map.put(:status, candidate.status)
       |> maybe_put_schedule_digest(candidate.schedule)
 
-    MLIR.Telemetry.emit(
-      [:autotuning, :candidate, :stop],
-      %{duration: candidate.duration},
-      metadata,
-      telemetry_opts
-    )
+    MLIR.Telemetry.emit([:autotuning, :candidate, :stop], %{duration: candidate.duration}, metadata, telemetry_opts)
   end
 
   defp maybe_put_schedule_digest(metadata, %Schedule.Resolved{digest: digest}),
@@ -439,17 +331,7 @@ defmodule Beaver.MLIR.Transform.Tuner do
   end
 
   defp validate_supported_options(opts) do
-    supported = [
-      :sequence,
-      :ctx,
-      :candidates,
-      :max_candidates,
-      :max_concurrency,
-      :timeout,
-      :cancellation,
-      :solver,
-      :telemetry
-    ]
+    supported = ~w(sequence ctx candidates max_candidates max_concurrency timeout cancellation solver telemetry)a
 
     case Keyword.keys(opts) -- supported do
       [] -> :ok
@@ -474,14 +356,9 @@ defmodule Beaver.MLIR.Transform.Tuner do
 
   defp validate_cancellation(opts) do
     case Keyword.get(opts, :cancellation) do
-      nil ->
-        :ok
-
-      %Cancellation{} ->
-        :ok
-
-      value ->
-        invalid_options(":cancellation must be a Cancellation token, got: #{inspect(value)}")
+      nil -> :ok
+      %Cancellation{} -> :ok
+      value -> invalid_options(":cancellation must be a Cancellation token, got: #{inspect(value)}")
     end
   end
 
@@ -493,7 +370,6 @@ defmodule Beaver.MLIR.Transform.Tuner do
     end
   end
 
-  defp invalid_options(reason) do
-    {:error, %Transform.Error{kind: :invalid_schedule, reason: reason}}
-  end
+  defp invalid_options(reason),
+    do: {:error, %Transform.Error{kind: :invalid_schedule, reason: reason}}
 end

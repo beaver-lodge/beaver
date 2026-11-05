@@ -55,18 +55,9 @@ defmodule Beaver.Shadow.Tuning do
   defmodule Record do
     @moduledoc "One tuning evaluation: provenance + decision + observations."
     @enforce_keys [:format, :kernel_digest, :config_space_digest, :config, :status]
-    defstruct [
-      :format,
-      :kernel_digest,
-      :target,
-      :capability,
-      :config_space_digest,
-      :config,
-      :status,
-      :failure,
-      :structural_proxy,
-      :timings
-    ]
+    defstruct ~w(
+      format kernel_digest target capability config_space_digest config status failure structural_proxy timings
+    )a
 
     @type t() :: %__MODULE__{
             format: pos_integer(),
@@ -117,16 +108,7 @@ defmodule Beaver.Shadow.Tuning do
     are the extensions the upstream protocol is missing.
     """
     @enforce_keys [:fn, :key, :best_config, :configs_timings, :cache_hit]
-    defstruct [
-      :fn,
-      :key,
-      :best_config,
-      :configs_timings,
-      :duration,
-      :cache_hit,
-      :structural_proxy,
-      :failure
-    ]
+    defstruct ~w(fn key best_config configs_timings duration cache_hit structural_proxy failure)a
 
     @type t() :: %__MODULE__{
             fn: String.t(),
@@ -169,16 +151,7 @@ defmodule Beaver.Shadow.Tuning do
         Beaver.Triton.register(context)
 
         Enum.map(configs, fn config ->
-          evaluate(
-            fixture,
-            config,
-            context,
-            target,
-            config_space_digest,
-            kernel_digest,
-            gpu?,
-            launch
-          )
+          evaluate(fixture, config, context, target, config_space_digest, kernel_digest, gpu?, launch)
         end)
       after
         MLIR.Context.destroy(context)
@@ -196,16 +169,13 @@ defmodule Beaver.Shadow.Tuning do
   @doc "Stable identity of a tuning record; observations are excluded."
   @spec identity(Record.t()) :: String.t()
   def identity(%Record{} = record) do
-    record
-    |> stable_facts()
-    |> then(&:crypto.hash(:sha256, :erlang.term_to_binary(&1)))
-    |> Base.encode16(case: :lower)
+    record |> stable_facts() |> then(&:crypto.hash(:sha256, :erlang.term_to_binary(&1))) |> Base.encode16(case: :lower)
   end
 
   @doc "The identity-bearing fields of a tuning record."
   @spec stable_facts(Record.t()) :: map()
-  def stable_facts(%Record{} = record) do
-    %{
+  def stable_facts(%Record{} = record),
+    do: %{
       format: record.format,
       kernel_digest: record.kernel_digest,
       target: record.target,
@@ -217,7 +187,6 @@ defmodule Beaver.Shadow.Tuning do
       failure_kind: if(record.failure, do: record.failure.kind, else: nil),
       structural_proxy: record.structural_proxy
     }
-  end
 
   @doc "Stable digest of a config space (ordered, index-independent)."
   @spec configs_digest([Config.t()]) :: String.t()
@@ -264,9 +233,7 @@ defmodule Beaver.Shadow.Tuning do
   def correlation(records, proxy_fun, latency_fun) do
     pairs =
       records
-      |> Enum.map(fn record ->
-        {proxy_fun.(record), latency_fun.(record)}
-      end)
+      |> Enum.map(fn record -> {proxy_fun.(record), latency_fun.(record)} end)
       |> Enum.filter(fn {proxy, latency} -> is_number(proxy) and is_number(latency) end)
 
     if length(pairs) < 2 do
@@ -304,11 +271,8 @@ defmodule Beaver.Shadow.Tuning do
     }
   end
 
-  def prune_by_structure(fixture_name, configs, opts) when is_atom(fixture_name) do
-    fixture_name
-    |> run(configs)
-    |> prune_by_structure(configs, opts)
-  end
+  def prune_by_structure(fixture_name, configs, opts) when is_atom(fixture_name),
+    do: fixture_name |> run(configs) |> prune_by_structure(configs, opts)
 
   @doc "Encodes a tuning run as JSON text."
   @spec encode!(Run.t()) :: String.t()
@@ -339,8 +303,7 @@ defmodule Beaver.Shadow.Tuning do
         |> then(&struct!(Record, &1))
       end)
 
-    winner =
-      Enum.find(records, &(&1.config.index == map["winner_index"]))
+    winner = Enum.find(records, &(&1.config.index == map["winner_index"]))
 
     %Run{
       fixture: map["fixture"] |> String.to_existing_atom(),
@@ -357,8 +320,7 @@ defmodule Beaver.Shadow.Tuning do
 
     %Event{
       fn: fn_name,
-      key:
-        {run.kernel_digest, run.records |> List.first() |> then(&(&1 && &1.config_space_digest))},
+      key: {run.kernel_digest, run.records |> List.first() |> then(&(&1 && &1.config_space_digest))},
       best_config: if(run.winner, do: run.winner.config, else: nil),
       configs_timings:
         Enum.map(run.records, fn record ->
@@ -373,38 +335,22 @@ defmodule Beaver.Shadow.Tuning do
       failure:
         run.records
         |> Enum.filter(&(&1.status == :failed))
-        |> Enum.map(fn record ->
-          %{config_index: record.config.index, failure: record.failure}
-        end)
+        |> Enum.map(fn record -> %{config_index: record.config.index, failure: record.failure} end)
     }
   end
 
-  defp evaluate(
-         fixture,
-         config,
-         context,
-         target,
-         config_space_digest,
-         kernel_digest,
-         gpu?,
-         launch
-       ) do
+  defp evaluate(fixture, config, ctx, target, config_space_digest, kernel_digest, gpu?, launch) do
     started = System.monotonic_time()
     source_text = File.read!(Corpus.fixture_path(fixture.name))
 
     try do
-      module = MLIR.Module.create!(source_text, ctx: context)
+      module = MLIR.Module.create!(source_text, ctx: ctx)
 
-      result =
-        OptimizationTrial.run(module,
-          target: target,
-          num_warps: config.num_warps,
-          gpu: false
-        )
+      result = OptimizationTrial.run(module, target: target, num_warps: config.num_warps, gpu: false)
 
       gpu_latency =
         if gpu? and launch do
-          case GPU.evaluate(source_text, context, target, config.num_warps, launch) do
+          case GPU.evaluate(source_text, ctx, target, config.num_warps, launch) do
             {:ok, ns} -> ns
             {:error, reason} -> reason
           end
@@ -426,15 +372,8 @@ defmodule Beaver.Shadow.Tuning do
         config: config,
         status: if(result.lowered_to_llvm, do: :evaluated, else: :failed),
         # GPU latency is an observation, never part of identity/1.
-        timings: %{
-          total_ns: System.monotonic_time() - started,
-          gpu_ns: gpu_latency
-        },
-        failure:
-          if(result.lowered_to_llvm,
-            do: nil,
-            else: %{kind: :lowering_failed, reason: "no llvm.func produced"}
-          ),
+        timings: %{total_ns: System.monotonic_time() - started, gpu_ns: gpu_latency},
+        failure: if(result.lowered_to_llvm, do: nil, else: %{kind: :lowering_failed, reason: "no llvm.func produced"}),
         structural_proxy: proxy
       }
     rescue
@@ -457,15 +396,12 @@ defmodule Beaver.Shadow.Tuning do
   defp rank(values) do
     sorted = values |> Enum.sort() |> Enum.with_index()
 
-    rank_map =
-      sorted |> Enum.group_by(&elem(&1, 0)) |> Map.new(fn {v, idxs} -> {v, avg_rank(idxs)} end)
+    rank_map = sorted |> Enum.group_by(&elem(&1, 0)) |> Map.new(fn {v, idxs} -> {v, avg_rank(idxs)} end)
 
     {Enum.map(values, &Map.fetch!(rank_map, &1)), sorted}
   end
 
-  defp avg_rank(idxs) do
-    Enum.map(idxs, &(elem(&1, 1) + 1)) |> Enum.sum() |> Kernel./(length(idxs))
-  end
+  defp avg_rank(idxs), do: Enum.map(idxs, &(elem(&1, 1) + 1)) |> Enum.sum() |> Kernel./(length(idxs))
 
   defp pearson(xs, ys) do
     n = length(xs)
@@ -530,37 +466,22 @@ defmodule Beaver.Shadow.Tuning do
 
   defp prune_reason(record, rank, max_keep) when rank < max_keep do
     case record.structural_proxy do
-      %{lowered_to_llvm: true, optimized: optimized} ->
-        "rank #{rank}: lowers to LLVM, #{optimized} convert_layouts"
-
-      nil ->
-        "rank #{rank}: no structural facts (failed)"
-
-      %{lowered_to_llvm: false} ->
-        "rank #{rank}: does not lower to LLVM"
+      %{lowered_to_llvm: true, optimized: optimized} -> "rank #{rank}: lowers to LLVM, #{optimized} convert_layouts"
+      nil -> "rank #{rank}: no structural facts (failed)"
+      %{lowered_to_llvm: false} -> "rank #{rank}: does not lower to LLVM"
     end
   end
 
-  defp prune_reason(_record, rank, max_keep) do
-    "pruned: rank #{rank} >= max_keep #{max_keep}"
-  end
+  defp prune_reason(_record, rank, max_keep), do: "pruned: rank #{rank} >= max_keep #{max_keep}"
 
-  defp record_to_map(record) do
-    record
-    |> Map.from_struct()
-    |> Map.update!(:config, &Map.from_struct/1)
-  end
+  defp record_to_map(record), do: record |> Map.from_struct() |> Map.update!(:config, &Map.from_struct/1)
 
   defp config_from_map(map) do
-    map
-    |> Map.new(fn {key, value} -> {String.to_existing_atom(key), value} end)
-    |> then(&struct!(Config, &1))
+    map |> Map.new(fn {key, value} -> {String.to_existing_atom(key), value} end) |> then(&struct!(Config, &1))
   end
 
   defp deep_atomize(map) when is_map(map) do
-    Map.new(map, fn {key, value} ->
-      {String.to_existing_atom(key), deep_atomize(value)}
-    end)
+    Map.new(map, fn {key, value} -> {String.to_existing_atom(key), deep_atomize(value)} end)
   end
 
   defp deep_atomize(list) when is_list(list), do: Enum.map(list, &deep_atomize/1)

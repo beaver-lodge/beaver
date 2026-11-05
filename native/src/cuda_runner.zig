@@ -103,9 +103,7 @@ fn loadDriver() ?*const CudaDriver {
     driver_mutex.lock();
     defer driver_mutex.unlock();
 
-    if (driver_probe_done) {
-        return if (driver) |*d| d else null;
-    }
+    if (driver_probe_done) return if (driver) |*d| d else null;
     driver_probe_done = true;
 
     for (libcuda_candidates) |path| {
@@ -229,10 +227,7 @@ pub fn cuda_device_compute_capability(env: beam.env, _: c_int, args: [*c]const b
     const minor_result = d.cuDeviceGetAttribute(&minor, cu_device_attribute_compute_capability_minor, device);
     if (minor_result != 0) return cuResultError(env, "cuDeviceGetAttribute(COMPUTE_CAPABILITY_MINOR)", minor_result);
 
-    var terms = [_]beam.term{
-        try beam.make(i32, env, major),
-        try beam.make(i32, env, minor),
-    };
+    var terms = [_]beam.term{ try beam.make(i32, env, major), try beam.make(i32, env, minor) };
     return beam.make_ok_term(env, beam.make_tuple(env, &terms));
 }
 
@@ -292,11 +287,7 @@ pub fn cuda_module_get_function(env: beam.env, _: c_int, args: [*c]const beam.te
     name[name_bin.size] = 0;
 
     var function: ?*anyopaque = null;
-    const result = d.cuModuleGetFunction(
-        &function,
-        @ptrFromInt(module_ptr),
-        @ptrCast(name.ptr),
-    );
+    const result = d.cuModuleGetFunction(&function, @ptrFromInt(module_ptr), @ptrCast(name.ptr));
     if (result != 0) return cuResultError(env, "cuModuleGetFunction", result);
     return beam.make_ok_term(env, make_ptr(env, @intFromPtr(function.?)));
 }

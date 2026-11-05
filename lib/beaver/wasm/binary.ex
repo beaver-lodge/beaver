@@ -21,12 +21,7 @@ defmodule Beaver.Wasm.Binary do
 
   defstruct [:bytes, :target, :imports, :exports]
 
-  @type t :: %__MODULE__{
-          bytes: binary(),
-          target: String.t() | nil,
-          imports: [import()],
-          exports: [export()]
-        }
+  @type t :: %__MODULE__{bytes: binary(), target: String.t() | nil, imports: [import()], exports: [export()]}
 
   @doc """
   Parses the wasm binary header and the import/export sections.
@@ -44,9 +39,7 @@ defmodule Beaver.Wasm.Binary do
     }
   end
 
-  def parse(_other) do
-    raise ArgumentError, "not a WebAssembly binary (missing \\0asm magic)"
-  end
+  def parse(_other), do: raise(ArgumentError, "not a WebAssembly binary (missing \\0asm magic)")
 
   defp parse_sections(<<>>, imports, exports), do: {Enum.reverse(imports), Enum.reverse(exports)}
 
@@ -120,10 +113,6 @@ defmodule Beaver.Wasm.Binary do
   defp decode_uleb(<<byte, rest::binary>>, acc, shift) do
     value = acc ||| (byte &&& 0x7F) <<< shift
 
-    if (byte &&& 0x80) == 0 do
-      {value, rest}
-    else
-      decode_uleb(rest, value, shift + 7)
-    end
+    if (byte &&& 0x80) == 0, do: {value, rest}, else: decode_uleb(rest, value, shift + 7)
   end
 end

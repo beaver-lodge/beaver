@@ -1,3 +1,6 @@
+alias Beaver.MLIR.{Attribute, Context, Operation, StringRef, Value}
+alias Beaver.Native
+
 defmodule Beaver.MLIR.Location do
   @moduledoc """
   Constructors and safe inspection helpers for MLIR locations.
@@ -16,13 +19,9 @@ defmodule Beaver.MLIR.Location do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
+  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Native
 
-  @type source() ::
-          t()
-          | MLIR.Operation.t()
-          | MLIR.Value.t()
-          | Deferred.contextual(t() | MLIR.Operation.t() | MLIR.Value.t())
+  @type source() :: t() | Operation.t() | Value.t() | Deferred.contextual(t() | Operation.t() | Value.t())
 
   @type file_opts() :: [
           name: String.t(),
@@ -67,10 +66,7 @@ defmodule Beaver.MLIR.Location do
     line = Keyword.fetch!(opts, :line)
     column = Keyword.get(opts, :column) || 0
 
-    Deferred.from_opts(
-      opts,
-      &CAPI.mlirLocationFileLineColGet(&1, MLIR.StringRef.create(name), line, column)
-    )
+    Deferred.from_opts(opts, &CAPI.mlirLocationFileLineColGet(&1, StringRef.create(name), line, column))
   end
 
   @doc """
@@ -88,14 +84,7 @@ defmodule Beaver.MLIR.Location do
     end_column = Keyword.fetch!(opts, :end_column)
 
     Deferred.from_opts(opts, fn ctx ->
-      CAPI.mlirLocationFileLineColRangeGet(
-        ctx,
-        MLIR.StringRef.create(name),
-        start_line,
-        start_column,
-        end_line,
-        end_column
-      )
+      CAPI.mlirLocationFileLineColRangeGet(ctx, StringRef.create(name), start_line, start_column, end_line, end_column)
     end)
   end
 
@@ -111,9 +100,7 @@ defmodule Beaver.MLIR.Location do
 
   @doc "Creates an unknown location."
   @spec unknown(Deferred.opts()) :: Deferred.contextual(t())
-  def unknown(opts \\ []) do
-    Deferred.from_opts(opts, &CAPI.mlirLocationUnknownGet/1)
-  end
+  def unknown(opts \\ []), do: Deferred.from_opts(opts, &CAPI.mlirLocationUnknownGet/1)
 
   @doc """
   Creates a named location with an unknown child.
@@ -124,11 +111,7 @@ defmodule Beaver.MLIR.Location do
   @spec named(String.Chars.t(), Deferred.opts()) :: Deferred.contextual(t())
   def named(name, opts) when is_list(opts) do
     Deferred.from_opts(opts, fn ctx ->
-      CAPI.mlirLocationNameGet(
-        ctx,
-        MLIR.StringRef.create(name),
-        CAPI.mlirLocationUnknownGet(ctx)
-      )
+      CAPI.mlirLocationNameGet(ctx, StringRef.create(name), CAPI.mlirLocationUnknownGet(ctx))
     end)
   end
 
@@ -136,13 +119,7 @@ defmodule Beaver.MLIR.Location do
   def named(name, child, opts \\ []) do
     opts = infer_context(opts, [child])
 
-    Deferred.from_opts(opts, fn ctx ->
-      CAPI.mlirLocationNameGet(
-        ctx,
-        MLIR.StringRef.create(name),
-        resolve(child, ctx)
-      )
-    end)
+    Deferred.from_opts(opts, fn ctx -> CAPI.mlirLocationNameGet(ctx, StringRef.create(name), resolve(child, ctx)) end)
   end
 
   @doc """
@@ -154,9 +131,7 @@ defmodule Beaver.MLIR.Location do
   def call_site(callee, caller, opts \\ []) do
     opts = infer_context(opts, [callee, caller])
 
-    Deferred.from_opts(opts, fn ctx ->
-      CAPI.mlirLocationCallSiteGet(resolve(callee, ctx), resolve(caller, ctx))
-    end)
+    Deferred.from_opts(opts, fn ctx -> CAPI.mlirLocationCallSiteGet(resolve(callee, ctx), resolve(caller, ctx)) end)
   end
 
   @doc """
@@ -177,12 +152,7 @@ defmodule Beaver.MLIR.Location do
       locations = Enum.map(sources, &resolve(&1, ctx))
       metadata = resolve_metadata(metadata, ctx)
 
-      CAPI.mlirLocationFusedGet(
-        ctx,
-        length(locations),
-        Beaver.Native.array(locations, __MODULE__),
-        metadata
-      )
+      CAPI.mlirLocationFusedGet(ctx, length(locations), Native.array(locations, __MODULE__), metadata)
     end)
   end
 
@@ -192,111 +162,94 @@ defmodule Beaver.MLIR.Location do
   This is the explicit metadata-preserving form of `fused/2` and is useful for
   transformation tags, debug scopes, and other provenance attributes.
   """
-  @spec with_metadata(source() | [source()], MLIR.Attribute.t() | Deferred.attribute(), keyword()) ::
+  @spec with_metadata(source() | [source()], Attribute.t() | Deferred.attribute(), keyword()) ::
           Deferred.contextual(t())
-  def with_metadata(sources, metadata, opts \\ []) do
-    fused(List.wrap(sources), Keyword.put(opts, :metadata, metadata))
-  end
+  def with_metadata(sources, metadata, opts \\ []),
+    do: fused(List.wrap(sources), Keyword.put(opts, :metadata, metadata))
 
   @doc "Returns the location carried by a location, operation, or value."
   @spec of(source()) :: Deferred.contextual(t())
-  def of(%__MODULE__{} = location), do: location
-  def of(%MLIR.Operation{} = operation), do: MLIR.Operation.location(operation)
-  def of(%MLIR.Value{} = value), do: MLIR.Value.location(value)
+  def of(%__MODULE__{} = loc), do: loc
+  def of(%Operation{} = op), do: Operation.location(op)
+  def of(%Value{} = value), do: Value.location(value)
 
   def of(%Deferred{} = deferred) do
     Deferred.defer(fn ctx -> deferred |> Deferred.resolve(ctx) |> of() end)
   end
 
   def of(other) do
-    raise ArgumentError,
-          "expected an MLIR location, operation, value, or deferred equivalent, got: #{inspect(other)}"
+    raise ArgumentError, "expected an MLIR location, operation, value, or deferred equivalent, got: #{inspect(other)}"
   end
 
   @doc "Resolves a location-bearing value in `ctx` and verifies context ownership."
-  @spec resolve(source(), MLIR.Context.t()) :: t()
-  def resolve(source, %MLIR.Context{} = ctx) do
+  @spec resolve(source(), Context.t()) :: t()
+  def resolve(source, %Context{} = ctx) do
     location = source |> Deferred.resolve(ctx) |> of()
 
-    MLIR.Context.ensure_same!(location, ctx)
+    Context.ensure_same!(location, ctx)
   end
 
   @doc "Returns the built-in location kind, or `:other` for dialect-defined locations."
   @spec kind(t()) :: kind()
-  def kind(%__MODULE__{} = location) do
+  def kind(%__MODULE__{} = loc) do
     cond do
-      unknown?(location) -> :unknown
-      file_range?(location) -> :file_range
-      name?(location) -> :name
-      call_site?(location) -> :call_site
-      fused?(location) -> :fused
+      unknown?(loc) -> :unknown
+      file_range?(loc) -> :file_range
+      name?(loc) -> :name
+      call_site?(loc) -> :call_site
+      fused?(loc) -> :fused
       true -> :other
     end
   end
 
   @doc "Returns structured source coordinates for a file range location."
   @spec source_range(t()) :: {:ok, source_range()} | :error
-  def source_range(%__MODULE__{} = location) do
-    if file_range?(location) do
-      {:ok,
-       %{
-         file: CAPI.mlirLocationFileLineColRangeGetFilename(location) |> to_string(),
-         start_line: location |> CAPI.mlirLocationFileLineColRangeGetStartLine() |> to_term(),
-         start_column: location |> CAPI.mlirLocationFileLineColRangeGetStartColumn() |> to_term(),
-         end_line: location |> CAPI.mlirLocationFileLineColRangeGetEndLine() |> to_term(),
-         end_column: location |> CAPI.mlirLocationFileLineColRangeGetEndColumn() |> to_term()
-       }}
-    else
-      :error
-    end
+  def source_range(%__MODULE__{} = loc) do
+    if file_range?(loc),
+      do:
+        {:ok,
+         %{
+           file: CAPI.mlirLocationFileLineColRangeGetFilename(loc) |> to_string(),
+           start_line: loc |> CAPI.mlirLocationFileLineColRangeGetStartLine() |> to_term(),
+           start_column: loc |> CAPI.mlirLocationFileLineColRangeGetStartColumn() |> to_term(),
+           end_line: loc |> CAPI.mlirLocationFileLineColRangeGetEndLine() |> to_term(),
+           end_column: loc |> CAPI.mlirLocationFileLineColRangeGetEndColumn() |> to_term()
+         }},
+      else: :error
   end
 
   @doc "Returns the label of a named location."
   @spec name(t()) :: {:ok, String.t()} | :error
-  def name(%__MODULE__{} = location) do
-    if name?(location) do
-      {:ok, location |> CAPI.mlirLocationNameGetName() |> to_string()}
-    else
-      :error
-    end
-  end
+  def name(%__MODULE__{} = loc),
+    do: if(name?(loc), do: {:ok, loc |> CAPI.mlirLocationNameGetName() |> to_string()}, else: :error)
 
   @doc "Returns the child provenance of a named location."
   @spec child(t()) :: {:ok, t()} | :error
-  def child(%__MODULE__{} = location) do
-    if name?(location), do: {:ok, CAPI.mlirLocationNameGetChildLoc(location)}, else: :error
-  end
+  def child(%__MODULE__{} = loc),
+    do: if(name?(loc), do: {:ok, CAPI.mlirLocationNameGetChildLoc(loc)}, else: :error)
 
   @doc "Returns the callee provenance of a call-site location."
   @spec callee(t()) :: {:ok, t()} | :error
-  def callee(%__MODULE__{} = location) do
-    if call_site?(location), do: {:ok, CAPI.mlirLocationCallSiteGetCallee(location)}, else: :error
-  end
+  def callee(%__MODULE__{} = loc),
+    do: if(call_site?(loc), do: {:ok, CAPI.mlirLocationCallSiteGetCallee(loc)}, else: :error)
 
   @doc "Returns the caller provenance of a call-site location."
   @spec caller(t()) :: {:ok, t()} | :error
-  def caller(%__MODULE__{} = location) do
-    if call_site?(location), do: {:ok, CAPI.mlirLocationCallSiteGetCaller(location)}, else: :error
-  end
+  def caller(%__MODULE__{} = loc),
+    do: if(call_site?(loc), do: {:ok, CAPI.mlirLocationCallSiteGetCaller(loc)}, else: :error)
 
   @doc "Returns the number of source locations retained by a fused location."
   @spec location_count(t()) :: {:ok, non_neg_integer()} | :error
-  def location_count(%__MODULE__{} = location) do
-    if fused?(location) do
-      {:ok, location |> CAPI.mlirLocationFusedGetNumLocations() |> to_term()}
-    else
-      :error
-    end
-  end
+  def location_count(%__MODULE__{} = loc),
+    do: if(fused?(loc), do: {:ok, loc |> CAPI.mlirLocationFusedGetNumLocations() |> to_term()}, else: :error)
 
   @doc "Returns the source locations retained by a fused location."
   @spec locations(t()) :: {:ok, [t()]} | :error
-  def locations(%__MODULE__{} = location) do
-    with true <- fused?(location),
-         {:ok, count} <- location_count(location) do
+  def locations(%__MODULE__{} = loc) do
+    with true <- fused?(loc), {:ok, count} <- location_count(loc) do
       {:ok,
        for position <- zero_based_range(count) do
-         CAPI.beaverLocationFusedGetLocationAt(location, position)
+         CAPI.beaverLocationFusedGetLocationAt(loc, position)
        end}
     else
       _ -> :error
@@ -309,59 +262,54 @@ defmodule Beaver.MLIR.Location do
   The returned attribute may be MLIR's null attribute when the fused location
   has no metadata; use `Beaver.MLIR.null?/1` to distinguish that case.
   """
-  @spec metadata(t()) :: {:ok, MLIR.Attribute.t()} | :error
-  def metadata(%__MODULE__{} = location) do
-    if fused?(location), do: {:ok, CAPI.mlirLocationFusedGetMetadata(location)}, else: :error
-  end
+  @spec metadata(t()) :: {:ok, Attribute.t()} | :error
+  def metadata(%__MODULE__{} = loc),
+    do: if(fused?(loc), do: {:ok, CAPI.mlirLocationFusedGetMetadata(loc)}, else: :error)
 
   @doc "Returns the location as its underlying location attribute."
-  @spec attribute(t()) :: MLIR.Attribute.t()
-  def attribute(%__MODULE__{} = location), do: CAPI.mlirLocationGetAttribute(location)
+  @spec attribute(t()) :: Attribute.t()
+  def attribute(%__MODULE__{} = loc), do: CAPI.mlirLocationGetAttribute(loc)
 
   @doc "Converts a location attribute back to a location."
-  @spec from_attribute(MLIR.Attribute.t()) :: t()
-  def from_attribute(%MLIR.Attribute{} = attribute) do
-    unless MLIR.Attribute.location?(attribute) do
-      raise ArgumentError, "expected an MLIR location attribute"
-    end
+  @spec from_attribute(Attribute.t()) :: t()
+  def from_attribute(%Attribute{} = attribute) do
+    unless Attribute.location?(attribute),
+      do: raise(ArgumentError, "expected an MLIR location attribute")
 
     CAPI.mlirLocationFromAttribute(attribute)
   end
 
   @doc "Returns whether the location is an MLIR unknown location."
   @spec unknown?(t()) :: boolean()
-  def unknown?(%__MODULE__{} = location),
-    do: location |> CAPI.mlirLocationIsAUnknown() |> to_term()
+  def unknown?(%__MODULE__{} = loc),
+    do: loc |> CAPI.mlirLocationIsAUnknown() |> to_term()
 
   @doc "Returns whether the location is an MLIR file range location."
   @spec file_range?(t()) :: boolean()
-  def file_range?(%__MODULE__{} = location),
-    do: location |> CAPI.mlirLocationIsAFileLineColRange() |> to_term()
+  def file_range?(%__MODULE__{} = loc),
+    do: loc |> CAPI.mlirLocationIsAFileLineColRange() |> to_term()
 
   @doc "Returns whether the location is an MLIR named location."
   @spec name?(t()) :: boolean()
-  def name?(%__MODULE__{} = location),
-    do: location |> CAPI.mlirLocationIsAName() |> to_term()
+  def name?(%__MODULE__{} = loc),
+    do: loc |> CAPI.mlirLocationIsAName() |> to_term()
 
   @doc "Returns whether the location is an MLIR call-site location."
   @spec call_site?(t()) :: boolean()
-  def call_site?(%__MODULE__{} = location),
-    do: location |> CAPI.mlirLocationIsACallSite() |> to_term()
+  def call_site?(%__MODULE__{} = loc),
+    do: loc |> CAPI.mlirLocationIsACallSite() |> to_term()
 
   @doc "Returns whether the location is an MLIR fused location."
   @spec fused?(t()) :: boolean()
-  def fused?(%__MODULE__{} = location),
-    do: location |> CAPI.mlirLocationIsAFused() |> to_term()
+  def fused?(%__MODULE__{} = loc),
+    do: loc |> CAPI.mlirLocationIsAFused() |> to_term()
 
-  defp resolve_metadata(nil, _ctx), do: MLIR.Attribute.null()
+  defp resolve_metadata(nil, _ctx), do: Attribute.null()
 
   defp resolve_metadata(metadata, ctx) do
     case Deferred.resolve(metadata, ctx) do
-      %MLIR.Attribute{} = attribute ->
-        MLIR.Context.ensure_same!(attribute, ctx)
-
-      other ->
-        raise ArgumentError, "location metadata must be an MLIR attribute, got: #{inspect(other)}"
+      %Attribute{} = attribute -> Context.ensure_same!(attribute, ctx)
+      other -> raise ArgumentError, "location metadata must be an MLIR attribute, got: #{inspect(other)}"
     end
   end
 
@@ -372,21 +320,16 @@ defmodule Beaver.MLIR.Location do
     end
   end
 
-  defp context_of(%module{} = entity)
-       when module in [__MODULE__, MLIR.Operation, MLIR.Value, MLIR.Attribute],
-       do: MLIR.context(entity)
+  defp context_of(%module{} = entity) when module in [__MODULE__, Operation, Value, Attribute], do: MLIR.context(entity)
 
   defp context_of(_other), do: nil
 
   defp zero_based_range(0), do: []
   defp zero_based_range(count), do: 0..(count - 1)
 
-  defp to_term(value), do: Beaver.Native.to_term(value)
+  defp to_term(value), do: Native.to_term(value)
 
   @spec env_file_opts(String.t(), integer(), env_opts()) :: file_opts()
-  defp env_file_opts(name, line, opts) do
-    opts
-    |> Keyword.put(:name, name)
-    |> Keyword.put(:line, line)
-  end
+  defp env_file_opts(name, line, opts),
+    do: opts |> Keyword.put(:name, name) |> Keyword.put(:line, line)
 end

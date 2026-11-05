@@ -10,23 +10,19 @@ extern "C" {
 /// Schedules callback-bridging work on the context's LLVM pool, outside BEAM
 /// scheduler threads. An elastic pool prevents nested pass/rewrite callbacks
 /// from starving a pool shared by multiple contexts.
-MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context,
-                                             void (*task)(void *), void *arg);
+MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context, void (*task)(void *), void *arg);
 
 /// Stable, capability-gated adapters for LLVM's transient MLIRContext scope.
 /// Begin returns false when unsupported or when the context is already in a
 /// scope; end returns false when no scope was entered through this adapter.
 MLIR_CAPI_EXPORTED bool beaverContextTransientScopeSupported(void);
-MLIR_CAPI_EXPORTED bool
-beaverContextBeginTransientScope(MlirContext context);
+MLIR_CAPI_EXPORTED bool beaverContextBeginTransientScope(MlirContext context);
 MLIR_CAPI_EXPORTED bool beaverContextEndTransientScope(MlirContext context);
-MLIR_CAPI_EXPORTED bool
-beaverContextHasActiveTransientScope(MlirContext context);
+MLIR_CAPI_EXPORTED bool beaverContextHasActiveTransientScope(MlirContext context);
 
 /// Creates a reusable thread pool that grows beyond its reported parallelism
 /// when every worker is blocked by nested synchronous callback work.
-MLIR_CAPI_EXPORTED MlirLlvmThreadPool
-beaverLlvmThreadPoolCreateElastic(unsigned maxConcurrency);
+MLIR_CAPI_EXPORTED MlirLlvmThreadPool beaverLlvmThreadPoolCreateElastic(unsigned maxConcurrency);
 
 /// Returns the LLVM version and source revision used to build Beaver. The
 /// returned string has static storage duration and must not be freed.

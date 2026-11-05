@@ -11,185 +11,89 @@ defmodule Beaver.CAPI.ManifestGenerator do
     {"BeaverCapiPolicyExclude__", "exclude"}
   ]
 
-  @manual_bridges %{
-    "mlirInferTypeOpInterfaceInferReturnTypes" => %{
-      "wrapper_name" => "beaver_raw_infer_return_types",
-      "runtime" => "native_collector",
-      "scheduler" => "normal",
-      "owner" => "caller",
-      "lifetime" => "nif_call",
-      "destructor" => "stack"
-    },
-    "mlirInferShapedTypeOpInterfaceInferReturnTypes" => %{
-      "wrapper_name" => "beaver_raw_infer_return_type_components",
-      "runtime" => "native_collector",
-      "scheduler" => "normal",
-      "owner" => "caller",
-      "lifetime" => "nif_call",
-      "destructor" => "stack"
-    },
-    "beaverTranslateModuleToLLVMIRText" => %{
-      "wrapper_name" => "beaver_raw_translate_module_to_llvm_ir",
-      "runtime" => "native_collector",
-      "scheduler" => "dirty_cpu",
-      "owner" => "caller",
-      "lifetime" => "nif_call",
-      "destructor" => "native_owner"
-    },
-    "beaverCompileLLVMIRToPTX" => %{
-      "wrapper_name" => "beaver_raw_compile_llvm_ir_to_ptx",
-      "runtime" => "native_collector",
-      "scheduler" => "dirty_cpu",
-      "owner" => "caller",
-      "lifetime" => "nif_call",
-      "destructor" => "native_owner"
-    },
-    "beaverCompilerKernelLoadAndPopulate" => %{
-      "wrapper_name" => "beaver_raw_compiler_kernel_load_and_populate",
-      "runtime" => "native_collector",
-      "scheduler" => "dirty_io",
-      "owner" => "caller",
-      "lifetime" => "nif_call",
-      "destructor" => "stack"
-    },
-    "mlirTransformStateForEachPayloadOp" => %{
-      "wrapper_name" => "beaver_raw_transform_state_payload_ops",
-      "runtime" => "native_collector",
-      "scheduler" => "normal",
-      "owner" => "caller",
-      "lifetime" => "nif_call",
-      "destructor" => "stack"
-    },
-    "mlirTransformStateForEachPayloadValue" => %{
-      "wrapper_name" => "beaver_raw_transform_state_payload_values",
-      "runtime" => "native_collector",
-      "scheduler" => "normal",
-      "owner" => "caller",
-      "lifetime" => "nif_call",
-      "destructor" => "stack"
-    },
-    "mlirTransformStateForEachParam" => %{
-      "wrapper_name" => "beaver_raw_transform_state_params",
-      "runtime" => "native_collector",
-      "scheduler" => "normal",
-      "owner" => "caller",
-      "lifetime" => "nif_call",
-      "destructor" => "stack"
-    },
-    "beaverMemoryEffectsOpInterfaceGetEffects" => %{
-      "wrapper_name" => "beaver_raw_memory_effects_query_async",
-      "runtime" => "native_collector",
-      "scheduler" => "context_worker",
-      "owner" => "caller",
-      "lifetime" => "async_operation",
-      "destructor" => "stack"
-    },
-    "mlirValueReplaceUsesWithIf" => %{
-      "wrapper_name" => "beaver_raw_value_replace_uses_with_if",
-      "runtime" => "manual_async_callback",
-      "scheduler" => "context_worker",
-      "owner" => "beam_process",
-      "lifetime" => "async_operation",
-      "destructor" => "native_owner"
-    }
+  @bridge_defaults %{
+    "runtime" => "native_collector",
+    "scheduler" => "normal",
+    "owner" => "caller",
+    "lifetime" => "nif_call",
+    "destructor" => "stack"
   }
+  @manual_bridges Map.new(
+                    [
+                      {"mlirInferTypeOpInterfaceInferReturnTypes", "infer_return_types", %{}},
+                      {"mlirInferShapedTypeOpInterfaceInferReturnTypes", "infer_return_type_components", %{}},
+                      {"beaverTranslateModuleToLLVMIRText", "translate_module_to_llvm_ir",
+                       %{"scheduler" => "dirty_cpu", "destructor" => "native_owner"}},
+                      {"beaverCompileLLVMIRToPTX", "compile_llvm_ir_to_ptx",
+                       %{"scheduler" => "dirty_cpu", "destructor" => "native_owner"}},
+                      {"beaverCompilerKernelLoadAndPopulate", "compiler_kernel_load_and_populate",
+                       %{"scheduler" => "dirty_io"}},
+                      {"mlirTransformStateForEachPayloadOp", "transform_state_payload_ops", %{}},
+                      {"mlirTransformStateForEachPayloadValue", "transform_state_payload_values", %{}},
+                      {"mlirTransformStateForEachParam", "transform_state_params", %{}},
+                      {"beaverMemoryEffectsOpInterfaceGetEffects", "memory_effects_query_async",
+                       %{"scheduler" => "context_worker", "lifetime" => "async_operation"}},
+                      {"mlirValueReplaceUsesWithIf", "value_replace_uses_with_if",
+                       %{
+                         "runtime" => "manual_async_callback",
+                         "scheduler" => "context_worker",
+                         "owner" => "beam_process",
+                         "lifetime" => "async_operation",
+                         "destructor" => "native_owner"
+                       }}
+                    ],
+                    fn {source, wrapper, overrides} ->
+                      policy =
+                        @bridge_defaults
+                        |> Map.merge(overrides)
+                        |> Map.put("wrapper_name", "beaver_raw_" <> wrapper)
 
-  @runtime_declarations %{
-    "mlirDynamicOpTraitCreate" => %{
-      name: "beaver_raw_dynamic_trait_attach",
-      params: [
-        "context",
-        "operation_name",
-        "type_id",
-        "verify_callback",
-        "verify_regions_callback",
-        "timeout_ms"
-      ]
-    },
-    "mlirTypeConverterAddConversion" => %{
-      name: "beaver_raw_type_converter_add_conversion",
-      params: ["registration", "callback", "timeout_ms"]
-    },
-    "mlirTypeConverterAdd1ToNConversion" => %{
-      name: "beaver_raw_type_converter_add_1_to_n_conversion",
-      params: ["registration", "callback", "timeout_ms"]
-    },
-    "mlirTypeConverterAddSourceMaterialization" => %{
-      name: "beaver_raw_type_converter_add_source_materialization",
-      params: ["registration", "callback", "timeout_ms"]
-    },
-    "mlirTypeConverterAddTargetMaterialization" => %{
-      name: "beaver_raw_type_converter_add_target_materialization",
-      params: ["registration", "callback", "timeout_ms"]
-    },
-    "mlirTypeConverterAdd1ToNTargetMaterialization" => %{
-      name: "beaver_raw_type_converter_add_1_to_n_target_materialization",
-      params: ["registration", "callback", "timeout_ms"]
-    },
-    "mlirConversionTargetAddDynamicallyLegalOp" => %{
-      name: "beaver_raw_conversion_target_add_dynamic_op",
-      params: ["registration", "operation_name", "callback", "timeout_ms"]
-    },
-    "mlirConversionTargetAddDynamicallyLegalDialect" => %{
-      name: "beaver_raw_conversion_target_add_dynamic_dialect",
-      params: ["registration", "dialect_name", "callback", "timeout_ms"]
-    },
-    "mlirConversionTargetMarkOpRecursivelyLegal" => %{
-      name: "beaver_raw_conversion_target_mark_recursively_legal",
-      params: ["registration", "operation_name", "callback", "timeout_ms"]
-    },
-    "mlirConversionTargetMarkUnknownOpDynamicallyLegal" => %{
-      name: "beaver_raw_conversion_target_mark_unknown_dynamic",
-      params: ["registration", "callback", "timeout_ms"]
-    },
-    "mlirOpConversionPatternCreate" => %{
-      name: "beaver_raw_conversion_pattern_add",
-      params: [
-        "pattern_set",
-        "root_name",
-        "benefit",
-        "context",
-        "type_converter_registration",
-        "callback",
-        "one_to_n",
-        "timeout_ms"
-      ]
-    },
-    "mlirConditionallySpeculatableOpInterfaceAttachFallbackModel" => %{
-      name: "beaver_raw_conditionally_speculatable_attach_fallback_model",
-      params: ["context", "operation_name", "callback", "timeout_ms"]
-    },
-    "beaverMemoryEffectsOpInterfaceAttachFallbackModel" => %{
-      name: "beaver_raw_memory_effects_attach_fallback_model",
-      params: ["context", "operation_name", "callback", "timeout_ms"]
-    },
-    "mlirTransformOpInterfaceAttachFallbackModel" => %{
-      name: "beaver_raw_transform_op_interface_attach_fallback_model",
-      params: [
-        "context",
-        "operation_name",
-        "apply_callback",
-        "allows_repeated_handle_operands_callback",
-        "timeout_ms"
-      ]
-    },
-    "mlirPatternDescriptorOpInterfaceAttachFallbackModel" => %{
-      name: "beaver_raw_pattern_descriptor_op_interface_attach_fallback_model",
-      params: [
-        "context",
-        "operation_name",
-        "populate_patterns_callback",
-        "populate_patterns_with_state_callback",
-        "timeout_ms"
-      ]
-    }
-  }
+                      {source, policy}
+                    end
+                  )
+
+  @runtime_declarations Map.new(
+                          [
+                            {"mlirDynamicOpTraitCreate", "dynamic_trait_attach",
+                             ~w(context operation_name type_id verify_callback verify_regions_callback timeout_ms)},
+                            {"mlirTypeConverterAddConversion", "type_converter_add_conversion",
+                             ~w(registration callback timeout_ms)},
+                            {"mlirTypeConverterAdd1ToNConversion", "type_converter_add_1_to_n_conversion",
+                             ~w(registration callback timeout_ms)},
+                            {"mlirTypeConverterAddSourceMaterialization", "type_converter_add_source_materialization",
+                             ~w(registration callback timeout_ms)},
+                            {"mlirTypeConverterAddTargetMaterialization", "type_converter_add_target_materialization",
+                             ~w(registration callback timeout_ms)},
+                            {"mlirTypeConverterAdd1ToNTargetMaterialization",
+                             "type_converter_add_1_to_n_target_materialization", ~w(registration callback timeout_ms)},
+                            {"mlirConversionTargetAddDynamicallyLegalOp", "conversion_target_add_dynamic_op",
+                             ~w(registration operation_name callback timeout_ms)},
+                            {"mlirConversionTargetAddDynamicallyLegalDialect", "conversion_target_add_dynamic_dialect",
+                             ~w(registration dialect_name callback timeout_ms)},
+                            {"mlirConversionTargetMarkOpRecursivelyLegal", "conversion_target_mark_recursively_legal",
+                             ~w(registration operation_name callback timeout_ms)},
+                            {"mlirConversionTargetMarkUnknownOpDynamicallyLegal",
+                             "conversion_target_mark_unknown_dynamic", ~w(registration callback timeout_ms)},
+                            {"mlirOpConversionPatternCreate", "conversion_pattern_add",
+                             ~w(pattern_set root_name benefit context type_converter_registration callback one_to_n timeout_ms)},
+                            {"mlirConditionallySpeculatableOpInterfaceAttachFallbackModel",
+                             "conditionally_speculatable_attach_fallback_model",
+                             ~w(context operation_name callback timeout_ms)},
+                            {"beaverMemoryEffectsOpInterfaceAttachFallbackModel",
+                             "memory_effects_attach_fallback_model", ~w(context operation_name callback timeout_ms)},
+                            {"mlirTransformOpInterfaceAttachFallbackModel",
+                             "transform_op_interface_attach_fallback_model",
+                             ~w(context operation_name apply_callback allows_repeated_handle_operands_callback timeout_ms)},
+                            {"mlirPatternDescriptorOpInterfaceAttachFallbackModel",
+                             "pattern_descriptor_op_interface_attach_fallback_model",
+                             ~w(context operation_name populate_patterns_callback populate_patterns_with_state_callback timeout_ms)}
+                          ],
+                          fn {source, name, params} -> {source, %{name: "beaver_raw_" <> name, params: params}} end
+                        )
 
   def run(argv) do
     {opts, _, _} =
-      OptionParser.parse(argv,
-        strict: [declaration: :string, callback_bridge: :string, ast: :string]
-      )
+      OptionParser.parse(argv, strict: [declaration: :string, callback_bridge: :string, ast: :string])
 
     ast =
       case Keyword.get(opts, :ast) do
@@ -200,18 +104,12 @@ defmodule Beaver.CAPI.ManifestGenerator do
 
     policy = policy_from_ast(ast)
 
-    functions =
-      ast
-      |> collect_functions()
-      |> Enum.filter(&candidate?/1)
-      |> Enum.sort_by(& &1.name)
+    functions = ast |> collect_functions() |> Enum.filter(&candidate?/1) |> Enum.sort_by(& &1.name)
 
     declaration_manifest = declaration_manifest(functions, policy)
     callback_bridge_manifest = callback_bridge_manifest(functions, policy)
 
-    opts
-    |> Keyword.fetch!(:declaration)
-    |> write_json!(declaration_manifest)
+    opts |> Keyword.fetch!(:declaration) |> write_json!(declaration_manifest)
 
     opts
     |> Keyword.fetch!(:callback_bridge)
@@ -223,23 +121,18 @@ defmodule Beaver.CAPI.ManifestGenerator do
     |> collect_enum_constants()
     |> Enum.reduce(%{}, fn marker, policy ->
       case decode_policy_marker(marker) do
-        {category, name} ->
-          Map.update(policy, category, MapSet.new([name]), &MapSet.put(&1, name))
-
-        nil ->
-          policy
+        {category, name} -> Map.update(policy, category, MapSet.new([name]), &MapSet.put(&1, name))
+        nil -> policy
       end
     end)
   end
 
-  defp collect_enum_constants(nodes) when is_list(nodes),
-    do: Enum.flat_map(nodes, &collect_enum_constants/1)
+  defp collect_enum_constants(nodes) when is_list(nodes), do: Enum.flat_map(nodes, &collect_enum_constants/1)
 
   defp collect_enum_constants(%{"kind" => "EnumConstantDecl", "name" => name} = node),
     do: [name | collect_enum_constants(Map.get(node, "inner", []))]
 
-  defp collect_enum_constants(%{} = node),
-    do: collect_enum_constants(Map.get(node, "inner", []))
+  defp collect_enum_constants(%{} = node), do: collect_enum_constants(Map.get(node, "inner", []))
 
   defp collect_enum_constants(_node), do: []
 
@@ -254,9 +147,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
     end)
   end
 
-  defp candidate?(%{name: name}) do
-    String.starts_with?(name, "mlir") or String.starts_with?(name, "beaver")
-  end
+  defp candidate?(%{name: name}), do: String.starts_with?(name, "mlir") or String.starts_with?(name, "beaver")
 
   defp declaration_manifest(functions, policy) do
     signature_manifest = %{
@@ -270,11 +161,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
       "signature_manifest_version" => 1,
       "signature_manifest" => signature_manifest,
       "nif_decls" =>
-        Enum.flat_map(functions, fn function ->
-          function
-          |> variants(policy)
-          |> Enum.map(&nif_decl(function, &1))
-        end),
+        Enum.flat_map(functions, fn function -> function |> variants(policy) |> Enum.map(&nif_decl(function, &1)) end),
       "type_decls" => []
     }
   end
@@ -371,11 +258,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
       diagnostics?(name, policy) ->
         [
           %{name: name, params: function.params, dirty: false},
-          %{
-            name: name <> "WithDiagnostics",
-            params: ["context" | function.params],
-            dirty: "dirty_cpu"
-          }
+          %{name: name <> "WithDiagnostics", params: ["context" | function.params], dirty: "dirty_cpu"}
         ]
 
       policy_member?(policy, "dirty_cpu_io", name) ->
@@ -390,21 +273,14 @@ defmodule Beaver.CAPI.ManifestGenerator do
     end
   end
 
-  defp diagnostics?(name, policy) do
-    String.ends_with?(name, "GetChecked") or policy_member?(policy, "diagnostics", name)
-  end
+  defp diagnostics?(name, policy),
+    do: String.ends_with?(name, "GetChecked") or policy_member?(policy, "diagnostics", name)
 
-  defp policy_member?(policy, category, name) do
-    policy
-    |> Map.get(category, MapSet.new())
-    |> MapSet.member?(name)
-  end
+  defp policy_member?(policy, category, name), do: policy |> Map.get(category, MapSet.new()) |> MapSet.member?(name)
 
   defp callback_bridge?(policy, name) do
-    policy_member?(policy, "callback_bridge", name) or
-      policy_member?(policy, "callback_runtime", name) or
-      policy_member?(policy, "manual_adapter", name) or
-      policy_member?(policy, "manual_runtime", name)
+    policy_member?(policy, "callback_bridge", name) or policy_member?(policy, "callback_runtime", name) or
+      policy_member?(policy, "manual_adapter", name) or policy_member?(policy, "manual_runtime", name)
   end
 
   defp bridge_metadata(name, policy) do
@@ -431,34 +307,16 @@ defmodule Beaver.CAPI.ManifestGenerator do
     end
   end
 
-  defp bridge_facets(nil) do
-    %{
-      "facets" => [
-        "beam_callback",
-        "lifetime_contract",
-        "scheduler_contract",
-        "rich_input_decoder"
-      ]
-    }
-  end
+  defp bridge_facets(nil), do: %{"facets" => ~w(beam_callback lifetime_contract scheduler_contract rich_input_decoder)}
 
-  defp bridge_facets(%{"runtime" => "native_collector"}) do
-    %{"facets" => ["native_collector", "context_owned_handles"]}
-  end
+  defp bridge_facets(%{"runtime" => "native_collector"}),
+    do: %{"facets" => ["native_collector", "context_owned_handles"]}
 
-  defp bridge_facets(_bridge) do
-    %{
-      "facets" => [
-        "beam_callback",
-        "lifetime_contract",
-        "scheduler_contract",
-        "rich_input_decoder"
-      ]
-    }
-  end
+  defp bridge_facets(_bridge),
+    do: %{"facets" => ~w(beam_callback lifetime_contract scheduler_contract rich_input_decoder)}
 
-  defp nif_decl(function, variant) do
-    %{
+  defp nif_decl(function, variant),
+    do: %{
       "wrapper_name" => variant.name,
       "nif_name" => nil,
       "params" => variant.params,
@@ -469,10 +327,9 @@ defmodule Beaver.CAPI.ManifestGenerator do
       "return_typespec" => nil,
       "dirty" => variant.dirty
     }
-  end
 
-  defp signature_variant(_function, variant) do
-    %{
+  defp signature_variant(_function, variant),
+    do: %{
       "wrapper_name" => variant.name,
       "params" => variant.params,
       "doc" => nil,
@@ -480,10 +337,8 @@ defmodule Beaver.CAPI.ManifestGenerator do
       "param_typespecs" => nil,
       "return_typespec" => nil
     }
-  end
 
-  defp collect_functions(nodes) when is_list(nodes),
-    do: Enum.flat_map(nodes, &collect_functions/1)
+  defp collect_functions(nodes) when is_list(nodes), do: Enum.flat_map(nodes, &collect_functions/1)
 
   defp collect_functions(%{"kind" => "FunctionDecl", "name" => name} = node) do
     params =
@@ -492,10 +347,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
       |> Enum.with_index()
       |> Enum.filter(fn {child, _index} -> Map.get(child, "kind") == "ParmVarDecl" end)
       |> Enum.map(fn {child, index} ->
-        %{
-          name: Map.get(child, "name", "param_#{index}"),
-          ctype: ctype(Map.get(child, "type"))
-        }
+        %{name: Map.get(child, "name", "param_#{index}"), ctype: ctype(Map.get(child, "type"))}
       end)
 
     function = %{
@@ -515,11 +367,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
 
   defp ctype(nil), do: nil
 
-  defp ctype(%{} = type) do
-    type
-    |> then(&(Map.get(&1, "desugaredQualType") || Map.get(&1, "qualType")))
-    |> ctype()
-  end
+  defp ctype(%{} = type), do: type |> then(&(Map.get(&1, "desugaredQualType") || Map.get(&1, "qualType"))) |> ctype()
 
   defp ctype(type) when is_binary(type) do
     spelling = normalize_type(type)
@@ -607,8 +455,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
   defp render_comment(nil), do: ""
 
   defp render_comment(%{"kind" => kind, "text" => text})
-       when kind in ["TextComment", "VerbatimBlockLineComment", "VerbatimLineComment"],
-       do: normalize_doc(text)
+       when kind in ["TextComment", "VerbatimBlockLineComment", "VerbatimLineComment"], do: normalize_doc(text)
 
   defp render_comment(%{"kind" => "ParamCommandComment", "param" => param} = node),
     do: normalize_doc("@param #{param} #{render_children(node)}")
@@ -630,9 +477,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
 
   defp normalize_doc(text), do: text |> String.replace(~r/[ \t]+/, " ") |> String.trim()
 
-  defp decode_json!(json) do
-    JSON.decode!(json)
-  end
+  defp decode_json!(json), do: JSON.decode!(json)
 
   defp write_json!(path, data) do
     encoded = JSON.encode!(data)

@@ -1,8 +1,10 @@
+alias Beaver.MLIR.CAPI
+
 defmodule Beaver.MLIR.Diagnostic do
   @moduledoc """
   This module provides functions to work with MLIR diagnostics.
   """
-  use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
+  use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
   alias Beaver.MLIR
 
   @mlir_severity_levels [:error, :warning, :note, :remark]
@@ -11,36 +13,28 @@ defmodule Beaver.MLIR.Diagnostic do
 
   If the MLIR severity level is not recognized, it returns `:unknown`.
   """
-  def severity(i) when is_integer(i) do
-    Enum.at(@mlir_severity_levels, i) || :unknown
-  end
+  def severity(i) when is_integer(i), do: Enum.at(@mlir_severity_levels, i) || :unknown
 
-  def severity(%__MODULE__{} = diagnostic) do
-    MLIR.CAPI.mlirDiagnosticGetSeverity(diagnostic) |> Beaver.Native.to_term() |> severity()
-  end
+  def severity(%__MODULE__{} = diagnostic),
+    do: CAPI.mlirDiagnosticGetSeverity(diagnostic) |> Beaver.Native.to_term() |> severity()
 
-  defdelegate detach(ctx, handler_id), to: MLIR.CAPI, as: :mlirContextDetachDiagnosticHandler
+  defdelegate detach(ctx, handler_id), to: CAPI, as: :mlirContextDetachDiagnosticHandler
 
   @doc "Converts diagnostic locations to strings so the tree is safe beyond context lifetime."
-  def process(diagnostics) when is_list(diagnostics) do
-    Enum.map(diagnostics, &process_diagnostic/1)
+  def process(diagnostics) when is_list(diagnostics),
+    do: Enum.map(diagnostics, &process_diagnostic/1)
+
+  defp process_diagnostic({severity, loc, message, nested}) do
+    loc = if is_binary(loc), do: loc, else: MLIR.to_string(loc)
+    {severity, loc, message, Enum.map(nested, &process_diagnostic/1)}
   end
 
-  defp process_diagnostic({severity, location, message, nested}) do
-    location = if is_binary(location), do: location, else: MLIR.to_string(location)
-    {severity, location, message, Enum.map(nested, &process_diagnostic/1)}
-  end
-
-  def walk({_, _, _, []} = diagnostic, acc, fun) do
-    fun.(diagnostic, acc)
-  end
+  def walk({_, _, _, []} = diagnostic, acc, fun), do: fun.(diagnostic, acc)
 
   def walk({_, _, _, nested} = diagnostic, acc, fun) do
     acc = fun.(diagnostic, acc)
 
-    Enum.reduce(nested, acc, fn d, acc ->
-      walk(d, acc, fun)
-    end)
+    Enum.reduce(nested, acc, fn d, acc -> walk(d, acc, fun) end)
   end
 
   def format(diagnostics, prefix \\ "") do
@@ -59,6 +53,6 @@ defmodule Beaver.MLIR.Diagnostic do
 
   def emit(ctx, msg) do
     msg_str = MLIR.StringRef.create(msg) |> MLIR.StringRef.data()
-    MLIR.CAPI.mlirEmitError(ctx, msg_str)
+    CAPI.mlirEmitError(ctx, msg_str)
   end
 end

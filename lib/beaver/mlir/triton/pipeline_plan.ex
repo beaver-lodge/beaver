@@ -23,16 +23,7 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
     source_sha256: "d2b6c6b79146143fa56107133ddceec6369812d29e74cb362a7d400476765be8"
   }
 
-  @enforce_keys [
-    :schema,
-    :profile,
-    :target,
-    :capability,
-    :num_warps,
-    :num_stages,
-    :provenance,
-    :passes
-  ]
+  @enforce_keys ~w(schema profile target capability num_warps num_stages provenance passes)a
   defstruct @enforce_keys
 
   @type profile :: :legacy | :pinned_nvidia_sm100
@@ -70,10 +61,8 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
           legacy_passes(target, capability, num_warps, from_ttgir?, remove_layouts?)
 
         :pinned_nvidia_sm100 ->
-          if capability < 100 do
-            raise ArgumentError,
-                  "unsupported_pipeline_profile: :pinned_nvidia_sm100 requires cuda:100 or newer"
-          end
+          if capability < 100,
+            do: raise(ArgumentError, "unsupported_pipeline_profile: :pinned_nvidia_sm100 requires cuda:100 or newer")
 
           pinned_sm100_passes(target, capability, num_warps, num_stages, from_ttgir?)
 
@@ -106,24 +95,15 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
   defp legacy_passes(target, capability, num_warps, from_ttgir?, remove_layouts?) do
     [
       unless(from_ttgir?,
-        do:
-          pass(
-            :convert_to_ttgpu,
-            :ttgir,
-            "convert-triton-to-tritongpu{target=#{target}, num-warps=#{num_warps}}"
-          )
+        do: pass(:convert_to_ttgpu, :ttgir, "convert-triton-to-tritongpu{target=#{target}, num-warps=#{num_warps}}")
       ),
       pass(:coalesce, :ttgir, "tritongpu-coalesce"),
       pass(:f32_dot_tc, :ttgir, "tritongpu-F32DotTC"),
       pass(:plan_cta, :ttgir, "triton-nvidia-gpu-plan-cta"),
-      if(remove_layouts?,
-        do: pass(:remove_layout_conversions_pre, :ttgir, "tritongpu-remove-layout-conversions")
-      ),
+      if(remove_layouts?, do: pass(:remove_layout_conversions_pre, :ttgir, "tritongpu-remove-layout-conversions")),
       pass(:optimize_thread_locality, :ttgir, "tritongpu-optimize-thread-locality"),
       pass(:accelerate_matmul, :ttgir, "tritongpu-accelerate-matmul"),
-      if(remove_layouts?,
-        do: pass(:remove_layout_conversions_post, :ttgir, "tritongpu-remove-layout-conversions")
-      ),
+      if(remove_layouts?, do: pass(:remove_layout_conversions_post, :ttgir, "tritongpu-remove-layout-conversions")),
       pass(:optimize_dot_operands, :ttgir, "tritongpu-optimize-dot-operands"),
       pass(:legacy_canonicalize, :ttgir, "canonicalize")
     ]
@@ -138,8 +118,7 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
           pass(
             :convert_to_ttgpu,
             :ttgir,
-            "convert-triton-to-tritongpu{target=#{target} num-warps=#{num_warps} " <>
-              "threads-per-warp=32 num-ctas=1}"
+            "convert-triton-to-tritongpu{target=#{target} num-warps=#{num_warps} " <> "threads-per-warp=32 num-ctas=1}"
           )
       ),
       pass(:coalesce, :ttgir, "tritongpu-coalesce"),
@@ -149,16 +128,8 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
       pass(:optimize_thread_locality, :ttgir, "tritongpu-optimize-thread-locality"),
       pass(:accelerate_matmul, :ttgir, "tritongpu-accelerate-matmul"),
       pass(:remove_layout_conversions_post, :ttgir, "tritongpu-remove-layout-conversions"),
-      pass(
-        :optimize_dot_operands_pre,
-        :ttgir,
-        "tritongpu-optimize-dot-operands{hoist-layout-conversion=true}"
-      ),
-      pass(
-        :optimize_descriptor_encoding,
-        :ttgir,
-        "triton-nvidia-optimize-descriptor-encoding"
-      ),
+      pass(:optimize_dot_operands_pre, :ttgir, "tritongpu-optimize-dot-operands{hoist-layout-conversion=true}"),
+      pass(:optimize_descriptor_encoding, :ttgir, "triton-nvidia-optimize-descriptor-encoding"),
       pass(:loop_aware_cse_pre, :ttgir, "triton-loop-aware-cse"),
       pass(:fuse_nested_loops, :ttgir, "tritongpu-fuse-nested-loops"),
       pass(:canonicalize_pre_pipeline, :ttgir, "canonicalize"),
@@ -166,33 +137,17 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
       pass(:optimize_accumulator_init, :ttgir, "tritongpu-optimize-accumulator-init"),
       pass(:hoist_tmem_alloc_pre, :ttgir, "tritongpu-hoist-tmem-alloc{post-pipeline=false}"),
       pass(:promote_lhs_to_tmem, :ttgir, "tritongpu-promote-lhs-to-tmem"),
-      pass(
-        :assign_latencies,
-        :ttgir,
-        "tritongpu-assign-latencies{num-stages=#{num_stages}}"
-      ),
+      pass(:assign_latencies, :ttgir, "tritongpu-assign-latencies{num-stages=#{num_stages}}"),
       pass(:schedule_loops, :ttgir, "tritongpu-schedule-loops"),
-      pass(
-        :warp_specialize,
-        :ttgir,
-        "tritongpu-automatic-warp-specialization{num-stages=#{num_stages}}"
-      ),
-      pass(
-        :pipeline,
-        :ttgir,
-        "tritongpu-pipeline{num-stages=#{num_stages} dump-intermediate-steps=false}"
-      ),
+      pass(:warp_specialize, :ttgir, "tritongpu-automatic-warp-specialization{num-stages=#{num_stages}}"),
+      pass(:pipeline, :ttgir, "tritongpu-pipeline{num-stages=#{num_stages} dump-intermediate-steps=false}"),
       pass(:optimize_partition_warps, :ttgir, "tritongpu-optimize-partition-warps"),
       pass(:combine_tensor_select_and_if_ttgir, :ttgir, "tritongpu-combine-tensor-select-and-if"),
       pass(:hoist_tmem_alloc_post, :ttgir, "tritongpu-hoist-tmem-alloc{post-pipeline=true}"),
       pass(:remove_tmem_tokens, :ttgir, "triton-nvidia-gpu-remove-tmem-tokens"),
       pass(:canonicalize_post_pipeline, :ttgir, "canonicalize"),
       pass(:loop_aware_cse_post, :ttgir, "triton-loop-aware-cse"),
-      pass(
-        :optimize_dot_operands_post,
-        :ttgir,
-        "tritongpu-optimize-dot-operands{hoist-layout-conversion=true}"
-      ),
+      pass(:optimize_dot_operands_post, :ttgir, "tritongpu-optimize-dot-operands{hoist-layout-conversion=true}"),
       pass(:coalesce_async_copy, :ttgir, "tritongpu-coalesce-async-copy"),
       pass(:optimize_tmem_layouts, :ttgir, "triton-nvidia-optimize-tmem-layouts"),
       pass(:tmem_load_reduce, :ttgir, "triton-nvidia-tmem-load-reduce"),
@@ -204,11 +159,7 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
       pass(:reorder_instructions, :ttgir, "tritongpu-reorder-instructions"),
       pass(:loop_aware_cse_final, :ttgir, "triton-loop-aware-cse"),
       pass(:symbol_dce, :ttgir, "symbol-dce"),
-      pass(
-        :fence_insertion,
-        :ttgir,
-        "triton-nvidia-gpu-fence-insertion{compute-capability=#{capability}}"
-      ),
+      pass(:fence_insertion, :ttgir, "triton-nvidia-gpu-fence-insertion{compute-capability=#{capability}}"),
       pass(:lower_mma, :ttgir, "triton-nvidia-mma-lowering"),
       pass(:sccp, :ttgir, "sccp"),
       pass(:cse, :ttgir, "cse"),
@@ -218,8 +169,8 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
     |> Kernel.++(llir_passes(capability))
   end
 
-  defp llir_passes(capability) do
-    [
+  defp llir_passes(capability),
+    do: [
       pass(:combine_tensor_select_and_if_llir, :llir, "tritongpu-combine-tensor-select-and-if"),
       pass(:allocate_warp_groups, :llir, "tritongpu-allocate-warp-groups"),
       pass(:convert_scf_to_cf, :llir, "convert-scf-to-cf"),
@@ -242,7 +193,6 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
       pass(:convert_nvvm_to_llvm, :llir, "convert-nvvm-to-llvm"),
       pass(:llir_canonicalize, :llir, "canonicalize")
     ]
-  end
 
   defp pass(id, phase, pipeline), do: %{id: id, phase: phase, pipeline: pipeline}
 
@@ -258,16 +208,12 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
   end
 
   defp capability!(target),
-    do:
-      raise(ArgumentError, "unsupported_pipeline_profile: invalid CUDA target #{inspect(target)}")
+    do: raise(ArgumentError, "unsupported_pipeline_profile: invalid CUDA target #{inspect(target)}")
 
   defp positive_integer!(opts, key, default) do
     case Keyword.get(opts, key, default) do
-      value when is_integer(value) and value > 0 ->
-        value
-
-      value ->
-        raise ArgumentError, "invalid_#{key}: expected a positive integer, got #{inspect(value)}"
+      value when is_integer(value) and value > 0 -> value
+      value -> raise ArgumentError, "invalid_#{key}: expected a positive integer, got #{inspect(value)}"
     end
   end
 

@@ -15,9 +15,7 @@ pub fn get_binary_as_string_ref(env: beam.env, term: beam.term) !mlir_capi.Strin
 const print_nif_prefix = "beaver_raw_to_string_";
 pub fn PrinterNIF(comptime ResourceKind: type, comptime print_fn: anytype) type {
     return struct {
-        const Error = error{
-            NullPointerFound,
-        };
+        const Error = error{NullPointerFound};
         const Buffer = std.array_list.Managed(u8);
         buffer: Buffer,
         fn collect_string_ref(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.c) void {
@@ -25,9 +23,7 @@ pub fn PrinterNIF(comptime ResourceKind: type, comptime print_fn: anytype) type 
             printer.*.buffer.appendSlice(s.data[0..s.length]) catch unreachable;
         }
         pub fn print_make(env: beam.env, entity: ResourceKind.T) !beam.term {
-            if (entity.ptr == null) {
-                return Error.NullPointerFound;
-            }
+            if (entity.ptr == null) return Error.NullPointerFound;
             var printer = @This(){ .buffer = Buffer.init(beam.allocator) };
             defer printer.buffer.deinit();
             print_fn(entity, collect_string_ref, &printer);
@@ -114,20 +110,13 @@ fn beaver_raw_string_ref_to_binary(env: beam.env, _: c_int, args: [*c]const beam
 
 // memory layout {StringRef, real_binary, null}
 fn beaver_raw_get_string_ref(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const Error = error{
-        ResAllocFailure,
-        NotBinary,
-    };
+    const Error = error{ ResAllocFailure, NotBinary };
     const StructT = mlir_capi.StringRef.T;
     const DataT = [*c]u8;
     var bin: beam.binary = undefined;
-    if (0 == e.enif_inspect_binary(env, args[0], &bin)) {
-        return Error.NotBinary;
-    }
+    if (0 == e.enif_inspect_binary(env, args[0], &bin)) return Error.NotBinary;
     const ptr: ?*anyopaque = e.enif_alloc_resource(mlir_capi.StringRef.resource.t, @sizeOf(StructT) + bin.size + 1);
-    if (ptr == null) {
-        return Error.ResAllocFailure;
-    }
+    if (ptr == null) return Error.ResAllocFailure;
     var dptr: DataT = @ptrCast(ptr);
     dptr += @sizeOf(StructT);
     const sptr: *StructT = @ptrCast(@alignCast(ptr));

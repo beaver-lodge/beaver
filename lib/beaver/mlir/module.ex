@@ -1,3 +1,6 @@
+alias Beaver.MLIR.Operation
+alias Beaver.Deferred
+
 defmodule Beaver.MLIR.Module do
   @moduledoc """
   This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
@@ -10,41 +13,26 @@ defmodule Beaver.MLIR.Module do
   Create a MLIR module by parsing string.
   """
   def create(str, opts \\ []) when is_binary(str) do
-    Beaver.Deferred.from_opts(
+    Deferred.from_opts(
       opts,
       fn ctx ->
         {module, diagnostics} =
-          CAPI.beaver_raw_module_create_parse_async(
-            ctx.ref,
-            ctx.ref,
-            MLIR.StringRef.create(str).ref
-          )
+          CAPI.beaver_raw_module_create_parse_async(ctx.ref, ctx.ref, MLIR.StringRef.create(str).ref)
           |> CAPI.await_async()
 
-        if MLIR.null?(module) do
-          {:error, diagnostics}
-        else
-          {:ok, module}
-        end
+        if MLIR.null?(module), do: {:error, diagnostics}, else: {:ok, module}
       end
     )
   end
 
   def create!(str, opts \\ []) when is_binary(str) do
     res =
-      Beaver.Deferred.from_opts(opts, fn ctx ->
-        Beaver.Deferred.resolve(create(str, opts), ctx)
-      end)
+      Deferred.from_opts(opts, fn ctx -> Deferred.resolve(create(str, opts), ctx) end)
 
     case res do
-      %Beaver.Deferred{} ->
-        raise ArgumentError, "calling a bang function to parse module must be eager"
-
-      {:error, diagnostics} ->
-        raise ArgumentError, MLIR.Diagnostic.format(diagnostics, "fail to parse module")
-
-      {:ok, module} ->
-        MLIR.verify!(module)
+      %Deferred{} -> raise ArgumentError, "calling a bang function to parse module must be eager"
+      {:error, diagnostics} -> raise ArgumentError, MLIR.Diagnostic.format(diagnostics, "fail to parse module")
+      {:ok, module} -> MLIR.verify!(module)
     end
   end
 
@@ -60,21 +48,20 @@ defmodule Beaver.MLIR.Module do
   defdelegate empty(location), to: CAPI, as: :mlirModuleCreateEmpty
 
   @impl Access
-  def fetch(module, attribute) do
-    MLIR.Operation.fetch(MLIR.Operation.from_module(module), attribute)
-  end
+  def fetch(module, attribute),
+    do: Operation.fetch(Operation.from_module(module), attribute)
 
   @impl Access
   def get_and_update(module, attribute, function) do
     {attr, _} =
-      MLIR.Operation.get_and_update(MLIR.Operation.from_module(module), attribute, function)
+      Operation.get_and_update(Operation.from_module(module), attribute, function)
 
     {attr, module}
   end
 
   @impl Access
   def pop(module, attribute) do
-    {attr, _} = MLIR.Operation.pop(MLIR.Operation.from_module(module), attribute)
+    {attr, _} = Operation.pop(Operation.from_module(module), attribute)
     {attr, module}
   end
 end

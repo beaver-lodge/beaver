@@ -1,3 +1,5 @@
+alias Beaver.MLIR.Operation
+
 defmodule Beaver.MLIR.ConditionallySpeculatable do
   @moduledoc """
   Installs and queries a callback-backed ConditionallySpeculatable fallback
@@ -11,48 +13,37 @@ defmodule Beaver.MLIR.ConditionallySpeculatable do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  @type speculatability ::
-          :not_speculatable | :speculatable | :recursively_speculatable
+  @type speculatability :: :not_speculatable | :speculatable | :recursively_speculatable
 
-  @callback speculatability(MLIR.Operation.t()) :: speculatability()
+  @callback speculatability(Operation.t()) :: speculatability()
 
   @spec attach(
           MLIR.Context.t(),
           String.t(),
-          module() | (MLIR.Operation.t() -> speculatability() | {:ok, speculatability()}),
+          module() | (Operation.t() -> speculatability() | {:ok, speculatability()}),
           keyword()
         ) :: MLIR.ExternalInterface.Attachment.t()
-  def attach(%MLIR.Context{} = context, operation_name, implementation, opts \\ [])
-      when is_binary(operation_name) do
+  def attach(%MLIR.Context{} = ctx, op_name, implementation, opts \\ [])
+      when is_binary(op_name) do
     callback = callback!(implementation)
 
-    MLIR.ExternalInterface.attach(
-      context,
-      operation_name,
-      :conditionally_speculatable,
-      %{get_speculatability: callback},
-      opts
-    )
+    MLIR.ExternalInterface.attach(ctx, op_name, :conditionally_speculatable, %{get_speculatability: callback}, opts)
   end
 
   @doc false
   def callback!(implementation) when is_atom(implementation) do
-    unless function_exported?(implementation, :speculatability, 1) do
-      raise ArgumentError,
-            "#{inspect(implementation)} must implement speculatability/1"
-    end
+    unless function_exported?(implementation, :speculatability, 1),
+      do: raise(ArgumentError, "#{inspect(implementation)} must implement speculatability/1")
 
     &implementation.speculatability/1
   end
 
   def callback!(callback) when is_function(callback, 1), do: callback
 
-  def callback!(other),
-    do:
-      raise(ArgumentError, "invalid ConditionallySpeculatable implementation: #{inspect(other)}")
+  def callback!(other), do: raise(ArgumentError, "invalid ConditionallySpeculatable implementation: #{inspect(other)}")
 
-  @spec query(MLIR.Operation.t(), keyword()) :: speculatability()
-  def query(%MLIR.Operation{ref: operation_ref}, opts \\ []) do
+  @spec query(Operation.t(), keyword()) :: speculatability()
+  def query(%Operation{ref: operation_ref}, opts \\ []) do
     timeout_ms = Keyword.get(opts, :timeout, 30_000)
     :ok = CAPI.beaver_raw_conditionally_speculatable_query_async(operation_ref)
     await_query(timeout_ms)
@@ -60,11 +51,9 @@ defmodule Beaver.MLIR.ConditionallySpeculatable do
 
   defp await_query(timeout_ms) do
     receive do
-      {:speculatability_done, value} ->
-        decode(value)
+      {:speculatability_done, value} -> decode(value)
     after
-      timeout_ms + 1_000 ->
-        raise "timed out querying ConditionallySpeculatable fallback model"
+      timeout_ms + 1_000 -> raise "timed out querying ConditionallySpeculatable fallback model"
     end
   end
 

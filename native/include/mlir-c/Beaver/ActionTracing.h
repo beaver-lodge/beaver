@@ -32,20 +32,18 @@ typedef void (*MlirBeaverActionEventsCallback)(const char *data, void *user_data
 /// The returned handle owns the tracing session; it must be released with
 /// mlirBeaverActionTracingDetach. Only one tracing session may be attached to
 /// a context at a time.
-MLIR_CAPI_EXPORTED MlirBeaverActionTracing
-mlirBeaverActionTracingAttach(MlirContext context, MlirStringRef filter_json,
-                              MlirStringRef location_json,
-                              MlirStringRef skip_json, MlirStringRef limit_json);
+MLIR_CAPI_EXPORTED MlirBeaverActionTracing mlirBeaverActionTracingAttach(MlirContext context, MlirStringRef filter_json,
+                                                                         MlirStringRef location_json,
+                                                                         MlirStringRef skip_json,
+                                                                         MlirStringRef limit_json);
 
 /// Drain all pending action events from the session and hand them to
 /// `callback` as a JSON array. Returns true on success.
-MLIR_CAPI_EXPORTED bool mlirBeaverActionTracingDrain(
-    MlirBeaverActionTracing tracing, MlirBeaverActionEventsCallback callback,
-    void *user_data);
+MLIR_CAPI_EXPORTED bool mlirBeaverActionTracingDrain(MlirBeaverActionTracing tracing,
+                                                     MlirBeaverActionEventsCallback callback, void *user_data);
 
 /// Detach and destroy the tracing session. Safe to call from any thread.
-MLIR_CAPI_EXPORTED void
-mlirBeaverActionTracingDetach(MlirBeaverActionTracing tracing);
+MLIR_CAPI_EXPORTED void mlirBeaverActionTracingDetach(MlirBeaverActionTracing tracing);
 
 #ifdef __cplusplus
 }

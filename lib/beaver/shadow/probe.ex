@@ -82,15 +82,11 @@ defmodule Beaver.Shadow.Probe do
           %{config: Tuning.Config.t(), result: Result.t()}
         ]
   def probe_many(fixture_name, configs) when is_atom(fixture_name) and is_list(configs) do
-    Enum.map(configs, fn config ->
-      %{config: config, result: run(fixture_name, num_warps: config.num_warps)}
-    end)
+    Enum.map(configs, fn config -> %{config: config, result: run(fixture_name, num_warps: config.num_warps)} end)
   end
 
-  defp elixir_executable do
-    System.find_executable("elixir") ||
-      raise ArgumentError, "elixir executable not found for the probe subprocess"
-  end
+  defp elixir_executable,
+    do: System.find_executable("elixir") || raise(ArgumentError, "elixir executable not found for the probe subprocess")
 
   defp child_args(fixture_name, opts) do
     code_paths =
@@ -124,8 +120,7 @@ defmodule Beaver.Shadow.Probe do
     try do
       Beaver.Triton.register(context)
 
-      module =
-        MLIR.Module.create!(File.read!(Corpus.fixture_path(fixture.name)), ctx: context)
+      module = MLIR.Module.create!(File.read!(Corpus.fixture_path(fixture.name)), ctx: context)
 
       pipeline = lowering_pipeline(fixture.dialect, num_warps)
 
@@ -136,8 +131,7 @@ defmodule Beaver.Shadow.Probe do
           try do
             {:cont, acc |> Beaver.Composer.append(pass) |> Beaver.Composer.run!()}
           rescue
-            exception ->
-              {:halt, {:pipeline_error, pass, Exception.message(exception)}}
+            exception -> {:halt, {:pipeline_error, pass, Exception.message(exception)}}
           end
         end)
 
@@ -150,8 +144,7 @@ defmodule Beaver.Shadow.Probe do
           %{status: "ok", llvm_func: MLIR.to_string(llvm) =~ "llvm.func"}
       end
     rescue
-      exception ->
-        %{status: "error", message: Exception.message(exception)}
+      exception -> %{status: "error", message: Exception.message(exception)}
     after
       MLIR.Context.destroy(context)
     end
@@ -192,9 +185,7 @@ defmodule Beaver.Shadow.Probe do
     |> Enum.reject(&is_nil/1)
   end
 
-  defp marker_path do
-    Path.join(System.tmp_dir!(), "shadow_probe_#{System.unique_integer([:positive])}.marker")
-  end
+  defp marker_path, do: Path.join(System.tmp_dir!(), "shadow_probe_#{System.unique_integer([:positive])}.marker")
 
   defp mark(pass) do
     case System.get_env(@marker_env) do

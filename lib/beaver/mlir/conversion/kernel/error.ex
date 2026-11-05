@@ -31,11 +31,7 @@ defmodule Beaver.MLIR.Conversion.Kernel.Error do
           | :population_failed
           | :native_exception
 
-  @type t() :: %__MODULE__{
-          code: code(),
-          message: String.t(),
-          details: map()
-        }
+  @type t() :: %__MODULE__{code: code(), message: String.t(), details: map()}
 
   @impl Exception
   def exception(opts) do
@@ -45,7 +41,6 @@ defmodule Beaver.MLIR.Conversion.Kernel.Error do
     %__MODULE__{code: code, details: details, message: message}
   end
 
-  defp default_message(code, details) do
-    "compiler-kernel contract rejected #{code}: #{inspect(details, limit: 20)}"
-  end
+  defp default_message(code, details),
+    do: "compiler-kernel contract rejected #{code}: #{inspect(details, limit: 20)}"
 end

@@ -1,3 +1,5 @@
+alias Beaver.MLIR.Context
+
 defmodule Beaver.Deferred do
   @moduledoc """
   Explicit, context-bound construction of MLIR entities.
@@ -15,7 +17,7 @@ defmodule Beaver.Deferred do
   @enforce_keys [:resolver]
   defstruct [:resolver]
 
-  @type context_arg() :: MLIR.Context.t()
+  @type context_arg() :: Context.t()
   @opaque t(value) :: %__MODULE__{resolver: (context_arg() -> value)}
   @type contextual(value) :: value | t(value)
   @type opts :: [ctx: context_arg()]
@@ -36,14 +38,9 @@ defmodule Beaver.Deferred do
   @spec from_opts(opts(), (context_arg() -> value)) :: contextual(value) when value: var
   def from_opts(opts, resolver) when is_list(opts) and is_function(resolver, 1) do
     case Keyword.fetch(opts, :ctx) do
-      :error ->
-        defer(resolver)
-
-      {:ok, %MLIR.Context{} = ctx} ->
-        resolver.(ctx) |> MLIR.Context.ensure_same!(ctx)
-
-      {:ok, invalid} ->
-        raise ArgumentError, "expected :ctx to be an MLIR context, got: #{inspect(invalid)}"
+      :error -> defer(resolver)
+      {:ok, %Context{} = ctx} -> resolver.(ctx) |> Context.ensure_same!(ctx)
+      {:ok, invalid} -> raise ArgumentError, "expected :ctx to be an MLIR context, got: #{inspect(invalid)}"
     end
   end
 
@@ -51,14 +48,9 @@ defmodule Beaver.Deferred do
   @spec context(opts()) :: context_arg() | nil
   def context(opts) when is_list(opts) do
     case Keyword.fetch(opts, :ctx) do
-      :error ->
-        nil
-
-      {:ok, %MLIR.Context{} = ctx} ->
-        ctx
-
-      {:ok, invalid} ->
-        raise ArgumentError, "expected :ctx to be an MLIR context, got: #{inspect(invalid)}"
+      :error -> nil
+      {:ok, %Context{} = ctx} -> ctx
+      {:ok, invalid} -> raise ArgumentError, "expected :ctx to be an MLIR context, got: #{inspect(invalid)}"
     end
   end
 
@@ -66,9 +58,7 @@ defmodule Beaver.Deferred do
           MLIR.Block.t() | MLIR.PatternRewriter.t() | MLIR.RewriterBase.t() | Macro.t() | nil
   def fetch_insertion_point(opts) do
     for key <- [:block, :blk] do
-      if opts[key] do
-        raise ArgumentError, "use :ip instead of :#{key} as key"
-      end
+      if opts[key], do: raise(ArgumentError, "use :ip instead of :#{key} as key")
     end
 
     opts[:ip]
@@ -82,28 +72,16 @@ defmodule Beaver.Deferred do
   `{:error, reason}`; success is unwrapped and errors become `ArgumentError`.
   """
   @spec resolve(contextual(value), context_arg()) :: value when value: var
-  def resolve(resolver, %MLIR.Context{}) when is_function(resolver, 1) do
-    raise ArgumentError,
-          "bare context resolvers are not deferred values; wrap the function with defer/1"
-  end
+  def resolve(resolver, %Context{}) when is_function(resolver, 1),
+    do: raise(ArgumentError, "bare context resolvers are not deferred values; wrap the function with defer/1")
 
-  def resolve(value, %MLIR.Context{} = ctx) do
-    value
-    |> do_resolve(ctx)
-    |> MLIR.Context.ensure_same!(ctx)
-  end
+  def resolve(value, %Context{} = ctx), do: value |> do_resolve(ctx) |> Context.ensure_same!(ctx)
 
-  def resolve(_value, invalid) do
-    raise ArgumentError, "expected an MLIR context, got: #{inspect(invalid)}"
-  end
+  def resolve(_value, invalid), do: raise(ArgumentError, "expected an MLIR context, got: #{inspect(invalid)}")
 
   defp do_resolve({:parametric, _, _, deferred}, ctx), do: do_resolve(deferred, ctx)
 
-  defp do_resolve(%__MODULE__{resolver: resolver}, ctx) do
-    resolver.(ctx)
-    |> unwrap()
-    |> do_resolve(ctx)
-  end
+  defp do_resolve(%__MODULE__{resolver: resolver}, ctx), do: resolver.(ctx) |> unwrap() |> do_resolve(ctx)
 
   defp do_resolve(entity, _ctx), do: entity
 
