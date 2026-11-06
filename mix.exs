@@ -69,6 +69,7 @@ defmodule Beaver.MixProject do
         "guides/transform-autotuning.md",
         "guides/slang.md",
         "guides/dialect-conversion.md",
+        "guides/ex-dialect.md",
         "guides/native-rewrite-patterns.md",
         "guides/action-tracing.md",
         "guides/conversion-profiling.md",

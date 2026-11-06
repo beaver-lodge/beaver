@@ -12,6 +12,10 @@ dialect using a `Conversion.Plan`. The resulting IR can then use MLIR's standard
 
 ## Ex provider boundary
 
+The Ex schema is organized by language, execution and runtime ownership.
+See [Ex ownership and conversion boundaries](ex-dialect.md) for boundary
+checks, selective conversion and the compatibility runtime ABI.
+
 Beaver owns the `ex` dialect schema and the provider-neutral external
 compiler-kernel ABI. Evolving production lowering belongs to Batata and is
 loaded through `Conversion.Plan.add_external_pattern_population/3`; Beaver
