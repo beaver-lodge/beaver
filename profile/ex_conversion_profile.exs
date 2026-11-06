@@ -25,13 +25,12 @@ defmodule Beaver.Profile.ExConversion do
     max_overhead_percent = optional_positive!(opts[:max_overhead_percent], "max-overhead-percent")
     assembly = assembly(functions)
 
-    if warmup > 0 do
-      Enum.each(1..warmup, fn _ -> measure(assembly, false) end)
-    end
+    for _ <- 1..warmup//1, profile? <- [false, true], do: measure(assembly, profile?)
 
     measurements =
-      Enum.flat_map(1..iterations, fn _ ->
-        [measure(assembly, false), measure(assembly, true)]
+      Enum.flat_map(1..iterations, fn i ->
+        order = if rem(i, 2) == 0, do: [true, false], else: [false, true]
+        order |> Enum.map(&measure(assembly, &1)) |> Enum.sort_by(& &1.mode)
       end)
 
     baseline = Enum.filter(measurements, &(&1.mode == "baseline"))

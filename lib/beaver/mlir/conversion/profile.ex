@@ -47,26 +47,16 @@ defmodule Beaver.MLIR.Conversion.Profile do
         do: max(state.peak_process_memory_bytes, process_memory_bytes()),
         else: state.peak_process_memory_bytes
 
-    summary = %{
-      count: 1,
-      service_ns: service_ns,
-      max_service_ns: service_ns,
-      native_wait_ns: native_wait_ns,
-      max_native_wait_ns: native_wait_ns
-    }
+    key = {kind, root_name}
+    {count, service_sum, service_max, wait_sum, wait_max} = Map.get(state.callbacks, key, {0, 0, 0, 0, 0})
+
+    summary =
+      {count + 1, service_sum + service_ns, max(service_max, service_ns), wait_sum + native_wait_ns,
+       max(wait_max, native_wait_ns)}
 
     %{
       state
-      | callbacks:
-          Map.update(state.callbacks, {kind, root_name}, summary, fn current ->
-            %{
-              count: current.count + 1,
-              service_ns: current.service_ns + service_ns,
-              max_service_ns: max(current.max_service_ns, service_ns),
-              native_wait_ns: current.native_wait_ns + native_wait_ns,
-              max_native_wait_ns: max(current.max_native_wait_ns, native_wait_ns)
-            }
-          end),
+      | callbacks: Map.put(state.callbacks, key, summary),
         peak_process_memory_bytes: peak_process_memory_bytes,
         callback_count: callback_count
     }
@@ -131,20 +121,17 @@ defmodule Beaver.MLIR.Conversion.Profile do
 
   defp callback_summaries(callbacks) do
     callbacks
-    |> Map.keys()
-    |> Enum.sort_by(fn {kind, root_name} -> {kind, root_name || ""} end)
-    |> Enum.map(fn {kind, root_name} = key ->
-      callback = Map.fetch!(callbacks, key)
-
+    |> Enum.sort_by(fn {{kind, root_name}, _summary} -> {kind, root_name || ""} end)
+    |> Enum.map(fn {{kind, root_name}, {count, service_sum, service_max, wait_sum, wait_max}} ->
       %{
         "kind" => Atom.to_string(kind),
         "root" => root_name,
-        "count" => callback.count,
-        "beam_service_ns" => callback.service_ns,
-        "max_beam_service_ns" => callback.max_service_ns,
-        "native_wait_sum_ns" => callback.native_wait_ns,
-        "max_native_wait_ns" => callback.max_native_wait_ns,
-        "boundary_overhead_sum_ns" => max(callback.native_wait_ns - callback.service_ns, 0)
+        "count" => count,
+        "beam_service_ns" => service_sum,
+        "max_beam_service_ns" => service_max,
+        "native_wait_sum_ns" => wait_sum,
+        "max_native_wait_ns" => wait_max,
+        "boundary_overhead_sum_ns" => max(wait_sum - service_sum, 0)
       }
     end)
   end
