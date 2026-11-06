@@ -19,14 +19,6 @@ exclude =
   end
 
 exclude =
-  if Beaver.MLIR.Transform.Schedule.DSL.alloc_to_global_supported?() and
-       Beaver.MLIR.Transform.Schedule.DSL.loop_unroll_full_supported?() do
-    exclude
-  else
-    exclude ++ [:recent_transform_helpers]
-  end
-
-exclude =
   if Code.ensure_loaded?(Beaver.MLIR.Dialect.Transform) and
        function_exported?(
          Beaver.MLIR.Dialect.Transform,

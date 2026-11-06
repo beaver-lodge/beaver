@@ -50,22 +50,20 @@ defmodule Beaver.MLIR.Dialect do
     end
   end
 
-  defmacro define(name) do
-    quote bind_quoted: [d: name] do
-      alias Beaver.MLIR.Dialect
-      module_name = d |> Dialect.Registry.normalize_dialect_name()
-      module_name = Module.concat([Beaver.MLIR.Dialect, module_name])
+  defmacro define(name),
+    do:
+      (quote bind_quoted: [d: name] do
+         alias Beaver.MLIR.Dialect
+         module_name = d |> Dialect.Registry.normalize_dialect_name()
+         module_name = Module.concat([Beaver.MLIR.Dialect, module_name])
 
-      ops = Dialect.Registry.ops(d)
+         ops = Dialect.Registry.ops(d)
 
-      defmodule module_name do
-        @file "#{d}.ex"
-        use Beaver.MLIR.Dialect,
-          dialect: d,
-          ops: ops
-      end
-    end
-  end
+         defmodule module_name do
+           @file "#{d}.ex"
+           use Beaver.MLIR.Dialect, dialect: d, ops: ops
+         end
+       end)
 
   @doc """
   Return the dialect handle for the given dialect name.

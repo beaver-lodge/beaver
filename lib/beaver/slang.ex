@@ -112,40 +112,26 @@ defmodule Beaver.Slang do
     end
   end
 
-  @doc false
-  # This function applies the target op to the given SSA (Static Single Assignment) form.
-  defp op_applier(ssa) do
-    {op, arguments} = pop_metadata!(ssa.arguments, :slang_target_op)
-    {names, arguments} = pop_metadata!(arguments, :slang_names)
-    {loc, arguments} = pop_metadata!(arguments, :slang_location)
-    n = arguments |> Enum.count(&match?(%MLIR.Value{}, &1))
+  defp emit_declaration(op, values, names, opts, extra) do
+    n = Enum.count(values, &match?(%MLIR.Value{}, &1))
 
     if length(names) != n,
       do: raise(ArgumentError, "#{op} declares #{length(names)} names for #{n} constraints: #{inspect(names)}")
 
-    names = Enum.map(names, &Attribute.string/1)
+    key = if op == :attributes, do: :attributeValueNames, else: :names
 
-    names_attr =
-      case op do
-        op when op in [:operands, :results, :parameters, :regions] -> [names: Attribute.array(names)]
-        :attributes -> [attributeValueNames: Attribute.array(names)]
-        _ -> []
-      end
+    attributes =
+      if op in [:operands, :results, :parameters, :regions, :attributes],
+        do: [{key, Attribute.array(Enum.map(names, &Attribute.string/1))}],
+        else: []
 
-    arguments = arguments ++ names_attr
-
-    apply(Beaver.MLIR.Dialect.IRDL, op, [%{ssa | arguments: arguments, loc: loc}])
-  end
-
-  defp pop_metadata!(arguments, key) do
-    case Enum.find_index(arguments, &match?({^key, _}, &1)) do
-      nil ->
-        raise ArgumentError, "missing internal Slang metadata #{inspect(key)}"
-
-      index ->
-        {{^key, value}, arguments} = List.pop_at(arguments, index)
-        {value, arguments}
-    end
+    MLIR.Operation.create(%Beaver.SSA{
+      op: "irdl.#{op}",
+      arguments: values ++ attributes ++ extra,
+      ctx: opts[:ctx],
+      ip: opts[:ip],
+      loc: opts[:loc]
+    })
   end
 
   # This function determines the variadicity of the given values based on the provided options. It generates the variadicity attribute for the values if needed.
@@ -175,80 +161,43 @@ defmodule Beaver.Slang do
   end
 
   @doc false
-  # This function runs the creator function for a given operation. It generates the MLIR code for the operation and its arguments, applies the operation using op_applier/1, and returns the result.
+  # Build constraint groups in an owned region, then attach the enclosing IRDL declaration.
   def run_creator(name, op, args_op, constrain_f, opts) do
-    use Beaver
-    return_op = opts[:return_op]
+    Deferred.from_opts(opts, fn ctx ->
+      location = source_location(opts, ctx)
+      region = CAPI.mlirRegionCreate()
+      block = MLIR.Block.create()
+      CAPI.mlirRegionAppendOwnedBlock(region, block)
+      local = [ctx: ctx, ip: block, loc: location]
 
-    Deferred.from_opts(
-      opts,
-      fn ctx ->
-        mlir ip: Deferred.fetch_insertion_point(opts), ctx: ctx do
-          source_loc = source_location(opts, ctx)
+      # The region is still caller-owned until the enclosing declaration is created.
+      try do
+        {args, ret, attributes, regions} = constrain_f.(block, ctx)
 
-          op_applier slang_target_op: op,
-                     slang_names: [],
-                     slang_location: source_loc,
-                     sym_name: ~a/#{name}/s do
-            region do
-              block _op() do
-                {args, ret, attributes, regions} = constrain_f.(Beaver.Env.block(), ctx)
+        groups = [
+          {args_op, args, opts[:argument_names], opts},
+          {opts[:return_op], ret, opts[:result_names], opts},
+          {:attributes, attributes, opts[:attribute_names], []},
+          {:regions, regions, opts[:region_names], []}
+        ]
 
-                case {args, strip_variadicity(args)} do
-                  {_, []} ->
-                    []
-
-                  {descriptors, args} ->
-                    op_applier(args, get_variadicity(descriptors, opts),
-                      slang_target_op: args_op,
-                      slang_names: opts[:argument_names],
-                      slang_location: source_loc
-                    ) >>> []
-                end
-
-                case {return_op, ret, strip_variadicity(ret)} do
-                  {_, _, []} ->
-                    []
-
-                  {return_op, descriptors, ret} when not is_nil(return_op) ->
-                    op_applier(
-                      ret |> Enum.map(&create_constraint(&1, ip: Beaver.Env.block(), ctx: ctx, loc: source_loc)),
-                      get_variadicity(descriptors, opts),
-                      slang_target_op: return_op,
-                      slang_names: opts[:result_names],
-                      slang_location: source_loc
-                    ) >>> []
-                end
-
-                case attributes do
-                  [] ->
-                    []
-
-                  attributes ->
-                    op_applier(attributes,
-                      slang_target_op: :attributes,
-                      slang_names: opts[:attribute_names],
-                      slang_location: source_loc
-                    ) >>> []
-                end
-
-                case regions do
-                  [] ->
-                    []
-
-                  regions ->
-                    op_applier(regions,
-                      slang_target_op: :regions,
-                      slang_names: opts[:region_names],
-                      slang_location: source_loc
-                    ) >>> []
-                end
-              end
-            end
-          end >>> []
+        for {group, descriptors, names, variadic_opts} <- groups,
+            values = strip_variadicity(descriptors),
+            values != [] do
+          if is_nil(group), do: raise(CaseClauseError, term: {group, descriptors, values})
+          values = if group == opts[:return_op], do: Enum.map(values, &create_constraint(&1, local)), else: values
+          emit_declaration(group, values, names, local, get_variadicity(descriptors, variadic_opts))
         end
+      catch
+        kind, reason ->
+          CAPI.mlirRegionDestroy(region)
+          :erlang.raise(kind, reason, __STACKTRACE__)
       end
-    )
+
+      emit_declaration(op, [region], [], Keyword.put(local, :ip, Deferred.fetch_insertion_point(opts)),
+        sym_name: Attribute.string(name, ctx: ctx)
+      )
+    end)
   end
 
   defp source_location(opts, ctx) do
@@ -393,9 +342,7 @@ defmodule Beaver.Slang do
 
   defp normalize_results_ast({:__block__, meta, expressions}, explicit_names) do
     {result_values, result_names} =
-      expressions
-      |> List.last()
-      |> split_named_values("result", explicit_names)
+      expressions |> List.last() |> split_named_values("result", explicit_names)
 
     result_expression = quote(do: [unquote_splicing(result_values)])
     expressions = List.replace_at(expressions, -1, result_expression)
@@ -456,17 +403,12 @@ defmodule Beaver.Slang do
       end
 
     attrs =
-      []
-      |> then(fn attrs ->
-        if is_nil(size),
-          do: attrs,
-          else: attrs ++ [numberOfBlocks: Deferred.resolve(Attribute.integer(MLIR.Type.i32(), size), ctx)]
-      end)
-      |> then(fn attrs ->
-        if constrained_args?,
-          do: attrs ++ [constrainedArguments: Deferred.resolve(Attribute.unit(), ctx)],
-          else: attrs
-      end)
+      if is_nil(size),
+        do: [],
+        else: [numberOfBlocks: Deferred.resolve(Attribute.integer(MLIR.Type.i32(), size), ctx)]
+
+    attrs =
+      if constrained_args?, do: attrs ++ [constrainedArguments: Deferred.resolve(Attribute.unit(), ctx)], else: attrs
 
     args ++ attrs
   end
@@ -539,22 +481,10 @@ defmodule Beaver.Slang do
     quote do
       Module.put_attribute(__MODULE__, unquote(attr_name), unquote(name))
       @__slang__creator__ {unquote(op), __MODULE__, unquote(creator)}
-      unquote(
-        if traits == [] do
-          quote(do: :ok)
-        else
+      unquote_splicing(
+        for {key, values} <- [__slang__trait__: traits, __slang__interface__: interfaces], values != [] do
           quote do
-            @__slang__trait__ {unquote(name), unquote(traits)}
-          end
-        end
-      )
-
-      unquote(
-        if interfaces == [] do
-          quote(do: :ok)
-        else
-          quote do
-            @__slang__interface__ {unquote(name), unquote(interfaces)}
+            Module.put_attribute(__MODULE__, unquote(key), {unquote(name), unquote(values)})
           end
         end
       )
@@ -611,8 +541,7 @@ defmodule Beaver.Slang do
 
   defp gen_create_element_creator(element, call, opts, caller) do
     {name, args} =
-      call
-      |> Macro.decompose_call()
+      call |> Macro.decompose_call()
 
     opts = Keyword.validate!(opts, [:parameter_names])
     source = %{file: caller.file, line: caller.line}
@@ -723,44 +652,26 @@ defmodule Beaver.Slang do
   @doc """
   This macro generates the AST for the any_of attribute in the dialect.
   """
-  defmacro any_of(types) do
+  defmacro any_of(types), do: combine_constraints(:any_of, types)
+
+  @doc "Generates an `irdl.all_of` constraint."
+  defmacro all_of(types), do: combine_constraints(:all_of, types)
+
+  defp combine_constraints(operation, types) do
     quote do
       use Beaver
 
       mlir do
         types =
-          for t <- unquote(types) do
-            Beaver.Slang.create_constraint(t,
+          for type <- unquote(types) do
+            Beaver.Slang.create_constraint(type,
               ip: Beaver.Env.block(),
               ctx: Beaver.Env.context(),
               loc: Kernel.var!(slang_internal_source_loc)
             )
           end
 
-        Beaver.MLIR.Dialect.IRDL.any_of([Kernel.var!(slang_internal_source_loc) | types]) >>>
-          ~t{!irdl.attribute}
-      end
-    end
-  end
-
-  @doc """
-  Generates an `irdl.all_of` constraint.
-  """
-  defmacro all_of(types) do
-    quote do
-      use Beaver
-
-      mlir do
-        types =
-          for t <- unquote(types) do
-            Beaver.Slang.create_constraint(t,
-              ip: Beaver.Env.block(),
-              ctx: Beaver.Env.context(),
-              loc: Kernel.var!(slang_internal_source_loc)
-            )
-          end
-
-        Beaver.MLIR.Dialect.IRDL.all_of([Kernel.var!(slang_internal_source_loc) | types]) >>>
+        Beaver.MLIR.Dialect.IRDL.unquote(operation)([Kernel.var!(slang_internal_source_loc) | types]) >>>
           ~t{!irdl.attribute}
       end
     end

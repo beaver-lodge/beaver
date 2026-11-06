@@ -65,9 +65,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
   @doc """
   invoke a function by symbol name.
   """
-  @type invoke_opts :: [
-          {:dirty, dirty}
-        ]
+  @type invoke_opts :: [{:dirty, dirty}]
   @spec invoke!(t(), String.t() | StringRef.t(), list(), any(), invoke_opts()) :: :ok
   def invoke!(jit, symbol, args \\ [], return \\ nil, opts \\ []) when is_list(args) do
     arg_ptr_list = args |> Enum.map(&Native.opaque_ptr/1)

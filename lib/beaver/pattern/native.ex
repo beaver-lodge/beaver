@@ -120,19 +120,19 @@ defmodule Beaver.Pattern.Native do
     native_module = __MODULE__
 
     quote do
-      def unquote(name)(opts \\ []) do
-        unquote(native_module).build_descriptor(
-          unquote(name),
-          [unquote_splicing(declaration_ast)],
-          fn unquote(callback_pattern),
-             unquote(callback_operation),
-             unquote(callback_rewriter),
-             unquote(callback_state) ->
-            unquote(callback_body)
-          end,
-          opts
-        )
-      end
+      def unquote(name)(opts \\ []),
+        do:
+          unquote(native_module).build_descriptor(
+            unquote(name),
+            [unquote_splicing(declaration_ast)],
+            fn unquote(callback_pattern),
+               unquote(callback_operation),
+               unquote(callback_rewriter),
+               unquote(callback_state) ->
+              unquote(callback_body)
+            end,
+            opts
+          )
     end
   end
 

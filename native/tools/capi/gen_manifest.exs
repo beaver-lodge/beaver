@@ -44,9 +44,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
                     ],
                     fn {source, wrapper, overrides} ->
                       policy =
-                        @bridge_defaults
-                        |> Map.merge(overrides)
-                        |> Map.put("wrapper_name", "beaver_raw_" <> wrapper)
+                        @bridge_defaults |> Map.merge(overrides) |> Map.put("wrapper_name", "beaver_raw_" <> wrapper)
 
                       {source, policy}
                     end
@@ -111,9 +109,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
 
     opts |> Keyword.fetch!(:declaration) |> write_json!(declaration_manifest)
 
-    opts
-    |> Keyword.fetch!(:callback_bridge)
-    |> write_json!(callback_bridge_manifest)
+    opts |> Keyword.fetch!(:callback_bridge) |> write_json!(callback_bridge_manifest)
   end
 
   defp policy_from_ast(ast) do
@@ -173,14 +169,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
         bridge = bridge_metadata(function.name, policy)
 
         %{
-          "function" => %{
-            "name" => function.name,
-            "arity" => function.arity,
-            "params" => function.params,
-            "doc" => function.doc,
-            "param_ctypes" => function.param_ctypes,
-            "return_ctype" => function.return_ctype
-          },
+          "function" => function_metadata(function),
           "callback_bridge" =>
             Map.merge(
               %{
@@ -204,16 +193,12 @@ defmodule Beaver.CAPI.ManifestGenerator do
     %{"version" => 2, "entries" => entries}
   end
 
+  defp function_metadata(function),
+    do: Map.new(function, fn {key, value} -> {Atom.to_string(key), value} end)
+
   defp signature_entry(function, policy) do
     entry = %{
-      "function" => %{
-        "name" => function.name,
-        "arity" => function.arity,
-        "params" => function.params,
-        "doc" => function.doc,
-        "param_ctypes" => function.param_ctypes,
-        "return_ctype" => function.return_ctype
-      },
+      "function" => function_metadata(function),
       "generation_blocker_reason" => blocker_reason(function.name, policy),
       "variants" => Enum.map(variants(function, policy), &signature_variant(function, &1))
     }
@@ -246,11 +231,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
 
     cond do
       policy_member?(policy, "callback_runtime", name) ->
-        [
-          Map.fetch!(@runtime_declarations, name)
-          |> Map.put(:dirty, false)
-          |> Map.put(:runtime, true)
-        ]
+        [Map.fetch!(@runtime_declarations, name) |> Map.put(:dirty, false) |> Map.put(:runtime, true)]
 
       blocker_reason(name, policy) != nil ->
         []
@@ -298,9 +279,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
 
       policy_member?(policy, "manual_adapter", name) or
           policy_member?(policy, "manual_runtime", name) ->
-        @manual_bridges
-        |> Map.fetch!(name)
-        |> Map.put("timeout_ms", nil)
+        @manual_bridges |> Map.fetch!(name) |> Map.put("timeout_ms", nil)
 
       true ->
         nil
@@ -409,36 +388,19 @@ defmodule Beaver.CAPI.ManifestGenerator do
   end
 
   defp integer_type?(type) do
-    type in [
-      "char",
-      "signed char",
-      "unsigned char",
-      "short",
-      "unsigned short",
-      "int",
-      "unsigned int",
-      "long",
-      "unsigned long",
-      "long long",
-      "unsigned long long",
-      "i8",
-      "i16",
-      "i32",
-      "i64",
-      "u8",
-      "u16",
-      "u32",
-      "u64",
-      "isize",
-      "usize",
-      "c_int",
-      "c_uint",
-      "size_t",
-      "ssize_t",
-      "intptr_t",
-      "uintptr_t",
-      "ptrdiff_t"
-    ] or Regex.match?(~r/^u?int(8|16|32|64)_t$/u, type)
+    type in ~w(
+      char short int long i8 i16 i32 i64 u8 u16 u32 u64 isize usize c_int c_uint size_t ssize_t intptr_t
+      uintptr_t ptrdiff_t
+    ) or
+      type in [
+        "signed char",
+        "unsigned char",
+        "unsigned short",
+        "unsigned int",
+        "unsigned long",
+        "long long",
+        "unsigned long long"
+      ] or Regex.match?(~r/^u?int(8|16|32|64)_t$/u, type)
   end
 
   defp extract_doc(node) do

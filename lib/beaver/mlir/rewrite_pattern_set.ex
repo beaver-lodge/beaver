@@ -84,8 +84,7 @@ defmodule Beaver.MLIR.RewritePatternSet do
 
     opts = put_in(opts, [:match_and_rewrite], &module.match_and_rewrite/4)
 
-    MLIR.RewritePattern.create(root_name, opts)
-    |> then(&add(set, &1))
+    MLIR.RewritePattern.create(root_name, opts) |> then(&add(set, &1))
   end
 
   def add(%__MODULE__{} = set, root_name, match_and_rewrite, opts)

@@ -53,38 +53,13 @@ defmodule Beaver.MLIR.DogfoodNativePatterns do
   end
 end
 
-defmodule Beaver.MLIR.DogfoodSchedule do
-  @moduledoc false
-  use Beaver.MLIR.Transform.Schedule.DSL
-
-  defschedule canonicalize do
-    sequence "__transform_main", [_root >>> any_op()] do
-      _tile = knob("tile_size", [8, 16])
-    end
-  end
-end
-
-defmodule DogfoodTest.TelemetryHandler do
-  @moduledoc false
-  def handle_event(event, measurements, metadata, %{parent: parent}) do
-    send(parent, {:dogfood_telemetry, event, measurements, metadata})
-  end
-
-  def handle_event(_event, _measurements, _metadata, _config), do: :ok
-end
-
 defmodule DogfoodTest do
   use Beaver.Case, async: true
 
   alias Beaver.MLIR
-  alias MLIR.CompilationCache
-  alias MLIR.CompilationPlan
-  alias MLIR.CompilationRuntime
   alias MLIR.Conversion.Plan
-  alias MLIR.Transform.Schedule
   alias MLIR.DogfoodDialect
   alias MLIR.DogfoodNativePatterns
-  alias MLIR.DogfoodSchedule
 
   @source """
   module {
@@ -96,7 +71,7 @@ defmodule DogfoodTest do
   }
   """
 
-  test "dogfood: Slang -> native rewrite -> conversion plan -> schedule DSL -> compilation plan",
+  test "dogfood: Slang -> native rewrite -> conversion plan -> transform schedule -> bytecode",
        %{
          ctx: ctx
        } do
@@ -144,122 +119,25 @@ defmodule DogfoodTest do
     refute MLIR.to_string(module2) =~ "dogfood"
     MLIR.Context.destroy(ctx2)
 
-    # 3. #488: defschedule authors upstream Transform IR (no Beaver-private
-    #    schedule object) that the CompilationPlan consumes by identity.
-    schedule = own(DogfoodSchedule.canonicalize(ctx: ctx))
-    resolved = Schedule.resolve!(schedule, %{"tile_size" => 8})
-    schedule_text = resolved.text
-    assert schedule_text =~ "transform.with_named_sequence"
+    # Compose the retained native primitives directly, then serialize the result.
+    schedule = """
+    module attributes {transform.with_named_sequence} {
+      transform.named_sequence @__transform_main(%root: !transform.any_op) {
+        transform.apply_patterns to %root {
+          transform.apply_patterns.canonicalization
+        } : !transform.any_op
+        transform.yield
+      }
+    }
+    """
 
-    # 4. #487: a cache-stable CompilationPlan carries the conversion plan and
-    #    schedule identities in its deterministic telemetry metadata.
-    plan_identity = inspect(Schedule.cache_identity(resolved))
-
-    compilation_plan =
-      CompilationPlan.new(
-        pipeline: ["canonicalize"],
-        target: %{triple: "host"},
-        schema_version: "v1",
-        telemetry_metadata: %{
-          dogfood: true,
-          conversion_plan: "dogfood.inc -> arith.addi",
-          schedule_identity: plan_identity
-        }
-      )
-      |> CompilationPlan.set_transform_schedule(schedule_text)
-
-    parent = self()
-
-    :telemetry.attach_many(
-      "dogfood-test",
-      [
-        [:beaver, :mlir, :compilation, :cache, :miss],
-        [:beaver, :mlir, :compilation, :cache, :hit]
-      ],
-      &DogfoodTest.TelemetryHandler.handle_event/4,
-      %{parent: parent}
-    )
-
-    try do
-      cache = start_supervised!({CompilationCache.Memory, []})
-      expected_plan_id = CompilationPlan.identity(compilation_plan)
-
-      first = CompilationRuntime.compile!(module, compilation_plan, cache: cache)
-      second = CompilationRuntime.compile!(module, compilation_plan, cache: cache)
-
-      assert first.cache == :miss
-      assert second.cache == :hit
-      assert first.key == second.key
-      assert first.bytecode == second.bytecode
-      assert second.timings.parse == 0
-      assert second.timings.transform == 0
-
-      # 5. telemetry correlates the compilation plan with the conversion and
-      #    schedule identities.
-      telemetry =
-        Enum.map(0..50, fn _ ->
-          receive do
-            {:dogfood_telemetry, event, _measurements, metadata} -> {event, metadata}
-          after
-            0 -> nil
-          end
-        end)
-        |> Enum.reject(&is_nil/1)
-
-      # Telemetry handlers are VM-global: other tests compiling in parallel
-      # also emit cache events. Scope to our plan via its deterministic
-      # telemetry marker.
-      telemetry = Enum.filter(telemetry, fn {_event, metadata} -> metadata[:dogfood] == true end)
-
-      assert telemetry != []
-
-      cache_events =
-        Enum.filter(telemetry, fn
-          {[_, _, _, :cache, _], _metadata} -> true
-          _ -> false
-        end)
-
-      assert Enum.any?(cache_events, fn {event, _} ->
-               event == [:beaver, :mlir, :compilation, :cache, :miss]
-             end)
-
-      assert Enum.any?(cache_events, fn {event, _} ->
-               event == [:beaver, :mlir, :compilation, :cache, :hit]
-             end)
-
-      miss_plan_id =
-        cache_events
-        |> Enum.find_value(fn
-          {[:beaver, :mlir, :compilation, :cache, :miss], metadata} -> metadata[:plan_id]
-          _ -> nil
-        end)
-
-      hit_plan_id =
-        cache_events
-        |> Enum.find_value(fn
-          {[:beaver, :mlir, :compilation, :cache, :hit], metadata} -> metadata[:plan_id]
-          _ -> nil
-        end)
-
-      refute is_nil(miss_plan_id)
-      refute is_nil(hit_plan_id)
-      assert miss_plan_id == expected_plan_id
-      assert hit_plan_id == expected_plan_id
-
-      assert Enum.any?(telemetry, fn {_event, metadata} ->
-               metadata[:dogfood] == true and
-                 metadata[:conversion_plan] == "dogfood.inc -> arith.addi" and
-                 metadata[:schedule_identity] == plan_identity
-             end)
-    after
-      :telemetry.detach("dogfood-test")
-    end
-
+    assert {:ok, _} = MLIR.Transform.apply_named_sequence(module, schedule)
+    bytecode = MLIR.Bytecode.write!(module)
+    reparsed = MLIR.Module.create!(bytecode, ctx: ctx)
+    MLIR.verify!(reparsed)
+    assert MLIR.to_string(reparsed) =~ "arith.muli"
+    assert MLIR.to_string(reparsed) =~ "arith.addi"
+    MLIR.Module.destroy(reparsed)
     MLIR.Module.destroy(module)
-  end
-
-  defp own(module) do
-    on_exit(fn -> MLIR.Module.destroy(module) end)
-    module
   end
 end

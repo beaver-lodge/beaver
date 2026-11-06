@@ -8,8 +8,7 @@ defmodule Beaver.MLIR.RewriterBase do
   alias Beaver.MLIR
 
   @helpers (for {f, "mlirRewriterBase" <> suffix, arity} <-
-                  CAPI.__info__(:functions)
-                  |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
+                  CAPI.__info__(:functions) |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
               suffix = String.replace_prefix(suffix, "Get", "")
               helper_name = Macro.underscore(suffix)
               args = Macro.generate_arguments(arity, __MODULE__)
@@ -19,13 +18,7 @@ defmodule Beaver.MLIR.RewriterBase do
 
   @doc false
   def helpers,
-    do: [
-      {:replace, 3},
-      {:replace_op, 3},
-      {:with_insertion_point, 2},
-      {:with_insertion_point, 3}
-      | @helpers
-    ]
+    do: [{:replace, 3}, {:replace_op, 3}, {:with_insertion_point, 2}, {:with_insertion_point, 3} | @helpers]
 
   @doc """
   Syntactic sugar for `replace_all_uses_with/3` and `replace_all_op_uses_with_operation/3`.

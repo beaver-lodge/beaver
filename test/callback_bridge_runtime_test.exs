@@ -7,33 +7,33 @@ defmodule Beaver.MLIR.CallbackBridgeRuntimeTest do
     owner = self()
 
     converter =
-      MLIR.TypeConverter.Callback.create(
-        fn type ->
+      MLIR.TypeConverter.create(
+        conversion: fn type ->
           send(owner, {:converted, type})
           target
         end,
         timeout: 1_000
       )
 
-    assert {:ok, converted} = MLIR.TypeConverter.Callback.convert(converter, source)
+    assert {:ok, converted} = MLIR.TypeConverter.convert(converter, source)
     assert MLIR.equal?(converted, target)
     assert_receive {:converted, callback_type}
     assert MLIR.equal?(callback_type, source)
-    assert :ok = MLIR.TypeConverter.Callback.destroy(converter)
+    assert :ok = MLIR.TypeConverter.destroy(converter)
   end
 
   test "TypeConverter callback supports declined and failure enum results", %{ctx: ctx} do
     source = MLIR.Type.i32(ctx: ctx)
 
-    declined = MLIR.TypeConverter.Callback.create(fn _ -> :declined end, timeout: 1_000)
-    assert {:error, :conversion_failed} = MLIR.TypeConverter.Callback.convert(declined, source)
-    assert :ok = MLIR.TypeConverter.Callback.destroy(declined)
+    declined = MLIR.TypeConverter.create(conversion: fn _ -> :declined end, timeout: 1_000)
+    assert {:error, :conversion_failed} = MLIR.TypeConverter.convert(declined, source)
+    assert :ok = MLIR.TypeConverter.destroy(declined)
 
     failed =
-      MLIR.TypeConverter.Callback.create(fn _ -> {:error, :unsupported} end, timeout: 1_000)
+      MLIR.TypeConverter.create(conversion: fn _ -> {:error, :unsupported} end, timeout: 1_000)
 
-    assert {:error, :unsupported} = MLIR.TypeConverter.Callback.convert(failed, source)
-    assert :ok = MLIR.TypeConverter.Callback.destroy(failed)
+    assert {:error, :unsupported} = MLIR.TypeConverter.convert(failed, source)
+    assert :ok = MLIR.TypeConverter.destroy(failed)
   end
 
   test "ConditionallySpeculatable fallback model dispatches through the context worker pool", %{

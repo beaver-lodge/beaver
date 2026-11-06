@@ -43,8 +43,7 @@ defmodule Beaver.MLIR.Attribute.Accessor do
 
     with {:ok, key} <- normalize_key(key, num_elements),
          elements <-
-           Range.new(0, num_elements - 1, 1)
-           |> Enum.map(&get_element.(attr, &1)),
+           Range.new(0, num_elements - 1, 1) |> Enum.map(&get_element.(attr, &1)),
          index <- to_index(key, elements, ctx),
          false <- is_nil(index) do
       case fun.(Enum.at(elements, index)) do
@@ -94,9 +93,8 @@ defmodule Beaver.MLIR.Attribute.Accessor do
     end
   end
 
-  defp wrap_get_num_element(%__MODULE__{} = acs) do
-    update_in(acs.get_num_element, fn f -> &Native.to_term(f.(&1)) end)
-  end
+  defp wrap_get_num_element(%__MODULE__{} = acs),
+    do: update_in(acs.get_num_element, fn f -> &Native.to_term(f.(&1)) end)
 
   defp wrap_get_element(%__MODULE__{} = acs) do
     update_in(acs.get_element, fn f ->
@@ -201,18 +199,13 @@ defmodule Beaver.MLIR.Attribute.Accessor do
 
       Attribute.strided_layout?(attr) ->
         offset =
-          mlirStridedLayoutAttrGetOffset(attr)
-          |> MLIR.ShapedType.cast_dynamic_magic_number(:offset)
+          mlirStridedLayoutAttrGetOffset(attr) |> MLIR.ShapedType.cast_dynamic_magic_number(:offset)
 
         %__MODULE__{
           get_num_element: &mlirStridedLayoutAttrGetNumStrides/1,
           get_element: fn
-            _, :offset ->
-              offset
-
-            attr, pos ->
-              mlirStridedLayoutAttrGetStride(attr, pos)
-              |> MLIR.ShapedType.cast_dynamic_magic_number(:stride)
+            _, :offset -> offset
+            attr, pos -> mlirStridedLayoutAttrGetStride(attr, pos) |> MLIR.ShapedType.cast_dynamic_magic_number(:stride)
           end,
           getter: &Attribute.strided_layout(offset, &1, &2)
         }

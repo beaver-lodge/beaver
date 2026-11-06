@@ -12,8 +12,7 @@ defmodule Beaver.Printer do
   @doc false
   def create() do
     printer =
-      apply(CAPI.Raw, Module.concat(__MODULE__, :make), [])
-      |> Native.normalize()
+      apply(CAPI.Raw, Module.concat(__MODULE__, :make), []) |> Native.normalize()
 
     user_data = apply(CAPI.Raw, Module.concat(__MODULE__, :opaque_ptr), [printer]) |> Native.normalize()
 

@@ -103,9 +103,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
       {~w(list_cons), &convert_term_list_cons/3},
       {~w(list_flatten list_insert_at), &convert_term_read/3},
       {~w(map), &convert_term_map/3},
-      {~w(
-        map_put map_fetch mapset_from_list mapset_member mapset_put file_read file_read_lines binary_from_list
-      ), &convert_term_read/3},
+      {~w( map_put map_fetch mapset_from_list mapset_member mapset_put file_read file_read_lines binary_from_list ),
+       &convert_term_read/3},
       {~w(binary), &convert_term_binary/3},
       {~w(
         iodata_to_binary float_lit bigint_lit string_to_float string_to_atom string_to_existing_atom
@@ -179,8 +178,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
   @doc """
   Returns the term runtime intrinsic symbols emitted by this conversion plan.
 
-  This is the declaration-first anchor for host-boundary manifests (e.g.
-  `Beaver.Wasm.TermABI`): every symbol here must be provided by the term
+  This is the declaration-first anchor for host-boundary manifests:
+  every symbol here must be provided by the term
   runtime (batata's Zig on native, a wasm host import on wasm).
   """
   @spec term_intrinsic_symbols() :: [String.t()]
@@ -273,17 +272,13 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp convert_func_addr(op, [], rewriter) do
     context = MLIR.context(op)
     base = insertion_point(op, rewriter)
-    location = Operation.location(op)
     {:ok, sym_name_attr} = op |> Operation.fetch(:sym_name)
     name = sym_name_attr |> CAPI.mlirStringAttrGetValue() |> MLIR.to_string()
     [result] = op |> Walker.results() |> Enum.to_list()
     result_type = result |> Value.type()
 
     func_const =
-      %Changeset{name: "func.constant", context: context, location: location}
-      |> Changeset.add_argument(value: Attribute.flat_symbol_ref(name, ctx: context))
-      |> Changeset.add_result(result_type)
-      |> Operation.create()
+      create_operation(op, "func.constant", [value: Attribute.flat_symbol_ref(name, ctx: context)], result_type)
 
     RewriterBase.insert(base, func_const)
     replace_with(rewriter, op, Operation.result(func_const, 0))
@@ -296,20 +291,20 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp convert_try(op, [], rewriter) do
     context = MLIR.context(op)
     base = insertion_point(op, rewriter)
-    location = Operation.location(op)
     [body_region, catch_region] = op |> Walker.regions() |> Enum.to_list()
 
     size = emit_runtime_call(op, rewriter, base, @term_intrinsics.jmp_buf_size, [])
 
     alloca =
-      %Changeset{name: "llvm.alloca", context: context, location: location}
-      |> Changeset.add_argument([size])
-      |> Changeset.add_argument(
-        elem_type: Attribute.type(Type.integer(8, ctx: context)),
-        alignment: Attribute.integer(Type.i64(), 8)
+      create_operation(
+        op,
+        "llvm.alloca",
+        [
+          [size],
+          [elem_type: Attribute.type(Type.integer(8, ctx: context)), alignment: Attribute.integer(Type.i64(), 8)]
+        ],
+        Type.llvm_pointer(ctx: context)
       )
-      |> Changeset.add_result(Type.llvm_pointer(ctx: context))
-      |> Operation.create()
 
     RewriterBase.insert(base, alloca)
     buf = Operation.result(alloca, 0)
@@ -322,22 +317,23 @@ defmodule Beaver.MLIR.Conversion.Ex do
     setjmp_addr = emit_runtime_call(op, rewriter, base, @term_intrinsics.setjmp_addr, [])
 
     fn_ptr =
-      %Changeset{name: "llvm.inttoptr", context: context, location: location}
-      |> Changeset.add_argument([setjmp_addr])
-      |> Changeset.add_result(Type.llvm_pointer(ctx: context))
-      |> Operation.create()
+      create_operation(op, "llvm.inttoptr", [setjmp_addr], Type.llvm_pointer(ctx: context))
 
     RewriterBase.insert(base, fn_ptr)
 
     setjmp =
-      %Changeset{name: "llvm.call", context: context, location: location}
-      |> Changeset.add_argument([Operation.result(fn_ptr, 0), buf])
-      |> Changeset.add_argument(
-        operandSegmentSizes: Attribute.dense_array([2, 0], Native.I32, ctx: context),
-        op_bundle_sizes: Attribute.dense_array([], Native.I32, ctx: context)
+      create_operation(
+        op,
+        "llvm.call",
+        [
+          [Operation.result(fn_ptr, 0), buf],
+          [
+            operandSegmentSizes: Attribute.dense_array([2, 0], Native.I32, ctx: context),
+            op_bundle_sizes: Attribute.dense_array([], Native.I32, ctx: context)
+          ]
+        ],
+        Type.i64()
       )
-      |> Changeset.add_result(Type.i64())
-      |> Operation.create()
 
     RewriterBase.insert(base, setjmp)
     saved = Operation.result(setjmp, 0)
@@ -345,21 +341,17 @@ defmodule Beaver.MLIR.Conversion.Ex do
     zero = emit_constant(0, op, base) |> Operation.result(0)
 
     cmp =
-      %Changeset{name: "arith.cmpi", context: context, location: location}
-      |> Changeset.add_argument([saved, zero])
-      |> Changeset.add_argument(predicate: cmp_i_predicate_attr(0))
-      |> Changeset.add_result(Type.i1())
-      |> Operation.create()
+      create_operation(op, "arith.cmpi", [[saved, zero], [predicate: cmp_i_predicate_attr(0)]], Type.i1())
 
     RewriterBase.insert(base, cmp)
 
     scf_if =
-      %Changeset{name: "scf.if", context: context, location: location}
-      |> Changeset.add_argument(Operation.result(cmp, 0))
-      |> Changeset.add_argument(CAPI.mlirRegionCreate())
-      |> Changeset.add_argument(CAPI.mlirRegionCreate())
-      |> Changeset.add_result([Type.i64()])
-      |> Operation.create()
+      create_operation(
+        op,
+        "scf.if",
+        [Operation.result(cmp, 0), CAPI.mlirRegionCreate(), CAPI.mlirRegionCreate()],
+        [Type.i64()]
+      )
 
     [new_then, new_else] = scf_if |> Walker.regions() |> Enum.to_list()
     CAPI.mlirRegionTakeBody(new_then, body_region)
@@ -403,14 +395,8 @@ defmodule Beaver.MLIR.Conversion.Ex do
   # point, so it can be placed inside a region).
   defp emit_try_pop_call(op, rewriter) do
     base = ConversionPatternRewriter.as_base(rewriter)
-    symbol = @term_intrinsics.try_pop
 
-    call =
-      %Changeset{name: "func.call", context: MLIR.context(op), location: Operation.location(op)}
-      |> Changeset.add_argument([])
-      |> Changeset.add_argument(callee: Attribute.flat_symbol_ref(symbol, ctx: MLIR.context(op)))
-      |> Changeset.add_result(Type.i64())
-      |> Operation.create()
+    call = runtime_call(op, @term_intrinsics.try_pop, [])
 
     RewriterBase.insert(base, call)
     Operation.result(call, 0)
@@ -466,7 +452,6 @@ defmodule Beaver.MLIR.Conversion.Ex do
   # words from the closure, then dispatches to the matching `__fn_*`.
   defp convert_apply(op, operands, rewriter) do
     base = insertion_point(op, rewriter)
-    ctx = MLIR.context(op)
     [closure | args] = operands
 
     arg_count = op |> required_attribute("arg_count") |> CAPI.mlirIntegerAttrGetValueInt() |> Native.to_term()
@@ -485,12 +470,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
 
     pad = List.duplicate(emit_constant(0, op, base) |> Operation.result(0), 4 - arg_count)
 
-    dispatch =
-      %Changeset{name: "func.call", context: ctx, location: Operation.location(op)}
-      |> Changeset.add_argument([idx] ++ envs ++ args ++ pad)
-      |> Changeset.add_argument(callee: Attribute.flat_symbol_ref("__fn_dispatch", ctx: ctx))
-      |> Changeset.add_result(Type.i64())
-      |> Operation.create()
+    dispatch = runtime_call(op, "__fn_dispatch", [idx] ++ envs ++ args ++ pad)
 
     RewriterBase.insert(base, dispatch)
     RewriterBase.set_insertion_point_after(base, dispatch)
@@ -530,10 +510,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     three = emit_constant(3, op, base)
 
     shl =
-      %Changeset{name: "arith.shli", context: MLIR.context(op), location: Operation.location(op)}
-      |> Changeset.add_argument([value, Operation.result(three, 0)])
-      |> Changeset.add_result(Type.i64())
-      |> Operation.create()
+      create_operation(op, "arith.shli", [value, Operation.result(three, 0)], Type.i64())
 
     RewriterBase.insert(base, shl)
     RewriterBase.set_insertion_point_after(base, shl)
@@ -556,16 +533,21 @@ defmodule Beaver.MLIR.Conversion.Ex do
     end)
   end
 
+  defp create_operation(anchor, name, arguments, results \\ []) do
+    %Changeset{name: name, context: MLIR.context(anchor), location: Operation.location(anchor)}
+    |> Changeset.add_argument(arguments)
+    |> Changeset.add_result(results)
+    |> Operation.create()
+  end
+
+  defp runtime_call(op, symbol, args, result_type \\ Type.i64()) do
+    callee = Attribute.flat_symbol_ref(symbol, ctx: MLIR.context(op))
+    create_operation(op, "func.call", [args, callee: callee], result_type)
+  end
+
   defp emit_constant(value, op, base) do
     constant =
-      %Changeset{
-        name: "arith.constant",
-        context: MLIR.context(op),
-        location: Operation.location(op)
-      }
-      |> Changeset.add_argument(value: Attribute.integer(Type.i64(), value))
-      |> Changeset.add_result(Type.i64())
-      |> Operation.create()
+      create_operation(op, "arith.constant", [value: Attribute.integer(Type.i64(), value)], Type.i64())
 
     RewriterBase.insert(base, constant)
     RewriterBase.set_insertion_point_after(base, constant)
@@ -580,12 +562,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp emit_declared_runtime_call(op, base, symbol, args) do
     RewriterBase.set_insertion_point_before(base, op)
 
-    call =
-      %Changeset{name: "func.call", context: MLIR.context(op), location: Operation.location(op)}
-      |> Changeset.add_argument(args)
-      |> Changeset.add_argument(callee: Attribute.flat_symbol_ref(symbol, ctx: MLIR.context(op)))
-      |> Changeset.add_result(Type.i64())
-      |> Operation.create()
+    call = runtime_call(op, symbol, args)
 
     RewriterBase.insert(base, call)
     RewriterBase.set_insertion_point_after(base, call)
@@ -597,8 +574,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   # Zig term runtime shared library satisfies the symbols.
   defp ensure_intrinsic_declaration(operation, rewriter, symbol) do
     module_op =
-      Stream.iterate(operation, &Operation.parent/1)
-      |> Enum.find(fn op -> op |> Operation.parent() |> MLIR.null?() end)
+      Stream.iterate(operation, &Operation.parent/1) |> Enum.find(fn op -> op |> Operation.parent() |> MLIR.null?() end)
 
     body = module_body(module_op)
 
@@ -607,12 +583,12 @@ defmodule Beaver.MLIR.Conversion.Ex do
       RewriterBase.set_insertion_point_to_end(base, body)
 
       declaration =
-        %Changeset{name: "func.func", context: MLIR.context(operation), location: Operation.location(operation)}
-        |> Changeset.add_argument(sym_name: Attribute.string(symbol))
-        |> Changeset.add_argument(sym_visibility: Attribute.string("private"))
-        |> Changeset.add_argument(function_type: intrinsic_function_type(symbol, MLIR.context(operation)))
-        |> Changeset.add_argument(CAPI.mlirRegionCreate())
-        |> Operation.create()
+        create_operation(operation, "func.func", [
+          [sym_name: Attribute.string(symbol)],
+          [sym_visibility: Attribute.string("private")],
+          [function_type: intrinsic_function_type(symbol, MLIR.context(operation))],
+          CAPI.mlirRegionCreate()
+        ])
 
       RewriterBase.insert(base, declaration)
     end
@@ -691,9 +667,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp cmp_i_predicate_attr(i), do: Attribute.integer(Type.i64(), i)
 
   defp convert_call(op, args, rewriter) do
-    context = MLIR.context(op)
     base = ConversionPatternRewriter.as_base(rewriter)
-    location = Operation.location(op)
 
     callee = op |> required_attribute("callee") |> CAPI.mlirStringAttrGetValue() |> MLIR.to_string()
 
@@ -705,12 +679,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     [result] = op |> Walker.results() |> Enum.to_list()
     result_type = result |> Value.type() |> convert_type()
 
-    call =
-      %Changeset{name: "func.call", context: context, location: location}
-      |> Changeset.add_argument(args)
-      |> Changeset.add_argument(callee: Attribute.flat_symbol_ref(callee, ctx: context))
-      |> Changeset.add_result(result_type)
-      |> Operation.create()
+    call = runtime_call(op, callee, args, result_type)
 
     RewriterBase.set_insertion_point_before(base, op)
     RewriterBase.insert(base, call)
@@ -719,14 +688,10 @@ defmodule Beaver.MLIR.Conversion.Ex do
   end
 
   defp convert_return(op, operands, rewriter) do
-    context = MLIR.context(op)
     base = ConversionPatternRewriter.as_base(rewriter)
-    location = Operation.location(op)
 
     return_op =
-      %Changeset{name: "func.return", context: context, location: location}
-      |> Changeset.add_argument(operands)
-      |> Operation.create()
+      create_operation(op, "func.return", operands)
 
     RewriterBase.set_insertion_point_before(base, op)
     RewriterBase.insert(base, return_op)
@@ -738,9 +703,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     do: raise(ArgumentError, "ex.var without ex.bind is unsupported: #{inspect(MLIR.to_string(op))}")
 
   defp convert_func(op, [], rewriter) do
-    context = MLIR.context(op)
     base = ConversionPatternRewriter.as_base(rewriter)
-    location = Operation.location(op)
 
     sym_name = op |> required_attribute("sym_name") |> CAPI.mlirStringAttrGetValue() |> MLIR.to_string()
 
@@ -758,11 +721,11 @@ defmodule Beaver.MLIR.Conversion.Ex do
     function_type = Type.function(arg_types, return_types)
 
     func =
-      %Changeset{name: "func.func", context: context, location: location}
-      |> Changeset.add_argument(sym_name: Attribute.string(sym_name))
-      |> Changeset.add_argument(function_type: function_type)
-      |> Changeset.add_argument(CAPI.mlirRegionCreate())
-      |> Operation.create()
+      create_operation(op, "func.func", [
+        [sym_name: Attribute.string(sym_name)],
+        [function_type: function_type],
+        CAPI.mlirRegionCreate()
+      ])
 
     func_body = func |> Walker.regions() |> Enum.to_list() |> hd()
     CAPI.mlirRegionTakeBody(func_body, body_region)

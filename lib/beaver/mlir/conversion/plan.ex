@@ -76,34 +76,18 @@ defmodule Beaver.MLIR.Conversion.Plan do
     }
   end
 
-  @spec add_legal_op(t(), String.Chars.t()) :: t()
-  def add_legal_op(%__MODULE__{} = plan, name),
-    do: append_entry(plan, {:add_legal_op, to_string(name)})
-
-  @spec add_illegal_op(t(), String.Chars.t()) :: t()
-  def add_illegal_op(%__MODULE__{} = plan, name),
-    do: append_entry(plan, {:add_illegal_op, to_string(name)})
-
-  @spec add_legal_dialect(t(), String.Chars.t()) :: t()
-  def add_legal_dialect(%__MODULE__{} = plan, name),
-    do: append_entry(plan, {:add_legal_dialect, to_string(name)})
-
-  @spec add_illegal_dialect(t(), String.Chars.t()) :: t()
-  def add_illegal_dialect(%__MODULE__{} = plan, name),
-    do: append_entry(plan, {:add_illegal_dialect, to_string(name)})
-
-  @spec add_dynamically_legal_op(t(), String.Chars.t(), ConversionTarget.legality_callback(), keyword()) :: t()
-  def add_dynamically_legal_op(%__MODULE__{} = plan, name, callback, opts \\ [])
-      when is_function(callback, 1) do
-    opts = validate_callback_opts!(opts, [:version], "add_dynamically_legal_op")
-    append_entry(plan, {:add_dynamically_legal_op, to_string(name), callback, opts})
+  for name <- ~w(add_legal_op add_illegal_op add_legal_dialect add_illegal_dialect)a do
+    @spec unquote(name)(t(), String.Chars.t()) :: t()
+    def unquote(name)(%__MODULE__{} = plan, name),
+      do: append_entry(plan, {unquote(name), to_string(name)})
   end
 
-  @spec add_dynamically_legal_dialect(t(), String.Chars.t(), ConversionTarget.legality_callback(), keyword()) :: t()
-  def add_dynamically_legal_dialect(%__MODULE__{} = plan, name, callback, opts \\ [])
-      when is_function(callback, 1) do
-    opts = validate_callback_opts!(opts, [:version], "add_dynamically_legal_dialect")
-    append_entry(plan, {:add_dynamically_legal_dialect, to_string(name), callback, opts})
+  for name <- ~w(add_dynamically_legal_op add_dynamically_legal_dialect)a do
+    @spec unquote(name)(t(), String.Chars.t(), ConversionTarget.legality_callback(), keyword()) :: t()
+    def unquote(name)(%__MODULE__{} = plan, name, callback, opts \\ []) when is_function(callback, 1) do
+      opts = validate_callback_opts!(opts, [:version], unquote(Atom.to_string(name)))
+      append_entry(plan, {unquote(name), to_string(name), callback, opts})
+    end
   end
 
   @spec mark_recursively_legal(t(), String.Chars.t(), ConversionTarget.legality_callback() | nil | keyword(), keyword()) ::
@@ -121,20 +105,19 @@ defmodule Beaver.MLIR.Conversion.Plan do
     append_entry(plan, {:mark_recursively_legal, to_string(name), callback, opts})
   end
 
-  @spec mark_unknown_dynamically_legal(t(), ConversionTarget.legality_callback(), keyword()) ::
-          t()
-  def mark_unknown_dynamically_legal(%__MODULE__{} = plan, callback, opts \\ [])
-      when is_function(callback, 1) do
-    opts = validate_callback_opts!(opts, [:version], "mark_unknown_dynamically_legal")
-    append_entry(plan, {:mark_unknown_dynamically_legal, callback, opts})
-  end
-
-  @spec add_conversion(t(), (Type.t() -> TypeConverter.conversion_result()), keyword()) ::
-          t()
-  def add_conversion(%__MODULE__{} = plan, callback, opts \\ [])
-      when is_function(callback, 1) do
-    opts = validate_callback_opts!(opts, [:version], "add_conversion")
-    append_entry(plan, {:add_conversion, callback, opts})
+  for {name, arity, callback_type} <- [
+        {:mark_unknown_dynamically_legal, 1, quote(do: ConversionTarget.legality_callback())},
+        {:add_conversion, 1, quote(do: (Type.t() -> TypeConverter.conversion_result()))},
+        {:add_1_to_n_conversion, 1, quote(do: (Type.t() -> TypeConverter.one_to_n_result()))},
+        {:add_source_materialization, 4, quote(do: function())},
+        {:add_target_materialization, 5, quote(do: function())},
+        {:add_1_to_n_target_materialization, 5, quote(do: function())}
+      ] do
+    @spec unquote(name)(t(), unquote(callback_type), keyword()) :: t()
+    def unquote(name)(%__MODULE__{} = plan, callback, opts \\ []) when is_function(callback, unquote(arity)) do
+      opts = validate_callback_opts!(opts, [:version], unquote(Atom.to_string(name)))
+      append_entry(plan, {unquote(name), callback, opts})
+    end
   end
 
   @doc """
@@ -151,35 +134,6 @@ defmodule Beaver.MLIR.Conversion.Plan do
       do: raise(ArgumentError, "conversion map source types must be a non-empty list of strings")
 
     append_entry(plan, {:add_conversion_map, source_types, target_type})
-  end
-
-  @spec add_1_to_n_conversion(t(), (Type.t() -> TypeConverter.one_to_n_result()), keyword()) ::
-          t()
-  def add_1_to_n_conversion(%__MODULE__{} = plan, callback, opts \\ [])
-      when is_function(callback, 1) do
-    opts = validate_callback_opts!(opts, [:version], "add_1_to_n_conversion")
-    append_entry(plan, {:add_1_to_n_conversion, callback, opts})
-  end
-
-  @spec add_source_materialization(t(), function(), keyword()) :: t()
-  def add_source_materialization(%__MODULE__{} = plan, callback, opts \\ [])
-      when is_function(callback, 4) do
-    opts = validate_callback_opts!(opts, [:version], "add_source_materialization")
-    append_entry(plan, {:add_source_materialization, callback, opts})
-  end
-
-  @spec add_target_materialization(t(), function(), keyword()) :: t()
-  def add_target_materialization(%__MODULE__{} = plan, callback, opts \\ [])
-      when is_function(callback, 5) do
-    opts = validate_callback_opts!(opts, [:version], "add_target_materialization")
-    append_entry(plan, {:add_target_materialization, callback, opts})
-  end
-
-  @spec add_1_to_n_target_materialization(t(), function(), keyword()) :: t()
-  def add_1_to_n_target_materialization(%__MODULE__{} = plan, callback, opts \\ [])
-      when is_function(callback, 5) do
-    opts = validate_callback_opts!(opts, [:version], "add_1_to_n_target_materialization")
-    append_entry(plan, {:add_1_to_n_target_materialization, callback, opts})
   end
 
   @spec add_conversion_pattern(t(), String.Chars.t(), MLIR.ConversionPattern.callback(), keyword()) :: t()
@@ -298,8 +252,7 @@ defmodule Beaver.MLIR.Conversion.Plan do
     target = ConversionTarget.create(context, target_opts)
 
     try do
-      converter_opts = if plan.timeout, do: [timeout: plan.timeout], else: []
-      converter = TypeConverter.create(converter_opts)
+      converter = TypeConverter.create(target_opts)
 
       try do
         patterns = RewritePatternSet.create(context)
@@ -348,15 +301,8 @@ defmodule Beaver.MLIR.Conversion.Plan do
 
   defp append_entry(%__MODULE__{entries: entries} = plan, entry), do: %{plan | entries: entries ++ [entry]}
 
-  defp validate_plan_options!(opts) do
-    unless Keyword.keyword?(opts),
-      do: raise(ArgumentError, "Plan options must be a keyword list, got: #{inspect(opts)}")
-
-    case Keyword.keys(opts) -- [:mode, :timeout, :folding_mode, :build_materializations] do
-      [] -> :ok
-      unsupported -> raise ArgumentError, "unsupported Plan options: #{inspect(unsupported)}"
-    end
-  end
+  defp validate_plan_options!(opts),
+    do: validate_callback_opts!(opts, [:mode, :timeout, :folding_mode, :build_materializations], "Plan")
 
   defp validate_mode!(mode) when mode in [:full, :partial], do: mode
 

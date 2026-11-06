@@ -7,10 +7,7 @@ defimpl Enumerable, for: Beaver.MLIR.Attribute do
   def new(attr) do
     accessor = MLIR.Attribute.Accessor.new(attr)
 
-    %__MODULE__{
-      num_elements: accessor.get_num_element.(attr),
-      get_element: &accessor.get_element.(attr, &1)
-    }
+    %__MODULE__{num_elements: accessor.get_num_element.(attr), get_element: &accessor.get_element.(attr, &1)}
   end
 
   def count(attr), do: {:ok, new(attr).num_elements}

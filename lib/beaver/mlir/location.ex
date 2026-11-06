@@ -173,9 +173,7 @@ defmodule Beaver.MLIR.Location do
   def of(%Operation{} = op), do: Operation.location(op)
   def of(%Value{} = value), do: Value.location(value)
 
-  def of(%Deferred{} = deferred) do
-    Deferred.defer(fn ctx -> deferred |> Deferred.resolve(ctx) |> of() end)
-  end
+  def of(%Deferred{} = deferred), do: Deferred.defer(fn ctx -> deferred |> Deferred.resolve(ctx) |> of() end)
 
   def of(other) do
     raise ArgumentError, "expected an MLIR location, operation, value, or deferred equivalent, got: #{inspect(other)}"

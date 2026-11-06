@@ -88,10 +88,7 @@ defmodule Beaver.MLIR.Trait do
 
   @doc false
   def global_registrar_child_specs,
-    do: [
-      {Registry, keys: :unique, name: @definition_registry},
-      {Registry, keys: :duplicate, name: @context_registry}
-    ]
+    do: [{Registry, keys: :unique, name: @definition_registry}, {Registry, keys: :duplicate, name: @context_registry}]
 
   @doc false
   def release_context(%Context{ref: context_ref}) do
@@ -100,9 +97,7 @@ defmodule Beaver.MLIR.Trait do
 
       entries |> Enum.filter(&(elem(&1, 1) == :attachment)) |> Enum.each(fn {pid, _kind} -> release_attachment(pid) end)
 
-      entries
-      |> Enum.filter(&(elem(&1, 1) == :definition))
-      |> Enum.each(fn {pid, _kind} -> stop_definition(pid) end)
+      entries |> Enum.filter(&(elem(&1, 1) == :definition)) |> Enum.each(fn {pid, _kind} -> stop_definition(pid) end)
     end
 
     :ok
@@ -343,8 +338,7 @@ defmodule Beaver.MLIR.Trait do
         name when is_binary(name) -> StringRef.create(name)
       end
 
-    CAPI.mlirOperationNameHasTrait(op_name, type_id, ctx)
-    |> Native.to_term()
+    CAPI.mlirOperationNameHasTrait(op_name, type_id, ctx) |> Native.to_term()
   end
 
   defp definition_server(%Context{ref: context_ref}) do

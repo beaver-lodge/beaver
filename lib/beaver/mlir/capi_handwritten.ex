@@ -1,103 +1,60 @@
 defmodule Beaver.MLIR.CAPI.Handwritten do
   @moduledoc false
 
-  @functions [
-    beaver_raw_apply_rewrite_pattern_set_with_module: 4,
-    beaver_raw_apply_rewrite_pattern_set_with_op: 4,
-    beaver_raw_callback_reply: 2,
-    beaver_raw_callback_reply_code: 3,
-    beaver_raw_conditionally_speculatable_query_async: 1,
-    beaver_raw_memory_effects_query_async: 1,
-    beaver_raw_action_tracing_attach: 5,
-    beaver_raw_action_tracing_drain: 1,
-    beaver_raw_action_tracing_detach: 1,
-    beaver_raw_cuda_available: 0,
-    beaver_raw_cuda_device_count: 0,
-    beaver_raw_cuda_device_name: 1,
-    beaver_raw_cuda_device_compute_capability: 1,
-    beaver_raw_cuda_module_load: 1,
-    beaver_raw_cuda_module_get_function: 2,
-    beaver_raw_cuda_func_set_attribute: 3,
-    beaver_raw_cuda_module_unload: 1,
-    beaver_raw_cuda_mem_alloc: 1,
-    beaver_raw_cuda_mem_free: 1,
-    beaver_raw_cuda_synchronize: 0,
-    beaver_raw_cuda_memcpy_htod: 2,
-    beaver_raw_cuda_memcpy_dtoh: 2,
-    beaver_raw_cuda_launch_kernel: 9,
-    beaver_raw_triton_register_dialects: 1,
-    beaver_raw_triton_register_passes: 0,
-    beaver_raw_external_interface_release: 1,
-    beaver_raw_module_create_parse_async: 3,
-    beaver_raw_operation_verify_async: 2,
-    beaver_raw_infer_return_types: 7,
-    beaver_raw_infer_return_type_components: 7,
-    beaver_raw_translate_module_to_llvm_ir: 1,
-    beaver_raw_compile_llvm_ir_to_ptx: 3,
-    beaver_raw_compiler_kernel_load_and_populate: 8,
-    beaver_raw_transform_state_payload_ops: 2,
-    beaver_raw_transform_state_payload_values: 2,
-    beaver_raw_transform_state_params: 2,
-    beaver_raw_apply_conversion_async: 8,
-    beaver_raw_operation_inventory: 1,
-    beaver_raw_peak_rss: 0,
-    beaver_raw_process_cpu_time: 0,
-    beaver_raw_conversion_target_add_static: 3,
-    beaver_raw_conversion_target_create: 1,
-    beaver_raw_conversion_target_destroy: 1,
-    beaver_raw_context_attach_diagnostic_handler: 2,
-    beaver_raw_create_mlir_pass: 6,
-    beaver_raw_create_mlir_rewrite_pattern: 6,
-    beaver_raw_deallocate_opaque_ptr: 1,
-    beaver_raw_destroy_frozen_rewrite_pattern_set: 2,
-    beaver_raw_destroy_pm_async: 1,
-    beaver_raw_destroy_rewrite_pattern_set: 2,
-    beaver_raw_enif_functions: 0,
-    beaver_raw_enif_signatures: 1,
-    beaver_raw_get_null_ptr: 0,
-    beaver_raw_get_string_ref: 1,
-    beaver_raw_jit_invoke_with_terms: 3,
-    beaver_raw_jit_invoke_with_terms_cpu_bound: 3,
-    beaver_raw_jit_invoke_with_terms_io_bound: 3,
-    beaver_raw_jit_register_enif: 1,
-    beaver_raw_memref_type_get_strides_and_offset: 1,
-    beaver_raw_mlir_type_of_enif_obj: 2,
-    beaver_raw_read_opaque_ptr: 2,
-    beaver_raw_registered_dialects: 1,
-    beaver_raw_registered_ops: 1,
-    beaver_raw_run_pm_on_op_async: 2,
-    beaver_raw_string_printer_callback: 0,
-    beaver_raw_string_printer_flush: 1,
-    beaver_raw_to_string_AffineMap: 1,
-    beaver_raw_to_string_Attribute: 1,
-    beaver_raw_to_string_Diagnostic: 1,
-    beaver_raw_to_string_Identifier: 1,
-    beaver_raw_to_string_Location: 1,
-    beaver_raw_to_string_OpPassManager: 1,
-    beaver_raw_to_string_Operation: 1,
-    beaver_raw_to_string_OperationBytecode: 1,
-    beaver_raw_to_string_OperationGeneric: 1,
-    beaver_raw_to_string_OperationSpecialized: 1,
-    beaver_raw_to_string_StringRef: 1,
-    beaver_raw_to_string_Type: 1,
-    beaver_raw_to_string_Value: 1,
-    beaver_raw_type_converter_convert_async: 2,
-    beaver_raw_type_converter_add_conversion_map: 4,
-    beaver_raw_type_converter_create: 0,
-    beaver_raw_type_converter_destroy: 1,
-    beaver_raw_type_converter_reply_callback: 4,
-    beaver_raw_type_converter_reply_types: 4,
-    beaver_raw_type_converter_reply_value: 3,
-    beaver_raw_type_converter_reply_values: 4,
-    beaver_raw_unranked_memref_descriptor_deallocate_with_c: 1,
-    beaver_raw_unranked_memref_descriptor_deallocate_with_enif: 1,
-    beaver_raw_unranked_memref_descriptor_empty: 1,
-    beaver_raw_unranked_memref_descriptor_get_offset: 1,
-    beaver_raw_unranked_memref_descriptor_get_rank: 1,
-    beaver_raw_unranked_memref_descriptor_get_sizes: 1,
-    beaver_raw_unranked_memref_descriptor_get_strides: 1,
-    beaver_raw_value_replace_uses_with_if: 3
-  ]
+  # Arity is shared by each declaration group; the public and raw surfaces use
+  # this same table, so their exports cannot drift apart.
+  @functions for {arity, names} <- [
+                   {4, ~w(
+        apply_rewrite_pattern_set_with_module apply_rewrite_pattern_set_with_op type_converter_add_conversion_map
+        type_converter_reply_callback type_converter_reply_types type_converter_reply_values
+      )},
+                   {2, ~w(
+        callback_reply cuda_module_get_function cuda_memcpy_htod cuda_memcpy_dtoh operation_verify_async
+        transform_state_payload_ops transform_state_payload_values transform_state_params
+        context_attach_diagnostic_handler destroy_frozen_rewrite_pattern_set destroy_rewrite_pattern_set
+        mlir_type_of_enif_obj read_opaque_ptr run_pm_on_op_async type_converter_convert_async
+      )},
+                   {3, ~w(
+        callback_reply_code cuda_func_set_attribute module_create_parse_async compile_llvm_ir_to_ptx
+        conversion_target_add_static jit_invoke_with_terms jit_invoke_with_terms_cpu_bound
+        jit_invoke_with_terms_io_bound type_converter_reply_value value_replace_uses_with_if
+      )},
+                   {1, ~w(
+        conditionally_speculatable_query_async memory_effects_query_async action_tracing_drain
+        action_tracing_detach cuda_device_name cuda_device_compute_capability cuda_module_load cuda_module_unload
+        cuda_mem_alloc cuda_mem_free triton_register_dialects external_interface_release
+        translate_module_to_llvm_ir operation_inventory conversion_target_create conversion_target_destroy
+        deallocate_opaque_ptr destroy_pm_async enif_signatures get_string_ref jit_register_enif
+        memref_type_get_strides_and_offset registered_dialects registered_ops string_printer_flush
+        to_string_AffineMap to_string_Attribute to_string_Diagnostic to_string_Identifier to_string_Location
+        to_string_OpPassManager to_string_Operation to_string_OperationBytecode to_string_OperationGeneric
+        to_string_OperationSpecialized to_string_StringRef to_string_Type to_string_Value type_converter_destroy
+        unranked_memref_descriptor_deallocate_with_c unranked_memref_descriptor_deallocate_with_enif
+        unranked_memref_descriptor_empty unranked_memref_descriptor_get_offset unranked_memref_descriptor_get_rank
+        unranked_memref_descriptor_get_sizes unranked_memref_descriptor_get_strides
+      )},
+                   {5, ~w(
+        action_tracing_attach
+      )},
+                   {0, ~w(
+        cuda_available cuda_device_count cuda_synchronize triton_register_passes peak_rss process_cpu_time
+        enif_functions get_null_ptr string_printer_callback type_converter_create
+      )},
+                   {9, ~w(
+        cuda_launch_kernel
+      )},
+                   {7, ~w(
+        infer_return_types infer_return_type_components
+      )},
+                   {8, ~w(
+        compiler_kernel_load_and_populate apply_conversion_async
+      )},
+                   {6, ~w(
+        create_mlir_pass create_mlir_rewrite_pattern
+      )}
+                 ],
+                 name <- names,
+                 do: {String.to_atom("beaver_raw_" <> name), arity}
 
   @doc false
   def functions, do: @functions

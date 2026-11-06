@@ -29,53 +29,36 @@ fn make_ptr(env: beam.env, ptr: usize) beam.term {
     return e.enif_make_uint64(env, @intCast(ptr));
 }
 
-const cuInitFn = *const fn (flags: c_uint) callconv(.c) CudaResult;
-const cuDeviceGetCountFn = *const fn (count: *c_int) callconv(.c) CudaResult;
-const cuDeviceGetFn = *const fn (device: *CuDevice, ordinal: c_int) callconv(.c) CudaResult;
-const cuDeviceGetNameFn = *const fn (name: [*c]u8, len: c_int, dev: CuDevice) callconv(.c) CudaResult;
-const cuDeviceGetAttributeFn = *const fn (value: *c_int, attribute: c_int, dev: CuDevice) callconv(.c) CudaResult;
-const cuModuleLoadDataFn = *const fn (module: *?*anyopaque, data: *const anyopaque) callconv(.c) CudaResult;
-const cuModuleGetFunctionFn = *const fn (function: *?*anyopaque, module: ?*anyopaque, name: [*:0]const u8) callconv(.c) CudaResult;
-const cuModuleUnloadFn = *const fn (module: ?*anyopaque) callconv(.c) CudaResult;
-const cuFuncSetAttributeFn = *const fn (function: ?*anyopaque, attribute: c_int, value: c_int) callconv(.c) CudaResult;
-const cuMemAllocFn = *const fn (ptr: *usize, size: usize) callconv(.c) CudaResult;
-const cuMemFreeFn = *const fn (ptr: usize) callconv(.c) CudaResult;
-const cuMemcpyFn = *const fn (dst: usize, src: usize, size: usize) callconv(.c) CudaResult;
-const cuDevicePrimaryCtxRetainFn = *const fn (pctx: *?*anyopaque, dev: CuDevice) callconv(.c) CudaResult;
-const cuCtxSetCurrentFn = *const fn (ctx: ?*anyopaque) callconv(.c) CudaResult;
-const cuCtxSynchronizeFn = *const fn () callconv(.c) CudaResult;
-const cuLaunchKernelFn = *const fn (
-    function: ?*anyopaque,
-    grid_x: c_uint,
-    grid_y: c_uint,
-    grid_z: c_uint,
-    block_x: c_uint,
-    block_y: c_uint,
-    block_z: c_uint,
-    shared_mem: c_uint,
-    stream: ?*anyopaque,
-    params: [*c]?*anyopaque,
-    extra: [*c]?*anyopaque,
-) callconv(.c) CudaResult;
-
 const CudaDriver = struct {
     dynlib: std.DynLib,
-    cuInit: cuInitFn,
-    cuDeviceGetCount: cuDeviceGetCountFn,
-    cuDeviceGet: cuDeviceGetFn,
-    cuDeviceGetName: cuDeviceGetNameFn,
-    cuDeviceGetAttribute: cuDeviceGetAttributeFn,
-    cuModuleLoadData: cuModuleLoadDataFn,
-    cuModuleGetFunction: cuModuleGetFunctionFn,
-    cuModuleUnload: cuModuleUnloadFn,
-    cuFuncSetAttribute: cuFuncSetAttributeFn,
-    cuMemAlloc: cuMemAllocFn,
-    cuMemFree: cuMemFreeFn,
-    cuMemcpy: cuMemcpyFn,
-    cuDevicePrimaryCtxRetain: cuDevicePrimaryCtxRetainFn,
-    cuCtxSetCurrent: cuCtxSetCurrentFn,
-    cuCtxSynchronize: cuCtxSynchronizeFn,
-    cuLaunchKernel: cuLaunchKernelFn,
+    cuInit: *const fn (flags: c_uint) callconv(.c) CudaResult,
+    cuDeviceGetCount: *const fn (count: *c_int) callconv(.c) CudaResult,
+    cuDeviceGet: *const fn (device: *CuDevice, ordinal: c_int) callconv(.c) CudaResult,
+    cuDeviceGetName: *const fn (name: [*c]u8, len: c_int, dev: CuDevice) callconv(.c) CudaResult,
+    cuDeviceGetAttribute: *const fn (value: *c_int, attribute: c_int, dev: CuDevice) callconv(.c) CudaResult,
+    cuModuleLoadData: *const fn (module: *?*anyopaque, data: *const anyopaque) callconv(.c) CudaResult,
+    cuModuleGetFunction: *const fn (function: *?*anyopaque, module: ?*anyopaque, name: [*:0]const u8) callconv(.c) CudaResult,
+    cuModuleUnload: *const fn (module: ?*anyopaque) callconv(.c) CudaResult,
+    cuFuncSetAttribute: *const fn (function: ?*anyopaque, attribute: c_int, value: c_int) callconv(.c) CudaResult,
+    cuMemAlloc: *const fn (ptr: *usize, size: usize) callconv(.c) CudaResult,
+    cuMemFree: *const fn (ptr: usize) callconv(.c) CudaResult,
+    cuMemcpy: *const fn (dst: usize, src: usize, size: usize) callconv(.c) CudaResult,
+    cuDevicePrimaryCtxRetain: *const fn (pctx: *?*anyopaque, dev: CuDevice) callconv(.c) CudaResult,
+    cuCtxSetCurrent: *const fn (ctx: ?*anyopaque) callconv(.c) CudaResult,
+    cuCtxSynchronize: *const fn () callconv(.c) CudaResult,
+    cuLaunchKernel: *const fn (
+        function: ?*anyopaque,
+        grid_x: c_uint,
+        grid_y: c_uint,
+        grid_z: c_uint,
+        block_x: c_uint,
+        block_y: c_uint,
+        block_z: c_uint,
+        shared_mem: c_uint,
+        stream: ?*anyopaque,
+        params: [*c]?*anyopaque,
+        extra: [*c]?*anyopaque,
+    ) callconv(.c) CudaResult,
     /// Result of `cuInit(0)`, cached so repeated NIF calls do not re-initialize.
     init_result: CudaResult,
     /// Retained primary context, mirroring the C++ runner's `ScopedContext`.
@@ -106,61 +89,31 @@ fn loadDriver() ?*const CudaDriver {
     if (driver_probe_done) return if (driver) |*d| d else null;
     driver_probe_done = true;
 
-    for (libcuda_candidates) |path| {
+    candidates: for (libcuda_candidates) |path| {
         var lib = std.DynLib.open(path) catch continue;
-        const cuInit = lib.lookup(cuInitFn, "cuInit") orelse continue;
-        const cuDeviceGetCount = lib.lookup(cuDeviceGetCountFn, "cuDeviceGetCount") orelse continue;
-        const cuDeviceGet = lib.lookup(cuDeviceGetFn, "cuDeviceGet") orelse continue;
-        const cuDeviceGetName = lib.lookup(cuDeviceGetNameFn, "cuDeviceGetName") orelse continue;
-        const cuDeviceGetAttribute = lib.lookup(cuDeviceGetAttributeFn, "cuDeviceGetAttribute") orelse continue;
-        const cuModuleLoadData = lib.lookup(cuModuleLoadDataFn, "cuModuleLoadData") orelse continue;
-        const cuModuleGetFunction = lib.lookup(cuModuleGetFunctionFn, "cuModuleGetFunction") orelse continue;
-        const cuModuleUnload = lib.lookup(cuModuleUnloadFn, "cuModuleUnload") orelse continue;
-        const cuFuncSetAttribute = lib.lookup(cuFuncSetAttributeFn, "cuFuncSetAttribute") orelse continue;
-        // CUDA 12+ drivers version the driver API entry points. On CUDA 13.x
-        // the plain `cuMemAlloc`/`cuMemFree`/`cuMemcpy` symbols resolve to the
-        // legacy entry points that fail with CUDA_ERROR_INVALID_CONTEXT, so
-        // prefer the `_v2` variants.
-        const cuMemAlloc = lib.lookup(cuMemAllocFn, "cuMemAlloc_v2") orelse lib.lookup(cuMemAllocFn, "cuMemAlloc") orelse continue;
-        const cuMemFree = lib.lookup(cuMemFreeFn, "cuMemFree_v2") orelse lib.lookup(cuMemFreeFn, "cuMemFree") orelse continue;
-        const cuMemcpy = lib.lookup(cuMemcpyFn, "cuMemcpy_v2") orelse lib.lookup(cuMemcpyFn, "cuMemcpy") orelse continue;
-        const cuDevicePrimaryCtxRetain = lib.lookup(cuDevicePrimaryCtxRetainFn, "cuDevicePrimaryCtxRetain") orelse continue;
-        const cuCtxSetCurrent = lib.lookup(cuCtxSetCurrentFn, "cuCtxSetCurrent") orelse continue;
-        const cuCtxSynchronize = lib.lookup(cuCtxSynchronizeFn, "cuCtxSynchronize") orelse continue;
-        const cuLaunchKernel = lib.lookup(cuLaunchKernelFn, "cuLaunchKernel") orelse continue;
-
-        const init_result = cuInit(0);
-        var primary_ctx: ?*anyopaque = null;
-        if (init_result == 0) {
-            var device: CuDevice = undefined;
-            const get_res = cuDeviceGet(&device, 0);
-            const retain_res = cuDevicePrimaryCtxRetain(&primary_ctx, device);
-            const set_res = cuCtxSetCurrent(primary_ctx);
-            _ = get_res;
-            _ = retain_res;
-            _ = set_res;
+        var installed = false;
+        defer if (!installed) lib.close();
+        var candidate: CudaDriver = undefined;
+        candidate.dynlib = lib;
+        // Function signatures and symbol names have one source of truth: the fields.
+        inline for (std.meta.fields(CudaDriver)) |field| {
+            if (comptime std.mem.startsWith(u8, field.name, "cu")) {
+                const versioned = comptime std.mem.eql(u8, field.name, "cuMemAlloc") or
+                    std.mem.eql(u8, field.name, "cuMemFree") or std.mem.eql(u8, field.name, "cuMemcpy");
+                // CUDA 12+ may expose incompatible legacy memory entry points.
+                @field(candidate, field.name) = (if (versioned) lib.lookup(field.type, field.name ++ "_v2") else null) orelse lib.lookup(field.type, field.name) orelse continue :candidates;
+            }
         }
-        driver = .{
-            .dynlib = lib,
-            .cuInit = cuInit,
-            .cuDeviceGetCount = cuDeviceGetCount,
-            .cuDeviceGet = cuDeviceGet,
-            .cuDeviceGetName = cuDeviceGetName,
-            .cuDeviceGetAttribute = cuDeviceGetAttribute,
-            .cuModuleLoadData = cuModuleLoadData,
-            .cuModuleGetFunction = cuModuleGetFunction,
-            .cuModuleUnload = cuModuleUnload,
-            .cuFuncSetAttribute = cuFuncSetAttribute,
-            .cuMemAlloc = cuMemAlloc,
-            .cuMemFree = cuMemFree,
-            .cuMemcpy = cuMemcpy,
-            .cuDevicePrimaryCtxRetain = cuDevicePrimaryCtxRetain,
-            .cuCtxSetCurrent = cuCtxSetCurrent,
-            .cuCtxSynchronize = cuCtxSynchronize,
-            .cuLaunchKernel = cuLaunchKernel,
-            .init_result = init_result,
-            .primary_ctx = primary_ctx,
-        };
+        candidate.init_result = candidate.cuInit(0);
+        candidate.primary_ctx = null;
+        if (candidate.init_result == 0) {
+            var device: CuDevice = undefined;
+            _ = candidate.cuDeviceGet(&device, 0);
+            _ = candidate.cuDevicePrimaryCtxRetain(&candidate.primary_ctx, device);
+            _ = candidate.cuCtxSetCurrent(candidate.primary_ctx);
+        }
+        driver = candidate;
+        installed = true;
         return &driver.?;
     }
     return null;
@@ -231,10 +184,7 @@ pub fn cuda_device_compute_capability(env: beam.env, _: c_int, args: [*c]const b
     return beam.make_ok_term(env, beam.make_tuple(env, &terms));
 }
 
-const DriverResult = union(enum) {
-    ok: *const CudaDriver,
-    err: beam.term,
-};
+const DriverResult = union(enum) { ok: *const CudaDriver, err: beam.term };
 
 fn requireDriver(env: beam.env) DriverResult {
     const d = loadDriver() orelse return .{ .err = beam.make_error_binary(env, "libcuda not found") };

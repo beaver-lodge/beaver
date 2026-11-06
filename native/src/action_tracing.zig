@@ -7,9 +7,7 @@ const prelude = @import("prelude.zig");
 const mlir_capi = @import("mlir_capi.zig");
 
 /// Mirror of the C ABI declared in mlir-c/Beaver/ActionTracing.h.
-const MlirBeaverActionTracing = extern struct {
-    ptr: ?*anyopaque,
-};
+const MlirBeaverActionTracing = extern struct { ptr: ?*anyopaque };
 
 const EventsCallback = *const fn (data: [*c]const u8, user_data: ?*anyopaque) callconv(.c) void;
 
@@ -29,9 +27,7 @@ extern fn mlirBeaverActionTracingDrain(
 
 extern fn mlirBeaverActionTracingDetach(tracing: MlirBeaverActionTracing) void;
 
-const TracingState = struct {
-    tracing: MlirBeaverActionTracing,
-};
+const TracingState = struct { tracing: MlirBeaverActionTracing };
 
 fn destroyTracingState(_: beam.env, object: ?*anyopaque) callconv(.c) void {
     const state: *TracingState = @ptrCast(@alignCast(object orelse return));
