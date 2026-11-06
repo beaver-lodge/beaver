@@ -12,6 +12,29 @@ dialect using a `Conversion.Plan`. The resulting IR can then use MLIR's standard
 
 ## Ex provider boundary
 
+Ex keeps one namespace with three schema owners: `Ex.Language` (values/control),
+`Ex.Execution` (scheduling/continuations) and `Ex.Runtime` (representation/host handles).
+`Beaver.MLIR.Dialect.Ex.verify_layers!(ir, [:language, :execution])` verifies MLIR and rejects
+nested Ex operations outside those owners; foreign dialects receive normal MLIR verification.
+`layers/0`, `operations/1` and `layer/1` expose the declaration-derived catalog.
+
+```elixir
+alias Beaver.MLIR.Conversion.{Ex, Plan}
+ir = Plan.run!(Ex.plan(layers: :execution), ir)
+ir = Ex.finish!(ir)
+```
+
+Selected-layer plans retain other owners and default to `build_materializations: false`.
+`finish!/1` lowers remaining Ex operations, reconciles type bridges and rejects unresolved casts.
+The default `plan/0` converts all layers. Prepare variables and cases first with
+`Beaver.MLIR.Dialect.Ex.MaterializeBoundVariables` and `Beaver.MLIR.Dialect.Ex.ExpandCase`.
+Scalar literals, add/subtract/multiply, comparisons and box/unbox casts declare pure effects;
+runtime calls, allocation, division and scheduling remain conservative.
+
+`Beaver.MLIR.Conversion.Ex.RuntimeABI` owns the original Batata Zig ABI; the current C runtime is separate.
+The schema digest covers all fragments and the shared macro, requiring new provider receipts.
+Structured patterns/guards, rescue/else/after paths and checked GC-root plans need further IR work.
+
 Beaver owns the `ex` dialect schema and the provider-neutral external
 compiler-kernel ABI. Evolving production lowering belongs to Batata and is
 loaded through `Conversion.Plan.add_external_pattern_population/3`; Beaver

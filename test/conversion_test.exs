@@ -187,6 +187,27 @@ defmodule Beaver.MLIR.ConversionTest do
     MLIR.Module.destroy(module)
   end
 
+  test "profile aggregates preserve totals and maxima across roots", %{ctx: ctx} do
+    alias Beaver.MLIR.Conversion.Profile
+    module = unknown_module(ctx, "foo.profiled")
+
+    state =
+      Enum.reduce(1..257, Profile.start(:full, module), fn i, acc ->
+        Profile.record_callback(acc, :conversion_pattern, "ex.func", i, i + 7)
+      end)
+
+    state = Profile.record_callback(state, :conversion_pattern, "ex.return", 4, 9)
+    receipt = Profile.finish(state, {:ok, module, []}, module, {100_000, 0})
+    assert receipt["beam"]["callback_count"] == 258
+    [func, return] = receipt["callbacks"]
+    keys = ~w(count beam_service_ns max_beam_service_ns native_wait_sum_ns max_native_wait_ns)
+    assert func["root"] == "ex.func"
+    assert Enum.map(keys, &func[&1]) == [257, 33_153, 257, 34_952, 264]
+    assert return["root"] == "ex.return"
+    assert Enum.map(keys, &return[&1]) == [1, 4, 4, 9, 9]
+    MLIR.Module.destroy(module)
+  end
+
   test "native type maps convert without a BEAM callback", %{ctx: ctx} do
     i32 = MLIR.Type.i32(ctx: ctx)
     i64 = MLIR.Type.i64(ctx: ctx)

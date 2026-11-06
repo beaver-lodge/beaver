@@ -264,7 +264,7 @@ defmodule ExConversionTest do
 
   test "exposes a stable Ex dialect schema identity" do
     assert ExDialect.schema_digest() ==
-             "sha256:0e366925c94cf882bd999ced92effefbb8e374e348c834133186cce07f2277c9"
+             "sha256:fa043e125d2e10df51e40bbbfc844b0cb92cae9615063fe1cfed599a5b7d98d5"
   end
 
   test "fails explicitly on a bare ex.var", %{ctx: ctx} do
