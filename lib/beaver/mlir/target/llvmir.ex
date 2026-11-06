@@ -10,9 +10,7 @@ defmodule Beaver.MLIR.Target.LLVMIR do
 
   @spec translate(MLIR.Module.t()) :: {:ok, binary()} | {:error, MLIR.diagnostics()}
   def translate(%MLIR.Module{} = module) do
-    module
-    |> MLIR.context()
-    |> MLIR.Context.register_translations()
+    module |> MLIR.context() |> MLIR.Context.register_translations()
 
     module
     |> MLIR.Operation.from_module()

@@ -270,19 +270,15 @@ defmodule Beaver.MLIR.Type do
   end
 
   for {f, "mlirTypeIsA" <> type_name, 1} <-
-        CAPI.__info__(:functions)
-        |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
+        CAPI.__info__(:functions) |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
     type_name =
-      type_name
-      |> String.replace(~r"Type$", "")
+      type_name |> String.replace(~r"Type$", "")
 
     @doc """
     calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is #{type_name} type.
     """
     helper_name =
-      type_name
-      |> Macro.underscore()
-      |> String.replace("mem_ref", "memref")
+      type_name |> Macro.underscore() |> String.replace("mem_ref", "memref")
 
     def unquote(:"#{helper_name}?")(%__MODULE__{} = t),
       do: unquote(f)(t) |> Native.to_term()
@@ -307,16 +303,13 @@ defmodule Beaver.MLIR.Type do
             not String.contains?(type_name, "UnrankedTensor")
         end) do
     type_name =
-      type_name
-      |> String.trim_trailing("TypeGet")
+      type_name |> String.trim_trailing("TypeGet")
 
     @doc """
     calls `Beaver.MLIR.CAPI.#{f}/1` to get #{type_name} type
     """
     helper_name =
-      type_name
-      |> Macro.underscore()
-      |> String.replace("mem_ref", "memref")
+      type_name |> Macro.underscore() |> String.replace("mem_ref", "memref")
 
     def unquote(:"#{helper_name}")(opts \\ []),
       do: Deferred.from_opts(opts, &unquote(f)(&1))
@@ -335,7 +328,6 @@ defmodule Beaver.MLIR.Type do
 
   defdelegate element_type(shaped_type), to: CAPI, as: :mlirShapedTypeGetElementType
 
-  def llvm_pointer(opts \\ []) do
-    Deferred.from_opts(opts, fn ctx -> CAPI.mlirLLVMPointerTypeGet(ctx, opts[:address_space] || 0) end)
-  end
+  def llvm_pointer(opts \\ []),
+    do: Deferred.from_opts(opts, fn ctx -> CAPI.mlirLLVMPointerTypeGet(ctx, opts[:address_space] || 0) end)
 end

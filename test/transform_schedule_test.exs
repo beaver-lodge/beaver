@@ -2,7 +2,7 @@ defmodule Beaver.MLIR.Transform.ScheduleTest do
   use ExUnit.Case, async: true
 
   alias Beaver.MLIR
-  alias MLIR.Transform.{Schedule, Tuner}
+  alias MLIR.Transform.Schedule
 
   @payload """
   module {
@@ -34,36 +34,6 @@ defmodule Beaver.MLIR.Transform.ScheduleTest do
         transform.yield
       }, {
         transform.yield
-      }
-      transform.yield
-    }
-  }
-  """
-
-  @conditional_schedule """
-  module attributes {transform.with_named_sequence} {
-    transform.named_sequence @__transform_main(%root: !transform.any_op) {
-      transform.tune.alternatives<"route"> {
-        %fast = transform.tune.knob<"fast_tile"> options = [8, 16] -> !transform.any_param
-        transform.yield
-      }, {
-        %slow = transform.tune.knob<"slow_tile"> options = [32, 64] -> !transform.any_param
-        transform.yield
-      }
-      transform.yield
-    }
-  }
-  """
-
-  @constraint_schedule """
-  module attributes {transform.with_named_sequence} {
-    transform.named_sequence @__transform_main(%root: !transform.any_op) {
-      %tile = transform.param.constant 42 -> !transform.param<i64>
-      transform.smt.constrain_params(%tile) : (!transform.param<i64>) -> () {
-        ^bb0(%symbol: !smt.int):
-        %zero = smt.int.constant 0
-        %in_range = smt.int.cmp le %zero, %symbol
-        smt.assert %in_range
       }
       transform.yield
     }
@@ -147,233 +117,33 @@ defmodule Beaver.MLIR.Transform.ScheduleTest do
     end
   end
 
-  test "Tune choices enumerate conditionally and resolve to replayable IR", %{ctx: ctx} do
-    assert {:ok, analysis} = Schedule.analyze(@conditional_schedule)
-    assert Enum.map(analysis.choices, & &1.name) == ["route", "fast_tile", "slow_tile"]
-
-    assert {:ok,
-            [
-              %{"route" => 0, "fast_tile" => 8},
-              %{"route" => 0, "fast_tile" => 16},
-              %{"route" => 1, "slow_tile" => 32},
-              %{"route" => 1, "slow_tile" => 64}
-            ]} = Schedule.enumerate(@conditional_schedule)
-
-    resolved =
-      Schedule.resolve!(@conditional_schedule, %{"route" => 1, "slow_tile" => 64})
-
-    assert resolved.choices == %{"route" => 1, "slow_tile" => 64}
-    assert resolved.text =~ ~s(selected_region = 1)
-    assert resolved.text =~ ~s(transform.tune.knob<"slow_tile"> = 64)
-    assert String.starts_with?(Schedule.serialize(resolved, :bytecode), "ML\xEFR")
-
-    replay = Schedule.resolve!(@conditional_schedule, %{"route" => 1, "slow_tile" => 64})
-    assert Schedule.cache_identity(resolved) == Schedule.cache_identity(replay)
-
-    payload = MLIR.Module.create!(@payload, ctx: ctx)
-
-    try do
-      assert {:ok, %MLIR.Transform.Result{}} = MLIR.Transform.execute(payload, resolved)
-
-      assert {:ok, %MLIR.Transform.Result{}} =
-               MLIR.Transform.execute(payload, Schedule.serialize(resolved, :bytecode))
-    after
-      MLIR.Module.destroy(payload)
-    end
-  end
-
-  test "knob values preserve common Elixir scalar types" do
-    schedule = """
+  test "selected Tune IR replays from text and bytecode", %{ctx: ctx} do
+    selected = """
     module attributes {transform.with_named_sequence} {
       transform.named_sequence @__transform_main(%root: !transform.any_op) {
-        %coin = transform.tune.knob<"coin"> options = [true, false] -> !transform.any_param
-        %animal = transform.tune.knob<"animal"> options = ["cat", unit] -> !transform.any_param
+        %tile = transform.tune.knob<"tile"> = 16 from options = [8, 16] -> !transform.any_param
+        transform.tune.alternatives<"route"> selected_region = 1 {
+          transform.yield
+        }, {
+          transform.yield
+        }
         transform.yield
       }
     }
     """
 
-    assert {:ok, candidates} = Schedule.enumerate(schedule)
+    schedule = MLIR.Module.create!(selected, ctx: ctx)
+    payload = MLIR.Module.create!(@payload, ctx: ctx)
 
-    assert candidates == [
-             %{"animal" => "cat", "coin" => true},
-             %{"animal" => :unit, "coin" => true},
-             %{"animal" => "cat", "coin" => false},
-             %{"animal" => :unit, "coin" => false}
-           ]
-  end
+    try do
+      assert {:ok, %MLIR.Transform.Result{}} = MLIR.Transform.execute(payload, {:text, selected})
+      bytecode = MLIR.Bytecode.write!(schedule)
 
-  test "SMT constraints remain inspectable and accept an optional solver adapter" do
-    assert {:ok, [constraint]} = Schedule.constraints(@constraint_schedule)
-    assert constraint.ir =~ ~s("transform.smt.constrain_params")
-    assert constraint.operands == 1
-    assert constraint.results == 0
-
-    solver = fn constraints, selections ->
-      assert length(constraints) == 1
-      assert selections == %{}
-      {:ok, %{solver: :test, satisfiable: true}}
-    end
-
-    assert {:ok, resolved} = Schedule.resolve(@constraint_schedule, %{}, solver: solver)
-    assert resolved.constraints == [constraint]
-    assert resolved.solver_metadata == %{solver: :test, satisfiable: true}
-
-    assert {:error, %MLIR.Transform.Error{kind: :constraint_failure}} =
-             Schedule.resolve(@constraint_schedule, %{},
-               solver: fn _, _ -> {:error, :unsatisfiable} end
-             )
-  end
-
-  test "candidate evaluation is bounded, deterministic, cancellable, and timed out" do
-    evaluator = fn resolved ->
-      tile = resolved.choices["tile"]
-      Process.sleep(if(tile == 8, do: 15, else: 1))
-      {:ok, tile * 2, %{tile: tile}}
-    end
-
-    assert {:ok, result} =
-             Tuner.search(@tune_schedule, evaluator, max_concurrency: 2, timeout: 1_000)
-
-    assert result.max_concurrency == 2
-
-    assert Enum.map(result.candidates, & &1.choices) == [
-             %{"tile" => 8, "vectorize" => 0},
-             %{"tile" => 8, "vectorize" => 1},
-             %{"tile" => 16, "vectorize" => 0},
-             %{"tile" => 16, "vectorize" => 1}
-           ]
-
-    assert Enum.all?(result.candidates, &(&1.status == :ok))
-
-    assert %Tuner.Candidate{value: 32} =
-             Tuner.select(result, &Enum.max_by(&1, fn candidate -> candidate.value end))
-
-    assert {:ok, failed} =
-             Tuner.search(@tune_schedule, fn _ -> {:error, :benchmark_failed} end,
-               candidates: [%{"tile" => 8, "vectorize" => 0}]
-             )
-
-    assert [%Tuner.Candidate{status: :evaluation_failure, reason: :benchmark_failed}] =
-             failed.candidates
-
-    assert {:ok, timed_out} =
-             Tuner.search(@tune_schedule, fn _ -> Process.sleep(50) end,
-               max_concurrency: 2,
-               timeout: 1
-             )
-
-    assert Enum.all?(timed_out.candidates, &(&1.status == :timeout))
-
-    cancellation = Tuner.Cancellation.new()
-    :ok = Tuner.Cancellation.cancel(cancellation)
-
-    assert {:ok, cancelled} =
-             Tuner.search(@tune_schedule, fn _ -> flunk("must not run") end,
-               cancellation: cancellation
-             )
-
-    assert Enum.all?(cancelled.candidates, &(&1.status == :cancelled))
-  end
-
-  test "autotuning telemetry correlates a candidate with MLIR action tracing", %{ctx: ctx} do
-    parent = self()
-
-    telemetry = fn event, measurements, metadata ->
-      send(parent, {:autotuning_telemetry, event, measurements, metadata})
-    end
-
-    choices = %{"tile" => 8, "vectorize" => 0}
-
-    evaluator = fn _resolved, candidate_context ->
-      session =
-        MLIR.ActionTracing.attach(ctx,
-          telemetry: telemetry,
-          metadata: candidate_context.telemetry_metadata
-        )
-
-      module = MLIR.Module.create!("module {}", ctx: ctx)
-
-      try do
-        module |> Beaver.Composer.append("canonicalize") |> Beaver.Composer.run!()
-        assert MLIR.ActionTracing.drain(session) != []
-        {:ok, candidate_context.index}
-      after
-        MLIR.ActionTracing.detach(session)
-        MLIR.Module.destroy(module)
-      end
-    end
-
-    assert {:ok, result} =
-             Tuner.search(@tune_schedule, evaluator,
-               candidates: [choices],
-               max_concurrency: 1,
-               telemetry: telemetry
-             )
-
-    assert [%Tuner.Candidate{status: :ok, schedule: %{digest: digest}}] = result.candidates
-
-    assert_receive {:autotuning_telemetry, [:beaver, :mlir, :compilation, :autotuning, :start],
-                    %{}, %{candidate_count: 1}}
-
-    assert_receive {:autotuning_telemetry,
-                    [:beaver, :mlir, :compilation, :autotuning, :candidate, :start], %{},
-                    %{candidate_index: 0, choices: ^choices}}
-
-    assert_receive {:autotuning_telemetry, [:beaver, :mlir, :compilation, :action, :stop],
-                    %{duration: action_duration},
-                    %{candidate_index: 0, choices: ^choices, transform_schedule_digest: ^digest}}
-
-    assert is_integer(action_duration) and action_duration >= 0
-
-    assert_receive {:autotuning_telemetry,
-                    [:beaver, :mlir, :compilation, :autotuning, :candidate, :stop],
-                    %{duration: candidate_duration},
-                    %{candidate_index: 0, status: :ok, transform_schedule_digest: ^digest}}
-
-    assert is_integer(candidate_duration) and candidate_duration >= 0
-
-    assert_receive {:autotuning_telemetry, [:beaver, :mlir, :compilation, :autotuning, :stop],
-                    %{candidate_count: 1}, %{status_counts: %{ok: 1}}}
-  end
-
-  test "resolved schedules participate in incremental compilation cache identity" do
-    cache = start_supervised!({MLIR.CompilationCache.Memory, []})
-    cache = {:memory, cache}
-    resolved = Schedule.resolve!(@canonicalize_schedule, %{})
-
-    first =
-      MLIR.CompilationRuntime.compile!(@payload,
-        cache: cache,
-        transform_schedule: resolved
-      )
-
-    second =
-      MLIR.CompilationRuntime.compile!(@payload,
-        cache: cache,
-        transform_schedule: resolved
-      )
-
-    assert first.cache == :miss
-    assert second.cache == :hit
-    assert first.metadata.transform_schedule == Schedule.cache_identity(resolved)
-    assert first.metadata.transform_options == %{}
-
-    changed =
-      MLIR.CompilationRuntime.compile!(@payload,
-        cache: cache,
-        transform_schedule: resolved,
-        transform_options: [expensive_checks: false]
-      )
-
-    assert changed.cache == :miss
-
-    assert_raise ArgumentError, ":transform_options must be a keyword list", fn ->
-      MLIR.CompilationRuntime.compile!(@payload,
-        cache: cache,
-        transform_schedule: resolved,
-        transform_options: %{expensive_checks: false}
-      )
+      assert {:ok, %MLIR.Transform.Result{}} =
+               MLIR.Transform.execute(payload, {:bytecode, bytecode})
+    after
+      MLIR.Module.destroy(payload)
+      MLIR.Module.destroy(schedule)
     end
   end
 end

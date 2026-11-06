@@ -28,12 +28,7 @@ defmodule Beaver.MLIR.ExternalInterface do
     @enforce_keys [:pid, :id, :interface, :operation_name]
     defstruct [:pid, :id, :interface, :operation_name]
 
-    @type t() :: %__MODULE__{
-            pid: pid(),
-            id: term(),
-            interface: atom(),
-            operation_name: String.t()
-          }
+    @type t() :: %__MODULE__{pid: pid(), id: term(), interface: atom(), operation_name: String.t()}
   end
 
   @type interface() :: :memory_effects | :conditionally_speculatable | :transform_op | :pattern_descriptor
@@ -154,37 +149,21 @@ defmodule Beaver.MLIR.ExternalInterface do
     end
   end
 
-  defp native_attach(ctx, op_name, :memory_effects, callbacks, timeout_ms) do
-    CAPI.beaver_raw_memory_effects_attach_fallback_model(ctx, op_name, Map.fetch!(callbacks, :get_effects), timeout_ms)
-  end
-
-  defp native_attach(ctx, op_name, :conditionally_speculatable, callbacks, timeout_ms) do
-    CAPI.beaver_raw_conditionally_speculatable_attach_fallback_model(
-      ctx,
-      op_name,
-      Map.fetch!(callbacks, :get_speculatability),
-      timeout_ms
-    )
-  end
-
-  defp native_attach(ctx, op_name, :transform_op, callbacks, timeout_ms) do
-    CAPI.beaver_raw_transform_op_interface_attach_fallback_model(
-      ctx,
-      op_name,
-      Map.fetch!(callbacks, :apply),
-      Map.get(callbacks, :allows_repeated_handle_operands),
-      timeout_ms
-    )
-  end
-
-  defp native_attach(ctx, op_name, :pattern_descriptor, callbacks, timeout_ms) do
-    CAPI.beaver_raw_pattern_descriptor_op_interface_attach_fallback_model(
-      ctx,
-      op_name,
-      Map.fetch!(callbacks, :populate_patterns),
-      Map.get(callbacks, :populate_patterns_with_state),
-      timeout_ms
-    )
+  for {interface, name, required, optional} <- [
+        {:memory_effects, :memory_effects_attach_fallback_model, :get_effects, []},
+        {:conditionally_speculatable, :conditionally_speculatable_attach_fallback_model, :get_speculatability, []},
+        {:transform_op, :transform_op_interface_attach_fallback_model, :apply, [:allows_repeated_handle_operands]},
+        {:pattern_descriptor, :pattern_descriptor_op_interface_attach_fallback_model, :populate_patterns,
+         [:populate_patterns_with_state]}
+      ] do
+    defp native_attach(ctx, op_name, unquote(interface), callbacks, timeout_ms),
+      do:
+        apply(
+          CAPI,
+          unquote(:"beaver_raw_#{name}"),
+          [ctx, op_name, Map.fetch!(callbacks, unquote(required))] ++
+            Enum.map(unquote(optional), &Map.get(callbacks, &1)) ++ [timeout_ms]
+        )
   end
 
   defp dispatch({:get_effects, token, callback, _id, op, effects}) do
@@ -203,50 +182,35 @@ defmodule Beaver.MLIR.ExternalInterface do
     )
   end
 
-  defp dispatch({:get_speculatability, token, callback, _id, op}) do
-    op = native(op)
+  for {name, arguments, normalize, invoke, reply} <- [
+        {:get_speculatability, [:op], :normalize_speculatability, :invoke_reply, :reply_speculatability},
+        {:apply, [:op, :rewriter, :results, :state], :normalize_transform_result, :invoke_reply,
+         :reply_transform_result},
+        {:allows_repeated_handle_operands, [:op], :normalize_boolean, :invoke_reply, :reply_boolean},
+        {:populate_patterns, [:op, :patterns], :normalize_void_result, :invoke, :beaver_raw_callback_reply},
+        {:populate_patterns_with_state, [:op, :patterns, :state], :normalize_void_result, :invoke,
+         :beaver_raw_callback_reply}
+      ] do
+    args = Enum.map(arguments, &Macro.var(&1, nil))
+    op = hd(args)
+    extra = if name == :apply, do: [op, Enum.at(args, 2)], else: []
+    callback = Macro.var(:callback, nil)
+    normalized = {normalize, [], [quote(do: unquote(callback).(unquote_splicing(args))) | extra]}
 
-    invoke_reply(token, fn -> {:ok, normalize_speculatability(callback.(op))} end, &reply_speculatability/2, op)
-  end
+    normalized =
+      if name in [:get_speculatability, :allows_repeated_handle_operands],
+        do: quote(do: {:ok, unquote(normalized)}),
+        else: normalized
 
-  defp dispatch({:apply, token, callback, _id, op, rewriter, results, state}) do
-    op = native(op)
-    rewriter = native(rewriter)
-    results = native(results)
-    state = native(state)
+    reply =
+      if invoke == :invoke,
+        do: quote(do: &CAPI.beaver_raw_callback_reply/2),
+        else: quote(do: &unquote(reply)(&1, &2))
 
-    invoke_reply(
-      token,
-      fn -> normalize_transform_result(callback.(op, rewriter, results, state), op, results) end,
-      &reply_transform_result/2,
-      op
-    )
-  end
-
-  defp dispatch({:allows_repeated_handle_operands, token, callback, _id, op}) do
-    op = native(op)
-
-    invoke_reply(token, fn -> {:ok, normalize_boolean(callback.(op))} end, &reply_boolean/2, op)
-  end
-
-  defp dispatch({:populate_patterns, token, callback, _id, op, patterns}) do
-    op = native(op)
-    patterns = native(patterns)
-
-    invoke(token, fn -> callback.(op, patterns) |> normalize_void_result() end, &CAPI.beaver_raw_callback_reply/2, op)
-  end
-
-  defp dispatch({:populate_patterns_with_state, token, callback, _id, op, patterns, state}) do
-    op = native(op)
-    patterns = native(patterns)
-    state = native(state)
-
-    invoke(
-      token,
-      fn -> callback.(op, patterns, state) |> normalize_void_result() end,
-      &CAPI.beaver_raw_callback_reply/2,
-      op
-    )
+    defp dispatch({unquote(name), token, unquote(callback), _id, unquote_splicing(args)}) do
+      unquote(args) = Enum.map(unquote(args), &native/1)
+      unquote(invoke)(token, fn -> unquote(normalized) end, unquote(reply), unquote(op))
+    end
   end
 
   defp dispatch(_message), do: :unhandled
@@ -328,8 +292,7 @@ defmodule Beaver.MLIR.ExternalInterface do
 
   defp reply_speculatability(token, {:ok, value}) do
     code =
-      %{not_speculatable: 0, speculatable: 1, recursively_speculatable: 2}
-      |> Map.fetch!(value)
+      %{not_speculatable: 0, speculatable: 1, recursively_speculatable: 2} |> Map.fetch!(value)
 
     CAPI.beaver_raw_callback_reply_code(token, true, code)
   end

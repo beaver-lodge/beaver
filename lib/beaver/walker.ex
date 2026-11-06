@@ -107,12 +107,7 @@ defmodule Beaver.Walker do
     container = %container_module{} = extract_container(container)
     verify_nesting!(container_module, element_module)
 
-    %__MODULE__{
-      container: container,
-      element_module: element_module,
-      get_num: get_num,
-      get_element: get_element
-    }
+    %__MODULE__{container: container, element_module: element_module, get_num: get_num, get_element: get_element}
   end
 
   defp new(container, element_module,
@@ -337,9 +332,8 @@ defmodule Beaver.Walker do
   defp do_traverse(%__MODULE__{} = walker, acc, pre, post),
     do: do_traverse(Enum.to_list(walker), acc, pre, post)
 
-  defp do_traverse(list, acc, pre, post) when is_list(list) do
-    :lists.mapfoldl(fn x, acc -> do_traverse(x, acc, pre, post) end, acc, list)
-  end
+  defp do_traverse(list, acc, pre, post) when is_list(list),
+    do: :lists.mapfoldl(fn x, acc -> do_traverse(x, acc, pre, post) end, acc, list)
 
   defp do_traverse(%Operation{} = op, acc, pre, post) do
     {op, acc} = pre.(op, acc)
@@ -405,33 +399,25 @@ defmodule Beaver.Walker do
   Performs a depth-first, pre-order traversal of a MLIR structure.
   """
   @spec prewalk(mlir(), (mlir() -> mlir())) :: mlir()
-  def prewalk(ast, fun) when is_function(fun, 1) do
-    elem(prewalk(ast, nil, fn x, nil -> {fun.(x), nil} end), 0)
-  end
+  def prewalk(ast, fun) when is_function(fun, 1), do: elem(prewalk(ast, nil, fn x, nil -> {fun.(x), nil} end), 0)
 
   @doc """
   Performs a depth-first, pre-order traversal of a MLIR structure using an accumulator.
   """
   @spec prewalk(mlir(), any, (mlir(), any -> {mlir(), any})) :: {mlir(), any}
-  def prewalk(ast, acc, fun) when is_function(fun, 2) do
-    traverse(ast, acc, fun, fn x, a -> {x, a} end)
-  end
+  def prewalk(ast, acc, fun) when is_function(fun, 2), do: traverse(ast, acc, fun, fn x, a -> {x, a} end)
 
   @doc """
   Performs a depth-first, post-order traversal of a MLIR structure.
   """
   @spec postwalk(mlir(), (mlir() -> mlir())) :: mlir()
-  def postwalk(ast, fun) when is_function(fun, 1) do
-    elem(postwalk(ast, nil, fn x, nil -> {fun.(x), nil} end), 0)
-  end
+  def postwalk(ast, fun) when is_function(fun, 1), do: elem(postwalk(ast, nil, fn x, nil -> {fun.(x), nil} end), 0)
 
   @doc """
   Performs a depth-first, post-order traversal of a MLIR structure using an accumulator.
   """
   @spec postwalk(mlir(), any, (mlir(), any -> {mlir(), any})) :: {mlir(), any}
-  def postwalk(ast, acc, fun) when is_function(fun, 2) do
-    traverse(ast, acc, fn x, a -> {x, a} end, fun)
-  end
+  def postwalk(ast, acc, fun) when is_function(fun, 2), do: traverse(ast, acc, fn x, a -> {x, a} end, fun)
 
   defimpl Enumerable do
     @spec count(Beaver.Walker.t()) :: {:ok, non_neg_integer()} | {:error, module()}
@@ -477,13 +463,12 @@ defmodule Beaver.Walker do
     def slice(%Beaver.Walker{get_first: get_first, get_next: get_next})
         when is_function(get_first, 1) and is_function(get_next, 1), do: {:error, __MODULE__}
 
-    defp slicing_fun(container, get_element) do
-      fn start, length, step ->
+    defp slicing_fun(container, get_element),
+      do: fn start, length, step ->
         for pos <- start..(start + length - 1)//step do
           get_element.(container, pos)
         end
       end
-    end
 
     @spec reduce(Beaver.Walker.t(), Enumerable.acc(), Enumerable.reducer()) :: Enumerable.result()
 

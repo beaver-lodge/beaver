@@ -7,8 +7,7 @@ defmodule Beaver.MLIR.Transform do
 
   `apply_named_sequence/3` executes a named Transform dialect sequence without
   routing it through a pass manager. Transform IR may be supplied as a module,
-  an operation nested in a module, textual MLIR, bytecode, or a resolved tuning
-  schedule produced by `Beaver.MLIR.Transform.Schedule`.
+  an operation nested in a module, textual MLIR, or bytecode.
 
   Handles remain owned by MLIR's transform state and never escape this call.
   Keeping expensive checks enabled (the default) makes use-after-consume handle
@@ -57,9 +56,7 @@ defmodule Beaver.MLIR.Transform do
       pipeline: opts |> Keyword.fetch!(:pipeline) |> validate_fixed_point_pipeline!(),
       max_iterations: opts |> Keyword.get(:max_iterations, 10) |> validate_fixed_point_max_iterations!(),
       on_convergence_failure:
-        opts
-        |> Keyword.get(:on_convergence_failure, :error)
-        |> validate_convergence_failure_action!()
+        opts |> Keyword.get(:on_convergence_failure, :error) |> validate_convergence_failure_action!()
     }
   end
 
@@ -119,11 +116,7 @@ defmodule Beaver.MLIR.Transform do
     @enforce_keys [:payload, :sequence, :diagnostics]
     defstruct [:payload, :sequence, :diagnostics]
 
-    @type t() :: %__MODULE__{
-            payload: MLIR.Module.t() | Operation.t(),
-            sequence: String.t(),
-            diagnostics: [term()]
-          }
+    @type t() :: %__MODULE__{payload: MLIR.Module.t() | Operation.t(), sequence: String.t(), diagnostics: [term()]}
   end
 
   defmodule Error do
@@ -157,7 +150,7 @@ defmodule Beaver.MLIR.Transform do
     end
   end
 
-  @type schedule_input() :: MLIR.Module.t() | Operation.t() | binary() | Schedule.Resolved.t()
+  @type schedule_input() :: MLIR.Module.t() | Operation.t() | binary() | {:text, binary()} | {:bytecode, binary()}
 
   @type execution_option() ::
           {:sequence, String.t()} | {:expensive_checks, boolean()} | {:enforce_single_top_level_transform_op, boolean()}
@@ -181,7 +174,7 @@ defmodule Beaver.MLIR.Transform do
          payload_operation <- Operation.from_module(payload),
          context <- MLIR.context(payload_operation) do
       Schedule.with_module(schedule, context, fn schedule_module ->
-        execute_loaded_schedule(payload, payload_operation, schedule, schedule_module, opts)
+        execute_loaded_schedule(payload, payload_operation, schedule_module, opts)
       end)
     end
   rescue
@@ -190,8 +183,8 @@ defmodule Beaver.MLIR.Transform do
        %Error{kind: :invalid_schedule, reason: Exception.message(exception), sequence: Keyword.get(opts, :sequence)}}
   end
 
-  defp execute_loaded_schedule(payload, payload_operation, schedule, schedule_module, opts) do
-    sequence = Keyword.get(opts, :sequence, Schedule.sequence(schedule))
+  defp execute_loaded_schedule(payload, payload_operation, schedule_module, opts) do
+    sequence = Keyword.get(opts, :sequence, "__transform_main")
 
     case Schedule.find_sequence(schedule_module, sequence) do
       {:ok, transform_root} ->

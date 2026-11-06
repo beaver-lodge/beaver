@@ -32,11 +32,7 @@ defmodule Beaver.Wasm.Binary do
   def parse(@magic <> <<version::little-32, rest::binary>>) when version != 0 do
     {imports, exports} = parse_sections(rest, [], [])
 
-    %Binary{
-      bytes: @magic <> <<version::little-32, rest::binary>>,
-      imports: imports,
-      exports: exports
-    }
+    %Binary{bytes: @magic <> <<version::little-32, rest::binary>>, imports: imports, exports: exports}
   end
 
   def parse(_other), do: raise(ArgumentError, "not a WebAssembly binary (missing \\0asm magic)")

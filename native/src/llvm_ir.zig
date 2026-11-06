@@ -61,10 +61,7 @@ const PTXCompilation = struct {
         const llvm_ir = try beam.get_binary(environment, args[0]);
         const cpu = try beam.get_binary(environment, args[1]);
         const features = try beam.get_binary(environment, args[2]);
-        var self = @This(){
-            .output = Buffer.init(beam.allocator),
-            .error_message = Buffer.init(beam.allocator),
-        };
+        var self = @This(){ .output = Buffer.init(beam.allocator), .error_message = Buffer.init(beam.allocator) };
         defer self.output.deinit();
         defer self.error_message.deinit();
 

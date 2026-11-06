@@ -7,11 +7,7 @@ const result = kinda.result;
 
 pub fn RankedMemRefDescriptor(comptime Rank: usize) type {
     if (Rank == 0) {
-        return extern struct {
-            allocated: ?*anyopaque = null,
-            aligned: ?*anyopaque = null,
-            offset: i64,
-        };
+        return extern struct { allocated: ?*anyopaque = null, aligned: ?*anyopaque = null, offset: i64 };
     } else {
         return extern struct {
             allocated: ?*anyopaque = null,

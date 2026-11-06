@@ -22,8 +22,7 @@ defmodule Beaver.MLIR.Dialect.Ex.MaterializeBoundVariables do
   end
 
   def run!(%Operation{} = op) do
-    if(Operation.name(op) == "ex.func", do: [op], else: ex_funcs(op))
-    |> Enum.each(&materialize_func/1)
+    if(Operation.name(op) == "ex.func", do: [op], else: ex_funcs(op)) |> Enum.each(&materialize_func/1)
 
     op
   end

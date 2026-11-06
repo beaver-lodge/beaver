@@ -303,9 +303,7 @@ defmodule Beaver.MLIR.Conversion.Callbacks do
 
       invoke(
         token,
-        fn ->
-          unquote(normalize)(apply(callback, Enum.map([unquote_splicing(args)], &native/1)))
-        end,
+        fn -> unquote(normalize)(apply(callback, Enum.map([unquote_splicing(args)], &native/1))) end,
         &unquote(reply)(&1, &2)
       )
     end

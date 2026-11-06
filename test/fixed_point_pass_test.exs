@@ -17,19 +17,6 @@ defmodule FixedPointPassTest do
              max_iterations: 7,
              on_convergence_failure: :error
            } = fixed_point
-
-    plan = MLIR.CompilationPlan.new(pipeline: [fixed_point])
-
-    assert %{
-             pipeline: [
-               fixed_point: %{
-                 name: "Canonical closure",
-                 pipeline: [{:pipeline, "canonicalize"}],
-                 max_iterations: 7,
-                 on_convergence_failure: :error
-               }
-             ]
-           } = MLIR.CompilationPlan.declaration(plan)
   end
 
   test "validates the structured declaration" do

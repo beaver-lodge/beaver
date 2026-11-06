@@ -77,11 +77,7 @@ defmodule Beaver.Changeset do
       ) do
     block_args = Enum.map(block_args, &Deferred.resolve(&1, ctx))
 
-    %__MODULE__{
-      changeset
-      | successors: successors ++ [successor_block],
-        operands: operands ++ block_args
-    }
+    %__MODULE__{changeset | successors: successors ++ [successor_block], operands: operands ++ block_args}
   end
 
   def add_argument(%__MODULE__{successors: successors} = changeset, %Block{} = successor),

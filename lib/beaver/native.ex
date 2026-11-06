@@ -26,9 +26,7 @@ defmodule Beaver.Native do
   def opaque_ptr(%mod{ref: ref}) do
     maker = Module.concat([mod, :opaque_ptr])
 
-    %__MODULE__.OpaquePtr{
-      ref: apply(CAPI.Raw, maker, [ref]) |> normalize()
-    }
+    %__MODULE__.OpaquePtr{ref: apply(CAPI.Raw, maker, [ref]) |> normalize()}
   end
 
   def array(data, module, opts \\ [mut: false])

@@ -101,9 +101,7 @@ defmodule Beaver.MLIR.Attribute do
     cond do
       Type.opaque?(element_type) or string_elements?(elements) ->
         strings =
-          elements
-          |> Enum.map(&StringRef.create/1)
-          |> Native.array(StringRef, mut: true)
+          elements |> Enum.map(&StringRef.create/1) |> Native.array(StringRef, mut: true)
 
         mlirDenseElementsAttrStringGet(shaped_type, num_elements, strings)
 
@@ -294,15 +292,13 @@ defmodule Beaver.MLIR.Attribute do
     )
   end
 
-  def index(value, opts \\ []) when is_integer(value) do
-    Deferred.from_opts(opts, fn ctx -> Deferred.resolve(~a{#{value} : index}, ctx) end)
-  end
+  def index(value, opts \\ []) when is_integer(value),
+    do: Deferred.from_opts(opts, fn ctx -> Deferred.resolve(~a{#{value} : index}, ctx) end)
 
   def null(), do: mlirAttributeGetNull()
 
   for {f, "mlirAttributeIsA" <> type_name, 1} <-
-        CAPI.__info__(:functions)
-        |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
+        CAPI.__info__(:functions) |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
     helper_name = type_name |> Macro.underscore()
 
     @doc """

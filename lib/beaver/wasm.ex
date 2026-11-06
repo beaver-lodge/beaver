@@ -11,7 +11,7 @@ defmodule Beaver.Wasm do
 
   This is the host-boundary step of the batata WASM preparation (Forgejo
   #37): the manifest names the WASI/import surface that a runtime must
-  provide, and the binary is ready for a `:wasm` Shadow Wavefront evaluator.
+  provide before executing the binary.
   """
 
   import Beaver.MLIR.Conversion

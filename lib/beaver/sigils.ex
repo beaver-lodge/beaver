@@ -64,11 +64,10 @@ defmodule Beaver.Sigils do
   """
   def sigil_o(op_name, []), do: operation_builder(op_name)
 
-  defp operation_builder(op_name) do
-    fn %Beaver.SSA{evaluator: evaluator} = ssa when is_function(evaluator, 1) ->
+  defp operation_builder(op_name),
+    do: fn %Beaver.SSA{evaluator: evaluator} = ssa when is_function(evaluator, 1) ->
       evaluator.(%Beaver.SSA{ssa | op: op_name})
     end
-  end
 
   @doc """
   Create a deferred type value.

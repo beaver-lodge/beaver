@@ -42,10 +42,7 @@ defmodule Beaver.ENIF.UseENIFAlloc do
   end
 
   def initialize(ctx, nil) do
-    patterns = [
-      replace_alloc(),
-      replace_free()
-    ]
+    patterns = [replace_alloc(), replace_free()]
 
     {set, pdl_mod} = RewritePatternSet.with_pdl_patterns(patterns, ctx: ctx)
 

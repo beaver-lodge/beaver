@@ -25,9 +25,7 @@ defmodule Beaver.MLIR.Dialect.Builtin do
 
         attr = Beaver.Deferred.resolve(attr, ctx)
 
-        module
-        |> Beaver.MLIR.CAPI.mlirModuleGetOperation()
-        |> Beaver.MLIR.Operation.put_attribute(name, attr)
+        module |> Beaver.MLIR.CAPI.mlirModuleGetOperation() |> Beaver.MLIR.Operation.put_attribute(name, attr)
       end
 
       module_body_block = Beaver.MLIR.Module.body(module)

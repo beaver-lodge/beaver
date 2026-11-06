@@ -9,8 +9,7 @@ defmodule Beaver.Native.Array do
 
   def as_opaque(%{ref: ref, element_kind: element_kind}) do
     ref =
-      apply(CAPI.Raw, Module.concat([element_kind, "array_as_opaque"]), [ref])
-      |> Native.normalize()
+      apply(CAPI.Raw, Module.concat([element_kind, "array_as_opaque"]), [ref]) |> Native.normalize()
 
     %Native.OpaqueArray{ref: ref}
   end

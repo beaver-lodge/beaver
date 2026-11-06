@@ -8,6 +8,15 @@ const c = prelude.c;
 const mlir_capi = @import("mlir_capi.zig");
 const string_ref = @import("string_ref.zig");
 const diagnostic = @import("diagnostic.zig");
+const callback_args = @import("callback_args.zig");
+const Values = callback_args.Range(mlir_capi.Value);
+const Types = callback_args.Range(mlir_capi.Type);
+const OptionalType = callback_args.Optional(mlir_capi.Type);
+const Timestamp = struct {
+    pub fn encode(environment: beam.env, _: void) !beam.term {
+        return beam.make_i64(environment, systemNs());
+    }
+};
 
 const LegalityDispatcher = kinda.callback_runtime.Dispatcher(.{"conversion_legality"});
 const TypeDispatcher = kinda.callback_runtime.Dispatcher(.{
@@ -103,15 +112,6 @@ fn systemNs() i64 {
     // negative/backwards sample in favour of its local service duration.
     const timestamp_ns = std.Io.Clock.real.now(std.Options.debug_io).toNanoseconds();
     return std.math.cast(i64, timestamp_ns) orelse std.math.maxInt(i64);
-}
-
-fn handleSlice(comptime Kind: type, environment: beam.env, count: isize, values: [*c]Kind.T) !beam.term {
-    const len: usize = @intCast(count);
-    if (len == 0) {
-        const empty = [_]beam.term{};
-        return beam.make_term_list(environment, &empty);
-    }
-    return kinda.callback_adapter.handleRange(Kind, environment, values[0..len]);
 }
 
 fn fetchHandleSlice(comptime Kind: type, environment: beam.env, list: beam.term) ![]Kind.T {
@@ -218,16 +218,11 @@ const LegalityState = struct {
 
     fn callback(operation: mlir_capi.Operation.T, user_data: ?*anyopaque) callconv(.c) c.MlirConversionTargetLegality {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.MLIR_CONVERSION_TARGET_LEGALITY_ILLEGAL));
-        const environment = e.enif_alloc_env() orelse
-            return c.MLIR_CONVERSION_TARGET_LEGALITY_ILLEGAL;
-        const operation_term = kinda.callback_adapter.handle(mlir_capi.Operation, environment, operation) catch {
-            e.enif_free_env(environment);
-            return c.MLIR_CONVERSION_TARGET_LEGALITY_ILLEGAL;
-        };
-        const response = self.dispatcher.invoke(
+        const response = callback_args.invoke(
+            self.dispatcher,
             "conversion_legality",
-            environment,
-            .{ beam.make_i64(environment, systemNs()), operation_term },
+            .{ Timestamp, mlir_capi.Operation },
+            .{ {}, operation },
         ) catch return c.MLIR_CONVERSION_TARGET_LEGALITY_ILLEGAL;
         return kinda.callback_adapter.scalarResult(
             c.MlirConversionTargetLegality,
@@ -404,20 +399,14 @@ const TypeCallbackState = struct {
         std.heap.smp_allocator.destroy(self);
     }
 
-    fn conversion(
-        type_: mlir_capi.Type.T,
-        converted_type: [*c]mlir_capi.Type.T,
-        user_data: ?*anyopaque,
-    ) callconv(.c) c.MlirTypeConverterConversionStatus {
+    fn conversion(type_: mlir_capi.Type.T, converted_type: [*c]mlir_capi.Type.T, user_data: ?*anyopaque) callconv(.c) c.MlirTypeConverterConversionStatus {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.MlirTypeConverterConversionStatusFailure));
-        const environment = e.enif_alloc_env() orelse
-            return c.MlirTypeConverterConversionStatusFailure;
-        const type_term = kinda.callback_adapter.handle(mlir_capi.Type, environment, type_) catch {
-            e.enif_free_env(environment);
-            return c.MlirTypeConverterConversionStatusFailure;
-        };
-        const response = self.dispatcher.invoke("convert_type", environment, .{ beam.make_i64(environment, systemNs()), type_term }) catch
-            return c.MlirTypeConverterConversionStatusFailure;
+        const response = callback_args.invoke(
+            self.dispatcher,
+            "convert_type",
+            .{ Timestamp, mlir_capi.Type },
+            .{ {}, type_ },
+        ) catch return c.MlirTypeConverterConversionStatusFailure;
         const status = kinda.callback_adapter.scalarResult(
             c.MlirTypeConverterConversionStatus,
             response,
@@ -437,14 +426,12 @@ const TypeCallbackState = struct {
         user_data: ?*anyopaque,
     ) callconv(.c) c.MlirTypeConverterConversionStatus {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.MlirTypeConverterConversionStatusFailure));
-        const environment = e.enif_alloc_env() orelse
-            return c.MlirTypeConverterConversionStatusFailure;
-        const type_term = kinda.callback_adapter.handle(mlir_capi.Type, environment, type_) catch {
-            e.enif_free_env(environment);
-            return c.MlirTypeConverterConversionStatusFailure;
-        };
-        const response = self.dispatcher.invoke("convert_types", environment, .{ beam.make_i64(environment, systemNs()), type_term }) catch
-            return c.MlirTypeConverterConversionStatusFailure;
+        const response = callback_args.invoke(
+            self.dispatcher,
+            "convert_types",
+            .{ Timestamp, mlir_capi.Type },
+            .{ {}, type_ },
+        ) catch return c.MlirTypeConverterConversionStatusFailure;
         const status = kinda.callback_adapter.scalarResult(
             c.MlirTypeConverterConversionStatus,
             response,
@@ -471,28 +458,12 @@ const TypeCallbackState = struct {
         user_data: ?*anyopaque,
     ) callconv(.c) mlir_capi.Value.T {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse return .{ .ptr = null }));
-        const environment = e.enif_alloc_env() orelse return .{ .ptr = null };
-        const args = .{
-            beam.make_i64(environment, systemNs()),
-            kinda.callback_adapter.handle(mlir_capi.RewriterBase, environment, rewriter) catch {
-                e.enif_free_env(environment);
-                return .{ .ptr = null };
-            },
-            kinda.callback_adapter.handle(mlir_capi.Type, environment, output_type) catch {
-                e.enif_free_env(environment);
-                return .{ .ptr = null };
-            },
-            handleSlice(mlir_capi.Value, environment, n_inputs, inputs) catch {
-                e.enif_free_env(environment);
-                return .{ .ptr = null };
-            },
-            kinda.callback_adapter.handle(mlir_capi.Location, environment, location) catch {
-                e.enif_free_env(environment);
-                return .{ .ptr = null };
-            },
-        };
-        const response = self.dispatcher.invoke("source_materialization", environment, args) catch
-            return .{ .ptr = null };
+        const response = callback_args.invoke(
+            self.dispatcher,
+            "source_materialization",
+            .{ Timestamp, mlir_capi.RewriterBase, mlir_capi.Type, Values, mlir_capi.Location },
+            .{ {}, rewriter, output_type, Values.slice(n_inputs, inputs), location },
+        ) catch return .{ .ptr = null };
         const projection = kinda.callback_adapter.projection(response) orelse return .{ .ptr = null };
         return .{ .ptr = @ptrFromInt(projection) };
     }
@@ -507,32 +478,12 @@ const TypeCallbackState = struct {
         user_data: ?*anyopaque,
     ) callconv(.c) mlir_capi.Value.T {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse return .{ .ptr = null }));
-        const environment = e.enif_alloc_env() orelse return .{ .ptr = null };
-        const args = .{
-            beam.make_i64(environment, systemNs()),
-            kinda.callback_adapter.handle(mlir_capi.RewriterBase, environment, rewriter) catch {
-                e.enif_free_env(environment);
-                return .{ .ptr = null };
-            },
-            kinda.callback_adapter.handle(mlir_capi.Type, environment, output_type) catch {
-                e.enif_free_env(environment);
-                return .{ .ptr = null };
-            },
-            handleSlice(mlir_capi.Value, environment, n_inputs, inputs) catch {
-                e.enif_free_env(environment);
-                return .{ .ptr = null };
-            },
-            kinda.callback_adapter.handle(mlir_capi.Location, environment, location) catch {
-                e.enif_free_env(environment);
-                return .{ .ptr = null };
-            },
-            kinda.callback_adapter.handle(mlir_capi.Type, environment, original_type) catch {
-                e.enif_free_env(environment);
-                return .{ .ptr = null };
-            },
-        };
-        const response = self.dispatcher.invoke("target_materialization", environment, args) catch
-            return .{ .ptr = null };
+        const response = callback_args.invoke(
+            self.dispatcher,
+            "target_materialization",
+            .{ Timestamp, mlir_capi.RewriterBase, mlir_capi.Type, Values, mlir_capi.Location, mlir_capi.Type },
+            .{ {}, rewriter, output_type, Values.slice(n_inputs, inputs), location, original_type },
+        ) catch return .{ .ptr = null };
         const projection = kinda.callback_adapter.projection(response) orelse return .{ .ptr = null };
         return .{ .ptr = @ptrFromInt(projection) };
     }
@@ -549,36 +500,12 @@ const TypeCallbackState = struct {
         user_data: ?*anyopaque,
     ) callconv(.c) mlir_capi.LogicalResult.T {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.beaverLogicalResultFailure()));
-        const environment = e.enif_alloc_env() orelse return c.beaverLogicalResultFailure();
-        const original_term = if (c.mlirTypeIsNull(original_type))
-            beam.make_nil(environment)
-        else
-            kinda.callback_adapter.handle(mlir_capi.Type, environment, original_type) catch {
-                e.enif_free_env(environment);
-                return c.beaverLogicalResultFailure();
-            };
-        const args = .{
-            beam.make_i64(environment, systemNs()),
-            kinda.callback_adapter.handle(mlir_capi.RewriterBase, environment, rewriter) catch {
-                e.enif_free_env(environment);
-                return c.beaverLogicalResultFailure();
-            },
-            handleSlice(mlir_capi.Type, environment, n_output_types, output_types) catch {
-                e.enif_free_env(environment);
-                return c.beaverLogicalResultFailure();
-            },
-            handleSlice(mlir_capi.Value, environment, n_inputs, inputs) catch {
-                e.enif_free_env(environment);
-                return c.beaverLogicalResultFailure();
-            },
-            kinda.callback_adapter.handle(mlir_capi.Location, environment, location) catch {
-                e.enif_free_env(environment);
-                return c.beaverLogicalResultFailure();
-            },
-            original_term,
-        };
-        const response = self.dispatcher.invoke("target_materialization_1_to_n", environment, args) catch
-            return c.beaverLogicalResultFailure();
+        const response = callback_args.invoke(
+            self.dispatcher,
+            "target_materialization_1_to_n",
+            .{ Timestamp, mlir_capi.RewriterBase, Types, Values, mlir_capi.Location, OptionalType },
+            .{ {}, rewriter, Types.slice(n_output_types, output_types), Values.slice(n_inputs, inputs), location, original_type },
+        ) catch return c.beaverLogicalResultFailure();
         if (!response.success) return c.beaverLogicalResultFailure();
         const projection = kinda.callback_adapter.projection(response) orelse
             return c.beaverLogicalResultFailure();
@@ -602,11 +529,7 @@ const TypeMappingState = struct {
         std.heap.smp_allocator.destroy(self);
     }
 
-    fn conversion(
-        type_: mlir_capi.Type.T,
-        converted_type: [*c]mlir_capi.Type.T,
-        user_data: ?*anyopaque,
-    ) callconv(.c) c.MlirTypeConverterConversionStatus {
+    fn conversion(type_: mlir_capi.Type.T, converted_type: [*c]mlir_capi.Type.T, user_data: ?*anyopaque) callconv(.c) c.MlirTypeConverterConversionStatus {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.MlirTypeConverterConversionStatusFailure));
 
         for (self.sources) |source| {
@@ -783,7 +706,6 @@ const TypeConverterWorker = struct {
         const environment = e.enif_alloc_env() orelse {
             e.enif_free_env(owned_environment);
             e.enif_release_resource(registration);
-            std.heap.smp_allocator.destroy(self);
             return;
         };
         defer e.enif_free_env(environment);
@@ -844,6 +766,24 @@ fn destroyTypeConverter(environment: beam.env, _: c_int, args: [*c]const beam.te
     return beam.make_atom(environment, "ok");
 }
 
+const ValueRanges = struct {
+    sizes: []const isize,
+    values: []const mlir_capi.Value.T,
+
+    pub fn encode(environment: beam.env, self: @This()) !beam.term {
+        const ranges = try beam.allocator.alloc(beam.term, self.sizes.len);
+        defer beam.allocator.free(ranges);
+        var offset: usize = 0;
+        for (self.sizes, ranges) |size, *range| {
+            const len: usize = @intCast(size);
+            if (len > self.values.len - offset) return error.InvalidOperandRange;
+            range.* = try Values.encode(environment, self.values[offset..][0..len]);
+            offset += len;
+        }
+        return beam.make_term_list(environment, ranges);
+    }
+};
+
 const ConversionPatternState = struct {
     dispatcher: *PatternDispatcher,
     converter_registration: *TypeConverterRegistration,
@@ -865,24 +805,12 @@ const ConversionPatternState = struct {
         user_data: ?*anyopaque,
     ) callconv(.c) mlir_capi.LogicalResult.T {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.beaverLogicalResultFailure()));
-        const environment = e.enif_alloc_env() orelse return c.beaverLogicalResultFailure();
-        const args = .{
-            beam.make_i64(environment, systemNs()),
-            kinda.callback_adapter.handle(mlir_capi.Operation, environment, operation) catch {
-                e.enif_free_env(environment);
-                return c.beaverLogicalResultFailure();
-            },
-            handleSlice(mlir_capi.Value, environment, n_operands, operands) catch {
-                e.enif_free_env(environment);
-                return c.beaverLogicalResultFailure();
-            },
-            kinda.callback_adapter.handle(mlir_capi.ConversionPatternRewriter, environment, rewriter) catch {
-                e.enif_free_env(environment);
-                return c.beaverLogicalResultFailure();
-            },
-        };
-        const response = self.dispatcher.invoke("conversion_pattern", environment, args) catch
-            return c.beaverLogicalResultFailure();
+        const response = callback_args.invoke(
+            self.dispatcher,
+            "conversion_pattern",
+            .{ Timestamp, mlir_capi.Operation, Values, mlir_capi.ConversionPatternRewriter },
+            .{ {}, operation, Values.slice(n_operands, operands), rewriter },
+        ) catch return c.beaverLogicalResultFailure();
         return if (response.success) c.beaverLogicalResultSuccess() else c.beaverLogicalResultFailure();
     }
 
@@ -897,49 +825,12 @@ const ConversionPatternState = struct {
         user_data: ?*anyopaque,
     ) callconv(.c) mlir_capi.LogicalResult.T {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.beaverLogicalResultFailure()));
-        const environment = e.enif_alloc_env() orelse return c.beaverLogicalResultFailure();
-        const count: usize = @intCast(n_ranges);
-        const ranges = beam.allocator.alloc(beam.term, count) catch {
-            e.enif_free_env(environment);
-            return c.beaverLogicalResultFailure();
-        };
-        defer beam.allocator.free(ranges);
-        var offset: usize = 0;
-        for (0..count) |index| {
-            const len: usize = @intCast(range_sizes[index]);
-            if (offset + len > @as(usize, @intCast(n_operands))) {
-                e.enif_free_env(environment);
-                return c.beaverLogicalResultFailure();
-            }
-            if (len == 0) {
-                const empty = [_]beam.term{};
-                ranges[index] = beam.make_term_list(environment, &empty);
-            } else {
-                ranges[index] = kinda.callback_adapter.handleRange(
-                    mlir_capi.Value,
-                    environment,
-                    operands[offset .. offset + len],
-                ) catch {
-                    e.enif_free_env(environment);
-                    return c.beaverLogicalResultFailure();
-                };
-            }
-            offset += len;
-        }
-        const args = .{
-            beam.make_i64(environment, systemNs()),
-            kinda.callback_adapter.handle(mlir_capi.Operation, environment, operation) catch {
-                e.enif_free_env(environment);
-                return c.beaverLogicalResultFailure();
-            },
-            beam.make_term_list(environment, ranges),
-            kinda.callback_adapter.handle(mlir_capi.ConversionPatternRewriter, environment, rewriter) catch {
-                e.enif_free_env(environment);
-                return c.beaverLogicalResultFailure();
-            },
-        };
-        const response = self.dispatcher.invoke("conversion_pattern_1_to_n", environment, args) catch
-            return c.beaverLogicalResultFailure();
+        const response = callback_args.invoke(
+            self.dispatcher,
+            "conversion_pattern_1_to_n",
+            .{ Timestamp, mlir_capi.Operation, ValueRanges, mlir_capi.ConversionPatternRewriter },
+            .{ {}, operation, ValueRanges{ .sizes = if (n_ranges == 0) &.{} else range_sizes[0..@intCast(n_ranges)], .values = Values.slice(n_operands, operands) }, rewriter },
+        ) catch return c.beaverLogicalResultFailure();
         return if (response.success) c.beaverLogicalResultSuccess() else c.beaverLogicalResultFailure();
     }
 };
@@ -1054,7 +945,6 @@ const ConversionWorker = struct {
             if (config_owned) c.mlirConversionConfigDestroy(config);
             e.enif_free_env(owned_environment);
             e.enif_release_resource(target);
-            std.heap.smp_allocator.destroy(self);
             return;
         };
         defer e.enif_free_env(environment);

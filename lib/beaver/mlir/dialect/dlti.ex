@@ -26,9 +26,8 @@ defmodule Beaver.MLIR.Dialect.DLTI do
   Strings, atoms, integers, booleans, MLIR attributes and deferred attributes
   are accepted as values. Types and deferred types are accepted as keys.
   """
-  def entry(key, value, opts \\ []) do
-    Deferred.from_opts(opts, fn ctx -> Attribute.get(entry_text(key, value, ctx), ctx: ctx) end)
-  end
+  def entry(key, value, opts \\ []),
+    do: Deferred.from_opts(opts, fn ctx -> Attribute.get(entry_text(key, value, ctx), ctx: ctx) end)
 
   @doc """
   Build a `#dlti.dl_spec` from `{key, value}` pairs or existing DLTI entries.
@@ -100,9 +99,8 @@ defmodule Beaver.MLIR.Dialect.DLTI do
     operation_or_module
   end
 
-  defp build_entry_container(name, entries, opts) do
-    Deferred.from_opts(opts, fn ctx -> Attribute.get(container_text(name, entries, ctx), ctx: ctx) end)
-  end
+  defp build_entry_container(name, entries, opts),
+    do: Deferred.from_opts(opts, fn ctx -> Attribute.get(container_text(name, entries, ctx), ctx: ctx) end)
 
   defp container_text(name, entries, ctx) do
     rendered = Enum.map(entries, &render_entry(&1, ctx))

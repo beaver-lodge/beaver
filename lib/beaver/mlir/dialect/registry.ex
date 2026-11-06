@@ -52,9 +52,7 @@ defmodule Beaver.MLIR.Dialect.Registry do
 
   def ops(dialect, opts \\ [])
 
-  def ops(:all, opts) do
-    unwrap_ctx_then(opts, fn ref -> CAPI.beaver_raw_registered_ops(ref) end)
-  end
+  def ops(:all, opts), do: unwrap_ctx_then(opts, fn ref -> CAPI.beaver_raw_registered_ops(ref) end)
 
   def ops(dialect, opts) do
     prefix = "#{dialect}."
