@@ -37,6 +37,7 @@ pub const nifs = capi_registry.nifs ++
     unranked_memref_descriptor.nifs ++
     value.nifs ++
     action_tracing.nifs ++
+    @import("remarks.zig").nifs ++
     llvm_ir.nifs ++
     infer_type.nifs ++
     triton.nifs;

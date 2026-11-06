@@ -10,7 +10,7 @@ mlir_headers =
   |> then(&Path.join(mlir_include_dir, &1))
   |> Path.wildcard()
   |> Stream.reject(&String.contains?(&1, "mlir-c/Bindings/Python"))
-  # LLVMIR uses Beaver's adapter; Remarks needs an adapter for callback-scoped handles.
+  # LLVMIR and Remarks use Beaver adapters; callback-scoped remarks never escape to BEAM.
   |> Stream.reject(&String.ends_with?(&1, ~w[mlir-c/Target/LLVMIR.h mlir-c/Remarks.h]))
   |> Enum.map(&Path.relative_to(&1, mlir_include_dir))
 
@@ -19,7 +19,7 @@ if mlir_headers == [], do: raise("no MLIR C headers found under #{mlir_include_d
 beaver_headers = ~w[
   mlir-c/Beaver/CAPIPolicy.h mlir-c/Beaver/Context.h mlir-c/Beaver/CompilerKernel.h mlir-c/Beaver/Conversion.h
   mlir-c/Beaver/Interfaces.h mlir-c/Beaver/Op.h mlir-c/Beaver/Pass.h mlir-c/Beaver/Debug.h mlir-c/Beaver/LLVMIR.h
-  mlir-c/Beaver/CallbackTypeDef.h
+  mlir-c/Beaver/CallbackTypeDef.h mlir-c/Beaver/Remarks.h
 ]
 
 Enum.each(beaver_headers, fn header ->

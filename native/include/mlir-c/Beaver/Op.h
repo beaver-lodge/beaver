@@ -72,6 +72,8 @@ MLIR_CAPI_EXPORTED bool beaverOperationHasInherentAttributeByName(MlirOperation 
 MLIR_CAPI_EXPORTED MlirAttribute beaverOperationGetInherentAttributeByName(MlirOperation operation, MlirStringRef name);
 MLIR_CAPI_EXPORTED intptr_t beaverOperationGetNumInherentAttributes(MlirOperation operation);
 MLIR_CAPI_EXPORTED MlirNamedAttribute beaverOperationGetInherentAttribute(MlirOperation operation, intptr_t position);
+MLIR_CAPI_EXPORTED MlirAttribute beaverOperationGetProperties(MlirOperation operation);
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverOperationSetProperties(MlirOperation operation, MlirAttribute properties);
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverOperationStateGetName(MlirOperationState state);
 // Create from a by-value state so the BEAM resource backing the state remains
@@ -133,6 +135,11 @@ MLIR_CAPI_EXPORTED intptr_t beaverShapedTypeGetNumElements(MlirType type);
 MLIR_CAPI_EXPORTED MlirStringRef beaverGetNumWorkgroupAttributionsAttrName();
 MLIR_CAPI_EXPORTED MlirStringRef beaverGetContainerModuleAttrName();
 MLIR_CAPI_EXPORTED MlirStringRef beaverROCDLTargetAttrGetChip(MlirAttribute target);
+MLIR_CAPI_EXPORTED bool beaverROCDLTargetInfoSupported(void);
+MLIR_CAPI_EXPORTED MlirStringRef beaverROCDLTargetAttrGetArch(MlirAttribute target);
+MLIR_CAPI_EXPORTED unsigned beaverROCDLTargetAttrGetWaveSize(MlirAttribute target);
+MLIR_CAPI_EXPORTED MlirAttribute beaverROCDLTargetAttrConfigure(MlirAttribute target, MlirStringRef arch, unsigned wavesize);
+MLIR_CAPI_EXPORTED void beaverROCDLTargetApplyModuleFlags(MlirOperation module, MlirAttribute target);
 MLIR_CAPI_EXPORTED MlirAttribute beaverGPUObjectAttrGet(MlirAttribute target, int32_t format, MlirStringRef object);
 MLIR_CAPI_EXPORTED bool beaverAttributeIsAGPUObject(MlirAttribute attribute);
 MLIR_CAPI_EXPORTED MlirStringRef beaverGPUObjectAttrGetObject(MlirAttribute attribute);

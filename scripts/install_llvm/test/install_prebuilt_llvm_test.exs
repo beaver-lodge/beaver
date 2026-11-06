@@ -20,10 +20,10 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
     assert metadata["kinda"]["ref"] == kinda_ref
 
     assert metadata["llvm"]["default_revisions"] == %{
-             "macos_arm64" => "20261103+0be29dfa4",
-             "manylinux_aarch64" => "20261103+0be29dfa4",
-             "manylinux_x86_64" => "20261103+0be29dfa4",
-             "windows_amd64" => "20261103+0be29dfa4"
+             "macos_arm64" => "20261106+b5bbdc97c",
+             "manylinux_aarch64" => "20261106+b5bbdc97c",
+             "manylinux_x86_64" => "20261106+b5bbdc97c",
+             "windows_amd64" => "20261106+b5bbdc97c"
            }
   end
 
@@ -49,8 +49,8 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
         ])
       end)
 
-    assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20261103+0be29dfa4.tar.gz"
-    assert output =~ "LLVM_EUDSL_ASSET_REVISION=20261103+0be29dfa4"
+    assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20261106+b5bbdc97c.tar.gz"
+    assert output =~ "LLVM_EUDSL_ASSET_REVISION=20261106+b5bbdc97c"
     assert output =~ "https://github.com/llvm/eudsl/releases/download/llvm/"
   end
 
@@ -82,14 +82,14 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
         ])
       end)
 
-    assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20261103+0be29dfa4.tar.gz"
+    assert output =~ "LLVM_PREBUILT_ASSET_NAME=mlir_manylinux_x86_64_20261106+b5bbdc97c.tar.gz"
   end
 
   test "resolves platform-specific revisions from the same LLVM commit" do
     for {os_name, arch, revision} <- [
-          {"macos", "arm64", "20261103+0be29dfa4"},
-          {"manylinux", "aarch64", "20261103+0be29dfa4"},
-          {"windows", "amd64", "20261103+0be29dfa4"}
+          {"macos", "arm64", "20261106+b5bbdc97c"},
+          {"manylinux", "aarch64", "20261106+b5bbdc97c"},
+          {"windows", "amd64", "20261106+b5bbdc97c"}
         ] do
       Mix.Task.reenable("beaver.install_prebuilt_llvm")
 

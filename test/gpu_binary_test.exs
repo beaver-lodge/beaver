@@ -64,6 +64,88 @@ defmodule GPUBinaryTest do
     assert MLIR.verify!(module) == module
   end
 
+  @tag :rocdl_target_info
+  test "ROCDL resolves full target IDs and validates wave sizes", %{ctx: ctx} do
+    target =
+      GPU.rocdl_target_attribute(
+        arch: "amdgcn-amd-amdhsa--gfx942:xnack+:sramecc-",
+        wavesize: 64,
+        ctx: ctx
+      )
+
+    ir = MLIR.to_string(target)
+    assert ir =~ ~s(chip = "gfx942")
+    assert ir =~ "wavesize = 64"
+    assert ir =~ "+wavefrontsize64"
+
+    assert MLIR.CAPI.beaverROCDLTargetAttrGetArch(target) |> MLIR.to_string() ==
+             "amdgcn-amd-amdhsa--gfx942:xnack+:sramecc-"
+
+    for opts <- [
+          [arch: "gfx942", wavesize: 32],
+          [arch: "unknown"],
+          [wavesize: 17],
+          [arch: "gfx1100", wavesize: 32, features: "+wavefrontsize64"],
+          [arch: "gfx942", chip: "gfx942"]
+        ] do
+      assert_raise ArgumentError, fn -> GPU.rocdl_target_attribute(opts ++ [ctx: ctx]) end
+    end
+
+    assert GPU.rocdl_target_attribute(arch: "gfx9-4-generic", ctx: ctx) |> MLIR.to_string() =~
+             "gfx9-4-generic"
+  end
+
+  @tag :rocdl_target_info
+  test "ROCDL compiles each target using its own wave size", %{ctx: ctx} do
+    module =
+      MLIR.Module.create!(
+        """
+        gpu.module @kernels {
+          gpu.func @empty() kernel {
+            gpu.return
+          }
+        }
+        """,
+        ctx: ctx
+      )
+
+    targets =
+      for wave <- [32, 64],
+          do: GPU.rocdl_target_attribute(arch: "gfx1100", wavesize: wave, ctx: ctx)
+
+    module = GPU.package_binary!(module, targets)
+    [binary] = Enum.to_list(Beaver.Walker.operations(MLIR.Module.body(module)))
+
+    [wave32, wave64] =
+      Enum.map(binary["objects"], fn object ->
+        {:ok, data} = GPU.object_data(object)
+        data
+      end)
+
+    assert wave32 =~ ".amdhsa_wavefront_size32 1"
+    assert wave64 =~ ".amdhsa_wavefront_size32 0"
+  end
+
+  @tag :rocdl_target_info
+  test "ROCDL target-ID modifiers reach LLVM module flags and assembly", %{ctx: ctx} do
+    module =
+      MLIR.Module.create!(
+        """
+        gpu.module @kernels {
+          gpu.func @empty() kernel { gpu.return }
+        }
+        """,
+        ctx: ctx
+      )
+
+    target = GPU.rocdl_target_attribute(arch: "gfx942:xnack+:sramecc-", ctx: ctx)
+    module = GPU.package_binary!(module, target)
+    [binary] = Enum.to_list(Beaver.Walker.operations(MLIR.Module.body(module)))
+    [object] = Enum.to_list(binary["objects"])
+    assert {:ok, assembly} = GPU.object_data(object)
+    assert assembly =~ "gfx942:sramecc-:xnack+"
+  end
+
   test "binary_module rejects unknown object formats", %{ctx: ctx} do
     target = GPU.nvvm_target_attribute(chip: "sm_80", ctx: ctx)
 

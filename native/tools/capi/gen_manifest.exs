@@ -28,6 +28,14 @@ defmodule Beaver.CAPI.ManifestGenerator do
                        %{"scheduler" => "dirty_cpu", "destructor" => "native_owner"}},
                       {"beaverCompilerKernelLoadAndPopulate", "compiler_kernel_load_and_populate",
                        %{"scheduler" => "dirty_io"}},
+                      {"beaverContextEnableOptimizationRemarks", "optimization_remarks_attach",
+                       %{
+                         "runtime" => "native_notification",
+                         "scheduler" => "mlir_worker",
+                         "owner" => "context",
+                         "lifetime" => "remark_engine",
+                         "destructor" => "native_owner"
+                       }},
                       {"mlirTransformStateForEachPayloadOp", "transform_state_payload_ops", %{}},
                       {"mlirTransformStateForEachPayloadValue", "transform_state_payload_values", %{}},
                       {"mlirTransformStateForEachParam", "transform_state_params", %{}},

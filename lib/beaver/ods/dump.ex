@@ -11,7 +11,8 @@ defmodule Beaver.MLIR.ODS.Dump do
   Each operation record also carries the enriched facts extracted from the
   TableGen ODS records: `native_class_name`, `traits`, `regions` (name +
   variadic), `builders` (declared builder parameter types), `assembly_format`,
-  and `has_folder`.
+  `has_folder`, and `properties` (name, constraint, storage/interface types and
+  default value). Properties are distinct from discardable attributes.
 
   Operations can be looked up using `lookup/1`, and documentation can be generated using `gen_doc/1`.
   """

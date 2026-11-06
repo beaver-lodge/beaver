@@ -58,6 +58,21 @@ defmodule Beaver.MLIR.Operation do
   defdelegate parent(op), to: CAPI, as: :mlirOperationGetParentOperation
   defdelegate destroy(op), to: CAPI, as: :mlirOperationDestroy
   defdelegate clone(op), to: CAPI, as: :mlirOperationClone
+
+  @doc "Returns all operation properties as an attribute, or nil if there are none."
+  def properties(%__MODULE__{} = op), do: op |> beaverOperationGetProperties() |> nil_if_null()
+
+  @doc """
+  Replaces properties from their attribute representation, preserving discardable
+  attributes. Failed conversion leaves the original properties unchanged.
+  """
+  def put_properties(%__MODULE__{} = op, properties) do
+    ctx = MLIR.context(op)
+    properties = Beaver.Deferred.resolve(properties, ctx)
+    {result, diagnostics} = beaverOperationSetPropertiesWithDiagnostics(ctx, op, properties)
+    if MLIR.LogicalResult.success?(result), do: {:ok, op}, else: {:error, diagnostics}
+  end
+
   defdelegate result(op, pos), to: CAPI, as: :mlirOperationGetResult
 
   @typedoc "Options shared by structural equivalence and structural hashing."

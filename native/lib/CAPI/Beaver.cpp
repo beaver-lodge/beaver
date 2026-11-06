@@ -35,6 +35,51 @@
 
 using namespace mlir;
 
+MLIR_CAPI_EXPORTED bool beaverContextIndependentLockingSupported() {
+#ifdef BEAVER_HAS_MLIR_CONTEXT_LOCKING
+  return true;
+#else
+  return false;
+#endif
+}
+
+MLIR_CAPI_EXPORTED bool beaverContextIsMultithreadingEnabled(MlirContext context) {
+  return unwrap(context)->isMultithreadingEnabled();
+}
+
+MLIR_CAPI_EXPORTED bool beaverContextEnableThreadSafeLocking(MlirContext context) {
+#ifdef BEAVER_HAS_MLIR_CONTEXT_LOCKING
+  unwrap(context)->enableThreadSafeLocking();
+  return true;
+#else
+  return false;
+#endif
+}
+
+MLIR_CAPI_EXPORTED bool beaverContextIsThreadSafeLockingEnabled(MlirContext context) {
+#ifdef BEAVER_HAS_MLIR_CONTEXT_LOCKING
+  return unwrap(context)->isThreadSafeLockingEnabled();
+#else
+  return unwrap(context)->isMultithreadingEnabled();
+#endif
+}
+
+MLIR_CAPI_EXPORTED MlirAttribute beaverOperationGetProperties(MlirOperation operation) {
+  return wrap(unwrap(operation)->getPropertiesAsAttribute());
+}
+
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverOperationSetProperties(MlirOperation operation, MlirAttribute properties) {
+  Operation *op = unwrap(operation);
+  if (!properties.ptr || unwrap(properties).getContext() != op->getContext()) return wrap(failure());
+  // Conversion may partially write properties before failing. Commit only a
+  // successful conversion, leaving both properties and discardable attrs intact.
+  Operation *copy = op->clone();
+  LogicalResult result = copy->setPropertiesFromAttribute(unwrap(properties), [&] { return op->emitError(); });
+  if (succeeded(result)) op->copyProperties(copy->getPropertiesStorage());
+  copy->destroy();
+  return wrap(result);
+}
+
 namespace {
 
 static bool isExTermType(Type type) {

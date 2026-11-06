@@ -42,22 +42,37 @@ defmodule Beaver.MLIR.Context do
           {:allow_unregistered, boolean()}
           | {:all_dialects, boolean()}
           | {:threading, boolean()}
+          | {:thread_safe, boolean()}
           | {:thread_pool, :application | MLIR.LLVMThreadPool.t() | GenServer.server() | nil}
           | {:registry, MLIR.DialectRegistry.t() | [MLIR.DialectRegistry.t()]}
   @spec create([context_option()]) :: __MODULE__.t()
   @doc """
   Create a MLIR context. By default it registers and loads all dialects.
+
+  `threading: false, thread_safe: true` keeps context uniquing safe for external
+  workers without creating an MLIR thread pool. Load dialects before sharing the
+  context; this does not make concurrent mutation of the same IR safe.
   """
   def create(opts \\ []) do
     allow_unregistered = Keyword.get(opts, :allow_unregistered, false)
     all_dialects = Keyword.get(opts, :all_dialects, true)
     threading = Keyword.get(opts, :threading, true)
+    thread_safe = Keyword.get(opts, :thread_safe, threading)
+
+    unless is_boolean(threading) and is_boolean(thread_safe),
+      do: raise(ArgumentError, ":threading and :thread_safe must be booleans")
+
+    if threading and not thread_safe,
+      do: raise(ArgumentError, "threading: true requires thread_safe: true")
+
+    if thread_safe and not threading and not independent_locking_supported?(),
+      do: raise(ArgumentError, "linked LLVM does not support independent context locking")
 
     if not threading and Keyword.has_key?(opts, :thread_pool),
       do: raise(ArgumentError, ":thread_pool cannot be used with threading: false")
 
     {pool, owner, lease} = resolve_thread_pool(opts, threading)
-    ctx = mlirContextCreate()
+    ctx = mlirContextCreateWithThreading(threading and is_nil(pool))
 
     try do
       if pool do
@@ -68,6 +83,7 @@ defmodule Beaver.MLIR.Context do
       end
 
       if not threading, do: mlirContextEnableMultithreading(ctx, false)
+      if thread_safe and not threading, do: beaverContextEnableThreadSafeLocking(ctx)
 
       opts |> Keyword.get(:registry, []) |> List.wrap() |> Enum.each(&mlirContextAppendDialectRegistry(ctx, &1))
 
@@ -82,6 +98,12 @@ defmodule Beaver.MLIR.Context do
         reraise exception, __STACKTRACE__
     end
   end
+
+  @doc "Whether the linked LLVM supports context locking without internal parallelism."
+  def independent_locking_supported?, do: beaverContextIndependentLockingSupported() |> Native.to_term()
+
+  @doc "Whether context uniquing is protected by thread-safe locks."
+  def thread_safe?(%__MODULE__{} = ctx), do: beaverContextIsThreadSafeLockingEnabled(ctx) |> Native.to_term()
 
   def destroy(%__MODULE__{} = ctx) do
     if beaverContextHasActiveTransientScope(ctx) |> Native.to_term(),
