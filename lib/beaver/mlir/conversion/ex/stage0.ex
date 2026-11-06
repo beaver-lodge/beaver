@@ -2,21 +2,19 @@ defmodule Beaver.MLIR.Conversion.Ex.Stage0 do
   @moduledoc """
   Machine-readable boundary of Beaver's frozen C++ Ex bootstrap seed.
 
-  This seed exists only to compile Batata's restricted compiler-kernel source
-  from a clean checkout and to serve as a differential oracle. It is not a
-  production provider and must not grow with Batata runtime or standard-library
-  semantics. Evolving production patterns belong to Batata.
+  This scalar seed serves as a differential oracle, not a production provider.
+  Version 2 retires the old tagged-word patterns. It must not grow with Batata
+  runtime or standard-library semantics; those require a dedicated provider.
 
   The identity digest covers the schema version, native entrypoint, and every
   ordered pattern declaration. Any seed change therefore requires an explicit
   manifest and bootstrap receipt update.
   """
 
-  @schema_version 1
+  @schema_version 2
   @entrypoint "beaverPopulateExScalarConversionPatterns"
   @patterns [
     %{"name" => "cpp.ex.add.v1", "root" => "ex.add", "version" => "1.0"},
-    %{"name" => "cpp.ex.box.v1", "root" => "ex.box", "version" => "1.0"},
     %{"name" => "cpp.ex.cmp.v1", "root" => "ex.cmp", "version" => "1.0"},
     %{"name" => "cpp.ex.div.v1", "root" => "ex.div", "version" => "1.0"},
     %{"name" => "cpp.ex.if.v1", "root" => "ex.if", "version" => "1.0"},
@@ -24,8 +22,6 @@ defmodule Beaver.MLIR.Conversion.Ex.Stage0 do
     %{"name" => "cpp.ex.mul.v1", "root" => "ex.mul", "version" => "1.0"},
     %{"name" => "cpp.ex.rem.v1", "root" => "ex.rem", "version" => "1.0"},
     %{"name" => "cpp.ex.sub.v1", "root" => "ex.sub", "version" => "1.0"},
-    %{"name" => "cpp.ex.to_word.v1", "root" => "ex.to_word", "version" => "1.0"},
-    %{"name" => "cpp.ex.unbox.v1", "root" => "ex.unbox", "version" => "1.0"},
     %{"name" => "cpp.ex.yield.v1", "root" => "ex.yield", "version" => "1.0"}
   ]
 

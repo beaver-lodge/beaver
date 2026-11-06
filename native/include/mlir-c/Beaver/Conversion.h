@@ -7,8 +7,8 @@
 extern "C" {
 #endif
 
-/// Adds Beaver's frozen C++ Stage 0 bootstrap seed for Batata's restricted
-/// compiler-kernel source. This is not a production Ex provider and must not
+/// Adds Beaver's versioned C++ Stage 0 scalar seed and differential oracle.
+/// Version 2 removes tagged-word patterns. This is not a production Ex provider and must not
 /// grow with runtime or standard-library semantics. The pattern set retains a
 /// borrowed reference to `typeConverter`; callers must destroy the patterns
 /// before destroying the converter, matching MLIR's normal conversion

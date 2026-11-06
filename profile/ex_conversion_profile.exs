@@ -135,8 +135,8 @@ defmodule Beaver.Profile.ExConversion do
         "ex.func"() ({
         ^bb0:
           %0 = "ex.lit"() {value = #{index} : i64} : () -> i64
-          %1 = "ex.box"(%0) : (i64) -> !ex.term
-          "ex.return"(%1) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> ()
+          %1 = "ex.add"(%0, %0) : (i64, i64) -> i64
+          "ex.return"(%1) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
         }) {sym_name = "f#{index}"} : () -> ()
         """
       end)

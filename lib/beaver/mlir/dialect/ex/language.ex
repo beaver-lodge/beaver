@@ -8,6 +8,10 @@ defmodule Beaver.MLIR.Dialect.Ex.Language do
     quote do
       @ex_layer :language
 
+      # Abstract term operations require a provider; no tagged-word encoding is implied.
+      defop box(value = ^any_value), results: [result: ^term_like]
+      defop unbox(value = ^term_like), results: [result: ^integer_like]
+
       defop lit(), results: [result: ^integer_like], attributes: [value: ^integer_value]
 
       defop var(), results: [result: base(unbound())], attributes: [name: base("#builtin.string")]

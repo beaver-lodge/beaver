@@ -2,7 +2,7 @@ defmodule ExLayersTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR
   alias Beaver.MLIR.Conversion.Ex
-  alias Beaver.MLIR.Conversion.Ex.RuntimeABI
+  alias Beaver.MLIR.Conversion.Ex.CRuntime
   alias Beaver.MLIR.Conversion.Plan
   alias Beaver.MLIR.Dialect.Ex, as: Dialect
   alias Beaver.MLIR.Operation
@@ -14,14 +14,16 @@ defmodule ExLayersTest do
     :ok
   end
 
-  test "legacy operations have explicit owners and unknown boundaries reject" do
+  test "C ABI operations have explicit owners and unknown boundaries reject" do
     assert Dialect.layer("ex.case") == :language
     assert Dialect.layer("ex.integer_mul") == :language
-    assert Dialect.layer("ex.cont_save") == :execution
-    assert Dialect.layer("ex.reduction_tick") == :execution
-    assert Dialect.layer("ex.make_fun_with_signature") == :runtime
-    assert Dialect.layer("ex.term_export") == :runtime
-    assert length(Dialect.operations()) == 172
+    assert Dialect.layer("ex.btt_step") == :execution
+    assert Dialect.layer("ex.btt_call") == :execution
+    assert Dialect.layer("ex.btt_create") == :runtime
+    assert Dialect.layer("ex.btt_release") == :runtime
+
+    for retired <- ~w(ex.cont_save ex.worker_run ex.runtime_enter ex.make_fun ex.to_word),
+        do: assert_raise(KeyError, fn -> Dialect.layer(retired) end)
 
     assert Enum.flat_map(Dialect.layers(), &Dialect.operations/1) |> Enum.sort() ==
              Dialect.operations()
@@ -36,16 +38,15 @@ defmodule ExLayersTest do
   test "boundary checks find runtime operations inside nested function regions", %{ctx: ctx} do
     module =
       parse(ctx, ~S"""
-      func.func @host() {
-        %runtime = "ex.runtime_create"() : () -> i64
-        %closed = "ex.runtime_destroy"(%runtime) : (i64) -> i64
+      func.func @host(%abi: i64, %out: !llvm.ptr) {
+        %status = "ex.btt_create"(%abi, %out) : (i64, !llvm.ptr) -> i32
         return
       }
       """)
 
     assert Dialect.verify_layers!(module, :runtime) == module
 
-    assert_raise ArgumentError, ~r/ex.runtime_create belongs to runtime/, fn ->
+    assert_raise ArgumentError, ~r/ex.btt_create belongs to runtime/, fn ->
       Dialect.verify_layers!(module, [:language, :execution])
     end
 
@@ -55,30 +56,39 @@ defmodule ExLayersTest do
 
   test "selected layers lower without consuming another owner's operations", %{ctx: ctx} do
     source = ~S"""
-    func.func @step(%x: i64) -> i64 {
+    func.func @step(%x: i64, %runtime: !llvm.ptr, %out: !llvm.ptr) -> i32 {
       %sum = "ex.add"(%x, %x) : (i64, i64) -> i64
-      %tick = "ex.reduction_tick"(%sum) : (i64) -> i64
-      %runtime = "ex.runtime_create"() : () -> i64
-      %closed = "ex.runtime_destroy"(%runtime) : (i64) -> i64
-      return %tick : i64
+      %one = arith.constant 1 : i32
+      %tick = "ex.btt_step"(%runtime, %one, %out) : (!llvm.ptr, i32, !llvm.ptr) -> i32
+      %query = "ex.btt_query"(%sum, %out) : (i64, !llvm.ptr) -> i32
+      return %tick : i32
     }
     """
 
     staged = parse(ctx, source)
-    staged = Plan.run!(Ex.plan(layers: :execution), staged) |> MLIR.verify!()
+
+    staged =
+      Plan.run!(Ex.plan(layers: :execution, runtime_namespace: "layers"), staged)
+      |> MLIR.verify!()
+
     names = names(staged)
-    refute "ex.reduction_tick" in names
+    refute "ex.btt_step" in names
     assert "ex.add" in names
-    assert "ex.runtime_create" in names
+    assert "ex.btt_query" in names
     assert Dialect.verify_layers!(staged, [:language, :runtime]) == staged
 
-    staged = Plan.run!(Ex.plan(layers: :runtime), staged) |> MLIR.verify!()
+    staged =
+      Plan.run!(Ex.plan(layers: :runtime, runtime_namespace: "layers"), staged) |> MLIR.verify!()
+
     assert "ex.add" in names(staged)
-    refute "ex.runtime_create" in names(staged)
+    refute "ex.btt_query" in names(staged)
     staged = Plan.run!(Ex.plan(layers: :language), staged) |> MLIR.verify!()
     refute Enum.any?(names(staged), &String.starts_with?(&1, "ex."))
 
-    direct = parse(ctx, source) |> then(&Plan.run!(Ex.plan(), &1)) |> MLIR.verify!()
+    direct =
+      parse(ctx, source)
+      |> then(&Plan.run!(Ex.plan(runtime_namespace: "layers"), &1))
+      |> MLIR.verify!()
 
     assert functions(staged) == functions(direct)
   end
@@ -86,12 +96,12 @@ defmodule ExLayersTest do
   test "canonicalization removes pure scalars but preserves effects", %{ctx: ctx} do
     module =
       parse(ctx, ~S"""
-      func.func @effects(%x: i64, %term: !ex.term) {
+      func.func @effects(%x: i64, %term: !ex.term, %out: !llvm.ptr) {
         %sum = "ex.add"(%x, %x) : (i64, i64) -> i64
         %division = "ex.div"(%x, %x) : (i64, i64) -> i64
         %integer = "ex.integer_mul"(%term, %term) : (!ex.term, !ex.term) -> !ex.term
         %sent = "ex.send"(%term, %term) : (!ex.term, !ex.term) -> !ex.term
-        %runtime = "ex.runtime_create"() : () -> i64
+        %runtime = "ex.btt_create"(%x, %out) : (i64, !llvm.ptr) -> i32
         return
       }
       """)
@@ -102,41 +112,19 @@ defmodule ExLayersTest do
     Beaver.Composer.append(module, MLIR.Transform.canonicalize()) |> Beaver.Composer.run!()
     refute "ex.add" in names(module)
 
-    for name <- ~w(ex.div ex.integer_mul ex.send ex.runtime_create),
+    for name <- ~w(ex.div ex.integer_mul ex.send ex.btt_create),
         do: assert(name in names(module))
   end
 
-  test "runtime manifest retains aliases and specialized calling conventions", %{ctx: ctx} do
-    assert RuntimeABI.intrinsics().reduction_tick == "ex.term.clock_tick"
-    assert RuntimeABI.intrinsics().term_export == "ex.term.export"
-    assert RuntimeABI.symbols() == Ex.term_intrinsic_symbols()
-    assert signature("ex.term.cont_save", ctx) == "(i64, i64, i64) -> i64"
-    assert signature("ex.term.worker_run", ctx) == "(i64, (i64) -> i64) -> i64"
-    assert signature("ex.term.try_push", ctx) == "(!llvm.ptr) -> i64"
-    assert_raise FunctionClauseError, fn -> RuntimeABI.function_type("ex.term.unknown", ctx) end
-  end
+  test "C ABI aggregates cross the compiler boundary by address", %{ctx: ctx} do
+    assert signature("step", ctx) == "(!llvm.ptr, i32, !llvm.ptr) -> i32"
+    assert signature("reply", ctx) == "(!llvm.ptr, !llvm.ptr, i64, !llvm.ptr, i32) -> i32"
+    assert CRuntime.abi_id() == 0x425454000000000C
+    assert CRuntime.status(:busy) == 3
+    assert_raise KeyError, fn -> CRuntime.function_type("legacy") end
 
-  test "term values survive staged conversion across representation boundaries", %{ctx: ctx} do
-    source = ~S"""
-    "ex.func"() ({
-    ^bb0(%x: i64):
-      %word = "ex.box"(%x) : (i64) -> !ex.term
-      %tuple = "ex.tuple"(%word) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> !ex.term
-      %result = "ex.unbox"(%tuple) : (!ex.term) -> i64
-      "ex.return"(%result) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
-    }) {sym_name = "pair"} : () -> ()
-    """
-
-    direct = parse(ctx, source) |> then(&Plan.run!(Ex.plan(), &1)) |> MLIR.verify!()
-
-    for order <- [[:runtime, :language], [:language, :runtime]] do
-      module = parse(ctx, source)
-
-      staged =
-        Enum.reduce(order, module, fn layer, ir -> Plan.run!(Ex.plan(layers: layer), ir) end)
-
-      staged = Ex.finish!(staged) |> MLIR.verify!()
-      assert functions(staged) == functions(direct)
+    assert_raise ArgumentError, ~r/abstract Ex terms/, fn ->
+      Ex.convert_type(Beaver.MLIR.Type.get("!ex.term", ctx: ctx))
     end
   end
 
@@ -156,7 +144,7 @@ defmodule ExLayersTest do
     do: MLIR.Module.create!("module {\n#{body}\n}", ctx: ctx) |> MLIR.verify!()
 
   defp signature(symbol, ctx),
-    do: RuntimeABI.function_type(symbol, ctx) |> Beaver.Deferred.resolve(ctx) |> MLIR.to_string()
+    do: CRuntime.function_type(symbol) |> Beaver.Deferred.resolve(ctx) |> MLIR.to_string()
 
   defp names(module), do: Enum.map(operations(module), &Operation.name/1)
 
