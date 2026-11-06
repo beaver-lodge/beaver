@@ -183,6 +183,13 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
       pass(:tensor_memory_allocation, :llir, "triton-tensor-memory-allocation"),
       pass(:check_matmul_two_cta, :llir, "triton-nvidia-check-matmul-two-cta"),
       pass(:proxy_fence_insertion, :llir, "triton-nvidia-gpu-proxy-fence-insertion"),
+      # Upstream make_llir now inserts shared-memory barriers separately from
+      # allocation/lowering. Reused scratch buffers otherwise race across warps.
+      pass(
+        :shared_memory_barriers,
+        :llir,
+        "triton-nvidia-gpu-membar{compute-capability=#{capability} ptx-version=#{capability}}"
+      ),
       pass(:tmem_barrier_insertion, :llir, "triton-nvidia-gpu-tmem-barrier-insertion"),
       pass(
         :convert_ttgpu_to_llvm,
