@@ -5,6 +5,7 @@ locals_without_parens = [
   defattr: 2,
   defop: 1,
   defop: 2,
+  defops: 3,
   defalias: 2,
   defconstraint: 2,
   defrewrite: 2,

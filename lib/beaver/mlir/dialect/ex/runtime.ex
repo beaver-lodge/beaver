@@ -3,94 +3,55 @@ defmodule Beaver.MLIR.Dialect.Ex.Runtime do
 
   @doc false
   defmacro __using__(_) do
-    # Slang evaluates this owner's declarations together in the Ex facade.
-    # credo:disable-for-next-line Credo.Check.Refactor.LongQuoteBlocks
     quote do
       @ex_layer :runtime
 
       defop box(value = ^any_value), results: [result: ^term_like]
 
-      # Lifts an already-tagged word (e.g. a function argument) into the term
-      # type without tagging: the conversion is a pure passthrough.
+      # Reinterprets an already-tagged word as a term without tagging.
       defop to_word(value = ^any_value), results: [result: ^term_like]
 
-      # Drops the term type annotation without untagging: the conversion is a
-      # pure passthrough, so a term word can cross control-flow regions (whose
-      # types must be legal after conversion) as a scalar i64.
+      # Drops the term annotation without untagging, for scalar i64 control-flow edges.
       defop unbox(word = ^term_like), results: [result: ^integer_like]
 
-      # Explicit runtime-instance lifecycle. Hosts use these operations to give
-      # each execution its own native state instead of relying on the
-      # compatibility runtime associated with the invoking OS thread.
-      defop runtime_create(), results: [result: ^integer_like]
+      # Explicit runtime lifecycle avoids the thread-local compatibility runtime.
+      defops ~w(runtime_create runtime_leave native_time)a, [], results: [result: ^integer_like]
 
-      defop runtime_enter(handle = ^integer_like), results: [result: ^integer_like]
+      defops ~w(
+        runtime_enter runtime_destroy result_destroy result_root_kind result_root_word result_exception_kind
+        result_exception_reason exported_clone exported_destroy exported_length term_handle_destroy
+      )a,
+             [handle = ^integer_like], results: [result: ^integer_like]
 
-      defop runtime_leave(), results: [result: ^integer_like]
-
-      defop runtime_destroy(handle = ^integer_like), results: [result: ^integer_like]
-
-      # Host-result lifecycle. A result handle keeps the producing runtime alive
-      # while the host materializes an arena-backed term, then releases both
-      # together. Inspection always carries the handle so runtimes can reject
-      # stale or foreign words instead of dereferencing arbitrary tagged i64s.
+      # Result handles retain their runtime/arena while the host reads terms.
+      # Inspection validates ownership before dereferencing tagged words.
       defop result_create(runtime = ^integer_like, word = ^integer_like), results: [result: ^integer_like]
 
-      # Retains a result whose unboxed i64 is known to carry an `!ex.term` word.
-      # The explicit operation avoids guessing whether an immediate integer word
-      # is a legacy scalar root at the host boundary.
+      # Marks an i64 root as an ex.term word instead of guessing its representation.
       defop result_create_term(runtime = ^integer_like, word = ^integer_like), results: [result: ^integer_like]
 
-      defop result_destroy(handle = ^integer_like), results: [result: ^integer_like]
-
-      defop result_root_kind(handle = ^integer_like), results: [result: ^integer_like]
-
-      defop result_root_word(handle = ^integer_like), results: [result: ^integer_like]
-
-      defop result_exception_kind(handle = ^integer_like), results: [result: ^integer_like]
-
-      defop result_exception_reason(handle = ^integer_like), results: [result: ^integer_like]
-
-      defop result_term_kind(handle = ^integer_like, word = ^integer_like), results: [result: ^integer_like]
-
-      defop result_atom_name(handle = ^integer_like, word = ^integer_like), results: [result: ^integer_like]
-
-      defop result_term_length(handle = ^integer_like, word = ^integer_like), results: [result: ^integer_like]
+      defops ~w(result_term_kind result_atom_name result_term_length)a, [handle = ^integer_like, word = ^integer_like],
+        results: [result: ^integer_like]
 
       defop result_term_get(handle = ^integer_like, word = ^integer_like, index = ^integer_like),
         results: [result: ^integer_like]
 
-      # Portable host boundary. Exported and imported term handles are opaque
-      # generation-checked capabilities; no operation exposes an arena word to
-      # the host without a validating owner.
+      # Export/import handles are generation-checked capabilities that validate ownership.
       defop term_export(result_handle = ^integer_like, word = ^integer_like), results: [exported_handle: ^integer_like]
 
       defop term_import(runtime_handle = ^integer_like, exported_handle = ^integer_like),
         results: [term_handle: ^integer_like]
 
-      defop exported_clone(handle = ^integer_like), results: [result: ^integer_like]
-
-      defop exported_destroy(handle = ^integer_like), results: [result: ^integer_like]
-
-      defop exported_length(handle = ^integer_like), results: [result: ^integer_like]
-
       defop exported_get(handle = ^integer_like, index = ^integer_like), results: [result: ^integer_like]
 
       defop term_handle_export(handle = ^integer_like), results: [exported_handle: ^integer_like]
 
-      defop term_handle_destroy(handle = ^integer_like), results: [result: ^integer_like]
-
       defop nil_word(), results: [result: ^term_like]
 
-      defop native_time(), results: [result: ^integer_like]
-
-      # Untags an integer term word to its scalar value (a passthrough for
-      # values that are already scalar).
+      # Untags an integer term word; already-scalar values pass through.
       defop to_int(word = ^term_like), results: [result: ^integer_like]
 
-      # Constructs a first-class function value (a tagged closure word): the
-      # extracted `__fn_*` is referenced by index, and the captured values are
-      # stored in the closure's env slots.
+      # Tagged closure: function index plus at most four captured environment words.
       defop make_fun(
               e0 = optional(^any_value),
               e1 = optional(^any_value),
@@ -100,9 +61,7 @@ defmodule Beaver.MLIR.Dialect.Ex.Runtime do
             results: [result: ^term_like],
             attributes: [fn_idx: ^integer_value, env_len: ^integer_value]
 
-      # Additive closure constructor carrying the function arity. Keep
-      # `ex.make_fun` available while downstream runtimes migrate from the
-      # original six-word ABI.
+      # Adds call arity to the original six-word closure ABI.
       defop make_fun_with_arity(
               e0 = optional(^any_value),
               e1 = optional(^any_value),
@@ -112,8 +71,7 @@ defmodule Beaver.MLIR.Dialect.Ex.Runtime do
             results: [result: ^term_like],
             attributes: [fn_idx: ^integer_value, arity: ^integer_value, env_len: ^integer_value]
 
-      # Closure constructor carrying both call arity and result representation.
-      # result_mode is runtime-defined (Batata uses 0 for scalar, 1 for term).
+      # Adds result_mode (Batata: 0 = scalar, 1 = term) to call arity.
       defop make_fun_with_signature(
               e0 = optional(^any_value),
               e1 = optional(^any_value),
@@ -131,9 +89,7 @@ defmodule Beaver.MLIR.Dialect.Ex.Runtime do
       # Reads the runtime-defined result representation carried by a closure.
       defop fun_result_mode(fun = ^term_like), results: [result: ^integer_like]
 
-      # Applies a first-class function value. The closure is resolved at runtime
-      # to its function index and env slots, then dispatched to the matching
-      # `__fn_*`.
+      # Dispatches the closure's function index with its environment and arguments.
       defop apply(
               closure = optional(^term_like),
               a0 = optional(^any_value),

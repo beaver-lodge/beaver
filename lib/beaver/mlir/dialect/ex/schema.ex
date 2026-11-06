@@ -5,6 +5,15 @@ defmodule Beaver.MLIR.Dialect.Ex.Schema do
   def pure_effects(_op), do: :pure
   def speculatable(_op), do: :speculatable
 
+  defmacro defops(names, operands, opts) do
+    definitions =
+      for name <- Macro.expand(names, __CALLER__) do
+        quote do: unquote(__MODULE__).defop(unquote({name, [], operands}), unquote(opts))
+      end
+
+    {:__block__, [], definitions}
+  end
+
   defmacro defop(call, opts \\ []) do
     # Fragment variables name schema operands and constraints in the facade.
     {call, opts} =

@@ -1,9 +1,7 @@
 defmodule Beaver.MLIR.Conversion.Ex.RuntimeABI do
-  @moduledoc "Legacy tagged-word ABI used by the reference Ex lowering; independent of language schemas."
+  @moduledoc "Original Batata Zig runtime ABI; the current C runtime has a separate contract."
   alias Beaver.MLIR.Type
 
-  # The original Batata term runtime implements this compatibility ABI.
-  # The current wavefrontier/batata C runtime has a separate contract.
   @intrinsic_names ~w(
     list_cons list_flatten list_insert_at map_put map_fetch self send receive mailbox_clear spawn runtime_create
     runtime_enter runtime_leave runtime_destroy result_create result_create_term result_destroy result_root_kind

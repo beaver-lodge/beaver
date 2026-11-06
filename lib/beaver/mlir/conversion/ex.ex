@@ -4,17 +4,9 @@ alias Beaver.Native
 
 defmodule Beaver.MLIR.Conversion.Ex do
   @moduledoc """
-  Reference lowering for the language, execution and runtime layers of `ex`.
-
-  `plan/1` lowers all layers to `func`/`arith`/`scf`/`cf`. With `:layers`, it
-  converts only the selected owners and retains the other Ex operations.
-  Intermediate plans leave explicit type bridges; finish with `finish!/1`
-  before passing the result to LLVM or another target conversion.
-
-  `RuntimeABI` owns the original Batata tagged-word symbols and signatures.
-  This reference path does not target wavefrontier/batata's current C runtime.
-  Materialize `ex.var`/`ex.bind` and expand supported `ex.case` operations before
-  conversion. See the [Ex organization guide](ex-dialect.html).
+  Reference Ex lowering. `plan(layers: ...)` preserves unselected owners;
+  `finish!/1` completes lowering and rejects unresolved type bridges.
+  See [layer contracts](dialect-conversion.html#ex-provider-boundary).
   """
 
   alias Beaver.Changeset
@@ -148,10 +140,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     replace_with(rewriter, op, result)
   end
 
-  # `ex.func_addr` resolves a function symbol to its address (an i64 word):
-  # func.constant yields the function value, which func-to-llvm lowers to a
-  # pointer. Used to hand a compiled reducer to the runtime's
-  # arbitrary-closure enumerable reduce.
+  # Keeps function-typed reducer addresses for func-to-llvm pointer lowering.
   defp convert_func_addr(op, [], rewriter) do
     context = MLIR.context(op)
     base = insertion_point(op, rewriter)
@@ -165,10 +154,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     replace_with(rewriter, op, Operation.result(func_const, 0))
   end
 
-  # `ex.try` lowers to a setjmp/longjmp pair: allocate a jmp_buf on the stack,
-  # push it on the runtime's buffer stack, and call libc `setjmp`. The normal
-  # path runs the body region; a `throw` longjmps back and the catch region
-  # matches the thrown value.
+  # Stack-allocate and push jmp_buf; setjmp selects the body or longjmp catch path.
   defp convert_try(op, [], rewriter) do
     context = MLIR.context(op)
     base = insertion_point(op, rewriter)
@@ -190,11 +176,9 @@ defmodule Beaver.MLIR.Conversion.Ex do
     RewriterBase.insert(base, alloca)
     buf = Operation.result(alloca, 0)
 
-    push = emit_runtime_call(op, rewriter, base, @term_intrinsics.try_push, [buf])
-    _ = push
+    emit_runtime_call(op, rewriter, base, @term_intrinsics.try_push, [buf])
 
-    # libc's setjmp is resolved indirectly (the ORC linker does not resolve
-    # libc symbols on its own): the runtime exposes its address.
+    # The runtime supplies setjmp's address because ORC cannot resolve libc here.
     setjmp_addr = emit_runtime_call(op, rewriter, base, @term_intrinsics.setjmp_addr, [])
 
     fn_ptr = create_operation(op, "llvm.inttoptr", [setjmp_addr], Type.llvm_pointer(ctx: context))
@@ -262,8 +246,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     :ok
   end
 
-  # All closure ABIs share environment padding, validation, and emission.
-  # Keep the legacy constructor's six words and the newer metadata in ABI order.
+  # Preserve legacy closure words and newer metadata in ABI order.
   defp convert_make_fun(op, operands, rewriter),
     do: convert_closure(op, operands, rewriter, ~w(fn_idx env_len))
 
@@ -302,8 +285,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     replace_with(rewriter, op, closure)
   end
 
-  # Applies a first-class function value: reads the function index and env
-  # words from the closure, then dispatches to the matching `__fn_*`.
+  # Dispatches the closure's function index with its environment and arguments.
   defp convert_apply(op, operands, rewriter) do
     base = insertion_point(op, rewriter)
     [closure | args] = operands
@@ -356,8 +338,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
   defp maybe_tag(original, converted, op, base),
     do: if(term_type?(Value.type(original)), do: converted, else: tag_integer(converted, op, base))
 
-  # Tags a scalar i64 as an immediate integer term: word = value << 3 with the
-  # low 3 bits (tag 0b000) left as the integer tag.
+  # Scalar i64 becomes value << 3; the low three bits are the integer tag 0b000.
   defp tag_integer(value, op, base) do
     three = emit_constant(3, op, base)
 
@@ -368,8 +349,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     Operation.result(shl, 0)
   end
 
-  # Builds a proper list word by consing words onto nil. Nil is the atom term
-  # with id 0: tag 0b001 | (0 << 3) = 1.
+  # Cons onto nil: atom id 0 with tag 0b001, encoded as 1.
   defp build_list([], op, _rewriter, base),
     do: emit_constant(1, op, base) |> Operation.result(0)
 
@@ -419,9 +399,7 @@ defmodule Beaver.MLIR.Conversion.Ex do
     Operation.result(call, 0)
   end
 
-  # `func.call` requires the callee symbol to exist, so each intrinsic gets a
-  # public `func.func` declaration (no body) at module scope. At link time the
-  # Zig term runtime shared library satisfies the symbols.
+  # Declare intrinsics at module scope for func.call; the Zig runtime supplies symbols.
   defp ensure_intrinsic_declaration(operation, rewriter, symbol) do
     module_op =
       Stream.iterate(operation, &Operation.parent/1) |> Enum.find(fn op -> op |> Operation.parent() |> MLIR.null?() end)

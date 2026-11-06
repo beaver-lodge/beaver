@@ -1,12 +1,8 @@
 defmodule Beaver.MLIR.Dialect.Ex do
   @moduledoc """
-  Elixir IR with separately owned language, execution and runtime operations.
-
-  `Language` owns values and structured control, `Execution` owns scheduling,
-  and `Runtime` owns representation and host boundaries. All existing `ex.*`
-  names and builders remain available through this compatibility facade.
-  `verify_layers!/2` checks an IR boundary; it does not prove source equivalence.
-  See the [Ex organization guide](ex-dialect.html) for contracts and limitations.
+  Elixir IR composed from language, execution and runtime schemas.
+  Existing `ex.*` builders and types remain available through this facade.
+  See [layer contracts](dialect-conversion.html#ex-provider-boundary).
   """
   alias Beaver.MLIR.Operation
 
@@ -18,7 +14,7 @@ defmodule Beaver.MLIR.Dialect.Ex do
 
   use Beaver.Slang, name: "ex"
   import Beaver.Slang, except: [defop: 1, defop: 2]
-  import Beaver.MLIR.Dialect.Ex.Schema, only: [defop: 2]
+  import Beaver.MLIR.Dialect.Ex.Schema, only: [defop: 2, defops: 3]
   Module.register_attribute(__MODULE__, :ex_operations, accumulate: true)
 
   deftype term()
@@ -31,8 +27,7 @@ defmodule Beaver.MLIR.Dialect.Ex do
 
   defconstraint cmp_predicate_value, do: base("#builtin.string")
 
-  # Named constraints keep the generated creator functions compact. Inlining
-  # these expressions repeats their MLIR builder AST in every operation.
+  # Named constraints avoid repeating MLIR builder ASTs.
   defconstraint any_value, do: any()
 
   defconstraint integer_like, do: all_of([base("!builtin.integer"), any()])

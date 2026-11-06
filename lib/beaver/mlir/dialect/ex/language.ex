@@ -11,23 +11,12 @@ defmodule Beaver.MLIR.Dialect.Ex.Language do
       defop lit(), results: [result: ^integer_like], attributes: [value: ^integer_value]
 
       defop var(), results: [result: base(unbound())], attributes: [name: base("#builtin.string")]
-
       defop bind(variable = base(unbound()), value = ^any_value), results: [result: base(bound())]
 
-      defop add(left = ^integer_like, right = ^integer_like), results: [result: ^integer_like]
+      defops ~w(add sub mul div rem)a, [left = ^integer_like, right = ^integer_like], results: [result: ^integer_like]
 
-      defop sub(left = ^integer_like, right = ^integer_like), results: [result: ^integer_like]
-
-      defop mul(left = ^integer_like, right = ^integer_like), results: [result: ^integer_like]
-
-      defop div(left = ^integer_like, right = ^integer_like), results: [result: ^integer_like]
-
-      defop rem(left = ^integer_like, right = ^integer_like), results: [result: ^integer_like]
-
-      # Each argument is its own optional slot so heterogeneous argument types
-      # (e.g. a term plus a scalar accumulator) verify: IRDL variadic groups are
-      # homogeneous, which would reject mixed-typed calls. Eight slots cover the
-      # closure ABI: four captured values plus four application arguments.
+      # Eight optional slots permit four captures plus four heterogeneous arguments;
+      # a single IRDL variadic group would require homogeneous types.
       defop call(
               arg0 = optional(^any_value),
               arg1 = optional(^any_value),
@@ -51,34 +40,26 @@ defmodule Beaver.MLIR.Dialect.Ex.Language do
         regions: [:any, :any]
 
       defop case(scrutinee = ^any_value), results: [result: variadic(^any_value)], regions: [:any]
-
       defop clause(guard = optional(^any_value)), attributes: [patterns: ^any_value]
 
       # Actor mailbox access: the current execution context is a single actor.
       defop self(), results: [result: ^term_like]
-
       defop send(pid = ^term_like, msg = ^term_like), results: [result: ^term_like]
-
       defop receive(), results: [result: ^term_like]
 
-      # Actor process spawn: registers a closure word as a new process entry and
-      # returns its pid. The scheduler driver executes spawned entries.
+      # Registers a closure as a process; the scheduler executes it.
       defop spawn(fun = optional(^term_like)), results: [result: ^term_like]
 
       defop unique_integer(negative = ^integer_like), results: [result: ^integer_like]
 
       defop process_exit(reason = ^term_like), results: [result: ^term_like]
-
       defop process_exit_reason(pid = ^term_like), results: [result: ^term_like]
-
       defop process_trap_exit(enabled = ^integer_like), results: [result: ^integer_like]
 
       defop process_dictionary_get(key = ^term_like, default = ^term_like), results: [result: ^term_like]
-
       defop process_dictionary_put(key = ^term_like, value = ^term_like), results: [result: ^term_like]
 
       defop link(pid = ^term_like, exit_tag = ^term_like, normal_tag = ^term_like), results: [result: ^term_like]
-
       defop unlink(pid = ^term_like), results: [result: ^integer_like]
 
       defop exit(pid = ^term_like, reason = ^term_like, exit_tag = ^term_like, normal_tag = ^term_like),
@@ -89,50 +70,37 @@ defmodule Beaver.MLIR.Dialect.Ex.Language do
 
       defop demonitor(reference = ^term_like), results: [result: ^integer_like]
 
-      # Non-local exit (`throw`) and its catch. The body region runs normally; a
-      # throw longjmps back and the catch region matches the thrown value.
+      # The body runs normally; throw longjmps into the catch region.
       defop try(),
         results: [result: ^any_value],
         regions: [:any, :any]
 
       defop throw(value = ^term_like), results: [result: ^term_like]
 
-      # Raises a typed runtime exception. Unlike `throw`, this bypasses user catch
-      # regions; `kind` is a runtime-defined integer discriminator and `reason`
-      # carries the exception payload.
+      # Typed runtime exception bypassing user catch; kind is runtime-defined.
       defop raise(reason = ^term_like, kind = ^integer_like), results: [result: ^term_like]
 
       defop catch_value(), results: [result: ^term_like]
 
-      # Reads a closure's declared arity. Runtimes return -1 for values or legacy
-      # closures which do not carry arity metadata.
+      # Returns declared arity, or -1 when the runtime has no arity metadata.
       defop fun_arity(fun = ^term_like), results: [result: ^integer_like]
 
-      defop tuple(elements = variadic(^term_like)), results: [result: ^term_like]
-
-      defop list(elements = variadic(^term_like)), results: [result: ^term_like]
+      defops ~w(tuple list)a, [elements = variadic(^term_like)], results: [result: ^term_like]
 
       defop list_cons(head = ^term_like, tail = ^term_like), results: [result: ^term_like]
 
-      defop list_flatten(list = ^term_like), results: [result: ^term_like]
+      defops ~w(list_flatten mapset_from_list list_head list_tail)a, [list = ^term_like], results: [result: ^term_like]
 
       defop list_insert_at(list = ^term_like, index = ^integer_like, value = ^term_like), results: [result: ^term_like]
 
       defop map(entries = variadic(^term_like)), results: [result: ^term_like]
-
       defop map_put(map = ^term_like, key = ^term_like, value = ^term_like), results: [result: ^term_like]
-
       defop map_fetch(map = ^term_like, key = ^term_like), results: [result: ^term_like]
 
-      defop mapset_from_list(list = ^term_like), results: [result: ^term_like]
-
       defop mapset_member(set = ^term_like, member = ^term_like), results: [result: ^integer_like]
-
       defop mapset_put(set = ^term_like, member = ^term_like), results: [result: ^term_like]
 
-      defop file_read(path = ^term_like), results: [result: ^term_like]
-
-      defop file_read_lines(path = ^term_like), results: [result: ^term_like]
+      defops ~w(file_read file_read_lines)a, [path = ^term_like], results: [result: ^term_like]
 
       defop binary(segments = variadic(^term_like)), results: [result: ^term_like]
 
@@ -140,40 +108,24 @@ defmodule Beaver.MLIR.Dialect.Ex.Language do
 
       defop iodata_to_binary(iodata = ^term_like), results: [result: ^term_like]
 
-      defop string_to_float(binary = ^term_like), results: [result: ^term_like]
-
-      defop string_to_atom(binary = ^term_like), results: [result: ^term_like]
-
-      defop string_to_existing_atom(binary = ^term_like), results: [result: ^term_like]
+      defops ~w(string_to_float string_to_atom string_to_existing_atom binary_quote binary_encode16 binary_decode16)a,
+             [binary = ^term_like], results: [result: ^term_like]
 
       defop float_to_binary_short(value = ^term_like), results: [result: ^term_like]
 
-      defop is_integer(value = ^any_value), results: [result: ^integer_like]
-
-      defop is_float(value = ^any_value), results: [result: ^integer_like]
-
-      defop is_atom(value = ^any_value), results: [result: ^integer_like]
-
-      defop is_binary(value = ^any_value), results: [result: ^integer_like]
-
-      defop is_list(value = ^any_value), results: [result: ^integer_like]
-
-      defop is_tuple(value = ^any_value), results: [result: ^integer_like]
-
-      defop is_map(value = ^any_value), results: [result: ^integer_like]
+      defops ~w(is_integer is_float is_atom is_binary is_list is_tuple is_map)a, [value = ^any_value],
+        results: [result: ^integer_like]
 
       defop tuple_get(tuple = ^term_like, index = ^integer_like), results: [result: ^term_like]
-
       defop tuple_length(tuple = ^term_like), results: [result: ^integer_like]
 
       defop map_length(map = ^term_like), results: [result: ^integer_like]
 
       defop enumerable_count(word = ^term_like), results: [result: ^integer_like]
 
-      defop enumerable_to_list(word = ^term_like), results: [result: ^term_like]
+      defops ~w(enumerable_to_list int_to_string int_to_hex)a, [word = ^term_like], results: [result: ^term_like]
 
       defop enumerable_into_map(enumerable = ^term_like, target = ^term_like), results: [result: ^term_like]
-
       defop enumerable_intersperse(enumerable = ^term_like, separator = ^term_like), results: [result: ^term_like]
 
       defop enumerable_to_list_range(start = ^integer_like, stop = ^integer_like), results: [result: ^term_like]
@@ -192,77 +144,35 @@ defmodule Beaver.MLIR.Dialect.Ex.Language do
       defop enumerable_reduce_fun(enumerable = ^term_like, acc = ^integer_like, reducer = ^any_value),
         results: [result: ^integer_like]
 
-      defop enumerable_map_fun(enumerable = ^term_like, mapper = ^any_value), results: [result: ^term_like]
-
-      defop enumerable_map_term_fun(enumerable = ^term_like, mapper = ^any_value), results: [result: ^term_like]
-
-      defop enumerable_flat_map_term_fun(enumerable = ^term_like, mapper = ^any_value), results: [result: ^term_like]
+      defops ~w(enumerable_map_fun enumerable_map_term_fun enumerable_flat_map_term_fun)a,
+             [enumerable = ^term_like, mapper = ^any_value], results: [result: ^term_like]
 
       defop stream_filter(list = ^term_like, predicate = ^any_value), results: [result: ^term_like]
 
-      defop stream_take(list = ^term_like, n = ^integer_like), results: [result: ^term_like]
-
-      defop stream_drop(list = ^term_like, n = ^integer_like), results: [result: ^term_like]
-
-      defop list_head(list = ^term_like), results: [result: ^term_like]
-
-      defop list_tail(list = ^term_like), results: [result: ^term_like]
+      defops ~w(stream_take stream_drop)a, [list = ^term_like, n = ^integer_like], results: [result: ^term_like]
 
       defop list_get(list = ^term_like, index = ^integer_like), results: [result: ^term_like]
-
       defop list_length(list = ^term_like), results: [result: ^integer_like]
 
-      defop term_eq(left = ^term_like, right = ^term_like), results: [result: ^integer_like]
+      # integer_compare returns -1/0/1; guards must validate integer operands first.
+      defops ~w(term_eq term_eq_loose integer_compare)a, [left = ^term_like, right = ^term_like],
+        results: [result: ^integer_like]
 
-      defop term_eq_loose(left = ^term_like, right = ^term_like), results: [result: ^integer_like]
+      # Term arithmetic preserves arbitrary precision across immediate and boxed integers.
+      defops ~w(integer_add integer_sub integer_mul integer_div integer_rem)a, [left = ^term_like, right = ^term_like],
+        results: [result: ^term_like]
 
-      # Exact integer ordering over tagged immediate or boxed integer terms.
-      # The runtime returns -1, 0, or 1; callers retain responsibility for
-      # validating that both operands are integers when guard semantics require it.
-      defop integer_compare(left = ^term_like, right = ^term_like), results: [result: ^integer_like]
+      defops ~w(binary_length binary_utf8_length string_printable string_to_int)a, [binary = ^term_like],
+        results: [result: ^integer_like]
 
-      # Representation-preserving integer arithmetic. Unlike the scalar ex.add/
-      # sub/mul/div/rem operations, these accept tagged immediate or boxed integer
-      # terms and return a term so arbitrary precision is not narrowed through i64.
-      defop integer_add(left = ^term_like, right = ^term_like), results: [result: ^term_like]
-
-      defop integer_sub(left = ^term_like, right = ^term_like), results: [result: ^term_like]
-
-      defop integer_mul(left = ^term_like, right = ^term_like), results: [result: ^term_like]
-
-      defop integer_div(left = ^term_like, right = ^term_like), results: [result: ^term_like]
-
-      defop integer_rem(left = ^term_like, right = ^term_like), results: [result: ^term_like]
-
-      defop binary_length(binary = ^term_like), results: [result: ^integer_like]
-
-      defop binary_get(binary = ^term_like, index = ^integer_like), results: [result: ^term_like]
+      defops ~w(binary_get binary_utf8_get)a, [binary = ^term_like, index = ^integer_like],
+        results: [result: ^term_like]
 
       defop binary_slice(binary = ^term_like, start = ^integer_like), results: [result: ^term_like]
-
       defop binary_part(binary = ^term_like, start = ^term_like, length = ^term_like), results: [result: ^term_like]
-
-      defop binary_utf8_get(binary = ^term_like, index = ^integer_like), results: [result: ^term_like]
-
       defop binary_utf8_width(binary = ^term_like, index = ^integer_like), results: [result: ^integer_like]
 
-      defop binary_utf8_length(binary = ^term_like), results: [result: ^integer_like]
-
-      defop string_printable(binary = ^term_like), results: [result: ^integer_like]
-
-      defop binary_quote(binary = ^term_like), results: [result: ^term_like]
-
-      defop binary_encode16(binary = ^term_like), results: [result: ^term_like]
-
-      defop binary_decode16(binary = ^term_like), results: [result: ^term_like]
-
-      defop int_to_string(word = ^term_like), results: [result: ^term_like]
-
       defop int_to_string_base(word = ^term_like, base = ^integer_like), results: [result: ^term_like]
-
-      defop int_to_hex(word = ^term_like), results: [result: ^term_like]
-
-      defop string_to_int(binary = ^term_like), results: [result: ^integer_like]
 
       defop yield(values = variadic(^any_value)), traits: [:terminator]
 

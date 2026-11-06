@@ -35,18 +35,13 @@ defmodule ExLayersTest do
 
   test "boundary checks find runtime operations inside nested function regions", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module {
-          func.func @host() {
-            %runtime = "ex.runtime_create"() : () -> i64
-            %closed = "ex.runtime_destroy"(%runtime) : (i64) -> i64
-            return
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      parse(ctx, ~S"""
+      func.func @host() {
+        %runtime = "ex.runtime_create"() : () -> i64
+        %closed = "ex.runtime_destroy"(%runtime) : (i64) -> i64
+        return
+      }
+      """)
 
     assert Dialect.verify_layers!(module, :runtime) == module
 
@@ -60,18 +55,16 @@ defmodule ExLayersTest do
 
   test "selected layers lower without consuming another owner's operations", %{ctx: ctx} do
     source = ~S"""
-    module {
-      func.func @step(%x: i64) -> i64 {
-        %sum = "ex.add"(%x, %x) : (i64, i64) -> i64
-        %tick = "ex.reduction_tick"(%sum) : (i64) -> i64
-        %runtime = "ex.runtime_create"() : () -> i64
-        %closed = "ex.runtime_destroy"(%runtime) : (i64) -> i64
-        return %tick : i64
-      }
+    func.func @step(%x: i64) -> i64 {
+      %sum = "ex.add"(%x, %x) : (i64, i64) -> i64
+      %tick = "ex.reduction_tick"(%sum) : (i64) -> i64
+      %runtime = "ex.runtime_create"() : () -> i64
+      %closed = "ex.runtime_destroy"(%runtime) : (i64) -> i64
+      return %tick : i64
     }
     """
 
-    staged = MLIR.Module.create!(source, ctx: ctx) |> MLIR.verify!()
+    staged = parse(ctx, source)
     staged = Plan.run!(Ex.plan(layers: :execution), staged) |> MLIR.verify!()
     names = names(staged)
     refute "ex.reduction_tick" in names
@@ -85,32 +78,23 @@ defmodule ExLayersTest do
     staged = Plan.run!(Ex.plan(layers: :language), staged) |> MLIR.verify!()
     refute Enum.any?(names(staged), &String.starts_with?(&1, "ex."))
 
-    direct =
-      MLIR.Module.create!(source, ctx: ctx) |> then(&Plan.run!(Ex.plan(), &1)) |> MLIR.verify!()
+    direct = parse(ctx, source) |> then(&Plan.run!(Ex.plan(), &1)) |> MLIR.verify!()
 
     assert functions(staged) == functions(direct)
   end
 
-  test "pure scalar computation can disappear while runtime and exceptional work remain", %{
-    ctx: ctx
-  } do
+  test "canonicalization removes pure scalars but preserves effects", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module {
-          func.func @effects(%x: i64, %term: !ex.term) {
-            %sum = "ex.add"(%x, %x) : (i64, i64) -> i64
-            %division = "ex.div"(%x, %x) : (i64, i64) -> i64
-            %integer = "ex.integer_mul"(%term, %term) : (!ex.term, !ex.term) -> !ex.term
-            %sent = "ex.send"(%term, %term) : (!ex.term, !ex.term) -> !ex.term
-            %runtime = "ex.runtime_create"() : () -> i64
-            return
-          }
-        }
-        """,
-        ctx: ctx
-      )
-      |> MLIR.verify!()
+      parse(ctx, ~S"""
+      func.func @effects(%x: i64, %term: !ex.term) {
+        %sum = "ex.add"(%x, %x) : (i64, i64) -> i64
+        %division = "ex.div"(%x, %x) : (i64, i64) -> i64
+        %integer = "ex.integer_mul"(%term, %term) : (!ex.term, !ex.term) -> !ex.term
+        %sent = "ex.send"(%term, %term) : (!ex.term, !ex.term) -> !ex.term
+        %runtime = "ex.runtime_create"() : () -> i64
+        return
+      }
+      """)
 
     add = operations(module) |> Enum.find(&(Operation.name(&1) == "ex.add"))
     assert MLIR.MemoryEffects.get(add) == []
@@ -134,22 +118,19 @@ defmodule ExLayersTest do
 
   test "term values survive staged conversion across representation boundaries", %{ctx: ctx} do
     source = ~S"""
-    module {
-      "ex.func"() ({
-      ^bb0(%x: i64):
-        %word = "ex.box"(%x) : (i64) -> !ex.term
-        %tuple = "ex.tuple"(%word) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> !ex.term
-        %result = "ex.unbox"(%tuple) : (!ex.term) -> i64
-        "ex.return"(%result) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
-      }) {sym_name = "pair"} : () -> ()
-    }
+    "ex.func"() ({
+    ^bb0(%x: i64):
+      %word = "ex.box"(%x) : (i64) -> !ex.term
+      %tuple = "ex.tuple"(%word) {operandSegmentSizes = array<i32: 1>} : (!ex.term) -> !ex.term
+      %result = "ex.unbox"(%tuple) : (!ex.term) -> i64
+      "ex.return"(%result) {operandSegmentSizes = array<i32: 1>} : (i64) -> ()
+    }) {sym_name = "pair"} : () -> ()
     """
 
-    direct =
-      MLIR.Module.create!(source, ctx: ctx) |> then(&Plan.run!(Ex.plan(), &1)) |> MLIR.verify!()
+    direct = parse(ctx, source) |> then(&Plan.run!(Ex.plan(), &1)) |> MLIR.verify!()
 
     for order <- [[:runtime, :language], [:language, :runtime]] do
-      module = MLIR.Module.create!(source, ctx: ctx) |> MLIR.verify!()
+      module = parse(ctx, source)
 
       staged =
         Enum.reduce(order, module, fn layer, ir -> Plan.run!(Ex.plan(layers: layer), ir) end)
@@ -161,20 +142,18 @@ defmodule ExLayersTest do
 
   test "finishing rejects a type bridge without a representation-preserving inverse", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module {
-          func.func @invalid_bridge(%x: f32) -> i64 {
-            %word = "builtin.unrealized_conversion_cast"(%x) : (f32) -> i64
-            return %word : i64
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      parse(ctx, ~S"""
+      func.func @invalid_bridge(%x: f32) -> i64 {
+        %word = "builtin.unrealized_conversion_cast"(%x) : (f32) -> i64
+        return %word : i64
+      }
+      """)
 
     assert_raise ArgumentError, ~r/unresolved Ex type bridge/, fn -> Ex.finish!(module) end
   end
+
+  defp parse(ctx, body),
+    do: MLIR.Module.create!("module {\n#{body}\n}", ctx: ctx) |> MLIR.verify!()
 
   defp signature(symbol, ctx),
     do: RuntimeABI.function_type(symbol, ctx) |> Beaver.Deferred.resolve(ctx) |> MLIR.to_string()
