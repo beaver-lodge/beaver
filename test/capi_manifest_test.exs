@@ -201,6 +201,13 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
     collector_entries = Map.fetch!(entries_by_runtime, "native_collector")
     manual_runtime_entries = Map.fetch!(entries_by_runtime, "manual_async_callback")
     pending_entries = Map.get(entries_by_runtime, "pending", [])
+    assert [remark_entry] = Map.fetch!(entries_by_runtime, "native_notification")
+
+    assert get_in(remark_entry, ["callback_bridge", "wrapper_name"]) ==
+             "beaver_raw_optimization_remarks_attach"
+
+    assert get_in(remark_entry, ["callback_bridge", "lifetime"]) == "remark_engine"
+    assert get_in(remark_entry, ["callback_bridge", "owner"]) == "context"
 
     assert Enum.map(runtime_entries, &get_in(&1, ["function", "name"])) |> MapSet.new() ==
              MapSet.new([

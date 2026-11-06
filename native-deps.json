@@ -8,10 +8,10 @@
     "repo": "llvm/eudsl",
     "tag": "llvm",
     "default_revisions": {
-      "macos_arm64": "20261103+0be29dfa4",
-      "manylinux_aarch64": "20261103+0be29dfa4",
-      "manylinux_x86_64": "20261103+0be29dfa4",
-      "windows_amd64": "20261103+0be29dfa4"
+      "macos_arm64": "20261106+b5bbdc97c",
+      "manylinux_aarch64": "20261106+b5bbdc97c",
+      "manylinux_x86_64": "20261106+b5bbdc97c",
+      "windows_amd64": "20261106+b5bbdc97c"
     }
   }
 }

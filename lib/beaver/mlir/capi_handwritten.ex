@@ -6,7 +6,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
   @functions for {arity, names} <- [
                    {4, ~w(
         apply_rewrite_pattern_set_with_module apply_rewrite_pattern_set_with_op type_converter_add_conversion_map
-        type_converter_reply_callback type_converter_reply_types type_converter_reply_values
+        type_converter_reply_callback type_converter_reply_types type_converter_reply_values optimization_remarks_attach
       )},
                    {2, ~w(
         callback_reply cuda_module_get_function cuda_memcpy_htod cuda_memcpy_dtoh operation_verify_async

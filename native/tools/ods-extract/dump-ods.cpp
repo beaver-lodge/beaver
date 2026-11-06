@@ -1,19 +1,11 @@
 #include "mlir/Support/FileUtilities.h"
 #include "mlir/Support/IndentedOstream.h"
-#include "mlir/Support/ToolUtilities.h"
-#include "mlir/TableGen/Argument.h"
 #include "mlir/TableGen/Attribute.h"
 #include "mlir/TableGen/Builder.h"
-#include "mlir/TableGen/Constraint.h"
 #include "mlir/TableGen/Operator.h"
+#include "mlir/TableGen/Property.h"
 #include "mlir/TableGen/Region.h"
 #include "mlir/TableGen/Trait.h"
-#include "mlir/Tools/PDLL/ODS/Constraint.h"
-#include "mlir/Tools/PDLL/ODS/Context.h"
-#include "mlir/Tools/PDLL/ODS/Dialect.h"
-#include "mlir/Tools/PDLL/ODS/Operation.h"
-#include "llvm/ADT/Hashing.h"
-#include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/FormatVariadic.h"
 #include "llvm/Support/InitLLVM.h"
@@ -21,271 +13,103 @@
 #include "llvm/Support/SourceMgr.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/VirtualFileSystem.h"
-#include "llvm/TableGen/Error.h"
 #include "llvm/TableGen/Parser.h"
+#include <map>
 
 using namespace mlir;
-using namespace mlir::pdll;
-
 namespace parser {
+using llvm::json::Array;
+using llvm::json::Object;
+// TableGen already owns the complete schema. Serialize it directly rather than
+// copying through a second, partial PDLL schema plus a parallel extras map.
+static std::map<std::string, std::map<std::string, Object>> dialects;
 
-constexpr llvm::StringLiteral kConstraintSuffixSeparator = "__beaver_ods__";
-
-std::string makeConstraintKey(StringRef name, StringRef summary, StringRef cppClass) {
-  if (name.contains(kConstraintSuffixSeparator)) return name.str();
-
-  return llvm::formatv("{0}{1}{2:x}", name.empty() ? StringRef("anonymous_constraint") : name,
-                       kConstraintSuffixSeparator, llvm::hash_combine(summary, cppClass))
-      .str();
+static std::string processAndFormatDoc(const Twine &doc) {
+  std::string text;
+  llvm::raw_string_ostream stream(text);
+  raw_indented_ostream(stream).printReindented(StringRef(doc.str()).rtrim(" \t"));
+  return text;
 }
 
-StringRef displayConstraintName(StringRef name) { return name.split(kConstraintSuffixSeparator).first; }
-
-template <typename T> SmallVector<T *> sortMapByName(const llvm::StringMap<std::unique_ptr<T>> &map) {
-  SmallVector<T *> storage;
-  for (auto &entry : map) storage.push_back(entry.second.get());
-  llvm::sort(storage, [](const auto &lhs, const auto &rhs) { return lhs->getName() < rhs->getName(); });
-  return storage;
+static Object constraint(StringRef name, const tblgen::Constraint &value, StringRef kind) {
+  std::string unique = value.getUniqueDefName();
+  StringRef display = StringRef(unique).split("(anonymous_").first.split("__beaver_ods__").first;
+  return Object{{"name", name.str()}, {"constraint", display.empty() ? std::string("anonymous_constraint") : display.str()},
+          {"description", value.getSummary().str()}, {"kind", kind}};
 }
 
-// Extra per-operation facts that the pdll ods::Context does not carry; they
-// are collected from the tblgen::Operator records in
-// processTdIncludeRecords and emitted alongside the context dump.
-struct OdsExtras {
-  struct BuilderInfo {
-    struct Parameter {
-      std::string name;
-      std::string cppType;
-      bool hasDefault;
-    };
-    std::vector<Parameter> parameters;
-    bool deprecated;
-  };
-
-  std::string nativeClassName;
-  std::vector<std::string> traits;
-  std::vector<std::pair<std::string, bool>> regions; // (name, variadic)
-  std::vector<BuilderInfo> builders;
-  std::string assemblyFormat;
-  bool hasFolder;
-};
-
-llvm::StringMap<OdsExtras> g_extras;
-
-void printODSContext(raw_ostream &os, const ods::Context &odsContext) {
-  using namespace mlir::pdll::ods;
-  auto formatConstraintName = [](const auto &constraint) {
-    return displayConstraintName(constraint.getDemangledName());
-  };
-  auto getVariableLengthStr = [](VariableLengthKind kind) -> StringRef {
-    switch (kind) {
-    case VariableLengthKind::Optional:
-      return "Optional";
-    case VariableLengthKind::Single:
-      return "Single";
-    case VariableLengthKind::Variadic:
-      return "Variadic";
-    }
-    llvm_unreachable("unknown variable length kind");
-  };
-
-  llvm::json::OStream j(os, 2);
-
-  auto printOperandsOrResults = [&](StringRef name, ArrayRef<OperandOrResult> elements) {
-    if (elements.empty()) return;
-    j.attributeArray(name, [&] {
-      for (const auto &element : elements) {
-        j.object([&] {
-          j.attribute("name", element.getName());
-          j.attribute("constraint", formatConstraintName(element.getConstraint()));
-          j.attribute("description", element.getConstraint().getSummary());
-          j.attribute("kind", getVariableLengthStr(element.getVariableLengthKind()));
-        });
-      }
-    });
-  };
-
-  j.object([&] {
-    j.attributeArray("dialects", [&] {
-      for (const Dialect &dialect : odsContext.getDialects()) {
-        j.object([&] {
-          j.attribute("name", dialect.getName());
-          j.attributeArray("operations", [&] {
-            for (const Operation *op : sortMapByName(dialect.getOperations())) {
-              const OdsExtras *extras = nullptr;
-              if (auto it = g_extras.find(op->getName()); it != g_extras.end()) extras = &it->second;
-
-              j.object([&] {
-                j.attribute("name", op->getName());
-                j.attribute("summary", op->getSummary());
-                j.attribute("description", op->getDescription());
-                j.attribute("result_type_inference", op->hasResultTypeInferrence());
-                j.attribute("native_class_name", extras ? extras->nativeClassName : "");
-
-                if (extras && !extras->traits.empty()) {
-                  j.attributeArray("traits", [&] {
-                    for (const std::string &trait : extras->traits) j.value(trait);
-                  });
-                }
-
-                if (extras && !extras->regions.empty()) {
-                  j.attributeArray("regions", [&] {
-                    for (const auto &[name, variadic] : extras->regions) {
-                      j.object([&] {
-                        j.attribute("name", name);
-                        j.attribute("variadic", variadic);
-                      });
-                    }
-                  });
-                }
-
-                if (extras && !extras->builders.empty()) {
-                  j.attributeArray("builders", [&] {
-                    for (const auto &builder : extras->builders) {
-                      j.object([&] {
-                        j.attribute("deprecated", builder.deprecated);
-                        j.attributeArray("parameters", [&] {
-                          for (const auto &param : builder.parameters) {
-                            j.object([&] {
-                              j.attribute("name", param.name);
-                              j.attribute("cpp_type", param.cppType);
-                              j.attribute("has_default", param.hasDefault);
-                            });
-                          }
-                        });
-                      });
-                    }
-                  });
-                }
-
-                if (extras && !extras->assemblyFormat.empty()) j.attribute("assembly_format", extras->assemblyFormat);
-
-                j.attribute("has_folder", extras ? extras->hasFolder : false);
-
-                // Attributes
-                ArrayRef<Attribute> attributes = op->getAttributes();
-                if (!attributes.empty()) {
-                  j.attributeArray("attributes", [&] {
-                    for (const Attribute &attr : attributes) {
-                      j.object([&] {
-                        j.attribute("name", attr.getName());
-                        j.attribute("constraint", formatConstraintName(attr.getConstraint()));
-                        j.attribute("description", attr.getConstraint().getSummary());
-                        j.attribute("kind", getVariableLengthStr(attr.isOptional() ? VariableLengthKind::Optional
-                                                                                   : VariableLengthKind::Single));
-                      });
-                    }
-                  });
-                }
-
-                // Operands
-                printOperandsOrResults("operands", op->getOperands());
-
-                // Results
-                printOperandsOrResults("results", op->getResults());
-              });
-            }
-          });
-        });
-      }
-    });
-  });
+template <typename Range> static Array typeConstraints(Range values) {
+  Array result;
+  for (const auto &value : values)
+    result.push_back(constraint(value.name, value.constraint,
+                               value.isOptional() ? "Optional" : value.isVariadic() ? "Variadic" : "Single"));
+  return result;
 }
 
-std::string processAndFormatDoc(const Twine &doc) {
-
-  std::string docStr;
-  {
-    llvm::raw_string_ostream docOS(docStr);
-    std::string tmpDocStr = doc.str();
-    raw_indented_ostream(docOS).printReindented(StringRef(tmpDocStr).rtrim(" 	"));
-  }
-  return docStr;
+static void putArray(Object &object, StringRef key, Array values) {
+  if (!values.empty()) object[key] = std::move(values);
 }
 
-void processTdIncludeRecords(const llvm::RecordKeeper &tdRecords, ods::Context &odsContext) {
-  // Return the length kind of the given value.
-  auto getLengthKind = [](const auto &value) {
-    if (value.isOptional()) return ods::VariableLengthKind::Optional;
-    return value.isVariadic() ? ods::VariableLengthKind::Variadic : ods::VariableLengthKind::Single;
-  };
-
-  auto addTypeConstraint = [&](const tblgen::NamedTypeConstraint &cst) -> const ods::TypeConstraint & {
-    return odsContext.insertTypeConstraint(
-        makeConstraintKey(cst.constraint.getUniqueDefName(), cst.constraint.getSummary(), cst.constraint.getCppType()),
-        cst.constraint.getSummary(), cst.constraint.getCppType());
-  };
-
-  // Process the parsed tablegen records to build ODS information.
-  /// Operations.
-  for (const llvm::Record *def : tdRecords.getAllDerivedDefinitions("Op")) {
+void processTdIncludeRecords(const llvm::RecordKeeper &records) {
+  for (const llvm::Record *def : records.getAllDerivedDefinitions("Op")) {
     tblgen::Operator op(def);
-
-    // Check to see if this operation is known to support type inferrence.
-    bool supportsResultTypeInferrence = op.getTrait("::mlir::InferTypeOpInterface::Trait");
-
-    auto [odsOp, inserted] =
-        odsContext.insertOperation(op.getOperationName(), op.getSummary(), processAndFormatDoc(op.getDescription()),
-                                   op.getQualCppClassName(), supportsResultTypeInferrence, op.getLoc().front());
-
-    // Ignore operations that have already been added.
-    if (!inserted) continue;
-
-    for (const tblgen::NamedAttribute &attr : op.getAttributes()) {
-      odsOp->appendAttribute(
-          attr.name, attr.attr.isOptional(),
-          odsContext.insertAttributeConstraint(
-              makeConstraintKey(attr.attr.getUniqueDefName(), attr.attr.getSummary(), attr.attr.getStorageType()),
-              attr.attr.getSummary(), attr.attr.getStorageType()));
+    auto &operations = dialects[op.getDialectName().str()];
+    std::string name = op.getOperationName();
+    if (operations.count(name)) continue;
+    Object data{{"name", name}, {"summary", op.getSummary().str()},
+                {"description", processAndFormatDoc(op.getDescription())},
+                {"result_type_inference", bool(op.getTrait("::mlir::InferTypeOpInterface::Trait"))},
+                {"native_class_name", op.getQualCppClassName()}, {"has_folder", op.hasFolder()}};
+    Array traits, regions, builders, attributes, properties;
+    for (const auto &trait : op.getTraits()) {
+      if (const auto *native = llvm::dyn_cast<tblgen::NativeTrait>(&trait))
+        traits.push_back(native->getFullyQualifiedTraitName());
+      else if (StringRef traitName = trait.getDef().getName(); !traitName.starts_with("anonymous_"))
+        traits.push_back(traitName.str());
     }
-    for (const tblgen::NamedTypeConstraint &operand : op.getOperands()) {
-      odsOp->appendOperand(operand.name, getLengthKind(operand), addTypeConstraint(operand));
+    for (const auto &region : op.getRegions())
+      regions.push_back(Object{{"name", region.name.str()}, {"variadic", region.isVariadic()}});
+    for (const auto &builder : op.getBuilders()) {
+      Array params;
+      for (const auto &param : builder.getParameters())
+        params.push_back(Object{{"name", param.getName().value_or("").str()}, {"cpp_type", param.getCppType().str()},
+                                {"has_default", param.getDefaultValue().has_value()}});
+      builders.push_back(Object{{"deprecated", builder.getDeprecatedMessage().has_value()},
+                                {"parameters", std::move(params)}});
     }
-    for (const tblgen::NamedTypeConstraint &result : op.getResults()) {
-      odsOp->appendResult(result.name, getLengthKind(result), addTypeConstraint(result));
+    for (const auto &attr : op.getAttributes())
+      attributes.push_back(constraint(attr.name, attr.attr, attr.attr.isOptional() ? "Optional" : "Single"));
+    for (const auto &property : op.getProperties()) {
+      const auto &prop = property.prop;
+      properties.push_back(Object{{"name", property.name.str()}, {"constraint", prop.getPropertyDefName().str()},
+                                  {"description", prop.getSummary().str()}, {"storage_type", prop.getStorageType().str()},
+                                  {"interface_type", prop.getInterfaceType().str()},
+                                  {"default_value", prop.hasDefaultValue() ? llvm::json::Value(prop.getDefaultValue().str())
+                                                                         : llvm::json::Value(nullptr)}});
     }
-
-    // Collect the extra facts that the pdll ODS context does not carry.
-    OdsExtras extras;
-    extras.nativeClassName = op.getQualCppClassName();
-    extras.hasFolder = op.hasFolder();
-
-    for (const tblgen::Trait &trait : op.getTraits()) {
-      if (const auto *native = llvm::dyn_cast<tblgen::NativeTrait>(&trait)) {
-        extras.traits.push_back(native->getFullyQualifiedTraitName());
-      } else {
-        // Predicate and internal traits carry anonymous record names; keep
-        // only the ones with a real TableGen name.
-        StringRef name = trait.getDef().getName();
-        if (!name.starts_with("anonymous_")) extras.traits.push_back(name.str());
-      }
-    }
-
-    for (const tblgen::NamedRegion &region : op.getRegions())
-      extras.regions.emplace_back(region.name.str(), region.isVariadic());
-
-    for (const tblgen::Builder &builder : op.getBuilders()) {
-      OdsExtras::BuilderInfo builderInfo;
-      builderInfo.deprecated = builder.getDeprecatedMessage().has_value();
-
-      for (const auto &param : builder.getParameters()) {
-        OdsExtras::BuilderInfo::Parameter parameter;
-        parameter.name = param.getName().value_or("").str();
-        parameter.cppType = param.getCppType().str();
-        parameter.hasDefault = param.getDefaultValue().has_value();
-        builderInfo.parameters.push_back(std::move(parameter));
-      }
-
-      extras.builders.push_back(std::move(builderInfo));
-    }
-
-    if (op.hasAssemblyFormat()) extras.assemblyFormat = op.getAssemblyFormat().str();
-
-    g_extras[op.getOperationName()] = std::move(extras);
+    data["properties"] = std::move(properties);
+    putArray(data, "traits", std::move(traits));
+    putArray(data, "regions", std::move(regions));
+    putArray(data, "builders", std::move(builders));
+    putArray(data, "attributes", std::move(attributes));
+    putArray(data, "operands", typeConstraints(op.getOperands()));
+    putArray(data, "results", typeConstraints(op.getResults()));
+    if (op.hasAssemblyFormat() && !op.getAssemblyFormat().empty()) data["assembly_format"] = op.getAssemblyFormat().str();
+    operations.emplace(name, std::move(data));
   }
 }
 
-LogicalResult parseTdInclude(ods::Context &odsContext, StringRef filename, llvm::SourceMgr &parserSrcMgr,
+void printODSContext(raw_ostream &stream) {
+  Array result;
+  for (auto &[name, operations] : dialects) {
+    Array entries;
+    for (auto &[_, operation] : operations) entries.push_back(std::move(operation));
+    result.push_back(Object{{"name", name}, {"operations", std::move(entries)}});
+  }
+  stream << llvm::formatv("{0:2}", llvm::json::Value(Object{{"dialects", std::move(result)}}));
+}
+
+LogicalResult parseTdInclude(StringRef filename, llvm::SourceMgr &parserSrcMgr,
                              function_ref<LogicalResult(llvm::SMRange, const Twine &)> emitError) {
   // Use the source manager to open the file, but don't yet add it.
   std::string includedFile;
@@ -313,7 +137,7 @@ LogicalResult parseTdInclude(ods::Context &odsContext, StringRef filename, llvm:
   if (llvm::TableGenParseFile(tdSrcMgr, tdRecords)) return failure();
 
   // Process the parsed records.
-  processTdIncludeRecords(tdRecords, odsContext);
+  processTdIncludeRecords(tdRecords);
   return success();
 }
 
@@ -338,14 +162,13 @@ int main(int argc, char **argv) {
   llvm::InitLLVM y(argc, argv);
   llvm::cl::ParseCommandLineOptions(argc, argv, "PDLL Frontend");
 
-  ods::Context odsContext;
   llvm::SourceMgr sourceMgr;
   sourceMgr.setIncludeDirs(includeDirs);
   sourceMgr.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
 
   for (const auto &inputFilename : inputFilenames) {
     // Process the .td file directly
-    if (failed(parser::parseTdInclude(odsContext, inputFilename, sourceMgr, [](llvm::SMRange loc, const Twine &msg) {
+    if (failed(parser::parseTdInclude(inputFilename, sourceMgr, [](llvm::SMRange loc, const Twine &msg) {
           llvm::errs() << "error: " << msg << "\n";
           return failure();
         }))) {
@@ -355,7 +178,7 @@ int main(int argc, char **argv) {
   // Set up the output
   std::string outputStr;
   llvm::raw_string_ostream outputStrOS(outputStr);
-  parser::printODSContext(outputStrOS, odsContext);
+  parser::printODSContext(outputStrOS);
 
   // Write the output.
   bool shouldWriteOutput = true;

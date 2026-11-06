@@ -101,12 +101,41 @@ defmodule Beaver.MLIR.Dialect.GPU do
     * `:features` - target features, e.g. `"+wavefrontsize64"`
     * `:opt` - optimization level, an integer (defaults to `2`)
     * `:abi` - ABI version, e.g. `"600"`
+    * `:arch` - processor, generic GPU, triple or full target ID; replaces `:chip`/`:triple`
+    * `:wavesize` - `0` (target default), `32` or `64`, for lowering and codegen
 
   Returns a deferred attribute value unless `ctx:` is given, following the
   convention of `MLIR.Attribute.get/2`. The resulting attribute can be passed
   to `package_binary!/3` as the target configuration of a `gpu.binary`.
   """
-  def rocdl_target_attribute(opts \\ []), do: target_attribute("rocdl", opts, [:chip, :triple, :features, :opt, :abi])
+  def rocdl_target_attribute(opts \\ []) do
+    if Keyword.has_key?(opts, :arch) and (Keyword.has_key?(opts, :chip) or Keyword.has_key?(opts, :triple)),
+      do: raise(ArgumentError, "use :arch or the legacy :chip/:triple pair")
+
+    wavesize = Keyword.get(opts, :wavesize, 0)
+    unless wavesize in [0, 32, 64], do: raise(ArgumentError, "wavesize must be 0, 32 or 64")
+    target = target_attribute("rocdl", opts, [:chip, :triple, :features, :opt, :abi])
+
+    if Keyword.has_key?(opts, :arch) or Keyword.has_key?(opts, :wavesize) do
+      arch = Keyword.get(opts, :arch, Keyword.get(opts, :chip, "gfx900"))
+
+      Deferred.from_opts(opts, fn ctx ->
+        target |> Deferred.resolve(ctx) |> configure_rocdl_target(arch, wavesize)
+      end)
+    else
+      target
+    end
+  end
+
+  @doc "Whether the linked LLVM supports TargetInfo-based ROCDL lowering with arch and wavesize options."
+  def rocdl_target_info_supported?, do: CAPI.beaverROCDLTargetInfoSupported() |> Beaver.Native.to_term()
+
+  defp configure_rocdl_target(target, arch, wavesize) do
+    unless rocdl_target_info_supported?(), do: raise(ArgumentError, "linked LLVM lacks TargetInfo-based ROCDL lowering")
+    configured = CAPI.beaverROCDLTargetAttrConfigure(target, StringRef.create(arch), wavesize)
+    if MLIR.null?(configured), do: raise(ArgumentError, "invalid or conflicting ROCDL arch, wavesize or features")
+    configured
+  end
 
   defp target_attribute(dialect, opts, keys) do
     params =
@@ -145,39 +174,79 @@ defmodule Beaver.MLIR.Dialect.GPU do
     ctx = MLIR.context(module)
     MLIR.Context.register_translations(ctx)
 
-    targets = List.wrap(targets)
-    conversion = conversion_pass!(targets)
+    targets = targets |> List.wrap() |> Enum.map(&Deferred.resolve(&1, ctx))
+    if targets == [], do: raise(ArgumentError, "at least one target attribute is required")
+    Enum.each(targets, &conversion_pass!/1)
+    module = module |> Beaver.Composer.append("gpu-kernel-outlining") |> Beaver.Composer.run!()
+    body = MLIR.Module.body(module)
 
-    lowered =
-      module
-      |> Beaver.Composer.append("gpu-kernel-outlining")
-      |> Beaver.Composer.nested("gpu.module", conversion)
-      |> Beaver.Composer.run!()
+    for gpu <- Enum.to_list(Beaver.Walker.operations(body)), Operation.name(gpu) == "gpu.module" do
+      [first | rest] = targets
+      binary = compile_target(gpu, first, format, ctx)
 
-    targets_attr = MLIR.Attribute.array(targets, ctx: ctx)
+      try do
+        Enum.each(rest, fn target ->
+          next = compile_target(gpu, target, format, ctx)
 
-    lowered
-    |> MLIR.Module.body()
-    |> Beaver.Walker.operations()
-    |> Enum.filter(&(MLIR.Operation.name(&1) == "gpu.module"))
-    |> Enum.each(&MLIR.Operation.get_and_update(&1, "targets", fn _ -> {nil, targets_attr} end))
+          try do
+            objects =
+              Enum.to_list(binary["objects"]) ++ Enum.to_list(next["objects"])
 
-    lowered
-    |> Beaver.Composer.append("gpu-module-to-binary{format=#{format}}")
-    |> Beaver.Composer.run!()
+            Operation.put_attribute(binary, "objects", Attribute.array(objects, ctx: ctx))
+          after
+            Operation.destroy(next)
+          end
+        end)
+
+        CAPI.mlirBlockInsertOwnedOperationBefore(body, gpu, binary)
+      rescue
+        error ->
+          Operation.destroy(binary)
+          reraise error, __STACKTRACE__
+      end
+
+      Operation.destroy(gpu)
+    end
+
+    MLIR.verify!(module)
   end
 
-  defp conversion_pass!([target | _]) do
-    dialect = target |> CAPI.mlirAttributeGetDialect() |> CAPI.mlirDialectGetNamespace() |> MLIR.to_string()
+  defp compile_target(gpu, target, format, ctx) do
+    container = MLIR.Module.empty(MLIR.Location.unknown(ctx: ctx))
+    clone = Operation.clone(gpu)
+    Block.append(MLIR.Module.body(container), clone)
 
-    case dialect do
-      "nvvm" -> "convert-gpu-to-nvvm"
-      "rocdl" -> "convert-gpu-to-rocdl{chipset=#{MLIR.to_string(CAPI.beaverROCDLTargetAttrGetChip(target))}}"
-      other -> raise ArgumentError, "unsupported GPU target attribute dialect: #{other}"
+    try do
+      container |> Beaver.Composer.nested("gpu.module", conversion_pass!(target)) |> Beaver.Composer.run!()
+      if target_dialect(target) == "rocdl", do: CAPI.beaverROCDLTargetApplyModuleFlags(clone, target)
+      Operation.put_attribute(clone, "targets", Attribute.array([target], ctx: ctx))
+      container |> Beaver.Composer.append("gpu-module-to-binary{format=#{format}}") |> Beaver.Composer.run!()
+      [binary] = Enum.to_list(Beaver.Walker.operations(MLIR.Module.body(container)))
+      CAPI.mlirOperationRemoveFromParent(binary)
+      binary
+    after
+      MLIR.Module.destroy(container)
     end
   end
 
-  defp conversion_pass!([]), do: raise(ArgumentError, "at least one target attribute is required")
+  defp target_dialect(target),
+    do: target |> CAPI.mlirAttributeGetDialect() |> CAPI.mlirDialectGetNamespace() |> MLIR.to_string()
+
+  defp conversion_pass!(target) do
+    case target_dialect(target) do
+      "nvvm" ->
+        "convert-gpu-to-nvvm"
+
+      "rocdl" ->
+        arch = CAPI.beaverROCDLTargetAttrGetArch(target) |> MLIR.to_string()
+        wave = CAPI.beaverROCDLTargetAttrGetWaveSize(target) |> Beaver.Native.to_term()
+        options = if rocdl_target_info_supported?(), do: "arch=#{arch} wavesize=#{wave}", else: "chipset=#{arch}"
+        "convert-gpu-to-rocdl{#{options}}"
+
+      other ->
+        raise ArgumentError, "unsupported GPU target attribute dialect: #{other}"
+    end
+  end
 
   defp object_format!(format) when is_map_key(@object_formats, format), do: Map.fetch!(@object_formats, format)
 

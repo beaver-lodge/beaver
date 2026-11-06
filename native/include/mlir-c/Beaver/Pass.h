@@ -14,6 +14,9 @@ typedef enum {
 extern "C" {
 #endif
 
+MLIR_CAPI_EXPORTED bool beaverStaticMemoryPlannerSupported(void);
+MLIR_CAPI_EXPORTED MlirPass beaverCreateStaticMemoryPlannerPass(bool callerArena, bool bestFit);
+
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetArgument(MlirPass pass);
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetName(MlirPass pass);
 

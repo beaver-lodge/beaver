@@ -12,6 +12,11 @@ extern "C" {
 /// from starving a pool shared by multiple contexts.
 MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context, void (*task)(void *), void *arg);
 
+MLIR_CAPI_EXPORTED bool beaverContextIndependentLockingSupported(void);
+MLIR_CAPI_EXPORTED bool beaverContextEnableThreadSafeLocking(MlirContext context);
+MLIR_CAPI_EXPORTED bool beaverContextIsThreadSafeLockingEnabled(MlirContext context);
+MLIR_CAPI_EXPORTED bool beaverContextIsMultithreadingEnabled(MlirContext context);
+
 /// Stable, capability-gated adapters for LLVM's transient MLIRContext scope.
 /// Begin returns false when unsupported or when the context is already in a
 /// scope; end returns false when no scope was entered through this adapter.

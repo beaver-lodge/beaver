@@ -64,6 +64,33 @@ defmodule Beaver.MLIR.Dialect.Bufferization do
   def one_shot!(operation_or_module, opts \\ []),
     do: operation_or_module |> pipeline(opts) |> Beaver.Composer.run!(Keyword.get(opts, :run, []))
 
+  @doc """
+  Appends static arena planning for function bodies with explicit memref deallocs.
+  Run after ownership-based deallocation and bufferization-lower-deallocations.
+  `algorithm: :best_fit` reuses storage across disjoint lifetimes; `:trivial`
+  packs allocations sequentially. `arena_mode: :arg` uses the first function
+  argument as a caller-owned static i8 arena and checks its capacity. `:allocate`
+  creates an arena and releases it at each function return.
+  Callers own argument-arena lifetime and must satisfy the original allocation alignments.
+  Dynamic shapes, unsupported element types and nonidentity layouts are skipped.
+  Integer/float storage widths must be powers of two from 8 to 128 bits.
+  """
+  def static_memory_plan(operation_or_module, opts \\ []) do
+    opts = Keyword.validate!(opts, algorithm: :best_fit, arena_mode: :allocate)
+    algorithm = Keyword.fetch!(opts, :algorithm)
+    mode = Keyword.fetch!(opts, :arena_mode)
+
+    unless algorithm in [:best_fit, :trivial] and mode in [:allocate, :arg],
+      do: raise(ArgumentError, "expected algorithm: :best_fit | :trivial and arena_mode: :allocate | :arg")
+
+    unless static_memory_planner_supported?(), do: raise(ArgumentError, "linked LLVM lacks static memory planning")
+    pass = Beaver.MLIR.CAPI.beaverCreateStaticMemoryPlannerPass(mode == :arg, algorithm == :best_fit)
+    Beaver.Composer.nested(operation_or_module, "func.func", pass)
+  end
+
+  def static_memory_planner_supported?,
+    do: Beaver.MLIR.CAPI.beaverStaticMemoryPlannerSupported() |> Beaver.Native.to_term()
+
   defp validate_options!(opts) do
     unless Keyword.keyword?(opts),
       do: raise(ArgumentError, "bufferization options must be a keyword list")

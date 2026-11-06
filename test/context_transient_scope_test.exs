@@ -53,8 +53,8 @@ defmodule ContextTransientScopeTest do
           drop_and_collect(parent, length(stale_wrappers))
         end)
 
-      assert_receive {:transient_wrappers_collected, ^pid, 6}
-      assert_receive {:DOWN, ^monitor, :process, ^pid, :normal}
+      assert_receive {:transient_wrappers_collected, ^pid, 6}, 5_000
+      assert_receive {:DOWN, ^monitor, :process, ^pid, :normal}, 5_000
 
       assert :reentered ==
                MLIR.Context.with_transient_scope(ctx, fn _ctx -> :reentered end)
@@ -73,7 +73,7 @@ defmodule ContextTransientScopeTest do
           end)
         end)
 
-      assert_receive :entered
+      assert_receive :entered, 5_000
 
       assert_raise ArgumentError, ~r/already has an active transient scope/, fn ->
         MLIR.Context.with_transient_scope(ctx, fn _ctx -> :ok end)

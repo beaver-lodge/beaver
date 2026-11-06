@@ -8,6 +8,49 @@ set(_beaver_saved_try_compile_target_type "${CMAKE_TRY_COMPILE_TARGET_TYPE}")
 set(CMAKE_REQUIRED_INCLUDES "${MLIR_INCLUDE_DIRS}")
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 check_cxx_source_compiles(
+  "#include <mlir/IR/MLIRContext.h>
+   int main() {
+     auto enable = &mlir::MLIRContext::enableThreadSafeLocking;
+     auto query = &mlir::MLIRContext::isThreadSafeLockingEnabled;
+     (void)enable; (void)query;
+   }"
+  BEAVER_HAS_MLIR_CONTEXT_LOCKING)
+check_cxx_source_compiles(
+  "#include <mlir/Dialect/LLVMIR/ROCDLTargetInfo.h>
+   #include <mlir/Conversion/GPUToROCDL/GPUToROCDLPass.h>
+   int main() { mlir::ConvertGpuOpsToROCDLOpsOptions options; options.arch = \"gfx1100\"; options.waveSize = 32; }"
+  BEAVER_HAS_ROCDL_TARGET_INFO)
+check_cxx_source_compiles(
+  "#include <mlir/Dialect/Bufferization/Transforms/Passes.h>
+   int main() { mlir::bufferization::StaticMemoryPlannerAnalysisPassOptions options; (void)options; }"
+  BEAVER_HAS_STATIC_MEMORY_PLANNER)
+# Older LLVMs expose the planner API but mishandle skipped allocations and
+# shared deallocs. Probe the installed tool before advertising this capability.
+if(BEAVER_HAS_STATIC_MEMORY_PLANNER)
+  file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/planner-probe.mlir" [=[
+func.func @probe(%n: index, %c: i1) {
+  %a = memref.alloc() : memref<4xf32>
+  %b = memref.alloc(%n) : memref<?xf32>
+  %ac = memref.cast %a : memref<4xf32> to memref<?xf32>
+  %s = arith.select %c, %ac, %b : memref<?xf32>
+  memref.dealloc %s : memref<?xf32>
+  %x = memref.alloc() : memref<4xcomplex<f32>>
+  memref.dealloc %x : memref<4xcomplex<f32>>
+  %y = memref.alloc() : memref<4xf32, strided<[2]>>
+  memref.dealloc %y : memref<4xf32, strided<[2]>>
+  return
+}
+]=])
+  execute_process(COMMAND "${LLVM_TOOLS_BINARY_DIR}/mlir-opt${CMAKE_EXECUTABLE_SUFFIX}"
+    "${CMAKE_CURRENT_BINARY_DIR}/planner-probe.mlir"
+    "--pass-pipeline=builtin.module(func.func(static-memory-planner-analysis))"
+    RESULT_VARIABLE _planner_result OUTPUT_VARIABLE _planner_output ERROR_QUIET TIMEOUT 15)
+  if(NOT "${_planner_result}" STREQUAL "0" OR _planner_output MATCHES "memref.view")
+    set(BEAVER_HAS_STATIC_MEMORY_PLANNER OFF)
+    message(STATUS "Static memory planner disabled: LLVM lacks skipped-allocation correctness fixes")
+  endif()
+endif()
+check_cxx_source_compiles(
   "#include <mlir-c/IR.h>
    int main() {
      auto *begin = &mlirContextBeginTransientScope;
@@ -68,10 +111,18 @@ add_mlir_public_c_api_library(
   BeaverGPU.cpp
   BeaverLLVMIR.cpp
   BeaverActionTracing.cpp
+  BeaverRemarks.cpp
+  BeaverMemoryPlanner.cpp
+  # Upstream d1ec07e04314 fixes DataLayout handling after the pinned prebuilt.
+  # Defining its complete translation unit here prevents the older static
+  # archive member from being pulled in. Remove on the next fixed LLVM pin.
+  IndexToLLVM.cpp
   Triton.cpp
   LINK_LIBS
   PUBLIC
   MLIRDebug
+  MLIRAnalysis
+  MLIRDataLayoutInterfaces
   LLVMSupport
   LLVMCore
   LLVMIRReader
@@ -90,45 +141,14 @@ else()
     PROPERTIES COMPILE_OPTIONS "-fexceptions")
 endif()
 
-if(BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE)
-  foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
-    target_compile_definitions(${_target}
-      PUBLIC
-      BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE=1)
-  endforeach()
-endif()
-
-if(BEAVER_HAS_PACKED_TRANSFORM_PARAMS)
-  foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
-    target_compile_definitions(${_target}
-      PUBLIC
-      BEAVER_HAS_PACKED_TRANSFORM_PARAMS=1)
-  endforeach()
-endif()
-
-if(BEAVER_HAS_MLIR_DEFAULT_SYMBOL_VISIBILITY_ATTRIBUTE_NAME)
-  foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
-    target_compile_definitions(${_target}
-      PUBLIC
-      BEAVER_HAS_MLIR_DEFAULT_SYMBOL_VISIBILITY_ATTRIBUTE_NAME=1)
-  endforeach()
-endif()
-
-if(BEAVER_HAS_MLIR_INHERENT_ATTRIBUTE_VISITOR)
-  foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
-    target_compile_definitions(${_target}
-      PUBLIC
-      BEAVER_HAS_MLIR_INHERENT_ATTRIBUTE_VISITOR=1)
-  endforeach()
-endif()
-
-if(BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION)
-  foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
-    target_compile_definitions(${_target}
-      PUBLIC
-      BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION=1)
-  endforeach()
-endif()
+foreach(_feature MLIR_CONTEXT_LOCKING ROCDL_TARGET_INFO STATIC_MEMORY_PLANNER MLIR_CONTEXT_TRANSIENT_SCOPE PACKED_TRANSFORM_PARAMS
+    MLIR_DEFAULT_SYMBOL_VISIBILITY_ATTRIBUTE_NAME MLIR_INHERENT_ATTRIBUTE_VISITOR MLIR_COMPOSITE_FAILURE_ACTION)
+  if(BEAVER_HAS_${_feature})
+    foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
+      target_compile_definitions(${_target} PUBLIC BEAVER_HAS_${_feature}=1)
+    endforeach()
+  endif()
+endforeach()
 
 if(BEAVER_TRITON_PREBUILT_DIR)
   foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
