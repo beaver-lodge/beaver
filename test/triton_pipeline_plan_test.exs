@@ -55,6 +55,7 @@ defmodule Beaver.MLIR.Triton.PipelinePlanTest do
     :tensor_memory_allocation,
     :check_matmul_two_cta,
     :proxy_fence_insertion,
+    :shared_memory_barriers,
     :tmem_barrier_insertion,
     :convert_ttgpu_to_llvm,
     :convert_warp_specialize_to_llvm,
@@ -137,6 +138,45 @@ defmodule Beaver.MLIR.Triton.PipelinePlanTest do
     for profile <- [:legacy, :pinned_nvidia_sm100] do
       plan = PipelinePlan.build(target: "cuda:120", pipeline_profile: profile, from_ttgir: true)
       refute Enum.any?(plan.passes, &(&1.id == :convert_to_ttgpu))
+    end
+  end
+
+  test "both profiles synchronize allocated shared memory before LLVM lowering" do
+    for {profile, capability} <- [
+          legacy: 80,
+          legacy: 120,
+          pinned_nvidia_sm100: 100,
+          pinned_nvidia_sm100: 120
+        ],
+        from_ttgir <- [false, true] do
+      plan =
+        PipelinePlan.build(
+          target: "cuda:#{capability}",
+          pipeline_profile: profile,
+          from_ttgir: from_ttgir
+        )
+
+      assert Enum.filter(plan.passes, &(&1.id == :shared_memory_barriers)) == [
+               %{
+                 id: :shared_memory_barriers,
+                 phase: :llir,
+                 pipeline:
+                   "triton-nvidia-gpu-membar{compute-capability=#{capability} ptx-version=#{capability}}"
+               }
+             ]
+
+      assert plan.passes
+             |> Enum.drop_while(&(&1.id != :allocate_shared_memory))
+             |> Enum.take(7)
+             |> Enum.map(& &1.id) == [
+               :allocate_shared_memory,
+               :tensor_memory_allocation,
+               :check_matmul_two_cta,
+               :proxy_fence_insertion,
+               :shared_memory_barriers,
+               :tmem_barrier_insertion,
+               :convert_ttgpu_to_llvm
+             ]
     end
   end
 
