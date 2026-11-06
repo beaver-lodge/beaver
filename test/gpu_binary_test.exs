@@ -44,6 +44,12 @@ defmodule GPUBinaryTest do
     assert full =~ ~s{features = "+wavefrontsize64"}
     assert full =~ "O = 3"
     assert full =~ ~s{abi = "500"}
+
+    unless GPU.rocdl_target_info_supported?() do
+      assert_raise ArgumentError, ~r/TargetInfo-based ROCDL lowering/, fn ->
+        GPU.rocdl_target_attribute(arch: "gfx1100", wavesize: 32, ctx: ctx)
+      end
+    end
   end
 
   test "binary_module preserves object bytes without MLIR text escaping", %{ctx: ctx} do
@@ -75,6 +81,7 @@ defmodule GPUBinaryTest do
 
     ir = MLIR.to_string(target)
     assert ir =~ ~s(chip = "gfx942")
+    assert ir =~ "amdgpu9.42-amd-amdhsa"
     assert ir =~ "wavesize = 64"
     assert ir =~ "+wavefrontsize64"
 
@@ -93,6 +100,14 @@ defmodule GPUBinaryTest do
 
     assert GPU.rocdl_target_attribute(arch: "gfx9-4-generic", ctx: ctx) |> MLIR.to_string() =~
              "gfx9-4-generic"
+
+    assert GPU.rocdl_target_attribute(
+             chip: "gfx942",
+             triple: "amdgcn-amd-amdhsa-pal",
+             wavesize: 64,
+             ctx: ctx
+           )
+           |> MLIR.to_string() =~ "amdgpu9.42-amd-amdhsa-pal"
   end
 
   @tag :rocdl_target_info

@@ -101,7 +101,7 @@ defmodule Beaver.MLIR.Dialect.GPU do
     * `:features` - target features, e.g. `"+wavefrontsize64"`
     * `:opt` - optimization level, an integer (defaults to `2`)
     * `:abi` - ABI version, e.g. `"600"`
-    * `:arch` - processor, generic GPU, triple or full target ID; replaces `:chip`
+    * `:arch` - processor, generic GPU, triple or full target ID; replaces `:chip`/`:triple`
     * `:wavesize` - `0` (target default), `32` or `64`, for lowering and codegen
 
   Returns a deferred attribute value unless `ctx:` is given, following the
@@ -109,30 +109,33 @@ defmodule Beaver.MLIR.Dialect.GPU do
   to `package_binary!/3` as the target configuration of a `gpu.binary`.
   """
   def rocdl_target_attribute(opts \\ []) do
-    if Keyword.has_key?(opts, :arch) and Keyword.has_key?(opts, :chip),
-      do: raise(ArgumentError, "use either :arch or :chip")
+    if Keyword.has_key?(opts, :arch) and (Keyword.has_key?(opts, :chip) or Keyword.has_key?(opts, :triple)),
+      do: raise(ArgumentError, "use :arch or the legacy :chip/:triple pair")
 
     wavesize = Keyword.get(opts, :wavesize, 0)
     unless wavesize in [0, 32, 64], do: raise(ArgumentError, "wavesize must be 0, 32 or 64")
     target = target_attribute("rocdl", opts, [:chip, :triple, :features, :opt, :abi])
 
     if Keyword.has_key?(opts, :arch) or Keyword.has_key?(opts, :wavesize) do
+      arch = Keyword.get(opts, :arch, Keyword.get(opts, :chip, "gfx900"))
+
       Deferred.from_opts(opts, fn ctx ->
-        unless rocdl_target_info_supported?(), do: raise(ArgumentError, "linked LLVM lacks ROCDL TargetInfo")
-        arch = Keyword.get(opts, :arch, Keyword.get(opts, :chip, "gfx900"))
-
-        configured =
-          CAPI.beaverROCDLTargetAttrConfigure(Deferred.resolve(target, ctx), StringRef.create(arch), wavesize)
-
-        if MLIR.null?(configured), do: raise(ArgumentError, "invalid or conflicting ROCDL arch, wavesize or features")
-        configured
+        target |> Deferred.resolve(ctx) |> configure_rocdl_target(arch, wavesize)
       end)
     else
       target
     end
   end
 
+  @doc "Whether the linked LLVM supports TargetInfo-based ROCDL lowering with arch and wavesize options."
   def rocdl_target_info_supported?, do: CAPI.beaverROCDLTargetInfoSupported() |> Beaver.Native.to_term()
+
+  defp configure_rocdl_target(target, arch, wavesize) do
+    unless rocdl_target_info_supported?(), do: raise(ArgumentError, "linked LLVM lacks TargetInfo-based ROCDL lowering")
+    configured = CAPI.beaverROCDLTargetAttrConfigure(target, StringRef.create(arch), wavesize)
+    if MLIR.null?(configured), do: raise(ArgumentError, "invalid or conflicting ROCDL arch, wavesize or features")
+    configured
+  end
 
   defp target_attribute(dialect, opts, keys) do
     params =

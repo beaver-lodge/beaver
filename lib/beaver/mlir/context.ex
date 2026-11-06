@@ -56,21 +56,7 @@ defmodule Beaver.MLIR.Context do
   def create(opts \\ []) do
     allow_unregistered = Keyword.get(opts, :allow_unregistered, false)
     all_dialects = Keyword.get(opts, :all_dialects, true)
-    threading = Keyword.get(opts, :threading, true)
-    thread_safe = Keyword.get(opts, :thread_safe, threading)
-
-    unless is_boolean(threading) and is_boolean(thread_safe),
-      do: raise(ArgumentError, ":threading and :thread_safe must be booleans")
-
-    if threading and not thread_safe,
-      do: raise(ArgumentError, "threading: true requires thread_safe: true")
-
-    if thread_safe and not threading and not independent_locking_supported?(),
-      do: raise(ArgumentError, "linked LLVM does not support independent context locking")
-
-    if not threading and Keyword.has_key?(opts, :thread_pool),
-      do: raise(ArgumentError, ":thread_pool cannot be used with threading: false")
-
+    {threading, thread_safe} = threading_options(opts)
     {pool, owner, lease} = resolve_thread_pool(opts, threading)
     ctx = mlirContextCreateWithThreading(threading and is_nil(pool))
 
@@ -82,7 +68,6 @@ defmodule Beaver.MLIR.Context do
         mlirContextSetThreadPool(ctx, pool)
       end
 
-      if not threading, do: mlirContextEnableMultithreading(ctx, false)
       if thread_safe and not threading, do: beaverContextEnableThreadSafeLocking(ctx)
 
       opts |> Keyword.get(:registry, []) |> List.wrap() |> Enum.each(&mlirContextAppendDialectRegistry(ctx, &1))
@@ -198,7 +183,28 @@ defmodule Beaver.MLIR.Context do
 
   def ensure_same!(entity, %__MODULE__{}), do: entity
 
-  defp resolve_thread_pool(_opts, false), do: {nil, nil, nil}
+  defp threading_options(opts) do
+    threading = Keyword.get(opts, :threading, true)
+    thread_safe = Keyword.get(opts, :thread_safe, threading)
+
+    unless is_boolean(threading) and is_boolean(thread_safe),
+      do: raise(ArgumentError, ":threading and :thread_safe must be booleans")
+
+    if threading and not thread_safe,
+      do: raise(ArgumentError, "threading: true requires thread_safe: true")
+
+    if thread_safe and not threading and not independent_locking_supported?(),
+      do: raise(ArgumentError, "linked LLVM does not support independent context locking")
+
+    {threading, thread_safe}
+  end
+
+  defp resolve_thread_pool(opts, false) do
+    if Keyword.has_key?(opts, :thread_pool),
+      do: raise(ArgumentError, ":thread_pool cannot be used with threading: false")
+
+    {nil, nil, nil}
+  end
 
   defp resolve_thread_pool(opts, true) do
     case Keyword.get(opts, :thread_pool, :application) do

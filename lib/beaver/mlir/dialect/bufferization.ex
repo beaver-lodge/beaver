@@ -71,6 +71,7 @@ defmodule Beaver.MLIR.Dialect.Bufferization do
   packs allocations sequentially. `arena_mode: :arg` uses the first function
   argument as a caller-owned static i8 arena and checks its capacity. `:allocate`
   creates an arena and releases it at each function return.
+  Callers own argument-arena lifetime and must satisfy the original allocation alignments.
   Dynamic shapes, unsupported element types and nonidentity layouts are skipped.
   Integer/float storage widths must be powers of two from 8 to 128 bits.
   """

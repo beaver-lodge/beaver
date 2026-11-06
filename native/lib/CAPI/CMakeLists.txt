@@ -16,6 +16,11 @@ check_cxx_source_compiles(
    }"
   BEAVER_HAS_MLIR_CONTEXT_LOCKING)
 check_cxx_source_compiles(
+  "#include <mlir/Dialect/LLVMIR/ROCDLTargetInfo.h>
+   #include <mlir/Conversion/GPUToROCDL/GPUToROCDLPass.h>
+   int main() { mlir::ConvertGpuOpsToROCDLOpsOptions options; options.arch = \"gfx1100\"; options.waveSize = 32; }"
+  BEAVER_HAS_ROCDL_TARGET_INFO)
+check_cxx_source_compiles(
   "#include <mlir/Dialect/Bufferization/Transforms/Passes.h>
    int main() { mlir::bufferization::StaticMemoryPlannerAnalysisPassOptions options; (void)options; }"
   BEAVER_HAS_STATIC_MEMORY_PLANNER)
@@ -136,7 +141,7 @@ else()
     PROPERTIES COMPILE_OPTIONS "-fexceptions")
 endif()
 
-foreach(_feature MLIR_CONTEXT_LOCKING STATIC_MEMORY_PLANNER MLIR_CONTEXT_TRANSIENT_SCOPE PACKED_TRANSFORM_PARAMS
+foreach(_feature MLIR_CONTEXT_LOCKING ROCDL_TARGET_INFO STATIC_MEMORY_PLANNER MLIR_CONTEXT_TRANSIENT_SCOPE PACKED_TRANSFORM_PARAMS
     MLIR_DEFAULT_SYMBOL_VISIBILITY_ATTRIBUTE_NAME MLIR_INHERENT_ATTRIBUTE_VISITOR MLIR_COMPOSITE_FAILURE_ACTION)
   if(BEAVER_HAS_${_feature})
     foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)

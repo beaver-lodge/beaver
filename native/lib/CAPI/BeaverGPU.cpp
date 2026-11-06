@@ -3,9 +3,8 @@
 #include "mlir/CAPI/Support.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
-#if __has_include("mlir/Dialect/LLVMIR/ROCDLTargetInfo.h")
+#ifdef BEAVER_HAS_ROCDL_TARGET_INFO
 #include "mlir/Dialect/LLVMIR/ROCDLTargetInfo.h"
-#define BEAVER_HAS_ROCDL_TARGET_INFO 1
 #endif
 
 using namespace mlir;
@@ -55,7 +54,9 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverROCDLTargetAttrConfigure(MlirAttribute at
   flags.set("arch", StringAttr::get(ctx, unwrap(arch)));
   flags.set("wavesize", IntegerAttr::get(IntegerType::get(ctx, 32), resolvedWave));
   flags.set(resolvedWave == 32 ? "no_wave64" : "wave64", UnitAttr::get(ctx));
-  return wrap(ROCDL::ROCDLTargetAttr::get(ctx, target.getO(), id->getTargetTripleString(), info->getArchName(),
+  llvm::Triple triple(target.getTriple() == "amdgcn-amd-amdhsa" ? id->getTargetTripleString() : target.getTriple());
+  triple.setArch(triple.getArch(), info->getSubArch());
+  return wrap(ROCDL::ROCDLTargetAttr::get(ctx, target.getO(), triple.str(), info->getArchName(),
       featureString, target.getAbi(), flags.getDictionary(ctx), target.getLink()));
 #else
   return {};
