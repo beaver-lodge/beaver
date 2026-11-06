@@ -1,5 +1,6 @@
 exclude = [
   stderr: true,
+  batata_runtime: System.get_env("BATATA_TEST_LIBRARY") == nil,
   cuda: :os.type() != {:unix, :linux},
   cuda_runtime: :os.type() != {:unix, :linux} or System.get_env("CI") == "true"
 ]

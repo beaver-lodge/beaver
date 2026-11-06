@@ -1,6 +1,32 @@
 defmodule Beaver.MLIR.Dialect.Ex.Schema do
   @moduledoc false
-  @pure ~w(lit add sub mul cmp box to_word unbox)a
+  @pure ~w(lit add sub mul cmp)a
+
+  defmacro defcops(layer) do
+    alias Beaver.MLIR.Conversion.Ex.CRuntime
+
+    definitions =
+      for name <- CRuntime.functions(layer), mode <- [:btt, :value] do
+        {inputs, outputs} =
+          if mode == :btt, do: {CRuntime.argument_types(name), ["i32"]}, else: CRuntime.value_signature(name)
+
+        args =
+          inputs
+          |> Enum.with_index()
+          |> Enum.map(fn {type, i} ->
+            quote do: unquote(Macro.var(String.to_atom("a#{i}"), nil)) = unquote(constraint(type))
+          end)
+
+        results = for {type, i} <- Enum.with_index(outputs), do: {String.to_atom("out#{i}"), constraint(type)}
+        call = {String.to_atom("#{mode}_" <> name), [], args}
+        quote do: Beaver.MLIR.Dialect.Ex.Schema.defop(unquote(call), results: unquote(results))
+      end
+
+    {:__block__, [], definitions}
+  end
+
+  defp constraint("!ex." <> name), do: quote(do: base(unquote({String.to_atom(name), [], []})))
+  defp constraint(type), do: quote(do: Beaver.MLIR.Type.get(unquote(type)))
 
   def pure_effects(_op), do: :pure
   def speculatable(_op), do: :speculatable

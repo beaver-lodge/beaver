@@ -27,7 +27,8 @@ limit. Kinda remains pinned to the same revision.
 | `Beaver.MLIR.Transform.Schedule.DSL`, `Tuner`, `Resolver`, and `Solver` | Use native Transform dialect operations; applications own search, scoring, and solver integration. |
 | `Beaver.Shadow.*` and the `mix shadow.*` tasks | Applications own experiment orchestration and reports. Native Transform, Triton, CUDA, ActionTracing, and conversion profiling remain. |
 | `Beaver.MLIR.Triton.LayoutAudit` and `PipelineEvidence` | Inspect IR with `Beaver.Walker` and collect native action traces or conversion profiles. `Triton.PipelinePlan` remains. |
-| `Beaver.Wasm.TermABI` | Runtime implementers own their ABI manifest; `Conversion.Ex.term_intrinsic_symbols/0` still exposes the intrinsic symbols. `Beaver.Wasm` and `Wasm.Binary` remain. |
+| `Beaver.Wasm.TermABI` | Runtime implementers own their ABI manifest. `Beaver.Wasm` and `Wasm.Binary` remain. |
+| `Conversion.Ex.RuntimeABI`, `term_intrinsic_symbols/0`, old Ex Zig runtime/continuation operations and tagged-word lowering | `Conversion.Ex.CRuntime`: raw `ex.btt_*` or SSA `ex.value_*` calls target Batata C ABI 12, including chunked imports and cross-guest copies. Language operations still require a provider; old handles/bytecode are incompatible. See [the runtime boundary](dialect-conversion.md#ex-provider-boundary). |
 
 The incremental compilation benchmark and tests dedicated to retired APIs are
 removed with their implementations. Tests for retained callbacks, native

@@ -1,12 +1,16 @@
 defmodule Beaver.MLIR.Dialect.Ex do
   @moduledoc """
   Elixir IR composed from language, execution and runtime schemas.
-  Existing `ex.*` builders and types remain available through this facade.
+  Batata calls use ex.btt_* pointers or ex.value_* SSA handles.
   See [layer contracts](dialect-conversion.html#ex-provider-boundary).
   """
   alias Beaver.MLIR.Operation
 
-  @schema_files [__ENV__.file | Enum.map(~w(language execution runtime schema), &Path.join(__DIR__, "ex/#{&1}.ex"))]
+  @schema_files [
+    __ENV__.file,
+    Path.expand("../conversion/ex/c_runtime.ex", __DIR__)
+    | Enum.map(~w(language execution runtime schema), &Path.join(__DIR__, "ex/#{&1}.ex"))
+  ]
   for path <- @schema_files, do: @external_resource(path)
 
   @schema_digest "sha256:" <>
@@ -18,6 +22,10 @@ defmodule Beaver.MLIR.Dialect.Ex do
   Module.register_attribute(__MODULE__, :ex_operations, accumulate: true)
 
   deftype term()
+  deftype process()
+  deftype entry()
+  deftype import_token()
+  deftype copy_job()
   deftype bound()
   deftype unbound()
 
@@ -33,6 +41,9 @@ defmodule Beaver.MLIR.Dialect.Ex do
   defconstraint integer_like, do: all_of([base("!builtin.integer"), any()])
 
   defconstraint term_like, do: any_of([base(term()), base(bound()), base(unbound())])
+
+  defconstraint runtime_value,
+    do: any_of([base(term()), base(process()), base(entry()), base(import_token()), base(copy_job())])
 
   use Beaver.MLIR.Dialect.Ex.Language
   use Beaver.MLIR.Dialect.Ex.Execution

@@ -13,41 +13,53 @@ dialect using a `Conversion.Plan`. The resulting IR can then use MLIR's standard
 ## Ex provider boundary
 
 Ex keeps one namespace with three schema owners: `Ex.Language` (values/control),
-`Ex.Execution` (scheduling/continuations) and `Ex.Runtime` (representation/host handles).
+`Ex.Execution` (process lifecycle/events) and `Ex.Runtime` (C ABI values/host handles).
 `Beaver.MLIR.Dialect.Ex.verify_layers!(ir, [:language, :execution])` verifies MLIR and rejects
 nested Ex operations outside those owners; foreign dialects receive normal MLIR verification.
 `layers/0`, `operations/1` and `layer/1` expose the declaration-derived catalog.
 
 ```elixir
 alias Beaver.MLIR.Conversion.{Ex, Plan}
-ir = Plan.run!(Ex.plan(layers: :execution), ir)
-ir = Ex.finish!(ir)
+namespace = "artifact_identity"
+ir = Plan.run!(Ex.plan(layers: :execution, runtime_namespace: namespace), ir)
+ir = Ex.finish!(ir, runtime_namespace: namespace)
 ```
 
 Selected-layer plans retain other owners and default to `build_materializations: false`.
 `finish!/1` lowers remaining Ex operations, reconciles type bridges and rejects unresolved casts.
 The default `plan/0` converts all layers. Prepare variables and cases first with
 `Beaver.MLIR.Dialect.Ex.MaterializeBoundVariables` and `Beaver.MLIR.Dialect.Ex.ExpandCase`.
-Scalar literals, add/subtract/multiply, comparisons and box/unbox casts declare pure effects;
+Scalar literals, add/subtract/multiply and comparisons declare pure effects;
 runtime calls, allocation, division and scheduling remain conservative.
 
-`Beaver.MLIR.Conversion.Ex.RuntimeABI` owns the original Batata Zig ABI; the current C runtime is separate.
-The schema digest covers all fragments and the shared macro, requiring new provider receipts.
-Structured patterns/guards, rescue/else/after paths and checked GC-root plans need further IR work.
+`Conversion.Ex.CRuntime` covers Batata BTT ABI 12 (`0x425454000000000c`), with
+raw-pointer `ex.btt_*` and SSA `ex.value_*` calls for all 49 entry points. Compile
+`CRuntime.adapter_source(namespace)` with an admitted library and matching `aot.h`,
+using `-fvisibility=hidden`. Load it through `ExecutionEngine.create!/2` and pass the
+same artifact-specific namespace to `Ex.plan/1`; this isolates JIT symbols and receipts.
+Rebuild libraries/adapters/receipts together; old ABI names and layouts reject.
 
-Beaver owns the `ex` dialect schema and the provider-neutral external
-compiler-kernel ABI. Evolving production lowering belongs to Batata and is
-loaded through `Conversion.Plan.add_external_pattern_population/3`; Beaver
-does not locate or download Batata artifacts.
+`value_signature/1` describes status-first SSA results; `storage_type/2` describes
+raw buffers. Term/process/entry/import/copy handles cross functions, branches and SCF
+loops. `ex.value_load/store` require valid caller-owned storage. Outputs start at zero;
+check status and clean up owned handles even on failed begins. No implicit retain/release.
+Imports use sequential chunks up to 256 bytes; ETF decoding needs bounded `step` calls.
+Copies target distinct uncalled guests in one instance, without transferring host
+capabilities. On failure, cancel and step until rollback completes before draining.
+Calls are serial per runtime; views expire on mutation. Release roots, cancel/drain
+processes (retry `BUSY`), then destroy instances before unloading. See Batata's `aot.h`.
 
-`Beaver.MLIR.Conversion.Ex.Stage0.manifest/0` describes the only Ex-specific
-C++ implementation retained in Beaver. It is a frozen, versioned bootstrap
-seed for Batata's restricted compiler-kernel source and a differential oracle,
-not a production provider. Runtime and standard-library patterns remain in the
-BEAM reference plan so Stage 0 can close a clean bootstrap without extending
-the C++ seed. A production compiler must select a verified native provider and
-fail before conversion if that artifact cannot be loaded; it must never fall
-back implicitly to Stage 0 or the BEAM callbacks.
+The old Zig ABI/continuations/tagged-word patterns are retired. The Stage 0 v2 manifest
+retains a scalar C++ seed; actors, IO, Enum and box/unbox need an execution provider.
+`Plan.add_external_pattern_population/3` loads external compiler kernels; Beaver does
+not replace Batata's source/plan admission or C emitter. Schema digests bind all fragments.
+
+Normal tests use independent ABI fixtures. Opt-in tests need a fresh admitted library
+with `identity/1` at `{0, 0}`, `invoke(f, x) = f.(x)` and a captured adder closure.
+Compile it with the adapter and `test/fixtures/batata_c/transactions.c` (its adjacent
+headers and Batata's matching `aot.h`). Set `BATATA_TEST_LIBRARY` to the absolute library
+path and `BATATA_TEST_NAMESPACE` to its query identity, then run
+`mix test test/batata_c_runtime_test.exs --include batata_runtime`.
 
 ```elixir
 defmodule Counter do
@@ -121,20 +133,9 @@ plan =
 {:ok, ^module, _diagnostics} = MLIR.Conversion.Plan.run(plan, module)
 
 # The custom dialect is gone. Continue with upstream conversion passes.
-pass_manager = MLIR.CAPI.mlirPassManagerCreate(ctx)
-
-MLIR.CAPI.mlirPassManagerAddOwnedPass(
-  pass_manager,
-  MLIR.CAPI.mlirCreateConversionArithToLLVMConversionPass()
-)
-
-MLIR.CAPI.mlirPassManagerAddOwnedPass(
-  pass_manager,
-  MLIR.CAPI.mlirCreateConversionConvertFuncToLLVMPass()
-)
-
-{:ok, _pass_diagnostics} = MLIR.PassManager.run(pass_manager, module)
-MLIR.PassManager.destroy(pass_manager)
+module
+|> Beaver.Composer.append("convert-arith-to-llvm,convert-func-to-llvm")
+|> Beaver.Composer.run!()
 ```
 
 ## Plan Inspection and Callback Versioning

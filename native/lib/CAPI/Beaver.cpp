@@ -82,15 +82,6 @@ MLIR_CAPI_EXPORTED MlirLogicalResult beaverOperationSetProperties(MlirOperation 
 
 namespace {
 
-static bool isExTermType(Type type) {
-  auto dynamicType = dyn_cast<DynamicType>(type);
-  if (!dynamicType) return false;
-
-  StringRef name = dynamicType.getTypeDef()->getName();
-  return name == "term" || name == "bound" || name == "unbound" || name.ends_with(".term") ||
-         name.ends_with(".bound") || name.ends_with(".unbound");
-}
-
 class ExLiteralConversion final : public ConversionPattern {
 public:
   ExLiteralConversion(const TypeConverter &converter, MLIRContext *context)
@@ -109,48 +100,6 @@ public:
     state.addTypes(resultType);
     Operation *constant = rewriter.create(state);
     rewriter.replaceOp(operation, constant->getResults());
-    return success();
-  }
-};
-
-class ExBoxConversion final : public ConversionPattern {
-public:
-  ExBoxConversion(const TypeConverter &converter, MLIRContext *context)
-      : ConversionPattern(converter, "ex.box", PatternBenefit(1), context) {}
-
-  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                                ConversionPatternRewriter &rewriter) const override {
-    if (operands.size() != 1 || operation->getNumOperands() != 1 || operation->getNumResults() != 1) return failure();
-
-    Value word = operands.front();
-    if (!isExTermType(operation->getOperand(0).getType())) {
-      IntegerType wordType = rewriter.getI64Type();
-
-      OperationState constantState(operation->getLoc(), "arith.constant");
-      constantState.addAttribute("value", rewriter.getI64IntegerAttr(3));
-      constantState.addTypes(wordType);
-      Operation *constant = rewriter.create(constantState);
-
-      OperationState shiftState(operation->getLoc(), "arith.shli");
-      shiftState.addOperands({word, constant->getResult(0)});
-      shiftState.addTypes(wordType);
-      word = rewriter.create(shiftState)->getResult(0);
-    }
-
-    rewriter.replaceOp(operation, word);
-    return success();
-  }
-};
-
-class ExIdentityConversion final : public ConversionPattern {
-public:
-  ExIdentityConversion(const TypeConverter &converter, StringRef rootName, MLIRContext *context)
-      : ConversionPattern(converter, rootName, PatternBenefit(1), context) {}
-
-  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                                ConversionPatternRewriter &rewriter) const override {
-    if (operands.size() != 1 || operation->getNumResults() != 1) return failure();
-    rewriter.replaceOp(operation, operands.front());
     return success();
   }
 };
@@ -288,9 +237,7 @@ void beaverPopulateExScalarConversionPatterns(MlirRewritePatternSet patterns, Ml
   TypeConverter *converter = unwrap(typeConverter);
   MLIRContext *context = set->getContext();
 
-  set->add<ExLiteralConversion, ExBoxConversion, ExYieldConversion>(*converter, context);
-  set->add<ExIdentityConversion>(*converter, "ex.to_word", context);
-  set->add<ExIdentityConversion>(*converter, "ex.unbox", context);
+  set->add<ExLiteralConversion, ExYieldConversion>(*converter, context);
   set->add<ExBinaryConversion>(*converter, "ex.add", "arith.addi", context);
   set->add<ExBinaryConversion>(*converter, "ex.sub", "arith.subi", context);
   set->add<ExBinaryConversion>(*converter, "ex.mul", "arith.muli", context);
