@@ -31,10 +31,7 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   @bootstrap_keys ~w(stage seed provenance)
   @pattern_keys ~w(name root version)
 
-  @enforce_keys ~w(
-    schema_version compiler_kernel_abi_version provider compiler_revision beaver_revision llvm_revision
-    dialect_schema_digest runtime_abi_digest patterns capabilities target artifact_sha256 entrypoints bootstrap
-  )a
+  @enforce_keys Enum.map(@top_level_keys, &String.to_atom/1)
   defstruct @enforce_keys
 
   @type pattern() :: %{required(String.t()) => String.t()}
@@ -79,24 +76,9 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   def new!(map) when is_map(map) do
     require_exact_keys!(map, @top_level_keys, "manifest")
 
-    manifest = %__MODULE__{
-      schema_version: fetch!(map, "schema_version"),
-      compiler_kernel_abi_version: fetch!(map, "compiler_kernel_abi_version"),
-      provider: fetch!(map, "provider"),
-      compiler_revision: fetch!(map, "compiler_revision"),
-      beaver_revision: fetch!(map, "beaver_revision"),
-      llvm_revision: fetch!(map, "llvm_revision"),
-      dialect_schema_digest: fetch!(map, "dialect_schema_digest"),
-      runtime_abi_digest: fetch!(map, "runtime_abi_digest"),
-      patterns: fetch!(map, "patterns"),
-      capabilities: fetch!(map, "capabilities"),
-      target: fetch!(map, "target"),
-      artifact_sha256: fetch!(map, "artifact_sha256"),
-      entrypoints: fetch!(map, "entrypoints"),
-      bootstrap: fetch!(map, "bootstrap")
-    }
-
-    validate!(manifest)
+    __MODULE__
+    |> struct!(Map.new(@enforce_keys, &{&1, fetch!(map, Atom.to_string(&1))}))
+    |> validate!()
   end
 
   def new!(other), do: reject!(:invalid_manifest, %{expected: "map", got: inspect(other)})
@@ -107,15 +89,8 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
     require_version!(manifest.schema_version, @schema_version, :unsupported_schema)
     require_version!(manifest.compiler_kernel_abi_version, @abi_version, :abi_mismatch)
 
-    Enum.each(
-      [
-        provider: manifest.provider,
-        compiler_revision: manifest.compiler_revision,
-        beaver_revision: manifest.beaver_revision,
-        llvm_revision: manifest.llvm_revision
-      ],
-      fn {name, value} -> require_non_empty_string!(value, name) end
-    )
+    for key <- ~w(provider compiler_revision beaver_revision llvm_revision)a,
+        do: require_non_empty_string!(Map.fetch!(manifest, key), key)
 
     require_digest!(manifest.dialect_schema_digest, :dialect_schema_digest)
     require_digest_or_none!(manifest.runtime_abi_digest, :runtime_abi_digest)
@@ -131,22 +106,7 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   @doc "Returns the normalized string-keyed map used for transport and receipts."
   @spec to_map(t()) :: map()
   def to_map(%__MODULE__{} = manifest),
-    do: %{
-      "schema_version" => manifest.schema_version,
-      "compiler_kernel_abi_version" => manifest.compiler_kernel_abi_version,
-      "provider" => manifest.provider,
-      "compiler_revision" => manifest.compiler_revision,
-      "beaver_revision" => manifest.beaver_revision,
-      "llvm_revision" => manifest.llvm_revision,
-      "dialect_schema_digest" => manifest.dialect_schema_digest,
-      "runtime_abi_digest" => manifest.runtime_abi_digest,
-      "patterns" => manifest.patterns,
-      "capabilities" => manifest.capabilities,
-      "target" => manifest.target,
-      "artifact_sha256" => manifest.artifact_sha256,
-      "entrypoints" => manifest.entrypoints,
-      "bootstrap" => manifest.bootstrap
-    }
+    do: Map.new(Map.from_struct(manifest), fn {key, value} -> {Atom.to_string(key), value} end)
 
   @doc "Encodes the canonical JSON representation used by `digest/1`."
   @spec encode!(t()) :: binary()

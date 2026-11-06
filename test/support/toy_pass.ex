@@ -2,29 +2,23 @@ defmodule ToyPass do
   @moduledoc false
   use Beaver
   alias MLIR.Dialect.TOSA
-  import Beaver.Pattern
   use MLIR.Pass, on: "builtin.module"
 
-  defpat replace_add_op() do
-    a = value()
-    b = value()
-    res = type()
-    {op, _t} = TOSA.add(a, b) >>> {:op, [res]}
+  def replace_add_op(_pattern, op, rewriter, state) do
+    [a, b] = Enum.to_list(Beaver.Walker.operands(op))
+    type = op |> MLIR.Operation.result(0) |> MLIR.Value.type()
 
-    rewrite op do
-      {r, _} = TOSA.sub(a, b) >>> {:op, [res]}
-      replace(op, with: r)
+    mlir ctx: MLIR.context(op), ip: rewriter do
+      result = TOSA.sub(a, b) >>> type
+      MLIR.PatternRewriter.replace_op(rewriter, op, result)
     end
+
+    {:ok, state}
   end
 
-  def run(%MLIR.Operation{} = operation, _state) do
-    with 1 <- Beaver.Walker.regions(operation) |> Enum.count(),
-         {:ok, _} <-
-           MLIR.apply_(MLIR.Module.from_operation(operation), [replace_add_op(benefit: 2)]) do
-      :ok
-    else
-      _ -> raise "unreachable"
-    end
+  def run(operation, state) do
+    MLIR.Rewrite.apply_patterns!(operation, [{"tosa.add", &replace_add_op/4}])
+    state
   end
 end
 
@@ -34,24 +28,20 @@ defmodule ToyPassWithInit do
   use MLIR.Pass, on: "builtin.module"
 
   def initialize(ctx, nil) do
-    {set, pattern_module} =
-      Beaver.MLIR.RewritePatternSet.with_pdl_patterns(
-        [ToyPass.replace_add_op(benefit: 2)],
-        ctx: ctx
-      )
+    frozen_set =
+      MLIR.RewritePatternSet.create(ctx)
+      |> MLIR.RewritePatternSet.add("tosa.add", &ToyPass.replace_add_op/4, ctx: ctx)
+      |> MLIR.RewritePatternSet.freeze()
 
-    frozen_set = MLIR.RewritePatternSet.freeze(set)
-    MLIR.Module.destroy(pattern_module)
-    {:ok, %{patterns: frozen_set}}
+    {:ok, %{patterns: frozen_set, ctx: ctx, owning: true}}
   end
 
-  def destruct(nil) do
-    :ok
-  end
+  def clone(state), do: %{state | owning: false}
 
-  def destruct(%{patterns: frozen_set}) do
-    MLIR.FrozenRewritePatternSet.destroy(frozen_set)
-  end
+  def destruct(%{patterns: patterns, ctx: ctx, owning: true}),
+    do: MLIR.FrozenRewritePatternSet.threaded_destroy(ctx, patterns)
+
+  def destruct(_state), do: :ok
 
   def run(%MLIR.Operation{} = operation, %{patterns: patterns} = state) do
     with 1 <- Beaver.Walker.regions(operation) |> Enum.count(),

@@ -10,9 +10,6 @@
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/ExtensibleDialect.h"
-#ifdef BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION
-#include "mlir/Transforms/CompositePass.h"
-#endif
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/IR/SymbolTable.h"
@@ -30,7 +27,6 @@
 #include <string>
 #include <thread>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 using namespace mlir;
@@ -46,212 +42,102 @@ static bool isExTermType(Type type) {
          name.ends_with(".bound") || name.ends_with(".unbound");
 }
 
-class ExLiteralConversion final : public ConversionPattern {
+class ExScalarConversion final : public ConversionPattern {
 public:
-  ExLiteralConversion(const TypeConverter &converter, MLIRContext *context)
-      : ConversionPattern(converter, "ex.lit", PatternBenefit(1), context) {}
+  enum Kind { Literal, Box, Identity, Binary, Compare, If, Yield };
+  ExScalarConversion(const TypeConverter &converter, StringRef root, Kind kind, StringRef target, MLIRContext *context)
+      : ConversionPattern(converter, root, PatternBenefit(1), context), kind(kind), target(target.str()) {}
 
-  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
+  LogicalResult matchAndRewrite(Operation *op, ArrayRef<Value> operands,
                                 ConversionPatternRewriter &rewriter) const override {
-    if (!operands.empty() || operation->getNumResults() != 1) return failure();
-
-    Attribute value = operation->getAttr("value");
-    Type resultType = getTypeConverter()->convertType(operation->getResult(0).getType());
-    if (!value || !resultType) return failure();
-
-    OperationState state(operation->getLoc(), "arith.constant");
-    state.addAttribute("value", value);
-    state.addTypes(resultType);
-    Operation *constant = rewriter.create(state);
-    rewriter.replaceOp(operation, constant->getResults());
-    return success();
-  }
-};
-
-class ExBoxConversion final : public ConversionPattern {
-public:
-  ExBoxConversion(const TypeConverter &converter, MLIRContext *context)
-      : ConversionPattern(converter, "ex.box", PatternBenefit(1), context) {}
-
-  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                                ConversionPatternRewriter &rewriter) const override {
-    if (operands.size() != 1 || operation->getNumOperands() != 1 || operation->getNumResults() != 1) return failure();
-
-    Value word = operands.front();
-    if (!isExTermType(operation->getOperand(0).getType())) {
-      IntegerType wordType = rewriter.getI64Type();
-
-      OperationState constantState(operation->getLoc(), "arith.constant");
-      constantState.addAttribute("value", rewriter.getI64IntegerAttr(3));
-      constantState.addTypes(wordType);
-      Operation *constant = rewriter.create(constantState);
-
-      OperationState shiftState(operation->getLoc(), "arith.shli");
-      shiftState.addOperands({word, constant->getResult(0)});
-      shiftState.addTypes(wordType);
-      word = rewriter.create(shiftState)->getResult(0);
+    auto create = [&](StringRef name, ValueRange values, TypeRange types, ArrayRef<NamedAttribute> attrs = {}) {
+      OperationState state(op->getLoc(), name);
+      state.addOperands(values);
+      state.addTypes(types);
+      state.addAttributes(attrs);
+      return rewriter.create(state);
+    };
+    auto replace = [&](Operation *replacement) {
+      rewriter.replaceOp(op, replacement->getResults());
+      return success();
+    };
+    if (kind == Yield) return replace(create("scf.yield", operands, {}));
+    if (kind == If) {
+      if (operands.size() != 1 || op->getNumRegions() != 2) return failure();
+      SmallVector<Type> resultTypes;
+      if (failed(getTypeConverter()->convertTypes(op->getResultTypes(), resultTypes))) return failure();
+      Operation *condition = create("arith.trunci", operands.front(), rewriter.getI1Type());
+      OperationState state(op->getLoc(), "scf.if");
+      state.addOperands(condition->getResult(0));
+      state.addTypes(resultTypes);
+      state.addRegion();
+      state.addRegion();
+      Operation *replacement = rewriter.create(state);
+      for (unsigned i = 0; i < 2; ++i) replacement->getRegion(i).takeBody(op->getRegion(i));
+      return replace(replacement);
     }
-
-    rewriter.replaceOp(operation, word);
-    return success();
-  }
-};
-
-class ExIdentityConversion final : public ConversionPattern {
-public:
-  ExIdentityConversion(const TypeConverter &converter, StringRef rootName, MLIRContext *context)
-      : ConversionPattern(converter, rootName, PatternBenefit(1), context) {}
-
-  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                                ConversionPatternRewriter &rewriter) const override {
-    if (operands.size() != 1 || operation->getNumResults() != 1) return failure();
-    rewriter.replaceOp(operation, operands.front());
-    return success();
-  }
-};
-
-class ExBinaryConversion final : public ConversionPattern {
-public:
-  ExBinaryConversion(const TypeConverter &converter, StringRef rootName, StringRef targetName, MLIRContext *context)
-      : ConversionPattern(converter, rootName, PatternBenefit(1), context), targetName(targetName.str()) {}
-
-  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                                ConversionPatternRewriter &rewriter) const override {
-    if (operands.size() != 2 || operation->getNumResults() != 1) return failure();
-
-    Type resultType = getTypeConverter()->convertType(operation->getResult(0).getType());
+    if (op->getNumResults() != 1) return failure();
+    if (kind == Identity || kind == Box) {
+      if (operands.size() != 1 || (kind == Box && op->getNumOperands() != 1)) return failure();
+      Value word = operands.front();
+      if (kind == Box && !isExTermType(op->getOperand(0).getType())) {
+        Type wordType = rewriter.getI64Type();
+        Operation *shift = create("arith.constant", {}, wordType,
+                                  {rewriter.getNamedAttr("value", rewriter.getI64IntegerAttr(3))});
+        word = create("arith.shli", {word, shift->getResult(0)}, wordType)->getResult(0);
+      }
+      rewriter.replaceOp(op, word);
+      return success();
+    }
+    if (operands.size() != (kind == Literal ? 0 : 2)) return failure();
+    Type resultType = getTypeConverter()->convertType(op->getResult(0).getType());
     if (!resultType) return failure();
-
-    OperationState state(operation->getLoc(), targetName);
-    state.addOperands(operands);
-    state.addTypes(resultType);
-    Operation *replacement = rewriter.create(state);
-    rewriter.replaceOp(operation, replacement->getResults());
-    return success();
+    if (kind == Literal) {
+      Attribute value = op->getAttr("value");
+      if (!value) return failure();
+      return replace(create("arith.constant", {}, resultType, {rewriter.getNamedAttr("value", value)}));
+    }
+    if (kind == Binary) return replace(create(target, operands, resultType));
+    StringAttr predicate = op->getAttrOfType<StringAttr>("predicate");
+    if (!predicate) return failure();
+    const StringRef predicates[] = {"eq", "ne", "slt", "sle", "sgt", "sge", "ult", "ule", "ugt", "uge"};
+    auto found = std::find(std::begin(predicates), std::end(predicates), predicate.getValue());
+    if (found == std::end(predicates)) return failure();
+    Operation *compare = create("arith.cmpi", operands, rewriter.getI1Type(),
+                                {rewriter.getNamedAttr("predicate", rewriter.getI64IntegerAttr(found - predicates))});
+    return replace(create("arith.extui", compare->getResult(0), resultType));
   }
 
 private:
-  std::string targetName;
-};
-
-static bool exCmpPredicateCode(StringRef predicate, int64_t &code) {
-  if (predicate == "eq")
-    code = 0;
-  else if (predicate == "ne")
-    code = 1;
-  else if (predicate == "slt")
-    code = 2;
-  else if (predicate == "sle")
-    code = 3;
-  else if (predicate == "sgt")
-    code = 4;
-  else if (predicate == "sge")
-    code = 5;
-  else if (predicate == "ult")
-    code = 6;
-  else if (predicate == "ule")
-    code = 7;
-  else if (predicate == "ugt")
-    code = 8;
-  else if (predicate == "uge")
-    code = 9;
-  else
-    return false;
-  return true;
-}
-
-class ExCmpConversion final : public ConversionPattern {
-public:
-  ExCmpConversion(const TypeConverter &converter, MLIRContext *context)
-      : ConversionPattern(converter, "ex.cmp", PatternBenefit(1), context) {}
-
-  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                                ConversionPatternRewriter &rewriter) const override {
-    if (operands.size() != 2 || operation->getNumResults() != 1) return failure();
-
-    StringAttr predicate = operation->getAttrOfType<StringAttr>("predicate");
-    Type resultType = getTypeConverter()->convertType(operation->getResult(0).getType());
-    int64_t predicateCode;
-    if (!predicate || !resultType || !exCmpPredicateCode(predicate.getValue(), predicateCode)) return failure();
-
-    OperationState compareState(operation->getLoc(), "arith.cmpi");
-    compareState.addOperands(operands);
-    compareState.addAttribute("predicate", rewriter.getI64IntegerAttr(predicateCode));
-    compareState.addTypes(rewriter.getI1Type());
-    Operation *compare = rewriter.create(compareState);
-
-    OperationState extendState(operation->getLoc(), "arith.extui");
-    extendState.addOperands(compare->getResult(0));
-    extendState.addTypes(resultType);
-    Operation *extend = rewriter.create(extendState);
-
-    rewriter.replaceOp(operation, extend->getResults());
-    return success();
-  }
-};
-
-class ExIfConversion final : public ConversionPattern {
-public:
-  ExIfConversion(const TypeConverter &converter, MLIRContext *context)
-      : ConversionPattern(converter, "ex.if", PatternBenefit(1), context) {}
-
-  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                                ConversionPatternRewriter &rewriter) const override {
-    if (operands.size() != 1 || operation->getNumRegions() != 2) return failure();
-
-    SmallVector<Type> resultTypes;
-    if (failed(getTypeConverter()->convertTypes(operation->getResultTypes(), resultTypes))) return failure();
-
-    OperationState truncateState(operation->getLoc(), "arith.trunci");
-    truncateState.addOperands(operands.front());
-    truncateState.addTypes(rewriter.getI1Type());
-    Operation *condition = rewriter.create(truncateState);
-
-    OperationState ifState(operation->getLoc(), "scf.if");
-    ifState.addOperands(condition->getResult(0));
-    ifState.addTypes(resultTypes);
-    ifState.addRegion();
-    ifState.addRegion();
-    Operation *ifOperation = rewriter.create(ifState);
-    ifOperation->getRegion(0).takeBody(operation->getRegion(0));
-    ifOperation->getRegion(1).takeBody(operation->getRegion(1));
-
-    rewriter.replaceOp(operation, ifOperation->getResults());
-    return success();
-  }
-};
-
-class ExYieldConversion final : public ConversionPattern {
-public:
-  ExYieldConversion(const TypeConverter &converter, MLIRContext *context)
-      : ConversionPattern(converter, "ex.yield", PatternBenefit(1), context) {}
-
-  LogicalResult matchAndRewrite(Operation *operation, ArrayRef<Value> operands,
-                                ConversionPatternRewriter &rewriter) const override {
-    OperationState state(operation->getLoc(), "scf.yield");
-    state.addOperands(operands);
-    Operation *yield = rewriter.create(state);
-    rewriter.replaceOp(operation, yield);
-    return success();
-  }
+  Kind kind;
+  std::string target;
 };
 
 } // namespace
 
 void beaverPopulateExScalarConversionPatterns(MlirRewritePatternSet patterns, MlirTypeConverter typeConverter) {
-  RewritePatternSet *set = unwrap(patterns);
-  TypeConverter *converter = unwrap(typeConverter);
-  MLIRContext *context = set->getContext();
-
-  set->add<ExLiteralConversion, ExBoxConversion, ExYieldConversion>(*converter, context);
-  set->add<ExIdentityConversion>(*converter, "ex.to_word", context);
-  set->add<ExIdentityConversion>(*converter, "ex.unbox", context);
-  set->add<ExBinaryConversion>(*converter, "ex.add", "arith.addi", context);
-  set->add<ExBinaryConversion>(*converter, "ex.sub", "arith.subi", context);
-  set->add<ExBinaryConversion>(*converter, "ex.mul", "arith.muli", context);
-  set->add<ExBinaryConversion>(*converter, "ex.div", "arith.divsi", context);
-  set->add<ExBinaryConversion>(*converter, "ex.rem", "arith.remsi", context);
-  set->add<ExCmpConversion, ExIfConversion>(*converter, context);
+  using Pattern = ExScalarConversion;
+  struct Entry {
+    const char *root;
+    Pattern::Kind kind;
+    const char *target;
+  };
+  const Entry entries[] = {
+      {"ex.lit", Pattern::Literal, ""},
+      {"ex.box", Pattern::Box, ""},
+      {"ex.yield", Pattern::Yield, ""},
+      {"ex.to_word", Pattern::Identity, ""},
+      {"ex.unbox", Pattern::Identity, ""},
+      {"ex.add", Pattern::Binary, "arith.addi"},
+      {"ex.sub", Pattern::Binary, "arith.subi"},
+      {"ex.mul", Pattern::Binary, "arith.muli"},
+      {"ex.div", Pattern::Binary, "arith.divsi"},
+      {"ex.rem", Pattern::Binary, "arith.remsi"},
+      {"ex.cmp", Pattern::Compare, ""},
+      {"ex.if", Pattern::If, ""}};
+  auto *set = unwrap(patterns);
+  for (const Entry &entry : entries)
+    set->add<Pattern>(*unwrap(typeConverter), entry.root, entry.kind, entry.target, set->getContext());
 }
 
 MLIR_CAPI_EXPORTED void beaverOperationDestroyIterative(MlirOperation operation) {
@@ -315,10 +201,6 @@ static llvm::SmallVector<NamedAttribute> collectInherentAttributes(Operation *op
   return attributes;
 }
 
-#ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
-static std::mutex transientScopeMutex;
-static std::unordered_set<MLIRContext *> transientScopeContexts;
-#endif
 
 class BeaverMemoryEffectsOpInterfaceFallbackModel
     : public MemoryEffectOpInterface::FallbackModel<BeaverMemoryEffectsOpInterfaceFallbackModel> {
@@ -569,36 +451,6 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverMemoryEffectInstanceGetSymbolRef(MlirMemo
   return wrap(unwrap(instance)->getSymbolRef());
 }
 
-MLIR_CAPI_EXPORTED void beaverTransformOnlyReadsHandle(MlirOpOperand *operands, intptr_t numOperands,
-                                                       MlirBeaverMemoryEffectInstancesList effects) {
-  MutableArrayRef<OpOperand> unwrapped;
-  if (numOperands != 0) unwrapped = MutableArrayRef<OpOperand>(unwrap(*operands), numOperands);
-  transform::onlyReadsHandle(unwrapped, *unwrapEffectList(effects));
-}
-
-MLIR_CAPI_EXPORTED void beaverTransformConsumesHandle(MlirOpOperand *operands, intptr_t numOperands,
-                                                      MlirBeaverMemoryEffectInstancesList effects) {
-  MutableArrayRef<OpOperand> unwrapped;
-  if (numOperands != 0) unwrapped = MutableArrayRef<OpOperand>(unwrap(*operands), numOperands);
-  transform::consumesHandle(unwrapped, *unwrapEffectList(effects));
-}
-
-MLIR_CAPI_EXPORTED void beaverTransformProducesHandle(MlirValue *results, intptr_t numResults,
-                                                      MlirBeaverMemoryEffectInstancesList effects) {
-  for (intptr_t index = 0; index < numResults; ++index) {
-    auto result = cast<OpResult>(unwrap(results[index]));
-    transform::producesHandle(ResultRange(result), *unwrapEffectList(effects));
-  }
-}
-
-MLIR_CAPI_EXPORTED void beaverTransformModifiesPayload(MlirBeaverMemoryEffectInstancesList effects) {
-  transform::modifiesPayload(*unwrapEffectList(effects));
-}
-
-MLIR_CAPI_EXPORTED void beaverTransformOnlyReadsPayload(MlirBeaverMemoryEffectInstancesList effects) {
-  transform::onlyReadsPayload(*unwrapEffectList(effects));
-}
-
 MLIR_CAPI_EXPORTED bool beaverTransformPackedParamsSupported(void) {
 #ifdef BEAVER_HAS_PACKED_TRANSFORM_PARAMS
   return true;
@@ -619,44 +471,6 @@ MLIR_CAPI_EXPORTED MlirStringRef beaverGetLLVMVersion() {
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetArgument(MlirPass pass) {
   auto argument = unwrap(pass)->getArgument();
   return wrap(argument);
-}
-
-MLIR_CAPI_EXPORTED MlirOpPassManager beaverOpPassManagerCreate(void) { return wrap(new OpPassManager()); }
-
-MLIR_CAPI_EXPORTED void beaverOpPassManagerDestroy(MlirOpPassManager passManager) { delete unwrap(passManager); }
-
-MLIR_CAPI_EXPORTED bool beaverCompositeFixedPointFailureActionSupported(void) {
-#ifdef BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION
-  return true;
-#else
-  return false;
-#endif
-}
-
-MLIR_CAPI_EXPORTED MlirPass beaverCreateCompositeFixedPointPass(MlirStringRef name, MlirOpPassManager innerPipeline,
-                                                                intptr_t maxIterations,
-                                                                MlirBeaverConvergenceFailureAction action) {
-  OpPassManager *source = unwrap(innerPipeline);
-  auto populate = [source](OpPassManager &target) { target = std::move(*source); };
-
-#ifdef BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION
-  ConvergenceFailureAction nativeAction;
-  switch (action) {
-  case MlirBeaverConvergenceFailureWarn:
-    nativeAction = ConvergenceFailureAction::Warn;
-    break;
-  case MlirBeaverConvergenceFailureError:
-    nativeAction = ConvergenceFailureAction::Error;
-    break;
-  case MlirBeaverConvergenceFailureSilent:
-    nativeAction = ConvergenceFailureAction::Silent;
-    break;
-  }
-  return wrap(createCompositeFixedPointPass(unwrap(name).str(), populate, maxIterations, nativeAction).release());
-#else
-  assert(action == MlirBeaverConvergenceFailureWarn && "linked LLVM cannot configure composite convergence failure");
-  return wrap(createCompositeFixedPointPass(unwrap(name).str(), populate, maxIterations).release());
-#endif
 }
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetName(MlirPass pass) {
@@ -817,52 +631,6 @@ MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context, void (*task)(v
   // elastic pool can grow when all current workers wait for nested callbacks.
   unwrap(mlirContextGetThreadPool(context))->async([task, arg]() { task(arg); });
   return true;
-}
-
-MLIR_CAPI_EXPORTED bool beaverContextTransientScopeSupported(void) {
-#ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
-  return true;
-#else
-  return false;
-#endif
-}
-
-MLIR_CAPI_EXPORTED bool beaverContextBeginTransientScope(MlirContext context) {
-#ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
-  MLIRContext *unwrapped = unwrap(context);
-  std::lock_guard<std::mutex> lock(transientScopeMutex);
-  if (!transientScopeContexts.insert(unwrapped).second) return false;
-  unwrapped->beginTransientScope();
-  return true;
-#else
-  (void)context;
-  return false;
-#endif
-}
-
-MLIR_CAPI_EXPORTED bool beaverContextEndTransientScope(MlirContext context) {
-#ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
-  MLIRContext *unwrapped = unwrap(context);
-  std::lock_guard<std::mutex> lock(transientScopeMutex);
-  auto active = transientScopeContexts.find(unwrapped);
-  if (active == transientScopeContexts.end()) return false;
-  unwrapped->endTransientScope();
-  transientScopeContexts.erase(active);
-  return true;
-#else
-  (void)context;
-  return false;
-#endif
-}
-
-MLIR_CAPI_EXPORTED bool beaverContextHasActiveTransientScope(MlirContext context) {
-#ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
-  std::lock_guard<std::mutex> lock(transientScopeMutex);
-  return transientScopeContexts.find(unwrap(context)) != transientScopeContexts.end();
-#else
-  (void)context;
-  return false;
-#endif
 }
 
 MLIR_CAPI_EXPORTED MlirType beaverDenseElementsAttrGetType(MlirAttribute attr) {

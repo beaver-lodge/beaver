@@ -551,25 +551,11 @@ static MlirLogicalResult ensureFunctionDeclaration(MlirOperation anchor, MlirCon
     if (!symbolTable || symbolTable->getNumRegions() != 1 || symbolTable->getRegion(0).empty())
       return hostFailure(diagnostic, diagnosticUserData, "operation has no enclosing symbol table");
 
-    MLIRContext *context = unwrap(rewriter)->getContext();
-    SmallVector<Type> inputs;
-    SmallVector<Type> results;
-    inputs.reserve(nInputTypes);
-    results.reserve(nResultTypes);
-
-    for (intptr_t index = 0; index < nInputTypes; ++index) {
-      if (mlirTypeIsNull(inputTypes[index]) || unwrap(inputTypes[index]).getContext() != context)
-        return hostFailure(diagnostic, diagnosticUserData, "function input type belongs to a foreign context");
-      inputs.push_back(unwrap(inputTypes[index]));
-    }
-
-    for (intptr_t index = 0; index < nResultTypes; ++index) {
-      if (mlirTypeIsNull(resultTypes[index]) || unwrap(resultTypes[index]).getContext() != context)
-        return hostFailure(diagnostic, diagnosticUserData, "function result type belongs to a foreign context");
-      results.push_back(unwrap(resultTypes[index]));
-    }
-
-    FunctionType functionType = FunctionType::get(context, inputs, results);
+    MlirType signature;
+    MlirLogicalResult checked = functionType(rewriter, nInputTypes, inputTypes, nResultTypes, resultTypes,
+                                              &signature, diagnostic, diagnosticUserData);
+    if (mlirLogicalResultIsFailure(checked)) return checked;
+    FunctionType functionType = cast<FunctionType>(unwrap(signature));
     if (Operation *existing = SymbolTable::lookupSymbolIn(symbolTable, name)) {
       auto existingType = existing->getAttrOfType<TypeAttr>("function_type");
       if (existing->getName().getStringRef() != "func.func" || !existingType || existingType.getValue() != functionType)

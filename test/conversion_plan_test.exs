@@ -6,24 +6,11 @@ defmodule Beaver.MLIR.CounterPlanTest do
   defop inc(value = Type.i32()), do: [Type.i32()]
 end
 
-defmodule Beaver.MLIR.ConversionPlanNativePatterns do
-  use Beaver.Pattern.Native
-
-  alias Beaver.MLIR
-
-  defrewrite erase_drop(operation, rewriter, owner), root: "plan_native.drop" do
-    send(owner, :native_plan_rewrite)
-    rewriter |> MLIR.PatternRewriter.as_base() |> MLIR.RewriterBase.erase_op(operation)
-    :ok
-  end
-end
-
 defmodule Beaver.MLIR.ConversionPlanTest do
   use Beaver.Case, async: true
 
   alias Beaver.MLIR
   alias Beaver.MLIR.Conversion.Plan
-  alias Beaver.MLIR.ConversionPlanNativePatterns
 
   test "lowers a Slang dialect using Plan and reuses the Plan across fresh MLIR contexts" do
     plan =
@@ -138,40 +125,6 @@ defmodule Beaver.MLIR.ConversionPlanTest do
     after
       MLIR.Context.destroy(ctx2)
     end
-  end
-
-  test "composes with a Native rewrite descriptor without another pattern language", %{ctx: ctx} do
-    MLIR.Context.allow_unregistered_dialects(ctx)
-    owner = self()
-
-    descriptor =
-      ConversionPlanNativePatterns.erase_drop(
-        init_state: owner,
-        destruct: fn pid -> send(pid, :native_plan_pattern_destroyed) end
-      )
-
-    plan =
-      Plan.new(mode: :full, timeout: 1_000)
-      |> Plan.add_legal_dialect("builtin")
-      |> Plan.add_illegal_dialect("plan_native")
-      |> Plan.add_pattern(descriptor, version: "1.0")
-
-    module = MLIR.Module.create!(~s[module { "plan_native.drop"() : () -> () }], ctx: ctx)
-
-    assert {:ok, ^module, []} = Plan.run(plan, module)
-    assert_receive :native_plan_rewrite
-    assert_receive :native_plan_pattern_destroyed
-    refute MLIR.to_string(module) =~ "plan_native.drop"
-
-    assert List.last(Plan.declaration(plan).entries) == %{
-             kind: :add_pattern,
-             name: :erase_drop,
-             root: "plan_native.drop",
-             benefit: 1,
-             version: "1.0"
-           }
-
-    MLIR.Module.destroy(module)
   end
 
   test "materializes a pattern population callback once per run", %{ctx: ctx} do
@@ -541,18 +494,6 @@ defmodule Beaver.MLIR.ConversionPlanTest do
 
     assert_raise ArgumentError, ~r/unsupported add_conversion_pattern options/, fn ->
       Plan.add_conversion_pattern(plan, "foo.op", fn _, _, _ -> :ok end, invalid: true)
-    end
-
-    assert_raise ArgumentError, ~r/unsupported add_pattern options/, fn ->
-      Plan.add_pattern(
-        plan,
-        %Beaver.Pattern.Native.Descriptor{
-          name: :dummy,
-          root: "arith.addi",
-          match_and_rewrite: fn _, _, _, _ -> {:ok, nil} end
-        },
-        benefit: 2
-      )
     end
 
     assert_raise ArgumentError, ~r/unsupported add_pattern_population options/, fn ->

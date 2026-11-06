@@ -86,8 +86,6 @@ defmodule Beaver.MixProject do
         DSL: [
           Beaver,
           Beaver.Env,
-          Beaver.Pattern,
-          ~r/^Beaver\.Pattern\.Native/,
           Beaver.Slang,
           ~r"Beaver.Exterior.*",
           Beaver.SSA

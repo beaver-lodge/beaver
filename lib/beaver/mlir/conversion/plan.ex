@@ -29,7 +29,6 @@ defmodule Beaver.MLIR.Conversion.Plan do
 
   alias Beaver.MLIR
   alias Beaver.MLIR.Conversion.Kernel, as: ConversionKernel
-  alias Beaver.Pattern.Native.Descriptor
 
   defstruct mode: :full, timeout: 30_000, folding_mode: nil, build_materializations: nil, entries: []
 
@@ -157,12 +156,6 @@ defmodule Beaver.MLIR.Conversion.Plan do
       do: raise(ArgumentError, ":timeout must be a non-negative integer or nil, got: #{inspect(timeout)}")
 
     append_entry(plan, {:add_conversion_pattern, to_string(root_name), callback, opts})
-  end
-
-  @spec add_pattern(t(), Descriptor.t(), keyword()) :: t()
-  def add_pattern(%__MODULE__{} = plan, %Descriptor{} = descriptor, opts \\ []) do
-    opts = validate_callback_opts!(opts, [:version], "add_pattern")
-    append_entry(plan, {:add_pattern, descriptor, opts})
   end
 
   @doc """
@@ -372,15 +365,6 @@ defmodule Beaver.MLIR.Conversion.Plan do
       version: callback_version(opts)
     }
 
-  defp entry_declaration({:add_pattern, descriptor, opts}),
-    do: %{
-      kind: :add_pattern,
-      name: descriptor.name,
-      root: descriptor.root,
-      benefit: descriptor.benefit,
-      version: callback_version(opts)
-    }
-
   defp entry_declaration({:add_external_pattern_population, manifest, _path, _opts}),
     do: %{
       kind: :add_external_pattern_population,
@@ -396,10 +380,6 @@ defmodule Beaver.MLIR.Conversion.Plan do
 
   defp populate_or_destroy!(entries, ctx, target, converter, patterns, plan_timeout) do
     populate(entries, ctx, target, converter, patterns, plan_timeout)
-  rescue
-    exception ->
-      RewritePatternSet.threaded_destroy(ctx, patterns)
-      reraise exception, __STACKTRACE__
   catch
     kind, reason ->
       RewritePatternSet.threaded_destroy(ctx, patterns)
@@ -440,9 +420,6 @@ defmodule Beaver.MLIR.Conversion.Plan do
     opts = conversion_pattern_opts(opts, resources.context, resources.timeout)
     MLIR.ConversionPattern.add(resources.patterns, root_name, resources.converter, callback, opts)
   end
-
-  defp populate_entry({:add_pattern, descriptor, _opts}, resources),
-    do: RewritePatternSet.add(resources.patterns, descriptor, ctx: resources.context)
 
   defp populate_entry({:add_pattern_population, callback, _opts}, resources) do
     case callback.(resources.patterns, resources.converter) do

@@ -32,48 +32,28 @@ defmodule Beaver.MLIR.Attribute.Accessor do
       else: update
   end
 
-  def get_and_update(
-        %__MODULE__{get_num_element: get_num_element, get_element: get_element, getter: getter} = acs,
-        attr,
-        key,
-        fun
-      ) do
-    num_elements = get_num_element.(attr)
+  def get_and_update(%__MODULE__{} = acs, attr, key, fun) do
+    num_elements = acs.get_num_element.(attr)
     ctx = MLIR.context(attr)
 
     with {:ok, key} <- normalize_key(key, num_elements),
-         elements <-
-           Range.new(0, num_elements - 1, 1) |> Enum.map(&get_element.(attr, &1)),
-         index <- to_index(key, elements, ctx),
-         false <- is_nil(index) do
-      case fun.(Enum.at(elements, index)) do
-        :pop ->
-          __MODULE__.pop(acs, attr, key)
+         elements <- Enum.map(0..(num_elements - 1)//1, &acs.get_element.(attr, &1)),
+         index when is_integer(index) <- to_index(key, elements, ctx) do
+      current = Enum.at(elements, index)
 
-        {get, update} ->
-          update = repack_named_attribute_for_dict(key, update)
-          new_attr = getter.(List.replace_at(elements, index, update), ctx: ctx)
-          {get, new_attr}
-      end
+      {get, values} =
+        case fun.(current) do
+          :pop -> List.pop_at(elements, index)
+          {get, update} -> {get, List.replace_at(elements, index, repack_named_attribute_for_dict(key, update))}
+        end
+
+      {get, acs.getter.(values, ctx: ctx)}
     else
       _ -> {nil, attr}
     end
   end
 
-  def pop(%__MODULE__{get_num_element: get_num_element, get_element: get_element, getter: getter}, attr, key) do
-    num_elements = get_num_element.(attr)
-    ctx = MLIR.context(attr)
-
-    with {:ok, key} <- normalize_key(key, num_elements),
-         elements <- Range.new(0, num_elements - 1, 1) |> Enum.map(&get_element.(attr, &1)),
-         index <- to_index(key, elements, ctx),
-         false <- is_nil(index),
-         true <- is_integer(index) do
-      elements |> List.pop_at(index) |> then(fn {popped, remaining} -> {popped, getter.(remaining, ctx: ctx)} end)
-    else
-      _ -> {nil, attr}
-    end
-  end
+  def pop(acs, attr, key), do: get_and_update(acs, attr, key, fn _ -> :pop end)
 
   defp cast_null_attr(a), do: if(MLIR.null?(a), do: :error, else: {:ok, a})
 
@@ -111,34 +91,9 @@ defmodule Beaver.MLIR.Attribute.Accessor do
   defp wrap_postprocessing(%__MODULE__{} = acs), do: acs |> wrap_get_num_element |> wrap_get_element
 
   defp dense_element_getter(element_type, attr, pos) do
-    cond do
-      MLIR.equal?(element_type, Type.i1()) ->
-        mlirDenseElementsAttrGetBoolValue(attr, pos)
-
-      Type.integer?(element_type) ->
-        width = Type.width(element_type)
-
-        apply(
-          CAPI,
-          if(Type.unsigned?(element_type),
-            do: :"mlirDenseElementsAttrGetUInt#{width}Value",
-            else: :"mlirDenseElementsAttrGetInt#{width}Value"
-          ),
-          [attr, pos]
-        )
-
-      MLIR.equal?(element_type, Type.index()) ->
-        mlirDenseElementsAttrGetIndexValue(attr, pos)
-
-      MLIR.equal?(element_type, Type.f32()) ->
-        mlirDenseElementsAttrGetFloatValue(attr, pos)
-
-      MLIR.equal?(element_type, Type.f64()) ->
-        mlirDenseElementsAttrGetDoubleValue(attr, pos)
-
-      true ->
-        mlirDenseElementsAttrGetStringValue(attr, pos)
-    end
+    {suffix, _native} = Attribute.element_storage(element_type)
+    suffix = if Type.index?(element_type), do: "Index", else: suffix
+    apply(CAPI, :"mlirDenseElementsAttrGet#{suffix}Value", [attr, pos])
   end
 
   @dense_array_types [

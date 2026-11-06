@@ -9,20 +9,18 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
         type_converter_reply_callback type_converter_reply_types type_converter_reply_values
       )},
                    {2, ~w(
-        callback_reply cuda_module_get_function cuda_memcpy_htod cuda_memcpy_dtoh operation_verify_async
-        transform_state_payload_ops transform_state_payload_values transform_state_params
+        callback_reply operation_verify_async
         context_attach_diagnostic_handler destroy_frozen_rewrite_pattern_set destroy_rewrite_pattern_set
         mlir_type_of_enif_obj read_opaque_ptr run_pm_on_op_async type_converter_convert_async
       )},
                    {3, ~w(
-        callback_reply_code cuda_func_set_attribute module_create_parse_async compile_llvm_ir_to_ptx
+        callback_reply_code module_create_parse_async compile_llvm_ir_to_ptx
         conversion_target_add_static jit_invoke_with_terms jit_invoke_with_terms_cpu_bound
         jit_invoke_with_terms_io_bound type_converter_reply_value value_replace_uses_with_if
       )},
                    {1, ~w(
         conditionally_speculatable_query_async memory_effects_query_async action_tracing_drain
-        action_tracing_detach cuda_device_name cuda_device_compute_capability cuda_module_load cuda_module_unload
-        cuda_mem_alloc cuda_mem_free triton_register_dialects external_interface_release
+        action_tracing_detach triton_register_dialects external_interface_release
         translate_module_to_llvm_ir operation_inventory conversion_target_create conversion_target_destroy
         deallocate_opaque_ptr destroy_pm_async enif_signatures get_string_ref jit_register_enif
         memref_type_get_strides_and_offset registered_dialects registered_ops string_printer_flush
@@ -37,15 +35,11 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
         action_tracing_attach
       )},
                    {0, ~w(
-        cuda_available cuda_device_count cuda_synchronize triton_register_passes peak_rss process_cpu_time
+        triton_register_passes peak_rss process_cpu_time
         enif_functions get_null_ptr string_printer_callback type_converter_create
       )},
-                   {9, ~w(
-        cuda_launch_kernel
-      )},
                    {7, ~w(
-        infer_return_types infer_return_type_components
-      )},
+        )},
                    {8, ~w(
         compiler_kernel_load_and_populate apply_conversion_async
       )},

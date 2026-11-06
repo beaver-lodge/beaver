@@ -113,53 +113,6 @@ the requested built-in dynamic traits:
 - `:isolated_from_above`
 - `:no_terminator`
 
-Custom dynamic traits attach Elixir verification callbacks under a stable
-identity. The same identity shares one MLIR TypeID across every operation in a
-context:
-
-```elixir
-defmodule MyDialect.ValidOperands do
-end
-
-def verify_operands(operation) do
-  operand_count =
-    Beaver.MLIR.CAPI.mlirOperationGetNumOperands(operation)
-    |> Beaver.Native.to_term()
-
-  if operand_count > 0,
-    do: :ok,
-    else: {:error, :missing_operand}
-end
-
-defop checked(value = optional(any())),
-  traits: [
-    {MyDialect.ValidOperands,
-     verify: &__MODULE__.verify_operands/1}
-  ]
-```
-
-Use `:verify` for ordinary invariants and `:verify_regions` for invariants that
-need access to nested regions. A verifier accepts one borrowed operation and
-returns `:ok`, `true`, `{:ok, value}`, `:error`, `false`, or
-`{:error, reason}`. Failures, exceptions, unavailable callback owners, and
-timeouts become MLIR diagnostics and verification failures.
-
-Each operation attachment has a dedicated callback process. Custom trait
-TypeIDs and callback ownership belong to the MLIR context and are released by
-`Beaver.MLIR.Context.destroy/1`. Context multithreading must remain enabled so
-parse and verification work can run outside BEAM scheduler threads. Direct
-`Beaver.MLIR.Trait.attach_custom/5` calls accept a `:timeout` option, which
-defaults to 30 seconds.
-
-The operation passed to a verifier is borrowed and valid only until the
-callback returns. Do not send it to another process, store it, or use it after
-the callback.
-
-Keeping attachment out of schema construction makes the IRDL module safe to
-inspect, serialize, and test without mutating dialect registration. It also
-makes failures attributable to either schema verification or interface
-attachment instead of interleaving the two phases.
-
 ### External operation interfaces
 
 The `interfaces:` option attaches MLIR fallback models implemented by Elixir
@@ -173,57 +126,29 @@ defmodule Effects do
   def pure(_operation), do: :pure
   def speculatable(_operation), do: :speculatable
 
-  def forward_apply(operation, _rewriter, _results, state) do
-    handle = Beaver.MLIR.CAPI.mlirOperationGetOperand(operation, 0)
-    payload = Beaver.MLIR.TransformOpInterface.payload_ops(state, handle)
-    {:ok, %{0 => {:ops, payload}}}
-  end
-
-  def forward_effects(operation, effects) do
-    operand = Beaver.MLIR.CAPI.mlirOperationGetOpOperand(operation, 0)
-    result = Beaver.MLIR.Operation.result(operation, 0)
-    Beaver.MLIR.MemoryEffects.only_reads_handle(effects, operand)
-    Beaver.MLIR.MemoryEffects.produces_handle(effects, result)
-    Beaver.MLIR.MemoryEffects.only_reads_payload(effects)
-  end
-
   defop constant(),
     interfaces: [
       memory_effects: &__MODULE__.pure/1,
       conditionally_speculatable: &__MODULE__.speculatable/1
     ]
 
-  defop forward(handle = base("!transform.any_op")),
-    do: [base("!transform.any_op")],
-    interfaces: [
-      memory_effects: &__MODULE__.forward_effects/2,
-      transform_op: [apply: &__MODULE__.forward_apply/4]
-    ]
+
 end
 ```
 
 The supported keys are:
 
 - `:memory_effects` accepts a callback of arity one that returns `:pure` or a
-  list of `Beaver.MLIR.MemoryEffects` specifications. An arity-two callback may
-  instead add transform handle effects to its borrowed effects list.
+  list of `Beaver.MLIR.MemoryEffects` specifications.
 - `:conditionally_speculatable` returns `:not_speculatable`, `:speculatable`,
   or `:recursively_speculatable`.
-- `:transform_op` requires an `:apply` callback of arity four and accepts an
-  optional `:allows_repeated_handle_operands` callback. Apply callbacks map op
-  results with `{:ops, values}`, `{:values, values}`, or `{:params, values}`.
-- `:pattern_descriptor` requires a `:populate_patterns` callback of arity two
-  and accepts a state-aware callback of arity three. Add patterns through
-  `Beaver.MLIR.RewritePatternSet`.
-
 Each attachment has a dedicated BEAM callback process and belongs to one MLIR
 context. Native callers wait outside normal BEAM schedulers, callback waits are
 bounded to 30 seconds by default, and `Beaver.MLIR.Context.destroy/1` releases
 the model and its callback process. Direct `attach` functions accept a
 `:timeout` option.
 
-Operations, effect lists, transform rewriters, transform results and states,
-and rewrite-pattern sets delivered to callbacks are borrowed. They are valid
+Operations and effect lists delivered to callbacks are borrowed. They are valid
 only until that callback returns: do not send them to another process, store
 them, or use them later. A callback may use the ordinary Beaver APIs during
 that interval, but it must not synchronously re-enter the same interface
@@ -233,7 +158,7 @@ interfaces.
 Callback exceptions are emitted as MLIR diagnostics at the operation location
 and logged on the BEAM side. The native fallback is conservative: failed
 memory-effect callbacks add an unknown write, failed speculation callbacks are
-not speculatable, and failed transform callbacks return a definite failure.
+not speculatable.
 
 Dynamic dialect and trait registration is local to an `MLIR.Context`; it is not
 stored in IRDL or operation bytecode. Call `Beaver.Slang.load/2` once for every

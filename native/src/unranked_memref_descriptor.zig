@@ -94,33 +94,17 @@ fn Deallocator(free: anytype) type {
     return struct {
         fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
             const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
-            if (d.rank == 0) {
-                const zero_rank = @as(*memref.RankedMemRefDescriptor(0), @ptrCast(@alignCast(d.descriptor)));
-                if (zero_rank.allocated) |ptr| {
+            inline for (supported_ranks_including_zero) |R| {
+                if (d.rank == R) {
+                    const ranked: *memref.RankedMemRefDescriptor(R) = @ptrCast(@alignCast(d.descriptor));
+                    const ptr = ranked.allocated orelse return beam.make_atom(env, "noop");
                     free(ptr);
-                    zero_rank.allocated = null;
-                    zero_rank.aligned = null;
+                    ranked.allocated = null;
+                    ranked.aligned = null;
                     return beam.make_ok(env);
-                } else {
-                    return beam.make_atom(env, "noop");
                 }
-            } else {
-                inline for (supported_ranks_excluding_zero) |R| {
-                    if (d.rank == R) {
-                        const D = memref.RankedMemRefDescriptor(R);
-                        const ranked = @as(*D, @ptrCast(@alignCast(d.descriptor)));
-                        if (ranked.allocated) |ptr| {
-                            free(ptr);
-                            ranked.allocated = null;
-                            ranked.aligned = null;
-                            return beam.make_ok(env);
-                        } else {
-                            return beam.make_atom(env, "noop");
-                        }
-                    }
-                }
-                return error.UnsupportedRank;
             }
+            return error.UnsupportedRank;
         }
     };
 }

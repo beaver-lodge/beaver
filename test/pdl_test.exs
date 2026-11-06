@@ -176,30 +176,6 @@ defmodule PDLTest do
     MLIR.Module.destroy(ir_module)
   end
 
-  test "replace tosa", %{ctx: ctx} do
-    for pattern <- [
-          TestTOSAPatterns.replace_add_op(),
-          TestTOSAPatterns.replace_multi_add_op(),
-          TestTOSAPatterns.replace_multi_add_op1(),
-          TestTOSAPatterns.replace_multi_add_op2(),
-          TestTOSAPatterns.replace_multi_add_op3()
-        ] do
-      ir_module = TestTOSAPatterns.gen_ir_module(ctx)
-      MLIR.verify!(ir_module)
-      ir_string = MLIR.to_string(ir_module)
-      assert not String.contains?(ir_string, "tosa.sub"), ir_string
-
-      MLIR.apply!(ir_module, [pattern])
-      |> MLIR.verify!()
-      |> MLIR.Transform.canonicalize()
-      |> Beaver.Composer.run!()
-
-      ir_string = MLIR.to_string(ir_module)
-      assert not String.contains?(ir_string, "tosa.add"), ir_string
-      assert String.contains?(ir_string, "tosa.sub"), ir_string
-    end
-  end
-
   for p <- [ToyPass, ToyPassWithInit] do
     test "toy compiler with pass: #{p}", %{ctx: ctx} do
       ir =

@@ -75,129 +75,67 @@ defmodule Beaver.MLIR.Type do
     end
   end
 
-  def ranked_tensor(shape, element_type, opts \\ [])
+  # The five checked composites share deferred resolution, context checks and
+  # bang semantics; only their C API argument layout differs.
+  for {name, ranked?} <- [
+        ranked_tensor: true,
+        memref: true,
+        vector: true,
+        unranked_tensor: false,
+        unranked_memref: false
+      ] do
+    shape = Macro.var(:shape, nil)
+    prefix = if ranked?, do: [shape], else: []
+    shape_arg = if ranked?, do: shape, else: nil
 
-  def ranked_tensor(shape, %Deferred{} = deferred, opts) do
+    def unquote(name)(unquote_splicing(prefix), element, opts \\ []) do
+      composite(unquote(name), unquote(shape_arg), element, opts)
+    end
+
+    def unquote(:"#{name}!")(unquote_splicing(prefix), element, opts \\ []) do
+      bang_composite_type(&unquote(name)(unquote_splicing(prefix), &1, &2), [element, opts])
+    end
+  end
+
+  def complex(%Deferred{} = element), do: Deferred.defer(&complex(Deferred.resolve(element, &1)))
+  def complex(%__MODULE__{} = element), do: mlirComplexTypeGet(element)
+
+  defp composite(name, shape, %Deferred{} = element, opts) do
     Deferred.from_opts(opts, fn ctx ->
-      ranked_tensor(shape, Deferred.resolve(deferred, ctx), Keyword.put(opts, :ctx, ctx))
+      composite(name, shape, Deferred.resolve(element, ctx), Keyword.put(opts, :ctx, ctx))
     end)
   end
 
-  def ranked_tensor(shape, %__MODULE__{} = element_type, opts)
-      when is_list(shape) do
-    ctx = composite_context(element_type, opts)
-    rank = length(shape)
-    encoding = (opts[:encoding] || mlirAttributeGetNull()) |> Deferred.resolve(ctx)
+  defp composite(name, shape, %__MODULE__{} = element, opts) do
+    ctx = composite_context(element, opts)
+    attr = fn key -> Deferred.resolve(opts[key] || mlirAttributeGetNull(), ctx) end
 
-    shape = shape |> Enum.map(&MLIR.ShapedType.to_dynamic_magic_number(&1, :size)) |> Native.array(Native.I64)
+    dimensions = fn ->
+      dims = if name == :vector, do: shape, else: Enum.map(shape, &MLIR.ShapedType.to_dynamic_magic_number(&1, :size))
+      [length(shape), Native.array(dims, Native.I64)]
+    end
 
-    checked_composite_type(
-      ctx,
-      &mlirRankedTensorTypeGetCheckedWithDiagnostics/6,
-      [rank, shape, element_type, encoding],
-      opts
-    )
+    {getter, args} =
+      case name do
+        :ranked_tensor ->
+          {&mlirRankedTensorTypeGetCheckedWithDiagnostics/6, dimensions.() ++ [element, attr.(:encoding)]}
+
+        :memref ->
+          {&mlirMemRefTypeGetCheckedWithDiagnostics/7,
+           [element] ++ dimensions.() ++ [attr.(:layout), attr.(:memory_space)]}
+
+        :vector ->
+          {&mlirVectorTypeGetCheckedWithDiagnostics/5, dimensions.() ++ [element]}
+
+        :unranked_tensor ->
+          {&mlirUnrankedTensorTypeGetCheckedWithDiagnostics/3, [element]}
+
+        :unranked_memref ->
+          {&mlirUnrankedMemRefTypeGetCheckedWithDiagnostics/4, [element, attr.(:memory_space)]}
+      end
+
+    checked_composite_type(ctx, getter, args, opts)
   end
-
-  def ranked_tensor!(shape, element_type, opts \\ []),
-    do: bang_composite_type(&ranked_tensor/3, [shape, element_type, opts])
-
-  def unranked_tensor(element_type, opts \\ [])
-
-  def unranked_tensor(%Deferred{} = element_type, opts) do
-    Deferred.from_opts(opts, fn ctx ->
-      unranked_tensor(Deferred.resolve(element_type, ctx), Keyword.put(opts, :ctx, ctx))
-    end)
-  end
-
-  def unranked_tensor(%__MODULE__{} = element_type, opts) do
-    ctx = composite_context(element_type, opts)
-
-    checked_composite_type(ctx, &mlirUnrankedTensorTypeGetCheckedWithDiagnostics/3, [element_type], opts)
-  end
-
-  def unranked_tensor!(element_type, opts \\ []), do: bang_composite_type(&unranked_tensor/2, [element_type, opts])
-
-  def unranked_memref(element_type, opts \\ [])
-
-  def unranked_memref(%Deferred{} = element_type, opts) do
-    Deferred.from_opts(opts, fn ctx ->
-      unranked_memref(Deferred.resolve(element_type, ctx), Keyword.put(opts, :ctx, ctx))
-    end)
-  end
-
-  def unranked_memref(%__MODULE__{} = element_type, opts) do
-    ctx = composite_context(element_type, opts)
-    default_null = mlirAttributeGetNull()
-    memory_space = (opts[:memory_space] || default_null) |> Deferred.resolve(ctx)
-
-    checked_composite_type(ctx, &mlirUnrankedMemRefTypeGetCheckedWithDiagnostics/4, [element_type, memory_space], opts)
-  end
-
-  def unranked_memref!(element_type, opts \\ []), do: bang_composite_type(&unranked_memref/2, [element_type, opts])
-
-  def complex(%Deferred{} = element_type), do: Deferred.defer(&complex(Deferred.resolve(element_type, &1)))
-
-  def complex(%__MODULE__{} = element_type), do: mlirComplexTypeGet(element_type)
-
-  def memref(shape, element_type, opts \\ [layout: nil, memory_space: nil])
-
-  def memref(shape, %Deferred{} = element_type, opts) do
-    Deferred.from_opts(opts, fn ctx ->
-      memref(shape, Deferred.resolve(element_type, ctx), Keyword.put(opts, :ctx, ctx))
-    end)
-  end
-
-  def memref(shape, %__MODULE__{} = element_type, opts)
-      when is_list(shape) do
-    ctx = composite_context(element_type, opts)
-    rank = length(shape)
-
-    shape = shape |> Enum.map(&MLIR.ShapedType.to_dynamic_magic_number(&1, :size)) |> Native.array(Native.I64)
-
-    default_null = mlirAttributeGetNull()
-
-    layout = %MLIR.Attribute{} = (opts[:layout] || default_null) |> Deferred.resolve(ctx)
-
-    memory_space = %MLIR.Attribute{} = (opts[:memory_space] || default_null) |> Deferred.resolve(ctx)
-
-    checked_composite_type(
-      ctx,
-      &mlirMemRefTypeGetCheckedWithDiagnostics/7,
-      [element_type, rank, shape, layout, memory_space],
-      opts
-    )
-  end
-
-  def memref!(shape, element_type, opts \\ []), do: bang_composite_type(&memref/3, [shape, element_type, opts])
-
-  @doc """
-  Get a vector type or deferred type value.
-
-  ## Examples
-      iex> ctx = MLIR.Context.create()
-      iex> MLIR.Type.vector!([1, 2, 3], MLIR.Type.i32(ctx: ctx)) |> MLIR.to_string()
-      "vector<1x2x3xi32>"
-      iex> MLIR.Context.destroy(ctx)
-  """
-
-  def vector(shape, element_type, opts \\ [])
-
-  def vector(shape, %Deferred{} = element_type, opts) do
-    Deferred.from_opts(opts, fn ctx ->
-      vector(shape, Deferred.resolve(element_type, ctx), Keyword.put(opts, :ctx, ctx))
-    end)
-  end
-
-  def vector(shape, %__MODULE__{} = element_type, opts) when is_list(shape) do
-    ctx = composite_context(element_type, opts)
-    rank = length(shape)
-    shape = shape |> Native.array(Native.I64)
-
-    checked_composite_type(ctx, &mlirVectorTypeGetCheckedWithDiagnostics/5, [rank, shape, element_type], opts)
-  end
-
-  def vector!(shape, element_type, opts \\ []), do: bang_composite_type(&vector/3, [shape, element_type, opts])
 
   defp composite_context(%__MODULE__{} = element_type, opts) do
     case Deferred.context(opts) do

@@ -11,9 +11,6 @@ const callback_args = @import("callback_args.zig");
 
 const SpeculatabilityDispatcher = kinda.callback_runtime.Dispatcher(.{"get_speculatability"});
 const MemoryEffectsDispatcher = kinda.callback_runtime.Dispatcher(.{"get_effects"});
-const TransformDispatcher = kinda.callback_runtime.Dispatcher(.{ "apply", "allows_repeated_handle_operands" });
-const PatternDescriptorDispatcher = kinda.callback_runtime.Dispatcher(.{ "populate_patterns", "populate_patterns_with_state" });
-const DynamicTraitDispatcher = kinda.callback_runtime.Dispatcher(.{ "verify", "verify_regions" });
 
 fn notifyReleased(recipient: beam.pid) void {
     const environment = e.enif_alloc_env() orelse return;
@@ -79,73 +76,6 @@ const MemoryEffectsState = struct {
     }
 };
 
-const TransformState = struct {
-    const resource_name = "Beaver.MLIR.TransformOpInterface.FallbackState";
-    dispatcher: *TransformDispatcher,
-    model_released: std.atomic.Value(bool) = .init(false),
-
-    fn apply(operation: mlir_capi.Operation.T, rewriter: mlir_capi.TransformRewriter.T, results: mlir_capi.TransformResults.T, state: mlir_capi.TransformState.T, user_data: ?*anyopaque) callconv(.c) c.MlirDiagnosedSilenceableFailure {
-        const failure = c.MlirDiagnosedSilenceableFailureDefiniteFailure;
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse return failure));
-        const response = callback_args.invoke(self.dispatcher, "apply", .{ mlir_capi.Operation, mlir_capi.TransformRewriter, mlir_capi.TransformResults, mlir_capi.TransformState }, .{ operation, rewriter, results, state }) catch return failure;
-        return kinda.callback_adapter.enumResult(c.MlirDiagnosedSilenceableFailure, response, failure);
-    }
-
-    fn allowsRepeatedHandleOperands(operation: mlir_capi.Operation.T, user_data: ?*anyopaque) callconv(.c) bool {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse return false));
-        if (!self.dispatcher.hasCallback("allows_repeated_handle_operands")) return false;
-        const response = callback_args.invoke(self.dispatcher, "allows_repeated_handle_operands", .{mlir_capi.Operation}, .{operation}) catch return false;
-        return kinda.callback_adapter.scalarResult(u1, response, 0) != 0;
-    }
-};
-
-const PatternDescriptorState = struct {
-    const resource_name = "Beaver.MLIR.PatternDescriptorOpInterface.FallbackState";
-    dispatcher: *PatternDescriptorDispatcher,
-    model_released: std.atomic.Value(bool) = .init(false),
-
-    fn populatePatterns(operation: mlir_capi.Operation.T, patterns: mlir_capi.RewritePatternSet.T, user_data: ?*anyopaque) callconv(.c) void {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
-        _ = callback_args.invoke(self.dispatcher, "populate_patterns", .{ mlir_capi.Operation, mlir_capi.RewritePatternSet }, .{ operation, patterns }) catch {};
-    }
-
-    fn populatePatternsWithState(operation: mlir_capi.Operation.T, patterns: mlir_capi.RewritePatternSet.T, state: mlir_capi.TransformState.T, user_data: ?*anyopaque) callconv(.c) void {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
-        _ = callback_args.invoke(self.dispatcher, "populate_patterns_with_state", .{ mlir_capi.Operation, mlir_capi.RewritePatternSet, mlir_capi.TransformState }, .{ operation, patterns, state }) catch {};
-    }
-};
-
-const DynamicTraitState = struct {
-    const resource_name = "Beaver.MLIR.Trait.DynamicState";
-    dispatcher: *DynamicTraitDispatcher,
-    model_released: std.atomic.Value(bool) = .init(false),
-
-    fn invokeVerifier(self: *@This(), comptime callback: []const u8, operation: mlir_capi.Operation.T) mlir_capi.LogicalResult.T {
-        if (!self.dispatcher.hasCallback(callback)) return c.beaverLogicalResultSuccess();
-        const response = callback_args.invoke(self.dispatcher, callback, .{mlir_capi.Operation}, .{operation}) catch return callbackFailure(operation);
-        if (response.status != .replied) return callbackFailure(operation);
-        return if (response.success) c.beaverLogicalResultSuccess() else c.beaverLogicalResultFailure();
-    }
-
-    fn callbackFailure(operation: mlir_capi.Operation.T) mlir_capi.LogicalResult.T {
-        c.mlirEmitError(
-            c.mlirOperationGetLocation(operation),
-            "dynamic trait callback timed out or its owner is unavailable",
-        );
-        return c.beaverLogicalResultFailure();
-    }
-
-    fn verify(operation: mlir_capi.Operation.T, user_data: ?*anyopaque) callconv(.c) mlir_capi.LogicalResult.T {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.beaverLogicalResultFailure()));
-        return self.invokeVerifier("verify", operation);
-    }
-
-    fn verifyRegions(operation: mlir_capi.Operation.T, user_data: ?*anyopaque) callconv(.c) mlir_capi.LogicalResult.T {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.beaverLogicalResultFailure()));
-        return self.invokeVerifier("verify_regions", operation);
-    }
-};
-
 fn constructModel(_: ?*anyopaque) callconv(.c) void {}
 
 fn destructModel(comptime State: type) fn (?*anyopaque) callconv(.c) void {
@@ -188,7 +118,7 @@ fn allocateState(comptime State: type, comptime callbacks: anytype, comptime req
     return state;
 }
 
-fn attachSpeculatabilityFallback(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+pub fn conditionally_speculatable_attach_fallback_model(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
     const state = try allocateState(SpeculatabilityState, .{"get_speculatability"}, 1, environment, args[2..4]);
     errdefer stateResource(SpeculatabilityState).release(state);
@@ -205,7 +135,7 @@ fn attachSpeculatabilityFallback(environment: beam.env, _: c_int, args: [*c]cons
     return attachmentTerm(SpeculatabilityState, environment, state.dispatcher.copyId(environment), state);
 }
 
-fn attachMemoryEffectsFallback(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+pub fn memory_effects_attach_fallback_model(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
     const state = try allocateState(MemoryEffectsState, .{"get_effects"}, 1, environment, args[2..4]);
     errdefer stateResource(MemoryEffectsState).release(state);
@@ -220,71 +150,6 @@ fn attachMemoryEffectsFallback(environment: beam.env, _: c_int, args: [*c]const 
         },
     );
     return attachmentTerm(MemoryEffectsState, environment, state.dispatcher.copyId(environment), state);
-}
-
-fn attachTransformFallback(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
-    const state = try allocateState(TransformState, .{ "apply", "allows_repeated_handle_operands" }, 1, environment, args[2..5]);
-    errdefer stateResource(TransformState).release(state);
-    c.mlirTransformOpInterfaceAttachFallbackModel(
-        context,
-        try string_ref.get_binary_as_string_ref(environment, args[1]),
-        .{
-            .construct = constructModel,
-            .destruct = destructModel(TransformState),
-            .apply = TransformState.apply,
-            .allowsRepeatedHandleOperands = TransformState.allowsRepeatedHandleOperands,
-            .userData = state,
-        },
-    );
-    return attachmentTerm(TransformState, environment, state.dispatcher.copyId(environment), state);
-}
-
-fn attachPatternDescriptorFallback(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
-    const state = try allocateState(PatternDescriptorState, .{ "populate_patterns", "populate_patterns_with_state" }, 1, environment, args[2..5]);
-    errdefer stateResource(PatternDescriptorState).release(state);
-    c.mlirPatternDescriptorOpInterfaceAttachFallbackModel(
-        context,
-        try string_ref.get_binary_as_string_ref(environment, args[1]),
-        .{
-            .construct = constructModel,
-            .destruct = destructModel(PatternDescriptorState),
-            .populatePatterns = PatternDescriptorState.populatePatterns,
-            .populatePatternsWithState = if (state.dispatcher.hasCallback("populate_patterns_with_state"))
-                PatternDescriptorState.populatePatternsWithState
-            else
-                null,
-            .userData = state,
-        },
-    );
-    return attachmentTerm(PatternDescriptorState, environment, state.dispatcher.copyId(environment), state);
-}
-
-fn attachDynamicTrait(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
-    const operation_name = try string_ref.get_binary_as_string_ref(environment, args[1]);
-    const type_id = try mlir_capi.TypeID.resource.fetch(environment, args[2]);
-    const state = try allocateState(DynamicTraitState, .{ "verify", "verify_regions" }, 0, environment, args[3..6]);
-
-    // Add the BEAM-term reference before handing the allocation reference to
-    // MLIR. A failed insertion destroys the trait synchronously; the term then
-    // keeps the state alive until this NIF returns and its environment clears.
-    const result = attachmentTerm(DynamicTraitState, environment, state.dispatcher.copyId(environment), state);
-    const trait = c.mlirDynamicOpTraitCreate(
-        type_id,
-        .{
-            .construct = constructModel,
-            .destruct = destructModel(DynamicTraitState),
-            .verifyTrait = DynamicTraitState.verify,
-            .verifyRegionTrait = DynamicTraitState.verifyRegions,
-        },
-        state,
-    );
-
-    if (!c.mlirDynamicOpTraitAttach(trait, operation_name, context))
-        return error.DynamicTraitAlreadyAttached;
-    return result;
 }
 
 fn AsyncDiagnosticsNIF(comptime name: []const u8) type {
@@ -350,13 +215,10 @@ fn releaseStateTerm(comptime State: type, comptime Resource: type, environment: 
     return true;
 }
 
-fn releaseExternalInterface(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+pub fn external_interface_release(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const released =
         releaseStateTerm(SpeculatabilityState, stateResource(SpeculatabilityState), environment, args[0]) or
-        releaseStateTerm(MemoryEffectsState, stateResource(MemoryEffectsState), environment, args[0]) or
-        releaseStateTerm(TransformState, stateResource(TransformState), environment, args[0]) or
-        releaseStateTerm(PatternDescriptorState, stateResource(PatternDescriptorState), environment, args[0]) or
-        releaseStateTerm(DynamicTraitState, stateResource(DynamicTraitState), environment, args[0]);
+        releaseStateTerm(MemoryEffectsState, stateResource(MemoryEffectsState), environment, args[0]);
     if (!released) return error.InvalidExternalInterfaceState;
     return beam.make_ok(environment);
 }
@@ -465,7 +327,7 @@ const MemoryEffectsWorker = struct {
     }
 };
 
-fn querySpeculatabilityAsync(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+pub fn conditionally_speculatable_query_async(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const operation = try mlir_capi.Operation.resource.fetch(environment, args[0]);
     const worker = try std.heap.smp_allocator.create(SpeculatabilityWorker);
     errdefer std.heap.smp_allocator.destroy(worker);
@@ -476,7 +338,7 @@ fn querySpeculatabilityAsync(environment: beam.env, _: c_int, args: [*c]const be
     return beam.make_ok(environment);
 }
 
-fn queryMemoryEffectsAsync(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+pub fn memory_effects_query_async(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const operation = try mlir_capi.Operation.resource.fetch(environment, args[0]);
     const worker = try std.heap.smp_allocator.create(MemoryEffectsWorker);
     errdefer std.heap.smp_allocator.destroy(worker);
@@ -487,46 +349,9 @@ fn queryMemoryEffectsAsync(environment: beam.env, _: c_int, args: [*c]const beam
     return beam.make_ok(environment);
 }
 
-fn collectTransformState(
-    comptime Kind: type,
-    comptime Iterator: anytype,
-    environment: beam.env,
-    args: [*c]const beam.term,
-) !beam.term {
-    const state = try mlir_capi.TransformState.resource.fetch(environment, args[0]);
-    const value = try mlir_capi.Value.resource.fetch(environment, args[1]);
-    var values = std.array_list.Managed(Kind.T).init(std.heap.smp_allocator);
-    defer values.deinit();
-
-    const Collector = struct {
-        fn append(item: Kind.T, user_data: ?*anyopaque) callconv(.c) void {
-            const list: *std.array_list.Managed(Kind.T) = @ptrCast(@alignCast(user_data orelse return));
-            list.append(item) catch @panic("failed to collect transform state mapping");
-        }
-    };
-
-    Iterator(state, value, Collector.append, &values);
-    return kinda.callback_adapter.handleRange(Kind, environment, values.items);
-}
-
-fn transformStatePayloadOps(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    return collectTransformState(mlir_capi.Operation, c.mlirTransformStateForEachPayloadOp, environment, args);
-}
-
-fn transformStatePayloadValues(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    return collectTransformState(mlir_capi.Value, c.mlirTransformStateForEachPayloadValue, environment, args);
-}
-
-fn transformStateParams(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    return collectTransformState(mlir_capi.Attribute, c.mlirTransformStateForEachParam, environment, args);
-}
-
 pub fn open(environment: beam.env) void {
     stateResource(SpeculatabilityState).open(environment);
     stateResource(MemoryEffectsState).open(environment);
-    stateResource(TransformState).open(environment);
-    stateResource(PatternDescriptorState).open(environment);
-    stateResource(DynamicTraitState).open(environment);
 }
 
 pub const nifs = .{
@@ -534,28 +359,11 @@ pub const nifs = .{
     prelude.beaverRawNIF(@This(), "conditionally_speculatable_query_async", 1),
     prelude.beaverRawNIF(@This(), "memory_effects_query_async", 1),
     prelude.beaverRawNIF(@This(), "memory_effects_attach_fallback_model", 4),
-    prelude.beaverRawNIF(@This(), "transform_op_interface_attach_fallback_model", 5),
-    prelude.beaverRawNIF(@This(), "pattern_descriptor_op_interface_attach_fallback_model", 5),
-    prelude.beaverRawNIF(@This(), "dynamic_trait_attach", 6),
     prelude.beaverRawNIF(@This(), "module_create_parse_async", 3),
     prelude.beaverRawNIF(@This(), "operation_verify_async", 2),
-    prelude.beaverRawNIF(@This(), "transform_state_payload_ops", 2),
-    prelude.beaverRawNIF(@This(), "transform_state_payload_values", 2),
-    prelude.beaverRawNIF(@This(), "transform_state_params", 2),
     prelude.beaverRawNIF(@This(), "external_interface_release", 1),
     kinda.callback_runtime.ReplyToken.codeNif("beaver_raw_callback_reply_code"),
 };
 
-pub const conditionally_speculatable_attach_fallback_model = attachSpeculatabilityFallback;
-pub const conditionally_speculatable_query_async = querySpeculatabilityAsync;
-pub const memory_effects_query_async = queryMemoryEffectsAsync;
-pub const memory_effects_attach_fallback_model = attachMemoryEffectsFallback;
-pub const transform_op_interface_attach_fallback_model = attachTransformFallback;
-pub const pattern_descriptor_op_interface_attach_fallback_model = attachPatternDescriptorFallback;
-pub const dynamic_trait_attach = attachDynamicTrait;
 pub const module_create_parse_async = AsyncDiagnosticsNIF("mlirModuleCreateParse").nif;
 pub const operation_verify_async = AsyncDiagnosticsNIF("mlirOperationVerify").nif;
-pub const transform_state_payload_ops = transformStatePayloadOps;
-pub const transform_state_payload_values = transformStatePayloadValues;
-pub const transform_state_params = transformStateParams;
-pub const external_interface_release = releaseExternalInterface;

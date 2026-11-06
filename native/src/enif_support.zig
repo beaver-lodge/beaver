@@ -13,18 +13,16 @@ const Invocation = struct {
     packed_args: []?*anyopaque = undefined, // [arg0, arg1... result]
     fn init(self: *@This(), env: beam.env, list: beam.term) !void {
         const size = try beam.get_list_length(env, list);
-        var head: beam.term = undefined;
         self.arg_terms = try beam.allocator.alloc(beam.term, size);
+        errdefer beam.allocator.free(self.arg_terms);
         self.packed_args = try beam.allocator.alloc(?*anyopaque, size + 2);
+        errdefer beam.allocator.free(self.packed_args);
         var movable_list = list;
         for (0..size) |idx| {
-            head = try beam.get_head_and_iter(env, &movable_list);
-            self.arg_terms[idx] = head;
+            self.arg_terms[idx] = try beam.get_head_and_iter(env, &movable_list);
             self.packed_args[idx + 1] = &self.arg_terms[idx];
         }
         self.packed_args[size + 1] = &self.res_term;
-        errdefer beam.allocator.free(self.arg_terms);
-        errdefer beam.allocator.free(self.packed_args);
     }
     fn deinit(self: *@This()) void {
         beam.allocator.free(self.arg_terms);
@@ -51,12 +49,6 @@ fn beaver_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const bea
 const enif_function_names = @import("enif_list.zig").functions ++ rt.exported;
 
 fn register_jit_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const u8, comptime f: anytype) void {
-    const prefixed_name = "_mlir_ciface_" ++ name;
-    const name_str_ref = c.MlirStringRef{ .data = prefixed_name.ptr, .length = prefixed_name.len };
-    c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @ptrCast(@constCast(&f)));
-}
-
-fn register_jit_plain_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const u8, comptime f: anytype) void {
     const name_str_ref = c.MlirStringRef{ .data = name.ptr, .length = name.len };
     c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @ptrCast(@constCast(&f)));
 }
@@ -82,7 +74,7 @@ fn beaver_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.te
     const jit = try mlir_capi.ExecutionEngine.resource.fetch(env, args[0]);
     inline for (enif_function_names) |name| {
         const f = if (@hasDecl(e, name)) @field(e, name) else @field(rt, name);
-        register_jit_symbol(jit, name, f);
+        register_jit_symbol(jit, "_mlir_ciface_" ++ name, f);
     }
     inline for (.{
         .{ "malloc", jit_malloc },
@@ -90,7 +82,7 @@ fn beaver_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.te
         .{ "realloc", jit_realloc },
         .{ "calloc", jit_calloc },
     }) |symbol| {
-        register_jit_plain_symbol(jit, symbol[0], symbol[1]);
+        register_jit_symbol(jit, symbol[0], symbol[1]);
     }
     return beam.make_ok(env);
 }
@@ -102,128 +94,58 @@ fn parse_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, t: []const u8) !beam
     }));
 }
 
-fn ptr_type(env: beam.env, ctx: mlir_capi.Context.T) !beam.term {
-    return parse_mlir_type(env, ctx, "!ptr.ptr<#ptr.generic_space>");
-}
-
-fn binary_memref_type(env: beam.env, ctx: mlir_capi.Context.T) !beam.term {
-    return parse_mlir_type(env, ctx, rt.BinaryMemRefType);
-}
-
-fn mlir_i_type_of_size(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
-    return mlir_capi.Type.resource.make(env, c.mlirIntegerTypeGet(ctx, @bitSizeOf(t)));
-}
-
-fn mlir_f_type_of_size(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
-    const mlir_t = switch (@bitSizeOf(t)) {
-        32 => c.mlirF32TypeGet(ctx),
-        64 => c.mlirF64TypeGet(ctx),
-        else => @compileError("unsupported float type"),
-    };
-    return mlir_capi.Type.resource.make(env, mlir_t);
-}
-
 fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
-    switch (@typeInfo(t)) {
-        .pointer => {
-            return ptr_type(env, ctx);
+    if (t == rt.BinaryMemRefDescriptor) return parse_mlir_type(env, ctx, rt.BinaryMemRefType);
+    if (t == beam.binary) return parse_mlir_type(env, ctx, rt.BinaryStructLLVMType);
+    const mlir_type = switch (@typeInfo(t)) {
+        .pointer, .optional => return parse_mlir_type(env, ctx, "!ptr.ptr<#ptr.generic_space>"),
+        .int, .@"struct", .@"opaque" => c.mlirIntegerTypeGet(ctx, @bitSizeOf(t)),
+        .float => switch (@bitSizeOf(t)) {
+            32 => c.mlirF32TypeGet(ctx),
+            64 => c.mlirF64TypeGet(ctx),
+            else => @compileError("unsupported float type"),
         },
-        .@"opaque" => {
-            return try mlir_i_type_of_size(env, ctx, t);
-        },
-        .@"struct" => {
-            if (t == rt.BinaryMemRefDescriptor) {
-                return try binary_memref_type(env, ctx);
-            } else if (t == beam.binary) {
-                return try parse_mlir_type(env, ctx, rt.BinaryStructLLVMType);
-            }
-            return try mlir_i_type_of_size(env, ctx, t);
-        },
-        .optional => {
-            return ptr_type(env, ctx);
-        },
-        else => {
-            const is_int =
-                t == c_int or t == c_uint or t == c_long or t == c_ulong or
-                t == c_longlong or t == c_ulonglong or t == beam.env or
-                t == usize or t == i32 or t == u32 or t == i64 or t == u64;
-            const is_float = t == f32 or t == f64;
-            const is_struct = t == beam.resource_type or t == e.ErlNifCond;
-            if (is_int or is_struct) {
-                return try mlir_i_type_of_size(env, ctx, t);
-            } else if (is_float) {
-                return try mlir_f_type_of_size(env, ctx, t);
-            } else if (t == void) {
-                return beam.make_atom(env, "void");
-            } else if (t == ?*anyopaque) {
-                return ptr_type(env, ctx);
-            } else {
-                @compileError("not supported type in enif signature: " ++ @typeName(t));
-            }
-        },
-    }
+        .void => return beam.make_atom(env, "void"),
+        else => @compileError("not supported type in enif signature: " ++ @typeName(t)),
+    };
+    return mlir_capi.Type.resource.make(env, mlir_type);
 }
 
 fn dump_type_info(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
-    var type_info_slice: []beam.term = try beam.allocator.alloc(beam.term, 2);
-    type_info_slice[0] = try enif_mlir_type(env, ctx, t);
-    type_info_slice[1] = try beam.make(i64, env, @sizeOf(t));
-    defer beam.allocator.free(type_info_slice);
-    return beam.make_tuple(env, type_info_slice);
+    var terms = [_]beam.term{ try enif_mlir_type(env, ctx, t), try beam.make(i64, env, @sizeOf(t)) };
+    return beam.make_tuple(env, &terms);
 }
 
 fn beaver_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
-    var signatures: []beam.term = try beam.allocator.alloc(beam.term, enif_function_names.len);
+    var signatures: [enif_function_names.len]beam.term = undefined;
     inline for (enif_function_names, 0..) |name, i| {
         const decl_name = "__decl__" ++ name;
         const f = if (@hasDecl(rt, decl_name)) @field(rt, decl_name) else (if (@hasDecl(e, name)) @field(e, name) else @field(rt, name));
-        const FTI = @typeInfo(@TypeOf(f)).@"fn";
-        var signature_slice: []beam.term = try beam.allocator.alloc(beam.term, 3);
-        defer beam.allocator.free(signature_slice);
-        var arg_type_slice: []beam.term = try beam.allocator.alloc(beam.term, FTI.params.len);
-        defer beam.allocator.free(arg_type_slice);
-        inline for (FTI.params, 0..) |p, arg_i| {
-            if (p.type) |t| {
-                arg_type_slice[arg_i] = try dump_type_info(env, ctx, t);
-            } else if (@TypeOf(f) == @TypeOf(e.enif_compare_pids)) {
-                arg_type_slice[arg_i] = try dump_type_info(env, ctx, [*c]u8);
-            } else {
-                @compileError("param type not found, function: " ++ name);
-            }
+        const info = @typeInfo(@TypeOf(f)).@"fn";
+        var arguments: [info.params.len]beam.term = undefined;
+        inline for (info.params, 0..) |param, index| {
+            // translate-C exposes this one macro as a generic Zig function.
+            const t = comptime param.type orelse if (std.mem.eql(u8, name, "enif_compare_pids")) [*c]u8 else @compileError("param type not found, function: " ++ name);
+            arguments[index] = try dump_type_info(env, ctx, t);
         }
-        // {name, [arg_types...], [ret_type]}
-        signature_slice[0] = beam.make_atom(env, name);
-        signature_slice[1] = beam.make_term_list(env, arg_type_slice);
-        var ret_size: usize = 1;
-        if (FTI.return_type) |t| {
-            if (t == void) {
-                ret_size = 0;
-            }
-        }
-        var ret_slice: []beam.term = try beam.allocator.alloc(beam.term, ret_size);
-        defer beam.allocator.free(ret_slice);
-        if (FTI.return_type) |t| {
-            if (t != void) {
-                ret_slice[0] = try dump_type_info(env, ctx, t);
-            }
-        } else if (f == e.enif_compare_pids) {
-            ret_slice[0] = try dump_type_info(env, ctx, c_int);
-        } else {
-            @compileError("return type not found, function: " ++ name);
-        }
-        signature_slice[2] = beam.make_term_list(env, ret_slice);
-        signatures[i] = beam.make_tuple(env, signature_slice);
+        const Return = comptime info.return_type orelse if (std.mem.eql(u8, name, "enif_compare_pids")) c_int else @compileError("return type not found, function: " ++ name);
+        var returns: [if (Return == void) 0 else 1]beam.term = undefined;
+        if (Return != void) returns[0] = try dump_type_info(env, ctx, Return);
+        var fields = [_]beam.term{
+            beam.make_atom(env, name),
+            beam.make_term_list(env, &arguments),
+            beam.make_term_list(env, &returns),
+        };
+        signatures[i] = beam.make_tuple(env, &fields);
     }
-    return beam.make_term_list(env, signatures);
+    return beam.make_term_list(env, &signatures);
 }
 
 fn beaver_raw_enif_functions(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
-    var names: []beam.term = try beam.allocator.alloc(beam.term, enif_function_names.len);
-    inline for (enif_function_names, 0..) |name, i| {
-        names[i] = beam.make_atom(env, name);
-    }
-    return beam.make_term_list(env, names);
+    var names: [enif_function_names.len]beam.term = undefined;
+    inline for (enif_function_names, 0..) |name, i| names[i] = beam.make_atom(env, name);
+    return beam.make_term_list(env, &names);
 }
 
 fn beaver_raw_mlir_type_of_enif_obj(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {

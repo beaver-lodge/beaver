@@ -48,29 +48,23 @@ defmodule ToyPass do
   @moduledoc false
   use Beaver
   alias MLIR.Dialect.TOSA
-  import Beaver.Pattern
   use MLIR.Pass, on: "builtin.module"
 
-  defpat replace_add_op() do
-    a = value()
-    b = value()
-    res = type()
-    {op, _t} = TOSA.add(a, b) >>> {:op, [res]}
+  def replace_add_op(_pattern, op, rewriter, state) do
+    [a, b] = Enum.to_list(Beaver.Walker.operands(op))
+    type = op |> MLIR.Operation.result(0) |> MLIR.Value.type()
 
-    rewrite op do
-      {r, _} = TOSA.sub(a, b) >>> {:op, [res]}
-      replace(op, with: r)
+    mlir ctx: MLIR.context(op), ip: rewriter do
+      result = TOSA.sub(a, b) >>> type
+      MLIR.PatternRewriter.replace_op(rewriter, op, result)
     end
+
+    {:ok, state}
   end
 
-  def run(%MLIR.Operation{} = operation, _state) do
-    with 1 <- Beaver.Walker.regions(operation) |> Enum.count(),
-         {:ok, _} <-
-           MLIR.apply_(MLIR.Module.from_operation(operation), [replace_add_op(benefit: 2)]) do
-      :ok
-    else
-      _ -> raise "unreachable"
-    end
+  def run(operation, state) do
+    MLIR.Rewrite.apply_patterns!(operation, [{"tosa.add", &replace_add_op/4}])
+    state
   end
 end
 

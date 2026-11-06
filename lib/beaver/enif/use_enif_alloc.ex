@@ -1,105 +1,46 @@
-alias Beaver.MLIR.RewritePatternSet
-
 defmodule Beaver.ENIF.UseENIFAlloc do
-  @moduledoc """
-  Replace LLVM call ops of `malloc` and `free` with `enif_alloc` and `enif_free`.
-  """
-  use Beaver
-  alias MLIR.Dialect.LLVM
-  use MLIR.Pass, on: LLVM.func()
-  import Beaver.Pattern
-
-  defmodule ReplaceLLVMOp do
-    @moduledoc false
-    use MLIR.RewritePattern
-
-    def construct(nil), do: :llvm_pat_state
-
-    def destruct(_state), do: :ok
-
-    def match_and_rewrite(_pattern, op, rewriter, state) do
-      if MLIR.Operation.name(op) == LLVM.call() and MLIR.Attribute.value(op[:callee]) == "malloc" do
-        ctx = MLIR.context(op)
-        ptr = MLIR.Operation.result(op, 0)
-
-        mlir ctx: ctx, ip: rewriter do
-          new_ptr =
-            LLVM.call(
-              callee_operands: Beaver.Walker.operands(op) |> Enum.to_list(),
-              callee: Attribute.flat_symbol_ref("enif_alloc"),
-              operand_segment_sizes: :infer,
-              op_bundle_sizes: ~a{array<i32>}
-            ) >>> MLIR.Value.type(ptr)
-
-          MLIR.PatternRewriter.replace_op(rewriter, op, new_ptr)
-        end
-
-        {:ok, state}
-      else
-        {:error, state}
-      end
-    end
-  end
+  @moduledoc "Replaces LLVM calls to malloc/free with the corresponding ENIF allocator."
+  alias Beaver.MLIR
+  alias MLIR.{Attribute, Operation, PatternRewriter, RewritePatternSet, RewriterBase}
+  use MLIR.Pass, on: "llvm.func"
 
   def initialize(ctx, nil) do
-    patterns = [replace_alloc(), replace_free()]
+    patterns =
+      RewritePatternSet.create(ctx)
+      |> RewritePatternSet.add("llvm.call", &replace_allocator/4, ctx: ctx)
+      |> RewritePatternSet.freeze()
 
-    {set, pdl_mod} = RewritePatternSet.with_pdl_patterns(patterns, ctx: ctx)
-
-    frozen_set = set |> RewritePatternSet.add(LLVM.call(), ReplaceLLVMOp, ctx: ctx) |> RewritePatternSet.freeze()
-
-    {:ok, %{patterns: frozen_set, pdl_mod: pdl_mod, owning: true, ctx: ctx}}
+    {:ok, %{patterns: patterns, owning: true, ctx: ctx}}
   end
 
-  def clone(%{patterns: frozen_set, owning: true}), do: %{patterns: frozen_set, owning: false}
+  def replace_allocator(_pattern, op, rewriter, state) do
+    callee = op[:callee]
+    name = if callee, do: Attribute.value(callee)
 
-  def destruct(%{patterns: frozen_set, pdl_mod: pdl_mod, owning: true, ctx: ctx}) do
-    MLIR.Module.destroy(pdl_mod)
-    MLIR.FrozenRewritePatternSet.threaded_destroy(ctx, frozen_set)
-  end
+    if replacement = %{"malloc" => "enif_alloc", "free" => "enif_free"}[name] do
+      base = PatternRewriter.as_base(rewriter)
+      RewriterBase.start_op_modification(base, op)
 
-  def destruct(%{owning: false}), do: :ok
+      Operation.get_and_update(op, :callee, fn _ ->
+        {nil, Attribute.flat_symbol_ref(replacement, ctx: MLIR.context(op))}
+      end)
 
-  # the state is nil when initialization fails
-  def destruct(nil), do: :ok
-
-  defpat replace_alloc(benefit: 10) do
-    size = value()
-    ptr_t = type()
-    {op, _} = LLVM.call(size, callee: Attribute.flat_symbol_ref("malloc")) >>> {:op, [ptr_t]}
-
-    rewrite op do
-      r =
-        LLVM.call(
-          callee_operands: size,
-          callee: Attribute.flat_symbol_ref("enif_alloc"),
-          operand_segment_sizes: :infer,
-          op_bundle_sizes: ~a{array<i32>}
-        ) >>> ptr_t
-
-      replace(op, with: r)
+      RewriterBase.finalize_op_modification(base, op)
+      {:ok, state}
+    else
+      {:error, state}
     end
   end
 
-  defpat replace_free(benefit: 10) do
-    ptr = value()
-    {op, _} = LLVM.call(ptr, callee: Attribute.flat_symbol_ref("free")) >>> {:op, []}
+  def clone(%{patterns: patterns}), do: %{patterns: patterns, owning: false}
 
-    rewrite op do
-      {enif_free, _} =
-        LLVM.call(
-          callee_operands: ptr,
-          callee: Attribute.flat_symbol_ref("enif_free"),
-          operand_segment_sizes: :infer,
-          op_bundle_sizes: ~a{array<i32>}
-        ) >>> {:op, []}
+  def destruct(%{patterns: patterns, owning: true, ctx: ctx}),
+    do: MLIR.FrozenRewritePatternSet.threaded_destroy(ctx, patterns)
 
-      replace(op, with: enif_free)
-    end
-  end
+  def destruct(_state), do: :ok
 
-  def run(op, %{patterns: patterns, owning: false} = state) do
-    MLIR.apply!(op, patterns)
+  def run(op, %{patterns: patterns} = state) do
+    MLIR.Rewrite.apply_patterns!(op, patterns)
     state
   end
 end

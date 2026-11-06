@@ -100,43 +100,6 @@ defmodule Beaver.MLIR.MemoryEffects do
     :ok
   end
 
-  @doc "Adds the standard transform-dialect effects for read-only handle operands."
-  def only_reads_handle(effects, operands),
-    do: transform_handle_effect(:beaverTransformOnlyReadsHandle, effects, operands)
-
-  @doc "Adds the standard transform-dialect effects for consumed handle operands."
-  def consumes_handle(effects, operands),
-    do: transform_handle_effect(:beaverTransformConsumesHandle, effects, operands)
-
-  @doc "Adds the standard transform-dialect effects for produced handle results."
-  def produces_handle(%MLIR.MemoryEffectInstancesList{} = effects, results) do
-    results = List.wrap(results)
-    validate_kind_list!(results, Value, "transform results")
-    array = Native.array(results, Value, mut: true)
-    CAPI.beaverTransformProducesHandle(array, length(results), effects)
-    :ok
-  end
-
-  @doc "Marks a transform operation as potentially modifying payload IR."
-  def modifies_payload(%MLIR.MemoryEffectInstancesList{} = effects) do
-    CAPI.beaverTransformModifiesPayload(effects)
-    :ok
-  end
-
-  @doc "Marks a transform operation as only reading payload IR."
-  def only_reads_payload(%MLIR.MemoryEffectInstancesList{} = effects) do
-    CAPI.beaverTransformOnlyReadsPayload(effects)
-    :ok
-  end
-
-  defp transform_handle_effect(function, %MLIR.MemoryEffectInstancesList{} = effects, operands) do
-    operands = List.wrap(operands)
-    validate_kind_list!(operands, OpOperand, "transform operands")
-    array = Native.array(operands, OpOperand, mut: true)
-    apply(CAPI, function, [array, length(operands), effects])
-    :ok
-  end
-
   defp append_one(effects, op, effect) when effect in [:allocate, :free, :read, :write],
     do: append_one(effects, op, {effect, nil, []})
 
@@ -250,9 +213,4 @@ defmodule Beaver.MLIR.MemoryEffects do
 
   defp create_instance(effect, %Attribute{} = symbol, parameters, stage, full_region, resource),
     do: CAPI.mlirMemoryEffectInstanceCreateForSymbol(effect, symbol, parameters, stage, full_region, resource)
-
-  defp validate_kind_list!(values, module, label) do
-    unless Enum.all?(values, &is_struct(&1, module)),
-      do: raise(ArgumentError, "#{label} must contain only #{inspect(module)} values")
-  end
 end

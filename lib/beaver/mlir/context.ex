@@ -84,54 +84,16 @@ defmodule Beaver.MLIR.Context do
   end
 
   def destroy(%__MODULE__{} = ctx) do
-    if beaverContextHasActiveTransientScope(ctx) |> Native.to_term(),
-      do: raise(ArgumentError, "cannot destroy a context with an active transient scope")
+    # Detach action tracing sessions while the native context is still alive;
+    # the native session destructor deregisters its action handler on the
+    # context.
+    MLIR.ActionTracing.release_context(ctx)
+    mlirContextDestroy(ctx)
+  after
+    MLIR.ExternalInterface.release_context(ctx)
 
-    try do
-      # Detach action tracing sessions while the native context is still alive;
-      # the native session destructor deregisters its action handler on the
-      # context.
-      MLIR.ActionTracing.release_context(ctx)
-      mlirContextDestroy(ctx)
-    after
-      MLIR.Trait.release_context(ctx)
-      MLIR.ExternalInterface.release_context(ctx)
-
-      if ctx.thread_pool_owner,
-        do: MLIR.ThreadPool.checkin(ctx.thread_pool_owner, ctx.thread_pool_lease)
-    end
-  end
-
-  @doc "Returns whether the linked LLVM supports resettable transient context scopes."
-  @spec transient_scope_supported?() :: boolean()
-  def transient_scope_supported?,
-    do: beaverContextTransientScopeSupported() |> Native.to_term()
-
-  @doc """
-  Runs `fun` inside a resettable transient allocation scope.
-
-  Dialects and external interfaces must be registered before entering the
-  scope. All IR that refers to types or attributes created inside the scope
-  must be destroyed before `fun` returns. The same context cannot host
-  concurrent or nested transient scopes. Types, attributes, and other
-  non-owning handles created inside the scope become stale when it ends and
-  must not be dereferenced; allowing their wrappers to be garbage-collected
-  afterward is safe.
-  """
-  @spec with_transient_scope(t(), (t() -> result)) :: result when result: term()
-  def with_transient_scope(%__MODULE__{} = ctx, fun) when is_function(fun, 1) do
-    unless transient_scope_supported?(),
-      do: raise(ArgumentError, "linked LLVM does not support transient context scopes")
-
-    unless beaverContextBeginTransientScope(ctx) |> Native.to_term(),
-      do: raise(ArgumentError, "context already has an active transient scope")
-
-    try do
-      fun.(ctx)
-    after
-      unless beaverContextEndTransientScope(ctx) |> Native.to_term(),
-        do: raise("transient context scope ended unexpectedly")
-    end
+    if ctx.thread_pool_owner,
+      do: MLIR.ThreadPool.checkin(ctx.thread_pool_owner, ctx.thread_pool_lease)
   end
 
   @context_owned_modules [

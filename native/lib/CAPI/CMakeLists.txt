@@ -8,16 +8,6 @@ set(_beaver_saved_try_compile_target_type "${CMAKE_TRY_COMPILE_TARGET_TYPE}")
 set(CMAKE_REQUIRED_INCLUDES "${MLIR_INCLUDE_DIRS}")
 set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 check_cxx_source_compiles(
-  "#include <mlir-c/IR.h>
-   int main() {
-     auto *begin = &mlirContextBeginTransientScope;
-     auto *end = &mlirContextEndTransientScope;
-     auto *active = &mlirContextIsInTransientScope;
-     (void)begin; (void)end; (void)active;
-     return 0;
-   }"
-  BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE)
-check_cxx_source_compiles(
   "#include <mlir/Dialect/Linalg/TransformOps/LinalgTransformOps.h>
    int main() {
      auto getter = &mlir::transform::TileUsingForOp::getPackedInterchange;
@@ -43,18 +33,6 @@ check_cxx_source_compiles(
      return 0;
    }"
   BEAVER_HAS_MLIR_INHERENT_ATTRIBUTE_VISITOR)
-check_cxx_source_compiles(
-  "#include <mlir/Transforms/CompositePass.h>
-   #include <mlir/Transforms/Passes.h>
-   int main() {
-     auto pass = mlir::createCompositeFixedPointPass(
-       \"beaver-probe\",
-       [](mlir::OpPassManager &) {},
-       1,
-       mlir::ConvergenceFailureAction::Error);
-     return pass ? 0 : 1;
-   }"
-  BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION)
 set(CMAKE_REQUIRED_INCLUDES "${_beaver_saved_required_includes}")
 set(CMAKE_TRY_COMPILE_TARGET_TYPE "${_beaver_saved_try_compile_target_type}")
 
@@ -90,13 +68,6 @@ else()
     PROPERTIES COMPILE_OPTIONS "-fexceptions")
 endif()
 
-if(BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE)
-  foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
-    target_compile_definitions(${_target}
-      PUBLIC
-      BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE=1)
-  endforeach()
-endif()
 
 if(BEAVER_HAS_PACKED_TRANSFORM_PARAMS)
   foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
@@ -122,13 +93,6 @@ if(BEAVER_HAS_MLIR_INHERENT_ATTRIBUTE_VISITOR)
   endforeach()
 endif()
 
-if(BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION)
-  foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)
-    target_compile_definitions(${_target}
-      PUBLIC
-      BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION=1)
-  endforeach()
-endif()
 
 if(BEAVER_TRITON_PREBUILT_DIR)
   foreach(_target MLIRCAPIBeaver obj.MLIRCAPIBeaver)

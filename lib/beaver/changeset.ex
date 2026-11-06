@@ -1,4 +1,4 @@
-alias Beaver.MLIR.{Block, Location, Region, Type, Value}
+alias Beaver.MLIR.{Block, Location, ODS.Dump, Region, Type, Value}
 
 defmodule Beaver.Changeset do
   @moduledoc false
@@ -87,17 +87,9 @@ defmodule Beaver.Changeset do
       when name in ~w(operand_segment_sizes operandSegmentSizes result_segment_sizes resultSegmentSizes)a,
       do: %__MODULE__{changeset | attributes: attributes ++ [{name, :infer}]}
 
-  def add_argument(%__MODULE__{context: ctx, attributes: attributes} = changeset, {name, %MLIR.Attribute{} = attr})
-      when is_atom(name) do
-    attr = Deferred.resolve(attr, ctx)
-    %__MODULE__{changeset | attributes: attributes ++ [{name, attr}]}
-  end
-
-  def add_argument(%__MODULE__{context: ctx, attributes: attributes} = changeset, {name, %Type{} = type})
-      when is_atom(name) do
-    type = Deferred.resolve(type, ctx)
-    %__MODULE__{changeset | attributes: attributes ++ [{name, type}]}
-  end
+  def add_argument(%__MODULE__{context: ctx, attributes: attributes} = changeset, {name, %kind{} = value})
+      when is_atom(name) and kind in [MLIR.Attribute, Type],
+      do: %__MODULE__{changeset | attributes: attributes ++ [{name, Deferred.resolve(value, ctx)}]}
 
   def add_argument(%__MODULE__{attributes: attributes} = changeset, {name, attr})
       when is_atom(name) and is_binary(attr), do: %__MODULE__{changeset | attributes: attributes ++ [{name, attr}]}
@@ -172,18 +164,16 @@ defmodule Beaver.Changeset do
 
   @doc false
   def reorder_operands(%__MODULE__{operands: operands, name: name, attributes: attributes, context: ctx} = changeset) do
-    case {should_reorder?(operands), MLIR.ODS.Dump.lookup(name)} do
-      {true, {:ok, op_dump}} ->
-        {operands, segment_sizes} = process_operands_with_dump(changeset.operands, op_dump)
-        update_changeset_with_operands(changeset, operands, segment_sizes, attributes, ctx)
+    if should_reorder?(operands) do
+      {operands, sizes} =
+        case Dump.lookup(name) do
+          {:ok, dump} -> process_operands_with_dump(operands, dump)
+          _ -> process_operands_with_keys(operands)
+        end
 
-      {true, _} ->
-        # Extract unique operand keys and group values by key
-        {operands, segment_sizes} = process_operands_with_keys(changeset.operands)
-        update_changeset_with_operands(changeset, operands, segment_sizes, attributes, ctx)
-
-      _ ->
-        changeset
+      update_changeset_with_operands(changeset, operands, sizes, attributes, ctx)
+    else
+      changeset
     end
   end
 

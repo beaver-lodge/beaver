@@ -1,50 +1,40 @@
 # Core API migration
 
-The core reduction from 25,000 to fewer than 20,000 code lines removes the
-experimental orchestration APIs below. This is an intentional API change, in
-addition to deduplication of Slang builders, conversion plans, and callback
-encoding. It does not provide compatibility stubs for the retired APIs.
+The reductions to 20,000 and then 15,000 code lines combine shared builders,
+callback encoding, and header-driven ENIF exports with retirement of unused
+experimental helpers. Retired APIs have no compatibility stubs.
 
-The count uses the same implementation scope before and after:
+Both counts use `cloc lib native --skip-uniqueness --quiet`, excluding blanks
+and comments. Implementation has not moved to tests, build output, dependencies,
+or another directory. The Kinda revision is unchanged.
 
-```sh
-cloc lib native --skip-uniqueness --quiet
-```
-
-Blank lines and comments are excluded. Implementation has not been moved into
-tests, build output, another dependency, or a different directory to meet the
-limit. Kinda remains pinned to the same revision.
-
-## Retired interfaces
-
-| Retired API | Supported replacement or migration |
+| Retired API | Replacement |
 | --- | --- |
-| `Beaver.MLIR.TypeConverterCallback` | `Beaver.MLIR.TypeConverter.create(conversion: callback)` and `TypeConverter.convert/2`. |
-| `Beaver.MLIR.CompilationPlan` and its declaration macro | Compose passes with `Beaver.Composer`; use `Beaver.MLIR.Conversion.Plan` for dialect conversion. |
-| `CompilationRuntime.compile!`, `jit!`, `emit_object!`, and cache operations | Use `MLIR.Module`, `Composer`, `MLIR.Bytecode`, and `MLIR.ExecutionEngine` directly. `CompilationRuntime.llvm_revision/0` remains available. |
-| `Beaver.MLIR.CompilationCache` and its Memory/File backends; compilation Artifact/CacheKey structs | Applications own cache storage, keys, invalidation, and artifact metadata. |
-| <code>Beaver.MLIR.Transform.Schedule</code> discovery, enumeration, resolution, serialization, and cache identity; its Option/Choice/Constraint/Analysis/Resolved structs | Author selected Transform IR and call `MLIR.Transform.execute/3`; serialize with `MLIR.Bytecode`. The internal parsing/execution bridge remains. |
-| `Beaver.MLIR.Transform.Schedule.DSL`, `Tuner`, `Resolver`, and `Solver` | Use native Transform dialect operations; applications own search, scoring, and solver integration. |
-| `Beaver.Shadow.*` and the `mix shadow.*` tasks | Applications own experiment orchestration and reports. Native Transform, Triton, CUDA, ActionTracing, and conversion profiling remain. |
-| `Beaver.MLIR.Triton.LayoutAudit` and `PipelineEvidence` | Inspect IR with `Beaver.Walker` and collect native action traces or conversion profiles. `Triton.PipelinePlan` remains. |
-| `Beaver.Wasm.TermABI` | Runtime implementers own their ABI manifest; `Conversion.Ex.term_intrinsic_symbols/0` still exposes the intrinsic symbols. `Beaver.Wasm` and `Wasm.Binary` remain. |
+| `TypeConverterCallback` | `MLIR.TypeConverter` callbacks. |
+| `CompilationPlan`, compilation cache/artifact structs, `CompilationRuntime` orchestration | `Composer`, `Conversion.Plan`, `Module`, `Bytecode`, and `ExecutionEngine`; consumers own caching. `CompilationRuntime.llvm_revision/0` remains. |
+| `Transform.Schedule`, DSL, Tuner, Resolver, Solver, `Transform.execute` / `apply_named_sequence` and type helpers | Transform dialect operations and `CAPI.mlirTransformApplyNamedSequenceWithDiagnostics`; `Type.get` for handle types. Standard `MLIR.Transform` passes remain. |
+| `Transform.composite_fixed_point` | Native textual pass pipelines through `Composer`. |
+| `Beaver.Shadow.*`, `mix shadow.*` | Consumer-owned experiments and reporting. |
+| `Triton.LayoutAudit`, `PipelineEvidence`, `PipelinePlan`, pipeline/profile helpers | Native Triton passes through `Composer`; `Walker`, `ActionTracing`, conversion profiling. |
+| `MLIR.CUDA`, native CUDA bootstrap NIFs | Consumer-owned CUDA runtime loading. GPU dialect compilation and LLVM-to-PTX remain. |
+| `Beaver.Wasm`, `Wasm.Binary`, `Wasm.TermABI` | Consumer-owned Wasm linking, packaging, and runtime ABI. Ex runtime intrinsic symbols remain. |
+| `Beaver.Pattern`, `Beaver.Pattern.Native`, descriptors and `Conversion.Plan.add_pattern` | Four-argument `RewritePattern` callbacks, `RewritePatternSet.add/4`, or `Plan.add_pattern_population/3`; construct native PDL operations directly. |
+| Custom dynamic trait callbacks, `TransformOpInterface`, `PatternDescriptorOpInterface`, transform memory-effect helpers | Native extension interfaces. Built-in traits, memory-effect and speculation callbacks remain. |
+| `InferType`, `InferShapedType`, `Inference.Request` collectors | Operation result inference (`>>> :infer`) remains. Standalone callback collectors are no longer bridged. |
+| `Context.with_transient_scope` and transient-scope adapters | Use separate contexts to bound allocations; native context CAPI remains available where LLVM provides it. |
+| `Location` named/fused/call-site/range and inspection helpers | Native location CAPI; `file`, `from_env`, `unknown`, `of`, and context-checked `resolve` remain. |
+| `DominanceInfo` / `PostDominanceInfo` helpers | Native dominance CAPI; handle types remain. |
+| LLVM type/attribute helpers and DLTI builders | `Type.get`, `Attribute.get`, generated dialect operations, or CAPI. `LLVM.func` remains. |
+| `SCF.if_` / `for_`, `Tensor.Slice` helpers, `Vector.transfer_read_` / `in_bounds` | Generated `SCF`, `Tensor`, and `Vector` operations with explicit regions and attributes. |
+| Bufferization pipeline helpers, `Linalg.llvm_pipeline` / `lower_to_llvm!` | Native textual pipelines through `Composer`; dialect operations and structured Linalg construction remain. |
 
-The incremental compilation benchmark and tests dedicated to retired APIs are
-removed with their implementations. Tests for retained callbacks, native
-Transform execution, Slang, conversion, and bytecode round trips remain.
+The audit covered local Batata (the older Elixir checkout), Charms, Manx,
+Compas, and Beaver IR source, tests, and configuration. Their required entry
+points are retained. External consumers must check this table before updating.
+Native exports and callback metadata for retired bridges are removed or marked
+pending; this is an intentional API change, not a promise of universal ABI
+compatibility.
 
-## Compatibility scope
-
-The removal audit covered Beaver itself and local Batata, Charms, Manx, Compas,
-and Beaver IR source/test/configuration files. None of those consumers uses the
-retired entry points. Batata's use of `CompilationRuntime.llvm_revision/0` is
-explicitly preserved. This audit cannot establish usage by external downstream
-projects; those projects should check the table before updating.
-
-The native C API declarations, callback bridge metadata, and hand-written NIF
-export names/arities are unchanged. Existing MLIR construction, Beaver's main
-DSL, Slang, rewrite patterns, conversion plans, JIT, Transform execution, native
-tracing, Triton pipeline construction, and CUDA operations remain supported.
-
-See [direct compilation](incremental-compilation-runtime.md) and
-[Transform execution](transform-autotuning.md) for migration examples.
+See [direct compilation](incremental-compilation-runtime.md),
+[callback rewrites](native-rewrite-patterns.md), and
+[Transform execution](transform-autotuning.md).

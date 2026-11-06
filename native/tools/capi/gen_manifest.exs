@@ -20,17 +20,12 @@ defmodule Beaver.CAPI.ManifestGenerator do
   }
   @manual_bridges Map.new(
                     [
-                      {"mlirInferTypeOpInterfaceInferReturnTypes", "infer_return_types", %{}},
-                      {"mlirInferShapedTypeOpInterfaceInferReturnTypes", "infer_return_type_components", %{}},
                       {"beaverTranslateModuleToLLVMIRText", "translate_module_to_llvm_ir",
                        %{"scheduler" => "dirty_cpu", "destructor" => "native_owner"}},
                       {"beaverCompileLLVMIRToPTX", "compile_llvm_ir_to_ptx",
                        %{"scheduler" => "dirty_cpu", "destructor" => "native_owner"}},
                       {"beaverCompilerKernelLoadAndPopulate", "compiler_kernel_load_and_populate",
                        %{"scheduler" => "dirty_io"}},
-                      {"mlirTransformStateForEachPayloadOp", "transform_state_payload_ops", %{}},
-                      {"mlirTransformStateForEachPayloadValue", "transform_state_payload_values", %{}},
-                      {"mlirTransformStateForEachParam", "transform_state_params", %{}},
                       {"beaverMemoryEffectsOpInterfaceGetEffects", "memory_effects_query_async",
                        %{"scheduler" => "context_worker", "lifetime" => "async_operation"}},
                       {"mlirValueReplaceUsesWithIf", "value_replace_uses_with_if",
@@ -52,8 +47,6 @@ defmodule Beaver.CAPI.ManifestGenerator do
 
   @runtime_declarations Map.new(
                           [
-                            {"mlirDynamicOpTraitCreate", "dynamic_trait_attach",
-                             ~w(context operation_name type_id verify_callback verify_regions_callback timeout_ms)},
                             {"mlirTypeConverterAddConversion", "type_converter_add_conversion",
                              ~w(registration callback timeout_ms)},
                             {"mlirTypeConverterAdd1ToNConversion", "type_converter_add_1_to_n_conversion",
@@ -78,13 +71,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
                              "conditionally_speculatable_attach_fallback_model",
                              ~w(context operation_name callback timeout_ms)},
                             {"beaverMemoryEffectsOpInterfaceAttachFallbackModel",
-                             "memory_effects_attach_fallback_model", ~w(context operation_name callback timeout_ms)},
-                            {"mlirTransformOpInterfaceAttachFallbackModel",
-                             "transform_op_interface_attach_fallback_model",
-                             ~w(context operation_name apply_callback allows_repeated_handle_operands_callback timeout_ms)},
-                            {"mlirPatternDescriptorOpInterfaceAttachFallbackModel",
-                             "pattern_descriptor_op_interface_attach_fallback_model",
-                             ~w(context operation_name populate_patterns_callback populate_patterns_with_state_callback timeout_ms)}
+                             "memory_effects_attach_fallback_model", ~w(context operation_name callback timeout_ms)}
                           ],
                           fn {source, name, params} -> {source, %{name: "beaver_raw_" <> name, params: params}} end
                         )
@@ -165,32 +152,30 @@ defmodule Beaver.CAPI.ManifestGenerator do
   defp callback_bridge_manifest(functions, policy) do
     entries =
       for function <- functions,
-          callback_bridge?(policy, function.name) do
-        bridge = bridge_metadata(function.name, policy)
-
-        %{
-          "function" => function_metadata(function),
-          "callback_bridge" =>
-            Map.merge(
-              %{
-                "function" => function.name,
-                "reason" => if(bridge, do: nil, else: "callback_bridge_required"),
-                "unblock_path" => if(bridge, do: nil, else: "callback_bridge_runtime"),
-                "runtime" => if(bridge, do: bridge["runtime"], else: "pending"),
-                "runtime_backed" => bridge != nil,
-                "wrapper_name" => if(bridge, do: bridge["wrapper_name"], else: nil),
-                "scheduler" => if(bridge, do: bridge["scheduler"], else: "unspecified"),
-                "owner" => if(bridge, do: bridge["owner"], else: "unspecified"),
-                "destructor" => if(bridge, do: bridge["destructor"], else: "unspecified"),
-                "lifetime" => if(bridge, do: bridge["lifetime"], else: "unspecified"),
-                "timeout_ms" => if(bridge, do: bridge["timeout_ms"], else: nil)
-              },
-              bridge_facets(bridge)
-            )
-        }
-      end
+          callback_bridge?(policy, function.name),
+          do: %{"function" => function_metadata(function), "callback_bridge" => bridge_entry(function.name, policy)}
 
     %{"version" => 2, "entries" => entries}
+  end
+
+  defp bridge_entry(name, policy) do
+    bridge = bridge_metadata(name, policy)
+
+    defaults = %{
+      "function" => name,
+      "reason" => if(bridge, do: nil, else: "callback_bridge_required"),
+      "unblock_path" => if(bridge, do: nil, else: "callback_bridge_runtime"),
+      "runtime" => "pending",
+      "runtime_backed" => bridge != nil,
+      "wrapper_name" => nil,
+      "timeout_ms" => nil,
+      "scheduler" => "unspecified",
+      "owner" => "unspecified",
+      "destructor" => "unspecified",
+      "lifetime" => "unspecified"
+    }
+
+    defaults |> Map.merge(bridge || %{}) |> Map.merge(bridge_facets(bridge))
   end
 
   defp function_metadata(function),
@@ -204,13 +189,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
     }
 
     if callback_bridge?(policy, function.name) do
-      callback_entry =
-        callback_bridge_manifest([function], policy)
-        |> Map.fetch!("entries")
-        |> List.first()
-        |> Map.fetch!("callback_bridge")
-
-      Map.put(entry, "callback_bridge", callback_entry)
+      Map.put(entry, "callback_bridge", bridge_entry(function.name, policy))
     else
       entry
     end
@@ -286,26 +265,20 @@ defmodule Beaver.CAPI.ManifestGenerator do
     end
   end
 
-  defp bridge_facets(nil), do: %{"facets" => ~w(beam_callback lifetime_contract scheduler_contract rich_input_decoder)}
-
   defp bridge_facets(%{"runtime" => "native_collector"}),
     do: %{"facets" => ["native_collector", "context_owned_handles"]}
 
   defp bridge_facets(_bridge),
     do: %{"facets" => ~w(beam_callback lifetime_contract scheduler_contract rich_input_decoder)}
 
-  defp nif_decl(function, variant),
-    do: %{
-      "wrapper_name" => variant.name,
+  defp nif_decl(function, variant) do
+    Map.merge(signature_variant(function, variant), %{
       "nif_name" => nil,
-      "params" => variant.params,
       "doc" => function.doc,
       "param_ctypes" => if(variant[:runtime], do: [], else: function.param_ctypes),
-      "return_ctype" => if(variant[:runtime], do: nil, else: function.return_ctype),
-      "param_typespecs" => nil,
-      "return_typespec" => nil,
-      "dirty" => variant.dirty
-    }
+      "return_ctype" => if(variant[:runtime], do: nil, else: function.return_ctype)
+    })
+  end
 
   defp signature_variant(_function, variant),
     do: %{

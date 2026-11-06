@@ -31,7 +31,7 @@ defmodule Beaver.MLIR.ExternalInterface do
     @type t() :: %__MODULE__{pid: pid(), id: term(), interface: atom(), operation_name: String.t()}
   end
 
-  @type interface() :: :memory_effects | :conditionally_speculatable | :transform_op | :pattern_descriptor
+  @type interface() :: :memory_effects | :conditionally_speculatable
 
   @registry __MODULE__.Registry
 
@@ -89,12 +89,6 @@ defmodule Beaver.MLIR.ExternalInterface do
         :conditionally_speculatable ->
           MLIR.ConditionallySpeculatable.attach(ctx, operation_name, implementation, opts)
 
-        :transform_op ->
-          MLIR.TransformOpInterface.attach(ctx, operation_name, implementation, opts)
-
-        :pattern_descriptor ->
-          MLIR.PatternDescriptorOpInterface.attach(ctx, operation_name, implementation, opts)
-
         other ->
           raise ArgumentError,
                 "unsupported external interface #{inspect(other)} on #{operation_name}"
@@ -109,10 +103,8 @@ defmodule Beaver.MLIR.ExternalInterface do
 
     {:ok,
      %{
-       context: ctx,
        operation_name: op_name,
        interface: interface,
-       callbacks: callbacks,
        id: id,
        native_owner: native_owner
      }}
@@ -120,12 +112,7 @@ defmodule Beaver.MLIR.ExternalInterface do
 
   @impl true
   def handle_call(:attachment, _from, state) do
-    attachment = %Attachment{
-      pid: self(),
-      id: state.id,
-      interface: state.interface,
-      operation_name: state.operation_name
-    }
+    attachment = struct!(Attachment, Map.take(state, [:id, :interface, :operation_name]) |> Map.put(:pid, self()))
 
     {:reply, attachment, state}
   end
@@ -140,29 +127,23 @@ defmodule Beaver.MLIR.ExternalInterface do
 
   def handle_info(message, state) do
     case dispatch(message) do
-      {:handled, _failure} ->
-        {:noreply, state}
-
-      :unhandled ->
-        Logger.warning("unexpected external interface callback message: #{inspect(message)}")
-        {:noreply, state}
+      :handled -> :ok
+      :unhandled -> Logger.warning("unexpected external interface callback message: #{inspect(message)}")
     end
+
+    {:noreply, state}
   end
 
-  for {interface, name, required, optional} <- [
-        {:memory_effects, :memory_effects_attach_fallback_model, :get_effects, []},
-        {:conditionally_speculatable, :conditionally_speculatable_attach_fallback_model, :get_speculatability, []},
-        {:transform_op, :transform_op_interface_attach_fallback_model, :apply, [:allows_repeated_handle_operands]},
-        {:pattern_descriptor, :pattern_descriptor_op_interface_attach_fallback_model, :populate_patterns,
-         [:populate_patterns_with_state]}
+  for {interface, name, required} <- [
+        {:memory_effects, :memory_effects_attach_fallback_model, :get_effects},
+        {:conditionally_speculatable, :conditionally_speculatable_attach_fallback_model, :get_speculatability}
       ] do
     defp native_attach(ctx, op_name, unquote(interface), callbacks, timeout_ms),
       do:
         apply(
           CAPI,
           unquote(:"beaver_raw_#{name}"),
-          [ctx, op_name, Map.fetch!(callbacks, unquote(required))] ++
-            Enum.map(unquote(optional), &Map.get(callbacks, &1)) ++ [timeout_ms]
+          [ctx, op_name, Map.fetch!(callbacks, unquote(required)), timeout_ms]
         )
   end
 
@@ -182,35 +163,9 @@ defmodule Beaver.MLIR.ExternalInterface do
     )
   end
 
-  for {name, arguments, normalize, invoke, reply} <- [
-        {:get_speculatability, [:op], :normalize_speculatability, :invoke_reply, :reply_speculatability},
-        {:apply, [:op, :rewriter, :results, :state], :normalize_transform_result, :invoke_reply,
-         :reply_transform_result},
-        {:allows_repeated_handle_operands, [:op], :normalize_boolean, :invoke_reply, :reply_boolean},
-        {:populate_patterns, [:op, :patterns], :normalize_void_result, :invoke, :beaver_raw_callback_reply},
-        {:populate_patterns_with_state, [:op, :patterns, :state], :normalize_void_result, :invoke,
-         :beaver_raw_callback_reply}
-      ] do
-    args = Enum.map(arguments, &Macro.var(&1, nil))
-    op = hd(args)
-    extra = if name == :apply, do: [op, Enum.at(args, 2)], else: []
-    callback = Macro.var(:callback, nil)
-    normalized = {normalize, [], [quote(do: unquote(callback).(unquote_splicing(args))) | extra]}
-
-    normalized =
-      if name in [:get_speculatability, :allows_repeated_handle_operands],
-        do: quote(do: {:ok, unquote(normalized)}),
-        else: normalized
-
-    reply =
-      if invoke == :invoke,
-        do: quote(do: &CAPI.beaver_raw_callback_reply/2),
-        else: quote(do: &unquote(reply)(&1, &2))
-
-    defp dispatch({unquote(name), token, unquote(callback), _id, unquote_splicing(args)}) do
-      unquote(args) = Enum.map(unquote(args), &native/1)
-      unquote(invoke)(token, fn -> unquote(normalized) end, unquote(reply), unquote(op))
-    end
+  defp dispatch({:get_speculatability, token, callback, _id, operation}) do
+    op = native(operation)
+    invoke_reply(token, fn -> {:ok, normalize_speculatability(callback.(op))} end, &reply_speculatability/2, op)
   end
 
   defp dispatch(_message), do: :unhandled
@@ -237,41 +192,14 @@ defmodule Beaver.MLIR.ExternalInterface do
   defp normalize_speculatability(other),
     do: raise(ArgumentError, "invalid speculatability callback result: #{inspect(other)}")
 
-  defp normalize_transform_result(:ok, _operation, _results), do: {:ok, :success}
-  defp normalize_transform_result({:ok, nil}, _operation, _results), do: {:ok, :success}
-
-  defp normalize_transform_result({:ok, mappings}, op, results) do
-    MLIR.TransformOpInterface.set_results(results, op, mappings)
-    {:ok, :success}
-  end
-
-  defp normalize_transform_result(:silenceable_failure, _operation, _results), do: {:ok, :silenceable_failure}
-
-  defp normalize_transform_result({:error, :silenceable}, _operation, _results), do: {:ok, :silenceable_failure}
-
-  defp normalize_transform_result(:definite_failure, _operation, _results), do: {:ok, :definite_failure}
-
-  defp normalize_transform_result({:error, :definite}, _operation, _results), do: {:ok, :definite_failure}
-
-  defp normalize_transform_result(other, _operation, _results),
-    do: raise(ArgumentError, "invalid transform apply callback result: #{inspect(other)}")
-
-  defp normalize_boolean({:ok, value}), do: normalize_boolean(value)
-  defp normalize_boolean(value) when is_boolean(value), do: value
-
-  defp normalize_boolean(other), do: raise(ArgumentError, "callback must return a boolean, got: #{inspect(other)}")
-
-  defp normalize_void_result({:error, _reason} = error), do: error
-  defp normalize_void_result(_value), do: {:ok, :ok}
-
   defp invoke(token, fun, reply, op) do
-    outcome = CallbackRuntime.invoke(token, fun, reply, &diagnose(&1, op))
-    {:handled, callback_failure(outcome)}
+    CallbackRuntime.invoke(token, fun, reply, &diagnose(&1, op))
+    :handled
   end
 
   defp invoke_reply(token, fun, reply, op) do
-    outcome = CallbackRuntime.invoke_reply(token, fun, reply, &diagnose(&1, op))
-    {:handled, callback_failure(outcome)}
+    CallbackRuntime.invoke_reply(token, fun, reply, &diagnose(&1, op))
+    :handled
   end
 
   defp diagnose({:exception, kind, reason, stacktrace}, op) do
@@ -299,23 +227,5 @@ defmodule Beaver.MLIR.ExternalInterface do
 
   defp reply_speculatability(token, _failure), do: CAPI.beaver_raw_callback_reply_code(token, false, 0)
 
-  defp reply_transform_result(token, {:ok, result}) do
-    code = %{success: 0, silenceable_failure: 1, definite_failure: 2} |> Map.fetch!(result)
-    CAPI.beaver_raw_callback_reply_code(token, true, code)
-  end
-
-  defp reply_transform_result(token, _failure), do: CAPI.beaver_raw_callback_reply_code(token, false, 2)
-
-  defp reply_boolean(token, {:ok, value}),
-    do: CAPI.beaver_raw_callback_reply_code(token, true, if(value, do: 1, else: 0))
-
-  defp reply_boolean(token, _failure), do: CAPI.beaver_raw_callback_reply_code(token, false, 0)
-
   defp native(value), do: Beaver.Native.check!(value)
-
-  defp callback_failure({:error, reason}), do: {:error, reason}
-
-  defp callback_failure({:exception, _kind, _reason, _stacktrace} = exception), do: exception
-
-  defp callback_failure(_outcome), do: nil
 end

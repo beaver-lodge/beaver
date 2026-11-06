@@ -1,8 +1,8 @@
 defmodule BufferizationTest do
   use Beaver.Case, async: true
 
+  alias Beaver.Composer
   alias Beaver.MLIR
-  alias Beaver.MLIR.Dialect.Bufferization
 
   @moduletag :smoke
 
@@ -17,25 +17,12 @@ defmodule BufferizationTest do
   }
   """
 
-  test "renders structured One-Shot Bufferize options" do
-    pipeline =
-      Bufferization.one_shot_pipeline(
-        bufferize_function_boundaries: true,
-        boundary_layout: :identity,
-        allow_unknown_ops: true,
-        analysis_heuristic: :bottom_up_from_terminators
-      )
-
-    assert pipeline =~ "bufferize-function-boundaries=true"
-    assert pipeline =~ "unknown-type-conversion=identity-layout-map"
-    assert pipeline =~ "function-boundary-type-conversion=identity-layout-map"
-    assert pipeline =~ "analysis-heuristic=bottom-up-from-terminators"
-  end
-
   test "runs bufferization and preserves structured diagnostics", %{ctx: ctx} do
     module = MLIR.Module.create!(@tensor_module, ctx: ctx)
 
-    assert {:ok, ^module, diagnostics} = Bufferization.one_shot(module)
+    assert {:ok, ^module, diagnostics} =
+             module |> Composer.append("one-shot-bufferize") |> Composer.run()
+
     assert is_list(diagnostics)
     MLIR.verify!(module)
     assert to_string(module) =~ "memref.alloc"
@@ -45,18 +32,12 @@ defmodule BufferizationTest do
   test "optionally appends ownership-based deallocation", %{ctx: ctx} do
     module = MLIR.Module.create!(@tensor_module, ctx: ctx)
 
-    assert ^module = Bufferization.one_shot!(module, deallocate: true)
+    assert ^module =
+             module
+             |> Composer.append("one-shot-bufferize,buffer-deallocation-pipeline")
+             |> Composer.run!()
+
     MLIR.verify!(module)
     assert to_string(module) =~ "memref.dealloc"
-  end
-
-  test "rejects unknown and invalid options" do
-    assert_raise ArgumentError, ~r/unsupported bufferization option/, fn ->
-      Bufferization.one_shot_pipeline(unknown: true)
-    end
-
-    assert_raise ArgumentError, ~r/allow_unknown_ops must be a boolean/, fn ->
-      Bufferization.one_shot_pipeline(allow_unknown_ops: :yes)
-    end
   end
 end

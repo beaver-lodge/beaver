@@ -54,19 +54,14 @@ defmodule Beaver.Walker do
           get_element: (container(), integer() -> element()) | nil,
           get_first: (container() -> element()) | nil,
           get_next: (element() -> element()) | nil,
-          get_parent: (element() -> container()) | nil,
-          parent_equal: (element(), element() -> Native.Bool.t() | bool()) | nil,
-          is_null: (element() -> Native.Bool.t() | bool()) | nil,
-          this: element() | non_neg_integer() | nil,
-          num: non_neg_integer() | nil
+          is_null: (element() -> Native.Bool.t() | bool()) | nil
         }
 
   container_keys = [:container, :element_module]
   index_func_keys = [:get_num, :get_element]
-  iter_keys = [:this, :num]
-  iter_func_keys = [:get_first, :get_next, :get_parent, :is_null, :parent_equal]
+  iter_func_keys = [:get_first, :get_next, :is_null]
   @enforce_keys container_keys
-  defstruct container_keys ++ index_func_keys ++ iter_keys ++ iter_func_keys
+  defstruct container_keys ++ index_func_keys ++ iter_func_keys
 
   # operands, results, attributes of one operation
   defp verify_nesting!(Operation, Value), do: :ok
@@ -101,36 +96,10 @@ defmodule Beaver.Walker do
 
   defp extract_container(container), do: container
 
-  defp new(container, element_module, get_num: get_num, get_element: get_element)
-       when is_function(get_num, 1) and
-              is_function(get_element, 2) do
+  defp new(container, element_module, callbacks) do
     container = %container_module{} = extract_container(container)
     verify_nesting!(container_module, element_module)
-
-    %__MODULE__{container: container, element_module: element_module, get_num: get_num, get_element: get_element}
-  end
-
-  defp new(container, element_module,
-         get_first: get_first,
-         get_next: get_next,
-         get_parent: get_parent,
-         is_null: is_null
-       )
-       when is_function(get_first, 1) and
-              is_function(get_next, 1) and
-              is_function(get_parent, 1) and
-              is_function(is_null, 1) do
-    container = %container_module{} = extract_container(container)
-    verify_nesting!(container_module, element_module)
-
-    %__MODULE__{
-      container: container,
-      element_module: element_module,
-      get_first: get_first,
-      get_next: get_next,
-      get_parent: get_parent,
-      is_null: is_null
-    }
+    struct!(__MODULE__, [container: container, element_module: element_module] ++ callbacks)
   end
 
   @spec operands(operation()) :: Enumerable.t()
@@ -232,7 +201,6 @@ defmodule Beaver.Walker do
     new(block, Operation,
       get_first: &CAPI.mlirBlockGetFirstOperation/1,
       get_next: &CAPI.mlirOperationGetNextInBlock/1,
-      get_parent: &CAPI.mlirOperationGetBlock/1,
       is_null: &MLIR.null?/1
     )
   end
@@ -245,7 +213,6 @@ defmodule Beaver.Walker do
     new(region, Block,
       get_first: &CAPI.mlirRegionGetFirstBlock/1,
       get_next: &CAPI.mlirBlockGetNextInRegion/1,
-      get_parent: &CAPI.mlirBlockGetParentRegion/1,
       is_null: &MLIR.null?/1
     )
   end
@@ -258,39 +225,16 @@ defmodule Beaver.Walker do
     new(value, OpOperand,
       get_first: &CAPI.mlirValueGetFirstUse/1,
       get_next: &CAPI.mlirOpOperandGetNextUse/1,
-      get_parent: &CAPI.mlirOpOperandGetValue/1,
       is_null: fn x -> CAPI.mlirOpOperandIsNull(x) |> Native.to_term() end
     )
   end
 
   @impl Access
-  def fetch(%__MODULE__{element_module: NamedAttribute} = walker, key) do
-    walker
-    |> Enum.find(fn named_attribute ->
-      name = named_attribute |> MLIR.NamedAttribute.name() |> MLIR.to_string()
-      name == to_string(key)
-    end)
-    |> then(
-      &case &1 do
-        %NamedAttribute{} -> {:ok, MLIR.CAPI.beaverNamedAttributeGetAttribute(&1)}
-        nil -> :error
-      end
-    )
-  end
-
   def fetch(%__MODULE__{element_module: {Identifier, Attribute}} = walker, key) do
-    walker
-    |> Enum.find(fn {name, _attribute} ->
-      with name_str <- name |> MLIR.CAPI.mlirIdentifierStr() |> MLIR.to_string() do
-        name_str == to_string(key)
-      end
-    end)
-    |> then(
-      &case &1 do
-        {_, %Attribute{} = attr} -> {:ok, attr}
-        nil -> :error
-      end
-    )
+    case Enum.find(walker, fn {name, _attribute} -> MLIR.to_string(name) == to_string(key) end) do
+      {_, %Attribute{} = attr} -> {:ok, attr}
+      nil -> :error
+    end
   end
 
   def fetch(%__MODULE__{element_module: element} = walker, key)
@@ -314,11 +258,11 @@ defmodule Beaver.Walker do
   You might expect this function works like `Macro.traverse/4`.
   ### More on manipulating the IR
   Keep mutation outside the active traversal. Use a pattern defined by
-  `Beaver.Pattern.defpat/2`, an Elixir `Beaver.MLIR.RewritePattern`, or first
+  `Beaver.MLIR.RewritePattern`, or first
   collect the operations to change and then use `Beaver.MLIR.IRRewriter`.
   ### Some tips
   - If your matching is very complicated, using `with/1` in Elixir should cover it.
-  - Use `defpat` if you want MLIR's greedy pattern application based on benefits instead of implementing something alike yourself.
+  - Use `Rewrite.apply_patterns/3` for MLIR's benefit-based greedy pattern application.
   - You can run traversals in a MLIR pass by calling them in `run/1` so that it joins the general MLIR pass manager's orchestration and will be run in parallel when possible.
   """
   @spec traverse(mlir(), any(), (mlir(), any() -> {mlir(), any()}), (mlir(), any() -> {mlir(), any()})) ::
@@ -420,137 +364,39 @@ defmodule Beaver.Walker do
   def postwalk(ast, acc, fun) when is_function(fun, 2), do: traverse(ast, acc, fn x, a -> {x, a} end, fun)
 
   defimpl Enumerable do
-    @spec count(Beaver.Walker.t()) :: {:ok, non_neg_integer()} | {:error, module()}
-    def count(%Beaver.Walker{container: container, get_num: get_num})
-        when is_function(get_num, 1) do
-      count = get_num.(container)
-      {:ok, if(is_integer(count), do: count, else: Native.to_term(count))}
+    def count(%{get_num: get_num, container: container}) when is_function(get_num, 1) do
+      value = get_num.(container)
+      {:ok, if(is_integer(value), do: value, else: Native.to_term(value))}
     end
 
-    def count(%Beaver.Walker{}), do: {:error, __MODULE__}
+    def count(_walker), do: {:error, __MODULE__}
+    def member?(walker, element), do: {:ok, Enum.any?(walker, &MLIR.equal?(&1, element))}
 
-    @spec member?(Beaver.Walker.t(), Beaver.Walker.element()) ::
-            {:ok, boolean()} | {:error, module()}
-    def member?(%Beaver.Walker{element_module: element_module} = walker, %element_module{} = element),
-      do: {:ok, Enum.any?(walker, &MLIR.equal?(&1, element))}
-
-    @spec member?(Beaver.Walker.t(), Beaver.Walker.element()) ::
-            {:ok, boolean()} | {:error, module()}
-    def member?(
-          %Beaver.Walker{
-            get_parent: get_parent,
-            parent_equal: parent_equal,
-            element_module: element_module,
-            container: container
-          },
-          %element_module{} = element
-        )
-        when is_function(get_parent, 1) and is_function(parent_equal, 2) do
-      is_member = parent_equal.(container, get_parent.(element)) |> Native.to_term()
-      {:ok, is_member}
+    def slice(%{get_element: get, container: container} = walker) when is_function(get, 2) do
+      {:ok, count} = count(walker)
+      {:ok, count, fn start, length, step -> for i <- 0..(length - 1)//1, do: get.(container, start + i * step) end}
     end
 
-    @spec slice(Beaver.Walker.t()) ::
-            {:ok, size :: non_neg_integer(), Enumerable.slicing_fun()} | {:error, module()}
-    def slice(walker = %Beaver.Walker{container: container, get_element: get_element})
-        when is_function(get_element, 2) do
-      case count(walker) do
-        {:ok, count} -> {:ok, count, slicing_fun(container, get_element)}
-        error -> error
-      end
-    end
+    def slice(_walker), do: {:error, __MODULE__}
 
-    def slice(%Beaver.Walker{get_first: get_first, get_next: get_next})
-        when is_function(get_first, 1) and is_function(get_next, 1), do: {:error, __MODULE__}
-
-    defp slicing_fun(container, get_element),
-      do: fn start, length, step ->
-        for pos <- start..(start + length - 1)//step do
-          get_element.(container, pos)
-        end
-      end
-
-    @spec reduce(Beaver.Walker.t(), Enumerable.acc(), Enumerable.reducer()) :: Enumerable.result()
-
-    # Do nothing special receiving :halt or :suspend
     def reduce(_walker, {:halt, acc}, _fun), do: {:halted, acc}
-
     def reduce(walker, {:suspend, acc}, fun), do: {:suspended, acc, &reduce(walker, &1, fun)}
+    def reduce(walker, acc, fun), do: Enumerable.reduce(stream(walker), acc, fun)
 
-    # Reduce by index
-    def reduce(%Beaver.Walker{get_element: get_element, this: nil, num: nil} = walker, {:cont, acc}, fun)
-        when is_function(get_element, 2) do
-      case count(walker) do
-        {:ok, count} -> reduce(%Beaver.Walker{walker | this: 0, num: count}, {:cont, acc}, fun)
-        error -> error
-      end
+    defp stream(%{get_element: get, container: container} = walker) when is_function(get, 2) do
+      {:ok, count} = count(walker)
+      Stream.map(0..(count - 1)//1, &expect_element!(get.(container, &1), walker.element_module))
     end
 
-    def reduce(
-          %Beaver.Walker{
-            container: container,
-            element_module: element_module,
-            get_element: get_element,
-            this: pos,
-            num: num
-          } = walker,
-          {:cont, acc},
-          fun
-        )
-        when is_function(get_element, 2) and
-               is_integer(pos) and pos >= 0 do
-      if pos < num do
-        value = get_element.(container, pos) |> expect_element!(element_module)
-        reduce(%Beaver.Walker{walker | this: pos + 1}, fun.(value, acc), fun)
-      else
-        {:done, acc}
-      end
-    end
-
-    # reduce by following the link
-    def reduce(
-          %Beaver.Walker{
-            container: container,
-            element_module: element_module,
-            get_first: get_first,
-            get_next: get_next,
-            is_null: is_null,
-            this: nil
-          } = walker,
-          {:cont, acc},
-          fun
-        )
-        when is_function(get_first, 1) and is_function(get_next, 1) and is_function(is_null, 1) do
-      this = get_first.(container) |> expect_element!(element_module)
-      reduce(%Beaver.Walker{walker | this: this}, {:cont, acc}, fun)
-    end
-
-    def reduce(
-          %Beaver.Walker{
-            get_next: get_next,
-            is_null: is_null,
-            element_module: element_module,
-            this: %element_module{} = this
-          } = walker,
-          {:cont, acc},
-          fun
-        )
-        when is_function(get_next, 1) and is_function(is_null, 1) do
-      if is_null.(this) do
-        {:done, acc}
-      else
-        next = get_next.(this) |> expect_element!(element_module)
-        reduce(%Beaver.Walker{walker | this: next}, fun.(this, acc), fun)
-      end
+    defp stream(walker) do
+      Stream.unfold(walker.get_first.(walker.container), fn current ->
+        current = expect_element!(current, walker.element_module)
+        unless walker.is_null.(current), do: {current, walker.get_next.(current)}
+      end)
     end
 
     defp expect_element!(%module{} = element, module), do: element
-
-    defp expect_element!(%module{}, expected), do: raise("Expected element module #{expected}, got #{module}")
-
-    defp expect_element!({%module_a{}, %module_b{}} = element, {module_a, module_b}), do: element
-
-    defp expect_element!({%module_a{}, %module_b{}}, expected),
-      do: raise("Expected element module #{inspect(expected)}, got #{inspect({module_a, module_b})}")
+    defp expect_element!({%a{}, %b{}} = element, {a, b}), do: element
+    defp expect_element!(element, expected), do: raise("Expected #{inspect(expected)}, got #{inspect(element)}")
   end
 end

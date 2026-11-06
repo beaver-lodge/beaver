@@ -215,10 +215,7 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
                "mlirTypeConverterAddSourceMaterialization",
                "mlirTypeConverterAddTargetMaterialization",
                "mlirConditionallySpeculatableOpInterfaceAttachFallbackModel",
-               "beaverMemoryEffectsOpInterfaceAttachFallbackModel",
-               "mlirPatternDescriptorOpInterfaceAttachFallbackModel",
-               "mlirTransformOpInterfaceAttachFallbackModel",
-               "mlirDynamicOpTraitCreate"
+               "beaverMemoryEffectsOpInterfaceAttachFallbackModel"
              ])
 
     for entry <- pending_entries do
@@ -227,7 +224,12 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
       refute MapSet.member?(emitted_names, name)
     end
 
-    assert pending_entries == []
+    assert MapSet.new(pending_entries, &get_in(&1, ["function", "name"])) == MapSet.new(~w(
+      mlirDynamicOpTraitCreate mlirPatternDescriptorOpInterfaceAttachFallbackModel
+      mlirTransformOpInterfaceAttachFallbackModel mlirTransformStateForEachPayloadOp
+      mlirTransformStateForEachPayloadValue mlirTransformStateForEachParam
+      mlirInferTypeOpInterfaceInferReturnTypes mlirInferShapedTypeOpInterfaceInferReturnTypes
+    ))
 
     assert Enum.map(collector_entries, &get_in(&1, ["callback_bridge", "wrapper_name"]))
            |> MapSet.new() ==
@@ -235,15 +237,10 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
                "beaver_raw_compile_llvm_ir_to_ptx",
                "beaver_raw_compiler_kernel_load_and_populate",
                "beaver_raw_translate_module_to_llvm_ir",
-               "beaver_raw_infer_return_types",
-               "beaver_raw_infer_return_type_components",
-               "beaver_raw_transform_state_params",
-               "beaver_raw_transform_state_payload_ops",
-               "beaver_raw_transform_state_payload_values",
                "beaver_raw_memory_effects_query_async"
              ])
 
-    {llvm_entries, transform_collector_entries} =
+    {llvm_entries, remaining_collectors} =
       Enum.split_with(
         collector_entries,
         &(get_in(&1, ["function", "name"]) in [
@@ -252,9 +249,9 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
           ])
       )
 
-    {memory_effect_entries, transform_collector_entries} =
+    {memory_effect_entries, remaining_collectors} =
       Enum.split_with(
-        transform_collector_entries,
+        remaining_collectors,
         &(get_in(&1, ["function", "name"]) == "beaverMemoryEffectsOpInterfaceGetEffects")
       )
 
@@ -268,9 +265,9 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
              "lifetime" => "async_operation"
            } = memory_effect_entry["callback_bridge"]
 
-    {compiler_kernel_entries, transform_collector_entries} =
+    {compiler_kernel_entries, remaining_collectors} =
       Enum.split_with(
-        transform_collector_entries,
+        remaining_collectors,
         &(get_in(&1, ["function", "name"]) == "beaverCompilerKernelLoadAndPopulate")
       )
 
@@ -284,15 +281,7 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
              "lifetime" => "nif_call"
            } = compiler_kernel_entry["callback_bridge"]
 
-    for entry <- transform_collector_entries do
-      bridge = Map.fetch!(entry, "callback_bridge")
-      assert bridge["runtime_backed"]
-      assert bridge["scheduler"] == "normal"
-      assert bridge["owner"] == "caller"
-      assert bridge["destructor"] == "stack"
-      assert bridge["lifetime"] == "nif_call"
-      assert bridge["facets"] == ["native_collector", "context_owned_handles"]
-    end
+    assert remaining_collectors == []
 
     assert Enum.map(llvm_entries, &get_in(&1, ["callback_bridge", "wrapper_name"]))
            |> MapSet.new() ==
@@ -345,16 +334,6 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
            )
 
     assert MapSet.member?(emitted_names, "beaver_raw_memory_effects_attach_fallback_model")
-
-    assert MapSet.member?(
-             emitted_names,
-             "beaver_raw_pattern_descriptor_op_interface_attach_fallback_model"
-           )
-
-    assert MapSet.member?(
-             emitted_names,
-             "beaver_raw_transform_op_interface_attach_fallback_model"
-           )
 
     signature_entries =
       declaration_manifest

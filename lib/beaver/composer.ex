@@ -36,30 +36,6 @@ defmodule Beaver.Composer do
   @doc false
   def create_pass(%MLIR.Pass{} = pass, _ctx), do: pass
 
-  def create_pass(%MLIR.Transform.FixedPoint{} = fixed_point, ctx) do
-    if fixed_point.on_convergence_failure != :warn and
-         not MLIR.Transform.composite_fixed_point_failure_action_supported?() do
-      raise ArgumentError,
-            "linked LLVM cannot configure fixed-point convergence failure; " <>
-              "update the LLVM pin before using #{inspect(fixed_point.on_convergence_failure)}"
-    end
-
-    inner_pipeline = mlir_op_pass_manager_create()
-
-    try do
-      Enum.each(fixed_point.pipeline, &add_pass(inner_pipeline, &1, ctx))
-
-      beaverCreateCompositeFixedPointPass(
-        StringRef.create(fixed_point.name),
-        inner_pipeline,
-        fixed_point.max_iterations,
-        encode_convergence_failure_action(fixed_point.on_convergence_failure)
-      )
-    after
-      beaverOpPassManagerDestroy(inner_pipeline)
-    end
-  end
-
   def create_pass({argument, op, run}, ctx) when is_function(run) do
     description = "beaver generated pass of #{Function.info(run) |> inspect}"
     MLIR.Pass.create(argument, description, op, run: run, ctx: ctx)
@@ -111,12 +87,6 @@ defmodule Beaver.Composer do
   defp add_pass(%MLIR.OpPassManager{} = pm, pass, ctx), do: mlirOpPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
 
   defp add_pass(%MLIR.PassManager{} = pm, pass, ctx), do: mlirPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
-
-  defp mlir_op_pass_manager_create, do: beaverOpPassManagerCreate()
-
-  defp encode_convergence_failure_action(:warn), do: 0
-  defp encode_convergence_failure_action(:error), do: 1
-  defp encode_convergence_failure_action(:silent), do: 2
 
   defp to_pm(%__MODULE__{passes: passes, op: op, ctx: ctx}) do
     ctx = ctx || MLIR.context(Operation.from_module(op))

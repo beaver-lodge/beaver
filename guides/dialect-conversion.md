@@ -196,24 +196,12 @@ Callbacks may return `:legal`, `:illegal`, or `:no_opinion`. Exceptions and
 `{:error, reason}` results are preserved in `Beaver.MLIR.Conversion.Error`
 rather than being flattened into a generic MLIR failure.
 
-## Native rewrite descriptors
+## Pattern population
 
-A plan can include descriptors produced by `Beaver.Pattern.Native.defrewrite/3`:
-
-```elixir
-plan =
-  MLIR.Conversion.Plan.add_pattern(
-    plan,
-    MyNativePatterns.lower_counter(),
-    version: "1.0"
-  )
-```
-
-This composes with the existing callback-backed Native DSL; `Conversion.Plan`
-does not introduce another matching language. Use `add_conversion_pattern/4`
-when a rewrite needs type-converted operand adaptors, and `add_pattern/3` for an
-ordinary Native descriptor. Declaration metadata records the descriptor name,
-root, benefit, and explicit version, but omits its callbacks and runtime state.
+Use `Plan.add_pattern_population/3` to install ordinary callback patterns into
+its mutable `RewritePatternSet`. Use `add_conversion_pattern/4` when a pattern
+needs type-converted operand adaptors. Both accept explicit version metadata;
+callbacks and runtime state are omitted from the plan's declaration receipt.
 
 ## 1:N conversion and materialization
 

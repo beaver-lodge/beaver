@@ -62,15 +62,6 @@ MLIR_CAPI_EXPORTED MlirOpOperand beaverMemoryEffectInstanceGetOpOperand(MlirMemo
 MLIR_CAPI_EXPORTED MlirValue beaverMemoryEffectInstanceGetValue(MlirMemoryEffectInstance instance);
 MLIR_CAPI_EXPORTED MlirAttribute beaverMemoryEffectInstanceGetSymbolRef(MlirMemoryEffectInstance instance);
 
-MLIR_CAPI_EXPORTED void beaverTransformOnlyReadsHandle(MlirOpOperand *operands, intptr_t numOperands,
-                                                       MlirBeaverMemoryEffectInstancesList effects);
-MLIR_CAPI_EXPORTED void beaverTransformConsumesHandle(MlirOpOperand *operands, intptr_t numOperands,
-                                                      MlirBeaverMemoryEffectInstancesList effects);
-MLIR_CAPI_EXPORTED void beaverTransformProducesHandle(MlirValue *results, intptr_t numResults,
-                                                      MlirBeaverMemoryEffectInstancesList effects);
-MLIR_CAPI_EXPORTED void beaverTransformModifiesPayload(MlirBeaverMemoryEffectInstancesList effects);
-MLIR_CAPI_EXPORTED void beaverTransformOnlyReadsPayload(MlirBeaverMemoryEffectInstancesList effects);
-
 /// Whether TileUsingForOp accepts packed tile-size and interchange handles.
 MLIR_CAPI_EXPORTED bool beaverTransformPackedParamsSupported(void);
 

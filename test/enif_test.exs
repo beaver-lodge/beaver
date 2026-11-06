@@ -3,6 +3,39 @@ defmodule EnifTest do
   use Beaver.Case, async: true
 
   @moduletag :smoke
+
+  test "allocator rewrite preserves calls and pass lifecycle", %{ctx: ctx} do
+    module =
+      MLIR.Module.create!(
+        """
+        module {
+          llvm.func @malloc(i64) -> !llvm.ptr
+          llvm.func @free(!llvm.ptr)
+          llvm.func @enif_alloc(i64) -> !llvm.ptr
+          llvm.func @enif_free(!llvm.ptr)
+          llvm.func @allocate(%n: i64) {
+            %p = llvm.call @malloc(%n) : (i64) -> !llvm.ptr
+            llvm.call @free(%p) : (!llvm.ptr) -> ()
+            llvm.return
+          }
+        }
+        """,
+        ctx: ctx
+      )
+
+    module
+    |> Beaver.Composer.nested("llvm.func", Beaver.ENIF.UseENIFAlloc)
+    |> Beaver.Composer.run!()
+    |> MLIR.verify!()
+
+    text = MLIR.to_string(module)
+    assert text =~ "llvm.call @enif_alloc"
+    assert text =~ "llvm.call @enif_free"
+    refute text =~ "llvm.call @malloc"
+    refute text =~ "llvm.call @free"
+    MLIR.Module.destroy(module)
+  end
+
   test "populate enif functions", %{ctx: ctx} do
     %ENIFSupport{engine: e} = s = AddENIF.init(ctx)
     invoker = &Beaver.ENIF.invoke(e, "add", [&1, &2])

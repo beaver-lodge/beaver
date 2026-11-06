@@ -7,7 +7,6 @@ defmodule Beaver.Application do
       MLIR.ThreadPool.child_spec(name: MLIR.ThreadPool.default_name()),
       MLIR.Pass.global_registrar_child_specs(),
       MLIR.RewritePattern.global_registrar_child_specs(),
-      MLIR.Trait.global_registrar_child_specs(),
       MLIR.ExternalInterface.global_registrar_child_specs(),
       MLIR.ActionTracing.global_registrar_child_specs(),
       MLIR.Rewrite.thread_pool_child_spec()

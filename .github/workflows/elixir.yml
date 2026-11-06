@@ -239,14 +239,6 @@ jobs:
         run: |
           mix run --no-compile profile/ex_conversion_profile.exs -- \
             --functions 128 --iterations 15 --warmup 4 --max-overhead-percent 5.0
-      - name: Run UseENIFAlloc benchmark
-        if: matrix.otp == '27.3' && matrix.elixir == '1.20.3' && runner.os != 'Windows'
-        env:
-          BENCH_TIME: "0.2"
-          BENCH_WARMUP: "0.1"
-          BENCH_INPUTS: "small_medium"
-        run: |
-          mix run bench/use_enif_alloc_bench.exs
       - name: Standalone Zig build
         if: matrix.elixir == '1.20.3'
         run: |

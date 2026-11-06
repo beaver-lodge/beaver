@@ -2,73 +2,8 @@ alias Beaver.MLIR.{CAPI, Context, Operation, StringRef}
 alias Beaver.Native
 
 defmodule Beaver.MLIR.Trait do
-  @moduledoc """
-  Attaches and queries traits on dynamically defined MLIR operations.
-
-  Trait registration belongs to an `MLIR.Context`. Attaching an already
-  present trait is a no-op, so a dynamic dialect's runtime extensions may be
-  installed more than once in the same context.
-
-  Custom traits use a stable TypeID per identity and context. Their verifier
-  callbacks run in a dedicated BEAM process and receive a borrowed operation
-  that is valid only until the callback returns. The target operation must
-  already be registered by an extensible dialect.
-  """
-
-  use GenServer
-
-  require Logger
-
+  @moduledoc "Attaches and queries the built-in traits of dynamic MLIR operations."
   alias Beaver.MLIR
-  alias Kinda.CallbackRuntime
-
-  defmodule Attachment do
-    @moduledoc "A live callback-backed dynamic trait attachment."
-    @enforce_keys [:pid, :id, :identity, :operation_name, :type_id]
-    defstruct [:pid, :id, :identity, :operation_name, :type_id]
-
-    @type t :: %__MODULE__{
-            pid: pid(),
-            id: term(),
-            identity: atom(),
-            operation_name: String.t(),
-            type_id: Beaver.MLIR.TypeID.t()
-          }
-  end
-
-  defmodule DefinitionServer do
-    @moduledoc false
-    use GenServer
-
-    alias Beaver.MLIR
-
-    @impl true
-    def init({context_ref, context_registry}) do
-      {:ok, _} = Registry.register(context_registry, context_ref, :definition)
-      {:ok, %{allocator: CAPI.mlirTypeIDAllocatorCreate(), type_ids: %{}}}
-    end
-
-    @impl true
-    def handle_call({:type_id, identity}, _from, state) do
-      {type_id, type_ids} =
-        Map.get_and_update(state.type_ids, identity, fn
-          nil ->
-            type_id = CAPI.mlirTypeIDAllocatorAllocateTypeID(state.allocator)
-            {type_id, type_id}
-
-          type_id ->
-            {type_id, type_id}
-        end)
-
-      {:reply, type_id, %{state | type_ids: type_ids}}
-    end
-
-    @impl true
-    def terminate(_reason, state) do
-      CAPI.mlirTypeIDAllocatorDestroy(state.allocator)
-      :ok
-    end
-  end
 
   @traits %{
     terminator: {:mlirDynamicOpTraitIsTerminatorCreate, :mlirDynamicOpTraitIsTerminatorGetTypeID},
@@ -77,31 +12,8 @@ defmodule Beaver.MLIR.Trait do
     no_terminator: {:mlirDynamicOpTraitNoTerminatorCreate, :mlirDynamicOpTraitNoTerminatorGetTypeID}
   }
 
-  @definition_registry __MODULE__.DefinitionRegistry
-  @context_registry __MODULE__.ContextRegistry
-  @custom_callback_keys [:verify, :verify_regions]
-
   @type builtin :: :terminator | :isolated_from_above | :no_terminator
-  @type identity :: module() | atom()
-  @type custom :: {identity(), keyword()}
-  @type declaration :: builtin() | custom()
-
-  @doc false
-  def global_registrar_child_specs,
-    do: [{Registry, keys: :unique, name: @definition_registry}, {Registry, keys: :duplicate, name: @context_registry}]
-
-  @doc false
-  def release_context(%Context{ref: context_ref}) do
-    if Process.whereis(@context_registry) do
-      entries = Registry.lookup(@context_registry, context_ref)
-
-      entries |> Enum.filter(&(elem(&1, 1) == :attachment)) |> Enum.each(fn {pid, _kind} -> release_attachment(pid) end)
-
-      entries |> Enum.filter(&(elem(&1, 1) == :definition)) |> Enum.each(fn {pid, _kind} -> stop_definition(pid) end)
-    end
-
-    :ok
-  end
+  @type declaration :: builtin()
 
   @doc "Returns the built-in dynamic traits supported by MLIR."
   @spec builtins() :: [builtin()]
@@ -112,7 +24,7 @@ defmodule Beaver.MLIR.Trait do
 
   def normalize!(traits) when is_list(traits) do
     traits = Enum.uniq(traits)
-    unsupported = Enum.reject(traits, &(builtin?(&1) or custom_declaration?(&1)))
+    unsupported = Enum.reject(traits, &is_map_key(@traits, &1))
 
     if unsupported != [], do: raise(ArgumentError, "unsupported Slang traits: #{inspect(unsupported)}")
 
@@ -125,7 +37,7 @@ defmodule Beaver.MLIR.Trait do
   def normalize!(traits), do: raise(ArgumentError, "expected a list of Slang traits, got: #{inspect(traits)}")
 
   @doc "Attaches a trait to a registered dynamic operation."
-  @spec attach(Context.t(), String.t(), declaration()) :: :ok | Attachment.t()
+  @spec attach(Context.t(), String.t(), declaration()) :: :ok
   def attach(%Context{} = ctx, op_name, trait)
       when is_binary(op_name) and is_atom(trait) do
     if has?(ctx, op_name, trait) do
@@ -146,34 +58,6 @@ defmodule Beaver.MLIR.Trait do
     end
   end
 
-  def attach(%Context{} = ctx, op_name, {identity, callbacks}) when is_binary(op_name),
-    do: attach_custom(ctx, op_name, identity, callbacks)
-
-  @doc "Attaches a callback-backed custom trait to a dynamic operation."
-  @spec attach_custom(Context.t(), String.t(), identity(), keyword(), keyword()) ::
-          :ok | Attachment.t()
-  def attach_custom(ctx, op_name, identity, callbacks, opts \\ []) do
-    callbacks = normalize_callbacks!(callbacks)
-    timeout_ms = Keyword.get(opts, :timeout, 30_000)
-
-    unless is_integer(timeout_ms) and timeout_ms >= 0,
-      do: raise(ArgumentError, ":timeout must be a non-negative integer")
-
-    type_id = type_id(ctx, identity)
-
-    if has_type_id?(ctx, op_name, type_id) do
-      :ok
-    else
-      init = {ctx, op_name, identity, type_id, callbacks, timeout_ms}
-
-      case GenServer.start(__MODULE__, init) do
-        {:ok, pid} -> GenServer.call(pid, :attachment)
-        {:error, {%_{} = exception, stacktrace}} -> reraise exception, stacktrace
-        {:error, reason} -> raise "failed to attach trait #{inspect(identity)}: #{inspect(reason)}"
-      end
-    end
-  end
-
   @doc "Attaches all declared traits for operations in a dynamic dialect."
   @spec attach_all(Context.t(), String.t(), [{String.t(), [declaration()]}]) :: :ok
   def attach_all(%Context{} = ctx, dialect, declarations)
@@ -186,150 +70,21 @@ defmodule Beaver.MLIR.Trait do
   end
 
   @doc "Checks whether a registered operation name has a trait."
-  @spec has?(Context.t(), String.t() | StringRef.t(), builtin() | identity()) ::
+  @spec has?(Context.t(), String.t() | StringRef.t(), builtin()) ::
           boolean()
   def has?(%Context{} = ctx, op_name, trait),
-    do: has_type_id?(ctx, op_name, type_id(ctx, trait))
+    do: has_type_id?(ctx, op_name, type_id(trait))
 
   @doc "Checks whether an operation has a trait."
-  @spec has?(Operation.t(), builtin() | identity()) :: boolean()
+  @spec has?(Operation.t(), builtin()) :: boolean()
   def has?(%Operation{} = op, trait),
     do: has?(MLIR.context(op), Operation.name(op), trait)
-
-  @doc "Returns the TypeID used by a trait in a context."
-  def type_id(%Context{} = ctx, trait),
-    do: if(builtin?(trait), do: type_id(trait), else: ctx |> definition_server() |> GenServer.call({:type_id, trait}))
 
   @doc false
   def type_id(trait) do
     {_create, type_id} = definition!(trait)
     apply(CAPI, type_id, [])
   end
-
-  @impl true
-  def init({ctx, op_name, identity, type_id, callbacks, timeout_ms}) do
-    {:ok, _} = Registry.register(@context_registry, ctx.ref, :attachment)
-
-    {id, native_owner} =
-      CAPI.beaver_raw_dynamic_trait_attach(
-        ctx,
-        op_name,
-        type_id,
-        callbacks[:verify],
-        callbacks[:verify_regions],
-        timeout_ms
-      )
-
-    {:ok,
-     %{
-       context: ctx,
-       operation_name: op_name,
-       identity: identity,
-       type_id: type_id,
-       callbacks: callbacks,
-       id: id,
-       native_owner: native_owner
-     }}
-  end
-
-  @impl true
-  def handle_call(:attachment, _from, state) do
-    attachment = %Attachment{
-      pid: self(),
-      id: state.id,
-      identity: state.identity,
-      operation_name: state.operation_name,
-      type_id: state.type_id
-    }
-
-    {:reply, attachment, state}
-  end
-
-  def handle_call(:context_destroyed, _from, state) do
-    :ok = CAPI.beaver_raw_external_interface_release(state.native_owner)
-    {:stop, :normal, :ok, state}
-  end
-
-  @impl true
-  def handle_info(:external_interface_released, state), do: {:stop, :normal, state}
-
-  def handle_info(message, state) do
-    case dispatch(message, state.identity) do
-      {:handled, _failure} ->
-        {:noreply, state}
-
-      :unhandled ->
-        Logger.warning("unexpected dynamic trait callback message: #{inspect(message)}")
-        {:noreply, state}
-    end
-  end
-
-  defp dispatch({callback_name, token, callback, _id, op}, identity)
-       when callback_name in [:verify, :verify_regions] do
-    op = Native.check!(op)
-
-    outcome =
-      CallbackRuntime.invoke(
-        token,
-        fn -> callback.(op) |> normalize_verification_result() end,
-        &CAPI.beaver_raw_callback_reply/2,
-        &diagnose(&1, op, identity, callback_name)
-      )
-
-    {:handled, callback_failure(outcome)}
-  end
-
-  defp dispatch(_message, _identity), do: :unhandled
-
-  defp normalize_verification_result(result) when result in [:ok, true], do: {:ok, :ok}
-  defp normalize_verification_result({:ok, _value}), do: {:ok, :ok}
-  defp normalize_verification_result(result) when result in [:error, false], do: {:error, result}
-  defp normalize_verification_result({:error, _reason} = error), do: error
-
-  defp normalize_verification_result(other) do
-    raise ArgumentError,
-          "trait verifier must return :ok, true, {:ok, value}, :error, false, " <>
-            "or {:error, reason}, got: #{inspect(other)}"
-  end
-
-  defp diagnose({:exception, kind, reason, stacktrace}, op, identity, callback_name) do
-    message =
-      "dynamic trait #{inspect(identity)} #{callback_name} callback raised:\n" <>
-        Exception.format(kind, reason, stacktrace)
-
-    Operation.location(op) |> MLIR.Diagnostic.emit(message)
-    Logger.error(message)
-  end
-
-  defp diagnose({:error, reason}, op, identity, callback_name) do
-    message =
-      "dynamic trait #{inspect(identity)} #{callback_name} callback failed: #{inspect(reason)}"
-
-    Operation.location(op) |> MLIR.Diagnostic.emit(message)
-    Logger.error(message)
-  end
-
-  defp diagnose(_outcome, _operation, _identity, _callback_name), do: :ok
-
-  defp normalize_callbacks!(callbacks) when is_list(callbacks) do
-    unless Keyword.keyword?(callbacks),
-      do: raise(ArgumentError, "custom trait callbacks must be a keyword list")
-
-    callbacks = Keyword.validate!(callbacks, @custom_callback_keys)
-
-    if Enum.all?(@custom_callback_keys, &is_nil(callbacks[&1])),
-      do: raise(ArgumentError, "custom trait requires :verify or :verify_regions")
-
-    Enum.each(callbacks, fn {name, callback} ->
-      unless is_function(callback, 1),
-        do: raise(ArgumentError, "custom trait #{inspect(name)} callback must have arity 1")
-    end)
-
-    callbacks
-  end
-
-  defp normalize_callbacks!(callbacks),
-    do: raise(ArgumentError, "custom trait callbacks must be a keyword list, got: #{inspect(callbacks)}")
 
   defp has_type_id?(ctx, op_name, type_id) do
     op_name =
@@ -340,44 +95,6 @@ defmodule Beaver.MLIR.Trait do
 
     CAPI.mlirOperationNameHasTrait(op_name, type_id, ctx) |> Native.to_term()
   end
-
-  defp definition_server(%Context{ref: context_ref}) do
-    name = {:via, Registry, {@definition_registry, context_ref}}
-
-    case GenServer.start(DefinitionServer, {context_ref, @context_registry}, name: name) do
-      {:ok, pid} -> pid
-      {:error, {:already_started, pid}} -> pid
-      {:error, reason} -> raise "failed to start trait definition registry: #{inspect(reason)}"
-    end
-  end
-
-  defp release_attachment(pid) do
-    GenServer.call(pid, :context_destroyed)
-  catch
-    :exit, {:noproc, _} -> :ok
-    :exit, {:normal, _} -> :ok
-  end
-
-  defp stop_definition(pid) do
-    GenServer.stop(pid, :normal)
-  catch
-    :exit, {:noproc, _} -> :ok
-  end
-
-  defp callback_failure({:error, reason}), do: {:error, reason}
-
-  defp callback_failure({:exception, _kind, _reason, _stacktrace} = exception), do: exception
-
-  defp callback_failure(_outcome), do: nil
-
-  defp builtin?(trait), do: is_map_key(@traits, trait)
-
-  defp custom_declaration?({identity, callbacks}) when is_list(callbacks) do
-    identity != nil and Keyword.keyword?(callbacks) and Keyword.keys(callbacks) -- @custom_callback_keys == [] and
-      Enum.any?(@custom_callback_keys, &Keyword.has_key?(callbacks, &1))
-  end
-
-  defp custom_declaration?(_trait), do: false
 
   defp definition!(trait) do
     case @traits do

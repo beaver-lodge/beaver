@@ -7,7 +7,6 @@ defmodule Beaver.MLIR.Dialect.Linalg do
   """
 
   alias Beaver.MLIR
-  alias Beaver.MLIR.Dialect.Bufferization
 
   use Beaver.MLIR.Dialect, dialect: "linalg", ops: Beaver.MLIR.Dialect.Registry.ops("linalg")
 
@@ -98,32 +97,6 @@ defmodule Beaver.MLIR.Dialect.Linalg do
   @doc false
   def result_types(outputs),
     do: outputs |> Enum.map(&MLIR.Value.type/1) |> Enum.filter(&MLIR.Type.tensor?/1)
-
-  @doc "Build a Linalg → Bufferization → LLVM lowering composer."
-  def llvm_pipeline(operation_or_module, opts \\ []) do
-    bufferization_opts =
-      opts
-      |> Keyword.get(:bufferization, [])
-      |> Keyword.put_new(:bufferize_function_boundaries, true)
-      |> Keyword.put_new(:boundary_layout, :identity)
-
-    operation_or_module
-    |> Bufferization.pipeline(bufferization_opts)
-    |> Beaver.Composer.append("convert-linalg-to-loops")
-    |> Beaver.Composer.append("canonicalize")
-    |> Beaver.Composer.append("lower-affine")
-    |> Beaver.Composer.append("convert-scf-to-cf")
-    |> Beaver.Composer.append("convert-index-to-llvm")
-    |> Beaver.Composer.append("convert-arith-to-llvm")
-    |> Beaver.Composer.append("finalize-memref-to-llvm")
-    |> Beaver.Composer.append("convert-func-to-llvm")
-    |> Beaver.Composer.append("convert-cf-to-llvm")
-    |> Beaver.Composer.append("reconcile-unrealized-casts")
-  end
-
-  @doc "Run the Linalg → Bufferization → LLVM lowering pipeline."
-  def lower_to_llvm!(operation_or_module, opts \\ []),
-    do: operation_or_module |> llvm_pipeline(opts) |> Beaver.Composer.run!(Keyword.get(opts, :run, []))
 
   defp scalar_vars(prefix, count) do
     for index <- 0..(count - 1)//1, do: Macro.var(:"#{prefix}_#{index}", nil)

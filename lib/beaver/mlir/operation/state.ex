@@ -1,4 +1,4 @@
-alias Beaver.MLIR.{Location, Operation, StringRef, Type}
+alias Beaver.MLIR.{Location, StringRef, Type}
 alias Beaver.{Changeset, Deferred, Native}
 
 defmodule Beaver.MLIR.Operation.State do
@@ -23,7 +23,7 @@ defmodule Beaver.MLIR.Operation.State do
 
   defp add_attributes(state, []), do: state
 
-  defp add_attributes(%Operation.State{} = state, attr_kw)
+  defp add_attributes(%__MODULE__{} = state, attr_kw)
        when is_list(attr_kw) do
     ctx = CAPI.beaverOperationStateGetContext(state)
 
@@ -42,30 +42,22 @@ defmodule Beaver.MLIR.Operation.State do
         CAPI.mlirNamedAttributeGet(CAPI.mlirIdentifierGet(ctx, StringRef.create(Atom.to_string(k))), attr)
       end
 
-    CAPI.mlirOperationStateAddAttributes(
-      Native.ptr(state),
-      length(attr_list),
-      Native.array(attr_list, MLIR.NamedAttribute)
-    )
+    add_array(state, attr_list, MLIR.NamedAttribute, :mlirOperationStateAddAttributes)
+  end
+
+  defp add_array(state, values, kind, function) do
+    if values not in [[], nil],
+      do: apply(CAPI, function, [Native.ptr(state), length(values), Native.array(values, kind)])
 
     state
   end
 
-  defp add_operands(%Operation.State{} = state, []), do: state
+  defp add_results(%__MODULE__{} = state, []), do: state
 
-  defp add_operands(%Operation.State{} = state, operands) do
-    array = operands |> Native.array(MLIR.Value)
-
-    CAPI.mlirOperationStateAddOperands(Native.ptr(state), length(operands), array)
-    state
-  end
-
-  defp add_results(%Operation.State{} = state, []), do: state
-
-  defp add_results(%Operation.State{} = state, :infer),
+  defp add_results(%__MODULE__{} = state, :infer),
     do: state |> tap(&CAPI.mlirOperationStateEnableResultTypeInference(Native.ptr(&1)))
 
-  defp add_results(%Operation.State{} = state, types)
+  defp add_results(%__MODULE__{} = state, types)
        when is_list(types) do
     context = CAPI.beaverOperationStateGetContext(state)
 
@@ -82,54 +74,19 @@ defmodule Beaver.MLIR.Operation.State do
     state
   end
 
-  defp add_regions(%Operation.State{} = state, empty) when empty in [[], nil], do: state
-
-  defp add_regions(%Operation.State{} = state, regions) when is_list(regions) do
-    Enum.each(regions, fn
-      %MLIR.Region{} -> :ok
-      other -> raise "not a region: #{inspect(other)}"
-    end)
-
-    array_ptr = regions |> Native.array(MLIR.Region)
-
-    CAPI.mlirOperationStateAddOwnedRegions(Native.ptr(state), length(regions), array_ptr)
-
-    state
-  end
-
-  defp add_successors(state, []), do: state
-
-  defp add_successors(%Operation.State{} = state, successors)
-       when is_list(successors) do
-    array_ptr = successors |> Native.array(MLIR.Block)
-
-    CAPI.mlirOperationStateAddSuccessors(Native.ptr(state), length(successors), array_ptr)
-
-    state
-  end
-
   @doc """
   Create a new operation state in MLIR CAPI.
   """
   def create(%Changeset{} = changeset) do
-    %Changeset{
-      name: name,
-      attributes: attributes,
-      operands: operands,
-      results: results,
-      successors: successors,
-      regions: regions,
-      location: location,
-      context: _context
-    } = changeset |> Changeset.reorder_operands() |> prepare()
+    changeset = changeset |> Changeset.reorder_operands() |> prepare()
 
-    name
+    changeset.name
     |> StringRef.create()
-    |> CAPI.mlirOperationStateGet(location)
-    |> add_attributes(attributes)
-    |> add_operands(operands)
-    |> add_successors(successors)
-    |> add_regions(regions)
-    |> add_results(results)
+    |> CAPI.mlirOperationStateGet(changeset.location)
+    |> add_attributes(changeset.attributes)
+    |> add_array(changeset.operands, MLIR.Value, :mlirOperationStateAddOperands)
+    |> add_array(changeset.successors, MLIR.Block, :mlirOperationStateAddSuccessors)
+    |> add_array(changeset.regions, MLIR.Region, :mlirOperationStateAddOwnedRegions)
+    |> add_results(changeset.results)
   end
 end

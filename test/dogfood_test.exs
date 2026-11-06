@@ -11,17 +11,13 @@ end
 defmodule Beaver.MLIR.DogfoodNativePatterns do
   @moduledoc false
   use Beaver
-  use Beaver.Pattern.Native
 
   alias Beaver.MLIR
   alias Beaver.MLIR.Dialect.Arith
   alias Beaver.MLIR.Type
 
-  defrewrite square_to_mul(operation, rewriter, _state),
-    root: "dogfood.square",
-    operands: [input],
-    results: [_result],
-    attributes: [] do
+  def square_to_mul(_pattern, operation, rewriter, state) do
+    [input] = Enum.to_list(Beaver.Walker.operands(operation))
     base = MLIR.PatternRewriter.as_base(rewriter)
     ctx = MLIR.context(operation)
     type = MLIR.Value.type(input)
@@ -31,14 +27,11 @@ defmodule Beaver.MLIR.DogfoodNativePatterns do
       MLIR.RewriterBase.replace_op(base, operation, [replacement])
     end
 
-    :ok
+    {:ok, state}
   end
 
-  defrewrite inc_to_add1(operation, rewriter, _state),
-    root: "dogfood.inc",
-    operands: [input],
-    results: [_result],
-    attributes: [] do
+  def inc_to_add1(_pattern, operation, rewriter, state) do
+    [input] = Enum.to_list(Beaver.Walker.operands(operation))
     base = MLIR.PatternRewriter.as_base(rewriter)
     ctx = MLIR.context(operation)
     type = MLIR.Value.type(input)
@@ -49,7 +42,7 @@ defmodule Beaver.MLIR.DogfoodNativePatterns do
       MLIR.RewriterBase.replace_op(base, operation, [replacement])
     end
 
-    :ok
+    {:ok, state}
   end
 end
 
@@ -79,9 +72,10 @@ defmodule DogfoodTest do
 
     module = MLIR.Module.create!(@source, ctx: ctx)
 
-    # 1. #485: native matcher rewrites dogfood.square without hand-written
-    #    Walker unpacking and without generating wrapper source.
-    MLIR.Rewrite.apply_patterns!(module, [DogfoodNativePatterns.square_to_mul()])
+    # A callback rewrite precedes dialect conversion.
+    MLIR.Rewrite.apply_patterns!(module, [
+      {"dogfood.square", &DogfoodNativePatterns.square_to_mul/4}
+    ])
 
     rewritten = MLIR.to_string(module)
     refute rewritten =~ "dogfood.square"
@@ -101,7 +95,13 @@ defmodule DogfoodTest do
       |> Plan.add_legal_dialect("arith")
       |> Plan.add_illegal_dialect("dogfood")
       |> Plan.add_conversion(fn type -> type end, version: "1.0")
-      |> Plan.add_pattern(DogfoodNativePatterns.inc_to_add1())
+      |> Plan.add_pattern_population(fn patterns, _converter ->
+        MLIR.RewritePatternSet.add(patterns, "dogfood.inc", &DogfoodNativePatterns.inc_to_add1/4,
+          ctx: MLIR.CAPI.mlirRewritePatternSetGetContext(patterns)
+        )
+
+        :ok
+      end)
 
     assert {:ok, ^module, _diagnostics} = Plan.run(plan, module)
 
@@ -114,7 +114,11 @@ defmodule DogfoodTest do
     ctx2 = MLIR.Context.create()
     assert Beaver.Slang.load(ctx2, DogfoodDialect) |> MLIR.LogicalResult.success?()
     module2 = MLIR.Module.create!(@source, ctx: ctx2)
-    MLIR.Rewrite.apply_patterns!(module2, [DogfoodNativePatterns.square_to_mul()])
+
+    MLIR.Rewrite.apply_patterns!(module2, [
+      {"dogfood.square", &DogfoodNativePatterns.square_to_mul/4}
+    ])
+
     assert {:ok, _module2, _diagnostics} = Plan.run(plan, module2)
     refute MLIR.to_string(module2) =~ "dogfood"
     MLIR.Context.destroy(ctx2)
@@ -131,7 +135,29 @@ defmodule DogfoodTest do
     }
     """
 
-    assert {:ok, _} = MLIR.Transform.apply_named_sequence(module, schedule)
+    schedule = MLIR.Module.create!(schedule, ctx: ctx)
+    root = schedule |> MLIR.Operation.from_module() |> Beaver.Walker.regions() |> Enum.at(0)
+
+    root =
+      root |> Beaver.Walker.blocks() |> Enum.at(0) |> Beaver.Walker.operations() |> Enum.at(0)
+
+    options = MLIR.CAPI.mlirTransformOptionsCreate()
+
+    try do
+      result =
+        MLIR.CAPI.mlirTransformApplyNamedSequence(
+          MLIR.Operation.from_module(module),
+          root,
+          MLIR.Operation.from_module(schedule),
+          options
+        )
+
+      assert MLIR.LogicalResult.success?(result)
+    after
+      MLIR.CAPI.mlirTransformOptionsDestroy(options)
+      MLIR.Module.destroy(schedule)
+    end
+
     bytecode = MLIR.Bytecode.write!(module)
     reparsed = MLIR.Module.create!(bytecode, ctx: ctx)
     MLIR.verify!(reparsed)

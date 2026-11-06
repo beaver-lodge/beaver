@@ -19,7 +19,16 @@ defmodule StructuredComputeTest do
             region do
               block _entry(source >>> ~t{tensor<8xf32>}) do
                 result =
-                  Tensor.extract_slice_(source, Tensor.slice([2], [4], [1])) >>>
+                  Tensor.extract_slice(
+                    source: source,
+                    offsets: [],
+                    sizes: [],
+                    strides: [],
+                    static_offsets: Attribute.dense_array([2], Beaver.Native.I64),
+                    static_sizes: Attribute.dense_array([4], Beaver.Native.I64),
+                    static_strides: Attribute.dense_array([1], Beaver.Native.I64),
+                    operand_segment_sizes: :infer
+                  ) >>>
                     ~t{tensor<4xf32>}
 
                 Func.return(result) >>> []
@@ -46,10 +55,14 @@ defmodule StructuredComputeTest do
                 padding = Arith.constant(value: Attribute.float(Type.f32(), 0.0)) >>> Type.f32()
 
                 _vector =
-                  Vector.transfer_read_(source, padding,
+                  Vector.transfer_read(
+                    base: source,
+                    padding: padding,
                     indices: [index],
-                    permutation_map: map,
-                    in_bounds: [true]
+                    mask: [],
+                    permutation_map: Attribute.affine_map(map),
+                    in_bounds: Attribute.array([Attribute.bool(true)]),
+                    operand_segment_sizes: :infer
                   ) >>> ~t{vector<4xf32>}
 
                 Func.return() >>> []
@@ -94,7 +107,10 @@ defmodule StructuredComputeTest do
     MLIR.verify!(module)
     assert to_string(module) =~ "linalg.generic"
 
-    assert ^module = Linalg.lower_to_llvm!(module)
+    pipeline =
+      "one-shot-bufferize{bufferize-function-boundaries=true unknown-type-conversion=identity-layout-map function-boundary-type-conversion=identity-layout-map},convert-linalg-to-loops,canonicalize,lower-affine,convert-scf-to-cf,convert-index-to-llvm,convert-arith-to-llvm,finalize-memref-to-llvm,convert-func-to-llvm,convert-cf-to-llvm,reconcile-unrealized-casts"
+
+    assert ^module = module |> Beaver.Composer.append(pipeline) |> Beaver.Composer.run!()
     MLIR.verify!(module)
     assert to_string(module) =~ "llvm.func @add"
     refute to_string(module) =~ "linalg.generic"

@@ -37,9 +37,7 @@ defmodule Beaver.MLIR.Rewrite do
   @type match_and_rewrite() ::
           (MLIR.RewritePattern.t(), Operation.t(), MLIR.PatternRewriter.t(), any() -> {:ok, any()} | {:error, any()})
 
-  @type pattern_entry() ::
-          Beaver.Pattern.Native.Descriptor.t()
-          | {root_name :: term(), match_and_rewrite() | Beaver.Pattern.Native.Descriptor.t()}
+  @type pattern_entry() :: {root_name :: term(), match_and_rewrite()}
 
   @type pattern_list() :: [pattern_entry()]
   @type apply_result() :: {LogicalResult.t(), diagnostics()}
@@ -107,8 +105,6 @@ defmodule Beaver.MLIR.Rewrite do
     set = RewritePatternSet.create(ctx)
 
     Enum.each(patterns, fn
-      %Beaver.Pattern.Native.Descriptor{} = descriptor -> RewritePatternSet.add(set, descriptor, ctx: ctx)
-      {root, %Beaver.Pattern.Native.Descriptor{} = descriptor} -> RewritePatternSet.add(set, root, descriptor, ctx: ctx)
       {root, match_and_rewrite} -> RewritePatternSet.add(set, root, match_and_rewrite, ctx: ctx)
     end)
 

@@ -1,6 +1,6 @@
 set(LLVM_LINK_COMPONENTS Demangle Support TableGen)
 
-set(LIBS MLIRIR MLIRPDLLODS MLIRTableGen)
+set(LIBS MLIRIR MLIRTableGen)
 
 add_tablegen(
   ods-extract

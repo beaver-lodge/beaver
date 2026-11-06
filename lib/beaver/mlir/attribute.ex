@@ -35,98 +35,66 @@ defmodule Beaver.MLIR.Attribute do
 
   defp truthy_elements(elements), do: Enum.map(elements, &if(&1, do: 1, else: 0))
 
-  defp dense_elements_splat_get(shaped_type, value, ctx) do
-    element_type = Type.element_type(shaped_type)
-
+  @doc false
+  def element_storage(type) do
     cond do
-      match?(%Attribute{}, value) ->
-        mlirDenseElementsAttrSplatGet(shaped_type, value)
+      MLIR.equal?(type, Type.i1()) ->
+        {"Bool", Native.CInt}
 
-      is_boolean(value) ->
-        mlirDenseElementsAttrBoolSplatGet(shaped_type, value)
+      Type.integer?(type) ->
+        width = Type.width(type)
+        {prefix, native} = if Type.unsigned?(type), do: {"UInt", "U"}, else: {"Int", "I"}
+        {"#{prefix}#{width}", Module.concat(Native, "#{native}#{width}")}
 
-      Type.integer?(element_type) ->
-        width = Type.width(element_type)
+      Type.index?(type) ->
+        {"UInt64", Native.U64}
 
-        apply(
-          CAPI,
-          if(Type.unsigned?(element_type),
-            do: :"mlirDenseElementsAttrUInt#{width}SplatGet",
-            else: :"mlirDenseElementsAttrInt#{width}SplatGet"
-          ),
-          [shaped_type, value]
-        )
+      Type.f32?(type) ->
+        {"Float", Native.F32}
 
-      MLIR.equal?(element_type, Type.f(32, ctx: ctx)) ->
-        mlirDenseElementsAttrFloatSplatGet(shaped_type, value)
-
-      MLIR.equal?(element_type, Type.f(64, ctx: ctx)) ->
-        mlirDenseElementsAttrDoubleSplatGet(shaped_type, value)
+      Type.f64?(type) ->
+        {"Double", Native.F64}
 
       true ->
-        raise ArgumentError, "unsupported splat value type"
+        {"String", StringRef}
     end
   end
 
-  defp string_elements?(elements) do
-    (Enum.all?(elements, &is_binary/1) or Enum.all?(elements, &match?(%StringRef{}, &1))) and not Enum.empty?(elements)
-  end
+  defp dense_elements_splat_get(shaped_type, value, _ctx) do
+    {suffix, _native} = element_storage(Type.element_type(shaped_type))
 
-  defp attr_elements?(elements), do: Enum.all?(elements, &match?(%Attribute{}, &1)) and not Enum.empty?(elements)
-
-  defp int_dense_elements_attr_getter(element_type) do
-    width = Type.width(element_type)
-
-    {f, t} =
-      if Type.unsigned?(element_type),
-        do: {:"mlirDenseElementsAttrUInt#{width}Get", :"Elixir.Beaver.Native.U#{width}"},
-        else: {:"mlirDenseElementsAttrInt#{width}Get", :"Elixir.Beaver.Native.I#{width}"}
-
-    &apply(CAPI, f, [&1, &2, Native.array(&3, t)])
-  end
-
-  defp float_dense_elements_attr_getter(element_type) do
-    {f, t} =
-      case Type.width(element_type) do
-        32 -> {&mlirDenseElementsAttrFloatGet/3, Native.F32}
-        64 -> {&mlirDenseElementsAttrDoubleGet/3, Native.F64}
+    suffix =
+      cond do
+        is_struct(value, Attribute) -> ""
+        is_boolean(value) -> "Bool"
+        suffix == "String" -> raise ArgumentError, "unsupported splat value type"
+        true -> suffix
       end
 
-    &apply(f, [&1, &2, Native.array(&3, t)])
+    apply(CAPI, :"mlirDenseElementsAttr#{suffix}SplatGet", [shaped_type, value])
   end
+
+  defp all_elements?(elements, predicate), do: elements != [] and Enum.all?(elements, predicate)
 
   defp dense_elements_get(shaped_type, num_elements, elements) do
     element_type = Type.element_type(shaped_type)
 
-    cond do
-      Type.opaque?(element_type) or string_elements?(elements) ->
-        strings =
-          elements |> Enum.map(&StringRef.create/1) |> Native.array(StringRef, mut: true)
+    {suffix, native, elements} =
+      cond do
+        Type.opaque?(element_type) or all_elements?(elements, &(is_binary(&1) or is_struct(&1, StringRef))) ->
+          {"String", StringRef, Enum.map(elements, &StringRef.create/1)}
 
-        mlirDenseElementsAttrStringGet(shaped_type, num_elements, strings)
+        all_elements?(elements, &is_struct(&1, Attribute)) ->
+          {"", Attribute, elements}
 
-      attr_elements?(elements) ->
-        attrs = Native.array(elements, Attribute)
-        mlirDenseElementsAttrGet(shaped_type, num_elements, attrs)
+        true ->
+          {suffix, native} = element_storage(element_type)
+          if suffix == "String", do: raise(ArgumentError, "unsupported element type #{MLIR.to_string(element_type)}")
+          {suffix, native, if(suffix == "Bool", do: truthy_elements(elements), else: elements)}
+      end
 
-      MLIR.equal?(element_type, Type.i1()) ->
-        elements = truthy_elements(elements)
-
-        mlirDenseElementsAttrBoolGet(shaped_type, num_elements, Native.array(elements, Native.CInt))
-
-      Type.integer?(element_type) ->
-        int_dense_elements_attr_getter(element_type).(shaped_type, num_elements, elements)
-
-      MLIR.equal?(element_type, Type.index()) ->
-        mlirDenseElementsAttrUInt64Get(shaped_type, num_elements, Native.array(elements, Native.U64))
-
-      Type.float?(element_type) ->
-        float_dense_elements_attr_getter(element_type).(shaped_type, num_elements, elements)
-
-      true ->
-        raise ArgumentError,
-              "unsupported element type #{MLIR.to_string(element_type)}"
-    end
+    data = Native.array(elements, native, mut: native == StringRef)
+    apply(CAPI, :"mlirDenseElementsAttr#{suffix}Get", [shaped_type, num_elements, data])
   end
 
   def dense_elements(elements_or_value, shaped_type \\ {:i, 8}, opts \\ [])

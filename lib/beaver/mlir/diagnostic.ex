@@ -29,8 +29,6 @@ defmodule Beaver.MLIR.Diagnostic do
     {severity, loc, message, Enum.map(nested, &process_diagnostic/1)}
   end
 
-  def walk({_, _, _, []} = diagnostic, acc, fun), do: fun.(diagnostic, acc)
-
   def walk({_, _, _, nested} = diagnostic, acc, fun) do
     acc = fun.(diagnostic, acc)
 
