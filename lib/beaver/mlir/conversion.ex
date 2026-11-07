@@ -42,7 +42,7 @@ defmodule Beaver.MLIR.Conversion.Callbacks do
 
   defp invoke(token, fun, reply) do
     outcome = CallbackRuntime.invoke_reply(token, fun, reply)
-    {:handled, callback_failure(outcome)}
+    {:handled, MLIR.ExternalInterface.callback_failure(outcome)}
   end
 
   defp native(nil), do: nil
@@ -124,12 +124,6 @@ defmodule Beaver.MLIR.Conversion.Callbacks do
   defp reply_pattern(token, {:ok, :match}), do: CAPI.beaver_raw_callback_reply(token, true)
 
   defp reply_pattern(token, _no_match_or_failure), do: CAPI.beaver_raw_callback_reply(token, false)
-
-  defp callback_failure({:error, reason}), do: {:error, reason}
-
-  defp callback_failure({:exception, _kind, _reason, _stacktrace} = exception), do: exception
-
-  defp callback_failure(_outcome), do: nil
 end
 
 defmodule Beaver.MLIR.Conversion do
@@ -278,10 +272,7 @@ defmodule Beaver.MLIR.Conversion do
     folding_mode = folding_mode!(Keyword.get(opts, :folding_mode))
     materializations = materializations!(Keyword.get(opts, :build_materializations))
 
-    timeout_ms = Keyword.get(opts, :timeout, 30_000)
-
-    unless is_integer(timeout_ms) and timeout_ms >= 0,
-      do: raise(ArgumentError, ":timeout must be a non-negative integer")
+    timeout_ms = Beaver.Execution.callback_timeout!(opts)
 
     {folding_mode, materializations, timeout_ms, opts[:profile]}
   end

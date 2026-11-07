@@ -185,81 +185,26 @@ fn allocateState(comptime State: type, comptime callbacks: anytype, comptime req
     return state;
 }
 
-fn attachSpeculatabilityFallback(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
-    c.beaverExecutionMarkCallbacks(context);
-    const state = try allocateState(SpeculatabilityState, .{"get_speculatability"}, 1, environment, args[2..4]);
-    errdefer stateResource(SpeculatabilityState).release(state);
-    c.mlirConditionallySpeculatableOpInterfaceAttachFallbackModel(
-        context,
-        try string_ref.get_binary_as_string_ref(environment, args[1]),
-        .{
-            .construct = constructModel,
-            .destruct = destructModel(SpeculatabilityState),
-            .getSpeculatability = SpeculatabilityState.getSpeculatability,
-            .userData = state,
-        },
-    );
-    return attachmentTerm(SpeculatabilityState, environment, state.dispatcher.copyId(environment), state);
-}
-
-fn attachMemoryEffectsFallback(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
-    c.beaverExecutionMarkCallbacks(context);
-    const state = try allocateState(MemoryEffectsState, .{"get_effects"}, 1, environment, args[2..4]);
-    errdefer stateResource(MemoryEffectsState).release(state);
-    c.beaverMemoryEffectsOpInterfaceAttachFallbackModel(
-        context,
-        try string_ref.get_binary_as_string_ref(environment, args[1]),
-        .{
-            .construct = constructModel,
-            .destruct = destructModel(MemoryEffectsState),
-            .getEffects = MemoryEffectsState.getEffects,
-            .userData = state,
-        },
-    );
-    return attachmentTerm(MemoryEffectsState, environment, state.dispatcher.copyId(environment), state);
-}
-
-fn attachTransformFallback(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
-    c.beaverExecutionMarkCallbacks(context);
-    const state = try allocateState(TransformState, .{ "apply", "allows_repeated_handle_operands" }, 1, environment, args[2..5]);
-    errdefer stateResource(TransformState).release(state);
-    c.mlirTransformOpInterfaceAttachFallbackModel(
-        context,
-        try string_ref.get_binary_as_string_ref(environment, args[1]),
-        .{
-            .construct = constructModel,
-            .destruct = destructModel(TransformState),
-            .apply = TransformState.apply,
-            .allowsRepeatedHandleOperands = TransformState.allowsRepeatedHandleOperands,
-            .userData = state,
-        },
-    );
-    return attachmentTerm(TransformState, environment, state.dispatcher.copyId(environment), state);
-}
-
-fn attachPatternDescriptorFallback(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
-    c.beaverExecutionMarkCallbacks(context);
-    const state = try allocateState(PatternDescriptorState, .{ "populate_patterns", "populate_patterns_with_state" }, 1, environment, args[2..5]);
-    errdefer stateResource(PatternDescriptorState).release(state);
-    c.mlirPatternDescriptorOpInterfaceAttachFallbackModel(
-        context,
-        try string_ref.get_binary_as_string_ref(environment, args[1]),
-        .{
-            .construct = constructModel,
-            .destruct = destructModel(PatternDescriptorState),
-            .populatePatterns = PatternDescriptorState.populatePatterns,
-            .populatePatternsWithState = if (state.dispatcher.hasCallback("populate_patterns_with_state"))
-                PatternDescriptorState.populatePatternsWithState
-            else
-                null,
-            .userData = state,
-        },
-    );
-    return attachmentTerm(PatternDescriptorState, environment, state.dispatcher.copyId(environment), state);
+// Every fallback transfers the allocation reference to MLIR and returns a
+// separate BEAM reference. Only the state-aware descriptor hook is nullable.
+fn Fallback(comptime State: type, comptime callbacks: anytype, comptime Attach: anytype, comptime methods: anytype) type {
+    return struct {
+        fn attach(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
+            const name = try string_ref.get_binary_as_string_ref(environment, args[1]);
+            const state = try allocateState(State, callbacks, 1, environment, args[2 .. 3 + callbacks.len]);
+            var model: @typeInfo(@TypeOf(Attach)).@"fn".params[2].type.? = undefined;
+            model.construct = constructModel;
+            model.destruct = destructModel(State);
+            model.userData = state;
+            inline for (std.meta.fields(@TypeOf(methods))) |field| @field(model, field.name) = @field(methods, field.name);
+            if (State == PatternDescriptorState and !state.dispatcher.hasCallback("populate_patterns_with_state"))
+                model.populatePatternsWithState = null;
+            c.beaverExecutionMarkCallbacks(context);
+            Attach(context, name, model);
+            return attachmentTerm(State, environment, state.dispatcher.copyId(environment), state);
+        }
+    };
 }
 
 fn attachDynamicTrait(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
@@ -289,21 +234,16 @@ fn attachDynamicTrait(environment: beam.env, _: c_int, args: [*c]const beam.term
     return result;
 }
 
-fn releaseStateTerm(comptime State: type, comptime Resource: type, environment: beam.env, term: beam.term) bool {
-    const state: *State = Resource.fetch(environment, term) catch return false;
-    releaseModel(State, state);
-    return true;
-}
+const States = .{ SpeculatabilityState, MemoryEffectsState, TransformState, PatternDescriptorState, DynamicTraitState };
 
 fn releaseExternalInterface(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const released =
-        releaseStateTerm(SpeculatabilityState, stateResource(SpeculatabilityState), environment, args[0]) or
-        releaseStateTerm(MemoryEffectsState, stateResource(MemoryEffectsState), environment, args[0]) or
-        releaseStateTerm(TransformState, stateResource(TransformState), environment, args[0]) or
-        releaseStateTerm(PatternDescriptorState, stateResource(PatternDescriptorState), environment, args[0]) or
-        releaseStateTerm(DynamicTraitState, stateResource(DynamicTraitState), environment, args[0]);
-    if (!released) return error.InvalidExternalInterfaceState;
-    return beam.make_ok(environment);
+    inline for (States) |State| {
+        if (stateResource(State).fetch(environment, args[0])) |state| {
+            releaseModel(State, state);
+            return beam.make_ok(environment);
+        } else |_| {}
+    }
+    return error.InvalidExternalInterfaceState;
 }
 
 const EffectsCollector = struct {
@@ -412,11 +352,7 @@ fn transformStateParams(environment: beam.env, _: c_int, args: [*c]const beam.te
 }
 
 pub fn open(environment: beam.env) void {
-    stateResource(SpeculatabilityState).open(environment);
-    stateResource(MemoryEffectsState).open(environment);
-    stateResource(TransformState).open(environment);
-    stateResource(PatternDescriptorState).open(environment);
-    stateResource(DynamicTraitState).open(environment);
+    inline for (States) |State| stateResource(State).open(environment);
 }
 
 pub const nifs = .{
@@ -432,10 +368,26 @@ pub const nifs = .{
     kinda.callback_runtime.ReplyToken.codeNif("beaver_raw_callback_reply_code"),
 };
 
-pub const conditionally_speculatable_attach_fallback_model = attachSpeculatabilityFallback;
-pub const memory_effects_attach_fallback_model = attachMemoryEffectsFallback;
-pub const transform_op_interface_attach_fallback_model = attachTransformFallback;
-pub const pattern_descriptor_op_interface_attach_fallback_model = attachPatternDescriptorFallback;
+pub const conditionally_speculatable_attach_fallback_model = Fallback(
+    SpeculatabilityState,
+    .{"get_speculatability"},
+    c.mlirConditionallySpeculatableOpInterfaceAttachFallbackModel,
+    .{ .getSpeculatability = SpeculatabilityState.getSpeculatability },
+).attach;
+pub const memory_effects_attach_fallback_model = Fallback(
+    MemoryEffectsState,
+    .{"get_effects"},
+    c.beaverMemoryEffectsOpInterfaceAttachFallbackModel,
+    .{ .getEffects = MemoryEffectsState.getEffects },
+).attach;
+pub const transform_op_interface_attach_fallback_model = Fallback(TransformState, .{ "apply", "allows_repeated_handle_operands" }, c.mlirTransformOpInterfaceAttachFallbackModel, .{
+    .apply = TransformState.apply,
+    .allowsRepeatedHandleOperands = TransformState.allowsRepeatedHandleOperands,
+}).attach;
+pub const pattern_descriptor_op_interface_attach_fallback_model = Fallback(PatternDescriptorState, .{ "populate_patterns", "populate_patterns_with_state" }, c.mlirPatternDescriptorOpInterfaceAttachFallbackModel, .{
+    .populatePatterns = PatternDescriptorState.populatePatterns,
+    .populatePatternsWithState = PatternDescriptorState.populatePatternsWithState,
+}).attach;
 pub const dynamic_trait_attach = attachDynamicTrait;
 pub const transform_state_payload_ops = transformStatePayloadOps;
 pub const transform_state_payload_values = transformStatePayloadValues;

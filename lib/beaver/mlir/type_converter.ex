@@ -23,52 +23,58 @@ defmodule Beaver.MLIR.TypeConverter do
   @type one_to_n_materialization_result() ::
           [Value.t()] | {:ok, [Value.t()]} | :declined | {:error, term()}
 
+  @callbacks [
+    {:conversion, :add_conversion, quote(do: (Type.t() -> conversion_result())), 1},
+    {:one_to_n, :add_1_to_n_conversion, quote(do: (Type.t() -> one_to_n_result())), 1},
+    {:source_materialization, :add_source_materialization,
+     quote(do: (RewriterBase.t(), Type.t(), [Value.t()], Location.t() -> materialization_result())), 4},
+    {:target_materialization, :add_target_materialization,
+     quote(do: (RewriterBase.t(), Type.t(), [Value.t()], Location.t(), Type.t() -> materialization_result())), 5},
+    {:one_to_n_target_materialization, :add_1_to_n_target_materialization,
+     quote(
+       do: (RewriterBase.t(), [Type.t()], [Value.t()], Location.t(), Type.t() | nil ->
+              one_to_n_materialization_result())
+     ), 5}
+  ]
+
+  @callback_options for {key, add, _, _} <- @callbacks, do: {key, add}
+
   @spec create(keyword()) :: t()
   def create(opts \\ []) when is_list(opts) do
-    allowed = ~w(
-      timeout conversion one_to_n source_materialization target_materialization one_to_n_target_materialization
-    )a
+    allowed = [:timeout | Keyword.keys(@callback_options)]
 
     case Keyword.keys(opts) -- allowed do
       [] -> :ok
       unsupported -> raise ArgumentError, "unsupported TypeConverter options: #{inspect(unsupported)}"
     end
 
-    timeout_ms = Keyword.get(opts, :timeout, 30_000)
-
-    unless is_integer(timeout_ms) and timeout_ms >= 0,
-      do: raise(ArgumentError, ":timeout must be a non-negative integer")
+    timeout_ms = Beaver.Execution.callback_timeout!(opts)
 
     {:managed_type_converter, converter_term, registration} = CAPI.beaver_raw_type_converter_create()
 
     %__MODULE__{ref: ref} = Native.check!(converter_term)
     converter = %__MODULE__{ref: ref, registration: registration, timeout_ms: timeout_ms}
 
-    for {key, add} <- [
-          conversion: &add_conversion/2,
-          one_to_n: &add_1_to_n_conversion/2,
-          source_materialization: &add_source_materialization/2,
-          target_materialization: &add_target_materialization/2,
-          one_to_n_target_materialization: &add_1_to_n_target_materialization/2
-        ],
-        callback <- callback_values(opts, key),
-        do: add.(converter, callback)
+    for {key, add} <- @callback_options,
+        callback <- Enum.flat_map(Keyword.get_values(opts, key), &if(is_list(&1), do: &1, else: [&1])),
+        do: apply(__MODULE__, add, [converter, callback])
 
     converter
   end
 
-  defp callback_values(opts, key) do
-    opts
-    |> Keyword.get_values(key)
-    |> Enum.flat_map(fn
-      callbacks when is_list(callbacks) -> callbacks
-      callback -> [callback]
-    end)
-  end
+  for {_key, name, callback_type, arity} <- @callbacks do
+    @spec unquote(name)(t(), unquote(callback_type)) :: t()
+    def unquote(name)(%__MODULE__{} = converter, callback) when is_function(callback, unquote(arity)) do
+      :ok =
+        apply(CAPI, unquote(:"beaver_raw_type_converter_#{name}"), [
+          converter.registration,
+          callback,
+          converter.timeout_ms
+        ])
 
-  @spec add_conversion(t(), (Type.t() -> conversion_result())) :: t()
-  def add_conversion(%__MODULE__{} = converter, callback) when is_function(callback, 1),
-    do: add_callback(converter, callback, :beaver_raw_type_converter_add_conversion)
+      converter
+    end
+  end
 
   @doc """
   Adds a native, callback-free mapping from any source type to one target type.
@@ -100,38 +106,6 @@ defmodule Beaver.MLIR.TypeConverter do
 
   def add_conversion_map(%__MODULE__{}, sources, %Type{}, _opts) when is_list(sources),
     do: raise(ArgumentError, "conversion map requires at least one source type")
-
-  @spec add_1_to_n_conversion(t(), (Type.t() -> one_to_n_result())) :: t()
-  def add_1_to_n_conversion(%__MODULE__{} = converter, callback) when is_function(callback, 1),
-    do: add_callback(converter, callback, :beaver_raw_type_converter_add_1_to_n_conversion)
-
-  @spec add_source_materialization(t(), (RewriterBase.t(), Type.t(), [Value.t()], Location.t() ->
-                                           materialization_result())) :: t()
-  def add_source_materialization(%__MODULE__{} = converter, callback)
-      when is_function(callback, 4),
-      do: add_callback(converter, callback, :beaver_raw_type_converter_add_source_materialization)
-
-  @spec add_target_materialization(t(), (RewriterBase.t(), Type.t(), [Value.t()], Location.t(), Type.t() ->
-                                           materialization_result())) :: t()
-  def add_target_materialization(%__MODULE__{} = converter, callback)
-      when is_function(callback, 5),
-      do: add_callback(converter, callback, :beaver_raw_type_converter_add_target_materialization)
-
-  @spec add_1_to_n_target_materialization(t(), (RewriterBase.t(),
-                                                [Type.t()],
-                                                [Value.t()],
-                                                Location.t(),
-                                                Type.t()
-                                                | nil ->
-                                                  one_to_n_materialization_result())) :: t()
-  def add_1_to_n_target_materialization(%__MODULE__{} = converter, callback)
-      when is_function(callback, 5),
-      do: add_callback(converter, callback, :beaver_raw_type_converter_add_1_to_n_target_materialization)
-
-  defp add_callback(converter, callback, function) do
-    :ok = apply(CAPI, function, [converter.registration, callback, converter.timeout_ms])
-    converter
-  end
 
   @spec convert(t(), Type.t()) :: {:ok, Type.t()} | {:error, term()}
   def convert(%__MODULE__{} = converter, %Type{} = type) do

@@ -12,23 +12,12 @@ const callback_args = @import("callback_args.zig");
 
 threadlocal var typeIDAllocator: ?mlir_capi.TypeIDAllocator.T = null;
 const CallbackDispatcher = struct {
-    fn construct(userData: ?*anyopaque) callconv(.c) void {
-        const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
-        const temp_env = e.enif_alloc_env() orelse unreachable;
-        const response = callback_args.invokeTerms(this, "construct", temp_env, .{}) catch unreachable;
-        if (!response.success) @panic("Fail to construct a pass implemented in Elixir");
-    }
-    fn destruct(userData: ?*anyopaque) callconv(.c) void {
-        const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
-        const temp_env = e.enif_alloc_env() orelse unreachable;
-        const response = callback_args.invokeTerms(this, "destruct", temp_env, .{}) catch unreachable;
-        if (!response.success) @panic("Fail to destruct a pass implemented in Elixir");
-        this.deinit();
-    }
+    const Lifecycle = callback_args.Lifecycle(RuntimeDispatcher, "a pass");
+    const construct = Lifecycle.construct;
+    const destruct = Lifecycle.destruct;
     fn initialize(ctx: mlir_capi.Context.T, userData: ?*anyopaque) callconv(.c) mlir_capi.LogicalResult.T {
         const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
-        const temp_env = e.enif_alloc_env() orelse unreachable;
-        const response = callback_args.invokeTerms(this, "initialize", temp_env, .{mlir_capi.Context.resource.make_kind(temp_env, ctx) catch unreachable}) catch return c.beaverLogicalResultFailure();
+        const response = callback_args.invoke(this, "initialize", .{mlir_capi.Context}, .{ctx}) catch return c.beaverLogicalResultFailure();
         if (!response.success) {
             const loc = c.mlirLocationUnknownGet(ctx);
             c.mlirEmitError(loc, "Fail to initialize a pass implemented in Elixir");
@@ -48,12 +37,8 @@ const CallbackDispatcher = struct {
         return new_dispatcher;
     }
     fn run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) callconv(.c) void {
-        const scope = c.beaverExecutionEnterOperation(op);
-        defer c.beaverExecutionLeaveOperation(scope);
         const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
-        const temp_env = e.enif_alloc_env() orelse unreachable;
-        const op_kind = mlir_capi.Operation.resource.make_kind(temp_env, op) catch return c.mlirExternalPassSignalFailure(pass);
-        if (callback_args.invokeTerms(this, "run", temp_env, .{op_kind})) |response| {
+        if (callback_args.invoke(this, "run", .{mlir_capi.Operation}, .{op})) |response| {
             if (!response.success) {
                 c.mlirEmitError(c.mlirOperationGetLocation(op), "Fail to run a pass implemented in Elixir");
                 c.mlirExternalPassSignalFailure(pass);

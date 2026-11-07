@@ -88,19 +88,6 @@ fn systemNs() i64 {
     return @intCast(c.beaverExecutionClock());
 }
 
-fn fetchHandleSlice(comptime Kind: type, environment: beam.env, list: beam.term) ![]Kind.T {
-    const len = try beam.get_list_length(environment, list);
-    const values = try std.heap.smp_allocator.alloc(Kind.T, len);
-    errdefer std.heap.smp_allocator.free(values);
-
-    var rest = list;
-    for (values) |*value| {
-        const head = try beam.get_head_and_iter(environment, &rest);
-        value.* = try Kind.resource.fetch(environment, head);
-    }
-    return values;
-}
-
 fn HandleProjection(comptime Kind: type) type {
     return struct {
         values: []Kind.T,
@@ -108,7 +95,7 @@ fn HandleProjection(comptime Kind: type) type {
         fn init(environment: beam.env, list: beam.term) !*@This() {
             const self = try std.heap.smp_allocator.create(@This());
             errdefer std.heap.smp_allocator.destroy(self);
-            self.* = .{ .values = try fetchHandleSlice(Kind, environment, list) };
+            self.* = .{ .values = try callback_args.Range(Kind).decode(environment, list, std.heap.smp_allocator) };
             return self;
         }
 
@@ -119,43 +106,26 @@ fn HandleProjection(comptime Kind: type) type {
     };
 }
 
-fn replyHandleList(comptime Kind: type) type {
+fn replyHandle(comptime Kind: type, comptime many: bool) type {
     return struct {
         fn nif(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            const scalar_value = Kind == mlir_capi.Value and !many;
             const success = try beam.get_bool(environment, args[1]);
-            const code = try beam.get_i64(environment, args[2]);
+            const code = if (scalar_value) 0 else try beam.get_i64(environment, args[2]);
+            const term = args[if (scalar_value) 2 else 3];
             var projection: usize = 0;
-            var projected: ?*HandleProjection(Kind) = null;
+            var owned: ?*HandleProjection(Kind) = null;
+            errdefer if (owned) |value| value.deinit();
             if (success and code == c.MlirTypeConverterConversionStatusSuccess) {
-                projected = try HandleProjection(Kind).init(environment, args[3]);
-                projection = @intFromPtr(projected.?);
+                if (many) {
+                    owned = try HandleProjection(Kind).init(environment, term);
+                    projection = @intFromPtr(owned.?);
+                } else if (!(scalar_value and beam.is_nil2(environment, term))) {
+                    projection = @intFromPtr((try Kind.resource.fetch(environment, term)).ptr);
+                }
             }
-
-            const accepted = try kinda.callback_runtime.ReplyToken.complete(
-                environment,
-                args[0],
-                .replied,
-                success,
-                code,
-                projection,
-            );
-            if (!accepted) if (projected) |value| value.deinit();
-            return beam.make_atom(environment, if (accepted) "ok" else "stale");
-        }
-    };
-}
-
-fn replyHandle(comptime Kind: type) type {
-    return struct {
-        fn nif(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-            const success = try beam.get_bool(environment, args[1]);
-            const code = if (Kind == mlir_capi.Value) 0 else try beam.get_i64(environment, args[2]);
-            const term = args[if (Kind == mlir_capi.Value) 2 else 3];
-            var projection: usize = 0;
-            if (success and code == c.MlirTypeConverterConversionStatusSuccess and
-                !(Kind == mlir_capi.Value and beam.is_nil2(environment, term)))
-                projection = @intFromPtr((try Kind.resource.fetch(environment, term)).ptr);
             const accepted = try kinda.callback_runtime.ReplyToken.complete(environment, args[0], .replied, success, code, projection);
+            if (!accepted) if (owned) |value| value.deinit();
             return beam.make_atom(environment, if (accepted) "ok" else "stale");
         }
     };
@@ -185,143 +155,113 @@ const LegalityState = struct {
     }
 };
 
-const TargetRegistration = struct {
-    target: mlir_capi.ConversionTarget.T,
-    context: mlir_capi.Context.T,
-    callbacks: std.array_list.Managed(*LegalityState),
-    mutex: std.Io.Mutex = .init,
-    closed: std.atomic.Value(bool) = .init(false),
+// Targets and converters share the same serialized lifetime. Pattern-owned
+// references keep converters alive; explicit close still rejects active users.
+fn Registration(comptime Kind: type, comptime Callback: type, comptime name: []const u8, comptime tag: []const u8) type {
+    return struct {
+        const Self = @This();
+        // Do not take over older resources with the pre-unification layout.
+        const Resource = kinda.RawResourceType(Self, "Beaver.MLIR." ++ name ++ ".Registration.V2", destruct);
+        handle: Kind.T,
+        context: mlir_capi.Context.T = .{ .ptr = null },
+        callbacks: std.array_list.Managed(*Callback) = .init(std.heap.smp_allocator),
+        mappings: std.array_list.Managed(*TypeMappingState) = .init(std.heap.smp_allocator),
+        mutex: std.Io.Mutex = .init,
+        closed: std.atomic.Value(bool) = .init(false),
+        pattern_users: std.atomic.Value(usize) = .init(0),
 
-    fn close(self: *@This()) bool {
-        const io = std.Options.debug_io;
-        self.mutex.lockUncancelable(io);
-        defer self.mutex.unlock(io);
-        if (self.closed.cmpxchgStrong(false, true, .acq_rel, .acquire) != null) return false;
-        c.mlirConversionTargetDestroy(self.target);
-        for (self.callbacks.items) |callback| callback.deinit();
-        self.callbacks.deinit();
-        return true;
-    }
-};
+        fn closeLocked(self: *Self) bool {
+            if (self.closed.cmpxchgStrong(false, true, .acq_rel, .acquire) != null) return false;
+            if (Kind == mlir_capi.ConversionTarget) c.mlirConversionTargetDestroy(self.handle) else c.mlirTypeConverterDestroy(self.handle);
+            inline for (.{ "callbacks", "mappings" }) |field| {
+                for (@field(self, field).items) |item| item.deinit();
+                @field(self, field).deinit();
+            }
+            return true;
+        }
 
-fn destroyTargetRegistration(_: beam.env, object: ?*anyopaque) callconv(.c) void {
-    const registration: *TargetRegistration = @ptrCast(@alignCast(object orelse return));
-    _ = registration.close();
+        fn close(self: *Self) bool {
+            self.mutex.lockUncancelable(std.Options.debug_io);
+            defer self.mutex.unlock(std.Options.debug_io);
+            return self.closeLocked();
+        }
+
+        fn destruct(_: beam.env, object: ?*anyopaque) callconv(.c) void {
+            const self: *Self = @ptrCast(@alignCast(object orelse return));
+            _ = self.close();
+        }
+
+        fn create(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            const context = if (Kind == mlir_capi.ConversionTarget) try mlir_capi.Context.resource.fetch(environment, args[0]) else mlir_capi.Context.T{ .ptr = null };
+            const self = Resource.alloc() catch return @field(anyerror, "FailedToAllocate" ++ name ++ "Registration");
+            self.* = .{
+                .handle = if (Kind == mlir_capi.ConversionTarget) c.mlirConversionTargetCreate(context) else c.mlirTypeConverterCreate(),
+                .context = context,
+            };
+            defer Resource.release(self);
+            var terms = [_]beam.term{ beam.make_atom(environment, tag), try Kind.resource.make_kind(environment, self.handle), e.enif_make_resource(environment, self) };
+            return beam.make_tuple(environment, &terms);
+        }
+
+        fn destroy(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            const self = try Resource.fetch(environment, args[0]);
+            self.mutex.lockUncancelable(std.Options.debug_io);
+            defer self.mutex.unlock(std.Options.debug_io);
+            if (self.pattern_users.load(.acquire) != 0) return error.TypeConverterInUseByPatterns;
+            _ = self.closeLocked();
+            return beam.make_ok(environment);
+        }
+    };
 }
 
-const TargetRegistrationResource = kinda.RawResourceType(
-    TargetRegistration,
-    "Beaver.MLIR.ConversionTarget.Registration",
-    destroyTargetRegistration,
-);
+const TargetRegistration = Registration(mlir_capi.ConversionTarget, LegalityState, "ConversionTarget", "managed_conversion_target");
+const TypeConverterRegistration = Registration(mlir_capi.TypeConverter, TypeCallbackState, "TypeConverter", "managed_type_converter");
+const TargetRegistrationResource = TargetRegistration.Resource;
+const TypeConverterRegistrationResource = TypeConverterRegistration.Resource;
+const fetchTargetRegistration = TargetRegistrationResource.fetch;
+const fetchTypeConverterRegistration = TypeConverterRegistrationResource.fetch;
 
-fn fetchTargetRegistration(environment: beam.env, term: beam.term) !*TargetRegistration {
-    return TargetRegistrationResource.fetch(environment, term);
-}
-
-fn createTarget(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
-    const registration = TargetRegistrationResource.alloc() catch
-        return error.FailedToAllocateConversionTargetRegistration;
-    registration.* = .{
-        .target = c.mlirConversionTargetCreate(context),
-        .context = context,
-        .callbacks = std.array_list.Managed(*LegalityState).init(std.heap.smp_allocator),
-    };
-    const registration_term = e.enif_make_resource(environment, registration);
-    TargetRegistrationResource.release(registration);
-    var terms = [_]beam.term{
-        beam.make_atom(environment, "managed_conversion_target"),
-        try mlir_capi.ConversionTarget.resource.make_kind(environment, registration.target),
-        registration_term,
-    };
-    return beam.make_tuple(environment, &terms);
+fn appendCallback(comptime State: type, environment: beam.env, callbacks: *std.array_list.Managed(*State), comptime name: []const u8, callback: beam.term, timeout: beam.term) !*State {
+    const Dispatcher = @typeInfo(@FieldType(State, "dispatcher")).pointer.child;
+    const dispatcher = try Dispatcher.initWithOptions(try beam.self(environment), callback_args.fixedOptions(Dispatcher, try beam.get_u64(environment, timeout)));
+    errdefer dispatcher.deinit();
+    dispatcher.setCallback(name, callback);
+    const state = try std.heap.smp_allocator.create(State);
+    errdefer std.heap.smp_allocator.destroy(state);
+    state.* = .{ .dispatcher = dispatcher };
+    try callbacks.append(state);
+    return state;
 }
 
 const LegalityKind = enum { operation, dialect, recursively_legal, unknown };
 
-fn addLegality(
-    environment: beam.env,
-    registration: *TargetRegistration,
-    name_term: ?beam.term,
-    callback_term: ?beam.term,
-    timeout_term: beam.term,
-    kind: LegalityKind,
-) !beam.term {
-    const io = std.Options.debug_io;
-    registration.mutex.lockUncancelable(io);
-    defer registration.mutex.unlock(io);
-    if (registration.closed.load(.acquire)) return error.ConversionTargetClosed;
-
-    const name = if (name_term) |term|
-        try string_ref.get_binary_as_string_ref(environment, term)
-    else
-        mlir_capi.StringRef.T{ .data = null, .length = 0 };
-
-    if (kind == .recursively_legal and callback_term != null and beam.is_nil2(environment, callback_term.?)) {
-        c.mlirConversionTargetMarkOpRecursivelyLegal(registration.target, name, null, null);
-        return beam.make_atom(environment, "ok");
-    }
-
-    const dispatcher = try LegalityDispatcher.initWithOptions(try beam.self(environment), callback_args.fixedOptions(LegalityDispatcher, try beam.get_u64(environment, timeout_term)));
-    var dispatcher_owned = true;
-    errdefer if (dispatcher_owned) dispatcher.deinit();
-    dispatcher.setCallback("conversion_legality", callback_term.?);
-
-    const state = try std.heap.smp_allocator.create(LegalityState);
-    errdefer std.heap.smp_allocator.destroy(state);
-    state.* = .{ .dispatcher = dispatcher };
-    dispatcher_owned = false;
-    errdefer state.deinit();
-    try registration.callbacks.append(state);
-
-    switch (kind) {
-        .operation => c.mlirConversionTargetAddDynamicallyLegalOp(
-            registration.target,
-            name,
-            LegalityState.callback,
-            state,
-        ),
-        .dialect => c.mlirConversionTargetAddDynamicallyLegalDialect(
-            registration.target,
-            name,
-            LegalityState.callback,
-            state,
-        ),
-        .recursively_legal => c.mlirConversionTargetMarkOpRecursivelyLegal(
-            registration.target,
-            name,
-            LegalityState.callback,
-            state,
-        ),
-        .unknown => c.mlirConversionTargetMarkUnknownOpDynamicallyLegal(
-            registration.target,
-            LegalityState.callback,
-            state,
-        ),
-    }
-    return beam.make_atom(environment, "ok");
-}
-
-fn addDynamicOp(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    return addLegality(environment, try fetchTargetRegistration(environment, args[0]), args[1], args[2], args[3], .operation);
-}
-
-fn addDynamicDialect(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    return addLegality(environment, try fetchTargetRegistration(environment, args[0]), args[1], args[2], args[3], .dialect);
-}
-
-fn markRecursivelyLegal(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    return addLegality(environment, try fetchTargetRegistration(environment, args[0]), args[1], args[2], args[3], .recursively_legal);
-}
-
-fn markUnknownDynamic(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    return addLegality(environment, try fetchTargetRegistration(environment, args[0]), null, args[1], args[2], .unknown);
-}
-
-fn destroyTarget(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    _ = (try fetchTargetRegistration(environment, args[0])).close();
-    return beam.make_atom(environment, "ok");
+fn Legality(comptime kind: LegalityKind) type {
+    return struct {
+        fn add(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            const registration = try fetchTargetRegistration(environment, args[0]);
+            registration.mutex.lockUncancelable(std.Options.debug_io);
+            defer registration.mutex.unlock(std.Options.debug_io);
+            if (registration.closed.load(.acquire)) return error.ConversionTargetClosed;
+            const named = kind != .unknown;
+            const callback = args[if (named) 2 else 1];
+            const name = if (named) try string_ref.get_binary_as_string_ref(environment, args[1]) else mlir_capi.StringRef.T{ .data = null, .length = 0 };
+            if (kind == .recursively_legal and beam.is_nil2(environment, callback)) {
+                c.mlirConversionTargetMarkOpRecursivelyLegal(registration.handle, name, null, null);
+            } else {
+                const state = try appendCallback(LegalityState, environment, &registration.callbacks, "conversion_legality", callback, args[if (named) 3 else 2]);
+                if (named) {
+                    const register = switch (kind) {
+                        .operation => c.mlirConversionTargetAddDynamicallyLegalOp,
+                        .dialect => c.mlirConversionTargetAddDynamicallyLegalDialect,
+                        .recursively_legal => c.mlirConversionTargetMarkOpRecursivelyLegal,
+                        .unknown => unreachable,
+                    };
+                    register(registration.handle, name, LegalityState.callback, state);
+                } else c.mlirConversionTargetMarkUnknownOpDynamicallyLegal(registration.handle, LegalityState.callback, state);
+            }
+            return beam.make_ok(environment);
+        }
+    };
 }
 
 fn addStaticLegality(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
@@ -333,10 +273,10 @@ fn addStaticLegality(environment: beam.env, _: c_int, args: [*c]const beam.term)
     defer registration.mutex.unlock(io);
     if (registration.closed.load(.acquire)) return error.ConversionTargetClosed;
     switch (kind) {
-        0 => c.mlirConversionTargetAddLegalOp(registration.target, name),
-        1 => c.mlirConversionTargetAddIllegalOp(registration.target, name),
-        2 => c.mlirConversionTargetAddLegalDialect(registration.target, name),
-        3 => c.mlirConversionTargetAddIllegalDialect(registration.target, name),
+        0 => c.mlirConversionTargetAddLegalOp(registration.handle, name),
+        1 => c.mlirConversionTargetAddIllegalOp(registration.handle, name),
+        2 => c.mlirConversionTargetAddLegalDialect(registration.handle, name),
+        3 => c.mlirConversionTargetAddIllegalDialect(registration.handle, name),
         else => return error.InvalidStaticLegalityKind,
     }
     return beam.make_atom(environment, "ok");
@@ -469,112 +409,18 @@ const TypeMappingState = struct {
     }
 };
 
-const TypeConverterRegistration = struct {
-    converter: mlir_capi.TypeConverter.T,
-    callbacks: std.array_list.Managed(*TypeCallbackState),
-    mappings: std.array_list.Managed(*TypeMappingState),
-    mutex: std.Io.Mutex = .init,
-    closed: std.atomic.Value(bool) = .init(false),
-    pattern_users: std.atomic.Value(usize) = .init(0),
-
-    fn closeLocked(self: *@This()) bool {
-        if (self.closed.cmpxchgStrong(false, true, .acq_rel, .acquire) != null) return false;
-        c.mlirTypeConverterDestroy(self.converter);
-        for (self.callbacks.items) |callback| callback.deinit();
-        self.callbacks.deinit();
-        for (self.mappings.items) |mapping| mapping.deinit();
-        self.mappings.deinit();
-        return true;
-    }
-
-    fn close(self: *@This()) bool {
-        const io = std.Options.debug_io;
-        self.mutex.lockUncancelable(io);
-        defer self.mutex.unlock(io);
-        return self.closeLocked();
-    }
-};
-
-fn destroyTypeConverterRegistration(_: beam.env, object: ?*anyopaque) callconv(.c) void {
-    const registration: *TypeConverterRegistration = @ptrCast(@alignCast(object orelse return));
-    _ = registration.close();
-}
-
-const TypeConverterRegistrationResource = kinda.RawResourceType(
-    TypeConverterRegistration,
-    "Beaver.MLIR.TypeConverter.Registration",
-    destroyTypeConverterRegistration,
-);
-
-fn fetchTypeConverterRegistration(environment: beam.env, term: beam.term) !*TypeConverterRegistration {
-    return TypeConverterRegistrationResource.fetch(environment, term);
-}
-
-fn createTypeConverter(environment: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
-    const registration = TypeConverterRegistrationResource.alloc() catch
-        return error.FailedToAllocateTypeConverterRegistration;
-    registration.* = .{
-        .converter = c.mlirTypeConverterCreate(),
-        .callbacks = std.array_list.Managed(*TypeCallbackState).init(std.heap.smp_allocator),
-        .mappings = std.array_list.Managed(*TypeMappingState).init(std.heap.smp_allocator),
+fn TypeCallback(comptime name: []const u8, comptime Register: anytype, comptime callback: anytype) type {
+    return struct {
+        fn add(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            const registration = try fetchTypeConverterRegistration(environment, args[0]);
+            registration.mutex.lockUncancelable(std.Options.debug_io);
+            defer registration.mutex.unlock(std.Options.debug_io);
+            if (registration.closed.load(.acquire)) return error.TypeConverterClosed;
+            const state = try appendCallback(TypeCallbackState, environment, &registration.callbacks, name, args[1], args[2]);
+            Register(registration.handle, callback, state);
+            return beam.make_ok(environment);
+        }
     };
-    const registration_term = e.enif_make_resource(environment, registration);
-    TypeConverterRegistrationResource.release(registration);
-    var terms = [_]beam.term{
-        beam.make_atom(environment, "managed_type_converter"),
-        try mlir_capi.TypeConverter.resource.make_kind(environment, registration.converter),
-        registration_term,
-    };
-    return beam.make_tuple(environment, &terms);
-}
-
-const TypeCallbackKind = enum { conversion, conversion_1_to_n, source, target, target_1_to_n };
-
-fn addTypeCallback(
-    environment: beam.env,
-    registration: *TypeConverterRegistration,
-    callback: beam.term,
-    timeout: beam.term,
-    kind: TypeCallbackKind,
-) !beam.term {
-    const io = std.Options.debug_io;
-    registration.mutex.lockUncancelable(io);
-    defer registration.mutex.unlock(io);
-    if (registration.closed.load(.acquire)) return error.TypeConverterClosed;
-
-    const dispatcher = try TypeDispatcher.initWithOptions(try beam.self(environment), callback_args.fixedOptions(TypeDispatcher, try beam.get_u64(environment, timeout)));
-    var dispatcher_owned = true;
-    errdefer if (dispatcher_owned) dispatcher.deinit();
-    switch (kind) {
-        .conversion => dispatcher.setCallback("convert_type", callback),
-        .conversion_1_to_n => dispatcher.setCallback("convert_types", callback),
-        .source => dispatcher.setCallback("source_materialization", callback),
-        .target => dispatcher.setCallback("target_materialization", callback),
-        .target_1_to_n => dispatcher.setCallback("target_materialization_1_to_n", callback),
-    }
-    const state = try std.heap.smp_allocator.create(TypeCallbackState);
-    errdefer std.heap.smp_allocator.destroy(state);
-    state.* = .{ .dispatcher = dispatcher };
-    dispatcher_owned = false;
-    errdefer state.deinit();
-    try registration.callbacks.append(state);
-
-    switch (kind) {
-        .conversion => c.mlirTypeConverterAddConversion(registration.converter, TypeCallbackState.conversion, state),
-        .conversion_1_to_n => c.mlirTypeConverterAdd1ToNConversion(registration.converter, TypeCallbackState.conversion1ToN, state),
-        .source => c.mlirTypeConverterAddSourceMaterialization(registration.converter, TypeCallbackState.sourceMaterialization, state),
-        .target => c.mlirTypeConverterAddTargetMaterialization(registration.converter, TypeCallbackState.targetMaterialization, state),
-        .target_1_to_n => c.mlirTypeConverterAdd1ToNTargetMaterialization(registration.converter, TypeCallbackState.targetMaterialization1ToN, state),
-    }
-    return beam.make_atom(environment, "ok");
-}
-
-fn addTypeConversion(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    return addTypeCallback(environment, try fetchTypeConverterRegistration(environment, args[0]), args[1], args[2], .conversion);
-}
-
-fn addTypeConversion1ToN(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    return addTypeCallback(environment, try fetchTypeConverterRegistration(environment, args[0]), args[1], args[2], .conversion_1_to_n);
 }
 
 fn addTypeConversionMap(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
@@ -584,7 +430,7 @@ fn addTypeConversionMap(environment: beam.env, _: c_int, args: [*c]const beam.te
     defer registration.mutex.unlock(io);
     if (registration.closed.load(.acquire)) return error.TypeConverterClosed;
 
-    const sources = try fetchHandleSlice(mlir_capi.Type, environment, args[1]);
+    const sources = try callback_args.Range(mlir_capi.Type).decode(environment, args[1], std.heap.smp_allocator);
     errdefer std.heap.smp_allocator.free(sources);
     if (sources.len == 0) return error.EmptyTypeConversionMap;
 
@@ -595,22 +441,9 @@ fn addTypeConversionMap(environment: beam.env, _: c_int, args: [*c]const beam.te
         .target = try mlir_capi.Type.resource.fetch(environment, args[2]),
         .identity_fallback = try beam.get_bool(environment, args[3]),
     };
-    errdefer state.deinit();
     try registration.mappings.append(state);
-    c.mlirTypeConverterAddConversion(registration.converter, TypeMappingState.conversion, state);
+    c.mlirTypeConverterAddConversion(registration.handle, TypeMappingState.conversion, state);
     return beam.make_atom(environment, "ok");
-}
-
-fn addSourceMaterialization(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    return addTypeCallback(environment, try fetchTypeConverterRegistration(environment, args[0]), args[1], args[2], .source);
-}
-
-fn addTargetMaterialization(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    return addTypeCallback(environment, try fetchTypeConverterRegistration(environment, args[0]), args[1], args[2], .target);
-}
-
-fn addTargetMaterialization1ToN(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    return addTypeCallback(environment, try fetchTypeConverterRegistration(environment, args[0]), args[1], args[2], .target_1_to_n);
 }
 
 pub fn convertType(environment: beam.env, arguments: beam.term) !beam.term {
@@ -621,18 +454,8 @@ pub fn convertType(environment: beam.env, arguments: beam.term) !beam.term {
     registration.mutex.lockUncancelable(io);
     defer registration.mutex.unlock(io);
     if (registration.closed.load(.acquire)) return beam.make_nil(environment);
-    const converted = c.mlirTypeConverterConvertType(registration.converter, type_);
+    const converted = c.mlirTypeConverterConvertType(registration.handle, type_);
     return if (c.mlirTypeIsNull(converted)) beam.make_nil(environment) else try mlir_capi.Type.resource.make_kind(environment, converted);
-}
-
-fn destroyTypeConverter(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const registration = try fetchTypeConverterRegistration(environment, args[0]);
-    const io = std.Options.debug_io;
-    registration.mutex.lockUncancelable(io);
-    defer registration.mutex.unlock(io);
-    if (registration.pattern_users.load(.acquire) != 0) return error.TypeConverterInUseByPatterns;
-    _ = registration.closeLocked();
-    return beam.make_atom(environment, "ok");
 }
 
 const ValueRanges = struct {
@@ -748,7 +571,7 @@ fn addConversionPattern(environment: beam.env, _: c_int, args: [*c]const beam.te
         root_name,
         benefit,
         context,
-        registration.converter,
+        registration.handle,
         callbacks,
         state,
         0,
@@ -808,7 +631,7 @@ pub fn convert(environment: beam.env, context: mlir_capi.Context.T, arguments: b
     const result = if (target.closed.load(.acquire)) beam.make_nil(environment) else diagnostic.call_with_diagnostics(environment, context, applyConversion, .{ environment, .{
         .full = full,
         .operation = operation,
-        .target = target.target,
+        .target = target.handle,
         .patterns = patterns,
         .config = config,
     } }) catch beam.make_nil(environment);
@@ -850,24 +673,29 @@ pub const nifs = .{
     prelude.beaverRawNIF(ProfileMetrics, "peak_rss", 0),
 };
 
-pub const conversion_target_create = createTarget;
+pub const conversion_target_create = TargetRegistration.create;
 pub const conversion_target_add_static = addStaticLegality;
-pub const conversion_target_add_dynamic_op = addDynamicOp;
-pub const conversion_target_add_dynamic_dialect = addDynamicDialect;
-pub const conversion_target_mark_recursively_legal = markRecursivelyLegal;
-pub const conversion_target_mark_unknown_dynamic = markUnknownDynamic;
-pub const conversion_target_destroy = destroyTarget;
-pub const type_converter_create = createTypeConverter;
-pub const type_converter_add_conversion = addTypeConversion;
-pub const type_converter_add_1_to_n_conversion = addTypeConversion1ToN;
+pub const conversion_target_add_dynamic_op = Legality(.operation).add;
+pub const conversion_target_add_dynamic_dialect = Legality(.dialect).add;
+pub const conversion_target_mark_recursively_legal = Legality(.recursively_legal).add;
+pub const conversion_target_mark_unknown_dynamic = Legality(.unknown).add;
+pub const conversion_target_destroy = TargetRegistration.destroy;
+pub const type_converter_create = TypeConverterRegistration.create;
+pub const type_converter_add_conversion =
+    TypeCallback("convert_type", c.mlirTypeConverterAddConversion, TypeCallbackState.conversion).add;
+pub const type_converter_add_1_to_n_conversion =
+    TypeCallback("convert_types", c.mlirTypeConverterAdd1ToNConversion, TypeCallbackState.conversion1ToN).add;
 pub const type_converter_add_conversion_map = addTypeConversionMap;
-pub const type_converter_add_source_materialization = addSourceMaterialization;
-pub const type_converter_add_target_materialization = addTargetMaterialization;
-pub const type_converter_add_1_to_n_target_materialization = addTargetMaterialization1ToN;
-pub const type_converter_destroy = destroyTypeConverter;
-pub const type_converter_reply_callback = replyHandle(mlir_capi.Type).nif;
-pub const type_converter_reply_types = replyHandleList(mlir_capi.Type).nif;
-pub const type_converter_reply_value = replyHandle(mlir_capi.Value).nif;
-pub const type_converter_reply_values = replyHandleList(mlir_capi.Value).nif;
+pub const type_converter_add_source_materialization =
+    TypeCallback("source_materialization", c.mlirTypeConverterAddSourceMaterialization, TypeCallbackState.sourceMaterialization).add;
+pub const type_converter_add_target_materialization =
+    TypeCallback("target_materialization", c.mlirTypeConverterAddTargetMaterialization, TypeCallbackState.targetMaterialization).add;
+pub const type_converter_add_1_to_n_target_materialization =
+    TypeCallback("target_materialization_1_to_n", c.mlirTypeConverterAdd1ToNTargetMaterialization, TypeCallbackState.targetMaterialization1ToN).add;
+pub const type_converter_destroy = TypeConverterRegistration.destroy;
+pub const type_converter_reply_callback = replyHandle(mlir_capi.Type, false).nif;
+pub const type_converter_reply_types = replyHandle(mlir_capi.Type, true).nif;
+pub const type_converter_reply_value = replyHandle(mlir_capi.Value, false).nif;
+pub const type_converter_reply_values = replyHandle(mlir_capi.Value, true).nif;
 pub const conversion_pattern_add = addConversionPattern;
 pub const compiler_kernel_load_and_populate = compilerKernelLoadAndPopulate;

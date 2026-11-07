@@ -36,14 +36,11 @@ defmodule Beaver.MLIR.ConversionPattern do
 
     benefit = Keyword.get(opts, :benefit, 1)
     one_to_n = Keyword.get(opts, :one_to_n, false)
-    timeout_ms = Keyword.get(opts, :timeout, 30_000)
+    timeout_ms = Beaver.Execution.callback_timeout!(opts)
 
     unless is_integer(benefit) and benefit >= 0, do: raise(ArgumentError, ":benefit must be a non-negative integer")
 
     unless is_boolean(one_to_n), do: raise(ArgumentError, ":one_to_n must be boolean")
-
-    unless is_integer(timeout_ms) and timeout_ms >= 0,
-      do: raise(ArgumentError, ":timeout must be a non-negative integer")
 
     :ok =
       MLIR.CAPI.beaver_raw_conversion_pattern_add(

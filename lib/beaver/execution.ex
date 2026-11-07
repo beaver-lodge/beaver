@@ -4,6 +4,12 @@ defmodule Beaver.Execution do
   alias Beaver.MLIR.CAPI
   alias Beaver.Execution.Profile
 
+  def callback_timeout!(opts) do
+    timeout = Keyword.get(opts, :timeout, 30_000)
+    unless is_integer(timeout) and timeout >= 0, do: raise(ArgumentError, ":timeout must be a non-negative integer")
+    timeout
+  end
+
   def run(ctx, command, arguments, opts \\ []) do
     profile = opts[:profile]
     strategy = Keyword.get(opts, :strategy, :worker)

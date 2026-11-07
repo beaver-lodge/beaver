@@ -9,6 +9,18 @@ defmodule Beaver.MLIR.CallbackServer do
   def start_link(kind, callbacks, value),
     do: GenServer.start_link(__MODULE__, %{kind: kind, callbacks: callbacks, value: value, count: 0})
 
+  def create(kind, callbacks, value, create) do
+    {:ok, owner} = start_link(kind, callbacks, value)
+
+    try do
+      create.(owner)
+    catch
+      kind, reason ->
+        if Process.alive?(owner), do: GenServer.stop(owner)
+        :erlang.raise(kind, reason, __STACKTRACE__)
+    end
+  end
+
   @impl true
   def init(state), do: {:ok, state}
 

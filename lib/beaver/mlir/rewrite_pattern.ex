@@ -44,9 +44,8 @@ defmodule Beaver.MLIR.RewritePattern do
     match_and_rewrite = opts[:match_and_rewrite] || (&Beaver.FallbackPattern.match_and_rewrite/4)
 
     callbacks = %{construct: construct, destruct: destruct, matchAndRewrite: match_and_rewrite}
-    {:ok, owner} = CallbackServer.start_link(__MODULE__, callbacks, init_state)
 
-    try do
+    CallbackServer.create(__MODULE__, callbacks, init_state, fn owner ->
       pattern =
         Beaver.Execution.run(
           ctx,
@@ -55,11 +54,7 @@ defmodule Beaver.MLIR.RewritePattern do
         )
 
       %{pattern | owner: owner}
-    catch
-      kind, reason ->
-        if Process.alive?(owner), do: GenServer.stop(owner)
-        :erlang.raise(kind, reason, __STACKTRACE__)
-    end
+    end)
   end
 
   @doc "Number of BEAM match callbacks serviced by this live pattern."

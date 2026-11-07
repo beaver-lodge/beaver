@@ -56,14 +56,8 @@ defmodule Beaver.MLIR.Pass do
 
     callbacks = callbacks(opts)
 
-    {:ok, owner} = CallbackServer.start_link(__MODULE__, callbacks, opts[:init_state] || nil)
-
-    try do
+    CallbackServer.create(__MODULE__, callbacks, opts[:init_state] || nil, fn owner ->
       Beaver.Execution.run(ctx, :create_pass, {name, argument, desc, op, owner})
-    catch
-      kind, reason ->
-        if Process.alive?(owner), do: GenServer.stop(owner)
-        :erlang.raise(kind, reason, __STACKTRACE__)
-    end
+    end)
   end
 end

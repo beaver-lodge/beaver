@@ -44,7 +44,7 @@ const PatternState = struct {
         return this;
     }
 
-    fn deinit(this: *@This()) void {
+    pub fn deinit(this: *@This()) void {
         beam.allocator.free(this.attributes);
         this.dispatcher.deinit();
         beam.allocator.destroy(this);
@@ -61,29 +61,13 @@ const PatternState = struct {
 };
 
 const CallbackDispatcher = struct {
-    fn construct(userData: ?*anyopaque) callconv(.c) void {
-        const this: *PatternState = @ptrCast(@alignCast(userData));
-        const temp_env = e.enif_alloc_env() orelse unreachable;
-        const response = callback_args.invokeTerms(this.dispatcher, "construct", temp_env, .{}) catch unreachable;
-        if (!response.success) @panic("Fail to construct a rewrite pattern implemented in Elixir");
-    }
-
-    fn destruct(userData: ?*anyopaque) callconv(.c) void {
-        const this: *PatternState = @ptrCast(@alignCast(userData));
-        const temp_env = e.enif_alloc_env() orelse unreachable;
-        const response = callback_args.invokeTerms(this.dispatcher, "destruct", temp_env, .{}) catch unreachable;
-        if (!response.success) @panic("Fail to destruct a rewrite pattern implemented in Elixir");
-        this.deinit();
-    }
-
+    const Lifecycle = callback_args.Lifecycle(PatternState, "a rewrite pattern");
+    const construct = Lifecycle.construct;
+    const destruct = Lifecycle.destruct;
     fn matchAndRewrite(pattern: mlir_capi.RewritePattern.T, op: mlir_capi.Operation.T, rewriter: mlir_capi.PatternRewriter.T, userData: ?*anyopaque) callconv(.c) mlir_capi.LogicalResult.T {
         const this: *PatternState = @ptrCast(@alignCast(userData));
         if (!this.matches(op)) return c.beaverLogicalResultFailure();
-        const temp_env = e.enif_alloc_env() orelse unreachable;
-        const pattern_ = mlir_capi.RewritePattern.resource.make_kind(temp_env, pattern) catch @panic("failed to make resource for RewritePattern");
-        const op_ = mlir_capi.Operation.resource.make_kind(temp_env, op) catch @panic("failed to make resource for Operation");
-        const rewriter_ = mlir_capi.PatternRewriter.resource.make_kind(temp_env, rewriter) catch @panic("failed to make resource for PatternRewriter");
-        const response = callback_args.invokeTerms(this.dispatcher, "matchAndRewrite", temp_env, .{ pattern_, op_, rewriter_ }) catch @panic("failed to forward matchAndRewrite callback");
+        const response = callback_args.invoke(this.dispatcher, "matchAndRewrite", .{ mlir_capi.RewritePattern, mlir_capi.Operation, mlir_capi.PatternRewriter }, .{ pattern, op, rewriter }) catch @panic("failed to forward matchAndRewrite callback");
         return if (response.success) c.beaverLogicalResultSuccess() else c.beaverLogicalResultFailure();
     }
 };
