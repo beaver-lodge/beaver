@@ -76,19 +76,15 @@ defmodule Beaver.MLIR.MemoryEffects do
   without retaining its callback-scoped handle.
   """
   @spec get(Operation.t(), keyword()) :: [effect_spec()]
-  def get(%Operation{ref: operation_ref}, opts \\ []) do
+  def get(%Operation{} = op, opts \\ []) do
     timeout_ms = Keyword.get(opts, :timeout, 30_000)
 
     unless is_integer(timeout_ms) and timeout_ms >= 0,
       do: raise(ArgumentError, ":timeout must be a non-negative integer")
 
-    :ok = CAPI.beaver_raw_memory_effects_query_async(operation_ref)
-
-    receive do
-      {:memory_effects_done, :error} -> raise ArgumentError, "operation does not implement MemoryEffectsOpInterface"
-      {:memory_effects_done, instances} when is_list(instances) -> Enum.map(instances, &decode_instance/1)
-    after
-      timeout_ms + 1_000 -> raise "timed out querying MemoryEffectsOpInterface"
+    case Beaver.Execution.run(MLIR.context(op), :memory_effects, {op.ref}, timeout: timeout_ms + 1_000) do
+      :error -> raise ArgumentError, "operation does not implement MemoryEffectsOpInterface"
+      instances -> Enum.map(instances, &decode_instance/1)
     end
   end
 

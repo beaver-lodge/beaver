@@ -156,20 +156,19 @@ defmodule Beaver.Composer do
   @spec run!(composer, [run_option]) :: operation
 
   def run!(composer, opts \\ @run_default_opts) do
-    case run(composer, opts) do
-      {:ok, op, []} ->
-        op
-
-      {:ok, op, diagnostics} ->
-        Logger.warning("Passes completed with diagnostics:\n" <> MLIR.Diagnostic.format(diagnostics))
-
-        op
-
-      {:error, diagnostics} ->
-        raise ArgumentError,
-              MLIR.Diagnostic.format(diagnostics, "Unexpected failure running passes")
-    end
+    unwrap_result!(run(composer, opts))
   end
+
+  @doc false
+  def unwrap_result!({:ok, op, []}), do: op
+
+  def unwrap_result!({:ok, op, diagnostics}) do
+    Logger.warning("Passes completed with diagnostics:\n" <> MLIR.Diagnostic.format(diagnostics))
+    op
+  end
+
+  def unwrap_result!({:error, diagnostics}),
+    do: raise(ArgumentError, MLIR.Diagnostic.format(diagnostics, "Unexpected failure running passes"))
 
   @spec run(composer) :: run_result
   @spec run(composer, [run_option]) :: run_result

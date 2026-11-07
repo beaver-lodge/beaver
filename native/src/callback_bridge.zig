@@ -6,7 +6,6 @@ const prelude = @import("prelude.zig");
 const c = prelude.c;
 const mlir_capi = @import("mlir_capi.zig");
 const string_ref = @import("string_ref.zig");
-const diagnostic = @import("diagnostic.zig");
 const callback_args = @import("callback_args.zig");
 
 const SpeculatabilityDispatcher = kinda.callback_runtime.Dispatcher(.{"get_speculatability"});
@@ -290,68 +289,6 @@ fn attachDynamicTrait(environment: beam.env, _: c_int, args: [*c]const beam.term
     return result;
 }
 
-fn AsyncDiagnosticsNIF(comptime name: []const u8) type {
-    const bang = kinda.BangFunc(@import("prelude.zig").allKinds, c, name);
-
-    return struct {
-        const Worker = struct {
-            recipient: beam.pid,
-            environment: beam.env,
-            context: mlir_capi.Context.T,
-            args: [bang.arity]beam.term,
-
-            fn deinit(self: *@This()) void {
-                e.enif_free_env(self.environment);
-                std.heap.smp_allocator.destroy(self);
-            }
-
-            fn run(user_data: ?*anyopaque) callconv(.c) void {
-                const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
-                const binding = if (comptime std.mem.eql(u8, name, "mlirOperationVerify")) binding: {
-                    const op = mlir_capi.Operation.resource.fetch(self.environment, self.args[0]) catch break :binding null;
-                    break :binding c.beaverExecutionBindOperation(op);
-                } else null;
-                defer c.beaverExecutionUnbindOperation(binding);
-                const result = diagnostic.call_with_diagnostics(
-                    self.environment,
-                    self.context,
-                    bang.nif,
-                    .{ self.environment, bang.arity, &self.args },
-                ) catch {
-                    self.deinit();
-                    return;
-                };
-
-                _ = beam.send_advanced(null, self.recipient, self.environment, result);
-                self.deinit();
-            }
-        };
-
-        fn nif(environment: beam.env, n: c_int, args: [*c]const beam.term) !beam.term {
-            if (n != bang.arity + 1) return error.BadArity;
-            const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
-            const worker = try std.heap.smp_allocator.create(Worker);
-            errdefer std.heap.smp_allocator.destroy(worker);
-            const owned_environment = e.enif_alloc_env() orelse
-                return error.FailedToAllocateDiagnosticEnvironment;
-            errdefer e.enif_free_env(owned_environment);
-
-            worker.* = .{
-                .recipient = try beam.self(environment),
-                .environment = owned_environment,
-                .context = context,
-                .args = undefined,
-            };
-            for (0..bang.arity) |index| {
-                worker.args[index] = e.enif_make_copy(owned_environment, args[index + 1]);
-            }
-
-            if (!c.beaverContextAddWork(context, Worker.run, worker)) return error.ContextThreadSafeLockingDisabled;
-            return beam.make_atom(environment, "async");
-        }
-    };
-}
-
 fn releaseStateTerm(comptime State: type, comptime Resource: type, environment: beam.env, term: beam.term) bool {
     const state: *State = Resource.fetch(environment, term) catch return false;
     releaseModel(State, state);
@@ -369,130 +306,75 @@ fn releaseExternalInterface(environment: beam.env, _: c_int, args: [*c]const bea
     return beam.make_ok(environment);
 }
 
-const SpeculatabilityWorker = struct {
-    operation: mlir_capi.Operation.T,
-    recipient: beam.pid,
+const EffectsCollector = struct {
+    environment: beam.env,
+    terms: std.array_list.Managed(beam.term),
+    failed: bool = false,
 
-    fn run(user_data: ?*anyopaque) callconv(.c) void {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
-        defer std.heap.smp_allocator.destroy(self);
-        const environment = e.enif_alloc_env() orelse return;
-        defer e.enif_free_env(environment);
-        const value = c.mlirConditionallySpeculatableOpInterfaceGetSpeculatability(self.operation);
-        var terms = [_]beam.term{
-            beam.make_atom(environment, "speculatability_done"),
-            beam.make_c_int(environment, @intCast(value)),
+    fn handle(self: *@This(), comptime Kind: type, value: Kind.T) ?beam.term {
+        return kinda.callback_adapter.handle(Kind, self.environment, value) catch {
+            self.failed = true;
+            return null;
         };
-        _ = beam.send_advanced(null, self.recipient, environment, beam.make_tuple(environment, &terms));
     }
-};
 
-const MemoryEffectsWorker = struct {
-    operation: mlir_capi.Operation.T,
-    recipient: beam.pid,
-
-    const Collector = struct {
-        environment: beam.env,
-        terms: std.array_list.Managed(beam.term),
-        failed: bool = false,
-
-        fn handle(self: *@This(), comptime Kind: type, value: Kind.T) ?beam.term {
-            return kinda.callback_adapter.handle(Kind, self.environment, value) catch {
-                self.failed = true;
-                return null;
-            };
+    fn append(count: isize, instances: [*c]c.MlirMemoryEffectInstance, user_data: ?*anyopaque) callconv(.c) void {
+        const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
+        if (count < 0) {
+            self.failed = true;
+            return;
         }
 
-        fn append(count: isize, instances: [*c]c.MlirMemoryEffectInstance, user_data: ?*anyopaque) callconv(.c) void {
-            const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
-            if (count < 0) {
+        for (0..@intCast(count)) |index| {
+            const instance = instances[index];
+            const parameters = self.handle(
+                mlir_capi.Attribute,
+                c.beaverMemoryEffectInstanceGetParameters(instance),
+            ) orelse return;
+            const resource = self.handle(
+                mlir_capi.SideEffectResource,
+                c.beaverMemoryEffectInstanceGetResource(instance),
+            ) orelse return;
+
+            const operand = c.beaverMemoryEffectInstanceGetOpOperand(instance);
+            const value = c.beaverMemoryEffectInstanceGetValue(instance);
+            const symbol = c.beaverMemoryEffectInstanceGetSymbolRef(instance);
+            var target_kind = beam.make_atom(self.environment, "none");
+            var target = beam.make_nil(self.environment);
+
+            if (operand.ptr != null) {
+                target_kind = beam.make_atom(self.environment, "operand");
+                target = self.handle(mlir_capi.OpOperand, operand) orelse return;
+            } else if (value.ptr != null) {
+                target_kind = beam.make_atom(self.environment, "value");
+                target = self.handle(mlir_capi.Value, value) orelse return;
+            } else if (symbol.ptr != null) {
+                target_kind = beam.make_atom(self.environment, "symbol");
+                target = self.handle(mlir_capi.Attribute, symbol) orelse return;
+            }
+
+            var fields = [_]beam.term{
+                beam.make_c_int(self.environment, @intCast(c.beaverMemoryEffectInstanceGetKind(instance))),
+                target_kind,
+                target,
+                parameters,
+                beam.make_c_int(self.environment, c.beaverMemoryEffectInstanceGetStage(instance)),
+                beam.make_bool(self.environment, c.beaverMemoryEffectInstanceGetEffectOnFullRegion(instance)),
+                resource,
+            };
+            self.terms.append(beam.make_tuple(self.environment, &fields)) catch {
                 self.failed = true;
                 return;
-            }
-
-            for (0..@intCast(count)) |index| {
-                const instance = instances[index];
-                const parameters = self.handle(
-                    mlir_capi.Attribute,
-                    c.beaverMemoryEffectInstanceGetParameters(instance),
-                ) orelse return;
-                const resource = self.handle(
-                    mlir_capi.SideEffectResource,
-                    c.beaverMemoryEffectInstanceGetResource(instance),
-                ) orelse return;
-
-                const operand = c.beaverMemoryEffectInstanceGetOpOperand(instance);
-                const value = c.beaverMemoryEffectInstanceGetValue(instance);
-                const symbol = c.beaverMemoryEffectInstanceGetSymbolRef(instance);
-                var target_kind = beam.make_atom(self.environment, "none");
-                var target = beam.make_nil(self.environment);
-
-                if (operand.ptr != null) {
-                    target_kind = beam.make_atom(self.environment, "operand");
-                    target = self.handle(mlir_capi.OpOperand, operand) orelse return;
-                } else if (value.ptr != null) {
-                    target_kind = beam.make_atom(self.environment, "value");
-                    target = self.handle(mlir_capi.Value, value) orelse return;
-                } else if (symbol.ptr != null) {
-                    target_kind = beam.make_atom(self.environment, "symbol");
-                    target = self.handle(mlir_capi.Attribute, symbol) orelse return;
-                }
-
-                var fields = [_]beam.term{
-                    beam.make_c_int(self.environment, @intCast(c.beaverMemoryEffectInstanceGetKind(instance))),
-                    target_kind,
-                    target,
-                    parameters,
-                    beam.make_c_int(self.environment, c.beaverMemoryEffectInstanceGetStage(instance)),
-                    beam.make_bool(self.environment, c.beaverMemoryEffectInstanceGetEffectOnFullRegion(instance)),
-                    resource,
-                };
-                self.terms.append(beam.make_tuple(self.environment, &fields)) catch {
-                    self.failed = true;
-                    return;
-                };
-            }
+            };
         }
-    };
-
-    fn run(user_data: ?*anyopaque) callconv(.c) void {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
-        defer std.heap.smp_allocator.destroy(self);
-        const environment = e.enif_alloc_env() orelse return;
-        defer e.enif_free_env(environment);
-        var collector = Collector{ .environment = environment, .terms = .init(std.heap.smp_allocator) };
-        defer collector.terms.deinit();
-
-        const implemented = c.beaverMemoryEffectsOpInterfaceGetEffects(self.operation, Collector.append, &collector);
-        const payload = if (implemented and !collector.failed)
-            beam.make_term_list(environment, collector.terms.items)
-        else
-            beam.make_atom(environment, "error");
-        var terms = [_]beam.term{ beam.make_atom(environment, "memory_effects_done"), payload };
-        _ = beam.send_advanced(null, self.recipient, environment, beam.make_tuple(environment, &terms));
     }
 };
 
-fn querySpeculatabilityAsync(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const operation = try mlir_capi.Operation.resource.fetch(environment, args[0]);
-    const worker = try std.heap.smp_allocator.create(SpeculatabilityWorker);
-    errdefer std.heap.smp_allocator.destroy(worker);
-    worker.* = .{ .operation = operation, .recipient = try beam.self(environment) };
-    const context = c.mlirOperationGetContext(operation);
-    if (!c.beaverContextAddWork(context, SpeculatabilityWorker.run, worker))
-        return error.ContextThreadSafeLockingDisabled;
-    return beam.make_ok(environment);
-}
-
-fn queryMemoryEffectsAsync(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const operation = try mlir_capi.Operation.resource.fetch(environment, args[0]);
-    const worker = try std.heap.smp_allocator.create(MemoryEffectsWorker);
-    errdefer std.heap.smp_allocator.destroy(worker);
-    worker.* = .{ .operation = operation, .recipient = try beam.self(environment) };
-    const context = c.mlirOperationGetContext(operation);
-    if (!c.beaverContextAddWork(context, MemoryEffectsWorker.run, worker))
-        return error.ContextThreadSafeLockingDisabled;
-    return beam.make_ok(environment);
+pub fn memoryEffects(environment: beam.env, operation: mlir_capi.Operation.T) !beam.term {
+    var collector = EffectsCollector{ .environment = environment, .terms = .init(std.heap.smp_allocator) };
+    defer collector.terms.deinit();
+    const implemented = c.beaverMemoryEffectsOpInterfaceGetEffects(operation, EffectsCollector.append, &collector);
+    return if (implemented and !collector.failed) beam.make_term_list(environment, collector.terms.items) else beam.make_atom(environment, "error");
 }
 
 fn collectTransformState(
@@ -539,14 +421,10 @@ pub fn open(environment: beam.env) void {
 
 pub const nifs = .{
     prelude.beaverRawNIF(@This(), "conditionally_speculatable_attach_fallback_model", 4),
-    prelude.beaverRawNIF(@This(), "conditionally_speculatable_query_async", 1),
-    prelude.beaverRawNIF(@This(), "memory_effects_query_async", 1),
     prelude.beaverRawNIF(@This(), "memory_effects_attach_fallback_model", 4),
     prelude.beaverRawNIF(@This(), "transform_op_interface_attach_fallback_model", 5),
     prelude.beaverRawNIF(@This(), "pattern_descriptor_op_interface_attach_fallback_model", 5),
     prelude.beaverRawNIF(@This(), "dynamic_trait_attach", 6),
-    prelude.beaverRawNIF(@This(), "module_create_parse_async", 3),
-    prelude.beaverRawNIF(@This(), "operation_verify_async", 2),
     prelude.beaverRawNIF(@This(), "transform_state_payload_ops", 2),
     prelude.beaverRawNIF(@This(), "transform_state_payload_values", 2),
     prelude.beaverRawNIF(@This(), "transform_state_params", 2),
@@ -555,14 +433,10 @@ pub const nifs = .{
 };
 
 pub const conditionally_speculatable_attach_fallback_model = attachSpeculatabilityFallback;
-pub const conditionally_speculatable_query_async = querySpeculatabilityAsync;
-pub const memory_effects_query_async = queryMemoryEffectsAsync;
 pub const memory_effects_attach_fallback_model = attachMemoryEffectsFallback;
 pub const transform_op_interface_attach_fallback_model = attachTransformFallback;
 pub const pattern_descriptor_op_interface_attach_fallback_model = attachPatternDescriptorFallback;
 pub const dynamic_trait_attach = attachDynamicTrait;
-pub const module_create_parse_async = AsyncDiagnosticsNIF("beaverModuleCreateParseTracked").nif;
-pub const operation_verify_async = AsyncDiagnosticsNIF("mlirOperationVerify").nif;
 pub const transform_state_payload_ops = transformStatePayloadOps;
 pub const transform_state_payload_values = transformStatePayloadValues;
 pub const transform_state_params = transformStateParams;

@@ -70,24 +70,24 @@ defmodule Beaver.MLIR.Value do
   The predicate receives an `#{inspect(MLIR.OpOperand)}` and executes in the
   calling BEAM process. Native traversal runs outside the scheduler and waits
   through Kinda's resource-backed callback runtime. The source and replacement
-  values must belong to the same multithreaded MLIR context.
+  values must belong to the same context with thread-safe locking enabled.
 
   Predicate exceptions are re-raised with their original stacktrace after the
   native traversal stops. This operation is not transactional: replacements
   accepted before an exception remain applied.
   """
   @spec replace_uses_with_if(t(), t(), (MLIR.OpOperand.t() -> boolean())) :: :ok
-  def replace_uses_with_if(%__MODULE__{ref: from}, %__MODULE__{ref: replacement}, predicate)
+  def replace_uses_with_if(%__MODULE__{} = from, %__MODULE__{ref: replacement}, predicate)
       when is_function(predicate, 1) do
-    case CAPI.beaver_raw_value_replace_uses_with_if(from, replacement, predicate) do
-      {:async, id} -> await_conditional_replacement(id, nil)
-      other -> Native.check!(other)
-    end
+    id =
+      CAPI.beaver_raw_execution_worker(MLIR.context(from).ref, :replace_uses, {from.ref, replacement, predicate}, false)
+
+    await_conditional_replacement(id, nil)
   end
 
   defp await_conditional_replacement(id, exception) do
     receive do
-      {:filter, token, predicate, ^id, op_operand_ref} ->
+      {:filter, token, {^id, predicate}, _dispatcher, op_operand_ref} ->
         outcome =
           CallbackRuntime.invoke(
             token,
@@ -97,10 +97,10 @@ defmodule Beaver.MLIR.Value do
 
         await_conditional_replacement(id, exception || callback_exception(outcome))
 
-      {:replace_uses_with_if_done, ^id} ->
+      {^id, {{:ok, :ok}, nil}} ->
         finish_conditional_replacement(exception)
 
-      {:replace_uses_with_if_error, ^id, reason} ->
+      {^id, {{:error, reason}, nil}} ->
         finish_conditional_replacement(
           exception || {:exception, :error, RuntimeError.exception(Atom.to_string(reason)), []}
         )

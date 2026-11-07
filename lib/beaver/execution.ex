@@ -13,14 +13,14 @@ defmodule Beaver.Execution do
         case strategy do
           :worker ->
             id = CAPI.beaver_raw_execution_worker(ctx.ref, command, arguments, not is_nil(profile))
-            {await(id), :worker}
+            {await(id, opts), :worker}
 
           :dirty ->
             {CAPI.beaver_raw_execution_dirty(ctx.ref, command, arguments, not is_nil(profile)), :dirty}
 
           :auto ->
             case CAPI.beaver_raw_execution_auto(ctx.ref, command, arguments, not is_nil(profile)) do
-              id when is_reference(id) -> {await(id), :worker}
+              id when is_reference(id) -> {await(id, opts), :worker}
               result -> {result, :dirty}
             end
 
@@ -37,11 +37,13 @@ defmodule Beaver.Execution do
     end)
   end
 
-  # Correlate each completion. A nested operation cannot consume its caller's
-  # result, and a slow operation does not create an artificial timeout/IR lease.
-  defp await(id) do
+  # Correlate nested completions. Wait indefinitely unless the interface query
+  # explicitly requests a timeout; timing out does not cancel native work.
+  defp await(id, opts) do
     receive do
       {^id, result} -> result
+    after
+      Keyword.get(opts, :timeout, :infinity) -> raise "timed out waiting for native execution"
     end
   end
 

@@ -31,15 +31,8 @@ defmodule Beaver.Composer.Beam do
       {:ok, stages} ->
         {status, stages, diagnostics} = execute(stages, op, opts)
 
-        {status, diagnostics} =
-          if status == :ok and opts[:verifier] == :pipeline do
-            case verify(op, Keyword.put(opts, :verifier, true)) do
-              :ok -> {:ok, diagnostics}
-              {:error, errors} -> {:error, diagnostics ++ errors}
-            end
-          else
-            {status, diagnostics}
-          end
+        pipeline_opts = Keyword.put(opts, :verifier, opts[:verifier] == :pipeline)
+        {status, diagnostics} = verified({status, diagnostics}, op, pipeline_opts)
 
         cleanup = Profile.measure(opts[:profile], :cleanup, fn -> destroy(stages) end)
         if status == :ok and cleanup == [], do: {:ok, ir, diagnostics}, else: {:error, diagnostics ++ cleanup}
@@ -182,10 +175,8 @@ defmodule Beaver.Composer.Beam do
       {:ok, value} ->
         stage = {:beam, callbacks, value, originals}
 
-        case verify(op, opts) do
-          :ok -> {:ok, stage, []}
-          {:error, diagnostics} -> {:error, stage, diagnostics}
-        end
+        {status, diagnostics} = verified({:ok, []}, op, opts)
+        {status, stage, diagnostics}
 
       {:error, diagnostics} ->
         {:error, stage, diagnostics}
@@ -216,17 +207,18 @@ defmodule Beaver.Composer.Beam do
 
     # Mirror MLIR's adaptor pass: children were already checked, but parent
     # invariants (for example symbol uniqueness) still need verification.
-    {status, diagnostics} =
-      if status == :ok do
-        case verify(op, Keyword.put(opts, :recursive, false)) do
-          :ok -> {:ok, diagnostics}
-          {:error, errors} -> {:error, diagnostics ++ errors}
-        end
-      else
-        {status, diagnostics}
-      end
+    {status, diagnostics} = verified({status, diagnostics}, op, Keyword.put(opts, :recursive, false))
 
     {status, {:nested, root, stages}, diagnostics}
+  end
+
+  defp verified({:error, _} = result, _op, _opts), do: result
+
+  defp verified({:ok, diagnostics}, op, opts) do
+    case verify(op, opts) do
+      :ok -> {:ok, diagnostics}
+      {:error, errors} -> {:error, diagnostics ++ errors}
+    end
   end
 
   defp verify(op, opts) do

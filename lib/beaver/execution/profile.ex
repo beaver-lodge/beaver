@@ -78,15 +78,7 @@ defmodule Beaver.Execution.Profile do
       names =
         if kind == :phase,
           do: [:count, :duration_ns],
-          else: [
-            :count,
-            :queue_wait_ns,
-            :duration_ns,
-            :callback_count,
-            :callback_wait_ns,
-            :setup_ns,
-            :completion_delivery_ns
-          ]
+          else: ~w(count queue_wait_ns duration_ns callback_count callback_wait_ns setup_ns completion_delivery_ns)a
 
       key = if kind == :native, do: key |> Tuple.to_list() |> Enum.join("/"), else: key
       {key, Map.new(Enum.zip(names, tl(Tuple.to_list(row))))}

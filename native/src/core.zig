@@ -13,7 +13,6 @@ const pointer = @import("pointer.zig");
 const string_ref = @import("string_ref.zig");
 const memref = @import("memref.zig");
 const unranked_memref_descriptor = @import("unranked_memref_descriptor.zig");
-const value = @import("value.zig");
 const action_tracing = @import("action_tracing.zig");
 const triton = @import("triton.zig");
 const llvm_ir = @import("llvm_ir.zig");
@@ -26,7 +25,6 @@ const callback_nifs = .{kinda.callback_runtime.ReplyToken.nif("beaver_raw_callba
 pub const nifs = capi_registry.nifs ++
     logical_result.nifs ++
     mlir_capi.EntriesOfKinds ++
-    pass.nifs ++
     registry.nifs ++
     string_ref.nifs ++
     diagnostic.nifs ++
@@ -35,7 +33,6 @@ pub const nifs = capi_registry.nifs ++
     enif_support.nifs ++
     callback_nifs ++
     unranked_memref_descriptor.nifs ++
-    value.nifs ++
     action_tracing.nifs ++
     @import("remarks.zig").nifs ++
     llvm_ir.nifs ++

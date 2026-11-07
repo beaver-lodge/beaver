@@ -7,7 +7,6 @@ defmodule Beaver.MLIR.PassManager do
   """
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
   alias Beaver.MLIR
-  import CAPI
 
   @type print_opt ::
           {:before_all, boolean()}
@@ -38,16 +37,12 @@ defmodule Beaver.MLIR.PassManager do
     if MLIR.LogicalResult.success?(status), do: {:ok, diagnostics}, else: {:error, diagnostics}
   end
 
-  def destroy(%__MODULE__{ref: pm_ref}) do
-    case beaver_raw_destroy_pm_async(pm_ref) do
-      :async ->
-        receive do
-          :pm_destroy_done -> :ok
-        end
+  def destroy(%__MODULE__{} = pm) do
+    ctx = CAPI.beaverPassManagerGetContext(pm)
 
-      ret ->
-        Native.check!(ret)
-    end
+    if MLIR.Context.thread_safe?(ctx),
+      do: Beaver.Execution.run(ctx, :destroy, {:PassManager, pm.ref}),
+      else: CAPI.mlirPassManagerDestroy(pm)
   end
 
   defdelegate enable_verifier(pm, enable), to: CAPI, as: :mlirPassManagerEnableVerifier

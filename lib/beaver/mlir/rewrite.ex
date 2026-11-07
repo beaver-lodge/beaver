@@ -74,14 +74,8 @@ defmodule Beaver.MLIR.Rewrite do
 
     try do
       Enum.each(patterns, fn
-        %Beaver.Pattern.Native.Program{} = program ->
-          RewritePatternSet.add(set, program, ctx: ctx)
-
-        %Beaver.Pattern.Native.Descriptor{} = descriptor ->
+        %kind{} = descriptor when kind in [Beaver.Pattern.Native.Program, Beaver.Pattern.Native.Descriptor] ->
           RewritePatternSet.add(set, descriptor, ctx: ctx)
-
-        {root, %Beaver.Pattern.Native.Descriptor{} = descriptor} ->
-          RewritePatternSet.add(set, root, descriptor, ctx: ctx)
 
         {root, match_and_rewrite} ->
           RewritePatternSet.add(set, root, match_and_rewrite, ctx: ctx)

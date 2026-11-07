@@ -6,7 +6,6 @@ defmodule Beaver.MLIR.RewritePatternSet do
   """
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
   alias Beaver.MLIR
-  require Logger
 
   defdelegate create(context), to: CAPI, as: :mlirRewritePatternSetCreate
 
@@ -121,30 +120,10 @@ defmodule Beaver.MLIR.RewritePatternSet do
 
   defdelegate destroy(set), to: CAPI, as: :mlirRewritePatternSetDestroy
 
-  defp do_destroy(%MLIR.Context{ref: ctx}, %__MODULE__{ref: set}),
-    do: :async = CAPI.beaver_raw_destroy_rewrite_pattern_set(ctx, set)
-
-  defp do_destroy(%MLIR.Context{ref: ctx}, %MLIR.FrozenRewritePatternSet{ref: set}),
-    do: :async = CAPI.beaver_raw_destroy_frozen_rewrite_pattern_set(ctx, set)
-
-  defp dispatch_loop(timeout \\ 2) do
-    receive do
-      :destroy_done -> :ok
-    after
-      timeout * 1_000 ->
-        Logger.error("Timeout waiting for pattern destroy, timeout: #{inspect(timeout)}s")
-        Logger.flush()
-        dispatch_loop(timeout * 2)
-    end
-  end
-
-  @doc """
-  Destroy the given `MLIR.RewritePatternSet` or `MLIR.FrozenRewritePatternSet`
-  outside a BEAM scheduler thread.
-  """
-  def threaded_destroy(ctx, set) do
-    do_destroy(ctx, set)
-    dispatch_loop()
+  @doc "Destroys a pattern set on the callback executor."
+  def threaded_destroy(ctx, %kind{ref: ref}) when kind in [__MODULE__, MLIR.FrozenRewritePatternSet] do
+    name = if kind == __MODULE__, do: :RewritePatternSet, else: :FrozenRewritePatternSet
+    Beaver.Execution.run(ctx, :destroy, {name, ref})
   end
 
   @doc """

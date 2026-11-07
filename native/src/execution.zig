@@ -21,7 +21,7 @@ pub fn tuple(env: beam.env, term: beam.term, count: usize) ![]const beam.term {
     return terms[0..count];
 }
 
-const Command = enum { verify, pass, rewrite, snapshot, update };
+const Command = enum { verify, pass, rewrite, snapshot, update, parse, create_pass, create_pattern, destroy, speculatability, memory_effects, replace_uses };
 const Work = struct {
     context: m.Context.T,
     command: Command,
@@ -53,6 +53,32 @@ const Work = struct {
     fn execute(self: Work) !beam.term {
         const env = self.env;
         switch (self.command) {
+            .replace_uses => return @import("value.zig").replace(env, self.context, self.arguments, self.recipient, self.id),
+            .speculatability, .memory_effects => {
+                const op = try self.operation((try tuple(env, self.arguments, 1))[0]);
+                const binding = c.beaverExecutionBindOperation(op);
+                defer c.beaverExecutionUnbindOperation(binding);
+                if (self.command == .memory_effects) return @import("callback_bridge.zig").memoryEffects(env, op);
+                return beam.make_c_int(env, @intCast(c.mlirConditionallySpeculatableOpInterfaceGetSpeculatability(op)));
+            },
+            .parse => {
+                const args = try tuple(env, self.arguments, 1);
+                const source = try m.StringRef.resource.fetch(env, args[0]);
+                const f = kinda.BangFunc(prelude.allKinds, c, "beaverModuleCreateParseTracked").wrap_ret_call;
+                return diagnostic.call_with_diagnostics(env, self.context, f, .{ env, .{ self.context, source } });
+            },
+            .create_pass => return @import("pass.zig").create(env, self.arguments),
+            .create_pattern => return @import("rewrite_pattern.zig").create(env, self.context, self.arguments),
+            .destroy => {
+                const args = try tuple(env, self.arguments, 2);
+                inline for (.{ "PassManager", "RewritePatternSet", "FrozenRewritePatternSet" }) |name| {
+                    if (atom(env, args[0], name)) {
+                        @field(c, "mlir" ++ name ++ "Destroy")(try @field(m, name).resource.fetch(env, args[1]));
+                        return beam.make_ok(env);
+                    }
+                }
+                return error.InvalidDestroyKind;
+            },
             .verify => {
                 const args = try tuple(env, self.arguments, 2);
                 const op = try self.operation(args[0]);

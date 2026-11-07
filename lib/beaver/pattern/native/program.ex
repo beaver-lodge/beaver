@@ -26,20 +26,14 @@ defmodule Beaver.Pattern.Native.Program do
 
     checks =
       Enum.flat_map(opts, fn
-        {:operands, n} ->
-          [{0, index!(n), nil, nil}]
-
-        {:results, n} ->
-          [{1, index!(n), nil, nil}]
+        {kind, n} when kind in [:operands, :results] ->
+          [{if(kind == :operands, do: 0, else: 1), index!(n), nil, nil}]
 
         {:attributes, attrs} ->
           Enum.map(attrs, fn {name, %MLIR.Attribute{ref: ref}} -> {2, 0, to_string(name), ref} end)
 
-        {:operand_types, types} ->
-          type_checks(3, types)
-
-        {:result_types, types} ->
-          type_checks(4, types)
+        {kind, types} when kind in [:operand_types, :result_types] ->
+          type_checks(if(kind == :operand_types, do: 3, else: 4), types)
 
         {:same_operands, pairs} ->
           Enum.map(pairs, fn {a, b} -> {5, index!(a), nil, index!(b)} end)

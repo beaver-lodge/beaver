@@ -252,7 +252,6 @@ pub fn build(b: *std.Build) void {
     const core_lib = createNativePartitionLib(b, "beaver_core", "native/src/core.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
     const conversion_lib = createNativePartitionLib(b, "beaver_conversion", "native/src/conversion_root.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
     const callback_bridge_lib = createNativePartitionLib(b, "beaver_callback_bridge", "native/src/callback_bridge_root.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
-    const rewrite_pattern_lib = createNativePartitionLib(b, "beaver_rewrite_pattern", "native/src/rewrite_pattern_root.zig", target, optimize, capi_module, kinda_module, mlir_include_dir, .dynamic, llvm_lib_dir);
     // The Zig CUDA runner dlopens libcuda via std.DynLib, which only supports
     // ELF/dylib platforms; Windows and macOS skip the partition entirely.
     const cuda_runner_lib: ?*std.Build.Step.Compile = if (os == .linux)
@@ -267,9 +266,9 @@ pub fn build(b: *std.Build) void {
     const mlir_lib_dir = b.pathJoin(&.{ b.install_path, "lib" });
 
     const partitions: []const *std.Build.Step.Compile = if (cuda_runner_lib) |cuda_lib|
-        &.{ core_lib, conversion_lib, callback_bridge_lib, rewrite_pattern_lib, cuda_lib }
+        &.{ core_lib, conversion_lib, callback_bridge_lib, cuda_lib }
     else
-        &.{ core_lib, conversion_lib, callback_bridge_lib, rewrite_pattern_lib };
+        &.{ core_lib, conversion_lib, callback_bridge_lib };
     for (partitions) |partition| {
         partition.root_module.addLibraryPath(.{ .cwd_relative = mlir_lib_dir });
         partition.step.dependOn(cmake_step);
@@ -285,14 +284,12 @@ pub fn build(b: *std.Build) void {
     lib.root_module.linkLibrary(core_lib);
     lib.root_module.linkLibrary(conversion_lib);
     lib.root_module.linkLibrary(callback_bridge_lib);
-    lib.root_module.linkLibrary(rewrite_pattern_lib);
     if (cuda_runner_lib) |cuda_lib| {
         lib.root_module.linkLibrary(cuda_lib);
     }
     installArtifact(b, core_lib);
     installArtifact(b, conversion_lib);
     installArtifact(b, callback_bridge_lib);
-    installArtifact(b, rewrite_pattern_lib);
     if (cuda_runner_lib) |cuda_lib| {
         installArtifact(b, cuda_lib);
     }
@@ -333,14 +330,14 @@ pub fn build(b: *std.Build) void {
         b.getInstallStep().dependOn(&copy_mlir_dll.step);
         copy_mlir_dll.step.dependOn(cmake_step);
 
-        for ([_]*std.Build.Step.Compile{ core_lib, conversion_lib, callback_bridge_lib, rewrite_pattern_lib, lib }) |artifact| {
+        for ([_]*std.Build.Step.Compile{ core_lib, conversion_lib, callback_bridge_lib, lib }) |artifact| {
             artifact.root_module.linkLibrary(enif_shim);
         }
         // resource_sync.zig, compiled into the non-core partitions, calls
         // core_resource_type_by_name exported by the core partition. DLL
         // imports need an explicit record, unlike the flat runtime symbol
         // resolution that dylibs get on Unix.
-        for ([_]*std.Build.Step.Compile{ conversion_lib, callback_bridge_lib, rewrite_pattern_lib }) |partition| {
+        for ([_]*std.Build.Step.Compile{ conversion_lib, callback_bridge_lib }) |partition| {
             partition.root_module.linkLibrary(core_lib);
         }
     }

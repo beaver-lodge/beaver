@@ -17,8 +17,7 @@ defmodule Beaver.MLIR.Module do
       opts,
       fn ctx ->
         {module, diagnostics} =
-          CAPI.beaver_raw_module_create_parse_async(ctx.ref, ctx.ref, MLIR.StringRef.create(str).ref)
-          |> CAPI.await_async()
+          Beaver.Execution.run(ctx, :parse, {MLIR.StringRef.create(str).ref})
 
         if MLIR.null?(module), do: {:error, diagnostics}, else: {:ok, module}
       end
