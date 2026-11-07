@@ -2,16 +2,13 @@ const std = @import("std");
 const mlir_capi = @import("mlir_capi.zig");
 const prelude = @import("prelude.zig");
 pub const c = prelude.c;
-const result = @import("kinda").result;
 const kinda = @import("kinda");
 const memref = @import("memref.zig");
 const e = kinda.erl_nif;
 const beam = kinda.beam;
 
-// A constant list of ranks we support with comptime-sized structs.
-// This can be easily extended.
-const supported_ranks_excluding_zero = .{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-const supported_ranks_including_zero = .{0} ++ supported_ranks_excluding_zero;
+// Dispatch over supported ranks, including scalar memrefs.
+const supported_ranks = .{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
 
 // Simple Unranked MemRef descriptor
 pub const UnrankedMemRefDescriptor = extern struct {
@@ -41,86 +38,44 @@ pub fn unranked_memref_descriptor_get_rank(env: beam.env, _: c_int, args: [*c]co
     return beam.make_i64(env, d.rank);
 }
 
-// NIF: Get offset
-pub fn unranked_memref_descriptor_get_offset(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
-    // Dispatch to cast to the correct type before accessing the field.
-    inline for (supported_ranks_including_zero) |R| {
-        if (d.rank == R) {
-            const D = memref.RankedMemRefDescriptor(R);
-            const ranked = @as(*const D, @ptrCast(@alignCast(d.descriptor)));
-            return beam.make_i64(env, ranked.offset);
-        }
-    }
-    return error.UnsupportedRank;
-}
-
-// Helper function to get either sizes or strides using @field
-fn get_ranked_field(env: beam.env, arg: beam.term, comptime field_name: []const u8) !beam.term {
-    const d = try UnrankedMemRefDescriptor.resource.fetch(env, arg);
-    if (d.rank == 0) return beam.make_term_list(env, &[_]beam.term{});
-    // Dispatch to handle the specific RankedDescriptor(R) type.
-    inline for (supported_ranks_excluding_zero) |R| {
-        if (d.rank == R) {
-            const D = memref.RankedMemRefDescriptor(R);
-            const ranked = @as(*const D, @ptrCast(@alignCast(d.descriptor)));
-
-            var terms = try beam.allocator.alloc(beam.term, R);
-            defer beam.allocator.free(terms);
-
-            // @field works on the comptime field_name to get either .sizes or .strides.
-            const field = @field(ranked, field_name);
-            // Iterate over the array (which is now a fixed-size array, not a slice).
-            for (field, 0..) |value, i| {
-                terms[i] = beam.make_i64(env, value);
+fn RankedField(comptime name: []const u8) type {
+    return struct {
+        fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
+            inline for (supported_ranks) |rank| {
+                if (d.rank == rank) {
+                    if (comptime rank == 0 and !std.mem.eql(u8, name, "offset")) return beam.make_term_list(env, &.{});
+                    const ranked: *const memref.RankedMemRefDescriptor(rank) = @ptrCast(@alignCast(d.descriptor));
+                    if (comptime std.mem.eql(u8, name, "offset")) return beam.make_i64(env, ranked.offset);
+                    var terms: [rank]beam.term = undefined;
+                    for (@field(ranked, name), 0..) |value, i| terms[i] = beam.make_i64(env, value);
+                    return beam.make_term_list(env, &terms);
+                }
             }
-            return beam.make_term_list(env, terms);
+            return error.UnsupportedRank;
         }
-    }
-    return error.UnsupportedRank;
+    };
 }
 
-// NIF: Get sizes as Erlang list
-pub fn unranked_memref_descriptor_get_sizes(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    return get_ranked_field(env, args[0], "sizes");
-}
-
-// NIF: Get strides as Erlang list
-pub fn unranked_memref_descriptor_get_strides(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    return get_ranked_field(env, args[0], "strides");
-}
+pub const unranked_memref_descriptor_get_offset = RankedField("offset").nif;
+pub const unranked_memref_descriptor_get_sizes = RankedField("sizes").nif;
+pub const unranked_memref_descriptor_get_strides = RankedField("strides").nif;
 
 fn Deallocator(free: anytype) type {
     return struct {
         fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
             const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
-            if (d.rank == 0) {
-                const zero_rank = @as(*memref.RankedMemRefDescriptor(0), @ptrCast(@alignCast(d.descriptor)));
-                if (zero_rank.allocated) |ptr| {
+            inline for (supported_ranks) |rank| {
+                if (d.rank == rank) {
+                    const ranked: *memref.RankedMemRefDescriptor(rank) = @ptrCast(@alignCast(d.descriptor));
+                    const ptr = ranked.allocated orelse return beam.make_atom(env, "noop");
                     free(ptr);
-                    zero_rank.allocated = null;
-                    zero_rank.aligned = null;
+                    ranked.allocated = null;
+                    ranked.aligned = null;
                     return beam.make_ok(env);
-                } else {
-                    return beam.make_atom(env, "noop");
                 }
-            } else {
-                inline for (supported_ranks_excluding_zero) |R| {
-                    if (d.rank == R) {
-                        const D = memref.RankedMemRefDescriptor(R);
-                        const ranked = @as(*D, @ptrCast(@alignCast(d.descriptor)));
-                        if (ranked.allocated) |ptr| {
-                            free(ptr);
-                            ranked.allocated = null;
-                            ranked.aligned = null;
-                            return beam.make_ok(env);
-                        } else {
-                            return beam.make_atom(env, "noop");
-                        }
-                    }
-                }
-                return error.UnsupportedRank;
             }
+            return error.UnsupportedRank;
         }
     };
 }

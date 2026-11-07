@@ -12,6 +12,8 @@ defmodule UnrankedMemRefDescriptorTest do
   test "UnrankedMemRefDescriptor with rank 0" do
     d = UnrankedMemRefDescriptor.empty()
     assert 0 = UnrankedMemRefDescriptor.rank(d)
+    assert [] = UnrankedMemRefDescriptor.sizes(d)
+    assert [] = UnrankedMemRefDescriptor.strides(d)
   end
 
   test "UnrankedMemRefDescriptor with rank 3" do

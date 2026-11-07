@@ -87,16 +87,10 @@ defmodule Beaver.Changeset do
       when name in ~w(operand_segment_sizes operandSegmentSizes result_segment_sizes resultSegmentSizes)a,
       do: %__MODULE__{changeset | attributes: attributes ++ [{name, :infer}]}
 
-  def add_argument(%__MODULE__{context: ctx, attributes: attributes} = changeset, {name, %MLIR.Attribute{} = attr})
-      when is_atom(name) do
+  def add_argument(%__MODULE__{context: ctx, attributes: attributes} = changeset, {name, %kind{} = attr})
+      when is_atom(name) and kind in [MLIR.Attribute, Type] do
     attr = Deferred.resolve(attr, ctx)
     %__MODULE__{changeset | attributes: attributes ++ [{name, attr}]}
-  end
-
-  def add_argument(%__MODULE__{context: ctx, attributes: attributes} = changeset, {name, %Type{} = type})
-      when is_atom(name) do
-    type = Deferred.resolve(type, ctx)
-    %__MODULE__{changeset | attributes: attributes ++ [{name, type}]}
   end
 
   def add_argument(%__MODULE__{attributes: attributes} = changeset, {name, attr})
@@ -171,102 +165,60 @@ defmodule Beaver.Changeset do
   end
 
   @doc false
-  def reorder_operands(%__MODULE__{operands: operands, name: name, attributes: attributes, context: ctx} = changeset) do
-    case {should_reorder?(operands), MLIR.ODS.Dump.lookup(name)} do
-      {true, {:ok, op_dump}} ->
-        {operands, segment_sizes} = process_operands_with_dump(changeset.operands, op_dump)
-        update_changeset_with_operands(changeset, operands, segment_sizes, attributes, ctx)
+  def reorder_operands(%__MODULE__{operands: operands, name: name, attributes: attrs, context: ctx} = changeset) do
+    if should_reorder?(operands) do
+      groups =
+        case MLIR.ODS.Dump.lookup(name) do
+          {:ok, dump} -> operand_groups(operands, dump)
+          _ -> operand_groups(operands)
+        end
 
-      {true, _} ->
-        # Extract unique operand keys and group values by key
-        {operands, segment_sizes} = process_operands_with_keys(changeset.operands)
-        update_changeset_with_operands(changeset, operands, segment_sizes, attributes, ctx)
+      attrs =
+        if (attrs[:operand_segment_sizes] || attrs[:operandSegmentSizes]) == :infer do
+          sizes = groups |> Enum.map(&length/1) |> MLIR.ODS.segment_sizes() |> Deferred.resolve(ctx)
 
-      _ ->
-        changeset
+          attrs
+          |> Keyword.drop([:operand_segment_sizes, :operandSegmentSizes])
+          |> Keyword.put(:operand_segment_sizes, sizes)
+        else
+          attrs
+        end
+
+      %{changeset | operands: List.flatten(groups), attributes: attrs}
+    else
+      changeset
     end
   end
 
-  defp process_operands_with_keys(operands) do
-    # Check for duplicate keys
+  defp operand_groups(operands) do
     keys = Keyword.keys(operands)
-
     if length(keys) != length(Enum.uniq(keys)), do: raise("Duplicate keys found in operands: #{inspect(keys)}")
-
-    # Extract all values in order
-    grouped_values = Keyword.values(operands) |> Enum.map(&List.wrap/1)
-    segment_sizes = Enum.map(grouped_values, &length/1)
-    all_values = grouped_values |> List.flatten()
-
-    {all_values, MLIR.ODS.segment_sizes(segment_sizes)}
+    Enum.map(Keyword.values(operands), &List.wrap/1)
   end
 
-  defp update_changeset_with_operands(%__MODULE__{} = changeset, operands, segment_sizes, attributes, ctx) do
-    operand_segment_sizes =
-      attributes[:operand_segment_sizes] || attributes[:operandSegmentSizes]
+  defp operand_groups(operands, dump) do
+    for %{"name" => name, "kind" => kind} <- dump["operands"] || [] do
+      values =
+        for {key, values} <- operands, compare_tag(key, name), value <- List.wrap(values), do: value
 
-    attributes =
-      case operand_segment_sizes do
-        :infer ->
-          attributes
-          |> Keyword.delete(:operand_segment_sizes)
-          |> Keyword.delete(:operandSegmentSizes)
-          |> Keyword.put(:operand_segment_sizes, Beaver.Deferred.resolve(segment_sizes, ctx))
+      if values == [] and kind == "Single",
+        do: Logger.warning("Single operand '#{name}' not set when creating operation #{dump["name"]}")
 
-        _ ->
-          attributes
-      end
-
-    %__MODULE__{changeset | operands: operands, attributes: attributes}
+      values
+    end
   end
 
   defp should_reorder?([]), do: true
 
-  defp should_reorder?(operands) do
-    {tagged, untagged} = Enum.split_with(operands, &match?({_atom, _value}, &1))
-    has_tagged = not Enum.empty?(tagged)
-    has_untagged = not Enum.empty?(untagged)
+  defp should_reorder?([first | rest]) do
+    tagged = match?({_, _}, first)
 
-    if has_tagged and has_untagged, do: raise(ArgumentError, "Cannot mix tagged and untagged operands")
+    unless Enum.all?(rest, &(match?({_, _}, &1) == tagged)),
+      do: raise(ArgumentError, "Cannot mix tagged and untagged operands")
 
-    has_tagged
+    tagged
   end
 
-  defp compare_tag(tag, operand_name) do
-    tag = to_string(tag)
-    operand_name == tag or Macro.camelize(operand_name) == Macro.camelize(tag)
-  end
-
-  defp process_operands_with_dump(operands, op_dump) do
-    # 1. Normalize provided operands for efficient lookup (O(N))
-    # This avoids the nested loop by ensuring keys are strings, matching op_dump.
-    op_name = op_dump["name"]
-
-    # 2. Process defined operands in a single pass (O(M log N))
-    # A `for` comprehension clearly expresses the transformation.
-    tagged_operands =
-      for %{"name" => operand_name, "kind" => kind} <- op_dump["operands"] || [] do
-        values = matching_operand_values(operands, operand_name)
-
-        # Warn if a required single operand is missing
-        if Enum.empty?(values) and kind == "Single",
-          do: Logger.warning("Single operand '#{operand_name}' not set when creating operation #{op_name}")
-
-        {String.to_atom(operand_name), values}
-      end
-
-    # 3. Assemble the final result from the processed list
-    # This is cleaner as it operates on a well-structured intermediate variable.
-    all_values = Keyword.values(tagged_operands)
-    segment_sizes = MLIR.ODS.segment_sizes(Enum.map(all_values, &length/1))
-    final_operands = List.flatten(all_values)
-
-    {final_operands, segment_sizes}
-  end
-
-  defp matching_operand_values(operands, operand_name) do
-    Enum.reduce(operands, [], fn {key, values}, acc ->
-      if compare_tag(key, operand_name), do: acc ++ List.wrap(values), else: acc
-    end)
-  end
+  defp compare_tag(tag, operand_name),
+    do: operand_name == to_string(tag) or Macro.camelize(operand_name) == Macro.camelize(to_string(tag))
 end

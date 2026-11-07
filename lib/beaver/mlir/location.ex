@@ -5,15 +5,10 @@ defmodule Beaver.MLIR.Location do
   @moduledoc """
   Constructors and safe inspection helpers for MLIR locations.
 
-  Locations are owned and uniqued by an MLIR context. In addition to source
-  ranges, MLIR can represent named provenance, call sites, and fused
-  provenance with an arbitrary metadata attribute. `fused/2` accepts locations
-  as well as location-bearing operations and values so transformations can
-  preserve provenance without dropping to the C API.
-
-  MLIR may canonicalize a fused location without metadata to its only child.
-  Use `with_metadata/3` when the metadata itself must be retained even for a
-  single source location.
+  Locations belong to a context and carry source ranges, names, call sites or
+  fused provenance. `fused/2` accepts locations, operations and values. A fused
+  location without metadata may canonicalize to its only child; use
+  `with_metadata/3` to retain metadata even for a single source.
   """
   alias Beaver.Deferred
   alias Beaver.MLIR
@@ -70,10 +65,7 @@ defmodule Beaver.MLIR.Location do
   end
 
   @doc """
-  Creates a source range location.
-
-  Unlike `file/1`, all range coordinates are explicit so an accidentally
-  truncated range cannot silently be constructed.
+  Creates a source range with all coordinates required, preventing silent truncation.
   """
   @spec file_range(file_range_opts()) :: Deferred.contextual(t())
   def file_range(opts) when is_list(opts) do
@@ -95,7 +87,7 @@ defmodule Beaver.MLIR.Location do
     line = Map.get(env, :line)
     line = if is_integer(line), do: line, else: 0
 
-    file(env_file_opts(name, line, opts))
+    file(opts |> Keyword.put(:name, name) |> Keyword.put(:line, line))
   end
 
   @doc "Creates an unknown location."
@@ -103,10 +95,8 @@ defmodule Beaver.MLIR.Location do
   def unknown(opts \\ []), do: Deferred.from_opts(opts, &CAPI.mlirLocationUnknownGet/1)
 
   @doc """
-  Creates a named location with an unknown child.
-
-  Pass an operation, value, or location as the second argument to retain its
-  existing provenance as the child.
+  Creates a named location with an unknown child, or retains the provenance of
+  an operation, value or location supplied as the second argument.
   """
   @spec named(String.Chars.t(), Deferred.opts()) :: Deferred.contextual(t())
   def named(name, opts) when is_list(opts) do
@@ -123,9 +113,7 @@ defmodule Beaver.MLIR.Location do
   end
 
   @doc """
-  Creates a call-site location from callee and caller provenance.
-
-  Each argument may be a location, operation, value, or deferred equivalent.
+  Creates a call site from callee and caller locations, operations, values or deferred equivalents.
   """
   @spec call_site(source(), source(), Deferred.opts()) :: Deferred.contextual(t())
   def call_site(callee, caller, opts \\ []) do
@@ -135,13 +123,9 @@ defmodule Beaver.MLIR.Location do
   end
 
   @doc """
-  Fuses location-bearing sources, optionally retaining an MLIR attribute as
-  metadata.
-
-  `sources` may contain locations, operations, values, or deferred
-  equivalents. MLIR removes unknown children, deduplicates children, and may
-  return a non-fused location when no metadata is supplied and only one unique
-  child remains.
+  Fuses locations, operations, values or deferred equivalents with optional
+  `:metadata`. MLIR removes unknown and duplicate children; without metadata,
+  a single remaining child may be returned directly.
   """
   @spec fused([source()], keyword()) :: Deferred.contextual(t())
   def fused(sources, opts \\ []) when is_list(sources) do
@@ -157,10 +141,7 @@ defmodule Beaver.MLIR.Location do
   end
 
   @doc """
-  Attaches metadata while retaining all supplied source provenance.
-
-  This is the explicit metadata-preserving form of `fused/2` and is useful for
-  transformation tags, debug scopes, and other provenance attributes.
+  Attaches metadata while retaining source provenance; delegates to `fused/2`.
   """
   @spec with_metadata(source() | [source()], Attribute.t() | Deferred.attribute(), keyword()) ::
           Deferred.contextual(t())
@@ -208,10 +189,10 @@ defmodule Beaver.MLIR.Location do
         {:ok,
          %{
            file: CAPI.mlirLocationFileLineColRangeGetFilename(loc) |> to_string(),
-           start_line: loc |> CAPI.mlirLocationFileLineColRangeGetStartLine() |> to_term(),
-           start_column: loc |> CAPI.mlirLocationFileLineColRangeGetStartColumn() |> to_term(),
-           end_line: loc |> CAPI.mlirLocationFileLineColRangeGetEndLine() |> to_term(),
-           end_column: loc |> CAPI.mlirLocationFileLineColRangeGetEndColumn() |> to_term()
+           start_line: loc |> CAPI.mlirLocationFileLineColRangeGetStartLine() |> Native.to_term(),
+           start_column: loc |> CAPI.mlirLocationFileLineColRangeGetStartColumn() |> Native.to_term(),
+           end_line: loc |> CAPI.mlirLocationFileLineColRangeGetEndLine() |> Native.to_term(),
+           end_column: loc |> CAPI.mlirLocationFileLineColRangeGetEndColumn() |> Native.to_term()
          }},
       else: :error
   end
@@ -221,48 +202,38 @@ defmodule Beaver.MLIR.Location do
   def name(%__MODULE__{} = loc),
     do: if(name?(loc), do: {:ok, loc |> CAPI.mlirLocationNameGetName() |> to_string()}, else: :error)
 
-  @doc "Returns the child provenance of a named location."
-  @spec child(t()) :: {:ok, t()} | :error
-  def child(%__MODULE__{} = loc),
-    do: if(name?(loc), do: {:ok, CAPI.mlirLocationNameGetChildLoc(loc)}, else: :error)
-
-  @doc "Returns the callee provenance of a call-site location."
-  @spec callee(t()) :: {:ok, t()} | :error
-  def callee(%__MODULE__{} = loc),
-    do: if(call_site?(loc), do: {:ok, CAPI.mlirLocationCallSiteGetCallee(loc)}, else: :error)
-
-  @doc "Returns the caller provenance of a call-site location."
-  @spec caller(t()) :: {:ok, t()} | :error
-  def caller(%__MODULE__{} = loc),
-    do: if(call_site?(loc), do: {:ok, CAPI.mlirLocationCallSiteGetCaller(loc)}, else: :error)
+  for {name, predicate, getter, type, doc} <- [
+        {:child, :name?, :mlirLocationNameGetChildLoc, quote(do: t()), "Returns a named location's child provenance."},
+        {:callee, :call_site?, :mlirLocationCallSiteGetCallee, quote(do: t()),
+         "Returns a call site's callee provenance."},
+        {:caller, :call_site?, :mlirLocationCallSiteGetCaller, quote(do: t()),
+         "Returns a call site's caller provenance."},
+        {:metadata, :fused?, :mlirLocationFusedGetMetadata, quote(do: Attribute.t()),
+         "Returns fused metadata; use `Beaver.MLIR.null?/1` to check for an absent attribute."}
+      ] do
+    @doc doc
+    @spec unquote(name)(t()) :: {:ok, unquote(type)} | :error
+    def unquote(name)(%__MODULE__{} = loc),
+      do: if(unquote(predicate)(loc), do: {:ok, CAPI.unquote(getter)(loc)}, else: :error)
+  end
 
   @doc "Returns the number of source locations retained by a fused location."
   @spec location_count(t()) :: {:ok, non_neg_integer()} | :error
   def location_count(%__MODULE__{} = loc),
-    do: if(fused?(loc), do: {:ok, loc |> CAPI.mlirLocationFusedGetNumLocations() |> to_term()}, else: :error)
+    do: if(fused?(loc), do: {:ok, loc |> CAPI.mlirLocationFusedGetNumLocations() |> Native.to_term()}, else: :error)
 
   @doc "Returns the source locations retained by a fused location."
   @spec locations(t()) :: {:ok, [t()]} | :error
   def locations(%__MODULE__{} = loc) do
     with true <- fused?(loc), {:ok, count} <- location_count(loc) do
       {:ok,
-       for position <- zero_based_range(count) do
+       for position <- 0..(count - 1)//1 do
          CAPI.beaverLocationFusedGetLocationAt(loc, position)
        end}
     else
       _ -> :error
     end
   end
-
-  @doc """
-  Returns a fused location's metadata attribute.
-
-  The returned attribute may be MLIR's null attribute when the fused location
-  has no metadata; use `Beaver.MLIR.null?/1` to distinguish that case.
-  """
-  @spec metadata(t()) :: {:ok, Attribute.t()} | :error
-  def metadata(%__MODULE__{} = loc),
-    do: if(fused?(loc), do: {:ok, CAPI.mlirLocationFusedGetMetadata(loc)}, else: :error)
 
   @doc "Returns the location as its underlying location attribute."
   @spec attribute(t()) :: Attribute.t()
@@ -277,30 +248,18 @@ defmodule Beaver.MLIR.Location do
     CAPI.mlirLocationFromAttribute(attribute)
   end
 
-  @doc "Returns whether the location is an MLIR unknown location."
-  @spec unknown?(t()) :: boolean()
-  def unknown?(%__MODULE__{} = loc),
-    do: loc |> CAPI.mlirLocationIsAUnknown() |> to_term()
-
-  @doc "Returns whether the location is an MLIR file range location."
-  @spec file_range?(t()) :: boolean()
-  def file_range?(%__MODULE__{} = loc),
-    do: loc |> CAPI.mlirLocationIsAFileLineColRange() |> to_term()
-
-  @doc "Returns whether the location is an MLIR named location."
-  @spec name?(t()) :: boolean()
-  def name?(%__MODULE__{} = loc),
-    do: loc |> CAPI.mlirLocationIsAName() |> to_term()
-
-  @doc "Returns whether the location is an MLIR call-site location."
-  @spec call_site?(t()) :: boolean()
-  def call_site?(%__MODULE__{} = loc),
-    do: loc |> CAPI.mlirLocationIsACallSite() |> to_term()
-
-  @doc "Returns whether the location is an MLIR fused location."
-  @spec fused?(t()) :: boolean()
-  def fused?(%__MODULE__{} = loc),
-    do: loc |> CAPI.mlirLocationIsAFused() |> to_term()
+  for {name, suffix} <- [
+        unknown: "Unknown",
+        file_range: "FileLineColRange",
+        name: "Name",
+        call_site: "CallSite",
+        fused: "Fused"
+      ] do
+    @doc "Returns whether the location is an MLIR #{name} location."
+    @spec unquote(:"#{name}?")(t()) :: boolean()
+    def unquote(:"#{name}?")(%__MODULE__{} = loc),
+      do: CAPI.unquote(:"mlirLocationIsA#{suffix}")(loc) |> Native.to_term()
+  end
 
   defp resolve_metadata(nil, _ctx), do: Attribute.null()
 
@@ -321,13 +280,4 @@ defmodule Beaver.MLIR.Location do
   defp context_of(%module{} = entity) when module in [__MODULE__, Operation, Value, Attribute], do: MLIR.context(entity)
 
   defp context_of(_other), do: nil
-
-  defp zero_based_range(0), do: []
-  defp zero_based_range(count), do: 0..(count - 1)
-
-  defp to_term(value), do: Native.to_term(value)
-
-  @spec env_file_opts(String.t(), integer(), env_opts()) :: file_opts()
-  defp env_file_opts(name, line, opts),
-    do: opts |> Keyword.put(:name, name) |> Keyword.put(:line, line)
 end
