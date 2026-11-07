@@ -109,16 +109,9 @@ defmodule LLVMDialectTest do
       producer: "Beaver"
     ]
 
-    if LLVM.di_compile_unit_source_language_dialect_supported?() do
-      dialect = LLVM.di_compile_unit(dialect_opts)
-      printed = to_string(dialect)
+    printed = LLVM.di_compile_unit(dialect_opts) |> to_string()
 
-      assert printed =~ "DW_LANG_C"
-      assert printed =~ "DW_LLVM_LANG_DIALECT_tile"
-    else
-      assert_raise ArgumentError, ~r/does not support DICompileUnit/, fn ->
-        LLVM.di_compile_unit(dialect_opts)
-      end
-    end
+    assert printed =~ "DW_LANG_C"
+    assert printed =~ "DW_LLVM_LANG_DIALECT_tile"
   end
 end

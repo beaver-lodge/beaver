@@ -105,11 +105,7 @@ defmodule Beaver.MLIR.Dialect.GPU do
     end
   end
 
-  @doc "Whether the linked LLVM supports TargetInfo-based ROCDL lowering with arch and wavesize options."
-  def rocdl_target_info_supported?, do: CAPI.beaverROCDLTargetInfoSupported() |> Beaver.Native.to_term()
-
   defp configure_rocdl_target(target, arch, wavesize) do
-    unless rocdl_target_info_supported?(), do: raise(ArgumentError, "linked LLVM lacks TargetInfo-based ROCDL lowering")
     configured = CAPI.beaverROCDLTargetAttrConfigure(target, StringRef.create(arch), wavesize)
     if MLIR.null?(configured), do: raise(ArgumentError, "invalid or conflicting ROCDL arch, wavesize or features")
     configured
@@ -207,8 +203,7 @@ defmodule Beaver.MLIR.Dialect.GPU do
       "rocdl" ->
         arch = CAPI.beaverROCDLTargetAttrGetArch(target) |> MLIR.to_string()
         wave = CAPI.beaverROCDLTargetAttrGetWaveSize(target) |> Beaver.Native.to_term()
-        options = if rocdl_target_info_supported?(), do: "arch=#{arch} wavesize=#{wave}", else: "chipset=#{arch}"
-        "convert-gpu-to-rocdl{#{options}}"
+        "convert-gpu-to-rocdl{arch=#{arch} wavesize=#{wave}}"
 
       other ->
         raise ArgumentError, "unsupported GPU target attribute dialect: #{other}"

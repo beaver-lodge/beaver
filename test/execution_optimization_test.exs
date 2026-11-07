@@ -55,7 +55,7 @@ defmodule ExecutionOptimizationTest do
 
   defp context(opts \\ []) do
     defaults = [
-      threading: not Context.independent_locking_supported?(),
+      threading: false,
       thread_safe: true,
       callback_executor: [max_concurrency: 1, idle_timeout_ms: 25]
     ]
@@ -193,8 +193,7 @@ defmodule ExecutionOptimizationTest do
 
     assert Context.thread_safe?(ctx)
 
-    assert Native.to_term(CAPI.beaverContextIsMultithreadingEnabled(ctx)) ==
-             not Context.independent_locking_supported?()
+    refute Native.to_term(CAPI.beaverContextIsMultithreadingEnabled(ctx))
   end
 
   test "prepared pipelines isolate state across concurrent runs", %{ctx: ctx} do

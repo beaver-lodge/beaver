@@ -5,14 +5,11 @@
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
-#include "mlir/CAPI/Rewrite.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/ExtensibleDialect.h"
-#ifdef BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION
 #include "mlir/Transforms/CompositePass.h"
-#endif
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/IR/SymbolTable.h"
@@ -21,11 +18,8 @@
 #include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/VCSRevision.h"
 #include <algorithm>
-#include <atomic>
-#include <chrono>
 #include <condition_variable>
 #include <deque>
-#include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -35,33 +29,17 @@
 
 using namespace mlir;
 
-MLIR_CAPI_EXPORTED bool beaverContextIndependentLockingSupported() {
-#ifdef BEAVER_HAS_MLIR_CONTEXT_LOCKING
-  return true;
-#else
-  return false;
-#endif
-}
-
 MLIR_CAPI_EXPORTED bool beaverContextIsMultithreadingEnabled(MlirContext context) {
   return unwrap(context)->isMultithreadingEnabled();
 }
 
 MLIR_CAPI_EXPORTED bool beaverContextEnableThreadSafeLocking(MlirContext context) {
-#ifdef BEAVER_HAS_MLIR_CONTEXT_LOCKING
   unwrap(context)->enableThreadSafeLocking();
   return true;
-#else
-  return false;
-#endif
 }
 
 MLIR_CAPI_EXPORTED bool beaverContextIsThreadSafeLockingEnabled(MlirContext context) {
-#ifdef BEAVER_HAS_MLIR_CONTEXT_LOCKING
   return unwrap(context)->isThreadSafeLockingEnabled();
-#else
-  return unwrap(context)->isMultithreadingEnabled();
-#endif
 }
 
 MLIR_CAPI_EXPORTED MlirAttribute beaverOperationGetProperties(MlirOperation operation) {
@@ -121,52 +99,23 @@ MLIR_CAPI_EXPORTED void beaverOperationDestroyIterative(MlirOperation operation)
 namespace {
 using MemoryEffectList = llvm::SmallVectorImpl<MemoryEffects::EffectInstance>;
 
-static MemoryEffectList *unwrapEffectList(MlirBeaverMemoryEffectInstancesList effects) {
-  return static_cast<MemoryEffectList *>(effects.ptr);
+template <typename Fill>
+void emitEffects(MlirBeaverMemoryEffectInstancesList sink, Fill fill) {
+  llvm::SmallVector<MemoryEffects::EffectInstance> effects;
+  fill(effects);
+  for (auto &effect : effects) beaverMemoryEffectInstancesListAppend(sink, wrap(&effect));
 }
-
-static MlirBeaverMemoryEffectInstancesList wrapEffectList(MemoryEffectList *effects) { return {effects}; }
 
 static llvm::SmallVector<NamedAttribute> collectInherentAttributes(Operation *operation) {
   llvm::SmallVector<NamedAttribute> attributes;
-#ifdef BEAVER_HAS_MLIR_INHERENT_ATTRIBUTE_VISITOR
   operation->getName().walkInherentAttrs(operation, [&](llvm::StringRef name, Attribute &attribute) {
     if (attribute) attributes.emplace_back(StringAttr::get(operation->getContext(), name), attribute);
   });
-#else
-  NamedAttrList populated;
-  operation->getName().populateInherentAttrs(operation, populated);
-  attributes.append(populated.begin(), populated.end());
-#endif
   return attributes;
 }
 
-#ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
 static std::mutex transientScopeMutex;
 static std::unordered_set<MLIRContext *> transientScopeContexts;
-#endif
-
-class BeaverMemoryEffectsOpInterfaceFallbackModel
-    : public MemoryEffectOpInterface::FallbackModel<BeaverMemoryEffectsOpInterfaceFallbackModel> {
-public:
-  void setCallbacks(MlirBeaverMemoryEffectsOpInterfaceCallbacks value) { callbacks = value; }
-
-  ~BeaverMemoryEffectsOpInterfaceFallbackModel() {
-    if (callbacks.destruct) callbacks.destruct(callbacks.userData);
-  }
-
-  static TypeID getInterfaceID() { return MemoryEffectOpInterface::getInterfaceID(); }
-
-  static bool classof(const MemoryEffectOpInterface::Concept *) { return true; }
-
-  void getEffects(Operation *operation, MemoryEffectList &effects) const {
-    assert(callbacks.getEffects && "getEffects callback not set");
-    callbacks.getEffects(wrap(operation), wrapEffectList(&effects), callbacks.userData);
-  }
-
-private:
-  MlirBeaverMemoryEffectsOpInterfaceCallbacks callbacks{};
-};
 
 /// A reusable pool with a nominal MLIR parallelism limit and elastic workers.
 /// MLIR uses `getMaxConcurrency()` to bound ordinary parallel algorithms. The
@@ -262,23 +211,15 @@ private:
 } // namespace
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverSymbolTableGetDefaultVisibilityAttributeName(void) {
-#ifdef BEAVER_HAS_MLIR_DEFAULT_SYMBOL_VISIBILITY_ATTRIBUTE_NAME
   return wrap(SymbolOpInterface::getDefaultVisibilityAttrName());
-#else
-  return wrap(SymbolTable::getVisibilityAttrName());
-#endif
 }
 
+static_assert(int(SymbolTable::Visibility::Public) == MlirBeaverSymbolVisibilityPublic);
+static_assert(int(SymbolTable::Visibility::Private) == MlirBeaverSymbolVisibilityPrivate);
+static_assert(int(SymbolTable::Visibility::Nested) == MlirBeaverSymbolVisibilityNested);
+
 MLIR_CAPI_EXPORTED MlirBeaverSymbolVisibility beaverSymbolTableGetSymbolVisibility(MlirOperation symbol) {
-  switch (SymbolTable::getSymbolVisibility(unwrap(symbol))) {
-  case SymbolTable::Visibility::Public:
-    return MlirBeaverSymbolVisibilityPublic;
-  case SymbolTable::Visibility::Private:
-    return MlirBeaverSymbolVisibilityPrivate;
-  case SymbolTable::Visibility::Nested:
-    return MlirBeaverSymbolVisibilityNested;
-  }
-  llvm_unreachable("unknown symbol visibility");
+  return static_cast<MlirBeaverSymbolVisibility>(SymbolTable::getSymbolVisibility(unwrap(symbol)));
 }
 
 MLIR_CAPI_EXPORTED void beaverSymbolTableSetSymbolVisibility(MlirOperation symbol,
@@ -286,19 +227,7 @@ MLIR_CAPI_EXPORTED void beaverSymbolTableSetSymbolVisibility(MlirOperation symbo
   if (visibility < MlirBeaverSymbolVisibilityPublic || visibility > MlirBeaverSymbolVisibilityNested)
     llvm_unreachable("unknown Beaver symbol visibility");
 
-  SymbolTable::Visibility nativeVisibility = SymbolTable::Visibility::Public;
-  switch (visibility) {
-  case MlirBeaverSymbolVisibilityPublic:
-    nativeVisibility = SymbolTable::Visibility::Public;
-    break;
-  case MlirBeaverSymbolVisibilityPrivate:
-    nativeVisibility = SymbolTable::Visibility::Private;
-    break;
-  case MlirBeaverSymbolVisibilityNested:
-    nativeVisibility = SymbolTable::Visibility::Nested;
-    break;
-  }
-  SymbolTable::setSymbolVisibility(unwrap(symbol), nativeVisibility);
+  SymbolTable::setSymbolVisibility(unwrap(symbol), static_cast<SymbolTable::Visibility>(visibility));
 }
 
 MLIR_CAPI_EXPORTED bool beaverOperationHasInherentAttributeByName(MlirOperation operation, MlirStringRef name) {
@@ -327,38 +256,10 @@ MLIR_CAPI_EXPORTED MlirNamedAttribute beaverOperationGetInherentAttribute(MlirOp
   return MlirNamedAttribute{wrap(attribute.getName()), wrap(attribute.getValue())};
 }
 
-MLIR_CAPI_EXPORTED void
-beaverMemoryEffectsOpInterfaceAttachFallbackModel(MlirContext context, MlirStringRef operationName,
-                                                  MlirBeaverMemoryEffectsOpInterfaceCallbacks callbacks) {
-  std::optional<RegisteredOperationName> operation =
-      RegisteredOperationName::lookup(unwrap(operationName), unwrap(context));
-  assert(operation.has_value() && "operation not found in context");
-
-  operation->attachInterface<BeaverMemoryEffectsOpInterfaceFallbackModel>();
-  auto *model = cast<BeaverMemoryEffectsOpInterfaceFallbackModel>(
-      operation->getInterface<BeaverMemoryEffectsOpInterfaceFallbackModel>());
-  assert(model && "failed to get Beaver MemoryEffects fallback model");
-  model->setCallbacks(callbacks);
-}
-
 MLIR_CAPI_EXPORTED void beaverMemoryEffectInstancesListAppend(MlirBeaverMemoryEffectInstancesList effects,
                                                               MlirMemoryEffectInstance instance) {
-  unwrapEffectList(effects)->push_back(*unwrap(instance));
-}
-
-MLIR_CAPI_EXPORTED bool beaverMemoryEffectsOpInterfaceGetEffects(MlirOperation operation,
-                                                                 MlirBeaverMemoryEffectInstancesCallback callback,
-                                                                 void *userData) {
-  auto interface = dyn_cast<MemoryEffectOpInterface>(unwrap(operation));
-  if (!interface) return false;
-
-  llvm::SmallVector<MemoryEffects::EffectInstance> effects;
-  interface.getEffects(effects);
-  llvm::SmallVector<MlirMemoryEffectInstance> wrappedEffects;
-  wrappedEffects.reserve(effects.size());
-  for (MemoryEffects::EffectInstance &effect : effects) wrappedEffects.push_back(wrap(&effect));
-  callback(wrappedEffects.size(), wrappedEffects.data(), userData);
-  return true;
+  auto *sink = static_cast<MlirBeaverMemoryEffectSink *>(effects.ptr);
+  sink->callback(1, &instance, sink->userData);
 }
 
 MLIR_CAPI_EXPORTED MlirBeaverMemoryEffectKind beaverMemoryEffectInstanceGetKind(MlirMemoryEffectInstance instance) {
@@ -370,70 +271,38 @@ MLIR_CAPI_EXPORTED MlirBeaverMemoryEffectKind beaverMemoryEffectInstanceGetKind(
   return MlirBeaverMemoryEffectUnknown;
 }
 
-MLIR_CAPI_EXPORTED MlirSideEffectResource beaverMemoryEffectInstanceGetResource(MlirMemoryEffectInstance instance) {
-  return wrap(unwrap(instance)->getResource());
-}
-
-MLIR_CAPI_EXPORTED int beaverMemoryEffectInstanceGetStage(MlirMemoryEffectInstance instance) {
-  return unwrap(instance)->getStage();
-}
-
-MLIR_CAPI_EXPORTED bool beaverMemoryEffectInstanceGetEffectOnFullRegion(MlirMemoryEffectInstance instance) {
-  return unwrap(instance)->getEffectOnFullRegion();
-}
-
-MLIR_CAPI_EXPORTED MlirAttribute beaverMemoryEffectInstanceGetParameters(MlirMemoryEffectInstance instance) {
-  return wrap(unwrap(instance)->getParameters());
-}
-
 MLIR_CAPI_EXPORTED MlirOpOperand beaverMemoryEffectInstanceGetOpOperand(MlirMemoryEffectInstance instance) {
   return wrap(unwrap(instance)->getEffectValue<OpOperand *>());
-}
-
-MLIR_CAPI_EXPORTED MlirValue beaverMemoryEffectInstanceGetValue(MlirMemoryEffectInstance instance) {
-  return wrap(unwrap(instance)->getValue());
-}
-
-MLIR_CAPI_EXPORTED MlirAttribute beaverMemoryEffectInstanceGetSymbolRef(MlirMemoryEffectInstance instance) {
-  return wrap(unwrap(instance)->getSymbolRef());
 }
 
 MLIR_CAPI_EXPORTED void beaverTransformOnlyReadsHandle(MlirOpOperand *operands, intptr_t numOperands,
                                                        MlirBeaverMemoryEffectInstancesList effects) {
   MutableArrayRef<OpOperand> unwrapped;
   if (numOperands != 0) unwrapped = MutableArrayRef<OpOperand>(unwrap(*operands), numOperands);
-  transform::onlyReadsHandle(unwrapped, *unwrapEffectList(effects));
+  emitEffects(effects, [&](MemoryEffectList &out) { transform::onlyReadsHandle(unwrapped, out); });
 }
 
 MLIR_CAPI_EXPORTED void beaverTransformConsumesHandle(MlirOpOperand *operands, intptr_t numOperands,
                                                       MlirBeaverMemoryEffectInstancesList effects) {
   MutableArrayRef<OpOperand> unwrapped;
   if (numOperands != 0) unwrapped = MutableArrayRef<OpOperand>(unwrap(*operands), numOperands);
-  transform::consumesHandle(unwrapped, *unwrapEffectList(effects));
+  emitEffects(effects, [&](MemoryEffectList &out) { transform::consumesHandle(unwrapped, out); });
 }
 
 MLIR_CAPI_EXPORTED void beaverTransformProducesHandle(MlirValue *results, intptr_t numResults,
                                                       MlirBeaverMemoryEffectInstancesList effects) {
-  for (intptr_t index = 0; index < numResults; ++index) {
-    auto result = cast<OpResult>(unwrap(results[index]));
-    transform::producesHandle(ResultRange(result), *unwrapEffectList(effects));
-  }
+  emitEffects(effects, [&](MemoryEffectList &out) {
+    for (intptr_t index = 0; index < numResults; ++index)
+      transform::producesHandle(ResultRange(cast<OpResult>(unwrap(results[index]))), out);
+  });
 }
 
 MLIR_CAPI_EXPORTED void beaverTransformModifiesPayload(MlirBeaverMemoryEffectInstancesList effects) {
-  transform::modifiesPayload(*unwrapEffectList(effects));
+  emitEffects(effects, [&](MemoryEffectList &out) { transform::modifiesPayload(out); });
 }
 
 MLIR_CAPI_EXPORTED void beaverTransformOnlyReadsPayload(MlirBeaverMemoryEffectInstancesList effects) {
-  transform::onlyReadsPayload(*unwrapEffectList(effects));
-}
-
-MLIR_CAPI_EXPORTED bool beaverTransformPackedParamsSupported(void) {
-#ifdef BEAVER_HAS_PACKED_TRANSFORM_PARAMS
-  return true;
-#else
-  return false;
-#endif
+  emitEffects(effects, [&](MemoryEffectList &out) { transform::onlyReadsPayload(out); });
 }
 
 MLIR_CAPI_EXPORTED MlirLlvmThreadPool beaverLlvmThreadPoolCreateElastic(unsigned maxConcurrency) {
@@ -454,38 +323,19 @@ MLIR_CAPI_EXPORTED MlirOpPassManager beaverOpPassManagerCreate(void) { return wr
 
 MLIR_CAPI_EXPORTED void beaverOpPassManagerDestroy(MlirOpPassManager passManager) { delete unwrap(passManager); }
 
-MLIR_CAPI_EXPORTED bool beaverCompositeFixedPointFailureActionSupported(void) {
-#ifdef BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION
-  return true;
-#else
-  return false;
-#endif
-}
-
 MLIR_CAPI_EXPORTED MlirPass beaverCreateCompositeFixedPointPass(MlirStringRef name, MlirOpPassManager innerPipeline,
                                                                 intptr_t maxIterations,
                                                                 MlirBeaverConvergenceFailureAction action) {
   OpPassManager *source = unwrap(innerPipeline);
   auto populate = [source](OpPassManager &target) { target = std::move(*source); };
 
-#ifdef BEAVER_HAS_MLIR_COMPOSITE_FAILURE_ACTION
-  ConvergenceFailureAction nativeAction;
-  switch (action) {
-  case MlirBeaverConvergenceFailureWarn:
-    nativeAction = ConvergenceFailureAction::Warn;
-    break;
-  case MlirBeaverConvergenceFailureError:
-    nativeAction = ConvergenceFailureAction::Error;
-    break;
-  case MlirBeaverConvergenceFailureSilent:
-    nativeAction = ConvergenceFailureAction::Silent;
-    break;
-  }
-  return wrap(createCompositeFixedPointPass(unwrap(name).str(), populate, maxIterations, nativeAction).release());
-#else
-  assert(action == MlirBeaverConvergenceFailureWarn && "linked LLVM cannot configure composite convergence failure");
-  return wrap(createCompositeFixedPointPass(unwrap(name).str(), populate, maxIterations).release());
-#endif
+  static_assert(int(ConvergenceFailureAction::Warn) == MlirBeaverConvergenceFailureWarn);
+  static_assert(int(ConvergenceFailureAction::Error) == MlirBeaverConvergenceFailureError);
+  static_assert(int(ConvergenceFailureAction::Silent) == MlirBeaverConvergenceFailureSilent);
+  if (action < MlirBeaverConvergenceFailureWarn || action > MlirBeaverConvergenceFailureSilent)
+    llvm_unreachable("unknown convergence failure action");
+  return wrap(createCompositeFixedPointPass(unwrap(name).str(), populate, maxIterations,
+                                           static_cast<ConvergenceFailureAction>(action)).release());
 }
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetName(MlirPass pass) {
@@ -499,10 +349,6 @@ MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetDescription(MlirPass pass) {
 
 MLIR_CAPI_EXPORTED MlirContext beaverPassManagerGetContext(MlirPassManager passManager) {
   return wrap(unwrap(passManager)->getContext());
-}
-
-MLIR_CAPI_EXPORTED void beaverPassManagerEnableTiming(MlirPassManager passManager) {
-  unwrap(passManager)->enableTiming();
 }
 
 MLIR_CAPI_EXPORTED void beaverContextGetOps(MlirContext context, MlirStringCallback insert, void *container) {
@@ -526,16 +372,8 @@ MLIR_CAPI_EXPORTED uint64_t beaverOperationStructuralHashValue(MlirOperation op,
 }
 
 MLIR_CAPI_EXPORTED void beaverIRMappingClear(MlirIRMapping mapping) {
-  IRMapping *cppMapping = unwrap(mapping);
-  SmallVector<Block *> blocks;
-  SmallVector<Operation *> operations;
-
-  for (auto [from, _] : cppMapping->getBlockMap()) blocks.push_back(from);
-  for (auto [from, _] : cppMapping->getOperationMap()) operations.push_back(from);
-
-  cppMapping->clear();
-  for (Block *block : blocks) cppMapping->erase(block);
-  for (Operation *operation : operations) cppMapping->erase(operation);
+  // Upstream clear() resets only values; replace the whole map to clear all kinds.
+  *unwrap(mapping) = IRMapping{};
 }
 
 MLIR_CAPI_EXPORTED bool beaverIsNullContext(MlirContext w) { return !w.ptr; }
@@ -638,29 +476,15 @@ MLIR_CAPI_EXPORTED MlirGreedyRewriteDriverConfig beaverGreedyRewriteDriverConfig
   return mlirGreedyRewriteDriverConfigCreate();
 }
 
-MLIR_CAPI_EXPORTED bool beaverContextTransientScopeSupported(void) {
-#ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
-  return true;
-#else
-  return false;
-#endif
-}
-
 MLIR_CAPI_EXPORTED bool beaverContextBeginTransientScope(MlirContext context) {
-#ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
   MLIRContext *unwrapped = unwrap(context);
   std::lock_guard<std::mutex> lock(transientScopeMutex);
   if (!transientScopeContexts.insert(unwrapped).second) return false;
   unwrapped->beginTransientScope();
   return true;
-#else
-  (void)context;
-  return false;
-#endif
 }
 
 MLIR_CAPI_EXPORTED bool beaverContextEndTransientScope(MlirContext context) {
-#ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
   MLIRContext *unwrapped = unwrap(context);
   std::lock_guard<std::mutex> lock(transientScopeMutex);
   auto active = transientScopeContexts.find(unwrapped);
@@ -668,20 +492,11 @@ MLIR_CAPI_EXPORTED bool beaverContextEndTransientScope(MlirContext context) {
   unwrapped->endTransientScope();
   transientScopeContexts.erase(active);
   return true;
-#else
-  (void)context;
-  return false;
-#endif
 }
 
 MLIR_CAPI_EXPORTED bool beaverContextHasActiveTransientScope(MlirContext context) {
-#ifdef BEAVER_HAS_MLIR_CONTEXT_TRANSIENT_SCOPE
   std::lock_guard<std::mutex> lock(transientScopeMutex);
   return transientScopeContexts.find(unwrap(context)) != transientScopeContexts.end();
-#else
-  (void)context;
-  return false;
-#endif
 }
 
 MLIR_CAPI_EXPORTED MlirType beaverDenseElementsAttrGetType(MlirAttribute attr) {

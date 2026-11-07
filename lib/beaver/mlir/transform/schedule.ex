@@ -6,17 +6,23 @@ defmodule Beaver.MLIR.Transform.Schedule do
   alias Beaver.MLIR.Transform
 
   @doc false
-  def with_module(input, %Context{} = ctx, fun) when is_function(fun, 1) do
-    with {:ok, bytes} <- source_bytes(input),
-         {:ok, module} <- parse_module(bytes, ctx) do
+  def load(input, %Context{} = ctx, prepare \\ &{:ok, &1}) do
+    with {:ok, bytes} <- source_bytes(input), {:ok, module} <- parse_module(bytes, ctx) do
       try do
-        case MLIR.verify(module) do
-          {:ok, _module} -> fun.(module)
-          :null -> {:error, invalid_error("parsed transform module is null")}
-          {:error, diagnostics} -> {:error, invalid_error(:verification_failed, diagnostics)}
-        end
-      after
-        MLIR.Module.destroy(module)
+        result =
+          case MLIR.verify(module) do
+            {:ok, _} -> prepare.(module)
+            {:error, diagnostics} -> {:error, invalid_error(:verification_failed, diagnostics)}
+            :null -> {:error, invalid_error(:verification_failed)}
+          end
+
+        # Ownership transfers only on success, including native preparation.
+        unless match?({:ok, _}, result), do: MLIR.Module.destroy(module)
+        result
+      rescue
+        exception ->
+          MLIR.Module.destroy(module)
+          reraise exception, __STACKTRACE__
       end
     end
   rescue
@@ -64,14 +70,11 @@ defmodule Beaver.MLIR.Transform.Schedule do
     end
   end
 
-  defp enclosing_module(op),
-    do: if(Operation.name(op) == "builtin.module", do: op, else: enclosing_module_parent(Operation.parent(op)))
-
-  defp enclosing_module_parent(op) do
+  defp enclosing_module(op) do
     cond do
       MLIR.null?(op) -> nil
       Operation.name(op) == "builtin.module" -> op
-      true -> enclosing_module_parent(Operation.parent(op))
+      true -> enclosing_module(Operation.parent(op))
     end
   end
 

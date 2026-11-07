@@ -10,6 +10,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
         type_converter_reply_callback type_converter_reply_types type_converter_reply_values optimization_remarks_attach
       )},
                    {2, ~w(
+        analysis_invalidate analysis_mutation transform_prepare
         callback_reply cuda_module_get_function cuda_memcpy_htod cuda_memcpy_dtoh
         transform_state_payload_ops transform_state_payload_values transform_state_params
         context_attach_diagnostic_handler
@@ -21,6 +22,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
         jit_invoke_with_terms_io_bound type_converter_reply_value
       )},
                    {1, ~w(
+        analysis_create analysis_close transform_close
         executor_snapshot executor_release
         action_tracing_drain
         action_tracing_detach cuda_device_name cuda_device_compute_capability cuda_module_load cuda_module_unload

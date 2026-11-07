@@ -21,7 +21,7 @@ pub fn tuple(env: beam.env, term: beam.term, count: usize) ![]const beam.term {
     return terms[0..count];
 }
 
-const Command = enum { verify, pass, rewrite, snapshot, update, parse, create_pass, create_pattern, destroy, speculatability, memory_effects, replace_uses, conversion, convert_type };
+const Command = enum { transform, analysis, verify, pass, rewrite, snapshot, update, parse, create_pass, create_pattern, destroy, speculatability, memory_effects, replace_uses, conversion, convert_type };
 const Work = struct {
     context: m.Context.T,
     command: Command,
@@ -61,6 +61,8 @@ const Work = struct {
     fn execute(self: Work) !beam.term {
         const env = self.env;
         switch (self.command) {
+            .transform => return @import("prepared_transform.zig").apply(env, self.context, self.arguments, self.recipient),
+            .analysis => return @import("analysis.zig").query(env, self.context, self.arguments, self.recipient),
             .conversion => return @import("conversion.zig").convert(env, self.context, self.arguments, self.profile),
             .convert_type => return @import("conversion.zig").convertType(env, self.arguments),
             .replace_uses => return @import("value.zig").replace(env, self.context, self.arguments, self.recipient, self.id),

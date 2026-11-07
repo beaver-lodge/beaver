@@ -601,15 +601,15 @@ fn compilerKernelLoadAndPopulate(environment: beam.env, _: c_int, args: [*c]cons
 }
 
 fn applyConversion(environment: beam.env, args: anytype) !beam.term {
-    const result = if (args.full)
-        c.mlirApplyFullConversion(args.operation, args.target, args.patterns, args.config)
-    else
-        c.mlirApplyPartialConversion(args.operation, args.target, args.patterns, args.config);
+    var report = string_ref.TextBuffer.init(beam.allocator);
+    defer report.deinit();
+    const result = c.beaverConversionRun(args.mode, args.operation, args.target, args.patterns, args.config, if (args.report) string_ref.collectStringRef else null, &report);
+    if (args.report) return beam.make_slice(environment, report.items);
     return mlir_capi.LogicalResult.resource.make_kind(environment, result);
 }
 
 pub fn convert(environment: beam.env, context: mlir_capi.Context.T, arguments: beam.term, profile: bool) !beam.term {
-    const args = try @import("execution.zig").tuple(environment, arguments, 7);
+    const args = try @import("execution.zig").tuple(environment, arguments, 8);
     const target = try fetchTargetRegistration(environment, args[1]);
     const operation = try mlir_capi.Operation.resource.fetch(environment, args[2]);
     const patterns = try mlir_capi.FrozenRewritePatternSet.resource.fetch(environment, args[3]);
@@ -623,13 +623,15 @@ pub fn convert(environment: beam.env, context: mlir_capi.Context.T, arguments: b
     const materializations = try beam.get_i64(environment, args[6]);
     if (folding >= 0) c.mlirConversionConfigSetFoldingMode(config, @intCast(folding));
     if (materializations >= 0) c.mlirConversionConfigEnableBuildMaterializations(config, materializations != 0);
-    const full = try beam.get_bool(environment, args[0]);
+    const mode = try beam.get(c_uint, environment, args[0]);
+    const report = try beam.get_bool(environment, args[7]);
     const started = if (profile) systemNs() else 0;
     const io = std.Options.debug_io;
     target.mutex.lockUncancelable(io);
     const wait = if (profile) systemNs() - started else 0;
     const result = if (target.closed.load(.acquire)) beam.make_nil(environment) else diagnostic.call_with_diagnostics(environment, context, applyConversion, .{ environment, .{
-        .full = full,
+        .mode = mode,
+        .report = report,
         .operation = operation,
         .target = target.handle,
         .patterns = patterns,

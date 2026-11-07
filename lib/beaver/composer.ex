@@ -37,14 +37,7 @@ defmodule Beaver.Composer do
   def create_pass(%MLIR.Pass{} = pass, _ctx), do: pass
 
   def create_pass(%MLIR.Transform.FixedPoint{} = fixed_point, ctx) do
-    if fixed_point.on_convergence_failure != :warn and
-         not MLIR.Transform.composite_fixed_point_failure_action_supported?() do
-      raise ArgumentError,
-            "linked LLVM cannot configure fixed-point convergence failure; " <>
-              "update the LLVM pin before using #{inspect(fixed_point.on_convergence_failure)}"
-    end
-
-    inner_pipeline = mlir_op_pass_manager_create()
+    inner_pipeline = beaverOpPassManagerCreate()
 
     try do
       Enum.each(fixed_point.pipeline, &add_pass(inner_pipeline, &1, ctx))
@@ -111,8 +104,6 @@ defmodule Beaver.Composer do
   defp add_pass(%MLIR.OpPassManager{} = pm, pass, ctx), do: mlirOpPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
 
   defp add_pass(%MLIR.PassManager{} = pm, pass, ctx), do: mlirPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
-
-  defp mlir_op_pass_manager_create, do: beaverOpPassManagerCreate()
 
   defp encode_convergence_failure_action(:warn), do: 0
   defp encode_convergence_failure_action(:error), do: 1
@@ -188,6 +179,12 @@ defmodule Beaver.Composer do
   > avoiding a native verification round trip after every Elixir pass.
   """
   def run(composer, opts \\ @run_default_opts) do
+    Beaver.MLIR.AnalysisSession.track(opts[:analysis_session], fn ->
+      execute(composer, Keyword.delete(opts, :analysis_session))
+    end)
+  end
+
+  defp execute(composer, opts) do
     case Keyword.get(opts, :execution, :native) do
       :native ->
         if opts[:verifier] == :pipeline,
@@ -252,7 +249,7 @@ defmodule Beaver.Composer do
     verifier = Keyword.get(opts, :verifier, true)
     pm = to_pm(composer, anchor)
 
-    if timing, do: pm |> beaverPassManagerEnableTiming()
+    if timing, do: pm |> mlirPassManagerEnableTiming()
 
     :ok = MLIR.PassManager.enable_verifier(pm, verifier)
 

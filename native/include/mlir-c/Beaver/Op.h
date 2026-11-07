@@ -135,7 +135,6 @@ MLIR_CAPI_EXPORTED intptr_t beaverShapedTypeGetNumElements(MlirType type);
 MLIR_CAPI_EXPORTED MlirStringRef beaverGetNumWorkgroupAttributionsAttrName();
 MLIR_CAPI_EXPORTED MlirStringRef beaverGetContainerModuleAttrName();
 MLIR_CAPI_EXPORTED MlirStringRef beaverROCDLTargetAttrGetChip(MlirAttribute target);
-MLIR_CAPI_EXPORTED bool beaverROCDLTargetInfoSupported(void);
 MLIR_CAPI_EXPORTED MlirStringRef beaverROCDLTargetAttrGetArch(MlirAttribute target);
 MLIR_CAPI_EXPORTED unsigned beaverROCDLTargetAttrGetWaveSize(MlirAttribute target);
 MLIR_CAPI_EXPORTED MlirAttribute beaverROCDLTargetAttrConfigure(MlirAttribute target, MlirStringRef arch, unsigned wavesize);

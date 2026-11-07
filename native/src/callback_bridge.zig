@@ -65,7 +65,9 @@ const MemoryEffectsState = struct {
         c.beaverMemoryEffectInstancesListAppend(effects, instance);
     }
 
-    fn getEffects(operation: mlir_capi.Operation.T, effects: mlir_capi.MemoryEffectInstancesList.T, user_data: ?*anyopaque) callconv(.c) void {
+    fn getEffects(operation: mlir_capi.Operation.T, callback: c.MlirMemoryEffectInstancesCallback, callback_data: ?*anyopaque, user_data: ?*anyopaque) callconv(.c) void {
+        var sink = c.MlirBeaverMemoryEffectSink{ .callback = callback, .userData = callback_data };
+        const effects = mlir_capi.MemoryEffectInstancesList.T{ .ptr = &sink };
         const self: *@This() = @ptrCast(@alignCast(user_data orelse {
             appendConservativeEffect(effects);
             return;
@@ -251,70 +253,51 @@ const EffectsCollector = struct {
     terms: std.array_list.Managed(beam.term),
     failed: bool = false,
 
-    fn handle(self: *@This(), comptime Kind: type, value: Kind.T) ?beam.term {
-        return kinda.callback_adapter.handle(Kind, self.environment, value) catch {
-            self.failed = true;
-            return null;
-        };
-    }
-
     fn append(count: isize, instances: [*c]c.MlirMemoryEffectInstance, user_data: ?*anyopaque) callconv(.c) void {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
         if (count < 0) {
             self.failed = true;
             return;
         }
+        for (0..@intCast(count)) |index| self.instance(instances[index]) catch {
+            self.failed = true;
+            return;
+        };
+    }
 
-        for (0..@intCast(count)) |index| {
-            const instance = instances[index];
-            const parameters = self.handle(
-                mlir_capi.Attribute,
-                c.beaverMemoryEffectInstanceGetParameters(instance),
-            ) orelse return;
-            const resource = self.handle(
-                mlir_capi.SideEffectResource,
-                c.beaverMemoryEffectInstanceGetResource(instance),
-            ) orelse return;
-
-            const operand = c.beaverMemoryEffectInstanceGetOpOperand(instance);
-            const value = c.beaverMemoryEffectInstanceGetValue(instance);
-            const symbol = c.beaverMemoryEffectInstanceGetSymbolRef(instance);
-            var target_kind = beam.make_atom(self.environment, "none");
-            var target = beam.make_nil(self.environment);
-
-            if (operand.ptr != null) {
-                target_kind = beam.make_atom(self.environment, "operand");
-                target = self.handle(mlir_capi.OpOperand, operand) orelse return;
-            } else if (value.ptr != null) {
-                target_kind = beam.make_atom(self.environment, "value");
-                target = self.handle(mlir_capi.Value, value) orelse return;
-            } else if (symbol.ptr != null) {
-                target_kind = beam.make_atom(self.environment, "symbol");
-                target = self.handle(mlir_capi.Attribute, symbol) orelse return;
+    fn instance(self: *@This(), effect: c.MlirMemoryEffectInstance) !void {
+        var target_kind = beam.make_atom(self.environment, "none");
+        var target = beam.make_nil(self.environment);
+        inline for (.{
+            .{ "operand", mlir_capi.OpOperand, c.beaverMemoryEffectInstanceGetOpOperand(effect) },
+            .{ "value", mlir_capi.Value, c.mlirMemoryEffectInstanceGetValue(effect) },
+            .{ "symbol", mlir_capi.Attribute, c.mlirMemoryEffectInstanceGetSymbolRef(effect) },
+        }) |entry| {
+            if (entry[2].ptr != null) {
+                target_kind = beam.make_atom(self.environment, entry[0]);
+                target = try kinda.callback_adapter.handle(entry[1], self.environment, entry[2]);
+                break;
             }
-
-            var fields = [_]beam.term{
-                beam.make_c_int(self.environment, @intCast(c.beaverMemoryEffectInstanceGetKind(instance))),
-                target_kind,
-                target,
-                parameters,
-                beam.make_c_int(self.environment, c.beaverMemoryEffectInstanceGetStage(instance)),
-                beam.make_bool(self.environment, c.beaverMemoryEffectInstanceGetEffectOnFullRegion(instance)),
-                resource,
-            };
-            self.terms.append(beam.make_tuple(self.environment, &fields)) catch {
-                self.failed = true;
-                return;
-            };
         }
+        var fields = [_]beam.term{
+            beam.make_c_int(self.environment, @intCast(c.beaverMemoryEffectInstanceGetKind(effect))),
+            target_kind,
+            target,
+            try kinda.callback_adapter.handle(mlir_capi.Attribute, self.environment, c.mlirMemoryEffectInstanceGetParameters(effect)),
+            beam.make_c_int(self.environment, c.mlirMemoryEffectInstanceGetStage(effect)),
+            beam.make_bool(self.environment, c.mlirMemoryEffectInstanceGetEffectOnFullRegion(effect)),
+            try kinda.callback_adapter.handle(mlir_capi.SideEffectResource, self.environment, c.mlirMemoryEffectInstanceGetResource(effect)),
+        };
+        try self.terms.append(beam.make_tuple(self.environment, &fields));
     }
 };
 
 pub fn memoryEffects(environment: beam.env, operation: mlir_capi.Operation.T) !beam.term {
     var collector = EffectsCollector{ .environment = environment, .terms = .init(std.heap.smp_allocator) };
     defer collector.terms.deinit();
-    const implemented = c.beaverMemoryEffectsOpInterfaceGetEffects(operation, EffectsCollector.append, &collector);
-    return if (implemented and !collector.failed) beam.make_term_list(environment, collector.terms.items) else beam.make_atom(environment, "error");
+    if (!c.mlirOperationImplementsInterface(operation, c.mlirMemoryEffectsOpInterfaceTypeID())) return beam.make_atom(environment, "error");
+    c.mlirMemoryEffectsOpInterfaceGetEffects(operation, EffectsCollector.append, &collector);
+    return if (!collector.failed) beam.make_term_list(environment, collector.terms.items) else beam.make_atom(environment, "error");
 }
 
 fn collectTransformState(
@@ -377,7 +360,7 @@ pub const conditionally_speculatable_attach_fallback_model = Fallback(
 pub const memory_effects_attach_fallback_model = Fallback(
     MemoryEffectsState,
     .{"get_effects"},
-    c.beaverMemoryEffectsOpInterfaceAttachFallbackModel,
+    c.mlirMemoryEffectsOpInterfaceAttachFallbackModel,
     .{ .getEffects = MemoryEffectsState.getEffects },
 ).attach;
 pub const transform_op_interface_attach_fallback_model = Fallback(TransformState, .{ "apply", "allows_repeated_handle_operands" }, c.mlirTransformOpInterfaceAttachFallbackModel, .{

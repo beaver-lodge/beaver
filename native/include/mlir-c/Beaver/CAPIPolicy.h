@@ -6,6 +6,16 @@
 // consume these declarations.
 typedef enum {
   // Tracing sessions have managed resources and a collecting drain adapter.
+  BeaverCapiPolicyExclude__beaverAnalysisCreate,
+  BeaverCapiPolicyExclude__beaverAnalysisDestroy,
+  BeaverCapiPolicyExclude__beaverAnalysisInvalidate,
+  BeaverCapiPolicyExclude__beaverAnalysisGeneration,
+  BeaverCapiPolicyExclude__beaverAnalysisCached,
+  BeaverCapiPolicyExclude__beaverAnalysisQuery,
+  BeaverCapiPolicyExclude__beaverAnalysisLayout,
+  BeaverCapiPolicyExclude__beaverInferReturnTypes,
+  BeaverCapiPolicyExclude__beaverInferReturnComponents,
+  BeaverCapiPolicyExclude__beaverConversionRun,
   BeaverCapiPolicyExclude__mlirBeaverActionTracingAttach,
   BeaverCapiPolicyExclude__mlirBeaverActionTracingDrain,
   BeaverCapiPolicyExclude__mlirBeaverActionTracingDetach,
@@ -50,7 +60,7 @@ typedef enum {
   BeaverCapiPolicyManualAdapter__mlirTransformStateForEachParam,
   BeaverCapiPolicyManualAdapter__mlirTransformStateForEachPayloadOp,
   BeaverCapiPolicyManualAdapter__mlirTransformStateForEachPayloadValue,
-  BeaverCapiPolicyManualAdapter__beaverMemoryEffectsOpInterfaceGetEffects,
+  BeaverCapiPolicyManualAdapter__mlirMemoryEffectsOpInterfaceGetEffects,
   BeaverCapiPolicyManualAdapter__beaverTranslateModuleToLLVMIRText,
   BeaverCapiPolicyManualAdapter__beaverCompileLLVMIRToPTX,
   BeaverCapiPolicyManualAdapter__beaverCompilerKernelLoadAndPopulate,
@@ -69,16 +79,12 @@ typedef enum {
   BeaverCapiPolicyCallbackRuntime__mlirConversionTargetMarkUnknownOpDynamicallyLegal,
   BeaverCapiPolicyCallbackRuntime__mlirOpConversionPatternCreate,
   BeaverCapiPolicyCallbackRuntime__mlirConditionallySpeculatableOpInterfaceAttachFallbackModel,
-  BeaverCapiPolicyCallbackRuntime__beaverMemoryEffectsOpInterfaceAttachFallbackModel,
+  BeaverCapiPolicyCallbackRuntime__mlirMemoryEffectsOpInterfaceAttachFallbackModel,
   BeaverCapiPolicyCallbackRuntime__mlirPatternDescriptorOpInterfaceAttachFallbackModel,
   BeaverCapiPolicyCallbackRuntime__mlirTransformOpInterfaceAttachFallbackModel,
   BeaverCapiPolicyCallbackRuntime__mlirDynamicOpTraitCreate,
 
-  // Beaver owns a stable adapter for the MemoryEffects collector ABI. Exclude
-  // both generations of the upstream surface so manifests remain identical
-  // when compiling against Triton LLVM or an LLVM-main eudsl snapshot.
-  BeaverCapiPolicyExclude__mlirMemoryEffectsOpInterfaceAttachFallbackModel,
-  BeaverCapiPolicyExclude__mlirMemoryEffectsOpInterfaceGetEffects,
+  // The BEAM bridge owns MemoryEffects collectors and callback lifetimes.
   BeaverCapiPolicyExclude__mlirMemoryEffectInstancesListAppend,
   BeaverCapiPolicyExclude__mlirTransformOnlyReadsHandle,
   BeaverCapiPolicyExclude__mlirTransformConsumesHandle,

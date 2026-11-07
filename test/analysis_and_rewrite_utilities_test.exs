@@ -134,7 +134,9 @@ defmodule AnalysisAndRewriteUtilitiesTest do
         assert is_nil(MLIR.IRMapping.lookup(mapping, func))
         assert MLIR.equal?(func, MLIR.IRMapping.lookup_or_default(mapping, func))
 
+        assert ^mapping = MLIR.IRMapping.map(mapping, func, clone)
         assert ^mapping = MLIR.IRMapping.clear(mapping)
+        refute MLIR.IRMapping.contains?(mapping, func)
         refute MLIR.IRMapping.contains?(mapping, source_block)
         refute MLIR.IRMapping.contains?(mapping, source_argument)
       after

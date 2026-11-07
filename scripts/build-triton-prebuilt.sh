@@ -11,4 +11,4 @@ done
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "${script_dir}/install_llvm"
 mix deps.get
-exec mix openai_triton.build "$@"
+exec mix beaver.build_triton "$@"

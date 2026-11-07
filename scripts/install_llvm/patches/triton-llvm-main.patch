@@ -1,0 +1,26 @@
+diff --git a/lib/Conversion/TritonGPUToLLVM/WarpSpecializeUtility.cpp b/lib/Conversion/TritonGPUToLLVM/WarpSpecializeUtility.cpp
+index f4c4094e1..9f9905d68 100644
+--- a/lib/Conversion/TritonGPUToLLVM/WarpSpecializeUtility.cpp
++++ b/lib/Conversion/TritonGPUToLLVM/WarpSpecializeUtility.cpp
+@@ -369,7 +369,7 @@ static void disableLICM(LLVM::BrOp latchBr) {
+   MLIRContext *ctx = b.getContext();
+   auto licmMD = LLVM::LoopLICMAttr::get(ctx, b.getBoolAttr(true), {});
+   auto loopMD =
+-      LLVM::LoopAnnotationAttr::get(b.getContext(), {}, {}, {}, {}, {}, licmMD,
+-                                    {}, {}, {}, {}, {}, {}, {}, {}, {});
++      LLVM::LoopAnnotationAttr::get(ctx, {}, {}, {}, {}, {}, {}, licmMD,
++                                    {}, {}, {}, {}, {}, {}, 0, {}, {}, {});
+   latchBr.setLoopAnnotationAttr(loopMD);
+ }
+diff --git a/third_party/nvidia/lib/TritonNVIDIAGPUToLLVM/TritonGPUToLLVM.cpp b/third_party/nvidia/lib/TritonNVIDIAGPUToLLVM/TritonGPUToLLVM.cpp
+index febfe06c2..fa849b4d2 100644
+--- a/third_party/nvidia/lib/TritonNVIDIAGPUToLLVM/TritonGPUToLLVM.cpp
++++ b/third_party/nvidia/lib/TritonNVIDIAGPUToLLVM/TritonGPUToLLVM.cpp
+@@ -1,6 +1,7 @@
+ #include "Dialect/NVGPU/IR/Dialect.h"
+ #include "PatternTritonGPUOpToLLVM.h"
+ #include "TritonNVIDIAGPUToLLVM/Passes.h"
++#include "mlir/Conversion/ArithCommon/CeilFloorDivExpansion.h"
+ #include "mlir/Conversion/ArithToLLVM/ArithToLLVM.h"
+ #include "mlir/Conversion/ControlFlowToLLVM/ControlFlowToLLVM.h"
+ #include "mlir/Conversion/GPUToNVVM/GPUToNVVMPass.h"

@@ -1,5 +1,5 @@
 {
-  "schema_version": 2,
+  "schema_version": 3,
   "kinda": {
     "git_url": "https://github.com/beaver-lodge/kinda.git",
     "ref": "68a5f9d462d481e9cc04ff96435105ab1dd9ee74"
@@ -7,11 +7,25 @@
   "llvm": {
     "repo": "llvm/eudsl",
     "tag": "llvm",
-    "default_revisions": {
-      "macos_arm64": "20261106+b5bbdc97c",
-      "manylinux_aarch64": "20261106+b5bbdc97c",
-      "manylinux_x86_64": "20261106+b5bbdc97c",
-      "windows_amd64": "20261106+b5bbdc97c"
+    "source_ref": "378916e7f7c77cce03180b3c9e4d01de3c55c0f9",
+    "build_run": 42322920840,
+    "artifacts": {
+      "macos_arm64": {
+        "id": 13559250146,
+        "sha256": "c9511931ec934433e593ebfbf72c43d3eb75c9ccbf60f8f8df6e7ebd529f5eeb"
+      },
+      "manylinux_x86_64": {
+        "id": 13559624431,
+        "sha256": "60c1985aedc178f84cb908322605994d575bdac9e0204db2b638253cd397d6a8"
+      },
+      "manylinux_aarch64": {
+        "id": 13556627771,
+        "sha256": "f13bbfc4ef1fc8824e2455663c2cc0bdf4b6a97ec7dc03365385b6268884f2fa"
+      },
+      "windows_amd64": {
+        "id": 13557980435,
+        "sha256": "53e86f9a846bfce12da34f4519ff2e4d49d7a40416a9870912a9bc18e54a0728"
+      }
     }
   }
 }

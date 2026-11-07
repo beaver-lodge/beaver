@@ -1,170 +1,92 @@
 const std = @import("std");
 const kinda = @import("kinda");
 const beam = kinda.beam;
-const mlir_capi = @import("mlir_capi.zig");
-const diagnostic = @import("diagnostic.zig");
+const m = @import("mlir_capi.zig");
 const c = @import("prelude.zig").c;
+const callback_args = @import("callback_args.zig");
 
-const Request = struct {
-    op_name: mlir_capi.StringRef.T,
-    context: mlir_capi.Context.T,
-    location: mlir_capi.Location.T,
-    operands: []mlir_capi.Value.T,
-    attributes: mlir_capi.Attribute.T,
-    regions: []mlir_capi.Region.T,
+// Encode while the callback owns its borrowed data; no copied shapes or second
+// native result representation are needed after inference returns.
+const Collector = struct {
+    env: beam.env,
+    terms: std.array_list.Managed(beam.term) = .init(beam.allocator),
+    failure: ?anyerror = null,
 
-    fn init(environment: beam.env, args: [*c]const beam.term) !@This() {
-        if (0 == kinda.erl_nif.enif_is_identical(args[5], beam.make_atom(environment, "nil")))
-            return error.UnsupportedProperties;
+    fn types(count: isize, values: [*c]m.Type.T, data: ?*anyopaque) callconv(.c) void {
+        const self: *@This() = @ptrCast(@alignCast(data.?));
+        for (callback_args.Range(m.Type).slice(count, values)) |value| {
+            const term = m.Type.resource.make_kind(self.env, value) catch |err| {
+                self.failure = err;
+                return;
+            };
+            self.terms.append(term) catch |err| {
+                self.failure = err;
+                return;
+            };
+        }
+    }
 
-        const op_name = try beam.get_binary(environment, args[0]);
-        const operands = try @import("callback_args.zig").Range(mlir_capi.Value).decode(environment, args[3], beam.allocator);
-        errdefer beam.allocator.free(operands);
-        const regions = try @import("callback_args.zig").Range(mlir_capi.Region).decode(environment, args[6], beam.allocator);
-        errdefer beam.allocator.free(regions);
-        return .{
-            .op_name = c.mlirStringRefCreate(op_name.data, op_name.size),
-            .context = try mlir_capi.Context.resource.fetch(environment, args[1]),
-            .location = try mlir_capi.Location.resource.fetch(environment, args[2]),
-            .operands = operands,
-            .attributes = try mlir_capi.Attribute.resource.fetch(environment, args[4]),
-            .regions = regions,
+    fn components(ranked: bool, rank: isize, dims: [*c]const i64, element: m.Type.T, encoding: m.Attribute.T, data: ?*anyopaque) callconv(.c) void {
+        const self: *@This() = @ptrCast(@alignCast(data.?));
+        self.component(ranked, rank, dims, element, encoding) catch |err| {
+            self.failure = err;
         };
     }
 
-    fn deinit(self: *@This()) void {
-        beam.allocator.free(self.operands);
-        beam.allocator.free(self.regions);
-    }
-};
-
-const TypeCollector = struct {
-    values: std.array_list.Managed(mlir_capi.Type.T),
-
-    fn init() @This() {
-        return .{ .values = std.array_list.Managed(mlir_capi.Type.T).init(beam.allocator) };
-    }
-
-    fn deinit(self: *@This()) void {
-        self.values.deinit();
-    }
-
-    fn append(count: isize, values: [*c]mlir_capi.Type.T, user_data: ?*anyopaque) callconv(.c) void {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
-        const len: usize = @intCast(count);
-        self.values.appendSlice(values[0..len]) catch @panic("failed to collect inferred types");
-    }
-
-    fn toTerm(self: *@This(), environment: beam.env) !beam.term {
-        return kinda.callback_adapter.handleRange(mlir_capi.Type, environment, self.values.items);
-    }
-};
-
-const ShapedTypeCollector = struct {
-    const Component = struct {
-        ranked: bool,
-        shape: []i64,
-        element_type: mlir_capi.Type.T,
-        encoding: mlir_capi.Attribute.T,
-    };
-
-    values: std.array_list.Managed(Component),
-
-    fn init() @This() {
-        return .{ .values = std.array_list.Managed(Component).init(beam.allocator) };
-    }
-
-    fn deinit(self: *@This()) void {
-        for (self.values.items) |component| beam.allocator.free(component.shape);
-        self.values.deinit();
-    }
-
-    fn append(
-        ranked: bool,
-        rank: isize,
-        shape: [*c]const i64,
-        element_type: mlir_capi.Type.T,
-        encoding: mlir_capi.Attribute.T,
-        user_data: ?*anyopaque,
-    ) callconv(.c) void {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
-        const len: usize = if (ranked) @intCast(rank) else 0;
-        const owned_shape = if (len == 0)
-            beam.allocator.alloc(i64, 0) catch @panic("failed to allocate inferred shape")
-        else
-            beam.allocator.dupe(i64, shape[0..len]) catch @panic("failed to copy inferred shape");
-        self.values.append(.{
-            .ranked = ranked,
-            .shape = owned_shape,
-            .element_type = element_type,
-            .encoding = encoding,
-        }) catch @panic("failed to collect inferred shaped type components");
-    }
-
-    fn componentTerm(component: Component, environment: beam.env) !beam.term {
-        const shape = if (component.ranked) blk: {
-            const terms = try beam.allocator.alloc(beam.term, component.shape.len);
-            defer beam.allocator.free(terms);
-            for (component.shape, terms) |dimension, *term|
-                term.* = try beam.make(i64, environment, dimension);
-            break :blk beam.make_term_list(environment, terms);
-        } else beam.make_atom(environment, "unranked");
-
-        const element_type = if (c.beaverIsNullType(component.element_type))
-            beam.make_atom(environment, "nil")
-        else
-            try mlir_capi.Type.resource.make_kind(environment, component.element_type);
-
-        const encoding = if (c.beaverIsNullAttribute(component.encoding))
-            beam.make_atom(environment, "nil")
-        else
-            try mlir_capi.Attribute.resource.make_kind(environment, component.encoding);
-
-        var fields = [_]beam.term{ shape, element_type, encoding };
-        return beam.make_tuple(environment, &fields);
-    }
-
-    fn toTerm(self: *@This(), environment: beam.env) !beam.term {
-        const terms = try beam.allocator.alloc(beam.term, self.values.items.len);
-        defer beam.allocator.free(terms);
-        for (self.values.items, terms) |component, *term|
-            term.* = try componentTerm(component, environment);
-        return beam.make_term_list(environment, terms);
+    fn component(self: *@This(), ranked: bool, rank: isize, dims: [*c]const i64, element: m.Type.T, encoding: m.Attribute.T) !void {
+        var shape = beam.make_atom(self.env, "unranked");
+        if (ranked) {
+            shape = beam.make_term_list(self.env, &.{});
+            var remaining: usize = @intCast(rank);
+            while (remaining > 0) {
+                remaining -= 1;
+                shape = kinda.erl_nif.enif_make_list_cell(self.env, beam.make_i64(self.env, dims[remaining]), shape);
+            }
+        }
+        var fields = [_]beam.term{
+            shape,
+            try callback_args.Optional(m.Type).encode(self.env, element),
+            try callback_args.Optional(m.Attribute).encode(self.env, encoding),
+        };
+        try self.terms.append(beam.make_tuple(self.env, &fields));
     }
 };
 
 fn Inference(comptime shaped: bool) type {
-    const Collector = if (shaped) ShapedTypeCollector else TypeCollector;
-    const infer = if (shaped) c.mlirInferShapedTypeOpInterfaceInferReturnTypes else c.mlirInferTypeOpInterfaceInferReturnTypes;
     return struct {
-        fn collect(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-            var request = try Request.init(environment, args);
-            defer request.deinit();
-            var collector = Collector.init();
-            defer collector.deinit();
+        fn collect(env: beam.env, ctx: m.Context.T, args: [*c]const beam.term) !beam.term {
+            const location = try m.Location.resource.fetch(env, args[2]);
+            const operands = try callback_args.Range(m.Value).decode(env, args[3], beam.allocator);
+            defer beam.allocator.free(operands);
+            const regions = try callback_args.Range(m.Region).decode(env, args[6], beam.allocator);
+            defer beam.allocator.free(regions);
+            var collector = Collector{ .env = env };
+            defer collector.terms.deinit();
+            const infer = if (shaped) c.beaverInferReturnComponents else c.beaverInferReturnTypes;
             const status = infer(
-                request.op_name,
-                request.context,
-                request.location,
-                @intCast(request.operands.len),
-                request.operands.ptr,
-                request.attributes,
-                null,
-                @intCast(request.regions.len),
-                request.regions.ptr,
-                Collector.append,
+                try @import("string_ref.zig").get_binary_as_string_ref(env, args[0]),
+                ctx,
+                location,
+                @intCast(operands.len),
+                operands.ptr,
+                try m.Attribute.resource.fetch(env, args[4]),
+                if (beam.is_nil2(env, args[5])) .{ .ptr = null } else try m.Attribute.resource.fetch(env, args[5]),
+                @intCast(regions.len),
+                regions.ptr,
+                if (shaped) Collector.components else Collector.types,
                 &collector,
             );
+            if (collector.failure) |err| return err;
             if (c.beaverLogicalResultIsFailure(status)) {
-                c.mlirEmitError(request.location, if (shaped) "failed to infer shaped operation return components" else "failed to infer operation return types");
-                return beam.make_atom(environment, "error");
+                c.mlirEmitError(location, if (shaped) "failed to infer shaped operation return components" else "failed to infer operation return types");
+                return beam.make_atom(env, "error");
             }
-            return collector.toTerm(environment);
+            return beam.make_term_list(env, collector.terms.items);
         }
 
-        fn run(environment: beam.env, argc: c_int, args: [*c]const beam.term) !beam.term {
-            const context = try mlir_capi.Context.resource.fetch(environment, args[1]);
-            return diagnostic.call_with_diagnostics(environment, context, collect, .{ environment, argc, args });
+        fn run(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            const ctx = try m.Context.resource.fetch(env, args[1]);
+            return @import("diagnostic.zig").call_with_diagnostics(env, ctx, collect, .{ env, ctx, args });
         }
     };
 }

@@ -11,6 +11,11 @@ defmodule Beaver.Execution do
   end
 
   def run(ctx, command, arguments, opts \\ []) do
+    session = if command in [:pass, :rewrite, :update, :transform], do: opts[:analysis_session]
+    MLIR.AnalysisSession.track(session, fn -> execute(ctx, command, arguments, opts) end)
+  end
+
+  defp execute(ctx, command, arguments, opts) do
     profile = opts[:profile]
     strategy = Keyword.get(opts, :strategy, :worker)
 

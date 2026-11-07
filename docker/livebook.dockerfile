@@ -1,8 +1,9 @@
+# syntax=docker/dockerfile:1.10
 FROM ghcr.io/livebook-dev/livebook:0.19.9
 RUN apt-get upgrade -y \
   && apt-get update \
   && apt-get install --no-install-recommends -y \
-    ninja-build \
+    ninja-build git gh cmake build-essential \
     python3 \
   && apt-get clean \
   && rm -rf /var/lib/apt/lists/*
@@ -10,8 +11,7 @@ RUN apt-get upgrade -y \
 COPY ./scripts/install_llvm /usr/local/bin/install_llvm
 COPY ./native-deps.json /usr/local/native-deps.json
 COPY ./scripts/install-prebuilt-llvm.sh /usr/local/bin/install-prebuilt-llvm.sh
-ARG LLVM_EUDSL_ASSET_NAME
-RUN LLVM_EUDSL_ASSET_NAME="${LLVM_EUDSL_ASSET_NAME}" \
+RUN --mount=type=secret,id=github_token,env=GH_TOKEN \
   bash /usr/local/bin/install-prebuilt-llvm.sh /usr/local/mlir
 ENV LLVM_CONFIG_PATH=/usr/local/mlir/bin/llvm-config
 ENV PATH=/usr/local/mlir/bin:${PATH}

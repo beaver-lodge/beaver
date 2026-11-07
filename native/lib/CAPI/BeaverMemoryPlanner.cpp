@@ -9,7 +9,6 @@
 
 using namespace mlir;
 
-#ifdef BEAVER_HAS_STATIC_MEMORY_PLANNER
 namespace {
 // The upstream planner does not free allocated arenas or check argument size.
 // Keep planning upstream; supply these ownership/bounds checks at the boundary.
@@ -76,20 +75,7 @@ struct StaticMemoryPlan : PassWrapper<StaticMemoryPlan, OperationPass<func::Func
   bool callerArena, bestFit;
 };
 } // namespace
-#endif
-
-MLIR_CAPI_EXPORTED bool beaverStaticMemoryPlannerSupported() {
-#ifdef BEAVER_HAS_STATIC_MEMORY_PLANNER
-  return true;
-#else
-  return false;
-#endif
-}
 
 MLIR_CAPI_EXPORTED MlirPass beaverCreateStaticMemoryPlannerPass(bool callerArena, bool bestFit) {
-#ifdef BEAVER_HAS_STATIC_MEMORY_PLANNER
   return wrap(new StaticMemoryPlan(callerArena, bestFit));
-#else
-  return {};
-#endif
 }

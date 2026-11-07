@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: read
 
 concurrency:
   group: track-upstream
@@ -29,7 +30,6 @@ jobs:
       eudsl_asset: ${{ steps.eudsl.outputs.asset }}
       current_triton: ${{ steps.current.outputs.triton }}
       eudsl_current: ${{ steps.current.outputs.eudsl }}
-      llvm_available: ${{ steps.llvm.outputs.available }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -49,25 +49,6 @@ jobs:
             | sort -k2 | tail -1 | cut -f1)"
           echo "asset=$asset" >> "$GITHUB_OUTPUT"
 
-      - name: Check Triton-pinned LLVM availability
-        id: llvm
-        run: |
-          ref="${{ steps.triton.outputs.sha }}"
-          info="$(curl -fsS "https://raw.githubusercontent.com/triton-lang/triton/${ref}/cmake/llvm-info.json" \
-            || curl -fsS "https://raw.githubusercontent.com/triton-lang/triton/${ref}/cmake/llvm-build-info.json")"
-          hash="$(echo "$info" | jq -r '.llvm_hash // empty')"
-          build="$(echo "$info" | jq -r '.build_number // empty')"
-          if [[ -z "$hash" || -z "$build" || "$build" == "null" ]]; then
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "No LLVM info for ${ref}" >> "$GITHUB_STEP_SUMMARY"
-            exit 0
-          fi
-          url="https://oaitriton.blob.core.windows.net/public/llvm-builds/llvm-${hash:0:8}-ubuntu-x64-${build}.tar.gz"
-          code="$(curl -s -o /dev/null -w '%{http_code}' -I "$url")"
-          echo "llvm_url=$url" >> "$GITHUB_OUTPUT"
-          echo "available=$([ "$code" = "200" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-          echo "Triton ${ref} LLVM: ${url} -> HTTP ${code}" >> "$GITHUB_STEP_SUMMARY"
-
       - name: Read current pins
         id: current
         run: |
@@ -75,7 +56,7 @@ jobs:
           echo "eudsl=$(jq -r .llvm_eudsl_latest upstream-pins.json)" >> "$GITHUB_OUTPUT"
 
       - name: Create/update pin branch
-        if: (steps.eudsl.outputs.asset != steps.current.outputs.eudsl) || (steps.triton.outputs.sha != steps.current.outputs.triton && steps.llvm.outputs.available == 'true')
+        if: (steps.eudsl.outputs.asset != steps.current.outputs.eudsl) || (steps.triton.outputs.sha != steps.current.outputs.triton)
         run: |
           set -euo pipefail
           sha="${{ steps.triton.outputs.sha }}"
@@ -101,11 +82,8 @@ jobs:
 
   build-prebuilt:
     needs: track
-    # The pin PR's Elixir CI downloads triton-prebuilt-<ref>, so the prebuilt
-    # must be released BEFORE opening the PR. Only build when the triton pin
-    # moved and its LLVM is actually published (OpenAI's LLVM builds lag
-    # Triton main).
-    if: needs.track.outputs.triton_sha != needs.track.outputs.current_triton && needs.track.outputs.llvm_available == 'true'
+    # Validate Triton against the selected LLVM before opening the pin PR.
+    if: needs.track.outputs.triton_sha != needs.track.outputs.current_triton
     uses: ./.github/workflows/triton-prebuilt.yml
     with:
       triton_ref: ${{ needs.track.outputs.triton_sha }}
@@ -113,7 +91,7 @@ jobs:
 
   open-pr:
     needs: [track, build-prebuilt]
-    if: always() && (needs.track.outputs.eudsl_asset != needs.track.outputs.eudsl_current || (needs.track.outputs.triton_sha != needs.track.outputs.current_triton && needs.track.outputs.llvm_available == 'true')) && (needs.build-prebuilt.result == 'success' || needs.build-prebuilt.result == 'skipped')
+    if: always() && (needs.track.outputs.eudsl_asset != needs.track.outputs.eudsl_current || (needs.track.outputs.triton_sha != needs.track.outputs.current_triton)) && (needs.build-prebuilt.result == 'success' || needs.build-prebuilt.result == 'skipped')
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.UPSTREAM_PINS_TOKEN || github.token }}
@@ -135,7 +113,7 @@ jobs:
             "- triton_ref: ${sha}" \
             "- llvm/eudsl latest asset: ${asset}" \
             "" \
-            "The \`triton-prebuilt-${sha:0:12}\` release was built from this branch before opening the PR, so the Elixir CI can download it. Merging also triggers \`Build Triton prebuilt\` (push to main with \`triton.json\`), which is idempotent." \
+            "Triton core is rebuilt and checked against the LLVM revision in native-deps.json." \
             > /tmp/pr_body.md
 
           existing="$(gh pr list --repo beaver-lodge/beaver --head "$branch" \

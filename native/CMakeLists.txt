@@ -1,4 +1,6 @@
-cmake_minimum_required(VERSION 3.13.4)
+cmake_minimum_required(VERSION 3.20)
+# Match the static release CRT used by the selected LLVM Windows toolchain.
+set(CMAKE_MSVC_RUNTIME_LIBRARY MultiThreaded)
 set(CMAKE_BUILD_TYPE
     Release
     CACHE STRING "")

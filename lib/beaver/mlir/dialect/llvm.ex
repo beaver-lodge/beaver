@@ -111,16 +111,10 @@ defmodule Beaver.MLIR.Dialect.LLVM do
     end
   end
 
-  @doc "Whether the installed LLVM exposes source-language dialects on `DICompileUnit`."
-  def di_compile_unit_source_language_dialect_supported? do
-    Code.ensure_loaded?(CAPI) and function_exported?(CAPI, :mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect, 15)
-  end
-
   @doc """
   Build an LLVM `DICompileUnit` attribute.
 
-  `:source_language_dialect` is optional. Omitting it uses the established C
-  API; setting it uses the newer ABI while preserving all other defaults.
+  `:source_language_dialect` is optional and defaults to no dialect.
   Languages and dialects accept their DWARF integer values. The common `:c`,
   `:simt`, and `:tile` spellings are also accepted.
   """
@@ -128,14 +122,8 @@ defmodule Beaver.MLIR.Dialect.LLVM do
     ctx = Keyword.fetch!(opts, :ctx)
     source_language = debug_enum(Keyword.fetch!(opts, :source_language), @debug_languages)
 
-    source_language_dialect =
-      case Keyword.get(opts, :source_language_dialect) do
-        nil -> nil
-        value -> debug_enum(value, @debug_language_dialects)
-      end
-
-    if source_language_dialect != nil and not di_compile_unit_source_language_dialect_supported?(),
-      do: raise(ArgumentError, "installed LLVM does not support DICompileUnit source-language dialects")
+    dialect = opts[:source_language_dialect]
+    source_language_dialect = if is_nil(dialect), do: 0, else: debug_enum(dialect, @debug_language_dialects)
 
     id = Keyword.get_lazy(opts, :id, fn -> CAPI.mlirDistinctAttrCreate(Attribute.unit(ctx: ctx)) end)
 
@@ -160,12 +148,13 @@ defmodule Beaver.MLIR.Dialect.LLVM do
 
     name_table_kind = debug_enum(Keyword.get(opts, :name_table_kind, :default), @debug_name_table_kinds)
 
-    common = [
+    CAPI.mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect(
       ctx,
       rec_id,
       Keyword.get(opts, :rec_self, false),
       id,
       source_language,
+      source_language_dialect,
       file,
       producer,
       Keyword.get(opts, :optimized, false),
@@ -175,21 +164,7 @@ defmodule Beaver.MLIR.Dialect.LLVM do
       split_debug_filename,
       length(imported_entities),
       imported_array
-    ]
-
-    case source_language_dialect do
-      nil ->
-        apply(CAPI, :mlirLLVMDICompileUnitAttrGet, common)
-
-      dialect ->
-        [head, rec_id, rec_self, id, language | tail] = common
-
-        apply(
-          CAPI,
-          :mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect,
-          [head, rec_id, rec_self, id, language, dialect | tail]
-        )
-    end
+    )
   end
 
   @doc """

@@ -28,15 +28,12 @@ MLIR_CAPI_EXPORTED void beaverExecutionLeaveOperation(void *scope);
 MLIR_CAPI_EXPORTED MlirModule beaverModuleCreateParseTracked(MlirContext context, MlirStringRef source);
 MLIR_CAPI_EXPORTED bool beaverOperationVerify(MlirOperation operation, bool recursive);
 
-MLIR_CAPI_EXPORTED bool beaverContextIndependentLockingSupported(void);
 MLIR_CAPI_EXPORTED bool beaverContextEnableThreadSafeLocking(MlirContext context);
 MLIR_CAPI_EXPORTED bool beaverContextIsThreadSafeLockingEnabled(MlirContext context);
 MLIR_CAPI_EXPORTED bool beaverContextIsMultithreadingEnabled(MlirContext context);
 
-/// Stable, capability-gated adapters for LLVM's transient MLIRContext scope.
-/// Begin returns false when unsupported or when the context is already in a
-/// scope; end returns false when no scope was entered through this adapter.
-MLIR_CAPI_EXPORTED bool beaverContextTransientScopeSupported(void);
+/// Begin returns false when a transient scope is already active; end returns
+/// false when no scope was entered through this adapter.
 MLIR_CAPI_EXPORTED bool beaverContextBeginTransientScope(MlirContext context);
 MLIR_CAPI_EXPORTED bool beaverContextEndTransientScope(MlirContext context);
 MLIR_CAPI_EXPORTED bool beaverContextHasActiveTransientScope(MlirContext context);

@@ -21,6 +21,7 @@ erl_crash.dump
 
 # Temporary files, for example, from tests.
 /tmp/
+/scripts/install_llvm/tmp/
 .DS_Store
 
 *.so.tar.gz
