@@ -1,35 +1,26 @@
-const std = @import("std");
 const kinda = @import("kinda");
-const e = kinda.erl_nif;
 const beam = kinda.beam;
-const result = kinda.result;
 const mlir_capi = @import("mlir_capi.zig");
 const diagnostic = @import("diagnostic.zig");
-const c = @import("prelude.zig").c;
+const prelude = @import("prelude.zig");
+const c = prelude.c;
+const string_ref = @import("string_ref.zig");
+const Buffer = string_ref.TextBuffer;
 
 const Translation = struct {
-    const Buffer = std.array_list.Managed(u8);
-
-    buffer: Buffer,
-
-    fn appendString(value: mlir_capi.StringRef.T, user_data: ?*anyopaque) callconv(.c) void {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
-        self.buffer.appendSlice(value.data[0..value.length]) catch @panic("failed to collect LLVM IR");
-    }
-
     fn translateWithoutDiagnostics(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         const operation = try mlir_capi.Operation.resource.fetch(environment, args[0]);
-        var self = @This(){ .buffer = Buffer.init(beam.allocator) };
-        defer self.buffer.deinit();
+        var buffer = Buffer.init(beam.allocator);
+        defer buffer.deinit();
 
-        const status = c.beaverTranslateModuleToLLVMIRText(operation, appendString, &self);
+        const status = c.beaverTranslateModuleToLLVMIRText(operation, string_ref.collectStringRef, &buffer);
         if (c.beaverLogicalResultIsFailure(status))
             return beam.make_atom(environment, "error");
 
-        return beam.make_slice(environment, self.buffer.items);
+        return beam.make_slice(environment, buffer.items);
     }
 
-    fn translate(environment: beam.env, argc: c_int, args: [*c]const beam.term) !beam.term {
+    pub fn translate_module_to_llvm_ir(environment: beam.env, argc: c_int, args: [*c]const beam.term) !beam.term {
         const operation = try mlir_capi.Operation.resource.fetch(environment, args[0]);
         const context = c.mlirOperationGetContext(operation);
         return diagnostic.call_with_diagnostics(
@@ -42,33 +33,31 @@ const Translation = struct {
 };
 
 const PTXCompilation = struct {
-    const Buffer = std.array_list.Managed(u8);
-
     output: Buffer,
     error_message: Buffer,
 
     fn appendOutput(value: mlir_capi.StringRef.T, user_data: ?*anyopaque) callconv(.c) void {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
-        self.output.appendSlice(value.data[0..value.length]) catch @panic("failed to collect PTX");
+        string_ref.collectStringRef(value, &self.output);
     }
 
     fn appendError(value: mlir_capi.StringRef.T, user_data: ?*anyopaque) callconv(.c) void {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
-        self.error_message.appendSlice(value.data[0..value.length]) catch @panic("failed to collect LLVM target diagnostic");
+        string_ref.collectStringRef(value, &self.error_message);
     }
 
-    fn compile(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-        const llvm_ir = try beam.get_binary(environment, args[0]);
-        const cpu = try beam.get_binary(environment, args[1]);
-        const features = try beam.get_binary(environment, args[2]);
+    pub fn compile_llvm_ir_to_ptx(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+        const llvm_ir = try string_ref.get_binary_as_string_ref(environment, args[0]);
+        const cpu = try string_ref.get_binary_as_string_ref(environment, args[1]);
+        const features = try string_ref.get_binary_as_string_ref(environment, args[2]);
         var self = @This(){ .output = Buffer.init(beam.allocator), .error_message = Buffer.init(beam.allocator) };
         defer self.output.deinit();
         defer self.error_message.deinit();
 
         const status = c.beaverCompileLLVMIRToPTX(
-            c.mlirStringRefCreate(llvm_ir.data, llvm_ir.size),
-            c.mlirStringRefCreate(cpu.data, cpu.size),
-            c.mlirStringRefCreate(features.data, features.size),
+            llvm_ir,
+            cpu,
+            features,
             appendOutput,
             appendError,
             &self,
@@ -86,16 +75,6 @@ const PTXCompilation = struct {
 };
 
 pub const nifs = .{
-    result.nif_with_flags(
-        "beaver_raw_translate_module_to_llvm_ir",
-        1,
-        Translation.translate,
-        e.ERL_NIF_DIRTY_JOB_CPU_BOUND,
-    ).entry,
-    result.nif_with_flags(
-        "beaver_raw_compile_llvm_ir_to_ptx",
-        3,
-        PTXCompilation.compile,
-        e.ERL_NIF_DIRTY_JOB_CPU_BOUND,
-    ).entry,
+    prelude.beaverRawNIFDirtyCPU(Translation, "translate_module_to_llvm_ir", 1),
+    prelude.beaverRawNIFDirtyCPU(PTXCompilation, "compile_llvm_ir_to_ptx", 3),
 };

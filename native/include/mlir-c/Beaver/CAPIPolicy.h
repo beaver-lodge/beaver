@@ -5,6 +5,10 @@
 // to BEAM. Both Zig's translated-C namespace and the Elixir manifest extractor
 // consume these declarations.
 typedef enum {
+  // Tracing sessions have managed resources and a collecting drain adapter.
+  BeaverCapiPolicyExclude__mlirBeaverActionTracingAttach,
+  BeaverCapiPolicyExclude__mlirBeaverActionTracingDrain,
+  BeaverCapiPolicyExclude__mlirBeaverActionTracingDetach,
   // Internal execution state is thread-affine and only used by native adapters.
   BeaverCapiPolicyExclude__beaverExecutionMeasureBegin,
   BeaverCapiPolicyExclude__beaverExecutionMeasureEnd,

@@ -50,6 +50,14 @@ const Work = struct {
         if (op.ptr == null or !c.mlirContextEqual(self.context, c.mlirOperationGetContext(op))) return error.ContextMismatch;
         return op;
     }
+    fn invoke(self: Work, comptime name: []const u8, args: anytype) !beam.term {
+        const binding = inline for (args) |arg| {
+            if (@TypeOf(arg) == m.Operation.T) break c.beaverExecutionBindOperation(arg);
+        } else null;
+        defer c.beaverExecutionUnbindOperation(binding);
+        const f = kinda.BangFunc(prelude.allKinds, c, name).wrap_ret_call;
+        return diagnostic.call_with_diagnostics(self.env, self.context, f, .{ self.env, args });
+    }
     fn execute(self: Work) !beam.term {
         const env = self.env;
         switch (self.command) {
@@ -66,8 +74,7 @@ const Work = struct {
             .parse => {
                 const args = try tuple(env, self.arguments, 1);
                 const source = try m.StringRef.resource.fetch(env, args[0]);
-                const f = kinda.BangFunc(prelude.allKinds, c, "beaverModuleCreateParseTracked").wrap_ret_call;
-                return diagnostic.call_with_diagnostics(env, self.context, f, .{ env, .{ self.context, source } });
+                return self.invoke("beaverModuleCreateParseTracked", .{ self.context, source });
             },
             .create_pass => return @import("pass.zig").create(env, self.arguments),
             .create_pattern => return @import("rewrite_pattern.zig").create(env, self.context, self.arguments),
@@ -84,31 +91,22 @@ const Work = struct {
             .verify => {
                 const args = try tuple(env, self.arguments, 2);
                 const op = try self.operation(args[0]);
-                const binding = c.beaverExecutionBindOperation(op);
-                defer c.beaverExecutionUnbindOperation(binding);
-                const f = kinda.BangFunc(prelude.allKinds, c, "beaverOperationVerify").wrap_ret_call;
-                return diagnostic.call_with_diagnostics(env, self.context, f, .{ env, .{ op, try beam.get_bool(env, args[1]) } });
+                return self.invoke("beaverOperationVerify", .{ op, try beam.get_bool(env, args[1]) });
             },
             .pass => {
                 const args = try tuple(env, self.arguments, 2);
                 const pm = try m.PassManager.resource.fetch(env, args[0]);
                 const op = try self.operation(args[1]);
-                const binding = c.beaverExecutionBindOperation(op);
-                defer c.beaverExecutionUnbindOperation(binding);
                 if (!c.mlirContextEqual(self.context, c.beaverPassManagerGetContext(pm))) return error.ContextMismatch;
                 c.beaverPassManagerTrackExecution(pm);
-                const f = kinda.BangFunc(prelude.allKinds, c, "mlirPassManagerRunOnOp").wrap_ret_call;
-                return diagnostic.call_with_diagnostics(env, self.context, f, .{ env, .{ pm, op } });
+                return self.invoke("mlirPassManagerRunOnOp", .{ pm, op });
             },
             .rewrite => {
                 const args = try tuple(env, self.arguments, 3);
                 const op = try self.operation(args[0]);
-                const binding = c.beaverExecutionBindOperation(op);
-                defer c.beaverExecutionUnbindOperation(binding);
                 const patterns = try m.FrozenRewritePatternSet.resource.fetch(env, args[1]);
                 const config = try m.GreedyRewriteDriverConfig.resource.fetch(env, args[2]);
-                const f = kinda.BangFunc(prelude.allKinds, c, "mlirApplyPatternsAndFoldGreedilyWithOp").wrap_ret_call;
-                return diagnostic.call_with_diagnostics(env, self.context, f, .{ env, .{ op, patterns, config } });
+                return self.invoke("mlirApplyPatternsAndFoldGreedilyWithOp", .{ op, patterns, config });
             },
             .snapshot => return batch.snapshot(env, self.context, self.arguments),
             .update => return diagnostic.call_with_diagnostics(env, self.context, batch.update, .{ env, self.context, self.arguments }),

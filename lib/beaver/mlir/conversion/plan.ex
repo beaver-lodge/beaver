@@ -81,10 +81,8 @@ defmodule Beaver.MLIR.Conversion.Plan do
           t()
   def mark_recursively_legal(plan, name, callback_or_opts \\ nil, opts \\ [])
 
-  def mark_recursively_legal(%__MODULE__{} = plan, name, opts, []) when is_list(opts) do
-    opts = validate_callback_opts!(opts, [:version], "mark_recursively_legal")
-    append_entry(plan, {:mark_recursively_legal, to_string(name), nil, opts})
-  end
+  def mark_recursively_legal(%__MODULE__{} = plan, name, opts, []) when is_list(opts),
+    do: mark_recursively_legal(plan, name, nil, opts)
 
   def mark_recursively_legal(%__MODULE__{} = plan, name, callback, opts)
       when is_nil(callback) or is_function(callback, 1) do
@@ -98,8 +96,16 @@ defmodule Beaver.MLIR.Conversion.Plan do
         {:add_1_to_n_conversion, 1, quote(do: (Type.t() -> TypeConverter.one_to_n_result()))},
         {:add_source_materialization, 4, quote(do: function())},
         {:add_target_materialization, 5, quote(do: function())},
-        {:add_1_to_n_target_materialization, 5, quote(do: function())}
+        {:add_1_to_n_target_materialization, 5, quote(do: function())},
+        {:add_pattern_population, 2, quote(do: (RewritePatternSet.t(), TypeConverter.t() -> :ok))}
       ] do
+    if name == :add_pattern_population do
+      @doc """
+      Runs once per materialization with the mutable pattern set and converter;
+      must return `:ok`. Installed native patterns avoid per-match BEAM callbacks.
+      """
+    end
+
     @spec unquote(name)(t(), unquote(callback_type), keyword()) :: t()
     def unquote(name)(%__MODULE__{} = plan, callback, opts \\ []) when is_function(callback, unquote(arity)) do
       opts = validate_callback_opts!(opts, [:version], unquote(Atom.to_string(name)))
@@ -147,18 +153,6 @@ defmodule Beaver.MLIR.Conversion.Plan do
   def add_pattern(%__MODULE__{} = plan, %Descriptor{} = descriptor, opts \\ []) do
     opts = validate_callback_opts!(opts, [:version], "add_pattern")
     append_entry(plan, {:add_pattern, descriptor, opts})
-  end
-
-  @doc """
-  Runs once per materialization with the mutable pattern set and converter;
-  must return `:ok`. Native patterns installed here avoid per-match BEAM callbacks.
-  """
-  @spec add_pattern_population(t(), (RewritePatternSet.t(), TypeConverter.t() -> :ok), keyword()) ::
-          t()
-  def add_pattern_population(%__MODULE__{} = plan, callback, opts \\ [])
-      when is_function(callback, 2) do
-    opts = validate_callback_opts!(opts, [:version], "add_pattern_population")
-    append_entry(plan, {:add_pattern_population, callback, opts})
   end
 
   @doc """

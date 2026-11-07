@@ -2,17 +2,11 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   @moduledoc """
   Versioned, provider-neutral contract for an external conversion kernel.
 
-  Manifests bind a native artifact to the exact Beaver/LLVM, dialect schema,
-  runtime ABI, target, pattern roots, and compiler-ABI capabilities it was
-  built against. Validation is intentionally strict: unknown fields,
-  duplicate declarations, non-canonical list order, and identity mismatches
-  are rejected before native code is loaded.
-
-  The canonical representation is JSON with lexicographically sorted object
-  keys and no insignificant whitespace. `digest/1` therefore produces a
-  stable sidecar receipt across Elixir processes and JSON implementations.
-  `identity_digest/1` excludes the artifact hash so that the same identity can
-  be embedded in the artifact without creating a self-referential digest.
+  Binds an artifact to Beaver/LLVM revisions, dialect schema, runtime ABI,
+  target, pattern roots and capabilities. Rejects unknown fields, duplicates,
+  unsorted lists and identity mismatches before loading native code.
+  Digests use JSON with sorted object keys and no insignificant whitespace;
+  `identity_digest/1` excludes the artifact hash to avoid self-reference.
   """
 
   alias Beaver.MLIR.Conversion.Kernel.Error
@@ -31,10 +25,7 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   @bootstrap_keys ~w(stage seed provenance)
   @pattern_keys ~w(name root version)
 
-  @enforce_keys ~w(
-    schema_version compiler_kernel_abi_version provider compiler_revision beaver_revision llvm_revision
-    dialect_schema_digest runtime_abi_digest patterns capabilities target artifact_sha256 entrypoints bootstrap
-  )a
+  @enforce_keys Enum.map(@top_level_keys, &String.to_atom/1)
   defstruct @enforce_keys
 
   @type pattern() :: %{required(String.t()) => String.t()}
@@ -79,24 +70,8 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   def new!(map) when is_map(map) do
     require_exact_keys!(map, @top_level_keys, "manifest")
 
-    manifest = %__MODULE__{
-      schema_version: fetch!(map, "schema_version"),
-      compiler_kernel_abi_version: fetch!(map, "compiler_kernel_abi_version"),
-      provider: fetch!(map, "provider"),
-      compiler_revision: fetch!(map, "compiler_revision"),
-      beaver_revision: fetch!(map, "beaver_revision"),
-      llvm_revision: fetch!(map, "llvm_revision"),
-      dialect_schema_digest: fetch!(map, "dialect_schema_digest"),
-      runtime_abi_digest: fetch!(map, "runtime_abi_digest"),
-      patterns: fetch!(map, "patterns"),
-      capabilities: fetch!(map, "capabilities"),
-      target: fetch!(map, "target"),
-      artifact_sha256: fetch!(map, "artifact_sha256"),
-      entrypoints: fetch!(map, "entrypoints"),
-      bootstrap: fetch!(map, "bootstrap")
-    }
-
-    validate!(manifest)
+    fields = Enum.map(@enforce_keys, &{&1, Map.fetch!(map, Atom.to_string(&1))})
+    validate!(struct!(__MODULE__, fields))
   end
 
   def new!(other), do: reject!(:invalid_manifest, %{expected: "map", got: inspect(other)})
@@ -107,15 +82,8 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
     require_version!(manifest.schema_version, @schema_version, :unsupported_schema)
     require_version!(manifest.compiler_kernel_abi_version, @abi_version, :abi_mismatch)
 
-    Enum.each(
-      [
-        provider: manifest.provider,
-        compiler_revision: manifest.compiler_revision,
-        beaver_revision: manifest.beaver_revision,
-        llvm_revision: manifest.llvm_revision
-      ],
-      fn {name, value} -> require_non_empty_string!(value, name) end
-    )
+    for name <- ~w(provider compiler_revision beaver_revision llvm_revision)a,
+        do: require_non_empty_string!(Map.fetch!(manifest, name), name)
 
     require_digest!(manifest.dialect_schema_digest, :dialect_schema_digest)
     require_digest_or_none!(manifest.runtime_abi_digest, :runtime_abi_digest)
@@ -131,22 +99,7 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   @doc "Returns the normalized string-keyed map used for transport and receipts."
   @spec to_map(t()) :: map()
   def to_map(%__MODULE__{} = manifest),
-    do: %{
-      "schema_version" => manifest.schema_version,
-      "compiler_kernel_abi_version" => manifest.compiler_kernel_abi_version,
-      "provider" => manifest.provider,
-      "compiler_revision" => manifest.compiler_revision,
-      "beaver_revision" => manifest.beaver_revision,
-      "llvm_revision" => manifest.llvm_revision,
-      "dialect_schema_digest" => manifest.dialect_schema_digest,
-      "runtime_abi_digest" => manifest.runtime_abi_digest,
-      "patterns" => manifest.patterns,
-      "capabilities" => manifest.capabilities,
-      "target" => manifest.target,
-      "artifact_sha256" => manifest.artifact_sha256,
-      "entrypoints" => manifest.entrypoints,
-      "bootstrap" => manifest.bootstrap
-    }
+    do: Map.new(@enforce_keys, &{Atom.to_string(&1), Map.fetch!(manifest, &1)})
 
   @doc "Encodes the canonical JSON representation used by `digest/1`."
   @spec encode!(t()) :: binary()
@@ -156,22 +109,18 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   @doc "Returns the canonical manifest digest as a `sha256:` identity."
   @spec digest(t()) :: String.t()
   def digest(%__MODULE__{} = manifest),
-    do: "sha256:" <> Base.encode16(:crypto.hash(:sha256, encode!(manifest)), case: :lower)
+    do: sha256(encode!(manifest))
 
   @doc """
-  Returns the semantic identity embedded by a compiler-kernel artifact.
-
-  This digest covers the complete validated manifest except
-  `artifact_sha256`. A sidecar can therefore bind the finished artifact bytes
-  while the artifact exports this non-self-referential identity for the loader
-  to compare.
+  Returns the validated manifest digest excluding `artifact_sha256`.
+  Embed this identity in the artifact for comparison by the loader.
   """
   @spec identity_digest(t()) :: String.t()
   def identity_digest(%__MODULE__{} = manifest) do
     canonical =
       manifest |> validate!() |> to_map() |> Map.delete("artifact_sha256") |> canonical_json()
 
-    "sha256:" <> Base.encode16(:crypto.hash(:sha256, canonical), case: :lower)
+    sha256(canonical)
   end
 
   @doc "Verifies the artifact bytes named by this manifest before loading them."
@@ -179,7 +128,7 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   def verify_artifact!(%__MODULE__{} = manifest, path) when is_binary(path) do
     actual =
       case File.read(path) do
-        {:ok, bytes} -> "sha256:" <> Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
+        {:ok, bytes} -> sha256(bytes)
         {:error, reason} -> reject!(:artifact_unreadable, %{path: path, reason: reason})
       end
 
@@ -199,28 +148,23 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   def verify_compatible!(%__MODULE__{} = manifest, expected) do
     expected = expected_map!(expected)
 
-    allowed = ~w(
-      compiler_kernel_abi_version beaver_revision llvm_revision dialect_schema_digest runtime_abi_digest target
-      capabilities
-    )a
+    checks = [
+      compiler_kernel_abi_version: :abi_mismatch,
+      beaver_revision: :beaver_revision_mismatch,
+      llvm_revision: :llvm_revision_mismatch,
+      dialect_schema_digest: :dialect_schema_mismatch,
+      runtime_abi_digest: :runtime_abi_mismatch,
+      target: :target_mismatch
+    ]
 
-    case Map.keys(expected) -- allowed do
+    case Map.keys(expected) -- [:capabilities | Keyword.keys(checks)] do
       [] -> :ok
       unknown -> reject!(:invalid_manifest, %{unknown_expectations: Enum.sort(unknown)})
     end
 
-    checks = [
-      {:compiler_kernel_abi_version, manifest.compiler_kernel_abi_version, :abi_mismatch},
-      {:beaver_revision, manifest.beaver_revision, :beaver_revision_mismatch},
-      {:llvm_revision, manifest.llvm_revision, :llvm_revision_mismatch},
-      {:dialect_schema_digest, manifest.dialect_schema_digest, :dialect_schema_mismatch},
-      {:runtime_abi_digest, manifest.runtime_abi_digest, :runtime_abi_mismatch},
-      {:target, manifest.target, :target_mismatch}
-    ]
-
-    Enum.each(checks, fn {key, actual, code} ->
-      if Map.has_key?(expected, key), do: require_identity!(actual, expected[key], code)
-    end)
+    for {key, code} <- checks,
+        Map.has_key?(expected, key),
+        do: require_identity!(Map.fetch!(manifest, key), expected[key], code)
 
     if required = expected[:capabilities] do
       require_sorted_unique_strings!(required, :capabilities, non_empty: false)
@@ -234,11 +178,11 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   defp validate_patterns!(patterns) when is_list(patterns) and patterns != [] do
     Enum.each(patterns, fn pattern ->
       require_exact_keys!(pattern, @pattern_keys, "pattern")
-      Enum.each(@pattern_keys, &require_non_empty_string!(fetch!(pattern, &1), &1))
+      Enum.each(@pattern_keys, &require_non_empty_string!(Map.fetch!(pattern, &1), &1))
     end)
 
-    names = Enum.map(patterns, &fetch!(&1, "name"))
-    roots = Enum.map(patterns, &fetch!(&1, "root"))
+    names = Enum.map(patterns, &Map.fetch!(&1, "name"))
+    roots = Enum.map(patterns, &Map.fetch!(&1, "root"))
     require_sorted_unique_strings!(names, :pattern_names, non_empty: true)
     require_unique!(roots, :pattern_roots)
   end
@@ -248,14 +192,14 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
 
   defp validate_target!(target) do
     require_exact_keys!(target, @target_keys, "target")
-    require_non_empty_string!(fetch!(target, "triple"), :target_triple)
-    require_non_empty_string!(fetch!(target, "cpu"), :target_cpu)
-    require_sorted_unique_strings!(fetch!(target, "features"), :target_features, non_empty: false)
+    require_non_empty_string!(Map.fetch!(target, "triple"), :target_triple)
+    require_non_empty_string!(Map.fetch!(target, "cpu"), :target_cpu)
+    require_sorted_unique_strings!(Map.fetch!(target, "features"), :target_features, non_empty: false)
   end
 
   defp validate_entrypoints!(entrypoints) do
     require_exact_keys!(entrypoints, @entrypoint_keys, "entrypoints")
-    values = Enum.map(@entrypoint_keys, &fetch!(entrypoints, &1))
+    values = Enum.map(@entrypoint_keys, &Map.fetch!(entrypoints, &1))
 
     Enum.zip(@entrypoint_keys, values) |> Enum.each(fn {key, value} -> require_symbol!(value, key) end)
 
@@ -264,11 +208,11 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
 
   defp validate_bootstrap!(bootstrap) do
     require_exact_keys!(bootstrap, @bootstrap_keys, "bootstrap")
-    stage = fetch!(bootstrap, "stage")
-    seed = fetch!(bootstrap, "seed")
+    stage = Map.fetch!(bootstrap, "stage")
+    seed = Map.fetch!(bootstrap, "seed")
     require_member!(stage, @stages, :bootstrap_stage)
     require_member!(seed, @seed_kinds, :bootstrap_seed)
-    require_non_empty_string!(fetch!(bootstrap, "provenance"), :bootstrap_provenance)
+    require_non_empty_string!(Map.fetch!(bootstrap, "provenance"), :bootstrap_provenance)
   end
 
   defp require_exact_keys!(map, expected, label) when is_map(map) do
@@ -349,13 +293,6 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
   defp expected_map!(expected) when is_map(expected), do: expected
   defp expected_map!(_), do: reject!(:invalid_manifest, %{expected: "keyword or map"})
 
-  defp fetch!(map, key) do
-    case Map.fetch(map, key) do
-      {:ok, value} -> value
-      :error -> reject!(:invalid_manifest, %{missing: key})
-    end
-  end
-
   defp canonical_json(value) when is_map(value) do
     value
     |> Map.to_list()
@@ -372,6 +309,8 @@ defmodule Beaver.MLIR.Conversion.Kernel.Manifest do
 
   defp canonical_json(value),
     do: reject!(:invalid_manifest, %{reason: "value is not JSON-compatible", got: inspect(value)})
+
+  defp sha256(bytes), do: "sha256:" <> Base.encode16(:crypto.hash(:sha256, bytes), case: :lower)
 
   defp reject!(code, details), do: raise(Error, code: code, details: details)
 end

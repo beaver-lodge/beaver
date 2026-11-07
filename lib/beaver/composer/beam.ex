@@ -79,21 +79,14 @@ defmodule Beaver.Composer.Beam do
   defp initialize_stage({:native, passes, anchor}, ctx, opts) do
     opts = Keyword.put(opts, :verifier, Keyword.get(opts, :verifier, true) == true)
 
-    case capture(fn -> Composer.init(%Composer{ctx: ctx, passes: passes}, opts, anchor) end) do
-      {:ok, pm} ->
-        if opts[:print], do: MLIR.PassManager.enable_ir_printing(pm)
-        {:ok, {:native, pm}}
-
-      error ->
-        error
+    with {:ok, pm} <- capture(fn -> Composer.init(%Composer{ctx: ctx, passes: passes}, opts, anchor) end) do
+      if opts[:print], do: MLIR.PassManager.enable_ir_printing(pm)
+      {:ok, {:native, pm}}
     end
   end
 
   defp initialize_stage({:nested, root, templates}, ctx, opts) do
-    case initialize(templates, ctx, opts) do
-      {:ok, stages} -> {:ok, {:nested, root, stages}}
-      error -> error
-    end
+    with {:ok, stages} <- initialize(templates, ctx, opts), do: {:ok, {:nested, root, stages}}
   end
 
   defp initialize_stage({:beam, callbacks, nested?}, ctx, _opts) do
@@ -213,30 +206,22 @@ defmodule Beaver.Composer.Beam do
   defp verified({:error, _} = result, _op, _opts), do: result
 
   defp verified({:ok, diagnostics}, op, opts) do
-    case verify(op, opts) do
-      :ok -> {:ok, diagnostics}
-      {:error, errors} -> {:error, diagnostics ++ errors}
-    end
-  end
-
-  defp verify(op, opts) do
     if Keyword.get(opts, :verifier, true) == true do
-      result =
-        capture(fn ->
-          MLIR.verify(op,
-            strategy: Keyword.get(opts, :verify_execution, :auto),
-            recursive: Keyword.get(opts, :recursive, true),
-            profile: opts[:profile]
-          )
-        end)
+      verify = fn ->
+        MLIR.verify(op,
+          strategy: Keyword.get(opts, :verify_execution, :auto),
+          recursive: Keyword.get(opts, :recursive, true),
+          profile: opts[:profile]
+        )
+      end
 
-      case result do
-        {:ok, {:ok, _}} -> :ok
-        {:ok, {:error, diagnostics}} -> {:error, diagnostics}
-        {:error, diagnostics} -> {:error, diagnostics}
+      case capture(verify) do
+        {:ok, {:ok, _}} -> {:ok, diagnostics}
+        {:ok, {:error, errors}} -> {:error, diagnostics ++ errors}
+        {:error, errors} -> {:error, diagnostics ++ errors}
       end
     else
-      :ok
+      {:ok, diagnostics}
     end
   end
 

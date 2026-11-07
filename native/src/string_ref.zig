@@ -13,21 +13,20 @@ pub fn get_binary_as_string_ref(env: beam.env, term: beam.term) !mlir_capi.Strin
 }
 
 const print_nif_prefix = "beaver_raw_to_string_";
+pub const TextBuffer = std.array_list.Managed(u8);
+pub fn collectStringRef(s: mlir_capi.StringRef.T, user_data: ?*anyopaque) callconv(.c) void {
+    const buffer: *TextBuffer = @ptrCast(@alignCast(user_data orelse return));
+    buffer.appendSlice(s.data[0..s.length]) catch @panic("failed to collect MLIR text");
+}
+
 pub fn PrinterNIF(comptime ResourceKind: type, comptime print_fn: anytype) type {
     return struct {
-        const Error = error{NullPointerFound};
-        const Buffer = std.array_list.Managed(u8);
-        buffer: Buffer,
-        fn collect_string_ref(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.c) void {
-            const printer: *@This() = @ptrCast(@alignCast(userData));
-            printer.*.buffer.appendSlice(s.data[0..s.length]) catch unreachable;
-        }
         pub fn print_make(env: beam.env, entity: ResourceKind.T) !beam.term {
-            if (entity.ptr == null) return Error.NullPointerFound;
-            var printer = @This(){ .buffer = Buffer.init(beam.allocator) };
-            defer printer.buffer.deinit();
-            print_fn(entity, collect_string_ref, &printer);
-            return beam.make_slice(env, printer.buffer.items);
+            if (entity.ptr == null) return error.NullPointerFound;
+            var buffer = TextBuffer.init(beam.allocator);
+            defer buffer.deinit();
+            print_fn(entity, collectStringRef, &buffer);
+            return beam.make_slice(env, buffer.items);
         }
         fn to_string(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
             const entity: ResourceKind.T = try ResourceKind.resource.fetch(env, args[0]);
@@ -45,18 +44,17 @@ pub const Printer = struct {
     pub const PtrType = *@This();
     pub const ArrayType = [*]@This();
     const Error = error{ NullPointerFound, InvalidPrinter, @"Already flushed" };
-    const Buffer = std.array_list.Managed(u8);
     const Flushed = std.atomic.Value(bool);
-    buffer: Buffer,
+    buffer: TextBuffer,
     flushed: Flushed = Flushed.init(false),
     pub fn make(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
-        const v = @This(){ .buffer = Buffer.init(beam.allocator) };
+        const v = @This(){ .buffer = TextBuffer.init(beam.allocator) };
         return ResourceKind.resource.make(env, v) catch return beam.Error.@"Fail to create primitive";
     }
     pub const maker = .{ make, 0 };
     fn collect_string_ref(s: mlir_capi.StringRef.T, userData: ?*anyopaque) callconv(.c) void {
         const printer: *@This() = @ptrCast(@alignCast(userData));
-        printer.*.buffer.appendSlice(s.data[0..s.length]) catch unreachable;
+        collectStringRef(s, &printer.buffer);
     }
     pub fn destroy(_: beam.env, userData: ?*anyopaque) callconv(.c) void {
         const printer: *@This() = @ptrCast(@alignCast(userData));

@@ -2,42 +2,19 @@ alias Beaver.MLIR.{CAPI, Context}
 
 defmodule Beaver.MLIR.ActionTracing do
   @moduledoc """
-  Exposes MLIR Action Tracing through Elixir telemetry.
+  Context-scoped MLIR action tracing. Native observers queue events without
+  calling BEAM; `drain/1` (or a timer) emits paired telemetry events under
+  `[:beaver, :mlir, :compilation, :action, :start | :stop]`. Metadata contains
+  action tags, descriptions, depth and IR units; stop measurements include duration.
 
-  MLIR dispatches actions — pass execution, rewrite-pattern application,
-  tiling, and other compiler steps — through an action handler registered on
-  an `MLIR.Context`. This module attaches a context-scoped observer that
-  records `before`/`after` action events, hands them to the BEAM as structured
-  telemetry, and can skip or limit actions by tag.
+  Options:
+  - `:tags`, `:locations`: optional lists of tags or source-location substrings.
+  - `:skip`, `:limit`: maps from tag to non-negative skipped/executed action counts.
+  - `:drain_interval_ms`: a positive timer interval, or nil for manual draining.
+  - `:telemetry`: optional `(event, measurements, metadata) -> term` callback.
+  - `:metadata`: extra event metadata; event-owned fields take precedence.
 
-  Events are drained explicitly (or on a timer) and emitted as telemetry:
-
-  - `[:beaver, :mlir, :compilation, :action, :start]` — before an action runs
-  - `[:beaver, :mlir, :compilation, :action, :stop]` — after an action runs
-
-  Each event carries `tag`, `description`, `depth`, and `ir_units` metadata.
-  The `stop` event carries a `duration` measurement computed from the paired
-  `start` event.
-
-  Native observers run on MLIR worker threads and never invoke BEAM APIs
-  directly; events are queued on the native side and drained by the BEAM.
-
-  ## Options
-
-  - `:tags` — only observe actions whose tag is in this list. Defaults to all.
-  - `:locations` — only observe actions whose context IR units carry a
-    matching source location substring. Defaults to all.
-  - `:skip` — map of tag to a non-negative skip count; the first N occurrences
-    of that tag are skipped (not executed).
-  - `:limit` — map of tag to a non-negative execution limit; further
-    occurrences are skipped once the limit is reached.
-  - `:drain_interval_ms` — when set, a periodic drainer emits telemetry
-    automatically. Defaults to `nil` (manual draining).
-  - `:telemetry` — optional `(event, measurements, metadata) -> term` callback
-    used instead of `:telemetry` events (see `Beaver.MLIR.Telemetry`).
-  - `:metadata` — metadata merged into every emitted action event. Event-owned
-    fields take precedence. This can correlate actions with a higher-level
-    operation such as one Transform autotuning candidate.
+  Sessions detach automatically when their context is destroyed.
   """
 
   use GenServer
@@ -67,20 +44,18 @@ defmodule Beaver.MLIR.ActionTracing do
   def global_registrar_child_specs, do: [{Registry, keys: :duplicate, name: @registry}]
 
   @doc """
-  Attaches an action tracing session to `context`.
-
-  Returns a `Session` holding the native session resource. Call `drain/1`
-  periodically (or pass `drain_interval_ms`) to receive events, and
-  `detach/1` when done. The session is detached automatically when the context
-  is destroyed.
+  Attaches a session to `context`. Call `drain/1` periodically (or supply
+  `:drain_interval_ms`) to receive events, and `detach/1` when done.
   """
   @spec attach(Context.t(), keyword()) :: Session.t()
   def attach(%Context{} = ctx, opts \\ []) do
-    tags = normalize_tags!(Keyword.get(opts, :tags))
-    locations = normalize_locations!(Keyword.get(opts, :locations))
-    skip = normalize_count_map!(Keyword.get(opts, :skip, %{}), :skip)
-    limit = normalize_count_map!(Keyword.get(opts, :limit, %{}), :limit)
-    metadata = normalize_metadata!(Keyword.get(opts, :metadata, %{}))
+    filters = %{
+      tags: normalize_strings!(opts[:tags], :tags),
+      locations: normalize_strings!(opts[:locations], :locations),
+      skip: normalize_count_map!(Keyword.get(opts, :skip, %{}), :skip),
+      limit: normalize_count_map!(Keyword.get(opts, :limit, %{}), :limit),
+      metadata: normalize_metadata!(Keyword.get(opts, :metadata, %{}))
+    }
 
     drain_interval_ms =
       case Keyword.get(opts, :drain_interval_ms) do
@@ -89,32 +64,12 @@ defmodule Beaver.MLIR.ActionTracing do
         other -> raise ArgumentError, "invalid :drain_interval_ms: #{inspect(other)}"
       end
 
-    filter_json = JSON.encode!(tags || [])
-    location_json = JSON.encode!(locations || [])
-    skip_json = JSON.encode!(skip)
-    limit_json = JSON.encode!(limit)
-
-    session = CAPI.beaver_raw_action_tracing_attach(ctx.ref, filter_json, location_json, skip_json, limit_json)
-
-    {:ok, pid} =
-      GenServer.start(__MODULE__, %{
-        context: ctx,
-        session: session,
-        telemetry: Keyword.get(opts, :telemetry),
-        metadata: metadata,
-        drain_interval_ms: drain_interval_ms
-      })
-
-    %Session{
-      pid: pid,
-      context: ctx,
-      tags: tags,
-      locations: locations,
-      skip: skip,
-      limit: limit,
-      drain_interval_ms: drain_interval_ms,
-      metadata: metadata
-    }
+    json = Enum.map([:tags, :locations, :skip, :limit], &JSON.encode!(filters[&1] || []))
+    session = apply(CAPI, :beaver_raw_action_tracing_attach, [ctx.ref | json])
+    fields = Map.merge(filters, %{context: ctx, drain_interval_ms: drain_interval_ms})
+    state = Map.merge(fields, %{session: session, telemetry: opts[:telemetry]})
+    {:ok, pid} = GenServer.start(__MODULE__, state)
+    struct!(Session, Map.put(fields, :pid, pid))
   end
 
   @doc """
@@ -131,26 +86,11 @@ defmodule Beaver.MLIR.ActionTracing do
   def detach(pid) when is_pid(pid), do: GenServer.call(pid, :detach, 5_000)
 
   @doc false
-  def release_context(%Context{ref: context_ref}) do
-    if Process.whereis(@registry) do
-      Registry.dispatch(@registry, context_ref, fn entries ->
-        Enum.each(entries, fn {pid, nil} ->
-          try do
-            GenServer.call(pid, :context_destroyed, 5_000)
-          catch
-            :exit, {:noproc, _} -> :ok
-            :exit, {:normal, _} -> :ok
-          end
-        end)
-      end)
-    end
-
-    :ok
-  end
+  def release_context(ctx), do: MLIR.ExternalInterface.release_context(ctx, @registry)
 
   @impl true
   def init(state) do
-    {:ok, _} = Registry.register(@registry, state.context.ref, nil)
+    {:ok, _} = Registry.register(@registry, state.context.ref, :attachment)
 
     if state.drain_interval_ms, do: Process.send_after(self(), :drain_timer, state.drain_interval_ms)
 
@@ -164,12 +104,7 @@ defmodule Beaver.MLIR.ActionTracing do
     {:reply, events, state}
   end
 
-  def handle_call(:detach, _from, state) do
-    detach_session(state)
-    {:stop, :normal, :ok, state}
-  end
-
-  def handle_call(:context_destroyed, _from, state) do
+  def handle_call(command, _from, state) when command in [:detach, :context_destroyed] do
     detach_session(state)
     {:stop, :normal, :ok, state}
   end
@@ -189,92 +124,50 @@ defmodule Beaver.MLIR.ActionTracing do
   defp drain_raw_events(state), do: state.session |> CAPI.beaver_raw_action_tracing_drain() |> JSON.decode!()
 
   defp detach_session(state) do
-    try do
-      CAPI.beaver_raw_action_tracing_detach(state.session)
-    catch
-      :exit, _ -> :ok
-    end
-
+    CAPI.beaver_raw_action_tracing_detach(state.session)
     :ok
+  catch
+    :exit, _ -> :ok
   end
 
-  # Pair before/after events in order; compute the after event's duration.
-  defp pair_events(events) when is_list(events) do
-    {paired, _open} =
-      Enum.reduce(events, {[], %{}}, fn
-        %{"phase" => "before"} = event, {acc, open} ->
-          key = event_key(event)
-          {acc, Map.put(open, key, event)}
+  # Retain only unmatched starts while emitting completed pairs in event order.
+  defp emit_events(events, telemetry, extra_metadata) when is_list(events) do
+    Enum.reduce(events, %{}, fn
+      %{"phase" => "before"} = event, open ->
+        Map.put(open, event_key(event), event)
 
-        %{"phase" => "after"} = event, {acc, open} ->
-          key = event_key(event)
-          start = Map.get(open, key)
-          {[{:stop, start, event, duration(event, start)} | acc], Map.delete(open, key)}
+      %{"phase" => "after"} = event, open ->
+        {start, open} = Map.pop(open, event_key(event))
+        identity = %{"tag" => event["tag"], "depth" => event["depth"]}
+        MLIR.Telemetry.emit([:action, :start], %{}, Map.merge(extra_metadata, start || identity), telemetry: telemetry)
 
-        other, {acc, open} ->
-          {[{:bare, other} | acc], open}
-      end)
-
-    Enum.reverse(paired)
-  end
-
-  defp pair_events(other), do: raise("invalid action tracing event payload: #{inspect(other)}")
-
-  defp duration(event, %{"t_ns" => before_ns}) do
-    case event do
-      %{"t_ns" => after_ns} when is_integer(after_ns) and is_integer(before_ns) -> max(after_ns - before_ns, 0)
-      _ -> nil
-    end
-  end
-
-  defp duration(_event, _start), do: nil
-
-  defp event_key(event), do: {event["tag"], event["depth"]}
-
-  defp emit_events(events, telemetry, extra_metadata) do
-    events
-    |> pair_events()
-    |> Enum.each(fn
-      {:stop, start, event, duration} ->
-        start_event = start || %{"tag" => event["tag"], "depth" => event["depth"]}
-
-        MLIR.Telemetry.emit([:action, :start], %{}, Map.merge(extra_metadata, start_event), telemetry: telemetry)
-
-        MLIR.Telemetry.emit(
-          [:action, :stop],
-          %{duration: duration},
-          Map.merge(extra_metadata, %{"tag" => event["tag"], "depth" => event["depth"]}),
+        MLIR.Telemetry.emit([:action, :stop], %{duration: duration(event, start)}, Map.merge(extra_metadata, identity),
           telemetry: telemetry
         )
 
-      {:bare, _event} ->
-        :ok
+        open
+
+      _other, open ->
+        open
     end)
-
-    :ok
   end
 
-  defp normalize_tags!(nil), do: nil
+  defp emit_events(other, _, _), do: raise("invalid action tracing event payload: #{inspect(other)}")
+  defp event_key(event), do: {event["tag"], event["depth"]}
 
-  defp normalize_tags!(tags) when is_list(tags) do
-    unless Enum.all?(tags, &is_binary/1),
-      do: raise(ArgumentError, ":tags must be a list of strings")
+  defp duration(%{"t_ns" => after_ns}, %{"t_ns" => before_ns})
+       when is_integer(after_ns) and is_integer(before_ns), do: max(after_ns - before_ns, 0)
 
-    tags
+  defp duration(_event, _start), do: nil
+
+  defp normalize_strings!(nil, _name), do: nil
+
+  defp normalize_strings!(strings, name) when is_list(strings) do
+    unless Enum.all?(strings, &is_binary/1), do: raise(ArgumentError, "#{inspect(name)} must be a list of strings")
+    strings
   end
 
-  defp normalize_tags!(other), do: raise(ArgumentError, "invalid :tags: #{inspect(other)}")
-
-  defp normalize_locations!(nil), do: nil
-
-  defp normalize_locations!(locations) when is_list(locations) do
-    unless Enum.all?(locations, &is_binary/1),
-      do: raise(ArgumentError, ":locations must be a list of strings")
-
-    locations
-  end
-
-  defp normalize_locations!(other), do: raise(ArgumentError, "invalid :locations: #{inspect(other)}")
+  defp normalize_strings!(other, name), do: raise(ArgumentError, "invalid #{inspect(name)}: #{inspect(other)}")
 
   defp normalize_count_map!(map, _name) when is_map(map) do
     unless Enum.all?(map, fn {k, v} -> is_binary(k) and is_integer(v) and v >= 0 end),
