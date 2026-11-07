@@ -141,6 +141,9 @@ fn createCMakeStep(b: *std.Build, llvm_cmake_dir: []const u8, mlir_cmake_dir: []
         b.fmt("-DMLIR_DIR={s}", .{mlir_cmake_dir}),
         b.fmt("-DCMAKE_INSTALL_PREFIX={s}", .{b.install_path}),
         b.fmt("-DCMAKE_INSTALL_MESSAGE={s}", .{"LAZY"}),
+        // Zig configures before every build. Disable Ninja's second configure
+        // driver to avoid recursive manifest regeneration on Windows.
+        "-DCMAKE_SUPPRESS_REGENERATION=ON",
         // The prebuilt LLVM/MLIR archives are Release builds; compiling our
         // C++ in Debug would mix MSVC runtimes and fail the link with an
         // _ITERATOR_DEBUG_LEVEL mismatch.
