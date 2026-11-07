@@ -2,6 +2,14 @@ const kinda = @import("kinda");
 const beam = kinda.beam;
 const e = kinda.erl_nif;
 
+pub fn fixedOptions(comptime Dispatcher: type, timeout_ms: ?u64) Dispatcher.Options {
+    var options: Dispatcher.Options = .{ .timeout_ms = timeout_ms };
+    // Older published Kinda versions retain the serialized bridge. The pinned
+    // runtime can release its dispatcher lock before waiting for a reply.
+    if (@hasField(Dispatcher.Options, "ownership")) options.ownership = .fixed;
+    return options;
+}
+
 /// Encodes context-owned handles in a fresh message environment, then transfers
 /// that environment to the dispatcher. Failed encodings release it here.
 pub fn invoke(dispatcher: anytype, comptime name: []const u8, comptime Kinds: anytype, values: anytype) !kinda.callback_runtime.Response {

@@ -635,12 +635,13 @@ MLIR_CAPI_EXPORTED MlirGreedyRewriteDriverConfig beaverGreedyRewriteDriverConfig
 }
 
 MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context, void (*task)(void *), void *arg) {
-  if (!unwrap(context)->isMultithreadingEnabled()) return false;
+  if (!beaverContextIsThreadSafeLockingEnabled(context)) return false;
 
-  // Callback bridges may recursively schedule more bridge work (for example,
-  // an Elixir pass applying an Elixir rewrite pattern). The application-owned
-  // elastic pool can grow when all current workers wait for nested callbacks.
-  unwrap(mlirContextGetThreadPool(context))->async([task, arg]() { task(arg); });
+  // This executor is independent of MLIR's internal parallel algorithms. A
+  // callback can submit nested work while its native caller is waiting, so
+  // retain elastic workers instead of blocking a bounded LLVM pool.
+  static BeaverElasticThreadPool executor(std::thread::hardware_concurrency());
+  executor.async([task, arg]() { task(arg); });
   return true;
 }
 

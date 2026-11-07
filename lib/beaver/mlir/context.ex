@@ -52,6 +52,8 @@ defmodule Beaver.MLIR.Context do
   `threading: false, thread_safe: true` keeps context uniquing safe for external
   workers without creating an MLIR thread pool. Load dialects before sharing the
   context; this does not make concurrent mutation of the same IR safe.
+  Beaver's callback executor also works in this mode. Use
+  `Beaver.Composer.run/2` with `execution: :beam` to run Elixir passes directly.
   """
   def create(opts \\ []) do
     allow_unregistered = Keyword.get(opts, :allow_unregistered, false)

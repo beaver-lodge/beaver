@@ -34,7 +34,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
         unranked_memref_descriptor_get_sizes unranked_memref_descriptor_get_strides
       )},
                    {5, ~w(
-        action_tracing_attach
+        action_tracing_attach create_mlir_rewrite_pattern
       )},
                    {0, ~w(
         cuda_available cuda_device_count cuda_synchronize triton_register_passes peak_rss process_cpu_time
@@ -50,7 +50,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
         compiler_kernel_load_and_populate apply_conversion_async
       )},
                    {6, ~w(
-        create_mlir_pass create_mlir_rewrite_pattern
+        create_mlir_pass
       )}
                  ],
                  name <- names,

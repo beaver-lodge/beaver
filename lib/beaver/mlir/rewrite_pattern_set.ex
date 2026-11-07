@@ -60,6 +60,7 @@ defmodule Beaver.MLIR.RewritePatternSet do
       init_state: descriptor.init_state,
       construct: descriptor.construct,
       destruct: descriptor.destruct,
+      prefilter: descriptor.prefilter,
       match_and_rewrite: descriptor.match_and_rewrite
     )
     |> then(&add(set, &1))

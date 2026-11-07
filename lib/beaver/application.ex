@@ -9,12 +9,9 @@ defmodule Beaver.Application do
       MLIR.RewritePattern.global_registrar_child_specs(),
       MLIR.Trait.global_registrar_child_specs(),
       MLIR.ExternalInterface.global_registrar_child_specs(),
-      MLIR.ActionTracing.global_registrar_child_specs(),
-      MLIR.Rewrite.thread_pool_child_spec()
+      MLIR.ActionTracing.global_registrar_child_specs()
     ]
     |> List.flatten()
     |> Supervisor.start_link(strategy: :one_for_one)
   end
-
-  def stop([]), do: MLIR.Rewrite.stop_thread_pool()
 end

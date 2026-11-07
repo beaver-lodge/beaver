@@ -9,6 +9,7 @@ const diagnostic = @import("diagnostic.zig");
 const callback_names = .{ "construct", "destruct", "initialize", "clone", "run" };
 const RuntimeDispatcher = kinda.callback_runtime.Dispatcher(callback_names);
 const string_ref = @import("string_ref.zig");
+const callback_args = @import("callback_args.zig");
 
 threadlocal var typeIDAllocator: ?mlir_capi.TypeIDAllocator.T = null;
 const CallbackDispatcher = struct {
@@ -38,7 +39,10 @@ const CallbackDispatcher = struct {
     }
     fn clone(userData: ?*anyopaque) callconv(.c) ?*anyopaque {
         const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
-        const new_dispatcher = this.clone() catch unreachable;
+        const new_dispatcher = (if (@hasDecl(RuntimeDispatcher, "cloneWithOwnership"))
+            this.cloneWithOwnership(.bind_once)
+        else
+            this.clone()) catch unreachable;
         const temp_env = e.enif_alloc_env() orelse unreachable;
         const response = new_dispatcher.invoke("clone", temp_env, .{this.copyId(temp_env)}) catch unreachable;
         if (!response.success) @panic("Fail to clone a pass implemented in Elixir");
@@ -128,6 +132,7 @@ const ManagerRunner = struct {
 
 const PassCreator = struct {
     pid: beam.pid,
+    owner: beam.pid,
     name: beam.term,
     argument: beam.term,
     description: beam.term,
@@ -141,6 +146,7 @@ const PassCreator = struct {
         this.* = .{
             .dispatcher_env = env,
             .pid = pid,
+            .owner = pid,
             .name = e.enif_make_copy(env, args[0]),
             .argument = e.enif_make_copy(env, args[1]),
             .description = e.enif_make_copy(env, args[2]),
@@ -171,7 +177,7 @@ const PassCreator = struct {
             e.enif_free_env(this.dispatcher_env);
         }
         // the env's ownership will be transferred to dispatcher to make sure string like op_name lives long enough
-        const dispatcher = RuntimeDispatcher.initWithEnv(this.dispatcher_env, this.pid) catch @panic("fail to init pass callback dispatcher");
+        const dispatcher = RuntimeDispatcher.initWithEnvAndOptions(this.dispatcher_env, this.owner, callback_args.fixedOptions(RuntimeDispatcher, 30_000)) catch @panic("fail to init pass callback dispatcher");
         inline for (callback_names) |f| {
             if (this.cb_map.get(f)) |cb| {
                 dispatcher.setCallback(f, cb);
@@ -200,6 +206,11 @@ const PassCreator = struct {
     pub fn create_mlir_pass(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
         const creator = try PassCreator.init(try beam.self(env), args[1..5]);
+        errdefer creator.deinit();
+        errdefer e.enif_free_env(creator.dispatcher_env);
+        var owner: beam.term = undefined;
+        if (e.enif_get_map_value(env, args[5], beam.make_atom(env, "owner"), &owner) <= 0 or
+            e.enif_get_local_pid(env, owner, &creator.owner) == 0) return error.InvalidCallbackOwner;
         inline for (callback_names) |f| {
             const key = beam.make_atom(env, f);
             var cb: beam.term = undefined;
@@ -213,7 +224,7 @@ const PassCreator = struct {
         if (c.beaverContextAddWork(ctx, create_and_send_pass, @ptrCast(creator))) {
             return beam.make_atom(env, "async");
         } else {
-            @panic("fail to add work to context to create pass");
+            return error.ContextThreadSafeLockingDisabled;
         }
     }
 };

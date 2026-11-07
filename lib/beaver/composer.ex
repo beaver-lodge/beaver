@@ -118,16 +118,19 @@ defmodule Beaver.Composer do
   defp encode_convergence_failure_action(:error), do: 1
   defp encode_convergence_failure_action(:silent), do: 2
 
-  defp to_pm(%__MODULE__{passes: passes, op: op, ctx: ctx}) do
+  defp to_pm(%__MODULE__{passes: passes, op: op, ctx: ctx}, anchor \\ "builtin.module") do
     ctx = ctx || MLIR.context(Operation.from_module(op))
 
-    pm = mlirPassManagerCreate(ctx)
+    pm = mlirPassManagerCreateOnOperation(ctx, StringRef.create(anchor))
 
-    for pass <- passes do
-      add_pass(pm, pass, ctx)
+    try do
+      for pass <- passes, do: add_pass(pm, pass, ctx)
+      pm
+    catch
+      kind, reason ->
+        MLIR.PassManager.destroy(pm)
+        :erlang.raise(kind, reason, __STACKTRACE__)
     end
-
-    pm
   end
 
   def to_pipeline(composer) do
@@ -143,7 +146,8 @@ defmodule Beaver.Composer do
           {:debug, boolean()}
           | {:print, boolean()}
           | {:timing, boolean()}
-          | {:verifier, boolean()}
+          | {:verifier, boolean() | :pipeline}
+          | {:execution, :native | :beam}
   @type run_result :: {:ok, any()} | {:error, String.t()}
   @type composer :: __MODULE__.t()
   @spec run!(composer) :: operation
@@ -173,25 +177,43 @@ defmodule Beaver.Composer do
 
   > #### Elixir callback safety {: .info}
   >
-  > Native pipelines and Elixir passes use the context's shared elastic LLVM
-  > thread pool outside BEAM scheduler threads. Nested callback work can expand
-  > the pool rather than starving it.
+  > Native pipelines use a separate callback executor outside BEAM schedulers.
+  > With `execution: :beam`, Elixir passes run directly in the calling process;
+  > native stages still use MLIR's pass manager. Nested pipelines run in IR order
+  > with private pass state. Analyses are not preserved across BEAM stages.
+  > BEAM mode also accepts `verifier: :pipeline` to verify the final IR once,
+  > avoiding a native verification round trip after every Elixir pass.
   """
-  def run(%__MODULE__{op: op} = composer, opts \\ @run_default_opts) do
+  def run(composer, opts \\ @run_default_opts) do
+    case Keyword.get(opts, :execution, :native) do
+      :native ->
+        if opts[:verifier] == :pipeline,
+          do: raise(ArgumentError, "verifier: :pipeline requires execution: :beam")
+
+        run_native(composer, opts)
+
+      :beam ->
+        __MODULE__.Beam.run(composer, opts)
+
+      other ->
+        raise ArgumentError, "unsupported pass execution mode: #{inspect(other)}"
+    end
+  end
+
+  defp run_native(%__MODULE__{op: op} = composer, opts) do
     print = Keyword.get(opts, :print)
-    ctx = MLIR.context(Operation.from_module(op))
     pm = init(composer, opts)
 
-    if print do
-      mlirContextEnableMultithreading(ctx, false)
-      MLIR.PassManager.enable_ir_printing(pm)
-    end
+    # Local-scope printing does not require changing the shared context's
+    # threading configuration (which also changes its locking mode).
+    if print, do: MLIR.PassManager.enable_ir_printing(pm)
 
-    res = MLIR.PassManager.run(pm, op)
-
-    if print, do: mlirContextEnableMultithreading(ctx, true)
-
-    MLIR.PassManager.destroy(pm)
+    res =
+      try do
+        MLIR.PassManager.run(pm, op)
+      after
+        MLIR.PassManager.destroy(pm)
+      end
 
     case res do
       {:ok, diagnostics} -> {:ok, op, diagnostics}
@@ -199,11 +221,14 @@ defmodule Beaver.Composer do
     end
   end
 
-  def init(%__MODULE__{} = composer, opts \\ @run_default_opts) do
+  def init(composer, opts \\ @run_default_opts), do: init(composer, opts, "builtin.module")
+
+  @doc false
+  def init(%__MODULE__{} = composer, opts, anchor) do
     timing = Keyword.get(opts, :timing)
     debug = Keyword.get(opts, :debug)
-    verifier = !!Keyword.get(opts, :verifier)
-    pm = to_pm(composer)
+    verifier = Keyword.get(opts, :verifier, true)
+    pm = to_pm(composer, anchor)
 
     if timing, do: pm |> beaverPassManagerEnableTiming()
 

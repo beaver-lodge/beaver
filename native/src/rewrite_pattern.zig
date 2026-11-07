@@ -5,36 +5,86 @@ const c = prelude.c;
 const kinda = @import("kinda");
 const e = kinda.erl_nif;
 const beam = kinda.beam;
-const debug_print = @import("std").debug.print;
-const result = @import("kinda").result;
 const diagnostic = @import("diagnostic.zig");
 const string_ref = @import("string_ref.zig");
 const callback_names = .{ "construct", "destruct", "matchAndRewrite" };
 const RuntimeDispatcher = kinda.callback_runtime.Dispatcher(callback_names);
+const callback_args = @import("callback_args.zig");
+
+const PatternState = struct {
+    dispatcher: *RuntimeDispatcher,
+    operands: isize,
+    results: isize,
+    attributes: []mlir_capi.StringRef.T,
+
+    fn init(env: beam.env, owner: beam.pid, filter: beam.term) !*@This() {
+        const dispatcher = try RuntimeDispatcher.initWithOptions(owner, callback_args.fixedOptions(RuntimeDispatcher, 30_000));
+        errdefer dispatcher.deinit();
+        inline for (callback_names) |name| dispatcher.setCallback(name, beam.make_atom(env, name));
+        var arity: c_int = 0;
+        var terms: [*c]const beam.term = undefined;
+        if (e.enif_get_tuple(env, filter, &arity, &terms) == 0 or arity != 3) return error.InvalidPatternFilter;
+        const operands = try beam.get(isize, env, terms[0]);
+        const results = try beam.get(isize, env, terms[1]);
+        if (operands < -1 or results < -1) return error.InvalidPatternFilter;
+        const list = e.enif_make_copy(dispatcher.env, terms[2]);
+        const attributes = try beam.allocator.alloc(mlir_capi.StringRef.T, try beam.get_list_length(dispatcher.env, list));
+        errdefer beam.allocator.free(attributes);
+        var rest = list;
+        for (attributes) |*attribute| {
+            const term = try beam.get_head_and_iter(dispatcher.env, &rest);
+            attribute.* = try string_ref.get_binary_as_string_ref(dispatcher.env, term);
+        }
+        const this = try beam.allocator.create(@This());
+        this.* = .{
+            .dispatcher = dispatcher,
+            .operands = operands,
+            .results = results,
+            .attributes = attributes,
+        };
+        return this;
+    }
+
+    fn deinit(this: *@This()) void {
+        beam.allocator.free(this.attributes);
+        this.dispatcher.deinit();
+        beam.allocator.destroy(this);
+    }
+
+    fn matches(this: *@This(), operation: mlir_capi.Operation.T) bool {
+        if (this.operands >= 0 and c.mlirOperationGetNumOperands(operation) != this.operands) return false;
+        if (this.results >= 0 and c.mlirOperationGetNumResults(operation) != this.results) return false;
+        for (this.attributes) |name| {
+            if (c.mlirOperationGetAttributeByName(operation, name).ptr == null) return false;
+        }
+        return true;
+    }
+};
 
 const CallbackDispatcher = struct {
     fn construct(userData: ?*anyopaque) callconv(.c) void {
-        const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
+        const this: *PatternState = @ptrCast(@alignCast(userData));
         const temp_env = e.enif_alloc_env() orelse unreachable;
-        const response = this.invoke("construct", temp_env, .{}) catch unreachable;
+        const response = this.dispatcher.invoke("construct", temp_env, .{}) catch unreachable;
         if (!response.success) @panic("Fail to construct a rewrite pattern implemented in Elixir");
     }
 
     fn destruct(userData: ?*anyopaque) callconv(.c) void {
-        const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
+        const this: *PatternState = @ptrCast(@alignCast(userData));
         const temp_env = e.enif_alloc_env() orelse unreachable;
-        const response = this.invoke("destruct", temp_env, .{}) catch unreachable;
+        const response = this.dispatcher.invoke("destruct", temp_env, .{}) catch unreachable;
         if (!response.success) @panic("Fail to destruct a rewrite pattern implemented in Elixir");
         this.deinit();
     }
 
     fn matchAndRewrite(pattern: mlir_capi.RewritePattern.T, op: mlir_capi.Operation.T, rewriter: mlir_capi.PatternRewriter.T, userData: ?*anyopaque) callconv(.c) mlir_capi.LogicalResult.T {
-        const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
+        const this: *PatternState = @ptrCast(@alignCast(userData));
+        if (!this.matches(op)) return c.beaverLogicalResultFailure();
         const temp_env = e.enif_alloc_env() orelse unreachable;
         const pattern_ = mlir_capi.RewritePattern.resource.make_kind(temp_env, pattern) catch @panic("failed to make resource for RewritePattern");
         const op_ = mlir_capi.Operation.resource.make_kind(temp_env, op) catch @panic("failed to make resource for Operation");
         const rewriter_ = mlir_capi.PatternRewriter.resource.make_kind(temp_env, rewriter) catch @panic("failed to make resource for PatternRewriter");
-        const response = this.invoke("matchAndRewrite", temp_env, .{ pattern_, op_, rewriter_ }) catch @panic("failed to forward matchAndRewrite callback");
+        const response = this.dispatcher.invoke("matchAndRewrite", temp_env, .{ pattern_, op_, rewriter_ }) catch @panic("failed to forward matchAndRewrite callback");
         return if (response.success) c.beaverLogicalResultSuccess() else c.beaverLogicalResultFailure();
     }
 
@@ -44,7 +94,7 @@ const CallbackDispatcher = struct {
         rootName: beam.term,
         benefit: c_uint,
         context: mlir_capi.Context.T,
-        cb_map: std.StringHashMap(beam.term),
+        state: *PatternState,
 
         fn init(env: beam.env, args: [*c]const beam.term) !*@This() {
             if (e.enif_thread_type() == e.ERL_NIF_THR_UNDEFINED) {
@@ -56,29 +106,22 @@ const CallbackDispatcher = struct {
             if (e.enif_self(env, &pid) == null) return error.FailToGetSelfPid;
             const persistent_env = e.enif_alloc_env() orelse return error.FailToAllocateEnvironment;
             errdefer e.enif_free_env(persistent_env);
-            var cb_map = std.StringHashMap(beam.term).init(beam.allocator);
-            errdefer cb_map.deinit();
-            inline for (callback_names, 3..) |f, i| {
-                const cb = args[i];
-                if (!beam.is_nil2(env, cb)) {
-                    try cb_map.put(f, e.enif_make_copy(persistent_env, cb));
-                } else {
-                    @panic("nil callback found: " ++ f);
-                }
-            }
+            var owner: beam.pid = undefined;
+            if (e.enif_get_local_pid(env, args[3], &owner) == 0) return error.InvalidCallbackOwner;
+            const state = try PatternState.init(env, owner, args[4]);
+            errdefer state.deinit();
             this.* = .{
                 .pid = pid,
                 .env = persistent_env,
                 .rootName = e.enif_make_copy(persistent_env, args[0]),
                 .benefit = try beam.get(c_uint, env, args[1]),
                 .context = try mlir_capi.Context.resource.fetch(env, args[2]),
-                .cb_map = cb_map,
+                .state = state,
             };
             return this;
         }
 
         fn deinit(this: *@This()) void {
-            this.cb_map.deinit();
             e.enif_free_env(this.env);
             beam.allocator.destroy(this);
         }
@@ -94,21 +137,11 @@ const CallbackDispatcher = struct {
             const this: *@This() = @ptrCast(@alignCast(worker));
             defer this.deinit();
 
-            const callback_dispatcher = RuntimeDispatcher.init(this.pid) catch @panic("fail to allocate creator for rewrite pattern");
-            inline for (callback_names) |f| {
-                const cb = this.cb_map.get(f).?;
-                if (!beam.is_nil2(callback_dispatcher.env, cb)) {
-                    callback_dispatcher.setCallback(f, cb);
-                } else {
-                    callback_dispatcher.setCallback(f, null);
-                }
-            }
-
             const nGeneratedNames = 0;
             const generatedNames: [*c]mlir_capi.StringRef.T = null;
             const temp_env = e.enif_alloc_env() orelse unreachable;
             const rootName = string_ref.get_binary_as_string_ref(this.env, this.rootName) catch @panic("fail to get root name binary");
-            const pattern: beam.term = @call(.auto, kinda.BangFunc(prelude.allKinds, c, "mlirOpRewritePatternCreate").wrap_ret_call, .{ temp_env, .{ rootName, this.benefit, this.context, StructOfCallbacks, callback_dispatcher, nGeneratedNames, generatedNames } }) catch @panic("fail to create rewrite pattern");
+            const pattern: beam.term = @call(.auto, kinda.BangFunc(prelude.allKinds, c, "mlirOpRewritePatternCreate").wrap_ret_call, .{ temp_env, .{ rootName, this.benefit, this.context, StructOfCallbacks, this.state, nGeneratedNames, generatedNames } }) catch @panic("fail to create rewrite pattern");
 
             if (!beam.send_advanced(null, this.pid, temp_env, pattern)) {
                 @panic("fail to send rewrite pattern");
@@ -215,7 +248,8 @@ const CallbackDispatcher = struct {
             return beam.make_atom(env, "async");
         } else {
             defer creator.deinit();
-            return error.FailToCreateRewritePattern;
+            creator.state.deinit();
+            return error.ContextThreadSafeLockingDisabled;
         }
     }
     pub const destroy_frozen_rewrite_pattern_set = PatternSetDestroyAsyncFunctor("FrozenRewritePatternSet").destroy_nif;
@@ -225,7 +259,7 @@ const CallbackDispatcher = struct {
 };
 
 pub const nifs = .{
-    prelude.beaverRawNIF(CallbackDispatcher, "create_mlir_rewrite_pattern", 6),
+    prelude.beaverRawNIF(CallbackDispatcher, "create_mlir_rewrite_pattern", 5),
     prelude.beaverRawNIF(CallbackDispatcher, "destroy_frozen_rewrite_pattern_set", 2),
     prelude.beaverRawNIF(CallbackDispatcher, "destroy_rewrite_pattern_set", 2),
     prelude.beaverRawNIF(CallbackDispatcher, "apply_rewrite_pattern_set_with_module", 4),

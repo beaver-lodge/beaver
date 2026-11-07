@@ -310,9 +310,7 @@ fn addLegality(
         return beam.make_atom(environment, "ok");
     }
 
-    const dispatcher = try LegalityDispatcher.initWithOptions(try beam.self(environment), .{
-        .timeout_ms = try beam.get_u64(environment, timeout_term),
-    });
+    const dispatcher = try LegalityDispatcher.initWithOptions(try beam.self(environment), callback_args.fixedOptions(LegalityDispatcher, try beam.get_u64(environment, timeout_term)));
     var dispatcher_owned = true;
     errdefer if (dispatcher_owned) dispatcher.deinit();
     dispatcher.setCallback("conversion_legality", callback_term.?);
@@ -619,9 +617,7 @@ fn addTypeCallback(
     defer registration.mutex.unlock(io);
     if (registration.closed.load(.acquire)) return error.TypeConverterClosed;
 
-    const dispatcher = try TypeDispatcher.initWithOptions(try beam.self(environment), .{
-        .timeout_ms = try beam.get_u64(environment, timeout),
-    });
+    const dispatcher = try TypeDispatcher.initWithOptions(try beam.self(environment), callback_args.fixedOptions(TypeDispatcher, try beam.get_u64(environment, timeout)));
     var dispatcher_owned = true;
     errdefer if (dispatcher_owned) dispatcher.deinit();
     switch (kind) {
@@ -853,9 +849,7 @@ fn addConversionPattern(environment: beam.env, _: c_int, args: [*c]const beam.te
     errdefer {
         if (pattern_user_owned) _ = registration.pattern_users.fetchSub(1, .acq_rel);
     }
-    const dispatcher = try PatternDispatcher.initWithOptions(try beam.self(environment), .{
-        .timeout_ms = try beam.get_u64(environment, args[7]),
-    });
+    const dispatcher = try PatternDispatcher.initWithOptions(try beam.self(environment), callback_args.fixedOptions(PatternDispatcher, try beam.get_u64(environment, args[7])));
     var dispatcher_owned = true;
     errdefer if (dispatcher_owned) dispatcher.deinit();
     const one_to_n = try beam.get_bool(environment, args[6]);
@@ -1034,7 +1028,7 @@ fn applyConversionAsync(environment: beam.env, _: c_int, args: [*c]const beam.te
     e.enif_keep_resource(target);
     errdefer e.enif_release_resource(target);
     if (!c.beaverContextAddWork(target.context, ConversionWorker.run, worker))
-        return error.ContextMultithreadingDisabled;
+        return error.ContextThreadSafeLockingDisabled;
     config_owned = false;
     return id;
 }

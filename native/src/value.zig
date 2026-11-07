@@ -86,7 +86,7 @@ const ConditionalUseReplacer = struct {
         if (!c.mlirContextEqual(context, c.mlirValueGetContext(self.replacement))) {
             return error.ValuesFromDifferentContexts;
         }
-        if (!c.beaverContextAddWork(context, run, self)) return error.ContextMultithreadingDisabled;
+        if (!c.beaverContextAddWork(context, run, self)) return error.ContextThreadSafeLockingDisabled;
 
         var result = [_]beam.term{ beam.make_atom(env, "async"), self.dispatcher.copyId(env) };
         return beam.make_tuple(env, &result);

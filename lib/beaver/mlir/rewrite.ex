@@ -61,24 +61,6 @@ defmodule Beaver.MLIR.Rewrite do
     end
   end
 
-  @ctx_for_pat_apply __MODULE__.CtxForPatApply
-  @doc false
-  @spec thread_pool_child_spec() :: Supervisor.child_spec()
-  def thread_pool_child_spec() do
-    spec = Agent.child_spec(fn -> Context.create() end)
-
-    update_in(spec.start, fn {Agent, :start_link, [fun]} ->
-      opts = [name: @ctx_for_pat_apply]
-      {Agent, :start_link, [fun, opts]}
-    end)
-  end
-
-  @spec stop_thread_pool() :: :ok
-  def stop_thread_pool() do
-    Agent.get(@ctx_for_pat_apply, &Context.destroy/1)
-    Agent.stop(@ctx_for_pat_apply)
-  end
-
   @spec with_default_config((config_handle() -> result)) :: result when result: var
   def with_default_config(fun) when is_function(fun, 1),
     do:
@@ -146,7 +128,7 @@ defmodule Beaver.MLIR.Rewrite do
 
   def apply_patterns(ir, %MLIR.FrozenRewritePatternSet{} = patterns, configure)
       when is_function(configure, 1) do
-    ctx = Agent.get(@ctx_for_pat_apply, & &1)
+    ctx = MLIR.context(ir)
 
     with_default_config(fn cfg ->
       _ = configure.(cfg)

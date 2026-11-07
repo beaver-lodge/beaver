@@ -8,7 +8,7 @@ defmodule Beaver.MLIR.RewritePattern do
   require Logger
   alias Beaver.MLIR
   alias __MODULE__.Server
-  use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
+  use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native, fields: [owner: nil]
   @type state() :: any()
 
   @callback construct(state :: state()) :: state()
@@ -35,18 +35,6 @@ defmodule Beaver.MLIR.RewritePattern do
   @doc false
   def global_registrar_child_specs(), do: [{Registry, keys: :unique, name: @registry}]
 
-  defp start_worker(name, init_state) do
-    case Server.start_link(name, init_state) do
-      {:ok, pid} -> pid
-      {:error, {:already_started, pid}} -> pid
-      {:error, reason} -> raise reason
-    end
-  end
-
-  defp handle_cb({:construct, token_ref, construct, id}, init_state) do
-    {:via, Registry, {@registry, id}} |> start_worker(init_state) |> GenServer.cast({:construct, token_ref, construct})
-  end
-
   def create(root_name, opts) do
     init_state = opts[:init_state]
     benefit = opts[:benefit] || 1
@@ -56,17 +44,31 @@ defmodule Beaver.MLIR.RewritePattern do
 
     match_and_rewrite = opts[:match_and_rewrite] || (&Beaver.FallbackPattern.match_and_rewrite/4)
 
-    :async =
-      CAPI.beaver_raw_create_mlir_rewrite_pattern(root_name, benefit, ctx.ref, construct, destruct, match_and_rewrite)
+    callbacks = %{construct: construct, destruct: destruct, matchAndRewrite: match_and_rewrite}
+    {:ok, owner} = Server.start_link(callbacks, init_state)
 
-    receive do
-      msg -> handle_cb(msg, init_state)
-    end
+    try do
+      :async =
+        CAPI.beaver_raw_create_mlir_rewrite_pattern(
+          root_name,
+          benefit,
+          ctx.ref,
+          owner,
+          Keyword.get(opts, :prefilter, {-1, -1, []})
+        )
 
-    receive do
-      {:kind, __MODULE__, ref} = msg when is_reference(ref) -> msg |> Native.check!()
+      receive do
+        {:kind, __MODULE__, ref} = msg when is_reference(ref) -> %{Native.check!(msg) | owner: owner}
+      end
+    catch
+      kind, reason ->
+        if Process.alive?(owner), do: GenServer.stop(owner)
+        :erlang.raise(kind, reason, __STACKTRACE__)
     end
   end
+
+  @doc "Number of BEAM match callbacks serviced by this live pattern."
+  def callback_count(%__MODULE__{owner: owner}) when is_pid(owner), do: GenServer.call(owner, :callback_count)
 end
 
 defmodule Beaver.MLIR.RewritePattern.Server do
@@ -76,52 +78,42 @@ defmodule Beaver.MLIR.RewritePattern.Server do
   alias Beaver.MLIR
   alias Kinda.CallbackRuntime
 
-  # Client API
-
-  def start_link(name, state), do: GenServer.start_link(__MODULE__, state, name: name)
-
-  # Server Callbacks
+  def start_link(callbacks, value), do: GenServer.start_link(__MODULE__, {callbacks, value})
 
   @impl true
-  def init(initial_state), do: {:ok, initial_state}
+  def init({callbacks, value}), do: {:ok, %{callbacks: callbacks, value: value, count: 0}}
 
   @impl true
-  def handle_cast({:construct, token_ref, construct_fun}, state) do
-    case invoke(token_ref, fn -> {:ok, construct_fun.(state)} end, &log_exception/1) do
-      {:ok, new_state} -> {:noreply, new_state}
-      {:exception, _kind, _reason, _stacktrace} -> {:noreply, state}
-    end
+  def handle_call(:callback_count, _from, state), do: {:reply, state.count, state}
+
+  @impl true
+  def handle_info({:construct, token, :construct, id}, state) do
+    Registry.register(MLIR.RewritePattern.Registry, id, nil)
+    outcome = invoke(token, fn -> {:ok, state.callbacks.construct.(state.value)} end, &log_exception/1)
+    {:noreply, update_value(state, outcome)}
   end
 
-  @impl true
-  def handle_info({:matchAndRewrite, token_ref, match_and_rewrite, _id, pattern, op, rewriter}, state) do
-    case invoke(
-           token_ref,
-           fn ->
-             kind_args = Enum.map([pattern, op, rewriter], &Native.check!/1)
-             apply(match_and_rewrite, kind_args ++ [state])
-           end,
-           &log_exception/1
-         ) do
-      {:ok, new_state} ->
-        {:noreply, new_state}
+  def handle_info({:matchAndRewrite, token, :matchAndRewrite, _id, pattern, op, rewriter}, state) do
+    outcome =
+      invoke(
+        token,
+        fn ->
+          [pattern, op, rewriter] = Enum.map([pattern, op, rewriter], &Native.check!/1)
+          state.callbacks.matchAndRewrite.(pattern, op, rewriter, state.value)
+        end,
+        &log_exception/1
+      )
 
-      {:error, new_state} ->
-        # Store the new state, even on rewrite error
-        {:noreply, new_state}
-
-      {:exception, _kind, _reason, _stacktrace} ->
-        {:noreply, state}
-    end
+    {:noreply, update_value(%{state | count: state.count + 1}, outcome)}
   end
 
-  @impl true
-  def handle_info({:destruct, token_ref, destruct, _id}, state) do
-    case invoke(token_ref, fn -> {:ok, destruct.(state)} end, &log_exception/1) do
-      {:ok, _result} -> {:stop, :normal, nil}
-      {:exception, _kind, _reason, _stacktrace} -> {:stop, :normal, nil}
-    end
+  def handle_info({:destruct, token, :destruct, _id}, state) do
+    invoke(token, fn -> {:ok, state.callbacks.destruct.(state.value)} end, &log_exception/1)
+    {:stop, :normal, state}
   end
+
+  defp update_value(state, {status, value}) when status in [:ok, :error], do: %{state | value: value}
+  defp update_value(state, _exception), do: state
 
   defp invoke(token_ref, callback, before_reply),
     do: CallbackRuntime.invoke(token_ref, callback, &CAPI.beaver_raw_callback_reply/2, before_reply)

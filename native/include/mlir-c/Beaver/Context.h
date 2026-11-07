@@ -7,9 +7,9 @@
 extern "C" {
 #endif
 
-/// Schedules callback-bridging work on the context's LLVM pool, outside BEAM
-/// scheduler threads. An elastic pool prevents nested pass/rewrite callbacks
-/// from starving a pool shared by multiple contexts.
+/// Schedules work on Beaver's callback executor, outside BEAM scheduler threads.
+/// Requires thread-safe context locking, but not MLIR internal parallelism.
+/// The caller must keep the context and borrowed IR alive until completion.
 MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context, void (*task)(void *), void *arg);
 
 MLIR_CAPI_EXPORTED bool beaverContextIndependentLockingSupported(void);

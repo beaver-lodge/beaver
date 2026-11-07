@@ -35,24 +35,6 @@ defmodule Beaver.MLIR.Pass do
   @doc false
   def global_registrar_child_specs(), do: [{Registry, keys: :unique, name: @registry}]
 
-  @doc false
-  def start_worker(name, init_state) do
-    case Server.start_link(name, init_state) do
-      {:ok, pid} -> pid
-      {:error, {:already_started, pid}} -> pid
-      {:error, reason} -> raise reason
-    end
-  end
-
-  defp handle_cb({:construct, token_ref, construct_fun, id}, init_state) do
-    {:via, Registry, {@registry, id}}
-    |> start_worker(init_state)
-    |> GenServer.cast({:construct, token_ref, construct_fun})
-  end
-
-  @doc false
-  def registry(), do: @registry
-
   defp normalize_run_fun(run) do
     cond do
       is_function(run, 2) -> run
@@ -72,21 +54,34 @@ defmodule Beaver.MLIR.Pass do
     run = normalize_run_fun(run)
     %MLIR.Context{ref: ctx} = opts[:ctx] || raise ArgumentError, "option :ctx is required"
 
-    :async =
-      CAPI.beaver_raw_create_mlir_pass(ctx, name, argument, desc, op, %{
-        construct: construct,
-        destruct: destruct,
-        initialize: initialize,
-        clone: clone,
-        run: run
-      })
+    callbacks = %{
+      construct: construct,
+      destruct: destruct,
+      initialize: initialize,
+      clone: clone,
+      run: run
+    }
 
-    receive do
-      msg -> handle_cb(msg, init_state)
-    end
+    {:ok, owner} = Server.start_link(callbacks, init_state)
 
-    receive do
-      {:kind, __MODULE__, ref} = msg when is_reference(ref) -> msg |> Native.check!()
+    try do
+      :async =
+        CAPI.beaver_raw_create_mlir_pass(
+          ctx,
+          name,
+          argument,
+          desc,
+          op,
+          Map.new(callbacks, fn {key, _fun} -> {key, key} end) |> Map.put(:owner, owner)
+        )
+
+      receive do
+        {:kind, __MODULE__, ref} = msg when is_reference(ref) -> Native.check!(msg)
+      end
+    catch
+      kind, reason ->
+        if Process.alive?(owner), do: GenServer.stop(owner)
+        :erlang.raise(kind, reason, __STACKTRACE__)
     end
   end
 end
@@ -98,78 +93,59 @@ defmodule Beaver.MLIR.Pass.Server do
   alias Beaver.MLIR
   alias Kinda.CallbackRuntime
 
-  # Client API
-
-  def start_link(name, initial_state), do: GenServer.start_link(__MODULE__, initial_state, name: name)
-
-  # Server Callbacks
+  def start_link(callbacks, initial_state),
+    do: GenServer.start_link(__MODULE__, {callbacks, initial_state})
 
   @impl true
-  def init(initial_state), do: {:ok, initial_state}
+  def init({callbacks, initial_state}), do: {:ok, %{callbacks: callbacks, value: initial_state}}
 
   @impl true
-  def handle_call(:get_state, _from, state), do: {:reply, state, state}
+  def handle_call(:get_state, _from, state), do: {:reply, state.value, state}
 
   @impl true
-  def handle_cast({:construct, token_ref, construct_fun}, state) do
-    case invoke(token_ref, fn -> {:ok, construct_fun.(state)} end, &log_exception/1) do
-      {:ok, new_state} -> {:noreply, new_state}
-      {:exception, _kind, _reason, _stacktrace} -> {:noreply, nil}
-    end
+  def handle_cast({:clone, token, id}, state) do
+    Registry.register(MLIR.Pass.Registry, id, nil)
+    outcome = invoke(token, fn -> {:ok, state.callbacks.clone.(state.value)} end, &log_exception/1)
+    {:noreply, update_value(state, outcome)}
   end
 
-  def handle_cast({:clone, token_ref, clone_fun, from_state}, :started_by_clone) do
-    case invoke(token_ref, fn -> {:ok, clone_fun.(from_state)} end, &log_exception/1) do
-      {:ok, new_state} -> {:noreply, {:started_by_clone, new_state}}
-      {:exception, _kind, _reason, _stacktrace} -> {:noreply, nil}
-    end
+  @impl true
+  def handle_info({:construct, token, :construct, id}, state) do
+    Registry.register(MLIR.Pass.Registry, id, nil)
+    outcome = invoke(token, fn -> {:ok, state.callbacks.construct.(state.value)} end, &log_exception/1)
+    {:noreply, update_value(state, outcome)}
   end
 
-  # this should only be called if it is a cloned pass
-  @impl true
-  def handle_info({:construct, token_ref, construct_fun, _id}, {:started_by_clone, state}),
-    do: handle_cast({:construct, token_ref, construct_fun}, state)
-
-  def handle_info({:initialize, token_ref, initialize_fun, _id, ctx}, state) do
+  def handle_info({:initialize, token, :initialize, _id, ctx}, state) do
     ctx = Native.check!(ctx)
-
-    case invoke(token_ref, fn -> initialize_fun.(ctx, state) end, &emit_initialize_outcome(&1, ctx)) do
-      {:ok, new_state} -> {:noreply, new_state}
-      {:error, new_state} -> {:noreply, new_state}
-      {:exception, _kind, _reason, _stacktrace} -> {:noreply, nil}
-    end
+    outcome = invoke(token, fn -> state.callbacks.initialize.(ctx, state.value) end, &emit_initialize_outcome(&1, ctx))
+    {:noreply, update_value(state, outcome)}
   end
 
-  def handle_info({:clone, token_ref, clone_fun, id, from_id}, state) do
-    this = self()
-
-    Registry.dispatch(MLIR.Pass.registry(), from_id, fn entries ->
-      clone_from_owner(entries, this, id, token_ref, clone_fun, state)
-    end)
-
+  def handle_info({:clone, token, :clone, id, _from_id}, state) do
+    {:ok, clone} = start_link(state.callbacks, state.value)
+    GenServer.cast(clone, {:clone, token, id})
     {:noreply, state}
   end
 
-  def handle_info({:run, token_ref, run_fun, _id, op_ref}, state) do
+  def handle_info({:run, token, :run, _id, op_ref}, state) do
     op = Native.check!(op_ref)
     ctx = MLIR.context(op)
+    outcome = invoke(token, fn -> {:ok, state.callbacks.run.(op, state.value)} end, &emit_run_outcome(&1, ctx))
 
-    case invoke(token_ref, fn -> {:ok, run_fun.(op, state)} end, &emit_run_outcome(&1, ctx)) do
-      {:ok, new_state} ->
-        {:noreply, new_state}
-
-      {:exception, _kind, _reason, _stacktrace} ->
-        # On failure, keep the old state
-        {:noreply, state}
+    case outcome do
+      {:ok, value} -> {:noreply, %{state | value: value}}
+      _ -> {:noreply, state}
     end
   end
 
-  def handle_info({:destruct, token_ref, destruct_fun, _id}, state) do
-    case invoke(token_ref, fn -> {:ok, destruct_fun.(state)} end, &log_exception/1) do
-      {:ok, _result} -> {:stop, :normal, nil}
-      {:exception, _kind, _reason, _stacktrace} -> {:stop, :normal, nil}
-    end
+  def handle_info({:destruct, token, :destruct, _id}, state) do
+    invoke(token, fn -> {:ok, state.callbacks.destruct.(state.value)} end, &log_exception/1)
+    {:stop, :normal, state}
   end
+
+  defp update_value(state, {status, value}) when status in [:ok, :error], do: %{state | value: value}
+  defp update_value(state, _exception), do: %{state | value: nil}
 
   defp invoke(token_ref, callback, before_reply),
     do: CallbackRuntime.invoke(token_ref, callback, &CAPI.beaver_raw_callback_reply/2, before_reply)
@@ -199,15 +175,4 @@ defmodule Beaver.MLIR.Pass.Server do
     do: Location.unknown(ctx: ctx) |> Diagnostic.emit(Exception.format(kind, reason, stacktrace))
 
   defp emit_run_outcome(_outcome, _ctx), do: :ok
-
-  defp clone_from_owner(entries, owner, id, token_ref, clone_fun, state) do
-    Enum.each(entries, fn {from_pid, nil} ->
-      if from_pid == owner,
-        do:
-          {:via, Registry, {MLIR.Pass.registry(), id}}
-          |> MLIR.Pass.start_worker(:started_by_clone)
-          |> GenServer.cast({:clone, token_ref, clone_fun, state}),
-        else: Logger.error("non-owner is requested clone")
-    end)
-  end
 end

@@ -176,9 +176,7 @@ fn destroyState(comptime State: type) fn (beam.env, ?*anyopaque) callconv(.c) vo
 
 fn allocateState(comptime State: type, comptime callbacks: anytype, comptime required: usize, environment: beam.env, args: []const beam.term) !*State {
     const Dispatcher = @typeInfo(@FieldType(State, "dispatcher")).pointer.child;
-    const dispatcher = try Dispatcher.initWithOptions(try beam.self(environment), .{
-        .timeout_ms = try beam.get_u64(environment, args[callbacks.len]),
-    });
+    const dispatcher = try Dispatcher.initWithOptions(try beam.self(environment), callback_args.fixedOptions(Dispatcher, try beam.get_u64(environment, args[callbacks.len])));
     errdefer dispatcher.deinit();
     inline for (callbacks, 0..) |name, index| {
         if (index < required or !beam.is_nil2(environment, args[index])) dispatcher.setCallback(name, args[index]);
@@ -338,7 +336,7 @@ fn AsyncDiagnosticsNIF(comptime name: []const u8) type {
                 worker.args[index] = e.enif_make_copy(owned_environment, args[index + 1]);
             }
 
-            if (!c.beaverContextAddWork(context, Worker.run, worker)) return error.ContextMultithreadingDisabled;
+            if (!c.beaverContextAddWork(context, Worker.run, worker)) return error.ContextThreadSafeLockingDisabled;
             return beam.make_atom(environment, "async");
         }
     };
@@ -472,7 +470,7 @@ fn querySpeculatabilityAsync(environment: beam.env, _: c_int, args: [*c]const be
     worker.* = .{ .operation = operation, .recipient = try beam.self(environment) };
     const context = c.mlirOperationGetContext(operation);
     if (!c.beaverContextAddWork(context, SpeculatabilityWorker.run, worker))
-        return error.ContextMultithreadingDisabled;
+        return error.ContextThreadSafeLockingDisabled;
     return beam.make_ok(environment);
 }
 
@@ -483,7 +481,7 @@ fn queryMemoryEffectsAsync(environment: beam.env, _: c_int, args: [*c]const beam
     worker.* = .{ .operation = operation, .recipient = try beam.self(environment) };
     const context = c.mlirOperationGetContext(operation);
     if (!c.beaverContextAddWork(context, MemoryEffectsWorker.run, worker))
-        return error.ContextMultithreadingDisabled;
+        return error.ContextThreadSafeLockingDisabled;
     return beam.make_ok(environment);
 }
 
