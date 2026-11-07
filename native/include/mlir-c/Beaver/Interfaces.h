@@ -38,10 +38,7 @@ typedef struct {
 typedef void (*MlirBeaverMemoryEffectInstancesCallback)(intptr_t numEffects, MlirMemoryEffectInstance *effects,
                                                         void *userData);
 
-/// Stable Beaver-owned adapters for the MemoryEffects C API. Upstream changed
-/// its collector ABI from an opaque list to a callback in August 2026; these
-/// functions deliberately use MLIR's C++ interface so Beaver can compile
-/// against both layouts without exposing either one to Zig or Elixir.
+/// Callback-scoped ownership adapters for the BEAM interface bridge.
 MLIR_CAPI_EXPORTED void
 beaverMemoryEffectsOpInterfaceAttachFallbackModel(MlirContext context, MlirStringRef operationName,
                                                   MlirBeaverMemoryEffectsOpInterfaceCallbacks callbacks);

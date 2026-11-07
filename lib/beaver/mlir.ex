@@ -255,7 +255,10 @@ defmodule Beaver.MLIR do
           | RewritePatternSet.t()
 
   @type apply_option() ::
-          {:debug, boolean()} | {:ctx, Deferred.context_arg()} | Rewrite.config_option()
+          {:debug, boolean()}
+          | {:ctx, Deferred.context_arg()}
+          | {:analysis_session, MLIR.AnalysisSession.t()}
+          | Rewrite.config_option()
   @type apply_opts() :: [apply_option()] | Rewrite.config_callback() | nil
   @type apply_error() :: String.t()
   @type apply_outcome(t) :: {:ok, t} | {:error, apply_error()}
@@ -319,24 +322,17 @@ defmodule Beaver.MLIR do
   @doc """
   Apply patterns on a container (operation, module).
   It is named `apply_` with a underscore to avoid name collision with `Kernel.apply/2`
+  Pass `:analysis_session` to invalidate cached analyses around the rewrite.
   """
   @spec apply_(verifiable(), rewrite_pattern_input(), apply_opts()) :: apply_outcome(verifiable())
   def apply_(op, patterns, opts \\ @apply_default_opts)
 
-  def apply_(op, %MLIR.FrozenRewritePatternSet{} = patterns, opts) do
+  def apply_(op, %kind{} = patterns, opts)
+      when kind in [MLIR.FrozenRewritePatternSet, RewritePatternSet] do
     MLIR.verify!(op)
 
-    {result, diagnostics} = Beaver.MLIR.Rewrite.apply_patterns(op, patterns, rewrite_config_input(opts))
-
-    if MLIR.LogicalResult.success?(result),
-      do: {:ok, op},
-      else: {:error, Diagnostic.format(diagnostics, "failed to apply pattern set.")}
-  end
-
-  def apply_(op, %RewritePatternSet{} = patterns, opts) do
-    MLIR.verify!(op)
-
-    {result, diagnostics} = Beaver.MLIR.Rewrite.apply_patterns(op, patterns, rewrite_config_input(opts))
+    execution_opts = if is_list(opts), do: Keyword.take(opts, [:analysis_session]), else: []
+    {result, diagnostics} = Rewrite.apply_patterns(op, patterns, rewrite_config_input(opts), execution_opts)
 
     if MLIR.LogicalResult.success?(result),
       do: {:ok, op},

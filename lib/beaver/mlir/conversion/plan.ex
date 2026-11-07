@@ -198,6 +198,12 @@ defmodule Beaver.MLIR.Conversion.Plan do
           {MLIR.Conversion.result(), MLIR.Conversion.Profile.receipt()}
   def profile(%__MODULE__{} = plan, ir), do: execute(plan, ir, true)
 
+  @doc "Runs with explicit mutation and legalization reporting."
+  def report(%__MODULE__{} = plan, ir), do: execute(plan, ir, :report)
+
+  @doc "Runs legalization analysis without committing IR changes."
+  def analyze(%__MODULE__{} = plan, ir), do: report(%{plan | mode: :analysis}, ir)
+
   defp execute(plan, ir, profile?) do
     context = MLIR.context(ir)
 
@@ -206,7 +212,12 @@ defmodule Beaver.MLIR.Conversion.Plan do
     opts =
       Map.take(plan, [:timeout, :folding_mode, :build_materializations]) |> Enum.reject(fn {_, v} -> is_nil(v) end)
 
-    function = if profile?, do: :profile, else: :apply
+    function =
+      case profile? do
+        true -> :profile
+        :report -> :run
+        false -> :apply
+      end
 
     Native.with_resource(ConversionTarget.create(context, target_opts), &ConversionTarget.destroy/1, fn target ->
       TypeConverter.with(target_opts, fn converter ->
@@ -245,9 +256,10 @@ defmodule Beaver.MLIR.Conversion.Plan do
   defp validate_plan_options!(opts),
     do: validate_callback_opts!(opts, [:mode, :timeout, :folding_mode, :build_materializations], "Plan")
 
-  defp validate_mode!(mode) when mode in [:full, :partial], do: mode
+  defp validate_mode!(mode) when mode in [:full, :partial, :analysis], do: mode
 
-  defp validate_mode!(mode), do: raise(ArgumentError, ":mode must be :full or :partial, got: #{inspect(mode)}")
+  defp validate_mode!(mode),
+    do: raise(ArgumentError, ":mode must be :full, :partial or :analysis, got: #{inspect(mode)}")
 
   defp validate_plan_timeout!(nil), do: nil
   defp validate_plan_timeout!(timeout) when is_integer(timeout) and timeout >= 0, do: timeout

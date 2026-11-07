@@ -6,6 +6,16 @@
 // consume these declarations.
 typedef enum {
   // Tracing sessions have managed resources and a collecting drain adapter.
+  BeaverCapiPolicyExclude__beaverAnalysisCreate,
+  BeaverCapiPolicyExclude__beaverAnalysisDestroy,
+  BeaverCapiPolicyExclude__beaverAnalysisInvalidate,
+  BeaverCapiPolicyExclude__beaverAnalysisGeneration,
+  BeaverCapiPolicyExclude__beaverAnalysisCached,
+  BeaverCapiPolicyExclude__beaverAnalysisQuery,
+  BeaverCapiPolicyExclude__beaverAnalysisLayout,
+  BeaverCapiPolicyExclude__beaverInferReturnTypes,
+  BeaverCapiPolicyExclude__beaverInferReturnComponents,
+  BeaverCapiPolicyExclude__beaverConversionRun,
   BeaverCapiPolicyExclude__mlirBeaverActionTracingAttach,
   BeaverCapiPolicyExclude__mlirBeaverActionTracingDrain,
   BeaverCapiPolicyExclude__mlirBeaverActionTracingDetach,
@@ -74,9 +84,7 @@ typedef enum {
   BeaverCapiPolicyCallbackRuntime__mlirTransformOpInterfaceAttachFallbackModel,
   BeaverCapiPolicyCallbackRuntime__mlirDynamicOpTraitCreate,
 
-  // Beaver owns a stable adapter for the MemoryEffects collector ABI. Exclude
-  // both generations of the upstream surface so manifests remain identical
-  // when compiling against Triton LLVM or an LLVM-main eudsl snapshot.
+  // The BEAM bridge owns MemoryEffects collectors and callback lifetimes.
   BeaverCapiPolicyExclude__mlirMemoryEffectsOpInterfaceAttachFallbackModel,
   BeaverCapiPolicyExclude__mlirMemoryEffectsOpInterfaceGetEffects,
   BeaverCapiPolicyExclude__mlirMemoryEffectInstancesListAppend,

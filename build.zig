@@ -127,7 +127,6 @@ fn createCMakeStep(b: *std.Build, llvm_cmake_dir: []const u8, mlir_cmake_dir: []
     const step = b.step("cmake", "Build and install CMake targets");
 
     const cmake_build_dir = b.pathJoin(&.{ b.install_path, "cmake_build" });
-    const cmake_cache_path = b.pathJoin(&.{ cmake_build_dir, "CMakeCache.txt" });
     const cmake_build_type = switch (optimize) {
         .Debug => "Debug",
         .ReleaseSafe => "RelWithDebInfo",
@@ -157,10 +156,9 @@ fn createCMakeStep(b: *std.Build, llvm_cmake_dir: []const u8, mlir_cmake_dir: []
     const cmake_build_install = b.addSystemCommand(&.{ "cmake", "--build", cmake_build_dir, "--target", "install" });
     step.dependOn(&cmake_build_install.step);
 
-    std.Io.Dir.accessAbsolute(b.graph.io, cmake_cache_path, .{}) catch {
-        step.dependOn(&cmake_configure.step);
-        cmake_build_install.step.dependOn(&cmake_configure.step);
-    };
+    // Reconfigure when the toolchain or build flags change; an existing cache
+    // must never silently link C++ against a different LLVM than Zig.
+    cmake_build_install.step.dependOn(&cmake_configure.step);
     return step;
 }
 

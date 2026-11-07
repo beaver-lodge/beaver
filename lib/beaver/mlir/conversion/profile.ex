@@ -172,6 +172,7 @@ defmodule Beaver.MLIR.Conversion.Profile do
     %{"operations" => operations, "modules" => modules, "functions" => functions}
   end
 
+  defp status({:ok, %MLIR.Conversion.Result{}}), do: "ok"
   defp status({:ok, _ir, _diagnostics}), do: "ok"
   defp status({:error, _error}), do: "error"
 

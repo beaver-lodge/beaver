@@ -147,10 +147,11 @@ defmodule Beaver.MLIR.Conversion do
 
   defmodule Error do
     @moduledoc "An error returned by a failed dialect conversion."
-    defexception [:mode, diagnostics: [], callback_failure: nil, reason: :conversion_failed]
+    defexception [:mode, :result, diagnostics: [], callback_failure: nil, reason: :conversion_failed]
 
     @type t() :: %__MODULE__{
             mode: Beaver.MLIR.Conversion.mode(),
+            result: Beaver.MLIR.Conversion.Result.t() | nil,
             diagnostics: [term()],
             callback_failure: term(),
             reason: term()
@@ -178,9 +179,9 @@ defmodule Beaver.MLIR.Conversion do
     end
   end
 
-  @type mode() :: :full | :partial
+  @type mode() :: :full | :partial | :analysis
   @type conversion_ir() :: MLIR.Module.t() | Operation.t()
-  @type result() :: {:ok, conversion_ir(), [term()]} | {:error, Error.t()}
+  @type result() :: {:ok, conversion_ir(), [term()]} | {:ok, MLIR.Conversion.Result.t()} | {:error, Error.t()}
 
   @spec apply(
           mode(),
@@ -204,6 +205,13 @@ defmodule Beaver.MLIR.Conversion do
     end
   end
 
+  @doc "Runs conversion with an explicit mutation and legalization result. Errors include the same report in `error.result`."
+  def run(mode, ir, target, patterns, opts \\ []),
+    do: apply(mode, ir, target, patterns, Keyword.put(opts, :report, true))
+
+  @doc "Simulates legalization and rolls back every speculative IR change."
+  def analyze(ir, target, patterns, opts \\ []), do: run(:analysis, ir, target, patterns, opts)
+
   @doc """
   Runs one conversion with bounded callback and native-worker profiling.
 
@@ -222,11 +230,13 @@ defmodule Beaver.MLIR.Conversion do
     do: run(mode, ir, target, patterns, opts, true)
 
   defp run(mode, ir, %ConversionTarget{} = target, %kind{} = patterns, opts, profile?)
-       when mode in [:full, :partial] and kind in [RewritePatternSet, MLIR.FrozenRewritePatternSet] do
-    options = conversion_options!(opts)
-    owned = kind == RewritePatternSet
-    patterns = if owned, do: RewritePatternSet.freeze(patterns), else: patterns
-    do_apply(mode, ir, target, patterns, owned, options, profile?)
+       when mode in [:full, :partial, :analysis] and kind in [RewritePatternSet, MLIR.FrozenRewritePatternSet] do
+    MLIR.AnalysisSession.track(opts[:analysis_session], fn ->
+      options = conversion_options!(opts)
+      owned = kind == RewritePatternSet
+      patterns = if owned, do: RewritePatternSet.freeze(patterns), else: patterns
+      do_apply(mode, ir, target, patterns, owned, options, profile?)
+    end)
   end
 
   defp do_apply(
@@ -235,7 +245,7 @@ defmodule Beaver.MLIR.Conversion do
          %ConversionTarget{registration: registration},
          %MLIR.FrozenRewritePatternSet{ref: patterns_ref},
          owns_patterns,
-         {folding_mode, materializations, timeout_ms, execution_profile},
+         {folding_mode, materializations, timeout_ms, execution_profile, report?},
          profile?
        ) do
     operation = Operation.from_module(ir)
@@ -247,7 +257,8 @@ defmodule Beaver.MLIR.Conversion do
         CAPI.beaver_raw_execution_worker(
           context.ref,
           :conversion,
-          {mode == :full, registration, operation.ref, patterns_ref, owns_patterns, folding_mode, materializations},
+          {%{full: 0, partial: 1, analysis: 2}[mode], registration, operation.ref, patterns_ref, owns_patterns,
+           folding_mode, materializations, report?},
           profile?
         )
       rescue
@@ -265,7 +276,8 @@ defmodule Beaver.MLIR.Conversion do
     unless Keyword.keyword?(opts),
       do: raise(ArgumentError, "conversion options must be a keyword list")
 
-    unsupported = Keyword.keys(opts) -- [:timeout, :folding_mode, :build_materializations, :profile]
+    unsupported =
+      Keyword.keys(opts) -- [:timeout, :folding_mode, :build_materializations, :profile, :report, :analysis_session]
 
     if unsupported != [], do: raise(ArgumentError, "unsupported conversion options: #{inspect(unsupported)}")
 
@@ -274,7 +286,9 @@ defmodule Beaver.MLIR.Conversion do
 
     timeout_ms = Beaver.Execution.callback_timeout!(opts)
 
-    {folding_mode, materializations, timeout_ms, opts[:profile]}
+    report? = Keyword.get(opts, :report, false)
+    unless is_boolean(report?), do: raise(ArgumentError, ":report must be boolean")
+    {folding_mode, materializations, timeout_ms, opts[:profile], report?}
   end
 
   defp folding_mode!(nil), do: -1
@@ -381,6 +395,17 @@ defmodule Beaver.MLIR.Conversion do
 
   defp finish(mode, _ir, nil, callback_failure),
     do: {:error, %Error{mode: mode, callback_failure: callback_failure, reason: :native_worker_failed}}
+
+  defp finish(mode, ir, {json, diagnostics}, callback_failure) when is_binary(json) do
+    {_, diagnostics} = Beaver.Native.check!({json, diagnostics})
+    report = __MODULE__.Result.decode(json, mode, ir, MLIR.Diagnostic.process(diagnostics), callback_failure)
+
+    if report.status == :succeeded,
+      do: {:ok, report},
+      else:
+        {:error,
+         %Error{mode: mode, result: report, diagnostics: report.diagnostics, callback_failure: callback_failure}}
+  end
 
   defp finish(mode, ir, result, callback_failure) do
     {logical_result, diagnostics} = Beaver.Native.check!(result)

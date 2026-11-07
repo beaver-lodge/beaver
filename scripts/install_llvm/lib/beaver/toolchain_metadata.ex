@@ -14,43 +14,23 @@ defmodule Beaver.ToolchainMetadata do
 
   def encode!, do: load!() |> JSON.encode!()
 
-  def llvm_repo!, do: load!() |> get_in(["llvm", "repo"])
-  def llvm_tag!, do: load!() |> get_in(["llvm", "tag"])
-
-  def llvm_revision!(os_name, arch) do
-    platform = "#{os_name}_#{arch}"
-
-    case load!() |> get_in(["llvm", "default_revisions", platform]) do
-      revision when is_binary(revision) -> revision
-      nil -> Mix.raise("native-deps.json has no default LLVM revision for #{platform}")
-    end
-  end
-
   defp validate!(
          %{
-           "schema_version" => 2,
-           "kinda" => %{"git_url" => git_url, "ref" => kinda_ref},
-           "llvm" => %{
-             "repo" => llvm_repo,
-             "tag" => llvm_tag,
-             "default_revisions" => llvm_revisions
-           }
+           "schema_version" => 3,
+           "kinda" => %{"ref" => ref},
+           "llvm" => %{"source_ref" => llvm_ref, "artifacts" => artifacts}
          } = metadata
-       )
-       when is_binary(git_url) and is_binary(kinda_ref) and is_binary(llvm_repo) and
-              is_binary(llvm_tag) and is_map(llvm_revisions) do
-    if map_size(llvm_revisions) > 0 and
-         Enum.all?(llvm_revisions, fn {platform, revision} ->
-           is_binary(platform) and is_binary(revision) and
-             revision =~ ~r/^\d{8}\+[0-9a-f]+$/
-         end) do
-      metadata
-    else
-      Mix.raise("invalid Beaver toolchain metadata in #{@metadata_path}: #{inspect(metadata)}")
-    end
+       ) do
+    unless is_binary(ref) and is_binary(llvm_ref) and llvm_ref =~ ~r/^[0-9a-f]{40}$/ and
+             is_map(artifacts) and map_size(artifacts) == 4 and
+             Enum.all?(artifacts, fn {_, artifact} ->
+               is_integer(artifact["id"]) and is_binary(artifact["sha256"]) and
+                 artifact["sha256"] =~ ~r/^[0-9a-f]{64}$/
+             end),
+           do: Mix.raise("invalid toolchain source or artifact pin")
+
+    metadata
   end
 
-  defp validate!(metadata) do
-    Mix.raise("invalid Beaver toolchain metadata in #{@metadata_path}: #{inspect(metadata)}")
-  end
+  defp validate!(_), do: Mix.raise("native-deps.json must use the current toolchain schema")
 end

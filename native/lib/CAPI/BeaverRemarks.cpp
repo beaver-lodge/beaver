@@ -3,22 +3,14 @@
 #include "mlir/CAPI/Support.h"
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Regex.h"
-#if __has_include("mlir-c/Remarks.h")
 #include "mlir-c/Remarks.h"
-#define BEAVER_HAS_REMARKS 1
-#endif
 
 using namespace mlir;
 
 MLIR_CAPI_EXPORTED bool beaverOptimizationRemarksSupported() {
-#ifdef BEAVER_HAS_REMARKS
   return true;
-#else
-  return false;
-#endif
 }
 
-#ifdef BEAVER_HAS_REMARKS
 namespace {
 struct Receiver {
   MlirStringCallback callback;
@@ -49,12 +41,10 @@ static llvm::StringRef field(const llvm::json::Object &object, llvm::StringRef n
   return object.getString(name).value_or("");
 }
 } // namespace
-#endif
 
 MLIR_CAPI_EXPORTED bool beaverContextEnableOptimizationRemarks(
     MlirContext context, MlirStringRef filters, bool finalPolicy,
     MlirStringCallback callback, void *userData, void (*deleteUserData)(void *)) {
-#ifdef BEAVER_HAS_REMARKS
   std::unique_ptr<Receiver> receiver(new Receiver{callback, userData, deleteUserData});
   auto parsed = llvm::json::parse(unwrap(filters));
   if (!parsed) { llvm::consumeError(parsed.takeError()); return false; }
@@ -69,28 +59,17 @@ MLIR_CAPI_EXPORTED bool beaverContextEnableOptimizationRemarks(
   return mlirLogicalResultIsSuccess(mlirContextEnableOptimizationRemarksWithCallback(
       context, categories, finalPolicy ? MlirRemarkPolicyFinal : MlirRemarkPolicyAll,
       report, receiver.release(), [](void *data) { delete static_cast<Receiver *>(data); }, false));
-#else
-  deleteUserData(userData);
-  return false;
-#endif
 }
 
 MLIR_CAPI_EXPORTED void beaverContextFinalizeOptimizationRemarks(MlirContext context) {
-#ifdef BEAVER_HAS_REMARKS
   mlirContextFinalizeOptimizationRemarks(context);
-#endif
 }
 
 MLIR_CAPI_EXPORTED bool beaverContextHasOptimizationRemarks(MlirContext context) {
-#ifdef BEAVER_HAS_REMARKS
   return mlirContextHasRemarkEngine(context);
-#else
-  return false;
-#endif
 }
 
 MLIR_CAPI_EXPORTED bool beaverEmitOptimizationRemark(MlirLocation location, MlirStringRef payload) {
-#ifdef BEAVER_HAS_REMARKS
   auto parsed = llvm::json::parse(unwrap(payload));
   if (!parsed) { llvm::consumeError(parsed.takeError()); return false; }
   auto *object = parsed->getAsObject();
@@ -109,7 +88,4 @@ MLIR_CAPI_EXPORTED bool beaverEmitOptimizationRemark(MlirLocation location, Mlir
   return mlirEmitOptimizationRemark(location, static_cast<MlirRemarkKind>(kind),
       wrap(field(*object, "name")), wrap(field(*object, "category")), wrap(field(*object, "subcategory")),
       wrap(field(*object, "function")), wrap(field(*object, "message")), keys.size(), keys.data(), values.data());
-#else
-  return false;
-#endif
 }

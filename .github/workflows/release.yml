@@ -42,6 +42,7 @@ jobs:
     runs-on: ${{ matrix.job.os }}
     permissions:
       contents: write
+      actions: read
     strategy:
       fail-fast: false
       matrix:
@@ -93,24 +94,16 @@ jobs:
         run: mix deps.get
       - name: Strip dev suffix
         run: sed -i.bak 's/-dev//g' mix.exs && rm -f mix.exs.bak
-      - name: Read Triton version
+      - name: Set up MSVC toolchain
         if: runner.os == 'Windows'
-        run: echo "TRITON_REF=$(jq -er '.triton_ref' triton.json)" >> "$GITHUB_ENV"
+        uses: ./.github/actions/setup-msvc
       - name: Install prebuilt LLVM
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           cd scripts/install_llvm
           mix deps.get
-          if [[ "${{ runner.os }}" == "Windows" ]]; then
-            mix openai_triton.install --llvm-only --triton-ref "$TRITON_REF" \
-              --install-dir "$RUNNER_TEMP/llvm-prebuilt"
-          else
-            mix beaver.install_prebuilt_llvm --install-dir "$RUNNER_TEMP/llvm-prebuilt"
-          fi
-      - name: Set up MSVC toolchain
-        if: runner.os == 'Windows'
-        uses: ./.github/actions/setup-msvc
+          mix beaver.install_prebuilt_llvm --install-dir "$RUNNER_TEMP/llvm-prebuilt"
       - name: Configure Windows pagefile
         if: runner.os == 'Windows'
         shell: powershell
@@ -230,6 +223,7 @@ jobs:
     name: Docker build ${{ matrix.image.suffix }}
     permissions:
       contents: write
+      actions: read
     strategy:
       fail-fast: false
       matrix:
@@ -256,19 +250,6 @@ jobs:
         with:
           elixir-version: "1.20.3"
           otp-version: "27.3"
-      - name: Resolve prebuilt LLVM asset
-        id: llvm
-        working-directory: workflow-source
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          LLVM_EUDSL_ASSET_ARCH: ${{ matrix.image.llvm_arch }}
-          LLVM_EUDSL_ASSET_OS: manylinux
-          LLVM_EUDSL_RESOLVE_ONLY: 1
-        run: |
-          set -o pipefail
-          cd scripts/install_llvm
-          mix deps.get
-          mix beaver.install_prebuilt_llvm | grep -E '^LLVM_PREBUILT_(ASSET_NAME|URL)=' >> "$GITHUB_OUTPUT"
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
@@ -290,8 +271,9 @@ jobs:
           platforms: |
             ${{ matrix.image.platform }}
           file: workflow-source/docker/livebook.dockerfile
+          secrets: |
+            github_token=${{ github.token }}
           build-args: |
-            LLVM_EUDSL_ASSET_NAME=${{ steps.llvm.outputs.LLVM_PREBUILT_ASSET_NAME }}
             ZIG_URL=${{ matrix.image.zig }}
       - uses: actions/checkout@v7
         name: Check-out beaver

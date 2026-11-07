@@ -74,6 +74,50 @@ defmodule Beaver.MLIR.Transform.ScheduleTest do
     end
   end
 
+  test "prepared schedules reuse parsed IR with fresh execution state", %{ctx: ctx} do
+    assert {:ok, prepared} = MLIR.Transform.prepare(@canonicalize_schedule, ctx)
+
+    try do
+      for _ <- 1..3 do
+        payload = MLIR.Module.create!(@payload, ctx: ctx)
+
+        MLIR.AnalysisSession.with(payload, fn session ->
+          assert {:ok, %MLIR.Transform.Result{}} =
+                   MLIR.Transform.execute(payload, prepared, analysis_session: session)
+
+          refute MLIR.to_string(payload) =~ "arith.addi"
+          assert %{generation: 2, cached: []} = MLIR.AnalysisSession.stats(session)
+        end)
+
+        MLIR.Module.destroy(payload)
+      end
+
+      other = MLIR.Context.create()
+
+      try do
+        payload = MLIR.Module.create!(@payload, ctx: other)
+
+        assert {:error, %MLIR.Transform.Error{kind: :invalid_schedule}} =
+                 MLIR.Transform.execute(payload, prepared)
+
+        MLIR.Module.destroy(payload)
+      after
+        MLIR.Context.destroy(other)
+      end
+    after
+      MLIR.Transform.close(prepared)
+    end
+
+    assert :ok = MLIR.Transform.close(prepared)
+    payload = MLIR.Module.create!(@payload, ctx: ctx)
+
+    assert {:error, %MLIR.Transform.Error{reason: reason}} =
+             MLIR.Transform.execute(payload, prepared)
+
+    assert reason =~ "ClosedPreparedTransform"
+    MLIR.Module.destroy(payload)
+  end
+
   test "transform handle and parameter type helpers are context-aware", %{ctx: ctx} do
     assert MLIR.to_string(MLIR.Transform.any_op_type(ctx: ctx)) == "!transform.any_op"
     assert MLIR.to_string(MLIR.Transform.any_value_type(ctx: ctx)) == "!transform.any_value"

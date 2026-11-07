@@ -520,7 +520,7 @@ defmodule Beaver.MLIR.ConversionPlanTest do
       Plan.new(invalid_opt: 123)
     end
 
-    assert_raise ArgumentError, ~r/:mode must be :full or :partial/, fn ->
+    assert_raise ArgumentError, ~r/:mode must be :full, :partial or :analysis/, fn ->
       Plan.new(mode: :invalid)
     end
 

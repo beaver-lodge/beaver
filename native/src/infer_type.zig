@@ -11,12 +11,10 @@ const Request = struct {
     location: mlir_capi.Location.T,
     operands: []mlir_capi.Value.T,
     attributes: mlir_capi.Attribute.T,
+    properties: mlir_capi.Attribute.T,
     regions: []mlir_capi.Region.T,
 
     fn init(environment: beam.env, args: [*c]const beam.term) !@This() {
-        if (0 == kinda.erl_nif.enif_is_identical(args[5], beam.make_atom(environment, "nil")))
-            return error.UnsupportedProperties;
-
         const op_name = try beam.get_binary(environment, args[0]);
         const operands = try @import("callback_args.zig").Range(mlir_capi.Value).decode(environment, args[3], beam.allocator);
         errdefer beam.allocator.free(operands);
@@ -28,6 +26,7 @@ const Request = struct {
             .location = try mlir_capi.Location.resource.fetch(environment, args[2]),
             .operands = operands,
             .attributes = try mlir_capi.Attribute.resource.fetch(environment, args[4]),
+            .properties = if (kinda.erl_nif.enif_is_identical(args[5], beam.make_atom(environment, "nil")) != 0) .{ .ptr = null } else try mlir_capi.Attribute.resource.fetch(environment, args[5]),
             .regions = regions,
         };
     }
@@ -135,7 +134,7 @@ const ShapedTypeCollector = struct {
 
 fn Inference(comptime shaped: bool) type {
     const Collector = if (shaped) ShapedTypeCollector else TypeCollector;
-    const infer = if (shaped) c.mlirInferShapedTypeOpInterfaceInferReturnTypes else c.mlirInferTypeOpInterfaceInferReturnTypes;
+    const infer = if (shaped) c.beaverInferReturnComponents else c.beaverInferReturnTypes;
     return struct {
         fn collect(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
             var request = try Request.init(environment, args);
@@ -149,7 +148,7 @@ fn Inference(comptime shaped: bool) type {
                 @intCast(request.operands.len),
                 request.operands.ptr,
                 request.attributes,
-                null,
+                request.properties,
                 @intCast(request.regions.len),
                 request.regions.ptr,
                 Collector.append,

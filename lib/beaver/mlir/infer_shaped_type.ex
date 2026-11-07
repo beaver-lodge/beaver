@@ -4,9 +4,8 @@ defmodule Beaver.MLIR.InferShapedType do
 
   Ranked shapes expose dynamic dimensions as `:dynamic`; unranked results use
   `:unranked`. Element types and optional encoding attributes remain
-  owned by the request context. As with `Beaver.MLIR.InferType`, non-`nil`
-  operation properties are rejected because the upstream ABI is an untyped
-  `void *`.
+  owned by the request context. Operation properties use the same scoped,
+  attribute-based conversion as `Beaver.MLIR.InferType`.
   """
 
   alias Beaver.MLIR

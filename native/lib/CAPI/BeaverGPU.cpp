@@ -3,18 +3,12 @@
 #include "mlir/CAPI/Support.h"
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
-#ifdef BEAVER_HAS_ROCDL_TARGET_INFO
 #include "mlir/Dialect/LLVMIR/ROCDLTargetInfo.h"
-#endif
 
 using namespace mlir;
 
 MLIR_CAPI_EXPORTED bool beaverROCDLTargetInfoSupported() {
-#ifdef BEAVER_HAS_ROCDL_TARGET_INFO
   return true;
-#else
-  return false;
-#endif
 }
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverROCDLTargetAttrGetArch(MlirAttribute attribute) {
@@ -35,7 +29,6 @@ MLIR_CAPI_EXPORTED unsigned beaverROCDLTargetAttrGetWaveSize(MlirAttribute attri
 
 MLIR_CAPI_EXPORTED MlirAttribute beaverROCDLTargetAttrConfigure(MlirAttribute attribute, MlirStringRef arch,
                                                               unsigned wavesize) {
-#ifdef BEAVER_HAS_ROCDL_TARGET_INFO
   auto target = cast<ROCDL::ROCDLTargetAttr>(unwrap(attribute));
   auto *ctx = target.getContext();
   auto info = ROCDL::TargetInfo::get(unwrap(arch), wavesize, [&] { return emitError(UnknownLoc::get(ctx)); });
@@ -58,17 +51,12 @@ MLIR_CAPI_EXPORTED MlirAttribute beaverROCDLTargetAttrConfigure(MlirAttribute at
   triple.setArch(triple.getArch(), info->getSubArch());
   return wrap(ROCDL::ROCDLTargetAttr::get(ctx, target.getO(), triple.str(), info->getArchName(),
       featureString, target.getAbi(), flags.getDictionary(ctx), target.getLink()));
-#else
-  return {};
-#endif
 }
 
 MLIR_CAPI_EXPORTED void beaverROCDLTargetApplyModuleFlags(MlirOperation module, MlirAttribute target) {
-#ifdef BEAVER_HAS_ROCDL_TARGET_INFO
   auto info = ROCDL::TargetInfo::get(unwrap(beaverROCDLTargetAttrGetArch(target)),
       beaverROCDLTargetAttrGetWaveSize(target), [&] { return unwrap(module)->emitError(); });
   if (succeeded(info)) info->migrateArchFeaturesToModuleFlags(unwrap(module));
-#endif
 }
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverROCDLTargetAttrGetChip(MlirAttribute target) {

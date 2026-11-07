@@ -332,9 +332,7 @@ public:
     std::lock_guard<std::mutex> lock(instrumentationsMutex);
     instrumentedManagers.erase(manager);
   }
-#ifdef BEAVER_HAS_MLIR_THREAD_SAFE_PASS_INSTRUMENTATION
   bool isThreadSafe() const override { return true; }
-#endif
   void runBeforePass(mlir::Pass *, mlir::Operation *op) override {
     auto execution = operationExecution(op);
     passScopes.push_back(execution ? std::make_unique<beaver::ExecutionScope>(std::move(execution)) : nullptr);

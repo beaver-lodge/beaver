@@ -29,6 +29,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 defaults:
   run:
@@ -60,7 +61,7 @@ jobs:
           - runs-on: "windows-2022"
             otp: "27.3"
             elixir: "1.20.3"
-            llvm: "triton"
+            llvm: "eudsl"
     steps:
       - uses: actions/checkout@v7
         name: Check-out beaver
@@ -107,6 +108,9 @@ jobs:
           restore-keys: ${{ runner.os }}-mix-
       - name: Install dependencies
         run: mix deps.get
+      - name: Set up MSVC toolchain
+        if: runner.os == 'Windows'
+        uses: ./.github/actions/setup-msvc
       - name: Install prebuilt LLVM
         env:
           GITHUB_TOKEN: ${{ github.token }}
@@ -115,27 +119,31 @@ jobs:
         run: |
           cd scripts/install_llvm
           mix deps.get
-          if [ "${{ matrix.llvm }}" == "triton" ]; then
-            mix openai_triton.install --llvm-only --triton-ref "$TRITON_REF" \
-              --install-dir "$RUNNER_TEMP/llvm-prebuilt"
-          else
-            mix beaver.install_prebuilt_llvm --install-dir "$RUNNER_TEMP/llvm-prebuilt"
-          fi
-      - name: Install Triton core prebuilt
-        if: matrix.llvm == 'triton' && runner.os == 'Linux'
+          mix beaver.install_prebuilt_llvm --install-dir "$RUNNER_TEMP/llvm-prebuilt"
+      - name: Check out Triton
+        if: matrix.llvm == 'triton'
+        uses: actions/checkout@v7
+        with:
+          repository: triton-lang/triton
+          path: third_party/triton
+          ref: ${{ env.TRITON_REF }}
+      - name: Cache Triton core
+        if: matrix.llvm == 'triton'
+        id: triton-cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/triton-prebuilt
+          key: triton-${{ runner.os }}-${{ hashFiles('native-deps.json', 'triton.json', 'scripts/install_llvm/patches/*') }}
+      - name: Build Triton against the selected LLVM
+        if: matrix.llvm == 'triton' && steps.triton-cache.outputs.cache-hit != 'true'
         env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          ref="triton-prebuilt-${TRITON_REF}"
-          asset="triton-${TRITON_REF}-ubuntu-x86_64.tar.gz"
-          gh release download "$ref" --repo beaver-lodge/beaver \
-            --pattern "$asset" --dir "$RUNNER_TEMP"
-          mkdir -p "$RUNNER_TEMP/triton-prebuilt"
-          tar xzf "$RUNNER_TEMP/$asset" -C "$RUNNER_TEMP/triton-prebuilt"
-          echo "BEAVER_TRITON_PREBUILT_DIR=$RUNNER_TEMP/triton-prebuilt" >> "$GITHUB_ENV"
-      - name: Set up MSVC toolchain
-        if: runner.os == 'Windows'
-        uses: ./.github/actions/setup-msvc
+          TRITON_SOURCE_DIR: ${{ github.workspace }}/third_party/triton
+          LLVM_SYSPATH: ${{ runner.temp }}/llvm-prebuilt
+          TRITON_PREBUILT_OUTPUT_DIR: ${{ runner.temp }}/triton-prebuilt
+        run: bash scripts/build-triton-prebuilt.sh
+      - name: Enable Triton
+        if: matrix.llvm == 'triton'
+        run: echo "BEAVER_TRITON_PREBUILT_DIR=$RUNNER_TEMP/triton-prebuilt" >> "$GITHUB_ENV"
       - name: Configure Windows pagefile
         if: runner.os == 'Windows'
         shell: powershell

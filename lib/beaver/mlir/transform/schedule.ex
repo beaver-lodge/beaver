@@ -6,21 +6,32 @@ defmodule Beaver.MLIR.Transform.Schedule do
   alias Beaver.MLIR.Transform
 
   @doc false
-  def with_module(input, %Context{} = ctx, fun) when is_function(fun, 1) do
-    with {:ok, bytes} <- source_bytes(input),
-         {:ok, module} <- parse_module(bytes, ctx) do
-      try do
-        case MLIR.verify(module) do
-          {:ok, _module} -> fun.(module)
-          :null -> {:error, invalid_error("parsed transform module is null")}
-          {:error, diagnostics} -> {:error, invalid_error(:verification_failed, diagnostics)}
-        end
-      after
-        MLIR.Module.destroy(module)
-      end
-    end
+  def load(input, %Context{} = ctx) do
+    with {:ok, bytes} <- source_bytes(input), {:ok, module} <- parse_module(bytes, ctx), do: verify_loaded(module)
   rescue
     exception in [ArgumentError] -> {:error, invalid_error(Exception.message(exception))}
+  end
+
+  defp verify_loaded(module) do
+    result =
+      try do
+        MLIR.verify(module)
+      rescue
+        exception ->
+          MLIR.Module.destroy(module)
+          reraise exception, __STACKTRACE__
+      end
+
+    case result do
+      {:ok, _} -> {:ok, module}
+      {:error, diagnostics} -> invalid_module(module, diagnostics)
+      :null -> invalid_module(module, [])
+    end
+  end
+
+  defp invalid_module(module, diagnostics) do
+    MLIR.Module.destroy(module)
+    {:error, invalid_error(:verification_failed, diagnostics)}
   end
 
   @doc false

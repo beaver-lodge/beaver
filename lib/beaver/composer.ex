@@ -188,6 +188,12 @@ defmodule Beaver.Composer do
   > avoiding a native verification round trip after every Elixir pass.
   """
   def run(composer, opts \\ @run_default_opts) do
+    Beaver.MLIR.AnalysisSession.track(opts[:analysis_session], fn ->
+      execute(composer, Keyword.delete(opts, :analysis_session))
+    end)
+  end
+
+  defp execute(composer, opts) do
     case Keyword.get(opts, :execution, :native) do
       :native ->
         if opts[:verifier] == :pipeline,

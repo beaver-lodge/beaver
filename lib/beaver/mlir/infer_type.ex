@@ -5,9 +5,8 @@ defmodule Beaver.MLIR.InferType do
 
   Requests accept `:operation`, `:context`, and optional `:location`,
   `:operands`, dictionary `:attributes`, `:regions`, and `:properties` fields.
-  The upstream properties argument is an untyped `void *`; this API therefore
-  rejects every non-`nil` value until an operation-specific ownership contract
-  exists.
+  Properties are supplied as an MLIR attribute. Native code allocates, validates
+  and destroys the operation-specific storage within the inference call.
   """
 
   alias Beaver.MLIR

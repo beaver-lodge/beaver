@@ -132,6 +132,13 @@ Beaver is essentially LLVM/MLIR on Erlang/Elixir. It is kind of interesting to s
 
 ## Getting started
 
+Native builds require the LLVM main revision pinned in `native-deps.json` or a newer
+revision with the same APIs; older toolchains are unsupported. Run
+`mix beaver.install_prebuilt_llvm` in `scripts/install_llvm` after `mix deps.get`.
+The installer verifies upstream CI artifacts and falls back to building the exact
+source revision if they are unavailable (`--from-source` selects this explicitly).
+Triton core is rebuilt against that same LLVM with `mix beaver.build_triton`.
+
 - Tutorial: [Your first compiler with Beaver!](https://hexdocs.pm/beaver/your-first-beaver-compiler.html)
 
 <!-- TODO: single .exs example -->

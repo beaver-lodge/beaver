@@ -13,9 +13,12 @@ on:
       - main
     paths:
       - triton.json
+      - native-deps.json
+      - scripts/install_llvm/patches/**
 
 permissions:
   contents: write
+  actions: read
 
 concurrency:
   group: triton-prebuilt-${{ github.ref }}
@@ -49,6 +52,7 @@ jobs:
           fi
           echo "TRITON_REF=$ref" >> "$GITHUB_ENV"
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "LLVM_REF=$(jq -er .llvm.source_ref native-deps.json)" >> "$GITHUB_ENV"
 
       - uses: actions/checkout@v7
         name: Check out Triton
@@ -65,11 +69,13 @@ jobs:
       - name: Set up Zig, Ninja, and Python
         uses: ./.github/actions/setup-native-tools
 
-      - name: Install Triton-pinned LLVM prebuilt
+      - name: Install selected LLVM
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           cd scripts/install_llvm
           mix deps.get
-          mix openai_triton.install --llvm-only --triton-ref "$TRITON_REF" \
+          mix beaver.install_prebuilt_llvm \
             --install-dir "$RUNNER_TEMP/llvm-prebuilt"
 
       - name: Build Triton core libraries
@@ -97,10 +103,10 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          tag="triton-prebuilt-${TRITON_REF}"
+          tag="triton-prebuilt-${TRITON_REF}-llvm-${LLVM_REF}"
           asset="$RUNNER_TEMP/triton-${TRITON_REF}-${{ matrix.os }}-${{ matrix.arch }}.tar.gz"
           gh release create "${tag}" --repo beaver-lodge/beaver \
             --title "Triton core prebuilt @ ${TRITON_REF}" \
-            --notes "Core Triton dialects/passes/conversions built against the Triton-pinned LLVM." \
+            --notes "Core Triton dialects/passes/conversions built against LLVM ${LLVM_REF}." \
             || true
           gh release upload "${tag}" "${asset}" --repo beaver-lodge/beaver --clobber
