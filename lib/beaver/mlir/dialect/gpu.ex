@@ -34,14 +34,9 @@ defmodule Beaver.MLIR.Dialect.GPU do
   @object_formats %{offload: 1, assembly: 2, binary: 3, fatbin: 4}
 
   @doc """
-  Builds a `gpu.binary` module from an object value without printing or parsing
-  MLIR text.
-
-  `target` is an NVVM or ROCDL target attribute. `object` remains an Elixir
-  binary all the way into the native `gpu.object` builder, so assembly and
-  binary payloads do not require MLIR string escaping.
-
-  The supported formats are `:offload`, `:assembly`, `:binary`, and `:fatbin`.
+  Builds a `gpu.binary` module with an NVVM or ROCDL target attribute.
+  `object` passes directly to the native builder without MLIR string escaping.
+  Formats are `:offload`, `:assembly`, `:binary` and `:fatbin` (default).
   """
   @spec binary_module(String.t(), Deferred.attribute(), binary(), keyword()) ::
           Deferred.contextual(MLIR.Module.t())
@@ -76,37 +71,20 @@ defmodule Beaver.MLIR.Dialect.GPU do
   end
 
   @doc """
-  Construct an NVVM target attribute from Elixir data.
-
-  Supported options:
-
-    * `:chip` - target chip, e.g. `"sm_80"`
-    * `:triple` - target triple, e.g. `"nvptx64-nvidia-cuda"`
-    * `:features` - target features, e.g. `"+ptx80"`
-    * `:opt` - optimization level, an integer
-
-  Returns a deferred attribute value unless `ctx:` is given, following the
-  convention of `MLIR.Attribute.get/2`. The resulting attribute can be passed
-  to `package_binary!/3` as the target configuration of a `gpu.binary`.
+  Builds an NVVM target for `package_binary!/3`, deferred unless `ctx:` is given.
+  Options: `:chip` (e.g. `"sm_80"`), `:triple` (e.g. `"nvptx64-nvidia-cuda"`),
+  `:features` (e.g. `"+ptx80"`) and integer optimization level `:opt`.
   """
   def nvvm_target_attribute(opts \\ []), do: target_attribute("nvvm", opts, [:chip, :triple, :features, :opt])
 
   @doc """
-  Construct a ROCDL target attribute from Elixir data.
+  Builds a ROCDL target for `package_binary!/3`, deferred unless `ctx:` is given.
 
-  Supported options:
-
-    * `:chip` - target chip, e.g. `"gfx90a"` (defaults to `"gfx900"`)
-    * `:triple` - target triple, e.g. `"amdgcn-amd-amdhsa"`
-    * `:features` - target features, e.g. `"+wavefrontsize64"`
-    * `:opt` - optimization level, an integer (defaults to `2`)
-    * `:abi` - ABI version, e.g. `"600"`
-    * `:arch` - processor, generic GPU, triple or full target ID; replaces `:chip`/`:triple`
-    * `:wavesize` - `0` (target default), `32` or `64`, for lowering and codegen
-
-  Returns a deferred attribute value unless `ctx:` is given, following the
-  convention of `MLIR.Attribute.get/2`. The resulting attribute can be passed
-  to `package_binary!/3` as the target configuration of a `gpu.binary`.
+  * `:chip` — e.g. `"gfx90a"` (default `"gfx900"`).
+  * `:triple`, `:features`, `:abi` — e.g. `"amdgcn-amd-amdhsa"`, `"+wavefrontsize64"`, `"600"`.
+  * `:opt` — integer optimization level (default `2`).
+  * `:arch` — processor, generic GPU, triple or full target ID; excludes `:chip`/`:triple`.
+  * `:wavesize` — `0` (target default), `32` or `64`, for lowering and codegen.
   """
   def rocdl_target_attribute(opts \\ []) do
     if Keyword.has_key?(opts, :arch) and (Keyword.has_key?(opts, :chip) or Keyword.has_key?(opts, :triple)),
@@ -149,25 +127,14 @@ defmodule Beaver.MLIR.Dialect.GPU do
   end
 
   @doc """
-  Lower and package a module containing GPU kernels into a `gpu.binary`.
-
-  `targets` is an NVVM or ROCDL target attribute (from
-  `nvvm_target_attribute/1` or `rocdl_target_attribute/1`) or a list of them;
-  one `gpu.object` is produced per target. The conversion pass is selected
-  from the target dialect: `#nvvm.target` lowers through `convert-gpu-to-nvvm`
-  and `#rocdl.target` through `convert-gpu-to-rocdl`. The target configuration
-  is attached to each lowered `gpu.module` as its `targets` attribute,
-  replacing hard-coded legacy pipeline options.
-
-  Options:
-
-    * `:format` - binary format passed to `gpu-module-to-binary`. Defaults to
-      `:isa` (PTX assembly), which is generated entirely on CPU without
-      requiring a CUDA toolkit.
-
-  Returns the module with `gpu.launch`/`gpu.func` code replaced by `gpu.binary`
-  operations. Assembly (`:isa`) for both backends is generated entirely on CPU
-  by the LLVM NVPTX/AMDGPU targets bundled with the MLIR prebuilt.
+  Replaces GPU kernels with `gpu.binary` operations in the returned module.
+  Accepts one target attribute or a list from `nvvm_target_attribute/1` or
+  `rocdl_target_attribute/1`, producing one `gpu.object` per target.
+  Each target is attached to the lowered `gpu.module`; its dialect selects
+  `convert-gpu-to-nvvm` or `convert-gpu-to-rocdl`.
+  `:format` is passed to `gpu-module-to-binary` (default `:isa`, assembly).
+  Both NVPTX and AMDGPU assembly use the bundled LLVM backends on CPU,
+  without requiring a CUDA toolkit.
   """
   def package_binary!(module, targets, opts \\ []) do
     format = Keyword.get(opts, :format, :isa)

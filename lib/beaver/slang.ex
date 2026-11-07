@@ -16,7 +16,7 @@ defmodule Beaver.Slang do
   Slang supports named type and attribute parameters, named operation operands,
   results, attributes and regions, reusable constraints, `any_of`, `all_of` and
   `base` constraints, and optional or variadic operands and results. Built-in
-  built-in and callback-backed custom operation traits can be attached when
+  and callback-backed custom operation traits can be attached when
   the dialect is loaded.
 
   Schema construction and runtime interface attachment are separate:
@@ -25,9 +25,7 @@ defmodule Beaver.Slang do
   [Slang guide](slang.html) for a complete dialect and the supported syntax.
   """
 
-  @doc """
-  This macro is invoked when the module is used. It sets up the module by registering attributes and importing macros from `Beaver.Slang`.
-  """
+  @doc "Registers the dialect declarations and imports the Slang macros."
   defmacro __using__(opts) do
     name = opts |> Keyword.fetch!(:name)
 
@@ -45,7 +43,6 @@ defmodule Beaver.Slang do
   end
 
   @doc false
-  # This macro is invoked before the module is compiled. Internally it defines a function which creates the MLIR dialect's IRDL module. It also uses the `Beaver.MLIR.Dialect` module to define the dialect's operations.
   defmacro __before_compile__(_env) do
     quote do
       @doc false
@@ -67,17 +64,18 @@ defmodule Beaver.Slang do
     end
   end
 
+  defp creator_env do
+    quote do
+      [ip: Beaver.Env.block(), ctx: Beaver.Env.context(), loc: Kernel.var!(slang_internal_source_loc)]
+    end
+  end
+
   @doc false
-  # This function transforms the `^argument`s of a defop macro call. It handles different cases based on the structure of the pins and returns the transformed AST.
   defp transform_defop_pins({:^, _line1, [{name, _line2, nil}]}) do
     alias_name = get_alias_name(name)
 
     quote do
-      unquote(alias_name)(
-        ctx: Beaver.Env.context(),
-        ip: Beaver.Env.block(),
-        loc: Kernel.var!(slang_internal_source_loc)
-      )
+      unquote(alias_name)(unquote(creator_env()))
     end
   end
 
@@ -86,10 +84,9 @@ defmodule Beaver.Slang do
   defp transform_defop_pins({:=, _line0, [var, right]}) do
     quote do
       unquote(var) =
-        Beaver.Slang.create_constraint(unquote(right),
-          ip: Beaver.Env.block(),
-          ctx: Beaver.Env.context(),
-          loc: Kernel.var!(slang_internal_source_loc)
+        Beaver.Slang.create_constraint(
+          unquote(right),
+          unquote(creator_env())
         )
     end
   end
@@ -97,7 +94,6 @@ defmodule Beaver.Slang do
   defp transform_defop_pins(ast), do: ast
 
   @doc false
-  # This function creates a `irdl.is` op for a given value. It uses the mlir macro to generate the MLIR code for the constraint attribute.
   def create_constraint({variadic_tag, v}, opts) when variadic_tag in @variadic_tags,
     do: {variadic_tag, create_constraint(v, opts)}
 
@@ -134,7 +130,6 @@ defmodule Beaver.Slang do
     })
   end
 
-  # This function determines the variadicity of the given values based on the provided options. It generates the variadicity attribute for the values if needed.
   defp get_variadicity(values, opts) do
     if opts[:need_variadicity] do
       tags =
@@ -150,7 +145,6 @@ defmodule Beaver.Slang do
     end
   end
 
-  # This function removes the variadicity tags from the given values.
   defp strip_variadicity(values) do
     values
     |> List.wrap()
@@ -210,10 +204,8 @@ defmodule Beaver.Slang do
   @doc false
   def constraint_location(opts, ctx), do: opts[:loc] || source_location(opts, ctx)
 
-  # This function generates the AST for an argument based on the given index.
   defp get_slang_arg_ast(i), do: {"slang_internal_arg#{i}" |> String.to_atom(), [], nil}
 
-  # This function transforms the given argument AST based on the provided usage (if it is using as variable or constraint declaration). It handles different cases based on the structure of the argument and returns the transformed AST.
   defp transform_constraint(ast, i) do
     case ast do
       {_name, _line0, nil} ->
@@ -228,10 +220,9 @@ defmodule Beaver.Slang do
       _ ->
         quote do
           unquote(get_slang_arg_ast(i)) =
-            Beaver.Slang.create_constraint(unquote(ast),
-              ip: Beaver.Env.block(),
-              ctx: Beaver.Env.context(),
-              loc: Kernel.var!(slang_internal_source_loc)
+            Beaver.Slang.create_constraint(
+              unquote(ast),
+              unquote(creator_env())
             )
         end
     end
@@ -246,7 +237,6 @@ defmodule Beaver.Slang do
     end
   end
 
-  # This function generates the AST for the arguments of a creator function as variables.
   defp get_args_as_vars(args) do
     for {v, i} <- Enum.with_index(args), do: transform_variable(v, i)
   end
@@ -338,13 +328,8 @@ defmodule Beaver.Slang do
     Keyword.keyword?(values) and Enum.all?(values, fn {name, _value} -> name not in @variadic_tags end)
   end
 
-  defp normalize_results_ast(nil, _explicit_names), do: {quote(do: []), []}
-
   defp normalize_results_ast({:__block__, meta, expressions}, explicit_names) do
-    {result_values, result_names} =
-      expressions |> List.last() |> split_named_values("result", explicit_names)
-
-    result_expression = quote(do: [unquote_splicing(result_values)])
+    {result_expression, result_names} = normalize_results_ast(List.last(expressions), explicit_names)
     expressions = List.replace_at(expressions, -1, result_expression)
     {{:__block__, meta, expressions}, result_names}
   end
@@ -434,7 +419,6 @@ defmodule Beaver.Slang do
     do: regions |> List.wrap() |> Enum.map(&do_gen_region(&1, block, ctx, loc))
 
   @doc false
-  # This function generates the AST for a creator function for an IRDL operation (like `irdl.operation`, `irdl.type`). It uses the transform_defop_pins/1 function to transform the pins, generates the MLIR code for the operation and its arguments, and applies the operation using op_applier/1.
   defp gen_creator(op, args_op, call, do_block, opts) do
     {name, args} = call |> Macro.decompose_call()
     name = Atom.to_string(name)
@@ -568,21 +552,15 @@ defmodule Beaver.Slang do
     ]
   end
 
-  @doc """
-  This macro defines a type in the dialect.
-  """
+  @doc "Defines a type in the dialect."
   defmacro deftype(call, opts \\ []),
     do: gen_create_element_creator(:type, call, opts, __CALLER__)
 
-  @doc """
-  This macro defines a attribute in the dialect.
-  """
+  @doc "Defines an attribute in the dialect."
   defmacro defattr(call, opts \\ []),
     do: gen_create_element_creator(:attribute, call, opts, __CALLER__)
 
-  @doc """
-  This macro defines an operation in the dialect. It generates the AST for the creator function for the operation.
-  """
+  @doc "Defines an operation and generates its creator function."
   defmacro defop(call, block \\ nil) do
     block =
       Keyword.validate!(block || [], ~w(do results result_names operand_names attributes regions traits interfaces)a)
@@ -625,11 +603,7 @@ defmodule Beaver.Slang do
             Beaver.Slang.constraint_location(opts, Beaver.Env.context())
 
           unquote(block[:do])
-          |> Beaver.Slang.create_parametric(
-            ctx: Beaver.Env.context(),
-            ip: Beaver.Env.block(),
-            loc: Kernel.var!(slang_internal_source_loc)
-          )
+          |> Beaver.Slang.create_parametric(unquote(creator_env()))
         end
       end
     end
@@ -649,9 +623,7 @@ defmodule Beaver.Slang do
   """
   defmacro defalias(call, block), do: gen_constraint(call, block)
 
-  @doc """
-  This macro generates the AST for the any_of attribute in the dialect.
-  """
+  @doc "Generates an `irdl.any_of` constraint."
   defmacro any_of(types), do: combine_constraints(:any_of, types)
 
   @doc "Generates an `irdl.all_of` constraint."
@@ -664,10 +636,9 @@ defmodule Beaver.Slang do
       mlir do
         types =
           for type <- unquote(types) do
-            Beaver.Slang.create_constraint(type,
-              ip: Beaver.Env.block(),
-              ctx: Beaver.Env.context(),
-              loc: Kernel.var!(slang_internal_source_loc)
+            Beaver.Slang.create_constraint(
+              type,
+              unquote(creator_env())
             )
           end
 
@@ -681,22 +652,15 @@ defmodule Beaver.Slang do
   def create_base({:parametric, symbol, _values, _element}, opts),
     do: create_base({:base_ref, symbol}, opts)
 
-  def create_base({:base_ref, symbol}, opts) do
+  def create_base(name, opts) when is_binary(name), do: create_base({:base_name, Attribute.string(name)}, opts)
+
+  def create_base({key, value}, opts) when key in [:base_ref, :base_name] do
     Deferred.from_opts(opts, fn ctx ->
       mlir ctx: ctx, ip: Deferred.fetch_insertion_point(opts) do
         loc = constraint_location(opts, ctx)
 
-        IRDL.base([loc, base_ref: Deferred.resolve(symbol, ctx)]) >>>
+        IRDL.base([loc, {key, Deferred.resolve(value, ctx)}]) >>>
           ~t{!irdl.attribute}
-      end
-    end)
-  end
-
-  def create_base(name, opts) when is_binary(name) do
-    Deferred.from_opts(opts, fn ctx ->
-      mlir ctx: ctx, ip: Deferred.fetch_insertion_point(opts) do
-        loc = constraint_location(opts, ctx)
-        IRDL.base([loc, base_name: Attribute.string(name)]) >>> ~t{!irdl.attribute}
       end
     end)
   end
@@ -709,10 +673,9 @@ defmodule Beaver.Slang do
   """
   defmacro base(base) do
     quote do
-      Beaver.Slang.create_base(unquote(base),
-        ip: Beaver.Env.block(),
-        ctx: Beaver.Env.context(),
-        loc: Kernel.var!(slang_internal_source_loc)
+      Beaver.Slang.create_base(
+        unquote(base),
+        unquote(creator_env())
       )
     end
   end
@@ -726,9 +689,7 @@ defmodule Beaver.Slang do
   @doc "Marks an operand or result constraint as a required singleton."
   defmacro single(constraint), do: quote(do: {:single, unquote(constraint)})
 
-  @doc """
-  This macro generates the AST for `irdl.is` op, usually used to create a constraint on type
-  """
+  @doc "Generates an `irdl.is` constraint, typically for a type."
   defmacro is(type) do
     quote do
       use Beaver
@@ -740,9 +701,7 @@ defmodule Beaver.Slang do
     end
   end
 
-  @doc """
-  This macro generates the AST for the `irdl.any` op.
-  """
+  @doc "Generates an `irdl.any` constraint."
   defmacro any() do
     quote do
       use Beaver
@@ -754,7 +713,6 @@ defmodule Beaver.Slang do
   end
 
   @doc false
-  # This function creates a parametric attribute for a given value. It generates the code for `irdl.parametric` op.
   def create_parametric({:parametric, symbol, values, _}, opts) do
     base_type = symbol
 
@@ -773,7 +731,6 @@ defmodule Beaver.Slang do
   def create_parametric(v, _opts), do: v
 
   @doc false
-  # This function creates the MLIR dialect using the provided name and creators. It generates the MLIR code for the dialect and call all the generated creators.
   def create_dialect(name, creators, opts) do
     Deferred.from_opts(
       opts,

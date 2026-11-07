@@ -1,5 +1,131 @@
 alias Beaver.MLIR.{CAPI, ConversionTarget, Operation, RewritePatternSet, Type, Value}
 
+defmodule Beaver.MLIR.Conversion.Callbacks do
+  @moduledoc false
+
+  alias Beaver.MLIR
+  alias Kinda.CallbackRuntime
+
+  # Keep the exact native message shapes while sharing argument decoding and
+  # exception capture. Pattern registrations additionally carry a root name.
+  @callbacks [
+    {:conversion_legality, 1, :legality, :reply_legality},
+    {:convert_type, 1, :converted_type, :reply_type},
+    {:convert_types, 1, :converted_types, :reply_types},
+    {:source_materialization, 4, :materialized, :reply_value},
+    {:target_materialization, 5, :materialized, :reply_value},
+    {:target_materialization_1_to_n, 5, :materialized_values, :reply_values},
+    {:conversion_pattern, 3, :pattern_result, :reply_pattern},
+    {:conversion_pattern_1_to_n, 3, :pattern_result, :reply_pattern}
+  ]
+  @messages Enum.map(@callbacks, fn {kind, arity, _, _} -> {kind, arity + 5} end)
+  defguard is_message(message) when is_tuple(message) and {elem(message, 0), tuple_size(message)} in @messages
+
+  for {kind, arity, normalize, reply} <- @callbacks do
+    args = Macro.generate_arguments(arity, __MODULE__)
+
+    def handle({unquote(kind), token, callback, _id, _sent_at, unquote_splicing(args)}) do
+      callback =
+        if unquote(kind) in [:conversion_pattern, :conversion_pattern_1_to_n],
+          do: elem(MLIR.ConversionPattern.unwrap_callback(callback), 1),
+          else: callback
+
+      invoke(
+        token,
+        fn -> unquote(normalize)(apply(callback, Enum.map([unquote_splicing(args)], &native/1))) end,
+        &unquote(reply)(&1, &2)
+      )
+    end
+  end
+
+  def handle(_message), do: :unhandled
+
+  defp invoke(token, fun, reply) do
+    outcome = CallbackRuntime.invoke_reply(token, fun, reply)
+    {:handled, MLIR.ExternalInterface.callback_failure(outcome)}
+  end
+
+  defp native(nil), do: nil
+  defp native(values) when is_list(values), do: Enum.map(values, &native/1)
+  defp native(value), do: Beaver.Native.check!(value)
+
+  defp legality(value) when value in [:legal, true], do: {:ok, :legal}
+  defp legality(value) when value in [:illegal, false], do: {:ok, :illegal}
+  defp legality(:no_opinion), do: {:ok, :no_opinion}
+  defp legality({:error, _reason} = error), do: error
+
+  defp legality(other), do: raise(ArgumentError, "invalid dynamic legality result: #{inspect(other)}")
+
+  defguardp handle_result(value, module, many)
+            when (many and is_list(value)) or (not many and is_struct(value, module))
+
+  for {name, module, many, label, list_label} <- [
+        {:converted_type, Type, false, "type conversion", nil},
+        {:converted_types, Type, true, "1:N conversion", "1:N type conversion"},
+        {:materialized, Value, false, "materialization", nil},
+        {:materialized_values, Value, true, "1:N materialization", "1:N target materialization"}
+      ] do
+    defp unquote(name)({:ok, value}) when handle_result(value, unquote(module), unquote(many)),
+      do: unquote(name)(value)
+
+    defp unquote(name)(value) when handle_result(value, unquote(module), unquote(many)) do
+      if unquote(many), do: validate_list!(value, unquote(module), unquote(list_label))
+      {:ok, {:success, value}}
+    end
+
+    if name == :materialized do
+      defp unquote(name)(nil), do: {:ok, :declined}
+    end
+
+    defp unquote(name)(:declined), do: {:ok, :declined}
+    defp unquote(name)({:error, _} = error), do: error
+    defp unquote(name)(other), do: raise(ArgumentError, "invalid #{unquote(label)} result: #{inspect(other)}")
+  end
+
+  defp pattern_result(value) when value in [:ok, true], do: {:ok, :match}
+  defp pattern_result({:ok, _state}), do: {:ok, :match}
+  defp pattern_result(value) when value in [:no_match, false], do: {:ok, :no_match}
+  defp pattern_result({:error, _reason} = error), do: error
+
+  defp pattern_result(other), do: raise(ArgumentError, "invalid conversion pattern result: #{inspect(other)}")
+
+  defp validate_list!(values, module, label) do
+    unless Enum.all?(values, &is_struct(&1, module)),
+      do: raise(ArgumentError, "#{label} must return only #{inspect(module)} values")
+  end
+
+  defp reply_legality(token, {:ok, result}) do
+    code = %{legal: 0, illegal: 1, no_opinion: 2} |> Map.fetch!(result)
+    CAPI.beaver_raw_callback_reply_code(token, true, code)
+  end
+
+  defp reply_legality(token, _failure), do: CAPI.beaver_raw_callback_reply_code(token, false, 1)
+
+  for {name, nif, kind} <- [
+        {:reply_type, :beaver_raw_type_converter_reply_callback, :type},
+        {:reply_types, :beaver_raw_type_converter_reply_types, :types},
+        {:reply_value, :beaver_raw_type_converter_reply_value, :value},
+        {:reply_values, :beaver_raw_type_converter_reply_values, :values}
+      ] do
+    defp unquote(name)(token, outcome) do
+      {success, code, value} =
+        case outcome do
+          {:ok, {:success, value}} -> {true, 0, value}
+          {:ok, :declined} when unquote(kind) != :values -> {true, 2, nil}
+          _ -> {false, 1, nil}
+        end
+
+      value = if unquote(kind) in [:types, :values], do: Enum.map(value || [], & &1.ref), else: value && value.ref
+      args = if unquote(kind) == :value, do: [token, success, value], else: [token, success, code, value]
+      apply(CAPI, unquote(nif), args)
+    end
+  end
+
+  defp reply_pattern(token, {:ok, :match}), do: CAPI.beaver_raw_callback_reply(token, true)
+
+  defp reply_pattern(token, _no_match_or_failure), do: CAPI.beaver_raw_callback_reply(token, false)
+end
+
 defmodule Beaver.MLIR.Conversion do
   @moduledoc """
   High-level, diagnostic-aware MLIR dialect conversion.
@@ -16,6 +142,7 @@ defmodule Beaver.MLIR.Conversion do
   use Beaver.ComposerGenerator, prefix: "mlirCreateConversion"
 
   require Logger
+  require MLIR.Conversion.Callbacks
   alias Beaver.MLIR
 
   defmodule Error do
@@ -64,7 +191,18 @@ defmodule Beaver.MLIR.Conversion do
         ) :: result()
   def apply(mode, ir, target, patterns, opts \\ [])
 
-  def apply(mode, ir, target, patterns, opts), do: run(mode, ir, target, patterns, opts, false)
+  def apply(mode, ir, target, patterns, opts) do
+    case opts[:profile] do
+      nil ->
+        run(mode, ir, target, patterns, opts, false)
+
+      %Beaver.Execution.Profile{} = profile ->
+        Beaver.Execution.Profile.measure(profile, :conversion, fn ->
+          {result, _receipt} = run(mode, ir, target, patterns, opts, true)
+          result
+        end)
+    end
+  end
 
   @doc """
   Runs one conversion with bounded callback and native-worker profiling.
@@ -83,19 +221,12 @@ defmodule Beaver.MLIR.Conversion do
   def profile(mode, ir, target, patterns, opts \\ []),
     do: run(mode, ir, target, patterns, opts, true)
 
-  defp run(mode, ir, target, patterns, opts, profile?)
-
-  defp run(mode, ir, %ConversionTarget{} = target, %RewritePatternSet{} = set, opts, profile?)
-       when mode in [:full, :partial] do
-    conversion_options = conversion_options!(opts)
-    frozen = RewritePatternSet.freeze(set)
-
-    do_apply(mode, ir, target, frozen, true, conversion_options, profile?)
-  end
-
-  defp run(mode, ir, %ConversionTarget{} = target, %MLIR.FrozenRewritePatternSet{} = patterns, opts, profile?)
-       when mode in [:full, :partial] do
-    do_apply(mode, ir, target, patterns, false, conversion_options!(opts), profile?)
+  defp run(mode, ir, %ConversionTarget{} = target, %kind{} = patterns, opts, profile?)
+       when mode in [:full, :partial] and kind in [RewritePatternSet, MLIR.FrozenRewritePatternSet] do
+    options = conversion_options!(opts)
+    owned = kind == RewritePatternSet
+    patterns = if owned, do: RewritePatternSet.freeze(patterns), else: patterns
+    do_apply(mode, ir, target, patterns, owned, options, profile?)
   end
 
   defp do_apply(
@@ -104,23 +235,19 @@ defmodule Beaver.MLIR.Conversion do
          %ConversionTarget{registration: registration},
          %MLIR.FrozenRewritePatternSet{ref: patterns_ref},
          owns_patterns,
-         {folding_mode, materializations, timeout_ms},
+         {folding_mode, materializations, timeout_ms, execution_profile},
          profile?
        ) do
-    operation = operation(ir)
+    operation = Operation.from_module(ir)
     context = MLIR.context(ir)
-    profile = if profile?, do: __MODULE__.Profile.start(mode, ir)
+    profile = if profile?, do: Map.put(__MODULE__.Profile.start(mode, ir), :execution_profile, execution_profile)
 
     id =
       try do
-        CAPI.beaver_raw_apply_conversion_async(
-          mode == :full,
-          registration,
-          operation.ref,
-          patterns_ref,
-          owns_patterns,
-          folding_mode,
-          materializations,
+        CAPI.beaver_raw_execution_worker(
+          context.ref,
+          :conversion,
+          {mode == :full, registration, operation.ref, patterns_ref, owns_patterns, folding_mode, materializations},
           profile?
         )
       rescue
@@ -138,19 +265,16 @@ defmodule Beaver.MLIR.Conversion do
     unless Keyword.keyword?(opts),
       do: raise(ArgumentError, "conversion options must be a keyword list")
 
-    unsupported = Keyword.keys(opts) -- [:timeout, :folding_mode, :build_materializations]
+    unsupported = Keyword.keys(opts) -- [:timeout, :folding_mode, :build_materializations, :profile]
 
     if unsupported != [], do: raise(ArgumentError, "unsupported conversion options: #{inspect(unsupported)}")
 
     folding_mode = folding_mode!(Keyword.get(opts, :folding_mode))
     materializations = materializations!(Keyword.get(opts, :build_materializations))
 
-    timeout_ms = Keyword.get(opts, :timeout, 30_000)
+    timeout_ms = Beaver.Execution.callback_timeout!(opts)
 
-    unless is_integer(timeout_ms) and timeout_ms >= 0,
-      do: raise(ArgumentError, ":timeout must be a non-negative integer")
-
-    {folding_mode, materializations, timeout_ms}
+    {folding_mode, materializations, timeout_ms, opts[:profile]}
   end
 
   defp folding_mode!(nil), do: -1
@@ -193,35 +317,27 @@ defmodule Beaver.MLIR.Conversion do
     end
   end
 
-  defp operation(%Operation{} = op), do: op
-  defp operation(%MLIR.Module{} = module), do: Operation.from_module(module)
-
   defp await(id, mode, ir, timeout_ms, callback_failure, profile) do
     receive do
-      {:conversion_done, ^id, result, native_profile} ->
+      {^id, {outcome, costs}} ->
+        {result, native_profile} =
+          case outcome do
+            {:ok, value} -> value
+            {:error, _reason} -> {nil, {0, 0}}
+          end
+
+        if profile && profile[:execution_profile] do
+          Beaver.Execution.Profile.native(profile.execution_profile, :conversion, :worker, costs)
+          Beaver.Execution.Profile.record(profile.execution_profile, :conversion_target_lock, elem(native_profile, 1))
+        end
+
         conversion_result = finish(mode, ir, result, callback_failure)
 
         if profile,
           do: {conversion_result, __MODULE__.Profile.finish(profile, conversion_result, ir, native_profile)},
           else: conversion_result
 
-      {name, _token, _callback, _callback_id, _sent_at, _arg} = message
-      when name in [:conversion_legality, :convert_type, :convert_types] ->
-        handle_and_await(message, id, mode, ir, timeout_ms, callback_failure, profile)
-
-      {name, _token, _callback, _callback_id, _sent_at, _arg1, _arg2, _arg3} = message
-      when name in [:conversion_pattern, :conversion_pattern_1_to_n] ->
-        handle_and_await(message, id, mode, ir, timeout_ms, callback_failure, profile)
-
-      {:source_materialization, _token, _callback, _callback_id, _sent_at, _rewriter, _type, _inputs, _loc} = message ->
-        handle_and_await(message, id, mode, ir, timeout_ms, callback_failure, profile)
-
-      {:target_materialization, _token, _callback, _callback_id, _sent_at, _rewriter, _type, _inputs, _loc,
-       _original_type} = message ->
-        handle_and_await(message, id, mode, ir, timeout_ms, callback_failure, profile)
-
-      {:target_materialization_1_to_n, _token, _callback, _callback_id, _sent_at, _rewriter, _output_types, _inputs,
-       _loc, _original_type} = message ->
+      message when MLIR.Conversion.Callbacks.is_message(message) ->
         handle_and_await(message, id, mode, ir, timeout_ms, callback_failure, profile)
     after
       timeout_ms + 1_000 ->
@@ -231,14 +347,14 @@ defmodule Beaver.MLIR.Conversion do
   end
 
   defp handle_and_await(message, id, mode, ir, timeout_ms, callback_failure, profile) do
-    started_at = System.monotonic_time(:nanosecond)
+    started_at = if profile, do: CAPI.beaver_raw_execution_clock()
     {:handled, failure} = __MODULE__.Callbacks.handle(message)
-    stopped_at = System.monotonic_time(:nanosecond)
 
     profile =
       if profile do
+        stopped_at = CAPI.beaver_raw_execution_clock()
         service_ns = max(stopped_at - started_at, 0)
-        native_wait_ns = max(System.os_time(:nanosecond) - elem(message, 4), service_ns)
+        native_wait_ns = max(CAPI.beaver_raw_execution_clock() - elem(message, 4), service_ns)
 
         __MODULE__.Profile.record_callback(
           profile,
@@ -273,153 +389,4 @@ defmodule Beaver.MLIR.Conversion do
       do: {:ok, ir, diagnostics},
       else: {:error, %Error{mode: mode, diagnostics: diagnostics, callback_failure: callback_failure}}
   end
-end
-
-defmodule Beaver.MLIR.Conversion.Callbacks do
-  @moduledoc false
-
-  alias Beaver.MLIR
-  alias Kinda.CallbackRuntime
-
-  # Keep the exact native message shapes while sharing argument decoding and
-  # exception capture. Pattern registrations additionally carry a root name.
-  for {kind, arity, normalize, reply} <- [
-        {:conversion_legality, 1, :legality, :reply_legality},
-        {:convert_type, 1, :converted_type, :reply_type},
-        {:convert_types, 1, :converted_types, :reply_types},
-        {:source_materialization, 4, :materialized, :reply_value},
-        {:target_materialization, 5, :materialized, :reply_value},
-        {:target_materialization_1_to_n, 5, :materialized_values, :reply_values},
-        {:conversion_pattern, 3, :pattern_result, :reply_pattern},
-        {:conversion_pattern_1_to_n, 3, :pattern_result, :reply_pattern}
-      ] do
-    args = Macro.generate_arguments(arity, __MODULE__)
-
-    def handle({unquote(kind), token, callback, _id, _sent_at, unquote_splicing(args)}) do
-      callback =
-        if unquote(kind) in [:conversion_pattern, :conversion_pattern_1_to_n],
-          do: elem(MLIR.ConversionPattern.unwrap_callback(callback), 1),
-          else: callback
-
-      invoke(
-        token,
-        fn -> unquote(normalize)(apply(callback, Enum.map([unquote_splicing(args)], &native/1))) end,
-        &unquote(reply)(&1, &2)
-      )
-    end
-  end
-
-  def handle(_message), do: :unhandled
-
-  defp invoke(token, fun, reply) do
-    outcome = CallbackRuntime.invoke_reply(token, fun, reply)
-    {:handled, callback_failure(outcome)}
-  end
-
-  defp native(nil), do: nil
-  defp native(values) when is_list(values), do: Enum.map(values, &native/1)
-  defp native(value), do: Beaver.Native.check!(value)
-
-  defp legality(:legal), do: {:ok, :legal}
-  defp legality(true), do: {:ok, :legal}
-  defp legality(:illegal), do: {:ok, :illegal}
-  defp legality(false), do: {:ok, :illegal}
-  defp legality(:no_opinion), do: {:ok, :no_opinion}
-  defp legality({:error, _reason} = error), do: error
-
-  defp legality(other), do: raise(ArgumentError, "invalid dynamic legality result: #{inspect(other)}")
-
-  defp converted_type(%Type{} = type), do: {:ok, {:success, type}}
-  defp converted_type({:ok, %Type{} = type}), do: {:ok, {:success, type}}
-  defp converted_type(:declined), do: {:ok, :declined}
-  defp converted_type({:error, _reason} = error), do: error
-
-  defp converted_type(other), do: raise(ArgumentError, "invalid type conversion result: #{inspect(other)}")
-
-  defp converted_types(types) when is_list(types) do
-    validate_list!(types, Type, "1:N type conversion")
-    {:ok, {:success, types}}
-  end
-
-  defp converted_types({:ok, types}) when is_list(types), do: converted_types(types)
-  defp converted_types(:declined), do: {:ok, :declined}
-  defp converted_types({:error, _reason} = error), do: error
-
-  defp converted_types(other), do: raise(ArgumentError, "invalid 1:N conversion result: #{inspect(other)}")
-
-  defp materialized(%Value{} = value), do: {:ok, {:success, value}}
-  defp materialized({:ok, %Value{} = value}), do: {:ok, {:success, value}}
-  defp materialized(nil), do: {:ok, :declined}
-  defp materialized(:declined), do: {:ok, :declined}
-  defp materialized({:error, _reason} = error), do: error
-
-  defp materialized(other), do: raise(ArgumentError, "invalid materialization result: #{inspect(other)}")
-
-  defp materialized_values(values) when is_list(values) do
-    validate_list!(values, Value, "1:N target materialization")
-    {:ok, {:success, values}}
-  end
-
-  defp materialized_values({:ok, values}) when is_list(values), do: materialized_values(values)
-  defp materialized_values(:declined), do: {:ok, :declined}
-  defp materialized_values({:error, _reason} = error), do: error
-
-  defp materialized_values(other), do: raise(ArgumentError, "invalid 1:N materialization result: #{inspect(other)}")
-
-  defp pattern_result(:ok), do: {:ok, :match}
-  defp pattern_result(true), do: {:ok, :match}
-  defp pattern_result({:ok, _state}), do: {:ok, :match}
-  defp pattern_result(:no_match), do: {:ok, :no_match}
-  defp pattern_result(false), do: {:ok, :no_match}
-  defp pattern_result({:error, _reason} = error), do: error
-
-  defp pattern_result(other), do: raise(ArgumentError, "invalid conversion pattern result: #{inspect(other)}")
-
-  defp validate_list!(values, module, label) do
-    unless Enum.all?(values, &is_struct(&1, module)),
-      do: raise(ArgumentError, "#{label} must return only #{inspect(module)} values")
-  end
-
-  defp reply_legality(token, {:ok, result}) do
-    code = %{legal: 0, illegal: 1, no_opinion: 2} |> Map.fetch!(result)
-    CAPI.beaver_raw_callback_reply_code(token, true, code)
-  end
-
-  defp reply_legality(token, _failure), do: CAPI.beaver_raw_callback_reply_code(token, false, 1)
-
-  defp reply_type(token, {:ok, {:success, %Type{ref: ref}}}),
-    do: CAPI.beaver_raw_type_converter_reply_callback(token, true, 0, ref)
-
-  defp reply_type(token, {:ok, :declined}), do: CAPI.beaver_raw_type_converter_reply_callback(token, true, 2, nil)
-
-  defp reply_type(token, _failure), do: CAPI.beaver_raw_type_converter_reply_callback(token, false, 1, nil)
-
-  defp reply_types(token, {:ok, {:success, types}}),
-    do: CAPI.beaver_raw_type_converter_reply_types(token, true, 0, Enum.map(types, & &1.ref))
-
-  defp reply_types(token, {:ok, :declined}), do: CAPI.beaver_raw_type_converter_reply_types(token, true, 2, [])
-
-  defp reply_types(token, _failure), do: CAPI.beaver_raw_type_converter_reply_types(token, false, 1, [])
-
-  defp reply_value(token, {:ok, {:success, %Value{ref: ref}}}),
-    do: CAPI.beaver_raw_type_converter_reply_value(token, true, ref)
-
-  defp reply_value(token, {:ok, :declined}), do: CAPI.beaver_raw_type_converter_reply_value(token, true, nil)
-
-  defp reply_value(token, _failure), do: CAPI.beaver_raw_type_converter_reply_value(token, false, nil)
-
-  defp reply_values(token, {:ok, {:success, values}}),
-    do: CAPI.beaver_raw_type_converter_reply_values(token, true, 0, Enum.map(values, & &1.ref))
-
-  defp reply_values(token, _failure), do: CAPI.beaver_raw_type_converter_reply_values(token, false, 1, [])
-
-  defp reply_pattern(token, {:ok, :match}), do: CAPI.beaver_raw_callback_reply(token, true)
-
-  defp reply_pattern(token, _no_match_or_failure), do: CAPI.beaver_raw_callback_reply(token, false)
-
-  defp callback_failure({:error, reason}), do: {:error, reason}
-
-  defp callback_failure({:exception, _kind, _reason, _stacktrace} = exception), do: exception
-
-  defp callback_failure(_outcome), do: nil
 end

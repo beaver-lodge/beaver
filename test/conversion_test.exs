@@ -208,20 +208,31 @@ defmodule Beaver.MLIR.ConversionTest do
     MLIR.Module.destroy(module)
   end
 
-  test "native type maps convert without a BEAM callback", %{ctx: ctx} do
-    i32 = MLIR.Type.i32(ctx: ctx)
-    i64 = MLIR.Type.i64(ctx: ctx)
-    f32 = MLIR.Type.f32(ctx: ctx)
+  test "type conversion supports locked and unlocked contexts and closed handles", %{ctx: ctx} do
+    unlocked = MLIR.Context.create(threading: false, thread_safe: false)
+    on_exit(fn -> MLIR.Context.destroy(unlocked) end)
 
-    converter =
-      MLIR.TypeConverter.create()
-      |> MLIR.TypeConverter.add_conversion_map([i32], i64)
+    for ctx <- [ctx, unlocked] do
+      i32 = MLIR.Type.i32(ctx: ctx)
+      i64 = MLIR.Type.i64(ctx: ctx)
+      f32 = MLIR.Type.f32(ctx: ctx)
 
-    assert {:ok, converted} = MLIR.TypeConverter.convert(converter, i32)
-    assert MLIR.equal?(converted, i64)
-    assert {:ok, unchanged} = MLIR.TypeConverter.convert(converter, f32)
-    assert MLIR.equal?(unchanged, f32)
-    assert :ok = MLIR.TypeConverter.destroy(converter)
+      converter =
+        MLIR.TypeConverter.create()
+        |> MLIR.TypeConverter.add_conversion_map([i32], i64)
+
+      assert {:ok, converted} = MLIR.TypeConverter.convert(converter, i32)
+      assert MLIR.equal?(converted, i64)
+      assert {:ok, unchanged} = MLIR.TypeConverter.convert(converter, f32)
+      assert MLIR.equal?(unchanged, f32)
+      assert :ok = MLIR.TypeConverter.destroy(converter)
+      assert {:error, :conversion_failed} = MLIR.TypeConverter.convert(converter, i32)
+
+      MLIR.TypeConverter.with([conversion: fn type -> type end], fn callback ->
+        assert {:ok, converted} = MLIR.TypeConverter.convert(callback, i32)
+        assert MLIR.equal?(converted, i32)
+      end)
+    end
   end
 
   test "callback failures are attributed and a dead callback owner fails deterministically", %{

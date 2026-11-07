@@ -12,6 +12,7 @@ defmodule Beaver.Pattern.Native.Descriptor do
     :name,
     :root,
     :match_and_rewrite,
+    prefilter: {-1, -1, []},
     benefit: 1,
     init_state: nil,
     construct: &Beaver.FallbackPattern.construct/1,
@@ -27,6 +28,7 @@ defmodule Beaver.Pattern.Native.Descriptor do
           name: atom(),
           root: String.t(),
           match_and_rewrite: callback(state),
+          prefilter: {integer(), integer(), [String.t()]},
           benefit: non_neg_integer(),
           init_state: state,
           construct: (state -> state),
@@ -43,6 +45,8 @@ defmodule Beaver.Pattern.Native do
   `defrewrite/3` binds selected pieces of an operation before running an
   Elixir callback through `Beaver.MLIR.RewritePattern`. It does not build PDL
   and never switches between the native and PDL execution engines.
+
+  For callback-free attribute/value rewrites, use `Beaver.Pattern.Native.Program`.
 
   A declaration generates a zero- and one-arity builder. For example,
   `fold_add/0` returns a `Beaver.Pattern.Native.Descriptor`, while
@@ -72,6 +76,10 @@ defmodule Beaver.Pattern.Native do
   and `:attributes` declarations are Elixir patterns; a mismatch returns
   no-match without evaluating the body.
 
+  Fixed operand/result counts and required attribute names are also checked
+  natively before sending a callback. Other Elixir pattern matching stays in
+  the callback, including list tails and attribute value bindings.
+
   The body may return `:ok`, `:no_match`, `{:ok, new_state}`, or
   `{:error, new_state}`.
   """
@@ -91,6 +99,10 @@ defmodule Beaver.Pattern.Native do
     validate_list_pattern!(:operands, operands_pattern)
     validate_list_pattern!(:results, results_pattern)
     attribute_pairs = validate_attributes_pattern!(attributes_pattern)
+
+    prefilter =
+      {literal_arity(operands_pattern), literal_arity(results_pattern),
+       Enum.map(attribute_pairs, fn {name, _} -> to_string(name) end)}
 
     callback_operation = Macro.unique_var(:native_operation, __MODULE__)
     callback_rewriter = Macro.unique_var(:native_rewriter, __MODULE__)
@@ -133,6 +145,7 @@ defmodule Beaver.Pattern.Native do
             end,
             opts
           )
+          |> Map.put(:prefilter, unquote(Macro.escape(prefilter)))
     end
   end
 
@@ -179,6 +192,7 @@ defmodule Beaver.Pattern.Native do
     |> Map.take(@builder_options)
     |> Map.to_list()
     |> then(&build_descriptor(descriptor.name, &1, descriptor.match_and_rewrite, opts))
+    |> Map.put(:prefilter, descriptor.prefilter)
   end
 
   @doc false
@@ -271,6 +285,12 @@ defmodule Beaver.Pattern.Native do
 
   defp normalize_root!(_root),
     do: raise(ArgumentError, "native rewrite :root must resolve to a non-empty operation name")
+
+  defp literal_arity(nil), do: -1
+
+  defp literal_arity(pattern) do
+    if Enum.any?(pattern, &match?({:|, _, _}, &1)), do: -1, else: length(pattern)
+  end
 
   defp build_match_body(operation, state, operands_pattern, results_pattern, attribute_pairs, body, name) do
     native_module = __MODULE__

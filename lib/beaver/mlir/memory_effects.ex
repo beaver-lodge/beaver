@@ -15,15 +15,11 @@ defmodule Beaver.MLIR.MemoryEffects do
         {:read, {:symbol, symbol_ref}, stage: 1}
       ]
 
-  A bare effect such as `:write` is not associated with a particular IR
-  entity. Options are `:parameters`, `:stage`, `:effect_on_full_region`, and
-  `:resource`. The default resource and a null parameters attribute are used
-  when omitted.
-
-  The effects list passed to a two-argument callback is borrowed and valid only
-  until that callback returns. Prefer returning declarative specifications.
-  Callback exceptions are diagnosed and native code adds a conservative
-  unknown write effect.
+  Bare effects have no target. Options are `:parameters` (default null),
+  `:stage`, `:effect_on_full_region`, and `:resource` (default resource).
+  A two-argument callback's effects list is borrowed until it returns.
+  Prefer declarative specifications; callback exceptions emit diagnostics and
+  add a conservative unknown write effect.
   """
 
   alias Beaver.MLIR
@@ -68,27 +64,16 @@ defmodule Beaver.MLIR.MemoryEffects do
     do: raise(ArgumentError, "invalid memory effects implementation: #{inspect(other)}")
 
   @doc """
-  Returns the memory effects declared by an operation.
-
-  The result uses the same declarative specifications accepted by callbacks.
-  Every entry includes `:parameters`, `:stage`, `:effect_on_full_region`, and
-  `:resource` so callers can inspect the complete native effect instance
-  without retaining its callback-scoped handle.
+  Returns declarative effects, each including `:parameters`, `:stage`,
+  `:effect_on_full_region` and `:resource`, without retaining callback-scoped handles.
   """
   @spec get(Operation.t(), keyword()) :: [effect_spec()]
-  def get(%Operation{ref: operation_ref}, opts \\ []) do
-    timeout_ms = Keyword.get(opts, :timeout, 30_000)
+  def get(%Operation{} = op, opts \\ []) do
+    timeout_ms = Beaver.Execution.callback_timeout!(opts)
 
-    unless is_integer(timeout_ms) and timeout_ms >= 0,
-      do: raise(ArgumentError, ":timeout must be a non-negative integer")
-
-    :ok = CAPI.beaver_raw_memory_effects_query_async(operation_ref)
-
-    receive do
-      {:memory_effects_done, :error} -> raise ArgumentError, "operation does not implement MemoryEffectsOpInterface"
-      {:memory_effects_done, instances} when is_list(instances) -> Enum.map(instances, &decode_instance/1)
-    after
-      timeout_ms + 1_000 -> raise "timed out querying MemoryEffectsOpInterface"
+    case Beaver.Execution.run(MLIR.context(op), :memory_effects, {op.ref}, timeout: timeout_ms + 1_000) do
+      :error -> raise ArgumentError, "operation does not implement MemoryEffectsOpInterface"
+      instances -> Enum.map(instances, &decode_instance/1)
     end
   end
 
@@ -100,21 +85,20 @@ defmodule Beaver.MLIR.MemoryEffects do
     :ok
   end
 
-  @doc "Adds the standard transform-dialect effects for read-only handle operands."
-  def only_reads_handle(effects, operands),
-    do: transform_handle_effect(:beaverTransformOnlyReadsHandle, effects, operands)
-
-  @doc "Adds the standard transform-dialect effects for consumed handle operands."
-  def consumes_handle(effects, operands),
-    do: transform_handle_effect(:beaverTransformConsumesHandle, effects, operands)
-
-  @doc "Adds the standard transform-dialect effects for produced handle results."
-  def produces_handle(%MLIR.MemoryEffectInstancesList{} = effects, results) do
-    results = List.wrap(results)
-    validate_kind_list!(results, Value, "transform results")
-    array = Native.array(results, Value, mut: true)
-    CAPI.beaverTransformProducesHandle(array, length(results), effects)
-    :ok
+  for {name, function, kind, label, doc} <- [
+        {:only_reads_handle, :beaverTransformOnlyReadsHandle, OpOperand, "transform operands",
+         "Adds read-only handle effects."},
+        {:consumes_handle, :beaverTransformConsumesHandle, OpOperand, "transform operands",
+         "Adds consumed handle effects."},
+        {:produces_handle, :beaverTransformProducesHandle, Value, "transform results", "Adds produced handle effects."}
+      ] do
+    @doc doc
+    def unquote(name)(%MLIR.MemoryEffectInstancesList{} = effects, values) do
+      values = List.wrap(values)
+      validate_kind_list!(values, unquote(kind), unquote(label))
+      CAPI.unquote(function)(Native.array(values, unquote(kind), mut: true), length(values), effects)
+      :ok
+    end
   end
 
   @doc "Marks a transform operation as potentially modifying payload IR."
@@ -126,14 +110,6 @@ defmodule Beaver.MLIR.MemoryEffects do
   @doc "Marks a transform operation as only reading payload IR."
   def only_reads_payload(%MLIR.MemoryEffectInstancesList{} = effects) do
     CAPI.beaverTransformOnlyReadsPayload(effects)
-    :ok
-  end
-
-  defp transform_handle_effect(function, %MLIR.MemoryEffectInstancesList{} = effects, operands) do
-    operands = List.wrap(operands)
-    validate_kind_list!(operands, OpOperand, "transform operands")
-    array = Native.array(operands, OpOperand, mut: true)
-    apply(CAPI, function, [array, length(operands), effects])
     :ok
   end
 
@@ -210,20 +186,14 @@ defmodule Beaver.MLIR.MemoryEffects do
   defp normalize_target(op, {:operand, index}) when is_integer(index) and index >= 0,
     do: CAPI.mlirOperationGetOpOperand(op, index)
 
-  defp normalize_target(_operation, {:operand, %OpOperand{} = operand}), do: operand
-
   defp normalize_target(op, {:result, index}) when is_integer(index) and index >= 0,
     do: Operation.result(op, index)
 
-  defp normalize_target(_operation, {:result, %Value{} = result}), do: result
+  defp normalize_target(_operation, {tag, %kind{} = value})
+       when {tag, kind} in [{:operand, OpOperand}, {:result, Value}, {:block_argument, Value}, {:symbol, Attribute}],
+       do: value
 
-  defp normalize_target(_operation, {:block_argument, %Value{} = argument}),
-    do: argument
-
-  defp normalize_target(_operation, {:symbol, %Attribute{} = symbol}), do: symbol
-  defp normalize_target(_operation, %OpOperand{} = operand), do: operand
-  defp normalize_target(_operation, %Value{} = value), do: value
-  defp normalize_target(_operation, %Attribute{} = symbol), do: symbol
+  defp normalize_target(_operation, %kind{} = value) when kind in [OpOperand, Value, Attribute], do: value
 
   defp normalize_target(_operation, target),
     do: raise(ArgumentError, "invalid memory effect target: #{inspect(target)}")

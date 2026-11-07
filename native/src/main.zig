@@ -12,21 +12,15 @@ const NifFunc = e.ErlNifFunc;
 // at load time below because comptime values cannot cross artifact boundaries.
 extern const core_nifs: [0]NifFunc;
 extern const core_nifs_len: usize;
-extern const conversion_nifs: [0]NifFunc;
-extern const conversion_nifs_len: usize;
 extern const callback_bridge_nifs: [0]NifFunc;
 extern const callback_bridge_nifs_len: usize;
-extern const rewrite_pattern_nifs: [0]NifFunc;
-extern const rewrite_pattern_nifs_len: usize;
 extern const cuda_runner_nifs: [0]NifFunc;
 extern const cuda_runner_nifs_len: usize;
 
 // Registration hooks exported by the partitioned native libraries.
 extern fn core_register_all_passes() void;
 extern fn core_open_all(env: beam.env) void;
-extern fn conversion_open(env: beam.env) void;
 extern fn callback_bridge_open(env: beam.env) void;
-extern fn rewrite_pattern_open(env: beam.env) void;
 extern fn cuda_runner_open(env: beam.env) void;
 
 const max_nifs = 4096;
@@ -43,16 +37,12 @@ fn appendNifs(table: [*]const NifFunc, len: usize, index: *usize) void {
 fn assembleNifs() []NifFunc {
     const total =
         core_nifs_len +
-        conversion_nifs_len +
         callback_bridge_nifs_len +
-        rewrite_pattern_nifs_len +
         if (builtin.os.tag == .linux) cuda_runner_nifs_len else 0;
     if (total > max_nifs) @panic("assembled NIF table exceeds static capacity");
     var index: usize = 0;
     appendNifs(@ptrCast(&core_nifs), core_nifs_len, &index);
-    appendNifs(@ptrCast(&conversion_nifs), conversion_nifs_len, &index);
     appendNifs(@ptrCast(&callback_bridge_nifs), callback_bridge_nifs_len, &index);
-    appendNifs(@ptrCast(&rewrite_pattern_nifs), rewrite_pattern_nifs_len, &index);
     if (builtin.os.tag == .linux) appendNifs(@ptrCast(&cuda_runner_nifs), cuda_runner_nifs_len, &index);
     assembled_len = index;
     return assembled_nifs[0..assembled_len];
@@ -61,9 +51,7 @@ fn assembleNifs() []NifFunc {
 export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     core_register_all_passes();
     core_open_all(env);
-    conversion_open(env);
     callback_bridge_open(env);
-    rewrite_pattern_open(env);
     if (builtin.os.tag == .linux) cuda_runner_open(env);
     return 0;
 }

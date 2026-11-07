@@ -6,7 +6,6 @@ defmodule Beaver.MLIR.RewritePatternSet do
   """
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
   alias Beaver.MLIR
-  require Logger
 
   defdelegate create(context), to: CAPI, as: :mlirRewritePatternSetCreate
 
@@ -40,7 +39,7 @@ defmodule Beaver.MLIR.RewritePatternSet do
 
   The set takes ownership of a raw `MLIR.RewritePattern`. Native descriptors
   are materialized through the existing callback-backed rewrite bridge before
-  ownership is transferred.
+  ownership is transferred. Native programs execute entirely in the rewrite driver.
   """
   @spec add(t(), MLIR.RewritePattern.t()) :: t()
   def add(%__MODULE__{} = set, %MLIR.RewritePattern{} = pattern) do
@@ -48,7 +47,23 @@ defmodule Beaver.MLIR.RewritePatternSet do
     set
   end
 
-  @spec add(t(), Beaver.Pattern.Native.Descriptor.t(), keyword()) :: t()
+  @spec add(t(), Beaver.Pattern.Native.Descriptor.t() | Beaver.Pattern.Native.Program.t(), keyword()) :: t()
+  def add(%__MODULE__{} = set, %Beaver.Pattern.Native.Program{} = program, opts) do
+    ctx = Keyword.fetch!(opts, :ctx)
+
+    :ok =
+      CAPI.beaver_raw_declarative_pattern_add(
+        set.ref,
+        ctx.ref,
+        program.root,
+        program.benefit,
+        program.checks,
+        program.edits
+      )
+
+    set
+  end
+
   def add(%__MODULE__{} = set, %Beaver.Pattern.Native.Descriptor{} = descriptor, opts)
       when is_list(opts) do
     ctx = Keyword.get(opts, :ctx) || raise ArgumentError, "option :ctx is required"
@@ -60,6 +75,7 @@ defmodule Beaver.MLIR.RewritePatternSet do
       init_state: descriptor.init_state,
       construct: descriptor.construct,
       destruct: descriptor.destruct,
+      prefilter: descriptor.prefilter,
       match_and_rewrite: descriptor.match_and_rewrite
     )
     |> then(&add(set, &1))
@@ -104,30 +120,10 @@ defmodule Beaver.MLIR.RewritePatternSet do
 
   defdelegate destroy(set), to: CAPI, as: :mlirRewritePatternSetDestroy
 
-  defp do_destroy(%MLIR.Context{ref: ctx}, %__MODULE__{ref: set}),
-    do: :async = CAPI.beaver_raw_destroy_rewrite_pattern_set(ctx, set)
-
-  defp do_destroy(%MLIR.Context{ref: ctx}, %MLIR.FrozenRewritePatternSet{ref: set}),
-    do: :async = CAPI.beaver_raw_destroy_frozen_rewrite_pattern_set(ctx, set)
-
-  defp dispatch_loop(timeout \\ 2) do
-    receive do
-      :destroy_done -> :ok
-    after
-      timeout * 1_000 ->
-        Logger.error("Timeout waiting for pattern destroy, timeout: #{inspect(timeout)}s")
-        Logger.flush()
-        dispatch_loop(timeout * 2)
-    end
-  end
-
-  @doc """
-  Destroy the given `MLIR.RewritePatternSet` or `MLIR.FrozenRewritePatternSet`
-  outside a BEAM scheduler thread.
-  """
-  def threaded_destroy(ctx, set) do
-    do_destroy(ctx, set)
-    dispatch_loop()
+  @doc "Destroys a pattern set on the callback executor."
+  def threaded_destroy(ctx, %kind{ref: ref}) when kind in [__MODULE__, MLIR.FrozenRewritePatternSet] do
+    name = if kind == __MODULE__, do: :RewritePatternSet, else: :FrozenRewritePatternSet
+    Beaver.Execution.run(ctx, :destroy, {name, ref})
   end
 
   @doc """

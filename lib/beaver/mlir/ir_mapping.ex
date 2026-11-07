@@ -3,32 +3,17 @@ alias Beaver.Native
 
 defmodule Beaver.MLIR.IRMapping do
   @moduledoc """
-  An owned mapping between values, blocks, and operations in two pieces of IR.
+  Owned, mutable mappings between values, blocks and operations. Call
+  `destroy/1` or use `with_mapping/1`. Entries are borrowed: neither side may
+  be destroyed while the mapping is queried.
+  `clone/2` returns a detached operation that must be inserted or destroyed;
+  `clone/3` inserts through a rewriter and updates the mapping.
+  Use `MLIR.PatternRewriter.with_insertion_point/3` to scope insertion as well.
 
-  Mappings are mutable native resources. Destroy them explicitly with
-  `destroy/1`, or use `with_mapping/1` for scoped work. Mapped entities are
-  borrowed: a mapping must not be queried after either side of a mapping has
-  been destroyed.
-
-  `clone/2` creates a detached, caller-owned operation. Insert that operation
-  into a block or destroy it. `clone/3` inserts through a rewriter and updates
-  the mapping as part of the rewrite.
-
-  A mapping and a scoped insertion point can be combined in a rewrite callback
-  without leaking native state or the rewriter's temporary position:
-
-      base = MLIR.PatternRewriter.as_base(rewriter)
-      old_result = MLIR.Operation.result(operation, 0)
-
-      MLIR.PatternRewriter.with_insertion_point(rewriter, {:before, operation}, fn ->
-        MLIR.IRMapping.with_mapping(fn mapping ->
-          replacement = build_replacement.(base)
-
-          mapping
-          |> MLIR.IRMapping.map(old_result, replacement)
-          |> MLIR.IRMapping.lookup(old_result)
-          |> then(&MLIR.RewriterBase.replace(base, old_result, &1))
-        end)
+      MLIR.IRMapping.with_mapping(fn mapping ->
+        mapping
+        |> MLIR.IRMapping.map(old_result, replacement)
+        |> MLIR.IRMapping.lookup(old_result)
       end)
   """
 

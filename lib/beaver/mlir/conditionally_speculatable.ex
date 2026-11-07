@@ -11,7 +11,6 @@ defmodule Beaver.MLIR.ConditionallySpeculatable do
   """
 
   alias Beaver.MLIR
-  alias Beaver.MLIR.CAPI
 
   @type speculatability :: :not_speculatable | :speculatable | :recursively_speculatable
 
@@ -43,18 +42,11 @@ defmodule Beaver.MLIR.ConditionallySpeculatable do
   def callback!(other), do: raise(ArgumentError, "invalid ConditionallySpeculatable implementation: #{inspect(other)}")
 
   @spec query(Operation.t(), keyword()) :: speculatability()
-  def query(%Operation{ref: operation_ref}, opts \\ []) do
-    timeout_ms = Keyword.get(opts, :timeout, 30_000)
-    :ok = CAPI.beaver_raw_conditionally_speculatable_query_async(operation_ref)
-    await_query(timeout_ms)
-  end
-
-  defp await_query(timeout_ms) do
-    receive do
-      {:speculatability_done, value} -> decode(value)
-    after
-      timeout_ms + 1_000 -> raise "timed out querying ConditionallySpeculatable fallback model"
-    end
+  def query(%Operation{} = op, opts \\ []) do
+    Beaver.Execution.run(MLIR.context(op), :speculatability, {op.ref},
+      timeout: Keyword.get(opts, :timeout, 30_000) + 1_000
+    )
+    |> decode()
   end
 
   defp decode(0), do: :not_speculatable

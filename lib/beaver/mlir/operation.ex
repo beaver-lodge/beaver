@@ -2,9 +2,7 @@ alias Beaver.MLIR.{Attribute, CAPI, Location, StringRef}
 alias Beaver.Native
 
 defmodule Beaver.MLIR.Operation do
-  @moduledoc """
-  This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
-  """
+  @moduledoc "Creates, inspects and modifies MLIR operations."
   alias Beaver.MLIR
   alias __MODULE__.State
   alias Beaver.Changeset
@@ -13,26 +11,15 @@ defmodule Beaver.MLIR.Operation do
 
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
 
-  def create(%Beaver.SSA{
-        op: op_name,
-        ip: ip,
-        arguments: arguments,
-        results: results,
-        filler: filler,
-        ctx: ctx,
-        loc: loc
-      }) do
-    filler =
-      if is_function(filler, 0), do: List.wrap(filler), else: []
+  def create(%Beaver.SSA{} = ssa) do
+    filler = if is_function(ssa.filler, 0), do: [ssa.filler], else: []
+    changeset = %Changeset{name: ssa.op, location: ssa.loc || Location.unknown(), context: ssa.ctx}
 
-    location = loc || Location.unknown()
-    changeset = %Changeset{name: op_name, location: location, context: ctx}
-
-    Enum.reduce(arguments ++ filler, changeset, &Changeset.add_argument(&2, &1))
-    |> then(fn changeset -> Enum.reduce(results, changeset, &Changeset.add_result(&2, &1)) end)
+    Enum.reduce(ssa.arguments ++ filler, changeset, &Changeset.add_argument(&2, &1))
+    |> then(fn changeset -> Enum.reduce(ssa.results, changeset, &Changeset.add_result(&2, &1)) end)
     |> State.create()
     |> create()
-    |> tap(&Beaver.MLIR.InsertionPoint.insert_operation(ip, &1))
+    |> tap(&Beaver.MLIR.InsertionPoint.insert_operation(ssa.ip, &1))
   end
 
   def create(%Changeset{} = c), do: c |> State.create() |> create
@@ -92,26 +79,20 @@ defmodule Beaver.MLIR.Operation do
   }
 
   @doc """
-  Tests two operations for structural equivalence without printing or parsing.
-
-  The default comparison includes locations, discardable attributes,
-  properties, and commutative operand ordering. Set an option to `true` to
-  ignore that part of the comparison. In particular,
-  `ignore_commutativity: true` makes operand comparison order-sensitive; this
-  mirrors MLIR's `IgnoreCommutativity` flag.
+  Tests structural equivalence, including locations, discardable attributes,
+  properties and commutative operand ordering unless ignored via options.
+  `ignore_commutativity: true` makes operand comparison order-sensitive,
+  following MLIR's `IgnoreCommutativity` flag.
   """
   @spec equivalent?(__MODULE__.t(), __MODULE__.t(), equivalence_options()) :: boolean()
   def equivalent?(%__MODULE__{} = lhs, %__MODULE__{} = rhs, opts \\ []),
     do: mlirOperationIsStructurallyEquivalent(lhs, rhs, encode_equivalence_options(opts)) |> Native.to_term()
 
   @doc """
-  Computes MLIR's structural hash for an operation.
-
-  Use the same options as `equivalent?/3`: operations equivalent under the
-  same options have equal hashes. The converse is not guaranteed. MLIR hashes
-  external operands by identity, omits results, and does not include regions,
-  so this is intended for bucketing before an equivalence check rather than as
-  a complete content digest.
+  Computes MLIR's structural hash using the options of `equivalent?/3`.
+  Equivalent operations have equal hashes; the converse is not guaranteed.
+  MLIR hashes external operands by identity and omits results and regions:
+  use this for bucketing before equivalence checks, not as a content digest.
   """
   @spec structural_hash(__MODULE__.t(), equivalence_options()) :: non_neg_integer()
   def structural_hash(%__MODULE__{} = op, opts \\ []),
@@ -137,21 +118,13 @@ defmodule Beaver.MLIR.Operation do
 
   def from_module(%__MODULE__{} = op), do: op
 
-  defp normalize_results(results) do
-    case Enum.count(results) do
-      0 -> []
-      1 -> Enum.at(results, 0)
-      n when n > 1 -> Enum.to_list(results)
-    end
-  end
+  defp normalize_results([result]), do: result
+  defp normalize_results(results), do: results
 
   @doc """
-  Evaluate the SSA and return the operation or its results based on the defined result types.
-
-  Normalize the results of the given operation in the following way:
-  - If the operation has no result, return the operation itself.
-  - If the operation has one result, return that result.
-  - If the operation has multiple results, return a list of results.
+  Evaluates SSA, returning the operation for zero results, the value for one,
+  or a list for multiple results. `{:op, types}` additionally returns the
+  operation, preserving a result list when `types` is a list.
   """
   def eval_ssa(%Beaver.SSA{results: types} = ssa) do
     ssa =
@@ -161,20 +134,13 @@ defmodule Beaver.MLIR.Operation do
       end
 
     op = create(ssa)
-    results = op |> results()
+    results = op |> results() |> Enum.to_list()
 
-    case types do
-      [{:op, types}] when is_list(types) ->
-        {op, Enum.to_list(results)}
-
-      [{:op, _}] ->
-        {op, normalize_results(results)}
-
-      _ ->
-        case Enum.count(results) do
-          0 -> op
-          n when n > 0 -> normalize_results(results)
-        end
+    case {types, results} do
+      {[{:op, types}], _} when is_list(types) -> {op, results}
+      {[{:op, _}], _} -> {op, normalize_results(results)}
+      {_, []} -> op
+      {_, _} -> normalize_results(results)
     end
   end
 
@@ -188,11 +154,7 @@ defmodule Beaver.MLIR.Operation do
 
   @impl Access
   def get_and_update(op, attribute, function) do
-    attr =
-      case fetch(op, attribute) do
-        {:ok, attr} -> attr
-        :error -> nil
-      end
+    attr = attribute(op, attribute)
 
     case function.(attr) do
       {_current_value, new_value} -> put_attribute(op, attribute, new_value)
@@ -281,9 +243,7 @@ defmodule Beaver.MLIR.Operation do
   def with_symbol_table(%__MODULE__{} = op, fun),
     do: Beaver.Native.with_resource(mlirSymbolTableCreate(op), &mlirSymbolTableDestroy/1, fun)
 
-  @doc """
-  Check if the operation is a terminator.
-  """
+  @doc "Returns whether the operation is a terminator."
   def terminator?(%__MODULE__{} = op), do: MLIR.Trait.has?(op, :terminator)
 
   def implements_interface?(%__MODULE__{} = op, interface_id),

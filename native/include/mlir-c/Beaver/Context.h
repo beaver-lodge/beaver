@@ -7,10 +7,26 @@
 extern "C" {
 #endif
 
-/// Schedules callback-bridging work on the context's LLVM pool, outside BEAM
-/// scheduler threads. An elastic pool prevents nested pass/rewrite callbacks
-/// from starving a pool shared by multiple contexts.
+/// Schedules work on Beaver's callback executor, outside BEAM scheduler threads.
+/// Requires thread-safe context locking, but not MLIR internal parallelism.
+/// The caller must keep the context and borrowed IR alive until completion.
 MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context, void (*task)(void *), void *arg);
+MLIR_CAPI_EXPORTED bool beaverExecutorConfigure(MlirContext context, unsigned capacity, unsigned idleMs);
+MLIR_CAPI_EXPORTED bool beaverExecutorReleaseContext(MlirContext context);
+MLIR_CAPI_EXPORTED void beaverExecutorSnapshot(MlirContext context, uint64_t *out);
+MLIR_CAPI_EXPORTED void beaverExecutionMarkCallbacks(MlirContext context);
+MLIR_CAPI_EXPORTED bool beaverExecutionHasCallbacks(MlirContext context);
+MLIR_CAPI_EXPORTED void *beaverExecutionMeasureBegin(void);
+MLIR_CAPI_EXPORTED void beaverExecutionMeasureEnd(void *measurement, uint64_t *out);
+MLIR_CAPI_EXPORTED uint64_t beaverExecutionCallbackBegin(void);
+MLIR_CAPI_EXPORTED void beaverExecutionCallbackEnd(uint64_t start);
+MLIR_CAPI_EXPORTED uint64_t beaverExecutionClock(void);
+MLIR_CAPI_EXPORTED void *beaverExecutionBindOperation(MlirOperation operation);
+MLIR_CAPI_EXPORTED void beaverExecutionUnbindOperation(void *binding);
+MLIR_CAPI_EXPORTED void *beaverExecutionEnterOperation(MlirOperation operation);
+MLIR_CAPI_EXPORTED void beaverExecutionLeaveOperation(void *scope);
+MLIR_CAPI_EXPORTED MlirModule beaverModuleCreateParseTracked(MlirContext context, MlirStringRef source);
+MLIR_CAPI_EXPORTED bool beaverOperationVerify(MlirOperation operation, bool recursive);
 
 MLIR_CAPI_EXPORTED bool beaverContextIndependentLockingSupported(void);
 MLIR_CAPI_EXPORTED bool beaverContextEnableThreadSafeLocking(MlirContext context);

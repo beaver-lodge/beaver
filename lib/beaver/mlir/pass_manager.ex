@@ -7,8 +7,6 @@ defmodule Beaver.MLIR.PassManager do
   """
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
   alias Beaver.MLIR
-  import CAPI
-  require Logger
 
   @type print_opt ::
           {:before_all, boolean()}
@@ -32,40 +30,19 @@ defmodule Beaver.MLIR.PassManager do
     )
   end
 
-  def run(%MLIR.PassManager{ref: pm_ref}, op) do
+  def run(%MLIR.PassManager{ref: pm_ref}, op, opts \\ []) do
     {status, diagnostics} =
-      case beaver_raw_run_pm_on_op_async(pm_ref, MLIR.Operation.from_module(op).ref) do
-        :async -> dispatch_loop()
-        ret -> Native.check!(ret)
-      end
+      Beaver.Execution.run(MLIR.context(op), :pass, {pm_ref, MLIR.Operation.from_module(op).ref}, opts)
 
     if MLIR.LogicalResult.success?(status), do: {:ok, diagnostics}, else: {:error, diagnostics}
   end
 
-  defp dispatch_loop(timeout \\ 10) do
-    receive do
-      {{:kind, MLIR.LogicalResult, _}, diagnostics} = ret when is_list(diagnostics) -> Native.check!(ret)
-    after
-      timeout * 1_000 ->
-        msg = "Timeout waiting for pass manager to run, timeout: #{inspect(timeout)}s"
+  def destroy(%__MODULE__{} = pm) do
+    ctx = CAPI.beaverPassManagerGetContext(pm)
 
-        if timeout < 16, do: Logger.warning(msg), else: Logger.error(msg)
-
-        Logger.flush()
-        dispatch_loop(timeout * 2)
-    end
-  end
-
-  def destroy(%__MODULE__{ref: pm_ref}) do
-    case beaver_raw_destroy_pm_async(pm_ref) do
-      :async ->
-        receive do
-          :pm_destroy_done -> :ok
-        end
-
-      ret ->
-        Native.check!(ret)
-    end
+    if MLIR.Context.thread_safe?(ctx),
+      do: Beaver.Execution.run(ctx, :destroy, {:PassManager, pm.ref}),
+      else: CAPI.mlirPassManagerDestroy(pm)
   end
 
   defdelegate enable_verifier(pm, enable), to: CAPI, as: :mlirPassManagerEnableVerifier

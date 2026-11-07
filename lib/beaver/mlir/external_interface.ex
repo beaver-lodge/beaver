@@ -39,39 +39,41 @@ defmodule Beaver.MLIR.ExternalInterface do
   def global_registrar_child_specs, do: [{Registry, keys: :duplicate, name: @registry}]
 
   @doc false
-  def release_context(%Context{ref: context_ref}) do
-    if Process.whereis(@registry) do
-      Registry.dispatch(@registry, context_ref, fn entries ->
-        Enum.each(entries, fn {pid, nil} ->
-          try do
-            GenServer.call(pid, :context_destroyed)
-          catch
-            :exit, {:noproc, _} -> :ok
-            :exit, {:normal, _} -> :ok
-          end
-        end)
-      end)
+  def release_context(%Context{ref: context_ref}, registry \\ @registry) do
+    if Process.whereis(registry) do
+      for {pid, :attachment} <- Registry.lookup(registry, context_ref) do
+        try do
+          GenServer.call(pid, :context_destroyed)
+        catch
+          :exit, {reason, _} when reason in [:noproc, :normal] -> :ok
+        end
+      end
     end
 
     :ok
   end
 
   @doc false
+  def start(ctx, attachment, register, dispatch, registry \\ @registry) do
+    case GenServer.start(__MODULE__, {ctx, registry, attachment, register, dispatch}) do
+      {:ok, pid} -> GenServer.call(pid, :attachment)
+      {:error, {%_{} = exception, stacktrace}} -> reraise exception, stacktrace
+      {:error, reason} -> raise "failed to attach #{inspect(attachment.__struct__)}: #{inspect(reason)}"
+    end
+  end
+
+  @doc false
   @spec attach(Context.t(), String.t(), interface(), map(), keyword()) :: Attachment.t()
   def attach(%Context{} = ctx, op_name, interface, callbacks, opts \\ [])
       when is_binary(op_name) and is_map(callbacks) do
-    timeout_ms = Keyword.get(opts, :timeout, 30_000)
+    timeout_ms = Beaver.Execution.callback_timeout!(opts)
 
-    unless is_integer(timeout_ms) and timeout_ms >= 0,
-      do: raise(ArgumentError, ":timeout must be a non-negative integer")
-
-    init = {ctx, op_name, interface, callbacks, timeout_ms}
-
-    case GenServer.start(__MODULE__, init) do
-      {:ok, pid} -> GenServer.call(pid, :attachment)
-      {:error, {%_{} = exception, stacktrace}} -> reraise exception, stacktrace
-      {:error, reason} -> raise "failed to attach #{interface}: #{inspect(reason)}"
-    end
+    start(
+      ctx,
+      %Attachment{pid: nil, id: nil, interface: interface, operation_name: op_name},
+      fn -> native_attach(ctx, op_name, interface, callbacks, timeout_ms) end,
+      &dispatch/1
+    )
   end
 
   @doc false
@@ -82,53 +84,31 @@ defmodule Beaver.MLIR.ExternalInterface do
         {interface, implementation} <- interfaces do
       operation_name = "#{dialect}.#{operation}"
 
-      case interface do
-        :memory_effects ->
-          MLIR.MemoryEffects.attach(ctx, operation_name, implementation, opts)
+      modules = %{
+        memory_effects: MLIR.MemoryEffects,
+        conditionally_speculatable: MLIR.ConditionallySpeculatable,
+        transform_op: MLIR.TransformOpInterface,
+        pattern_descriptor: MLIR.PatternDescriptorOpInterface
+      }
 
-        :conditionally_speculatable ->
-          MLIR.ConditionallySpeculatable.attach(ctx, operation_name, implementation, opts)
+      provider =
+        modules[interface] ||
+          raise ArgumentError, "unsupported external interface #{inspect(interface)} on #{operation_name}"
 
-        :transform_op ->
-          MLIR.TransformOpInterface.attach(ctx, operation_name, implementation, opts)
-
-        :pattern_descriptor ->
-          MLIR.PatternDescriptorOpInterface.attach(ctx, operation_name, implementation, opts)
-
-        other ->
-          raise ArgumentError,
-                "unsupported external interface #{inspect(other)} on #{operation_name}"
-      end
+      provider.attach(ctx, operation_name, implementation, opts)
     end
   end
 
   @impl true
-  def init({ctx, op_name, interface, callbacks, timeout_ms}) do
-    {:ok, _} = Registry.register(@registry, ctx.ref, nil)
-    {id, native_owner} = native_attach(ctx, op_name, interface, callbacks, timeout_ms)
-
-    {:ok,
-     %{
-       context: ctx,
-       operation_name: op_name,
-       interface: interface,
-       callbacks: callbacks,
-       id: id,
-       native_owner: native_owner
-     }}
+  def init({ctx, registry, attachment, register, dispatch}) do
+    {:ok, _} = Registry.register(registry, ctx.ref, :attachment)
+    {id, native_owner} = register.()
+    attachment = %{attachment | pid: self(), id: id}
+    {:ok, %{context: ctx, attachment: attachment, native_owner: native_owner, dispatch: dispatch}}
   end
 
   @impl true
-  def handle_call(:attachment, _from, state) do
-    attachment = %Attachment{
-      pid: self(),
-      id: state.id,
-      interface: state.interface,
-      operation_name: state.operation_name
-    }
-
-    {:reply, attachment, state}
-  end
+  def handle_call(:attachment, _from, state), do: {:reply, state.attachment, state}
 
   def handle_call(:context_destroyed, _from, state) do
     :ok = CAPI.beaver_raw_external_interface_release(state.native_owner)
@@ -139,12 +119,12 @@ defmodule Beaver.MLIR.ExternalInterface do
   def handle_info(:external_interface_released, state), do: {:stop, :normal, state}
 
   def handle_info(message, state) do
-    case dispatch(message) do
+    case state.dispatch.(message) do
       {:handled, _failure} ->
         {:noreply, state}
 
       :unhandled ->
-        Logger.warning("unexpected external interface callback message: #{inspect(message)}")
+        Logger.warning("unexpected #{inspect(state.attachment.__struct__)} callback message: #{inspect(message)}")
         {:noreply, state}
     end
   end
@@ -264,58 +244,50 @@ defmodule Beaver.MLIR.ExternalInterface do
   defp normalize_void_result({:error, _reason} = error), do: error
   defp normalize_void_result(_value), do: {:ok, :ok}
 
-  defp invoke(token, fun, reply, op) do
-    outcome = CallbackRuntime.invoke(token, fun, reply, &diagnose(&1, op))
-    {:handled, callback_failure(outcome)}
+  for name <- [:invoke, :invoke_reply] do
+    defp unquote(name)(token, fun, reply, op) do
+      outcome = CallbackRuntime.unquote(name)(token, fun, reply, &diagnose(&1, op, "external interface"))
+      {:handled, callback_failure(outcome)}
+    end
   end
 
-  defp invoke_reply(token, fun, reply, op) do
-    outcome = CallbackRuntime.invoke_reply(token, fun, reply, &diagnose(&1, op))
-    {:handled, callback_failure(outcome)}
-  end
-
-  defp diagnose({:exception, kind, reason, stacktrace}, op) do
+  @doc false
+  def diagnose(outcome, op, label) do
     message =
-      "external interface callback raised:\n" <> Exception.format(kind, reason, stacktrace)
+      case outcome do
+        {:exception, kind, reason, stacktrace} ->
+          "#{label} callback raised:\n" <> Exception.format(kind, reason, stacktrace)
 
-    MLIR.Operation.location(op) |> MLIR.Diagnostic.emit(message)
-    Logger.error(message)
+        {:error, reason} ->
+          "#{label} callback failed: #{inspect(reason)}"
+
+        _ ->
+          nil
+      end
+
+    if message do
+      MLIR.Operation.location(op) |> MLIR.Diagnostic.emit(message)
+      Logger.error(message)
+    end
   end
 
-  defp diagnose({:error, reason}, op) do
-    message = "external interface callback failed: #{inspect(reason)}"
-    MLIR.Operation.location(op) |> MLIR.Diagnostic.emit(message)
-    Logger.error(message)
+  for {name, codes, fallback} <- [
+        {:reply_speculatability, %{not_speculatable: 0, speculatable: 1, recursively_speculatable: 2}, 0},
+        {:reply_transform_result, %{success: 0, silenceable_failure: 1, definite_failure: 2}, 2},
+        {:reply_boolean, %{false => 0, true => 1}, 0}
+      ] do
+    defp unquote(name)(token, {:ok, result}),
+      do: CAPI.beaver_raw_callback_reply_code(token, true, Map.fetch!(unquote(Macro.escape(codes)), result))
+
+    defp unquote(name)(token, _failure), do: CAPI.beaver_raw_callback_reply_code(token, false, unquote(fallback))
   end
-
-  defp diagnose(_outcome, _operation), do: :ok
-
-  defp reply_speculatability(token, {:ok, value}) do
-    code =
-      %{not_speculatable: 0, speculatable: 1, recursively_speculatable: 2} |> Map.fetch!(value)
-
-    CAPI.beaver_raw_callback_reply_code(token, true, code)
-  end
-
-  defp reply_speculatability(token, _failure), do: CAPI.beaver_raw_callback_reply_code(token, false, 0)
-
-  defp reply_transform_result(token, {:ok, result}) do
-    code = %{success: 0, silenceable_failure: 1, definite_failure: 2} |> Map.fetch!(result)
-    CAPI.beaver_raw_callback_reply_code(token, true, code)
-  end
-
-  defp reply_transform_result(token, _failure), do: CAPI.beaver_raw_callback_reply_code(token, false, 2)
-
-  defp reply_boolean(token, {:ok, value}),
-    do: CAPI.beaver_raw_callback_reply_code(token, true, if(value, do: 1, else: 0))
-
-  defp reply_boolean(token, _failure), do: CAPI.beaver_raw_callback_reply_code(token, false, 0)
 
   defp native(value), do: Beaver.Native.check!(value)
 
-  defp callback_failure({:error, reason}), do: {:error, reason}
+  @doc false
+  def callback_failure({:error, reason}), do: {:error, reason}
 
-  defp callback_failure({:exception, _kind, _reason, _stacktrace} = exception), do: exception
+  def callback_failure({:exception, _kind, _reason, _stacktrace} = exception), do: exception
 
-  defp callback_failure(_outcome), do: nil
+  def callback_failure(_outcome), do: nil
 end

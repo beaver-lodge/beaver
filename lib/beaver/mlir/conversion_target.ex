@@ -23,10 +23,7 @@ defmodule Beaver.MLIR.ConversionTarget do
       unsupported -> raise ArgumentError, "unsupported ConversionTarget options: #{inspect(unsupported)}"
     end
 
-    timeout_ms = Keyword.get(opts, :timeout, 30_000)
-
-    unless is_integer(timeout_ms) and timeout_ms >= 0,
-      do: raise(ArgumentError, ":timeout must be a non-negative integer")
+    timeout_ms = Beaver.Execution.callback_timeout!(opts)
 
     {:managed_conversion_target, target_term, registration} = CAPI.beaver_raw_conversion_target_create(context_ref)
 
@@ -34,65 +31,32 @@ defmodule Beaver.MLIR.ConversionTarget do
     %__MODULE__{ref: ref, registration: registration, timeout_ms: timeout_ms}
   end
 
-  @spec add_legal_op(t(), String.Chars.t()) :: t()
-  def add_legal_op(%__MODULE__{} = target, name), do: add_static(target, name, 0)
-
-  @spec add_illegal_op(t(), String.Chars.t()) :: t()
-  def add_illegal_op(%__MODULE__{} = target, name), do: add_static(target, name, 1)
-
-  @spec add_legal_dialect(t(), String.Chars.t()) :: t()
-  def add_legal_dialect(%__MODULE__{} = target, name), do: add_static(target, name, 2)
-
-  @spec add_illegal_dialect(t(), String.Chars.t()) :: t()
-  def add_illegal_dialect(%__MODULE__{} = target, name), do: add_static(target, name, 3)
-
-  defp add_static(%__MODULE__{} = target, name, kind) do
-    :ok =
-      CAPI.beaver_raw_conversion_target_add_static(target.registration, to_string(name), kind)
-
-    target
+  for {name, kind} <- Enum.with_index(~w(add_legal_op add_illegal_op add_legal_dialect add_illegal_dialect)a) do
+    @spec unquote(name)(t(), String.Chars.t()) :: t()
+    def unquote(name)(%__MODULE__{} = target, name) do
+      :ok = CAPI.beaver_raw_conversion_target_add_static(target.registration, to_string(name), unquote(kind))
+      target
+    end
   end
 
-  @spec add_dynamically_legal_op(t(), String.Chars.t(), legality_callback()) :: t()
-  def add_dynamically_legal_op(%__MODULE__{} = target, name, callback)
-      when is_function(callback, 1) do
-    :ok =
-      CAPI.beaver_raw_conversion_target_add_dynamic_op(
-        target.registration,
-        to_string(name),
-        callback,
-        target.timeout_ms
-      )
-
-    target
+  for {name, nif} <- [
+        add_dynamically_legal_op: :beaver_raw_conversion_target_add_dynamic_op,
+        add_dynamically_legal_dialect: :beaver_raw_conversion_target_add_dynamic_dialect
+      ] do
+    @spec unquote(name)(t(), String.Chars.t(), legality_callback()) :: t()
+    def unquote(name)(%__MODULE__{} = target, name, callback) when is_function(callback, 1),
+      do: add_dynamic(target, name, callback, unquote(nif))
   end
 
-  @spec add_dynamically_legal_dialect(t(), String.Chars.t(), legality_callback()) :: t()
-  def add_dynamically_legal_dialect(%__MODULE__{} = target, name, callback)
-      when is_function(callback, 1) do
-    :ok =
-      CAPI.beaver_raw_conversion_target_add_dynamic_dialect(
-        target.registration,
-        to_string(name),
-        callback,
-        target.timeout_ms
-      )
-
+  defp add_dynamic(target, name, callback, nif) do
+    :ok = apply(CAPI, nif, [target.registration, to_string(name), callback, target.timeout_ms])
     target
   end
 
   @spec mark_recursively_legal(t(), String.Chars.t(), legality_callback() | nil) :: t()
   def mark_recursively_legal(%__MODULE__{} = target, name, callback \\ nil)
       when is_nil(callback) or is_function(callback, 1) do
-    :ok =
-      CAPI.beaver_raw_conversion_target_mark_recursively_legal(
-        target.registration,
-        to_string(name),
-        callback,
-        target.timeout_ms
-      )
-
-    target
+    add_dynamic(target, name, callback, :beaver_raw_conversion_target_mark_recursively_legal)
   end
 
   @spec mark_unknown_dynamically_legal(t(), legality_callback()) :: t()

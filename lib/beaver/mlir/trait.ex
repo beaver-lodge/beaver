@@ -15,10 +15,6 @@ defmodule Beaver.MLIR.Trait do
   already be registered by an extensible dialect.
   """
 
-  use GenServer
-
-  require Logger
-
   alias Beaver.MLIR
   alias Kinda.CallbackRuntime
 
@@ -95,7 +91,7 @@ defmodule Beaver.MLIR.Trait do
     if Process.whereis(@context_registry) do
       entries = Registry.lookup(@context_registry, context_ref)
 
-      entries |> Enum.filter(&(elem(&1, 1) == :attachment)) |> Enum.each(fn {pid, _kind} -> release_attachment(pid) end)
+      MLIR.ExternalInterface.release_context(%Context{ref: context_ref}, @context_registry)
 
       entries |> Enum.filter(&(elem(&1, 1) == :definition)) |> Enum.each(fn {pid, _kind} -> stop_definition(pid) end)
     end
@@ -154,23 +150,31 @@ defmodule Beaver.MLIR.Trait do
           :ok | Attachment.t()
   def attach_custom(ctx, op_name, identity, callbacks, opts \\ []) do
     callbacks = normalize_callbacks!(callbacks)
-    timeout_ms = Keyword.get(opts, :timeout, 30_000)
-
-    unless is_integer(timeout_ms) and timeout_ms >= 0,
-      do: raise(ArgumentError, ":timeout must be a non-negative integer")
+    timeout_ms = Beaver.Execution.callback_timeout!(opts)
 
     type_id = type_id(ctx, identity)
 
     if has_type_id?(ctx, op_name, type_id) do
       :ok
     else
-      init = {ctx, op_name, identity, type_id, callbacks, timeout_ms}
+      attachment = %Attachment{pid: nil, id: nil, identity: identity, operation_name: op_name, type_id: type_id}
 
-      case GenServer.start(__MODULE__, init) do
-        {:ok, pid} -> GenServer.call(pid, :attachment)
-        {:error, {%_{} = exception, stacktrace}} -> reraise exception, stacktrace
-        {:error, reason} -> raise "failed to attach trait #{inspect(identity)}: #{inspect(reason)}"
-      end
+      MLIR.ExternalInterface.start(
+        ctx,
+        attachment,
+        fn ->
+          CAPI.beaver_raw_dynamic_trait_attach(
+            ctx,
+            op_name,
+            type_id,
+            callbacks[:verify],
+            callbacks[:verify_regions],
+            timeout_ms
+          )
+        end,
+        &dispatch(&1, identity),
+        @context_registry
+      )
     end
   end
 
@@ -206,64 +210,6 @@ defmodule Beaver.MLIR.Trait do
     apply(CAPI, type_id, [])
   end
 
-  @impl true
-  def init({ctx, op_name, identity, type_id, callbacks, timeout_ms}) do
-    {:ok, _} = Registry.register(@context_registry, ctx.ref, :attachment)
-
-    {id, native_owner} =
-      CAPI.beaver_raw_dynamic_trait_attach(
-        ctx,
-        op_name,
-        type_id,
-        callbacks[:verify],
-        callbacks[:verify_regions],
-        timeout_ms
-      )
-
-    {:ok,
-     %{
-       context: ctx,
-       operation_name: op_name,
-       identity: identity,
-       type_id: type_id,
-       callbacks: callbacks,
-       id: id,
-       native_owner: native_owner
-     }}
-  end
-
-  @impl true
-  def handle_call(:attachment, _from, state) do
-    attachment = %Attachment{
-      pid: self(),
-      id: state.id,
-      identity: state.identity,
-      operation_name: state.operation_name,
-      type_id: state.type_id
-    }
-
-    {:reply, attachment, state}
-  end
-
-  def handle_call(:context_destroyed, _from, state) do
-    :ok = CAPI.beaver_raw_external_interface_release(state.native_owner)
-    {:stop, :normal, :ok, state}
-  end
-
-  @impl true
-  def handle_info(:external_interface_released, state), do: {:stop, :normal, state}
-
-  def handle_info(message, state) do
-    case dispatch(message, state.identity) do
-      {:handled, _failure} ->
-        {:noreply, state}
-
-      :unhandled ->
-        Logger.warning("unexpected dynamic trait callback message: #{inspect(message)}")
-        {:noreply, state}
-    end
-  end
-
   defp dispatch({callback_name, token, callback, _id, op}, identity)
        when callback_name in [:verify, :verify_regions] do
     op = Native.check!(op)
@@ -273,10 +219,10 @@ defmodule Beaver.MLIR.Trait do
         token,
         fn -> callback.(op) |> normalize_verification_result() end,
         &CAPI.beaver_raw_callback_reply/2,
-        &diagnose(&1, op, identity, callback_name)
+        &MLIR.ExternalInterface.diagnose(&1, op, "dynamic trait #{inspect(identity)} #{callback_name}")
       )
 
-    {:handled, callback_failure(outcome)}
+    {:handled, MLIR.ExternalInterface.callback_failure(outcome)}
   end
 
   defp dispatch(_message, _identity), do: :unhandled
@@ -291,25 +237,6 @@ defmodule Beaver.MLIR.Trait do
           "trait verifier must return :ok, true, {:ok, value}, :error, false, " <>
             "or {:error, reason}, got: #{inspect(other)}"
   end
-
-  defp diagnose({:exception, kind, reason, stacktrace}, op, identity, callback_name) do
-    message =
-      "dynamic trait #{inspect(identity)} #{callback_name} callback raised:\n" <>
-        Exception.format(kind, reason, stacktrace)
-
-    Operation.location(op) |> MLIR.Diagnostic.emit(message)
-    Logger.error(message)
-  end
-
-  defp diagnose({:error, reason}, op, identity, callback_name) do
-    message =
-      "dynamic trait #{inspect(identity)} #{callback_name} callback failed: #{inspect(reason)}"
-
-    Operation.location(op) |> MLIR.Diagnostic.emit(message)
-    Logger.error(message)
-  end
-
-  defp diagnose(_outcome, _operation, _identity, _callback_name), do: :ok
 
   defp normalize_callbacks!(callbacks) when is_list(callbacks) do
     unless Keyword.keyword?(callbacks),
@@ -351,24 +278,11 @@ defmodule Beaver.MLIR.Trait do
     end
   end
 
-  defp release_attachment(pid) do
-    GenServer.call(pid, :context_destroyed)
-  catch
-    :exit, {:noproc, _} -> :ok
-    :exit, {:normal, _} -> :ok
-  end
-
   defp stop_definition(pid) do
     GenServer.stop(pid, :normal)
   catch
     :exit, {:noproc, _} -> :ok
   end
-
-  defp callback_failure({:error, reason}), do: {:error, reason}
-
-  defp callback_failure({:exception, _kind, _reason, _stacktrace} = exception), do: exception
-
-  defp callback_failure(_outcome), do: nil
 
   defp builtin?(trait), do: is_map_key(@traits, trait)
 

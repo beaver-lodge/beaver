@@ -46,16 +46,8 @@ defmodule Beaver.MLIR.Attribute do
         mlirDenseElementsAttrBoolSplatGet(shaped_type, value)
 
       Type.integer?(element_type) ->
-        width = Type.width(element_type)
-
-        apply(
-          CAPI,
-          if(Type.unsigned?(element_type),
-            do: :"mlirDenseElementsAttrUInt#{width}SplatGet",
-            else: :"mlirDenseElementsAttrInt#{width}SplatGet"
-          ),
-          [shaped_type, value]
-        )
+        {suffix, _kind} = integer_storage(element_type)
+        apply(CAPI, :"mlirDenseElementsAttr#{suffix}SplatGet", [shaped_type, value])
 
       MLIR.equal?(element_type, Type.f(32, ctx: ctx)) ->
         mlirDenseElementsAttrFloatSplatGet(shaped_type, value)
@@ -74,25 +66,23 @@ defmodule Beaver.MLIR.Attribute do
 
   defp attr_elements?(elements), do: Enum.all?(elements, &match?(%Attribute{}, &1)) and not Enum.empty?(elements)
 
-  defp int_dense_elements_attr_getter(element_type) do
+  @doc false
+  def integer_storage(element_type) do
     width = Type.width(element_type)
 
-    {f, t} =
-      if Type.unsigned?(element_type),
-        do: {:"mlirDenseElementsAttrUInt#{width}Get", :"Elixir.Beaver.Native.U#{width}"},
-        else: {:"mlirDenseElementsAttrInt#{width}Get", :"Elixir.Beaver.Native.I#{width}"}
-
-    &apply(CAPI, f, [&1, &2, Native.array(&3, t)])
+    if Type.unsigned?(element_type),
+      do: {"UInt#{width}", :"Elixir.Beaver.Native.U#{width}"},
+      else: {"Int#{width}", :"Elixir.Beaver.Native.I#{width}"}
   end
 
-  defp float_dense_elements_attr_getter(element_type) do
-    {f, t} =
-      case Type.width(element_type) do
-        32 -> {&mlirDenseElementsAttrFloatGet/3, Native.F32}
-        64 -> {&mlirDenseElementsAttrDoubleGet/3, Native.F64}
-      end
+  defp dense_numeric_elements(shaped_type, count, elements, {suffix, kind}),
+    do: apply(CAPI, :"mlirDenseElementsAttr#{suffix}Get", [shaped_type, count, Native.array(elements, kind)])
 
-    &apply(f, [&1, &2, Native.array(&3, t)])
+  defp float_storage(element_type) do
+    case Type.width(element_type) do
+      32 -> {"Float", Native.F32}
+      64 -> {"Double", Native.F64}
+    end
   end
 
   defp dense_elements_get(shaped_type, num_elements, elements) do
@@ -115,13 +105,13 @@ defmodule Beaver.MLIR.Attribute do
         mlirDenseElementsAttrBoolGet(shaped_type, num_elements, Native.array(elements, Native.CInt))
 
       Type.integer?(element_type) ->
-        int_dense_elements_attr_getter(element_type).(shaped_type, num_elements, elements)
+        dense_numeric_elements(shaped_type, num_elements, elements, integer_storage(element_type))
 
       MLIR.equal?(element_type, Type.index()) ->
         mlirDenseElementsAttrUInt64Get(shaped_type, num_elements, Native.array(elements, Native.U64))
 
       Type.float?(element_type) ->
-        float_dense_elements_attr_getter(element_type).(shaped_type, num_elements, elements)
+        dense_numeric_elements(shaped_type, num_elements, elements, float_storage(element_type))
 
       true ->
         raise ArgumentError,

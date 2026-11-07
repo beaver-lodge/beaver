@@ -5,30 +5,19 @@ const c = prelude.c;
 const kinda = @import("kinda");
 const e = kinda.erl_nif;
 const beam = kinda.beam;
-const diagnostic = @import("diagnostic.zig");
 const callback_names = .{ "construct", "destruct", "initialize", "clone", "run" };
 const RuntimeDispatcher = kinda.callback_runtime.Dispatcher(callback_names);
 const string_ref = @import("string_ref.zig");
+const callback_args = @import("callback_args.zig");
 
 threadlocal var typeIDAllocator: ?mlir_capi.TypeIDAllocator.T = null;
 const CallbackDispatcher = struct {
-    fn construct(userData: ?*anyopaque) callconv(.c) void {
-        const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
-        const temp_env = e.enif_alloc_env() orelse unreachable;
-        const response = this.invoke("construct", temp_env, .{}) catch unreachable;
-        if (!response.success) @panic("Fail to construct a pass implemented in Elixir");
-    }
-    fn destruct(userData: ?*anyopaque) callconv(.c) void {
-        const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
-        const temp_env = e.enif_alloc_env() orelse unreachable;
-        const response = this.invoke("destruct", temp_env, .{}) catch unreachable;
-        if (!response.success) @panic("Fail to destruct a pass implemented in Elixir");
-        this.deinit();
-    }
+    const Lifecycle = callback_args.Lifecycle(RuntimeDispatcher, "a pass");
+    const construct = Lifecycle.construct;
+    const destruct = Lifecycle.destruct;
     fn initialize(ctx: mlir_capi.Context.T, userData: ?*anyopaque) callconv(.c) mlir_capi.LogicalResult.T {
         const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
-        const temp_env = e.enif_alloc_env() orelse unreachable;
-        const response = this.invoke("initialize", temp_env, .{mlir_capi.Context.resource.make_kind(temp_env, ctx) catch unreachable}) catch return c.beaverLogicalResultFailure();
+        const response = callback_args.invoke(this, "initialize", .{mlir_capi.Context}, .{ctx}) catch return c.beaverLogicalResultFailure();
         if (!response.success) {
             const loc = c.mlirLocationUnknownGet(ctx);
             c.mlirEmitError(loc, "Fail to initialize a pass implemented in Elixir");
@@ -38,17 +27,18 @@ const CallbackDispatcher = struct {
     }
     fn clone(userData: ?*anyopaque) callconv(.c) ?*anyopaque {
         const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
-        const new_dispatcher = this.clone() catch unreachable;
+        const new_dispatcher = (if (@hasDecl(RuntimeDispatcher, "cloneWithOwnership"))
+            this.cloneWithOwnership(.bind_once)
+        else
+            this.clone()) catch unreachable;
         const temp_env = e.enif_alloc_env() orelse unreachable;
-        const response = new_dispatcher.invoke("clone", temp_env, .{this.copyId(temp_env)}) catch unreachable;
+        const response = callback_args.invokeTerms(new_dispatcher, "clone", temp_env, .{this.copyId(temp_env)}) catch unreachable;
         if (!response.success) @panic("Fail to clone a pass implemented in Elixir");
         return new_dispatcher;
     }
     fn run(op: mlir_capi.Operation.T, pass: c.MlirExternalPass, userData: ?*anyopaque) callconv(.c) void {
         const this: *RuntimeDispatcher = @ptrCast(@alignCast(userData));
-        const temp_env = e.enif_alloc_env() orelse unreachable;
-        const op_kind = mlir_capi.Operation.resource.make_kind(temp_env, op) catch return c.mlirExternalPassSignalFailure(pass);
-        if (this.invoke("run", temp_env, .{op_kind})) |response| {
+        if (callback_args.invoke(this, "run", .{mlir_capi.Operation}, .{op})) |response| {
             if (!response.success) {
                 c.mlirEmitError(c.mlirOperationGetLocation(op), "Fail to run a pass implemented in Elixir");
                 c.mlirExternalPassSignalFailure(pass);
@@ -60,163 +50,27 @@ const CallbackDispatcher = struct {
     }
 };
 
-const mlirPassManagerRunOnOpWrap = kinda.BangFunc(prelude.allKinds, c, "mlirPassManagerRunOnOp").wrap_ret_call;
-const ManagerRunner = struct {
-    const Error = error{ @"fail to allocate BEAM environment", @"fail to send message to pm caller", @"fail get caller's self pid" };
-    pid: beam.pid,
-    pm: mlir_capi.PassManager.T,
-    op: ?mlir_capi.Operation.T = null,
-    fn init(env: beam.env) !*@This() {
-        const this = try beam.allocator.create(@This());
-        if (e.enif_self(env, &this.*.pid) == null) return Error.@"fail get caller's self pid";
-        return this;
+pub fn create(env: beam.env, arguments: beam.term) !beam.term {
+    const args = try @import("execution.zig").tuple(env, arguments, 5);
+    var owner: beam.pid = undefined;
+    if (e.enif_get_local_pid(env, args[4], &owner) == 0) return error.InvalidCallbackOwner;
+    const dispatcher = try RuntimeDispatcher.initWithOptions(owner, callback_args.fixedOptions(RuntimeDispatcher, 30_000));
+    errdefer dispatcher.deinit();
+    inline for (callback_names) |name| dispatcher.setCallback(name, beam.make_atom(env, name));
+    // MLIR borrows the operation anchor; keep its bytes with the callback owner.
+    var names: [4]mlir_capi.StringRef.T = undefined;
+    for (&names, args[0..4]) |*name, term| {
+        name.* = try string_ref.get_binary_as_string_ref(dispatcher.env, e.enif_make_copy(dispatcher.env, term));
     }
-    fn run_with_diagnostics(this: @This()) !void {
-        const env = e.enif_alloc_env() orelse return Error.@"fail to allocate BEAM environment";
-        const ctx = c.mlirOperationGetContext(this.op.?);
-        const args = .{ this.pm, this.op.? };
-        errdefer e.enif_free_env(env);
-        if (!beam.send_advanced(env, this.pid, env, try diagnostic.call_with_diagnostics(env, ctx, mlirPassManagerRunOnOpWrap, .{ env, args }))) {
-            return Error.@"fail to send message to pm caller";
-        }
-    }
-    fn run_and_send(worker: ?*anyopaque) callconv(.c) void {
-        const this: ?*@This() = @ptrCast(@alignCast(worker));
-        defer beam.allocator.destroy(this.?);
-        if (run_with_diagnostics(this.?.*)) |_| {} else |err| {
-            c.mlirEmitError(c.mlirOperationGetLocation(this.?.op.?), @errorName(err));
-        }
-    }
-    pub fn run_pm_on_op_async(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-        const this = try init(env);
-        errdefer beam.allocator.destroy(this);
-        this.*.pm = try mlir_capi.PassManager.resource.fetch(env, args[0]);
-        this.*.op = try mlir_capi.Operation.resource.fetch(env, args[1]);
-        const ctx = c.mlirOperationGetContext(this.op.?);
-        if (c.beaverContextAddWork(ctx, @This().run_and_send, @ptrCast(@constCast(this)))) {
-            return beam.make_atom(env, "async");
-        } else {
-            defer beam.allocator.destroy(this);
-            return try diagnostic.call_with_diagnostics(env, ctx, mlirPassManagerRunOnOpWrap, .{ env, .{ this.pm, this.op.? } });
-        }
-    }
-
-    fn destroyManager(worker: ?*anyopaque) callconv(.c) void {
-        const this: ?*@This() = @ptrCast(@alignCast(worker));
-        defer beam.allocator.destroy(this.?);
-        c.mlirPassManagerDestroy(this.?.*.pm);
-        const msg = "pm_destroy_done";
-        const temp_env = e.enif_alloc_env() orelse @panic("fail to allocate BEAM environment: " ++ msg);
-        if (!beam.send_advanced(null, this.?.pid, temp_env, beam.make_atom(temp_env, msg))) {
-            @panic("fail to send message to pm caller: " ++ msg);
-        }
-    }
-    pub fn destroy_pm_async(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-        const this = try init(env);
-        errdefer beam.allocator.destroy(this);
-        this.*.pm = try mlir_capi.PassManager.resource.fetch(env, args[0]);
-        const ctx = c.beaverPassManagerGetContext(this.pm);
-        if (c.beaverContextAddWork(ctx, destroyManager, @ptrCast(@constCast(this)))) {
-            return beam.make_atom(env, "async");
-        } else {
-            defer beam.allocator.destroy(this);
-            c.mlirPassManagerDestroy(this.pm);
-            return beam.make_ok(env);
-        }
-    }
-};
-
-const PassCreator = struct {
-    pid: beam.pid,
-    name: beam.term,
-    argument: beam.term,
-    description: beam.term,
-    op_name: beam.term,
-    cb_map: std.StringHashMap(beam.term),
-    dispatcher_env: beam.env,
-
-    fn init(pid: beam.pid, args: *const [4]beam.term) !*@This() {
-        const this = try beam.allocator.create(@This());
-        const env = e.enif_alloc_env() orelse unreachable;
-        this.* = .{
-            .dispatcher_env = env,
-            .pid = pid,
-            .name = e.enif_make_copy(env, args[0]),
-            .argument = e.enif_make_copy(env, args[1]),
-            .description = e.enif_make_copy(env, args[2]),
-            .op_name = e.enif_make_copy(env, args[3]),
-            .cb_map = std.StringHashMap(beam.term).init(beam.allocator),
-        };
-        errdefer this.deinit();
-        return this;
-    }
-    fn deinit(self: *@This()) void {
-        self.cb_map.deinit();
-        beam.allocator.destroy(self);
-    }
-    const StructOfCallbacks = c.MlirExternalPassCallbacks{ .construct = CallbackDispatcher.construct, .destruct = CallbackDispatcher.destruct, .initialize = CallbackDispatcher.initialize, .clone = CallbackDispatcher.clone, .run = CallbackDispatcher.run };
-    fn create_and_send_pass(worker: ?*anyopaque) callconv(.c) void {
-        if (e.enif_thread_type() != e.ERL_NIF_THR_UNDEFINED) {
-            @panic("Must apply pattern on non-scheduler thread to prevent deadlock");
-        }
-        const this: *@This() = @ptrCast(@alignCast(worker));
-        defer this.deinit();
-        if (typeIDAllocator == null) {
-            typeIDAllocator = c.mlirTypeIDAllocatorCreate();
-        }
-        const passID = c.mlirTypeIDAllocatorAllocateTypeID(typeIDAllocator.?);
-        const nDependentDialects = 0;
-        const dependentDialects = null;
-        errdefer {
-            e.enif_free_env(this.dispatcher_env);
-        }
-        // the env's ownership will be transferred to dispatcher to make sure string like op_name lives long enough
-        const dispatcher = RuntimeDispatcher.initWithEnv(this.dispatcher_env, this.pid) catch @panic("fail to init pass callback dispatcher");
-        inline for (callback_names) |f| {
-            if (this.cb_map.get(f)) |cb| {
-                dispatcher.setCallback(f, cb);
-            }
-        }
-        const pass = kinda.BangFunc(prelude.allKinds, c, "beaverPassCreate").wrap_ret_call(this.dispatcher_env, .{
-            CallbackDispatcher.construct,
-            CallbackDispatcher.destruct,
-            CallbackDispatcher.initialize,
-            CallbackDispatcher.clone,
-            CallbackDispatcher.run,
-            passID,
-            string_ref.get_binary_as_string_ref(this.dispatcher_env, this.name) catch @panic("fail to string ref for name"),
-            string_ref.get_binary_as_string_ref(this.dispatcher_env, this.argument) catch @panic("fail to string ref for argument"),
-            string_ref.get_binary_as_string_ref(this.dispatcher_env, this.description) catch @panic("fail to string ref for description"),
-            string_ref.get_binary_as_string_ref(this.dispatcher_env, this.op_name) catch @panic("fail to string ref for op_name"),
-            nDependentDialects,
-            dependentDialects,
-            dispatcher,
-        }) catch @panic("fail to create pass resource");
-        if (!beam.send_advanced(null, this.pid, null, pass)) {
-            @panic("fail to send pass");
-        }
-    }
-
-    pub fn create_mlir_pass(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-        const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
-        const creator = try PassCreator.init(try beam.self(env), args[1..5]);
-        inline for (callback_names) |f| {
-            const key = beam.make_atom(env, f);
-            var cb: beam.term = undefined;
-            if (e.enif_get_map_value(env, args[5], key, &cb) <= 0) {
-                @panic("fail to get cb from map:" ++ f);
-            }
-            if (!beam.is_nil2(env, cb)) {
-                try creator.cb_map.put(f, e.enif_make_copy(creator.dispatcher_env, cb));
-            }
-        }
-        if (c.beaverContextAddWork(ctx, create_and_send_pass, @ptrCast(creator))) {
-            return beam.make_atom(env, "async");
-        } else {
-            @panic("fail to add work to context to create pass");
-        }
-    }
-};
+    if (typeIDAllocator == null) typeIDAllocator = c.mlirTypeIDAllocatorCreate();
+    return kinda.BangFunc(prelude.allKinds, c, "beaverPassCreate").wrap_ret_call(env, .{
+        CallbackDispatcher.construct, CallbackDispatcher.destruct, CallbackDispatcher.initialize,
+        CallbackDispatcher.clone,     CallbackDispatcher.run,      c.mlirTypeIDAllocatorAllocateTypeID(typeIDAllocator.?),
+        names[0],                     names[1],                    names[2],
+        names[3],                     0,                           null,
+        dispatcher,
+    });
+}
 
 var mutex: std.Io.Mutex = .init;
 var all_passes_registered = false;
@@ -229,9 +83,3 @@ pub fn register_all_passes() void {
         c.mlirRegisterAllPasses();
     }
 }
-
-pub const nifs = .{
-    prelude.beaverRawNIF(PassCreator, "create_mlir_pass", 6),
-    prelude.beaverRawNIF(ManagerRunner, "run_pm_on_op_async", 2),
-    prelude.beaverRawNIF(ManagerRunner, "destroy_pm_async", 1),
-};

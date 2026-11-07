@@ -2,14 +2,9 @@ alias Beaver.Native
 
 defmodule Beaver.MLIR.Value do
   @moduledoc """
-  This module handles MLIR values, which represent SSA (Static Single Assignment) values in the IR.
-
-  Values can be either block arguments or operation results. That's why this module provides
-  functions to check if a value is an argument or a result (`argument?/1`, `result?/1`), or to get the owner of a result (`owner/1`).
-
-  Conditional use replacement runs its native traversal on an MLIR worker
-  thread and dispatches each use to the calling BEAM process through
-  `Kinda.CallbackRuntime`.
+  MLIR SSA values: block arguments or operation results. Conditional use
+  replacement traverses uses on a worker and dispatches predicates to the
+  calling BEAM process through `Kinda.CallbackRuntime`.
   """
   alias Beaver.MLIR.CAPI
   alias Beaver.MLIR
@@ -19,21 +14,15 @@ defmodule Beaver.MLIR.Value do
 
   def argument?(%__MODULE__{} = value), do: CAPI.mlirValueIsABlockArgument(value) |> Native.to_term()
 
-  @doc """
-  Returns true if the value is a result of an operation.
-  """
+  @doc "Returns whether the value is an operation result."
   def result?(%__MODULE__{} = value),
     do: CAPI.mlirValueIsAOpResult(value) |> Native.to_term()
 
-  @doc """
-  Return the defining op of this value if this value is a result
-  """
+  @doc "Returns the defining operation, or an error for a block argument."
   def owner(%__MODULE__{} = value),
     do: if(result?(value), do: {:ok, CAPI.mlirOpResultGetOwner(value)}, else: {:error, "not a result"})
 
-  @doc """
-  Return the defining op of this value. Raises if this value is not a result
-  """
+  @doc "Returns the defining operation; raises for a block argument."
   def owner!(value) do
     case owner(value) do
       {:ok, op} -> op
@@ -41,19 +30,15 @@ defmodule Beaver.MLIR.Value do
     end
   end
 
-  @doc """
-  Return the type of this value
-  """
+  @doc "Returns the value's type."
   defdelegate type(value), to: CAPI, as: :mlirValueGetType
 
   @doc "Returns the source location carried by this value."
   defdelegate location(value), to: CAPI, as: :mlirValueGetLocation
 
   @doc """
-  Sets the location of a block argument and returns the value.
-
-  Operation-result locations are inherited from their defining operation and
-  cannot be set independently.
+  Sets a block argument's location and returns the value. Operation results
+  inherit their operation's location and cannot be set independently.
   """
   @spec set_location(t(), MLIR.Location.source()) :: t()
   def set_location(%__MODULE__{} = value, loc) do
@@ -65,29 +50,24 @@ defmodule Beaver.MLIR.Value do
   end
 
   @doc """
-  Replaces uses of `value` for which `predicate` returns `true`.
-
-  The predicate receives an `#{inspect(MLIR.OpOperand)}` and executes in the
-  calling BEAM process. Native traversal runs outside the scheduler and waits
-  through Kinda's resource-backed callback runtime. The source and replacement
-  values must belong to the same multithreaded MLIR context.
-
-  Predicate exceptions are re-raised with their original stacktrace after the
-  native traversal stops. This operation is not transactional: replacements
-  accepted before an exception remain applied.
+  Replaces uses whose `MLIR.OpOperand` predicate returns `true` on the calling
+  BEAM process. Native traversal waits outside the scheduler through Kinda's
+  callback runtime. Both values must share a context with thread-safe locking.
+  Exceptions are re-raised with their stacktrace after traversal stops;
+  replacements already accepted remain applied.
   """
   @spec replace_uses_with_if(t(), t(), (MLIR.OpOperand.t() -> boolean())) :: :ok
-  def replace_uses_with_if(%__MODULE__{ref: from}, %__MODULE__{ref: replacement}, predicate)
+  def replace_uses_with_if(%__MODULE__{} = from, %__MODULE__{ref: replacement}, predicate)
       when is_function(predicate, 1) do
-    case CAPI.beaver_raw_value_replace_uses_with_if(from, replacement, predicate) do
-      {:async, id} -> await_conditional_replacement(id, nil)
-      other -> Native.check!(other)
-    end
+    id =
+      CAPI.beaver_raw_execution_worker(MLIR.context(from).ref, :replace_uses, {from.ref, replacement, predicate}, false)
+
+    await_conditional_replacement(id, nil)
   end
 
   defp await_conditional_replacement(id, exception) do
     receive do
-      {:filter, token, predicate, ^id, op_operand_ref} ->
+      {:filter, token, {^id, predicate}, _dispatcher, op_operand_ref} ->
         outcome =
           CallbackRuntime.invoke(
             token,
@@ -97,10 +77,10 @@ defmodule Beaver.MLIR.Value do
 
         await_conditional_replacement(id, exception || callback_exception(outcome))
 
-      {:replace_uses_with_if_done, ^id} ->
+      {^id, {{:ok, :ok}, nil}} ->
         finish_conditional_replacement(exception)
 
-      {:replace_uses_with_if_error, ^id, reason} ->
+      {^id, {{:error, reason}, nil}} ->
         finish_conditional_replacement(
           exception || {:exception, :error, RuntimeError.exception(Atom.to_string(reason)), []}
         )

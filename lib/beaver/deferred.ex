@@ -2,15 +2,10 @@ alias Beaver.MLIR.Context
 
 defmodule Beaver.Deferred do
   @moduledoc """
-  Explicit, context-bound construction of MLIR entities.
-
-  MLIR types, attributes, locations, and similar entities belong to an
-  `Beaver.MLIR.Context`. Builders return a `%Beaver.Deferred{}` when no `:ctx`
-  option is supplied and return the concrete entity when one is supplied.
-
-  A deferred value is deliberately distinct from an ordinary one-argument
-  callback. Materialize it with `resolve/2`; passing a concrete context-owned
-  entity through `resolve/2` also verifies that it belongs to that context.
+  Context-bound MLIR construction. Builders return `%Beaver.Deferred{}` without
+  `:ctx`, or concrete entities with it. Unlike ordinary one-argument callbacks,
+  deferred values can be materialized by `resolve/2`, which also checks the
+  context ownership of concrete entities.
   """
   alias Beaver.MLIR
 
@@ -30,17 +25,14 @@ defmodule Beaver.Deferred do
   def defer(resolver) when is_function(resolver, 1), do: %__MODULE__{resolver: resolver}
 
   @doc """
-  Runs `resolver` immediately when `opts` contains `:ctx`; otherwise defers it.
-
-  An explicitly supplied `ctx: nil` or any non-context value is rejected rather
-  than being treated as if the option were absent.
+  Runs `resolver` with `:ctx`, or defers it when that option is absent.
+  Explicit `ctx: nil` and other non-context values are rejected.
   """
   @spec from_opts(opts(), (context_arg() -> value)) :: contextual(value) when value: var
   def from_opts(opts, resolver) when is_list(opts) and is_function(resolver, 1) do
-    case Keyword.fetch(opts, :ctx) do
-      :error -> defer(resolver)
-      {:ok, %Context{} = ctx} -> resolver.(ctx) |> Context.ensure_same!(ctx)
-      {:ok, invalid} -> raise ArgumentError, "expected :ctx to be an MLIR context, got: #{inspect(invalid)}"
+    case context(opts) do
+      nil -> defer(resolver)
+      ctx -> resolver.(ctx) |> Context.ensure_same!(ctx)
     end
   end
 
@@ -65,11 +57,9 @@ defmodule Beaver.Deferred do
   end
 
   @doc """
-  Materializes a deferred value in `ctx`.
-
-  Concrete context-owned entities pass through unchanged after their context
-  ownership has been checked. Resolvers may return `{:ok, value}` or
-  `{:error, reason}`; success is unwrapped and errors become `ArgumentError`.
+  Resolves deferred values in `ctx` and checks ownership of concrete entities.
+  Resolver successes `{:ok, value}` are unwrapped; `{:error, reason}` raises
+  `ArgumentError`.
   """
   @spec resolve(contextual(value), context_arg()) :: value when value: var
   def resolve(resolver, %Context{}) when is_function(resolver, 1),

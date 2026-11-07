@@ -275,15 +275,26 @@ defmodule Beaver.MLIR do
   end
 
   @spec verify(verifiable()) :: verify_result(verifiable())
-  def verify(op) do
+  @spec verify(verifiable(), keyword()) :: verify_result(verifiable())
+  @doc """
+  Verifies IR using `strategy: :worker` (default), `:dirty`, or `:auto`.
+  Automatic mode uses dirty CPU schedulers only before any BEAM-backed external
+  interface/trait has been registered in the context; otherwise it uses workers.
+  Register dialects and callbacks before sharing a context across executions.
+  """
+  def verify(op, opts \\ []) do
     if null?(op) do
       :null
     else
       ctx = MLIR.context(op)
 
       {is_success, diagnostics} =
-        Beaver.MLIR.CAPI.beaver_raw_operation_verify_async(ctx.ref, MLIR.Operation.from_module(op).ref)
-        |> Beaver.MLIR.CAPI.await_async()
+        Beaver.Execution.run(
+          ctx,
+          :verify,
+          {MLIR.Operation.from_module(op).ref, Keyword.get(opts, :recursive, true)},
+          opts
+        )
 
       if Native.to_term(is_success), do: {:ok, op}, else: {:error, diagnostics}
     end

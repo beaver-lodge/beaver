@@ -5,19 +5,6 @@ const mlir_capi = @import("mlir_capi.zig");
 const diagnostic = @import("diagnostic.zig");
 const c = @import("prelude.zig").c;
 
-fn fetchHandleSlice(comptime Kind: type, environment: beam.env, list: beam.term) ![]Kind.T {
-    const len = try beam.get_list_length(environment, list);
-    const values = try beam.allocator.alloc(Kind.T, len);
-    errdefer beam.allocator.free(values);
-
-    var rest = list;
-    for (values) |*value| {
-        const head = try beam.get_head_and_iter(environment, &rest);
-        value.* = try Kind.resource.fetch(environment, head);
-    }
-    return values;
-}
-
 const Request = struct {
     op_name: mlir_capi.StringRef.T,
     context: mlir_capi.Context.T,
@@ -31,9 +18,9 @@ const Request = struct {
             return error.UnsupportedProperties;
 
         const op_name = try beam.get_binary(environment, args[0]);
-        const operands = try fetchHandleSlice(mlir_capi.Value, environment, args[3]);
+        const operands = try @import("callback_args.zig").Range(mlir_capi.Value).decode(environment, args[3], beam.allocator);
         errdefer beam.allocator.free(operands);
-        const regions = try fetchHandleSlice(mlir_capi.Region, environment, args[6]);
+        const regions = try @import("callback_args.zig").Range(mlir_capi.Region).decode(environment, args[6], beam.allocator);
         errdefer beam.allocator.free(regions);
         return .{
             .op_name = c.mlirStringRefCreate(op_name.data, op_name.size),
@@ -146,68 +133,43 @@ const ShapedTypeCollector = struct {
     }
 };
 
-fn inferTypesWithoutDiagnostics(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    var request = try Request.init(environment, args);
-    defer request.deinit();
-    var collector = TypeCollector.init();
-    defer collector.deinit();
-
-    const status = c.mlirInferTypeOpInterfaceInferReturnTypes(
-        request.op_name,
-        request.context,
-        request.location,
-        @intCast(request.operands.len),
-        request.operands.ptr,
-        request.attributes,
-        null,
-        @intCast(request.regions.len),
-        request.regions.ptr,
-        TypeCollector.append,
-        &collector,
-    );
-    if (c.beaverLogicalResultIsFailure(status)) {
-        c.mlirEmitError(request.location, "failed to infer operation return types");
-        return beam.make_atom(environment, "error");
-    }
-    return collector.toTerm(environment);
-}
-
-fn inferShapedTypesWithoutDiagnostics(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    var request = try Request.init(environment, args);
-    defer request.deinit();
-    var collector = ShapedTypeCollector.init();
-    defer collector.deinit();
-
-    const status = c.mlirInferShapedTypeOpInterfaceInferReturnTypes(
-        request.op_name,
-        request.context,
-        request.location,
-        @intCast(request.operands.len),
-        request.operands.ptr,
-        request.attributes,
-        null,
-        @intCast(request.regions.len),
-        request.regions.ptr,
-        ShapedTypeCollector.append,
-        &collector,
-    );
-    if (c.beaverLogicalResultIsFailure(status)) {
-        c.mlirEmitError(request.location, "failed to infer shaped operation return components");
-        return beam.make_atom(environment, "error");
-    }
-    return collector.toTerm(environment);
-}
-
-fn withDiagnostics(comptime inference: anytype) type {
+fn Inference(comptime shaped: bool) type {
+    const Collector = if (shaped) ShapedTypeCollector else TypeCollector;
+    const infer = if (shaped) c.mlirInferShapedTypeOpInterfaceInferReturnTypes else c.mlirInferTypeOpInterfaceInferReturnTypes;
     return struct {
+        fn collect(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            var request = try Request.init(environment, args);
+            defer request.deinit();
+            var collector = Collector.init();
+            defer collector.deinit();
+            const status = infer(
+                request.op_name,
+                request.context,
+                request.location,
+                @intCast(request.operands.len),
+                request.operands.ptr,
+                request.attributes,
+                null,
+                @intCast(request.regions.len),
+                request.regions.ptr,
+                Collector.append,
+                &collector,
+            );
+            if (c.beaverLogicalResultIsFailure(status)) {
+                c.mlirEmitError(request.location, if (shaped) "failed to infer shaped operation return components" else "failed to infer operation return types");
+                return beam.make_atom(environment, "error");
+            }
+            return collector.toTerm(environment);
+        }
+
         fn run(environment: beam.env, argc: c_int, args: [*c]const beam.term) !beam.term {
             const context = try mlir_capi.Context.resource.fetch(environment, args[1]);
-            return diagnostic.call_with_diagnostics(environment, context, inference, .{ environment, argc, args });
+            return diagnostic.call_with_diagnostics(environment, context, collect, .{ environment, argc, args });
         }
     };
 }
 
 pub const nifs = .{
-    kinda.result.nif("beaver_raw_infer_return_types", 7, withDiagnostics(inferTypesWithoutDiagnostics).run).entry,
-    kinda.result.nif("beaver_raw_infer_return_type_components", 7, withDiagnostics(inferShapedTypesWithoutDiagnostics).run).entry,
+    kinda.result.nif("beaver_raw_infer_return_types", 7, Inference(false).run).entry,
+    kinda.result.nif("beaver_raw_infer_return_type_components", 7, Inference(true).run).entry,
 };
