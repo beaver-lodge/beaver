@@ -3,6 +3,8 @@
 /_build/
 /cover/
 /deps/
+/scripts/install_llvm/_build/
+/scripts/install_llvm/deps/
 /doc/
 /.fetch
 erl_crash.dump

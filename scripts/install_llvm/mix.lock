@@ -1,0 +1,4 @@
+%{
+  "mlir": {:hex, :mlir, "0.1.0", "8c230c752b496f00284be2af825ab109d48693342f29ce75a506d42d1ffb9314", [:mix], [], "hexpm", "87a16d8144df4693c7098429d8e8f1a584fa0132a86bd9a5b042e5c50345585c"},
+  "openai_triton": {:hex, :openai_triton, "0.1.0", "2eec5ad5bcb6a1924d66fadb8b931b1dbfeacdf65962a7783f887aa6a7bce2e4", [:mix], [{:mlir, "~> 0.1.0", [hex: :mlir, repo: "hexpm", optional: false]}], "hexpm", "1fc28cd77cc0db3eb5f87443f6bf96c66606cad713ea76eb3c2200246691d314"},
+}

@@ -39,3 +39,4 @@ zig-out
 /priv/
 /zig-pkg/
 /scripts/install_llvm/_build/
+/scripts/install_llvm/deps/

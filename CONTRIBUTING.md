@@ -48,8 +48,10 @@ Zig as a local package override, so both dependency graphs use the same source.
   The `beaver.install_prebuilt_llvm` Mix task selects the matching
   `mlir_<os>_<arch>_*.tar.gz` asset for the current machine, downloads it, and
   extracts the compiled binaries into a local prefix. It lives in
-  `scripts/install_llvm`, a tiny standalone Mix project, so running it never
-  compiles Beaver itself.
+  `scripts/install_llvm`, a thin consumer of the standalone `mlir` and
+  `openai_triton` packages, so running it never compiles Beaver itself.
+  For local installer development, set `MLIR_TOOLCHAIN_PATH` and
+  `OPENAI_TRITON_PATH` to the absolute paths of their checkouts.
 
   ```bash
   bash scripts/install-prebuilt-llvm.sh priv/llvm-prebuilt
@@ -60,9 +62,12 @@ Zig as a local package override, so both dependency graphs use the same source.
   invocation is:
 
   ```bash
-  (cd scripts/install_llvm && mix beaver.install_prebuilt_llvm \
+  (cd scripts/install_llvm && mix deps.get && mix beaver.install_prebuilt_llvm \
     --install-dir "$PWD/../../priv/llvm-prebuilt")
   ```
+
+  For Triton's paired LLVM, run
+  `mix openai_triton.install --llvm-only --triton-ref COMMIT` in the same project.
 
 - Option 2: Build from source https://mlir.llvm.org/getting_started/
   Recommended install commands:

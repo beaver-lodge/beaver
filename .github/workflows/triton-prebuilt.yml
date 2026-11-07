@@ -68,7 +68,8 @@ jobs:
       - name: Install Triton-pinned LLVM prebuilt
         run: |
           cd scripts/install_llvm
-          mix beaver.install_prebuilt_llvm --triton --triton-ref "$TRITON_REF" \
+          mix deps.get
+          mix openai_triton.install --llvm-only --triton-ref "$TRITON_REF" \
             --install-dir "$RUNNER_TEMP/llvm-prebuilt"
 
       - name: Build Triton core libraries

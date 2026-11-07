@@ -114,8 +114,9 @@ jobs:
           LLVM_EUDSL_ASSET_REVISION: ${{ inputs.llvm_prebuilt_asset_revision }}
         run: |
           cd scripts/install_llvm
+          mix deps.get
           if [ "${{ matrix.llvm }}" == "triton" ]; then
-            mix beaver.install_prebuilt_llvm --triton --triton-ref "$TRITON_REF" \
+            mix openai_triton.install --llvm-only --triton-ref "$TRITON_REF" \
               --install-dir "$RUNNER_TEMP/llvm-prebuilt"
           else
             mix beaver.install_prebuilt_llvm --install-dir "$RUNNER_TEMP/llvm-prebuilt"
@@ -212,6 +213,7 @@ jobs:
         if: matrix.elixir == '1.20.3'
         run: |
           cd scripts/install_llvm
+          mix deps.get
           mix test
       - name: Run tests
         run: |
