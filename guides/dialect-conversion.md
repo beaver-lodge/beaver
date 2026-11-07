@@ -10,57 +10,6 @@ This example defines a small Slang operation and lowers it to the `arith`
 dialect using a `Conversion.Plan`. The resulting IR can then use MLIR's standard
 `arith`-to-LLVM and `func`-to-LLVM passes.
 
-## Ex provider boundary
-
-Ex keeps one namespace with three schema owners: `Ex.Language` (values/control),
-`Ex.Execution` (process lifecycle/events) and `Ex.Runtime` (C ABI values/host handles).
-`Beaver.MLIR.Dialect.Ex.verify_layers!(ir, [:language, :execution])` verifies MLIR and rejects
-nested Ex operations outside those owners; foreign dialects receive normal MLIR verification.
-`layers/0`, `operations/1` and `layer/1` expose the declaration-derived catalog.
-
-```elixir
-alias Beaver.MLIR.Conversion.{Ex, Plan}
-namespace = "artifact_identity"
-ir = Plan.run!(Ex.plan(layers: :execution, runtime_namespace: namespace), ir)
-ir = Ex.finish!(ir, runtime_namespace: namespace)
-```
-
-Selected-layer plans retain other owners and default to `build_materializations: false`.
-`finish!/1` lowers remaining Ex operations, reconciles type bridges and rejects unresolved casts.
-The default `plan/0` converts all layers. Prepare variables and cases first with
-`Beaver.MLIR.Dialect.Ex.MaterializeBoundVariables` and `Beaver.MLIR.Dialect.Ex.ExpandCase`.
-Scalar literals, add/subtract/multiply and comparisons declare pure effects;
-runtime calls, allocation, division and scheduling remain conservative.
-
-`Conversion.Ex.CRuntime` covers Batata BTT ABI 12 (`0x425454000000000c`), with
-raw-pointer `ex.btt_*` and SSA `ex.value_*` calls for all 49 entry points. Compile
-`CRuntime.adapter_source(namespace)` with an admitted library and matching `aot.h`,
-using `-fvisibility=hidden`. Load it through `ExecutionEngine.create!/2` and pass the
-same artifact-specific namespace to `Ex.plan/1`; this isolates JIT symbols and receipts.
-Rebuild libraries/adapters/receipts together; old ABI names and layouts reject.
-
-`value_signature/1` describes status-first SSA results; `storage_type/2` describes
-raw buffers. Term/process/entry/import/copy handles cross functions, branches and SCF
-loops. `ex.value_load/store` require valid caller-owned storage. Outputs start at zero;
-check status and clean up owned handles even on failed begins. No implicit retain/release.
-Imports use sequential chunks up to 256 bytes; ETF decoding needs bounded `step` calls.
-Copies target distinct uncalled guests in one instance, without transferring host
-capabilities. On failure, cancel and step until rollback completes before draining.
-Calls are serial per runtime; views expire on mutation. Release roots, cancel/drain
-processes (retry `BUSY`), then destroy instances before unloading. See Batata's `aot.h`.
-
-The old Zig ABI/continuations/tagged-word patterns are retired. The Stage 0 v2 manifest
-retains a scalar C++ seed; actors, IO, Enum and box/unbox need an execution provider.
-`Plan.add_external_pattern_population/3` loads external compiler kernels; Beaver does
-not replace Batata's source/plan admission or C emitter. Schema digests bind all fragments.
-
-Normal tests use independent ABI fixtures. Opt-in tests need a fresh admitted library
-with `identity/1` at `{0, 0}`, `invoke(f, x) = f.(x)` and a captured adder closure.
-Compile it with the adapter and `test/fixtures/batata_c/transactions.c` (its adjacent
-headers and Batata's matching `aot.h`). Set `BATATA_TEST_LIBRARY` to the absolute library
-path and `BATATA_TEST_NAMESPACE` to its query identity, then run
-`mix test test/batata_c_runtime_test.exs --include batata_runtime`.
-
 ```elixir
 defmodule Counter do
   use Beaver.Slang, name: "counter"
