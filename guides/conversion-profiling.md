@@ -8,7 +8,7 @@ conversion does not walk the IR inventory or aggregate callback timings.
 ```elixir
 {converted, receipt} =
   Beaver.MLIR.Conversion.Plan.profile!(
-    Beaver.MLIR.Conversion.Ex.plan(),
+    plan,
     module
   )
 ```
@@ -49,9 +49,10 @@ report zero rather than substituting a different memory definition.
 
 ## Reproducible scaling probe
 
-The repository includes a synthetic Ex conversion probe:
+The `btt-abi` repository includes a synthetic Ex conversion probe:
 
 ```console
+# In the btt-abi checkout:
 mix run profile/ex_conversion_profile.exs -- --functions 64 --iterations 7 --warmup 2
 ```
 

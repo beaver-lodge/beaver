@@ -1,6 +1,6 @@
 # Core API migration
 
-The core reduction from 25,000 to fewer than 20,000 code lines removes the
+The earlier core reduction from 25,000 to fewer than 20,000 code lines removed the
 experimental orchestration APIs below. This is an intentional API change, in
 addition to deduplication of Slang builders, conversion plans, and callback
 encoding. It does not provide compatibility stubs for the retired APIs.
@@ -11,9 +11,9 @@ The count uses the same implementation scope before and after:
 cloc lib native --skip-uniqueness --quiet
 ```
 
-Blank lines and comments are excluded. Implementation has not been moved into
-tests, build output, another dependency, or a different directory to meet the
-limit. Kinda remains pinned to the same revision.
+Blank lines and comments are excluded. That reduction did not move implementation
+into tests, build output or dependencies. The subsequent Ex extraction into
+`btt-abi` is a package boundary change, separate from code compression.
 
 ## Retired interfaces
 
@@ -28,7 +28,7 @@ limit. Kinda remains pinned to the same revision.
 | `Beaver.Shadow.*` and the `mix shadow.*` tasks | Applications own experiment orchestration and reports. Native Transform, Triton, CUDA, ActionTracing, and conversion profiling remain. |
 | `Beaver.MLIR.Triton.LayoutAudit` and `PipelineEvidence` | Inspect IR with `Beaver.Walker` and collect native action traces or conversion profiles. `Triton.PipelinePlan` remains. |
 | `Beaver.Wasm.TermABI` | Runtime implementers own their ABI manifest. `Beaver.Wasm` and `Wasm.Binary` remain. |
-| `Conversion.Ex.RuntimeABI`, `term_intrinsic_symbols/0`, old Ex Zig runtime/continuation operations and tagged-word lowering | `Conversion.Ex.CRuntime`: raw `ex.btt_*` or SSA `ex.value_*` calls target Batata C ABI 12, including chunked imports and cross-guest copies. Language operations still require a provider; old handles/bytecode are incompatible. See [the runtime boundary](dialect-conversion.md#ex-provider-boundary). |
+| `Beaver.MLIR.Dialect.Ex` and `Beaver.MLIR.Conversion.Ex` | Moved to the `btt-abi` package as `BTT.ABI.Dialect.Ex` and `BTT.ABI.Conversion.Ex`. The `ex.*` IR namespace and BTT ABI 12 are unchanged. |
 
 The incremental compilation benchmark and tests dedicated to retired APIs are
 removed with their implementations. Tests for retained callbacks, native

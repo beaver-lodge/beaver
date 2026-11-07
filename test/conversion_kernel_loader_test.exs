@@ -1,3 +1,8 @@
+defmodule Beaver.KernelTestTypes do
+  use Beaver.Slang, name: "kernel_test"
+  deftype term()
+end
+
 defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
   use ExUnit.Case, async: true
 
@@ -387,7 +392,7 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
     tmp_dir: tmp_dir
   } do
     assert ctx
-           |> Beaver.Slang.load(Beaver.MLIR.Dialect.Ex)
+           |> Beaver.Slang.load(Beaver.KernelTestTypes)
            |> MLIR.LogicalResult.success?()
 
     patterns = [%{"name" => "fixture.type", "root" => "fixture.type", "version" => "1"}]
@@ -403,7 +408,7 @@ defmodule Beaver.MLIR.Conversion.KernelLoaderTest do
 
     module =
       MLIR.Module.create!(
-        ~s[module { func.func @types(%integer: i64, %term: !ex.term) -> i64 { %0 = "fixture.type"(%integer) : (i64) -> i64 %1 = "fixture.type"(%term) : (!ex.term) -> i64 %2 = arith.addi %0, %1 : i64 func.return %2 : i64 } }],
+        ~s[module { func.func @types(%integer: i64, %term: !kernel_test.term) -> i64 { %0 = "fixture.type"(%integer) : (i64) -> i64 %1 = "fixture.type"(%term) : (!kernel_test.term) -> i64 %2 = arith.addi %0, %1 : i64 func.return %2 : i64 } }],
         ctx: ctx
       )
 

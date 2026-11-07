@@ -3,22 +3,20 @@ defmodule Beaver.Wasm do
   WebAssembly packaging for MLIR modules — the WASM analogue of the
   `gpu.binary` packaging.
 
-  `package_binary!/2` lowers a module to LLVM IR (via the `ex` conversion
-  plan and the standard arith/scf/cf-to-llvm passes), translates it in-process,
+  `package_binary!/2` lowers a module to LLVM IR using the standard
+  arith/scf/cf-to-llvm passes, translates it in-process,
   compiles it to a wasm binary with the Zig wasm32 target, and returns a
   `Beaver.Wasm.Binary` carrying the bytes plus the imports/exports manifest
   parsed from the binary.
 
-  This is the host-boundary step of the batata WASM preparation (Forgejo
-  #37): the manifest names the WASI/import surface that a runtime must
-  provide before executing the binary.
+  Lower custom dialects before calling this function. The manifest names
+  the WASI/import surface that a runtime must provide to execute the binary.
   """
 
   import Beaver.MLIR.Conversion
   import Beaver.MLIR.Transform
 
   alias Beaver.MLIR
-  alias Beaver.MLIR.Conversion.{Ex, Plan}
   alias Beaver.MLIR.Target.LLVMIR
 
   @doc """
@@ -47,7 +45,6 @@ defmodule Beaver.Wasm do
   defp to_llvm_ir!(module) do
     llvm =
       module
-      |> then(&if(has_ex_ops?(&1), do: Plan.run!(Ex.plan(), &1), else: &1))
       |> canonicalize()
       |> convert_scf_to_cf()
       |> convert_to_llvm()
@@ -55,16 +52,6 @@ defmodule Beaver.Wasm do
       |> Beaver.Composer.run!()
 
     LLVMIR.translate!(llvm)
-  end
-
-  defp has_ex_ops?(module) do
-    module
-    |> MLIR.Module.body()
-    |> Beaver.Walker.prewalk(false, fn
-      %MLIR.Operation{} = op, acc -> {op, acc or String.starts_with?(MLIR.Operation.name(op), "ex.")}
-      other, acc -> {other, acc}
-    end)
-    |> elem(1)
   end
 
   defp compile!(llvm_ir, target, entry, opt, nostdlib) do

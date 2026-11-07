@@ -3,7 +3,6 @@
 
 #include "mlir-c/Beaver/Context.h"
 #include "mlir-c/Beaver/CompilerKernel.h"
-#include "mlir-c/Beaver/Conversion.h"
 #include "mlir-c/Beaver/Debug.h"
 #include "mlir-c/Beaver/Interfaces.h"
 #include "mlir-c/Beaver/LLVMIR.h"
