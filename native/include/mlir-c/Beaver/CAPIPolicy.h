@@ -5,6 +5,23 @@
 // to BEAM. Both Zig's translated-C namespace and the Elixir manifest extractor
 // consume these declarations.
 typedef enum {
+  // Internal execution state is thread-affine and only used by native adapters.
+  BeaverCapiPolicyExclude__beaverExecutionMeasureBegin,
+  BeaverCapiPolicyExclude__beaverExecutionMeasureEnd,
+  BeaverCapiPolicyExclude__beaverExecutionCallbackBegin,
+  BeaverCapiPolicyExclude__beaverExecutionCallbackEnd,
+  BeaverCapiPolicyExclude__beaverExecutionClock,
+  BeaverCapiPolicyExclude__beaverExecutionBindOperation,
+  BeaverCapiPolicyExclude__beaverExecutionUnbindOperation,
+  BeaverCapiPolicyExclude__beaverExecutionEnterOperation,
+  BeaverCapiPolicyExclude__beaverExecutionLeaveOperation,
+  BeaverCapiPolicyExclude__beaverExecutionMarkCallbacks,
+  BeaverCapiPolicyExclude__beaverExecutionHasCallbacks,
+  BeaverCapiPolicyExclude__beaverExecutorSnapshot,
+  BeaverCapiPolicyExclude__beaverExecutorReleaseContext,
+  BeaverCapiPolicyExclude__beaverModuleCreateParseTracked,
+  BeaverCapiPolicyExclude__beaverOperationVerify,
+  BeaverCapiPolicyExclude__beaverPassManagerTrackExecution,
   BeaverCapiPolicyDiagnostics__mlirAttributeParseGet,
   BeaverCapiPolicyDiagnostics__mlirOperationVerify,
   BeaverCapiPolicyDiagnostics__mlirTypeParseGet,

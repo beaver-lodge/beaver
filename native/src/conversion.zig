@@ -31,11 +31,21 @@ const PatternDispatcher = kinda.callback_runtime.Dispatcher(.{ "conversion_patte
 const ConversionProfile = struct {
     duration_ns: u64 = 0,
     target_lock_wait_ns: u64 = 0,
+    execution_costs: [4]u64 = .{ 0, 0, 0, 0 },
 
     fn makeTerm(self: *const @This(), environment: beam.env) beam.term {
+        var costs = [_]beam.term{
+            e.enif_make_uint64(environment, self.execution_costs[0]),
+            e.enif_make_uint64(environment, self.execution_costs[1]),
+            e.enif_make_uint64(environment, self.execution_costs[2]),
+            e.enif_make_uint64(environment, self.execution_costs[3]),
+            e.enif_make_int64(environment, 0),
+            e.enif_make_int64(environment, systemNs()),
+        };
         var fields = [_]beam.term{
             beam.make_u64(environment, self.duration_ns),
             beam.make_u64(environment, self.target_lock_wait_ns),
+            beam.make_tuple(environment, &costs),
         };
         return beam.make_tuple(environment, &fields);
     }
@@ -107,11 +117,8 @@ fn elapsedNs(started_at: std.Io.Timestamp) u64 {
 }
 
 fn systemNs() i64 {
-    // Native and BEAM monotonic clocks do not expose a portable shared epoch.
-    // Real-clock nanoseconds fit ErlNifTime until 2262. The BEAM rejects a
-    // negative/backwards sample in favour of its local service duration.
-    const timestamp_ns = std.Io.Clock.real.now(std.Options.debug_io).toNanoseconds();
-    return std.math.cast(i64, timestamp_ns) orelse std.math.maxInt(i64);
+    // The C++ clock is valid on scheduler and arbitrary worker threads.
+    return @intCast(c.beaverExecutionClock());
 }
 
 fn fetchHandleSlice(comptime Kind: type, environment: beam.env, list: beam.term) ![]Kind.T {
@@ -915,6 +922,7 @@ const ConversionWorker = struct {
     environment: beam.env,
     id: beam.term,
     profile: bool,
+    submitted: i64,
 
     fn apply(environment: beam.env, args: anytype) !beam.term {
         const logical_result = if (args.full)
@@ -945,9 +953,11 @@ const ConversionWorker = struct {
 
         var profile: ConversionProfile = .{};
         const profile_ptr = if (self.profile) &profile else null;
-        const worker_started_at = monotonicTimestamp();
+        const execution_started = if (self.profile) systemNs() else 0;
+        const measurement = if (self.profile) c.beaverExecutionMeasureBegin() else null;
+        const worker_started_at = if (self.profile) monotonicTimestamp() else undefined;
         const io = std.Options.debug_io;
-        const lock_started_at = monotonicTimestamp();
+        const lock_started_at = if (self.profile) monotonicTimestamp() else undefined;
         self.target.mutex.lockUncancelable(io);
         if (profile_ptr) |enabled| enabled.target_lock_wait_ns = elapsedNs(lock_started_at);
         const result = if (self.target.closed.load(.acquire))
@@ -982,6 +992,17 @@ const ConversionWorker = struct {
         const id_term = e.enif_make_copy(environment, self.id);
         e.enif_free_env(owned_environment);
         e.enif_release_resource(target);
+
+        if (measurement) |ptr| {
+            var counts: [2]u64 = undefined;
+            c.beaverExecutionMeasureEnd(ptr, &counts);
+            profile.execution_costs = .{
+                @intCast(execution_started - self.submitted),
+                @intCast(systemNs() - execution_started),
+                counts[0],
+                counts[1],
+            };
+        }
 
         var terms = [_]beam.term{
             beam.make_atom(environment, "conversion_done"),
@@ -1024,6 +1045,7 @@ fn applyConversionAsync(environment: beam.env, _: c_int, args: [*c]const beam.te
         .environment = owned_env,
         .id = e.enif_make_copy(owned_env, id),
         .profile = profile,
+        .submitted = if (profile) systemNs() else 0,
     };
     e.enif_keep_resource(target);
     errdefer e.enif_release_resource(target);

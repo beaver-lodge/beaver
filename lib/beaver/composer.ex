@@ -148,6 +148,8 @@ defmodule Beaver.Composer do
           | {:timing, boolean()}
           | {:verifier, boolean() | :pipeline}
           | {:execution, :native | :beam}
+          | {:verify_execution, :worker | :dirty | :auto}
+          | {:profile, Beaver.Execution.Profile.t()}
   @type run_result :: {:ok, any()} | {:error, String.t()}
   @type composer :: __MODULE__.t()
   @spec run!(composer) :: operation
@@ -181,6 +183,8 @@ defmodule Beaver.Composer do
   > With `execution: :beam`, Elixir passes run directly in the calling process;
   > native stages still use MLIR's pass manager. Nested pipelines run in IR order
   > with private pass state. Analyses are not preserved across BEAM stages.
+  > Per-pass verification uses `verify_execution: :auto`; `:worker` and `:dirty`
+  > select an explicit strategy without changing verification frequency.
   > BEAM mode also accepts `verifier: :pipeline` to verify the final IR once,
   > avoiding a native verification round trip after every Elixir pass.
   """
@@ -200,9 +204,28 @@ defmodule Beaver.Composer do
     end
   end
 
+  @doc "Resolves a reusable BEAM pipeline template without constructing mutable pass state."
+  def prepare(%__MODULE__{} = composer, opts \\ []) do
+    reusable!(composer.passes)
+    __MODULE__.Beam.prepare(composer, opts)
+  end
+
+  defp reusable!(passes) do
+    Enum.each(passes, fn
+      %MLIR.Pass{} -> raise ArgumentError, "prepared pipelines require pass declarations, not owned pass handles"
+      %MLIR.Transform.FixedPoint{pipeline: passes} -> reusable!(passes)
+      {_root, passes} when is_list(passes) -> reusable!(passes)
+      _ -> :ok
+    end)
+  end
+
+  @doc "Runs the pipeline and returns its result with a unified execution cost receipt."
+  def profile(composer, opts \\ []),
+    do: Beaver.Execution.Profile.capture(fn profile -> run(composer, Keyword.put(opts, :profile, profile)) end)
+
   defp run_native(%__MODULE__{op: op} = composer, opts) do
     print = Keyword.get(opts, :print)
-    pm = init(composer, opts)
+    pm = Beaver.Execution.Profile.measure(opts[:profile], :prepare, fn -> init(composer, opts) end)
 
     # Local-scope printing does not require changing the shared context's
     # threading configuration (which also changes its locking mode).
@@ -210,9 +233,9 @@ defmodule Beaver.Composer do
 
     res =
       try do
-        MLIR.PassManager.run(pm, op)
+        MLIR.PassManager.run(pm, op, Keyword.take(opts, [:profile]))
       after
-        MLIR.PassManager.destroy(pm)
+        Beaver.Execution.Profile.measure(opts[:profile], :cleanup, fn -> MLIR.PassManager.destroy(pm) end)
       end
 
     case res do

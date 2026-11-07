@@ -188,6 +188,7 @@ fn allocateState(comptime State: type, comptime callbacks: anytype, comptime req
 
 fn attachSpeculatabilityFallback(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
+    c.beaverExecutionMarkCallbacks(context);
     const state = try allocateState(SpeculatabilityState, .{"get_speculatability"}, 1, environment, args[2..4]);
     errdefer stateResource(SpeculatabilityState).release(state);
     c.mlirConditionallySpeculatableOpInterfaceAttachFallbackModel(
@@ -205,6 +206,7 @@ fn attachSpeculatabilityFallback(environment: beam.env, _: c_int, args: [*c]cons
 
 fn attachMemoryEffectsFallback(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
+    c.beaverExecutionMarkCallbacks(context);
     const state = try allocateState(MemoryEffectsState, .{"get_effects"}, 1, environment, args[2..4]);
     errdefer stateResource(MemoryEffectsState).release(state);
     c.beaverMemoryEffectsOpInterfaceAttachFallbackModel(
@@ -222,6 +224,7 @@ fn attachMemoryEffectsFallback(environment: beam.env, _: c_int, args: [*c]const 
 
 fn attachTransformFallback(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
+    c.beaverExecutionMarkCallbacks(context);
     const state = try allocateState(TransformState, .{ "apply", "allows_repeated_handle_operands" }, 1, environment, args[2..5]);
     errdefer stateResource(TransformState).release(state);
     c.mlirTransformOpInterfaceAttachFallbackModel(
@@ -240,6 +243,7 @@ fn attachTransformFallback(environment: beam.env, _: c_int, args: [*c]const beam
 
 fn attachPatternDescriptorFallback(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
+    c.beaverExecutionMarkCallbacks(context);
     const state = try allocateState(PatternDescriptorState, .{ "populate_patterns", "populate_patterns_with_state" }, 1, environment, args[2..5]);
     errdefer stateResource(PatternDescriptorState).release(state);
     c.mlirPatternDescriptorOpInterfaceAttachFallbackModel(
@@ -261,6 +265,7 @@ fn attachPatternDescriptorFallback(environment: beam.env, _: c_int, args: [*c]co
 
 fn attachDynamicTrait(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const context = try mlir_capi.Context.resource.fetch(environment, args[0]);
+    c.beaverExecutionMarkCallbacks(context);
     const operation_name = try string_ref.get_binary_as_string_ref(environment, args[1]);
     const type_id = try mlir_capi.TypeID.resource.fetch(environment, args[2]);
     const state = try allocateState(DynamicTraitState, .{ "verify", "verify_regions" }, 0, environment, args[3..6]);
@@ -302,6 +307,11 @@ fn AsyncDiagnosticsNIF(comptime name: []const u8) type {
 
             fn run(user_data: ?*anyopaque) callconv(.c) void {
                 const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
+                const binding = if (comptime std.mem.eql(u8, name, "mlirOperationVerify")) binding: {
+                    const op = mlir_capi.Operation.resource.fetch(self.environment, self.args[0]) catch break :binding null;
+                    break :binding c.beaverExecutionBindOperation(op);
+                } else null;
+                defer c.beaverExecutionUnbindOperation(binding);
                 const result = diagnostic.call_with_diagnostics(
                     self.environment,
                     self.context,
@@ -551,7 +561,7 @@ pub const memory_effects_attach_fallback_model = attachMemoryEffectsFallback;
 pub const transform_op_interface_attach_fallback_model = attachTransformFallback;
 pub const pattern_descriptor_op_interface_attach_fallback_model = attachPatternDescriptorFallback;
 pub const dynamic_trait_attach = attachDynamicTrait;
-pub const module_create_parse_async = AsyncDiagnosticsNIF("mlirModuleCreateParse").nif;
+pub const module_create_parse_async = AsyncDiagnosticsNIF("beaverModuleCreateParseTracked").nif;
 pub const operation_verify_async = AsyncDiagnosticsNIF("mlirOperationVerify").nif;
 pub const transform_state_payload_ops = transformStatePayloadOps;
 pub const transform_state_payload_values = transformStatePayloadValues;

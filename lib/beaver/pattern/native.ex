@@ -46,6 +46,8 @@ defmodule Beaver.Pattern.Native do
   Elixir callback through `Beaver.MLIR.RewritePattern`. It does not build PDL
   and never switches between the native and PDL execution engines.
 
+  For callback-free attribute/value rewrites, use `Beaver.Pattern.Native.Program`.
+
   A declaration generates a zero- and one-arity builder. For example,
   `fold_add/0` returns a `Beaver.Pattern.Native.Descriptor`, while
   `fold_add/1` can override lifecycle options such as `:benefit` and

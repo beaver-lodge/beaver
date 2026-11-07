@@ -65,14 +65,14 @@ const CallbackDispatcher = struct {
     fn construct(userData: ?*anyopaque) callconv(.c) void {
         const this: *PatternState = @ptrCast(@alignCast(userData));
         const temp_env = e.enif_alloc_env() orelse unreachable;
-        const response = this.dispatcher.invoke("construct", temp_env, .{}) catch unreachable;
+        const response = callback_args.invokeTerms(this.dispatcher, "construct", temp_env, .{}) catch unreachable;
         if (!response.success) @panic("Fail to construct a rewrite pattern implemented in Elixir");
     }
 
     fn destruct(userData: ?*anyopaque) callconv(.c) void {
         const this: *PatternState = @ptrCast(@alignCast(userData));
         const temp_env = e.enif_alloc_env() orelse unreachable;
-        const response = this.dispatcher.invoke("destruct", temp_env, .{}) catch unreachable;
+        const response = callback_args.invokeTerms(this.dispatcher, "destruct", temp_env, .{}) catch unreachable;
         if (!response.success) @panic("Fail to destruct a rewrite pattern implemented in Elixir");
         this.deinit();
     }
@@ -84,7 +84,7 @@ const CallbackDispatcher = struct {
         const pattern_ = mlir_capi.RewritePattern.resource.make_kind(temp_env, pattern) catch @panic("failed to make resource for RewritePattern");
         const op_ = mlir_capi.Operation.resource.make_kind(temp_env, op) catch @panic("failed to make resource for Operation");
         const rewriter_ = mlir_capi.PatternRewriter.resource.make_kind(temp_env, rewriter) catch @panic("failed to make resource for PatternRewriter");
-        const response = this.dispatcher.invoke("matchAndRewrite", temp_env, .{ pattern_, op_, rewriter_ }) catch @panic("failed to forward matchAndRewrite callback");
+        const response = callback_args.invokeTerms(this.dispatcher, "matchAndRewrite", temp_env, .{ pattern_, op_, rewriter_ }) catch @panic("failed to forward matchAndRewrite callback");
         return if (response.success) c.beaverLogicalResultSuccess() else c.beaverLogicalResultFailure();
     }
 
@@ -215,6 +215,9 @@ const CallbackDispatcher = struct {
                     else => @panic("unsupported container type"),
                 };
                 const args = .{ this.ir, this.set, this.cfg };
+                const operation = if (ContainerType == mlir_capi.Module) c.mlirModuleGetOperation(this.ir) else this.ir;
+                const binding = c.beaverExecutionBindOperation(operation);
+                defer c.beaverExecutionUnbindOperation(binding);
                 const result_with_diagnostics = diagnostic.call_with_diagnostics(temp_env, ctx, apply_func, .{ temp_env, args }) catch |err| {
                     c.mlirEmitError(loc, @errorName(err));
                     return;

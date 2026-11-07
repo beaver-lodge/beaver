@@ -6,7 +6,7 @@ const beam = kinda.beam;
 const callback_bridge = @import("callback_bridge.zig");
 const resource_sync = @import("resource_sync.zig");
 
-pub const nifs = callback_bridge.nifs;
+pub const nifs = callback_bridge.nifs ++ @import("execution.zig").nifs ++ @import("declarative_pattern.zig").nifs;
 
 export const callback_bridge_nifs: [nifs.len]e.ErlNifFunc = nifs;
 export const callback_bridge_nifs_len: usize = nifs.len;

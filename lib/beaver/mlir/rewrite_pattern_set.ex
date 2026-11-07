@@ -40,7 +40,7 @@ defmodule Beaver.MLIR.RewritePatternSet do
 
   The set takes ownership of a raw `MLIR.RewritePattern`. Native descriptors
   are materialized through the existing callback-backed rewrite bridge before
-  ownership is transferred.
+  ownership is transferred. Native programs execute entirely in the rewrite driver.
   """
   @spec add(t(), MLIR.RewritePattern.t()) :: t()
   def add(%__MODULE__{} = set, %MLIR.RewritePattern{} = pattern) do
@@ -48,7 +48,23 @@ defmodule Beaver.MLIR.RewritePatternSet do
     set
   end
 
-  @spec add(t(), Beaver.Pattern.Native.Descriptor.t(), keyword()) :: t()
+  @spec add(t(), Beaver.Pattern.Native.Descriptor.t() | Beaver.Pattern.Native.Program.t(), keyword()) :: t()
+  def add(%__MODULE__{} = set, %Beaver.Pattern.Native.Program{} = program, opts) do
+    ctx = Keyword.fetch!(opts, :ctx)
+
+    :ok =
+      CAPI.beaver_raw_declarative_pattern_add(
+        set.ref,
+        ctx.ref,
+        program.root,
+        program.benefit,
+        program.checks,
+        program.edits
+      )
+
+    set
+  end
+
   def add(%__MODULE__{} = set, %Beaver.Pattern.Native.Descriptor{} = descriptor, opts)
       when is_list(opts) do
     ctx = Keyword.get(opts, :ctx) || raise ArgumentError, "option :ctx is required"

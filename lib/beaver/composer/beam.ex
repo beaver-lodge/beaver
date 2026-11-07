@@ -3,22 +3,37 @@ defmodule Beaver.Composer.Beam do
   alias Beaver.{Composer, MLIR, Walker}
   alias Beaver.MLIR.Operation
 
-  # State is threaded through the execution tree, including failure paths.
-  # Neither an Agent nor a native callback is needed for a BEAM pass.
-  def run(%Composer{op: ir, passes: passes}, opts) do
+  alias Beaver.Execution.Profile
+
+  def prepare(%Composer{op: ir, ctx: ctx, passes: passes}, opts) do
+    op = if ir, do: Operation.from_module(ir)
+    ctx = ctx || MLIR.context(op)
+    anchor = if op, do: Operation.name(op), else: Keyword.get(opts, :root, "builtin.module")
+    %Composer.Prepared{context: ctx, root: anchor, stages: templates(passes, ctx, anchor, false)}
+  end
+
+  def run(composer, opts) do
+    case capture(fn -> Profile.measure(opts[:profile], :prepare, fn -> prepare(composer, opts) end) end) do
+      {:ok, plan} -> run_prepared(plan, composer.op, opts)
+      error -> error
+    end
+  end
+
+  def run_prepared(%Composer.Prepared{} = plan, ir, opts) do
     unless Keyword.get(opts, :verifier, true) in [true, false, :pipeline],
       do: raise(ArgumentError, ":verifier must be true, false, or :pipeline")
 
     op = Operation.from_module(ir)
-    ctx = MLIR.context(op)
+    MLIR.Context.ensure_same!(op, plan.context)
+    if Operation.name(op) != plan.root, do: raise(ArgumentError, "prepared pipeline root mismatch")
 
-    case prepare(passes, ctx, Operation.name(op), false, opts) do
+    case Profile.measure(opts[:profile], :initialize, fn -> initialize(plan.stages, plan.context, opts) end) do
       {:ok, stages} ->
         {status, stages, diagnostics} = execute(stages, op, opts)
 
         {status, diagnostics} =
           if status == :ok and opts[:verifier] == :pipeline do
-            case verify(op, verifier: true) do
+            case verify(op, Keyword.put(opts, :verifier, true)) do
               :ok -> {:ok, diagnostics}
               {:error, errors} -> {:error, diagnostics ++ errors}
             end
@@ -26,23 +41,38 @@ defmodule Beaver.Composer.Beam do
             {status, diagnostics}
           end
 
-        cleanup = destroy(stages)
-
-        if status == :ok and cleanup == [],
-          do: {:ok, ir, diagnostics},
-          else: {:error, diagnostics ++ cleanup}
+        cleanup = Profile.measure(opts[:profile], :cleanup, fn -> destroy(stages) end)
+        if status == :ok and cleanup == [], do: {:ok, ir, diagnostics}, else: {:error, diagnostics ++ cleanup}
 
       {:error, diagnostics} ->
         {:error, diagnostics}
     end
   end
 
-  defp prepare(passes, ctx, anchor, nested?, opts) do
+  defp templates(passes, ctx, anchor, nested?) do
     passes
     |> Enum.chunk_by(&native?/1)
-    |> Enum.flat_map(fn group -> if native?(hd(group)), do: [{:native, group}], else: group end)
-    |> Enum.reduce_while({:ok, []}, fn pass, {:ok, acc} ->
-      case prepare_stage(pass, ctx, anchor, nested?, opts) do
+    |> Enum.flat_map(fn group -> if native?(hd(group)), do: [{:native, group, anchor}], else: group end)
+    |> Enum.map(fn
+      {:native, _, _} = native ->
+        native
+
+      {root, passes} when is_binary(root) and is_list(passes) ->
+        unless MLIR.Trait.has?(ctx, root, :isolated_from_above),
+          do: raise(ArgumentError, "nested BEAM pipeline requires a registered IsolatedFromAbove operation: #{root}")
+
+        {:nested, root, templates(passes, ctx, root, true)}
+
+      pass ->
+        {:beam, callbacks(pass, anchor), nested?}
+    end)
+  end
+
+  defp native?(pass), do: is_binary(pass) or is_struct(pass)
+
+  defp initialize(templates, ctx, opts) do
+    Enum.reduce_while(templates, {:ok, []}, fn template, {:ok, acc} ->
+      case initialize_stage(template, ctx, opts) do
         {:ok, stage} -> {:cont, {:ok, [stage | acc]}}
         {:error, diagnostics} -> {:halt, {:error, diagnostics ++ destroy(acc)}}
       end
@@ -53,9 +83,7 @@ defmodule Beaver.Composer.Beam do
     end
   end
 
-  defp native?(pass), do: is_binary(pass) or is_struct(pass)
-
-  defp prepare_stage({:native, passes}, ctx, anchor, _nested?, opts) do
+  defp initialize_stage({:native, passes, anchor}, ctx, opts) do
     opts = Keyword.put(opts, :verifier, Keyword.get(opts, :verifier, true) == true)
 
     case capture(fn -> Composer.init(%Composer{ctx: ctx, passes: passes}, opts, anchor) end) do
@@ -68,20 +96,15 @@ defmodule Beaver.Composer.Beam do
     end
   end
 
-  defp prepare_stage({root, passes}, ctx, _anchor, _nested?, opts) when is_binary(root) and is_list(passes) do
-    if MLIR.Trait.has?(ctx, root, :isolated_from_above) do
-      case prepare(passes, ctx, root, true, opts) do
-        {:ok, stages} -> {:ok, {:nested, root, stages}}
-        error -> error
-      end
-    else
-      failure("nested BEAM pipeline requires a registered IsolatedFromAbove operation: #{root}")
+  defp initialize_stage({:nested, root, templates}, ctx, opts) do
+    case initialize(templates, ctx, opts) do
+      {:ok, stages} -> {:ok, {:nested, root, stages}}
+      error -> error
     end
   end
 
-  defp prepare_stage(pass, ctx, anchor, nested?, _opts) do
-    with {:ok, callbacks} <- capture(fn -> callbacks(pass, anchor) end),
-         {:ok, constructed} <- capture(fn -> callbacks.construct.(nil) end) do
+  defp initialize_stage({:beam, callbacks, nested?}, ctx, _opts) do
+    with {:ok, constructed} <- capture(fn -> callbacks.construct.(nil) end) do
       case capture(fn -> callbacks.initialize.(ctx, constructed) end) do
         {:ok, {:ok, value}} ->
           prepare_clone(callbacks, value, nested?)
@@ -155,7 +178,7 @@ defmodule Beaver.Composer.Beam do
   end
 
   defp execute_stage({:beam, callbacks, value, originals} = stage, op, opts) do
-    case capture(fn -> callbacks.run.(op, value) end) do
+    case capture(fn -> Profile.measure(opts[:profile], :beam_pass, fn -> callbacks.run.(op, value) end) end) do
       {:ok, value} ->
         stage = {:beam, callbacks, value, originals}
 
@@ -169,8 +192,8 @@ defmodule Beaver.Composer.Beam do
     end
   end
 
-  defp execute_stage({:native, pm} = stage, op, _opts) do
-    case capture(fn -> MLIR.PassManager.run(pm, op) end) do
+  defp execute_stage({:native, pm} = stage, op, opts) do
+    case capture(fn -> MLIR.PassManager.run(pm, op, Keyword.take(opts, [:profile])) end) do
       {:ok, {status, diagnostics}} -> {status, stage, diagnostics}
       {:error, diagnostics} -> {:error, stage, diagnostics}
     end
@@ -191,12 +214,30 @@ defmodule Beaver.Composer.Beam do
         if status == :ok, do: {:cont, result}, else: {:halt, result}
       end)
 
+    # Mirror MLIR's adaptor pass: children were already checked, but parent
+    # invariants (for example symbol uniqueness) still need verification.
+    {status, diagnostics} =
+      if status == :ok do
+        case verify(op, Keyword.put(opts, :recursive, false)) do
+          :ok -> {:ok, diagnostics}
+          {:error, errors} -> {:error, diagnostics ++ errors}
+        end
+      else
+        {status, diagnostics}
+      end
+
     {status, {:nested, root, stages}, diagnostics}
   end
 
   defp verify(op, opts) do
     if Keyword.get(opts, :verifier, true) == true do
-      case capture(fn -> MLIR.verify(op) end) do
+      case capture(fn ->
+             MLIR.verify(op,
+               strategy: Keyword.get(opts, :verify_execution, :auto),
+               recursive: Keyword.get(opts, :recursive, true),
+               profile: opts[:profile]
+             )
+           end) do
         {:ok, {:ok, _}} -> :ok
         {:ok, {:error, diagnostics}} -> {:error, diagnostics}
         {:error, diagnostics} -> {:error, diagnostics}

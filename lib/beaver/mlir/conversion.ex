@@ -64,7 +64,18 @@ defmodule Beaver.MLIR.Conversion do
         ) :: result()
   def apply(mode, ir, target, patterns, opts \\ [])
 
-  def apply(mode, ir, target, patterns, opts), do: run(mode, ir, target, patterns, opts, false)
+  def apply(mode, ir, target, patterns, opts) do
+    case opts[:profile] do
+      nil ->
+        run(mode, ir, target, patterns, opts, false)
+
+      %Beaver.Execution.Profile{} = profile ->
+        Beaver.Execution.Profile.measure(profile, :conversion, fn ->
+          {result, _receipt} = run(mode, ir, target, patterns, opts, true)
+          result
+        end)
+    end
+  end
 
   @doc """
   Runs one conversion with bounded callback and native-worker profiling.
@@ -104,12 +115,12 @@ defmodule Beaver.MLIR.Conversion do
          %ConversionTarget{registration: registration},
          %MLIR.FrozenRewritePatternSet{ref: patterns_ref},
          owns_patterns,
-         {folding_mode, materializations, timeout_ms},
+         {folding_mode, materializations, timeout_ms, execution_profile},
          profile?
        ) do
     operation = operation(ir)
     context = MLIR.context(ir)
-    profile = if profile?, do: __MODULE__.Profile.start(mode, ir)
+    profile = if profile?, do: Map.put(__MODULE__.Profile.start(mode, ir), :execution_profile, execution_profile)
 
     id =
       try do
@@ -138,7 +149,7 @@ defmodule Beaver.MLIR.Conversion do
     unless Keyword.keyword?(opts),
       do: raise(ArgumentError, "conversion options must be a keyword list")
 
-    unsupported = Keyword.keys(opts) -- [:timeout, :folding_mode, :build_materializations]
+    unsupported = Keyword.keys(opts) -- [:timeout, :folding_mode, :build_materializations, :profile]
 
     if unsupported != [], do: raise(ArgumentError, "unsupported conversion options: #{inspect(unsupported)}")
 
@@ -150,7 +161,7 @@ defmodule Beaver.MLIR.Conversion do
     unless is_integer(timeout_ms) and timeout_ms >= 0,
       do: raise(ArgumentError, ":timeout must be a non-negative integer")
 
-    {folding_mode, materializations, timeout_ms}
+    {folding_mode, materializations, timeout_ms, opts[:profile]}
   end
 
   defp folding_mode!(nil), do: -1
@@ -199,6 +210,11 @@ defmodule Beaver.MLIR.Conversion do
   defp await(id, mode, ir, timeout_ms, callback_failure, profile) do
     receive do
       {:conversion_done, ^id, result, native_profile} ->
+        if profile && profile[:execution_profile] do
+          Beaver.Execution.Profile.native(profile.execution_profile, :conversion, :worker, elem(native_profile, 2))
+          Beaver.Execution.Profile.record(profile.execution_profile, :conversion_target_lock, elem(native_profile, 1))
+        end
+
         conversion_result = finish(mode, ir, result, callback_failure)
 
         if profile,
@@ -231,14 +247,14 @@ defmodule Beaver.MLIR.Conversion do
   end
 
   defp handle_and_await(message, id, mode, ir, timeout_ms, callback_failure, profile) do
-    started_at = System.monotonic_time(:nanosecond)
+    started_at = if profile, do: System.monotonic_time(:nanosecond)
     {:handled, failure} = __MODULE__.Callbacks.handle(message)
-    stopped_at = System.monotonic_time(:nanosecond)
 
     profile =
       if profile do
+        stopped_at = System.monotonic_time(:nanosecond)
         service_ns = max(stopped_at - started_at, 0)
-        native_wait_ns = max(System.os_time(:nanosecond) - elem(message, 4), service_ns)
+        native_wait_ns = max(CAPI.beaver_raw_execution_clock() - elem(message, 4), service_ns)
 
         __MODULE__.Profile.record_callback(
           profile,

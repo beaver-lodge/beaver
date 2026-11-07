@@ -1,4 +1,4 @@
-alias Beaver.MLIR.{CAPI, Context, LogicalResult, Operation, RewritePatternSet}
+alias Beaver.MLIR.{CAPI, LogicalResult, Operation, RewritePatternSet}
 
 defmodule Beaver.MLIR.Rewrite do
   @moduledoc """
@@ -39,27 +39,11 @@ defmodule Beaver.MLIR.Rewrite do
 
   @type pattern_entry() ::
           Beaver.Pattern.Native.Descriptor.t()
+          | Beaver.Pattern.Native.Program.t()
           | {root_name :: term(), match_and_rewrite() | Beaver.Pattern.Native.Descriptor.t()}
 
   @type pattern_list() :: [pattern_entry()]
   @type apply_result() :: {LogicalResult.t(), diagnostics()}
-
-  defp do_apply(%Context{ref: ctx}, %MLIR.Module{ref: mod}, %MLIR.FrozenRewritePatternSet{ref: set}, cfg),
-    do: CAPI.beaver_raw_apply_rewrite_pattern_set_with_module(ctx, mod, set, cfg)
-
-  defp do_apply(%Context{ref: ctx}, %Operation{ref: op}, %MLIR.FrozenRewritePatternSet{ref: set}, cfg),
-    do: CAPI.beaver_raw_apply_rewrite_pattern_set_with_op(ctx, op, set, cfg)
-
-  defp dispatch_loop(timeout \\ 2) do
-    receive do
-      {{:kind, LogicalResult, _} = ret, diagnostics} -> {Beaver.Native.check!(ret), diagnostics}
-    after
-      timeout * 1_000 ->
-        Logger.error("Timeout waiting for pattern set application, timeout: #{inspect(timeout)}s")
-        Logger.flush()
-        dispatch_loop(timeout * 2)
-    end
-  end
 
   @spec with_default_config((config_handle() -> result)) :: result when result: var
   def with_default_config(fun) when is_function(fun, 1),
@@ -88,13 +72,27 @@ defmodule Beaver.MLIR.Rewrite do
   defp create_pattern_set(ctx, patterns) do
     set = RewritePatternSet.create(ctx)
 
-    Enum.each(patterns, fn
-      %Beaver.Pattern.Native.Descriptor{} = descriptor -> RewritePatternSet.add(set, descriptor, ctx: ctx)
-      {root, %Beaver.Pattern.Native.Descriptor{} = descriptor} -> RewritePatternSet.add(set, root, descriptor, ctx: ctx)
-      {root, match_and_rewrite} -> RewritePatternSet.add(set, root, match_and_rewrite, ctx: ctx)
-    end)
+    try do
+      Enum.each(patterns, fn
+        %Beaver.Pattern.Native.Program{} = program ->
+          RewritePatternSet.add(set, program, ctx: ctx)
 
-    set
+        %Beaver.Pattern.Native.Descriptor{} = descriptor ->
+          RewritePatternSet.add(set, descriptor, ctx: ctx)
+
+        {root, %Beaver.Pattern.Native.Descriptor{} = descriptor} ->
+          RewritePatternSet.add(set, root, descriptor, ctx: ctx)
+
+        {root, match_and_rewrite} ->
+          RewritePatternSet.add(set, root, match_and_rewrite, ctx: ctx)
+      end)
+
+      set
+    catch
+      kind, reason ->
+        RewritePatternSet.threaded_destroy(ctx, set)
+        :erlang.raise(kind, reason, __STACKTRACE__)
+    end
   end
 
   @spec to_config_callback(config_input()) :: config_callback()
@@ -121,34 +119,57 @@ defmodule Beaver.MLIR.Rewrite do
 
   @spec apply_patterns(rewrite_ir(), pattern_input()) :: apply_result()
   @spec apply_patterns(rewrite_ir(), pattern_input(), config_input()) :: apply_result()
-  def apply_patterns(ir, patterns, configure \\ nil)
+  def apply_patterns(ir, patterns, configure \\ nil), do: apply_patterns(ir, patterns, configure, [])
 
-  def apply_patterns(ir, patterns, configure) when is_nil(configure) or is_list(configure),
-    do: apply_patterns(ir, patterns, to_config_callback(configure))
-
-  def apply_patterns(ir, %MLIR.FrozenRewritePatternSet{} = patterns, configure)
-      when is_function(configure, 1) do
-    ctx = MLIR.context(ir)
-
-    with_default_config(fn cfg ->
-      _ = configure.(cfg)
-      :async = do_apply(ctx, ir, patterns, cfg)
-      dispatch_loop()
+  @spec apply_patterns(rewrite_ir(), pattern_input(), config_input(), keyword()) :: apply_result()
+  def apply_patterns(ir, %MLIR.FrozenRewritePatternSet{} = patterns, configure, opts) do
+    with_default_config(configure, fn cfg ->
+      Beaver.Execution.run(
+        MLIR.context(ir),
+        :rewrite,
+        {Operation.from_module(ir).ref, patterns.ref, Kinda.unwrap_ref(cfg)},
+        opts
+      )
     end)
   end
 
-  def apply_patterns(ir, patterns, configure)
-      when (is_list(patterns) or is_struct(patterns, RewritePatternSet)) and
-             is_function(configure, 1) do
-    ctx = MLIR.context(ir)
-    set = if is_list(patterns), do: create_pattern_set(ctx, patterns), else: patterns
-    frozen = %MLIR.FrozenRewritePatternSet{} = RewritePatternSet.freeze(set)
+  def apply_patterns(ir, patterns, configure, opts)
+      when is_list(patterns) or is_struct(patterns, RewritePatternSet) do
+    with_patterns(
+      MLIR.context(ir),
+      patterns,
+      fn frozen ->
+        apply_patterns(ir, frozen, configure, opts)
+      end,
+      opts
+    )
+  end
+
+  @doc """
+  Prepares patterns once for repeated runs on independently owned IR. Native
+  programs are stateless and can run concurrently. Callback-backed frozen sets
+  retain their callback owner's state; prepare a fresh set for isolated state.
+  """
+  def with_patterns(ctx, patterns, fun, opts \\ []) do
+    profile = opts[:profile]
+
+    frozen =
+      Beaver.Execution.Profile.measure(profile, :prepare, fn ->
+        set = if is_list(patterns), do: create_pattern_set(ctx, patterns), else: patterns
+        RewritePatternSet.freeze(set)
+      end)
 
     try do
-      apply_patterns(ir, frozen, configure)
+      fun.(frozen)
     after
-      MLIR.FrozenRewritePatternSet.threaded_destroy(ctx, frozen)
+      Beaver.Execution.Profile.measure(profile, :cleanup, fn ->
+        MLIR.FrozenRewritePatternSet.threaded_destroy(ctx, frozen)
+      end)
     end
+  end
+
+  def profile(ir, patterns, configure \\ nil) do
+    Beaver.Execution.Profile.capture(fn profile -> apply_patterns(ir, patterns, configure, profile: profile) end)
   end
 
   @spec apply_patterns!(rewrite_ir(), pattern_input()) :: rewrite_ir()

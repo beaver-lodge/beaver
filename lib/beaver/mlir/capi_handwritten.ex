@@ -5,6 +5,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
   # this same table, so their exports cannot drift apart.
   @functions for {arity, names} <- [
                    {4, ~w(
+        execution_worker execution_dirty execution_auto
         apply_rewrite_pattern_set_with_module apply_rewrite_pattern_set_with_op type_converter_add_conversion_map
         type_converter_reply_callback type_converter_reply_types type_converter_reply_values optimization_remarks_attach
       )},
@@ -20,6 +21,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
         jit_invoke_with_terms_io_bound type_converter_reply_value value_replace_uses_with_if
       )},
                    {1, ~w(
+        executor_snapshot executor_release
         conditionally_speculatable_query_async memory_effects_query_async action_tracing_drain
         action_tracing_detach cuda_device_name cuda_device_compute_capability cuda_module_load cuda_module_unload
         cuda_mem_alloc cuda_mem_free triton_register_dialects external_interface_release
@@ -37,6 +39,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
         action_tracing_attach create_mlir_rewrite_pattern
       )},
                    {0, ~w(
+        execution_build_mode execution_clock
         cuda_available cuda_device_count cuda_synchronize triton_register_passes peak_rss process_cpu_time
         enif_functions get_null_ptr string_printer_callback type_converter_create
       )},
@@ -50,7 +53,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
         compiler_kernel_load_and_populate apply_conversion_async
       )},
                    {6, ~w(
-        create_mlir_pass
+        create_mlir_pass declarative_pattern_add
       )}
                  ],
                  name <- names,

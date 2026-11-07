@@ -14,6 +14,10 @@ typedef enum {
 extern "C" {
 #endif
 
+/// Empty native pass for measuring pass-manager and verifier overhead.
+MLIR_CAPI_EXPORTED MlirPass beaverCreateNoopPass(void);
+MLIR_CAPI_EXPORTED void beaverPassManagerTrackExecution(MlirPassManager passManager);
+
 MLIR_CAPI_EXPORTED bool beaverStaticMemoryPlannerSupported(void);
 MLIR_CAPI_EXPORTED MlirPass beaverCreateStaticMemoryPlannerPass(bool callerArena, bool bestFit);
 

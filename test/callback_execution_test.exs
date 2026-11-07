@@ -50,7 +50,9 @@ defmodule CallbackExecutionTest do
   end
 
   setup do
-    ctx = Context.create(threading: false, thread_safe: true)
+    ctx =
+      Context.create(threading: not Context.independent_locking_supported?(), thread_safe: true)
+
     on_exit(fn -> Context.destroy(ctx) end)
     %{ctx: ctx}
   end
@@ -87,7 +89,9 @@ defmodule CallbackExecutionTest do
       assert_received {:destruct, 2}
       assert_received {:destruct, :initialized}
       assert Context.thread_safe?(ctx)
-      refute MLIR.CAPI.beaverContextIsMultithreadingEnabled(ctx) |> Beaver.Native.to_term()
+
+      assert MLIR.CAPI.beaverContextIsMultithreadingEnabled(ctx) |> Beaver.Native.to_term() ==
+               not Context.independent_locking_supported?()
     after
       MLIR.Module.destroy(ir)
     end
@@ -142,7 +146,7 @@ defmodule CallbackExecutionTest do
     end
   end
 
-  test "independent locking supports native pass callbacks which apply nested patterns", %{
+  test "thread-safe contexts support native pass callbacks which apply nested patterns", %{
     ctx: ctx
   } do
     ir = module(ctx)

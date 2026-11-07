@@ -1,4 +1,5 @@
 #include "mlir/CAPI/Beaver.h"
+#include "mlir/CAPI/Execution.h"
 #include "mlir/CAPI/IRMapping.h"
 #include "mlir/CAPI/Rewrite.h"
 #include "mlir-c/BuiltinAttributes.h"
@@ -204,7 +205,10 @@ private:
   void asyncEnqueue(llvm::unique_function<void()> task, llvm::ThreadPoolTaskGroup *group) override {
     std::lock_guard<std::mutex> lock(mutex);
     assert(!shuttingDown && "queueing work during pool destruction");
-    tasks.emplace_back(std::move(task), group);
+    tasks.emplace_back([execution = beaver::currentExecution(), task = std::move(task)]() mutable {
+      beaver::ExecutionScope scope(execution);
+      task();
+    }, group);
     ++outstanding;
     if (group) ++groupOutstanding[group];
 
@@ -632,17 +636,6 @@ MLIR_CAPI_EXPORTED void beaverOperationDumpGeneric(MlirOperation op) {
 
 MLIR_CAPI_EXPORTED MlirGreedyRewriteDriverConfig beaverGreedyRewriteDriverConfigGet() {
   return mlirGreedyRewriteDriverConfigCreate();
-}
-
-MLIR_CAPI_EXPORTED bool beaverContextAddWork(MlirContext context, void (*task)(void *), void *arg) {
-  if (!beaverContextIsThreadSafeLockingEnabled(context)) return false;
-
-  // This executor is independent of MLIR's internal parallel algorithms. A
-  // callback can submit nested work while its native caller is waiting, so
-  // retain elastic workers instead of blocking a bounded LLVM pool.
-  static BeaverElasticThreadPool executor(std::thread::hardware_concurrency());
-  executor.async([task, arg]() { task(arg); });
-  return true;
 }
 
 MLIR_CAPI_EXPORTED bool beaverContextTransientScopeSupported(void) {

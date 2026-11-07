@@ -1,4 +1,5 @@
 const mlir_capi = @import("mlir_capi.zig");
+const callback_args = @import("callback_args.zig");
 const prelude = @import("prelude.zig");
 const c = prelude.c;
 const kinda = @import("kinda");
@@ -34,7 +35,7 @@ const ConditionalUseReplacer = struct {
             self.callback_error = err;
             return false;
         };
-        const response = self.dispatcher.invoke("filter", message_env, .{operand}) catch |err| {
+        const response = callback_args.invokeTerms(self.dispatcher, "filter", message_env, .{operand}) catch |err| {
             self.callback_error = err;
             return false;
         };

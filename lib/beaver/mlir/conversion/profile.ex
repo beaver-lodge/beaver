@@ -115,6 +115,9 @@ defmodule Beaver.MLIR.Conversion.Profile do
     }
   end
 
+  defp decode_native_profile({duration_ns, target_lock_wait_ns, _execution_costs}),
+    do: decode_native_profile({duration_ns, target_lock_wait_ns})
+
   defp decode_native_profile({duration_ns, target_lock_wait_ns})
        when is_integer(duration_ns) and is_integer(target_lock_wait_ns),
        do: %{duration_ns: duration_ns, target_lock_wait_ns: target_lock_wait_ns}

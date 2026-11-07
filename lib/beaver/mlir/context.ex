@@ -43,6 +43,7 @@ defmodule Beaver.MLIR.Context do
           | {:all_dialects, boolean()}
           | {:threading, boolean()}
           | {:thread_safe, boolean()}
+          | {:callback_executor, keyword()}
           | {:thread_pool, :application | MLIR.LLVMThreadPool.t() | GenServer.server() | nil}
           | {:registry, MLIR.DialectRegistry.t() | [MLIR.DialectRegistry.t()]}
   @spec create([context_option()]) :: __MODULE__.t()
@@ -54,6 +55,11 @@ defmodule Beaver.MLIR.Context do
   context; this does not make concurrent mutation of the same IR safe.
   Beaver's callback executor also works in this mode. Use
   `Beaver.Composer.run/2` with `execution: :beam` to run Elixir passes directly.
+
+  `callback_executor: [max_concurrency: n, idle_timeout_ms: ms]` limits admitted
+  worker jobs. Jobs waiting for BEAM lend their admission slot to nested or
+  queued work. Blocked threads can exceed this limit; idle workers retire.
+  Dirty schedulers and MLIR's internal parallelism have independent limits.
   """
   def create(opts \\ []) do
     allow_unregistered = Keyword.get(opts, :allow_unregistered, false)
@@ -72,6 +78,19 @@ defmodule Beaver.MLIR.Context do
 
       if thread_safe and not threading, do: beaverContextEnableThreadSafeLocking(ctx)
 
+      if executor = opts[:callback_executor] do
+        unless Keyword.keyword?(executor) and Keyword.keys(executor) -- [:max_concurrency, :idle_timeout_ms] == [],
+          do: raise(ArgumentError, "invalid callback executor options")
+
+        capacity = Keyword.get(executor, :max_concurrency, System.schedulers_online())
+        idle = Keyword.get(executor, :idle_timeout_ms, 1000)
+
+        unless is_integer(capacity) and capacity > 0 and is_integer(idle) and idle > 0,
+          do: raise(ArgumentError, "callback executor capacity and idle timeout must be positive integers")
+
+        true = beaverExecutorConfigure(ctx, capacity, idle) |> Native.to_term()
+      end
+
       opts |> Keyword.get(:registry, []) |> List.wrap() |> Enum.each(&mlirContextAppendDialectRegistry(ctx, &1))
 
       if all_dialects, do: load_all_dialects(ctx)
@@ -80,6 +99,7 @@ defmodule Beaver.MLIR.Context do
       %{ctx | thread_pool_owner: owner, thread_pool_lease: lease}
     rescue
       exception ->
+        beaver_raw_executor_release(ctx.ref)
         mlirContextDestroy(ctx)
         if owner, do: MLIR.ThreadPool.checkin(owner, lease)
         reraise exception, __STACKTRACE__
@@ -96,6 +116,9 @@ defmodule Beaver.MLIR.Context do
     if beaverContextHasActiveTransientScope(ctx) |> Native.to_term(),
       do: raise(ArgumentError, "cannot destroy a context with an active transient scope")
 
+    unless beaver_raw_executor_release(ctx.ref),
+      do: raise(ArgumentError, "cannot destroy a context with active callback executor work")
+
     try do
       # Detach action tracing sessions while the native context is still alive;
       # the native session destructor deregisters its action handler on the
@@ -110,6 +133,9 @@ defmodule Beaver.MLIR.Context do
         do: MLIR.ThreadPool.checkin(ctx.thread_pool_owner, ctx.thread_pool_lease)
     end
   end
+
+  @doc "Current callback executor capacity, queue and worker counts for this context."
+  defdelegate executor_stats(ctx), to: Beaver.Execution
 
   @doc "Returns whether the linked LLVM supports resettable transient context scopes."
   @spec transient_scope_supported?() :: boolean()
