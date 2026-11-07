@@ -1,6 +1,5 @@
 const std = @import("std");
 const kinda = @import("kinda");
-const e = kinda.erl_nif;
 const beam = kinda.beam;
 const prelude = @import("prelude.zig");
 const c = prelude.c;
@@ -26,17 +25,12 @@ pub fn action_tracing_attach(env: beam.env, _: c_int, args: [*c]const beam.term)
     const skip_json = try makeStringRef(env, args[3]);
     const limit_json = try makeStringRef(env, args[4]);
 
-    const state = TracingStateResource.alloc() catch
+    const tracing = c.mlirBeaverActionTracingAttach(context, filter_json, location_json, skip_json, limit_json);
+    if (tracing.ptr == null) return error.FailedToAttachActionTracing;
+    return TracingStateResource.make(env, .{ .tracing = tracing }) catch {
+        c.mlirBeaverActionTracingDetach(tracing);
         return error.FailedToAllocateActionTracingState;
-    errdefer TracingStateResource.release(state);
-
-    state.tracing =
-        c.mlirBeaverActionTracingAttach(context, filter_json, location_json, skip_json, limit_json);
-    if (state.tracing.ptr == null) return error.FailedToAttachActionTracing;
-
-    const term = e.enif_make_resource(env, state);
-    TracingStateResource.release(state);
-    return term;
+    };
 }
 
 fn drainCollector(data: [*c]const u8, user_data: ?*anyopaque) callconv(.c) void {

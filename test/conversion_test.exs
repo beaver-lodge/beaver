@@ -3,6 +3,7 @@ defmodule Beaver.MLIR.ConversionTest do
   use Beaver
 
   alias Beaver.MLIR
+  import Beaver.ConversionHelpers
 
   test "lowers a Slang dialect with per-instance legality and a 1:N type conversion", %{
     ctx: ctx
@@ -107,35 +108,29 @@ defmodule Beaver.MLIR.ConversionTest do
   end
 
   test "partial conversion permits unknown operations while full conversion returns diagnostics",
-       %{
-         ctx: ctx
-       } do
-    partial_module = unknown_module(ctx)
-    partial_target = legal_builtin_target(ctx)
-    partial_patterns = MLIR.RewritePatternSet.create(ctx)
+       %{ctx: ctx} do
+    for mode <- [:partial, :full] do
+      module = unknown_module(ctx)
+      target = legal_builtin_target(ctx)
+      patterns = MLIR.RewritePatternSet.create(ctx)
 
-    assert {:ok, ^partial_module, []} =
-             MLIR.Conversion.partial(
-               partial_module,
-               partial_target,
-               partial_patterns,
-               timeout: 1_000
-             )
+      try do
+        result = apply(MLIR.Conversion, mode, [module, target, patterns, [timeout: 1_000]])
 
-    assert :ok = MLIR.ConversionTarget.destroy(partial_target)
-    MLIR.Module.destroy(partial_module)
+        if mode == :partial do
+          assert {:ok, ^module, []} = result
+        else
+          assert {:error, %MLIR.Conversion.Error{mode: :full, diagnostics: diagnostics} = error} =
+                   result
 
-    full_module = unknown_module(ctx)
-    full_target = legal_builtin_target(ctx)
-    full_patterns = MLIR.RewritePatternSet.create(ctx)
-
-    assert {:error, %MLIR.Conversion.Error{mode: :full, diagnostics: diagnostics} = error} =
-             MLIR.Conversion.full(full_module, full_target, full_patterns, timeout: 1_000)
-
-    assert diagnostics != []
-    assert Exception.message(error) =~ "foo.unknown"
-    assert :ok = MLIR.ConversionTarget.destroy(full_target)
-    MLIR.Module.destroy(full_module)
+          assert diagnostics != []
+          assert Exception.message(error) =~ "foo.unknown"
+        end
+      after
+        assert :ok = MLIR.ConversionTarget.destroy(target)
+        MLIR.Module.destroy(module)
+      end
+    end
   end
 
   test "profiling returns bounded native and BEAM callback aggregates", %{ctx: ctx} do
@@ -294,11 +289,7 @@ defmodule Beaver.MLIR.ConversionTest do
     i32 = MLIR.Type.i32(ctx: ctx)
     i64 = MLIR.Type.i64(ctx: ctx)
 
-    source_module =
-      MLIR.Module.create!(
-        ~S[module { %a = arith.constant 1 : i64 %s = "foo.source"() : () -> i32 "foo.keep"(%s) : (i32) -> () }],
-        ctx: ctx
-      )
+    source_module = materialization_module(ctx, :source)
 
     [constant | _] =
       source_module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.to_list()
@@ -315,7 +306,7 @@ defmodule Beaver.MLIR.ConversionTest do
         conversion: fn type -> if MLIR.equal?(type, i32), do: i64, else: :declined end,
         source_materialization: fn rewriter, output_type, inputs, loc ->
           send(owner, {:source_materialized, output_type, inputs})
-          [value] = build_unrealized_cast(ctx, rewriter, [output_type], inputs, loc)
+          [value] = build_unrealized_cast(rewriter, [output_type], inputs, loc)
           value
         end,
         timeout: 1_000
@@ -351,11 +342,7 @@ defmodule Beaver.MLIR.ConversionTest do
     assert :ok = MLIR.ConversionTarget.destroy(source_target)
     MLIR.Module.destroy(source_module)
 
-    target_module =
-      MLIR.Module.create!(
-        ~S[module { %a = arith.constant 1 : i32 "foo.sink"(%a) : (i32) -> () }],
-        ctx: ctx
-      )
+    target_module = materialization_module(ctx, :one_to_n)
 
     target = legal_arith_target(ctx) |> MLIR.ConversionTarget.add_illegal_dialect("foo")
 
@@ -364,7 +351,7 @@ defmodule Beaver.MLIR.ConversionTest do
         one_to_n: fn type -> if MLIR.equal?(type, i32), do: [i64, i64], else: :declined end,
         one_to_n_target_materialization: fn rewriter, output_types, inputs, loc, _original ->
           send(owner, {:target_materialized, output_types, inputs})
-          build_unrealized_cast(ctx, rewriter, output_types, inputs, loc)
+          build_unrealized_cast(rewriter, output_types, inputs, loc)
         end,
         timeout: 1_000
       )
@@ -378,17 +365,7 @@ defmodule Beaver.MLIR.ConversionTest do
       fn operation, [[lhs, rhs]], rewriter ->
         base = MLIR.ConversionPatternRewriter.as_base(rewriter)
 
-        add =
-          %Beaver.Changeset{
-            name: "arith.addi",
-            context: ctx,
-            location: MLIR.Operation.location(operation)
-          }
-          |> Beaver.Changeset.add_argument([lhs, rhs])
-          |> Beaver.Changeset.add_result(i64)
-          |> MLIR.Operation.create()
-
-        MLIR.RewriterBase.insert(base, add)
+        insert(base, "arith.addi", MLIR.Operation.location(operation), [lhs, rhs], i64)
         MLIR.ConversionPatternRewriter.erase_op(rewriter, operation)
         :ok
       end,
@@ -495,23 +472,6 @@ defmodule Beaver.MLIR.ConversionTest do
   defp legal_arith_target(ctx) do
     legal_builtin_target(ctx)
     |> MLIR.ConversionTarget.add_legal_dialect("arith")
-  end
-
-  defp build_unrealized_cast(ctx, rewriter, output_types, inputs, loc) do
-    changeset =
-      %Beaver.Changeset{
-        name: "builtin.unrealized_conversion_cast",
-        context: ctx,
-        location: loc
-      }
-      |> Beaver.Changeset.add_argument(inputs)
-
-    operation =
-      Enum.reduce(output_types, changeset, &Beaver.Changeset.add_result(&2, &1))
-      |> MLIR.Operation.create()
-
-    MLIR.RewriterBase.insert(rewriter, operation)
-    operation |> MLIR.Operation.results() |> Enum.to_list()
   end
 
   defp eventually_destroy_converter(converter, attempts) do

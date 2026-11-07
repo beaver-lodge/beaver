@@ -28,11 +28,7 @@ const Resource = kinda.RawResourceType(Prepared, "Beaver.MLIR.Transform.Prepared
 pub fn transform_prepare(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const module = try m.Module.resource.fetch(env, args[0]);
     const sequence = try m.Operation.resource.fetch(env, args[1]);
-    const owner = try beam.self(env);
-    const prepared = try Resource.alloc();
-    prepared.* = .{ .module = module, .sequence = sequence, .context = c.mlirModuleGetContext(module), .owner = owner };
-    defer Resource.release(prepared);
-    return e.enif_make_resource(env, prepared);
+    return Resource.make(env, .{ .module = module, .sequence = sequence, .context = c.mlirModuleGetContext(module), .owner = try beam.self(env) });
 }
 pub fn transform_close(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const prepared = try Resource.fetch(env, args[0]);

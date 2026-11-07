@@ -14,17 +14,14 @@ const Session = struct {
     mutation_depth: u32 = 0,
     mutex: @import("mutex.zig").Mutex = .{},
 
-    fn close(self: *@This()) void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
-        self.releaseHandle();
-    }
     fn releaseHandle(self: *@This()) void {
         if (self.handle) |handle| c.beaverAnalysisDestroy(handle);
         self.handle = null;
     }
     fn destroy(self: *@This()) void {
-        self.close();
+        self.mutex.lock();
+        self.releaseHandle();
+        self.mutex.unlock();
         self.mutex.destroy();
     }
     fn acquire(env: beam.env, ref: beam.term, caller: beam.pid) !*Session {
@@ -40,11 +37,9 @@ pub fn analysis_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam
     const root = try m.Operation.resource.fetch(env, args[0]);
     if (root.ptr == null) return error.NullAnalysisRoot;
     const owner = try beam.self(env);
-    const session = try Resource.alloc();
-    session.* = .{ .handle = null, .context = c.mlirOperationGetContext(root), .owner = owner };
-    defer Resource.release(session);
-    session.handle = c.beaverAnalysisCreate(root);
-    return e.enif_make_resource(env, session);
+    const handle = c.beaverAnalysisCreate(root);
+    errdefer c.beaverAnalysisDestroy(handle);
+    return Resource.make(env, .{ .handle = handle, .context = c.mlirOperationGetContext(root), .owner = owner });
 }
 pub fn analysis_close(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const session = try Session.acquire(env, args[0], try beam.self(env));

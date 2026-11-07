@@ -32,7 +32,6 @@ MLIR_CAPI_EXPORTED MlirPass beaverCreateCompositeFixedPointPass(MlirStringRef na
                                                                 MlirBeaverConvergenceFailureAction action);
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetDescription(MlirPass pass);
 MLIR_CAPI_EXPORTED MlirContext beaverPassManagerGetContext(MlirPassManager passManager);
-MLIR_CAPI_EXPORTED void beaverPassManagerEnableTiming(MlirPassManager passManager);
 
 #ifdef __cplusplus
 }

@@ -4,16 +4,6 @@ defmodule UpstreamCapabilitiesTest do
   alias Beaver.MLIR.{Attribute, CAPI, Context, Operation, Type}
   alias Beaver.MLIR.Dialect.Bufferization
 
-  test "the default LLVM pin enables every advertised upstream capability" do
-    assert Context.independent_locking_supported?()
-    assert Beaver.MLIR.OptimizationRemarks.supported?()
-    assert Beaver.MLIR.Dialect.GPU.rocdl_target_info_supported?()
-    assert Bufferization.static_memory_planner_supported?()
-    assert Context.transient_scope_supported?()
-    assert Beaver.MLIR.Transform.packed_params_supported?()
-    assert Beaver.MLIR.Transform.composite_fixed_point_failure_action_supported?()
-  end
-
   test "independent context locks allow external workers without a pool" do
     ctx = Context.create(threading: false, thread_safe: true)
 

@@ -111,9 +111,6 @@ defmodule Beaver.MLIR.Dialect.LLVM do
     end
   end
 
-  @doc "Whether the installed LLVM exposes source-language dialects on `DICompileUnit`."
-  def di_compile_unit_source_language_dialect_supported?, do: true
-
   @doc """
   Build an LLVM `DICompileUnit` attribute.
 

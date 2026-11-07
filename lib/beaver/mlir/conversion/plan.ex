@@ -16,7 +16,7 @@ defmodule Beaver.MLIR.Conversion.Plan do
 
   defstruct mode: :full, timeout: 30_000, folding_mode: nil, build_materializations: nil, entries: []
 
-  @type mode() :: :full | :partial
+  @type mode() :: :full | :partial | :analysis
   @type option() ::
           {:mode, mode()}
           | {:timeout, non_neg_integer() | nil}
@@ -32,7 +32,7 @@ defmodule Beaver.MLIR.Conversion.Plan do
         }
 
   @doc """
-  Creates a plan with `:mode` (`:full` or `:partial`), `:timeout` (default 30_000),
+  Creates a plan with `:mode` (`:full`, `:partial` or `:analysis`), `:timeout` (default 30_000),
   `:folding_mode` (`:never`, `:before_patterns`, `:after_patterns` or nil) and
   `:build_materializations` (boolean or nil).
   """

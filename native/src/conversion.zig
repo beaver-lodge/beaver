@@ -600,14 +600,10 @@ fn compilerKernelLoadAndPopulate(environment: beam.env, _: c_int, args: [*c]cons
     return beam.make_slice(environment, error_message.data[0..error_message.length]);
 }
 
-fn reportCollector(text: c.MlirStringRef, data: ?*anyopaque) callconv(.c) void {
-    const output: *std.array_list.Managed(u8) = @ptrCast(@alignCast(data.?));
-    output.appendSlice(text.data[0..text.length]) catch @panic("failed to collect conversion report");
-}
 fn applyConversion(environment: beam.env, args: anytype) !beam.term {
-    var report = std.array_list.Managed(u8).init(beam.allocator);
+    var report = string_ref.TextBuffer.init(beam.allocator);
     defer report.deinit();
-    const result = c.beaverConversionRun(args.mode, args.operation, args.target, args.patterns, args.config, if (args.report) reportCollector else null, &report);
+    const result = c.beaverConversionRun(args.mode, args.operation, args.target, args.patterns, args.config, if (args.report) string_ref.collectStringRef else null, &report);
     if (args.report) return beam.make_slice(environment, report.items);
     return mlir_capi.LogicalResult.resource.make_kind(environment, result);
 }

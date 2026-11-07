@@ -1,0 +1,33 @@
+name: Set up Beaver build
+description: Install the paired Kinda revision, Mix dependencies, native tools and selected LLVM
+runs:
+  using: composite
+  steps:
+    # The Hex release predates the Windows fixes and ResourceSlot registry.
+    - name: Check out paired Kinda
+      shell: bash
+      run: |
+        ref="$(jq -er '.kinda.ref | select(type == "string" and length > 0)' native-deps.json)"
+        git clone https://github.com/beaver-lodge/kinda.git kinda
+        git -C kinda checkout "$ref"
+        echo "BEAVER_KINDA_PATH=${GITHUB_WORKSPACE}/kinda" >> "$GITHUB_ENV"
+    - uses: ./.github/actions/setup-native-tools
+    - name: Restore dependencies cache
+      uses: actions/cache@v6
+      with:
+        path: deps
+        key: ${{ runner.os }}-mix-${{ hashFiles('**/mix.lock') }}
+        restore-keys: ${{ runner.os }}-mix-
+    - name: Install dependencies
+      shell: bash
+      run: mix deps.get
+    - uses: ./.github/actions/setup-msvc
+      if: runner.os == 'Windows'
+    - name: Install prebuilt LLVM
+      shell: bash
+      working-directory: scripts/install_llvm
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+      run: |
+        mix deps.get
+        mix beaver.install_prebuilt_llvm --install-dir "$RUNNER_TEMP/llvm-prebuilt"

@@ -37,7 +37,7 @@ defmodule Beaver.Composer do
   def create_pass(%MLIR.Pass{} = pass, _ctx), do: pass
 
   def create_pass(%MLIR.Transform.FixedPoint{} = fixed_point, ctx) do
-    inner_pipeline = mlir_op_pass_manager_create()
+    inner_pipeline = beaverOpPassManagerCreate()
 
     try do
       Enum.each(fixed_point.pipeline, &add_pass(inner_pipeline, &1, ctx))
@@ -104,8 +104,6 @@ defmodule Beaver.Composer do
   defp add_pass(%MLIR.OpPassManager{} = pm, pass, ctx), do: mlirOpPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
 
   defp add_pass(%MLIR.PassManager{} = pm, pass, ctx), do: mlirPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
-
-  defp mlir_op_pass_manager_create, do: beaverOpPassManagerCreate()
 
   defp encode_convergence_failure_action(:warn), do: 0
   defp encode_convergence_failure_action(:error), do: 1
@@ -251,7 +249,7 @@ defmodule Beaver.Composer do
     verifier = Keyword.get(opts, :verifier, true)
     pm = to_pm(composer, anchor)
 
-    if timing, do: pm |> beaverPassManagerEnableTiming()
+    if timing, do: pm |> mlirPassManagerEnableTiming()
 
     :ok = MLIR.PassManager.enable_verifier(pm, verifier)
 

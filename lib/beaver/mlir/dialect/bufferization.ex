@@ -87,9 +87,6 @@ defmodule Beaver.MLIR.Dialect.Bufferization do
     Beaver.Composer.nested(operation_or_module, "func.func", pass)
   end
 
-  def static_memory_planner_supported?,
-    do: true
-
   defp validate_options!(opts) do
     unless Keyword.keyword?(opts),
       do: raise(ArgumentError, "bufferization options must be a keyword list")

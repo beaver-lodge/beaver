@@ -108,9 +108,6 @@ defmodule Beaver.MLIR.Context do
     true = beaverExecutorConfigure(ctx, capacity, idle) |> Native.to_term()
   end
 
-  @doc "Whether the linked LLVM supports context locking without internal parallelism."
-  def independent_locking_supported?, do: true
-
   @doc "Whether context uniquing is protected by thread-safe locks."
   def thread_safe?(%__MODULE__{} = ctx), do: beaverContextIsThreadSafeLockingEnabled(ctx) |> Native.to_term()
 
@@ -138,11 +135,6 @@ defmodule Beaver.MLIR.Context do
 
   @doc "Current callback executor capacity, queue and worker counts for this context."
   defdelegate executor_stats(ctx), to: Beaver.Execution
-
-  @doc "Returns whether the linked LLVM supports resettable transient context scopes."
-  @spec transient_scope_supported?() :: boolean()
-  def transient_scope_supported?,
-    do: true
 
   @doc """
   Runs `fun` inside a resettable transient allocation scope.

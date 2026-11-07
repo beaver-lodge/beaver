@@ -24,6 +24,7 @@ defmodule Beaver.MLIR.ConversionPlanTest do
   alias Beaver.MLIR
   alias Beaver.MLIR.Conversion.Plan
   alias Beaver.MLIR.ConversionPlanNativePatterns
+  import Beaver.ConversionHelpers
 
   test "lowers a Slang dialect using Plan and reuses the Plan across fresh MLIR contexts" do
     plan =
@@ -41,102 +42,61 @@ defmodule Beaver.MLIR.ConversionPlanTest do
       |> Plan.add_conversion_pattern(
         "counter_plan_test.inc",
         fn operation, [input], rewriter ->
-          context = MLIR.context(operation)
           base = MLIR.ConversionPatternRewriter.as_base(rewriter)
           type = MLIR.Value.type(input)
           location = MLIR.Operation.location(operation)
+          MLIR.RewriterBase.set_insertion_point_before(base, operation)
 
           one =
-            %Beaver.Changeset{name: "arith.constant", context: context, location: location}
-            |> Beaver.Changeset.add_argument(value: MLIR.Attribute.integer(type, 1))
-            |> Beaver.Changeset.add_result(type)
-            |> MLIR.Operation.create()
+            insert(
+              base,
+              "arith.constant",
+              location,
+              [value: MLIR.Attribute.integer(type, 1)],
+              type
+            )
 
-          add =
-            %Beaver.Changeset{name: "arith.addi", context: context, location: location}
-            |> Beaver.Changeset.add_argument([input, MLIR.Operation.result(one, 0)])
-            |> Beaver.Changeset.add_result(type)
-            |> MLIR.Operation.create()
-
-          MLIR.RewriterBase.set_insertion_point_before(base, operation)
-          MLIR.RewriterBase.insert(base, one)
-          MLIR.RewriterBase.insert(base, add)
+          add = insert(base, "arith.addi", location, [input, MLIR.Operation.result(one, 0)], type)
           MLIR.ConversionPatternRewriter.replace_op(rewriter, operation, add)
           :ok
         end,
         version: "1.0"
       )
 
-    # First context run
-    ctx1 = MLIR.Context.create()
+    for driver <- [:run, :run!] do
+      Beaver.Native.with_resource(MLIR.Context.create(), &MLIR.Context.destroy/1, fn ctx ->
+        assert Beaver.Slang.load(ctx, Beaver.MLIR.CounterPlanTest)
+               |> MLIR.LogicalResult.success?()
 
-    try do
-      assert Beaver.Slang.load(ctx1, Beaver.MLIR.CounterPlanTest) |> MLIR.LogicalResult.success?()
-
-      module1 =
-        MLIR.Module.create!(
-          ~S"""
-          module {
-            func.func @increment(%arg0: i32) -> i32 {
-              %0 = "counter_plan_test.inc"(%arg0) : (i32) -> i32
-              return %0 : i32
+        module =
+          MLIR.Module.create!(
+            ~S"""
+            module {
+              func.func @increment(%arg0: i32) -> i32 {
+                %0 = "counter_plan_test.inc"(%arg0) : (i32) -> i32
+                return %0 : i32
+              }
             }
-          }
-          """,
-          ctx: ctx1
-        )
+            """,
+            ctx: ctx
+          )
 
-      assert {:ok, ^module1, _diagnostics} = Plan.run(plan, module1)
+        Beaver.Native.with_resource(module, &MLIR.Module.destroy/1, fn module ->
+          if driver == :run do
+            assert {:ok, ^module, _diagnostics} = Plan.run(plan, module)
 
-      pass_manager1 = MLIR.CAPI.mlirPassManagerCreate(ctx1)
+            Beaver.Composer.append(module, "convert-arith-to-llvm,convert-func-to-llvm")
+            |> Beaver.Composer.run!()
 
-      MLIR.CAPI.mlirPassManagerAddOwnedPass(
-        pass_manager1,
-        MLIR.CAPI.mlirCreateConversionArithToLLVMConversionPass()
-      )
+            assert MLIR.to_string(module) =~ "llvm.func"
+          else
+            assert ^module = Plan.run!(plan, module)
+            assert MLIR.to_string(module) =~ "arith.addi"
+          end
 
-      MLIR.CAPI.mlirPassManagerAddOwnedPass(
-        pass_manager1,
-        MLIR.CAPI.mlirCreateConversionConvertFuncToLLVMPass()
-      )
-
-      assert {:ok, _} = MLIR.PassManager.run(pass_manager1, module1)
-      MLIR.PassManager.destroy(pass_manager1)
-
-      rendered1 = MLIR.to_string(module1)
-      refute rendered1 =~ "counter_plan_test.inc"
-      assert rendered1 =~ "llvm.func"
-      MLIR.Module.destroy(module1)
-    after
-      MLIR.Context.destroy(ctx1)
-    end
-
-    # Second context run using the EXACT same Plan instance
-    ctx2 = MLIR.Context.create()
-
-    try do
-      assert Beaver.Slang.load(ctx2, Beaver.MLIR.CounterPlanTest) |> MLIR.LogicalResult.success?()
-
-      module2 =
-        MLIR.Module.create!(
-          ~S"""
-          module {
-            func.func @increment(%arg0: i32) -> i32 {
-              %0 = "counter_plan_test.inc"(%arg0) : (i32) -> i32
-              return %0 : i32
-            }
-          }
-          """,
-          ctx: ctx2
-        )
-
-      assert converted2 = Plan.run!(plan, module2)
-      rendered2 = MLIR.to_string(converted2)
-      refute rendered2 =~ "counter_plan_test.inc"
-      assert rendered2 =~ "arith.addi"
-      MLIR.Module.destroy(module2)
-    after
-      MLIR.Context.destroy(ctx2)
+          refute MLIR.to_string(module) =~ "counter_plan_test.inc"
+        end)
+      end)
     end
   end
 
@@ -247,11 +207,7 @@ defmodule Beaver.MLIR.ConversionPlanTest do
     i32 = MLIR.Type.i32(ctx: ctx)
     i64 = MLIR.Type.i64(ctx: ctx)
 
-    source_module =
-      MLIR.Module.create!(
-        ~S[module { %a = arith.constant 1 : i64 %s = "foo.source"() : () -> i32 "foo.keep"(%s) : (i32) -> () }],
-        ctx: ctx
-      )
+    source_module = materialization_module(ctx, :source)
 
     [constant | _] =
       source_module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.to_list()
@@ -271,7 +227,7 @@ defmodule Beaver.MLIR.ConversionPlanTest do
       |> Plan.add_source_materialization(
         fn rewriter, output_type, inputs, loc ->
           send(owner, {:source_materialized, MLIR.to_string(output_type), length(inputs)})
-          [value] = build_unrealized_cast(ctx, rewriter, [output_type], inputs, loc)
+          [value] = build_unrealized_cast(rewriter, [output_type], inputs, loc)
           value
         end,
         version: "1.0"
@@ -290,11 +246,7 @@ defmodule Beaver.MLIR.ConversionPlanTest do
     assert MLIR.to_string(source_module) =~ "unrealized_conversion_cast"
     MLIR.Module.destroy(source_module)
 
-    target_module =
-      MLIR.Module.create!(
-        ~S[module { %a = "foo.producer"() : () -> i32 "foo.sink"(%a) : (i32) -> () }],
-        ctx: ctx
-      )
+    target_module = materialization_module(ctx, :target)
 
     target_plan =
       Plan.new(mode: :partial, timeout: 1_000, build_materializations: true)
@@ -317,7 +269,7 @@ defmodule Beaver.MLIR.ConversionPlanTest do
              MLIR.to_string(original_type)}
           )
 
-          [value] = build_unrealized_cast(ctx, rewriter, [output_type], inputs, loc)
+          [value] = build_unrealized_cast(rewriter, [output_type], inputs, loc)
           value
         end,
         version: "1.0"
@@ -329,16 +281,7 @@ defmodule Beaver.MLIR.ConversionPlanTest do
 
           base = MLIR.ConversionPatternRewriter.as_base(rewriter)
 
-          legal_sink =
-            %Beaver.Changeset{
-              name: "foo.sink_legal",
-              context: MLIR.context(operation),
-              location: MLIR.Operation.location(operation)
-            }
-            |> Beaver.Changeset.add_argument(converted)
-            |> MLIR.Operation.create()
-
-          MLIR.RewriterBase.insert(base, legal_sink)
+          insert(base, "foo.sink_legal", MLIR.Operation.location(operation), converted)
           MLIR.ConversionPatternRewriter.erase_op(rewriter, operation)
           :ok
         end,
@@ -353,11 +296,7 @@ defmodule Beaver.MLIR.ConversionPlanTest do
     assert MLIR.to_string(target_module) =~ "unrealized_conversion_cast"
     MLIR.Module.destroy(target_module)
 
-    one_to_n_module =
-      MLIR.Module.create!(
-        ~S[module { %a = arith.constant 1 : i32 "foo.sink"(%a) : (i32) -> () }],
-        ctx: ctx
-      )
+    one_to_n_module = materialization_module(ctx, :one_to_n)
 
     one_to_n_plan =
       Plan.new(mode: :full, timeout: 1_000, build_materializations: true)
@@ -376,27 +315,15 @@ defmodule Beaver.MLIR.ConversionPlanTest do
              length(inputs)}
           )
 
-          build_unrealized_cast(ctx, rewriter, output_types, inputs, loc)
+          build_unrealized_cast(rewriter, output_types, inputs, loc)
         end,
         version: "1.0"
       )
       |> Plan.add_conversion_pattern(
         "foo.sink",
         fn operation, [[lhs, rhs]], rewriter ->
-          context = MLIR.context(operation)
           base = MLIR.ConversionPatternRewriter.as_base(rewriter)
-
-          add =
-            %Beaver.Changeset{
-              name: "arith.addi",
-              context: context,
-              location: MLIR.Operation.location(operation)
-            }
-            |> Beaver.Changeset.add_argument([lhs, rhs])
-            |> Beaver.Changeset.add_result(i64)
-            |> MLIR.Operation.create()
-
-          MLIR.RewriterBase.insert(base, add)
+          insert(base, "arith.addi", MLIR.Operation.location(operation), [lhs, rhs], i64)
           MLIR.ConversionPatternRewriter.erase_op(rewriter, operation)
           :ok
         end,
@@ -434,15 +361,7 @@ defmodule Beaver.MLIR.ConversionPlanTest do
           send(owner, {:erased_operand_count, length(converted)})
           base = MLIR.ConversionPatternRewriter.as_base(rewriter)
 
-          legal_sink =
-            %Beaver.Changeset{
-              name: "foo.sink_legal",
-              context: MLIR.context(operation),
-              location: MLIR.Operation.location(operation)
-            }
-            |> MLIR.Operation.create()
-
-          MLIR.RewriterBase.insert(base, legal_sink)
+          insert(base, "foo.sink_legal", MLIR.Operation.location(operation), [])
           MLIR.ConversionPatternRewriter.erase_op(rewriter, operation)
           :ok
         end,
@@ -450,11 +369,7 @@ defmodule Beaver.MLIR.ConversionPlanTest do
         version: "1.0"
       )
 
-    module =
-      MLIR.Module.create!(
-        ~S[module { %a = "foo.producer"() : () -> i32 "foo.sink"(%a) : (i32) -> () }],
-        ctx: ctx
-      )
+    module = materialization_module(ctx, :target)
 
     assert {:ok, ^module, []} = Plan.run(plan, module)
     assert_receive {:erased_operand_count, 0}
@@ -463,77 +378,48 @@ defmodule Beaver.MLIR.ConversionPlanTest do
     MLIR.Module.destroy(module)
   end
 
-  test "cleanup on success, conversion failure, callback exception, and callback timeout",
-       %{
-         ctx: ctx
-       } do
+  test "cleanup on conversion failure, callback exception, and callback timeout", %{ctx: ctx} do
     MLIR.Context.allow_unregistered_dialects(ctx)
 
-    # 1. Conversion failure cleanup
-    fail_plan =
-      Plan.new(mode: :full, timeout: 1_000)
-      |> Plan.add_legal_dialect("builtin")
-      |> Plan.add_illegal_dialect("foo")
-      |> add_lifetime_probe()
+    for scenario <- [:illegal, :exception, :timeout] do
+      plan =
+        Plan.new(mode: :full, timeout: if(scenario == :timeout, do: 50, else: 1_000))
+        |> Plan.add_legal_dialect("builtin")
+        |> add_lifetime_probe()
 
-    fail_module = MLIR.Module.create!(~s[module { "foo.illegal"() : () -> () }], ctx: ctx)
-    assert {:error, %MLIR.Conversion.Error{mode: :full}} = Plan.run(fail_plan, fail_module)
-    MLIR.Module.destroy(fail_module)
+      plan =
+        if scenario == :illegal do
+          Plan.add_illegal_dialect(plan, "foo")
+        else
+          Plan.add_dynamically_legal_op(plan, "foo.dynamic", fn _ ->
+            if scenario == :exception, do: raise("legality error in plan")
+            Process.sleep(200)
+            :legal
+          end)
+        end
 
-    # 2. Callback exception cleanup
-    exc_plan =
-      Plan.new(mode: :full, timeout: 1_000)
-      |> Plan.add_legal_dialect("builtin")
-      |> Plan.add_dynamically_legal_op("foo.dynamic", fn _ ->
-        raise "legality error in plan"
+      module = MLIR.Module.create!(~s[module { "foo.dynamic"() : () -> () }], ctx: ctx)
+
+      Beaver.Native.with_resource(module, &MLIR.Module.destroy/1, fn module ->
+        assert {:error, %MLIR.Conversion.Error{mode: :full} = error} = Plan.run(plan, module)
+
+        if scenario == :exception do
+          assert {:exception, :error, %RuntimeError{message: "legality error in plan"}, _} =
+                   error.callback_failure
+        end
       end)
-      |> add_lifetime_probe()
-
-    exc_module = MLIR.Module.create!(~s[module { "foo.dynamic"() : () -> () }], ctx: ctx)
-
-    assert {:error,
-            %MLIR.Conversion.Error{
-              callback_failure:
-                {:exception, :error, %RuntimeError{message: "legality error in plan"}, _}
-            }} = Plan.run(exc_plan, exc_module)
-
-    MLIR.Module.destroy(exc_module)
-
-    # 3. Callback timeout cleanup
-    timeout_plan =
-      Plan.new(mode: :full, timeout: 50)
-      |> Plan.add_legal_dialect("builtin")
-      |> Plan.add_dynamically_legal_op("foo.slow", fn _ ->
-        Process.sleep(200)
-        :legal
-      end)
-      |> add_lifetime_probe()
-
-    timeout_module = MLIR.Module.create!(~s[module { "foo.slow"() : () -> () }], ctx: ctx)
-    assert {:error, %MLIR.Conversion.Error{}} = Plan.run(timeout_plan, timeout_module)
-    MLIR.Module.destroy(timeout_module)
+    end
   end
 
   test "Plan.declaration/1 and compile/runtime option validation", %{ctx: ctx} do
-    # Option validation in Plan.new
-    assert_raise ArgumentError, ~r/unsupported Plan options/, fn ->
-      Plan.new(invalid_opt: 123)
-    end
-
-    assert_raise ArgumentError, ~r/:mode must be :full, :partial or :analysis/, fn ->
-      Plan.new(mode: :invalid)
-    end
-
-    assert_raise ArgumentError, ~r/:timeout must be a non-negative integer/, fn ->
-      Plan.new(timeout: -10)
-    end
-
-    assert_raise ArgumentError, ~r/unsupported conversion folding mode/, fn ->
-      Plan.new(folding_mode: :invalid)
-    end
-
-    assert_raise ArgumentError, ~r/build_materializations must be boolean/, fn ->
-      Plan.new(build_materializations: 123)
+    for {options, message} <- [
+          {[invalid_opt: 123], ~r/unsupported Plan options/},
+          {[mode: :invalid], ~r/:mode must be :full, :partial or :analysis/},
+          {[timeout: -10], ~r/:timeout must be a non-negative integer/},
+          {[folding_mode: :invalid], ~r/unsupported conversion folding mode/},
+          {[build_materializations: 123], ~r/build_materializations must be boolean/}
+        ] do
+      assert_raise ArgumentError, message, fn -> Plan.new(options) end
     end
 
     # Option validation in builder functions
@@ -572,77 +458,44 @@ defmodule Beaver.MLIR.ConversionPlanTest do
         version: "1.0"
       )
 
-    decl = Plan.declaration(declared_plan)
-
-    assert decl.mode == :full
-    assert decl.folding_mode == :before_patterns
-    assert decl.timeout == 2_000
-    assert length(decl.entries) == 6
-
-    assert Enum.at(decl.entries, 0) == %{kind: :add_legal_dialect, dialect: "builtin"}
-    assert Enum.at(decl.entries, 1) == %{kind: :add_illegal_op, op: "foo.bar"}
-
-    assert Enum.at(decl.entries, 2) == %{
-             kind: :add_dynamically_legal_op,
-             op: "foo.dynamic",
-             version: "2.1"
-           }
-
-    assert Enum.at(decl.entries, 3) == %{kind: :add_conversion, version: :unversioned}
-
-    assert Enum.at(decl.entries, 4) == %{
-             kind: :add_conversion_map,
-             source_types: ["i32", "index"],
-             target_type: "i64"
-           }
-
-    assert Enum.at(decl.entries, 5) == %{
-             kind: :add_conversion_pattern,
-             root: "foo.pattern",
-             benefit: 2,
-             one_to_n: false,
-             timeout: nil,
-             version: "1.0"
+    assert Plan.declaration(declared_plan) == %{
+             mode: :full,
+             folding_mode: :before_patterns,
+             timeout: 2_000,
+             build_materializations: nil,
+             entries: [
+               %{kind: :add_legal_dialect, dialect: "builtin"},
+               %{kind: :add_illegal_op, op: "foo.bar"},
+               %{kind: :add_dynamically_legal_op, op: "foo.dynamic", version: "2.1"},
+               %{kind: :add_conversion, version: :unversioned},
+               %{kind: :add_conversion_map, source_types: ["i32", "index"], target_type: "i64"},
+               %{
+                 kind: :add_conversion_pattern,
+                 root: "foo.pattern",
+                 benefit: 2,
+                 one_to_n: false,
+                 timeout: nil,
+                 version: "1.0"
+               }
+             ]
            }
 
     nil_timeout_plan =
       Plan.new(timeout: nil)
       |> Plan.add_legal_dialect("builtin")
-      |> Plan.add_conversion_pattern(
-        "plan.never",
-        fn _operation, _operands, _rewriter -> :no_match end,
-        timeout: nil,
-        version: "1.0"
-      )
+      |> add_lifetime_probe(timeout: nil, version: "1.0")
 
     empty_module = MLIR.Module.create!("module {}", ctx: ctx)
     assert {:ok, ^empty_module, []} = Plan.run(nil_timeout_plan, empty_module)
     MLIR.Module.destroy(empty_module)
   end
 
-  defp build_unrealized_cast(ctx, rewriter, output_types, inputs, loc) do
-    changeset =
-      %Beaver.Changeset{
-        name: "builtin.unrealized_conversion_cast",
-        context: ctx,
-        location: loc
-      }
-      |> Beaver.Changeset.add_argument(inputs)
-
-    operation =
-      Enum.reduce(output_types, changeset, &Beaver.Changeset.add_result(&2, &1))
-      |> MLIR.Operation.create()
-
-    MLIR.RewriterBase.insert(rewriter, operation)
-    operation |> MLIR.Operation.results() |> Enum.to_list()
-  end
-
-  defp add_lifetime_probe(plan) do
+  defp add_lifetime_probe(plan, opts \\ []) do
     Plan.add_conversion_pattern(
       plan,
       "plan.never",
       fn _operation, _operands, _rewriter -> :no_match end,
-      version: "lifetime-probe"
+      Keyword.put_new(opts, :version, "lifetime-probe")
     )
   end
 end

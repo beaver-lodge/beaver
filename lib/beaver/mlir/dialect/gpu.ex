@@ -105,9 +105,6 @@ defmodule Beaver.MLIR.Dialect.GPU do
     end
   end
 
-  @doc "Whether the linked LLVM supports TargetInfo-based ROCDL lowering with arch and wavesize options."
-  def rocdl_target_info_supported?, do: true
-
   defp configure_rocdl_target(target, arch, wavesize) do
     configured = CAPI.beaverROCDLTargetAttrConfigure(target, StringRef.create(arch), wavesize)
     if MLIR.null?(configured), do: raise(ArgumentError, "invalid or conflicting ROCDL arch, wavesize or features")

@@ -58,13 +58,6 @@ defmodule Beaver.Native do
           UndefinedFunctionError -> ref
         end
 
-      {{:kind, mod, ref}, diagnostics} ->
-        {try do
-           struct!(mod, %{ref: ref})
-         rescue
-           UndefinedFunctionError -> ref
-         end, Enum.map(diagnostics, &postprocess_diagnostics/1)}
-
       {value, diagnostics} when is_list(diagnostics) ->
         {normalize(value), Enum.map(diagnostics, &postprocess_diagnostics/1)}
 

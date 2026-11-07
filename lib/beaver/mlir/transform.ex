@@ -84,11 +84,6 @@ defmodule Beaver.MLIR.Transform do
     raise ArgumentError, "#{inspect(key)} must be #{Map.fetch!(expected, key)}"
   end
 
-  @doc "Returns whether the linked LLVM can configure convergence failure behavior."
-  @spec composite_fixed_point_failure_action_supported?() :: boolean()
-  def composite_fixed_point_failure_action_supported?,
-    do: true
-
   defmodule Result do
     @moduledoc "The result of successfully applying a named transform sequence."
 
@@ -137,11 +132,6 @@ defmodule Beaver.MLIR.Transform do
           | {:expensive_checks, boolean()}
           | {:enforce_single_top_level_transform_op, boolean()}
           | {:analysis_session, MLIR.AnalysisSession.t()}
-
-  @doc "Whether the linked LLVM supports packed tile-size and interchange parameters."
-  @spec packed_params_supported?() :: boolean()
-  def packed_params_supported?,
-    do: true
 
   @doc """
   Applies a named sequence (default `__transform_main`) to an operation or module.

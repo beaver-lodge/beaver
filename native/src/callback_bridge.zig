@@ -253,62 +253,42 @@ const EffectsCollector = struct {
     terms: std.array_list.Managed(beam.term),
     failed: bool = false,
 
-    fn handle(self: *@This(), comptime Kind: type, value: Kind.T) ?beam.term {
-        return kinda.callback_adapter.handle(Kind, self.environment, value) catch {
-            self.failed = true;
-            return null;
-        };
-    }
-
     fn append(count: isize, instances: [*c]c.MlirMemoryEffectInstance, user_data: ?*anyopaque) callconv(.c) void {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
         if (count < 0) {
             self.failed = true;
             return;
         }
+        for (0..@intCast(count)) |index| self.instance(instances[index]) catch {
+            self.failed = true;
+            return;
+        };
+    }
 
-        for (0..@intCast(count)) |index| {
-            const instance = instances[index];
-            const parameters = self.handle(
-                mlir_capi.Attribute,
-                c.mlirMemoryEffectInstanceGetParameters(instance),
-            ) orelse return;
-            const resource = self.handle(
-                mlir_capi.SideEffectResource,
-                c.mlirMemoryEffectInstanceGetResource(instance),
-            ) orelse return;
-
-            const operand = c.beaverMemoryEffectInstanceGetOpOperand(instance);
-            const value = c.mlirMemoryEffectInstanceGetValue(instance);
-            const symbol = c.mlirMemoryEffectInstanceGetSymbolRef(instance);
-            var target_kind = beam.make_atom(self.environment, "none");
-            var target = beam.make_nil(self.environment);
-
-            if (operand.ptr != null) {
-                target_kind = beam.make_atom(self.environment, "operand");
-                target = self.handle(mlir_capi.OpOperand, operand) orelse return;
-            } else if (value.ptr != null) {
-                target_kind = beam.make_atom(self.environment, "value");
-                target = self.handle(mlir_capi.Value, value) orelse return;
-            } else if (symbol.ptr != null) {
-                target_kind = beam.make_atom(self.environment, "symbol");
-                target = self.handle(mlir_capi.Attribute, symbol) orelse return;
+    fn instance(self: *@This(), effect: c.MlirMemoryEffectInstance) !void {
+        var target_kind = beam.make_atom(self.environment, "none");
+        var target = beam.make_nil(self.environment);
+        inline for (.{
+            .{ "operand", mlir_capi.OpOperand, c.beaverMemoryEffectInstanceGetOpOperand(effect) },
+            .{ "value", mlir_capi.Value, c.mlirMemoryEffectInstanceGetValue(effect) },
+            .{ "symbol", mlir_capi.Attribute, c.mlirMemoryEffectInstanceGetSymbolRef(effect) },
+        }) |entry| {
+            if (entry[2].ptr != null) {
+                target_kind = beam.make_atom(self.environment, entry[0]);
+                target = try kinda.callback_adapter.handle(entry[1], self.environment, entry[2]);
+                break;
             }
-
-            var fields = [_]beam.term{
-                beam.make_c_int(self.environment, @intCast(c.beaverMemoryEffectInstanceGetKind(instance))),
-                target_kind,
-                target,
-                parameters,
-                beam.make_c_int(self.environment, c.mlirMemoryEffectInstanceGetStage(instance)),
-                beam.make_bool(self.environment, c.mlirMemoryEffectInstanceGetEffectOnFullRegion(instance)),
-                resource,
-            };
-            self.terms.append(beam.make_tuple(self.environment, &fields)) catch {
-                self.failed = true;
-                return;
-            };
         }
+        var fields = [_]beam.term{
+            beam.make_c_int(self.environment, @intCast(c.beaverMemoryEffectInstanceGetKind(effect))),
+            target_kind,
+            target,
+            try kinda.callback_adapter.handle(mlir_capi.Attribute, self.environment, c.mlirMemoryEffectInstanceGetParameters(effect)),
+            beam.make_c_int(self.environment, c.mlirMemoryEffectInstanceGetStage(effect)),
+            beam.make_bool(self.environment, c.mlirMemoryEffectInstanceGetEffectOnFullRegion(effect)),
+            try kinda.callback_adapter.handle(mlir_capi.SideEffectResource, self.environment, c.mlirMemoryEffectInstanceGetResource(effect)),
+        };
+        try self.terms.append(beam.make_tuple(self.environment, &fields));
     }
 };
 

@@ -5,7 +5,6 @@
 #include "mlir-c/BuiltinAttributes.h"
 #include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Registration.h"
-#include "mlir/CAPI/Rewrite.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/Builders.h"
@@ -19,11 +18,8 @@
 #include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/VCSRevision.h"
 #include <algorithm>
-#include <atomic>
-#include <chrono>
 #include <condition_variable>
 #include <deque>
-#include <functional>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -218,16 +214,12 @@ MLIR_CAPI_EXPORTED MlirStringRef beaverSymbolTableGetDefaultVisibilityAttributeN
   return wrap(SymbolOpInterface::getDefaultVisibilityAttrName());
 }
 
+static_assert(int(SymbolTable::Visibility::Public) == MlirBeaverSymbolVisibilityPublic);
+static_assert(int(SymbolTable::Visibility::Private) == MlirBeaverSymbolVisibilityPrivate);
+static_assert(int(SymbolTable::Visibility::Nested) == MlirBeaverSymbolVisibilityNested);
+
 MLIR_CAPI_EXPORTED MlirBeaverSymbolVisibility beaverSymbolTableGetSymbolVisibility(MlirOperation symbol) {
-  switch (SymbolTable::getSymbolVisibility(unwrap(symbol))) {
-  case SymbolTable::Visibility::Public:
-    return MlirBeaverSymbolVisibilityPublic;
-  case SymbolTable::Visibility::Private:
-    return MlirBeaverSymbolVisibilityPrivate;
-  case SymbolTable::Visibility::Nested:
-    return MlirBeaverSymbolVisibilityNested;
-  }
-  llvm_unreachable("unknown symbol visibility");
+  return static_cast<MlirBeaverSymbolVisibility>(SymbolTable::getSymbolVisibility(unwrap(symbol)));
 }
 
 MLIR_CAPI_EXPORTED void beaverSymbolTableSetSymbolVisibility(MlirOperation symbol,
@@ -235,19 +227,7 @@ MLIR_CAPI_EXPORTED void beaverSymbolTableSetSymbolVisibility(MlirOperation symbo
   if (visibility < MlirBeaverSymbolVisibilityPublic || visibility > MlirBeaverSymbolVisibilityNested)
     llvm_unreachable("unknown Beaver symbol visibility");
 
-  SymbolTable::Visibility nativeVisibility = SymbolTable::Visibility::Public;
-  switch (visibility) {
-  case MlirBeaverSymbolVisibilityPublic:
-    nativeVisibility = SymbolTable::Visibility::Public;
-    break;
-  case MlirBeaverSymbolVisibilityPrivate:
-    nativeVisibility = SymbolTable::Visibility::Private;
-    break;
-  case MlirBeaverSymbolVisibilityNested:
-    nativeVisibility = SymbolTable::Visibility::Nested;
-    break;
-  }
-  SymbolTable::setSymbolVisibility(unwrap(symbol), nativeVisibility);
+  SymbolTable::setSymbolVisibility(unwrap(symbol), static_cast<SymbolTable::Visibility>(visibility));
 }
 
 MLIR_CAPI_EXPORTED bool beaverOperationHasInherentAttributeByName(MlirOperation operation, MlirStringRef name) {
@@ -349,19 +329,13 @@ MLIR_CAPI_EXPORTED MlirPass beaverCreateCompositeFixedPointPass(MlirStringRef na
   OpPassManager *source = unwrap(innerPipeline);
   auto populate = [source](OpPassManager &target) { target = std::move(*source); };
 
-  ConvergenceFailureAction nativeAction;
-  switch (action) {
-  case MlirBeaverConvergenceFailureWarn:
-    nativeAction = ConvergenceFailureAction::Warn;
-    break;
-  case MlirBeaverConvergenceFailureError:
-    nativeAction = ConvergenceFailureAction::Error;
-    break;
-  case MlirBeaverConvergenceFailureSilent:
-    nativeAction = ConvergenceFailureAction::Silent;
-    break;
-  }
-  return wrap(createCompositeFixedPointPass(unwrap(name).str(), populate, maxIterations, nativeAction).release());
+  static_assert(int(ConvergenceFailureAction::Warn) == MlirBeaverConvergenceFailureWarn);
+  static_assert(int(ConvergenceFailureAction::Error) == MlirBeaverConvergenceFailureError);
+  static_assert(int(ConvergenceFailureAction::Silent) == MlirBeaverConvergenceFailureSilent);
+  if (action < MlirBeaverConvergenceFailureWarn || action > MlirBeaverConvergenceFailureSilent)
+    llvm_unreachable("unknown convergence failure action");
+  return wrap(createCompositeFixedPointPass(unwrap(name).str(), populate, maxIterations,
+                                           static_cast<ConvergenceFailureAction>(action)).release());
 }
 
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetName(MlirPass pass) {
@@ -375,10 +349,6 @@ MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetDescription(MlirPass pass) {
 
 MLIR_CAPI_EXPORTED MlirContext beaverPassManagerGetContext(MlirPassManager passManager) {
   return wrap(unwrap(passManager)->getContext());
-}
-
-MLIR_CAPI_EXPORTED void beaverPassManagerEnableTiming(MlirPassManager passManager) {
-  unwrap(passManager)->enableTiming();
 }
 
 MLIR_CAPI_EXPORTED void beaverContextGetOps(MlirContext context, MlirStringCallback insert, void *container) {
@@ -402,16 +372,8 @@ MLIR_CAPI_EXPORTED uint64_t beaverOperationStructuralHashValue(MlirOperation op,
 }
 
 MLIR_CAPI_EXPORTED void beaverIRMappingClear(MlirIRMapping mapping) {
-  IRMapping *cppMapping = unwrap(mapping);
-  SmallVector<Block *> blocks;
-  SmallVector<Operation *> operations;
-
-  for (auto [from, _] : cppMapping->getBlockMap()) blocks.push_back(from);
-  for (auto [from, _] : cppMapping->getOperationMap()) operations.push_back(from);
-
-  cppMapping->clear();
-  for (Block *block : blocks) cppMapping->erase(block);
-  for (Operation *operation : operations) cppMapping->erase(operation);
+  // Upstream clear() resets only values; replace the whole map to clear all kinds.
+  *unwrap(mapping) = IRMapping{};
 }
 
 MLIR_CAPI_EXPORTED bool beaverIsNullContext(MlirContext w) { return !w.ptr; }

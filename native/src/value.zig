@@ -3,7 +3,6 @@ const callback_args = @import("callback_args.zig");
 const prelude = @import("prelude.zig");
 const c = prelude.c;
 const kinda = @import("kinda");
-const e = kinda.erl_nif;
 const beam = kinda.beam;
 
 const callback_names = .{"filter"};
@@ -19,16 +18,7 @@ const ConditionalUseReplacer = struct {
         const self: *Self = @ptrCast(@alignCast(user_data orelse return false));
         if (self.callback_error != null) return false;
 
-        const message_env = e.enif_alloc_env() orelse {
-            self.callback_error = error.FailedToAllocateEnvironment;
-            return false;
-        };
-        const operand = mlir_capi.OpOperand.resource.make_kind(message_env, op_operand) catch |err| {
-            e.enif_free_env(message_env);
-            self.callback_error = err;
-            return false;
-        };
-        const response = callback_args.invokeTerms(self.dispatcher, "filter", message_env, .{operand}) catch |err| {
+        const response = callback_args.invoke(self.dispatcher, "filter", .{mlir_capi.OpOperand}, .{op_operand}) catch |err| {
             self.callback_error = err;
             return false;
         };
