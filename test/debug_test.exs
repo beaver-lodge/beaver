@@ -70,20 +70,19 @@ defmodule DebugTest do
   end
 
   test "attach_llvm_scopes! is idempotent", %{ctx: ctx} do
-    module = ctx |> add_module() |> to_llvm()
+    module = ctx |> add_module() |> to_llvm() |> Beaver.MLIR.Debug.attach_llvm_scopes!()
+    operation = MLIR.Operation.from_module(module)
+    once = MLIR.Operation.clone(operation)
 
-    once =
-      module
-      |> Beaver.MLIR.Debug.attach_llvm_scopes!()
-      |> MLIR.to_string(debug_info: true)
-
-    twice =
-      module
-      |> Beaver.MLIR.Debug.attach_llvm_scopes!()
-      |> Beaver.MLIR.Debug.attach_llvm_scopes!()
-      |> MLIR.to_string(debug_info: true)
-
-    assert once == twice
+    try do
+      for _ <- 1..2 do
+        Beaver.MLIR.Debug.attach_llvm_scopes!(module)
+        assert MLIR.Operation.equivalent?(once, operation, ignore_commutativity: true)
+      end
+    after
+      MLIR.Operation.destroy(once)
+      MLIR.Module.destroy(module)
+    end
   end
 
   test "LLVM IR translation emits DILocation metadata for Elixir lines", %{ctx: ctx} do
