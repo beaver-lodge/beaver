@@ -10,7 +10,7 @@ defmodule Beaver.MLIR.OptimizationRemarks do
   alias Beaver.Native
   @kinds %{passed: 1, missed: 2, failure: 3, analysis: 4}
 
-  def supported?, do: CAPI.beaverOptimizationRemarksSupported() |> Native.to_term()
+  def supported?, do: true
   def enabled?(%Context{} = ctx), do: CAPI.beaverContextHasOptimizationRemarks(ctx) |> Native.to_term()
 
   @doc "Enables remarks; filters use LLVM regular expressions on category names."

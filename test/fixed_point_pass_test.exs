@@ -78,18 +78,12 @@ defmodule FixedPointPassTest do
       |> Beaver.Composer.append(fixed_point)
       |> Beaver.Composer.append({"test-after-fixed-point", "builtin.module", unreachable})
 
-    if MLIR.Transform.composite_fixed_point_failure_action_supported?() do
-      assert {:error, diagnostics} = Beaver.Composer.run(composer)
-      assert MLIR.Diagnostic.format(diagnostics) =~ ~r/Toggle.*didn't converge.*2 iterations/s
+    assert {:error, diagnostics} = Beaver.Composer.run(composer)
+    assert MLIR.Diagnostic.format(diagnostics) =~ ~r/Toggle.*didn't converge.*2 iterations/s
 
-      assert MLIR.Operation.discardable_attribute(
-               MLIR.Operation.from_module(module),
-               "test.after_fixed_point"
-             ) == nil
-    else
-      assert_raise ArgumentError, ~r/update the LLVM pin/, fn ->
-        Beaver.Composer.init(composer)
-      end
-    end
+    assert MLIR.Operation.discardable_attribute(
+             MLIR.Operation.from_module(module),
+             "test.after_fixed_point"
+           ) == nil
   end
 end

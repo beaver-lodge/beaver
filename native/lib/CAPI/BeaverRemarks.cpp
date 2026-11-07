@@ -7,10 +7,6 @@
 
 using namespace mlir;
 
-MLIR_CAPI_EXPORTED bool beaverOptimizationRemarksSupported() {
-  return true;
-}
-
 namespace {
 struct Receiver {
   MlirStringCallback callback;

@@ -65,7 +65,9 @@ const MemoryEffectsState = struct {
         c.beaverMemoryEffectInstancesListAppend(effects, instance);
     }
 
-    fn getEffects(operation: mlir_capi.Operation.T, effects: mlir_capi.MemoryEffectInstancesList.T, user_data: ?*anyopaque) callconv(.c) void {
+    fn getEffects(operation: mlir_capi.Operation.T, callback: c.MlirMemoryEffectInstancesCallback, callback_data: ?*anyopaque, user_data: ?*anyopaque) callconv(.c) void {
+        var sink = c.MlirBeaverMemoryEffectSink{ .callback = callback, .userData = callback_data };
+        const effects = mlir_capi.MemoryEffectInstancesList.T{ .ptr = &sink };
         const self: *@This() = @ptrCast(@alignCast(user_data orelse {
             appendConservativeEffect(effects);
             return;
@@ -269,16 +271,16 @@ const EffectsCollector = struct {
             const instance = instances[index];
             const parameters = self.handle(
                 mlir_capi.Attribute,
-                c.beaverMemoryEffectInstanceGetParameters(instance),
+                c.mlirMemoryEffectInstanceGetParameters(instance),
             ) orelse return;
             const resource = self.handle(
                 mlir_capi.SideEffectResource,
-                c.beaverMemoryEffectInstanceGetResource(instance),
+                c.mlirMemoryEffectInstanceGetResource(instance),
             ) orelse return;
 
             const operand = c.beaverMemoryEffectInstanceGetOpOperand(instance);
-            const value = c.beaverMemoryEffectInstanceGetValue(instance);
-            const symbol = c.beaverMemoryEffectInstanceGetSymbolRef(instance);
+            const value = c.mlirMemoryEffectInstanceGetValue(instance);
+            const symbol = c.mlirMemoryEffectInstanceGetSymbolRef(instance);
             var target_kind = beam.make_atom(self.environment, "none");
             var target = beam.make_nil(self.environment);
 
@@ -298,8 +300,8 @@ const EffectsCollector = struct {
                 target_kind,
                 target,
                 parameters,
-                beam.make_c_int(self.environment, c.beaverMemoryEffectInstanceGetStage(instance)),
-                beam.make_bool(self.environment, c.beaverMemoryEffectInstanceGetEffectOnFullRegion(instance)),
+                beam.make_c_int(self.environment, c.mlirMemoryEffectInstanceGetStage(instance)),
+                beam.make_bool(self.environment, c.mlirMemoryEffectInstanceGetEffectOnFullRegion(instance)),
                 resource,
             };
             self.terms.append(beam.make_tuple(self.environment, &fields)) catch {
@@ -313,8 +315,9 @@ const EffectsCollector = struct {
 pub fn memoryEffects(environment: beam.env, operation: mlir_capi.Operation.T) !beam.term {
     var collector = EffectsCollector{ .environment = environment, .terms = .init(std.heap.smp_allocator) };
     defer collector.terms.deinit();
-    const implemented = c.beaverMemoryEffectsOpInterfaceGetEffects(operation, EffectsCollector.append, &collector);
-    return if (implemented and !collector.failed) beam.make_term_list(environment, collector.terms.items) else beam.make_atom(environment, "error");
+    if (!c.mlirOperationImplementsInterface(operation, c.mlirMemoryEffectsOpInterfaceTypeID())) return beam.make_atom(environment, "error");
+    c.mlirMemoryEffectsOpInterfaceGetEffects(operation, EffectsCollector.append, &collector);
+    return if (!collector.failed) beam.make_term_list(environment, collector.terms.items) else beam.make_atom(environment, "error");
 }
 
 fn collectTransformState(
@@ -377,7 +380,7 @@ pub const conditionally_speculatable_attach_fallback_model = Fallback(
 pub const memory_effects_attach_fallback_model = Fallback(
     MemoryEffectsState,
     .{"get_effects"},
-    c.beaverMemoryEffectsOpInterfaceAttachFallbackModel,
+    c.mlirMemoryEffectsOpInterfaceAttachFallbackModel,
     .{ .getEffects = MemoryEffectsState.getEffects },
 ).attach;
 pub const transform_op_interface_attach_fallback_model = Fallback(TransformState, .{ "apply", "allows_repeated_handle_operands" }, c.mlirTransformOpInterfaceAttachFallbackModel, .{

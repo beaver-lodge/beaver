@@ -37,13 +37,6 @@ defmodule Beaver.Composer do
   def create_pass(%MLIR.Pass{} = pass, _ctx), do: pass
 
   def create_pass(%MLIR.Transform.FixedPoint{} = fixed_point, ctx) do
-    if fixed_point.on_convergence_failure != :warn and
-         not MLIR.Transform.composite_fixed_point_failure_action_supported?() do
-      raise ArgumentError,
-            "linked LLVM cannot configure fixed-point convergence failure; " <>
-              "update the LLVM pin before using #{inspect(fixed_point.on_convergence_failure)}"
-    end
-
     inner_pipeline = mlir_op_pass_manager_create()
 
     try do

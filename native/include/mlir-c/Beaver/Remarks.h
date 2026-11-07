@@ -4,7 +4,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-MLIR_CAPI_EXPORTED bool beaverOptimizationRemarksSupported(void);
 // Copies each callback-scoped remark into JSON. Takes ownership of userData
 // even on failure; the engine releases it on finalization or context teardown.
 MLIR_CAPI_EXPORTED bool beaverContextEnableOptimizationRemarks(

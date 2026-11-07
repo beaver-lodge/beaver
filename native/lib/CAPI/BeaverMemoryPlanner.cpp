@@ -76,10 +76,6 @@ struct StaticMemoryPlan : PassWrapper<StaticMemoryPlan, OperationPass<func::Func
 };
 } // namespace
 
-MLIR_CAPI_EXPORTED bool beaverStaticMemoryPlannerSupported() {
-  return true;
-}
-
 MLIR_CAPI_EXPORTED MlirPass beaverCreateStaticMemoryPlannerPass(bool callerArena, bool bestFit) {
   return wrap(new StaticMemoryPlan(callerArena, bestFit));
 }

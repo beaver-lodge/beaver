@@ -33,10 +33,6 @@
 
 using namespace mlir;
 
-MLIR_CAPI_EXPORTED bool beaverContextIndependentLockingSupported() {
-  return true;
-}
-
 MLIR_CAPI_EXPORTED bool beaverContextIsMultithreadingEnabled(MlirContext context) {
   return unwrap(context)->isMultithreadingEnabled();
 }
@@ -107,11 +103,12 @@ MLIR_CAPI_EXPORTED void beaverOperationDestroyIterative(MlirOperation operation)
 namespace {
 using MemoryEffectList = llvm::SmallVectorImpl<MemoryEffects::EffectInstance>;
 
-static MemoryEffectList *unwrapEffectList(MlirBeaverMemoryEffectInstancesList effects) {
-  return static_cast<MemoryEffectList *>(effects.ptr);
+template <typename Fill>
+void emitEffects(MlirBeaverMemoryEffectInstancesList sink, Fill fill) {
+  llvm::SmallVector<MemoryEffects::EffectInstance> effects;
+  fill(effects);
+  for (auto &effect : effects) beaverMemoryEffectInstancesListAppend(sink, wrap(&effect));
 }
-
-static MlirBeaverMemoryEffectInstancesList wrapEffectList(MemoryEffectList *effects) { return {effects}; }
 
 static llvm::SmallVector<NamedAttribute> collectInherentAttributes(Operation *operation) {
   llvm::SmallVector<NamedAttribute> attributes;
@@ -123,28 +120,6 @@ static llvm::SmallVector<NamedAttribute> collectInherentAttributes(Operation *op
 
 static std::mutex transientScopeMutex;
 static std::unordered_set<MLIRContext *> transientScopeContexts;
-
-class BeaverMemoryEffectsOpInterfaceFallbackModel
-    : public MemoryEffectOpInterface::FallbackModel<BeaverMemoryEffectsOpInterfaceFallbackModel> {
-public:
-  void setCallbacks(MlirBeaverMemoryEffectsOpInterfaceCallbacks value) { callbacks = value; }
-
-  ~BeaverMemoryEffectsOpInterfaceFallbackModel() {
-    if (callbacks.destruct) callbacks.destruct(callbacks.userData);
-  }
-
-  static TypeID getInterfaceID() { return MemoryEffectOpInterface::getInterfaceID(); }
-
-  static bool classof(const MemoryEffectOpInterface::Concept *) { return true; }
-
-  void getEffects(Operation *operation, MemoryEffectList &effects) const {
-    assert(callbacks.getEffects && "getEffects callback not set");
-    callbacks.getEffects(wrap(operation), wrapEffectList(&effects), callbacks.userData);
-  }
-
-private:
-  MlirBeaverMemoryEffectsOpInterfaceCallbacks callbacks{};
-};
 
 /// A reusable pool with a nominal MLIR parallelism limit and elastic workers.
 /// MLIR uses `getMaxConcurrency()` to bound ordinary parallel algorithms. The
@@ -301,38 +276,10 @@ MLIR_CAPI_EXPORTED MlirNamedAttribute beaverOperationGetInherentAttribute(MlirOp
   return MlirNamedAttribute{wrap(attribute.getName()), wrap(attribute.getValue())};
 }
 
-MLIR_CAPI_EXPORTED void
-beaverMemoryEffectsOpInterfaceAttachFallbackModel(MlirContext context, MlirStringRef operationName,
-                                                  MlirBeaverMemoryEffectsOpInterfaceCallbacks callbacks) {
-  std::optional<RegisteredOperationName> operation =
-      RegisteredOperationName::lookup(unwrap(operationName), unwrap(context));
-  assert(operation.has_value() && "operation not found in context");
-
-  operation->attachInterface<BeaverMemoryEffectsOpInterfaceFallbackModel>();
-  auto *model = cast<BeaverMemoryEffectsOpInterfaceFallbackModel>(
-      operation->getInterface<BeaverMemoryEffectsOpInterfaceFallbackModel>());
-  assert(model && "failed to get Beaver MemoryEffects fallback model");
-  model->setCallbacks(callbacks);
-}
-
 MLIR_CAPI_EXPORTED void beaverMemoryEffectInstancesListAppend(MlirBeaverMemoryEffectInstancesList effects,
                                                               MlirMemoryEffectInstance instance) {
-  unwrapEffectList(effects)->push_back(*unwrap(instance));
-}
-
-MLIR_CAPI_EXPORTED bool beaverMemoryEffectsOpInterfaceGetEffects(MlirOperation operation,
-                                                                 MlirBeaverMemoryEffectInstancesCallback callback,
-                                                                 void *userData) {
-  auto interface = dyn_cast<MemoryEffectOpInterface>(unwrap(operation));
-  if (!interface) return false;
-
-  llvm::SmallVector<MemoryEffects::EffectInstance> effects;
-  interface.getEffects(effects);
-  llvm::SmallVector<MlirMemoryEffectInstance> wrappedEffects;
-  wrappedEffects.reserve(effects.size());
-  for (MemoryEffects::EffectInstance &effect : effects) wrappedEffects.push_back(wrap(&effect));
-  callback(wrappedEffects.size(), wrappedEffects.data(), userData);
-  return true;
+  auto *sink = static_cast<MlirBeaverMemoryEffectSink *>(effects.ptr);
+  sink->callback(1, &instance, sink->userData);
 }
 
 MLIR_CAPI_EXPORTED MlirBeaverMemoryEffectKind beaverMemoryEffectInstanceGetKind(MlirMemoryEffectInstance instance) {
@@ -344,66 +291,38 @@ MLIR_CAPI_EXPORTED MlirBeaverMemoryEffectKind beaverMemoryEffectInstanceGetKind(
   return MlirBeaverMemoryEffectUnknown;
 }
 
-MLIR_CAPI_EXPORTED MlirSideEffectResource beaverMemoryEffectInstanceGetResource(MlirMemoryEffectInstance instance) {
-  return wrap(unwrap(instance)->getResource());
-}
-
-MLIR_CAPI_EXPORTED int beaverMemoryEffectInstanceGetStage(MlirMemoryEffectInstance instance) {
-  return unwrap(instance)->getStage();
-}
-
-MLIR_CAPI_EXPORTED bool beaverMemoryEffectInstanceGetEffectOnFullRegion(MlirMemoryEffectInstance instance) {
-  return unwrap(instance)->getEffectOnFullRegion();
-}
-
-MLIR_CAPI_EXPORTED MlirAttribute beaverMemoryEffectInstanceGetParameters(MlirMemoryEffectInstance instance) {
-  return wrap(unwrap(instance)->getParameters());
-}
-
 MLIR_CAPI_EXPORTED MlirOpOperand beaverMemoryEffectInstanceGetOpOperand(MlirMemoryEffectInstance instance) {
   return wrap(unwrap(instance)->getEffectValue<OpOperand *>());
-}
-
-MLIR_CAPI_EXPORTED MlirValue beaverMemoryEffectInstanceGetValue(MlirMemoryEffectInstance instance) {
-  return wrap(unwrap(instance)->getValue());
-}
-
-MLIR_CAPI_EXPORTED MlirAttribute beaverMemoryEffectInstanceGetSymbolRef(MlirMemoryEffectInstance instance) {
-  return wrap(unwrap(instance)->getSymbolRef());
 }
 
 MLIR_CAPI_EXPORTED void beaverTransformOnlyReadsHandle(MlirOpOperand *operands, intptr_t numOperands,
                                                        MlirBeaverMemoryEffectInstancesList effects) {
   MutableArrayRef<OpOperand> unwrapped;
   if (numOperands != 0) unwrapped = MutableArrayRef<OpOperand>(unwrap(*operands), numOperands);
-  transform::onlyReadsHandle(unwrapped, *unwrapEffectList(effects));
+  emitEffects(effects, [&](MemoryEffectList &out) { transform::onlyReadsHandle(unwrapped, out); });
 }
 
 MLIR_CAPI_EXPORTED void beaverTransformConsumesHandle(MlirOpOperand *operands, intptr_t numOperands,
                                                       MlirBeaverMemoryEffectInstancesList effects) {
   MutableArrayRef<OpOperand> unwrapped;
   if (numOperands != 0) unwrapped = MutableArrayRef<OpOperand>(unwrap(*operands), numOperands);
-  transform::consumesHandle(unwrapped, *unwrapEffectList(effects));
+  emitEffects(effects, [&](MemoryEffectList &out) { transform::consumesHandle(unwrapped, out); });
 }
 
 MLIR_CAPI_EXPORTED void beaverTransformProducesHandle(MlirValue *results, intptr_t numResults,
                                                       MlirBeaverMemoryEffectInstancesList effects) {
-  for (intptr_t index = 0; index < numResults; ++index) {
-    auto result = cast<OpResult>(unwrap(results[index]));
-    transform::producesHandle(ResultRange(result), *unwrapEffectList(effects));
-  }
+  emitEffects(effects, [&](MemoryEffectList &out) {
+    for (intptr_t index = 0; index < numResults; ++index)
+      transform::producesHandle(ResultRange(cast<OpResult>(unwrap(results[index]))), out);
+  });
 }
 
 MLIR_CAPI_EXPORTED void beaverTransformModifiesPayload(MlirBeaverMemoryEffectInstancesList effects) {
-  transform::modifiesPayload(*unwrapEffectList(effects));
+  emitEffects(effects, [&](MemoryEffectList &out) { transform::modifiesPayload(out); });
 }
 
 MLIR_CAPI_EXPORTED void beaverTransformOnlyReadsPayload(MlirBeaverMemoryEffectInstancesList effects) {
-  transform::onlyReadsPayload(*unwrapEffectList(effects));
-}
-
-MLIR_CAPI_EXPORTED bool beaverTransformPackedParamsSupported(void) {
-  return true;
+  emitEffects(effects, [&](MemoryEffectList &out) { transform::onlyReadsPayload(out); });
 }
 
 MLIR_CAPI_EXPORTED MlirLlvmThreadPool beaverLlvmThreadPoolCreateElastic(unsigned maxConcurrency) {
@@ -423,10 +342,6 @@ MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetArgument(MlirPass pass) {
 MLIR_CAPI_EXPORTED MlirOpPassManager beaverOpPassManagerCreate(void) { return wrap(new OpPassManager()); }
 
 MLIR_CAPI_EXPORTED void beaverOpPassManagerDestroy(MlirOpPassManager passManager) { delete unwrap(passManager); }
-
-MLIR_CAPI_EXPORTED bool beaverCompositeFixedPointFailureActionSupported(void) {
-  return true;
-}
 
 MLIR_CAPI_EXPORTED MlirPass beaverCreateCompositeFixedPointPass(MlirStringRef name, MlirOpPassManager innerPipeline,
                                                                 intptr_t maxIterations,
@@ -597,10 +512,6 @@ MLIR_CAPI_EXPORTED void beaverOperationDumpGeneric(MlirOperation op) {
 
 MLIR_CAPI_EXPORTED MlirGreedyRewriteDriverConfig beaverGreedyRewriteDriverConfigGet() {
   return mlirGreedyRewriteDriverConfigCreate();
-}
-
-MLIR_CAPI_EXPORTED bool beaverContextTransientScopeSupported(void) {
-  return true;
 }
 
 MLIR_CAPI_EXPORTED bool beaverContextBeginTransientScope(MlirContext context) {

@@ -109,7 +109,7 @@ defmodule Beaver.MLIR.Context do
   end
 
   @doc "Whether the linked LLVM supports context locking without internal parallelism."
-  def independent_locking_supported?, do: beaverContextIndependentLockingSupported() |> Native.to_term()
+  def independent_locking_supported?, do: true
 
   @doc "Whether context uniquing is protected by thread-safe locks."
   def thread_safe?(%__MODULE__{} = ctx), do: beaverContextIsThreadSafeLockingEnabled(ctx) |> Native.to_term()
@@ -142,7 +142,7 @@ defmodule Beaver.MLIR.Context do
   @doc "Returns whether the linked LLVM supports resettable transient context scopes."
   @spec transient_scope_supported?() :: boolean()
   def transient_scope_supported?,
-    do: beaverContextTransientScopeSupported() |> Native.to_term()
+    do: true
 
   @doc """
   Runs `fun` inside a resettable transient allocation scope.
@@ -157,9 +157,6 @@ defmodule Beaver.MLIR.Context do
   """
   @spec with_transient_scope(t(), (t() -> result)) :: result when result: term()
   def with_transient_scope(%__MODULE__{} = ctx, fun) when is_function(fun, 1) do
-    unless transient_scope_supported?(),
-      do: raise(ArgumentError, "linked LLVM does not support transient context scopes")
-
     unless beaverContextBeginTransientScope(ctx) |> Native.to_term(),
       do: raise(ArgumentError, "context already has an active transient scope")
 
@@ -222,9 +219,6 @@ defmodule Beaver.MLIR.Context do
 
     if threading and not thread_safe,
       do: raise(ArgumentError, "threading: true requires thread_safe: true")
-
-    if thread_safe and not threading and not independent_locking_supported?(),
-      do: raise(ArgumentError, "linked LLVM does not support independent context locking")
 
     {threading, thread_safe}
   end

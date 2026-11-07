@@ -18,6 +18,7 @@ defmodule Beaver.MLIR.AnalysisSessionTest do
         ctx: ctx
       )
 
+    on_exit(fn -> MLIR.Module.destroy(module) end)
     func = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.at(0)
     block = func |> Beaver.Walker.regions() |> Enum.at(0) |> Beaver.Walker.blocks() |> Enum.at(0)
     [add, mul, ret] = Enum.to_list(Beaver.Walker.operations(block))
@@ -50,8 +51,6 @@ defmodule Beaver.MLIR.AnalysisSessionTest do
       assert %{generation: 2, cached: []} = AnalysisSession.stats(session)
       assert AnalysisSession.dead_after?(session, value, add)
     end)
-
-    MLIR.Module.destroy(module)
   end
 
   test "preservation is explicit and a failed mutation still clears cached results", %{
@@ -87,8 +86,6 @@ defmodule Beaver.MLIR.AnalysisSessionTest do
 
       assert %{generation: 5, cached: []} = AnalysisSession.stats(session)
     end)
-
-    MLIR.Module.destroy(module)
   end
 
   test "greedy rewriting invalidates analyses for mutable and frozen pattern sets", %{
@@ -121,8 +118,6 @@ defmodule Beaver.MLIR.AnalysisSessionTest do
         end
       end
     end)
-
-    MLIR.Module.destroy(module)
   end
 
   test "checks ownership, query scope and closed sessions", %{module: module, add: add, ctx: ctx} do
@@ -149,15 +144,9 @@ defmodule Beaver.MLIR.AnalysisSessionTest do
     end
 
     MLIR.Module.destroy(other)
-    MLIR.Module.destroy(module)
   end
 
-  test "DataLayout caches scoped index widths and retains scalable sizes", %{
-    ctx: ctx,
-    module: unused
-  } do
-    MLIR.Module.destroy(unused)
-
+  test "DataLayout caches scoped index widths and retains scalable sizes", %{ctx: ctx} do
     module =
       MLIR.Module.create!(
         """

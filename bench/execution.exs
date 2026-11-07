@@ -1,7 +1,7 @@
 # MIX_ENV=prod mix run bench/execution.exs [operations=1000] [samples=100] [hit_rate=100]
 defmodule ExecutionBench do
   alias Beaver.{Composer, MLIR, Native, Walker}
-  alias Beaver.MLIR.{CAPI, Context, IRBatch, Operation, Rewrite}
+  alias Beaver.MLIR.{AnalysisSession, CAPI, Context, IRBatch, Operation, Rewrite, Transform}
   alias Beaver.Pattern.Native.Program
 
   def run(count, samples, hit_rate) do
@@ -99,10 +99,51 @@ defmodule ExecutionBench do
             rewrites: rewrites,
             profile: profile,
             rewrite_profile: rewrite_profile,
+            analyses: analyses(ctx, source, samples),
             mixed: mixed
           })
         )
       )
+    end)
+  end
+
+  defp analyses(ctx, source, samples) do
+    with_ir(ctx, source, fn ir ->
+      ops = operations(ir)
+      first = hd(ops)
+      last = List.last(ops)
+      value = Operation.result(first, 0)
+      queries = List.duplicate({:dominates, first, last}, 100)
+
+      schedule = """
+      module attributes {transform.with_named_sequence} {
+        transform.named_sequence @__transform_main(%root: !transform.any_op) { transform.yield }
+      }
+      """
+
+      {:ok, prepared} = Transform.prepare(schedule, ctx)
+
+      Native.with_resource(prepared, &Transform.close/1, fn prepared ->
+        AnalysisSession.with(ir, fn session ->
+          %{
+            scalar_100: fn ->
+              for _ <- 1..100, do: AnalysisSession.dominates?(session, first, last)
+            end,
+            batch_100: fn ->
+              %{results: results} = AnalysisSession.query(session, queries)
+              true = Enum.all?(results)
+            end,
+            liveness_cold: fn ->
+              AnalysisSession.with(ir, &AnalysisSession.dead_after?(&1, value, last))
+            end,
+            liveness_warm: fn -> AnalysisSession.dead_after?(session, value, last) end,
+            transform_cold: fn -> {:ok, _} = Transform.execute(ir, schedule) end,
+            transform_prepared: fn -> {:ok, _} = Transform.execute(ir, prepared) end
+          }
+          |> Map.new(fn {key, fun} -> {key, fn -> timed(fun) end} end)
+          |> sample(samples)
+        end)
+      end)
     end)
   end
 

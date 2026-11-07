@@ -11,13 +11,8 @@ defmodule Beaver.Execution do
   end
 
   def run(ctx, command, arguments, opts \\ []) do
-    if command in [:pass, :rewrite, :update] and opts[:analysis_session] do
-      MLIR.AnalysisSession.mutate(opts[:analysis_session], fn ->
-        run(ctx, command, arguments, Keyword.delete(opts, :analysis_session))
-      end)
-    else
-      execute(ctx, command, arguments, opts)
-    end
+    session = if command in [:pass, :rewrite, :update, :transform], do: opts[:analysis_session]
+    MLIR.AnalysisSession.track(session, fn -> execute(ctx, command, arguments, opts) end)
   end
 
   defp execute(ctx, command, arguments, opts) do

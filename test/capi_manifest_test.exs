@@ -222,7 +222,7 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
                "mlirTypeConverterAddSourceMaterialization",
                "mlirTypeConverterAddTargetMaterialization",
                "mlirConditionallySpeculatableOpInterfaceAttachFallbackModel",
-               "beaverMemoryEffectsOpInterfaceAttachFallbackModel",
+               "mlirMemoryEffectsOpInterfaceAttachFallbackModel",
                "mlirPatternDescriptorOpInterfaceAttachFallbackModel",
                "mlirTransformOpInterfaceAttachFallbackModel",
                "mlirDynamicOpTraitCreate"
@@ -262,7 +262,7 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
     {memory_effect_entries, transform_collector_entries} =
       Enum.split_with(
         transform_collector_entries,
-        &(get_in(&1, ["function", "name"]) == "beaverMemoryEffectsOpInterfaceGetEffects")
+        &(get_in(&1, ["function", "name"]) == "mlirMemoryEffectsOpInterfaceGetEffects")
       )
 
     assert [memory_effect_entry] = memory_effect_entries

@@ -6,32 +6,27 @@ defmodule Beaver.MLIR.Transform.Schedule do
   alias Beaver.MLIR.Transform
 
   @doc false
-  def load(input, %Context{} = ctx) do
-    with {:ok, bytes} <- source_bytes(input), {:ok, module} <- parse_module(bytes, ctx), do: verify_loaded(module)
-  rescue
-    exception in [ArgumentError] -> {:error, invalid_error(Exception.message(exception))}
-  end
-
-  defp verify_loaded(module) do
-    result =
+  def load(input, %Context{} = ctx, prepare \\ &{:ok, &1}) do
+    with {:ok, bytes} <- source_bytes(input), {:ok, module} <- parse_module(bytes, ctx) do
       try do
-        MLIR.verify(module)
+        result =
+          case MLIR.verify(module) do
+            {:ok, _} -> prepare.(module)
+            {:error, diagnostics} -> {:error, invalid_error(:verification_failed, diagnostics)}
+            :null -> {:error, invalid_error(:verification_failed)}
+          end
+
+        # Ownership transfers only on success, including native preparation.
+        unless match?({:ok, _}, result), do: MLIR.Module.destroy(module)
+        result
       rescue
         exception ->
           MLIR.Module.destroy(module)
           reraise exception, __STACKTRACE__
       end
-
-    case result do
-      {:ok, _} -> {:ok, module}
-      {:error, diagnostics} -> invalid_module(module, diagnostics)
-      :null -> invalid_module(module, [])
     end
-  end
-
-  defp invalid_module(module, diagnostics) do
-    MLIR.Module.destroy(module)
-    {:error, invalid_error(:verification_failed, diagnostics)}
+  rescue
+    exception in [ArgumentError] -> {:error, invalid_error(Exception.message(exception))}
   end
 
   @doc false
@@ -75,14 +70,11 @@ defmodule Beaver.MLIR.Transform.Schedule do
     end
   end
 
-  defp enclosing_module(op),
-    do: if(Operation.name(op) == "builtin.module", do: op, else: enclosing_module_parent(Operation.parent(op)))
-
-  defp enclosing_module_parent(op) do
+  defp enclosing_module(op) do
     cond do
       MLIR.null?(op) -> nil
       Operation.name(op) == "builtin.module" -> op
-      true -> enclosing_module_parent(Operation.parent(op))
+      true -> enclosing_module(Operation.parent(op))
     end
   end
 

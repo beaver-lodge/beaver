@@ -7,10 +7,6 @@
 
 using namespace mlir;
 
-MLIR_CAPI_EXPORTED bool beaverROCDLTargetInfoSupported() {
-  return true;
-}
-
 MLIR_CAPI_EXPORTED MlirStringRef beaverROCDLTargetAttrGetArch(MlirAttribute attribute) {
   auto target = cast<ROCDL::ROCDLTargetAttr>(unwrap(attribute));
   if (auto flags = target.getFlags())

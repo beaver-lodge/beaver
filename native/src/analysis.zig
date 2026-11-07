@@ -27,8 +27,11 @@ const Session = struct {
         self.close();
         self.mutex.destroy();
     }
-    fn checkOwner(self: *@This(), pid: beam.pid) !void {
-        if (e.enif_compare_pids(&self.owner, &pid) != 0) return error.AnalysisOwnerMismatch;
+    fn acquire(env: beam.env, ref: beam.term, caller: beam.pid) !*Session {
+        const session = try Resource.fetch(env, ref);
+        if (e.enif_compare_pids(&session.owner, &caller) != 0) return error.AnalysisOwnerMismatch;
+        session.mutex.lock();
+        return session;
     }
 };
 const Resource = kinda.RawResourceType(Session, "Beaver.MLIR.AnalysisSession", kinda.resourceDestructor(Session, Session.destroy));
@@ -44,18 +47,14 @@ pub fn analysis_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam
     return e.enif_make_resource(env, session);
 }
 pub fn analysis_close(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const session = try Resource.fetch(env, args[0]);
-    try session.checkOwner(try beam.self(env));
-    session.mutex.lock();
+    const session = try Session.acquire(env, args[0], try beam.self(env));
     defer session.mutex.unlock();
     if (session.mutation_depth != 0) return error.AnalysisMutationInProgress;
     session.releaseHandle();
     return beam.make_ok(env);
 }
 pub fn analysis_invalidate(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const session = try Resource.fetch(env, args[0]);
-    try session.checkOwner(try beam.self(env));
-    session.mutex.lock();
+    const session = try Session.acquire(env, args[0], try beam.self(env));
     defer session.mutex.unlock();
     const handle = session.handle orelse return error.ClosedAnalysisSession;
     c.beaverAnalysisInvalidate(handle, try beam.get(c_uint, env, args[1]));
@@ -63,10 +62,8 @@ pub fn analysis_invalidate(env: beam.env, _: c_int, args: [*c]const beam.term) !
 }
 
 pub fn analysis_mutation(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const session = try Resource.fetch(env, args[0]);
-    try session.checkOwner(try beam.self(env));
     const begin = try beam.get_bool(env, args[1]);
-    session.mutex.lock();
+    const session = try Session.acquire(env, args[0], try beam.self(env));
     defer session.mutex.unlock();
     const handle = session.handle orelse return error.ClosedAnalysisSession;
     if (begin) {
@@ -81,11 +78,9 @@ pub fn analysis_mutation(env: beam.env, _: c_int, args: [*c]const beam.term) !be
 
 pub fn query(env: beam.env, context: m.Context.T, args_term: beam.term, caller: beam.pid) !beam.term {
     const args = try tuple(env, args_term, 2);
-    const session = try Resource.fetch(env, args[0]);
-    try session.checkOwner(caller);
-    if (!c.mlirContextEqual(context, session.context)) return error.ContextMismatch;
-    session.mutex.lock();
+    const session = try Session.acquire(env, args[0], caller);
     defer session.mutex.unlock();
+    if (!c.mlirContextEqual(context, session.context)) return error.ContextMismatch;
     const handle = session.handle orelse return error.ClosedAnalysisSession;
     if (session.mutation_depth != 0) return error.AnalysisMutationInProgress;
     const count = try beam.get_list_length(env, args[1]);

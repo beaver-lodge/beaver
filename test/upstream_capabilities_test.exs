@@ -5,42 +5,37 @@ defmodule UpstreamCapabilitiesTest do
   alias Beaver.MLIR.Dialect.Bufferization
 
   test "the default LLVM pin enables every advertised upstream capability" do
-    if Beaver.MLIR.CompilationRuntime.llvm_revision() =~ "b5bbdc97c" do
-      assert Context.independent_locking_supported?()
-      assert Beaver.MLIR.OptimizationRemarks.supported?()
-      assert Beaver.MLIR.Dialect.GPU.rocdl_target_info_supported?()
-      assert Bufferization.static_memory_planner_supported?()
-    end
+    assert Context.independent_locking_supported?()
+    assert Beaver.MLIR.OptimizationRemarks.supported?()
+    assert Beaver.MLIR.Dialect.GPU.rocdl_target_info_supported?()
+    assert Bufferization.static_memory_planner_supported?()
+    assert Context.transient_scope_supported?()
+    assert Beaver.MLIR.Transform.packed_params_supported?()
+    assert Beaver.MLIR.Transform.composite_fixed_point_failure_action_supported?()
   end
 
   test "independent context locks allow external workers without a pool" do
-    if Context.independent_locking_supported?() do
-      ctx = Context.create(threading: false, thread_safe: true)
+    ctx = Context.create(threading: false, thread_safe: true)
 
-      try do
-        assert Context.thread_safe?(ctx)
-        refute CAPI.beaverContextIsMultithreadingEnabled(ctx) |> Native.to_term()
-        assert ctx.thread_pool_owner == nil
-        expected = Type.i64(ctx: ctx)
+    try do
+      assert Context.thread_safe?(ctx)
+      refute CAPI.beaverContextIsMultithreadingEnabled(ctx) |> Native.to_term()
+      assert ctx.thread_pool_owner == nil
+      expected = Type.i64(ctx: ctx)
 
-        1..16
-        |> Task.async_stream(
-          fn _ ->
-            for n <- 1..100 do
-              assert MLIR.equal?(expected, Type.i64(ctx: ctx))
-              assert Attribute.integer(expected, n) |> MLIR.to_string() == "#{n} : i64"
-            end
-          end,
-          max_concurrency: 16
-        )
-        |> Enum.each(fn {:ok, _} -> :ok end)
-      after
-        Context.destroy(ctx)
-      end
-    else
-      assert_raise ArgumentError, ~r/independent context locking/, fn ->
-        Context.create(threading: false, thread_safe: true)
-      end
+      1..16
+      |> Task.async_stream(
+        fn _ ->
+          for n <- 1..100 do
+            assert MLIR.equal?(expected, Type.i64(ctx: ctx))
+            assert Attribute.integer(expected, n) |> MLIR.to_string() == "#{n} : i64"
+          end
+        end,
+        max_concurrency: 16
+      )
+      |> Enum.each(fn {:ok, _} -> :ok end)
+    after
+      Context.destroy(ctx)
     end
 
     assert_raise ArgumentError, ~r/requires thread_safe/, fn ->

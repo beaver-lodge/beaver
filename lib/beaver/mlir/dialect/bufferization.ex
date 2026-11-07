@@ -83,13 +83,12 @@ defmodule Beaver.MLIR.Dialect.Bufferization do
     unless algorithm in [:best_fit, :trivial] and mode in [:allocate, :arg],
       do: raise(ArgumentError, "expected algorithm: :best_fit | :trivial and arena_mode: :allocate | :arg")
 
-    unless static_memory_planner_supported?(), do: raise(ArgumentError, "linked LLVM lacks static memory planning")
     pass = Beaver.MLIR.CAPI.beaverCreateStaticMemoryPlannerPass(mode == :arg, algorithm == :best_fit)
     Beaver.Composer.nested(operation_or_module, "func.func", pass)
   end
 
   def static_memory_planner_supported?,
-    do: Beaver.MLIR.CAPI.beaverStaticMemoryPlannerSupported() |> Beaver.Native.to_term()
+    do: true
 
   defp validate_options!(opts) do
     unless Keyword.keyword?(opts),

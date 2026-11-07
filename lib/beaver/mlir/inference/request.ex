@@ -3,6 +3,17 @@ defmodule Beaver.MLIR.Inference.Request do
 
   alias Beaver.MLIR
 
+  def infer(request, function, normalize \\ &Beaver.Native.check!/1) do
+    request
+    |> raw_arguments()
+    |> then(&apply(MLIR.CAPI, function, &1))
+    |> Beaver.Native.check!()
+    |> case do
+      {values, _diagnostics} when is_list(values) -> {:ok, Enum.map(values, normalize)}
+      {:error, diagnostics} -> {:error, diagnostics}
+    end
+  end
+
   @spec raw_arguments(map() | keyword()) :: [term()]
   def raw_arguments(request) when is_map(request) or is_list(request) do
     request = Map.new(request)

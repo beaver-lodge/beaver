@@ -27,26 +27,15 @@ defmodule Beaver.MLIR.InferShapedType do
 
   @spec return_components(request()) ::
           {:ok, [Component.t()]} | {:error, MLIR.diagnostics()}
-  def return_components(request) do
-    request
-    |> Request.raw_arguments()
-    |> then(&apply(MLIR.CAPI, :beaver_raw_infer_return_type_components, &1))
-    |> Beaver.Native.check!()
-    |> case do
-      {components, _diagnostics} when is_list(components) -> {:ok, Enum.map(components, &normalize_component/1)}
-      {:error, diagnostics} -> {:error, diagnostics}
-    end
-  end
+  def return_components(request),
+    do: Request.infer(request, :beaver_raw_infer_return_type_components, &normalize_component/1)
 
   defp normalize_component({shape, element_type, encoding}),
     do: %Component{
       shape: normalize_shape(shape),
-      element_type: normalize_optional_handle(element_type),
-      encoding: normalize_optional_handle(encoding)
+      element_type: Beaver.Native.check!(element_type),
+      encoding: Beaver.Native.check!(encoding)
     }
-
-  defp normalize_optional_handle(nil), do: nil
-  defp normalize_optional_handle(handle), do: Beaver.Native.check!(handle)
 
   defp normalize_shape(:unranked), do: :unranked
 

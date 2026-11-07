@@ -15,14 +15,5 @@ defmodule Beaver.MLIR.InferType do
   @type request :: map() | keyword()
 
   @spec return_types(request()) :: {:ok, [MLIR.Type.t()]} | {:error, MLIR.diagnostics()}
-  def return_types(request) do
-    request
-    |> Request.raw_arguments()
-    |> then(&apply(MLIR.CAPI, :beaver_raw_infer_return_types, &1))
-    |> Beaver.Native.check!()
-    |> case do
-      {types, _diagnostics} when is_list(types) -> {:ok, Enum.map(types, &Beaver.Native.check!/1)}
-      {:error, diagnostics} -> {:error, diagnostics}
-    end
-  end
+  def return_types(request), do: Request.infer(request, :beaver_raw_infer_return_types)
 end

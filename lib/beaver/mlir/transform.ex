@@ -87,7 +87,7 @@ defmodule Beaver.MLIR.Transform do
   @doc "Returns whether the linked LLVM can configure convergence failure behavior."
   @spec composite_fixed_point_failure_action_supported?() :: boolean()
   def composite_fixed_point_failure_action_supported?,
-    do: CAPI.beaverCompositeFixedPointFailureActionSupported() |> Beaver.Native.to_term()
+    do: true
 
   defmodule Result do
     @moduledoc "The result of successfully applying a named transform sequence."
@@ -141,7 +141,7 @@ defmodule Beaver.MLIR.Transform do
   @doc "Whether the linked LLVM supports packed tile-size and interchange parameters."
   @spec packed_params_supported?() :: boolean()
   def packed_params_supported?,
-    do: CAPI.beaverTransformPackedParamsSupported() |> Beaver.Native.to_term()
+    do: true
 
   @doc """
   Applies a named sequence (default `__transform_main`) to an operation or module.
@@ -153,24 +153,22 @@ defmodule Beaver.MLIR.Transform do
   def apply_named_sequence(payload, schedule, opts \\ [])
 
   def apply_named_sequence(payload, %Prepared{} = prepared, opts) do
-    with :ok <- validate_execution_options(opts) do
-      if prepared.owner != self(), do: raise(ArgumentError, "prepared transform belongs to another process")
+    validate_execution_options(opts)
+    if prepared.owner != self(), do: raise(ArgumentError, "prepared transform belongs to another process")
 
-      if Keyword.get(opts, :sequence, prepared.sequence) != prepared.sequence,
-        do: raise(ArgumentError, "prepared transform entry sequence cannot be changed")
+    if Keyword.get(opts, :sequence, prepared.sequence) != prepared.sequence,
+      do: raise(ArgumentError, "prepared transform entry sequence cannot be changed")
 
-      operation = Operation.from_module(payload)
+    operation = Operation.from_module(payload)
 
-      MLIR.AnalysisSession.track(opts[:analysis_session], fn ->
-        Beaver.Execution.run(
-          MLIR.context(operation),
-          :transform,
-          {prepared.ref, operation.ref, Keyword.get(opts, :expensive_checks, true),
-           Keyword.get(opts, :enforce_single_top_level_transform_op, true)}
-        )
-        |> transform_result(payload, prepared.sequence)
-      end)
-    end
+    Beaver.Execution.run(
+      MLIR.context(operation),
+      :transform,
+      {prepared.ref, operation.ref, Keyword.get(opts, :expensive_checks, true),
+       Keyword.get(opts, :enforce_single_top_level_transform_op, true)},
+      analysis_session: opts[:analysis_session]
+    )
+    |> transform_result(payload, prepared.sequence)
   rescue
     exception in [ArgumentError] -> invalid_schedule(exception, prepared.sequence)
   end
@@ -185,25 +183,15 @@ defmodule Beaver.MLIR.Transform do
 
   @doc "Parses and verifies a schedule once and resolves its entry sequence. The context must outlive the result."
   def prepare(schedule, %MLIR.Context{} = context, opts \\ []) do
-    with :ok <- validate_execution_options(opts), {:ok, module} <- Schedule.load(schedule, context) do
-      sequence = Keyword.get(opts, :sequence, "__transform_main")
+    validate_execution_options(opts)
+    sequence = Keyword.get(opts, :sequence, "__transform_main")
 
-      case Schedule.find_sequence(module, sequence) do
-        {:ok, root} ->
-          try do
-            ref = CAPI.beaver_raw_transform_prepare(module.ref, root.ref)
-            {:ok, %Prepared{ref: ref, context: context, sequence: sequence, owner: self()}}
-          rescue
-            exception ->
-              MLIR.Module.destroy(module)
-              reraise exception, __STACKTRACE__
-          end
-
-        {:error, _} = error ->
-          MLIR.Module.destroy(module)
-          error
+    Schedule.load(schedule, context, fn module ->
+      with {:ok, root} <- Schedule.find_sequence(module, sequence) do
+        ref = CAPI.beaver_raw_transform_prepare(module.ref, root.ref)
+        {:ok, %Prepared{ref: ref, context: context, sequence: sequence, owner: self()}}
       end
-    end
+    end)
   rescue
     exception in [ArgumentError] -> invalid_schedule(exception, Keyword.get(opts, :sequence))
   end

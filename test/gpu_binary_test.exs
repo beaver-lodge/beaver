@@ -44,12 +44,6 @@ defmodule GPUBinaryTest do
     assert full =~ ~s{features = "+wavefrontsize64"}
     assert full =~ "O = 3"
     assert full =~ ~s{abi = "500"}
-
-    unless GPU.rocdl_target_info_supported?() do
-      assert_raise ArgumentError, ~r/TargetInfo-based ROCDL lowering/, fn ->
-        GPU.rocdl_target_attribute(arch: "gfx1100", wavesize: 32, ctx: ctx)
-      end
-    end
   end
 
   test "binary_module preserves object bytes without MLIR text escaping", %{ctx: ctx} do
