@@ -13,7 +13,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
         callback_reply cuda_module_get_function cuda_memcpy_htod cuda_memcpy_dtoh
         transform_state_payload_ops transform_state_payload_values transform_state_params
         context_attach_diagnostic_handler
-        mlir_type_of_enif_obj read_opaque_ptr type_converter_convert_async
+        mlir_type_of_enif_obj read_opaque_ptr
       )},
                    {3, ~w(
         callback_reply_code cuda_func_set_attribute compile_llvm_ir_to_ptx
@@ -50,7 +50,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
         infer_return_types infer_return_type_components
       )},
                    {8, ~w(
-        compiler_kernel_load_and_populate apply_conversion_async
+        compiler_kernel_load_and_populate
       )},
                    {6, ~w(
         declarative_pattern_add

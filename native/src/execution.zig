@@ -21,7 +21,7 @@ pub fn tuple(env: beam.env, term: beam.term, count: usize) ![]const beam.term {
     return terms[0..count];
 }
 
-const Command = enum { verify, pass, rewrite, snapshot, update, parse, create_pass, create_pattern, destroy, speculatability, memory_effects, replace_uses };
+const Command = enum { verify, pass, rewrite, snapshot, update, parse, create_pass, create_pattern, destroy, speculatability, memory_effects, replace_uses, conversion, convert_type };
 const Work = struct {
     context: m.Context.T,
     command: Command,
@@ -53,6 +53,8 @@ const Work = struct {
     fn execute(self: Work) !beam.term {
         const env = self.env;
         switch (self.command) {
+            .conversion => return @import("conversion.zig").convert(env, self.context, self.arguments, self.profile),
+            .convert_type => return @import("conversion.zig").convertType(env, self.arguments),
             .replace_uses => return @import("value.zig").replace(env, self.context, self.arguments, self.recipient, self.id),
             .speculatability, .memory_effects => {
                 const op = try self.operation((try tuple(env, self.arguments, 1))[0]);
@@ -136,9 +138,12 @@ const Work = struct {
     fn run(data: ?*anyopaque) callconv(.c) void {
         const self: *Work = @ptrCast(@alignCast(data orelse return));
         defer beam.allocator.destroy(self);
-        defer e.enif_free_env(self.env);
-        var reply = [_]beam.term{ self.id, self.result() };
-        _ = beam.send_advanced(null, self.recipient, self.env, beam.make_tuple(self.env, &reply));
+        const output = e.enif_alloc_env() orelse @panic("failed to allocate execution result environment");
+        defer e.enif_free_env(output);
+        var reply = [_]beam.term{ e.enif_make_copy(output, self.id), e.enif_make_copy(output, self.result()) };
+        // Release retained registrations before the caller may destroy its context.
+        e.enif_free_env(self.env);
+        _ = beam.send_advanced(null, self.recipient, output, beam.make_tuple(output, &reply));
     }
 };
 
@@ -157,7 +162,12 @@ pub fn execution_worker(env: beam.env, _: c_int, args: [*c]const beam.term) !bea
     const worker = try beam.allocator.create(Work);
     errdefer beam.allocator.destroy(worker);
     worker.* = work;
-    if (!c.beaverContextAddWork(work.context, Work.run, worker)) return error.ContextThreadSafeLockingDisabled;
+    if (!c.beaverContextAddWork(work.context, Work.run, worker)) {
+        if (work.command != .convert_type) return error.ContextThreadSafeLockingDisabled;
+        // Standalone type conversion also supports contexts without thread-safe locking.
+        const thread = try @import("std").Thread.spawn(.{}, Work.run, .{worker});
+        thread.detach();
+    }
     return id;
 }
 

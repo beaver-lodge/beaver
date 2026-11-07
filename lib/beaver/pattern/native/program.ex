@@ -24,45 +24,36 @@ defmodule Beaver.Pattern.Native.Program do
              length(Keyword.keys(opts)) == length(Enum.uniq(Keyword.keys(opts))),
            do: raise(ArgumentError, "invalid declarative pattern options")
 
-    checks =
-      Enum.flat_map(opts, fn
-        {kind, n} when kind in [:operands, :results] ->
-          [{if(kind == :operands, do: 0, else: 1), index!(n), nil, nil}]
-
-        {:attributes, attrs} ->
-          Enum.map(attrs, fn {name, %MLIR.Attribute{ref: ref}} -> {2, 0, to_string(name), ref} end)
-
-        {kind, types} when kind in [:operand_types, :result_types] ->
-          type_checks(if(kind == :operand_types, do: 3, else: 4), types)
-
-        {:same_operands, pairs} ->
-          Enum.map(pairs, fn {a, b} -> {5, index!(a), nil, index!(b)} end)
-
-        _ ->
-          []
-      end)
-
-    edits =
-      case Keyword.fetch!(opts, :rewrite) do
-        {:attributes, [_ | _] = attrs} ->
-          names = Enum.map(attrs, fn {name, _} -> to_string(name) end)
-          unless length(names) == length(Enum.uniq(names)), do: raise(ArgumentError, "duplicate rewrite attribute")
-          Enum.map(attrs, fn {name, %MLIR.Attribute{ref: ref}} -> {0, 0, to_string(name), ref} end)
-
-        {:operand, index} ->
-          [{1, index!(index), nil, nil}]
-
-        :erase ->
-          [{2, 0, nil, nil}]
-
-        other ->
-          raise ArgumentError, "unsupported declarative rewrite: #{inspect(other)}"
-      end
-
+    checks = Enum.flat_map(opts, &check/1)
+    edits = edit(Keyword.fetch!(opts, :rewrite))
     benefit = Keyword.get(opts, :benefit, 1)
-    unless is_integer(benefit) and benefit >= 0 and benefit < 65535, do: raise(ArgumentError, "invalid pattern benefit")
+    unless benefit in 0..65_534, do: raise(ArgumentError, "invalid pattern benefit")
     %__MODULE__{root: root, checks: checks, edits: edits, benefit: benefit}
   end
+
+  defp check({kind, n}) when kind in [:operands, :results],
+    do: [{if(kind == :operands, do: 0, else: 1), index!(n), nil, nil}]
+
+  defp check({:attributes, attrs}),
+    do: Enum.map(attrs, fn {name, %MLIR.Attribute{ref: ref}} -> {2, 0, to_string(name), ref} end)
+
+  defp check({kind, types}) when kind in [:operand_types, :result_types],
+    do: type_checks(if(kind == :operand_types, do: 3, else: 4), types)
+
+  defp check({:same_operands, pairs}),
+    do: Enum.map(pairs, fn {a, b} -> {5, index!(a), nil, index!(b)} end)
+
+  defp check(_), do: []
+
+  defp edit({:attributes, [_ | _] = attrs}) do
+    names = Enum.map(attrs, fn {name, _} -> to_string(name) end)
+    unless length(names) == length(Enum.uniq(names)), do: raise(ArgumentError, "duplicate rewrite attribute")
+    Enum.map(attrs, fn {name, %MLIR.Attribute{ref: ref}} -> {0, 0, to_string(name), ref} end)
+  end
+
+  defp edit({:operand, index}), do: [{1, index!(index), nil, nil}]
+  defp edit(:erase), do: [{2, 0, nil, nil}]
+  defp edit(other), do: raise(ArgumentError, "unsupported declarative rewrite: #{inspect(other)}")
 
   defp type_checks(kind, types),
     do: Enum.map(types, fn {index, %MLIR.Type{ref: type}} -> {kind, index!(index), nil, type} end)

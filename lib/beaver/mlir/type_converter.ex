@@ -134,15 +134,20 @@ defmodule Beaver.MLIR.TypeConverter do
   end
 
   @spec convert(t(), Type.t()) :: {:ok, Type.t()} | {:error, term()}
-  def convert(%__MODULE__{} = converter, %Type{ref: type_ref}) do
-    id = CAPI.beaver_raw_type_converter_convert_async(converter.registration, type_ref)
+  def convert(%__MODULE__{} = converter, %Type{} = type) do
+    id =
+      CAPI.beaver_raw_execution_worker(MLIR.context(type).ref, :convert_type, {converter.registration, type.ref}, false)
+
     await_conversion(id, converter.timeout_ms, nil)
   end
 
   defp await_conversion(id, timeout_ms, callback_failure) do
     receive do
-      {:type_converter_done, ^id, result} ->
+      {^id, {{:ok, result}, nil}} ->
         finish_conversion(result, callback_failure)
+
+      {^id, {{:error, reason}, nil}} ->
+        {:error, reason}
 
       {kind, _token, _callback, _callback_id, _sent_at, _type} = message
       when kind in [:convert_type, :convert_types] ->

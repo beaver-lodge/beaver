@@ -115,9 +115,6 @@ defmodule Beaver.MLIR.Conversion.Profile do
     }
   end
 
-  defp decode_native_profile({duration_ns, target_lock_wait_ns, _execution_costs}),
-    do: decode_native_profile({duration_ns, target_lock_wait_ns})
-
   defp decode_native_profile({duration_ns, target_lock_wait_ns})
        when is_integer(duration_ns) and is_integer(target_lock_wait_ns),
        do: %{duration_ns: duration_ns, target_lock_wait_ns: target_lock_wait_ns}
@@ -178,16 +175,9 @@ defmodule Beaver.MLIR.Conversion.Profile do
   defp status({:ok, _ir, _diagnostics}), do: "ok"
   defp status({:error, _error}), do: "error"
 
-  defp reductions do
-    {:reductions, reductions} = Process.info(self(), :reductions)
-    reductions
-  end
+  defp reductions, do: self() |> Process.info(:reductions) |> elem(1)
+  defp process_memory_bytes, do: self() |> Process.info(:memory) |> elem(1)
 
-  defp process_memory_bytes do
-    {:memory, memory} = Process.info(self(), :memory)
-    memory
-  end
-
-  defp monotonic_ns, do: System.monotonic_time(:nanosecond)
+  defp monotonic_ns, do: CAPI.beaver_raw_execution_clock()
   defp elapsed_ns(started_at), do: max(monotonic_ns() - started_at, 0)
 end

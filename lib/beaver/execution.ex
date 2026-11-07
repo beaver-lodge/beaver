@@ -9,24 +9,18 @@ defmodule Beaver.Execution do
     strategy = Keyword.get(opts, :strategy, :worker)
 
     Profile.measure(profile, phase(command), fn ->
-      {{outcome, costs}, actual_strategy} =
+      enabled = not is_nil(profile)
+
+      result =
         case strategy do
-          :worker ->
-            id = CAPI.beaver_raw_execution_worker(ctx.ref, command, arguments, not is_nil(profile))
-            {await(id, opts), :worker}
-
-          :dirty ->
-            {CAPI.beaver_raw_execution_dirty(ctx.ref, command, arguments, not is_nil(profile)), :dirty}
-
-          :auto ->
-            case CAPI.beaver_raw_execution_auto(ctx.ref, command, arguments, not is_nil(profile)) do
-              id when is_reference(id) -> {await(id, opts), :worker}
-              result -> {result, :dirty}
-            end
-
-          other ->
-            raise ArgumentError, "unsupported execution strategy: #{inspect(other)}"
+          :worker -> CAPI.beaver_raw_execution_worker(ctx.ref, command, arguments, enabled)
+          :dirty -> CAPI.beaver_raw_execution_dirty(ctx.ref, command, arguments, enabled)
+          :auto -> CAPI.beaver_raw_execution_auto(ctx.ref, command, arguments, enabled)
+          other -> raise ArgumentError, "unsupported execution strategy: #{inspect(other)}"
         end
+
+      {{outcome, costs}, actual_strategy} =
+        if is_reference(result), do: {await(result, opts), :worker}, else: {result, :dirty}
 
       Profile.native(profile, command, actual_strategy, costs)
 

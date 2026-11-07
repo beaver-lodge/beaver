@@ -13,7 +13,7 @@ defmodule Beaver.Composer.Beam do
   end
 
   def run(composer, opts) do
-    case capture(fn -> Profile.measure(opts[:profile], :prepare, fn -> prepare(composer, opts) end) end) do
+    case measure(opts, :prepare, fn -> prepare(composer, opts) end) do
       {:ok, plan} -> run_prepared(plan, composer.op, opts)
       error -> error
     end
@@ -98,7 +98,9 @@ defmodule Beaver.Composer.Beam do
 
   defp initialize_stage({:beam, callbacks, nested?}, ctx, _opts) do
     with {:ok, constructed} <- capture(fn -> callbacks.construct.(nil) end) do
-      case capture(fn -> callbacks.initialize.(ctx, constructed) end) do
+      initialized = capture(fn -> callbacks.initialize.(ctx, constructed) end)
+
+      case initialized do
         {:ok, {:ok, value}} ->
           prepare_clone(callbacks, value, nested?)
 
@@ -121,7 +123,9 @@ defmodule Beaver.Composer.Beam do
   defp prepare_clone(callbacks, value, true) do
     case capture(fn -> callbacks.clone.(value) end) do
       {:ok, clone} ->
-        case capture(fn -> callbacks.construct.(clone) end) do
+        constructed = capture(fn -> callbacks.construct.(clone) end)
+
+        case constructed do
           {:ok, constructed} -> {:ok, {:beam, callbacks, constructed, [value]}}
           {:error, errors} -> {:error, errors ++ destroy_value(callbacks, clone) ++ destroy_value(callbacks, value)}
         end
@@ -136,13 +140,7 @@ defmodule Beaver.Composer.Beam do
     run = if is_function(run, 1), do: fn op, _ -> run.(op) end, else: run
     unless is_function(run, 2), do: raise(ArgumentError, "pass must accept one or two arguments")
 
-    %{
-      construct: &Beaver.FallbackPass.construct/1,
-      initialize: &Beaver.FallbackPass.initialize/2,
-      clone: &Beaver.FallbackPass.clone/1,
-      destruct: &Beaver.FallbackPass.destruct/1,
-      run: run
-    }
+    MLIR.Pass.callbacks(run: run)
   end
 
   defp callbacks(module, anchor) when is_atom(module) do
@@ -171,7 +169,7 @@ defmodule Beaver.Composer.Beam do
   end
 
   defp execute_stage({:beam, callbacks, value, originals} = stage, op, opts) do
-    case capture(fn -> Profile.measure(opts[:profile], :beam_pass, fn -> callbacks.run.(op, value) end) end) do
+    case measure(opts, :beam_pass, fn -> callbacks.run.(op, value) end) do
       {:ok, value} ->
         stage = {:beam, callbacks, value, originals}
 
@@ -223,13 +221,16 @@ defmodule Beaver.Composer.Beam do
 
   defp verify(op, opts) do
     if Keyword.get(opts, :verifier, true) == true do
-      case capture(fn ->
-             MLIR.verify(op,
-               strategy: Keyword.get(opts, :verify_execution, :auto),
-               recursive: Keyword.get(opts, :recursive, true),
-               profile: opts[:profile]
-             )
-           end) do
+      result =
+        capture(fn ->
+          MLIR.verify(op,
+            strategy: Keyword.get(opts, :verify_execution, :auto),
+            recursive: Keyword.get(opts, :recursive, true),
+            profile: opts[:profile]
+          )
+        end)
+
+      case result do
         {:ok, {:ok, _}} -> :ok
         {:ok, {:error, diagnostics}} -> {:error, diagnostics}
         {:error, diagnostics} -> {:error, diagnostics}
@@ -260,6 +261,8 @@ defmodule Beaver.Composer.Beam do
       {:error, diagnostics} -> diagnostics
     end
   end
+
+  defp measure(opts, phase, fun), do: capture(fn -> Profile.measure(opts[:profile], phase, fun) end)
 
   defp capture(fun) do
     {:ok, fun.()}

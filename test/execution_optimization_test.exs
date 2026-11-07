@@ -597,7 +597,13 @@ defmodule ExecutionOptimizationTest do
       Task.await(long, 5000)
     end
 
-    Process.sleep(100)
-    assert %{threads: 0, running: 0, queued: 0, peak_running: 1} = Context.executor_stats(ctx)
+    assert Enum.any?(1..100, fn _ ->
+             Process.sleep(10)
+
+             match?(
+               %{threads: 0, running: 0, queued: 0, peak_running: 1},
+               Context.executor_stats(ctx)
+             )
+           end)
   end
 end

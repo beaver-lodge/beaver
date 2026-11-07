@@ -17,7 +17,7 @@ defmodule Beaver.Execution.Profile do
     profile = %__MODULE__{table: :ets.new(__MODULE__, [:public, :set, write_concurrency: true])}
     cpu = Beaver.MLIR.CAPI.beaver_raw_process_cpu_time()
     rss = Beaver.MLIR.CAPI.beaver_raw_peak_rss()
-    started = System.monotonic_time(:nanosecond)
+    started = Beaver.MLIR.CAPI.beaver_raw_execution_clock()
     reductions = reductions()
 
     try do
@@ -25,7 +25,7 @@ defmodule Beaver.Execution.Profile do
 
       receipt = %{
         schema_version: 1,
-        duration_ns: System.monotonic_time(:nanosecond) - started,
+        duration_ns: Beaver.MLIR.CAPI.beaver_raw_execution_clock() - started,
         caller_reductions: reductions() - reductions,
         vm_cpu_time_ns: max(Beaver.MLIR.CAPI.beaver_raw_process_cpu_time() - cpu, 0),
         vm_peak_rss_before_bytes: rss,
@@ -43,12 +43,12 @@ defmodule Beaver.Execution.Profile do
   def measure(nil, _phase, fun), do: fun.()
 
   def measure(%__MODULE__{} = profile, phase, fun) do
-    started = System.monotonic_time(:nanosecond)
+    started = Beaver.MLIR.CAPI.beaver_raw_execution_clock()
 
     try do
       fun.()
     after
-      record(profile, phase, System.monotonic_time(:nanosecond) - started)
+      record(profile, phase, Beaver.MLIR.CAPI.beaver_raw_execution_clock() - started)
     end
   end
 

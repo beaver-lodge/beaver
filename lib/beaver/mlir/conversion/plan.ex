@@ -27,7 +27,7 @@ defmodule Beaver.MLIR.Conversion.Plan do
   conversion target destruction.
   """
 
-  alias Beaver.MLIR
+  alias Beaver.{MLIR, Native}
   alias Beaver.MLIR.Conversion.Kernel, as: ConversionKernel
   alias Beaver.Pattern.Native.Descriptor
 
@@ -249,33 +249,21 @@ defmodule Beaver.MLIR.Conversion.Plan do
     context = MLIR.context(ir)
 
     target_opts = if plan.timeout, do: [timeout: plan.timeout], else: []
-    target = ConversionTarget.create(context, target_opts)
 
-    try do
-      converter = TypeConverter.create(target_opts)
+    opts =
+      Map.take(plan, [:timeout, :folding_mode, :build_materializations]) |> Enum.reject(fn {_, v} -> is_nil(v) end)
 
-      try do
+    function = if profile?, do: :profile, else: :apply
+
+    Native.with_resource(ConversionTarget.create(context, target_opts), &ConversionTarget.destroy/1, fn target ->
+      TypeConverter.with(target_opts, fn converter ->
         patterns = RewritePatternSet.create(context)
-
         populate_or_destroy!(plan.entries, context, target, converter, patterns, plan.timeout)
 
-        conversion_opts =
-          [timeout: plan.timeout, folding_mode: plan.folding_mode, build_materializations: plan.build_materializations]
-          |> Enum.reject(fn {_k, v} -> is_nil(v) end)
-
-        # Conversion.apply/5 freezes the mutable set and transfers its ownership
-        # to the native worker. Do not rescue around this call and try to destroy
-        # the stale mutable handle: apply/5 already releases the owned frozen set
-        # if starting the worker fails, and the worker releases it on every exit.
-        if profile?,
-          do: MLIR.Conversion.profile(plan.mode, ir, target, patterns, conversion_opts),
-          else: MLIR.Conversion.apply(plan.mode, ir, target, patterns, conversion_opts)
-      after
-        TypeConverter.destroy(converter)
-      end
-    after
-      ConversionTarget.destroy(target)
-    end
+        # Conversion owns the frozen set once submitted, including worker failure.
+        apply(MLIR.Conversion, function, [plan.mode, ir, target, patterns, opts])
+      end)
+    end)
   end
 
   @doc """
@@ -394,22 +382,13 @@ defmodule Beaver.MLIR.Conversion.Plan do
 
   defp callback_version(opts), do: Keyword.get(opts, :version, :unversioned)
 
-  defp populate_or_destroy!(entries, ctx, target, converter, patterns, plan_timeout) do
-    populate(entries, ctx, target, converter, patterns, plan_timeout)
-  rescue
-    exception ->
-      RewritePatternSet.threaded_destroy(ctx, patterns)
-      reraise exception, __STACKTRACE__
+  defp populate_or_destroy!(entries, ctx, target, converter, patterns, timeout) do
+    resources = %{context: ctx, target: target, converter: converter, patterns: patterns, timeout: timeout}
+    Enum.each(entries, &populate_entry(&1, resources))
   catch
     kind, reason ->
       RewritePatternSet.threaded_destroy(ctx, patterns)
       :erlang.raise(kind, reason, __STACKTRACE__)
-  end
-
-  defp populate(entries, ctx, target, converter, patterns, timeout) do
-    resources = %{context: ctx, target: target, converter: converter, patterns: patterns, timeout: timeout}
-
-    Enum.each(entries, &populate_entry(&1, resources))
   end
 
   defp populate_entry({kind, name}, %{target: target})

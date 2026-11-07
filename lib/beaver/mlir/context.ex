@@ -78,18 +78,7 @@ defmodule Beaver.MLIR.Context do
 
       if thread_safe and not threading, do: beaverContextEnableThreadSafeLocking(ctx)
 
-      if executor = opts[:callback_executor] do
-        unless Keyword.keyword?(executor) and Keyword.keys(executor) -- [:max_concurrency, :idle_timeout_ms] == [],
-          do: raise(ArgumentError, "invalid callback executor options")
-
-        capacity = Keyword.get(executor, :max_concurrency, System.schedulers_online())
-        idle = Keyword.get(executor, :idle_timeout_ms, 1000)
-
-        unless is_integer(capacity) and capacity > 0 and is_integer(idle) and idle > 0,
-          do: raise(ArgumentError, "callback executor capacity and idle timeout must be positive integers")
-
-        true = beaverExecutorConfigure(ctx, capacity, idle) |> Native.to_term()
-      end
+      if executor = opts[:callback_executor], do: configure_executor(ctx, executor)
 
       opts |> Keyword.get(:registry, []) |> List.wrap() |> Enum.each(&mlirContextAppendDialectRegistry(ctx, &1))
 
@@ -104,6 +93,19 @@ defmodule Beaver.MLIR.Context do
         if owner, do: MLIR.ThreadPool.checkin(owner, lease)
         reraise exception, __STACKTRACE__
     end
+  end
+
+  defp configure_executor(ctx, executor) do
+    unless Keyword.keyword?(executor) and Keyword.keys(executor) -- [:max_concurrency, :idle_timeout_ms] == [],
+      do: raise(ArgumentError, "invalid callback executor options")
+
+    capacity = Keyword.get(executor, :max_concurrency, System.schedulers_online())
+    idle = Keyword.get(executor, :idle_timeout_ms, 1000)
+
+    unless is_integer(capacity) and capacity > 0 and is_integer(idle) and idle > 0,
+      do: raise(ArgumentError, "callback executor capacity and idle timeout must be positive integers")
+
+    true = beaverExecutorConfigure(ctx, capacity, idle) |> Native.to_term()
   end
 
   @doc "Whether the linked LLVM supports context locking without internal parallelism."

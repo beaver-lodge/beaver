@@ -42,17 +42,19 @@ defmodule Beaver.MLIR.Pass do
     end
   end
 
+  @doc false
+  def callbacks(opts) do
+    Map.new([construct: 1, destruct: 1, initialize: 2, clone: 1, run: 2], fn {key, arity} ->
+      {key, opts[key] || Function.capture(Beaver.FallbackPass, key, arity)}
+    end)
+    |> Map.update!(:run, &normalize_run_fun/1)
+  end
+
   def create(argument, desc, op, opts) do
     name = opts[:name] || "beaver generated pass of #{argument}"
     ctx = opts[:ctx] || raise ArgumentError, "option :ctx is required"
 
-    callbacks = %{
-      construct: opts[:construct] || (&Beaver.FallbackPass.construct/1),
-      destruct: opts[:destruct] || (&Beaver.FallbackPass.destruct/1),
-      initialize: opts[:initialize] || (&Beaver.FallbackPass.initialize/2),
-      clone: opts[:clone] || (&Beaver.FallbackPass.clone/1),
-      run: normalize_run_fun(opts[:run] || (&Beaver.FallbackPass.run/2))
-    }
+    callbacks = callbacks(opts)
 
     {:ok, owner} = CallbackServer.start_link(__MODULE__, callbacks, opts[:init_state] || nil)
 

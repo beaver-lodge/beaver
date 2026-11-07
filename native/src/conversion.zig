@@ -28,29 +28,6 @@ const TypeDispatcher = kinda.callback_runtime.Dispatcher(.{
 });
 const PatternDispatcher = kinda.callback_runtime.Dispatcher(.{ "conversion_pattern", "conversion_pattern_1_to_n" });
 
-const ConversionProfile = struct {
-    duration_ns: u64 = 0,
-    target_lock_wait_ns: u64 = 0,
-    execution_costs: [4]u64 = .{ 0, 0, 0, 0 },
-
-    fn makeTerm(self: *const @This(), environment: beam.env) beam.term {
-        var costs = [_]beam.term{
-            e.enif_make_uint64(environment, self.execution_costs[0]),
-            e.enif_make_uint64(environment, self.execution_costs[1]),
-            e.enif_make_uint64(environment, self.execution_costs[2]),
-            e.enif_make_uint64(environment, self.execution_costs[3]),
-            e.enif_make_int64(environment, 0),
-            e.enif_make_int64(environment, systemNs()),
-        };
-        var fields = [_]beam.term{
-            beam.make_u64(environment, self.duration_ns),
-            beam.make_u64(environment, self.target_lock_wait_ns),
-            beam.make_tuple(environment, &costs),
-        };
-        return beam.make_tuple(environment, &fields);
-    }
-};
-
 const OperationInventory = struct {
     operations: u64 = 0,
     modules: u64 = 0,
@@ -105,16 +82,6 @@ const ProfileMetrics = struct {
         return beam.make_u64(environment, bytes);
     }
 };
-
-fn monotonicTimestamp() std.Io.Timestamp {
-    return std.Io.Clock.awake.now(std.Options.debug_io);
-}
-
-fn elapsedNs(started_at: std.Io.Timestamp) u64 {
-    const duration_ns = started_at.durationTo(monotonicTimestamp()).toNanoseconds();
-    if (duration_ns <= 0) return 0;
-    return std.math.cast(u64, duration_ns) orelse std.math.maxInt(u64);
-}
 
 fn systemNs() i64 {
     // The C++ clock is valid on scheduler and arbitrary worker threads.
@@ -178,41 +145,20 @@ fn replyHandleList(comptime Kind: type) type {
     };
 }
 
-fn replyValue(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const success = try beam.get_bool(environment, args[1]);
-    var projection: usize = 0;
-    if (success and !beam.is_nil2(environment, args[2])) {
-        const value = try mlir_capi.Value.resource.fetch(environment, args[2]);
-        projection = @intFromPtr(value.ptr);
-    }
-    const accepted = try kinda.callback_runtime.ReplyToken.complete(
-        environment,
-        args[0],
-        .replied,
-        success,
-        0,
-        projection,
-    );
-    return beam.make_atom(environment, if (accepted) "ok" else "stale");
-}
-
-fn replyType(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const success = try beam.get_bool(environment, args[1]);
-    const code = try beam.get_i64(environment, args[2]);
-    var projection: usize = 0;
-    if (success and code == c.MlirTypeConverterConversionStatusSuccess) {
-        const converted_type = try mlir_capi.Type.resource.fetch(environment, args[3]);
-        projection = @intFromPtr(converted_type.ptr);
-    }
-    const accepted = try kinda.callback_runtime.ReplyToken.complete(
-        environment,
-        args[0],
-        .replied,
-        success,
-        code,
-        projection,
-    );
-    return beam.make_atom(environment, if (accepted) "ok" else "stale");
+fn replyHandle(comptime Kind: type) type {
+    return struct {
+        fn nif(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+            const success = try beam.get_bool(environment, args[1]);
+            const code = if (Kind == mlir_capi.Value) 0 else try beam.get_i64(environment, args[2]);
+            const term = args[if (Kind == mlir_capi.Value) 2 else 3];
+            var projection: usize = 0;
+            if (success and code == c.MlirTypeConverterConversionStatusSuccess and
+                !(Kind == mlir_capi.Value and beam.is_nil2(environment, term)))
+                projection = @intFromPtr((try Kind.resource.fetch(environment, term)).ptr);
+            const accepted = try kinda.callback_runtime.ReplyToken.complete(environment, args[0], .replied, success, code, projection);
+            return beam.make_atom(environment, if (accepted) "ok" else "stale");
+        }
+    };
 }
 
 const LegalityState = struct {
@@ -404,55 +350,27 @@ const TypeCallbackState = struct {
         std.heap.smp_allocator.destroy(self);
     }
 
-    fn conversion(type_: mlir_capi.Type.T, converted_type: [*c]mlir_capi.Type.T, user_data: ?*anyopaque) callconv(.c) c.MlirTypeConverterConversionStatus {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.MlirTypeConverterConversionStatusFailure));
-        const response = callback_args.invoke(
-            self.dispatcher,
-            "convert_type",
-            .{ Timestamp, mlir_capi.Type },
-            .{ {}, type_ },
-        ) catch return c.MlirTypeConverterConversionStatusFailure;
-        const status = kinda.callback_adapter.scalarResult(
-            c.MlirTypeConverterConversionStatus,
-            response,
-            c.MlirTypeConverterConversionStatusFailure,
-        );
-        if (status == c.MlirTypeConverterConversionStatusSuccess) {
-            const projection = kinda.callback_adapter.projection(response) orelse
-                return c.MlirTypeConverterConversionStatusFailure;
-            converted_type.* = .{ .ptr = @ptrFromInt(projection) };
-        }
-        return status;
-    }
-
-    fn conversion1ToN(
-        type_: mlir_capi.Type.T,
-        results: mlir_capi.TypeConverterConversionResults.T,
-        user_data: ?*anyopaque,
-    ) callconv(.c) c.MlirTypeConverterConversionStatus {
-        const self: *@This() = @ptrCast(@alignCast(user_data orelse return c.MlirTypeConverterConversionStatusFailure));
-        const response = callback_args.invoke(
-            self.dispatcher,
-            "convert_types",
-            .{ Timestamp, mlir_capi.Type },
-            .{ {}, type_ },
-        ) catch return c.MlirTypeConverterConversionStatusFailure;
-        const status = kinda.callback_adapter.scalarResult(
-            c.MlirTypeConverterConversionStatus,
-            response,
-            c.MlirTypeConverterConversionStatusFailure,
-        );
-        if (status == c.MlirTypeConverterConversionStatusSuccess) {
-            const projection = kinda.callback_adapter.projection(response) orelse
-                return c.MlirTypeConverterConversionStatusFailure;
-            const projected: *HandleProjection(mlir_capi.Type) = @ptrFromInt(projection);
-            defer projected.deinit();
-            for (projected.values) |value| {
-                c.mlirTypeConverterConversionResultsAppend(results, value);
+    fn Conversion(comptime many: bool) type {
+        const Output = if (many) mlir_capi.TypeConverterConversionResults.T else [*c]mlir_capi.Type.T;
+        return struct {
+            fn run(type_: mlir_capi.Type.T, output: Output, data: ?*anyopaque) callconv(.c) c.MlirTypeConverterConversionStatus {
+                const self: *TypeCallbackState = @ptrCast(@alignCast(data orelse return c.MlirTypeConverterConversionStatusFailure));
+                const response = callback_args.invoke(self.dispatcher, if (many) "convert_types" else "convert_type", .{ Timestamp, mlir_capi.Type }, .{ {}, type_ }) catch return c.MlirTypeConverterConversionStatusFailure;
+                const status = kinda.callback_adapter.scalarResult(c.MlirTypeConverterConversionStatus, response, c.MlirTypeConverterConversionStatusFailure);
+                if (status == c.MlirTypeConverterConversionStatusSuccess) {
+                    const projection = kinda.callback_adapter.projection(response) orelse return c.MlirTypeConverterConversionStatusFailure;
+                    if (many) {
+                        const projected: *HandleProjection(mlir_capi.Type) = @ptrFromInt(projection);
+                        defer projected.deinit();
+                        for (projected.values) |value| c.mlirTypeConverterConversionResultsAppend(output, value);
+                    } else output.* = .{ .ptr = @ptrFromInt(projection) };
+                }
+                return status;
             }
-        }
-        return status;
+        };
     }
+    const conversion = Conversion(false).run;
+    const conversion1ToN = Conversion(true).run;
 
     fn sourceMaterialization(
         rewriter: mlir_capi.RewriterBase.T,
@@ -695,68 +613,16 @@ fn addTargetMaterialization1ToN(environment: beam.env, _: c_int, args: [*c]const
     return addTypeCallback(environment, try fetchTypeConverterRegistration(environment, args[0]), args[1], args[2], .target_1_to_n);
 }
 
-const TypeConverterWorker = struct {
-    registration: *TypeConverterRegistration,
-    recipient: beam.pid,
-    environment: beam.env,
-    id: beam.term,
-    type_: mlir_capi.Type.T,
-
-    fn run(self: *@This()) void {
-        const registration = self.registration;
-        const owned_environment = self.environment;
-        defer std.heap.smp_allocator.destroy(self);
-        const environment = e.enif_alloc_env() orelse {
-            e.enif_free_env(owned_environment);
-            e.enif_release_resource(registration);
-            return;
-        };
-        defer e.enif_free_env(environment);
-
-        const io = std.Options.debug_io;
-        self.registration.mutex.lockUncancelable(io);
-        const converted = if (self.registration.closed.load(.acquire))
-            mlir_capi.Type.T{ .ptr = null }
-        else
-            c.mlirTypeConverterConvertType(self.registration.converter, self.type_);
-        self.registration.mutex.unlock(io);
-        // Complete native cleanup before notifying the BEAM: once
-        // `type_converter_done` is delivered the receiver may tear down the
-        // context, so nothing may reference it afterwards.
-        const id_term = e.enif_make_copy(environment, self.id);
-        e.enif_free_env(owned_environment);
-        e.enif_release_resource(registration);
-        var terms = [_]beam.term{
-            beam.make_atom(environment, "type_converter_done"),
-            id_term,
-            if (c.mlirTypeIsNull(converted))
-                beam.make_nil(environment)
-            else
-                mlir_capi.Type.resource.make_kind(environment, converted) catch beam.make_nil(environment),
-        };
-        _ = beam.send_advanced(null, self.recipient, environment, beam.make_tuple(environment, &terms));
-    }
-};
-
-fn convertTypeAsync(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+pub fn convertType(environment: beam.env, arguments: beam.term) !beam.term {
+    const args = try @import("execution.zig").tuple(environment, arguments, 2);
     const registration = try fetchTypeConverterRegistration(environment, args[0]);
-    const worker = try std.heap.smp_allocator.create(TypeConverterWorker);
-    errdefer std.heap.smp_allocator.destroy(worker);
-    const owned_env = e.enif_alloc_env() orelse return error.FailedToAllocateEnvironment;
-    errdefer e.enif_free_env(owned_env);
-    const id = e.enif_make_ref(environment);
-    worker.* = .{
-        .registration = registration,
-        .recipient = try beam.self(environment),
-        .environment = owned_env,
-        .id = e.enif_make_copy(owned_env, id),
-        .type_ = try mlir_capi.Type.resource.fetch(environment, args[1]),
-    };
-    e.enif_keep_resource(registration);
-    errdefer e.enif_release_resource(registration);
-    const thread = try std.Thread.spawn(.{}, TypeConverterWorker.run, .{worker});
-    thread.detach();
-    return id;
+    const type_ = try mlir_capi.Type.resource.fetch(environment, args[1]);
+    const io = std.Options.debug_io;
+    registration.mutex.lockUncancelable(io);
+    defer registration.mutex.unlock(io);
+    if (registration.closed.load(.acquire)) return beam.make_nil(environment);
+    const converted = c.mlirTypeConverterConvertType(registration.converter, type_);
+    return if (c.mlirTypeIsNull(converted)) beam.make_nil(environment) else try mlir_capi.Type.resource.make_kind(environment, converted);
 }
 
 fn destroyTypeConverter(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
@@ -911,148 +777,45 @@ fn compilerKernelLoadAndPopulate(environment: beam.env, _: c_int, args: [*c]cons
     return beam.make_slice(environment, error_message.data[0..error_message.length]);
 }
 
-const ConversionWorker = struct {
-    target: *TargetRegistration,
-    operation: mlir_capi.Operation.T,
-    patterns: mlir_capi.FrozenRewritePatternSet.T,
-    config: mlir_capi.ConversionConfig.T,
-    owns_patterns: bool,
-    full: bool,
-    recipient: beam.pid,
-    environment: beam.env,
-    id: beam.term,
-    profile: bool,
-    submitted: i64,
+fn applyConversion(environment: beam.env, args: anytype) !beam.term {
+    const result = if (args.full)
+        c.mlirApplyFullConversion(args.operation, args.target, args.patterns, args.config)
+    else
+        c.mlirApplyPartialConversion(args.operation, args.target, args.patterns, args.config);
+    return mlir_capi.LogicalResult.resource.make_kind(environment, result);
+}
 
-    fn apply(environment: beam.env, args: anytype) !beam.term {
-        const logical_result = if (args.full)
-            c.mlirApplyFullConversion(args.operation, args.target, args.patterns, args.config)
-        else
-            c.mlirApplyPartialConversion(args.operation, args.target, args.patterns, args.config);
-        return mlir_capi.LogicalResult.resource.make_kind(environment, logical_result);
-    }
-
-    fn run(worker: ?*anyopaque) callconv(.c) void {
-        const self: *@This() = @ptrCast(@alignCast(worker orelse return));
-        const target = self.target;
-        const owned_environment = self.environment;
-        const config = self.config;
-        const patterns = self.patterns;
-        const owns_patterns = self.owns_patterns;
-        var config_owned = true;
-        var patterns_owned = owns_patterns;
-        defer std.heap.smp_allocator.destroy(self);
-        const environment = e.enif_alloc_env() orelse {
-            if (patterns_owned) c.mlirFrozenRewritePatternSetDestroy(patterns);
-            if (config_owned) c.mlirConversionConfigDestroy(config);
-            e.enif_free_env(owned_environment);
-            e.enif_release_resource(target);
-            return;
-        };
-        defer e.enif_free_env(environment);
-
-        var profile: ConversionProfile = .{};
-        const profile_ptr = if (self.profile) &profile else null;
-        const execution_started = if (self.profile) systemNs() else 0;
-        const measurement = if (self.profile) c.beaverExecutionMeasureBegin() else null;
-        const worker_started_at = if (self.profile) monotonicTimestamp() else undefined;
-        const io = std.Options.debug_io;
-        const lock_started_at = if (self.profile) monotonicTimestamp() else undefined;
-        self.target.mutex.lockUncancelable(io);
-        if (profile_ptr) |enabled| enabled.target_lock_wait_ns = elapsedNs(lock_started_at);
-        const result = if (self.target.closed.load(.acquire))
-            null
-        else
-            diagnostic.call_with_diagnostics(
-                environment,
-                self.target.context,
-                apply,
-                .{ environment, .{
-                    .full = self.full,
-                    .operation = self.operation,
-                    .target = self.target.target,
-                    .patterns = self.patterns,
-                    .config = self.config,
-                } },
-            ) catch null;
-        self.target.mutex.unlock(io);
-        if (profile_ptr) |enabled| enabled.duration_ns = elapsedNs(worker_started_at);
-
-        if (patterns_owned) {
-            c.mlirFrozenRewritePatternSetDestroy(patterns);
-            patterns_owned = false;
-        }
-        if (config_owned) {
-            c.mlirConversionConfigDestroy(config);
-            config_owned = false;
-        }
-        // Complete native cleanup before notifying the BEAM: once
-        // `conversion_done` is delivered the receiver may destroy the MLIR
-        // context, so nothing may reference it afterwards.
-        const id_term = e.enif_make_copy(environment, self.id);
-        e.enif_free_env(owned_environment);
-        e.enif_release_resource(target);
-
-        if (measurement) |ptr| {
-            var counts: [2]u64 = undefined;
-            c.beaverExecutionMeasureEnd(ptr, &counts);
-            profile.execution_costs = .{
-                @intCast(execution_started - self.submitted),
-                @intCast(systemNs() - execution_started),
-                counts[0],
-                counts[1],
-            };
-        }
-
-        var terms = [_]beam.term{
-            beam.make_atom(environment, "conversion_done"),
-            id_term,
-            result orelse beam.make_nil(environment),
-            if (profile_ptr) |enabled| enabled.makeTerm(environment) else beam.make_nil(environment),
-        };
-        _ = beam.send_advanced(null, self.recipient, environment, beam.make_tuple(environment, &terms));
-    }
-};
-
-fn applyConversionAsync(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+pub fn convert(environment: beam.env, context: mlir_capi.Context.T, arguments: beam.term, profile: bool) !beam.term {
+    const args = try @import("execution.zig").tuple(environment, arguments, 7);
     const target = try fetchTargetRegistration(environment, args[1]);
+    const operation = try mlir_capi.Operation.resource.fetch(environment, args[2]);
     const patterns = try mlir_capi.FrozenRewritePatternSet.resource.fetch(environment, args[3]);
     const owns_patterns = try beam.get_bool(environment, args[4]);
-    const folding_mode = try beam.get_i64(environment, args[5]);
-    const materializations = try beam.get_i64(environment, args[6]);
-    const profile = try beam.get_bool(environment, args[7]);
+    defer if (owns_patterns) c.mlirFrozenRewritePatternSetDestroy(patterns);
+    if (!c.mlirContextEqual(context, target.context) or
+        !c.mlirContextEqual(context, c.mlirOperationGetContext(operation))) return error.ContextMismatch;
     const config = c.mlirConversionConfigCreate();
-    var config_owned = true;
-    errdefer if (config_owned) c.mlirConversionConfigDestroy(config);
-    if (folding_mode >= 0)
-        c.mlirConversionConfigSetFoldingMode(config, @intCast(folding_mode));
-    if (materializations >= 0)
-        c.mlirConversionConfigEnableBuildMaterializations(config, materializations != 0);
-
-    const worker = try std.heap.smp_allocator.create(ConversionWorker);
-    errdefer std.heap.smp_allocator.destroy(worker);
-    const owned_env = e.enif_alloc_env() orelse return error.FailedToAllocateEnvironment;
-    errdefer e.enif_free_env(owned_env);
-    const id = e.enif_make_ref(environment);
-    worker.* = .{
-        .target = target,
-        .operation = try mlir_capi.Operation.resource.fetch(environment, args[2]),
+    defer c.mlirConversionConfigDestroy(config);
+    const folding = try beam.get_i64(environment, args[5]);
+    const materializations = try beam.get_i64(environment, args[6]);
+    if (folding >= 0) c.mlirConversionConfigSetFoldingMode(config, @intCast(folding));
+    if (materializations >= 0) c.mlirConversionConfigEnableBuildMaterializations(config, materializations != 0);
+    const full = try beam.get_bool(environment, args[0]);
+    const started = if (profile) systemNs() else 0;
+    const io = std.Options.debug_io;
+    target.mutex.lockUncancelable(io);
+    const wait = if (profile) systemNs() - started else 0;
+    const result = if (target.closed.load(.acquire)) beam.make_nil(environment) else diagnostic.call_with_diagnostics(environment, context, applyConversion, .{ environment, .{
+        .full = full,
+        .operation = operation,
+        .target = target.target,
         .patterns = patterns,
         .config = config,
-        .owns_patterns = owns_patterns,
-        .full = try beam.get_bool(environment, args[0]),
-        .recipient = try beam.self(environment),
-        .environment = owned_env,
-        .id = e.enif_make_copy(owned_env, id),
-        .profile = profile,
-        .submitted = if (profile) systemNs() else 0,
-    };
-    e.enif_keep_resource(target);
-    errdefer e.enif_release_resource(target);
-    if (!c.beaverContextAddWork(target.context, ConversionWorker.run, worker))
-        return error.ContextThreadSafeLockingDisabled;
-    config_owned = false;
-    return id;
+    } }) catch beam.make_nil(environment);
+    target.mutex.unlock(io);
+    var costs = [_]beam.term{ beam.make_i64(environment, if (profile) systemNs() - started else 0), beam.make_i64(environment, wait) };
+    var output = [_]beam.term{ result, if (profile) beam.make_tuple(environment, &costs) else beam.make_nil(environment) };
+    return beam.make_tuple(environment, &output);
 }
 
 pub fn open(environment: beam.env) void {
@@ -1075,7 +838,6 @@ pub const nifs = .{
     prelude.beaverRawNIF(@This(), "type_converter_add_source_materialization", 3),
     prelude.beaverRawNIF(@This(), "type_converter_add_target_materialization", 3),
     prelude.beaverRawNIF(@This(), "type_converter_add_1_to_n_target_materialization", 3),
-    prelude.beaverRawNIF(@This(), "type_converter_convert_async", 2),
     prelude.beaverRawNIF(@This(), "type_converter_destroy", 1),
     prelude.beaverRawNIF(@This(), "type_converter_reply_callback", 4),
     prelude.beaverRawNIF(@This(), "type_converter_reply_types", 4),
@@ -1083,7 +845,6 @@ pub const nifs = .{
     prelude.beaverRawNIF(@This(), "type_converter_reply_values", 4),
     prelude.beaverRawNIF(@This(), "conversion_pattern_add", 8),
     prelude.beaverRawNIFDirtyIO(@This(), "compiler_kernel_load_and_populate", 8),
-    prelude.beaverRawNIF(@This(), "apply_conversion_async", 8),
     prelude.beaverRawNIFDirtyCPU(OperationInventory, "operation_inventory", 1),
     prelude.beaverRawNIF(ProfileMetrics, "process_cpu_time", 0),
     prelude.beaverRawNIF(ProfileMetrics, "peak_rss", 0),
@@ -1103,12 +864,10 @@ pub const type_converter_add_conversion_map = addTypeConversionMap;
 pub const type_converter_add_source_materialization = addSourceMaterialization;
 pub const type_converter_add_target_materialization = addTargetMaterialization;
 pub const type_converter_add_1_to_n_target_materialization = addTargetMaterialization1ToN;
-pub const type_converter_convert_async = convertTypeAsync;
 pub const type_converter_destroy = destroyTypeConverter;
-pub const type_converter_reply_callback = replyType;
+pub const type_converter_reply_callback = replyHandle(mlir_capi.Type).nif;
 pub const type_converter_reply_types = replyHandleList(mlir_capi.Type).nif;
-pub const type_converter_reply_value = replyValue;
+pub const type_converter_reply_value = replyHandle(mlir_capi.Value).nif;
 pub const type_converter_reply_values = replyHandleList(mlir_capi.Value).nif;
 pub const conversion_pattern_add = addConversionPattern;
 pub const compiler_kernel_load_and_populate = compilerKernelLoadAndPopulate;
-pub const apply_conversion_async = applyConversionAsync;
