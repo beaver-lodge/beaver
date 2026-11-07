@@ -101,8 +101,9 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           cd scripts/install_llvm
+          mix deps.get
           if [[ "${{ runner.os }}" == "Windows" ]]; then
-            mix beaver.install_prebuilt_llvm --triton --triton-ref "$TRITON_REF" \
+            mix openai_triton.install --llvm-only --triton-ref "$TRITON_REF" \
               --install-dir "$RUNNER_TEMP/llvm-prebuilt"
           else
             mix beaver.install_prebuilt_llvm --install-dir "$RUNNER_TEMP/llvm-prebuilt"
@@ -266,6 +267,7 @@ jobs:
         run: |
           set -o pipefail
           cd scripts/install_llvm
+          mix deps.get
           mix beaver.install_prebuilt_llvm | grep -E '^LLVM_PREBUILT_(ASSET_NAME|URL)=' >> "$GITHUB_OUTPUT"
       - name: Login to Docker Hub
         uses: docker/login-action@v3
