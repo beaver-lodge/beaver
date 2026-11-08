@@ -15,6 +15,9 @@ on:
       llvm_prebuilt_asset_revision:
         description: "llvm/eudsl asset revision, or latest; empty uses the installer default"
         required: false
+      llvm_ci_manifest:
+        description: "frozen upstream CI manifest from mix beaver.resolve_upstream_llvm"
+        required: false
 
   workflow_call:
     inputs:
@@ -24,6 +27,10 @@ on:
         required: false
       llvm_prebuilt_asset_revision:
         description: "llvm/eudsl asset revision, or latest; empty uses the installer default"
+        type: string
+        required: false
+      llvm_ci_manifest:
+        description: "frozen upstream CI manifest from mix beaver.resolve_upstream_llvm"
         type: string
         required: false
 
@@ -36,7 +43,7 @@ defaults:
     shell: bash
 
 concurrency:
-  group: build-and-test-${{ github.ref }}-${{ inputs.llvm_prebuilt_asset_name || inputs.llvm_prebuilt_asset_revision || 'default' }}
+  group: build-and-test-${{ github.workflow }}-${{ github.ref }}-${{ inputs.llvm_ci_manifest && fromJSON(inputs.llvm_ci_manifest).build_run || inputs.llvm_prebuilt_asset_name || inputs.llvm_prebuilt_asset_revision || 'default' }}
   cancel-in-progress: true
 
 jobs:
@@ -74,6 +81,8 @@ jobs:
           elixir-version: ${{matrix.elixir}}
       - name: Set up build dependencies
         uses: ./.github/actions/setup-build
+        with:
+          llvm-ci-manifest: ${{ inputs.llvm_ci_manifest }}
         env:
           LLVM_EUDSL_ASSET_NAME: ${{ inputs.llvm_prebuilt_asset_name }}
           LLVM_EUDSL_ASSET_REVISION: ${{ inputs.llvm_prebuilt_asset_revision }}
@@ -101,7 +110,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/triton-prebuilt
-          key: triton-${{ runner.os }}-${{ hashFiles('native-deps.json', 'triton.json', 'scripts/install_llvm/patches/*') }}
+          key: triton-${{ runner.os }}-${{ env.LLVM_ARTIFACT_SHA256 || env.LLVM_SOURCE_REF || env.LLVM_PREBUILT_ASSET_NAME }}-${{ hashFiles('native-deps.json', 'triton.json', 'scripts/install_llvm/patches/*') }}
       - name: Build Triton against the selected LLVM
         if: matrix.llvm == 'triton' && steps.triton-cache.outputs.cache-hit != 'true'
         env:

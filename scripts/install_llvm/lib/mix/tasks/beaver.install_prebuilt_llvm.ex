@@ -4,8 +4,12 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
   def run(args) do
     {opts, positional} =
       OptionParser.parse!(args,
-        strict: MLIR.Toolchain.switches() ++ [from_source: :boolean, jobs: :integer]
+        strict:
+          MLIR.Toolchain.switches() ++
+            [from_source: :boolean, jobs: :integer, ci_manifest: :string]
       )
+
+    opts = Enum.reject(opts, fn {_, value} -> value == "" end)
 
     if opts[:print_metadata] do
       if positional != [], do: Mix.raise("--print-metadata does not accept positional arguments")
@@ -21,10 +25,18 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
             &(System.get_env(&1) not in [nil, ""])
           )
 
+      if opts[:ci_manifest] && (explicit || opts[:from_source]),
+        do: Mix.raise("ci-manifest cannot be combined with release overrides or from-source")
+
       if explicit do
-        MLIR.Toolchain.run(args, metadata: metadata)
+        MLIR.Toolchain.run(OptionParser.to_argv(opts) ++ positional, metadata: metadata)
       else
-        opts = Enum.reject(opts, fn {_, value} -> value == "" end)
+        metadata =
+          if manifest = opts[:ci_manifest],
+            do: manifest |> JSON.decode!() |> Beaver.UpstreamLLVM.validate!(metadata),
+            else: metadata
+
+        opts = Keyword.put(opts, :require_artifact, not is_nil(opts[:ci_manifest]))
 
         opts =
           if positional == [], do: opts, else: Keyword.put_new(opts, :install_dir, hd(positional))
@@ -42,7 +54,7 @@ defmodule Mix.Tasks.Beaver.InstallPrebuiltLlvm do
           asset = Beaver.LLVM.asset(metadata, opts)
 
           IO.puts(
-            "LLVM_PREBUILT_ASSET_NAME=#{asset.name}\nLLVM_PREBUILT_URL=https://api.github.com/#{asset.endpoint}\nLLVM_SOURCE_REF=#{metadata["source_ref"]}"
+            "LLVM_PREBUILT_ASSET_NAME=#{asset.name}\nLLVM_PREBUILT_URL=https://api.github.com/#{asset.endpoint}\nLLVM_SOURCE_REF=#{metadata["source_ref"]}\nLLVM_ARTIFACT_SHA256=#{asset.sha256}"
           )
         else
           Beaver.LLVM.install!(metadata, opts)

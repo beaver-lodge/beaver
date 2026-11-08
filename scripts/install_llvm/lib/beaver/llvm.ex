@@ -54,7 +54,12 @@ defmodule Beaver.LLVM do
           reraise error, __STACKTRACE__
       end
 
-      export_env(dir, metadata["source_ref"], opts[:github_env] || System.get_env("GITHUB_ENV"))
+      export_env(
+        dir,
+        metadata["source_ref"],
+        opts[:github_env] || System.get_env("GITHUB_ENV"),
+        if(opts[:require_artifact], do: asset.sha256)
+      )
 
       dir
     after
@@ -62,12 +67,17 @@ defmodule Beaver.LLVM do
     end
   end
 
-  def export_env(dir, ref, env_file \\ nil) do
+  def export_env(dir, ref, env_file \\ nil, artifact_sha256 \\ nil) do
     output = """
     LLVM_PREBUILT_DIR=#{dir}
     LLVM_CONFIG_PATH=#{config(dir)}
     LLVM_SOURCE_REF=#{ref}
     """
+
+    output =
+      if artifact_sha256,
+        do: output <> "LLVM_ARTIFACT_SHA256=#{artifact_sha256}\n",
+        else: output
 
     IO.write(output)
     if env_file, do: File.write!(env_file, output, [:append])
@@ -76,22 +86,28 @@ defmodule Beaver.LLVM do
   defp download_or_build!(metadata, asset, stage, opts) do
     zip = Path.join(stage, "artifact.zip")
     token = opts[:github_token] || System.get_env("GH_TOKEN") || System.get_env("GITHUB_TOKEN")
-    env = if token, do: [{"GH_TOKEN", token}], else: []
-
-    result =
-      if System.find_executable("gh"),
-        do:
-          System.cmd("gh", ["api", asset.endpoint], env: env, into: File.stream!(zip, [:write])),
-        else: {nil, 1}
+    result = (opts[:download] || (&download/3)).(asset, zip, token)
 
     case result do
       {_, 0} ->
         extract!(zip, Path.join(stage, "extracted"), asset.sha256)
 
       _ ->
+        if opts[:require_artifact],
+          do:
+            Mix.raise("selected upstream LLVM CI artifact unavailable; refusing source fallback")
+
         IO.puts("Pinned CI artifact unavailable; building the same LLVM source revision.")
         build!(metadata["source_ref"], stage, opts)
     end
+  end
+
+  defp download(asset, zip, token) do
+    env = if token, do: [{"GH_TOKEN", token}], else: []
+
+    if System.find_executable("gh"),
+      do: System.cmd("gh", ["api", asset.endpoint], env: env, into: File.stream!(zip, [:write])),
+      else: {nil, 1}
   end
 
   # Public for fixture tests; check the digest and paths before extracting.

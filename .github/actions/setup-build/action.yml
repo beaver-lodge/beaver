@@ -1,5 +1,10 @@
 name: Set up Beaver build
 description: Install the paired Kinda revision, Mix dependencies, native tools and selected LLVM
+inputs:
+  llvm-ci-manifest:
+    description: Frozen upstream CI artifact manifest; empty preserves native-deps.json pins
+    required: false
+    default: ""
 runs:
   using: composite
   steps:
@@ -28,6 +33,7 @@ runs:
       working-directory: scripts/install_llvm
       env:
         GITHUB_TOKEN: ${{ github.token }}
+        LLVM_CI_MANIFEST: ${{ inputs.llvm-ci-manifest }}
       run: |
         mix deps.get
-        mix beaver.install_prebuilt_llvm --install-dir "$RUNNER_TEMP/llvm-prebuilt"
+        mix beaver.install_prebuilt_llvm --install-dir "$RUNNER_TEMP/llvm-prebuilt" --ci-manifest "$LLVM_CI_MANIFEST"

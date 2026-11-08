@@ -64,6 +64,14 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
 
     assert File.read!(env_file) == "EXISTING=preserved\n" <> expected
     assert capture_io(fn -> Beaver.LLVM.export_env(root, "fixture-revision") end) == expected
+
+    sha = String.duplicate("a", 64)
+
+    assert capture_io(fn -> Beaver.LLVM.export_env(root, "fixture-revision", env_file, sha) end) ==
+             expected <> "LLVM_ARTIFACT_SHA256=#{sha}\n"
+
+    assert File.read!(env_file) ==
+             "EXISTING=preserved\n" <> expected <> expected <> "LLVM_ARTIFACT_SHA256=#{sha}\n"
   end
 
   @tag :tmp_dir

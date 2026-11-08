@@ -43,13 +43,13 @@ Zig as a local package override, so both dependency graphs use the same source.
 
 4. Install LLVM/MLIR
 
-- Option 1: Install a prebuilt `llvm/eudsl` tarball
+- Option 1: Install the pinned `llvm/eudsl` CI artifact
 
-  The `beaver.install_prebuilt_llvm` Mix task selects the matching
-  `mlir_<os>_<arch>_*.tar.gz` asset for the current machine, downloads it, and
-  extracts the compiled binaries into a local prefix. It lives in
-  `scripts/install_llvm`, a thin consumer of the standalone `mlir` and
-  `openai_triton` packages, so running it never compiles Beaver itself.
+  The `beaver.install_prebuilt_llvm` Mix task selects the platform ZIP pinned
+  in `native-deps.json`, verifies its SHA-256 and LLVM source revision, and
+  installs it into a local prefix. It lives in `scripts/install_llvm`, so
+  running it never compiles Beaver itself. Explicit release asset overrides
+  remain available through the standalone `mlir` package.
   For local installer development, set `MLIR_TOOLCHAIN_PATH` and
   `OPENAI_TRITON_PATH` to the absolute paths of their checkouts.
 
@@ -68,6 +68,18 @@ Zig as a local package override, so both dependency graphs use the same source.
 
   For Triton's paired LLVM, run
   `mix openai_triton.install --llvm-only --triton-ref COMMIT` in the same project.
+
+  `Check Upstream` deliberately uses a separate CI channel: release tarballs
+  may lag behind Beaver's required LLVM semantics. The workflow first runs
+  `mix beaver.resolve_upstream_llvm`, freezes one official `llvm/eudsl` build
+  from `main` or `update-llvm`, and passes the same JSON manifest to every lane
+  via `--ci-manifest`. All four native LLVM build jobs must have succeeded;
+  unrelated downstream jobs do not decide artifact availability. The manifest
+  records the source revision, run, artifact IDs and SHA-256 digests. Missing,
+  expired or invalid artifacts fail closed, without a source-build fallback.
+  The native semantic probes and full tests still gate compatibility. This
+  does not update production pins. Use the workflow's `llvm_build_run` input
+  to replay a specific build, or `latest` to discover the newest one.
 
 - Option 2: Build from source https://mlir.llvm.org/getting_started/
   Recommended install commands:
