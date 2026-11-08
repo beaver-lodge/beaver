@@ -21,6 +21,7 @@ jobs:
     name: Prebuilt LLVM
     permissions:
       contents: read
+      actions: read
       pull-requests: write
     uses: ./.github/workflows/elixir.yml
     with:
