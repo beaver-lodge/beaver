@@ -44,6 +44,29 @@ defmodule Beaver.InstallPrebuiltLlvmTest do
   end
 
   @tag :tmp_dir
+  test "exports the installed LLVM root and preserves existing GitHub environment entries", %{
+    tmp_dir: tmp
+  } do
+    root = Path.join(tmp, "llvm with spaces")
+    env_file = Path.join(tmp, "github-env")
+    File.write!(env_file, "EXISTING=preserved\n")
+
+    config = if match?({:win32, _}, :os.type()), do: "llvm-config.exe", else: "llvm-config"
+
+    expected = """
+    LLVM_PREBUILT_DIR=#{root}
+    LLVM_CONFIG_PATH=#{Path.join([root, "bin", config])}
+    LLVM_SOURCE_REF=fixture-revision
+    """
+
+    assert capture_io(fn -> Beaver.LLVM.export_env(root, "fixture-revision", env_file) end) ==
+             expected
+
+    assert File.read!(env_file) == "EXISTING=preserved\n" <> expected
+    assert capture_io(fn -> Beaver.LLVM.export_env(root, "fixture-revision") end) == expected
+  end
+
+  @tag :tmp_dir
   test "artifact installation checks content, source identity and archive paths", %{tmp_dir: tmp} do
     ref = "378916e7f7c77cce03180b3c9e4d01de3c55c0f9"
     zip = Path.join(tmp, "artifact.zip")

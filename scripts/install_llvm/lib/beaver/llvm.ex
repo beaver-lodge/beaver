@@ -54,16 +54,23 @@ defmodule Beaver.LLVM do
           reraise error, __STACKTRACE__
       end
 
-      output = "LLVM_CONFIG_PATH=#{config(dir)}\nLLVM_SOURCE_REF=#{metadata["source_ref"]}\n"
-      IO.write(output)
-
-      if env_file = opts[:github_env] || System.get_env("GITHUB_ENV"),
-        do: File.write!(env_file, output, [:append])
+      export_env(dir, metadata["source_ref"], opts[:github_env] || System.get_env("GITHUB_ENV"))
 
       dir
     after
       File.rm_rf!(stage)
     end
+  end
+
+  def export_env(dir, ref, env_file \\ nil) do
+    output = """
+    LLVM_PREBUILT_DIR=#{dir}
+    LLVM_CONFIG_PATH=#{config(dir)}
+    LLVM_SOURCE_REF=#{ref}
+    """
+
+    IO.write(output)
+    if env_file, do: File.write!(env_file, output, [:append])
   end
 
   defp download_or_build!(metadata, asset, stage, opts) do
