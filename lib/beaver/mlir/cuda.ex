@@ -2,18 +2,11 @@ alias Beaver.MLIR.{CAPI, Operation}
 
 defmodule Beaver.MLIR.CUDA do
   @moduledoc """
-  A minimal Zig-based CUDA runner bootstrap.
+  CUDA driver discovery, module loading, memory copies and kernel launches.
 
-  The native side (`beaver_cuda` partition) loads the CUDA Driver API
-  (`libcuda`) with `dlopen` at runtime, so Beaver never links against NVIDIA
-  libraries and degrades gracefully on machines without a driver. This is the
-  first slice of the Zig CUDA runner that will eventually replace the MLIR
-  C++ CUDA runtime (`libmlir_cuda_runtime.so`), which is not shipped by the
-  eudsl LLVM prebuilts.
-
-  The compilation side keeps using the MLIR C API to produce PTX/cubin
-  artifacts (see `Beaver.MLIR.Dialect.GPU.package_binary!/3`); this module only
-  covers device discovery for now. Launch/memcpy/cache slices follow.
+  The Zig runner loads `libcuda` dynamically, without linking NVIDIA libraries,
+  and reports unavailable drivers gracefully. Compilation remains separate;
+  see `Beaver.MLIR.Dialect.GPU.package_binary!/3` for PTX/cubin packaging.
   """
 
   alias Beaver.MLIR
@@ -182,24 +175,14 @@ defmodule Beaver.MLIR.CUDA do
   end
 
   defp extract_ptx(module) do
-    with {:ok, op} <- fetch_gpu_binary(module),
+    operations = module |> MLIR.Module.body() |> Beaver.Walker.operations()
+
+    with %Operation{} = op <- Enum.find(operations, &(Operation.name(&1) == "gpu.binary")),
          {:ok, objects} <- Operation.fetch(op, "objects"),
          {:ok, object} <- MLIR.Attribute.fetch(objects, 0) do
-      extract_assembly(object)
+      GPU.object_data(object)
     else
       _ -> {:error, "no gpu.binary with objects found"}
     end
   end
-
-  defp fetch_gpu_binary(module) do
-    case module
-         |> MLIR.Module.body()
-         |> Beaver.Walker.operations()
-         |> Enum.find(&(Operation.name(&1) == "gpu.binary")) do
-      %Operation{} = op -> {:ok, op}
-      _ -> {:error, :not_found}
-    end
-  end
-
-  defp extract_assembly(object), do: GPU.object_data(object)
 end
