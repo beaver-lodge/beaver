@@ -16,7 +16,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
         mlir_type_of_enif_obj read_opaque_ptr
       )},
                    {3, ~w(
-        callback_reply_code cuda_func_set_attribute compile_llvm_ir_to_ptx
+        callback_reply_code cuda_func_set_attribute cuda_memcpy_dtod compile_llvm_ir_to_ptx
         conversion_target_add_static jit_invoke_with_terms jit_invoke_with_terms_cpu_bound
         jit_invoke_with_terms_io_bound type_converter_reply_value
       )},

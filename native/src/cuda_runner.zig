@@ -243,7 +243,7 @@ pub fn cuda_module_get_function(env: beam.env, _: c_int, args: [*c]const beam.te
 }
 
 /// Sets a CUDA function attribute, e.g. the dynamic shared memory size in
-/// bytes (`CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES = 0`).
+/// bytes (`CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES = 8`).
 pub fn cuda_func_set_attribute(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const d = switch (requireDriver(env)) {
         .ok => |ok_driver| ok_driver,
@@ -335,6 +335,25 @@ pub fn cuda_memcpy_dtoh(env: beam.env, _: c_int, args: [*c]const beam.term) !bea
     return beam.make_ok_term(env, beam.make_slice(env, buffer));
 }
 
+/// Default-stream device copy, with no intermediate host allocation.
+pub fn cuda_memcpy_dtod(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+    const d = switch (requireDriver(env)) {
+        .ok => |ok_driver| ok_driver,
+        .err => |err_term| return err_term,
+    };
+    const dst = try beam.get_u64(env, args[0]);
+    const src = try beam.get_u64(env, args[1]);
+    const size = try beam.get_u64(env, args[2]);
+    if (size == 0) return beam.make_ok(env);
+    if (dst == 0 or src == 0) return beam.make_error_binary(env, "device copy requires non-null ranges");
+    if (dst == src) return beam.make_ok(env);
+    if ((if (dst > src) dst - src else src - dst) < size)
+        return beam.make_error_binary(env, "overlapping device copy ranges");
+    const result = d.cuMemcpy(dst, src, size);
+    if (result != 0) return cuResultError(env, "cuMemcpyDtoD", result);
+    return beam.make_ok(env);
+}
+
 /// Launches a kernel.
 ///
 /// `args` is a binary of kernel parameters packed in 8-byte slots (the Elixir
@@ -390,6 +409,7 @@ pub fn cuda_launch_kernel(env: beam.env, _: c_int, args: [*c]const beam.term) !b
 }
 
 pub const nifs = .{
+    prelude.beaverRawNIF(@This(), "cuda_memcpy_dtod", 3),
     prelude.beaverRawNIF(@This(), "cuda_available", 0),
     prelude.beaverRawNIF(@This(), "cuda_device_count", 0),
     prelude.beaverRawNIF(@This(), "cuda_device_name", 1),

@@ -48,6 +48,26 @@ defmodule Beaver.MLIR.Triton.PipelineProfileTest do
   end
 
   @tag skip: !@enabled
+  test "legacy conversion keeps the exact target and warp attributes", %{ctx: ctx} do
+    Beaver.Triton.register(ctx)
+    plan = Beaver.Triton.pipeline_plan(target: "cuda:120", num_warps: 8)
+    module = MLIR.Module.create!(@load_store, ctx: ctx)
+
+    try do
+      module =
+        module |> Beaver.Composer.append(hd(plan.passes).pipeline) |> Beaver.Composer.run!()
+
+      operation = MLIR.Operation.from_module(module)
+      assert {:ok, target} = MLIR.Operation.fetch(operation, "ttg.target")
+      assert MLIR.Attribute.value(target) == "cuda:120"
+      assert {:ok, warps} = MLIR.Operation.fetch(operation, "ttg.num-warps")
+      assert MLIR.Attribute.value(warps) == 8
+    after
+      MLIR.Module.destroy(module)
+    end
+  end
+
+  @tag skip: !@enabled
   test "executes and deterministically traces the pinned sm_100+ profile" do
     {first_module, first_trace} = compile_with_trace(@load_store)
     first_text = MLIR.to_string(first_module, generic: true)

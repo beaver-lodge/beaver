@@ -96,7 +96,7 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
   defp legacy_passes(target, capability, num_warps, from_ttgir?, remove_layouts?) do
     [
       unless(from_ttgir?,
-        do: pass(:convert_to_ttgpu, :ttgir, "convert-triton-to-tritongpu{target=#{target}, num-warps=#{num_warps}}")
+        do: pass(:convert_to_ttgpu, :ttgir, "convert-triton-to-tritongpu{target=#{target} num-warps=#{num_warps}}")
       ),
       pass(:coalesce, :ttgir, "tritongpu-coalesce"),
       pass(:f32_dot_tc, :ttgir, "tritongpu-F32DotTC"),

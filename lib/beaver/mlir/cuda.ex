@@ -77,8 +77,9 @@ defmodule Beaver.MLIR.CUDA do
   @doc """
   Sets a CUDA function attribute, e.g. the dynamic shared memory size.
 
-  `attribute` is the `CUfunction_attribute` enum value; shared size bytes is
-  `0`. Required for Triton kernels that use `global_smem`.
+  `attribute` is the `CUfunction_attribute` enum value. To opt into larger
+  dynamic shared memory use `CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES`
+  (`8`), not the read-only static shared-size attribute (`0`).
   """
   @spec func_set_attribute(non_neg_integer(), integer(), integer()) :: :ok | {:error, String.t()}
   def func_set_attribute(function_handle, attribute, value),
@@ -123,6 +124,17 @@ defmodule Beaver.MLIR.CUDA do
           {:ok, binary()} | {:error, String.t()}
   def memcpy_dtoh(device_ptr, size),
     do: CAPI.beaver_raw_cuda_memcpy_dtoh(device_ptr, size)
+
+  @doc """
+  Copies device allocations without host staging, ordered on the default stream.
+
+  The caller retains both allocations until completion. Use `synchronize/0`
+  when a host-visible completion boundary is required. Overlap is unsupported.
+  """
+  @spec memcpy_dtod(non_neg_integer(), non_neg_integer(), non_neg_integer()) ::
+          :ok | {:error, String.t()}
+  def memcpy_dtod(destination, source, size),
+    do: CAPI.beaver_raw_cuda_memcpy_dtod(destination, source, size)
 
   @doc """
   Launches a kernel.
