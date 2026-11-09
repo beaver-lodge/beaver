@@ -121,7 +121,7 @@ defmodule Beaver.MLIR.Triton.PipelinePlanTest do
     assert plan.provenance == nil
 
     assert Enum.map(Enum.filter(plan.passes, &(&1.phase == :ttgir)), & &1.pipeline) == [
-             "convert-triton-to-tritongpu{target=cuda:120, num-warps=8}",
+             "convert-triton-to-tritongpu{target=cuda:120 num-warps=8}",
              "tritongpu-coalesce",
              "tritongpu-F32DotTC",
              "triton-nvidia-gpu-assign-cga-layouts",
