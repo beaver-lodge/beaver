@@ -64,6 +64,8 @@ defmodule Beaver.MixProject do
       main: "Beaver",
       extras: [
         "guides/your-first-beaver-compiler.livemd",
+        "guides/architecture.md",
+        "guides/passes-and-patterns.md",
         "guides/core-api-migration.md",
         "guides/incremental-compilation-runtime.md",
         "guides/transform-autotuning.md",
