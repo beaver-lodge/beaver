@@ -5,6 +5,8 @@ defmodule Beaver.Dummy do
   alias Beaver.MLIR.Dialect.{Func, Arith, CF}
   require Func
 
+  @external_resource Path.expand("../../guides/blocks.md", __DIR__)
+
   defp put_func(ctx, block) do
     mlir ctx: ctx, ip: block do
       Func.func some_func(
@@ -43,10 +45,13 @@ defmodule Beaver.Dummy do
     end
   end
 
-  def readme(ctx) do
+  def documented_control_flow(ctx) do
     mlir ctx: ctx do
       module do
-        unquote(File.read!("test/support/readme_example.exs") |> Code.string_to_quoted!())
+        unquote(
+          Beaver.Test.DocumentationExample.read!("guides/blocks.md", "control-flow")
+          |> Code.string_to_quoted!()
+        )
       end
     end
   end

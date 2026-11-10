@@ -33,6 +33,42 @@ creates the block on first use, and the later `block bb1(...) do ... end`
 definition appends it to the region. This is how terminators form control-flow
 edges between blocks that are written out of order.
 
+## Conditional branches and block arguments
+
+The following function branches to either `bb1` or `bb2`; both paths reach
+`bb2`, whose block argument receives the value passed by the predecessor.
+Place it inside `mlir ctx: ctx do` and `module do`, with
+`Beaver.MLIR.Dialect.{Func, Arith, CF}` aliased and `require Func` in scope.
+`mlir` supplies the `Type` and `Attribute` aliases.
+
+<!-- beaver:test:control-flow -->
+```elixir
+Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+  region do
+    block _() do
+      v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+      cond0 = Arith.constant(true) >>> Type.i(1)
+      CF.cond_br(cond0, Beaver.Env.block(bb1), {Beaver.Env.block(bb2), [v0]}) >>> []
+    end
+
+    block bb1() do
+      v1 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+      _add = Arith.addi(v0, v0) >>> Type.i(32)
+      CF.br({Beaver.Env.block(bb2), [v1]}) >>> []
+    end
+
+    block bb2(arg >>> Type.i(32)) do
+      v2 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+      add = Arith.addi(arg, v2) >>> Type.i(32)
+      Func.return(add) >>> []
+    end
+  end
+end
+```
+
+See [the first compiler tutorial](your-first-beaver-compiler.livemd) for a
+complete context setup and execution example.
+
 ## Dangling blocks
 
 A block is *dangling* when it was created (usually by a forward reference) but

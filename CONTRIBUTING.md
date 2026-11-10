@@ -1,31 +1,13 @@
 # Contributing to Beaver
-This document describes how to contribute to Beaver by introducing the idea behind how Beaver group its functionalities and how to set up the development environment.
 
-## Beaver's functionalities
-
-There are three main parts in Beaver. Here is a brief introduction to each part:
-- DSL: The syntax of Beaver SSA expression.
-- Utilities: Work with MLIR in Elixir way.
-- Bindings: Thin wrapper of MLIR CAPI.
-
-### DSL
-Modules including `Beaver`, `Beaver.Env`.
-
-DSL is the core part of Beaver. It uses Elixir's syntax to express MLIR semantics.
-
-### Utilities
-Modules including `Beaver.Walker`, `Beaver.Composer`
-
-Utilities are the helper functions that help to generate or manipulate MLIR IR. They are implemented in Elixir and is designed to be used in the DSL part to further enhance it and improve ergonomics.
-
-### Bindings
-Modules including `Beaver.MLIR`, `Beaver.MLIR.Dialect`, `Beaver.MLIR.Pass`, `Beaver.MLIR.Transform`, `Beaver.MLIR.ExecutionEngine`
-
-Bindings are the part that provides the interface to the MLIR CAPIs. They are implemented in Zig and are responsible for calling MLIR functions. Beaver uses Zig comptime reflection over Build System C translation for native registration and a machine-readable declaration manifest for the Elixir surface; it does not generate wrapper source files.
+This guide covers native toolchains, development, testing, and releases.
+For package installation and a runnable example, start with the
+[README](README.md). For the DSL, utilities, and native binding boundaries,
+see [Beaver architecture](guides/architecture.md).
 
 ## Development
 
-1. Install Elixir, [see installation guide](https://elixir-lang.org/install.html)
+1. Install Elixir 1.18 or later, [see installation guide](https://elixir-lang.org/install.html)
 2. Install Zig, [see installation guide](https://ziglang.org/learn/getting-started/#installing-zig)
 3. Clone this repo. To iterate on Beaver and Kinda together, clone both and
    point Beaver at the Kinda checkout explicitly:
@@ -42,6 +24,13 @@ Without `BEAVER_KINDA_PATH`, Mix uses the released Kinda version from
 Zig as a local package override, so both dependency graphs use the same source.
 
 4. Install LLVM/MLIR
+
+Native builds require the LLVM main revision pinned in `native-deps.json`, or
+a newer revision with the same APIs; older toolchains are unsupported. The
+normal installer verifies upstream CI artifacts and falls back to building
+the exact source revision if they are unavailable. Pass `--from-source` to
+select that build explicitly. The separate CI-manifest mode described below
+does not allow a source-build fallback.
 
 - Option 1: Install the pinned `llvm/eudsl` CI artifact
 
@@ -68,6 +57,9 @@ Zig as a local package override, so both dependency graphs use the same source.
 
   For Triton's paired LLVM, run
   `mix openai_triton.install --llvm-only --triton-ref COMMIT` in the same project.
+  To build Triton core against the selected LLVM, run `mix beaver.build_triton`
+  from `scripts/install_llvm`, supplying `--source PATH`, `--llvm PATH`, and
+  `--output PATH`. Use the same LLVM prefix as Beaver's native build.
 
   `Check Upstream` deliberately uses a separate CI channel: release tarballs
   may lag behind Beaver's required LLVM semantics. The workflow first runs
@@ -135,17 +127,31 @@ Zig as a local package override, so both dependency graphs use the same source.
 - setting environment variable to control Erlang scheduler number, `ERL_AFLAGS="+S 10:5"`
 - run mix test under LLDB, `scripts/lldb-mix-test`
 
+## Documentation examples
+
+Mark executable Elixir fences with `<!-- beaver:test:NAME -->`.
+`Beaver.Test.DocumentationExample.read!/2` selects by repository-relative path
+and marker, rejecting missing/duplicate markers and misplaced fences.
+Tests run the README and pass pipeline as written; IR/bytecode tests share the
+control-flow guide snippet. Register guides in `mix.exs`'s `docs/0` extras.
+With the native toolchain ready, run:
+
+```bash
+mix test test/documentation_example_test.exs test/documentation_examples_test.exs \
+  test/gen_ir_test.exs test/bytecode_test.exs
+```
+
 ## Release a new version
 
 ### Update Elixir source
 
-- Bump versions in [`README.md`](README.md) and [`mix.exs`](/mix.exs)
+- Bump versions in [`README.md`](README.md) and [`mix.exs`](mix.exs)
 
 ### Linux
 
 - Run CI, which generates the new GitHub release in https://github.com/beaver-lodge/beaver/releases.
   Release uploads use the workflow-scoped `GITHUB_TOKEN`; no separate release token is required.
-- Update release url in [`mix.exs`](/mix.exs)
+- Update release url in [`mix.exs`](mix.exs)
 - Run docker image to build for ARM:
   ```bash
   docker run -it --rm -v $PWD/..:/src -w /src/beaver --env MIX_BUILD_ROOT='_build/arm' jackalcooper/beaver-livebook-arm64:latest bash scripts/build-for-publish.sh

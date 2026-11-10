@@ -17,8 +17,8 @@ defmodule BytecodeTest do
     |> roundtrip_bytecode
   end
 
-  test "bytecode writing and parsing readme", %{ctx: ctx} do
-    Beaver.Dummy.readme(ctx)
+  test "bytecode writing and parsing the documented control flow", %{ctx: ctx} do
+    Beaver.Dummy.documented_control_flow(ctx)
     |> roundtrip_bytecode
   end
 

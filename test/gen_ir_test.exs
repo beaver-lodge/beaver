@@ -10,7 +10,10 @@ defmodule CFTest do
     ir =
       mlir ctx: ctx do
         module do
-          unquote(File.read!("test/support/readme_example.exs") |> Code.string_to_quoted!())
+          unquote(
+            Beaver.Test.DocumentationExample.read!("guides/blocks.md", "control-flow")
+            |> Code.string_to_quoted!()
+          )
 
           Func.func some_func2(function_type: Type.function([], [Type.i(32)])) do
             region do
