@@ -11,8 +11,8 @@ defmodule Beaver.MLIR.Conversion.Plan do
   """
 
   alias Beaver.{MLIR, Native}
-  alias Beaver.MLIR.Conversion.Kernel, as: ConversionKernel
-  alias Beaver.Pattern.Native.Descriptor
+  alias Beaver.Pattern.Native.{Descriptor, Program}
+  import Bitwise
 
   defstruct mode: :full, timeout: 30_000, folding_mode: nil, build_materializations: nil, entries: []
 
@@ -116,14 +116,54 @@ defmodule Beaver.MLIR.Conversion.Plan do
   @doc """
   Adds a native type mapping. Assembly strings resolve in each run's context;
   the mapping has no callbacks and needs no version metadata.
+
+  Options:
+    * `:recursive` - when `true`, recursively rewrites nested occurrences of `source_types`
+      inside composite types (`FunctionType`, `LLVM.struct`, `LLVM.array`, `memref`, `tensor`, `vector`).
+    * `:fallback` - `:identity` (default) or `:declined`.
   """
-  @spec add_conversion_map(t(), [String.t()], String.t()) :: t()
-  def add_conversion_map(%__MODULE__{} = plan, source_types, target_type)
-      when is_list(source_types) and is_binary(target_type) do
+  @spec add_conversion_map(t(), [String.t()], String.t(), keyword()) :: t()
+  def add_conversion_map(%__MODULE__{} = plan, source_types, target_type, opts \\ [])
+      when is_list(source_types) and is_binary(target_type) and is_list(opts) do
     unless source_types != [] and Enum.all?(source_types, &is_binary/1),
       do: raise(ArgumentError, "conversion map source types must be a non-empty list of strings")
 
-    append_entry(plan, {:add_conversion_map, source_types, target_type})
+    opts = validate_callback_opts!(opts, [:recursive, :fallback], "add_conversion_map")
+    fallback = Keyword.get(opts, :fallback, :identity)
+    recursive = Keyword.get(opts, :recursive, false)
+
+    unless fallback in [:identity, :declined] and is_boolean(recursive),
+      do:
+        raise(
+          ArgumentError,
+          "add_conversion_map :fallback must be :identity or :declined and :recursive must be boolean"
+        )
+
+    if opts == [] do
+      append_entry(plan, {:add_conversion_map, source_types, target_type})
+    else
+      append_entry(plan, {:add_conversion_map, source_types, target_type, opts})
+    end
+  end
+
+  @doc """
+  Populates upstream MLIR structural type conversion patterns and legality rules
+  natively in C++ without BEAM callbacks.
+
+  Supported domains are `:func` (function signatures, `func.call`, `func.return`,
+  `llvm.func`, `llvm.return`), `:cf` (branch operations and `cf` dialect), and
+  `:scf` (`scf.if`, `scf.for`, `scf.while`, `scf.yield`).
+  """
+  @spec add_structural_type_conversions(t(), [atom()]) :: t()
+  def add_structural_type_conversions(%__MODULE__{} = plan, domains \\ [:func, :cf, :scf])
+      when is_list(domains) do
+    allowed_domains = [:func, :cf, :scf]
+
+    unless domains != [] and Enum.all?(domains, &(&1 in allowed_domains)),
+      do:
+        raise(ArgumentError, "structural conversion domains must be a non-empty subset of #{inspect(allowed_domains)}")
+
+    append_entry(plan, {:add_structural_type_conversions, Enum.uniq(domains)})
   end
 
   @spec add_conversion_pattern(t(), String.Chars.t(), MLIR.ConversionPattern.callback(), keyword()) :: t()
@@ -149,31 +189,40 @@ defmodule Beaver.MLIR.Conversion.Plan do
     append_entry(plan, {:add_conversion_pattern, to_string(root_name), callback, opts})
   end
 
-  @spec add_pattern(t(), Descriptor.t(), keyword()) :: t()
-  def add_pattern(%__MODULE__{} = plan, %Descriptor{} = descriptor, opts \\ []) do
+  @spec add_pattern(t(), Descriptor.t() | Program.t(), keyword()) :: t()
+  def add_pattern(plan, pattern, opts \\ [])
+
+  def add_pattern(%__MODULE__{} = plan, %Descriptor{} = descriptor, opts) do
     opts = validate_callback_opts!(opts, [:version], "add_pattern")
     append_entry(plan, {:add_pattern, descriptor, opts})
   end
 
-  @doc """
-  Verifies and loads a compiler kernel during materialization. Its native patterns
-  avoid BEAM callbacks. `artifact_path` must be absolute; `:expected` constrains
-  provider schema, runtime ABI, target and capabilities.
-  """
-  @spec add_external_pattern_population(t(), ConversionKernel.Manifest.t(), Path.t(), keyword()) ::
-          t()
-  def add_external_pattern_population(
-        %__MODULE__{} = plan,
-        %ConversionKernel.Manifest{} = manifest,
-        artifact_path,
-        opts \\ []
-      ) do
-    opts =
-      validate_callback_opts!(opts, [:expected], "add_external_pattern_population")
+  def add_pattern(%__MODULE__{} = plan, %Program{} = program, opts) do
+    opts = validate_callback_opts!(opts, [:version], "add_pattern")
+    append_entry(plan, {:add_program, program, opts})
+  end
 
-    ConversionKernel.Manifest.validate!(manifest)
-    artifact_path = ConversionKernel.validate_artifact_path!(artifact_path)
-    append_entry(plan, {:add_external_pattern_population, manifest, artifact_path, opts})
+  @doc """
+  Adds a callback-free C ABI aggregate call lowering pattern to the plan.
+  """
+  @spec add_c_abi_call_pattern(t(), String.t(), String.t(), keyword()) :: t()
+  def add_c_abi_call_pattern(%__MODULE__{} = plan, root_op, target_op \\ "llvm.call", opts \\ [])
+      when is_binary(root_op) and is_binary(target_op) and is_list(opts) do
+    {plan_opts, call_opts} = Keyword.split(opts, [:version])
+    program = Program.c_abi_call(root_op, target_op, call_opts)
+    add_pattern(plan, program, plan_opts)
+  end
+
+  @doc """
+  Adds PDL patterns (as a PDL MLIR text string or list of builder callbacks) to the plan.
+  When materialized, the PDL patterns are compiled to `PDLInterp` bytecode and
+  executed natively without BEAM callbacks.
+  """
+  @spec add_pdl_patterns(t(), binary() | [function()], keyword()) :: t()
+  def add_pdl_patterns(%__MODULE__{} = plan, pdl_source_or_builders, opts \\ [])
+      when (is_binary(pdl_source_or_builders) or is_list(pdl_source_or_builders)) and is_list(opts) do
+    opts = validate_callback_opts!(opts, [:version], "add_pdl_patterns")
+    append_entry(plan, {:add_pdl_patterns, pdl_source_or_builders, opts})
   end
 
   @doc """
@@ -302,6 +351,16 @@ defmodule Beaver.MLIR.Conversion.Plan do
   defp entry_declaration({:add_conversion_map, source_types, target_type}),
     do: %{kind: :add_conversion_map, source_types: source_types, target_type: target_type}
 
+  defp entry_declaration({:add_conversion_map, source_types, target_type, opts}),
+    do:
+      Map.merge(
+        %{kind: :add_conversion_map, source_types: source_types, target_type: target_type},
+        Map.new(opts)
+      )
+
+  defp entry_declaration({:add_structural_type_conversions, domains}),
+    do: %{kind: :add_structural_type_conversions, domains: domains}
+
   defp entry_declaration({:add_conversion_pattern, root, _cb, opts}),
     do: %{
       kind: :add_conversion_pattern,
@@ -321,21 +380,41 @@ defmodule Beaver.MLIR.Conversion.Plan do
       version: callback_version(opts)
     }
 
-  defp entry_declaration({:add_external_pattern_population, manifest, _path, _opts}),
+  defp entry_declaration({:add_program, program, opts}),
     do: %{
-      kind: :add_external_pattern_population,
-      provider: manifest.provider,
-      manifest_digest: ConversionKernel.Manifest.digest(manifest),
-      identity_digest: ConversionKernel.Manifest.identity_digest(manifest),
-      artifact_sha256: manifest.artifact_sha256,
-      patterns: manifest.patterns,
-      bootstrap: manifest.bootstrap
+      kind: :add_program,
+      root: program.root,
+      benefit: program.benefit,
+      version: callback_version(opts)
+    }
+
+  defp entry_declaration({:add_pdl_patterns, _source, opts}),
+    do: %{
+      kind: :add_pdl_patterns,
+      version: callback_version(opts)
     }
 
   defp callback_version(opts), do: Keyword.get(opts, :version, :unversioned)
 
   defp populate_or_destroy!(entries, ctx, target, converter, patterns, timeout) do
-    resources = %{context: ctx, target: target, converter: converter, patterns: patterns, timeout: timeout}
+    has_type_conversions =
+      Enum.any?(entries, fn
+        {:add_conversion, _, _} -> true
+        {:add_1_to_n_conversion, _, _} -> true
+        {:add_conversion_map, _, _} -> true
+        {:add_conversion_map, _, _, _} -> true
+        _ -> false
+      end)
+
+    resources = %{
+      context: ctx,
+      target: target,
+      converter: converter,
+      program_converter: if(has_type_conversions, do: converter, else: nil),
+      patterns: patterns,
+      timeout: timeout
+    }
+
     Enum.each(entries, &populate_entry(&1, resources))
   catch
     kind, reason ->
@@ -367,6 +446,25 @@ defmodule Beaver.MLIR.Conversion.Plan do
     TypeConverter.add_conversion_map(resources.converter, sources, target)
   end
 
+  defp populate_entry({:add_conversion_map, source_types, target_type, opts}, resources) do
+    sources = Enum.map(source_types, &Type.get(&1, ctx: resources.context))
+    target = Type.get(target_type, ctx: resources.context)
+    TypeConverter.add_conversion_map(resources.converter, sources, target, opts)
+  end
+
+  defp populate_entry({:add_structural_type_conversions, domains}, resources) do
+    domain_bits = %{func: 1, cf: 2, scf: 4}
+    mask = Enum.reduce(domains, 0, fn d, acc -> acc ||| Map.fetch!(domain_bits, d) end)
+
+    :ok =
+      MLIR.CAPI.beaver_raw_conversion_populate_structural(
+        resources.target.registration,
+        resources.patterns.ref,
+        resources.converter.registration,
+        mask
+      )
+  end
+
   defp populate_entry({:add_conversion_pattern, root_name, callback, opts}, resources) do
     opts = conversion_pattern_opts(opts, resources.context, resources.timeout)
     MLIR.ConversionPattern.add(resources.patterns, root_name, resources.converter, callback, opts)
@@ -375,17 +473,21 @@ defmodule Beaver.MLIR.Conversion.Plan do
   defp populate_entry({:add_pattern, descriptor, _opts}, resources),
     do: RewritePatternSet.add(resources.patterns, descriptor, ctx: resources.context)
 
+  defp populate_entry({:add_program, program, _opts}, resources),
+    do:
+      RewritePatternSet.add(resources.patterns, program,
+        ctx: resources.context,
+        type_converter: resources.program_converter
+      )
+
+  defp populate_entry({:add_pdl_patterns, pdl_source_or_builders, _opts}, resources),
+    do: RewritePatternSet.add_pdl(resources.patterns, pdl_source_or_builders, ctx: resources.context)
+
   defp populate_entry({:add_pattern_population, callback, _opts}, resources) do
     case callback.(resources.patterns, resources.converter) do
       :ok -> :ok
       other -> raise ArgumentError, "pattern population must return :ok, got: #{inspect(other)}"
     end
-  end
-
-  defp populate_entry({:add_external_pattern_population, manifest, artifact_path, opts}, resources) do
-    ConversionKernel.populate!(resources.patterns, resources.converter, manifest, artifact_path,
-      expected: Keyword.get(opts, :expected, [])
-    )
   end
 
   defp conversion_pattern_opts(opts, ctx, plan_timeout) do

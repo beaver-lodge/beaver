@@ -6,11 +6,11 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
   @functions for {arity, names} <- [
                    {4, ~w(
         execution_worker execution_dirty execution_auto
-        type_converter_add_conversion_map
+        type_converter_add_conversion_map conversion_populate_structural
         type_converter_reply_callback type_converter_reply_types type_converter_reply_values optimization_remarks_attach
       )},
                    {2, ~w(
-        analysis_invalidate analysis_mutation transform_prepare
+        analysis_invalidate analysis_mutation transform_prepare pdl_pattern_add
         callback_reply cuda_module_get_function cuda_memcpy_htod cuda_memcpy_dtoh
         transform_state_payload_ops transform_state_payload_values transform_state_params
         context_attach_diagnostic_handler
@@ -18,6 +18,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
       )},
                    {3, ~w(
         callback_reply_code cuda_func_set_attribute cuda_memcpy_dtod compile_llvm_ir_to_ptx
+        extract_function_module safepoint_analyze
         conversion_target_add_static jit_invoke_with_terms jit_invoke_with_terms_cpu_bound
         jit_invoke_with_terms_io_bound type_converter_reply_value
       )},
@@ -38,10 +39,10 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
         unranked_memref_descriptor_get_sizes unranked_memref_descriptor_get_strides
       )},
                    {5, ~w(
-        action_tracing_attach
+        action_tracing_attach safepoint_lower_resumable
       )},
                    {0, ~w(
-        execution_build_mode execution_clock
+        execution_build_mode execution_clock llvm_host_target
         cuda_available cuda_device_count cuda_synchronize triton_register_passes peak_rss process_cpu_time
         enif_functions get_null_ptr string_printer_callback type_converter_create
       )},
@@ -49,10 +50,7 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
         cuda_launch_kernel
       )},
                    {7, ~w(
-        infer_return_types infer_return_type_components
-      )},
-                   {8, ~w(
-        compiler_kernel_load_and_populate
+        infer_return_types infer_return_type_components compile_to_object
       )},
                    {6, ~w(
         declarative_pattern_add

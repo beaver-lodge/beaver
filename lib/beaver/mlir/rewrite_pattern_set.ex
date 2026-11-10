@@ -51,10 +51,16 @@ defmodule Beaver.MLIR.RewritePatternSet do
   def add(%__MODULE__{} = set, %Beaver.Pattern.Native.Program{} = program, opts) do
     ctx = Keyword.fetch!(opts, :ctx)
 
+    ctx_arg =
+      case Keyword.get(opts, :type_converter) do
+        %MLIR.TypeConverter{ref: converter_ref} -> {ctx.ref, converter_ref}
+        nil -> ctx.ref
+      end
+
     :ok =
       CAPI.beaver_raw_declarative_pattern_add(
         set.ref,
-        ctx.ref,
+        ctx_arg,
         program.root,
         program.benefit,
         program.checks,
@@ -110,6 +116,53 @@ defmodule Beaver.MLIR.RewritePatternSet do
 
     MLIR.RewritePattern.create(root_name, ctx: ctx, benefit: benefit, match_and_rewrite: match_and_rewrite)
     |> then(&add(set, &1))
+  end
+
+  @doc """
+  Adds a PDL pattern module (or PDL source string / builder callbacks) into an
+  existing `MLIR.RewritePatternSet`. When frozen, MLIR compiles the PDL patterns
+  into `PDLInterp` bytecode so matching and rewriting execute natively without
+  BEAM callbacks.
+  """
+  @spec add_pdl(t(), MLIR.Module.t() | MLIR.Operation.t() | binary() | [function()], keyword()) :: t()
+  def add_pdl(set, pdl, opts \\ [])
+
+  def add_pdl(%__MODULE__{} = set, %MLIR.Module{} = pdl_module, _opts) do
+    op = MLIR.Operation.from_module(pdl_module)
+    :ok = CAPI.beaver_raw_pdl_pattern_add(set.ref, op.ref)
+    set
+  end
+
+  def add_pdl(%__MODULE__{} = set, %MLIR.Operation{} = pdl_op, _opts) do
+    :ok = CAPI.beaver_raw_pdl_pattern_add(set.ref, pdl_op.ref)
+    set
+  end
+
+  def add_pdl(%__MODULE__{} = set, pdl_source, opts) when is_binary(pdl_source) do
+    ctx = Keyword.get(opts, :ctx) || raise ArgumentError, "option :ctx is required when adding PDL source string"
+
+    Beaver.Native.with_resource(MLIR.Module.create!(pdl_source, ctx: ctx), &MLIR.Module.destroy/1, fn pdl_module ->
+      add_pdl(set, pdl_module, opts)
+    end)
+  end
+
+  def add_pdl(%__MODULE__{} = set, patterns, opts) when is_list(patterns) do
+    ctx = Keyword.get(opts, :ctx) || raise ArgumentError, "option :ctx is required when building PDL patterns"
+    pattern_module = MLIR.Location.from_env(__ENV__, ctx: ctx) |> MLIR.Module.empty()
+
+    try do
+      block = MLIR.Module.body(pattern_module)
+
+      for p <- patterns do
+        op = p.(ctx, block)
+        if opts[:debug], do: MLIR.dump!(op)
+      end
+
+      MLIR.verify!(pattern_module)
+      add_pdl(set, pattern_module, opts)
+    after
+      MLIR.Module.destroy(pattern_module)
+    end
   end
 
   @doc """

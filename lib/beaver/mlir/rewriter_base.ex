@@ -18,7 +18,24 @@ defmodule Beaver.MLIR.RewriterBase do
 
   @doc false
   def helpers,
-    do: [{:replace, 3}, {:replace_op, 3}, {:with_insertion_point, 2}, {:with_insertion_point, 3} | @helpers]
+    do: [
+      {:replace, 3},
+      {:replace_op, 3},
+      {:move_region_blocks, 3},
+      {:with_insertion_point, 2},
+      {:with_insertion_point, 3}
+      | @helpers
+    ]
+
+  @doc """
+  Moves all blocks from `source` region to the end of `destination` region through
+  MLIR's rewriter infrastructure (`RewriterBase::inlineRegionBefore`).
+  """
+  @spec move_region_blocks(t(), MLIR.Region.t(), MLIR.Region.t()) :: :ok
+  def move_region_blocks(%__MODULE__{} = rewriter, %MLIR.Region{} = source, %MLIR.Region{} = destination) do
+    CAPI.beaverRewriterBaseInlineRegionBlocks(rewriter, source, destination)
+    :ok
+  end
 
   @doc """
   Syntactic sugar for `replace_all_uses_with/3` and `replace_all_op_uses_with_operation/3`.

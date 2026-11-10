@@ -26,6 +26,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
   @type enable_pic :: boolean()
   @type opts :: [
           {:shared_lib_paths, [shared_lib_path]},
+          {:symbols, map() | keyword()},
           {:opt_level, opt_level},
           {:object_dump, object_dump},
           {:enable_pic, enable_pic},
@@ -36,6 +37,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
   @spec create!(MLIR.Module.t(), opts()) :: t()
   def create!(module, opts) do
     shared_lib_paths = Keyword.get(opts, :shared_lib_paths, [])
+    symbols = Keyword.get(opts, :symbols, [])
     opt_level = Keyword.get(opts, :opt_level, 2)
     object_dump = Keyword.get(opts, :object_dump, false)
     enable_pic = Keyword.get(opts, :enable_pic, false)
@@ -59,7 +61,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
     if MLIR.null?(jit),
       do: raise(ArgumentError, MLIR.Diagnostic.format(diagnostics, "Execution engine creation failed"))
 
-    jit
+    if symbols != [] and symbols != %{}, do: register_symbols(jit, symbols), else: jit
   end
 
   @doc """
@@ -110,8 +112,55 @@ defmodule Beaver.MLIR.ExecutionEngine do
   @doc "Register a native pointer under a symbol name."
   @spec register_symbol(t(), String.t() | StringRef.t(), Native.OpaquePtr.t()) :: t()
   def register_symbol(jit, symbol, pointer) do
-    mlirExecutionEngineRegisterSymbol(jit, StringRef.create(symbol), pointer)
+    clean_symbol = symbol |> to_string() |> String.trim_leading("@")
+    mlirExecutionEngineRegisterSymbol(jit, StringRef.create(clean_symbol), pointer)
     jit
+  end
+
+  @doc "Looks up a symbol address in a dynamic library or in the current process (`nil`)."
+  @spec lookup_library_symbol(Path.t() | nil, String.Chars.t()) :: {:ok, Native.OpaquePtr.t()} | :error
+  def lookup_library_symbol(library_path \\ nil, symbol_name) do
+    lib_str = if library_path, do: Path.expand(library_path), else: ""
+    sym_str = symbol_name |> to_string() |> String.trim_leading("@")
+    ptr = beaverDynamicLibrarySearchForAddressOfSymbol(StringRef.create(lib_str), StringRef.create(sym_str))
+    if ptr == Native.OpaquePtr.null(), do: :error, else: {:ok, ptr}
+  end
+
+  @doc "Registers multiple symbols on `jit` from pointers, `{library_path, native_sym}` tuples, or symbol names."
+  @spec register_symbols(t(), map() | keyword()) :: t()
+  def register_symbols(jit, symbols) when is_map(symbols) or is_list(symbols) do
+    Enum.each(symbols, fn
+      {jit_sym, %Native.OpaquePtr{} = ptr} ->
+        register_symbol(jit, jit_sym, ptr)
+
+      {jit_sym, {library_path, native_sym}} ->
+        case lookup_library_symbol(library_path, native_sym) do
+          {:ok, ptr} -> register_symbol(jit, jit_sym, ptr)
+          :error -> raise ArgumentError, "symbol #{inspect(native_sym)} not found in #{inspect(library_path)}"
+        end
+
+      {jit_sym, native_sym} when is_binary(native_sym) or is_atom(native_sym) ->
+        case lookup_library_symbol(nil, native_sym) do
+          {:ok, ptr} -> register_symbol(jit, jit_sym, ptr)
+          :error -> raise ArgumentError, "symbol #{inspect(native_sym)} not found in loaded dynamic libraries"
+        end
+    end)
+
+    jit
+  end
+
+  @doc "Binds symbols from `library_path` into `jit` with optional aliasing."
+  @spec bind_library_symbols!(t(), Path.t(), map() | keyword() | [String.Chars.t()]) :: t()
+  def bind_library_symbols!(jit, library_path, symbols) do
+    expanded = Path.expand(library_path)
+
+    pairs =
+      Enum.map(symbols, fn
+        {jit_sym, native_sym} -> {jit_sym, {expanded, native_sym}}
+        sym -> {sym, {expanded, sym}}
+      end)
+
+    register_symbols(jit, pairs)
   end
 
   @doc """

@@ -146,6 +146,10 @@ MLIR_CAPI_EXPORTED MlirStringRef beaverGPUObjectAttrGetObject(MlirAttribute attr
 #include "mlir-c/ExecutionEngine.h"
 
 MLIR_CAPI_EXPORTED bool beaverIsNullExecutionEngine(MlirExecutionEngine w);
+MLIR_CAPI_EXPORTED void beaverRewriterBaseInlineRegionBlocks(MlirRewriterBase rewriter, MlirRegion source,
+                                                             MlirRegion destination);
+MLIR_CAPI_EXPORTED void *beaverDynamicLibrarySearchForAddressOfSymbol(MlirStringRef libraryPath,
+                                                                      MlirStringRef symbolName);
 #ifdef __cplusplus
 }
 #endif

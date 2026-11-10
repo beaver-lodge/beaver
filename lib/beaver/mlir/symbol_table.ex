@@ -85,4 +85,46 @@ defmodule Beaver.MLIR.SymbolTable do
   defdelegate replace_all_symbol_uses(old_symbol, new_symbol, from),
     to: CAPI,
     as: :mlirSymbolTableReplaceAllSymbolUses
+
+  @doc "Looks up or creates an external function/symbol declaration in `module_or_op`'s symbol table."
+  @spec ensure_declaration!(
+          MLIR.Module.t() | MLIR.Operation.t(),
+          String.Chars.t(),
+          MLIR.Type.t() | String.t(),
+          keyword()
+        ) ::
+          MLIR.Operation.t()
+  def ensure_declaration!(module_or_op, sym_name, function_type, opts \\ []) do
+    root_op = MLIR.Operation.from_module(module_or_op)
+    ctx = MLIR.context(root_op)
+    clean_name = sym_name |> to_string() |> String.trim_leading("@")
+    type = if is_binary(function_type), do: MLIR.Type.get(function_type, ctx: ctx), else: function_type
+
+    Beaver.Native.with_resource(create(root_op), &destroy/1, fn sym_table ->
+      existing = lookup(sym_table, clean_name)
+      if MLIR.null?(existing), do: insert_declaration(sym_table, root_op, clean_name, type, opts), else: existing
+    end)
+  end
+
+  defp insert_declaration(sym_table, root_op, clean_name, type, opts) do
+    ctx = MLIR.context(root_op)
+    op_name = Keyword.get(opts, :op, "func.func")
+    loc = Keyword.get_lazy(opts, :location, fn -> MLIR.Operation.location(root_op) end)
+    base_attrs = [sym_name: MLIR.Attribute.string(clean_name, ctx: ctx), function_type: MLIR.Attribute.type(type)]
+    vis = Keyword.get(opts, :visibility, :private) |> to_string()
+
+    attrs =
+      if op_name == "func.func",
+        do: Keyword.put(base_attrs, :sym_visibility, MLIR.Attribute.string(vis, ctx: ctx)),
+        else: base_attrs
+
+    decl =
+      %Beaver.Changeset{name: op_name, location: loc, context: ctx}
+      |> Beaver.Changeset.add_argument(attrs)
+      |> Beaver.Changeset.add_argument(CAPI.mlirRegionCreate())
+      |> MLIR.Operation.create()
+
+    insert(sym_table, decl)
+    decl
+  end
 end

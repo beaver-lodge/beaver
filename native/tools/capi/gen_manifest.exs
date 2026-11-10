@@ -26,8 +26,6 @@ defmodule Beaver.CAPI.ManifestGenerator do
                        %{"scheduler" => "dirty_cpu", "destructor" => "native_owner"}},
                       {"beaverCompileLLVMIRToPTX", "compile_llvm_ir_to_ptx",
                        %{"scheduler" => "dirty_cpu", "destructor" => "native_owner"}},
-                      {"beaverCompilerKernelLoadAndPopulate", "compiler_kernel_load_and_populate",
-                       %{"scheduler" => "dirty_io"}},
                       {"beaverContextEnableOptimizationRemarks", "optimization_remarks_attach",
                        %{
                          "runtime" => "native_notification",
