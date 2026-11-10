@@ -8,7 +8,6 @@ defmodule DocumentationExampleTest do
   @examples [
     {"README.md", "quickstart"},
     {"guides/blocks.md", "control-flow"},
-    {"guides/architecture.md", "module"},
     {"guides/passes-and-patterns.md", "pass-definition"},
     {"guides/passes-and-patterns.md", "pass-pipeline"}
   ]

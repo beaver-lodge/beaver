@@ -129,19 +129,12 @@ does not allow a source-build fallback.
 
 ## Documentation examples
 
-Executable snippets are identified by `<!-- beaver:test:NAME -->` immediately
-before an Elixir code fence. `Beaver.Test.DocumentationExample.read!/2` reads
-them by repository-relative document path and marker, independently of the
-working directory. Missing or duplicate examples fail rather than silently
-selecting another code block.
-
-`test/documentation_examples_test.exs` runs the README quickstart as written,
-tests the PDL pass definition and pipeline together, and verifies the
-control-flow and module fragments in their documented construction scopes.
-The control-flow and bytecode tests reuse the same guide snippet instead of a
-separate copy. Add new guides to the `extras` list in `mix.exs`'s `docs/0` as well.
-
-After setting up the native toolchain, run:
+Mark executable Elixir fences with `<!-- beaver:test:NAME -->`.
+`Beaver.Test.DocumentationExample.read!/2` selects by repository-relative path
+and marker, rejecting missing/duplicate markers and misplaced fences.
+Tests run the README and pass pipeline as written; IR/bytecode tests share the
+control-flow guide snippet. Register guides in `mix.exs`'s `docs/0` extras.
+With the native toolchain ready, run:
 
 ```bash
 mix test test/documentation_example_test.exs test/documentation_examples_test.exs \
