@@ -9,6 +9,7 @@ defmodule Beaver.Slang do
   @callback __slang_traits__() :: [{String.t(), [Beaver.MLIR.Trait.declaration()]}]
   @callback __slang_interfaces__() :: [{String.t(), keyword()}]
   @callback __slang_dialect_name__() :: String.t()
+  @callback __slang_schema_digest__() :: String.t()
   @moduledoc """
   Defines extensible MLIR dialects in Elixir and compiles their schemas to
   [IRDL](https://mlir.llvm.org/docs/Dialects/IRDL/).
@@ -39,12 +40,18 @@ defmodule Beaver.Slang do
       Module.register_attribute(__MODULE__, :__slang__type__, accumulate: true)
       Module.register_attribute(__MODULE__, :__slang__trait__, accumulate: true)
       Module.register_attribute(__MODULE__, :__slang__interface__, accumulate: true)
+      Module.register_attribute(__MODULE__, :__slang__op_meta__, accumulate: true)
     end
   end
 
   @doc false
   defmacro __before_compile__(_env) do
+    introspection_ast = slang_introspection_ast()
+
     quote do
+      @__slang_ordered_ops__ Beaver.Slang.__reverse_list__(@__slang__operation__)
+      @__slang_ordered_meta__ Beaver.Slang.__reverse_list__(@__slang__op_meta__)
+
       @doc false
       def __slang_dialect__(ctx),
         do: Beaver.Slang.create_dialect(@__slang_dialect_name__, Enum.reverse(@__slang__creator__), ctx: ctx)
@@ -58,9 +65,36 @@ defmodule Beaver.Slang do
       @doc false
       def __slang_dialect_name__, do: @__slang_dialect_name__
 
+      unquote(introspection_ast)
+
       use Beaver.MLIR.Dialect,
         dialect: @__slang_dialect_name__,
-        ops: @__slang__operation__ || []
+        ops: Beaver.Slang.__or_empty__(@__slang__operation__)
+    end
+  end
+
+  defp slang_introspection_ast do
+    quote do
+      @doc "Returns a deterministic SHA-256 digest of the canonicalized IRDL dialect schema."
+      def __slang_schema_digest__, do: Beaver.Slang.schema_digest(__MODULE__)
+
+      @doc "Returns full operation names (`\"dialect.op\"`) declared in this dialect."
+      def __slang_operations__, do: Beaver.Slang.__ops_for_dialect__(@__slang_dialect_name__, @__slang_ordered_ops__)
+
+      @doc "Returns full operation names (`\"dialect.op\"`) belonging to `layer`."
+      def __slang_operations__(layer),
+        do: Beaver.Slang.__ops_for_layer__(@__slang_dialect_name__, @__slang_ordered_meta__, layer)
+
+      @doc "Returns unique non-nil layers declared on operations in this dialect."
+      def __slang_layers__, do: Beaver.Slang.__layers_for_meta__(@__slang_ordered_meta__)
+
+      @doc "Returns the declared `:layer` for `op_name`, or `nil`."
+      def __slang_layer__(op_name),
+        do: Beaver.Slang.__layer_for_op__(@__slang_dialect_name__, @__slang_ordered_meta__, op_name)
+
+      @doc "Returns the declared `:metadata` map for `op_name`."
+      def __slang_metadata__(op_name),
+        do: Beaver.Slang.__metadata_for_op__(@__slang_dialect_name__, @__slang_ordered_meta__, op_name)
     end
   end
 
@@ -71,7 +105,7 @@ defmodule Beaver.Slang do
   end
 
   @doc false
-  defp transform_defop_pins({:^, _line1, [{name, _line2, nil}]}) do
+  defp transform_defop_pins({:^, _line1, [{name, _line2, ctx}]}) when is_atom(name) and is_atom(ctx) do
     alias_name = get_alias_name(name)
 
     quote do
@@ -159,9 +193,9 @@ defmodule Beaver.Slang do
   def run_creator(name, op, args_op, constrain_f, opts) do
     Deferred.from_opts(opts, fn ctx ->
       location = source_location(opts, ctx)
-      region = CAPI.mlirRegionCreate()
+      region = MLIR.Region.create()
       block = MLIR.Block.create()
-      CAPI.mlirRegionAppendOwnedBlock(region, block)
+      MLIR.Region.append(region, block)
       local = [ctx: ctx, ip: block, loc: location]
 
       # The region is still caller-owned until the enclosing declaration is created.
@@ -184,7 +218,7 @@ defmodule Beaver.Slang do
         end
       catch
         kind, reason ->
-          CAPI.mlirRegionDestroy(region)
+          MLIR.Region.destroy(region)
           :erlang.raise(kind, reason, __STACKTRACE__)
       end
 
@@ -208,13 +242,13 @@ defmodule Beaver.Slang do
 
   defp transform_constraint(ast, i) do
     case ast do
-      {_name, _line0, nil} ->
+      {name, _line0, ctx} when is_atom(name) and is_atom(ctx) ->
         nil
 
       {:=, _line0, [_var, _right]} ->
         ast
 
-      {variadic_tag, {_name, _line0, nil}} when variadic_tag in @variadic_tags ->
+      {variadic_tag, {name, _line0, ctx}} when variadic_tag in @variadic_tags and is_atom(name) and is_atom(ctx) ->
         ast
 
       _ ->
@@ -230,9 +264,9 @@ defmodule Beaver.Slang do
 
   defp transform_variable(ast, i) do
     case ast do
-      {_name, _line0, nil} -> ast
+      {name, _line0, ctx} when is_atom(name) and is_atom(ctx) -> ast
       {:=, _line0, [var, _right]} -> var
-      {variadic_tag, {_name, _line0, nil}} when variadic_tag in @variadic_tags -> ast
+      {variadic_tag, {name, _line0, ctx}} when variadic_tag in @variadic_tags and is_atom(name) and is_atom(ctx) -> ast
       _ -> get_slang_arg_ast(i)
     end
   end
@@ -246,7 +280,8 @@ defmodule Beaver.Slang do
   defp declaration_name({tag, value}, index, prefix) when tag in @variadic_tags,
     do: declaration_name(value, index, prefix)
 
-  defp declaration_name({name, _, nil}, _index, _prefix) when is_atom(name), do: Atom.to_string(name)
+  defp declaration_name({name, _, ctx}, _index, _prefix) when is_atom(name) and is_atom(ctx),
+    do: Atom.to_string(name)
 
   defp declaration_name(_ast, index, prefix), do: "#{prefix}_#{index + 1}"
 
@@ -451,7 +486,7 @@ defmodule Beaver.Slang do
 
     creator_opts =
       opts
-      |> Keyword.drop(~w(argument_names result_names attributes regions traits interfaces)a)
+      |> Keyword.drop(~w(argument_names result_names attributes regions traits interfaces layer metadata)a)
       |> Keyword.merge(
         argument_names: argument_names,
         result_names: result_names,
@@ -465,6 +500,19 @@ defmodule Beaver.Slang do
     quote do
       Module.put_attribute(__MODULE__, unquote(attr_name), unquote(name))
       @__slang__creator__ {unquote(op), __MODULE__, unquote(creator)}
+      unquote_splicing(
+        if op == :operation do
+          [
+            quote do
+              @__slang__op_meta__ {unquote(name), unquote(opts[:layer]),
+                                   Beaver.Slang.__normalize_op_metadata__!(unquote(opts[:metadata]))}
+            end
+          ]
+        else
+          []
+        end
+      )
+
       unquote_splicing(
         for {key, values} <- [__slang__trait__: traits, __slang__interface__: interfaces], values != [] do
           quote do
@@ -563,7 +611,10 @@ defmodule Beaver.Slang do
   @doc "Defines an operation and generates its creator function."
   defmacro defop(call, block \\ nil) do
     block =
-      Keyword.validate!(block || [], ~w(do results result_names operand_names attributes regions traits interfaces)a)
+      Keyword.validate!(
+        block || [],
+        ~w(do results result_names operand_names attributes regions traits interfaces layer metadata)a
+      )
 
     if Keyword.has_key?(block, :do) and Keyword.has_key?(block, :results),
       do: raise(ArgumentError, "defop accepts either a do block or :results, not both")
@@ -579,8 +630,32 @@ defmodule Beaver.Slang do
       regions: block[:regions],
       traits: block[:traits],
       interfaces: block[:interfaces],
+      layer: block[:layer],
+      metadata: block[:metadata],
       source: %{file: __CALLER__.file, line: __CALLER__.line}
     )
+  end
+
+  @doc """
+  Defines multiple operations declaratively from a table of specs without manual AST construction.
+
+  Each entry in `specs` may be `{name, operands, results}`, `{name, operands, results, attributes}`,
+  `{name, operands, results, attributes, op_opts}`, or a keyword/map spec. Constraint atoms like `:tv`
+  expand to pinned named constraints `^tv`, and `{:variadic, c}` / `{:optional, c}` / `{:base, b}` /
+  `:any` expand to the corresponding Slang constraint forms.
+  """
+  defmacro defops(specs, shared_opts \\ []) do
+    expanded_specs = Macro.expand(specs, __CALLER__)
+    expanded_shared = Macro.expand(shared_opts, __CALLER__)
+
+    unless is_list(expanded_specs),
+      do: raise(ArgumentError, "defops expects a list of operation specifications, got: #{Macro.to_string(specs)}")
+
+    decls = Enum.map(expanded_specs, &expand_table_op!(&1, expanded_shared))
+
+    quote do
+      (unquote_splicing(decls))
+    end
   end
 
   defp get_alias_name(def_name), do: String.to_atom("alias_" <> Atom.to_string(def_name))
@@ -770,6 +845,337 @@ defmodule Beaver.Slang do
 
   defp normalize_interfaces!(other),
     do: raise(ArgumentError, ":interfaces must be a keyword list, got: #{inspect(other)}")
+
+  @doc false
+  def __normalize_op_metadata__!(nil), do: %{}
+  def __normalize_op_metadata__!(%{} = map), do: map
+  def __normalize_op_metadata__!(kw) when is_list(kw), do: Map.new(kw)
+
+  def __normalize_op_metadata__!(other),
+    do: raise(ArgumentError, "operation :metadata must be a map or keyword list, got: #{inspect(other)}")
+
+  @doc false
+  def __or_empty__(nil), do: []
+  def __or_empty__(list) when is_list(list), do: list
+
+  @doc false
+  def __reverse_list__(nil), do: []
+  def __reverse_list__(list) when is_list(list), do: Enum.reverse(list)
+
+  @doc false
+  def __ops_for_dialect__(dialect_name, ordered_ops),
+    do: Enum.map(ordered_ops, &(dialect_name <> "." <> &1))
+
+  @doc false
+  def __ops_for_layer__(dialect_name, ordered_meta, layer) do
+    for {op, ^layer, _meta} <- ordered_meta, do: dialect_name <> "." <> op
+  end
+
+  @doc false
+  def __layers_for_meta__(ordered_meta) do
+    ordered_meta
+    |> Enum.map(&elem(&1, 1))
+    |> Enum.reject(&is_nil/1)
+    |> Enum.uniq()
+  end
+
+  @doc false
+  def __layer_for_op__(dialect_name, ordered_meta, op_name) do
+    short = short_op_name(dialect_name, op_name)
+
+    case List.keyfind(ordered_meta, short, 0) do
+      {^short, layer, _meta} -> layer
+      nil -> nil
+    end
+  end
+
+  @doc false
+  def __metadata_for_op__(dialect_name, ordered_meta, op_name) do
+    short = short_op_name(dialect_name, op_name)
+
+    case List.keyfind(ordered_meta, short, 0) do
+      {^short, _layer, meta} -> meta
+      nil -> %{}
+    end
+  end
+
+  @doc false
+  def short_op_name(dialect_name, op_name) do
+    str = to_string(op_name)
+    prefix = dialect_name <> "."
+    String.replace_prefix(str, prefix, "")
+  end
+
+  @doc """
+  Computes (and caches per compiled module MD5 via `:persistent_term`) a deterministic
+  `"sha256:..."` digest of `mod`'s canonicalized IRDL schema, traits, and interface keys.
+  """
+  @spec schema_digest(module()) :: String.t()
+  def schema_digest(mod) when is_atom(mod) do
+    cache_key = {__MODULE__, :schema_digest, mod, mod.__info__(:md5)}
+
+    case :persistent_term.get(cache_key, nil) do
+      digest when is_binary(digest) ->
+        digest
+
+      nil ->
+        digest = compute_schema_digest(mod)
+        :persistent_term.put(cache_key, digest)
+        digest
+    end
+  end
+
+  defp compute_schema_digest(mod) do
+    ir_text =
+      MLIR.Context.with_context(fn ctx ->
+        mod
+        |> apply(:__slang_dialect__, [ctx])
+        |> Beaver.MLIR.Transform.canonicalize()
+        |> Beaver.Composer.run!()
+        |> MLIR.verify!()
+        |> MLIR.Module.with_module(fn irdl_mod ->
+          MLIR.to_string(irdl_mod, generic: true)
+        end)
+      end)
+
+    trait_summary =
+      Enum.map(mod.__slang_traits__(), fn {op, decls} ->
+        {op,
+         Enum.map(decls, fn
+           {id, kw} when is_list(kw) -> {id, Keyword.keys(kw)}
+           builtin -> builtin
+         end)}
+      end)
+
+    iface_summary =
+      Enum.map(mod.__slang_interfaces__(), fn {op, kw} -> {op, Keyword.keys(kw)} end)
+
+    hash =
+      :crypto.hash(:sha256, [ir_text, :erlang.term_to_binary({trait_summary, iface_summary})])
+      |> Base.encode16(case: :lower)
+
+    "sha256:" <> hash
+  end
+
+  @doc """
+  Verifies that every operation belonging to `dialect_mod` inside `ir` satisfies the given
+  layer rule (either an enumerable of allowed layers or `[allow: layers, forbid: layers]`).
+  """
+  @spec verify_layers(MLIR.Module.t() | MLIR.Operation.t(), module(), Enumerable.t() | keyword()) ::
+          :ok | {:error, [%{operation: String.t(), layer: term()}]}
+  def verify_layers(ir, dialect_mod, rule) when is_atom(dialect_mod) do
+    prefix = dialect_mod.__slang_dialect_name__() <> "."
+    {allow_set, forbid_set} = parse_layer_rule(rule)
+
+    violations =
+      ir
+      |> Beaver.Walker.find_ops(fn op -> String.starts_with?(MLIR.Operation.name(op), prefix) end)
+      |> Enum.flat_map(&layer_violation(dialect_mod, &1, allow_set, forbid_set))
+
+    if violations == [], do: :ok, else: {:error, violations}
+  end
+
+  defp parse_layer_rule(rule) when is_list(rule) do
+    if Keyword.keyword?(rule) and (Keyword.has_key?(rule, :allow) or Keyword.has_key?(rule, :forbid)) do
+      {optional_map_set(Keyword.fetch(rule, :allow)), optional_map_set(Keyword.fetch(rule, :forbid)) || MapSet.new()}
+    else
+      {MapSet.new(rule), MapSet.new()}
+    end
+  end
+
+  defp parse_layer_rule(rule), do: {MapSet.new(rule), MapSet.new()}
+
+  defp optional_map_set({:ok, list}), do: MapSet.new(list)
+  defp optional_map_set(:error), do: nil
+
+  defp layer_violation(dialect_mod, op, allow_set, forbid_set) do
+    op_name = MLIR.Operation.name(op)
+    layer = dialect_mod.__slang_layer__(op_name)
+
+    if layer_allowed?(layer, allow_set, forbid_set),
+      do: [],
+      else: [%{operation: op_name, layer: layer}]
+  end
+
+  defp layer_allowed?(layer, nil, forbid_set), do: not MapSet.member?(forbid_set, layer)
+
+  defp layer_allowed?(layer, allow_set, forbid_set),
+    do: MapSet.member?(allow_set, layer) and not MapSet.member?(forbid_set, layer)
+
+  @doc "Verifies dialect operation layers via `verify_layers/3`, returning `ir` or raising `ArgumentError`."
+  @spec verify_layers!(MLIR.Module.t() | MLIR.Operation.t(), module(), Enumerable.t() | keyword()) ::
+          MLIR.Module.t() | MLIR.Operation.t()
+  def verify_layers!(ir, dialect_mod, rule) do
+    case verify_layers(ir, dialect_mod, rule) do
+      :ok ->
+        ir
+
+      {:error, violations} ->
+        summary =
+          violations
+          |> Enum.map(fn %{operation: name, layer: l} -> "#{name} (layer: #{inspect(l)})" end)
+          |> Enum.uniq()
+          |> Enum.join(", ")
+
+        raise ArgumentError,
+              "layer verification failed for #{inspect(dialect_mod)} (#{inspect(rule)}): #{summary}"
+    end
+  end
+
+  defp expand_table_op!(entry, shared_opts) do
+    {op_name, operands, results, attributes, op_opts} = unpack_table_op!(entry)
+    merged_opts = merge_table_op_opts(shared_opts, op_opts)
+
+    {operand_asts, explicit_op_names} = expand_table_items!(operands, merged_opts[:operand_names])
+    {result_asts, explicit_res_names} = expand_table_items!(results, merged_opts[:result_names])
+
+    attr_asts =
+      Enum.map(attributes || [], fn {k, v} ->
+        {if(is_atom(k), do: k, else: String.to_atom(to_string(k))), expand_table_constraint(v)}
+      end)
+
+    call_ast = {op_name, [], operand_asts}
+
+    defop_opts =
+      merged_opts
+      |> Keyword.put(:results, result_asts)
+      |> maybe_put_kw(:operand_names, explicit_op_names)
+      |> maybe_put_kw(:result_names, explicit_res_names)
+      |> maybe_put_kw(:attributes, if(attr_asts == [], do: merged_opts[:attributes], else: attr_asts))
+
+    quote do
+      Beaver.Slang.defop(unquote(call_ast), unquote(defop_opts))
+    end
+  end
+
+  defp merge_table_op_opts(shared_opts, op_opts) do
+    merged = Keyword.merge(shared_opts, op_opts)
+
+    case {shared_opts[:metadata], op_opts[:metadata]} do
+      {nil, _} ->
+        merged
+
+      {_, nil} ->
+        merged
+
+      {s_meta, o_meta} ->
+        Keyword.put(
+          merged,
+          :metadata,
+          quote(do: Map.merge(Map.new(unquote(s_meta)), Map.new(unquote(o_meta))))
+        )
+    end
+  end
+
+  defp maybe_put_kw(kw, _key, nil), do: kw
+  defp maybe_put_kw(kw, key, val), do: Keyword.put(kw, key, val)
+
+  defp unpack_table_op!({:{}, _meta, [name, operands, results]}),
+    do: {to_op_atom!(name), operands, results, [], []}
+
+  defp unpack_table_op!({:{}, _meta, [name, operands, results, attributes]}),
+    do: {to_op_atom!(name), operands, results, attributes, []}
+
+  defp unpack_table_op!({:{}, _meta, [name, operands, results, attributes, op_opts]}),
+    do: {to_op_atom!(name), operands, results, attributes, op_opts}
+
+  defp unpack_table_op!({:%{}, _meta, kvs}), do: unpack_table_op!(kvs)
+
+  defp unpack_table_op!({name, operands, results}) when is_atom(name) or is_binary(name),
+    do: {to_op_atom!(name), operands, results, [], []}
+
+  defp unpack_table_op!({name, operands, results, attributes})
+       when is_atom(name) or is_binary(name),
+       do: {to_op_atom!(name), operands, results, attributes, []}
+
+  defp unpack_table_op!({name, operands, results, attributes, op_opts})
+       when is_atom(name) or is_binary(name),
+       do: {to_op_atom!(name), operands, results, attributes, op_opts}
+
+  defp unpack_table_op!(%{} = map), do: unpack_table_op!(Map.to_list(map))
+
+  defp unpack_table_op!(kw) when is_list(kw) do
+    name = Keyword.fetch!(kw, :name) |> to_op_atom!()
+    operands = Keyword.get(kw, :operands, [])
+    results = Keyword.get(kw, :results, [])
+    attributes = Keyword.get(kw, :attributes, [])
+    rest = Keyword.drop(kw, [:name, :operands, :results, :attributes])
+    {name, operands, results, attributes, rest}
+  end
+
+  defp unpack_table_op!(other),
+    do: raise(ArgumentError, "invalid Slang defops specification: #{inspect(other)}")
+
+  defp to_op_atom!(a) when is_atom(a), do: a
+  defp to_op_atom!(s) when is_binary(s) and s != "", do: String.to_atom(s)
+
+  defp expand_table_items!(items, explicit_names) when is_list(items) do
+    if items != [] and named_value_keyword?(items) do
+      if explicit_names,
+        do: raise(ArgumentError, "cannot combine named defops items with explicit *_names option")
+
+      names = Enum.map(items, fn {k, _} -> to_string(k) end)
+      asts = Enum.map(items, fn {_, spec} -> expand_table_constraint(spec) end)
+      {asts, names}
+    else
+      {Enum.map(items, &expand_table_constraint/1), explicit_names}
+    end
+  end
+
+  defp expand_table_constraint(:any), do: quote(do: Beaver.Slang.any())
+  defp expand_table_constraint(:i1), do: quote(do: Beaver.MLIR.Type.i1())
+  defp expand_table_constraint(:i8), do: quote(do: Beaver.MLIR.Type.i8())
+  defp expand_table_constraint(:i16), do: quote(do: Beaver.MLIR.Type.i16())
+  defp expand_table_constraint(:i32), do: quote(do: Beaver.MLIR.Type.i32())
+  defp expand_table_constraint(:i64), do: quote(do: Beaver.MLIR.Type.i64())
+  defp expand_table_constraint(:i128), do: quote(do: Beaver.MLIR.Type.i128())
+  defp expand_table_constraint(:index), do: quote(do: Beaver.MLIR.Type.index())
+  defp expand_table_constraint(:f16), do: quote(do: Beaver.MLIR.Type.f16())
+  defp expand_table_constraint(:bf16), do: quote(do: Beaver.MLIR.Type.bf16())
+  defp expand_table_constraint(:f32), do: quote(do: Beaver.MLIR.Type.f32())
+  defp expand_table_constraint(:f64), do: quote(do: Beaver.MLIR.Type.f64())
+
+  defp expand_table_constraint(pin_name)
+       when is_atom(pin_name) and not is_boolean(pin_name) and not is_nil(pin_name) do
+    var = {pin_name, [], nil}
+    quote(do: ^unquote(var))
+  end
+
+  defp expand_table_constraint({:pin, pin_name}) when is_atom(pin_name) do
+    var = {pin_name, [], nil}
+    quote(do: ^unquote(var))
+  end
+
+  defp expand_table_constraint({:type, str}) when is_binary(str),
+    do: quote(do: Beaver.MLIR.Type.get(unquote(str)))
+
+  defp expand_table_constraint(str) when is_binary(str) do
+    cond do
+      String.starts_with?(str, "#") and not String.contains?(str, "<") ->
+        quote(do: Beaver.Slang.base(unquote(str)))
+
+      String.starts_with?(str, "!") and not String.contains?(str, "<") ->
+        quote(do: Beaver.Slang.base(unquote(str)))
+
+      true ->
+        quote(do: Beaver.MLIR.Type.get(unquote(str)))
+    end
+  end
+
+  defp expand_table_constraint({tag, inner}) when tag in [:variadic, :optional, :single] do
+    expanded = expand_table_constraint(inner)
+    quote(do: Beaver.Slang.unquote(tag)(unquote(expanded)))
+  end
+
+  defp expand_table_constraint({:base, inner}), do: quote(do: Beaver.Slang.base(unquote(inner)))
+
+  defp expand_table_constraint({comb, list}) when comb in [:any_of, :all_of] and is_list(list) do
+    expanded = Enum.map(list, &expand_table_constraint/1)
+    quote(do: Beaver.Slang.unquote(comb)(unquote(expanded)))
+  end
+
+  defp expand_table_constraint({:is, inner}), do: quote(do: Beaver.Slang.is(unquote(inner)))
+  defp expand_table_constraint(ast), do: ast
 
   @doc """
   This function loads the MLIR dialect into the MLIR context. It invokes the internal function of the provided module to create the dialect's IRDL module and performs additional MLIR transformations and verification.

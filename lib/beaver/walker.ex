@@ -272,6 +272,112 @@ defmodule Beaver.Walker do
   @spec postwalk(mlir(), any, (mlir(), any -> {mlir(), any})) :: {mlir(), any}
   def postwalk(ast, acc, fun) when is_function(fun, 2), do: traverse(ast, acc, fn x, a -> {x, a} end, fun)
 
+  @type op_matcher() ::
+          :all
+          | String.t()
+          | atom()
+          | [String.Chars.t()]
+          | MapSet.t()
+          | (Operation.t() -> as_boolean(term()))
+
+  @doc """
+  Finds operations inside `root` (`MLIR.Module`, `MLIR.Operation`, `MLIR.Region`, or `MLIR.Block`)
+  in pre-order without traversing operands, results, attributes, or successors.
+
+  `matcher` may be `:all`, an operation name (`"arith.addi"`), a list or `MapSet` of operation names,
+  or a 1-arity predicate `(Operation.t() -> boolean())`.
+
+  Options:
+    * `:exclude_root` - when `true`, skips `root` itself (default `false`; note that when `root`
+      is an `MLIR.Module`, `builtin.module` is skipped when `exclude_root: true`).
+  """
+  @spec find_ops(Module.t() | Operation.t() | Region.t() | Block.t(), op_matcher(), keyword()) :: [Operation.t()]
+  def find_ops(root, matcher \\ :all, opts \\ []) when is_list(opts) do
+    predicate = build_op_predicate!(matcher)
+    exclude_root = Keyword.get(opts, :exclude_root, false)
+    container = extract_container(root)
+
+    acc =
+      case container do
+        %Operation{} = root_op ->
+          init = if not exclude_root and predicate.(root_op), do: [root_op], else: []
+          walk_op_regions(root_op, init, predicate)
+
+        %Region{} = region ->
+          walk_region_ops(region, [], predicate)
+
+        %Block{} = block ->
+          walk_block_ops(block, [], predicate)
+      end
+
+    Enum.reverse(acc)
+  end
+
+  defp build_op_predicate!(:all), do: fn _op -> true end
+  defp build_op_predicate!(fun) when is_function(fun, 1), do: fn op -> if(fun.(op), do: true, else: false) end
+
+  defp build_op_predicate!(name) when is_binary(name) or is_atom(name) do
+    target = to_string(name)
+    fn op -> Operation.name(op) == target end
+  end
+
+  defp build_op_predicate!(%MapSet{} = set) do
+    names = MapSet.new(set, &to_string/1)
+    fn op -> MapSet.member?(names, Operation.name(op)) end
+  end
+
+  defp build_op_predicate!(names) when is_list(names) do
+    case names do
+      [] -> fn _op -> false end
+      [single] -> build_op_predicate!(single)
+      many -> build_op_predicate!(MapSet.new(many, &to_string/1))
+    end
+  end
+
+  defp build_op_predicate!(other),
+    do: raise(ArgumentError, "invalid Walker.find_ops matcher: #{inspect(other)}")
+
+  defp walk_op_regions(%Operation{} = op, acc, predicate) do
+    num_regions = native_integer(CAPI.mlirOperationGetNumRegions(op))
+
+    if num_regions == 0 do
+      acc
+    else
+      Enum.reduce(0..(num_regions - 1), acc, fn idx, inner_acc ->
+        op |> CAPI.mlirOperationGetRegion(idx) |> walk_region_ops(inner_acc, predicate)
+      end)
+    end
+  end
+
+  defp walk_region_ops(%Region{} = region, acc, predicate) do
+    first_blk = CAPI.mlirRegionGetFirstBlock(region)
+    walk_region_blocks_loop(first_blk, acc, predicate)
+  end
+
+  defp walk_region_blocks_loop(%Block{} = blk, acc, predicate) do
+    if MLIR.null?(blk) do
+      acc
+    else
+      acc = walk_block_ops(blk, acc, predicate)
+      walk_region_blocks_loop(CAPI.mlirBlockGetNextInRegion(blk), acc, predicate)
+    end
+  end
+
+  defp walk_block_ops(%Block{} = blk, acc, predicate) do
+    first_op = CAPI.mlirBlockGetFirstOperation(blk)
+    walk_block_ops_loop(first_op, acc, predicate)
+  end
+
+  defp walk_block_ops_loop(%Operation{} = op, acc, predicate) do
+    if MLIR.null?(op) do
+      acc
+    else
+      acc = if predicate.(op), do: [op | acc], else: acc
+      acc = walk_op_regions(op, acc, predicate)
+      walk_block_ops_loop(CAPI.mlirOperationGetNextInBlock(op), acc, predicate)
+    end
+  end
+
   defimpl Enumerable do
     @spec count(Beaver.Walker.t()) :: {:ok, non_neg_integer()} | {:error, module()}
     def count(%Beaver.Walker{container: container, get_num: get_num})

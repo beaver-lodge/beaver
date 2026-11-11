@@ -86,24 +86,60 @@ defmodule Beaver.MLIR.SymbolTable do
     to: CAPI,
     as: :mlirSymbolTableReplaceAllSymbolUses
 
-  @doc "Looks up or creates an external function/symbol declaration in `module_or_op`'s symbol table."
+  @doc """
+  Looks up or creates an external function/symbol declaration in `module_or_op`'s enclosing symbol table.
+
+  Options:
+    * `:op` - declaration operation name (default `"func.func"`).
+    * `:visibility` - `:private` (default), `:public`, or `:nested` (applied to `"func.func"`).
+    * `:location` - explicit `MLIR.Location` for a newly created declaration.
+    * `:verify_type` - when `true`, verifies that an already existing symbol's `function_type`
+      attribute matches `function_type` and raises `ArgumentError` on mismatch.
+  """
   @spec ensure_declaration!(
           MLIR.Module.t() | MLIR.Operation.t(),
           String.Chars.t(),
-          MLIR.Type.t() | String.t(),
+          MLIR.Type.t() | Beaver.Deferred.t() | String.t(),
           keyword()
         ) ::
           MLIR.Operation.t()
   def ensure_declaration!(module_or_op, sym_name, function_type, opts \\ []) do
-    root_op = MLIR.Operation.from_module(module_or_op)
+    op = MLIR.Operation.from_module(module_or_op)
+    root_op = MLIR.Operation.enclosing_symbol_table(op) || op
     ctx = MLIR.context(root_op)
     clean_name = sym_name |> to_string() |> String.trim_leading("@")
-    type = if is_binary(function_type), do: MLIR.Type.get(function_type, ctx: ctx), else: function_type
+
+    type =
+      case function_type do
+        s when is_binary(s) -> MLIR.Type.get(s, ctx: ctx)
+        %Beaver.Deferred{} = d -> Beaver.Deferred.resolve(d, ctx)
+        %MLIR.Type{} = t -> t
+      end
 
     Beaver.Native.with_resource(create(root_op), &destroy/1, fn sym_table ->
-      existing = lookup(sym_table, clean_name)
-      if MLIR.null?(existing), do: insert_declaration(sym_table, root_op, clean_name, type, opts), else: existing
+      lookup_or_insert_declaration!(sym_table, root_op, clean_name, type, opts)
     end)
+  end
+
+  defp lookup_or_insert_declaration!(sym_table, root_op, clean_name, type, opts) do
+    existing = lookup(sym_table, clean_name)
+
+    if MLIR.null?(existing) do
+      insert_declaration(sym_table, root_op, clean_name, type, opts)
+    else
+      if Keyword.get(opts, :verify_type, false), do: verify_existing_type!(existing, clean_name, type)
+      existing
+    end
+  end
+
+  defp verify_existing_type!(existing, clean_name, expected_type) do
+    expected_attr = MLIR.Attribute.type(expected_type)
+    actual_attr = existing["function_type"]
+
+    if is_nil(actual_attr) or MLIR.null?(actual_attr) or not MLIR.equal?(actual_attr, expected_attr) do
+      raise ArgumentError,
+            "symbol @#{clean_name} already declared with incompatible function_type #{actual_attr && MLIR.to_string(actual_attr)}, expected #{MLIR.to_string(expected_type)}"
+    end
   end
 
   defp insert_declaration(sym_table, root_op, clean_name, type, opts) do
@@ -121,7 +157,7 @@ defmodule Beaver.MLIR.SymbolTable do
     decl =
       %Beaver.Changeset{name: op_name, location: loc, context: ctx}
       |> Beaver.Changeset.add_argument(attrs)
-      |> Beaver.Changeset.add_argument(CAPI.mlirRegionCreate())
+      |> Beaver.Changeset.add_argument(MLIR.Region.create())
       |> MLIR.Operation.create()
 
     insert(sym_table, decl)

@@ -124,6 +124,19 @@ defmodule Beaver.MLIR.TypeConverter do
     await_conversion(id, converter.timeout_ms, nil)
   end
 
+  @doc "Converts `type` with `converter`, returning the converted `Type.t()` or raising `ArgumentError`."
+  @spec convert!(t(), Type.t()) :: Type.t()
+  def convert!(%__MODULE__{} = converter, %Type{} = type) do
+    case convert(converter, type) do
+      {:ok, converted} ->
+        converted
+
+      {:error, reason} ->
+        raise ArgumentError,
+              "TypeConverter failed to convert #{MLIR.to_string(type)}: #{inspect(reason)}"
+    end
+  end
+
   defp await_conversion(id, timeout_ms, callback_failure) do
     receive do
       {^id, {{:ok, result}, nil}} ->

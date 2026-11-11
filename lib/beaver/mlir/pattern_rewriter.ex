@@ -11,11 +11,17 @@ defmodule Beaver.MLIR.PatternRewriter do
     [_ | args] = Macro.generate_arguments(arity, __MODULE__)
 
     @doc """
-    Delegates to `Beaver.MLIR.RewriterBase.#{helper_name}/#{arity}` after converting the first argument as base.
+    Delegates to `Beaver.MLIR.RewriterBase.#{helper_name}/#{arity}`.
     """
-    def unquote(:"#{helper_name}")(%__MODULE__{} = rewriter, unquote_splicing(args)) do
-      base = rewriter |> as_base()
-      MLIR.RewriterBase.unquote(:"#{helper_name}")(base, unquote_splicing(args))
+    if helper_name in Beaver.MLIR.RewriterBase.polymorphic_helper_names() do
+      def unquote(:"#{helper_name}")(%__MODULE__{} = rewriter, unquote_splicing(args)) do
+        MLIR.RewriterBase.unquote(:"#{helper_name}")(rewriter, unquote_splicing(args))
+      end
+    else
+      def unquote(:"#{helper_name}")(%__MODULE__{} = rewriter, unquote_splicing(args)) do
+        base = rewriter |> as_base()
+        MLIR.RewriterBase.unquote(:"#{helper_name}")(base, unquote_splicing(args))
+      end
     end
   end
 end

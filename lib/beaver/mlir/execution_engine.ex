@@ -98,6 +98,17 @@ defmodule Beaver.MLIR.ExecutionEngine do
 
   defdelegate destroy(jit), to: CAPI, as: :mlirExecutionEngineDestroy
 
+  @doc """
+  Creates an `ExecutionEngine`, runs `fun.(jit)`, and always destroys the engine afterward.
+  """
+  @spec with_jit(Composer.t() | MLIR.Module.t(), (t() -> result)) :: result when result: var
+  def with_jit(composer_or_module, fun) when is_function(fun, 1),
+    do: with_jit(composer_or_module, [], fun)
+
+  @spec with_jit(Composer.t() | MLIR.Module.t(), opts(), (t() -> result)) :: result when result: var
+  def with_jit(composer_or_module, opts, fun) when is_list(opts) and is_function(fun, 1),
+    do: Native.with_resource(create!(composer_or_module, opts), &destroy/1, fun)
+
   @doc "Look up a symbol in an execution engine."
   @spec lookup(t(), String.t() | StringRef.t(), keyword()) :: Native.OpaquePtr.t()
   def lookup(jit, symbol, opts \\ []) do
@@ -117,16 +128,36 @@ defmodule Beaver.MLIR.ExecutionEngine do
     jit
   end
 
-  @doc "Looks up a symbol address in a dynamic library or in the current process (`nil`)."
-  @spec lookup_library_symbol(Path.t() | nil, String.Chars.t()) :: {:ok, Native.OpaquePtr.t()} | :error
-  def lookup_library_symbol(library_path \\ nil, symbol_name) do
+  @doc """
+  Looks up a symbol address (or the first matching symbol from a list of fallback candidates)
+  in a dynamic library or in the current process (`nil`).
+  """
+  @spec lookup_library_symbol(Path.t() | nil, String.Chars.t() | [String.Chars.t()]) ::
+          {:ok, Native.OpaquePtr.t()} | :error
+  def lookup_library_symbol(library_path \\ nil, symbol_or_candidates)
+
+  def lookup_library_symbol(library_path, [_ | _] = candidates) do
+    Enum.find_value(candidates, :error, fn candidate ->
+      case lookup_library_symbol(library_path, candidate) do
+        {:ok, ptr} -> {:ok, ptr}
+        :error -> nil
+      end
+    end)
+  end
+
+  def lookup_library_symbol(_library_path, []), do: :error
+
+  def lookup_library_symbol(library_path, symbol_name) do
     lib_str = if library_path, do: Path.expand(library_path), else: ""
     sym_str = symbol_name |> to_string() |> String.trim_leading("@")
     ptr = beaverDynamicLibrarySearchForAddressOfSymbol(StringRef.create(lib_str), StringRef.create(sym_str))
     if Native.to_term(ptr) == 0, do: :error, else: {:ok, ptr}
   end
 
-  @doc "Registers multiple symbols on `jit` from pointers, `{library_path, native_sym}` tuples, or symbol names."
+  @doc """
+  Registers multiple symbols on `jit` from pointers, `{library_path, native_sym_or_candidates}` tuples,
+  symbol names, or candidate fallback lists `["preferred_sym", "fallback_sym"]`.
+  """
   @spec register_symbols(t(), map() | keyword()) :: t()
   def register_symbols(jit, symbols) when is_map(symbols) or is_list(symbols) do
     Enum.each(symbols, fn
@@ -137,6 +168,12 @@ defmodule Beaver.MLIR.ExecutionEngine do
         case lookup_library_symbol(library_path, native_sym) do
           {:ok, ptr} -> register_symbol(jit, jit_sym, ptr)
           :error -> raise ArgumentError, "symbol #{inspect(native_sym)} not found in #{inspect(library_path)}"
+        end
+
+      {jit_sym, candidates} when is_list(candidates) ->
+        case lookup_library_symbol(nil, candidates) do
+          {:ok, ptr} -> register_symbol(jit, jit_sym, ptr)
+          :error -> raise ArgumentError, "none of symbols #{inspect(candidates)} found in loaded dynamic libraries"
         end
 
       {jit_sym, native_sym} when is_binary(native_sym) or is_atom(native_sym) ->

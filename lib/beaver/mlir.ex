@@ -51,6 +51,8 @@ defmodule Beaver.MLIR do
     Attribute,
     Type,
     Block,
+    Region,
+    SymbolTable,
     Location,
     Operation,
     AffineMap,
@@ -102,6 +104,8 @@ defmodule Beaver.MLIR do
           | Operation.t()
           | Module.t()
           | Block.t()
+          | Region.t()
+          | SymbolTable.t()
           | Dialect.t()
           | ExecutionEngine.t()
 

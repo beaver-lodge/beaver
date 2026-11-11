@@ -53,15 +53,20 @@ defmodule Beaver.MLIR.Conversion.Plan do
     )
   end
 
-  for {name, field} <- [
-        add_legal_op: :op,
-        add_illegal_op: :op,
-        add_legal_dialect: :dialect,
-        add_illegal_dialect: :dialect
+  for {name, plural, field} <- [
+        {:add_legal_op, :add_legal_ops, :op},
+        {:add_illegal_op, :add_illegal_ops, :op},
+        {:add_legal_dialect, :add_legal_dialects, :dialect},
+        {:add_illegal_dialect, :add_illegal_dialects, :dialect}
       ] do
     @spec unquote(name)(t(), String.Chars.t()) :: t()
     def unquote(name)(%__MODULE__{} = plan, name),
       do: append_entry(plan, {unquote(name), to_string(name)})
+
+    @doc "Adds multiple entries via `#{name}/2`."
+    @spec unquote(plural)(t(), Enumerable.t()) :: t()
+    def unquote(plural)(%__MODULE__{} = plan, names),
+      do: Enum.reduce(names, plan, &unquote(name)(&2, &1))
 
     defp entry_declaration({unquote(name), name}), do: %{unquote(field) => name, kind: unquote(name)}
   end
@@ -166,28 +171,52 @@ defmodule Beaver.MLIR.Conversion.Plan do
     append_entry(plan, {:add_structural_type_conversions, Enum.uniq(domains)})
   end
 
-  @spec add_conversion_pattern(t(), String.Chars.t(), MLIR.ConversionPattern.callback(), keyword()) :: t()
-  def add_conversion_pattern(%__MODULE__{} = plan, root_name, callback, opts \\ [])
-      when is_function(callback, 3) do
+  @type conversion_callback() ::
+          MLIR.ConversionPattern.callback()
+          | (MLIR.Operation.t(),
+             MLIR.ConversionPattern.adaptor(),
+             MLIR.ConversionPatternRewriter.t(),
+             TypeConverter.t() ->
+               term())
+
+  @spec add_conversion_pattern(t(), String.Chars.t() | [String.Chars.t()], conversion_callback(), keyword()) :: t()
+  def add_conversion_pattern(plan, root_or_roots, callback, opts \\ [])
+
+  def add_conversion_pattern(%__MODULE__{} = plan, [_ | _] = roots, callback, opts)
+      when is_function(callback, 3) or is_function(callback, 4) do
+    Enum.reduce(roots, plan, &add_conversion_pattern(&2, &1, callback, opts))
+  end
+
+  def add_conversion_pattern(%__MODULE__{} = plan, root_name, callback, opts)
+      when (is_binary(root_name) or is_atom(root_name)) and
+             (is_function(callback, 3) or is_function(callback, 4)) do
+    opts = validate_conversion_pattern_opts!(opts)
+    append_entry(plan, {:add_conversion_pattern, to_string(root_name), callback, opts})
+  end
+
+  defp validate_conversion_pattern_opts!(opts) do
     opts =
       validate_callback_opts!(opts, [:version, :benefit, :one_to_n, :timeout], "add_conversion_pattern")
 
-    benefit = Keyword.get(opts, :benefit, 1)
-
-    unless is_integer(benefit) and benefit >= 0,
-      do: raise(ArgumentError, ":benefit must be a non-negative integer, got: #{inspect(benefit)}")
-
-    one_to_n = Keyword.get(opts, :one_to_n, false)
-
-    unless is_boolean(one_to_n), do: raise(ArgumentError, ":one_to_n must be boolean, got: #{inspect(one_to_n)}")
-
-    timeout = Keyword.get(opts, :timeout)
-
-    if timeout != nil and not (is_integer(timeout) and timeout >= 0),
-      do: raise(ArgumentError, ":timeout must be a non-negative integer or nil, got: #{inspect(timeout)}")
-
-    append_entry(plan, {:add_conversion_pattern, to_string(root_name), callback, opts})
+    validate_non_neg_int_opt!(Keyword.get(opts, :benefit, 1), :benefit)
+    validate_boolean_opt!(Keyword.get(opts, :one_to_n, false), :one_to_n)
+    validate_optional_timeout!(Keyword.get(opts, :timeout))
+    opts
   end
+
+  defp validate_non_neg_int_opt!(v, _key) when is_integer(v) and v >= 0, do: :ok
+
+  defp validate_non_neg_int_opt!(v, key),
+    do: raise(ArgumentError, "#{inspect(key)} must be a non-negative integer, got: #{inspect(v)}")
+
+  defp validate_boolean_opt!(v, _key) when is_boolean(v), do: :ok
+  defp validate_boolean_opt!(v, key), do: raise(ArgumentError, "#{inspect(key)} must be boolean, got: #{inspect(v)}")
+
+  defp validate_optional_timeout!(nil), do: :ok
+  defp validate_optional_timeout!(v) when is_integer(v) and v >= 0, do: :ok
+
+  defp validate_optional_timeout!(v),
+    do: raise(ArgumentError, ":timeout must be a non-negative integer or nil, got: #{inspect(v)}")
 
   @spec add_pattern(t(), Descriptor.t() | Program.t(), keyword()) :: t()
   def add_pattern(plan, pattern, opts \\ [])
@@ -300,6 +329,58 @@ defmodule Beaver.MLIR.Conversion.Plan do
     end
   end
 
+  @doc """
+  Executes `plan` on `ir`, optionally runs `"reconcile-unrealized-casts"` (`reconcile_casts: true`
+  by default), and verifies that no `"builtin.unrealized_conversion_cast"` operations remain
+  (unless `allow_unrealized_casts: true`).
+  """
+  @spec finish(t(), MLIR.Conversion.conversion_ir(), keyword()) ::
+          {:ok, MLIR.Conversion.conversion_ir(), [term()]} | {:error, term()}
+  def finish(%__MODULE__{} = plan, ir, opts \\ []) when is_list(opts) do
+    opts = validate_callback_opts!(opts, [:reconcile_casts, :allow_unrealized_casts], "Plan.finish")
+    reconcile? = Keyword.get(opts, :reconcile_casts, true)
+    allow_casts? = Keyword.get(opts, :allow_unrealized_casts, false)
+
+    with {:ok, converted, diagnostics} <- run(plan, ir),
+         {:ok, reconciled} <- maybe_reconcile_casts(converted, reconcile?),
+         :ok <- check_unrealized_casts(reconciled, allow_casts?) do
+      {:ok, reconciled, diagnostics}
+    end
+  end
+
+  @doc "Executes `finish/3` and returns the finalized IR or raises on failure."
+  @spec finish!(t(), MLIR.Conversion.conversion_ir(), keyword()) :: MLIR.Conversion.conversion_ir()
+  def finish!(%__MODULE__{} = plan, ir, opts \\ []) do
+    case finish(plan, ir, opts) do
+      {:ok, converted, _diagnostics} -> converted
+      {:error, %MLIR.Conversion.Error{} = error} -> raise error
+      {:error, reason} when is_binary(reason) -> raise ArgumentError, reason
+      {:error, reason} -> raise ArgumentError, "Plan.finish! failed: #{inspect(reason)}"
+    end
+  end
+
+  defp maybe_reconcile_casts(ir, false), do: {:ok, ir}
+
+  defp maybe_reconcile_casts(ir, true) do
+    case ir |> Beaver.Composer.append("reconcile-unrealized-casts") |> Beaver.Composer.run() do
+      {:ok, reconciled} -> {:ok, reconciled}
+      {:ok, reconciled, _diagnostics} -> {:ok, reconciled}
+      {:error, diagnostics} -> {:error, MLIR.Diagnostic.format(diagnostics, "reconcile-unrealized-casts failed")}
+    end
+  end
+
+  defp check_unrealized_casts(_ir, true), do: :ok
+
+  defp check_unrealized_casts(ir, false) do
+    case Beaver.Walker.find_ops(ir, "builtin.unrealized_conversion_cast") do
+      [] ->
+        :ok
+
+      casts ->
+        {:error, "#{length(casts)} residual builtin.unrealized_conversion_cast operation(s) remained after conversion"}
+    end
+  end
+
   defp append_entry(%__MODULE__{entries: entries} = plan, entry), do: %{plan | entries: entries ++ [entry]}
 
   defp validate_plan_options!(opts),
@@ -406,6 +487,11 @@ defmodule Beaver.MLIR.Conversion.Plan do
         _ -> false
       end)
 
+    if not has_type_conversions do
+      i1 = Type.i1(ctx: ctx)
+      TypeConverter.add_conversion_map(converter, [i1], i1, fallback: :identity)
+    end
+
     resources = %{
       context: ctx,
       target: target,
@@ -467,7 +553,13 @@ defmodule Beaver.MLIR.Conversion.Plan do
 
   defp populate_entry({:add_conversion_pattern, root_name, callback, opts}, resources) do
     opts = conversion_pattern_opts(opts, resources.context, resources.timeout)
-    MLIR.ConversionPattern.add(resources.patterns, root_name, resources.converter, callback, opts)
+
+    wrapped =
+      if is_function(callback, 4),
+        do: fn op, adaptor, rw -> callback.(op, adaptor, rw, resources.converter) end,
+        else: callback
+
+    MLIR.ConversionPattern.add(resources.patterns, root_name, resources.converter, wrapped, opts)
   end
 
   defp populate_entry({:add_pattern, descriptor, _opts}, resources),

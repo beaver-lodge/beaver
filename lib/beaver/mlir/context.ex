@@ -133,6 +133,16 @@ defmodule Beaver.MLIR.Context do
     end
   end
 
+  @doc """
+  Creates an `MLIR.Context` with `opts`, runs `fun.(ctx)`, and always destroys the context afterward.
+  """
+  @spec with_context((t() -> result)) :: result when result: var
+  def with_context(fun) when is_function(fun, 1), do: with_context([], fun)
+
+  @spec with_context([context_option()], (t() -> result)) :: result when result: var
+  def with_context(opts, fun) when is_list(opts) and is_function(fun, 1),
+    do: Native.with_resource(create(opts), &destroy/1, fun)
+
   @doc "Current callback executor capacity, queue and worker counts for this context."
   defdelegate executor_stats(ctx), to: Beaver.Execution
 
@@ -249,6 +259,11 @@ defmodule Beaver.MLIR.Context do
     mlirContextSetAllowUnregisteredDialects(ctx, allow)
     ctx
   end
+
+  @doc "Returns `true` if `ctx` currently permits unregistered dialects."
+  @spec allow_unregistered_dialects?(t()) :: boolean()
+  def allow_unregistered_dialects?(%__MODULE__{} = ctx),
+    do: mlirContextGetAllowUnregisteredDialects(ctx) |> Native.to_term()
 
   def register_translations(ctx) do
     mlirRegisterAllLLVMTranslations(ctx)

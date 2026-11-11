@@ -46,6 +46,66 @@ defmodule Beaver.MLIR.Operation do
   defdelegate destroy(op), to: CAPI, as: :mlirOperationDestroy
   defdelegate clone(op), to: CAPI, as: :mlirOperationClone
 
+  @doc "Returns the block containing `op`, or `nil` if `op` is detached."
+  @spec block(t()) :: MLIR.Block.t() | nil
+  def block(%__MODULE__{} = op), do: op |> mlirOperationGetBlock() |> nil_if_null()
+
+  @doc "Returns the parent operation of `op`, or `nil` if `op` is top-level."
+  @spec parent_op(t()) :: t() | nil
+  def parent_op(%__MODULE__{} = op), do: op |> mlirOperationGetParentOperation() |> nil_if_null()
+
+  @doc "Returns the next operation in the same block, or `nil` at the end of the block."
+  @spec next_in_block(t()) :: t() | nil
+  def next_in_block(%__MODULE__{} = op), do: op |> mlirOperationGetNextInBlock() |> nil_if_null()
+
+  @doc "Returns the top-most ancestor operation containing `op` (or `op` itself if top-level)."
+  @spec root(t()) :: t()
+  def root(%__MODULE__{} = op) do
+    case parent_op(op) do
+      nil -> op
+      parent -> root(parent)
+    end
+  end
+
+  @doc "Returns the nearest enclosing operation (including `op`) that has a `SymbolTable`, or `nil`."
+  @spec enclosing_symbol_table(t()) :: t() | nil
+  def enclosing_symbol_table(%__MODULE__{} = op) do
+    sym_table = mlirSymbolTableCreate(op)
+
+    if MLIR.null?(sym_table) do
+      case parent_op(op) do
+        nil -> nil
+        parent -> enclosing_symbol_table(parent)
+      end
+    else
+      mlirSymbolTableDestroy(sym_table)
+      op
+    end
+  end
+
+  @doc """
+  Copies attributes from `src` to `dst`, returning `dst`.
+
+  Options:
+    * `:only` - list of attribute names (atoms or strings) to include.
+    * `:except` - list of attribute names (atoms or strings) to exclude.
+  """
+  @spec copy_attributes(t(), t(), keyword()) :: t()
+  def copy_attributes(%__MODULE__{} = src, %__MODULE__{} = dst, opts \\ []) when is_list(opts) do
+    only_set = opts[:only] && MapSet.new(opts[:only], &Kernel.to_string/1)
+    except_set = MapSet.new(Keyword.get(opts, :except, []), &Kernel.to_string/1)
+
+    for {id, attr} <- Beaver.Walker.attributes(src) do
+      key = MLIR.to_string(id)
+
+      if (is_nil(only_set) or MapSet.member?(only_set, key)) and not MapSet.member?(except_set, key) do
+        put_attribute(dst, key, attr)
+      end
+    end
+
+    dst
+  end
+
   @doc "Returns all operation properties as an attribute, or nil if there are none."
   def properties(%__MODULE__{} = op), do: op |> beaverOperationGetProperties() |> nil_if_null()
 
@@ -242,6 +302,19 @@ defmodule Beaver.MLIR.Operation do
 
   def with_symbol_table(%__MODULE__{} = op, fun),
     do: Beaver.Native.with_resource(mlirSymbolTableCreate(op), &mlirSymbolTableDestroy/1, fun)
+
+  @doc "Returns an enumerable of all SSA operands consumed by `op`."
+  defdelegate operands(op), to: Beaver.Walker
+
+  @doc "Returns the types of all SSA results produced by `op`."
+  @spec result_types(t()) :: [MLIR.Type.t()]
+  def result_types(%__MODULE__{} = op),
+    do: op |> results() |> Enum.map(&MLIR.Value.type/1)
+
+  @doc "Returns the types of all SSA operands consumed by `op`."
+  @spec operand_types(t()) :: [MLIR.Type.t()]
+  def operand_types(%__MODULE__{} = op),
+    do: op |> operands() |> Enum.map(&MLIR.Value.type/1)
 
   @doc "Returns whether the operation is a terminator."
   def terminator?(%__MODULE__{} = op), do: MLIR.Trait.has?(op, :terminator)

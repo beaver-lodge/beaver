@@ -69,7 +69,12 @@ defmodule Beaver.MLIR.ConversionPatternRewriter do
       helper_name not in [:replace_op, "replace_op"] do
     [_ | args] = Macro.generate_arguments(arity, __MODULE__)
 
-    def unquote(:"#{helper_name}")(%__MODULE__{} = rewriter, unquote_splicing(args)),
-      do: RewriterBase.unquote(:"#{helper_name}")(as_base(rewriter), unquote_splicing(args))
+    if helper_name in RewriterBase.polymorphic_helper_names() do
+      def unquote(:"#{helper_name}")(%__MODULE__{} = rewriter, unquote_splicing(args)),
+        do: RewriterBase.unquote(:"#{helper_name}")(rewriter, unquote_splicing(args))
+    else
+      def unquote(:"#{helper_name}")(%__MODULE__{} = rewriter, unquote_splicing(args)),
+        do: RewriterBase.unquote(:"#{helper_name}")(as_base(rewriter), unquote_splicing(args))
+    end
   end
 end

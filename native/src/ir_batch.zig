@@ -115,6 +115,7 @@ const OperandRef = struct {
 };
 
 const BuildSpec = struct {
+    block_idx: usize,
     name: m.StringRef.T,
     loc: m.Location.T,
     operands: []OperandRef,
@@ -124,30 +125,166 @@ const BuildSpec = struct {
     num_regions: usize,
 };
 
-pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
-    const args = try tuple(env, arguments, 4);
-    const block = try m.Block.resource.fetch(env, args[0]);
-    if (block.ptr == null) return error.InvalidBatchBlock;
+fn decodeType(env: beam.env, ctx: m.Context.T, term: beam.term) !m.Type.T {
+    if (string_ref.get_binary_as_string_ref(env, term)) |sr| {
+        if (sr.length == 0) return error.InvalidBatchType;
+        const parsed = c.mlirTypeParseGet(ctx, sr);
+        if (parsed.ptr == null) return error.InvalidBatchType;
+        return parsed;
+    } else |_| {
+        const t = try m.Type.resource.fetch(env, term);
+        if (t.ptr == null or !c.mlirContextEqual(ctx, c.mlirTypeGetContext(t))) return error.ContextMismatch;
+        return t;
+    }
+}
 
-    var insert_mode: u8 = 0; // 0 = end, 1 = start, 2 = before, 3 = after
-    var anchor_op: m.Operation.T = .{ .ptr = null };
-    if (e.enif_is_identical(args[1], beam.make_atom(env, "end")) != 0) {
-        insert_mode = 0;
-    } else if (e.enif_is_identical(args[1], beam.make_atom(env, "start")) != 0) {
-        insert_mode = 1;
-    } else {
-        const pos_tuple = try tuple(env, args[1], 2);
-        anchor_op = try operation(env, ctx, pos_tuple[1]);
-        if (!c.mlirBlockEqual(c.mlirOperationGetBlock(anchor_op), block)) return error.OperationOutsideTargetBlock;
-        if (e.enif_is_identical(pos_tuple[0], beam.make_atom(env, "before")) != 0) {
-            insert_mode = 2;
-        } else if (e.enif_is_identical(pos_tuple[0], beam.make_atom(env, "after")) != 0) {
-            insert_mode = 3;
-        } else return error.InvalidInsertionPosition;
+fn decodeAttribute(env: beam.env, ctx: m.Context.T, term: beam.term) !m.Attribute.T {
+    if (e.enif_is_identical(term, beam.make_atom(env, "unit")) != 0) {
+        return c.mlirUnitAttrGet(ctx);
+    }
+    if (e.enif_is_identical(term, beam.make_atom(env, "true")) != 0) {
+        return c.mlirBoolAttrGet(ctx, 1);
+    }
+    if (e.enif_is_identical(term, beam.make_atom(env, "false")) != 0) {
+        return c.mlirBoolAttrGet(ctx, 0);
     }
 
+    var tag_arity: c_int = 0;
+    var tag_terms: [*c]const beam.term = undefined;
+    if (e.enif_get_tuple(env, term, &tag_arity, &tag_terms) != 0 and tag_arity >= 1) {
+        const tag = tag_terms[0];
+        if (tag_arity == 1 and e.enif_is_identical(tag, beam.make_atom(env, "unit")) != 0) {
+            return c.mlirUnitAttrGet(ctx);
+        }
+        if (tag_arity == 2) {
+            if (e.enif_is_identical(tag, beam.make_atom(env, "i64")) != 0) {
+                return c.mlirIntegerAttrGet(c.mlirIntegerTypeGet(ctx, 64), try beam.get(i64, env, tag_terms[1]));
+            }
+            if (e.enif_is_identical(tag, beam.make_atom(env, "i32")) != 0) {
+                return c.mlirIntegerAttrGet(c.mlirIntegerTypeGet(ctx, 32), try beam.get(i64, env, tag_terms[1]));
+            }
+            if (e.enif_is_identical(tag, beam.make_atom(env, "i16")) != 0) {
+                return c.mlirIntegerAttrGet(c.mlirIntegerTypeGet(ctx, 16), try beam.get(i64, env, tag_terms[1]));
+            }
+            if (e.enif_is_identical(tag, beam.make_atom(env, "i8")) != 0) {
+                return c.mlirIntegerAttrGet(c.mlirIntegerTypeGet(ctx, 8), try beam.get(i64, env, tag_terms[1]));
+            }
+            if (e.enif_is_identical(tag, beam.make_atom(env, "index")) != 0) {
+                return c.mlirIntegerAttrGet(c.mlirIndexTypeGet(ctx), try beam.get(i64, env, tag_terms[1]));
+            }
+            if (e.enif_is_identical(tag, beam.make_atom(env, "bool")) != 0 or e.enif_is_identical(tag, beam.make_atom(env, "i1")) != 0) {
+                if (beam.get_bool(env, tag_terms[1])) |b| {
+                    return c.mlirBoolAttrGet(ctx, if (b) 1 else 0);
+                } else |_| {
+                    const n = try beam.get(i64, env, tag_terms[1]);
+                    if (n != 0 and n != 1) return error.InvalidBatchAttribute;
+                    return c.mlirBoolAttrGet(ctx, @intCast(n));
+                }
+            }
+            if (e.enif_is_identical(tag, beam.make_atom(env, "f64")) != 0) {
+                return c.mlirFloatAttrDoubleGet(ctx, c.mlirF64TypeGet(ctx), try beam.get(f64, env, tag_terms[1]));
+            }
+            if (e.enif_is_identical(tag, beam.make_atom(env, "f32")) != 0) {
+                return c.mlirFloatAttrDoubleGet(ctx, c.mlirF32TypeGet(ctx), try beam.get(f64, env, tag_terms[1]));
+            }
+            if (e.enif_is_identical(tag, beam.make_atom(env, "string")) != 0) {
+                return c.mlirStringAttrGet(ctx, try string_ref.get_binary_as_string_ref(env, tag_terms[1]));
+            }
+            if (e.enif_is_identical(tag, beam.make_atom(env, "symbol")) != 0 or e.enif_is_identical(tag, beam.make_atom(env, "flat_symbol")) != 0) {
+                const sym = try string_ref.get_binary_as_string_ref(env, tag_terms[1]);
+                if (sym.length == 0) return error.InvalidBatchAttribute;
+                return c.mlirFlatSymbolRefAttrGet(ctx, sym);
+            }
+            if (e.enif_is_identical(tag, beam.make_atom(env, "type")) != 0) {
+                return c.mlirTypeAttrGet(try decodeType(env, ctx, tag_terms[1]));
+            }
+            if (e.enif_is_identical(tag, beam.make_atom(env, "dense_i32")) != 0) {
+                const len = try beam.get_list_length(env, tag_terms[1]);
+                const elems = try beam.allocator.alloc(i32, len);
+                defer beam.allocator.free(elems);
+                var list_rest = tag_terms[1];
+                for (elems) |*el| el.* = try beam.get(i32, env, try beam.get_head_and_iter(env, &list_rest));
+                return c.mlirDenseI32ArrayGet(ctx, @intCast(len), elems.ptr);
+            }
+            if (e.enif_is_identical(tag, beam.make_atom(env, "dense_i64")) != 0) {
+                const len = try beam.get_list_length(env, tag_terms[1]);
+                const elems = try beam.allocator.alloc(i64, len);
+                defer beam.allocator.free(elems);
+                var list_rest = tag_terms[1];
+                for (elems) |*el| el.* = try beam.get(i64, env, try beam.get_head_and_iter(env, &list_rest));
+                return c.mlirDenseI64ArrayGet(ctx, @intCast(len), elems.ptr);
+            }
+            if (e.enif_is_identical(tag, beam.make_atom(env, "parse")) != 0) {
+                const sr = try string_ref.get_binary_as_string_ref(env, tag_terms[1]);
+                if (sr.length == 0) return error.InvalidBatchAttribute;
+                const parsed = c.mlirAttributeParseGet(ctx, sr);
+                if (parsed.ptr == null) return error.InvalidBatchAttribute;
+                return parsed;
+            }
+        }
+        if (tag_arity == 3 and e.enif_is_identical(tag, beam.make_atom(env, "int")) != 0) {
+            const width = try beam.get(c_uint, env, tag_terms[1]);
+            if (width == 0) return error.InvalidBatchAttribute;
+            return c.mlirIntegerAttrGet(c.mlirIntegerTypeGet(ctx, width), try beam.get(i64, env, tag_terms[2]));
+        }
+        return error.InvalidBatchAttribute;
+    }
+
+    if (string_ref.get_binary_as_string_ref(env, term)) |sr| {
+        if (sr.length == 0) return error.InvalidBatchAttribute;
+        const parsed = c.mlirAttributeParseGet(ctx, sr);
+        if (parsed.ptr == null) return error.InvalidBatchAttribute;
+        return parsed;
+    } else |_| {
+        const a_val = try m.Attribute.resource.fetch(env, term);
+        if (a_val.ptr == null or !c.mlirContextEqual(ctx, c.mlirAttributeGetContext(a_val))) return error.ContextMismatch;
+        return a_val;
+    }
+}
+
+pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
+    const args = try tuple(env, arguments, 4);
+
+    var insert_mode: u8 = 0; // 0 = end, 1 = start, 2 = before, 3 = after, 4 = multi-block end
+    var anchor_op: m.Operation.T = .{ .ptr = null };
+    var blocks: []m.Block.T = undefined;
+    if (e.enif_is_identical(args[1], beam.make_atom(env, "blocks")) != 0) {
+        insert_mode = 4;
+        const num_blocks = try beam.get_list_length(env, args[0]);
+        if (num_blocks == 0) return error.InvalidBatchBlock;
+        blocks = try beam.allocator.alloc(m.Block.T, num_blocks);
+        errdefer beam.allocator.free(blocks);
+        var blk_rest = args[0];
+        for (blocks) |*b| {
+            b.* = try m.Block.resource.fetch(env, try beam.get_head_and_iter(env, &blk_rest));
+            if (b.ptr == null) return error.InvalidBatchBlock;
+        }
+    } else {
+        const single_block = try m.Block.resource.fetch(env, args[0]);
+        if (single_block.ptr == null) return error.InvalidBatchBlock;
+        blocks = try beam.allocator.alloc(m.Block.T, 1);
+        blocks[0] = single_block;
+        errdefer beam.allocator.free(blocks);
+
+        if (e.enif_is_identical(args[1], beam.make_atom(env, "end")) != 0) {
+            insert_mode = 0;
+        } else if (e.enif_is_identical(args[1], beam.make_atom(env, "start")) != 0) {
+            insert_mode = 1;
+        } else {
+            const pos_tuple = try tuple(env, args[1], 2);
+            anchor_op = try operation(env, ctx, pos_tuple[1]);
+            if (!c.mlirBlockEqual(c.mlirOperationGetBlock(anchor_op), single_block)) return error.OperationOutsideTargetBlock;
+            if (e.enif_is_identical(pos_tuple[0], beam.make_atom(env, "before")) != 0) {
+                insert_mode = 2;
+            } else if (e.enif_is_identical(pos_tuple[0], beam.make_atom(env, "after")) != 0) {
+                insert_mode = 3;
+            } else return error.InvalidInsertionPosition;
+        }
+    }
+    defer beam.allocator.free(blocks);
+
     const count = try beam.get_list_length(env, args[2]);
-    if (count > 1024) return error.BatchTooLarge;
+    if (count > 65536) return error.BatchTooLarge;
 
     const verify_root = if (beam.is_nil2(env, args[3])) m.Operation.T{ .ptr = null } else try operation(env, ctx, args[3]);
     const binding = if (verify_root.ptr != null) c.beaverExecutionBindOperation(verify_root) else null;
@@ -165,10 +302,19 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
         beam.allocator.free(specs);
     }
 
-    const num_block_args: usize = @intCast(c.mlirBlockGetNumArguments(block));
     var rest = args[2];
     for (specs, 0..) |*spec, i| {
-        const fields = try tuple(env, try beam.get_head_and_iter(env, &rest), 7);
+        const spec_term = try beam.get_head_and_iter(env, &rest);
+        var spec_arity: c_int = 0;
+        var fields_ptr: [*c]const beam.term = undefined;
+        if (e.enif_get_tuple(env, spec_term, &spec_arity, &fields_ptr) == 0 or (spec_arity != 7 and spec_arity != 8)) {
+            return error.InvalidExecutionArguments;
+        }
+        const fields = fields_ptr[0..@intCast(spec_arity)];
+        const block_idx: usize = if (spec_arity == 8) try beam.get(usize, env, fields[7]) else 0;
+        if (block_idx >= blocks.len) return error.InvalidBatchBlock;
+        const num_block_args: usize = @intCast(c.mlirBlockGetNumArguments(blocks[block_idx]));
+
         const name = try string_ref.get_binary_as_string_ref(env, fields[0]);
         if (name.length == 0) return error.EmptyOperationName;
         const loc = try m.Location.resource.fetch(env, fields[1]);
@@ -198,6 +344,14 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
                     if (arg_idx >= num_block_args) return error.InvalidBlockArgumentIndex;
                     op_ref.* = .{ .kind = 2, .index_a = arg_idx };
                 },
+                3 => {
+                    const target_blk = try beam.get(usize, env, o_fields[1]);
+                    const arg_idx = try beam.get(usize, env, o_fields[2]);
+                    if (target_blk >= blocks.len or arg_idx >= @as(usize, @intCast(c.mlirBlockGetNumArguments(blocks[target_blk])))) {
+                        return error.InvalidBlockArgumentIndex;
+                    }
+                    op_ref.* = .{ .kind = 3, .index_a = target_blk, .index_b = arg_idx };
+                },
                 else => return error.InvalidBatchOperandReference,
             }
         }
@@ -207,8 +361,7 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
         errdefer beam.allocator.free(res_types);
         var res_rest = fields[3];
         for (res_types) |*rt| {
-            rt.* = try m.Type.resource.fetch(env, try beam.get_head_and_iter(env, &res_rest));
-            if (rt.ptr == null or !c.mlirContextEqual(ctx, c.mlirTypeGetContext(rt.*))) return error.ContextMismatch;
+            rt.* = try decodeType(env, ctx, try beam.get_head_and_iter(env, &res_rest));
         }
 
         const attr_len = try beam.get_list_length(env, fields[4]);
@@ -218,8 +371,7 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
         for (attrs) |*na| {
             const a_fields = try tuple(env, try beam.get_head_and_iter(env, &attr_rest), 2);
             const a_name = try string_ref.get_binary_as_string_ref(env, a_fields[0]);
-            const a_val = try m.Attribute.resource.fetch(env, a_fields[1]);
-            if (a_val.ptr == null or !c.mlirContextEqual(ctx, c.mlirAttributeGetContext(a_val))) return error.ContextMismatch;
+            const a_val = try decodeAttribute(env, ctx, a_fields[1]);
             na.* = c.mlirNamedAttributeGet(c.mlirIdentifierGet(ctx, a_name), a_val);
         }
 
@@ -234,6 +386,7 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
 
         const num_regions = try beam.get(usize, env, fields[6]);
         spec.* = .{
+            .block_idx = block_idx,
             .name = name,
             .loc = loc,
             .operands = op_refs,
@@ -254,13 +407,15 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
 
     var prev_inserted: m.Operation.T = anchor_op;
     for (specs, 0..) |spec, i| {
+        const spec_block = blocks[spec.block_idx];
         const resolved_operands = try beam.allocator.alloc(m.Value.T, spec.operands.len);
         defer beam.allocator.free(resolved_operands);
         for (spec.operands, 0..) |op_ref, k| {
             resolved_operands[k] = switch (op_ref.kind) {
                 0 => op_ref.value,
                 1 => c.mlirOperationGetResult(created_ops[op_ref.index_a], @intCast(op_ref.index_b)),
-                2 => c.mlirBlockGetArgument(block, @intCast(op_ref.index_a)),
+                2 => c.mlirBlockGetArgument(spec_block, @intCast(op_ref.index_a)),
+                3 => c.mlirBlockGetArgument(blocks[op_ref.index_a], @intCast(op_ref.index_b)),
                 else => unreachable,
             };
         }
@@ -288,18 +443,18 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
         const created = c.beaverOperationCreate(state);
         if (created.ptr == null) return error.OperationCreationFailed;
         switch (insert_mode) {
-            0 => c.mlirBlockAppendOwnedOperation(block, created),
+            0, 4 => c.mlirBlockAppendOwnedOperation(spec_block, created),
             1 => {
                 if (i == 0) {
-                    c.mlirBlockInsertOwnedOperation(block, 0, created);
+                    c.mlirBlockInsertOwnedOperation(spec_block, 0, created);
                 } else {
-                    c.mlirBlockInsertOwnedOperationAfter(block, prev_inserted, created);
+                    c.mlirBlockInsertOwnedOperationAfter(spec_block, prev_inserted, created);
                 }
                 prev_inserted = created;
             },
-            2 => c.mlirBlockInsertOwnedOperationBefore(block, anchor_op, created),
+            2 => c.mlirBlockInsertOwnedOperationBefore(spec_block, anchor_op, created),
             3 => {
-                c.mlirBlockInsertOwnedOperationAfter(block, prev_inserted, created);
+                c.mlirBlockInsertOwnedOperationAfter(spec_block, prev_inserted, created);
                 prev_inserted = created;
             },
             else => unreachable,

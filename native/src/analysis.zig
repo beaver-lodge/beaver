@@ -39,6 +39,9 @@ extern fn beaverLowerResumableCFG(
     m.StringRef.T,
     m.StringRef.T,
     isize,
+    isize,
+    isize,
+    *u64,
 ) bool;
 
 const SafepointCollector = struct {
@@ -297,9 +300,26 @@ pub fn safepoint_lower_resumable(env: beam.env, _: c_int, args: [*c]const beam.t
     defer beam.allocator.free(sp_ops);
     const save_op = try string_ref.get_binary_as_string_ref(env, args[2]);
     const load_op = try string_ref.get_binary_as_string_ref(env, args[3]);
-    const state_arg_index = try beam.get(isize, env, args[4]);
-    if (!beaverLowerResumableCFG(func_op, sp_ops.ptr, sp_ops.len, save_op, load_op, state_arg_index)) {
+    var state_arg_index: isize = -1;
+    var frame_arg_index: isize = -1;
+    var slot_stride: isize = 0;
+    var tuple_mode = false;
+    var tup_arity: c_int = 0;
+    var tup_terms: [*c]const beam.term = undefined;
+    if (e.enif_get_tuple(env, args[4], &tup_arity, &tup_terms) != 0 and tup_arity == 3) {
+        tuple_mode = true;
+        state_arg_index = try beam.get(isize, env, tup_terms[0]);
+        frame_arg_index = try beam.get(isize, env, tup_terms[1]);
+        slot_stride = try beam.get(isize, env, tup_terms[2]);
+    } else {
+        state_arg_index = try beam.get(isize, env, args[4]);
+    }
+    var frame_bytes: u64 = 0;
+    if (!beaverLowerResumableCFG(func_op, sp_ops.ptr, sp_ops.len, save_op, load_op, state_arg_index, frame_arg_index, slot_stride, &frame_bytes)) {
         return error.ResumableCFGLoweringFailed;
+    }
+    if (tuple_mode) {
+        return beam.make_ok_term(env, beam.make_u64(env, frame_bytes));
     }
     return beam.make_ok(env);
 }
