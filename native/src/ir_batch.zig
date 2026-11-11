@@ -106,3 +106,215 @@ pub fn update(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term 
     const verify = e.enif_is_identical(args[2], beam.make_atom(env, "true")) != 0;
     return beam.make_bool(env, !verify or c.mlirOperationVerify(root));
 }
+
+const OperandRef = struct {
+    kind: c_int,
+    index_a: usize = 0,
+    index_b: usize = 0,
+    value: m.Value.T = .{ .ptr = null },
+};
+
+const BuildSpec = struct {
+    name: m.StringRef.T,
+    loc: m.Location.T,
+    operands: []OperandRef,
+    result_types: []m.Type.T,
+    attributes: []c.MlirNamedAttribute,
+    successors: []m.Block.T,
+    num_regions: usize,
+};
+
+pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
+    const args = try tuple(env, arguments, 4);
+    const block = try m.Block.resource.fetch(env, args[0]);
+    if (block.ptr == null) return error.InvalidBatchBlock;
+
+    var insert_mode: u8 = 0; // 0 = end, 1 = start, 2 = before, 3 = after
+    var anchor_op: m.Operation.T = .{ .ptr = null };
+    if (e.enif_is_identical(args[1], beam.make_atom(env, "end")) != 0) {
+        insert_mode = 0;
+    } else if (e.enif_is_identical(args[1], beam.make_atom(env, "start")) != 0) {
+        insert_mode = 1;
+    } else {
+        const pos_tuple = try tuple(env, args[1], 2);
+        anchor_op = try operation(env, ctx, pos_tuple[1]);
+        if (!c.mlirBlockEqual(c.mlirOperationGetBlock(anchor_op), block)) return error.OperationOutsideTargetBlock;
+        if (e.enif_is_identical(pos_tuple[0], beam.make_atom(env, "before")) != 0) {
+            insert_mode = 2;
+        } else if (e.enif_is_identical(pos_tuple[0], beam.make_atom(env, "after")) != 0) {
+            insert_mode = 3;
+        } else return error.InvalidInsertionPosition;
+    }
+
+    const count = try beam.get_list_length(env, args[2]);
+    if (count > 1024) return error.BatchTooLarge;
+
+    const verify_root = if (beam.is_nil2(env, args[3])) m.Operation.T{ .ptr = null } else try operation(env, ctx, args[3]);
+    const binding = if (verify_root.ptr != null) c.beaverExecutionBindOperation(verify_root) else null;
+    defer c.beaverExecutionUnbindOperation(binding);
+
+    const specs = try beam.allocator.alloc(BuildSpec, count);
+    var initialized_specs: usize = 0;
+    defer {
+        for (specs[0..initialized_specs]) |spec| {
+            beam.allocator.free(spec.operands);
+            beam.allocator.free(spec.result_types);
+            beam.allocator.free(spec.attributes);
+            beam.allocator.free(spec.successors);
+        }
+        beam.allocator.free(specs);
+    }
+
+    const num_block_args: usize = @intCast(c.mlirBlockGetNumArguments(block));
+    var rest = args[2];
+    for (specs, 0..) |*spec, i| {
+        const fields = try tuple(env, try beam.get_head_and_iter(env, &rest), 7);
+        const name = try string_ref.get_binary_as_string_ref(env, fields[0]);
+        if (name.length == 0) return error.EmptyOperationName;
+        const loc = try m.Location.resource.fetch(env, fields[1]);
+        if (loc.ptr == null or !c.mlirContextEqual(ctx, c.mlirLocationGetContext(loc))) return error.ContextMismatch;
+
+        const op_len = try beam.get_list_length(env, fields[2]);
+        const op_refs = try beam.allocator.alloc(OperandRef, op_len);
+        errdefer beam.allocator.free(op_refs);
+        var op_rest = fields[2];
+        for (op_refs) |*op_ref| {
+            const o_fields = try tuple(env, try beam.get_head_and_iter(env, &op_rest), 3);
+            const kind = try beam.get(c_int, env, o_fields[0]);
+            switch (kind) {
+                0 => {
+                    const val = try m.Value.resource.fetch(env, o_fields[2]);
+                    if (val.ptr == null or !c.mlirContextEqual(ctx, c.mlirTypeGetContext(c.mlirValueGetType(val)))) return error.ContextMismatch;
+                    op_ref.* = .{ .kind = 0, .value = val };
+                },
+                1 => {
+                    const op_idx = try beam.get(usize, env, o_fields[1]);
+                    const res_idx = try beam.get(usize, env, o_fields[2]);
+                    if (op_idx >= i or res_idx >= specs[op_idx].result_types.len) return error.InvalidBatchResultReference;
+                    op_ref.* = .{ .kind = 1, .index_a = op_idx, .index_b = res_idx };
+                },
+                2 => {
+                    const arg_idx = try beam.get(usize, env, o_fields[1]);
+                    if (arg_idx >= num_block_args) return error.InvalidBlockArgumentIndex;
+                    op_ref.* = .{ .kind = 2, .index_a = arg_idx };
+                },
+                else => return error.InvalidBatchOperandReference,
+            }
+        }
+
+        const res_len = try beam.get_list_length(env, fields[3]);
+        const res_types = try beam.allocator.alloc(m.Type.T, res_len);
+        errdefer beam.allocator.free(res_types);
+        var res_rest = fields[3];
+        for (res_types) |*rt| {
+            rt.* = try m.Type.resource.fetch(env, try beam.get_head_and_iter(env, &res_rest));
+            if (rt.ptr == null or !c.mlirContextEqual(ctx, c.mlirTypeGetContext(rt.*))) return error.ContextMismatch;
+        }
+
+        const attr_len = try beam.get_list_length(env, fields[4]);
+        const attrs = try beam.allocator.alloc(c.MlirNamedAttribute, attr_len);
+        errdefer beam.allocator.free(attrs);
+        var attr_rest = fields[4];
+        for (attrs) |*na| {
+            const a_fields = try tuple(env, try beam.get_head_and_iter(env, &attr_rest), 2);
+            const a_name = try string_ref.get_binary_as_string_ref(env, a_fields[0]);
+            const a_val = try m.Attribute.resource.fetch(env, a_fields[1]);
+            if (a_val.ptr == null or !c.mlirContextEqual(ctx, c.mlirAttributeGetContext(a_val))) return error.ContextMismatch;
+            na.* = c.mlirNamedAttributeGet(c.mlirIdentifierGet(ctx, a_name), a_val);
+        }
+
+        const succ_len = try beam.get_list_length(env, fields[5]);
+        const succs = try beam.allocator.alloc(m.Block.T, succ_len);
+        errdefer beam.allocator.free(succs);
+        var succ_rest = fields[5];
+        for (succs) |*sb| {
+            sb.* = try m.Block.resource.fetch(env, try beam.get_head_and_iter(env, &succ_rest));
+            if (sb.ptr == null) return error.InvalidBatchSuccessor;
+        }
+
+        const num_regions = try beam.get(usize, env, fields[6]);
+        spec.* = .{
+            .name = name,
+            .loc = loc,
+            .operands = op_refs,
+            .result_types = res_types,
+            .attributes = attrs,
+            .successors = succs,
+            .num_regions = num_regions,
+        };
+        initialized_specs += 1;
+    }
+
+    const created_ops = try beam.allocator.alloc(m.Operation.T, count);
+    defer beam.allocator.free(created_ops);
+    const op_terms = try beam.allocator.alloc(beam.term, count);
+    defer beam.allocator.free(op_terms);
+    const res_list_terms = try beam.allocator.alloc(beam.term, count);
+    defer beam.allocator.free(res_list_terms);
+
+    var prev_inserted: m.Operation.T = anchor_op;
+    for (specs, 0..) |spec, i| {
+        const resolved_operands = try beam.allocator.alloc(m.Value.T, spec.operands.len);
+        defer beam.allocator.free(resolved_operands);
+        for (spec.operands, 0..) |op_ref, k| {
+            resolved_operands[k] = switch (op_ref.kind) {
+                0 => op_ref.value,
+                1 => c.mlirOperationGetResult(created_ops[op_ref.index_a], @intCast(op_ref.index_b)),
+                2 => c.mlirBlockGetArgument(block, @intCast(op_ref.index_a)),
+                else => unreachable,
+            };
+        }
+
+        var state = c.mlirOperationStateGet(spec.name, spec.loc);
+        if (resolved_operands.len > 0) {
+            c.mlirOperationStateAddOperands(&state, @intCast(resolved_operands.len), resolved_operands.ptr);
+        }
+        if (spec.result_types.len > 0) {
+            c.mlirOperationStateAddResults(&state, @intCast(spec.result_types.len), spec.result_types.ptr);
+        }
+        if (spec.attributes.len > 0) {
+            c.mlirOperationStateAddAttributes(&state, @intCast(spec.attributes.len), spec.attributes.ptr);
+        }
+        if (spec.successors.len > 0) {
+            c.mlirOperationStateAddSuccessors(&state, @intCast(spec.successors.len), spec.successors.ptr);
+        }
+        if (spec.num_regions > 0) {
+            const regions = try beam.allocator.alloc(m.Region.T, spec.num_regions);
+            defer beam.allocator.free(regions);
+            for (regions) |*r| r.* = c.mlirRegionCreate();
+            c.mlirOperationStateAddOwnedRegions(&state, @intCast(regions.len), regions.ptr);
+        }
+
+        const created = c.beaverOperationCreate(state);
+        if (created.ptr == null) return error.OperationCreationFailed;
+        switch (insert_mode) {
+            0 => c.mlirBlockAppendOwnedOperation(block, created),
+            1 => {
+                if (i == 0) {
+                    c.mlirBlockInsertOwnedOperation(block, 0, created);
+                } else {
+                    c.mlirBlockInsertOwnedOperationAfter(block, prev_inserted, created);
+                }
+                prev_inserted = created;
+            },
+            2 => c.mlirBlockInsertOwnedOperationBefore(block, anchor_op, created),
+            3 => {
+                c.mlirBlockInsertOwnedOperationAfter(block, prev_inserted, created);
+                prev_inserted = created;
+            },
+            else => unreachable,
+        }
+
+        created_ops[i] = created;
+        op_terms[i] = try m.Operation.resource.make_kind(env, created);
+        res_list_terms[i] = try values(env, created, false, false);
+    }
+
+    const valid = verify_root.ptr == null or c.mlirOperationVerify(verify_root);
+    var out = [_]beam.term{
+        beam.make_bool(env, valid),
+        beam.make_term_list(env, op_terms),
+        beam.make_term_list(env, res_list_terms),
+    };
+    return beam.make_tuple(env, &out);
+}

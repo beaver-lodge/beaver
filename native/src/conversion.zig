@@ -382,10 +382,14 @@ const TypeCallbackState = struct {
     }
 };
 
+extern fn beaverConvertCompositeType(mlir_capi.Type.T, [*]const mlir_capi.Type.T, usize, mlir_capi.Type.T) mlir_capi.Type.T;
+extern fn beaverPopulateStructuralTypeConversions(mlir_capi.ConversionTarget.T, mlir_capi.RewritePatternSet.T, mlir_capi.TypeConverter.T, c_uint) void;
+
 const TypeMappingState = struct {
     sources: []mlir_capi.Type.T,
     target: mlir_capi.Type.T,
     identity_fallback: bool,
+    recursive: bool,
 
     fn deinit(self: *@This()) void {
         std.heap.smp_allocator.free(self.sources);
@@ -398,6 +402,13 @@ const TypeMappingState = struct {
         for (self.sources) |source| {
             if (c.mlirTypeEqual(type_, source)) {
                 converted_type.* = self.target;
+                return c.MlirTypeConverterConversionStatusSuccess;
+            }
+        }
+        if (self.recursive and self.sources.len > 0) {
+            const replaced = beaverConvertCompositeType(type_, self.sources.ptr, self.sources.len, self.target);
+            if (!c.mlirTypeIsNull(replaced) and !c.mlirTypeEqual(replaced, type_)) {
+                converted_type.* = replaced;
                 return c.MlirTypeConverterConversionStatusSuccess;
             }
         }
@@ -434,12 +445,24 @@ fn addTypeConversionMap(environment: beam.env, _: c_int, args: [*c]const beam.te
     errdefer std.heap.smp_allocator.free(sources);
     if (sources.len == 0) return error.EmptyTypeConversionMap;
 
+    var identity_fallback = true;
+    var recursive = false;
+    var tup_n: c_int = 0;
+    var tup_terms: [*c]const beam.term = undefined;
+    if (e.enif_get_tuple(environment, args[3], &tup_n, &tup_terms) != 0 and tup_n == 2) {
+        identity_fallback = try beam.get_bool(environment, tup_terms[0]);
+        recursive = try beam.get_bool(environment, tup_terms[1]);
+    } else {
+        identity_fallback = try beam.get_bool(environment, args[3]);
+    }
+
     const state = try std.heap.smp_allocator.create(TypeMappingState);
     errdefer std.heap.smp_allocator.destroy(state);
     state.* = .{
         .sources = sources,
         .target = try mlir_capi.Type.resource.fetch(environment, args[2]),
-        .identity_fallback = try beam.get_bool(environment, args[3]),
+        .identity_fallback = identity_fallback,
+        .recursive = recursive,
     };
     try registration.mappings.append(state);
     c.mlirTypeConverterAddConversion(registration.handle, TypeMappingState.conversion, state);
@@ -582,22 +605,20 @@ fn addConversionPattern(environment: beam.env, _: c_int, args: [*c]const beam.te
     return beam.make_atom(environment, "ok");
 }
 
-fn compilerKernelLoadAndPopulate(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const patterns = try mlir_capi.RewritePatternSet.resource.fetch(environment, args[0]);
-    const type_converter = try mlir_capi.TypeConverter.resource.fetch(environment, args[1]);
-    const error_message = c.beaverCompilerKernelLoadAndPopulate(
-        patterns,
-        type_converter,
-        try string_ref.get_binary_as_string_ref(environment, args[2]),
-        try string_ref.get_binary_as_string_ref(environment, args[3]),
-        try string_ref.get_binary_as_string_ref(environment, args[4]),
-        try string_ref.get_binary_as_string_ref(environment, args[5]),
-        try string_ref.get_binary_as_string_ref(environment, args[6]),
-        try string_ref.get_binary_as_string_ref(environment, args[7]),
-    );
-
-    if (error_message.length == 0) return beam.make_slice(environment, "");
-    return beam.make_slice(environment, error_message.data[0..error_message.length]);
+fn populateStructuralConversions(environment: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
+    const target_reg = try fetchTargetRegistration(environment, args[0]);
+    const patterns = try mlir_capi.RewritePatternSet.resource.fetch(environment, args[1]);
+    const conv_reg = try fetchTypeConverterRegistration(environment, args[2]);
+    const domain_mask = try beam.get(c_uint, environment, args[3]);
+    const io = std.Options.debug_io;
+    target_reg.mutex.lockUncancelable(io);
+    defer target_reg.mutex.unlock(io);
+    conv_reg.mutex.lockUncancelable(io);
+    defer conv_reg.mutex.unlock(io);
+    if (target_reg.closed.load(.acquire)) return error.ConversionTargetClosed;
+    if (conv_reg.closed.load(.acquire)) return error.TypeConverterClosed;
+    beaverPopulateStructuralTypeConversions(target_reg.handle, patterns, conv_reg.handle, domain_mask);
+    return beam.make_atom(environment, "ok");
 }
 
 fn applyConversion(environment: beam.env, args: anytype) !beam.term {
@@ -669,7 +690,7 @@ pub const nifs = .{
     prelude.beaverRawNIF(@This(), "type_converter_reply_value", 3),
     prelude.beaverRawNIF(@This(), "type_converter_reply_values", 4),
     prelude.beaverRawNIF(@This(), "conversion_pattern_add", 8),
-    prelude.beaverRawNIFDirtyIO(@This(), "compiler_kernel_load_and_populate", 8),
+    prelude.beaverRawNIF(@This(), "conversion_populate_structural", 4),
     prelude.beaverRawNIFDirtyCPU(OperationInventory, "operation_inventory", 1),
     prelude.beaverRawNIF(ProfileMetrics, "process_cpu_time", 0),
     prelude.beaverRawNIF(ProfileMetrics, "peak_rss", 0),
@@ -700,4 +721,4 @@ pub const type_converter_reply_types = replyHandle(mlir_capi.Type, true).nif;
 pub const type_converter_reply_value = replyHandle(mlir_capi.Value, false).nif;
 pub const type_converter_reply_values = replyHandle(mlir_capi.Value, true).nif;
 pub const conversion_pattern_add = addConversionPattern;
-pub const compiler_kernel_load_and_populate = compilerKernelLoadAndPopulate;
+pub const conversion_populate_structural = populateStructuralConversions;

@@ -88,17 +88,26 @@ defmodule Beaver.MLIR.TypeConverter do
   def add_conversion_map(converter, sources, target, opts \\ [])
 
   def add_conversion_map(%__MODULE__{} = converter, [%Type{} | _] = sources, %Type{} = target, opts) do
-    identity_fallback = Keyword.get(opts, :fallback, :identity) == :identity
+    fallback = Keyword.get(opts, :fallback, :identity)
+    recursive = Keyword.get(opts, :recursive, false)
 
-    unless Keyword.keys(opts) -- [:fallback] == [] and Keyword.get(opts, :fallback, :identity) in [:identity, :declined],
-      do: raise(ArgumentError, "conversion map :fallback must be :identity or :declined")
+    unless Keyword.keys(opts) -- [:fallback, :recursive] == [] and fallback in [:identity, :declined] and
+             is_boolean(recursive),
+           do:
+             raise(
+               ArgumentError,
+               "conversion map options must be :fallback (:identity | :declined) and :recursive (boolean)"
+             )
+
+    identity_fallback = fallback == :identity
+    mode_arg = if recursive, do: {identity_fallback, true}, else: identity_fallback
 
     :ok =
       CAPI.beaver_raw_type_converter_add_conversion_map(
         converter.registration,
         Enum.map(sources, & &1.ref),
         target.ref,
-        identity_fallback
+        mode_arg
       )
 
     converter

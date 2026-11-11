@@ -21,7 +21,7 @@ pub fn tuple(env: beam.env, term: beam.term, count: usize) ![]const beam.term {
     return terms[0..count];
 }
 
-const Command = enum { transform, analysis, verify, pass, rewrite, snapshot, update, parse, create_pass, create_pattern, destroy, speculatability, memory_effects, replace_uses, conversion, convert_type };
+const Command = enum { transform, analysis, verify, pass, rewrite, snapshot, update, build, parse, create_pass, create_pattern, destroy, speculatability, memory_effects, replace_uses, conversion, convert_type };
 const Work = struct {
     context: m.Context.T,
     command: Command,
@@ -112,6 +112,7 @@ const Work = struct {
             },
             .snapshot => return batch.snapshot(env, self.context, self.arguments),
             .update => return diagnostic.call_with_diagnostics(env, self.context, batch.update, .{ env, self.context, self.arguments }),
+            .build => return diagnostic.call_with_diagnostics(env, self.context, batch.build, .{ env, self.context, self.arguments }),
         }
     }
     fn result(self: Work) beam.term {
@@ -174,7 +175,7 @@ pub fn execution_worker(env: beam.env, _: c_int, args: [*c]const beam.term) !bea
 pub fn execution_dirty(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const work = try Work.init(env, args);
     switch (work.command) {
-        .verify, .snapshot, .update => {},
+        .verify, .snapshot, .update, .build => {},
         else => return error.DirtyExecutionRequiresCallbackFreeCommand,
     }
     if (c.beaverExecutionHasCallbacks(work.context)) return error.CallbackContextRequiresWorker;

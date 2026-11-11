@@ -15,6 +15,7 @@
 #include "mlir/IR/SymbolTable.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Config/llvm-config.h"
+#include "llvm/Support/DynamicLibrary.h"
 #include "llvm/Support/ThreadPool.h"
 #include "llvm/Support/VCSRevision.h"
 #include <algorithm>
@@ -505,4 +506,26 @@ MLIR_CAPI_EXPORTED MlirType beaverDenseElementsAttrGetType(MlirAttribute attr) {
 
 MLIR_CAPI_EXPORTED intptr_t beaverShapedTypeGetNumElements(MlirType type) {
   return llvm::cast<ShapedType>(unwrap(type)).getNumElements();
+}
+
+MLIR_CAPI_EXPORTED void beaverRewriterBaseInlineRegionBlocks(MlirRewriterBase rewriter, MlirRegion source,
+                                                             MlirRegion destination) {
+  Region *src = unwrap(source);
+  Region *dst = unwrap(destination);
+  if (!src || !dst || src == dst) return;
+  unwrap(rewriter)->inlineRegionBefore(*src, *dst, dst->end());
+}
+
+MLIR_CAPI_EXPORTED void *beaverDynamicLibrarySearchForAddressOfSymbol(MlirStringRef libraryPath,
+                                                                      MlirStringRef symbolName) {
+  std::string sym = unwrap(symbolName).str();
+  if (sym.empty()) return nullptr;
+  if (libraryPath.length > 0) {
+    std::string path = unwrap(libraryPath).str();
+    std::string errMsg;
+    auto lib = llvm::sys::DynamicLibrary::getPermanentLibrary(path.c_str(), &errMsg);
+    if (!lib.isValid()) return nullptr;
+    return lib.getAddressOfSymbol(sym.c_str());
+  }
+  return llvm::sys::DynamicLibrary::SearchForAddressOfSymbol(sym);
 }

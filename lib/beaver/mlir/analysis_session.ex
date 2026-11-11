@@ -62,6 +62,8 @@ defmodule Beaver.MLIR.AnalysisSession do
     results =
       Enum.zip_with(queries, results, fn
         {:data_layout, _, _}, result -> MLIR.DataLayout.decode(result)
+        {:safepoints, _, _}, result -> MLIR.Safepoint.decode(result)
+        {:safepoints, _, _, _}, result -> MLIR.Safepoint.decode(result)
         _, result -> result
       end)
 
@@ -73,12 +75,26 @@ defmodule Beaver.MLIR.AnalysisSession do
   def dominates?(session, lhs, rhs), do: one(session, {:dominates, lhs, rhs})
   def post_dominates?(session, lhs, rhs), do: one(session, {:post_dominates, lhs, rhs})
   def dead_after?(session, value, operation), do: one(session, {:dead_after, operation, value})
+
+  def safepoints(session, func_op, safepoint_ops, opts \\ []),
+    do: one(session, {:safepoints, func_op, safepoint_ops, opts})
+
   @doc false
   def one(session, query), do: session |> query([query]) |> Map.fetch!(:results) |> hd()
   defp command({:dominates, %Operation{ref: a}, %Operation{ref: b}}), do: {0, a, b}
   defp command({:post_dominates, %Operation{ref: a}, %Operation{ref: b}}), do: {1, a, b}
   defp command({:dead_after, %Operation{ref: a}, %MLIR.Value{ref: b}}), do: {2, a, b}
   defp command({:data_layout, %Operation{ref: a}, %MLIR.Type{ref: b}}), do: {3, a, b}
+
+  defp command({:safepoints, %Operation{} = func_op, safepoint_ops}),
+    do: command({:safepoints, func_op, safepoint_ops, []})
+
+  defp command({:safepoints, %Operation{ref: func_ref} = func_op, safepoint_ops, opts}) when is_list(opts) do
+    resolved_ops = MLIR.Safepoint.resolve_ops(func_op, safepoint_ops)
+    exclude_entry_args = Keyword.get(opts, :exclude_entry_args, false)
+    {4, func_ref, {Enum.map(resolved_ops, & &1.ref), exclude_entry_args}}
+  end
+
   defp command(query), do: raise(ArgumentError, "unsupported analysis query: #{inspect(query)}")
   defp owner!(%{owner: owner}) when owner == self(), do: :ok
   defp owner!(_), do: raise(ArgumentError, "analysis session belongs to another process")

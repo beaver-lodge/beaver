@@ -63,7 +63,6 @@ typedef enum {
   BeaverCapiPolicyManualAdapter__mlirMemoryEffectsOpInterfaceGetEffects,
   BeaverCapiPolicyManualAdapter__beaverTranslateModuleToLLVMIRText,
   BeaverCapiPolicyManualAdapter__beaverCompileLLVMIRToPTX,
-  BeaverCapiPolicyManualAdapter__beaverCompilerKernelLoadAndPopulate,
   BeaverCapiPolicyManualAdapter__beaverContextEnableOptimizationRemarks,
 
   BeaverCapiPolicyManualRuntime__mlirValueReplaceUsesWithIf,

@@ -168,7 +168,6 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
     collectors = [
       {"beaverCompileLLVMIRToPTX", "compile_llvm_ir_to_ptx", :llvm},
       {"beaverTranslateModuleToLLVMIRText", "translate_module_to_llvm_ir", :llvm},
-      {"beaverCompilerKernelLoadAndPopulate", "compiler_kernel_load_and_populate", :kernel},
       {"mlirInferTypeOpInterfaceInferReturnTypes", "infer_return_types", :handles},
       {"mlirInferShapedTypeOpInterfaceInferReturnTypes", "infer_return_type_components",
        :handles},
@@ -180,7 +179,6 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
 
     policies = %{
       llvm: {"dirty_cpu", "native_owner", "nif_call"},
-      kernel: {"dirty_io", "stack", "nif_call"},
       handles: {"normal", "stack", "nif_call"},
       effects: {"context_worker", "stack", "async_operation"}
     }

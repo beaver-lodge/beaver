@@ -8,7 +8,6 @@ add_mlir_public_c_api_library(
   Beaver.cpp
   BeaverAnalysis.cpp
   BeaverExecution.cpp
-  BeaverCompilerKernel.cpp
   BeaverIRDL.cpp
   BeaverDebug.cpp
   BeaverGPU.cpp
@@ -22,23 +21,27 @@ add_mlir_public_c_api_library(
   MLIRDebug
   MLIRAnalysis
   MLIRDataLayoutInterfaces
+  MLIRControlFlowDialect
+  MLIRControlFlowTransforms
+  MLIRFuncDialect
+  MLIRFuncTransforms
+  MLIRLLVMDialect
+  MLIRSCFTransforms
+  MLIRPDLDialect
+  MLIRPDLInterpDialect
+  MLIRPDLToPDLInterp
   LLVMSupport
   LLVMCore
   LLVMIRReader
+  LLVMPasses
   LLVMTarget
+  LLVMTargetParser
   LLVMCodeGen
-  LLVMNVPTXCodeGen)
-
-# External providers may be built with C++ exceptions enabled. Keep the
-# exception barrier local to the compiler-kernel boundary while the rest of
-# MLIR/Beaver remains compiled with LLVM's normal -fno-exceptions policy.
-if(MSVC)
-  set_source_files_properties(BeaverCompilerKernel.cpp
-    PROPERTIES COMPILE_OPTIONS "/EHsc")
-else()
-  set_source_files_properties(BeaverCompilerKernel.cpp
-    PROPERTIES COMPILE_OPTIONS "-fexceptions")
-endif()
+  LLVMNVPTXCodeGen
+  LLVM${LLVM_NATIVE_ARCH}CodeGen
+  LLVM${LLVM_NATIVE_ARCH}AsmParser
+  LLVM${LLVM_NATIVE_ARCH}Desc
+  LLVM${LLVM_NATIVE_ARCH}Info)
 
 if(BEAVER_TRITON_PREBUILT_DIR)
   file(READ "${BEAVER_TRITON_PREBUILT_DIR}/toolchain.json" _triton_metadata)
