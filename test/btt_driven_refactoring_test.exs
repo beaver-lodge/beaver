@@ -18,9 +18,8 @@ defmodule Beaver.BttDrivenRefactoringTest do
   alias Beaver.MLIR.Target.LLVMIR
   alias Beaver.Pattern.Native.Program
 
-  describe "1. Callback-free Rewrite Engine: Extended Pattern.Native.Program & PDLInterp" do
-    test "Program :replace_op rewrites operations, selects operands, copies/sets attrs, and converts types with 0 callbacks",
-         %{ctx: ctx} do
+  describe "rewrite engine" do
+    test "Program :replace_op rewrites ops with 0 callbacks", %{ctx: ctx} do
       MLIR.Context.allow_unregistered_dialects(ctx)
 
       swap_sub =
@@ -140,10 +139,8 @@ defmodule Beaver.BttDrivenRefactoringTest do
     end
   end
 
-  describe "2. Conversion.Plan Structural Type Conversions, Recursive TypeConverter, SymbolTable & RewriterBase" do
-    test "TypeConverter recursive conversion map rewrites nested composite types natively", %{
-      ctx: ctx
-    } do
+  describe "conversion plan" do
+    test "TypeConverter recursive conversion map rewrites nested composite types", %{ctx: ctx} do
       TypeConverter.with(fn converter ->
         TypeConverter.add_conversion_map(converter, [Type.i32(ctx: ctx)], Type.i64(ctx: ctx),
           recursive: true
@@ -230,9 +227,8 @@ defmodule Beaver.BttDrivenRefactoringTest do
     end
   end
 
-  describe "3. BeaverLLVMIR: Host AOT Object Compiler & Per-Function Concurrent Sharding" do
-    test "queries host target and compiles MLIR module directly to native object code and assembly",
-         %{ctx: ctx} do
+  describe "llvmir aot" do
+    test "compiles MLIR module to native object and assembly", %{ctx: ctx} do
       target = LLVMIR.host_target()
       assert is_binary(target.triple) and byte_size(target.triple) > 0 and is_binary(target.cpu)
 
@@ -260,8 +256,7 @@ defmodule Beaver.BttDrivenRefactoringTest do
     end
 
     @tag :tmp_dir
-    test "compile_functions shards a multi-function module concurrently and caches .o artifacts by SHA-256",
-         %{ctx: ctx, tmp_dir: tmp_dir} do
+    test "compile_functions shards and caches objects", %{ctx: ctx, tmp_dir: tmp_dir} do
       ir = ~S"""
       module {
         llvm.mlir.global external @shared_bias(10 : i64) : i64
@@ -290,14 +285,14 @@ defmodule Beaver.BttDrivenRefactoringTest do
           shards2 = LLVMIR.compile_functions!(module, cache_dir: tmp_dir, opt_level: 2)
           assert Enum.all?(shards2, & &1.cached?)
           assert Enum.map(shards1, & &1.digest) == Enum.map(shards2, & &1.digest)
+          File.rm_rf!(tmp_dir)
         end
       )
     end
   end
 
-  describe "4. IRBatch.build: Single-NIF Batch IR Construction" do
-    test "builds a multi-op basic block with intra-batch SSA and block-arg references in one submission",
-         %{ctx: ctx} do
+  describe "ir_batch" do
+    test "builds basic block in one submission", %{ctx: ctx} do
       ir = ~S"""
       module {
         func.func @batch_target(%x: i32, %y: i32) -> i32 {
@@ -344,9 +339,8 @@ defmodule Beaver.BttDrivenRefactoringTest do
     end
   end
 
-  describe "5. ExecutionEngine Symbol Rebinding & C ABI Aggregate Call Lowering" do
-    test "lowers C ABI aggregate calls with stacksave, alloca, store, load, stackrestore, and symbol declaration",
-         %{ctx: ctx} do
+  describe "execution engine" do
+    test "lowers C ABI aggregate calls", %{ctx: ctx} do
       MLIR.Context.allow_unregistered_dialects(ctx)
 
       plan =
@@ -394,8 +388,7 @@ defmodule Beaver.BttDrivenRefactoringTest do
     end
 
     @tag :tmp_dir
-    test "ExecutionEngine binds native symbols under custom aliased names without global collisions",
-         %{ctx: ctx, tmp_dir: tmp_dir} do
+    test "binds aliased native symbols", %{ctx: ctx, tmp_dir: tmp_dir} do
       lib_ir = ~S"""
       module {
         llvm.func @native_impl_run(%x: i32) -> i32 {
@@ -452,9 +445,8 @@ defmodule Beaver.BttDrivenRefactoringTest do
     end
   end
 
-  describe "6. BeaverAnalysis: Native Safepoint Liveness, Slot Coloring & Resumable CFG Lowering" do
-    test "computes live-across-safepoint SSA values, shares non-overlapping slots, and lowers resumable CFG",
-         %{ctx: ctx} do
+  describe "safepoint" do
+    test "analyzes liveness and lowers resumable CFG", %{ctx: ctx} do
       MLIR.Context.allow_unregistered_dialects(ctx)
 
       ir = ~S"""
