@@ -123,7 +123,7 @@ defmodule Beaver.MLIR.ExecutionEngine do
     lib_str = if library_path, do: Path.expand(library_path), else: ""
     sym_str = symbol_name |> to_string() |> String.trim_leading("@")
     ptr = beaverDynamicLibrarySearchForAddressOfSymbol(StringRef.create(lib_str), StringRef.create(sym_str))
-    if ptr == Native.OpaquePtr.null(), do: :error, else: {:ok, ptr}
+    if Native.to_term(ptr) == 0, do: :error, else: {:ok, ptr}
   end
 
   @doc "Registers multiple symbols on `jit` from pointers, `{library_path, native_sym}` tuples, or symbol names."

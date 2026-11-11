@@ -435,6 +435,8 @@ defmodule Beaver.BttDrivenRefactoringTest do
         |> Beaver.Composer.run!()
 
       Beaver.Native.with_resource(caller_module, &MLIR.Module.destroy/1, fn caller_module ->
+        assert ExecutionEngine.lookup_library_symbol(dylib_path, "nonexistent_symbol") == :error
+
         jit =
           ExecutionEngine.create!(caller_module,
             symbols: %{"aliased_kernel" => {dylib_path, "native_impl_run"}}
