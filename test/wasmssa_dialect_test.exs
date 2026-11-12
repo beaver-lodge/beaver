@@ -19,15 +19,13 @@ defmodule WasmSSADialectTest do
 
   test "parses wasmssa text", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        """
-        wasmssa.func @f() -> i32 {
-          %0 = wasmssa.const 10 : i32
-          wasmssa.return %0 : i32
-        }
-        """,
-        ctx: ctx
-      )
+      """
+      wasmssa.func @f() -> i32 {
+        %0 = wasmssa.const 10 : i32
+        wasmssa.return %0 : i32
+      }
+      """
+      |> MLIR.Module.create!(ctx: ctx)
 
     text = MLIR.to_string(module)
     assert text =~ "wasmssa.func @f() -> i32"

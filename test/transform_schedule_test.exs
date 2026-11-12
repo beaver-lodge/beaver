@@ -4,41 +4,11 @@ defmodule Beaver.MLIR.Transform.ScheduleTest do
   alias Beaver.MLIR
   alias MLIR.Transform.Schedule
 
-  @payload """
-  module {
-    func.func @fold_me() -> i32 {
-      %zero = arith.constant 0 : i32
-      %one = arith.constant 1 : i32
-      %sum = arith.addi %one, %zero : i32
-      return %sum : i32
-    }
-  }
-  """
+  @payload "module {\n  func.func @fold_me() -> i32 {\n    %zero = arith.constant 0 : i32\n    %one = arith.constant 1 : i32\n    %sum = arith.addi %one, %zero : i32\n    return %sum : i32\n  }\n}\n"
 
-  @canonicalize_schedule """
-  module attributes {transform.with_named_sequence} {
-    transform.named_sequence @__transform_main(%root: !transform.any_op) {
-      transform.apply_patterns to %root {
-        transform.apply_patterns.canonicalization
-      } : !transform.any_op
-      transform.yield
-    }
-  }
-  """
+  @canonicalize_schedule "module attributes {transform.with_named_sequence} {\n  transform.named_sequence @__transform_main(%root: !transform.any_op) {\n    transform.apply_patterns to %root {\n      transform.apply_patterns.canonicalization\n    } : !transform.any_op\n    transform.yield\n  }\n}\n"
 
-  @tune_schedule """
-  module attributes {transform.with_named_sequence} {
-    transform.named_sequence @__transform_main(%root: !transform.any_op) {
-      %tile = transform.tune.knob<"tile"> options = [8, 16] -> !transform.any_param
-      transform.tune.alternatives<"vectorize"> {
-        transform.yield
-      }, {
-        transform.yield
-      }
-      transform.yield
-    }
-  }
-  """
+  @tune_schedule "module attributes {transform.with_named_sequence} {\n  transform.named_sequence @__transform_main(%root: !transform.any_op) {\n    %tile = transform.tune.knob<\"tile\"> options = [8, 16] -> !transform.any_param\n    transform.tune.alternatives<\"vectorize\"> {\n      transform.yield\n    }, {\n      transform.yield\n    }\n    transform.yield\n  }\n}\n"
 
   defp ir(ctx, source \\ @payload) do
     module = MLIR.Module.create!(source, ctx: ctx)
@@ -114,14 +84,8 @@ defmodule Beaver.MLIR.Transform.ScheduleTest do
 
     assert {:error, %MLIR.Transform.Error{kind: :invalid_schedule}} = MLIR.Transform.execute(payload, "not mlir")
 
-    silenceable = """
-    module attributes {transform.with_named_sequence} {
-      transform.named_sequence @__transform_main(%root: !transform.any_op) {
-        %func = transform.cast %root : !transform.any_op to !transform.op<"func.func">
-        transform.yield
-      }
-    }
-    """
+    silenceable =
+      "module attributes {transform.with_named_sequence} {\n  transform.named_sequence @__transform_main(%root: !transform.any_op) {\n    %func = transform.cast %root : !transform.any_op to !transform.op<\"func.func\">\n    transform.yield\n  }\n}\n"
 
     assert {:error, %MLIR.Transform.Error{kind: :silenceable_failure, diagnostics: [{:error, location, _, _}]}} =
              MLIR.Transform.execute(payload, silenceable)
@@ -133,19 +97,8 @@ defmodule Beaver.MLIR.Transform.ScheduleTest do
   end
 
   test "selected Tune IR replays from text and bytecode", %{ctx: ctx} do
-    selected = """
-    module attributes {transform.with_named_sequence} {
-      transform.named_sequence @__transform_main(%root: !transform.any_op) {
-        %tile = transform.tune.knob<"tile"> = 16 from options = [8, 16] -> !transform.any_param
-        transform.tune.alternatives<"route"> selected_region = 1 {
-          transform.yield
-        }, {
-          transform.yield
-        }
-        transform.yield
-      }
-    }
-    """
+    selected =
+      "module attributes {transform.with_named_sequence} {\n  transform.named_sequence @__transform_main(%root: !transform.any_op) {\n    %tile = transform.tune.knob<\"tile\"> = 16 from options = [8, 16] -> !transform.any_param\n    transform.tune.alternatives<\"route\"> selected_region = 1 {\n      transform.yield\n    }, {\n      transform.yield\n    }\n    transform.yield\n  }\n}\n"
 
     schedule = ir(ctx, selected)
     payload = ir(ctx)

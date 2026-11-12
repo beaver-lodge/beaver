@@ -8,17 +8,8 @@ defmodule Beaver.MLIR.Target.LLVMIRTest do
 
   test "exports an LLVM dialect module as LLVM IR text", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        """
-        module {
-          llvm.func @answer() -> i32 {
-            %answer = llvm.mlir.constant(42 : i32) : i32
-            llvm.return %answer : i32
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  llvm.func @answer() -> i32 {\n    %answer = llvm.mlir.constant(42 : i32) : i32\n    llvm.return %answer : i32\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     assert {:ok, llvm_ir} = LLVMIR.translate(module)
     assert llvm_ir =~ "define i32 @answer()"
@@ -28,17 +19,8 @@ defmodule Beaver.MLIR.Target.LLVMIRTest do
 
   test "returns diagnostics for a module that is not lowered to LLVM dialect", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        """
-        module {
-          func.func @answer() -> i32 {
-            %answer = arith.constant 42 : i32
-            return %answer : i32
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  func.func @answer() -> i32 {\n    %answer = arith.constant 42 : i32\n    return %answer : i32\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     assert {:error, diagnostics} = LLVMIR.translate(module)
     assert diagnostics != []

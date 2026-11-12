@@ -4,13 +4,7 @@ defmodule SlangCompleteTest do
 
   @moduletag :smoke
 
-  @valid_module ~S"""
-  module {
-    "complete_slang.scope"() ({
-    ^bb0:
-    }) {label = "ok"} : () -> ()
-  }
-  """
+  @valid_module "module {\n  \"complete_slang.scope\"() ({\n  ^bb0:\n  }) {label = \"ok\"} : () -> ()\n}\n"
 
   test "emits a complete, named IRDL schema", %{ctx: ctx} do
     schema = CompleteSlang.__slang_dialect__(ctx) |> MLIR.verify!()
@@ -66,30 +60,12 @@ defmodule SlangCompleteTest do
     Beaver.Slang.load(ctx, CompleteSlang)
 
     assert_raise ArgumentError, ~r/using value defined outside the region/, fn ->
-      ~S"""
-      module {
-        func.func @bad(%arg0: i32) {
-          "complete_slang.scope"() ({
-          ^bb0:
-            "complete_slang.consume"(%arg0) : (i32) -> ()
-          }) {label = "bad"} : () -> ()
-          return
-        }
-      }
-      """
+      "module {\n  func.func @bad(%arg0: i32) {\n    \"complete_slang.scope\"() ({\n    ^bb0:\n      \"complete_slang.consume\"(%arg0) : (i32) -> ()\n    }) {label = \"bad\"} : () -> ()\n    return\n  }\n}\n"
       |> MLIR.Module.create!(ctx: ctx)
     end
 
     assert_raise ArgumentError, ~r/must be the last operation in the parent block/, fn ->
-      ~S"""
-      module {
-        "complete_slang.scope"() ({
-        ^bb0:
-          "complete_slang.yield"() : () -> ()
-          "complete_slang.yield"() : () -> ()
-        }) {label = "bad"} : () -> ()
-      }
-      """
+      "module {\n  \"complete_slang.scope\"() ({\n  ^bb0:\n    \"complete_slang.yield\"() : () -> ()\n    \"complete_slang.yield\"() : () -> ()\n  }) {label = \"bad\"} : () -> ()\n}\n"
       |> MLIR.Module.create!(ctx: ctx)
     end
   end

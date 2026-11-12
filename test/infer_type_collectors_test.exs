@@ -82,23 +82,8 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
 
   test "shaped inference uses properties and borrows regions without consuming them", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        """
-        module {
-          func.func @infer(%input: tensor<2x3xf32>, %cond: i1) -> i32 {
-            %result = scf.if %cond -> (i32) {
-              %a = arith.constant 1 : i32
-              scf.yield %a : i32
-            } else {
-              %b = arith.constant 2 : i32
-              scf.yield %b : i32
-            }
-            return %result : i32
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  func.func @infer(%input: tensor<2x3xf32>, %cond: i1) -> i32 {\n    %result = scf.if %cond -> (i32) {\n      %a = arith.constant 1 : i32\n      scf.yield %a : i32\n    } else {\n      %b = arith.constant 2 : i32\n      scf.yield %b : i32\n    }\n    return %result : i32\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     func = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.at(0)
     block = func |> Beaver.Walker.regions() |> Enum.at(0) |> Beaver.Walker.blocks() |> Enum.at(0)

@@ -5,6 +5,9 @@ defmodule Beaver.MLIR.IRBatch.Builder do
   Values are symbolic bindings, not native handles. `data` belongs to the caller. Integer constants are reused within
   their block, or throughout the function when explicitly emitted in the entry block with `scope: :entry`.
   `finish/1` returns blocks for `IRBatch.build_function!/3`; MLIR verifies types and dominance at submission.
+
+  `expression/2` constructs deferred operands; `emit/2` evaluates them in order against the supplied builder.
+  Bind shared results explicitly: reusing an expression describes another emission, including any side effects.
   """
   defstruct blocks: [],
             current: nil,
@@ -32,6 +35,7 @@ defmodule Beaver.MLIR.IRBatch.Builder do
   def end_block(%__MODULE__{current: nil}, _), do: raise(ArgumentError, "no current block")
 
   def end_block(b, terminator) do
+    {terminator, b} = emit(b, terminator)
     block = %{name: b.current, body: Enum.reverse([terminator | b.operations])}
     block = if b.args == [], do: block, else: Map.put(block, :args, b.args)
     %{b | blocks: [block | b.blocks], current: nil, args: [], operations: []}
@@ -43,17 +47,20 @@ defmodule Beaver.MLIR.IRBatch.Builder do
 
   def operation(b, name, operands, results, attributes, bind) do
     if is_nil(b.current), do: raise(ArgumentError, "start a block before emitting operations")
+    {operands, b} = emit(b, operands)
     op = %{name: name, operands: operands, results: results, attributes: attributes, bind: bind}
     %{b | operations: [op | b.operations]}
   end
 
   def value(b, name, operands, type, attributes \\ []) do
+    {operands, b} = emit(b, operands)
     {v, b} = fresh(b)
     {v, operation(b, name, operands, [type], attributes, v)}
   end
 
   @doc "Emits func.call; returns `{nil | value | values, builder}` for zero, one or multiple results."
   def call(b, symbol, operands, result_types) do
+    {operands, b} = emit(b, operands)
     {values, b} = Enum.map_reduce(result_types, b, fn _, acc -> fresh(acc) end)
 
     result =
@@ -65,6 +72,25 @@ defmodule Beaver.MLIR.IRBatch.Builder do
 
     {result, operation(b, "func.call", operands, result_types, [callee: {:symbol, symbol}], result)}
   end
+
+  @doc "Describes a nested value expression. Each occurrence emits once, in left-to-right operand order."
+  def expression(kind, args) when kind in [:constant, :call, :value, :compare, :binary],
+    do: {__MODULE__, kind, args}
+
+  @doc "Emits nested expressions in a value, list or tuple, returning the resolved value and immutable builder."
+  def emit(b, {__MODULE__, kind, args}) when kind in [:constant, :call, :value, :compare, :binary] do
+    {args, b} = emit(b, args)
+    apply(__MODULE__, kind, [b | args])
+  end
+
+  def emit(b, values) when is_list(values), do: Enum.map_reduce(values, b, &emit(&2, &1))
+
+  def emit(b, values) when is_tuple(values) do
+    {values, b} = emit(b, Tuple.to_list(values))
+    {List.to_tuple(values), b}
+  end
+
+  def emit(b, value), do: {value, b}
 
   def constant_ref(b, type, value), do: Map.fetch!(b.constants, {type, value})
 

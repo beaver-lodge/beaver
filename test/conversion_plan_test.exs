@@ -66,17 +66,8 @@ defmodule Beaver.MLIR.ConversionPlanTest do
         assert Beaver.Slang.load(ctx, Beaver.MLIR.CounterPlanTest) |> LogicalResult.success?()
 
         module =
-          MLIR.Module.create!(
-            ~S"""
-            module {
-              func.func @increment(%arg0: i32) -> i32 {
-                %0 = "counter_plan_test.inc"(%arg0) : (i32) -> i32
-                return %0 : i32
-              }
-            }
-            """,
-            ctx: ctx
-          )
+          "module {\n  func.func @increment(%arg0: i32) -> i32 {\n    %0 = \"counter_plan_test.inc\"(%arg0) : (i32) -> i32\n    return %0 : i32\n  }\n}\n"
+          |> MLIR.Module.create!(ctx: ctx)
 
         Beaver.MLIR.Module.with_module(module, fn module ->
           if driver == :run do

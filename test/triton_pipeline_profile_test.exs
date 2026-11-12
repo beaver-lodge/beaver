@@ -6,41 +6,11 @@ defmodule Beaver.MLIR.Triton.PipelineProfileTest do
   @moduletag :triton
   @enabled System.get_env("BEAVER_TRITON_PREBUILT_DIR") != nil
 
-  @load_store ~S"""
-  module {
-    tt.func public @pipeline_profile_smoke(
-      %input: !tt.ptr<f32> {tt.divisibility = 16 : i32},
-      %output: !tt.ptr<f32> {tt.divisibility = 16 : i32}
-    ) attributes {noinline = false} {
-      %value = tt.load %input : !tt.ptr<f32>
-      tt.store %output, %value : !tt.ptr<f32>
-      tt.return
-    }
-  }
-  """
+  @load_store "module {\n  tt.func public @pipeline_profile_smoke(\n    %input: !tt.ptr<f32> {tt.divisibility = 16 : i32},\n    %output: !tt.ptr<f32> {tt.divisibility = 16 : i32}\n  ) attributes {noinline = false} {\n    %value = tt.load %input : !tt.ptr<f32>\n    tt.store %output, %value : !tt.ptr<f32>\n    tt.return\n  }\n}\n"
 
   # The producer spans four warps, while the consumer reads those values in
   # one warp. Allocation alone cannot make the shared writes visible to it.
-  @shared_load ~S"""
-  #producer = #ttg.blocked<{sizePerThread = [1], threadsPerWarp = [32], warpsPerCTA = [4], order = [0]}>
-  #consumer = #ttg.blocked<{sizePerThread = [4], threadsPerWarp = [32], warpsPerCTA = [4], order = [0]}>
-  #shared = #ttg.swizzled_shared<{vec = 1, perPhase = 1, maxPhase = 1, order = [0]}>
-  module attributes {ttg.target = "__TARGET__", "ttg.num-ctas" = 1 : i32, "ttg.num-warps" = 4 : i32, "ttg.threads-per-warp" = 32 : i32} {
-    tt.func public @shared_load(%input: !tt.ptr<f32> {tt.divisibility = 16 : i32}, %output: !tt.ptr<f32> {tt.divisibility = 16 : i32}) {
-      %in_indices = tt.make_range {start = 0 : i32, end = 128 : i32} : tensor<128xi32, #producer>
-      %in_base = tt.splat %input : !tt.ptr<f32> -> tensor<128x!tt.ptr<f32>, #producer>
-      %in_ptrs = tt.addptr %in_base, %in_indices : tensor<128x!tt.ptr<f32>, #producer>, tensor<128xi32, #producer>
-      %values = tt.load %in_ptrs : tensor<128x!tt.ptr<f32>, #producer>
-      %buffer = ttg.local_alloc %values : (tensor<128xf32, #producer>) -> !ttg.memdesc<128xf32, #shared, #ttg.shared_memory>
-      %result = ttg.local_load %buffer : !ttg.memdesc<128xf32, #shared, #ttg.shared_memory> -> tensor<128xf32, #consumer>
-      %out_indices = tt.make_range {start = 0 : i32, end = 128 : i32} : tensor<128xi32, #consumer>
-      %out_base = tt.splat %output : !tt.ptr<f32> -> tensor<128x!tt.ptr<f32>, #consumer>
-      %out_ptrs = tt.addptr %out_base, %out_indices : tensor<128x!tt.ptr<f32>, #consumer>, tensor<128xi32, #consumer>
-      tt.store %out_ptrs, %result : tensor<128x!tt.ptr<f32>, #consumer>
-      tt.return
-    }
-  }
-  """
+  @shared_load "#producer = #ttg.blocked<{sizePerThread = [1], threadsPerWarp = [32], warpsPerCTA = [4], order = [0]}>\n#consumer = #ttg.blocked<{sizePerThread = [4], threadsPerWarp = [32], warpsPerCTA = [4], order = [0]}>\n#shared = #ttg.swizzled_shared<{vec = 1, perPhase = 1, maxPhase = 1, order = [0]}>\nmodule attributes {ttg.target = \"__TARGET__\", \"ttg.num-ctas\" = 1 : i32, \"ttg.num-warps\" = 4 : i32, \"ttg.threads-per-warp\" = 32 : i32} {\n  tt.func public @shared_load(%input: !tt.ptr<f32> {tt.divisibility = 16 : i32}, %output: !tt.ptr<f32> {tt.divisibility = 16 : i32}) {\n    %in_indices = tt.make_range {start = 0 : i32, end = 128 : i32} : tensor<128xi32, #producer>\n    %in_base = tt.splat %input : !tt.ptr<f32> -> tensor<128x!tt.ptr<f32>, #producer>\n    %in_ptrs = tt.addptr %in_base, %in_indices : tensor<128x!tt.ptr<f32>, #producer>, tensor<128xi32, #producer>\n    %values = tt.load %in_ptrs : tensor<128x!tt.ptr<f32>, #producer>\n    %buffer = ttg.local_alloc %values : (tensor<128xf32, #producer>) -> !ttg.memdesc<128xf32, #shared, #ttg.shared_memory>\n    %result = ttg.local_load %buffer : !ttg.memdesc<128xf32, #shared, #ttg.shared_memory> -> tensor<128xf32, #consumer>\n    %out_indices = tt.make_range {start = 0 : i32, end = 128 : i32} : tensor<128xi32, #consumer>\n    %out_base = tt.splat %output : !tt.ptr<f32> -> tensor<128x!tt.ptr<f32>, #consumer>\n    %out_ptrs = tt.addptr %out_base, %out_indices : tensor<128x!tt.ptr<f32>, #consumer>, tensor<128xi32, #consumer>\n    tt.store %out_ptrs, %result : tensor<128x!tt.ptr<f32>, #consumer>\n    tt.return\n  }\n}\n"
 
   setup_all do
     if @enabled, do: Beaver.Triton.register_passes()

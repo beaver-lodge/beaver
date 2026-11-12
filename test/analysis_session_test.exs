@@ -5,18 +5,8 @@ defmodule Beaver.MLIR.AnalysisSessionTest do
 
   setup %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        """
-        module {
-          func.func @compute(%x: i32) -> i32 {
-            %a = arith.addi %x, %x : i32
-            %b = arith.muli %a, %x : i32
-            return %b : i32
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  func.func @compute(%x: i32) -> i32 {\n    %a = arith.addi %x, %x : i32\n    %b = arith.muli %a, %x : i32\n    return %b : i32\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     on_exit(fn -> MLIR.Module.destroy(module) end)
     func = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.at(0)
@@ -128,15 +118,8 @@ defmodule Beaver.MLIR.AnalysisSessionTest do
 
   test "DataLayout caches scoped index widths and retains scalable sizes", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        """
-        module {
-          module @narrow attributes {dlti.dl_spec = #dlti.dl_spec<#dlti.dl_entry<index, 32>>} {}
-          module @wide attributes {dlti.dl_spec = #dlti.dl_spec<#dlti.dl_entry<index, 64>>} {}
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  module @narrow attributes {dlti.dl_spec = #dlti.dl_spec<#dlti.dl_entry<index, 32>>} {}\n  module @wide attributes {dlti.dl_spec = #dlti.dl_spec<#dlti.dl_entry<index, 64>>} {}\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     [narrow, wide] = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.to_list()
 

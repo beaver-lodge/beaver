@@ -163,7 +163,8 @@ defmodule Beaver.MLIR.IRBatch do
 
   @doc """
   Creates a new `MLIR.Module` in `ctx` and populates it with `func_specs` using `build_function/3`. Verifies the
-  resulting module once at the end by default (`verify: true`).
+  resulting module once at the end by default (`verify: true`). An optional `:finalize` callback can insert
+  declarations or imports before verification; failure destroys the partially built module.
   """
   @spec build_module(MLIR.Context.t(), [map() | keyword()], keyword()) ::
           {:ok, MLIR.Module.t(), [term()]} | {:error, [term()]}
@@ -174,6 +175,7 @@ defmodule Beaver.MLIR.IRBatch do
 
     try do
       Enum.each(func_specs, fn func_spec -> {:ok, _fn_op, _} = build_function(module, func_spec, per_fn_opts) end)
+      if finalize = opts[:finalize], do: finalize.(module)
 
       if Keyword.get(opts, :verify, true) do
         case MLIR.verify(module) do

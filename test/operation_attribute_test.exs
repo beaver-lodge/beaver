@@ -64,10 +64,8 @@ defmodule OperationAttributeTest do
     assert CompleteSlang |> then(&Beaver.Slang.load(ctx, &1)) |> LogicalResult.success?()
 
     module =
-      MLIR.Module.create!(
-        ~S[module { "complete_slang.scope"() ({ ^bb0: }) {label = "dynamic"} : () -> () }],
-        ctx: ctx
-      )
+      ~S[module { "complete_slang.scope"() ({ ^bb0: }) {label = "dynamic"} : () -> () }]
+      |> MLIR.Module.create!(ctx: ctx)
 
     operation = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.fetch!(0)
     refute Operation.inherent_attribute?(operation, :label)
@@ -161,24 +159,10 @@ defmodule OperationAttributeTest do
   defp operation_named(module, name), do: module |> Beaver.Walker.find_ops(name) |> List.first()
 
   defp alloc_tensor_source(attributes) do
-    """
-    module {
-      func.func @allocate() -> tensor<4xf32> {
-        %0 = bufferization.alloc_tensor() #{attributes} : tensor<4xf32>
-        return %0 : tensor<4xf32>
-      }
-    }
-    """
+    "module {\n  func.func @allocate() -> tensor<4xf32> {\n    %0 = bufferization.alloc_tensor() #{attributes} : tensor<4xf32>\n    return %0 : tensor<4xf32>\n  }\n}\n"
   end
 
   defp emitc_source(properties) do
-    """
-    module {
-      func.func @sizeof() -> !emitc.size_t {
-        %0 = emitc.call_opaque "sizeof"() #{properties} {test.note} : () -> !emitc.size_t
-        return %0 : !emitc.size_t
-      }
-    }
-    """
+    "module {\n  func.func @sizeof() -> !emitc.size_t {\n    %0 = emitc.call_opaque \"sizeof\"() #{properties} {test.note} : () -> !emitc.size_t\n    return %0 : !emitc.size_t\n  }\n}\n"
   end
 end

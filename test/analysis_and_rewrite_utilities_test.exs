@@ -19,26 +19,8 @@ defmodule AnalysisAndRewriteUtilitiesTest do
   alias Beaver.MLIR
 
   defp control_flow_module(ctx) do
-    MLIR.Module.create!(
-      """
-      module {
-        func.func @branch(%cond: i1, %arg: i32) -> i32 {
-          cf.cond_br %cond, ^left, ^right
-        ^left:
-          %left_value = arith.addi %arg, %arg : i32
-          cf.br ^merge(%left_value : i32)
-        ^right:
-          %right_value = arith.subi %arg, %arg : i32
-          cf.br ^merge(%right_value : i32)
-        ^merge(%result: i32):
-          return %result : i32
-        ^unreachable:
-          return %arg : i32
-        }
-      }
-      """,
-      ctx: ctx
-    )
+    "module {\n  func.func @branch(%cond: i1, %arg: i32) -> i32 {\n    cf.cond_br %cond, ^left, ^right\n  ^left:\n    %left_value = arith.addi %arg, %arg : i32\n    cf.br ^merge(%left_value : i32)\n  ^right:\n    %right_value = arith.subi %arg, %arg : i32\n    cf.br ^merge(%right_value : i32)\n  ^merge(%result: i32):\n    return %result : i32\n  ^unreachable:\n    return %arg : i32\n  }\n}\n"
+    |> MLIR.Module.create!(ctx: ctx)
   end
 
   defp func_and_blocks(module) do
@@ -172,20 +154,8 @@ defmodule AnalysisAndRewriteUtilitiesTest do
 
   test "structural equivalence exposes properties and commutativity flags", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        """
-        module {
-          func.func @operations(%lhs: i32, %rhs: i32) {
-            %0 = arith.addi %lhs, %rhs : i32
-            %1 = arith.addi %rhs, %lhs : i32
-            %2 = arith.constant 1 : i32
-            %3 = arith.constant 2 : i32
-            return
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  func.func @operations(%lhs: i32, %rhs: i32) {\n    %0 = arith.addi %lhs, %rhs : i32\n    %1 = arith.addi %rhs, %lhs : i32\n    %2 = arith.constant 1 : i32\n    %3 = arith.constant 2 : i32\n    return\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     MLIR.Module.with_module(module, fn _ ->
       {func, _blocks} = func_and_blocks(module)
@@ -210,19 +180,8 @@ defmodule AnalysisAndRewriteUtilitiesTest do
 
   test "conditional use replacement dispatches a safe Elixir predicate", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        """
-        module {
-          func.func @replace_selected_use(%arg: i32) -> i32 {
-            %replacement = arith.constant 7 : i32
-            %selected = arith.addi %arg, %replacement : i32
-            %kept = arith.subi %arg, %selected : i32
-            return %kept : i32
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  func.func @replace_selected_use(%arg: i32) -> i32 {\n    %replacement = arith.constant 7 : i32\n    %selected = arith.addi %arg, %replacement : i32\n    %kept = arith.subi %arg, %selected : i32\n    return %kept : i32\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     MLIR.Module.with_module(module, fn _ ->
       {func, _blocks} = func_and_blocks(module)
@@ -268,18 +227,8 @@ defmodule AnalysisAndRewriteUtilitiesTest do
   end
 
   defp constants_module(ctx) do
-    MLIR.Module.create!(
-      """
-      module {
-        func.func @constants() -> i32 {
-          %0 = arith.constant 1 : i32
-          %1 = arith.constant 2 : i32
-          return %1 : i32
-        }
-      }
-      """,
-      ctx: ctx
-    )
+    "module {\n  func.func @constants() -> i32 {\n    %0 = arith.constant 1 : i32\n    %1 = arith.constant 2 : i32\n    return %1 : i32\n  }\n}\n"
+    |> MLIR.Module.create!(ctx: ctx)
   end
 
   test "scoped insertion points restore on return and exception", %{ctx: ctx} do

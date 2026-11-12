@@ -97,14 +97,10 @@ defmodule Beaver.MLIR.SymbolTable do
   end
 
   @doc "Checks all existing declarations against signatures without changing the module. Missing symbols are allowed."
-  def check_declarations!(module, signatures) do
-    declarations(module, signatures, [], false)
-  end
+  def check_declarations!(module, signatures), do: declarations(module, signatures, [], false)
 
   @doc "Checks every signature before inserting missing declarations; returns module. Accepts types or textual type pairs."
-  def ensure_declarations!(module, signatures, opts \\ []) do
-    declarations(module, signatures, opts, true)
-  end
+  def ensure_declarations!(module, signatures, opts \\ []), do: declarations(module, signatures, opts, true)
 
   defp declarations(module, signatures, opts, insert?) do
     root = symbol_root(module)

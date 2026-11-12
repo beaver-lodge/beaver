@@ -28,13 +28,10 @@ defmodule MlirTest do
     _module = mlirModuleCreateEmpty(location)
 
     module =
-      MLIR.Module.create!(
-        """
-        func.func private @printNewline()
-        func.func private @printI64(i64)
-        """,
-        ctx: ctx
-      )
+      ("" <>
+         "func.func private @printNewline()\n" <>
+         "func.func private @printI64(i64)\n")
+      |> MLIR.Module.create!(ctx: ctx)
 
     _operation = mlirModuleGetOperation(module)
     _ret_str = MLIR.StringRef.create("func.return")
@@ -96,24 +93,17 @@ defmodule MlirTest do
 
   def create_adder_module(ctx) do
     MLIR.Module.create(
-      """
-      func.func @foo(%arg0 : i32) -> i32 {
-        %res = arith.addi %arg0, %arg0 : i32
-        return %res : i32
-      }
-      """,
+      "" <>
+        "func.func @foo(%arg0 : i32) -> i32 {\n  %res = arith.addi %arg0, %arg0 : i32\n  return %res : i32\n}\n",
       ctx: ctx
     )
   end
 
   def create_redundant_transpose_module(ctx) do
-    MLIR.Module.create("""
-    func.func @test_transpose(%arg0: tensor<1x2x3xi32>) -> () {
-      %1 = "tosa.transpose"(%arg0) {perms = array<i32: 1, 2, 0>} : (tensor<1x2x3xi32>) -> (tensor<2x3x1xi32>)
-      %3 = "tosa.transpose"(%1) {perms = array<i32: 2, 0, 1>} : (tensor<2x3x1xi32>) -> (tensor<1x2x3xi32>)
-      return
-    }
-    """)
+    MLIR.Module.create(
+      "" <>
+        "func.func @test_transpose(%arg0: tensor<1x2x3xi32>) -> () {\n  %1 = \"tosa.transpose\"(%arg0) {perms = array<i32: 1, 2, 0>} : (tensor<1x2x3xi32>) -> (tensor<2x3x1xi32>)\n  %3 = \"tosa.transpose\"(%1) {perms = array<i32: 2, 0, 1>} : (tensor<2x3x1xi32>) -> (tensor<1x2x3xi32>)\n  return\n}\n"
+    )
     |> Beaver.Deferred.resolve(ctx)
   end
 
@@ -201,14 +191,8 @@ defmodule MlirTest do
   end
 
   test "basic jit", %{ctx: ctx} do
-    module_str = """
-    module {
-      func.func @add(%arg0 : i32) -> i32 attributes { llvm.emit_c_interface } {
-        %res = arith.addi %arg0, %arg0 : i32
-        return %res : i32
-      }
-    }
-    """
+    module_str =
+      "module {\n  func.func @add(%arg0 : i32) -> i32 attributes { llvm.emit_c_interface } {\n    %res = arith.addi %arg0, %arg0 : i32\n    return %res : i32\n  }\n}\n"
 
     {:ok, module} = MLIR.Module.create(module_str, ctx: ctx)
     MLIR.verify!(module)

@@ -7,30 +7,10 @@ defmodule IRDLTest do
     import Beaver.Sigils
 
     m =
-      ~m"""
-      irdl.dialect @cmath {
-        irdl.type @complex {
-          %0 = irdl.is f32
-          %1 = irdl.is f64
-          %2 = irdl.any_of(%0, %1)
-          irdl.parameters(elem: %2)
-        }
-        irdl.operation @norm {
-          %0 = irdl.any
-          %1 = irdl.parametric @cmath::@complex<%0>
-          irdl.operands(complex: %1)
-          irdl.results(norm: %0)
-        }
-         irdl.operation @mul {
-          %0 = irdl.is f32
-          %1 = irdl.is f64
-          %2 = irdl.any_of(%0, %1)
-          %3 = irdl.parametric @cmath::@complex<%2>
-          irdl.operands(lhs: %3, rhs: %3)
-          irdl.results(res: %3)
-        }
-      }
-      """
+      sigil_m(
+        "irdl.dialect @cmath {\n  irdl.type @complex {\n    %0 = irdl.is f32\n    %1 = irdl.is f64\n    %2 = irdl.any_of(%0, %1)\n    irdl.parameters(elem: %2)\n  }\n  irdl.operation @norm {\n    %0 = irdl.any\n    %1 = irdl.parametric @cmath::@complex<%0>\n    irdl.operands(complex: %1)\n    irdl.results(norm: %0)\n  }\n   irdl.operation @mul {\n    %0 = irdl.is f32\n    %1 = irdl.is f64\n    %2 = irdl.any_of(%0, %1)\n    %3 = irdl.parametric @cmath::@complex<%2>\n    irdl.operands(lhs: %3, rhs: %3)\n    irdl.results(res: %3)\n  }\n}\n",
+        []
+      )
       |> Beaver.Deferred.resolve(ctx)
       |> MLIR.verify!()
 

@@ -23,18 +23,8 @@ defmodule Beaver.MLIR.ConversionTest do
     assert ConversionSlang |> then(&Beaver.Slang.load(ctx, &1)) |> LogicalResult.success?()
 
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module {
-          %a = arith.constant 1 : i64
-          %b = arith.constant 2 : i64
-          %source = "conversion_test.source"() : () -> i32
-          "conversion_test.sink"(%source) : (i32) -> ()
-          "conversion_test.keep"() : () -> ()
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  %a = arith.constant 1 : i64\n  %b = arith.constant 2 : i64\n  %source = \"conversion_test.source\"() : () -> i32\n  \"conversion_test.sink\"(%source) : (i32) -> ()\n  \"conversion_test.keep\"() : () -> ()\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     [first, second | _] = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.to_list()
 

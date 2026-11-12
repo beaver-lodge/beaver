@@ -6,16 +6,7 @@ defmodule BufferizationTest do
 
   @moduletag :smoke
 
-  @tensor_module """
-  module {
-    func.func @main() -> f32 {
-      %tensor = bufferization.alloc_tensor() : tensor<4xf32>
-      %c0 = arith.constant 0 : index
-      %value = tensor.extract %tensor[%c0] : tensor<4xf32>
-      func.return %value : f32
-    }
-  }
-  """
+  @tensor_module "module {\n  func.func @main() -> f32 {\n    %tensor = bufferization.alloc_tensor() : tensor<4xf32>\n    %c0 = arith.constant 0 : index\n    %value = tensor.extract %tensor[%c0] : tensor<4xf32>\n    func.return %value : f32\n  }\n}\n"
 
   test "renders structured One-Shot Bufferize options" do
     pipeline =

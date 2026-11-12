@@ -17,17 +17,8 @@ defmodule ActionTracingTest do
     session = MLIR.ActionTracing.attach(ctx, drain_interval_ms: nil)
 
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module {
-          func.func @f(%arg0: i32) -> i32 {
-            %0 = arith.addi %arg0, %arg0 : i32
-            return %0 : i32
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  func.func @f(%arg0: i32) -> i32 {\n    %0 = arith.addi %arg0, %arg0 : i32\n    return %0 : i32\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     module |> Beaver.Composer.append("canonicalize") |> Beaver.Composer.run!()
 
@@ -64,16 +55,8 @@ defmodule ActionTracingTest do
 
   test "filtering by source location substring", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module {
-          func.func @f() -> () {
-            return
-          }
-        } loc("tracing.mlir":1:2)
-        """,
-        ctx: ctx
-      )
+      "module {\n  func.func @f() -> () {\n    return\n  }\n} loc(\"tracing.mlir\":1:2)\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     matching = MLIR.ActionTracing.attach(ctx, locations: ["tracing.mlir"])
     module |> Beaver.Composer.append("canonicalize") |> Beaver.Composer.run!()

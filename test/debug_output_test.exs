@@ -6,12 +6,11 @@ defmodule DebugOutputTest do
   @moduletag :smoke
 
   def ir(ctx) do
-    ~m"""
-    func.func @add(%arg0 : i32, %arg1 : i32) -> i32 {
-      %res = arith.addi %arg0, %arg1 : i32
-      return %res : i32
-    }
-    """
+    sigil_m(
+      "" <>
+        "func.func @add(%arg0 : i32, %arg1 : i32) -> i32 {\n  %res = arith.addi %arg0, %arg1 : i32\n  return %res : i32\n}\n",
+      []
+    )
     |> Beaver.Deferred.resolve(ctx)
   end
 

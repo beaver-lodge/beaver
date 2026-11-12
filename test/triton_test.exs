@@ -19,20 +19,8 @@ defmodule TritonTest do
     Beaver.Triton.register(ctx)
 
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module {
-          tt.func @load_store(%ptr: !tt.ptr<f32> {tt.divisibility = 16 : i32}, %mask : i1) {
-            %a = tt.load %ptr : !tt.ptr<f32>
-            %b = tt.load %ptr, %mask : !tt.ptr<f32>
-            tt.store %ptr, %a : !tt.ptr<f32>
-            tt.store %ptr, %b, %mask : !tt.ptr<f32>
-            tt.return
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  tt.func @load_store(%ptr: !tt.ptr<f32> {tt.divisibility = 16 : i32}, %mask : i1) {\n    %a = tt.load %ptr : !tt.ptr<f32>\n    %b = tt.load %ptr, %mask : !tt.ptr<f32>\n    tt.store %ptr, %a : !tt.ptr<f32>\n    tt.store %ptr, %b, %mask : !tt.ptr<f32>\n    tt.return\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     text = MLIR.to_string(module, generic: false)
     assert text =~ "tt.func @load_store"
@@ -46,17 +34,8 @@ defmodule TritonTest do
     Beaver.Triton.register(ctx)
 
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module attributes {"ttg.num-warps" = 4 : i32, ttg.target = "cuda:90"} {
-          tt.func @addptr(%ptr: !tt.ptr<f32>, %i: i32) {
-            %0 = tt.addptr %ptr, %i : !tt.ptr<f32>, i32
-            tt.return
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module attributes {\"ttg.num-warps\" = 4 : i32, ttg.target = \"cuda:90\"} {\n  tt.func @addptr(%ptr: !tt.ptr<f32>, %i: i32) {\n    %0 = tt.addptr %ptr, %i : !tt.ptr<f32>, i32\n    tt.return\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     module
     |> Beaver.Composer.append("convert-triton-to-tritongpu{target=cuda:90}")
@@ -75,29 +54,8 @@ defmodule TritonTest do
     Beaver.Triton.register(ctx)
 
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module attributes {"ttg.num-warps" = 4 : i32, ttg.target = "cuda:90"} {
-          tt.func @addptr(%ptr: !tt.ptr<f32>, %i: i32) {
-            %0 = tt.addptr %ptr, %i : !tt.ptr<f32>, i32
-            tt.return
-          }
-          tt.func @increment(%ptr: !tt.ptr<f32>, %n: i32) {
-            %zero = arith.constant 0 : i32
-            %step = arith.constant 1 : i32
-            %one = arith.constant 1.0 : f32
-            scf.for %i = %zero to %n step %step : i32 {
-              %element = tt.addptr %ptr, %i : !tt.ptr<f32>, i32
-              %value = tt.load %element : !tt.ptr<f32>
-              %added = arith.addf %value, %one : f32
-              tt.store %element, %added : !tt.ptr<f32>
-            }
-            tt.return
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module attributes {\"ttg.num-warps\" = 4 : i32, ttg.target = \"cuda:90\"} {\n  tt.func @addptr(%ptr: !tt.ptr<f32>, %i: i32) {\n    %0 = tt.addptr %ptr, %i : !tt.ptr<f32>, i32\n    tt.return\n  }\n  tt.func @increment(%ptr: !tt.ptr<f32>, %n: i32) {\n    %zero = arith.constant 0 : i32\n    %step = arith.constant 1 : i32\n    %one = arith.constant 1.0 : f32\n    scf.for %i = %zero to %n step %step : i32 {\n      %element = tt.addptr %ptr, %i : !tt.ptr<f32>, i32\n      %value = tt.load %element : !tt.ptr<f32>\n      %added = arith.addf %value, %one : f32\n      tt.store %element, %added : !tt.ptr<f32>\n    }\n    tt.return\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     lowered = Beaver.Triton.compile_to_llvm(module, target: "cuda:90")
 

@@ -31,13 +31,7 @@ defmodule Beaver.CompilerBuildingBlocksTest do
     b = b |> Builder.start_block(:default) |> Builder.end_block({:return, [zero]})
     assert b.data == %{language: :test}
 
-    spec = %{
-      name: "run",
-      inputs: [x: :i64, selector: :i32],
-      results: [:i64],
-      blocks: Builder.finish(b),
-      attributes: ["llvm.emit_c_interface": Attribute.unit(ctx: ctx)]
-    }
+    spec = run_spec(ctx, b, x: :i64, selector: :i32)
 
     Native.with_resource(IRBatch.build_module!(ctx, [spec]), &Module.destroy/1, fn module ->
       with_jit(module, fn jit ->
@@ -64,6 +58,23 @@ defmodule Beaver.CompilerBuildingBlocksTest do
     assert_raise ArgumentError, fn ->
       Builder.dispatch(b, :selector, :i32, :default, [{0, :case, nil}], fn _, x -> x end)
     end
+  end
+
+  test "nested expressions evaluate effectful operands once in left-to-right order", %{ctx: ctx} do
+    source =
+      "module { func.func @next(%p: !llvm.ptr) -> i64 { %v = llvm.load %p : !llvm.ptr -> i64 %one = arith.constant 1 : i64 %n = arith.addi %v, %one : i64 llvm.store %n, %p : i64, !llvm.ptr return %v : i64 } }"
+
+    b = Builder.new() |> Builder.start_block(:entry)
+    {one, b} = Builder.constant(b, :i64, 1)
+    {ptr, b} = Builder.value(b, "llvm.alloca", [one], :ptr, elem_type: {:type, :i64})
+    b = Builder.operation(b, "llvm.store", [one, ptr], [], [], nil)
+    next = Builder.expression(:call, ["next", [ptr], [:i64]])
+    difference = Builder.expression(:binary, ["subi", [next, next], :i64])
+    b = Builder.end_block(b, {:return, [difference]})
+
+    finalize = fn module -> Module.with_module(ctx, source, &Module.import_symbols!(module, &1)) end
+    module = IRBatch.build_module!(ctx, [run_spec(ctx, b, [])], finalize: finalize)
+    Native.with_resource(module, &Module.destroy/1, &with_jit(&1, fn jit -> assert invoke(jit, []) == -1 end))
   end
 
   test "template revisions cache portable data while each use owns independent IR", %{ctx: ctx} do
@@ -181,6 +192,11 @@ defmodule Beaver.CompilerBuildingBlocksTest do
   defp rename_rule(from, to) do
     {from,
      "pdl.pattern @rename_#{from} : benefit(1) { %x = pdl.operand %t = pdl.type : i64 %src = pdl.attribute = @#{from} %dst = pdl.attribute = @#{to} %call = pdl.operation \"func.call\"(%x : !pdl.value) {\"callee\" = %src} -> (%t : !pdl.type) pdl.rewrite %call { %next = pdl.operation \"func.call\"(%x : !pdl.value) {\"callee\" = %dst} -> (%t : !pdl.type) pdl.replace %call with %next } }\n"}
+  end
+
+  defp run_spec(ctx, b, inputs) do
+    %{name: "run", inputs: inputs, results: [:i64], blocks: Builder.finish(b)}
+    |> Map.put(:attributes, "llvm.emit_c_interface": Attribute.unit(ctx: ctx))
   end
 
   defp with_jit(module, fun) do

@@ -8,14 +8,10 @@ defmodule E2ETest do
     import MLIR.{Transform, Conversion}
 
     def make_jit(ctx) do
-      ~m"""
-      module {
-        func.func @add(%arg0 : i32, %arg1 : i32) -> i32 attributes { llvm.emit_c_interface } {
-          %res = arith.addi %arg0, %arg1 : i32
-          return %res : i32
-        }
-      }
-      """
+      sigil_m(
+        "module {\n  func.func @add(%arg0 : i32, %arg1 : i32) -> i32 attributes { llvm.emit_c_interface } {\n    %res = arith.addi %arg0, %arg1 : i32\n    return %res : i32\n  }\n}\n",
+        []
+      )
       |> Beaver.Deferred.resolve(ctx)
       |> canonicalize
       |> cse
@@ -31,14 +27,10 @@ defmodule E2ETest do
       assert_raise ArgumentError,
                    ~r{Execution engine creation failed\nat -:2:3: .+for op: func.func\n  at -:2:3: see current operation: \n    \"func.func\".+\n    .+\n    },
                    fn ->
-                     ~m"""
-                     module {
-                       func.func @add(%arg0 : i32, %arg1 : i32) -> i32 attributes { llvm.emit_c_interface } {
-                         %res = arith.addi %arg0, %arg1 : i32
-                         return %res : i32
-                       }
-                     }
-                     """
+                     sigil_m(
+                       "module {\n  func.func @add(%arg0 : i32, %arg1 : i32) -> i32 attributes { llvm.emit_c_interface } {\n    %res = arith.addi %arg0, %arg1 : i32\n    return %res : i32\n  }\n}\n",
+                       []
+                     )
                      |> Beaver.Deferred.resolve(ctx)
                      |> MLIR.ExecutionEngine.create!()
                    end

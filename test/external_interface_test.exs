@@ -29,15 +29,8 @@ defmodule ExternalInterfaceTest do
     Beaver.Slang.load(ctx, ExternalInterfaceSlang)
 
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module {
-          "external_interface_test.pure"() : () -> ()
-          "external_interface_test.write"() : () -> ()
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  \"external_interface_test.pure\"() : () -> ()\n  \"external_interface_test.write\"() : () -> ()\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
       |> MLIR.verify!()
 
     module |> Beaver.Composer.append(MLIR.Transform.canonicalize()) |> Beaver.Composer.run!()
@@ -51,18 +44,9 @@ defmodule ExternalInterfaceTest do
     Beaver.Slang.load(ctx, ExternalInterfaceSlang)
 
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module {
-          "external_interface_test.write"() : () -> ()
-          func.func @read(%buffer: memref<4xi32>, %index: index) -> i32 {
-            %value = memref.load %buffer[%index] : memref<4xi32>
-            return %value : i32
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      ("module {\n  \"external_interface_test.write\"() : () -> ()\n" <>
+         "  func.func @read(%buffer: memref<4xi32>, %index: index) -> i32 {\n    %value = memref.load %buffer[%index] : memref<4xi32>\n    return %value : i32\n  }\n}\n")
+      |> MLIR.Module.create!(ctx: ctx)
       |> MLIR.verify!()
 
     operations =
@@ -142,27 +126,8 @@ defmodule ExternalInterfaceTest do
     Beaver.Slang.load(ctx, ExternalInterfaceSlang)
 
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module {
-          func.func @payload() {
-            %0 = arith.constant 1 : i32
-            return
-          }
-          module attributes {transform.with_named_sequence} {
-            transform.named_sequence @__transform_main(%arg0: !transform.any_op) {
-              %0 = "external_interface_test.forward"(%arg0) : (!transform.any_op) -> !transform.any_op
-              "external_interface_test.mark"(%0) : (!transform.any_op) -> ()
-              transform.apply_patterns to %0 {
-                "external_interface_test.patterns"() : () -> ()
-              } : !transform.any_op
-              transform.yield
-            }
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  func.func @payload() {\n    %0 = arith.constant 1 : i32\n    return\n  }\n  module attributes {transform.with_named_sequence} {\n    transform.named_sequence @__transform_main(%arg0: !transform.any_op) {\n      %0 = \"external_interface_test.forward\"(%arg0) : (!transform.any_op) -> !transform.any_op\n      \"external_interface_test.mark\"(%0) : (!transform.any_op) -> ()\n      transform.apply_patterns to %0 {\n        \"external_interface_test.patterns\"() : () -> ()\n      } : !transform.any_op\n      transform.yield\n    }\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     module = MLIR.verify!(module)
 
@@ -177,22 +142,8 @@ defmodule ExternalInterfaceTest do
     Beaver.Slang.load(ctx, ExternalInterfaceSlang)
 
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module {
-          func.func @payload() {
-            return
-          }
-          module attributes {transform.with_named_sequence} {
-            transform.named_sequence @__transform_main(%arg0: !transform.any_op) {
-              "external_interface_test.fail"(%arg0) : (!transform.any_op) -> ()
-              transform.yield
-            }
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  func.func @payload() {\n    return\n  }\n  module attributes {transform.with_named_sequence} {\n    transform.named_sequence @__transform_main(%arg0: !transform.any_op) {\n      \"external_interface_test.fail\"(%arg0) : (!transform.any_op) -> ()\n      transform.yield\n    }\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     log =
       capture_log(fn ->

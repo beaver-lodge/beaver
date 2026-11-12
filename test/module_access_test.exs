@@ -2,14 +2,7 @@ defmodule ModuleAccessTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR
 
-  @source """
-  module {
-    func.func @test_func() -> i32 {
-      %0 = arith.constant 42 : i32
-      return %0 : i32
-    }
-  }
-  """
+  @source "module {\n  func.func @test_func() -> i32 {\n    %0 = arith.constant 42 : i32\n    return %0 : i32\n  }\n}\n"
 
   test "module supports Access behavior", %{ctx: ctx} do
     opts = [ctx: ctx]
