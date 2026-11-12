@@ -99,12 +99,7 @@ defmodule TritonTest do
         ctx: ctx
       )
 
-    lowered =
-      module
-      |> Beaver.Composer.append("convert-triton-to-tritongpu{target=cuda:90}")
-      |> Beaver.Composer.append("convert-triton-gpu-to-llvm")
-      |> Beaver.Composer.append("canonicalize")
-      |> Beaver.Composer.run!()
+    lowered = Beaver.Triton.compile_to_llvm(module, target: "cuda:90")
 
     ptx = lowered |> Beaver.MLIR.Target.LLVMIR.translate!() |> Beaver.MLIR.Target.LLVMIR.compile_to_ptx!(cpu: "sm_90")
 
