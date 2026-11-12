@@ -71,7 +71,7 @@ defmodule TritonTest do
   end
 
   @tag skip: !@enabled
-  test "compiles a Triton kernel to PTX on the CPU", %{ctx: ctx} do
+  test "compiles Triton kernels with loop induction variables to PTX on the CPU", %{ctx: ctx} do
     Beaver.Triton.register(ctx)
 
     module =
@@ -82,21 +82,31 @@ defmodule TritonTest do
             %0 = tt.addptr %ptr, %i : !tt.ptr<f32>, i32
             tt.return
           }
+          tt.func @increment(%ptr: !tt.ptr<f32>, %n: i32) {
+            %zero = arith.constant 0 : i32
+            %step = arith.constant 1 : i32
+            %one = arith.constant 1.0 : f32
+            scf.for %i = %zero to %n step %step : i32 {
+              %element = tt.addptr %ptr, %i : !tt.ptr<f32>, i32
+              %value = tt.load %element : !tt.ptr<f32>
+              %added = arith.addf %value, %one : f32
+              tt.store %element, %added : !tt.ptr<f32>
+            }
+            tt.return
+          }
         }
         """,
         ctx: ctx
       )
 
-    lowered =
-      module
-      |> Beaver.Composer.append("convert-triton-to-tritongpu{target=cuda:90}")
-      |> Beaver.Composer.append("convert-triton-gpu-to-llvm")
-      |> Beaver.Composer.append("canonicalize")
-      |> Beaver.Composer.run!()
+    lowered = Beaver.Triton.compile_to_llvm(module, target: "cuda:90")
 
     ptx = lowered |> Beaver.MLIR.Target.LLVMIR.translate!() |> Beaver.MLIR.Target.LLVMIR.compile_to_ptx!(cpu: "sm_90")
 
     assert ptx =~ ".visible .entry addptr"
+    assert ptx =~ ".visible .entry increment"
+    assert ptx =~ "ld.global"
+    assert ptx =~ "st.global"
     assert ptx =~ ".target sm_90"
   end
 end

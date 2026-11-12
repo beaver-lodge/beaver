@@ -1,7 +1,7 @@
 defmodule Mix.Tasks.Beaver.BuildTriton do
   use Mix.Task
   @shortdoc "Build Triton against the current LLVM API"
-  @patch Path.expand("../../../patches/triton-llvm-main.patch", __DIR__)
+  @patches Path.expand("../../../patches", __DIR__)
   def run(args) do
     {opts, []} =
       OptionParser.parse!(args,
@@ -11,14 +11,29 @@ defmodule Mix.Tasks.Beaver.BuildTriton do
     source =
       opts[:source] || System.get_env("TRITON_SOURCE_DIR") || Mix.raise("Triton source required")
 
-    # A narrow API migration for the pinned Triton source, applied idempotently.
-    case System.cmd("git", ["-C", source, "apply", "--reverse", "--check", @patch], stderr_to_stdout: true) do
-      {_, 0} -> :ok
-      _ -> Beaver.LLVM.run!("git", ["-C", source, "apply", @patch])
+    llvm = opts[:llvm] || System.fetch_env!("LLVM_SYSPATH")
+
+    sparse_analysis =
+      File.read!(Path.join(llvm, "include/mlir/Analysis/DataFlow/SparseAnalysis.h"))
+
+    # LLVM main added a lattice-read callback after our pinned LLVM revision.
+    for {name, needed?} <- [
+          {"triton-llvm-main.patch", true},
+          {"triton-dataflow-lattice.patch", String.contains?(sparse_analysis, "using GetLatticeFn =")}
+        ] do
+      patch = Path.join(@patches, name)
+
+      {_, status} =
+        System.cmd("git", ["-C", source, "apply", "--reverse", "--check", patch], stderr_to_stdout: true)
+
+      if needed? != (status == 0) do
+        args = if needed?, do: [patch], else: ["--reverse", patch]
+        Beaver.LLVM.run!("git", ["-C", source, "apply" | args])
+      end
     end
 
     output = OpenAITriton.Builder.build!(opts)
-    record_identity!(output, source, opts[:llvm] || System.fetch_env!("LLVM_SYSPATH"))
+    record_identity!(output, source, llvm)
   end
 
   @doc false

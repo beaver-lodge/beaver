@@ -1,0 +1,47 @@
+diff --git a/include/triton/Analysis/AxisInfo.h b/include/triton/Analysis/AxisInfo.h
+--- a/include/triton/Analysis/AxisInfo.h
++++ b/include/triton/Analysis/AxisInfo.h
+@@ -223,10 +223,12 @@ protected:
+   void visitNonControlFlowArguments(
+       Operation *op, const RegionSuccessor & /*successor*/,
+       ValueRange /*nonSuccessorInputs*/,
+-      ArrayRef<dataflow::Lattice<AxisInfo> *> argLattices) override;
++      ArrayRef<dataflow::Lattice<AxisInfo> *> argLattices,
++      GetLatticeFn getLattice) override;
+
+   void
+   visitForOpInductionVar(scf::ForOp op,
+-                         ArrayRef<dataflow::Lattice<AxisInfo> *> argLattices);
++                        ArrayRef<dataflow::Lattice<AxisInfo> *> argLattices,
++                        GetLatticeFn getLattice);
+
+ public:
+diff --git a/lib/Analysis/AxisInfo.cpp b/lib/Analysis/AxisInfo.cpp
+--- a/lib/Analysis/AxisInfo.cpp
++++ b/lib/Analysis/AxisInfo.cpp
+@@ -1261,9 +1261,10 @@ void AxisInfoAnalysis::setToEntryState(dataflow::Lattice<AxisInfo> *lattice) {
+ void AxisInfoAnalysis::visitNonControlFlowArguments(
+     Operation *op, const RegionSuccessor & /*successor*/,
+     ValueRange /*nonSuccessorInputs*/,
+-    ArrayRef<dataflow::Lattice<AxisInfo> *> argLattices) {
++    ArrayRef<dataflow::Lattice<AxisInfo> *> argLattices,
++    GetLatticeFn getLattice) {
+   if (auto forOp = dyn_cast<scf::ForOp>(op)) {
+-    visitForOpInductionVar(forOp, argLattices);
++    visitForOpInductionVar(forOp, argLattices, getLattice);
+   } else {
+     setAllToEntryStates(argLattices);
+   }
+@@ -1323,8 +1324,8 @@ LogicalResult AxisInfoAnalysis::visitOperation(
+ void AxisInfoAnalysis::visitForOpInductionVar(
+-    scf::ForOp op, ArrayRef<dataflow::Lattice<AxisInfo> *> argLattices) {
+-  ProgramPoint *programPoint = getProgramPointAfter(op);
+-  auto *lbLattice = getLatticeElementFor(programPoint, op.getLowerBound());
+-  auto *stepLattice = getLatticeElementFor(programPoint, op.getStep());
++    scf::ForOp op, ArrayRef<dataflow::Lattice<AxisInfo> *> argLattices,
++    GetLatticeFn getLattice) {
++  auto *lbLattice = getLattice(op.getLowerBound());
++  auto *stepLattice = getLattice(op.getStep());
+   // If lb or step is not yet ready, skip this operation for now.
+   if (lbLattice->getValue().getRank() == 0 ||
+       stepLattice->getValue().getRank() == 0) {
