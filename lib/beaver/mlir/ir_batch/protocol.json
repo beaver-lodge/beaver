@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "operation_fields": [
+    "name",
+    "location",
+    "operands",
+    "result_types",
+    "attributes",
+    "successors",
+    "regions",
+    "block"
+  ],
+  "operation_required": 7,
+  "operand_fields": [
+    "kind",
+    "index",
+    "value"
+  ],
+  "operand_kinds": [
+    "value",
+    "result",
+    "block_arg",
+    "cfg_block_arg"
+  ]
+}

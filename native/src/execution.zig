@@ -21,7 +21,7 @@ pub fn tuple(env: beam.env, term: beam.term, count: usize) ![]const beam.term {
     return terms[0..count];
 }
 
-const Command = enum { transform, analysis, verify, pass, rewrite, snapshot, update, build, referenced_symbols, parse, create_pass, create_pattern, destroy, speculatability, memory_effects, replace_uses, conversion, convert_type };
+const Command = enum { batch_schema, transform, analysis, verify, pass, rewrite, snapshot, update, build, referenced_symbols, parse, create_pass, create_pattern, destroy, speculatability, memory_effects, replace_uses, conversion, convert_type };
 const Work = struct {
     context: m.Context.T,
     command: Command,
@@ -61,6 +61,7 @@ const Work = struct {
     fn execute(self: Work) !beam.term {
         const env = self.env;
         switch (self.command) {
+            .batch_schema => return beam.make_slice(env, @import("batch_protocol.zig").schema.source),
             .transform => return @import("prepared_transform.zig").apply(env, self.context, self.arguments, self.recipient),
             .analysis => return @import("analysis.zig").query(env, self.context, self.arguments, self.recipient),
             .conversion => return @import("conversion.zig").convert(env, self.context, self.arguments, self.profile),
@@ -176,7 +177,7 @@ pub fn execution_worker(env: beam.env, _: c_int, args: [*c]const beam.term) !bea
 pub fn execution_dirty(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const work = try Work.init(env, args);
     switch (work.command) {
-        .verify, .snapshot, .update, .build, .referenced_symbols => {},
+        .verify, .snapshot, .update, .build, .referenced_symbols, .batch_schema => {},
         else => return error.DirtyExecutionRequiresCallbackFreeCommand,
     }
     if (c.beaverExecutionHasCallbacks(work.context)) return error.CallbackContextRequiresWorker;

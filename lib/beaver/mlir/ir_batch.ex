@@ -210,46 +210,10 @@ defmodule Beaver.MLIR.IRBatch do
     do: raise(ArgumentError, MLIR.Diagnostic.format(diagnostics, "IRBatch.#{name}! verification failed"))
 
   @doc "Maps function and block argument types and expands body steps with their `{block, step}` positions."
-  def map_function(spec, type, expand) when is_function(type, 1) and is_function(expand, 2) do
-    arguments = fn xs ->
-      Enum.map(xs, fn
-        {name, t} -> {name, type.(t)}
-        t -> type.(t)
-      end)
-    end
+  def map_function(spec, type, expand) when is_function(type, 1) and is_function(expand, 2),
+    do: __MODULE__.Spec.normalize(spec, type: type, expand: expand)
 
-    body = fn xs, b -> Enum.with_index(xs) |> Enum.flat_map(fn {step, i} -> expand.(step, {b, i}) end) end
-
-    spec =
-      normalize_func_spec!(spec)
-      |> map_present(:inputs, arguments)
-      |> map_present(:results, &Enum.map(List.wrap(&1), type))
-
-    if Map.has_key?(spec, :blocks) do
-      blocks =
-        Enum.with_index(spec.blocks, fn raw, i ->
-          block = Map.new(raw) |> map_present(:args, arguments)
-          Map.put(block, :body, body.(block[:body] || [], i))
-        end)
-
-      Map.put(spec, :blocks, blocks)
-    else
-      Map.put(spec, :body, body.(spec[:body] || [], 0))
-    end
-  end
-
-  defp map_present(map, key, fun), do: if(Map.has_key?(map, key), do: Map.update!(map, key, fun), else: map)
-  defp normalize_func_spec!(%{} = map), do: map
-  defp normalize_func_spec!(kw) when is_list(kw), do: Map.new(kw)
-
-  defp normalize_func_spec!({kind, name, inputs, results}),
-    do: %{kind: kind, name: name, inputs: inputs, results: results}
-
-  defp normalize_func_spec!({kind, name, inputs, results, extra}) when is_list(extra) or is_map(extra),
-    do: extra |> Map.new() |> Map.merge(%{kind: kind, name: name, inputs: inputs, results: results})
-
-  defp normalize_func_spec!(other),
-    do: raise(ArgumentError, "invalid function specification for IRBatch.build_function: #{inspect(other)}")
+  defp normalize_func_spec!(spec), do: __MODULE__.Spec.function(spec)
 
   defp resolve_container_block!(%MLIR.Block{} = block), do: block
   defp resolve_container_block!(%MLIR.Module{} = module), do: MLIR.Module.body(module)
@@ -605,30 +569,41 @@ defmodule Beaver.MLIR.IRBatch do
     next_bindings = register_spec_bindings!(bindings, Map.get(map, :bind), op_idx, length(result_types))
 
     encoded =
-      if is_nil(block_idx),
-        do: {name, loc_ref, operands, result_types, attributes, successors, regions},
-        else: {name, loc_ref, operands, result_types, attributes, successors, regions, block_idx}
+      __MODULE__.Protocol.operation(%{
+        name: name,
+        location: loc_ref,
+        operands: operands,
+        result_types: result_types,
+        attributes: attributes,
+        successors: successors,
+        regions: regions,
+        block: block_idx
+      })
 
     {encoded, next_bindings}
   end
 
-  defp encode_operand_ref!(%MLIR.Value{ref: ref}, _bindings), do: {0, 0, ref}
-  defp encode_operand_ref!({:op, op_idx}, _bindings) when is_integer(op_idx) and op_idx >= 0, do: {1, op_idx, 0}
+  defp encode_operand_ref!(%MLIR.Value{ref: ref}, _bindings), do: __MODULE__.Protocol.operand(:value, 0, ref)
+
+  defp encode_operand_ref!({:op, op_idx}, _bindings) when is_integer(op_idx) and op_idx >= 0,
+    do: __MODULE__.Protocol.operand(:result, op_idx, 0)
 
   defp encode_operand_ref!({:result, op_idx, res_idx}, _bindings)
-       when is_integer(op_idx) and op_idx >= 0 and is_integer(res_idx) and res_idx >= 0, do: {1, op_idx, res_idx}
+       when is_integer(op_idx) and op_idx >= 0 and is_integer(res_idx) and res_idx >= 0,
+       do: __MODULE__.Protocol.operand(:result, op_idx, res_idx)
 
   defp encode_operand_ref!({:block_arg, arg_idx}, _bindings) when is_integer(arg_idx) and arg_idx >= 0,
-    do: {2, arg_idx, 0}
+    do: __MODULE__.Protocol.operand(:block_arg, arg_idx, 0)
 
   defp encode_operand_ref!({:block_arg, blk_idx, arg_idx}, _bindings)
-       when is_integer(blk_idx) and blk_idx >= 0 and is_integer(arg_idx) and arg_idx >= 0, do: {3, blk_idx, arg_idx}
+       when is_integer(blk_idx) and blk_idx >= 0 and is_integer(arg_idx) and arg_idx >= 0,
+       do: __MODULE__.Protocol.operand(:cfg_block_arg, blk_idx, arg_idx)
 
   defp encode_operand_ref!(sym, bindings) when is_atom(sym) or is_binary(sym) do
     case Map.fetch(bindings, sym) do
-      {:ok, {:cfg_block_arg, blk_idx, arg_idx}} -> {3, blk_idx, arg_idx}
-      {:ok, {:op_result, op_idx, res_idx}} -> {1, op_idx, res_idx}
-      {:ok, %MLIR.Value{ref: ref}} -> {0, 0, ref}
+      {:ok, {:cfg_block_arg, blk_idx, arg_idx}} -> __MODULE__.Protocol.operand(:cfg_block_arg, blk_idx, arg_idx)
+      {:ok, {:op_result, op_idx, res_idx}} -> __MODULE__.Protocol.operand(:result, op_idx, res_idx)
+      {:ok, %MLIR.Value{ref: ref}} -> __MODULE__.Protocol.operand(:value, 0, ref)
       :error -> raise ArgumentError, "unbound SSA reference in IRBatch: #{inspect(sym)}"
     end
   end

@@ -1,4 +1,5 @@
 const std = @import("std");
+const protocol = @import("batch_protocol.zig");
 const kinda = @import("kinda");
 const beam = kinda.beam;
 const e = kinda.erl_nif;
@@ -108,7 +109,7 @@ pub fn update(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term 
 }
 
 const OperandRef = struct {
-    kind: c_int,
+    kind: protocol.OperandKind,
     index_a: usize = 0,
     index_b: usize = 0,
     value: m.Value.T = .{ .ptr = null },
@@ -305,69 +306,63 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
     var rest = args[2];
     for (specs, 0..) |*spec, i| {
         const spec_term = try beam.get_head_and_iter(env, &rest);
-        var spec_arity: c_int = 0;
-        var fields_ptr: [*c]const beam.term = undefined;
-        if (e.enif_get_tuple(env, spec_term, &spec_arity, &fields_ptr) == 0 or (spec_arity != 7 and spec_arity != 8)) {
-            return error.InvalidExecutionArguments;
-        }
-        const fields = fields_ptr[0..@intCast(spec_arity)];
-        const block_idx: usize = if (spec_arity == 8) try beam.get(usize, env, fields[7]) else 0;
+        const fields = try protocol.Operation.decode(env, spec_term);
+        const block_idx = if (fields.optional("block")) |value| try beam.get(usize, env, value) else 0;
         if (block_idx >= blocks.len) return error.InvalidBatchBlock;
         const num_block_args: usize = @intCast(c.mlirBlockGetNumArguments(blocks[block_idx]));
 
-        const name = try string_ref.get_binary_as_string_ref(env, fields[0]);
+        const name = try string_ref.get_binary_as_string_ref(env, fields.get("name"));
         if (name.length == 0) return error.EmptyOperationName;
-        const loc = try m.Location.resource.fetch(env, fields[1]);
+        const loc = try m.Location.resource.fetch(env, fields.get("location"));
         if (loc.ptr == null or !c.mlirContextEqual(ctx, c.mlirLocationGetContext(loc))) return error.ContextMismatch;
 
-        const op_len = try beam.get_list_length(env, fields[2]);
+        const op_len = try beam.get_list_length(env, fields.get("operands"));
         const op_refs = try beam.allocator.alloc(OperandRef, op_len);
         errdefer beam.allocator.free(op_refs);
-        var op_rest = fields[2];
+        var op_rest = fields.get("operands");
         for (op_refs) |*op_ref| {
-            const o_fields = try tuple(env, try beam.get_head_and_iter(env, &op_rest), 3);
-            const kind = try beam.get(c_int, env, o_fields[0]);
+            const o_fields = try protocol.Operand.decode(env, try beam.get_head_and_iter(env, &op_rest));
+            const kind = try protocol.operandKind(env, o_fields.get("kind"));
             switch (kind) {
-                0 => {
-                    const val = try m.Value.resource.fetch(env, o_fields[2]);
+                .value => {
+                    const val = try m.Value.resource.fetch(env, o_fields.get("value"));
                     if (val.ptr == null or !c.mlirContextEqual(ctx, c.mlirTypeGetContext(c.mlirValueGetType(val)))) return error.ContextMismatch;
-                    op_ref.* = .{ .kind = 0, .value = val };
+                    op_ref.* = .{ .kind = .value, .value = val };
                 },
-                1 => {
-                    const op_idx = try beam.get(usize, env, o_fields[1]);
-                    const res_idx = try beam.get(usize, env, o_fields[2]);
+                .result => {
+                    const op_idx = try beam.get(usize, env, o_fields.get("index"));
+                    const res_idx = try beam.get(usize, env, o_fields.get("value"));
                     if (op_idx >= i or res_idx >= specs[op_idx].result_types.len) return error.InvalidBatchResultReference;
-                    op_ref.* = .{ .kind = 1, .index_a = op_idx, .index_b = res_idx };
+                    op_ref.* = .{ .kind = .result, .index_a = op_idx, .index_b = res_idx };
                 },
-                2 => {
-                    const arg_idx = try beam.get(usize, env, o_fields[1]);
+                .block_arg => {
+                    const arg_idx = try beam.get(usize, env, o_fields.get("index"));
                     if (arg_idx >= num_block_args) return error.InvalidBlockArgumentIndex;
-                    op_ref.* = .{ .kind = 2, .index_a = arg_idx };
+                    op_ref.* = .{ .kind = .block_arg, .index_a = arg_idx };
                 },
-                3 => {
-                    const target_blk = try beam.get(usize, env, o_fields[1]);
-                    const arg_idx = try beam.get(usize, env, o_fields[2]);
+                .cfg_block_arg => {
+                    const target_blk = try beam.get(usize, env, o_fields.get("index"));
+                    const arg_idx = try beam.get(usize, env, o_fields.get("value"));
                     if (target_blk >= blocks.len or arg_idx >= @as(usize, @intCast(c.mlirBlockGetNumArguments(blocks[target_blk])))) {
                         return error.InvalidBlockArgumentIndex;
                     }
-                    op_ref.* = .{ .kind = 3, .index_a = target_blk, .index_b = arg_idx };
+                    op_ref.* = .{ .kind = .cfg_block_arg, .index_a = target_blk, .index_b = arg_idx };
                 },
-                else => return error.InvalidBatchOperandReference,
             }
         }
 
-        const res_len = try beam.get_list_length(env, fields[3]);
+        const res_len = try beam.get_list_length(env, fields.get("result_types"));
         const res_types = try beam.allocator.alloc(m.Type.T, res_len);
         errdefer beam.allocator.free(res_types);
-        var res_rest = fields[3];
+        var res_rest = fields.get("result_types");
         for (res_types) |*rt| {
             rt.* = try decodeType(env, ctx, try beam.get_head_and_iter(env, &res_rest));
         }
 
-        const attr_len = try beam.get_list_length(env, fields[4]);
+        const attr_len = try beam.get_list_length(env, fields.get("attributes"));
         const attrs = try beam.allocator.alloc(c.MlirNamedAttribute, attr_len);
         errdefer beam.allocator.free(attrs);
-        var attr_rest = fields[4];
+        var attr_rest = fields.get("attributes");
         for (attrs) |*na| {
             const a_fields = try tuple(env, try beam.get_head_and_iter(env, &attr_rest), 2);
             const a_name = try string_ref.get_binary_as_string_ref(env, a_fields[0]);
@@ -375,16 +370,16 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
             na.* = c.mlirNamedAttributeGet(c.mlirIdentifierGet(ctx, a_name), a_val);
         }
 
-        const succ_len = try beam.get_list_length(env, fields[5]);
+        const succ_len = try beam.get_list_length(env, fields.get("successors"));
         const succs = try beam.allocator.alloc(m.Block.T, succ_len);
         errdefer beam.allocator.free(succs);
-        var succ_rest = fields[5];
+        var succ_rest = fields.get("successors");
         for (succs) |*sb| {
             sb.* = try m.Block.resource.fetch(env, try beam.get_head_and_iter(env, &succ_rest));
             if (sb.ptr == null) return error.InvalidBatchSuccessor;
         }
 
-        const num_regions = try beam.get(usize, env, fields[6]);
+        const num_regions = try beam.get(usize, env, fields.get("regions"));
         spec.* = .{
             .block_idx = block_idx,
             .name = name,
@@ -412,11 +407,10 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
         defer beam.allocator.free(resolved_operands);
         for (spec.operands, 0..) |op_ref, k| {
             resolved_operands[k] = switch (op_ref.kind) {
-                0 => op_ref.value,
-                1 => c.mlirOperationGetResult(created_ops[op_ref.index_a], @intCast(op_ref.index_b)),
-                2 => c.mlirBlockGetArgument(spec_block, @intCast(op_ref.index_a)),
-                3 => c.mlirBlockGetArgument(blocks[op_ref.index_a], @intCast(op_ref.index_b)),
-                else => unreachable,
+                .value => op_ref.value,
+                .result => c.mlirOperationGetResult(created_ops[op_ref.index_a], @intCast(op_ref.index_b)),
+                .block_arg => c.mlirBlockGetArgument(spec_block, @intCast(op_ref.index_a)),
+                .cfg_block_arg => c.mlirBlockGetArgument(blocks[op_ref.index_a], @intCast(op_ref.index_b)),
             };
         }
 

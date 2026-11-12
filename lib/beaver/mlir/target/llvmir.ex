@@ -466,13 +466,7 @@ defmodule Beaver.MLIR.Target.LLVMIR do
     {value, System.monotonic_time(:nanosecond) - start}
   end
 
-  defp sha256(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
+  defp sha256(bytes), do: Beaver.Build.ArtifactCache.digest(bytes)
   defp temp_path(path), do: "#{path}.tmp-#{System.pid()}-#{System.unique_integer([:positive])}"
-
-  defp write_atomic!(path, bytes) do
-    File.mkdir_p!(Path.dirname(path))
-    tmp = temp_path(path)
-    File.write!(tmp, bytes)
-    File.rename!(tmp, path)
-  end
+  defp write_atomic!(path, bytes), do: Beaver.Build.ArtifactCache.write_atomic!(path, bytes)
 end
