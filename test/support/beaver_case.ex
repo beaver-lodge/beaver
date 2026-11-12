@@ -1,7 +1,5 @@
 defmodule Beaver.Case do
-  @moduledoc """
-  Test case for beaver tests, with a MLIR context created and destroy automatically.
-  """
+  @moduledoc "Test case for beaver tests, with a MLIR context created and destroy automatically."
 
   use ExUnit.CaseTemplate
 
@@ -12,9 +10,7 @@ defmodule Beaver.Case do
       setup do
         ctx = MLIR.Context.create(unquote(options))
 
-        on_exit(fn ->
-          MLIR.Context.destroy(ctx)
-        end)
+        on_exit(fn -> MLIR.Context.destroy(ctx) end)
 
         %{ctx: ctx}
       end

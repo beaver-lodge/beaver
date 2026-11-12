@@ -27,10 +27,7 @@ defmodule ExternalInterfaceSlang do
   def forward_apply(operation, _rewriter, _results, state) do
     handle = Beaver.MLIR.CAPI.mlirOperationGetOperand(operation, 0)
 
-    payload =
-      state
-      |> Beaver.MLIR.TransformOpInterface.payload_ops(handle)
-      |> Enum.flat_map(&payload_functions/1)
+    payload = state |> Beaver.MLIR.TransformOpInterface.payload_ops(handle) |> Enum.flat_map(&payload_functions/1)
 
     {:ok, %{0 => {:ops, payload}}}
   end
@@ -41,8 +38,7 @@ defmodule ExternalInterfaceSlang do
   end
 
   defp collect_payload_function(%Beaver.MLIR.Operation{} = operation, acc) do
-    acc =
-      if Beaver.MLIR.Operation.name(operation) == "func.func", do: [operation | acc], else: acc
+    acc = if Beaver.MLIR.Operation.name(operation) == "func.func", do: [operation | acc], else: acc
 
     {operation, acc}
   end
@@ -120,23 +116,13 @@ defmodule ExternalInterfaceSlang do
 
   defop forward(handle = base("!transform.any_op")),
     do: [base("!transform.any_op")],
-    interfaces: [
-      memory_effects: &__MODULE__.forward_effects/2,
-      transform_op: [apply: &__MODULE__.forward_apply/4]
-    ]
+    interfaces: [memory_effects: &__MODULE__.forward_effects/2, transform_op: [apply: &__MODULE__.forward_apply/4]]
 
   defop mark(handle = base("!transform.any_op")),
-    interfaces: [
-      memory_effects: &__MODULE__.mark_effects/2,
-      transform_op: [apply: &__MODULE__.mark_apply/4]
-    ]
+    interfaces: [memory_effects: &__MODULE__.mark_effects/2, transform_op: [apply: &__MODULE__.mark_apply/4]]
 
   defop fail(handle = base("!transform.any_op")),
-    interfaces: [
-      memory_effects: &__MODULE__.mark_effects/2,
-      transform_op: [apply: &__MODULE__.fail_apply/4]
-    ]
+    interfaces: [memory_effects: &__MODULE__.mark_effects/2, transform_op: [apply: &__MODULE__.fail_apply/4]]
 
-  defop patterns(),
-    interfaces: [pattern_descriptor: [populate_patterns: &__MODULE__.populate_patterns/2]]
+  defop patterns(), interfaces: [pattern_descriptor: [populate_patterns: &__MODULE__.populate_patterns/2]]
 end

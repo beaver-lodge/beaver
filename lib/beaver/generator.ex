@@ -10,19 +10,13 @@ defmodule Beaver.ComposerGenerator do
       alias Beaver.MLIR
       alias Beaver.MLIR.CAPI
       alias Beaver.Composer
-
       # We are calling C functions dynamically at compile time, so we need to make sure managed libraries get loaded.
-
       for {name, 0} <- CAPI.__info__(:functions),
           name |> Atom.to_string() |> String.starts_with?(prefix) do
         pass = apply(CAPI, name, [])
-
         arg_name = pass |> CAPI.beaverPassGetArgument() |> MLIR.to_string()
-
         pass_name = pass |> CAPI.beaverPassGetName() |> MLIR.to_string()
-
         normalized_name = Beaver.ComposerGenerator.normalized_name(arg_name)
-
         doc = pass |> CAPI.beaverPassGetDescription() |> MLIR.to_string()
 
         @doc """

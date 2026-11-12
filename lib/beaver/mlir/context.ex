@@ -2,9 +2,7 @@ alias Beaver.MLIR.StringRef
 alias Beaver.Native
 
 defmodule Beaver.MLIR.Context do
-  @moduledoc """
-  This module defines functions creating or destroying MLIR context.
-  """
+  @moduledoc "This module defines functions creating or destroying MLIR context."
   alias Beaver.MLIR
   import MLIR.CAPI
 
@@ -13,9 +11,7 @@ defmodule Beaver.MLIR.Context do
     codec: Native,
     fields: [thread_pool_owner: nil, thread_pool_lease: nil]
 
-  @doc """
-  Run a function with a registry appended to the context.
-  """
+  @doc "Run a function with a registry appended to the context."
   def with_registry(ctx, fun) when is_function(fun, 1) do
     registry = mlirDialectRegistryCreate()
     mlirContextAppendDialectRegistry(ctx, registry)
@@ -50,15 +46,13 @@ defmodule Beaver.MLIR.Context do
   @doc """
   Create a MLIR context. By default it registers and loads all dialects.
 
-  `threading: false, thread_safe: true` keeps context uniquing safe for external
-  workers without creating an MLIR thread pool. Load dialects before sharing the
-  context; this does not make concurrent mutation of the same IR safe.
-  Beaver's callback executor also works in this mode. Use
-  `Beaver.Composer.run/2` with `execution: :beam` to run Elixir passes directly.
+  `threading: false, thread_safe: true` keeps context uniquing safe for external workers without creating an MLIR
+  thread pool. Load dialects before sharing the context; this does not make concurrent mutation of the same IR safe.
+  Beaver's callback executor also works in this mode. Use `Beaver.Composer.run/2` with `execution: :beam` to run
+  Elixir passes directly.
 
-  `callback_executor: [max_concurrency: n, idle_timeout_ms: ms]` limits admitted
-  worker jobs. Jobs waiting for BEAM lend their admission slot to nested or
-  queued work. Blocked threads can exceed this limit; idle workers retire.
+  `callback_executor: [max_concurrency: n, idle_timeout_ms: ms]` limits admitted worker jobs. Jobs waiting for BEAM
+  lend their admission slot to nested or queued work. Blocked threads can exceed this limit; idle workers retire.
   Dirty schedulers and MLIR's internal parallelism have independent limits.
   """
   def create(opts \\ []) do
@@ -77,14 +71,10 @@ defmodule Beaver.MLIR.Context do
       end
 
       if thread_safe and not threading, do: beaverContextEnableThreadSafeLocking(ctx)
-
       if executor = opts[:callback_executor], do: configure_executor(ctx, executor)
-
       opts |> Keyword.get(:registry, []) |> List.wrap() |> Enum.each(&mlirContextAppendDialectRegistry(ctx, &1))
-
       if all_dialects, do: load_all_dialects(ctx)
       mlirContextSetAllowUnregisteredDialects(ctx, allow_unregistered)
-
       %{ctx | thread_pool_owner: owner, thread_pool_lease: lease}
     rescue
       exception ->
@@ -128,10 +118,17 @@ defmodule Beaver.MLIR.Context do
       MLIR.Trait.release_context(ctx)
       MLIR.ExternalInterface.release_context(ctx)
 
-      if ctx.thread_pool_owner,
-        do: MLIR.ThreadPool.checkin(ctx.thread_pool_owner, ctx.thread_pool_lease)
+      if ctx.thread_pool_owner, do: MLIR.ThreadPool.checkin(ctx.thread_pool_owner, ctx.thread_pool_lease)
     end
   end
+
+  @doc "Creates an `MLIR.Context` with `opts`, runs `fun.(ctx)`, and always destroys the context afterward."
+  @spec with_context((t() -> result)) :: result when result: var
+  def with_context(fun) when is_function(fun, 1), do: with_context([], fun)
+
+  @spec with_context([context_option()], (t() -> result)) :: result when result: var
+  def with_context(opts, fun) when is_list(opts) and is_function(fun, 1),
+    do: Native.with_resource(create(opts), &destroy/1, fun)
 
   @doc "Current callback executor capacity, queue and worker counts for this context."
   defdelegate executor_stats(ctx), to: Beaver.Execution
@@ -139,13 +136,11 @@ defmodule Beaver.MLIR.Context do
   @doc """
   Runs `fun` inside a resettable transient allocation scope.
 
-  Dialects and external interfaces must be registered before entering the
-  scope. All IR that refers to types or attributes created inside the scope
-  must be destroyed before `fun` returns. The same context cannot host
-  concurrent or nested transient scopes. Types, attributes, and other
-  non-owning handles created inside the scope become stale when it ends and
-  must not be dereferenced; allowing their wrappers to be garbage-collected
-  afterward is safe.
+  Dialects and external interfaces must be registered before entering the scope. All IR that refers to types or
+  attributes created inside the scope must be destroyed before `fun` returns. The same context cannot host
+  concurrent or nested transient scopes. Types, attributes, and other non-owning handles created inside the scope
+  become stale when it ends and must not be dereferenced; allowing their wrappers to be garbage-collected afterward
+  is safe.
   """
   @spec with_transient_scope(t(), (t() -> result)) :: result when result: term()
   def with_transient_scope(%__MODULE__{} = ctx, fun) when is_function(fun, 1) do
@@ -181,12 +176,11 @@ defmodule Beaver.MLIR.Context do
   @doc """
   Verifies that a context-owned MLIR entity belongs to `expected`.
 
-  Context-free values pass through unchanged, which makes this suitable for
-  validating the output of contextual builders at their common boundary.
+  Context-free values pass through unchanged, which makes this suitable for validating the output of contextual
+  builders at their common boundary.
   """
   @spec ensure_same!(term(), t()) :: term()
-  def ensure_same!(%module{} = entity, %__MODULE__{} = expected)
-      when module in @context_owned_modules do
+  def ensure_same!(%module{} = entity, %__MODULE__{} = expected) when module in @context_owned_modules do
     if not MLIR.null?(entity) and not same?(MLIR.context(entity), expected) do
       kind = module |> Module.split() |> List.last() |> Macro.underscore()
       raise ArgumentError, "#{kind} belongs to a different MLIR context"
@@ -209,8 +203,7 @@ defmodule Beaver.MLIR.Context do
     unless is_boolean(threading) and is_boolean(thread_safe),
       do: raise(ArgumentError, ":threading and :thread_safe must be booleans")
 
-    if threading and not thread_safe,
-      do: raise(ArgumentError, "threading: true requires thread_safe: true")
+    if threading and not thread_safe, do: raise(ArgumentError, "threading: true requires thread_safe: true")
 
     {threading, thread_safe}
   end
@@ -250,14 +243,17 @@ defmodule Beaver.MLIR.Context do
     ctx
   end
 
+  @doc "Returns `true` if `ctx` currently permits unregistered dialects."
+  @spec allow_unregistered_dialects?(t()) :: boolean()
+  def allow_unregistered_dialects?(%__MODULE__{} = ctx),
+    do: mlirContextGetAllowUnregisteredDialects(ctx) |> Native.to_term()
+
   def register_translations(ctx) do
     mlirRegisterAllLLVMTranslations(ctx)
     ctx
   end
 
-  @doc """
-  Check if the op name is terminator
-  """
+  @doc "Check if the op name is terminator"
   def terminator?(%__MODULE__{} = ctx, op), do: MLIR.Trait.has?(ctx, op, :terminator)
 
   def implements_interface?(ctx, op, interface_id),

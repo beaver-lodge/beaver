@@ -2,12 +2,10 @@ alias Beaver.MLIR.Operation
 
 defmodule Beaver.MLIR.ConditionallySpeculatable do
   @moduledoc """
-  Installs and queries a callback-backed ConditionallySpeculatable fallback
-  interface model.
+  Installs and queries a callback-backed ConditionallySpeculatable fallback interface model.
 
-  A dedicated attachment process owns the callback mailbox. Queries execute on
-  the MLIR context worker pool, so no BEAM scheduler blocks while native MLIR
-  waits for the callback result. The process is released with the context.
+  A dedicated attachment process owns the callback mailbox. Queries execute on the MLIR context worker pool, so no
+  BEAM scheduler blocks while native MLIR waits for the callback result. The process is released with the context.
   """
 
   alias Beaver.MLIR
@@ -25,7 +23,6 @@ defmodule Beaver.MLIR.ConditionallySpeculatable do
   def attach(%MLIR.Context{} = ctx, op_name, implementation, opts \\ [])
       when is_binary(op_name) do
     callback = callback!(implementation)
-
     MLIR.ExternalInterface.attach(ctx, op_name, :conditionally_speculatable, %{get_speculatability: callback}, opts)
   end
 

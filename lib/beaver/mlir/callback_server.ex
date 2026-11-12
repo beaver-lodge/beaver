@@ -100,13 +100,11 @@ defmodule Beaver.MLIR.CallbackServer do
 
   defp emit_initialize_outcome({:error, _state}, ctx) do
     Location.unknown(ctx: ctx) |> Diagnostic.emit("Pass initialization callback returned {:error, state}")
-
     Logger.flush()
   end
 
   defp emit_initialize_outcome({:exception, kind, reason, stacktrace}, ctx) do
     Location.unknown(ctx: ctx) |> Diagnostic.emit(Exception.format(kind, reason, stacktrace))
-
     Logger.flush()
   end
 

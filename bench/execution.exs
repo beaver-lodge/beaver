@@ -14,8 +14,7 @@ defmodule ExecutionBench do
 
       passes =
         for driver <- drivers, verify <- [false, true], into: %{} do
-          {"#{driver}/verify_#{verify}",
-           scenario(ctx, empty, &run_pass(driver, &1, noop, plan, verify))}
+          {"#{driver}/verify_#{verify}", scenario(ctx, empty, &run_pass(driver, &1, noop, plan, verify))}
         end
 
       verification =
@@ -44,8 +43,7 @@ defmodule ExecutionBench do
         for workload <- [:reads, :writes], into: %{} do
           cases =
             for size <- [1, 32, 128, 256], into: %{} do
-              {batch_name(size),
-               scenario(ctx, source, &batch(workload, &1, size, attr), &{&1, operations(&1)})}
+              {batch_name(size), scenario(ctx, source, &batch(workload, &1, size, attr), &{&1, operations(&1)})}
             end
 
           {workload, cases}
@@ -53,8 +51,7 @@ defmodule ExecutionBench do
 
       cold =
         for driver <- [:beam_worker, :beam_auto], into: %{} do
-          {driver,
-           fn -> timed(fn -> with_ir(ctx, empty, &run_pass(driver, &1, noop, plan, true)) end) end}
+          {driver, fn -> timed(fn -> with_ir(ctx, empty, &run_pass(driver, &1, noop, plan, true)) end) end}
         end
 
       # Execute groups sequentially; each group rotates case order after warmup.
@@ -342,8 +339,7 @@ defmodule ExecutionBench do
   defp batch_name(n), do: "batch_#{n}"
 
   defp context(n),
-    do:
-      Context.create(threading: false, thread_safe: true, callback_executor: [max_concurrency: n])
+    do: Context.create(threading: false, thread_safe: true, callback_executor: [max_concurrency: n])
 
   defp with_ir(ctx, source, fun),
     do: Native.with_resource(MLIR.Module.create!(source, ctx: ctx), &MLIR.Module.destroy/1, fun)

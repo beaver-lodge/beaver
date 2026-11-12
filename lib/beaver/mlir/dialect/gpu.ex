@@ -7,9 +7,7 @@ defmodule Beaver.MLIR.Dialect.GPU do
   alias Beaver.MLIR.{Attribute, Block, Operation, StringRef}
   alias Beaver.MLIR.Dialect
 
-  @moduledoc """
-  This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect.
-  """
+  @moduledoc "This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect."
 
   use Beaver.MLIR.Dialect, dialect: "gpu", ops: Dialect.Registry.ops("gpu")
 
@@ -28,26 +26,21 @@ defmodule Beaver.MLIR.Dialect.GPU do
     iex> Beaver.MLIR.Dialect.GPU.container_module_attribute_name()
     :"gpu.container_module"
   """
-  def container_module_attribute_name,
-    do: CAPI.beaverGetContainerModuleAttrName() |> to_string() |> String.to_atom()
+  def container_module_attribute_name, do: CAPI.beaverGetContainerModuleAttrName() |> to_string() |> String.to_atom()
 
   @object_formats %{offload: 1, assembly: 2, binary: 3, fatbin: 4}
 
   @doc """
-  Builds a `gpu.binary` module with an NVVM or ROCDL target attribute.
-  `object` passes directly to the native builder without MLIR string escaping.
-  Formats are `:offload`, `:assembly`, `:binary` and `:fatbin` (default).
+  Builds a `gpu.binary` module with an NVVM or ROCDL target attribute. `object` passes directly to the native
+  builder without MLIR string escaping. Formats are `:offload`, `:assembly`, `:binary` and `:fatbin` (default).
   """
-  @spec binary_module(String.t(), Deferred.attribute(), binary(), keyword()) ::
-          Deferred.contextual(MLIR.Module.t())
-  def binary_module(name, target, object, opts \\ [])
-      when is_binary(name) and is_binary(object) and is_list(opts) do
+  @spec binary_module(String.t(), Deferred.attribute(), binary(), keyword()) :: Deferred.contextual(MLIR.Module.t())
+  def binary_module(name, target, object, opts \\ []) when is_binary(name) and is_binary(object) and is_list(opts) do
     format = opts |> Keyword.get(:format, :fatbin) |> object_format!()
 
     Deferred.from_opts(opts, fn ctx ->
       location = MLIR.Location.unknown(ctx: ctx)
       target = Deferred.resolve(target, ctx)
-
       object_attribute = CAPI.beaverGPUObjectAttrGet(target, format, StringRef.create(object))
 
       operation =
@@ -71,9 +64,8 @@ defmodule Beaver.MLIR.Dialect.GPU do
   end
 
   @doc """
-  Builds an NVVM target for `package_binary!/3`, deferred unless `ctx:` is given.
-  Options: `:chip` (e.g. `"sm_80"`), `:triple` (e.g. `"nvptx64-nvidia-cuda"`),
-  `:features` (e.g. `"+ptx80"`) and integer optimization level `:opt`.
+  Builds an NVVM target for `package_binary!/3`, deferred unless `ctx:` is given. Options: `:chip` (e.g. `"sm_80"`),
+  `:triple` (e.g. `"nvptx64-nvidia-cuda"`), `:features` (e.g. `"+ptx80"`) and integer optimization level `:opt`.
   """
   def nvvm_target_attribute(opts \\ []), do: target_attribute("nvvm", opts, [:chip, :triple, :features, :opt])
 
@@ -97,9 +89,7 @@ defmodule Beaver.MLIR.Dialect.GPU do
     if Keyword.has_key?(opts, :arch) or Keyword.has_key?(opts, :wavesize) do
       arch = Keyword.get(opts, :arch, Keyword.get(opts, :chip, "gfx900"))
 
-      Deferred.from_opts(opts, fn ctx ->
-        target |> Deferred.resolve(ctx) |> configure_rocdl_target(arch, wavesize)
-      end)
+      Deferred.from_opts(opts, fn ctx -> target |> Deferred.resolve(ctx) |> configure_rocdl_target(arch, wavesize) end)
     else
       target
     end
@@ -123,20 +113,16 @@ defmodule Beaver.MLIR.Dialect.GPU do
   end
 
   @doc """
-  Replaces GPU kernels with `gpu.binary` operations in the returned module.
-  Accepts one target attribute or a list from `nvvm_target_attribute/1` or
-  `rocdl_target_attribute/1`, producing one `gpu.object` per target.
-  Each target is attached to the lowered `gpu.module`; its dialect selects
-  `convert-gpu-to-nvvm` or `convert-gpu-to-rocdl`.
-  `:format` is passed to `gpu-module-to-binary` (default `:isa`, assembly).
-  Both NVPTX and AMDGPU assembly use the bundled LLVM backends on CPU,
-  without requiring a CUDA toolkit.
+  Replaces GPU kernels with `gpu.binary` operations in the returned module. Accepts one target attribute or a list
+  from `nvvm_target_attribute/1` or `rocdl_target_attribute/1`, producing one `gpu.object` per target. Each target
+  is attached to the lowered `gpu.module`; its dialect selects `convert-gpu-to-nvvm` or `convert-gpu-to-rocdl`.
+  `:format` is passed to `gpu-module-to-binary` (default `:isa`, assembly). Both NVPTX and AMDGPU assembly use the
+  bundled LLVM backends on CPU, without requiring a CUDA toolkit.
   """
   def package_binary!(module, targets, opts \\ []) do
     format = Keyword.get(opts, :format, :isa)
     ctx = MLIR.context(module)
     MLIR.Context.register_translations(ctx)
-
     targets = targets |> List.wrap() |> Enum.map(&Deferred.resolve(&1, ctx))
     if targets == [], do: raise(ArgumentError, "at least one target attribute is required")
     Enum.each(targets, &conversion_pass!/1)
@@ -152,8 +138,7 @@ defmodule Beaver.MLIR.Dialect.GPU do
           next = compile_target(gpu, target, format, ctx)
 
           try do
-            objects =
-              Enum.to_list(binary["objects"]) ++ Enum.to_list(next["objects"])
+            objects = Enum.to_list(binary["objects"]) ++ Enum.to_list(next["objects"])
 
             Operation.put_attribute(binary, "objects", Attribute.array(objects, ctx: ctx))
           after

@@ -2,9 +2,7 @@ alias Beaver.MLIR.CAPI
 alias Beaver.Native
 
 defmodule Beaver.MLIR.PassManager do
-  @moduledoc """
-  This module defines functions working with MLIR PassManager.
-  """
+  @moduledoc "This module defines functions working with MLIR PassManager."
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
   alias Beaver.MLIR
 

@@ -1,9 +1,7 @@
 alias Beaver.MLIR.CAPI
 
 defmodule Beaver.MLIR.Diagnostic do
-  @moduledoc """
-  This module provides functions to work with MLIR diagnostics.
-  """
+  @moduledoc "This module provides functions to work with MLIR diagnostics."
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
   alias Beaver.MLIR
 
@@ -21,8 +19,7 @@ defmodule Beaver.MLIR.Diagnostic do
   defdelegate detach(ctx, handler_id), to: CAPI, as: :mlirContextDetachDiagnosticHandler
 
   @doc "Converts diagnostic locations to strings so the tree is safe beyond context lifetime."
-  def process(diagnostics) when is_list(diagnostics),
-    do: Enum.map(diagnostics, &process_diagnostic/1)
+  def process(diagnostics) when is_list(diagnostics), do: Enum.map(diagnostics, &process_diagnostic/1)
 
   defp process_diagnostic({severity, loc, message, nested}) do
     loc = if is_binary(loc), do: loc, else: MLIR.to_string(loc)
@@ -33,7 +30,6 @@ defmodule Beaver.MLIR.Diagnostic do
 
   def walk({_, _, _, nested} = diagnostic, acc, fun) do
     acc = fun.(diagnostic, acc)
-
     Enum.reduce(nested, acc, fn d, acc -> walk(d, acc, fun) end)
   end
 

@@ -2,9 +2,7 @@ defmodule Beaver.MLIR.Dialect.CF do
   alias Beaver.MLIR
   alias Beaver.MLIR.Dialect
 
-  @moduledoc """
-  This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect.
-  """
+  @moduledoc "This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect."
 
   use Beaver.MLIR.Dialect, dialect: "cf", ops: Dialect.Registry.ops("cf")
 
@@ -18,14 +16,10 @@ defmodule Beaver.MLIR.Dialect.CF do
     end)
   end
 
-  @doc """
-  Create cf.cond_br op. Passing atom will lead to defer the creation of this terminator.
-  """
+  @doc "Create cf.cond_br op. Passing atom will lead to defer the creation of this terminator."
   def cond_br(%Beaver.SSA{arguments: arguments, results: []} = ssa) do
     sizes = sizes_of_block_args(arguments)
-
     if length(sizes) not in [1, 2], do: raise("cond_br requires 1 or 2 successors, instead got: #{length(sizes)}")
-
     # always prepend 1 for the condition operand
     operand_segment_sizes = [1 | sizes] |> MLIR.ODS.operand_segment_sizes()
 

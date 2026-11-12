@@ -5,9 +5,7 @@ defmodule Beaver.Composer do
   alias Beaver.MLIR
   require Logger
 
-  @moduledoc """
-  This module provide functions to compose and run passes.
-  """
+  @moduledoc "This module provide functions to compose and run passes."
   defstruct passes: [], op: nil, ctx: nil
   @type operation :: MLIR.Module.t() | Operation.t()
   @type t :: %__MODULE__{passes: list(any()), op: operation}
@@ -72,13 +70,10 @@ defmodule Beaver.Composer do
     )
   end
 
-  defp add_pipeline(%MLIR.OpPassManager{} = pm, pipeline_str)
-       when is_binary(pipeline_str) do
-    {res, err} =
-      Beaver.Printer.run(&mlirOpPassManagerAddPipeline(pm, StringRef.create(pipeline_str), &1, &2))
+  defp add_pipeline(%MLIR.OpPassManager{} = pm, pipeline_str) when is_binary(pipeline_str) do
+    {res, err} = Beaver.Printer.run(&mlirOpPassManagerAddPipeline(pm, StringRef.create(pipeline_str), &1, &2))
 
     if not MLIR.LogicalResult.success?(res), do: raise("Unexpected failure parsing pipeline: #{pipeline_str}, #{err}")
-
     pm
   end
 
@@ -94,9 +89,7 @@ defmodule Beaver.Composer do
         %MLIR.OpPassManager{} -> mlirOpPassManagerGetNestedUnder(pm, StringRef.create(op_name))
       end
 
-    for pass <- passes do
-      add_pass(npm, pass, ctx)
-    end
+    for pass <- passes, do: add_pass(npm, pass, ctx)
   end
 
   defp add_pass(pm, pipeline_str, _ctx) when is_binary(pipeline_str), do: add_pipeline(pm, pipeline_str)
@@ -111,7 +104,6 @@ defmodule Beaver.Composer do
 
   defp to_pm(%__MODULE__{passes: passes, op: op, ctx: ctx}, anchor \\ "builtin.module") do
     ctx = ctx || MLIR.context(Operation.from_module(op))
-
     pm = mlirPassManagerCreateOnOperation(ctx, StringRef.create(anchor))
 
     try do
@@ -146,9 +138,7 @@ defmodule Beaver.Composer do
   @spec run!(composer) :: operation
   @spec run!(composer, [run_option]) :: operation
 
-  def run!(composer, opts \\ @run_default_opts) do
-    unwrap_result!(run(composer, opts))
-  end
+  def run!(composer, opts \\ @run_default_opts), do: unwrap_result!(run(composer, opts))
 
   @doc false
   def unwrap_result!({:ok, op, []}), do: op
@@ -187,8 +177,7 @@ defmodule Beaver.Composer do
   defp execute(composer, opts) do
     case Keyword.get(opts, :execution, :native) do
       :native ->
-        if opts[:verifier] == :pipeline,
-          do: raise(ArgumentError, "verifier: :pipeline requires execution: :beam")
+        if opts[:verifier] == :pipeline, do: raise(ArgumentError, "verifier: :pipeline requires execution: :beam")
 
         run_native(composer, opts)
 
@@ -222,7 +211,6 @@ defmodule Beaver.Composer do
   defp run_native(%__MODULE__{op: op} = composer, opts) do
     print = Keyword.get(opts, :print)
     pm = Beaver.Execution.Profile.measure(opts[:profile], :prepare, fn -> init(composer, opts) end)
-
     # Local-scope printing does not require changing the shared context's
     # threading configuration (which also changes its locking mode).
     if print, do: MLIR.PassManager.enable_ir_printing(pm)
@@ -248,9 +236,7 @@ defmodule Beaver.Composer do
     debug = Keyword.get(opts, :debug)
     verifier = Keyword.get(opts, :verifier, true)
     pm = to_pm(composer, anchor)
-
     if timing, do: pm |> mlirPassManagerEnableTiming()
-
     :ok = MLIR.PassManager.enable_verifier(pm, verifier)
 
     if debug do

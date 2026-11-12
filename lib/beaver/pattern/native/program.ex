@@ -1,7 +1,5 @@
 defmodule Beaver.Pattern.Native.Program do
-  @moduledoc """
-  A callback-free rewrite and dialect-conversion program executed natively in C++.
-  """
+  @moduledoc "A callback-free rewrite and dialect-conversion program executed natively in C++."
   alias Beaver.MLIR
   import Bitwise
 
@@ -41,8 +39,7 @@ defmodule Beaver.Pattern.Native.Program do
   defp check({kind, types}) when kind in [:operand_types, :result_types],
     do: type_checks(if(kind == :operand_types, do: 3, else: 4), types)
 
-  defp check({:same_operands, pairs}),
-    do: Enum.map(pairs, fn {a, b} -> {5, index!(a), nil, index!(b)} end)
+  defp check({:same_operands, pairs}), do: Enum.map(pairs, fn {a, b} -> {5, index!(a), nil, index!(b)} end)
 
   defp check(_), do: []
 
@@ -68,25 +65,30 @@ defmodule Beaver.Pattern.Native.Program do
 
     flags =
       encode_regions_flag!(Keyword.get(opts, :regions, :none)) ||| copy_flag |||
-        bool_flag(opts, :convert_function_type, false, 4)
+        encode_convert_fn_flag!(Keyword.get(opts, :convert_function_type, false))
 
-    attr_edits =
-      Enum.map(Keyword.get(opts, :attributes, []), fn {name, value} -> {5, 0, to_string(name), attr_value!(value)} end)
-
+    attr_edits = Enum.map(Keyword.get(opts, :attributes, []), &encode_replace_attr!/1)
     result_edits = encode_replace_results!(Keyword.get(opts, :result_types, :preserve))
     [{3, operand_mode, target_op, flags}] ++ operand_edits ++ copy_edits ++ attr_edits ++ result_edits
   end
 
   defp edit({:c_abi_call, target_op, opts}) when is_binary(target_op) and byte_size(target_op) > 0 and is_list(opts) do
-    validate_keys!(opts, [:params, :callee, :return_type, :stack_save, :ensure_declaration], ":c_abi_call")
+    validate_keys!(
+      opts,
+      [:params, :callee, :return_type, :stack_save, :ensure_declaration, :verify_declaration],
+      ":c_abi_call"
+    )
+
     params = Keyword.get(opts, :params, [])
     unless is_list(params), do: raise(ArgumentError, ":c_abi_call :params must be a list")
     stack_save = bool_flag(opts, :stack_save, true, 1)
-    ensure_decl = bool_flag(opts, :ensure_declaration, true, 1)
+
+    decl_flags = bool_flag(opts, :ensure_declaration, true, 1) ||| bool_flag(opts, :verify_declaration, false, 2)
+
     callee = encode_callee(Keyword.get(opts, :callee))
     {ret_type_ref, ret_type_edits} = encode_c_abi_return!(Keyword.get(opts, :return_type))
     param_edits = Enum.map(params, &encode_c_abi_param!/1)
-    [{8, stack_save, target_op, {ensure_decl, callee, ret_type_ref}}] ++ ret_type_edits ++ param_edits
+    [{8, stack_save, target_op, {decl_flags, callee, ret_type_ref}}] ++ ret_type_edits ++ param_edits
   end
 
   defp edit(other), do: raise(ArgumentError, "unsupported declarative rewrite: #{inspect(other)}")
@@ -110,10 +112,27 @@ defmodule Beaver.Pattern.Native.Program do
 
   defp encode_copy_attrs!(false), do: {0, []}
   defp encode_copy_attrs!(copy_all) when copy_all in [true, :all], do: {2, []}
+
+  defp encode_copy_attrs!({:except, names}) when is_list(names), do: {8, Enum.map(names, &{13, 0, to_string(&1), nil})}
+
   defp encode_copy_attrs!(names) when is_list(names), do: {0, Enum.map(names, &{6, 0, to_string(&1), nil})}
 
   defp encode_copy_attrs!(other),
     do: raise(ArgumentError, "invalid :replace_op :copy_attributes option: #{inspect(other)}")
+
+  defp encode_convert_fn_flag!(false), do: 0
+  defp encode_convert_fn_flag!(true), do: 4
+  defp encode_convert_fn_flag!(mode) when mode in [:infer, :from_region], do: 4 ||| 16
+
+  defp encode_convert_fn_flag!(other),
+    do: raise(ArgumentError, "invalid :replace_op :convert_function_type option: #{inspect(other)}")
+
+  defp encode_replace_attr!({name, {:symbol_ref, src_attr}})
+       when (is_atom(src_attr) or is_binary(src_attr)) and src_attr != "" do
+    {14, 0, to_string(name), to_string(src_attr)}
+  end
+
+  defp encode_replace_attr!({name, value}), do: {5, 0, to_string(name), attr_value!(value)}
 
   defp encode_replace_results!(:preserve), do: []
   defp encode_replace_results!([]), do: [{7, -1, nil, nil}]

@@ -1,9 +1,7 @@
 alias Beaver.Native
 
 defmodule Beaver.MLIR.Dialect.Tensor do
-  @moduledoc """
-  This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect.
-  """
+  @moduledoc "This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect."
   alias Beaver.MLIR.{Attribute, Type}
 
   defmodule Slice do

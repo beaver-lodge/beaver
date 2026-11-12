@@ -44,7 +44,8 @@ defmodule Beaver do
   @doc """
   Transform the given DSL block but without specifying the context and block.
 
-  This is useful when you want to generate partials of quoted code and doesn't want to pass around the context and block.
+  This is useful when you want to generate partials of quoted code and doesn't want to pass around the context and
+  block.
   """
   defmacro mlir(do: dsl_block) do
     quote do
@@ -83,8 +84,7 @@ defmodule Beaver do
           Kernel.var!(beaver_internal_env_ctx) = unquote(ctx)
 
           match?(%MLIR.Context{}, Kernel.var!(beaver_internal_env_ctx)) ||
-            raise CompileError,
-                  Beaver.Env.compile_err_msg(MLIR.Context, unquote(Macro.escape(__CALLER__)))
+            raise CompileError, Beaver.Env.compile_err_msg(MLIR.Context, unquote(Macro.escape(__CALLER__)))
         end
       end
 
@@ -94,8 +94,7 @@ defmodule Beaver do
           Kernel.var!(beaver_internal_env_ip) = unquote(ip)
 
           Beaver.Env.valid_insertion_point?(Kernel.var!(beaver_internal_env_ip)) ||
-            raise CompileError,
-                  Beaver.Env.compile_err_msg("insertion point", unquote(Macro.escape(__CALLER__)))
+            raise CompileError, Beaver.Env.compile_err_msg("insertion point", unquote(Macro.escape(__CALLER__)))
         end
       end
 

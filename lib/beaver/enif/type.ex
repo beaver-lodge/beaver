@@ -1,9 +1,7 @@
 alias Beaver.MLIR.Type
 
 defmodule Beaver.ENIF.Type do
-  @moduledoc """
-  Query the MLIR type of an Erlang term or environment.
-  """
+  @moduledoc "Query the MLIR type of an Erlang term or environment."
   alias Beaver.MLIR
 
   @typedoc """

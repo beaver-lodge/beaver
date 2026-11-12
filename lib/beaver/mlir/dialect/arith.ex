@@ -1,7 +1,5 @@
 defmodule Beaver.MLIR.Dialect.Arith do
-  @moduledoc """
-  This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect.
-  """
+  @moduledoc "This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect."
   alias Beaver.MLIR
   alias Beaver.MLIR.Dialect
   import Beaver.Sigils

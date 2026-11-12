@@ -4,18 +4,15 @@ defmodule Beaver.MLIR.ThreadPool do
   @moduledoc """
   Owns an LLVM thread pool that can be shared by multiple MLIR contexts.
 
-  The application starts one pool under `default_name/0`. `MLIR.Context.create/1`
-  checks out a lease from it by default and returns the lease when the context is
-  destroyed. Calling `close/1` while contexts are attached defers native pool
-  destruction until the final lease is returned.
+  The application starts one pool under `default_name/0`. `MLIR.Context.create/1` checks out a lease from it by
+  default and returns the lease when the context is destroyed. Calling `close/1` while contexts are attached defers
+  native pool destruction until the final lease is returned.
 
-  If an owner is forcibly terminated while leases remain, the native pool is
-  deliberately retained so attached MLIR contexts never hold a dangling pool
-  pointer. Use `close/1` for deterministic reclamation.
+  If an owner is forcibly terminated while leases remain, the native pool is deliberately retained so attached MLIR
+  contexts never hold a dangling pool pointer. Use `close/1` for deterministic reclamation.
 
-  An explicit owner can be selected with `thread_pool: owner`, or a raw
-  `Beaver.MLIR.LLVMThreadPool` can be supplied when its lifetime is managed by
-  the caller.
+  An explicit owner can be selected with `thread_pool: owner`, or a raw `Beaver.MLIR.LLVMThreadPool` can be supplied
+  when its lifetime is managed by the caller.
   """
 
   use GenServer
@@ -42,8 +39,7 @@ defmodule Beaver.MLIR.ThreadPool do
       type: :worker
     }
 
-  @spec checkout(GenServer.server()) ::
-          {MLIR.LLVMThreadPool.t(), reference()} | {:error, :closing}
+  @spec checkout(GenServer.server()) :: {MLIR.LLVMThreadPool.t(), reference()} | {:error, :closing}
   def checkout(owner \\ @default_name), do: GenServer.call(owner, :checkout)
 
   @spec checkin(GenServer.server(), reference()) :: :ok
@@ -72,9 +68,7 @@ defmodule Beaver.MLIR.ThreadPool do
 
   def max_concurrency(owner), do: owner |> pool() |> max_concurrency()
 
-  @doc """
-  Closes the owner. Returns `:deferred` if attached contexts still hold leases.
-  """
+  @doc "Closes the owner. Returns `:deferred` if attached contexts still hold leases."
   @spec close(GenServer.server()) :: :ok | :deferred
   def close(owner \\ @default_name), do: GenServer.call(owner, :close)
 
@@ -107,15 +101,12 @@ defmodule Beaver.MLIR.ThreadPool do
   def handle_cast({:checkin, lease}, state) do
     state = %{state | leases: MapSet.delete(state.leases, lease)}
 
-    if state.closing? and MapSet.size(state.leases) == 0,
-      do: {:stop, :normal, state},
-      else: {:noreply, state}
+    if state.closing? and MapSet.size(state.leases) == 0, do: {:stop, :normal, state}, else: {:noreply, state}
   end
 
   @impl GenServer
   def terminate(_reason, state) do
     if MapSet.size(state.leases) == 0, do: destroy(state.pool)
-
     :ok
   end
 end

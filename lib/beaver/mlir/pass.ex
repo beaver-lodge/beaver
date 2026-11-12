@@ -2,17 +2,14 @@ alias Beaver.MLIR.CAPI
 alias Beaver.Native
 
 defmodule Beaver.MLIR.Pass do
-  @moduledoc """
-  This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
-  """
+  @moduledoc "This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}."
   alias Beaver.MLIR
   alias Beaver.MLIR.CallbackServer
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
   @type state() :: any()
   @callback construct(state :: state()) :: state()
   @callback run(op :: MLIR.Operation.t(), state :: state()) :: state()
-  @callback initialize(ctx :: MLIR.Context.t(), state :: state()) ::
-              {:ok, state()} | {:error, state()}
+  @callback initialize(ctx :: MLIR.Context.t(), state :: state()) :: {:ok, state()} | {:error, state()}
   @callback destruct(state :: state()) :: any()
   @callback clone(state :: state()) :: state()
   @optional_callbacks construct: 1, initialize: 2, destruct: 1, clone: 1
@@ -53,7 +50,6 @@ defmodule Beaver.MLIR.Pass do
   def create(argument, desc, op, opts) do
     name = opts[:name] || "beaver generated pass of #{argument}"
     ctx = opts[:ctx] || raise ArgumentError, "option :ctx is required"
-
     callbacks = callbacks(opts)
 
     CallbackServer.create(__MODULE__, callbacks, opts[:init_state] || nil, fn owner ->

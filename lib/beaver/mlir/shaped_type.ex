@@ -1,9 +1,7 @@
 alias Beaver.Native
 
 defmodule Beaver.MLIR.ShapedType do
-  @moduledoc """
-  This module provides utilities for MLIR shaped types.
-  """
+  @moduledoc "This module provides utilities for MLIR shaped types."
   alias Beaver.MLIR
   import MLIR.CAPI
 
@@ -38,15 +36,11 @@ defmodule Beaver.MLIR.ShapedType do
 
   def num_elements(type) do
     if not MLIR.Type.shaped?(type), do: raise(ArgumentError, "not a shaped type")
-
     if not static?(type), do: raise(ArgumentError, "cannot get element count of dynamic shaped type")
-
     beaverShapedTypeGetNumElements(type) |> Native.to_term()
   end
 
-  @doc """
-  Returns whether the shape is fully static.
-  """
+  @doc "Returns whether the shape is fully static."
   def static?(type), do: mlirShapedTypeHasStaticShape(type) |> Native.to_term()
 
   def element_type(type) do
@@ -66,6 +60,5 @@ defmodule Beaver.MLIR.ShapedType do
   def cast_dynamic_magic_number(stride_or_offset, modifier) when modifier in [:stride, :offset],
     do: if(MLIR.ShapedType.dynamic_stride_or_offset?(stride_or_offset), do: :dynamic, else: stride_or_offset)
 
-  def cast_dynamic_magic_number(size, :size),
-    do: if(MLIR.ShapedType.dynamic_size?(size), do: :dynamic, else: size)
+  def cast_dynamic_magic_number(size, :size), do: if(MLIR.ShapedType.dynamic_size?(size), do: :dynamic, else: size)
 end

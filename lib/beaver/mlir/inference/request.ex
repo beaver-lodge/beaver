@@ -23,11 +23,8 @@ defmodule Beaver.MLIR.Inference.Request do
     location = Map.get_lazy(request, :location, fn -> MLIR.Location.unknown(ctx: context) end)
     operands = Map.get(request, :operands, [])
     regions = Map.get(request, :regions, [])
-
     attributes = Map.get_lazy(request, :attributes, fn -> MLIR.Attribute.dictionary([], ctx: context) end)
-
     properties = properties_ref(Map.get(request, :properties))
-
     unless match?(%MLIR.Location{}, location), do: raise(ArgumentError, ":location must be a Beaver.MLIR.Location")
 
     unless match?(%MLIR.Attribute{}, attributes),

@@ -6,9 +6,7 @@ defmodule Beaver.Changeset do
   alias Beaver.MLIR
   require Logger
 
-  @doc """
-  Changeset of entities to create an operation.
-  """
+  @doc "Changeset of entities to create an operation."
   @type t() :: %__MODULE__{
           operands: list(),
           results: list(),
@@ -44,22 +42,20 @@ defmodule Beaver.Changeset do
 
   @spec add_argument(t(), argument()) :: t()
 
-  @doc """
-  Add an ODS argument to changeset.
-  """
+  @doc "Add an ODS argument to changeset."
+
+  def add_argument(%__MODULE__{context: nil, location: %Location{} = loc} = changeset, argument),
+    do: add_argument(%__MODULE__{changeset | context: MLIR.context(loc)}, argument)
 
   def add_argument(%__MODULE__{} = changeset, argument) when is_list(argument) do
-    for arg <- argument, reduce: changeset do
-      changeset -> add_argument(changeset, arg)
-    end
+    for arg <- argument, [reduce: changeset], do: (changeset -> add_argument(changeset, arg))
   end
 
   def add_argument(%__MODULE__{context: ctx} = changeset, {tag, %Deferred{} = deferred})
       when is_atom(tag), do: add_argument(changeset, {tag, Deferred.resolve(deferred, ctx)})
 
   # f should return regions
-  def add_argument(%__MODULE__{} = changeset, f) when is_function(f, 0),
-    do: add_argument(changeset, f.())
+  def add_argument(%__MODULE__{} = changeset, f) when is_function(f, 0), do: add_argument(changeset, f.())
 
   # If the context is not set, we extract it from the argument
   def add_argument(%__MODULE__{context: nil} = changeset, %{} = argument),
@@ -76,7 +72,6 @@ defmodule Beaver.Changeset do
         {%Block{} = successor_block, block_args}
       ) do
     block_args = Enum.map(block_args, &Deferred.resolve(&1, ctx))
-
     %__MODULE__{changeset | successors: successors ++ [successor_block], operands: operands ++ block_args}
   end
 
@@ -95,6 +90,11 @@ defmodule Beaver.Changeset do
 
   def add_argument(%__MODULE__{attributes: attributes} = changeset, {name, attr})
       when is_atom(name) and is_binary(attr), do: %__MODULE__{changeset | attributes: attributes ++ [{name, attr}]}
+
+  def add_argument(%__MODULE__{} = changeset, {name, shorthand})
+      when is_atom(name) and (shorthand == :unit or is_boolean(shorthand) or is_tuple(shorthand)) do
+    add_argument(changeset, {name, resolve_shorthand_attribute!(shorthand)})
+  end
 
   def add_argument(%__MODULE__{context: ctx, operands: operands} = changeset, {operand_name, %Value{} = value})
       when is_atom(operand_name) do
@@ -126,15 +126,32 @@ defmodule Beaver.Changeset do
     """
   end
 
+  @shorthand_types %{
+    i1: "i1",
+    i8: "i8",
+    i16: "i16",
+    i32: "i32",
+    i64: "i64",
+    i128: "i128",
+    index: "index",
+    f16: "f16",
+    bf16: "bf16",
+    f32: "f32",
+    f64: "f64",
+    ptr: "!llvm.ptr",
+    none: "none"
+  }
+
   @type deferred_type() :: {:parametric, term(), term(), term()}
-  @type type() :: Type.t() | deferred_type() | [Type.t() | deferred_type()]
+  @type type() :: Type.t() | String.t() | atom() | deferred_type() | [Type.t() | String.t() | atom() | deferred_type()]
   @type result() :: :infer | type() | Deferred.contextual(type())
   @spec add_result(t(), result()) :: t()
 
+  def add_result(%__MODULE__{context: nil, location: %Location{} = loc} = changeset, argument),
+    do: add_result(%__MODULE__{changeset | context: MLIR.context(loc)}, argument)
+
   def add_result(%__MODULE__{} = changeset, argument) when is_list(argument) do
-    for arg <- argument, reduce: changeset do
-      changeset -> add_result(changeset, arg)
-    end
+    for arg <- argument, [reduce: changeset], do: (changeset -> add_result(changeset, arg))
   end
 
   def add_result(%__MODULE__{context: ctx} = changeset, %Deferred{} = deferred),
@@ -144,6 +161,14 @@ defmodule Beaver.Changeset do
     do: raise(ArgumentError, "already set to infer the result types")
 
   def add_result(%__MODULE__{} = changeset, :infer), do: %__MODULE__{changeset | results: :infer}
+
+  def add_result(%__MODULE__{} = changeset, shorthand) when is_map_key(@shorthand_types, shorthand),
+    do: add_result(changeset, Map.fetch!(@shorthand_types, shorthand))
+
+  def add_result(%__MODULE__{context: ctx, results: results} = changeset, type_str) when is_binary(type_str) do
+    resolved = if ctx, do: Type.get(type_str, ctx: ctx), else: type_str
+    %__MODULE__{changeset | results: results ++ [resolved]}
+  end
 
   def add_result(%__MODULE__{context: ctx, results: results} = changeset, %Type{} = result_type) do
     result_type = Deferred.resolve(result_type, ctx)
@@ -158,11 +183,48 @@ defmodule Beaver.Changeset do
     Invalid result received: #{inspect(result)}
 
     Supported results:
-    - (list of) type
+    - (list of) type, type string, or shorthand atom (:i1, :i8, :i16, :i32, :i64, :i128, :index, :f32, :f64, :ptr)
     - function that returns type
     - :infer
     """
   end
+
+  defp resolve_shorthand_attribute!(:unit), do: MLIR.Attribute.unit()
+  defp resolve_shorthand_attribute!(b) when is_boolean(b), do: MLIR.Attribute.bool(b)
+  defp resolve_shorthand_attribute!({:bool, b}) when is_boolean(b), do: MLIR.Attribute.bool(b)
+  defp resolve_shorthand_attribute!({:i1, b}) when is_boolean(b), do: MLIR.Attribute.bool(b)
+  defp resolve_shorthand_attribute!({:i1, n}) when n in [0, 1], do: MLIR.Attribute.bool(n == 1)
+  defp resolve_shorthand_attribute!({:i8, n}) when is_integer(n), do: MLIR.Attribute.integer(Type.i(8), n)
+  defp resolve_shorthand_attribute!({:i16, n}) when is_integer(n), do: MLIR.Attribute.integer(Type.i(16), n)
+  defp resolve_shorthand_attribute!({:i32, n}) when is_integer(n), do: MLIR.Attribute.integer(Type.i32(), n)
+  defp resolve_shorthand_attribute!({:i64, n}) when is_integer(n), do: MLIR.Attribute.integer(Type.i64(), n)
+
+  defp resolve_shorthand_attribute!({:int, width, n}) when is_integer(width) and width > 0 and is_integer(n),
+    do: MLIR.Attribute.integer(Type.i(width), n)
+
+  defp resolve_shorthand_attribute!({:index, n}) when is_integer(n), do: MLIR.Attribute.index(n)
+  defp resolve_shorthand_attribute!({:f32, x}) when is_number(x), do: MLIR.Attribute.float(Type.f32(), x * 1.0)
+  defp resolve_shorthand_attribute!({:f64, x}) when is_number(x), do: MLIR.Attribute.float(Type.f64(), x * 1.0)
+  defp resolve_shorthand_attribute!({:string, s}) when is_binary(s), do: MLIR.Attribute.string(s)
+
+  defp resolve_shorthand_attribute!({tag, s}) when tag in [:symbol, :flat_symbol] and (is_binary(s) or is_atom(s)),
+    do: MLIR.Attribute.flat_symbol_ref(s |> to_string() |> String.trim_leading("@"))
+
+  defp resolve_shorthand_attribute!({:type, %Type{} = t}), do: MLIR.Attribute.type(t)
+
+  defp resolve_shorthand_attribute!({:type, s}) when is_binary(s),
+    do: Deferred.defer(&MLIR.Attribute.type(Type.get(s, ctx: &1)))
+
+  defp resolve_shorthand_attribute!({:dense_i32, list}) when is_list(list),
+    do: MLIR.Attribute.dense_array(list, Beaver.Native.I32)
+
+  defp resolve_shorthand_attribute!({:dense_i64, list}) when is_list(list),
+    do: MLIR.Attribute.dense_array(list, Beaver.Native.I64)
+
+  defp resolve_shorthand_attribute!({:parse, s}) when is_binary(s), do: s
+
+  defp resolve_shorthand_attribute!(other),
+    do: raise(ArgumentError, "unsupported attribute shorthand: #{inspect(other)}")
 
   @doc false
   def reorder_operands(%__MODULE__{operands: operands, name: name, attributes: attrs, context: ctx} = changeset) do
@@ -198,8 +260,7 @@ defmodule Beaver.Changeset do
 
   defp operand_groups(operands, dump) do
     for %{"name" => name, "kind" => kind} <- dump["operands"] || [] do
-      values =
-        for {key, values} <- operands, compare_tag(key, name), value <- List.wrap(values), do: value
+      values = for {key, values} <- operands, compare_tag(key, name), value <- List.wrap(values), do: value
 
       if values == [] and kind == "Single",
         do: Logger.warning("Single operand '#{name}' not set when creating operation #{dump["name"]}")

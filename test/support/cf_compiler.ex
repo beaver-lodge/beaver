@@ -14,26 +14,15 @@ defmodule MutCompiler do
   defp fetch_var(%Acc{vars: vars}, {var_name, _line, nil}) do
     found = Map.get(vars, var_name)
 
-    if is_nil(found) do
-      :not_found
-    else
-      {:ok, found}
-    end
+    if is_nil(found), do: :not_found, else: {:ok, found}
   end
 
-  defp put_var(%Acc{vars: vars} = acc, {var_name, _line, nil}, var) do
-    %Acc{acc | vars: Map.put(vars, var_name, var)}
-  end
+  defp put_var(%Acc{vars: vars} = acc, {var_name, _line, nil}, var), do: %Acc{acc | vars: Map.put(vars, var_name, var)}
 
-  defp update_block(%Acc{block: _old} = acc, block) do
-    %Acc{acc | block: block}
-  end
+  defp update_block(%Acc{block: _old} = acc, block), do: %Acc{acc | block: block}
 
   # 1. starts with "root", the return expression
-  defp gen_mlir(
-         {:return, _line, [arg]},
-         %Acc{block: block, ctx: ctx} = acc
-       ) do
+  defp gen_mlir({:return, _line, [arg]}, %Acc{block: block, ctx: ctx} = acc) do
     # we expect it to be a MLIR Value
     {arg = %MLIR.Value{}, acc} = gen_mlir(arg, acc)
 
@@ -82,8 +71,7 @@ defmodule MutCompiler do
     false_branch =
       mlir ctx: ctx do
         block do
-          {mlir, acc} =
-            gen_mlir(else_block_ast, update_block(acc, Beaver.Env.block()))
+          {mlir, acc} = gen_mlir(else_block_ast, update_block(acc, Beaver.Env.block()))
 
           CF.br({bb_next, [mlir]}) >>> []
         end
@@ -102,14 +90,7 @@ defmodule MutCompiler do
 
   # an assign, it is different from binding in Elixir, so we want to generate IR of mutable semantic
   # but this could be complicated, we can simply call gen_mlir with the ast of the var for now
-  defp gen_mlir(
-         {:=, _,
-          [
-            {_name, _, nil} = ast,
-            var
-          ]},
-         acc
-       ) do
+  defp gen_mlir({:=, _, [{_name, _, nil} = ast, var]}, acc) do
     {mlir, acc} = gen_mlir(var, acc)
     {mlir, put_var(acc, ast, mlir)}
   end
@@ -143,9 +124,7 @@ defmodule MutCompiler do
 
   # at some point you should see logging of node not supported for MLIR CAPI Value,
   # let's add the match to disable this kind of logging
-  defp gen_mlir(%MLIR.Value{} = mlir, acc) do
-    {mlir, acc}
-  end
+  defp gen_mlir(%MLIR.Value{} = mlir, acc), do: {mlir, acc}
 
   # you might want to print the node not matched
   defp gen_mlir(ast, acc) do
@@ -183,9 +162,7 @@ defmodule MutCompiler do
 
               # keep generating until we meet a terminator
               {_mlir, _acc} =
-                Macro.prewalk(block, acc, fn ast, %Acc{} = acc ->
-                  gen_mlir(ast, acc)
-                end)
+                Macro.prewalk(block, acc, fn ast, %Acc{} = acc -> gen_mlir(ast, acc) end)
             end
           end
         end
@@ -198,9 +175,7 @@ defmodule MutCompiler do
   # In most of LLVM or other compiler guidance, it starts with ast parsing.
   # In Elixir we don't have to, just reuse the Elixir ast and use macro to do the magic!
   defmacro defnative(call, do: block) do
-    mlir_asm =
-      MutCompiler.gen_func(call, block)
-      |> MLIR.to_string()
+    mlir_asm = MutCompiler.gen_func(call, block) |> MLIR.to_string()
 
     quote do
       alias MLIR.Dialect.Func
@@ -230,17 +205,9 @@ defmodule MutCompiler do
     fn total_iters, factor, base_lr, step ->
       return = Beaver.Native.F32.make(0.9999)
 
-      arguments =
-        [
-          total_iters,
-          factor,
-          base_lr,
-          step
-        ]
-        |> Enum.map(&Beaver.Native.F32.make/1)
+      arguments = [total_iters, factor, base_lr, step] |> Enum.map(&Beaver.Native.F32.make/1)
 
-      MLIR.ExecutionEngine.invoke!(jit, func, arguments, return)
-      |> Beaver.Native.to_term()
+      MLIR.ExecutionEngine.invoke!(jit, func, arguments, return) |> Beaver.Native.to_term()
     end
   end
 end

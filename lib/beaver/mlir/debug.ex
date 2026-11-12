@@ -32,9 +32,7 @@ defmodule Beaver.MLIR.Debug do
   alias Beaver.MLIR
   import MLIR.CAPI
 
-  @doc """
-  Enable or disable global debugging.
-  """
+  @doc "Enable or disable global debugging."
   def enable(enable \\ true), do: mlirEnableGlobalDebug(enable)
 
   def disable(), do: enable(false)
@@ -86,16 +84,13 @@ defmodule Beaver.MLIR.Debug do
   @doc """
   Attach a `DISubprogramAttr` debug scope to every `llvm.func` in the module.
 
-  The pass is idempotent: functions that already carry a subprogram scope are
-  left untouched. The attached scopes reference the Elixir file and line that
-  each `llvm.func` was originally built from, so the MLIR-to-LLVM translation
-  can emit `DILocation` metadata for it.
+  The pass is idempotent: functions that already carry a subprogram scope are left untouched. The attached scopes
+  reference the Elixir file and line that each `llvm.func` was originally built from, so the MLIR-to-LLVM
+  translation can emit `DILocation` metadata for it.
 
-  Requires the module to be in the LLVM dialect (the pass fails on other
-  modules).
+  Requires the module to be in the LLVM dialect (the pass fails on other modules).
   """
-  @spec attach_llvm_scopes!(Composer.t() | MLIR.Module.t() | MLIR.Operation.t()) ::
-          MLIR.Module.t() | MLIR.Operation.t()
+  @spec attach_llvm_scopes!(Composer.t() | MLIR.Module.t() | MLIR.Operation.t()) :: MLIR.Module.t() | MLIR.Operation.t()
   def attach_llvm_scopes!(composer_or_op) do
     pass = MLIR.CAPI.mlirCreateLLVMDIScopeForLLVMFuncOpPass()
     composer_or_op |> Composer.append(pass) |> Composer.run!()

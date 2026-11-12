@@ -2,9 +2,8 @@ defmodule Beaver.MLIR.Dialect.SCF do
   @moduledoc """
   Operations and semantic builders for the MLIR `scf` dialect.
 
-  The generated operation functions remain available. `if_/2` and `for_/5`
-  add a small Elixir-shaped layer that owns the mechanical region, block
-  argument, result, and `scf.yield` construction.
+  The generated operation functions remain available. `if_/2` and `for_/5` add a small Elixir-shaped layer that owns
+  the mechanical region, block argument, result, and `scf.yield` construction.
   """
 
   use Beaver.MLIR.Dialect, dialect: "scf", ops: Beaver.MLIR.Dialect.Registry.ops("scf")
@@ -66,9 +65,7 @@ defmodule Beaver.MLIR.Dialect.SCF do
   """
   defmacro for_(lower, upper, step, opts, do: body) do
     iter_args = Keyword.get(opts, :iter_args, [])
-
     unless is_list(iter_args), do: raise(ArgumentError, "SCF.for_/5 expects :iter_args to be a list")
-
     iv = Macro.var(:scf_iv, nil)
 
     carried =

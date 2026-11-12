@@ -2,9 +2,8 @@ defmodule Beaver.MLIR.Dialect.Bufferization do
   @moduledoc """
   Operations and structured One-Shot Bufferization pipelines.
 
-  The pipeline helpers validate and render pass options, preserve diagnostics
-  through `Beaver.Composer`, and optionally append MLIR's ownership-based
-  deallocation pipeline.
+  The pipeline helpers validate and render pass options, preserve diagnostics through `Beaver.Composer`, and
+  optionally append MLIR's ownership-based deallocation pipeline.
   """
 
   use Beaver.MLIR.Dialect, dialect: "bufferization", ops: Beaver.MLIR.Dialect.Registry.ops("bufferization")
@@ -18,8 +17,7 @@ defmodule Beaver.MLIR.Dialect.Bufferization do
   @list_options ~w(dialect_filter no_analysis_func_filter)a
   @layout_options ~w(function_boundary_type_conversion unknown_type_conversion)a
   @control_options ~w(boundary_layout deallocate private_function_dynamic_ownership run)a
-  @supported_options @boolean_options ++
-                       @scalar_options ++ @list_options ++ @layout_options ++ @control_options
+  @supported_options @boolean_options ++ @scalar_options ++ @list_options ++ @layout_options ++ @control_options
 
   @layout_values %{
     identity: "identity-layout-map",
@@ -65,15 +63,13 @@ defmodule Beaver.MLIR.Dialect.Bufferization do
     do: operation_or_module |> pipeline(opts) |> Beaver.Composer.run!(Keyword.get(opts, :run, []))
 
   @doc """
-  Appends static arena planning for function bodies with explicit memref deallocs.
-  Run after ownership-based deallocation and bufferization-lower-deallocations.
-  `algorithm: :best_fit` reuses storage across disjoint lifetimes; `:trivial`
-  packs allocations sequentially. `arena_mode: :arg` uses the first function
-  argument as a caller-owned static i8 arena and checks its capacity. `:allocate`
-  creates an arena and releases it at each function return.
-  Callers own argument-arena lifetime and must satisfy the original allocation alignments.
-  Dynamic shapes, unsupported element types and nonidentity layouts are skipped.
-  Integer/float storage widths must be powers of two from 8 to 128 bits.
+  Appends static arena planning for function bodies with explicit memref deallocs. Run after ownership-based
+  deallocation and bufferization-lower-deallocations. `algorithm: :best_fit` reuses storage across disjoint
+  lifetimes; `:trivial` packs allocations sequentially. `arena_mode: :arg` uses the first function argument as a
+  caller-owned static i8 arena and checks its capacity. `:allocate` creates an arena and releases it at each
+  function return. Callers own argument-arena lifetime and must satisfy the original allocation alignments. Dynamic
+  shapes, unsupported element types and nonidentity layouts are skipped. Integer/float storage widths must be powers
+  of two from 8 to 128 bits.
   """
   def static_memory_plan(operation_or_module, opts \\ []) do
     opts = Keyword.validate!(opts, algorithm: :best_fit, arena_mode: :allocate)
@@ -88,8 +84,7 @@ defmodule Beaver.MLIR.Dialect.Bufferization do
   end
 
   defp validate_options!(opts) do
-    unless Keyword.keyword?(opts),
-      do: raise(ArgumentError, "bufferization options must be a keyword list")
+    unless Keyword.keyword?(opts), do: raise(ArgumentError, "bufferization options must be a keyword list")
 
     case Keyword.keys(opts) -- @supported_options do
       [] -> :ok

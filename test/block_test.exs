@@ -56,10 +56,7 @@ defmodule BlockTest do
     assert {:error,
             [
               {:error, _, "reference to block defined in another region",
-               [
-                 {:note, _, "see current operation: \"cf.br\"(%0)[INVALIDBLOCK] : (i32) -> ()",
-                  []}
-               ]}
+               [{:note, _, "see current operation: \"cf.br\"(%0)[INVALIDBLOCK] : (i32) -> ()", []}]}
             ]} = res
   end
 
@@ -239,8 +236,7 @@ defmodule BlockTest do
             block _(a >>> Type.i32()) do
               assert_raise ArgumentError, "not a result", fn -> MLIR.Value.owner!(a) end
 
-              {const, v0} =
-                Arith.constant(value: Attribute.integer(Type.i32(), 0)) >>> {:op, Type.i32()}
+              {const, v0} = Arith.constant(value: Attribute.integer(Type.i32(), 0)) >>> {:op, Type.i32()}
 
               {:ok, owner} = MLIR.Value.owner(v0)
               assert MLIR.equal?(owner, const)

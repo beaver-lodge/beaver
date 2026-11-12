@@ -35,8 +35,7 @@ defmodule Beaver.MLIR.IRMapping do
 
   @doc "Runs `fun` with a new mapping and always destroys it."
   @spec with_mapping((t() -> result)) :: result when result: var
-  def with_mapping(fun) when is_function(fun, 1),
-    do: Beaver.Native.with_resource(create(), &destroy/1, fun)
+  def with_mapping(fun) when is_function(fun, 1), do: Beaver.Native.with_resource(create(), &destroy/1, fun)
 
   @entity_kinds [Value, Block, Operation]
   for kind <- @entity_kinds, verb <- ~w(Map LookupOrNull LookupOrDefault Contains Erase) do
@@ -82,8 +81,7 @@ defmodule Beaver.MLIR.IRMapping do
 
   @doc "Clones `operation` as a detached caller-owned operation and updates `mapping`."
   @spec clone(t(), Operation.t()) :: Operation.t()
-  def clone(%__MODULE__{} = mapping, %Operation{} = op),
-    do: CAPI.mlirOperationCloneWithMapping(op, mapping)
+  def clone(%__MODULE__{} = mapping, %Operation{} = op), do: CAPI.mlirOperationCloneWithMapping(op, mapping)
 
   @doc "Clones and inserts `operation` through `rewriter`, updating `mapping`."
   @spec clone(t(), Operation.t(), rewriter()) :: Operation.t()

@@ -45,15 +45,14 @@ defmodule RegionTest do
 
     {_, [region_num]} =
       op
-      |> Beaver.Walker.prewalk([], fn
-        ir, acc ->
-          with op = %Beaver.MLIR.Operation{} <- ir,
-               "func.func" <- MLIR.Operation.name(op),
-               region_num <- Beaver.Walker.regions(op) |> Enum.count() do
-            {ir, [region_num | acc]}
-          else
-            _ -> {ir, acc}
-          end
+      |> Beaver.Walker.prewalk([], fn ir, acc ->
+        with op = %Beaver.MLIR.Operation{} <- ir,
+             "func.func" <- MLIR.Operation.name(op),
+             region_num <- Beaver.Walker.regions(op) |> Enum.count() do
+          {ir, [region_num | acc]}
+        else
+          _ -> {ir, acc}
+        end
       end)
 
     assert region_num == 2
@@ -62,7 +61,7 @@ defmodule RegionTest do
   test "module region not accessible by env macro", %{ctx: ctx} do
     mlir ctx: ctx do
       module do
-        assert {:not_found, [file: __ENV__.file, line: 65]} == Beaver.Env.region()
+        assert {:not_found, [file: __ENV__.file, line: __ENV__.line]} == Beaver.Env.region()
 
         Func.func some_func(function_type: Type.function([], [])) do
           region do

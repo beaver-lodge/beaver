@@ -42,6 +42,5 @@ defmodule Beaver.MLIR.ConversionConfig do
   defdelegate destroy(config), to: CAPI, as: :mlirConversionConfigDestroy
 
   @spec with(keyword(), (t() -> result)) :: result when result: var
-  def with(opts \\ [], fun) when is_function(fun, 1),
-    do: Beaver.Native.with_resource(create(opts), &destroy/1, fun)
+  def with(opts \\ [], fun) when is_function(fun, 1), do: Beaver.Native.with_resource(create(opts), &destroy/1, fun)
 end

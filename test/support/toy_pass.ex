@@ -19,8 +19,7 @@ defmodule ToyPass do
 
   def run(%MLIR.Operation{} = operation, _state) do
     with 1 <- Beaver.Walker.regions(operation) |> Enum.count(),
-         {:ok, _} <-
-           MLIR.apply_(MLIR.Module.from_operation(operation), [replace_add_op(benefit: 2)]) do
+         {:ok, _} <- MLIR.apply_(MLIR.Module.from_operation(operation), [replace_add_op(benefit: 2)]) do
       :ok
     else
       _ -> raise "unreachable"
@@ -35,23 +34,16 @@ defmodule ToyPassWithInit do
 
   def initialize(ctx, nil) do
     {set, pattern_module} =
-      Beaver.MLIR.RewritePatternSet.with_pdl_patterns(
-        [ToyPass.replace_add_op(benefit: 2)],
-        ctx: ctx
-      )
+      Beaver.MLIR.RewritePatternSet.with_pdl_patterns([ToyPass.replace_add_op(benefit: 2)], ctx: ctx)
 
     frozen_set = MLIR.RewritePatternSet.freeze(set)
     MLIR.Module.destroy(pattern_module)
     {:ok, %{patterns: frozen_set}}
   end
 
-  def destruct(nil) do
-    :ok
-  end
+  def destruct(nil), do: :ok
 
-  def destruct(%{patterns: frozen_set}) do
-    MLIR.FrozenRewritePatternSet.destroy(frozen_set)
-  end
+  def destruct(%{patterns: frozen_set}), do: MLIR.FrozenRewritePatternSet.destroy(frozen_set)
 
   def run(%MLIR.Operation{} = operation, %{patterns: patterns} = state) do
     with 1 <- Beaver.Walker.regions(operation) |> Enum.count(),

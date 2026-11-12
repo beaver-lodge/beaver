@@ -5,9 +5,8 @@ defmodule Beaver.MLIR.Dialect.DLTI do
   @moduledoc """
   Operations and structured attribute builders for MLIR DLTI.
 
-  DLTI attributes are contextual, so all builders follow Beaver's deferred
-  convention: pass `ctx:` for eager creation or pass the returned deferred value to
-  another builder or operation.
+  DLTI attributes are contextual, so all builders follow Beaver's deferred convention: pass `ctx:` for eager
+  creation or pass the returned deferred value to another builder or operation.
   """
 
   alias Beaver.MLIR
@@ -23,31 +22,26 @@ defmodule Beaver.MLIR.Dialect.DLTI do
   @doc """
   Build one DLTI entry from a string/type key and an attribute-compatible value.
 
-  Strings, atoms, integers, booleans, MLIR attributes and deferred attributes
-  are accepted as values. Types and deferred types are accepted as keys.
+  Strings, atoms, integers, booleans, MLIR attributes and deferred attributes are accepted as values. Types and
+  deferred types are accepted as keys.
   """
   def entry(key, value, opts \\ []),
     do: Deferred.from_opts(opts, fn ctx -> Attribute.get(entry_text(key, value, ctx), ctx: ctx) end)
 
-  @doc """
-  Build a `#dlti.dl_spec` from `{key, value}` pairs or existing DLTI entries.
-  """
-  def spec(entries, opts \\ []) when is_list(entries),
-    do: build_entry_container("dl_spec", entries, opts)
+  @doc "Build a `#dlti.dl_spec` from `{key, value}` pairs or existing DLTI entries."
+  def spec(entries, opts \\ []) when is_list(entries), do: build_entry_container("dl_spec", entries, opts)
 
   @doc """
   Build a common data-layout spec.
 
-  Supported semantic options are `:endianness` (`:little` or `:big`) and
-  `:mangling_mode`. Additional `{key, value}` pairs may be supplied through
-  `:entries`.
+  Supported semantic options are `:endianness` (`:little` or `:big`) and `:mangling_mode`. Additional `{key, value}`
+  pairs may be supplied through `:entries`.
   """
   def data_layout(opts \\ []) when is_list(opts) do
     entries =
       []
       |> maybe_add(:endianness, opts, fn value ->
-        unless value in [:little, :big, "little", "big"],
-          do: raise(ArgumentError, "endianness must be :little or :big")
+        unless value in [:little, :big, "little", "big"], do: raise(ArgumentError, "endianness must be :little or :big")
 
         {"dlti.endianness", value}
       end)
@@ -61,9 +55,7 @@ defmodule Beaver.MLIR.Dialect.DLTI do
   def target_device_spec(entries, opts \\ []) when is_list(entries),
     do: build_entry_container("target_device_spec", entries, opts)
 
-  @doc """
-  Build a target-system spec from `{device_id, entries_or_device_spec}` pairs.
-  """
+  @doc "Build a target-system spec from `{device_id, entries_or_device_spec}` pairs."
   def target_system_spec(devices, opts \\ []) when is_list(devices) do
     Deferred.from_opts(opts, fn ctx ->
       entries =
@@ -85,8 +77,7 @@ defmodule Beaver.MLIR.Dialect.DLTI do
   end
 
   @doc "Attach a data-layout spec to an MLIR module or operation."
-  def attach(operation_or_module, spec),
-    do: put_attribute(operation_or_module, @data_layout_attribute, spec)
+  def attach(operation_or_module, spec), do: put_attribute(operation_or_module, @data_layout_attribute, spec)
 
   @doc "Attach a target-system spec to an MLIR module or operation."
   def attach_target_system(operation_or_module, target_system_spec),

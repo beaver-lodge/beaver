@@ -506,26 +506,92 @@ struct DeclarativeProgram {
       mlir::NamedAttrList newAttrs;
       if (first.other & 2) {
         for (const mlir::NamedAttribute &na : op->getAttrs()) newAttrs.set(na.getName(), na.getValue());
+      } else if (first.other & 8) {
+        for (const mlir::NamedAttribute &na : op->getAttrs()) {
+          bool excluded = false;
+          llvm::StringRef attrName = na.getName().getValue();
+          for (size_t i = 1; i < edits.size(); ++i) {
+            if (edits[i].kind == 13 && attrName == edits[i].name) {
+              excluded = true;
+              break;
+            }
+          }
+          if (!excluded) newAttrs.set(na.getName(), na.getValue());
+        }
       }
       for (size_t i = 1; i < edits.size(); ++i) {
         if (edits[i].kind == 6) {
           if (mlir::Attribute copied = op->getAttr(edits[i].name)) newAttrs.set(edits[i].name, copied);
         } else if (edits[i].kind == 5) {
           newAttrs.set(edits[i].name, edits[i].attr);
+        } else if (edits[i].kind == 14) {
+          mlir::Attribute src = op->getAttr(edits[i].extra);
+          if (auto strAttr = llvm::dyn_cast_or_null<mlir::StringAttr>(src)) {
+            newAttrs.set(edits[i].name, mlir::FlatSymbolRefAttr::get(op->getContext(), strAttr.getValue().ltrim('@')));
+          } else if (auto symAttr = llvm::dyn_cast_or_null<mlir::FlatSymbolRefAttr>(src)) {
+            newAttrs.set(edits[i].name, symAttr);
+          } else {
+            return mlir::failure();
+          }
         }
       }
-      if ((first.other & 4) && converter) {
-        if (auto typeAttr = op->getAttrOfType<mlir::TypeAttr>("function_type")) {
-          if (auto fnType = llvm::dyn_cast<mlir::FunctionType>(typeAttr.getValue())) {
-            mlir::TypeConverter::SignatureConversion sigConv(fnType.getNumInputs());
-            for (auto [idx, inputType] : llvm::enumerate(fnType.getInputs())) {
-              if (mlir::failed(converter->convertSignatureArg(idx, inputType, sigConv))) return mlir::failure();
+      if (first.other & 4) {
+        auto buildTargetFnType = [&](llvm::ArrayRef<mlir::Type> rawInputs,
+                                     llvm::ArrayRef<mlir::Type> rawResults) -> mlir::Type {
+          llvm::SmallVector<mlir::Type> convInputs;
+          llvm::SmallVector<mlir::Type> convResults;
+          if (converter) {
+            mlir::TypeConverter::SignatureConversion sigConv(rawInputs.size());
+            for (auto [idx, inputType] : llvm::enumerate(rawInputs)) {
+              if (mlir::failed(converter->convertSignatureArg(idx, inputType, sigConv))) return mlir::Type();
             }
-            llvm::SmallVector<mlir::Type> resTypes;
-            if (mlir::failed(converter->convertTypes(fnType.getResults(), resTypes))) return mlir::failure();
-            auto newFnType = mlir::FunctionType::get(op->getContext(), sigConv.getConvertedTypes(), resTypes);
-            newAttrs.set("function_type", mlir::TypeAttr::get(newFnType));
+            llvm::append_range(convInputs, sigConv.getConvertedTypes());
+            if (mlir::failed(converter->convertTypes(rawResults, convResults))) return mlir::Type();
+          } else {
+            llvm::append_range(convInputs, rawInputs);
+            llvm::append_range(convResults, rawResults);
           }
+          auto *fnCtx = op->getContext();
+          if (first.name == "llvm.func") {
+            mlir::Type llvmRet;
+            if (convResults.empty()) {
+              llvmRet = mlir::LLVM::LLVMVoidType::get(fnCtx);
+            } else if (convResults.size() == 1) {
+              llvmRet = convResults[0];
+            } else {
+              llvmRet = mlir::LLVM::LLVMStructType::getLiteral(fnCtx, convResults);
+            }
+            return mlir::LLVM::LLVMFunctionType::get(llvmRet, convInputs, false);
+          }
+          return mlir::FunctionType::get(fnCtx, convInputs, convResults);
+        };
+
+        mlir::Type newFnType;
+        auto typeAttr = op->getAttrOfType<mlir::TypeAttr>("function_type");
+        if (!(first.other & 16) && typeAttr) {
+          if (auto fnType = llvm::dyn_cast<mlir::FunctionType>(typeAttr.getValue())) {
+            newFnType = buildTargetFnType(fnType.getInputs(), fnType.getResults());
+            if (!newFnType) return mlir::failure();
+          }
+        } else if (op->getNumRegions() > 0 && !op->getRegion(0).empty()) {
+          mlir::Region &body = op->getRegion(0);
+          llvm::SmallVector<mlir::Type> inferredInputs(body.front().getArgumentTypes().begin(),
+                                                       body.front().getArgumentTypes().end());
+          llvm::SmallVector<mlir::Type> inferredResults;
+          for (mlir::Block &blk : body) {
+            if (blk.empty()) continue;
+            mlir::Operation &term = blk.back();
+            if ((term.hasTrait<mlir::OpTrait::IsTerminator>() || !term.isRegistered()) &&
+                term.getNumSuccessors() == 0 && term.getNumResults() == 0) {
+              llvm::append_range(inferredResults, term.getOperandTypes());
+              break;
+            }
+          }
+          newFnType = buildTargetFnType(inferredInputs, inferredResults);
+          if (!newFnType) return mlir::failure();
+        }
+        if (newFnType) {
+          newAttrs.set("function_type", mlir::TypeAttr::get(newFnType));
         }
       }
       llvm::SmallVector<mlir::Type> resultTypes;
@@ -618,19 +684,36 @@ struct DeclarativeProgram {
       mlir::Type callRetType = first.type ? convertOrKeep(first.type) : mlir::Type();
       if (!first.extra.empty() && first.other != 0) {
         if (mlir::Operation *symTableOp = mlir::SymbolTable::getNearestSymbolTable(op)) {
-          if (!mlir::SymbolTable::lookupSymbolIn(symTableOp, first.extra)) {
-            llvm::SmallVector<mlir::Type> paramTypes;
-            for (mlir::Value v : callOperands) paramTypes.push_back(v.getType());
+          llvm::SmallVector<mlir::Type> paramTypes;
+          for (mlir::Value v : callOperands) paramTypes.push_back(v.getType());
+          auto expectedFnType = [&]() -> mlir::Type {
+            if (first.name == "llvm.call") {
+              mlir::Type llvmRet = callRetType ? callRetType : mlir::Type(mlir::LLVM::LLVMVoidType::get(ctx));
+              return mlir::LLVM::LLVMFunctionType::get(llvmRet, paramTypes, false);
+            }
+            if (first.name == "func.call") {
+              llvm::SmallVector<mlir::Type> retTypes;
+              if (callRetType) retTypes.push_back(callRetType);
+              return mlir::FunctionType::get(ctx, paramTypes, retTypes);
+            }
+            return mlir::Type();
+          };
+          if (mlir::Operation *existingSym = mlir::SymbolTable::lookupSymbolIn(symTableOp, first.extra)) {
+            if ((first.other & 2) != 0) {
+              mlir::Type expType = expectedFnType();
+              auto existingAttr = existingSym->getAttrOfType<mlir::TypeAttr>("function_type");
+              if (expType && (!existingAttr || existingAttr.getValue() != expType)) {
+                return mlir::failure();
+              }
+            }
+          } else if ((first.other & 1) != 0) {
             mlir::OpBuilder::InsertionGuard guard(rewriter);
             rewriter.setInsertionPointToStart(&symTableOp->getRegion(0).front());
             if (first.name == "llvm.call") {
-              mlir::Type llvmRet = callRetType ? callRetType : mlir::Type(mlir::LLVM::LLVMVoidType::get(ctx));
-              auto fnType = mlir::LLVM::LLVMFunctionType::get(llvmRet, paramTypes, false);
+              auto fnType = llvm::cast<mlir::LLVM::LLVMFunctionType>(expectedFnType());
               mlir::LLVM::LLVMFuncOp::create(rewriter, loc, first.extra, fnType, mlir::LLVM::Linkage::External);
             } else if (first.name == "func.call") {
-              llvm::SmallVector<mlir::Type> retTypes;
-              if (callRetType) retTypes.push_back(callRetType);
-              auto fnType = mlir::FunctionType::get(ctx, paramTypes, retTypes);
+              auto fnType = llvm::cast<mlir::FunctionType>(expectedFnType());
               auto funcOp = mlir::func::FuncOp::create(rewriter, loc, first.extra, fnType);
               funcOp.setPrivate();
             }

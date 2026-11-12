@@ -266,8 +266,7 @@ defmodule Beaver.UpstreamLLVMTest do
 
     files = [
       {String.to_charlist("llvm-install/bin/#{config}"), "binary"},
-      {~c"llvm-install/include/llvm/Support/VCSRevision.h",
-       "#define LLVM_REVISION \"#{@source}\""}
+      {~c"llvm-install/include/llvm/Support/VCSRevision.h", "#define LLVM_REVISION \"#{@source}\""}
     ]
 
     {:ok, _} = :zip.create(String.to_charlist(zip), files)

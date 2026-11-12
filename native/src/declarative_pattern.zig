@@ -122,9 +122,15 @@ pub fn declarative_pattern_add(env: beam.env, _: c_int, args: [*c]const beam.ter
             4 => {
                 if (index == 0 or edit.index < 0) return error.InvalidPatternRewrite;
             },
-            6 => {
+            6, 13 => {
                 if (index == 0) return error.InvalidPatternRewrite;
                 edit.name = try string_ref.get_binary_as_string_ref(env, fields[2]);
+            },
+            14 => {
+                if (index == 0) return error.InvalidPatternRewrite;
+                edit.name = try string_ref.get_binary_as_string_ref(env, fields[2]);
+                edit.extra = try string_ref.get_binary_as_string_ref(env, fields[3]);
+                if (edit.name.length == 0 or edit.extra.length == 0) return error.InvalidPatternRewrite;
             },
             7, 12 => {
                 if (index == 0) return error.InvalidPatternRewrite;

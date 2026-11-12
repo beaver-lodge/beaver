@@ -435,9 +435,12 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverAnalyzeSafepoints(
 
 extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
     MlirOperation funcOp, const MlirOperation *safepointOps, size_t numSafepoints,
-    MlirStringRef saveOpName, MlirStringRef loadOpName, intptr_t stateArgIndex) {
+    MlirStringRef saveOpName, MlirStringRef loadOpName, intptr_t stateArgIndex,
+    intptr_t frameArgIndex, intptr_t slotStrideBytes, uint64_t *outFrameBytes) {
+  if (outFrameBytes) *outFrameBytes = 0;
   Operation *func = unwrap(funcOp);
   if (!func || func->getNumRegions() == 0 || func->getRegion(0).empty()) return false;
+  if (slotStrideBytes < 0) return false;
   if (numSafepoints == 0) return true;
 
   SmallVector<Operation *> sps;
@@ -455,17 +458,77 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
 
   Location funcLoc = func->getLoc();
   Region &body = func->getRegion(0);
+  Block *initialEntry = &body.front();
+
+  bool useFramePtr = frameArgIndex >= 0;
+  Value framePtr;
+  SmallVector<uint64_t> slotByteOffsets(coloring.slotTypes.size(), 0);
+  if (useFramePtr) {
+    if (static_cast<size_t>(frameArgIndex) >= initialEntry->getNumArguments()) return false;
+    framePtr = initialEntry->getArgument(frameArgIndex);
+    if (!isa<LLVM::LLVMPointerType>(framePtr.getType())) return false;
+
+    DataLayout dl = DataLayout::closest(func);
+    uint64_t runningOffset = 0;
+    for (size_t s = 0; s < coloring.slotTypes.size(); ++s) {
+      Type st = coloring.slotTypes[s];
+      Type storageType = st.isIndex() ? IntegerType::get(func->getContext(), 64) : st;
+      if (!LLVM::isCompatibleType(storageType)) return false;
+      llvm::TypeSize typeSize = dl.getTypeSize(storageType);
+      if (typeSize.isScalable()) return false;
+      uint64_t byteSize = typeSize.getFixedValue();
+      if (slotStrideBytes > 0) {
+        if (byteSize > static_cast<uint64_t>(slotStrideBytes)) return false;
+        slotByteOffsets[s] = s * static_cast<uint64_t>(slotStrideBytes);
+        runningOffset = (s + 1) * static_cast<uint64_t>(slotStrideBytes);
+      } else {
+        uint64_t align = std::max<uint64_t>(1, dl.getTypeABIAlignment(storageType));
+        uint64_t aligned = llvm::alignTo(runningOffset, align);
+        slotByteOffsets[s] = aligned;
+        runningOffset = aligned + byteSize;
+      }
+    }
+    if (outFrameBytes) *outFrameBytes = runningOffset;
+  }
+
+  auto buildSlotPtr = [&](OpBuilder &builder, Location loc, size_t slotIdx) -> Value {
+    uint64_t offset = slotByteOffsets[slotIdx];
+    if (offset == 0) return framePtr;
+    Type ptrType = LLVM::LLVMPointerType::get(func->getContext());
+    Type i8Type = builder.getI8Type();
+    if (offset <= static_cast<uint64_t>(INT32_MAX)) {
+      return LLVM::GEPOp::create(builder, loc, ptrType, i8Type, framePtr,
+                                 ArrayRef<LLVM::GEPArg>{static_cast<int32_t>(offset)})
+          .getRes();
+    }
+    Value dynIdx = LLVM::ConstantOp::create(builder, loc, builder.getI64Type(),
+                                            builder.getI64IntegerAttr(offset))
+                       .getRes();
+    return LLVM::GEPOp::create(builder, loc, ptrType, i8Type, framePtr,
+                               ArrayRef<LLVM::GEPArg>{dynIdx})
+        .getRes();
+  };
 
   // 1. Insert save operations immediately before each safepoint.
   for (size_t i = 0; i < numSafepoints; ++i) {
     Operation *sp = sps[i];
     OpBuilder builder(sp);
+    Location loc = sp->getLoc();
     for (size_t k = 0; k < coloring.liveAt[i].size(); ++k) {
-      OperationState saveState(sp->getLoc(), unwrap(saveOpName));
-      saveState.addOperands(coloring.liveAt[i][k]);
-      saveState.addAttribute("slot", builder.getI64IntegerAttr(coloring.slotsAt[i][k]));
-      saveState.addAttribute("safepoint", builder.getI64IntegerAttr(i + 1));
-      builder.create(saveState);
+      if (useFramePtr) {
+        Value liveVal = coloring.liveAt[i][k];
+        if (liveVal.getType().isIndex()) {
+          liveVal = arith::IndexCastOp::create(builder, loc, builder.getI64Type(), liveVal);
+        }
+        Value slotPtr = buildSlotPtr(builder, loc, coloring.slotsAt[i][k]);
+        LLVM::StoreOp::create(builder, loc, liveVal, slotPtr);
+      } else {
+        OperationState saveState(loc, unwrap(saveOpName));
+        saveState.addOperands(coloring.liveAt[i][k]);
+        saveState.addAttribute("slot", builder.getI64IntegerAttr(coloring.slotsAt[i][k]));
+        saveState.addAttribute("safepoint", builder.getI64IntegerAttr(i + 1));
+        builder.create(saveState);
+      }
     }
   }
 
@@ -492,12 +555,23 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
     Location loc = sps[i]->getLoc();
     for (size_t k = 0; k < coloring.liveAt[i].size(); ++k) {
       Value origVal = coloring.liveAt[i][k];
-      OperationState loadState(loc, unwrap(loadOpName));
-      loadState.addTypes(origVal.getType());
-      loadState.addAttribute("slot", builder.getI64IntegerAttr(coloring.slotsAt[i][k]));
-      loadState.addAttribute("safepoint", builder.getI64IntegerAttr(i + 1));
-      Operation *loadOp = builder.create(loadState);
-      reloadedAt[i].push_back(loadOp->getResult(0));
+      if (useFramePtr) {
+        Type origType = origVal.getType();
+        Type loadType = origType.isIndex() ? Type(builder.getI64Type()) : origType;
+        Value slotPtr = buildSlotPtr(builder, loc, coloring.slotsAt[i][k]);
+        Value loaded = LLVM::LoadOp::create(builder, loc, loadType, slotPtr).getRes();
+        if (origType.isIndex()) {
+          loaded = arith::IndexCastOp::create(builder, loc, origType, loaded);
+        }
+        reloadedAt[i].push_back(loaded);
+      } else {
+        OperationState loadState(loc, unwrap(loadOpName));
+        loadState.addTypes(origVal.getType());
+        loadState.addAttribute("slot", builder.getI64IntegerAttr(coloring.slotsAt[i][k]));
+        loadState.addAttribute("safepoint", builder.getI64IntegerAttr(i + 1));
+        Operation *loadOp = builder.create(loadState);
+        reloadedAt[i].push_back(loadOp->getResult(0));
+      }
     }
   }
 
@@ -516,6 +590,7 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
   }
 
   // 4. Replace the temporary branch + safepoint in each preBlock with a suspend return.
+  bool isLLVMFunc = isa<LLVM::LLVMFuncOp>(func);
   SmallVector<Type> funcResTypes;
   if (auto fnOp = dyn_cast<FunctionOpInterface>(func)) {
     llvm::append_range(funcResTypes, fnOp.getResultTypes());
@@ -527,13 +602,23 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
     OpBuilder builder(tempBr);
     if (funcResTypes.size() == 1 && isa<IntegerType, IndexType>(funcResTypes[0])) {
       Type retType = funcResTypes[0];
-      Attribute stateAttr = retType.isIndex()
-                                ? static_cast<Attribute>(builder.getIndexAttr(i + 1))
-                                : static_cast<Attribute>(builder.getIntegerAttr(retType, i + 1));
-      Value stateVal = arith::ConstantOp::create(builder, loc, retType, cast<TypedAttr>(stateAttr));
-      func::ReturnOp::create(builder, loc, ValueRange{stateVal});
-    } else if (funcResTypes.empty()) {
-      func::ReturnOp::create(builder, loc);
+      if (isLLVMFunc) {
+        Value stateVal =
+            LLVM::ConstantOp::create(builder, loc, retType, builder.getIntegerAttr(retType, i + 1)).getRes();
+        LLVM::ReturnOp::create(builder, loc, ValueRange{stateVal});
+      } else {
+        Attribute stateAttr = retType.isIndex()
+                                  ? static_cast<Attribute>(builder.getIndexAttr(i + 1))
+                                  : static_cast<Attribute>(builder.getIntegerAttr(retType, i + 1));
+        Value stateVal = arith::ConstantOp::create(builder, loc, retType, cast<TypedAttr>(stateAttr));
+        func::ReturnOp::create(builder, loc, ValueRange{stateVal});
+      }
+    } else if (funcResTypes.empty() ||
+               (funcResTypes.size() == 1 && isa<LLVM::LLVMVoidType>(funcResTypes[0]))) {
+      if (isLLVMFunc)
+        LLVM::ReturnOp::create(builder, loc, ValueRange{});
+      else
+        func::ReturnOp::create(builder, loc);
     } else {
       return false;
     }

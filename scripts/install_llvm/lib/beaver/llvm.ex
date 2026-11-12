@@ -94,8 +94,7 @@ defmodule Beaver.LLVM do
 
       _ ->
         if opts[:require_artifact],
-          do:
-            Mix.raise("selected upstream LLVM CI artifact unavailable; refusing source fallback")
+          do: Mix.raise("selected upstream LLVM CI artifact unavailable; refusing source fallback")
 
         IO.puts("Pinned CI artifact unavailable; building the same LLVM source revision.")
         build!(metadata["source_ref"], stage, opts)

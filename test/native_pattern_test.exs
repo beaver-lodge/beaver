@@ -34,9 +34,7 @@ defmodule NativePatternTest do
         rhs_value = MLIR.Attribute.value(rhs_value_attribute)
 
         mlir ctx: ctx, ip: base do
-          replacement =
-            Arith.constant(value: Attribute.integer(Type.i64(), lhs_value + rhs_value)) >>>
-              Type.i64()
+          replacement = Arith.constant(value: Attribute.integer(Type.i64(), lhs_value + rhs_value)) >>> Type.i64()
 
           MLIR.RewriterBase.replace_op(base, operation, [replacement])
         end
@@ -59,8 +57,7 @@ defmodule NativePatternTest do
         ctx = MLIR.context(operation)
 
         mlir ctx: ctx, ip: base do
-          replacement =
-            Arith.constant(value: Attribute.integer(Type.i64(), 999)) >>> Type.i64()
+          replacement = Arith.constant(value: Attribute.integer(Type.i64(), 999)) >>> Type.i64()
 
           MLIR.RewriterBase.replace_op(base, operation, [replacement])
         end
@@ -71,18 +68,15 @@ defmodule NativePatternTest do
       end
     end
 
-    defrewrite invalid_outcome(_operation, _rewriter, _state),
-      root: Arith.constant() do
+    defrewrite invalid_outcome(_operation, _rewriter, _state), root: Arith.constant() do
       :invalid_outcome_value
     end
 
-    defrewrite raise_in_callback(_operation, _rewriter, state),
-      root: Arith.addi() do
+    defrewrite raise_in_callback(_operation, _rewriter, state), root: Arith.addi() do
       raise "native rewrite boom: #{inspect(state)}"
     end
 
-    defrewrite probe_borrowed_rewriter(_operation, rewriter, state),
-      root: Arith.addi() do
+    defrewrite probe_borrowed_rewriter(_operation, rewriter, state), root: Arith.addi() do
       {test_pid, count} = state
       %MLIR.PatternRewriter{} = rewriter
       %MLIR.RewriterBase{} = MLIR.PatternRewriter.as_base(rewriter)
@@ -94,9 +88,7 @@ defmodule NativePatternTest do
   defmodule MismatchPatterns do
     use Beaver.Pattern.Native
 
-    defrewrite expect_three_operands(_operation, _rewriter, test_pid),
-      root: "arith.addi",
-      operands: [_a, _b, _c] do
+    defrewrite expect_three_operands(_operation, _rewriter, test_pid), root: "arith.addi", operands: [_a, _b, _c] do
       send(test_pid, :unexpected_operand_match)
       :no_match
     end
@@ -112,9 +104,7 @@ defmodule NativePatternTest do
   defmodule StateTracker do
     def construct(state), do: state
 
-    def destruct({test_pid, final_state}) do
-      send(test_pid, {:destruct_state, final_state})
-    end
+    def destruct({test_pid, final_state}), do: send(test_pid, {:destruct_state, final_state})
   end
 
   defp create_add_ir(ctx, lhs, rhs) do
@@ -137,13 +127,11 @@ defmodule NativePatternTest do
 
   test "descriptor defaults, validation, and builder options" do
     descriptor = TestNativePatterns.fold_const_add()
-
     assert %Beaver.Pattern.Native.Descriptor{} = descriptor
     assert descriptor.name == :fold_const_add
     assert descriptor.root == "arith.addi"
     assert descriptor.benefit == 2
     assert descriptor.init_state == nil
-
     overridden = TestNativePatterns.fold_const_add(benefit: 10, init_state: :custom)
     assert overridden.benefit == 10
     assert overridden.init_state == :custom
@@ -152,9 +140,7 @@ defmodule NativePatternTest do
       TestNativePatterns.fold_const_add(unknown: true)
     end
 
-    assert_raise ArgumentError, ~r/non-negative integer/, fn ->
-      TestNativePatterns.fold_const_add(benefit: -1)
-    end
+    assert_raise ArgumentError, ~r/non-negative integer/, fn -> TestNativePatterns.fold_const_add(benefit: -1) end
   end
 
   test "invalid declarations fail while the macro is expanded" do
@@ -165,15 +151,11 @@ defmodule NativePatternTest do
         end
       end
 
-    assert_raise ArgumentError, ~r/requires the :root option/, fn ->
-      Macro.expand_once(missing_root, __ENV__)
-    end
+    assert_raise ArgumentError, ~r/requires the :root option/, fn -> Macro.expand_once(missing_root, __ENV__) end
 
     invalid_operands =
       quote do
-        Native.defrewrite broken(operation, rewriter, state),
-          root: "arith.addi",
-          operands: :not_a_list do
+        Native.defrewrite broken(operation, rewriter, state), root: "arith.addi", operands: :not_a_list do
           {operation, rewriter, state}
         end
       end
@@ -184,8 +166,7 @@ defmodule NativePatternTest do
 
     destructured_argument =
       quote do
-        Native.defrewrite broken(operation, rewriter, {_pid, _count}),
-          root: "arith.addi" do
+        Native.defrewrite broken(operation, rewriter, {_pid, _count}), root: "arith.addi" do
           :no_match
         end
       end
@@ -203,14 +184,7 @@ defmodule NativePatternTest do
       enable_constant_cse: false
     )
 
-    assert Enum.any?(function_operations(ir), fn operation ->
-             if MLIR.Operation.name(operation) == Arith.constant() do
-               {:ok, attribute} = MLIR.Operation.fetch(operation, "value")
-               MLIR.Attribute.value(attribute) == 30
-             else
-               false
-             end
-           end)
+    assert_constant(ir, 30)
 
     MLIR.verify!(ir)
   end
@@ -246,11 +220,9 @@ defmodule NativePatternTest do
       )
 
     MLIR.RewritePatternSet.add(set, descriptor, ctx: ctx)
-
     frozen_set = MLIR.RewritePatternSet.freeze(set)
     MLIR.Rewrite.apply_patterns!(ir, frozen_set)
     MLIR.FrozenRewritePatternSet.threaded_destroy(ctx, frozen_set)
-
     assert_received {:destruct_state, 1}
     MLIR.verify!(ir)
   end
@@ -260,9 +232,7 @@ defmodule NativePatternTest do
 
     log =
       capture_log(fn ->
-        MLIR.Rewrite.apply_patterns!(
-          ir,
-          [TestNativePatterns.raise_in_callback(init_state: :test_state)],
+        MLIR.Rewrite.apply_patterns!(ir, [TestNativePatterns.raise_in_callback(init_state: :test_state)],
           enable_folding: false,
           enable_constant_cse: false
         )
@@ -282,10 +252,7 @@ defmodule NativePatternTest do
         destruct: fn {test_pid, count} -> send(test_pid, {:probe_destruct, count}) end
       )
 
-    MLIR.Rewrite.apply_patterns!(ir, [descriptor],
-      enable_folding: false,
-      enable_constant_cse: false
-    )
+    MLIR.Rewrite.apply_patterns!(ir, [descriptor], enable_folding: false, enable_constant_cse: false)
 
     assert_received {:rewriter_usable_in_callback, callback_pid}
     refute callback_pid == self()
@@ -305,24 +272,22 @@ defmodule NativePatternTest do
   test "a descriptor can be added directly to a rewrite pattern set", %{ctx: ctx} do
     ir = create_add_ir(ctx, 7, 8)
     set = MLIR.RewritePatternSet.create(ctx)
-
     MLIR.RewritePatternSet.add(set, TestNativePatterns.fold_const_add(), ctx: ctx)
 
-    MLIR.Rewrite.apply_patterns!(ir, set,
-      enable_folding: false,
-      enable_constant_cse: false
-    )
+    MLIR.Rewrite.apply_patterns!(ir, set, enable_folding: false, enable_constant_cse: false)
 
+    assert_constant(ir, 15)
+
+    MLIR.verify!(ir)
+  end
+
+  defp assert_constant(ir, expected) do
     assert Enum.any?(function_operations(ir), fn operation ->
              if MLIR.Operation.name(operation) == Arith.constant() do
                {:ok, attribute} = MLIR.Operation.fetch(operation, "value")
-               MLIR.Attribute.value(attribute) == 15
-             else
-               false
+               MLIR.Attribute.value(attribute) == expected
              end
            end)
-
-    MLIR.verify!(ir)
   end
 
   defp function_operations(ir) do

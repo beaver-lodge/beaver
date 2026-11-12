@@ -5,11 +5,7 @@ defmodule FixedPointPassTest do
 
   test "declares deterministic fail-closed fixed-point pipelines" do
     fixed_point =
-      MLIR.Transform.composite_fixed_point(
-        name: "Canonical closure",
-        pipeline: ["canonicalize"],
-        max_iterations: 7
-      )
+      MLIR.Transform.composite_fixed_point(name: "Canonical closure", pipeline: ["canonicalize"], max_iterations: 7)
 
     assert %MLIR.Transform.FixedPoint{
              name: "Canonical closure",
@@ -30,13 +26,11 @@ defmodule FixedPointPassTest do
       MLIR.Transform.composite_fixed_point(pipeline: ["canonicalize"], max_iterations: 0)
     end
 
-    assert_raise ArgumentError,
-                 ":on_convergence_failure must be :warn, :error, or :silent",
-                 fn ->
-                   apply(MLIR.Transform, :composite_fixed_point, [
-                     [pipeline: ["canonicalize"], on_convergence_failure: :continue]
-                   ])
-                 end
+    assert_raise ArgumentError, ":on_convergence_failure must be :warn, :error, or :silent", fn ->
+      apply(MLIR.Transform, :composite_fixed_point, [
+        [pipeline: ["canonicalize"], on_convergence_failure: :continue]
+      ])
+    end
   end
 
   test "fails the pass manager when a pipeline does not converge", %{ctx: ctx} do
@@ -81,9 +75,6 @@ defmodule FixedPointPassTest do
     assert {:error, diagnostics} = Beaver.Composer.run(composer)
     assert MLIR.Diagnostic.format(diagnostics) =~ ~r/Toggle.*didn't converge.*2 iterations/s
 
-    assert MLIR.Operation.discardable_attribute(
-             MLIR.Operation.from_module(module),
-             "test.after_fixed_point"
-           ) == nil
+    assert MLIR.Operation.discardable_attribute(MLIR.Operation.from_module(module), "test.after_fixed_point") == nil
   end
 end

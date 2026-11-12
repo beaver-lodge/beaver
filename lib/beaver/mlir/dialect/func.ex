@@ -1,23 +1,15 @@
 defmodule Beaver.MLIR.Dialect.Func do
-  @moduledoc """
-  This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect.
-  """
-  use Beaver.MLIR.Dialect,
-    dialect: "func",
-    ops: Beaver.MLIR.Dialect.Registry.ops("func")
+  @moduledoc "This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect."
+  use Beaver.MLIR.Dialect, dialect: "func", ops: Beaver.MLIR.Dialect.Registry.ops("func")
 
-  @doc """
-  Syntax sugar for `Func.func` SSA expression. No need to specify result types.
-  """
+  @doc "Syntax sugar for `Func.func` SSA expression. No need to specify result types."
   defmacro func(call, opts) do
     quote do
       Beaver.MLIR.Dialect.Func.func_like(unquote(call), Beaver.MLIR.Dialect.Func.func(), unquote(opts))
     end
   end
 
-  @doc """
-  Syntax sugar for `Func.func` alike SSA expression. No need to specify result types.
-  """
+  @doc "Syntax sugar for `Func.func` alike SSA expression. No need to specify result types."
   defmacro func_like(call, op, do: body) do
     {func_name, args} = call |> Macro.decompose_call()
 

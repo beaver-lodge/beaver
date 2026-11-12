@@ -3,25 +3,21 @@ alias Beaver.Native
 
 defmodule Beaver.MLIR.TypeConverter do
   @moduledoc """
-  An owning MLIR type converter whose Elixir callbacks are safe across native
-  worker threads, process termination, and NIF upgrades.
+  An owning MLIR type converter whose Elixir callbacks are safe across native worker threads, process termination,
+  and NIF upgrades.
 
-  Conversion callbacks may return one type (1:1), multiple types (1:N), an
-  empty list (type erasure), `:declined`, or `{:error, reason}`.
+  Conversion callbacks may return one type (1:1), multiple types (1:N), an empty list (type erasure), `:declined`,
+  or `{:error, reason}`.
   """
 
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native, fields: [registration: nil, timeout_ms: 30_000]
 
   alias Beaver.MLIR
 
-  @type conversion_result() ::
-          Type.t() | {:ok, Type.t()} | :declined | {:error, term()}
-  @type one_to_n_result() ::
-          [Type.t()] | {:ok, [Type.t()]} | :declined | {:error, term()}
-  @type materialization_result() ::
-          Value.t() | {:ok, Value.t()} | :declined | {:error, term()}
-  @type one_to_n_materialization_result() ::
-          [Value.t()] | {:ok, [Value.t()]} | :declined | {:error, term()}
+  @type conversion_result() :: Type.t() | {:ok, Type.t()} | :declined | {:error, term()}
+  @type one_to_n_result() :: [Type.t()] | {:ok, [Type.t()]} | :declined | {:error, term()}
+  @type materialization_result() :: Value.t() | {:ok, Value.t()} | :declined | {:error, term()}
+  @type one_to_n_materialization_result() :: [Value.t()] | {:ok, [Value.t()]} | :declined | {:error, term()}
 
   @callbacks [
     {:conversion, :add_conversion, quote(do: (Type.t() -> conversion_result())), 1},
@@ -49,9 +45,7 @@ defmodule Beaver.MLIR.TypeConverter do
     end
 
     timeout_ms = Beaver.Execution.callback_timeout!(opts)
-
     {:managed_type_converter, converter_term, registration} = CAPI.beaver_raw_type_converter_create()
-
     %__MODULE__{ref: ref} = Native.check!(converter_term)
     converter = %__MODULE__{ref: ref, registration: registration, timeout_ms: timeout_ms}
 
@@ -79,10 +73,9 @@ defmodule Beaver.MLIR.TypeConverter do
   @doc """
   Adds a native, callback-free mapping from any source type to one target type.
 
-  All types must belong to the same context used by the conversion. The map is
-  stored by the native converter and does not invoke the BEAM while MLIR asks
-  repeated type-conversion questions. `:fallback` is `:identity` by default;
-  use `:declined` to let a later converter callback handle unmatched types.
+  All types must belong to the same context used by the conversion. The map is stored by the native converter and
+  does not invoke the BEAM while MLIR asks repeated type-conversion questions. `:fallback` is `:identity` by
+  default; use `:declined` to let a later converter callback handle unmatched types.
   """
   @spec add_conversion_map(t(), [Type.t()], Type.t(), keyword()) :: t()
   def add_conversion_map(converter, sources, target, opts \\ [])
@@ -124,6 +117,19 @@ defmodule Beaver.MLIR.TypeConverter do
     await_conversion(id, converter.timeout_ms, nil)
   end
 
+  @doc "Converts `type` with `converter`, returning the converted `Type.t()` or raising `ArgumentError`."
+  @spec convert!(t(), Type.t()) :: Type.t()
+  def convert!(%__MODULE__{} = converter, %Type{} = type) do
+    case convert(converter, type) do
+      {:ok, converted} ->
+        converted
+
+      {:error, reason} ->
+        raise ArgumentError,
+              "TypeConverter failed to convert #{MLIR.to_string(type)}: #{inspect(reason)}"
+    end
+  end
+
   defp await_conversion(id, timeout_ms, callback_failure) do
     receive do
       {^id, {{:ok, result}, nil}} ->
@@ -148,10 +154,8 @@ defmodule Beaver.MLIR.TypeConverter do
   defp finish_conversion(result, nil), do: {:ok, Native.check!(result)}
 
   @spec destroy(t()) :: :ok
-  def destroy(%__MODULE__{registration: registration}),
-    do: CAPI.beaver_raw_type_converter_destroy(registration)
+  def destroy(%__MODULE__{registration: registration}), do: CAPI.beaver_raw_type_converter_destroy(registration)
 
   @spec with(keyword(), (t() -> result)) :: result when result: var
-  def with(opts \\ [], fun) when is_function(fun, 1),
-    do: Beaver.Native.with_resource(create(opts), &destroy/1, fun)
+  def with(opts \\ [], fun) when is_function(fun, 1), do: Beaver.Native.with_resource(create(opts), &destroy/1, fun)
 end

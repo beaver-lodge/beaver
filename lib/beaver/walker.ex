@@ -9,14 +9,12 @@ defmodule Beaver.Walker do
   @behaviour Access
 
   @moduledoc """
-  Enumerable and Access views over MLIR operations, values, attributes, regions
-  and blocks. For example, `operands(op)[0]` reads an operand and
-  `attributes(op)[:name]` reads an attribute.
+  Enumerable and Access views over MLIR operations, values, attributes, regions and blocks. For example,
+  `operands(op)[0]` reads an operand and `attributes(op)[:name]` reads an attribute.
 
-  `prewalk/2,3` and `postwalk/2,3` traverse depth-first, before or after children.
-  Callbacks should inspect IR; collect changes and apply them afterward with
-  `MLIR.IRRewriter`, or use `MLIR.PatternRewriter` within a rewrite pattern.
-  Mutating during traversal can invalidate borrowed handles.
+  `prewalk/2,3` and `postwalk/2,3` traverse depth-first, before or after children. Callbacks should inspect IR;
+  collect changes and apply them afterward with `MLIR.IRRewriter`, or use `MLIR.PatternRewriter` within a rewrite
+  pattern. Mutating during traversal can invalidate borrowed handles.
   """
   @type operation() :: Module.t() | Operation.t()
   @type container() :: operation() | Region.t() | Block.t() | NamedAttribute.t()
@@ -93,13 +91,10 @@ defmodule Beaver.Walker do
   @doc """
   Returns inherent attributes followed by discardable attributes.
 
-  Prefer `inherent_attributes/1` or `discardable_attributes/1` when the
-  distinction is semantically relevant.
+  Prefer `inherent_attributes/1` or `discardable_attributes/1` when the distinction is semantically relevant.
   """
   def attributes(op) do
-    new(
-      op,
-      {Identifier, Attribute},
+    new(op, {Identifier, Attribute},
       get_num: fn operation ->
         native_integer(CAPI.beaverOperationGetNumInherentAttributes(operation)) +
           native_integer(CAPI.mlirOperationGetNumDiscardableAttributes(operation))
@@ -139,9 +134,7 @@ defmodule Beaver.Walker do
   defp native_integer(value) when is_integer(value), do: value
   defp native_integer(value), do: Native.to_term(value)
 
-  @doc """
-  Returns an enumerable of the arguments of an `Block.t()`
-  """
+  @doc "Returns an enumerable of the arguments of an `Block.t()`"
   @spec arguments(Block.t()) :: Enumerable.t()
   def arguments(%Block{} = block),
     do: new(block, Value, get_num: &CAPI.mlirBlockGetNumArguments/1, get_element: &CAPI.mlirBlockGetArgument/2)
@@ -198,8 +191,8 @@ defmodule Beaver.Walker do
   @type mlir() :: container() | element()
 
   @doc """
-  Traverses operations, regions and blocks like `Macro.traverse/4`. `pre` runs
-  before children and `post` after them; keep mutation outside the traversal.
+  Traverses operations, regions and blocks like `Macro.traverse/4`. `pre` runs before children and `post` after
+  them; keep mutation outside the traversal.
   """
   @spec traverse(mlir(), any(), (mlir(), any() -> {mlir(), any()}), (mlir(), any() -> {mlir(), any()})) ::
           {mlir(), any()}
@@ -209,8 +202,7 @@ defmodule Beaver.Walker do
   end
 
   # traverse the nested with the walker
-  defp do_traverse(%__MODULE__{} = walker, acc, pre, post),
-    do: do_traverse(Enum.to_list(walker), acc, pre, post)
+  defp do_traverse(%__MODULE__{} = walker, acc, pre, post), do: do_traverse(Enum.to_list(walker), acc, pre, post)
 
   defp do_traverse(list, acc, pre, post) when is_list(list),
     do: :lists.mapfoldl(fn x, acc -> do_traverse(x, acc, pre, post) end, acc, list)
@@ -272,6 +264,61 @@ defmodule Beaver.Walker do
   @spec postwalk(mlir(), any, (mlir(), any -> {mlir(), any})) :: {mlir(), any}
   def postwalk(ast, acc, fun) when is_function(fun, 2), do: traverse(ast, acc, fn x, a -> {x, a} end, fun)
 
+  @type op_matcher() ::
+          :all | String.t() | atom() | [String.Chars.t()] | MapSet.t() | (Operation.t() -> as_boolean(term()))
+
+  @doc """
+  Finds operations inside `root` (`MLIR.Module`, `MLIR.Operation`, `MLIR.Region`, or `MLIR.Block`)
+  in pre-order without traversing operands, results, attributes, or successors.
+
+  `matcher` may be `:all`, an operation name (`"arith.addi"`), a list or `MapSet` of operation names,
+  or a 1-arity predicate `(Operation.t() -> boolean())`.
+
+  Options:
+    * `:exclude_root` - when `true`, skips `root` itself (default `false`; note that when `root`
+      is an `MLIR.Module`, `builtin.module` is skipped when `exclude_root: true`).
+  """
+  @spec find_ops(Module.t() | Operation.t() | Region.t() | Block.t(), op_matcher(), keyword()) :: [Operation.t()]
+  def find_ops(root, matcher \\ :all, opts \\ []) when is_list(opts) do
+    predicate = build_op_predicate!(matcher)
+    exclude_root = Keyword.get(opts, :exclude_root, false)
+    container = extract_container(root)
+
+    children =
+      case container do
+        %Operation{} = op when exclude_root -> Enum.to_list(regions(op))
+        node -> [node]
+      end
+
+    collect_ops(children, [], predicate) |> Enum.reverse()
+  end
+
+  defp build_op_predicate!(:all), do: fn _op -> true end
+  defp build_op_predicate!(fun) when is_function(fun, 1), do: fn op -> if(fun.(op), do: true, else: false) end
+
+  defp build_op_predicate!(names) when is_binary(names) or is_atom(names), do: build_op_predicate!([names])
+
+  defp build_op_predicate!(names) when is_list(names) or is_struct(names, MapSet) do
+    names = MapSet.new(names, &to_string/1)
+    fn op -> MapSet.member?(names, Operation.name(op)) end
+  end
+
+  defp build_op_predicate!(other),
+    do: raise(ArgumentError, "invalid Walker.find_ops matcher: #{inspect(other)}")
+
+  defp collect_ops(nodes, acc, predicate) do
+    Enum.reduce(nodes, acc, fn
+      %Operation{} = node, acc ->
+        collect_ops(regions(node), if(predicate.(node), do: [node | acc], else: acc), predicate)
+
+      %Region{} = node, acc ->
+        collect_ops(blocks(node), acc, predicate)
+
+      %Block{} = node, acc ->
+        collect_ops(operations(node), acc, predicate)
+    end)
+  end
+
   defimpl Enumerable do
     @spec count(Beaver.Walker.t()) :: {:ok, non_neg_integer()} | {:error, module()}
     def count(%Beaver.Walker{container: container, get_num: get_num})
@@ -282,13 +329,11 @@ defmodule Beaver.Walker do
 
     def count(%Beaver.Walker{}), do: {:error, __MODULE__}
 
-    @spec member?(Beaver.Walker.t(), Beaver.Walker.element()) ::
-            {:ok, boolean()} | {:error, module()}
+    @spec member?(Beaver.Walker.t(), Beaver.Walker.element()) :: {:ok, boolean()} | {:error, module()}
     def member?(%Beaver.Walker{element_module: element_module} = walker, %element_module{} = element),
       do: {:ok, Enum.any?(walker, &MLIR.equal?(&1, element))}
 
-    @spec slice(Beaver.Walker.t()) ::
-            {:ok, size :: non_neg_integer(), Enumerable.slicing_fun()} | {:error, module()}
+    @spec slice(Beaver.Walker.t()) :: {:ok, size :: non_neg_integer(), Enumerable.slicing_fun()} | {:error, module()}
     def slice(walker = %Beaver.Walker{container: container, get_element: get_element})
         when is_function(get_element, 2) do
       case count(walker) do
@@ -301,11 +346,7 @@ defmodule Beaver.Walker do
         when is_function(get_first, 1) and is_function(get_next, 1), do: {:error, __MODULE__}
 
     defp slicing_fun(container, get_element),
-      do: fn start, length, step ->
-        for pos <- start..(start + length - 1)//step do
-          get_element.(container, pos)
-        end
-      end
+      do: fn start, length, step -> for pos <- start..(start + length - 1)//step, do: get_element.(container, pos) end
 
     @spec reduce(Beaver.Walker.t(), Enumerable.acc(), Enumerable.reducer()) :: Enumerable.result()
 
@@ -314,8 +355,7 @@ defmodule Beaver.Walker do
 
     def reduce(walker, {:suspend, acc}, fun), do: {:suspended, acc, &reduce(walker, &1, fun)}
 
-    def reduce(%Beaver.Walker{this: nil} = walker, {:cont, acc}, fun),
-      do: reduce(initialize(walker), {:cont, acc}, fun)
+    def reduce(%Beaver.Walker{this: nil} = walker, {:cont, acc}, fun), do: reduce(initialize(walker), {:cont, acc}, fun)
 
     def reduce(walker, {:cont, acc}, fun) do
       case next(walker) do

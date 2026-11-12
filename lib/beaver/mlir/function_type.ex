@@ -1,9 +1,7 @@
 alias Beaver.MLIR.CAPI
 
 defmodule Beaver.MLIR.FunctionType do
-  @moduledoc """
-  This module provides utilities for MLIR function type.
-  """
+  @moduledoc "This module provides utilities for MLIR function type."
   import CAPI
 
   defdelegate input(type, pos), to: CAPI, as: :mlirFunctionTypeGetInput

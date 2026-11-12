@@ -4,9 +4,8 @@ defmodule Beaver.MLIR.Conversion.Profile do
   @moduledoc """
   Builds a bounded receipt for one dialect conversion.
 
-  Profiling is explicit: ordinary conversion does not allocate callback
-  aggregates or walk the IR inventory. The receipt retains one aggregate per
-  callback kind and conversion-pattern root, never one record per callback
+  Profiling is explicit: ordinary conversion does not allocate callback aggregates or walk the IR inventory. The
+  receipt retains one aggregate per callback kind and conversion-pattern root, never one record per callback
   invocation.
   """
 
@@ -35,8 +34,7 @@ defmodule Beaver.MLIR.Conversion.Profile do
     }
 
   @doc false
-  @spec record_callback(state(), atom(), String.t() | nil, non_neg_integer(), non_neg_integer()) ::
-          state()
+  @spec record_callback(state(), atom(), String.t() | nil, non_neg_integer(), non_neg_integer()) :: state()
   def record_callback(state, kind, root_name, service_ns, native_wait_ns)
       when is_atom(kind) and (is_binary(root_name) or is_nil(root_name)) and service_ns >= 0 and
              native_wait_ns >= service_ns do
@@ -63,8 +61,7 @@ defmodule Beaver.MLIR.Conversion.Profile do
   end
 
   @doc false
-  @spec finish(state(), MLIR.Conversion.result(), MLIR.Conversion.conversion_ir(), term()) ::
-          receipt()
+  @spec finish(state(), MLIR.Conversion.result(), MLIR.Conversion.conversion_ir(), term()) :: receipt()
   def finish(state, result, ir, native_profile) do
     memory_after = process_memory_bytes()
     process_cpu_time_after_ns = CAPI.beaver_raw_process_cpu_time()
@@ -75,9 +72,7 @@ defmodule Beaver.MLIR.Conversion.Profile do
     max_native_wait_ns = Enum.max(Enum.map(callbacks, & &1["max_native_wait_ns"]), fn -> 0 end)
     beam_service_ns = Enum.sum(Enum.map(callbacks, & &1["beam_service_ns"]))
     boundary_overhead_sum_ns = max(native_wait_ns - beam_service_ns, 0)
-
     unattributed_residual_ns = max(native.duration_ns - native.target_lock_wait_ns - native_wait_ns, 0)
-
     hotspots = hotspots(callbacks, unattributed_residual_ns, native.target_lock_wait_ns)
 
     %{
@@ -168,7 +163,6 @@ defmodule Beaver.MLIR.Conversion.Profile do
   defp inventory(ir) do
     operation = MLIR.Operation.from_module(ir)
     {operations, modules, functions} = CAPI.beaver_raw_operation_inventory(operation.ref)
-
     %{"operations" => operations, "modules" => modules, "functions" => functions}
   end
 

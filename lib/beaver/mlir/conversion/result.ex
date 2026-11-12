@@ -2,14 +2,13 @@ defmodule Beaver.MLIR.Conversion.Result do
   @moduledoc """
   A conversion outcome with mutation and legalization information.
 
-  `legalizable` (analysis mode) and `unlegalized` (partial mode) contain copied
-  name/location/preorder-index snapshots of original operations, never dangling
-  operation handles. Partial conversion may stop at an explicitly illegal op;
-  `unlegalized_complete?` is then false. Full conversion does not collect a
-  legalization inventory. Analysis mode always rolls back speculative changes.
+  `legalizable` (analysis mode) and `unlegalized` (partial mode) contain copied name/location/preorder-index
+  snapshots of original operations, never dangling operation handles. Partial conversion may stop at an explicitly
+  illegal op; `unlegalized_complete?` is then false. Full conversion does not collect a legalization inventory.
+  Analysis mode always rolls back speculative changes.
 
-  Mutation reporting covers edits made through the conversion rewriter. Native
-  rollback cannot undo arbitrary side effects performed by user callbacks.
+  Mutation reporting covers edits made through the conversion rewriter. Native rollback cannot undo arbitrary side
+  effects performed by user callbacks.
   """
   defstruct [
     :ir,

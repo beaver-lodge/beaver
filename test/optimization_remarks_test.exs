@@ -7,25 +7,15 @@ defmodule OptimizationRemarksTest do
     ref = OptimizationRemarks.attach(ctx, filters: [passed: "beaver"])
     loc = Location.unknown(ctx: ctx)
 
-    assert OptimizationRemarks.emit(loc, :passed, "fold",
-             args: [value: "你好\0quoted\""],
-             function: "work"
-           )
+    assert OptimizationRemarks.emit(loc, :passed, "fold", args: [value: "你好\0quoted\""], function: "work")
 
     refute OptimizationRemarks.emit(loc, :missed, "filtered")
     refute OptimizationRemarks.emit(loc, :passed, "filtered", category: "other")
     send(self(), :unrelated)
     OptimizationRemarks.finalize(ctx)
 
-    assert [
-             %{
-               "kind" => "passed",
-               "name" => "fold",
-               "function" => "work",
-               "args" => args,
-               "location" => location
-             }
-           ] = OptimizationRemarks.drain(ref)
+    assert [%{"kind" => "passed", "name" => "fold", "function" => "work", "args" => args, "location" => location}] =
+             OptimizationRemarks.drain(ref)
 
     assert ["value", "你好\0quoted\""] in args
     assert is_binary(location)
@@ -46,12 +36,8 @@ defmodule OptimizationRemarksTest do
     end
   end
 
-  test "failed attachment preserves the original engine and releases the rejected receiver", %{
-    ctx: ctx
-  } do
-    assert_raise ArgumentError, ~r/cannot enable/, fn ->
-      OptimizationRemarks.attach(ctx, filters: [all: "["])
-    end
+  test "failed attachment preserves the original engine and releases the rejected receiver", %{ctx: ctx} do
+    assert_raise ArgumentError, ~r/cannot enable/, fn -> OptimizationRemarks.attach(ctx, filters: [all: "["]) end
 
     refute OptimizationRemarks.enabled?(ctx)
     ref = OptimizationRemarks.attach(ctx)
@@ -67,15 +53,12 @@ defmodule OptimizationRemarksTest do
     loc = Location.unknown(ctx: ctx)
 
     1..100
-    |> Task.async_stream(fn n -> assert OptimizationRemarks.emit(loc, :passed, "worker-#{n}") end,
-      max_concurrency: 16
-    )
+    |> Task.async_stream(fn n -> assert OptimizationRemarks.emit(loc, :passed, "worker-#{n}") end, max_concurrency: 16)
     |> Enum.each(fn {:ok, true} -> :ok end)
 
     OptimizationRemarks.finalize(ctx)
 
-    assert OptimizationRemarks.drain(ref) |> Enum.map(& &1["name"]) |> Enum.uniq() |> length() ==
-             100
+    assert OptimizationRemarks.drain(ref) |> Enum.map(& &1["name"]) |> Enum.uniq() |> length() == 100
   end
 
   test "a departed receiver does not prevent context cleanup", %{ctx: ctx} do

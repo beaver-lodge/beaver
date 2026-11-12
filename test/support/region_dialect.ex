@@ -7,9 +7,7 @@ defmodule TestRegion do
   defop sized_region(), regions: {:sized, 11}
   defop empty_args_region(), regions: {:region, args: []}
 
-  defop typed_args_region(),
-    regions: {:region, args: [Beaver.MLIR.Type.i32(), Beaver.MLIR.Type.i64()]}
+  defop typed_args_region(), regions: {:region, args: [Beaver.MLIR.Type.i32(), Beaver.MLIR.Type.i64()]}
 
-  defop sized_typed_region(),
-    regions: {:region, args: [Beaver.MLIR.Type.i32()], size: 2}
+  defop sized_typed_region(), regions: {:region, args: [Beaver.MLIR.Type.i32()], size: 2}
 end

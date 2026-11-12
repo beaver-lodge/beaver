@@ -8,8 +8,7 @@ defmodule Beaver.MLIR.Attribute.Accessor do
   defstruct [:get_num_element, :get_element, :getter]
 
   defp normalize_key(index, num_elements) when is_integer(index) do
-    index =
-      if index < 0, do: num_elements + index, else: index
+    index = if index < 0, do: num_elements + index, else: index
 
     if index >= 0 and index < num_elements, do: {:ok, index}, else: :error
   end
@@ -27,9 +26,7 @@ defmodule Beaver.MLIR.Attribute.Accessor do
 
   defp repack_named_attribute_for_dict(key, update) do
     # if the key is string-like, create NamedAttribute so it can be used to create dictionary
-    if not is_integer(key) and match?(%Attribute{}, update),
-      do: NamedAttribute.get(key, update),
-      else: update
+    if not is_integer(key) and match?(%Attribute{}, update), do: NamedAttribute.get(key, update), else: update
   end
 
   def get_and_update(%__MODULE__{} = accessor, attr, key, fun) do
@@ -166,8 +163,7 @@ defmodule Beaver.MLIR.Attribute.Accessor do
         }
 
       Attribute.strided_layout?(attr) ->
-        offset =
-          mlirStridedLayoutAttrGetOffset(attr) |> MLIR.ShapedType.cast_dynamic_magic_number(:offset)
+        offset = mlirStridedLayoutAttrGetOffset(attr) |> MLIR.ShapedType.cast_dynamic_magic_number(:offset)
 
         %__MODULE__{
           get_num_element: &mlirStridedLayoutAttrGetNumStrides/1,

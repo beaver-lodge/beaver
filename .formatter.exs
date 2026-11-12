@@ -5,6 +5,8 @@ locals_without_parens = [
   defattr: 2,
   defop: 1,
   defop: 2,
+  defops: 1,
+  defops: 2,
   defops: 3,
   defalias: 2,
   defconstraint: 2,
@@ -14,6 +16,7 @@ locals_without_parens = [
 
 # Used by "mix format"
 [
+  line_length: 120,
   locals_without_parens: locals_without_parens,
   inputs: ["{mix,.formatter}.exs", "{config,test,scripts,bench,profile}/**/*.{ex,exs}"],
   subdirectories: ["lib", "native"],

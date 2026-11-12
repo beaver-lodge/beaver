@@ -2,19 +2,17 @@ alias Beaver.MLIR.{Block, Context, Region}
 
 defmodule Beaver.Env do
   @moduledoc """
-  This module defines macros to getting MLIR context, region, block within the do block of mlir/1. It works like __MODULE__/0, __CALLER__/0 of Elixir special forms.
+  This module defines macros to getting MLIR context, region, block within the do block of mlir/1. It works like
+  __MODULE__/0, __CALLER__/0 of Elixir special forms.
   """
   alias Beaver.MLIR
 
-  @doc """
-  Return context in the DSL environment
-  """
+  @doc "Return context in the DSL environment"
   defmacro context() do
     if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_ctx, nil}) do
       quote do
         match?(%Context{}, Kernel.var!(beaver_internal_env_ctx)) ||
-          raise CompileError,
-                Beaver.Env.compile_err_msg(Context, unquote(Macro.escape(__CALLER__)))
+          raise CompileError, Beaver.Env.compile_err_msg(Context, unquote(Macro.escape(__CALLER__)))
 
         Kernel.var!(beaver_internal_env_ctx)
       end
@@ -23,15 +21,12 @@ defmodule Beaver.Env do
     end
   end
 
-  @doc """
-  Return region in the DSL environment
-  """
+  @doc "Return region in the DSL environment"
   defmacro region() do
     if Macro.Env.has_var?(__CALLER__, {:beaver_env_region, nil}) do
       quote do
         match?(%Region{}, Kernel.var!(beaver_env_region)) ||
-          raise CompileError,
-                Beaver.Env.compile_err_msg(Region, unquote(Macro.escape(__CALLER__)))
+          raise CompileError, Beaver.Env.compile_err_msg(Region, unquote(Macro.escape(__CALLER__)))
 
         Kernel.var!(beaver_env_region)
       end
@@ -43,9 +38,7 @@ defmodule Beaver.Env do
     end
   end
 
-  @doc """
-  Return insertion point in the DSL environment
-  """
+  @doc "Return insertion point in the DSL environment"
   defmacro ip() do
     if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_ip, nil}) do
       quote do
@@ -56,9 +49,7 @@ defmodule Beaver.Env do
     end
   end
 
-  @doc """
-  Return block in the DSL environment
-  """
+  @doc "Return block in the DSL environment"
   defmacro block() do
     quote do
       Beaver.Env.block_from_insertion_point(Beaver.Env.ip(), __ENV__)
@@ -73,9 +64,7 @@ defmodule Beaver.Env do
     end
   end
 
-  @doc """
-  Return block with a given name in the DSL environment
-  """
+  @doc "Return block with a given name in the DSL environment"
   defmacro block({var_name, _line, nil} = block_var) do
     if Macro.Env.has_var?(__CALLER__, {var_name, nil}) do
       block_var

@@ -3,26 +3,22 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
 
   # Arity is shared by each declaration group; the public and raw surfaces use
   # this same table, so their exports cannot drift apart.
-  @functions for {arity, names} <- [
-                   {4, ~w(
+  @functions for {arity, names} <- [{4, ~w(
         execution_worker execution_dirty execution_auto
         type_converter_add_conversion_map conversion_populate_structural
         type_converter_reply_callback type_converter_reply_types type_converter_reply_values optimization_remarks_attach
-      )},
-                   {2, ~w(
+      )}, {2, ~w(
         analysis_invalidate analysis_mutation transform_prepare pdl_pattern_add
         callback_reply cuda_module_get_function cuda_memcpy_htod cuda_memcpy_dtoh
         transform_state_payload_ops transform_state_payload_values transform_state_params
         context_attach_diagnostic_handler
         mlir_type_of_enif_obj read_opaque_ptr
-      )},
-                   {3, ~w(
+      )}, {3, ~w(
         callback_reply_code cuda_func_set_attribute cuda_memcpy_dtod compile_llvm_ir_to_ptx
         extract_function_module safepoint_analyze
         conversion_target_add_static jit_invoke_with_terms jit_invoke_with_terms_cpu_bound
         jit_invoke_with_terms_io_bound type_converter_reply_value
-      )},
-                   {1, ~w(
+      )}, {1, ~w(
         analysis_create analysis_close transform_close
         executor_snapshot executor_release
         action_tracing_drain
@@ -37,27 +33,19 @@ defmodule Beaver.MLIR.CAPI.Handwritten do
         unranked_memref_descriptor_deallocate_with_c unranked_memref_descriptor_deallocate_with_enif
         unranked_memref_descriptor_empty unranked_memref_descriptor_get_offset unranked_memref_descriptor_get_rank
         unranked_memref_descriptor_get_sizes unranked_memref_descriptor_get_strides
-      )},
-                   {5, ~w(
+      )}, {5, ~w(
         action_tracing_attach safepoint_lower_resumable
-      )},
-                   {0, ~w(
+      )}, {0, ~w(
         execution_build_mode execution_clock llvm_host_target
         cuda_available cuda_device_count cuda_synchronize triton_register_passes peak_rss process_cpu_time
         enif_functions get_null_ptr string_printer_callback type_converter_create
-      )},
-                   {9, ~w(
+      )}, {9, ~w(
         cuda_launch_kernel
-      )},
-                   {7, ~w(
+      )}, {7, ~w(
         infer_return_types infer_return_type_components compile_to_object
-      )},
-                   {6, ~w(
+      )}, {6, ~w(
         declarative_pattern_add
-      )}
-                 ],
-                 name <- names,
-                 do: {String.to_atom("beaver_raw_" <> name), arity}
+      )}], name <- names, do: {String.to_atom("beaver_raw_" <> name), arity}
 
   @doc false
   def functions, do: @functions

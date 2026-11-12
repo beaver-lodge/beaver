@@ -34,9 +34,7 @@ defmodule IRDLTest do
       |> Beaver.Deferred.resolve(ctx)
       |> MLIR.verify!()
 
-    assert m
-           |> Beaver.MLIR.CAPI.mlirLoadIRDLDialects()
-           |> Beaver.MLIR.LogicalResult.success?()
+    assert m |> Beaver.MLIR.CAPI.mlirLoadIRDLDialects() |> Beaver.MLIR.LogicalResult.success?()
 
     found = MapSet.new(MLIR.Dialect.Registry.ops("cmath", ctx: ctx))
     expected = MapSet.new(["mul", "norm"])
@@ -46,22 +44,14 @@ defmodule IRDLTest do
   test "cmath dialect", %{ctx: ctx} do
     use Beaver
     alias Beaver.MLIR.Type
-
     CMath.__slang_dialect__(ctx) |> MLIR.verify!()
     Beaver.Slang.load(ctx, CMath)
-
     CMath.IRExample.get(ctx)
     CMath.IRExample.gen(ctx)
 
-    assert not (CMath.some_attr(Type.f32())
-                |> Beaver.Deferred.resolve(ctx)
-                |> MLIR.null?())
+    assert not (CMath.some_attr(Type.f32()) |> Beaver.Deferred.resolve(ctx) |> MLIR.null?())
 
-    assert not (MLIR.CAPI.mlirContextGetOrLoadDialect(
-                  ctx,
-                  MLIR.StringRef.create("cmath")
-                )
-                |> MLIR.null?())
+    assert not (MLIR.CAPI.mlirContextGetOrLoadDialect(ctx, MLIR.StringRef.create("cmath")) |> MLIR.null?())
   end
 
   test "var dialect", %{ctx: ctx} do
@@ -70,12 +60,9 @@ defmodule IRDLTest do
   end
 
   test "region dialect", %{ctx: ctx} do
-    dialect =
-      TestRegion.__slang_dialect__(ctx)
-      |> MLIR.verify!()
+    dialect = TestRegion.__slang_dialect__(ctx) |> MLIR.verify!()
 
     rendered = MLIR.to_string(dialect)
-
     assert rendered =~ "irdl.region()"
     assert rendered =~ "irdl.region(%"
     assert rendered =~ "with size 2"

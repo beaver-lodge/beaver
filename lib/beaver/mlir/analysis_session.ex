@@ -1,13 +1,12 @@
 defmodule Beaver.MLIR.AnalysisSession do
   @moduledoc """
-  A process-owned cache of MLIR dominance, post-dominance, liveness and data
-  layout analyses. `query/2` submits up to 256 queries in one native call.
+  A process-owned cache of MLIR dominance, post-dominance, liveness and data layout analyses. `query/2` submits up
+  to 256 queries in one native call.
 
-  The caller owns the root IR and context; both must outlive the session.
-  Use `mutate/2` for edits (including passes, rewriting and direct CAPI calls),
-  or call `invalidate/2` after external edits. Queries and edits must not race.
-  `with/2` closes the cache even if its callback raises. Query results are
-  snapshots, not live analysis handles.
+  The caller owns the root IR and context; both must outlive the session. Use `mutate/2` for edits (including
+  passes, rewriting and direct CAPI calls), or call `invalidate/2` after external edits. Queries and edits must not
+  race. `with/2` closes the cache even if its callback raises. Query results are snapshots, not live analysis
+  handles.
   """
   alias Beaver.MLIR
   alias Beaver.MLIR.{CAPI, Operation}
@@ -22,8 +21,7 @@ defmodule Beaver.MLIR.AnalysisSession do
     %__MODULE__{ref: CAPI.beaver_raw_analysis_create(root.ref), root: root, context: MLIR.context(root), owner: self()}
   end
 
-  def with(ir, fun) when is_function(fun, 1),
-    do: Beaver.Native.with_resource(create(ir), &close/1, fun)
+  def with(ir, fun) when is_function(fun, 1), do: Beaver.Native.with_resource(create(ir), &close/1, fun)
 
   def close(%__MODULE__{} = session) do
     owner!(session)

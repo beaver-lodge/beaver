@@ -8,9 +8,7 @@ defmodule TritonTest do
   @enabled System.get_env("BEAVER_TRITON_PREBUILT_DIR") != nil
 
   setup_all do
-    if @enabled do
-      Beaver.Triton.register_passes()
-    end
+    if @enabled, do: Beaver.Triton.register_passes()
 
     :ok
   end
@@ -96,10 +94,7 @@ defmodule TritonTest do
       |> Beaver.Composer.append("canonicalize")
       |> Beaver.Composer.run!()
 
-    ptx =
-      lowered
-      |> Beaver.MLIR.Target.LLVMIR.translate!()
-      |> Beaver.MLIR.Target.LLVMIR.compile_to_ptx!(cpu: "sm_90")
+    ptx = lowered |> Beaver.MLIR.Target.LLVMIR.translate!() |> Beaver.MLIR.Target.LLVMIR.compile_to_ptx!(cpu: "sm_90")
 
     assert ptx =~ ".visible .entry addptr"
     assert ptx =~ ".target sm_90"

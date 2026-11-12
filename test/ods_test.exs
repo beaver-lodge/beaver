@@ -8,12 +8,7 @@ defmodule ODSDumpTest do
 
   @moduletag :smoke
   test "lookup" do
-    assert {:ok,
-            %{
-              "attributes" => _,
-              "operands" => _,
-              "results" => _
-            }} = MLIR.ODS.Dump.lookup("affine.for")
+    assert {:ok, %{"attributes" => _, "operands" => _, "results" => _}} = MLIR.ODS.Dump.lookup("affine.for")
 
     assert {:error, "failed to find ODS dump of \"???\""} = MLIR.ODS.Dump.lookup("???")
   end
@@ -24,18 +19,13 @@ defmodule ODSDumpTest do
     assert arith_addi["has_folder"] == true
     assert arith_addi["traits"] |> Enum.any?(&(&1 == "::mlir::OpTrait::IsCommutative"))
     assert arith_addi["traits"] |> Enum.any?(&(&1 == "InferTypeOpInterface"))
-
     assert {:ok, scf_for} = MLIR.ODS.Dump.lookup("scf.for")
     assert scf_for["regions"] == [%{"name" => "region", "variadic" => false}]
     assert is_list(scf_for["builders"])
 
-    first_builder_parameters =
-      scf_for["builders"] |> List.first() |> Map.fetch!("parameters")
+    first_builder_parameters = scf_for["builders"] |> List.first() |> Map.fetch!("parameters")
 
-    assert Enum.any?(
-             first_builder_parameters,
-             &(&1["name"] == "lowerBound" and &1["cpp_type"] == "Value")
-           )
+    assert Enum.any?(first_builder_parameters, &(&1["name"] == "lowerBound" and &1["cpp_type"] == "Value"))
   end
 
   test "loads the canonical JSON dump lazily" do
@@ -43,8 +33,7 @@ defmodule ODSDumpTest do
     priv_dir = Application.app_dir(:beaver, "priv")
 
     archived_priv_paths =
-      Mix.Project.config()[:make_precompiler_priv_paths]
-      |> Enum.flat_map(&Path.wildcard(Path.join(priv_dir, &1)))
+      Mix.Project.config()[:make_precompiler_priv_paths] |> Enum.flat_map(&Path.wildcard(Path.join(priv_dir, &1)))
 
     assert MLIR.ODS.Dump.__info__(:attributes)[:external_resource] == [dump_path]
     assert dump_path in archived_priv_paths
@@ -57,8 +46,7 @@ defmodule ODSDumpTest do
       module do
         Func.func _(
                     function_type: Type.function([Type.i32(), Type.i32()], []),
-                    sym_name:
-                      Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                    sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
                   ) do
           region do
             block _(a >>> Type.i32(), b >>> Type.i32()) do
@@ -79,8 +67,7 @@ defmodule ODSDumpTest do
           module do
             Func.func _(
                         function_type: Type.function([Type.i32(), Type.i32()], []),
-                        sym_name:
-                          Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                        sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
                       ) do
               region do
                 block _(a >>> Type.i32(), b >>> Type.i32()) do
@@ -105,8 +92,7 @@ defmodule ODSDumpTest do
             module do
               Func.func _(
                           function_type: Type.function([Type.i32(), Type.i32()], []),
-                          sym_name:
-                            Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                          sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
                         ) do
                 region do
                   block _(_a >>> Type.i32(), b >>> Type.i32()) do
@@ -133,8 +119,7 @@ defmodule ODSDumpTest do
           b = Arith.constant(value: Attribute.integer(Type.i32(), 2)) >>> :infer
           UndefinedDialect.foo(lhs: a, rhs: b, operand_segment_sizes: :infer) >>> Type.i32()
 
-          UndefinedDialect.foo(rhs: [a], lhs: [a, b], operand_segment_sizes: :infer) >>>
-            Type.i32()
+          UndefinedDialect.foo(rhs: [a], lhs: [a, b], operand_segment_sizes: :infer) >>> Type.i32()
         end
 
       ops = MLIR.Module.body(m) |> Beaver.Walker.operations()
@@ -150,8 +135,7 @@ defmodule ODSDumpTest do
       module do
         Func.func _(
                     function_type: Type.function([Type.i32(), Type.i32()], []),
-                    sym_name:
-                      Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                    sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
                   ) do
           region do
             block _(a >>> Type.i32(), b >>> Type.i32()) do
@@ -170,13 +154,11 @@ defmodule ODSDumpTest do
       module do
         Func.func _(
                     function_type: Type.function([], []),
-                    sym_name:
-                      Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                    sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
                   ) do
           region do
             block _() do
-              MemRef.alloca(operand_segment_sizes: :infer) >>>
-                Type.memref!([1], Type.i32(ctx: ctx))
+              MemRef.alloca(operand_segment_sizes: :infer) >>> Type.memref!([1], Type.i32(ctx: ctx))
 
               Func.return() >>> []
             end

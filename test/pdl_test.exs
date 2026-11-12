@@ -43,16 +43,10 @@ defmodule PDLTest do
     pdl_pat_mod = mlirPDLPatternModuleFromModule(pattern_module)
     cfg = mlirGreedyRewriteDriverConfigCreate()
 
-    frozen_pat_set =
-      pdl_pat_mod |> mlirRewritePatternSetFromPDLPatternModule() |> mlirFreezeRewritePattern()
+    frozen_pat_set = pdl_pat_mod |> mlirRewritePatternSetFromPDLPatternModule() |> mlirFreezeRewritePattern()
 
     try do
-      result =
-        mlirApplyPatternsAndFoldGreedily(
-          ir_module,
-          frozen_pat_set,
-          cfg
-        )
+      result = mlirApplyPatternsAndFoldGreedily(ir_module, frozen_pat_set, cfg)
 
       assert MLIR.LogicalResult.success?(result)
       cb.(ir_module)
@@ -68,31 +62,16 @@ defmodule PDLTest do
     pattern_module = MLIR.Module.create!(@apply_rewrite_op_patterns, ctx: ctx)
 
     inspector = fn
-      {:successor, %MLIR.Block{} = successor}, acc ->
-        {{:successor, successor}, acc}
-
-      {:argument, %MLIR.Value{}} = argument, acc ->
-        {argument, acc}
-
-      {:result, %MLIR.Value{}} = result, acc ->
-        {result, acc}
-
-      {:operand, %MLIR.Value{}} = operand, acc ->
-        {operand, acc}
-
-      {name, %MLIR.Attribute{} = attribute}, acc ->
-        {{name, attribute}, acc}
-
-      %MLIR.Operation{} = op, acc ->
-        {op, [MLIR.Operation.name(op) | acc]}
-
-      %element{} = mlir, acc ->
-        {mlir, [element | acc]}
+      {:successor, %MLIR.Block{} = successor}, acc -> {{:successor, successor}, acc}
+      {:argument, %MLIR.Value{}} = argument, acc -> {argument, acc}
+      {:result, %MLIR.Value{}} = result, acc -> {result, acc}
+      {:operand, %MLIR.Value{}} = operand, acc -> {operand, acc}
+      {name, %MLIR.Attribute{} = attribute}, acc -> {{name, attribute}, acc}
+      %MLIR.Operation{} = op, acc -> {op, [MLIR.Operation.name(op) | acc]}
+      %element{} = mlir, acc -> {mlir, [element | acc]}
     end
 
-    {mlir, acc} =
-      pattern_module
-      |> Beaver.Walker.traverse([], inspector, inspector)
+    {mlir, acc} = pattern_module |> Beaver.Walker.traverse([], inspector, inspector)
 
     assert acc == [
              "builtin.module",
@@ -142,7 +121,6 @@ defmodule PDLTest do
            ]
 
     assert MLIR.equal?(mlir, MLIR.Operation.from_module(pattern_module))
-
     ir_module = MLIR.Module.create!(@apply_rewrite_op_ir, ctx: ctx)
 
     apply_patterns(pattern_module, ir_module, fn ir_module ->
@@ -189,10 +167,7 @@ defmodule PDLTest do
       ir_string = MLIR.to_string(ir_module)
       assert not String.contains?(ir_string, "tosa.sub"), ir_string
 
-      MLIR.apply!(ir_module, [pattern])
-      |> MLIR.verify!()
-      |> MLIR.Transform.canonicalize()
-      |> Beaver.Composer.run!()
+      MLIR.apply!(ir_module, [pattern]) |> MLIR.verify!() |> MLIR.Transform.canonicalize() |> Beaver.Composer.run!()
 
       ir_string = MLIR.to_string(ir_module)
       assert not String.contains?(ir_string, "tosa.add"), ir_string

@@ -30,10 +30,8 @@ defmodule Beaver.Composer.Beam do
     case Profile.measure(opts[:profile], :initialize, fn -> initialize(plan.stages, plan.context, opts) end) do
       {:ok, stages} ->
         {status, stages, diagnostics} = execute(stages, op, opts)
-
         pipeline_opts = Keyword.put(opts, :verifier, opts[:verifier] == :pipeline)
         {status, diagnostics} = verified({status, diagnostics}, op, pipeline_opts)
-
         cleanup = Profile.measure(opts[:profile], :cleanup, fn -> destroy(stages) end)
         if status == :ok and cleanup == [], do: {:ok, ir, diagnostics}, else: {:error, diagnostics ++ cleanup}
 
@@ -132,7 +130,6 @@ defmodule Beaver.Composer.Beam do
     if root != anchor, do: raise(ArgumentError, "pass #{name} targets #{root}, pipeline targets #{anchor}")
     run = if is_function(run, 1), do: fn op, _ -> run.(op) end, else: run
     unless is_function(run, 2), do: raise(ArgumentError, "pass must accept one or two arguments")
-
     MLIR.Pass.callbacks(run: run)
   end
 
@@ -165,7 +162,6 @@ defmodule Beaver.Composer.Beam do
     case measure(opts, :beam_pass, fn -> callbacks.run.(op, value) end) do
       {:ok, value} ->
         stage = {:beam, callbacks, value, originals}
-
         {status, diagnostics} = verified({:ok, []}, op, opts)
         {status, stage, diagnostics}
 
@@ -199,7 +195,6 @@ defmodule Beaver.Composer.Beam do
     # Mirror MLIR's adaptor pass: children were already checked, but parent
     # invariants (for example symbol uniqueness) still need verification.
     {status, diagnostics} = verified({status, diagnostics}, op, Keyword.put(opts, :recursive, false))
-
     {status, {:nested, root, stages}, diagnostics}
   end
 
@@ -227,14 +222,9 @@ defmodule Beaver.Composer.Beam do
 
   defp destroy(stages) do
     Enum.flat_map(stages, fn
-      {:native, pm} ->
-        cleanup(fn -> MLIR.PassManager.destroy(pm) end)
-
-      {:nested, _, nested} ->
-        destroy(nested)
-
-      {:beam, callbacks, value, originals} ->
-        Enum.flat_map([value | originals], &destroy_value(callbacks, &1))
+      {:native, pm} -> cleanup(fn -> MLIR.PassManager.destroy(pm) end)
+      {:nested, _, nested} -> destroy(nested)
+      {:beam, callbacks, value, originals} -> Enum.flat_map([value | originals], &destroy_value(callbacks, &1))
     end)
   end
 

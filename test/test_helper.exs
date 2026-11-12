@@ -4,12 +4,7 @@ exclude = [
   cuda_runtime: :os.type() != {:unix, :linux} or System.get_env("CI") == "true"
 ]
 
-exclude =
-  if System.get_env("BEAVER_TRITON_PREBUILT_DIR") == nil do
-    exclude ++ [:triton]
-  else
-    exclude
-  end
+exclude = if System.get_env("BEAVER_TRITON_PREBUILT_DIR") == nil, do: exclude ++ [:triton], else: exclude
 
 ExUnit.configure(exclude: exclude)
 

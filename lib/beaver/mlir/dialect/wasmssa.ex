@@ -4,17 +4,14 @@ defmodule Beaver.MLIR.Dialect.WasmSSA do
   @moduledoc """
   This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect.
 
-  The WebAssembly SSA dialect is MLIR's native WASM IR (block/loop/if, locals,
-  imports, tables, memories). Op construction functions are generated from the
-  ops registered in the MLIR context; operand/attribute segment sizes and
-  documentation come from the ODS dump.
+  The WebAssembly SSA dialect is MLIR's native WASM IR (block/loop/if, locals, imports, tables, memories). Op
+  construction functions are generated from the ops registered in the MLIR context; operand/attribute segment sizes
+  and documentation come from the ODS dump.
   """
 
   use Beaver.MLIR.Dialect, dialect: "wasmssa", ops: Dialect.Registry.ops("wasmssa")
 
-  @doc """
-  Syntax sugar for `WasmSSA.func` SSA expression, mirroring `Func.func`.
-  """
+  @doc "Syntax sugar for `WasmSSA.func` SSA expression, mirroring `Func.func`."
   defmacro func(call, do: body) do
     {func_name, args} = call |> Macro.decompose_call()
 

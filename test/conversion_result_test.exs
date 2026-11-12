@@ -3,18 +3,10 @@ defmodule Beaver.MLIR.ConversionResultTest do
   alias Beaver.MLIR
   alias MLIR.Conversion.{Plan, Result}
 
-  defp with_module(
-         ctx,
-         source \\ ~s[module { "report.drop"() : () -> () "report.keep"() : () -> () }],
-         fun
-       ) do
+  defp with_module(ctx, source \\ ~s[module { "report.drop"() : () -> () "report.keep"() : () -> () }], fun) do
     MLIR.Context.allow_unregistered_dialects(ctx)
 
-    Beaver.Native.with_resource(
-      MLIR.Module.create!(source, ctx: ctx),
-      &MLIR.Module.destroy/1,
-      fun
-    )
+    Beaver.Native.with_resource(MLIR.Module.create!(source, ctx: ctx), &MLIR.Module.destroy/1, fun)
   end
 
   defp plan(mode) do
@@ -27,16 +19,12 @@ defmodule Beaver.MLIR.ConversionResultTest do
     end)
   end
 
-  test "analysis simulates rewrites, reports original identities and leaves IR unchanged", %{
-    ctx: ctx
-  } do
+  test "analysis simulates rewrites, reports original identities and leaves IR unchanged", %{ctx: ctx} do
     report =
       with_module(ctx, fn module ->
         original = MLIR.to_string(module)
 
-        assert {:ok,
-                %Result{mode: :analysis, status: :succeeded, changed?: false, rolled_back?: true} =
-                  report} =
+        assert {:ok, %Result{mode: :analysis, status: :succeeded, changed?: false, rolled_back?: true} = report} =
                  Plan.analyze(plan(:full), module)
 
         assert MLIR.to_string(module) == original
@@ -51,12 +39,7 @@ defmodule Beaver.MLIR.ConversionResultTest do
   test "partial conversion reports remaining original ops and committed changes", %{ctx: ctx} do
     with_module(ctx, fn module ->
       assert {:ok,
-              %Result{
-                status: :succeeded,
-                changed?: true,
-                rolled_back?: false,
-                unlegalized_complete?: true
-              } = report} =
+              %Result{status: :succeeded, changed?: true, rolled_back?: false, unlegalized_complete?: true} = report} =
                Plan.report(plan(:partial), module)
 
       assert [%{"name" => "report.keep", "index" => 2}] = report.unlegalized
@@ -64,16 +47,11 @@ defmodule Beaver.MLIR.ConversionResultTest do
     end)
   end
 
-  test "failed full conversion reports rollback even after a successful speculative rewrite", %{
-    ctx: ctx
-  } do
+  test "failed full conversion reports rollback even after a successful speculative rewrite", %{ctx: ctx} do
     with_module(ctx, fn module ->
       original = MLIR.to_string(module)
 
-      assert {:error,
-              %MLIR.Conversion.Error{
-                result: %Result{status: :failed, changed?: false, rolled_back?: true}
-              }} =
+      assert {:error, %MLIR.Conversion.Error{result: %Result{status: :failed, changed?: false, rolled_back?: true}}} =
                Plan.report(plan(:full), module)
 
       assert MLIR.to_string(module) == original
@@ -82,8 +60,7 @@ defmodule Beaver.MLIR.ConversionResultTest do
 
   test "successful and no-op full conversions have distinct mutation results", %{ctx: ctx} do
     with_module(ctx, ~s[module { "report.drop"() : () -> () }], fn module ->
-      assert {:ok, %Result{status: :succeeded, changed?: true, rolled_back?: false}} =
-               Plan.report(plan(:full), module)
+      assert {:ok, %Result{status: :succeeded, changed?: true, rolled_back?: false}} = Plan.report(plan(:full), module)
 
       assert {:ok, %Result{status: :succeeded, changed?: false, rolled_back?: false}} =
                Plan.report(plan(:full), module)

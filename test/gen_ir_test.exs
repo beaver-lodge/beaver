@@ -38,7 +38,6 @@ defmodule CFTest do
       |> MLIR.verify!()
 
     text = ir |> MLIR.to_string()
-
     assert text =~ ~r"module"
     assert text =~ ~r"// pred.+bb0"
     assert text =~ ~r"// 2 preds.+bb0.+bb1"

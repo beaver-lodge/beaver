@@ -6,7 +6,6 @@ defimpl Enumerable, for: Beaver.MLIR.Attribute do
 
   def new(attr) do
     accessor = MLIR.Attribute.Accessor.new(attr)
-
     %__MODULE__{num_elements: accessor.get_num_element.(attr), get_element: &accessor.get_element.(attr, &1)}
   end
 
@@ -39,10 +38,7 @@ defimpl Enumerable, for: Beaver.MLIR.Attribute do
      end)}
   end
 
-  def do_reduce(%__MODULE__{}, {:halt, acc}, _fun), do: {:halted, acc}
   def do_reduce(_attr, {:halt, acc}, _fun), do: {:halted, acc}
-
-  def do_reduce(%__MODULE__{} = enum, {:suspend, acc}, fun), do: {:suspended, acc, &do_reduce(enum, &1, fun)}
 
   def do_reduce(attr, {:suspend, acc}, fun), do: {:suspended, acc, &do_reduce(attr, &1, fun)}
 
@@ -52,8 +48,7 @@ defimpl Enumerable, for: Beaver.MLIR.Attribute do
         fun
       ) do
     if index < num_elements do
-      head = get_element.(index)
-      do_reduce(%__MODULE__{enum | index: index + 1}, fun.(head, acc), fun)
+      do_reduce(%__MODULE__{enum | index: index + 1}, fun.(get_element.(index), acc), fun)
     else
       {:done, acc}
     end
@@ -65,10 +60,6 @@ defimpl Enumerable, for: Beaver.MLIR.Attribute do
     %__MODULE__{num_elements: num_elements, get_element: get_element} = new(attr)
 
     {:ok, num_elements,
-     fn start, length, step ->
-       for pos <- start..(start + length - 1)//step do
-         get_element.(pos)
-       end
-     end}
+     fn start, length, step -> for pos <- start..(start + length - 1)//step, do: get_element.(pos) end}
   end
 end

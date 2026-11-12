@@ -51,6 +51,8 @@ defmodule Beaver.MLIR do
     Attribute,
     Type,
     Block,
+    Region,
+    SymbolTable,
     Location,
     Operation,
     AffineMap,
@@ -61,25 +63,19 @@ defmodule Beaver.MLIR do
     ExecutionEngine
   }
 
-  @doc """
-  Get the MLIR context of an MLIR entity.
-  """
+  @doc "Get the MLIR context of an MLIR entity."
   def context(%m{} = entity) do
     entity_name = extract_entity_name(m)
     apply(CAPI, :"mlir#{entity_name}GetContext", [entity])
   end
 
-  @doc """
-  Get the MLIR location of an MLIR entity.
-  """
+  @doc "Get the MLIR location of an MLIR entity."
   def location(%m{} = entity) do
     entity_name = extract_entity_name(m)
     apply(CAPI, :"mlir#{entity_name}GetLocation", [entity])
   end
 
-  @doc """
-  Compare two MLIR entities.
-  """
+  @doc "Compare two MLIR entities."
   def equal?(%m{} = a, %m{} = b) do
     entity_name = extract_entity_name(m)
     apply(CAPI, :"mlir#{entity_name}Equal", [a, b]) |> Native.to_term()
@@ -102,13 +98,16 @@ defmodule Beaver.MLIR do
           | Operation.t()
           | Module.t()
           | Block.t()
+          | Region.t()
+          | SymbolTable.t()
           | Dialect.t()
           | ExecutionEngine.t()
 
   @doc """
   Check if an MLIR entity is null.
 
-  To prevent crashing the BEAM, it is encouraged to use this function to check if an entity is null before calling functions that require a non-null entity.
+  To prevent crashing the BEAM, it is encouraged to use this function to check if an entity is null before calling
+  functions that require a non-null entity.
   """
   @spec null?(nullable()) :: boolean()
   def null?(%m{} = entity) do
@@ -119,7 +118,6 @@ defmodule Beaver.MLIR do
 
   defp not_null_run(%m{} = entity, dumper) do
     entity_name = extract_entity_name(m)
-
     if null?(entity), do: {:error, "#{entity_name} is null"}, else: dumper.(entity)
   end
 
@@ -148,7 +146,8 @@ defmodule Beaver.MLIR do
   @doc """
   Dump MLIR element to stdio.
 
-  This will call the printer registered in C/C++. Note that the outputs wouldn't go through Erlang's IO system, so it's not possible to capture the output in Elixir. If you need to capture the output, use `to_string/1` instead.
+  This will call the printer registered in C/C++. Note that the outputs wouldn't go through Erlang's IO system, so
+  it's not possible to capture the output in Elixir. If you need to capture the output, use `to_string/1` instead.
   """
   def dump(mlir, opts \\ [])
 
@@ -165,9 +164,7 @@ defmodule Beaver.MLIR do
     not_null_run(entity, &apply(CAPI, :"mlir#{entity_name}Dump", [&1]))
   end
 
-  @doc """
-  Dump MLIR element to stdio and raise an error if it fails.
-  """
+  @doc "Dump MLIR element to stdio and raise an error if it fails."
   def dump!(mlir, opts \\ [])
 
   def dump!(mlir, opts) do
@@ -182,11 +179,12 @@ defmodule Beaver.MLIR do
   @doc """
   Print MLIR element or StringRef as Elixir binary string.
 
-  When printing an operation, it is recommended to use `generic: false` or `generic: true` to explicitly specify the format if your usage requires consistent output. If not specified, the default behavior is subject to change according to the MLIR version.
+  When printing an operation, it is recommended to use `generic: false` or `generic: true` to explicitly specify the
+  format if your usage requires consistent output. If not specified, the default behavior is subject to change
+  according to the MLIR version.
 
-  Pass `debug_info: true` to include location and debug information (for example
-  the `#llvm.di_subprogram` attributes attached by `Beaver.MLIR.Debug`) in the
-  printed output. The output remains valid, parseable MLIR text.
+  Pass `debug_info: true` to include location and debug information (for example the `#llvm.di_subprogram`
+  attributes attached by `Beaver.MLIR.Debug`) in the printed output. The output remains valid, parseable MLIR text.
   """
 
   def to_string(mlir, opts \\ [])
@@ -249,10 +247,7 @@ defmodule Beaver.MLIR do
   @type diagnostics() :: Rewrite.diagnostics()
   @type verify_result(t) :: {:ok, t} | :null | {:error, diagnostics()}
   @type verify_summary() :: boolean()
-  @type rewrite_pattern_input() ::
-          Rewrite.pattern_list()
-          | MLIR.FrozenRewritePatternSet.t()
-          | RewritePatternSet.t()
+  @type rewrite_pattern_input() :: Rewrite.pattern_list() | MLIR.FrozenRewritePatternSet.t() | RewritePatternSet.t()
 
   @type apply_option() ::
           {:debug, boolean()}
@@ -280,10 +275,9 @@ defmodule Beaver.MLIR do
   @spec verify(verifiable()) :: verify_result(verifiable())
   @spec verify(verifiable(), keyword()) :: verify_result(verifiable())
   @doc """
-  Verifies IR using `strategy: :worker` (default), `:dirty`, or `:auto`.
-  Automatic mode uses dirty CPU schedulers only before any BEAM-backed external
-  interface/trait has been registered in the context; otherwise it uses workers.
-  Register dialects and callbacks before sharing a context across executions.
+  Verifies IR using `strategy: :worker` (default), `:dirty`, or `:auto`. Automatic mode uses dirty CPU schedulers
+  only before any BEAM-backed external interface/trait has been registered in the context; otherwise it uses
+  workers. Register dialects and callbacks before sharing a context across executions.
   """
   def verify(op, opts \\ []) do
     if null?(op) do
@@ -308,8 +302,8 @@ defmodule Beaver.MLIR do
 
   @apply_default_opts [debug: false]
   @doc """
-  Apply patterns on a container (region, operation, module).
-  It returns the container if it succeeds otherwise it raises.
+  Apply patterns on a container (region, operation, module). It returns the container if it succeeds otherwise it
+  raises.
   """
   @spec apply!(verifiable(), rewrite_pattern_input(), apply_opts()) :: verifiable()
   def apply!(op, patterns, opts \\ @apply_default_opts) do
@@ -320,9 +314,8 @@ defmodule Beaver.MLIR do
   end
 
   @doc """
-  Apply patterns on a container (operation, module).
-  It is named `apply_` with a underscore to avoid name collision with `Kernel.apply/2`
-  Pass `:analysis_session` to invalidate cached analyses around the rewrite.
+  Apply patterns on a container (operation, module). It is named `apply_` with a underscore to avoid name collision
+  with `Kernel.apply/2` Pass `:analysis_session` to invalidate cached analyses around the rewrite.
   """
   @spec apply_(verifiable(), rewrite_pattern_input(), apply_opts()) :: apply_outcome(verifiable())
   def apply_(op, patterns, opts \\ @apply_default_opts)
@@ -330,7 +323,6 @@ defmodule Beaver.MLIR do
   def apply_(op, %kind{} = patterns, opts)
       when kind in [MLIR.FrozenRewritePatternSet, RewritePatternSet] do
     MLIR.verify!(op)
-
     execution_opts = if is_list(opts), do: Keyword.take(opts, [:analysis_session]), else: []
     {result, diagnostics} = Rewrite.apply_patterns(op, patterns, rewrite_config_input(opts), execution_opts)
 

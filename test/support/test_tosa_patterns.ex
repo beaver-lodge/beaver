@@ -12,10 +12,7 @@ defmodule TestTOSAPatterns do
         Func.func test_multi_broadcast(
                     function_type:
                       Type.function(
-                        [
-                          Type.ranked_tensor([1, 3], Type.f32()),
-                          Type.ranked_tensor([2, 1], Type.f32())
-                        ],
+                        [Type.ranked_tensor([1, 3], Type.f32()), Type.ranked_tensor([2, 1], Type.f32())],
                         [Type.ranked_tensor([2, 3], Type.f32())]
                       )
                   ) do
@@ -24,9 +21,7 @@ defmodule TestTOSAPatterns do
                     a >>> Type.ranked_tensor([1, 3], Type.f32()),
                     b >>> Type.ranked_tensor([2, 1], Type.f32())
                   ) do
-              res =
-                TOSA.add(a, b, one: Attribute.integer(Type.i32(), 1)) >>>
-                  Type.ranked_tensor([2, 3], Type.f32())
+              res = TOSA.add(a, b, one: Attribute.integer(Type.i32(), 1)) >>> Type.ranked_tensor([2, 3], Type.f32())
 
               res1 = TOSA.add(res, b) >>> Type.ranked_tensor([2, 3], Type.f32())
               Func.return(res1) >>> []

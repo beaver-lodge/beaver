@@ -3,10 +3,9 @@ alias Beaver.Deferred
 
 defmodule Beaver.MLIR.Transform do
   @moduledoc """
-  Executes named Transform dialect sequences directly and exposes MLIR's
-  default transformations. Schedules accept modules, nested operations, text
-  or bytecode. Transform handles never escape execution; expensive checks
-  (enabled by default) diagnose use-after-consume errors.
+  Executes named Transform dialect sequences directly and exposes MLIR's default transformations. Schedules accept
+  modules, nested operations, text or bytecode. Transform handles never escape execution; expensive checks (enabled
+  by default) diagnose use-after-consume errors.
   """
 
   alias __MODULE__.{Schedule, Prepared}
@@ -18,8 +17,8 @@ defmodule Beaver.MLIR.Transform do
 
   defmodule FixedPoint do
     @moduledoc """
-    A pipeline repeated until its IR fingerprint converges. This declaration
-    owns no native resources; `Beaver.Composer` materializes it in the target context.
+    A pipeline repeated until its IR fingerprint converges. This declaration owns no native resources;
+    `Beaver.Composer` materializes it in the target context.
     """
 
     @enforce_keys [:name, :pipeline, :max_iterations, :on_convergence_failure]
@@ -35,8 +34,8 @@ defmodule Beaver.MLIR.Transform do
   end
 
   @doc """
-  Declares a fixed-point pipeline. Non-convergence fails by default;
-  `:warn` or `:silent` explicitly allow partially converged IR.
+  Declares a fixed-point pipeline. Non-convergence fails by default; `:warn` or `:silent` explicitly allow partially
+  converged IR.
   """
   @spec composite_fixed_point(keyword()) :: FixedPoint.t()
   def composite_fixed_point(opts) when is_list(opts) do
@@ -55,8 +54,7 @@ defmodule Beaver.MLIR.Transform do
     do: raise(ArgumentError, "fixed-point options must be a keyword list, got: #{inspect(other)}")
 
   defp validate_fixed_point_options!(opts) do
-    unless Keyword.keyword?(opts),
-      do: raise(ArgumentError, "fixed-point options must be a keyword list")
+    unless Keyword.keyword?(opts), do: raise(ArgumentError, "fixed-point options must be a keyword list")
 
     supported = [:name, :pipeline, :max_iterations, :on_convergence_failure]
 
@@ -115,12 +113,9 @@ defmodule Beaver.MLIR.Transform do
         end
 
       prefix = if error.sequence, do: prefix <> " (#{error.sequence})", else: prefix
-
       details = if is_nil(error.reason), do: prefix, else: prefix <> ": " <> inspect(error.reason)
 
-      if error.diagnostics == [],
-        do: details,
-        else: MLIR.Diagnostic.format(error.diagnostics, details)
+      if error.diagnostics == [], do: details, else: MLIR.Diagnostic.format(error.diagnostics, details)
     end
   end
 
@@ -134,9 +129,8 @@ defmodule Beaver.MLIR.Transform do
           | {:analysis_session, MLIR.AnalysisSession.t()}
 
   @doc """
-  Applies a named sequence (default `__transform_main`) to an operation or module.
-  Expensive handle checks and single-top-level-transform enforcement both
-  default to `true` and can be configured independently.
+  Applies a named sequence (default `__transform_main`) to an operation or module. Expensive handle checks and
+  single-top-level-transform enforcement both default to `true` and can be configured independently.
   """
   @spec apply_named_sequence(MLIR.Module.t() | Operation.t(), schedule_input(), [execution_option()]) ::
           {:ok, Result.t()} | {:error, Error.t()}
@@ -264,11 +258,9 @@ defmodule Beaver.MLIR.Transform do
   end
 
   defp validate_execution_options(opts) do
-    unless Keyword.keyword?(opts),
-      do: raise(ArgumentError, "transform execution options must be a keyword list")
+    unless Keyword.keyword?(opts), do: raise(ArgumentError, "transform execution options must be a keyword list")
 
     supported = [:sequence, :expensive_checks, :enforce_single_top_level_transform_op, :analysis_session]
-
     unsupported = Keyword.keys(opts) -- supported
     if unsupported != [], do: raise(ArgumentError, "unsupported transform execution options: #{inspect(unsupported)}")
 

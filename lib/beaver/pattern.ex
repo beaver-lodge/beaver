@@ -2,9 +2,7 @@ alias Beaver.MLIR.Value
 alias Beaver.Changeset
 
 defmodule Beaver.Pattern do
-  @moduledoc """
-  Beaver pattern DSL for MLIR, a PDL frontend in Elixir.
-  """
+  @moduledoc "Beaver pattern DSL for MLIR, a PDL frontend in Elixir."
   use Beaver
   alias Beaver.MLIR.Dialect.PDL
   alias Beaver.MLIR.{Attribute, Type}
@@ -167,10 +165,7 @@ defmodule Beaver.Pattern do
     mlir ip: block, ctx: ctx do
       results = results |> Enum.map(&gen_pdl(block, changeset, &1))
 
-      attribute_names =
-        for {k, _} <- attributes do
-          k |> Atom.to_string() |> MLIR.Attribute.string()
-        end
+      attribute_names = for {k, _} <- attributes, do: k |> Atom.to_string() |> MLIR.Attribute.string()
 
       attributes =
         for {_, a} <- attributes do
@@ -189,9 +184,7 @@ defmodule Beaver.Pattern do
     end
   end
 
-  @doc """
-  Evaluate SSA as ops in a rewrite block. Note that function is only public so that it could be used in a AST.
-  """
+  @doc "Evaluate SSA as ops in a rewrite block. Note that function is only public so that it could be used in a AST."
   def eval_rewrite(%Beaver.SSA{op: op_name, arguments: arguments, results: result_types, ctx: ctx, ip: block, loc: loc}) do
     ods_operands =
       case MLIR.ODS.Dump.lookup(op_name) do
@@ -216,9 +209,7 @@ defmodule Beaver.Pattern do
       |> Enum.map(&gen_pdl(block, changeset, &1))
 
     op = %Changeset{changeset | results: result_types_unwrap} |> Changeset.reorder_operands() |> create_operation(block)
-
     results = result_types_unwrap |> Enum.with_index() |> Enum.map(fn {_, i} -> result(block, op, i) end)
-
     results = if length(results) == 1, do: List.first(results), else: results
 
     case result_types do

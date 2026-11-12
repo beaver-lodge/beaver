@@ -1,12 +1,10 @@
 defmodule Beaver.MLIR.InferType do
   @moduledoc """
-  Native collection for `InferTypeOpInterface` results without constructing an
-  operation.
+  Native collection for `InferTypeOpInterface` results without constructing an operation.
 
-  Requests accept `:operation`, `:context`, and optional `:location`,
-  `:operands`, dictionary `:attributes`, `:regions`, and `:properties` fields.
-  Properties are supplied as an MLIR attribute. Native code allocates, validates
-  and destroys the operation-specific storage within the inference call.
+  Requests accept `:operation`, `:context`, and optional `:location`, `:operands`, dictionary `:attributes`,
+  `:regions`, and `:properties` fields. Properties are supplied as an MLIR attribute. Native code allocates,
+  validates and destroys the operation-specific storage within the inference call.
   """
 
   alias Beaver.MLIR

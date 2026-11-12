@@ -7,10 +7,9 @@ for {module, prefix, verb} <- [
     ] do
   defmodule module do
     @moduledoc """
-    High-level access to MLIR #{if verb == "dominates", do: "dominance", else: "post-dominance"} analysis.
-    The owned analysis must not outlive its IR or context. Use `with_info/2` for
-    scoped access or call `destroy/1` explicitly. After mutating the analyzed IR,
-    call `invalidate/1` before issuing another query.
+    High-level access to MLIR #{if verb == "dominates", do: "dominance", else: "post-dominance"} analysis. The owned
+    analysis must not outlive its IR or context. Use `with_info/2` for scoped access or call `destroy/1` explicitly.
+    After mutating the analyzed IR, call `invalidate/1` before issuing another query.
     """
     alias Beaver.MLIR
     alias Beaver.MLIR.CAPI
@@ -27,8 +26,7 @@ for {module, prefix, verb} <- [
 
     @doc "Runs `fun` with a new analysis and always destroys it."
     @spec with_info(analyzed_ir(), (t() -> result)) :: result when result: var
-    def with_info(ir, fun) when is_function(fun, 1),
-      do: Native.with_resource(create(ir), &destroy/1, fun)
+    def with_info(ir, fun) when is_function(fun, 1), do: Native.with_resource(create(ir), &destroy/1, fun)
 
     for qualifier <- ["", "properly_"] do
       query = :"#{qualifier}#{verb}?"

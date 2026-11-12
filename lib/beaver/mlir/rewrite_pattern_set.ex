@@ -1,21 +1,17 @@
 alias Beaver.MLIR.CAPI
 
 defmodule Beaver.MLIR.RewritePatternSet do
-  @moduledoc """
-  This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
-  """
+  @moduledoc "This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}."
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
   alias Beaver.MLIR
 
   defdelegate create(context), to: CAPI, as: :mlirRewritePatternSetCreate
 
   @doc """
-  Create a `MLIR.RewritePatternSet` from the given PDL patterns.
-  The `patterns` is a list of functions that accept two arguments: `ctx` and `block`,
-  and create PDL patterns in the given `block` under the given `ctx`.
-  The `opts` may contain:
-    * `:ctx` - (required) the `MLIR.Context` to create the patterns in.
-    * `:debug` - (optional) if set to `true`, dump each created pattern for debugging.
+  Create a `MLIR.RewritePatternSet` from the given PDL patterns. The `patterns` is a list of functions that accept
+  two arguments: `ctx` and `block`, and create PDL patterns in the given `block` under the given `ctx`. The `opts`
+  may contain: * `:ctx` - (required) the `MLIR.Context` to create the patterns in. * `:debug` - (optional) if set to
+  `true`, dump each created pattern for debugging.
   """
   def with_pdl_patterns(patterns, opts \\ []) do
     ctx = opts[:ctx] || raise("context is required in opts")
@@ -24,7 +20,6 @@ defmodule Beaver.MLIR.RewritePatternSet do
 
     for p <- patterns do
       p = p.(ctx, block)
-
       if opts[:debug], do: p |> MLIR.dump!()
     end
 
@@ -37,9 +32,9 @@ defmodule Beaver.MLIR.RewritePatternSet do
   @doc """
   Add a rewrite pattern into a `MLIR.RewritePatternSet`.
 
-  The set takes ownership of a raw `MLIR.RewritePattern`. Native descriptors
-  are materialized through the existing callback-backed rewrite bridge before
-  ownership is transferred. Native programs execute entirely in the rewrite driver.
+  The set takes ownership of a raw `MLIR.RewritePattern`. Native descriptors are materialized through the existing
+  callback-backed rewrite bridge before ownership is transferred. Native programs execute entirely in the rewrite
+  driver.
   """
   @spec add(t(), MLIR.RewritePattern.t()) :: t()
   def add(%__MODULE__{} = set, %MLIR.RewritePattern{} = pattern) do
@@ -90,22 +85,15 @@ defmodule Beaver.MLIR.RewritePatternSet do
   @spec add(t(), term(), module() | function() | Beaver.Pattern.Native.Descriptor.t()) :: t()
   def add(%__MODULE__{} = set, root_name, pattern), do: add(set, root_name, pattern, [])
 
-  @spec add(t(), term(), module() | function() | Beaver.Pattern.Native.Descriptor.t(), keyword()) ::
-          t()
+  @spec add(t(), term(), module() | function() | Beaver.Pattern.Native.Descriptor.t(), keyword()) :: t()
   def add(%__MODULE__{} = set, root_name, %Beaver.Pattern.Native.Descriptor{} = descriptor, opts)
       when is_list(opts), do: add(set, descriptor, Keyword.put(opts, :root, root_name))
 
-  def add(%__MODULE__{} = set, root_name, module, opts)
-      when is_atom(module) and is_list(opts) do
-    opts =
-      if function_exported?(module, :construct, 1),
-        do: put_in(opts, [:construct], &module.construct/1),
-        else: opts
+  def add(%__MODULE__{} = set, root_name, module, opts) when is_atom(module) and is_list(opts) do
+    opts = if function_exported?(module, :construct, 1), do: put_in(opts, [:construct], &module.construct/1), else: opts
 
     opts = if function_exported?(module, :destruct, 1), do: put_in(opts, [:destruct], &module.destruct/1), else: opts
-
     opts = put_in(opts, [:match_and_rewrite], &module.match_and_rewrite/4)
-
     MLIR.RewritePattern.create(root_name, opts) |> then(&add(set, &1))
   end
 
@@ -119,10 +107,9 @@ defmodule Beaver.MLIR.RewritePatternSet do
   end
 
   @doc """
-  Adds a PDL pattern module (or PDL source string / builder callbacks) into an
-  existing `MLIR.RewritePatternSet`. When frozen, MLIR compiles the PDL patterns
-  into `PDLInterp` bytecode so matching and rewriting execute natively without
-  BEAM callbacks.
+  Adds a PDL pattern module (or PDL source string / builder callbacks) into an existing `MLIR.RewritePatternSet`.
+  When frozen, MLIR compiles the PDL patterns into `PDLInterp` bytecode so matching and rewriting execute natively
+  without BEAM callbacks.
   """
   @spec add_pdl(t(), MLIR.Module.t() | MLIR.Operation.t() | binary() | [function()], keyword()) :: t()
   def add_pdl(set, pdl, opts \\ [])
@@ -165,9 +152,7 @@ defmodule Beaver.MLIR.RewritePatternSet do
     end
   end
 
-  @doc """
-  Creates a dialect conversion pattern and transfers it into this set.
-  """
+  @doc "Creates a dialect conversion pattern and transfers it into this set."
   def add_conversion(set, root_name, converter, match_and_rewrite, opts \\ []),
     do: MLIR.ConversionPattern.add(set, root_name, converter, match_and_rewrite, opts)
 
@@ -180,8 +165,8 @@ defmodule Beaver.MLIR.RewritePatternSet do
   end
 
   @doc """
-  Freeze the given `MLIR.RewritePatternSet` to a `MLIR.FrozenRewritePatternSet`.
-  Note that the ownership of the input set is transferred into the frozen set after this call.
+  Freeze the given `MLIR.RewritePatternSet` to a `MLIR.FrozenRewritePatternSet`. Note that the ownership of the
+  input set is transferred into the frozen set after this call.
   """
   defdelegate freeze(set), to: CAPI, as: :mlirFreezeRewritePattern
 end
