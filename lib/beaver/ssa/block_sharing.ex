@@ -1,11 +1,8 @@
 defmodule Beaver.SSA.BlockSharing do
   @moduledoc """
-  Shares alpha-equivalent blocks, parameterizing selected literals and free values.
-
-  The caller supplies eligibility, literal and jump policies. The entry block is
-  never shared, and definitions used outside a candidate disqualify it. Grouping
-  uses the complete normalized structure (not a hash), preserving opaque metadata.
-  Instructions retain their order; literals stay in their original predecessors.
+  Shares alpha-equivalent blocks using caller-supplied eligibility, literal and jump policies.
+  Entry blocks and escaping definitions are excluded. Complete normalized structures determine equality,
+  preserving opaque metadata and instruction order; literals remain in the original predecessors.
   """
 
   def run(function, schema, opts) do
@@ -19,16 +16,14 @@ defmodule Beaver.SSA.BlockSharing do
         &elem(&1, 1)
       )
 
+    candidates =
+      for {block, index} <- Enum.with_index(blocks),
+          index > 0,
+          {arguments, normalized} <- List.wrap(candidate(block, index, uses, schema, opts)),
+          do: {normalized, {index, arguments}}
+
     groups =
-      blocks
-      |> Enum.with_index()
-      |> Enum.drop(1)
-      |> Enum.reduce(%{}, fn {block, index}, groups ->
-        case candidate(block, index, uses, schema, opts) do
-          nil -> groups
-          {arguments, normalized} -> Map.update(groups, normalized, [{index, arguments}], &(&1 ++ [{index, arguments}]))
-        end
-      end)
+      Enum.group_by(candidates, &elem(&1, 0), &elem(&1, 1))
       |> Enum.filter(fn {_, members} -> length(members) >= 2 end)
       |> Enum.sort_by(fn {block, _} -> {Keyword.get(opts, :sort_key, &Function.identity/1).(block), block} end)
 
@@ -79,18 +74,13 @@ defmodule Beaver.SSA.BlockSharing do
       if length(arguments) <= Keyword.fetch!(opts, :max_arguments) and
            length(instructions) >= Keyword.get(opts, :min_instructions, 1) do
         template = block |> Map.put(fields[:parameters], arguments) |> Map.put(fields[:instructions], instructions)
-
         {arguments, alpha_normalize(template, arguments, schema)}
       end
     end
   end
 
   defp alpha_normalize(template, arguments, schema) do
-    names =
-      Enum.reduce(schema.block_defs(template), Map.new(Enum.with_index(arguments)), fn value, names ->
-        Map.put_new(names, value, map_size(names))
-      end)
-
+    names = (arguments ++ schema.block_defs(template)) |> Enum.uniq() |> Enum.with_index() |> Map.new()
     schema.map_block_values(template, &Map.fetch!(names, &1))
   end
 end

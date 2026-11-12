@@ -90,59 +90,25 @@ that need arbitrary Elixir checks or callback state, see
 and operation lowering, see [dialect conversion](dialect-conversion.md).
 ## Reusable compiler building blocks
 
-`Beaver.MLIR.IRBatch.Builder` assembles immutable CFG specifications with block-local or explicit entry constants,
-multi-result calls, guarded joins, and switch dispatch. Language-specific state belongs in `builder.data`.
-Submit the finished blocks through `IRBatch.build_function!/3`; the builder itself owns no native resources.
+| API | Responsibility |
+| --- | --- |
+| `IRBatch.Builder` | Immutable blocks, scoped constants, deferred expressions, multi-result calls, guarded joins and dispatch. |
+| `IRBatch.Spec` | Map/keyword/tuple normalization, declared type aliases and call shortcuts; custom literal expansion. |
+| `Template.Library` | Revision-keyed bytecode and signatures; each use owns independent IR in the caller's context. |
+| `SymbolTable` | Check complete declaration batches and transitive imports before changing the target. |
+| `Pattern.PDL` | Explicit callee metadata (`:all` for unrestricted rules); reconsider rules when rewrites introduce callees. |
+| `CABI.wrapper_source/4` | Value wrappers using the same conventions as `Pattern.Native.Program.c_abi_call/3`. |
+| `SSA.Schema` / `SSA.BlockSharing` | Traverse declared value/edge paths; share alpha-equivalent bodies with caller eligibility/literal/jump policies. |
+| `Build.Plan` / `Build.ArtifactCache` | Stage dependencies and timings; digest checks and atomic publication of artifacts before manifests. |
 
-`Beaver.MLIR.Template.Library` stores verified bytecode and textual signatures. `fetch/3` requires a revision covering
-every source input. Each use creates a fresh module in the caller's context. `SymbolTable.ensure_declarations!/3`
-checks the entire signature batch before insertion; `import_symbols!/3` with `verify_type: true` checks transitive
-imports before changing the target.
+Use `builder.data` for language state. Sharing preserves metadata/order and excludes entry blocks and escaping definitions.
+Cache revisions must include every semantic input and generator dependency. `LLVMIR.compile_units!` owns parallel object
+compilation. Each rename is atomic; publication of multiple files is not a filesystem transaction.
 
-`Beaver.Pattern.PDL` manages rule collections with explicit callee metadata and revisits rule selection when rewriting
-introduces new callees. Use `:all` for rules without a callee restriction. `Beaver.MLIR.CABI.wrapper_source/4` generates
-value wrappers using the same input, aggregate, and output parameter conventions as `Pattern.Native.Program.c_abi_call/3`.
+`IRBatch.CFG` adds hygienic syntax: bind effectful expressions with `<-` before reuse; `step` runs a builder callback,
+`emit` discards its result, and `dispatch` emits runtime arms. Duplicate static names fail at expansion; Builder checks
+block closure and MLIR checks types/dominance. Submit `Builder.finish(builder)` through `IRBatch.build_function!/3`.
 
-`IRBatch.CFG.cfg/2` adds syntax over that same immutable builder. A block contains
-`value <- expression`, `emit expression`, and `terminate terminator`; `step callback`
-composes a runtime transformation and `dispatch` emits dynamic arms. Bind effectful
-expressions with `<-` before reusing them. Duplicate static block names fail during
-macro expansion; Builder checks closure/termination and MLIR checks types/dominance.
-
-```elixir
-import Beaver.MLIR.IRBatch.CFG
-alias Beaver.MLIR.IRBatch.Builder
-
-builder = cfg Builder.new() do
-  block :entry do
-    sum <- Builder.expression(:binary, ["addi", [:x, :y], :i64])
-    terminate {:return, [sum]}
-  end
-end
-```
-
-`IRBatch.Spec` normalizes map, keyword and tuple function/block descriptions.
-`use Beaver.MLIR.IRBatch.Spec, types: [term: :i64], calls: [{:add, "add", 2, [:i64]}]`
-generates type aliases, fixed-arity call expansion and a normalization entry point.
-Language-specific literal injection can use its expansion callback. Symbolic value
-names remain unchanged when types are mapped.
-
-`Beaver.SSA.Schema` declares uses, definitions and successor edges using paths into
-caller-owned maps. It generates traversal/renaming functions for each exit variant.
-`SSA.BlockSharing.run/3` parameterizes literals and free values, compares complete
-alpha-normalized structures, then rewrites eligible blocks to shared bodies. The
-caller provides eligibility, literal and jump policies; unwind/safepoint decisions
-remain with the language. Escaping definitions and the entry block are excluded.
-
-`Beaver.Build.Plan` records ordered stage dependencies and measures their execution.
-`Build.ArtifactCache` centralizes digest checks, JSON cache reuse and atomic file
-publication. Publish referenced artifacts before their manifest; each rename is
-atomic, while a group of files is not a filesystem transaction. Include all semantic
-inputs and tool revisions in the cache key. `LLVMIR.compile_units!` still owns
-parallel object compilation and its object/manifest cache contract.
-
-`IRBatch.Protocol` and Zig's `batch_protocol.zig` derive tuple fields and operand
-tags from `lib/beaver/mlir/ir_batch/protocol.json`. Zig specializes named field access
-at comptime, retaining native bounds/context/resource checks before mutation.
-Version 1 preserves the seven-field single-block and eight-field CFG wire formats.
-`Protocol.native_schema(ctx)` detects a loaded NIF built from a different schema.
+`IRBatch.Protocol` and Zig's `batch_protocol.zig` derive field positions and operand tags from `protocol.json`.
+Version 1 preserves seven-field single-block and eight-field CFG tuples, with native bounds/context/resource checks.
+`Protocol.native_schema(ctx)` detects NIF/schema mismatches.

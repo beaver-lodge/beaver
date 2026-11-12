@@ -381,13 +381,6 @@ bool computeSafepointColoring(Operation *func, ArrayRef<Operation *> safepoints,
 }
 } // namespace
 
-using BeaverSafepointCallback = void (*)(size_t totalSlots, const MlirType *slotTypes,
-                                         size_t numColoredValues, const MlirValue *coloredValues,
-                                         const size_t *valueSlots, size_t safepointIndex,
-                                         MlirOperation safepointOp, size_t numLive,
-                                         const MlirValue *liveValues, const size_t *liveSlots,
-                                         void *userData);
-
 extern "C" MLIR_CAPI_EXPORTED bool beaverAnalyzeSafepoints(
     void *session, MlirOperation funcOp, const MlirOperation *safepointOps,
     size_t numSafepoints, bool excludeEntryArgs, BeaverSafepointCallback callback,

@@ -7,6 +7,11 @@
 typedef enum {
   // Tracing sessions have managed resources and a collecting drain adapter.
   BeaverCapiPolicyExclude__beaverAnalysisCreate,
+  BeaverCapiPolicyExclude__beaverLLVMGetHostTarget,
+  BeaverCapiPolicyExclude__beaverCompileToObject,
+  BeaverCapiPolicyExclude__beaverExtractFunctionModule,
+  BeaverCapiPolicyExclude__beaverAnalyzeSafepoints,
+  BeaverCapiPolicyExclude__beaverLowerResumableCFG,
   BeaverCapiPolicyExclude__beaverAnalysisDestroy,
   BeaverCapiPolicyExclude__beaverAnalysisInvalidate,
   BeaverCapiPolicyExclude__beaverAnalysisGeneration,

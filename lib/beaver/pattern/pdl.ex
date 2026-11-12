@@ -1,10 +1,7 @@
 defmodule Beaver.Pattern.PDL do
   @moduledoc """
-  Context-independent PDL rule collections indexed by explicitly supplied flat callee symbols.
-
-  Entries are `{symbols, source}`; use `:all` for rules without a callee restriction. Metadata is supplied when
-  generating rules, never recovered by parsing PDL text. Rewriting revisits selection when new symbols appear,
-  so a rule may expose a match for an initially unselected rule. Compiled native pattern sets remain local to a run.
+  Portable PDL collections indexed by explicit callee metadata: `{symbols, source}`, or `:all` for unrestricted rules.
+  Selection revisits new callees introduced by rewriting. Compiled native pattern sets remain local to each run.
   """
   alias Beaver.MLIR.{Rewrite, SymbolTable}
   @enforce_keys [:entries, :digest]
@@ -25,15 +22,8 @@ defmodule Beaver.Pattern.PDL do
     %__MODULE__{entries: entries, digest: digest}
   end
 
-  def fetch(key, revision, build) when is_function(build, 0) do
-    key = {__MODULE__, key}
-    revision = {__MODULE__.__info__(:md5), revision}
-
-    case :persistent_term.get(key, nil) do
-      {^revision, rules} -> rules
-      _ -> tap(new(build.()), &:persistent_term.put(key, {revision, &1}))
-    end
-  end
+  def fetch(key, revision, build) when is_function(build, 0),
+    do: Beaver.Build.ArtifactCache.fetch_revision(__MODULE__, key, revision, fn -> new(build.()) end)
 
   def source(%__MODULE__{entries: entries}),
     do: IO.iodata_to_binary(["module {\n", Enum.map(entries, &elem(&1, 1)), "}\n"])

@@ -21,6 +21,13 @@ MLIR_CAPI_EXPORTED MlirLogicalResult beaverCompileLLVMIRToPTX(MlirStringRef llvm
                                                               MlirStringRef features, MlirStringCallback outputCallback,
                                                               MlirStringCallback errorCallback, void *userData);
 
+/// Internal object compilation adapters shared by the C++ implementation and Zig bindings.
+MLIR_CAPI_EXPORTED void beaverLLVMGetHostTarget(MlirStringCallback callback, void *data);
+MLIR_CAPI_EXPORTED MlirLogicalResult beaverCompileToObject(MlirOperation module, MlirStringRef ir,
+    MlirStringRef triple, MlirStringRef cpu, MlirStringRef features, unsigned level, bool pic, bool assembly,
+    uint64_t *timings, MlirStringCallback output, MlirStringCallback error, void *data);
+MLIR_CAPI_EXPORTED MlirModule beaverExtractFunctionModule(MlirOperation module, MlirStringRef name, bool globals);
+
 #ifdef __cplusplus
 }
 #endif

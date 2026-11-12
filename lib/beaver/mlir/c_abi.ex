@@ -1,7 +1,6 @@
 defmodule Beaver.MLIR.CABI do
   @moduledoc "C ABI parameter conventions shared by native call lowering and value-wrapper templates."
-  alias Beaver.MLIR
-  alias Beaver.MLIR.Template
+  alias Beaver.{MLIR, MLIR.Template}
 
   @doc "Normalizes a parameter to `{direction, type, options}`; aggregate inputs are passed by address."
   def parameter!(:in), do: {:in, nil, []}
@@ -89,12 +88,9 @@ defmodule Beaver.MLIR.CABI do
   defp return_type([]), do: "()"
   defp return_type([type]), do: type
 
-  defp load_outputs(indexed),
-    do:
-      for(
-        {{:out, type, _}, i} <- indexed,
-        do: "  %outv#{i} = llvm.load %outp#{i} : !llvm.ptr -> #{type_string(type)}\n"
-      )
+  defp load_outputs(indexed) do
+    for {{:out, type, _}, i} <- indexed, do: "  %outv#{i} = llvm.load %outp#{i} : !llvm.ptr -> #{type_string(type)}\n"
+  end
 
   defp return_source(indexed, raw_results, results) do
     values = if(raw_results == [], do: [], else: ["%st"]) ++ for({{:out, _, _}, i} <- indexed, do: "%outv#{i}")

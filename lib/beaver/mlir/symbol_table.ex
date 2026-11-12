@@ -63,22 +63,8 @@ defmodule Beaver.MLIR.SymbolTable do
           keyword()
         ) :: Operation.t()
   def ensure_declaration!(module, name, function_type, opts \\ []) do
-    root = symbol_root(module)
-    ctx = MLIR.context(root)
-    name = clean_name(name)
-
-    type = resolve_type!(function_type, ctx)
-
-    Operation.with_symbol_table(root, fn st ->
-      op = lookup(st, name)
-
-      if MLIR.null?(op) do
-        insert_declaration(st, root, name, type, opts)
-      else
-        verify_if_requested!(op, name, type, opts)
-        op
-      end
-    end)
+    declarations(module, [{name, function_type}], opts, true, Keyword.get(opts, :verify_type, false))
+    Operation.with_symbol_table(symbol_root(module), &lookup(&1, clean_name(name)))
   end
 
   @doc "Returns context-independent `{input_types, result_types}` for immediate func.func symbols."
@@ -102,17 +88,20 @@ defmodule Beaver.MLIR.SymbolTable do
   @doc "Checks every signature before inserting missing declarations; returns module. Accepts types or textual type pairs."
   def ensure_declarations!(module, signatures, opts \\ []), do: declarations(module, signatures, opts, true)
 
-  defp declarations(module, signatures, opts, insert?) do
+  defp declarations(module, signatures, opts, insert?, verify? \\ true) do
     root = symbol_root(module)
     ctx = MLIR.context(root)
     types = Enum.map(signatures, fn {name, type} -> {clean_name(name), resolve_type!(type, ctx)} end)
-
     check_duplicate_types!(types)
 
     Operation.with_symbol_table(root, fn st ->
-      for {name, type} <- types, op = lookup(st, name), not MLIR.null?(op), do: verify_existing_type!(op, name, type)
+      for {name, type} <- types,
+          verify?,
+          op = lookup(st, name),
+          not MLIR.null?(op),
+          do: verify_existing_type!(op, name, type)
 
-      if insert?, do: insert_declarations(st, root, types, opts)
+      for {name, type} <- types, insert?, MLIR.null?(lookup(st, name)), do: declare_symbol!(st, root, name, type, opts)
     end)
 
     module
@@ -123,10 +112,6 @@ defmodule Beaver.MLIR.SymbolTable do
       if acc[name] && not MLIR.equal?(acc[name], type), do: raise(ArgumentError, "conflicting signatures for @#{name}")
       Map.put(acc, name, type)
     end)
-  end
-
-  defp insert_declarations(st, root, types, opts) do
-    for {name, type} <- types, MLIR.null?(lookup(st, name)), do: insert_declaration(st, root, name, type, opts)
   end
 
   defp resolve_type!({inputs, results}, ctx) when is_list(inputs) and is_list(results),
@@ -140,7 +125,7 @@ defmodule Beaver.MLIR.SymbolTable do
     type
   end
 
-  defp insert_declaration(st, root, name, type, opts) do
+  defp declare_symbol!(st, root, name, type, opts) do
     ctx = MLIR.context(root)
     op_name = Keyword.get(opts, :op, "func.func")
     loc = Keyword.get_lazy(opts, :location, fn -> Operation.location(root) end)
@@ -190,15 +175,11 @@ defmodule Beaver.MLIR.SymbolTable do
     Operation.with_symbol_table(dst, fn dst_st ->
       Operation.with_symbol_table(src, fn src_st ->
         imports = plan_imports!(dst_st, src_st, seeds, MapSet.new(), opts, [])
-        import_planned!(dst_st, imports, opts)
+        Enum.each(imports, &clone_import!(&1, dst_st, opts))
       end)
     end)
 
     target
-  end
-
-  defp import_planned!(table, imports, opts) do
-    for {name, op} <- imports, do: clone_symbol!(table, op, lookup(table, name), opts)
   end
 
   @doc "Returns unique flat symbol names referenced by operation attributes inside module_or_op."
@@ -243,6 +224,8 @@ defmodule Beaver.MLIR.SymbolTable do
   defp verify_if_requested!(op, name, type, opts) do
     if opts[:verify_type] && not MLIR.null?(op), do: verify_existing_type!(op, name, type)
   end
+
+  defp clone_import!({name, op}, table, opts), do: clone_symbol!(table, op, lookup(table, name), opts)
 
   defp clone_symbol!(table, src, dst, opts) do
     unless MLIR.null?(dst), do: erase(table, dst)

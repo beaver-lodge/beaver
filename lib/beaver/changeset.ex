@@ -126,21 +126,7 @@ defmodule Beaver.Changeset do
     """
   end
 
-  @shorthand_types %{
-    i1: "i1",
-    i8: "i8",
-    i16: "i16",
-    i32: "i32",
-    i64: "i64",
-    i128: "i128",
-    index: "index",
-    f16: "f16",
-    bf16: "bf16",
-    f32: "f32",
-    f64: "f64",
-    ptr: "!llvm.ptr",
-    none: "none"
-  }
+  @shorthand_types Beaver.MLIR.IRBatch.Spec.types()
 
   @type deferred_type() :: {:parametric, term(), term(), term()}
   @type type() :: Type.t() | String.t() | atom() | deferred_type() | [Type.t() | String.t() | atom() | deferred_type()]

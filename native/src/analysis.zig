@@ -7,42 +7,7 @@ const c = prelude.c;
 const m = @import("mlir_capi.zig");
 const string_ref = @import("string_ref.zig");
 const tuple = @import("execution.zig").tuple;
-
-const SafepointCallback = *const fn (
-    usize,
-    [*]const m.Type.T,
-    usize,
-    [*]const m.Value.T,
-    [*]const usize,
-    usize,
-    m.Operation.T,
-    usize,
-    [*]const m.Value.T,
-    [*]const usize,
-    ?*anyopaque,
-) callconv(.c) void;
-
-extern fn beaverAnalyzeSafepoints(
-    ?*anyopaque,
-    m.Operation.T,
-    [*]const m.Operation.T,
-    usize,
-    bool,
-    SafepointCallback,
-    ?*anyopaque,
-) bool;
-
-extern fn beaverLowerResumableCFG(
-    m.Operation.T,
-    [*]const m.Operation.T,
-    usize,
-    m.StringRef.T,
-    m.StringRef.T,
-    isize,
-    isize,
-    isize,
-    *u64,
-) bool;
+const Range = @import("callback_args.zig").Range;
 
 const SafepointCollector = struct {
     env: beam.env,
@@ -50,102 +15,62 @@ const SafepointCollector = struct {
     slot_types: beam.term = undefined,
     value_slots: beam.term = undefined,
     initialized: bool = false,
-    entries: std.array_list.Managed(beam.term),
+    entries: std.array_list.Managed(beam.term) = .init(beam.allocator),
     failed: bool = false,
-
-    fn init(env: beam.env) @This() {
-        return .{
-            .env = env,
-            .entries = std.array_list.Managed(beam.term).init(beam.allocator),
-        };
-    }
-
-    fn deinit(self: *@This()) void {
-        self.entries.deinit();
-    }
 
     fn collect(
         total_slots: usize,
-        slot_types_ptr: [*]const m.Type.T,
+        slot_types_ptr: [*c]const m.Type.T,
         num_colored: usize,
-        colored_values_ptr: [*]const m.Value.T,
-        value_slots_ptr: [*]const usize,
+        colored_values_ptr: [*c]const m.Value.T,
+        value_slots_ptr: [*c]const usize,
         sp_index: usize,
         sp_op: m.Operation.T,
         num_live: usize,
-        live_values_ptr: [*]const m.Value.T,
-        live_slots_ptr: [*]const usize,
+        live_values_ptr: [*c]const m.Value.T,
+        live_slots_ptr: [*c]const usize,
         user_data: ?*anyopaque,
     ) callconv(.c) void {
         const self: *@This() = @ptrCast(@alignCast(user_data orelse return));
         if (self.failed) return;
-        const env = self.env;
+        self.append(.{
+            .types = Range(m.Type).slice(@intCast(total_slots), slot_types_ptr),
+            .colored = Range(m.Value).slice(@intCast(num_colored), colored_values_ptr),
+            .slots = value_slots_ptr,
+            .index = sp_index,
+            .op = sp_op,
+            .live = Range(m.Value).slice(@intCast(num_live), live_values_ptr),
+            .live_slots = live_slots_ptr,
+        }) catch {
+            self.failed = true;
+        };
+    }
 
+    fn append(self: *@This(), data: anytype) !void {
+        const env = self.env;
         if (!self.initialized) {
             self.initialized = true;
-            self.slot_count = total_slots;
-            const st_terms = beam.allocator.alloc(beam.term, total_slots) catch {
-                self.failed = true;
-                return;
-            };
-            defer beam.allocator.free(st_terms);
-            for (0..total_slots) |i| {
-                st_terms[i] = m.Type.resource.make_kind(env, slot_types_ptr[i]) catch {
-                    self.failed = true;
-                    return;
-                };
+            self.slot_count = data.types.len;
+            self.slot_types = try Range(m.Type).encode(env, data.types);
+            const pairs = try beam.allocator.alloc(beam.term, data.colored.len);
+            defer beam.allocator.free(pairs);
+            for (data.colored, pairs, 0..) |value, *pair, i| {
+                var fields = [_]beam.term{ try m.Value.resource.make_kind(env, value), beam.make_u64(env, data.slots[i]) };
+                pair.* = beam.make_tuple(env, &fields);
             }
-            self.slot_types = beam.make_term_list(env, st_terms);
-
-            const vs_terms = beam.allocator.alloc(beam.term, num_colored) catch {
-                self.failed = true;
-                return;
-            };
-            defer beam.allocator.free(vs_terms);
-            for (0..num_colored) |i| {
-                const v_term = m.Value.resource.make_kind(env, colored_values_ptr[i]) catch {
-                    self.failed = true;
-                    return;
-                };
-                var pair = [_]beam.term{ v_term, beam.make_u64(env, value_slots_ptr[i]) };
-                vs_terms[i] = beam.make_tuple(env, &pair);
-            }
-            self.value_slots = beam.make_term_list(env, vs_terms);
+            self.value_slots = beam.make_term_list(env, pairs);
         }
-
-        if (sp_op.ptr == null) return;
-
-        const lv_terms = beam.allocator.alloc(beam.term, num_live) catch {
-            self.failed = true;
-            return;
-        };
-        defer beam.allocator.free(lv_terms);
-        const ls_terms = beam.allocator.alloc(beam.term, num_live) catch {
-            self.failed = true;
-            return;
-        };
-        defer beam.allocator.free(ls_terms);
-        for (0..num_live) |i| {
-            lv_terms[i] = m.Value.resource.make_kind(env, live_values_ptr[i]) catch {
-                self.failed = true;
-                return;
-            };
-            ls_terms[i] = beam.make_u64(env, live_slots_ptr[i]);
-        }
-        const op_term = m.Operation.resource.make_kind(env, sp_op) catch {
-            self.failed = true;
-            return;
-        };
+        if (data.op.ptr == null) return;
+        const slots = try beam.allocator.alloc(beam.term, data.live.len);
+        defer beam.allocator.free(slots);
+        for (slots, 0..) |*slot, i| slot.* = beam.make_u64(env, data.live_slots[i]);
         var entry = [_]beam.term{
-            beam.make_u64(env, sp_index),
-            op_term,
-            beam.make_term_list(env, lv_terms),
-            beam.make_term_list(env, ls_terms),
+            beam.make_u64(env, data.index),
+            try m.Operation.resource.make_kind(env, data.op),
+            try Range(m.Value).encode(env, data.live),
+            beam.make_term_list(env, slots),
         };
-        self.entries.append(beam.make_tuple(env, &entry)) catch {
-            self.failed = true;
-            return;
-        };
+        try self.entries.append(beam.make_tuple(env, &entry));
     }
 
     fn finish(self: *@This()) !beam.term {
@@ -161,14 +86,7 @@ const SafepointCollector = struct {
 };
 
 fn decodeSafepointOps(env: beam.env, list_term: beam.term) ![]m.Operation.T {
-    const len = try beam.get_list_length(env, list_term);
-    const ops = try beam.allocator.alloc(m.Operation.T, len);
-    errdefer beam.allocator.free(ops);
-    var rest = list_term;
-    for (ops) |*item| {
-        item.* = try m.Operation.resource.fetch(env, try beam.get_head_and_iter(env, &rest));
-    }
-    return ops;
+    return Range(m.Operation).decode(env, list_term, beam.allocator);
 }
 
 const Session = struct {
@@ -261,15 +179,7 @@ pub fn query(env: beam.env, context: m.Context.T, args_term: beam.term, caller: 
             try results.append(beam.make_tuple(env, &terms));
         } else if (kind == 4) {
             const sp_args = try tuple(env, fields[2], 2);
-            const sp_ops = try decodeSafepointOps(env, sp_args[0]);
-            defer beam.allocator.free(sp_ops);
-            const exclude_entry_args = try beam.get_bool(env, sp_args[1]);
-            var collector = SafepointCollector.init(env);
-            defer collector.deinit();
-            if (!beaverAnalyzeSafepoints(handle, op, sp_ops.ptr, sp_ops.len, exclude_entry_args, SafepointCollector.collect, &collector)) {
-                return error.InvalidSafepointAnalysis;
-            }
-            try results.append(try collector.finish());
+            try results.append(try analyzeSafepoints(env, handle, op, sp_args[0], try beam.get_bool(env, sp_args[1])));
         } else {
             const rhs = if (kind < 2) try m.Operation.resource.fetch(env, fields[2]) else m.Operation.T{ .ptr = null };
             const value = if (kind == 2) try m.Value.resource.fetch(env, fields[2]) else m.Value.T{ .ptr = null };
@@ -282,15 +192,16 @@ pub fn query(env: beam.env, context: m.Context.T, args_term: beam.term, caller: 
     return beam.make_tuple(env, &output);
 }
 pub fn safepoint_analyze(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
-    const func_op = try m.Operation.resource.fetch(env, args[0]);
-    const sp_ops = try decodeSafepointOps(env, args[1]);
-    defer beam.allocator.free(sp_ops);
-    const exclude_entry_args = try beam.get_bool(env, args[2]);
-    var collector = SafepointCollector.init(env);
-    defer collector.deinit();
-    if (!beaverAnalyzeSafepoints(null, func_op, sp_ops.ptr, sp_ops.len, exclude_entry_args, SafepointCollector.collect, &collector)) {
+    return analyzeSafepoints(env, null, try m.Operation.resource.fetch(env, args[0]), args[1], try beam.get_bool(env, args[2]));
+}
+
+fn analyzeSafepoints(env: beam.env, session: ?*anyopaque, op: m.Operation.T, points: beam.term, exclude_entry: bool) !beam.term {
+    const ops = try decodeSafepointOps(env, points);
+    defer beam.allocator.free(ops);
+    var collector = SafepointCollector{ .env = env };
+    defer collector.entries.deinit();
+    if (!c.beaverAnalyzeSafepoints(session, op, ops.ptr, ops.len, exclude_entry, SafepointCollector.collect, &collector))
         return error.InvalidSafepointAnalysis;
-    }
     return collector.finish();
 }
 
@@ -300,28 +211,17 @@ pub fn safepoint_lower_resumable(env: beam.env, _: c_int, args: [*c]const beam.t
     defer beam.allocator.free(sp_ops);
     const save_op = try string_ref.get_binary_as_string_ref(env, args[2]);
     const load_op = try string_ref.get_binary_as_string_ref(env, args[3]);
-    var state_arg_index: isize = -1;
-    var frame_arg_index: isize = -1;
-    var slot_stride: isize = 0;
-    var tuple_mode = false;
-    var tup_arity: c_int = 0;
-    var tup_terms: [*c]const beam.term = undefined;
-    if (e.enif_get_tuple(env, args[4], &tup_arity, &tup_terms) != 0 and tup_arity == 3) {
-        tuple_mode = true;
-        state_arg_index = try beam.get(isize, env, tup_terms[0]);
-        frame_arg_index = try beam.get(isize, env, tup_terms[1]);
-        slot_stride = try beam.get(isize, env, tup_terms[2]);
-    } else {
-        state_arg_index = try beam.get(isize, env, args[4]);
-    }
+    const tuple_mode = e.enif_is_tuple(env, args[4]) != 0;
+    var indices = [_]isize{ -1, -1, 0 };
+    if (tuple_mode) {
+        const fields = try tuple(env, args[4], 3);
+        for (&indices, fields) |*index, field| index.* = try beam.get(isize, env, field);
+    } else indices[0] = try beam.get(isize, env, args[4]);
     var frame_bytes: u64 = 0;
-    if (!beaverLowerResumableCFG(func_op, sp_ops.ptr, sp_ops.len, save_op, load_op, state_arg_index, frame_arg_index, slot_stride, &frame_bytes)) {
+    if (!c.beaverLowerResumableCFG(func_op, sp_ops.ptr, sp_ops.len, save_op, load_op, indices[0], indices[1], indices[2], &frame_bytes)) {
         return error.ResumableCFGLoweringFailed;
     }
-    if (tuple_mode) {
-        return beam.make_ok_term(env, beam.make_u64(env, frame_bytes));
-    }
-    return beam.make_ok(env);
+    return if (tuple_mode) beam.make_ok_term(env, beam.make_u64(env, frame_bytes)) else beam.make_ok(env);
 }
 
 pub fn open(env: beam.env) void {

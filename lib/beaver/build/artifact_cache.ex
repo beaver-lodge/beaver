@@ -1,13 +1,20 @@
 defmodule Beaver.Build.ArtifactCache do
   @moduledoc """
-  Digest-checked artifacts and atomic single-file publication.
-
-  JSON cache entries publish their checksum before their manifest. Incomplete
-  entries are misses; a complete entry with a bad digest raises instead of silently
-  trusting corrupted data. Object caches may deliberately treat that as a miss.
-  Files are written beside their destination and renamed, with temporary files
-  cleaned on failure. Callers publish referenced artifacts before their manifest.
+  Digest-checked artifacts and atomic publication. JSON caches publish checksums before manifests.
+  Incomplete entries are misses; complete entries with bad digests raise. Temporary files are cleaned on failure.
+  Publish referenced artifacts before their manifest; renaming a group of files is not a filesystem transaction.
   """
+
+  @doc "Caches portable data by owner/key and revision; callers include every generator dependency."
+  def fetch_revision(owner, key, revision, build) do
+    key = {owner, key}
+    revision = {owner.__info__(:md5), revision}
+
+    case :persistent_term.get(key, nil) do
+      {^revision, value} -> value
+      _ -> tap(build.(), &:persistent_term.put(key, {revision, &1}))
+    end
+  end
 
   def digest(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
 
@@ -36,10 +43,7 @@ defmodule Beaver.Build.ArtifactCache do
     value
   end
 
-  def copy_verified!(source, destination, expected) do
-    bytes = read_verified!(source, expected)
-    write_atomic!(destination, bytes)
-  end
+  def copy_verified!(source, destination, expected), do: write_atomic!(destination, read_verified!(source, expected))
 
   def write_atomic!(path, data) do
     bytes = IO.iodata_to_binary(data)

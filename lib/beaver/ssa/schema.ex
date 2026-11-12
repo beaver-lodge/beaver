@@ -1,11 +1,8 @@
 defmodule Beaver.SSA.Schema do
   @moduledoc """
-  Declares value and edge positions in a caller-owned SSA representation.
-
-  Paths contain map keys, list indices, and `:each` for repeated fields. Exit
-  variants generate traversal clauses; opaque metadata and non-value literals
-  are preserved. Unknown exits have no values or edges. Language policy (effects,
-  unwind behavior and safepoints) belongs in the caller, not in the schema.
+  Declares SSA uses, definitions and edges using paths of map keys, list indices and `:each`.
+  Exit variants generate traversal clauses; unknown exits have no values or edges. Opaque metadata and literals
+  are preserved. Language policy, including effects, unwind and safepoints, remains with the caller.
   """
 
   defmacro __using__(opts) do
@@ -44,38 +41,36 @@ defmodule Beaver.SSA.Schema do
         |> map_edges(&Map.update!(&1, arguments, fn values -> Enum.map(values, fun) end))
       end
 
-      def instruction_uses(instruction), do: Map.fetch!(instruction, @graph_schema.instruction[:uses])
-      def instruction_defs(instruction), do: Map.fetch!(instruction, @graph_schema.instruction[:defs])
+      @instruction_paths for {_, key} <- @graph_schema.instruction, do: [key, :each]
+      @block_paths for path <- @instruction_paths, do: [@graph_schema.block[:instructions], :each | path]
+      @value_paths [[@graph_schema.block[:parameters], :each] | @block_paths]
+      for role <- [:uses, :defs] do
+        key = @graph_schema.instruction[role]
+        paths = [[@graph_schema.block[:instructions], :each, key, :each]]
+        paths = if role == :defs, do: [[@graph_schema.block[:parameters], :each] | paths], else: paths
+        def unquote(:"instruction_#{role}")(node), do: Map.fetch!(node, unquote(key))
 
-      def map_instruction_values(instruction, fun) do
-        Enum.reduce(@graph_schema.instruction, instruction, fn {_, key}, node ->
-          Map.update!(node, key, &Enum.map(&1, fun))
-        end)
+        def unquote(:"block_#{role}")(node) do
+          exit = node[@graph_schema.block[:exit]]
+          tail = if unquote(role) == :uses, do: exit_uses(exit), else: exit_values(exit, :defs)
+          Beaver.SSA.Schema.values(node, unquote(Macro.escape(paths))) ++ tail
+        end
       end
 
-      def block_defs(block) do
-        fields = @graph_schema.block
+      def map_instruction_values(node, fun), do: Beaver.SSA.Schema.map_values(node, @instruction_paths, fun)
 
-        block[fields[:parameters]] ++
-          Enum.flat_map(block[fields[:instructions]], &instruction_defs/1) ++
-          exit_values(block[fields[:exit]], :defs)
-      end
-
-      def block_uses(block) do
-        fields = @graph_schema.block
-        Enum.flat_map(block[fields[:instructions]], &instruction_uses/1) ++ exit_uses(block[fields[:exit]])
-      end
-
-      def map_block_values(block, fun) do
-        fields = @graph_schema.block
-
-        block
-        |> Map.update!(fields[:parameters], &Enum.map(&1, fun))
-        |> Map.update!(fields[:instructions], &Enum.map(&1, fn node -> map_instruction_values(node, fun) end))
-        |> Map.update!(fields[:exit], &map_exit_values(&1, fun))
+      def map_block_values(node, fun) do
+        node
+        |> Beaver.SSA.Schema.map_values(@value_paths, fun)
+        |> Map.update!(@graph_schema.block[:exit], &map_exit_values(&1, fun))
       end
     end
   end
+
+  @doc false
+  def values(node, paths), do: Enum.flat_map(paths, &read(node, &1))
+  @doc false
+  def map_values(node, paths, fun), do: Enum.reduce(paths, node, &update(&2, &1, fun))
 
   @doc false
   def read(value, []), do: [value]

@@ -1,11 +1,5 @@
 defmodule Beaver.Build.Plan do
-  @moduledoc """
-  An immutable build plan with explicit stage dependencies and measured execution.
-
-  Stages are declared in dependency order. Each callback receives only its named
-  dependencies; IO and caching remain in the stage, so plans are inspectable before
-  execution. Independent compilation units can use LLVMIR's concurrent executor.
-  """
+  @moduledoc "Immutable stages in dependency order; callbacks receive named dependencies and execution records timings."
   defstruct stages: []
   def new, do: %__MODULE__{}
 

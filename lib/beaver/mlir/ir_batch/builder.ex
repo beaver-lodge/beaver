@@ -1,13 +1,9 @@
 defmodule Beaver.MLIR.IRBatch.Builder do
   @moduledoc """
-  Immutable, context-independent CFG specifications for `Beaver.MLIR.IRBatch`.
-
-  Values are symbolic bindings, not native handles. `data` belongs to the caller. Integer constants are reused within
-  their block, or throughout the function when explicitly emitted in the entry block with `scope: :entry`.
-  `finish/1` returns blocks for `IRBatch.build_function!/3`; MLIR verifies types and dominance at submission.
-
-  `expression/2` constructs deferred operands; `emit/2` evaluates them in order against the supplied builder.
-  Bind shared results explicitly: reusing an expression describes another emission, including any side effects.
+  Immutable, context-independent CFG specifications. Values are symbolic; `data` belongs to the caller.
+  Integer constants are block-local unless explicitly emitted in the entry block with `scope: :entry`.
+  `finish/1` returns blocks for `IRBatch.build_function!/3`; MLIR verifies types and dominance.
+  Deferred expressions emit on each use, including effects: bind their results explicitly to share them.
   """
   defstruct blocks: [],
             current: nil,

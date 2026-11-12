@@ -139,111 +139,85 @@ fn decodeType(env: beam.env, ctx: m.Context.T, term: beam.term) !m.Type.T {
     }
 }
 
+const AttributeTag = enum { unit, i8, i16, i32, i64, index, bool, i1, f32, f64, string, symbol, flat_symbol, type, dense_i32, dense_i64, parse, int };
+
+fn attributeTag(env: beam.env, term: beam.term) !AttributeTag {
+    inline for (@typeInfo(AttributeTag).@"enum".fields) |field| {
+        if (e.enif_is_identical(term, beam.make_atom(env, field.name)) != 0) return @field(AttributeTag, field.name);
+    }
+    return error.InvalidBatchAttribute;
+}
+
 fn decodeAttribute(env: beam.env, ctx: m.Context.T, term: beam.term) !m.Attribute.T {
-    if (e.enif_is_identical(term, beam.make_atom(env, "unit")) != 0) {
-        return c.mlirUnitAttrGet(ctx);
+    inline for (.{ "unit", "true", "false" }, 0..) |atom, i| {
+        if (e.enif_is_identical(term, beam.make_atom(env, atom)) != 0)
+            return if (i == 0) c.mlirUnitAttrGet(ctx) else c.mlirBoolAttrGet(ctx, if (i == 1) 1 else 0);
     }
-    if (e.enif_is_identical(term, beam.make_atom(env, "true")) != 0) {
-        return c.mlirBoolAttrGet(ctx, 1);
-    }
-    if (e.enif_is_identical(term, beam.make_atom(env, "false")) != 0) {
-        return c.mlirBoolAttrGet(ctx, 0);
-    }
-
-    var tag_arity: c_int = 0;
-    var tag_terms: [*c]const beam.term = undefined;
-    if (e.enif_get_tuple(env, term, &tag_arity, &tag_terms) != 0 and tag_arity >= 1) {
-        const tag = tag_terms[0];
-        if (tag_arity == 1 and e.enif_is_identical(tag, beam.make_atom(env, "unit")) != 0) {
-            return c.mlirUnitAttrGet(ctx);
-        }
-        if (tag_arity == 2) {
-            if (e.enif_is_identical(tag, beam.make_atom(env, "i64")) != 0) {
-                return c.mlirIntegerAttrGet(c.mlirIntegerTypeGet(ctx, 64), try beam.get(i64, env, tag_terms[1]));
-            }
-            if (e.enif_is_identical(tag, beam.make_atom(env, "i32")) != 0) {
-                return c.mlirIntegerAttrGet(c.mlirIntegerTypeGet(ctx, 32), try beam.get(i64, env, tag_terms[1]));
-            }
-            if (e.enif_is_identical(tag, beam.make_atom(env, "i16")) != 0) {
-                return c.mlirIntegerAttrGet(c.mlirIntegerTypeGet(ctx, 16), try beam.get(i64, env, tag_terms[1]));
-            }
-            if (e.enif_is_identical(tag, beam.make_atom(env, "i8")) != 0) {
-                return c.mlirIntegerAttrGet(c.mlirIntegerTypeGet(ctx, 8), try beam.get(i64, env, tag_terms[1]));
-            }
-            if (e.enif_is_identical(tag, beam.make_atom(env, "index")) != 0) {
-                return c.mlirIntegerAttrGet(c.mlirIndexTypeGet(ctx), try beam.get(i64, env, tag_terms[1]));
-            }
-            if (e.enif_is_identical(tag, beam.make_atom(env, "bool")) != 0 or e.enif_is_identical(tag, beam.make_atom(env, "i1")) != 0) {
-                if (beam.get_bool(env, tag_terms[1])) |b| {
-                    return c.mlirBoolAttrGet(ctx, if (b) 1 else 0);
-                } else |_| {
-                    const n = try beam.get(i64, env, tag_terms[1]);
-                    if (n != 0 and n != 1) return error.InvalidBatchAttribute;
-                    return c.mlirBoolAttrGet(ctx, @intCast(n));
-                }
-            }
-            if (e.enif_is_identical(tag, beam.make_atom(env, "f64")) != 0) {
-                return c.mlirFloatAttrDoubleGet(ctx, c.mlirF64TypeGet(ctx), try beam.get(f64, env, tag_terms[1]));
-            }
-            if (e.enif_is_identical(tag, beam.make_atom(env, "f32")) != 0) {
-                return c.mlirFloatAttrDoubleGet(ctx, c.mlirF32TypeGet(ctx), try beam.get(f64, env, tag_terms[1]));
-            }
-            if (e.enif_is_identical(tag, beam.make_atom(env, "string")) != 0) {
-                return c.mlirStringAttrGet(ctx, try string_ref.get_binary_as_string_ref(env, tag_terms[1]));
-            }
-            if (e.enif_is_identical(tag, beam.make_atom(env, "symbol")) != 0 or e.enif_is_identical(tag, beam.make_atom(env, "flat_symbol")) != 0) {
-                const sym = try string_ref.get_binary_as_string_ref(env, tag_terms[1]);
-                if (sym.length == 0) return error.InvalidBatchAttribute;
-                return c.mlirFlatSymbolRefAttrGet(ctx, sym);
-            }
-            if (e.enif_is_identical(tag, beam.make_atom(env, "type")) != 0) {
-                return c.mlirTypeAttrGet(try decodeType(env, ctx, tag_terms[1]));
-            }
-            if (e.enif_is_identical(tag, beam.make_atom(env, "dense_i32")) != 0) {
-                const len = try beam.get_list_length(env, tag_terms[1]);
-                const elems = try beam.allocator.alloc(i32, len);
+    var arity: c_int = 0;
+    var fields: [*c]const beam.term = undefined;
+    if (e.enif_get_tuple(env, term, &arity, &fields) != 0 and arity >= 1) {
+        const tag = try attributeTag(env, fields[0]);
+        const expected: c_int = switch (tag) {
+            .unit => 1,
+            .int => 3,
+            else => 2,
+        };
+        if (arity != expected) return error.InvalidBatchAttribute;
+        return switch (tag) {
+            .unit => c.mlirUnitAttrGet(ctx),
+            inline .i8, .i16, .i32, .i64 => |integer| c.mlirIntegerAttrGet(
+                c.mlirIntegerTypeGet(ctx, comptime std.fmt.parseInt(c_uint, @tagName(integer)[1..], 10) catch unreachable),
+                try beam.get(i64, env, fields[1]),
+            ),
+            .index => c.mlirIntegerAttrGet(c.mlirIndexTypeGet(ctx), try beam.get(i64, env, fields[1])),
+            .int => blk: {
+                const width = try beam.get(c_uint, env, fields[1]);
+                if (width == 0) return error.InvalidBatchAttribute;
+                break :blk c.mlirIntegerAttrGet(c.mlirIntegerTypeGet(ctx, width), try beam.get(i64, env, fields[2]));
+            },
+            .bool, .i1 => blk: {
+                const value: i64 = if (beam.get_bool(env, fields[1])) |b| @intFromBool(b) else |_| try beam.get(i64, env, fields[1]);
+                if (value != 0 and value != 1) return error.InvalidBatchAttribute;
+                break :blk c.mlirBoolAttrGet(ctx, @intCast(value));
+            },
+            inline .f32, .f64 => |float| c.mlirFloatAttrDoubleGet(ctx, @field(c, "mlirF" ++ @tagName(float)[1..] ++ "TypeGet")(ctx), try beam.get(f64, env, fields[1])),
+            .string => c.mlirStringAttrGet(ctx, try string_ref.get_binary_as_string_ref(env, fields[1])),
+            .symbol, .flat_symbol => blk: {
+                const symbol = try string_ref.get_binary_as_string_ref(env, fields[1]);
+                if (symbol.length == 0) return error.InvalidBatchAttribute;
+                break :blk c.mlirFlatSymbolRefAttrGet(ctx, symbol);
+            },
+            .type => c.mlirTypeAttrGet(try decodeType(env, ctx, fields[1])),
+            inline .dense_i32, .dense_i64 => |dense| blk: {
+                const width = @tagName(dense)[7..];
+                const Int = std.meta.Int(.signed, comptime std.fmt.parseInt(u16, width, 10) catch unreachable);
+                const elems = try beam.allocator.alloc(Int, try beam.get_list_length(env, fields[1]));
                 defer beam.allocator.free(elems);
-                var list_rest = tag_terms[1];
-                for (elems) |*el| el.* = try beam.get(i32, env, try beam.get_head_and_iter(env, &list_rest));
-                return c.mlirDenseI32ArrayGet(ctx, @intCast(len), elems.ptr);
-            }
-            if (e.enif_is_identical(tag, beam.make_atom(env, "dense_i64")) != 0) {
-                const len = try beam.get_list_length(env, tag_terms[1]);
-                const elems = try beam.allocator.alloc(i64, len);
-                defer beam.allocator.free(elems);
-                var list_rest = tag_terms[1];
-                for (elems) |*el| el.* = try beam.get(i64, env, try beam.get_head_and_iter(env, &list_rest));
-                return c.mlirDenseI64ArrayGet(ctx, @intCast(len), elems.ptr);
-            }
-            if (e.enif_is_identical(tag, beam.make_atom(env, "parse")) != 0) {
-                const sr = try string_ref.get_binary_as_string_ref(env, tag_terms[1]);
-                if (sr.length == 0) return error.InvalidBatchAttribute;
-                const parsed = c.mlirAttributeParseGet(ctx, sr);
-                if (parsed.ptr == null) return error.InvalidBatchAttribute;
-                return parsed;
-            }
-        }
-        if (tag_arity == 3 and e.enif_is_identical(tag, beam.make_atom(env, "int")) != 0) {
-            const width = try beam.get(c_uint, env, tag_terms[1]);
-            if (width == 0) return error.InvalidBatchAttribute;
-            return c.mlirIntegerAttrGet(c.mlirIntegerTypeGet(ctx, width), try beam.get(i64, env, tag_terms[2]));
-        }
-        return error.InvalidBatchAttribute;
+                var rest = fields[1];
+                for (elems) |*el| el.* = try beam.get(Int, env, try beam.get_head_and_iter(env, &rest));
+                break :blk @field(c, "mlirDenseI" ++ width ++ "ArrayGet")(ctx, @intCast(elems.len), elems.ptr);
+            },
+            .parse => parseAttribute(ctx, try string_ref.get_binary_as_string_ref(env, fields[1])),
+        };
     }
-
-    if (string_ref.get_binary_as_string_ref(env, term)) |sr| {
-        if (sr.length == 0) return error.InvalidBatchAttribute;
-        const parsed = c.mlirAttributeParseGet(ctx, sr);
-        if (parsed.ptr == null) return error.InvalidBatchAttribute;
-        return parsed;
-    } else |_| {
-        const a_val = try m.Attribute.resource.fetch(env, term);
-        if (a_val.ptr == null or !c.mlirContextEqual(ctx, c.mlirAttributeGetContext(a_val))) return error.ContextMismatch;
-        return a_val;
+    if (string_ref.get_binary_as_string_ref(env, term)) |source| return parseAttribute(ctx, source) else |_| {
+        const attr = try m.Attribute.resource.fetch(env, term);
+        if (attr.ptr == null or !c.mlirContextEqual(ctx, c.mlirAttributeGetContext(attr))) return error.ContextMismatch;
+        return attr;
     }
 }
 
+fn parseAttribute(ctx: m.Context.T, source: m.StringRef.T) !m.Attribute.T {
+    if (source.length == 0) return error.InvalidBatchAttribute;
+    const parsed = c.mlirAttributeParseGet(ctx, source);
+    if (parsed.ptr == null) return error.InvalidBatchAttribute;
+    return parsed;
+}
+
 pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
+    var memory = std.heap.ArenaAllocator.init(beam.allocator);
+    defer memory.deinit();
+    const allocator = memory.allocator();
     const args = try tuple(env, arguments, 4);
 
     var insert_mode: u8 = 0; // 0 = end, 1 = start, 2 = before, 3 = after, 4 = multi-block end
@@ -251,21 +225,14 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
     var blocks: []m.Block.T = undefined;
     if (e.enif_is_identical(args[1], beam.make_atom(env, "blocks")) != 0) {
         insert_mode = 4;
-        const num_blocks = try beam.get_list_length(env, args[0]);
-        if (num_blocks == 0) return error.InvalidBatchBlock;
-        blocks = try beam.allocator.alloc(m.Block.T, num_blocks);
-        errdefer beam.allocator.free(blocks);
-        var blk_rest = args[0];
-        for (blocks) |*b| {
-            b.* = try m.Block.resource.fetch(env, try beam.get_head_and_iter(env, &blk_rest));
-            if (b.ptr == null) return error.InvalidBatchBlock;
-        }
+        blocks = try @import("callback_args.zig").Range(m.Block).decode(env, args[0], allocator);
+        if (blocks.len == 0) return error.InvalidBatchBlock;
+        for (blocks) |block| if (block.ptr == null) return error.InvalidBatchBlock;
     } else {
         const single_block = try m.Block.resource.fetch(env, args[0]);
         if (single_block.ptr == null) return error.InvalidBatchBlock;
-        blocks = try beam.allocator.alloc(m.Block.T, 1);
+        blocks = try allocator.alloc(m.Block.T, 1);
         blocks[0] = single_block;
-        errdefer beam.allocator.free(blocks);
 
         if (e.enif_is_identical(args[1], beam.make_atom(env, "end")) != 0) {
             insert_mode = 0;
@@ -282,7 +249,6 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
             } else return error.InvalidInsertionPosition;
         }
     }
-    defer beam.allocator.free(blocks);
 
     const count = try beam.get_list_length(env, args[2]);
     if (count > 1048576) return error.BatchTooLarge;
@@ -291,18 +257,7 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
     const binding = if (verify_root.ptr != null) c.beaverExecutionBindOperation(verify_root) else null;
     defer c.beaverExecutionUnbindOperation(binding);
 
-    const specs = try beam.allocator.alloc(BuildSpec, count);
-    var initialized_specs: usize = 0;
-    defer {
-        for (specs[0..initialized_specs]) |spec| {
-            beam.allocator.free(spec.operands);
-            beam.allocator.free(spec.result_types);
-            beam.allocator.free(spec.attributes);
-            beam.allocator.free(spec.successors);
-        }
-        beam.allocator.free(specs);
-    }
-
+    const specs = try allocator.alloc(BuildSpec, count);
     var rest = args[2];
     for (specs, 0..) |*spec, i| {
         const spec_term = try beam.get_head_and_iter(env, &rest);
@@ -317,8 +272,8 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
         if (loc.ptr == null or !c.mlirContextEqual(ctx, c.mlirLocationGetContext(loc))) return error.ContextMismatch;
 
         const op_len = try beam.get_list_length(env, fields.get("operands"));
-        const op_refs = try beam.allocator.alloc(OperandRef, op_len);
-        errdefer beam.allocator.free(op_refs);
+        const op_refs = try allocator.alloc(OperandRef, op_len);
+
         var op_rest = fields.get("operands");
         for (op_refs) |*op_ref| {
             const o_fields = try protocol.Operand.decode(env, try beam.get_head_and_iter(env, &op_rest));
@@ -352,16 +307,16 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
         }
 
         const res_len = try beam.get_list_length(env, fields.get("result_types"));
-        const res_types = try beam.allocator.alloc(m.Type.T, res_len);
-        errdefer beam.allocator.free(res_types);
+        const res_types = try allocator.alloc(m.Type.T, res_len);
+
         var res_rest = fields.get("result_types");
         for (res_types) |*rt| {
             rt.* = try decodeType(env, ctx, try beam.get_head_and_iter(env, &res_rest));
         }
 
         const attr_len = try beam.get_list_length(env, fields.get("attributes"));
-        const attrs = try beam.allocator.alloc(c.MlirNamedAttribute, attr_len);
-        errdefer beam.allocator.free(attrs);
+        const attrs = try allocator.alloc(c.MlirNamedAttribute, attr_len);
+
         var attr_rest = fields.get("attributes");
         for (attrs) |*na| {
             const a_fields = try tuple(env, try beam.get_head_and_iter(env, &attr_rest), 2);
@@ -370,14 +325,8 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
             na.* = c.mlirNamedAttributeGet(c.mlirIdentifierGet(ctx, a_name), a_val);
         }
 
-        const succ_len = try beam.get_list_length(env, fields.get("successors"));
-        const succs = try beam.allocator.alloc(m.Block.T, succ_len);
-        errdefer beam.allocator.free(succs);
-        var succ_rest = fields.get("successors");
-        for (succs) |*sb| {
-            sb.* = try m.Block.resource.fetch(env, try beam.get_head_and_iter(env, &succ_rest));
-            if (sb.ptr == null) return error.InvalidBatchSuccessor;
-        }
+        const succs = try @import("callback_args.zig").Range(m.Block).decode(env, fields.get("successors"), allocator);
+        for (succs) |block| if (block.ptr == null) return error.InvalidBatchSuccessor;
 
         const num_regions = try beam.get(usize, env, fields.get("regions"));
         spec.* = .{
@@ -390,15 +339,13 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
             .successors = succs,
             .num_regions = num_regions,
         };
-        initialized_specs += 1;
     }
 
-    const created_ops = try beam.allocator.alloc(m.Operation.T, count);
-    defer beam.allocator.free(created_ops);
-    const op_terms = try beam.allocator.alloc(beam.term, count);
-    defer beam.allocator.free(op_terms);
-    const res_list_terms = try beam.allocator.alloc(beam.term, count);
-    defer beam.allocator.free(res_list_terms);
+    const created_ops = try allocator.alloc(m.Operation.T, count);
+
+    const op_terms = try allocator.alloc(beam.term, count);
+
+    const res_list_terms = try allocator.alloc(beam.term, count);
 
     var prev_inserted: m.Operation.T = anchor_op;
     for (specs, 0..) |spec, i| {
@@ -415,17 +362,8 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
         }
 
         var state = c.mlirOperationStateGet(spec.name, spec.loc);
-        if (resolved_operands.len > 0) {
-            c.mlirOperationStateAddOperands(&state, @intCast(resolved_operands.len), resolved_operands.ptr);
-        }
-        if (spec.result_types.len > 0) {
-            c.mlirOperationStateAddResults(&state, @intCast(spec.result_types.len), spec.result_types.ptr);
-        }
-        if (spec.attributes.len > 0) {
-            c.mlirOperationStateAddAttributes(&state, @intCast(spec.attributes.len), spec.attributes.ptr);
-        }
-        if (spec.successors.len > 0) {
-            c.mlirOperationStateAddSuccessors(&state, @intCast(spec.successors.len), spec.successors.ptr);
+        inline for (.{ "Operands", "Results", "Attributes", "Successors" }, .{ resolved_operands, spec.result_types, spec.attributes, spec.successors }) |kind, items| {
+            if (items.len > 0) @field(c, "mlirOperationStateAdd" ++ kind)(&state, @intCast(items.len), items.ptr);
         }
         if (spec.num_regions > 0) {
             const regions = try beam.allocator.alloc(m.Region.T, spec.num_regions);

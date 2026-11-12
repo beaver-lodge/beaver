@@ -19,6 +19,7 @@ defmodule Beaver.IRBatchSpecTest do
     assert spec.inputs == [term: :i64]
     assert spec.results == [:i64]
     assert List.last(spec.blocks).args == [value: :i64]
+    spec = Map.put(spec, :bindings, term: {:cfg_block_arg, 0, 99})
     Module.with_module(IRBatch.build_module!(ctx, [spec]), &MLIR.verify!/1)
 
     assert [%{bind: [:a, :b], operands: [:x, :y], results: [:i64, :i64]}] =

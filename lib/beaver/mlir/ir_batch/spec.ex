@@ -1,12 +1,14 @@
 defmodule Beaver.MLIR.IRBatch.Spec do
   @moduledoc """
-  Function/block normalization and declarative operation shortcuts.
-
-  `use Spec, types: [...], calls: [{shortcut, symbol, arity, results}]` generates
-  type alias clauses and fixed-arity call expansion. A language can add its own
-  expansion callback for literal injection or variable-arity operations.
-  Symbolic argument names are never treated as type aliases.
+  Function/block normalization with declarative operation shortcuts.
+  `use Spec, types: [...], calls: [{shortcut, symbol, arity, results}]` generates aliases and call expansion.
+  Custom expansion callbacks handle literals or variable arity; symbolic names are never mapped as types.
   """
+
+  @types Map.new(~w(i1 i8 i16 i32 i64 i128 index f16 bf16 f32 f64 none)a, &{&1, to_string(&1)})
+         |> Map.put(:ptr, "!llvm.ptr")
+  @doc "Builtin shorthand types shared by deferred changesets and batch specifications."
+  def types, do: @types
 
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
@@ -15,7 +17,6 @@ defmodule Beaver.MLIR.IRBatch.Spec do
       end
 
       def spec_type(type), do: type
-
       @spec_calls Keyword.get(opts, :calls, [])
       if length(Enum.uniq_by(@spec_calls, &elem(&1, 0))) != length(@spec_calls),
         do: raise(ArgumentError, "duplicate operation shortcut")
@@ -33,29 +34,21 @@ defmodule Beaver.MLIR.IRBatch.Spec do
 
       def expand_declared_operation(_), do: :unknown
 
-      def normalize_function(raw) do
-        normalize_function(raw, fn step, _ ->
-          case expand_declared_operation(step) do
-            :unknown -> [step]
-            operations -> operations
-          end
-        end)
-      end
+      def normalize_function(raw, expand \\ &expand_default/2),
+        do: Beaver.MLIR.IRBatch.Spec.normalize(raw, type: &spec_type/1, expand: expand, attribute_aliases: [:at])
 
-      def normalize_function(raw, expand) do
-        Beaver.MLIR.IRBatch.Spec.normalize(raw, type: &spec_type/1, expand: expand, attribute_aliases: [:at])
+      defp expand_default(step, _) do
+        case expand_declared_operation(step) do
+          :unknown -> [step]
+          operations -> operations
+        end
       end
     end
   end
 
   def call(symbol, operands, results, bind) do
-    %{
-      name: "func.call",
-      operands: operands,
-      results: results,
-      attributes: [callee: {:symbol, symbol}],
-      bind: if(is_tuple(bind), do: Tuple.to_list(bind), else: bind)
-    }
+    bind = if is_tuple(bind), do: Tuple.to_list(bind), else: bind
+    %{name: "func.call", operands: operands, results: results, attributes: [callee: {:symbol, symbol}], bind: bind}
   end
 
   @doc "Normalizes maps, keyword lists and function/block tuples without allocating native resources."
@@ -77,25 +70,25 @@ defmodule Beaver.MLIR.IRBatch.Spec do
   end
 
   defp normalize_body(spec, type, expand, opts) do
-    cond do
-      not Map.has_key?(spec, :blocks) ->
-        Map.put(spec, :body, body(spec[:body] || [], 0, expand))
+    spec = if opts[:empty_blocks_as_body] && spec[:blocks] in [nil, []], do: Map.delete(spec, :blocks), else: spec
 
-      Keyword.get(opts, :empty_blocks_as_body, false) and spec.blocks in [nil, []] ->
-        spec |> Map.delete(:blocks) |> Map.put(:body, body(spec[:body] || [], 0, expand))
+    if Map.has_key?(spec, :blocks) do
+      if spec[:body], do: raise(ArgumentError, "function cannot contain both :body and :blocks")
 
-      true ->
-        if spec[:body], do: raise(ArgumentError, "function cannot contain both :body and :blocks")
+      blocks =
+        Enum.with_index(spec.blocks, fn raw, index ->
+          raw |> block() |> map_present(:args, &arguments(&1, type)) |> expand_body(index, expand)
+        end)
 
-        Map.put(
-          spec,
-          :blocks,
-          Enum.with_index(spec.blocks, fn raw, index ->
-            block = block(raw) |> map_present(:args, &arguments(&1, type))
-            Map.put(block, :body, body(block[:body] || [], index, expand))
-          end)
-        )
+      Map.put(spec, :blocks, blocks)
+    else
+      expand_body(spec, 0, expand)
     end
+  end
+
+  defp expand_body(spec, block, expand) do
+    body = Enum.with_index(spec[:body] || []) |> Enum.flat_map(fn {step, index} -> expand.(step, {block, index}) end)
+    Map.put(spec, :body, body)
   end
 
   def function(%{} = spec), do: spec
@@ -119,9 +112,6 @@ defmodule Beaver.MLIR.IRBatch.Spec do
       value -> type.(value)
     end)
   end
-
-  defp body(steps, block, expand),
-    do: steps |> Enum.with_index() |> Enum.flat_map(fn {step, index} -> expand.(step, {block, index}) end)
 
   defp map_present(map, key, fun), do: if(Map.has_key?(map, key), do: Map.update!(map, key, fun), else: map)
 end

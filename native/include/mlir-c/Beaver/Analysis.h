@@ -15,6 +15,13 @@ MLIR_CAPI_EXPORTED unsigned beaverAnalysisCached(void *session);
 MLIR_CAPI_EXPORTED int beaverAnalysisQuery(void *session, unsigned kind, MlirOperation lhs, MlirOperation rhs, MlirValue value);
 MLIR_CAPI_EXPORTED bool beaverAnalysisLayout(void *session, MlirOperation scope, MlirType type, uint64_t *result);
 
+typedef void (*BeaverSafepointCallback)(size_t, const MlirType *, size_t, const MlirValue *, const size_t *,
+                                        size_t, MlirOperation, size_t, const MlirValue *, const size_t *, void *);
+MLIR_CAPI_EXPORTED bool beaverAnalyzeSafepoints(void *session, MlirOperation func, const MlirOperation *points,
+    size_t count, bool excludeEntryArgs, BeaverSafepointCallback callback, void *data);
+MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(MlirOperation func, const MlirOperation *points, size_t count,
+    MlirStringRef saveOp, MlirStringRef loadOp, intptr_t stateArg, intptr_t frameArg, intptr_t stride, uint64_t *frameBytes);
+
 MLIR_CAPI_EXPORTED MlirLogicalResult beaverInferReturnTypes(
     MlirStringRef name, MlirContext context, MlirLocation location,
     intptr_t nOperands, MlirValue *operands, MlirAttribute attributes,
