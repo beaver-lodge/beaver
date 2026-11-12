@@ -1,11 +1,8 @@
 defmodule Beaver.BttDrivenRefactoringTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR.{Attribute, Context, Conversion, Operation, Target}
-
   alias Beaver.MLIR
-
   alias Beaver.MLIR.{AnalysisSession, CAPI, ExecutionEngine, IRBatch, Safepoint, SymbolTable, Type, TypeConverter}
-
   alias Conversion.Plan
   alias Target.LLVMIR
   alias Beaver.Pattern.Native.Program
@@ -149,7 +146,6 @@ defmodule Beaver.BttDrivenRefactoringTest do
 
       Beaver.MLIR.Module.with_module(ir, [ctx: ctx], fn module ->
         assert {:ok, obj_bytes, metrics} = LLVMIR.compile_object(module, opt_level: 2, return_metrics: true)
-
         assert byte_size(obj_bytes) > 64 and metrics.translate_ns > 0 and metrics.codegen_ns > 0
         assert {:ok, asm_text} = LLVMIR.compile_object(module, format: :assembly, opt_level: 1)
         assert asm_text =~ "add_i64"
@@ -180,9 +176,7 @@ defmodule Beaver.BttDrivenRefactoringTest do
 
       Beaver.MLIR.Module.with_module(ir, [ctx: ctx], fn module ->
         func = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.at(0)
-
         block = func |> Beaver.Walker.regions() |> Enum.at(0) |> Beaver.Walker.blocks() |> Enum.at(0)
-
         [old_ret] = Enum.to_list(Beaver.Walker.operations(block))
         i32 = Type.i32(ctx: ctx)
 
@@ -229,9 +223,7 @@ defmodule Beaver.BttDrivenRefactoringTest do
         assert receipt["beam"]["callback_count"] == 0
         assert MLIR.verify!(module)
         ir_text = MLIR.to_string(module)
-
         assert ir_text =~ "llvm.func @btt_c_value_add(i64, !llvm.ptr, !llvm.ptr, !llvm.ptr) -> i32"
-
         assert ir_text =~ "llvm.intr.stacksave" and ir_text =~ "llvm.alloca" and ir_text =~ "llvm.store"
 
         assert ir_text =~ "llvm.call @btt_c_value_add" and ir_text =~ "llvm.load" and
@@ -266,7 +258,6 @@ defmodule Beaver.BttDrivenRefactoringTest do
 
       Beaver.MLIR.Module.with_module(caller_module, fn caller_module ->
         assert ExecutionEngine.lookup_library_symbol(dylib_path, "nonexistent_symbol") == :error
-
         jit = ExecutionEngine.create!(caller_module, symbols: %{"aliased_kernel" => {dylib_path, "native_impl_run"}})
 
         Beaver.Native.with_resource(jit, &ExecutionEngine.destroy/1, fn jit ->
@@ -298,12 +289,9 @@ defmodule Beaver.BttDrivenRefactoringTest do
         end)
 
         assert ^func_op = Safepoint.lower_resumable!(func_op, safepoints: ["coro.suspend"], state_arg: 0)
-
         assert MLIR.verify!(module)
         lowered_ir = MLIR.to_string(module)
-
         assert lowered_ir =~ "cf.switch" and lowered_ir =~ "coro.save" and lowered_ir =~ "coro.load"
-
         refute lowered_ir =~ "coro.suspend"
       end)
     end

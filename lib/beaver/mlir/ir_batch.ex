@@ -209,6 +209,36 @@ defmodule Beaver.MLIR.IRBatch do
   defp unwrap_build!({:error, diagnostics}, name),
     do: raise(ArgumentError, MLIR.Diagnostic.format(diagnostics, "IRBatch.#{name}! verification failed"))
 
+  @doc "Maps function and block argument types and expands body steps with their `{block, step}` positions."
+  def map_function(spec, type, expand) when is_function(type, 1) and is_function(expand, 2) do
+    arguments = fn xs ->
+      Enum.map(xs, fn
+        {name, t} -> {name, type.(t)}
+        t -> type.(t)
+      end)
+    end
+
+    body = fn xs, b -> Enum.with_index(xs) |> Enum.flat_map(fn {step, i} -> expand.(step, {b, i}) end) end
+
+    spec =
+      normalize_func_spec!(spec)
+      |> map_present(:inputs, arguments)
+      |> map_present(:results, &Enum.map(List.wrap(&1), type))
+
+    if Map.has_key?(spec, :blocks) do
+      blocks =
+        Enum.with_index(spec.blocks, fn raw, i ->
+          block = Map.new(raw) |> map_present(:args, arguments)
+          Map.put(block, :body, body.(block[:body] || [], i))
+        end)
+
+      Map.put(spec, :blocks, blocks)
+    else
+      Map.put(spec, :body, body.(spec[:body] || [], 0))
+    end
+  end
+
+  defp map_present(map, key, fun), do: if(Map.has_key?(map, key), do: Map.update!(map, key, fun), else: map)
   defp normalize_func_spec!(%{} = map), do: map
   defp normalize_func_spec!(kw) when is_list(kw), do: Map.new(kw)
 

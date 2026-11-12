@@ -1,11 +1,8 @@
 defmodule SlangCompleteTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR
-
   @moduletag :smoke
-
   @valid_module "module {\n  \"complete_slang.scope\"() ({\n  ^bb0:\n  }) {label = \"ok\"} : () -> ()\n}\n"
-
   test "emits a complete, named IRDL schema", %{ctx: ctx} do
     schema = CompleteSlang.__slang_dialect__(ctx) |> MLIR.verify!()
     rendered = MLIR.to_string(schema, generic: true)
@@ -25,7 +22,6 @@ defmodule SlangCompleteTest do
              rendered =~ ~s{variadicity_array[<single>, <variadic>, <optional>]}
 
     assert rendered =~ ~s{variadicity_array[optional]} or rendered =~ ~s{variadicity_array[<optional>]}
-
     assert rendered =~ ~s{"irdl.attributes"}
     assert rendered =~ ~s{attributeValueNames = ["label"]}
     assert rendered =~ ~s{"irdl.regions"}
@@ -41,9 +37,7 @@ defmodule SlangCompleteTest do
     assert CompleteSlang |> then(&Beaver.Slang.load(ctx, &1)) |> MLIR.LogicalResult.success?()
     assert MLIR.Context.terminator?(ctx, "complete_slang.yield")
     type = CompleteSlang.box(MLIR.Type.i32()) |> Beaver.Deferred.resolve(ctx)
-
     attribute = CompleteSlang.direction(MLIR.Attribute.string("left")) |> Beaver.Deferred.resolve(ctx)
-
     refute MLIR.null?(type)
     refute MLIR.null?(attribute)
     assert MLIR.to_string(type) == "!complete_slang.box<i32>"
@@ -73,20 +67,14 @@ defmodule SlangCompleteTest do
   test "round-trips a dynamic dialect through text and bytecode", %{ctx: ctx} do
     Beaver.Slang.load(ctx, CompleteSlang)
     original = MLIR.Module.create!(@valid_module, ctx: ctx) |> MLIR.verify!()
-
     text_roundtrip = original |> MLIR.to_string(generic: true) |> MLIR.Module.create!(ctx: ctx) |> MLIR.verify!()
-
     bytecode = MLIR.Bytecode.write!(text_roundtrip)
     fresh_ctx = MLIR.Context.create()
     on_exit(fn -> MLIR.Context.destroy(fresh_ctx) end)
     refute MLIR.Context.terminator?(fresh_ctx, "complete_slang.yield")
-
     assert CompleteSlang |> then(&Beaver.Slang.load(fresh_ctx, &1)) |> MLIR.LogicalResult.success?()
-
     assert MLIR.Context.terminator?(fresh_ctx, "complete_slang.yield")
-
     bytecode_roundtrip = bytecode |> MLIR.Bytecode.read!(ctx: fresh_ctx) |> MLIR.verify!()
-
     assert MLIR.to_string(bytecode_roundtrip, generic: true) == MLIR.to_string(original, generic: true)
   end
 
@@ -102,7 +90,6 @@ defmodule SlangCompleteTest do
     )
 
     {:error, diagnostics} = apply(InvalidSlangSourceLocation, :__slang_dialect__, [ctx]) |> MLIR.verify()
-
     message = MLIR.Diagnostic.format(diagnostics)
     assert message =~ "/tmp/invalid_slang_source_location.ex:3"
     assert message =~ "the base type or attribute name should start with '!' or '#'"

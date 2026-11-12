@@ -1,14 +1,11 @@
 defmodule Beaver.MLIR.CounterPlanTest do
   use Beaver.Slang, name: "counter_plan_test"
-
   alias Beaver.MLIR.Type
-
   defop inc(value = Type.i32()), do: [Type.i32()]
 end
 
 defmodule Beaver.MLIR.ConversionPlanNativePatterns do
   use Beaver.Pattern.Native
-
   alias Beaver.MLIR
 
   defrewrite erase_drop(operation, rewriter, owner), root: "plan_native.drop" do
@@ -51,9 +48,7 @@ defmodule Beaver.MLIR.ConversionPlanTest do
           type = Value.type(input)
           location = Operation.location(operation)
           RewriterBase.set_insertion_point_before(base, operation)
-
           one = insert(base, "arith.constant", location, [value: Attribute.integer(type, 1)], type)
-
           add = insert(base, "arith.addi", location, [input, Operation.result(one, 0)], type)
           ConversionPatternRewriter.replace_op(rewriter, operation, add)
           :ok
@@ -72,9 +67,7 @@ defmodule Beaver.MLIR.ConversionPlanTest do
         Beaver.MLIR.Module.with_module(module, fn module ->
           if driver == :run do
             assert {:ok, ^module, _diagnostics} = Plan.run(plan, module)
-
             Beaver.Composer.append(module, "convert-arith-to-llvm,convert-func-to-llvm") |> Beaver.Composer.run!()
-
             assert MLIR.to_string(module) =~ "llvm.func"
           else
             assert ^module = Plan.run!(plan, module)
@@ -137,9 +130,7 @@ defmodule Beaver.MLIR.ConversionPlanTest do
     module = MLIR.Module.create!("module {}", ctx: ctx)
     assert {:ok, ^module, []} = Plan.run(plan, module)
     assert_receive {:populated, %MLIR.RewritePatternSet{}, %MLIR.TypeConverter{}}
-
     assert List.last(Plan.declaration(plan).entries) == %{kind: :add_pattern_population, version: "1.0"}
-
     MLIR.Module.destroy(module)
   end
 
@@ -150,27 +141,19 @@ defmodule Beaver.MLIR.ConversionPlanTest do
       |> Plan.add_pattern_population(fn _patterns, _converter -> :ignored end)
 
     module = MLIR.Module.create!("module {}", ctx: ctx)
-
     assert_raise ArgumentError, ~r/pattern population must return :ok/, fn -> Plan.run(plan, module) end
-
     MLIR.Module.destroy(module)
   end
 
   test "full vs partial mode in Plan", %{ctx: ctx} do
     Context.allow_unregistered_dialects(ctx)
-
     partial_plan = Plan.new(mode: :partial, timeout: 1_000) |> Plan.add_legal_dialect("builtin")
-
     module = MLIR.Module.create!(~s[module { "foo.unknown"() : () -> () }], ctx: ctx)
     assert {:ok, ^module, []} = Plan.run(partial_plan, module)
     MLIR.Module.destroy(module)
-
     full_plan = Plan.new(mode: :full, timeout: 1_000) |> Plan.add_legal_dialect("builtin")
-
     full_module = MLIR.Module.create!(~s[module { "foo.unknown"() : () -> () }], ctx: ctx)
-
     assert {:error, %Conversion.Error{mode: :full, diagnostics: diagnostics} = error} = Plan.run(full_plan, full_module)
-
     assert diagnostics != []
     assert Exception.message(error) =~ "foo.unknown"
     MLIR.Module.destroy(full_module)

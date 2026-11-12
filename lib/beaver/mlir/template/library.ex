@@ -34,8 +34,52 @@ defmodule Beaver.MLIR.Template.Library do
 
   def with_module(%__MODULE__{} = library, ctx, fun), do: Module.with_module(ctx, library.bytecode, fun)
 
+  @doc "Imports selected roots and their dependencies; optional `:select` filters explicit or referenced roots."
   def import!(library, target, opts \\ []) do
-    with_module(library, MLIR.context(target), &Module.import_symbols!(target, &1, opts))
+    case Keyword.pop(opts, :select) do
+      {nil, opts} -> with_module(library, MLIR.context(target), &Module.import_symbols!(target, &1, opts))
+      {select, opts} -> import_selected!(library, target, select, opts)
+    end
+  end
+
+  defp import_selected!(library, target, select, opts) do
+    symbols = Keyword.get_lazy(opts, :symbols, fn -> SymbolTable.referenced_symbols(target) end)
+    symbols = if symbols == :referenced, do: SymbolTable.referenced_symbols(target), else: symbols
+    selected = Enum.filter(symbols, select)
+
+    if selected == [],
+      do: target,
+      else:
+        with_module(
+          library,
+          MLIR.context(target),
+          &Module.import_symbols!(target, &1, Keyword.put(opts, :symbols, selected))
+        )
+  end
+
+  @doc "Adds missing flat function declarations from this library before parsing textual MLIR."
+  def with_declarations(library, source) when is_binary(source) do
+    declarations =
+      for {name, {inputs, outputs}} <- Enum.sort(library.signatures),
+          symbol = Beaver.MLIR.Template.check_symbol!(name),
+          token = Regex.escape(symbol) <> "(?=[\\s(),{}:]|$)",
+          Regex.match?(Regex.compile!(token), source),
+          not Regex.match?(Regex.compile!("func\\.func\\s+(?:(?:private|public|nested)\\s+)?" <> token), source) do
+        result = if outputs == [], do: "", else: " -> (" <> Enum.join(outputs, ", ") <> ")"
+        "  func.func private #{symbol}(#{Enum.join(inputs, ", ")})#{result}"
+      end
+
+    insert_declarations(source, Enum.join(declarations, "\n"))
+  end
+
+  defp insert_declarations(source, ""), do: source
+
+  defp insert_declarations(source, declarations) do
+    opening = ~r/\A(\s*module\b[^{]*\{)/
+
+    if Regex.match?(opening, source),
+      do: Regex.replace(opening, source, fn prefix, _ -> prefix <> "\n" <> declarations end, global: false),
+      else: declarations <> "\n" <> source
   end
 
   def declare!(library, target, opts \\ []) do

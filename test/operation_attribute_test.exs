@@ -1,7 +1,6 @@
 defmodule OperationAttributeTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR.{Attribute, Bytecode, Context, LogicalResult, Operation}
-
   alias Beaver.MLIR
 
   test "keeps inherent properties and discardable metadata on separate paths", %{ctx: ctx} do
@@ -9,9 +8,7 @@ defmodule OperationAttributeTest do
     operation = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.fetch!(0)
     assert Operation.inherent_attribute?(operation, :sym_name)
     assert Operation.inherent_attribute?(operation, :sym_visibility)
-
     assert Operation.inherent_attribute(operation, :sym_name) |> to_string() == ~s("example")
-
     assert Operation.inherent_attribute(operation, :sym_visibility) == nil
     refute Operation.inherent_attribute?(operation, "test.note")
     note = Attribute.string("metadata", ctx: ctx)
@@ -48,14 +45,10 @@ defmodule OperationAttributeTest do
 
   test "treats attributes on unregistered operations as discardable", %{ctx: ctx} do
     Context.allow_unregistered_dialects(ctx)
-
     module = MLIR.Module.create!(~S[module { "test.unknown"() {test.value = 1 : i32} : () -> () }], ctx: ctx)
-
     operation = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.fetch!(0)
     refute Operation.inherent_attribute?(operation, "test.value")
-
     assert Operation.discardable_attribute(operation, "test.value") |> to_string() == "1 : i32"
-
     assert attribute_names(Beaver.Walker.inherent_attributes(operation)) == []
     assert attribute_names(Beaver.Walker.discardable_attributes(operation)) == [:"test.value"]
   end
@@ -76,21 +69,15 @@ defmodule OperationAttributeTest do
   test "preserves attribute classes through generic assembly and bytecode", %{ctx: ctx} do
     original = MLIR.Module.create!("module { func.func @example() { return } }", ctx: ctx)
     original_function = operation_named(original, "func.func")
-
     Operation.put_discardable_attribute(original_function, "test.note", Attribute.string("round-trip", ctx: ctx))
-
     text_round_trip = original |> MLIR.to_string(generic: true) |> MLIR.Module.create!(ctx: ctx)
-
     bytecode_round_trip = original |> Bytecode.write!() |> Bytecode.read!(ctx: ctx)
 
     for round_trip <- [text_round_trip, bytecode_round_trip] do
       function = operation_named(round_trip, "func.func")
       assert Operation.inherent_attribute?(function, :sym_name)
-
       assert Operation.inherent_attribute(function, :sym_name) |> to_string() == ~s("example")
-
       assert Operation.discardable_attribute(function, "test.note") |> to_string() == ~s("round-trip")
-
       assert Operation.equivalent?(original_function, function, ignore_locations: true)
 
       assert Operation.structural_hash(original_function, ignore_locations: true) ==
@@ -146,7 +133,6 @@ defmodule OperationAttributeTest do
     bytecode_round_trip = module |> Bytecode.write!() |> Bytecode.read!(ctx: ctx)
     round_trip_alloc = operation_named(bytecode_round_trip, "bufferization.alloc_tensor")
     assert Operation.inherent_attribute?(round_trip_alloc, :memory_space)
-
     assert Operation.discardable_attribute(round_trip_alloc, "test.escape") |> to_string() == "unit"
   end
 

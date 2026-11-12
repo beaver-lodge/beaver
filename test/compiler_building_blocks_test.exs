@@ -104,6 +104,45 @@ defmodule Beaver.CompilerBuildingBlocksTest do
     assert replacement.signatures == %{"identity" => {["i32"], ["i32"]}}
   end
 
+  test "template declarations preserve definitions and selection imports transitive dependencies", %{ctx: ctx} do
+    source =
+      "module { func.func @entry(%x: i64) -> i64 { %r = func.call @helper(%x) : (i64) -> i64 return %r : i64 } func.func private @helper(%x: i64) -> i64 { return %x : i64 } func.func @unused() { return } }"
+
+    library = Library.new(source)
+    user = "module { func.func @run(%x: i64) -> i64 { %r = func.call @entry(%x) : (i64) -> i64 return %r : i64 } }"
+    declared = Library.with_declarations(library, user)
+    assert declared == Library.with_declarations(library, declared)
+    assert source == Library.with_declarations(library, source)
+
+    Module.with_module(ctx, declared, fn target ->
+      before = MLIR.to_string(target)
+      Library.import!(library, target, select: fn _ -> false end)
+      assert MLIR.to_string(target) == before
+      Library.import!(library, target, select: &(&1 == "entry"), verify_type: true)
+      assert Map.keys(SymbolTable.function_signatures(MLIR.verify!(target))) |> Enum.sort() == ~w(entry helper run)
+      assert MLIR.to_string(target) =~ "return %arg0"
+    end)
+  end
+
+  test "function mapping keeps bindings intact and expands each CFG position", %{ctx: ctx} do
+    spec = %{
+      name: "mapped",
+      inputs: [term: :term],
+      results: :term,
+      blocks: [[name: :entry, body: [:next]], [name: :done, args: [result: :term], body: [:return]]]
+    }
+
+    expand = fn
+      :next, {0, 0} -> [{:br, :done, [:term]}]
+      :return, {1, 0} -> [{:return, [:result]}]
+    end
+
+    mapped = IRBatch.map_function(spec, fn :term -> :i64 end, expand)
+    assert mapped.inputs == [term: :i64]
+    assert mapped.blocks |> List.last() |> Map.fetch!(:args) == [result: :i64]
+    Native.with_resource(IRBatch.build_module!(ctx, [mapped]), &Module.destroy/1, &MLIR.verify!/1)
+  end
+
   test "declaration and transitive import conflicts leave the target unchanged", %{ctx: ctx} do
     source =
       "module { func.func @entry(%x: i64) -> i64 { %r = func.call @helper(%x) : (i64) -> i64 return %r : i64 } func.func private @helper(%x: i64) -> i64 { return %x : i64 } }"

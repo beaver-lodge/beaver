@@ -49,9 +49,7 @@ defmodule AnalysisAndRewriteUtilitiesTest do
                assert DominanceInfo.value_dominates?(info, left_value, left_branch)
                assert DominanceInfo.value_properly_dominates?(info, left_value, left_branch)
                refute DominanceInfo.value_dominates?(info, left_value, merge_return)
-
                assert MLIR.equal?(entry, DominanceInfo.nearest_common_dominator(info, left, right))
-
                assert DominanceInfo.reachable_from_entry?(info, merge)
                refute DominanceInfo.reachable_from_entry?(info, unreachable)
                assert ^info = DominanceInfo.invalidate(info)
@@ -137,7 +135,6 @@ defmodule AnalysisAndRewriteUtilitiesTest do
       tag = Attribute.integer(Type.i32(ctx: ctx), 1)
       :ok = Operation.put_discardable_attribute(clone, "test.tag", tag)
       refute Operation.equivalent?(func, clone, ignore_locations: true)
-
       assert Operation.equivalent?(func, clone, ignore_locations: true, ignore_discardable_attributes: true)
 
       assert Operation.structural_hash(func, ignore_locations: true, ignore_discardable_attributes: true) ==
@@ -170,9 +167,7 @@ defmodule AnalysisAndRewriteUtilitiesTest do
         |> Enum.to_list()
 
       assert Operation.equivalent?(add, reversed_add, ignore_locations: true)
-
       refute Operation.equivalent?(add, reversed_add, ignore_locations: true, ignore_commutativity: true)
-
       refute Operation.equivalent?(one, two, ignore_locations: true)
       assert Operation.equivalent?(one, two, ignore_locations: true, ignore_properties: true)
     end)
@@ -185,13 +180,9 @@ defmodule AnalysisAndRewriteUtilitiesTest do
 
     MLIR.Module.with_module(module, fn _ ->
       {func, _blocks} = func_and_blocks(module)
-
       block = func |> Beaver.Walker.regions() |> Enum.fetch!(0) |> Beaver.Walker.blocks() |> Enum.fetch!(0)
-
       argument = Block.get_arg!(block, 0)
-
       [replacement, selected, kept, _return] = block |> Beaver.Walker.operations() |> Enum.to_list()
-
       replacement_value = Operation.result(replacement, 0)
       caller = self()
 
@@ -233,11 +224,8 @@ defmodule AnalysisAndRewriteUtilitiesTest do
 
   test "scoped insertion points restore on return and exception", %{ctx: ctx} do
     module = constants_module(ctx)
-
     {func, _blocks} = func_and_blocks(module)
-
     block = func |> Beaver.Walker.regions() |> Enum.fetch!(0) |> Beaver.Walker.blocks() |> Enum.fetch!(0)
-
     [first, second, _return] = Enum.to_list(Beaver.Walker.operations(block))
 
     MLIR.Module.with_module(module, fn _ ->
@@ -263,7 +251,6 @@ defmodule AnalysisAndRewriteUtilitiesTest do
 
   test "saved insertion point round-trips through block creation and insertion", %{ctx: ctx} do
     module = constants_module(ctx)
-
     {_func, [block | _]} = func_and_blocks(module)
     [first | _] = Enum.to_list(Beaver.Walker.operations(block))
 

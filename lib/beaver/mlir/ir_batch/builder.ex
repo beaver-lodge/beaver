@@ -20,9 +20,7 @@ defmodule Beaver.MLIR.IRBatch.Builder do
             data: %{}
 
   @predicates Map.new(Enum.with_index(~w(eq ne slt sle sgt sge ult ule ugt uge)a))
-
   def new(opts \\ []), do: %__MODULE__{data: Map.new(Keyword.get(opts, :data, []))}
-
   def start_block(b, name, args \\ [])
 
   def start_block(%__MODULE__{current: nil} = b, name, args) when not is_nil(name) do
@@ -31,7 +29,6 @@ defmodule Beaver.MLIR.IRBatch.Builder do
   end
 
   def start_block(_, _, _), do: raise(ArgumentError, "terminate the current block before starting another")
-
   def end_block(%__MODULE__{current: nil}, _), do: raise(ArgumentError, "no current block")
 
   def end_block(b, terminator) do
@@ -91,7 +88,6 @@ defmodule Beaver.MLIR.IRBatch.Builder do
   end
 
   def emit(b, value), do: {value, b}
-
   def constant_ref(b, type, value), do: Map.fetch!(b.constants, {type, value})
 
   def constant(b, type, value, opts \\ []) when is_atom(type) do
@@ -119,7 +115,6 @@ defmodule Beaver.MLIR.IRBatch.Builder do
     do: value(b, "arith.cmpi", [lhs, rhs], :i1, predicate: {:i64, Map.fetch!(@predicates, predicate)})
 
   def binary(b, op, operands, type), do: value(b, "arith.#{op}", operands, type)
-
   @doc "Branches to ready or fallback, then starts ready. The fallback destination can carry block arguments."
   def guard(b, condition, ready, fallback),
     do: b |> end_block({:cond_br, condition, ready, fallback}) |> start_block(ready)
@@ -146,7 +141,6 @@ defmodule Beaver.MLIR.IRBatch.Builder do
   end
 
   def switch(b, selector, type, default, cases), do: end_block(b, {:switch, selector, type, default, cases})
-
   @doc "Emits a switch and each `{case_value, block_name, payload}` arm; `emit.(payload, builder)` must terminate it."
   def dispatch(b, selector, type, default, cases, emit) do
     b = switch(b, selector, type, default, Enum.map(cases, fn {key, name, _} -> {key, name} end))

@@ -29,9 +29,7 @@ defmodule Beaver.MLIR.AnalysisSessionTest do
                ])
 
       assert %{generation: 0, results: [true]} = AnalysisSession.query(session, [{:dominates, add, mul}])
-
       assert {:ok, _, _} = MLIR.IRBatch.update(module, [{:operand, mul, 0, arg}], analysis_session: session)
-
       assert %{generation: 2, cached: []} = AnalysisSession.stats(session)
       assert AnalysisSession.dead_after?(session, value, add)
     end)
@@ -51,17 +49,13 @@ defmodule Beaver.MLIR.AnalysisSessionTest do
       assert_raise RuntimeError, "mutation failed", fn ->
         AnalysisSession.mutate(session, fn ->
           assert_raise ArgumentError, ~r/AnalysisMutationInProgress/, fn -> AnalysisSession.stats(session) end
-
           assert_raise Kinda.CallError, ~r/AnalysisMutationInProgress/, fn -> AnalysisSession.close(session) end
-
           raise "mutation failed"
         end)
       end
 
       assert %{generation: 3, cached: []} = AnalysisSession.stats(session)
-
       module |> Beaver.Composer.append("canonicalize") |> Beaver.Composer.run!(analysis_session: session)
-
       assert %{generation: 5, cached: []} = AnalysisSession.stats(session)
     end)
   end
@@ -76,15 +70,12 @@ defmodule Beaver.MLIR.AnalysisSessionTest do
       for {kind, generation} <- [mutable: 2, frozen: 4] do
         assert AnalysisSession.dominates?(session, add, mul)
         marker = MLIR.Attribute.string(Atom.to_string(kind), ctx: ctx)
-
         program = Beaver.Pattern.Native.Program.new("arith.muli", rewrite: {:attributes, marker: marker})
-
         set = MLIR.RewritePatternSet.create(ctx) |> MLIR.RewritePatternSet.add(program, ctx: ctx)
         set = if kind == :frozen, do: MLIR.RewritePatternSet.freeze(set), else: set
 
         try do
           assert {:ok, ^module} = MLIR.apply_(module, set, analysis_session: session, enable_folding: false)
-
           assert MLIR.equal?(mul[:marker], marker)
           assert %{generation: ^generation, cached: []} = AnalysisSession.stats(session)
         after
@@ -110,9 +101,7 @@ defmodule Beaver.MLIR.AnalysisSessionTest do
 
     assert :ok = AnalysisSession.close(session)
     assert :ok = AnalysisSession.close(session)
-
     assert_raise ArgumentError, ~r/ClosedAnalysisSession/, fn -> AnalysisSession.stats(session) end
-
     MLIR.Module.destroy(other)
   end
 
