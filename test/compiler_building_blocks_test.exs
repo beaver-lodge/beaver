@@ -1,0 +1,193 @@
+defmodule Beaver.CompilerBuildingBlocksTest do
+  use Beaver.Case, async: true
+  alias Beaver.{Composer, MLIR, Native}
+  alias Beaver.MLIR.{Attribute, CABI, Context, ExecutionEngine, IRBatch, Module, Operation, SymbolTable}
+  alias Beaver.MLIR.IRBatch.Builder
+  alias Beaver.MLIR.Template.Library
+  alias Beaver.Pattern.PDL
+
+  test "immutable CFGs join multiple values and execute every dispatch arm", %{ctx: ctx} do
+    initial = Builder.new(data: %{language: :test}) |> Builder.start_block(:entry)
+    {zero, b} = Builder.constant(initial, :i64, 0, scope: :entry)
+    assert {^zero, ^b} = Builder.constant(b, :i64, 0)
+    assert initial.operations == []
+    {positive, b} = Builder.compare(b, :sge, :x, zero)
+
+    {[magnitude, extra], b} =
+      Builder.guarded(b, positive, [:x, zero], [:i64, :i64], fn acc ->
+        {negative, acc} = Builder.binary(acc, "subi", [zero, :x], :i64)
+        {[negative, zero], acc}
+      end)
+
+    {sum, b} = Builder.binary(b, "addi", [magnitude, extra], :i64)
+
+    b =
+      Builder.dispatch(b, :selector, :i32, :default, [{0, :zero, 0}, {1, :one, 1}], fn n, acc ->
+        {value, acc} = Builder.constant(acc, :i64, n)
+        {result, acc} = Builder.binary(acc, "addi", [sum, value], :i64)
+        Builder.end_block(acc, {:return, [result]})
+      end)
+
+    b = b |> Builder.start_block(:default) |> Builder.end_block({:return, [zero]})
+    assert b.data == %{language: :test}
+
+    spec = %{
+      name: "run",
+      inputs: [x: :i64, selector: :i32],
+      results: [:i64],
+      blocks: Builder.finish(b),
+      attributes: ["llvm.emit_c_interface": Attribute.unit(ctx: ctx)]
+    }
+
+    Native.with_resource(IRBatch.build_module!(ctx, [spec]), &Module.destroy/1, fn module ->
+      with_jit(module, fn jit ->
+        for {x, selector, expected} <- [{7, 0, 7}, {-7, 1, 8}, {7, 2, 0}] do
+          assert invoke(jit, [Native.I64.make(x), Native.I32.make(selector)]) == expected
+        end
+      end)
+    end)
+  end
+
+  test "block constants never escape their scope and malformed CFG assembly is rejected" do
+    b = Builder.new() |> Builder.start_block(:entry)
+    {entry, b} = Builder.constant(b, :i64, 9)
+    b = b |> Builder.end_block({:br, :next}) |> Builder.start_block(:next)
+    {local, b} = Builder.constant(b, :i64, 9)
+    refute entry == local
+    assert {^local, ^b} = Builder.constant(b, :i64, 9)
+    assert_raise ArgumentError, fn -> Builder.constant(b, :i64, 10, scope: :entry) end
+    assert_raise ArgumentError, fn -> Builder.finish(b) end
+    assert_raise ArgumentError, fn -> Builder.start_block(b, :other) end
+    assert_raise ArgumentError, fn -> b |> Builder.end_block({:return, []}) |> Builder.start_block(:entry) end
+    assert_raise ArgumentError, fn -> Builder.guarded(b, :cond, [], [:i64], fn x -> {[], x} end) end
+
+    assert_raise ArgumentError, fn ->
+      Builder.dispatch(b, :selector, :i32, :default, [{0, :case, nil}], fn _, x -> x end)
+    end
+  end
+
+  test "template revisions cache portable data while each use owns independent IR", %{ctx: ctx} do
+    source = "module { func.func @identity(%x: i64) -> i64 { return %x : i64 } }"
+    key = {__MODULE__, make_ref()}
+    on_exit(fn -> :persistent_term.erase({Library, key}) end)
+    library = Library.fetch(key, 1, fn -> source end)
+    assert Library.fetch(key, 1, fn -> flunk("unchanged revision rebuilt") end) == library
+    assert library.signatures == %{"identity" => {["i64"], ["i64"]}}
+
+    Library.with_module(library, ctx, fn module ->
+      Operation.put_attribute(Operation.from_module(module), "test.changed", Attribute.unit(ctx: ctx))
+    end)
+
+    Context.with_context(fn other ->
+      Library.with_module(library, other, fn module -> refute MLIR.to_string(module) =~ "test.changed" end)
+
+      Module.with_module(other, fn target ->
+        Library.declare!(library, target, symbols: ["identity"])
+        Library.import!(library, target, symbols: ["identity"], verify_type: true)
+        assert MLIR.to_string(MLIR.verify!(target)) =~ "return"
+      end)
+    end)
+
+    replacement = Library.fetch(key, 2, fn -> String.replace(source, "i64", "i32") end)
+    refute replacement.digest == library.digest
+    assert replacement.signatures == %{"identity" => {["i32"], ["i32"]}}
+  end
+
+  test "declaration and transitive import conflicts leave the target unchanged", %{ctx: ctx} do
+    source =
+      "module { func.func @entry(%x: i64) -> i64 { %r = func.call @helper(%x) : (i64) -> i64 return %r : i64 } func.func private @helper(%x: i64) -> i64 { return %x : i64 } }"
+
+    target = "module { func.func private @entry(i64) -> i64 func.func private @helper(i32) -> i32 }"
+
+    Module.with_module(ctx, source, fn source ->
+      Module.with_module(ctx, target, fn target ->
+        before = MLIR.to_string(target)
+        types = [{"new", {["i64"], ["i64"]}}, {"helper", {["i64"], ["i64"]}}]
+        assert_raise ArgumentError, fn -> SymbolTable.check_declarations!(target, types) end
+        assert_raise ArgumentError, fn -> SymbolTable.ensure_declarations!(target, types) end
+
+        assert_raise ArgumentError, fn ->
+          Module.import_symbols!(target, source, symbols: ["entry"], verify_type: true)
+        end
+
+        assert MLIR.to_string(target) == before
+
+        assert_raise ArgumentError, fn ->
+          SymbolTable.ensure_declarations!(target, [{"new", "() -> i32"}, {"new", "() -> i64"}])
+        end
+
+        assert MLIR.to_string(target) == before
+        SymbolTable.ensure_declarations!(target, [{"new", "() -> i32"}])
+        assert SymbolTable.function_signatures(target)["new"] == {[], ["i32"]}
+      end)
+    end)
+  end
+
+  test "PDL selection includes new matching symbols introduced by another rule", %{ctx: ctx} do
+    entries = [rename_rule("start", "middle"), rename_rule("middle", "finish")]
+    key = {__MODULE__, make_ref()}
+    on_exit(fn -> :persistent_term.erase({PDL, key}) end)
+    rules = PDL.fetch(key, 1, fn -> entries end)
+    assert rules == PDL.fetch(key, 1, fn -> flunk("unchanged rules rebuilt") end)
+    refute PDL.new(Enum.reverse(entries)).digest == rules.digest
+    refute PDL.applicable?(rules, ["unrelated"])
+
+    source =
+      "module { func.func private @start(i64) -> i64 func.func private @middle(i64) -> i64 func.func private @finish(i64) -> i64 func.func @user(%x: i64) -> i64 { %r = func.call @start(%x) : (i64) -> i64 return %r : i64 } }"
+
+    Module.with_module(ctx, source, fn module ->
+      PDL.apply!(rules, module)
+      assert SymbolTable.referenced_symbols(MLIR.verify!(module)) == ["finish"]
+    end)
+
+    Context.with_context(fn other ->
+      Module.with_module(other, source, fn module ->
+        assert SymbolTable.referenced_symbols(PDL.apply!(rules, module)) == ["finish"]
+      end)
+    end)
+  end
+
+  test "C ABI wrappers copy aggregates and zero unwritten out slots", %{ctx: ctx} do
+    params = [{:aggregate, "i64"}, {:out, "i64"}]
+    assert CABI.value_signature(params, "i32") == {["i64"], ["i32", "i64"]}
+
+    raw =
+      "module { func.func @raw(%input: !llvm.ptr, %output: !llvm.ptr) -> i32 { %value = llvm.load %input : !llvm.ptr -> i64 llvm.store %value, %output : i64, !llvm.ptr %zero = arith.constant 0 : i32 return %zero : i32 } }"
+
+    failed =
+      "module { func.func @raw(%input: !llvm.ptr, %output: !llvm.ptr) -> i32 { %status = arith.constant 2 : i32 return %status : i32 } }"
+
+    entry =
+      "func.func @run(%x: i64) -> i64 attributes {llvm.emit_c_interface} { %s, %v = func.call @wrapped(%x) : (i64) -> (i32, i64) %wide = arith.extui %s : i32 to i64 %r = arith.addi %v, %wide : i64 return %r : i64 }"
+
+    library =
+      Library.new("module {\n" <> CABI.wrapper_source("wrapped", "raw", params, return_type: "i32") <> entry <> "\n}")
+
+    for {implementation, expected} <- [{raw, 42}, {failed, 2}] do
+      Library.with_module(library, ctx, fn module ->
+        Module.with_module(ctx, implementation, &Module.import_symbols!(module, &1, verify_type: true))
+        with_jit(module, fn jit -> assert invoke(jit, [Native.I64.make(42)]) == expected end)
+      end)
+    end
+
+    for {parameters, opts} <- [{[], []}, {[{:out_ptr, "i64", zero_init: false}], [stack_save: false]}] do
+      source = CABI.wrapper_source("void_wrapper", "void_raw", parameters, opts)
+      assert %Library{} = Library.new("module {\n" <> source <> "\n}")
+      refute source =~ "stacksave"
+      refute source =~ "mlir.zero"
+    end
+  end
+
+  defp rename_rule(from, to) do
+    {from,
+     "pdl.pattern @rename_#{from} : benefit(1) { %x = pdl.operand %t = pdl.type : i64 %src = pdl.attribute = @#{from} %dst = pdl.attribute = @#{to} %call = pdl.operation \"func.call\"(%x : !pdl.value) {\"callee\" = %src} -> (%t : !pdl.type) pdl.rewrite %call { %next = pdl.operation \"func.call\"(%x : !pdl.value) {\"callee\" = %dst} -> (%t : !pdl.type) pdl.replace %call with %next } }\n"}
+  end
+
+  defp with_jit(module, fun) do
+    passes = ~w(convert-arith-to-llvm convert-cf-to-llvm convert-func-to-llvm reconcile-unrealized-casts)
+    Enum.reduce(passes, module, &Composer.append(&2, &1)) |> Composer.run!()
+    Native.with_resource(ExecutionEngine.create!(module), &ExecutionEngine.destroy/1, fun)
+  end
+
+  defp invoke(jit, args), do: Native.to_term(tap(Native.I64.make(0), &ExecutionEngine.invoke!(jit, "run", args, &1)))
+end

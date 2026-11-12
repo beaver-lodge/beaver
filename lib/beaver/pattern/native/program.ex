@@ -149,16 +149,14 @@ defmodule Beaver.Pattern.Native.Program do
   defp encode_c_abi_return!(s) when is_binary(s), do: {nil, [{12, 0, nil, s}]}
   defp encode_c_abi_return!(other), do: raise(ArgumentError, "invalid :c_abi_call :return_type: #{inspect(other)}")
 
-  defp encode_c_abi_param!(:in), do: {9, 0, nil, nil}
-  defp encode_c_abi_param!({:in, _type}), do: {9, 0, nil, nil}
-  defp encode_c_abi_param!(dir) when dir in [:in_ptr, :aggregate], do: {10, 0, nil, nil}
-  defp encode_c_abi_param!({dir, type}) when dir in [:in_ptr, :aggregate], do: {10, 0, nil, type_value!(type)}
-  defp encode_c_abi_param!({dir, type}) when dir in [:out, :out_ptr], do: {11, 1, nil, type_value!(type)}
-
-  defp encode_c_abi_param!({dir, type, param_opts}) when dir in [:out, :out_ptr] and is_list(param_opts),
-    do: {11, bool_flag(param_opts, :zero_init, true, 1), nil, type_value!(type)}
-
-  defp encode_c_abi_param!(other), do: raise(ArgumentError, "invalid :c_abi_call parameter spec: #{inspect(other)}")
+  defp encode_c_abi_param!(param) do
+    case MLIR.CABI.parameter!(param) do
+      {:in, _, _} -> {9, 0, nil, nil}
+      {:aggregate, nil, _} -> {10, 0, nil, nil}
+      {:aggregate, type, _} -> {10, 0, nil, type_value!(type)}
+      {:out, type, opts} -> {11, bool_flag(opts, :zero_init, true, 1), nil, type_value!(type)}
+    end
+  end
 
   defp type_checks(kind, types),
     do: Enum.map(types, fn {index, type} -> {kind, index!(index), nil, type_value!(type)} end)

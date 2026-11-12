@@ -88,3 +88,17 @@ The printed function contains `tosa.sub` instead of `tosa.add`. For rewrites
 that need arbitrary Elixir checks or callback state, see
 [native rewrite patterns](native-rewrite-patterns.md). For coordinated type
 and operation lowering, see [dialect conversion](dialect-conversion.md).
+## Reusable compiler building blocks
+
+`Beaver.MLIR.IRBatch.Builder` assembles immutable CFG specifications with block-local or explicit entry constants,
+multi-result calls, guarded joins, and switch dispatch. Language-specific state belongs in `builder.data`.
+Submit the finished blocks through `IRBatch.build_function!/3`; the builder itself owns no native resources.
+
+`Beaver.MLIR.Template.Library` stores verified bytecode and textual signatures. `fetch/3` requires a revision covering
+every source input. Each use creates a fresh module in the caller's context. `SymbolTable.ensure_declarations!/3`
+checks the entire signature batch before insertion; `import_symbols!/3` with `verify_type: true` checks transitive
+imports before changing the target.
+
+`Beaver.Pattern.PDL` manages rule collections with explicit callee metadata and revisits rule selection when rewriting
+introduces new callees. Use `:all` for rules without a callee restriction. `Beaver.MLIR.CABI.wrapper_source/4` generates
+value wrappers using the same input, aggregate, and output parameter conventions as `Pattern.Native.Program.c_abi_call/3`.
