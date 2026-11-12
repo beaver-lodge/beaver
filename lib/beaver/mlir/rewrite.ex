@@ -4,21 +4,15 @@ defmodule Beaver.MLIR.Rewrite do
   @moduledoc "This module defines functions working with MLIR rewrite patterns and pattern sets."
   alias Beaver.MLIR
   require Logger
-
   @typedoc "IR surfaces accepted by the rewrite driver."
   @type rewrite_ir() :: MLIR.Module.t() | Operation.t()
-
   @typedoc "Processed MLIR diagnostic tree emitted during rewrite application."
   @type diagnostic() :: {severity :: atom(), location :: String.t(), message :: String.t(), nested :: [diagnostic()]}
-
   @type diagnostics() :: [diagnostic()]
-
   @typedoc "Opaque greedy rewrite driver config handle passed to configuration callbacks."
   @type config_handle() :: term()
-
   @typedoc "Callback used to customize a greedy rewrite config before application."
   @type config_callback() :: (config_handle() -> any())
-
   @typedoc "Supported high-level rewrite config options."
   @type config_option() ::
           {:max_iterations, integer()}
@@ -26,23 +20,18 @@ defmodule Beaver.MLIR.Rewrite do
           | {:use_top_down_traversal, boolean()}
           | {:enable_folding, boolean()}
           | {:enable_constant_cse, boolean()}
-
   @type config_opts() :: [config_option()]
   @type config_input() :: config_opts() | config_callback() | nil
-
   @typedoc "Pattern callback entries accepted by the list-based rewrite surface."
   @type match_and_rewrite() ::
           (MLIR.RewritePattern.t(), Operation.t(), MLIR.PatternRewriter.t(), any() -> {:ok, any()} | {:error, any()})
-
   @type pattern_entry() ::
           Beaver.Pattern.Native.Descriptor.t()
           | Beaver.Pattern.Native.Program.t()
           | {:pdl, MLIR.Module.t() | Operation.t() | binary() | [function()]}
           | {root_name :: term(), match_and_rewrite() | Beaver.Pattern.Native.Descriptor.t()}
-
   @type pattern_list() :: [pattern_entry()]
   @type apply_result() :: {LogicalResult.t(), diagnostics()}
-
   @spec with_default_config((config_handle() -> result)) :: result when result: var
   def with_default_config(fun) when is_function(fun, 1),
     do:
@@ -109,11 +98,9 @@ defmodule Beaver.MLIR.Rewrite do
   end
 
   @type pattern_input() :: pattern_list() | RewritePatternSet.t() | MLIR.FrozenRewritePatternSet.t()
-
   @spec apply_patterns(rewrite_ir(), pattern_input()) :: apply_result()
   @spec apply_patterns(rewrite_ir(), pattern_input(), config_input()) :: apply_result()
   def apply_patterns(ir, patterns, configure \\ nil), do: apply_patterns(ir, patterns, configure, [])
-
   @spec apply_patterns(rewrite_ir(), pattern_input(), config_input(), keyword()) :: apply_result()
   def apply_patterns(ir, %MLIR.FrozenRewritePatternSet{} = patterns, configure, opts) do
     with_default_config(configure, fn cfg ->
@@ -166,7 +153,6 @@ defmodule Beaver.MLIR.Rewrite do
       do: Logger.error(MLIR.Diagnostic.format(diagnostics, "failed to apply pattern set."))
 
     Logger.flush()
-
     if LogicalResult.success?(result), do: ir, else: raise("pattern application failed to converge")
   end
 end

@@ -3,33 +3,28 @@ defmodule Beaver.MLIR.Safepoint do
   Native safepoint liveness analysis, conflict-free frame slot coloring, resumable CFG state-machine lowering (with
   optional native LLVM frame-pointer materialization), and bounded-leaf fast-path cloning.
   """
-
-  alias Beaver.{MLIR, Native}
-  alias Beaver.MLIR.{CAPI, IRRewriter, Operation, RewriterBase}
+  alias Beaver.{MLIR, Native, Walker}
+  alias Beaver.MLIR.{Attribute, Block, CAPI, IRRewriter, Operation, RewriterBase, SymbolTable, Value}
 
   @type safepoint_entry() :: %{
           id: non_neg_integer(),
           operation: Operation.t(),
-          live_values: [MLIR.Value.t()],
+          live_values: [Value.t()],
           slots: [non_neg_integer()]
         }
-
   @type analysis_result() :: %{
           slot_count: non_neg_integer(),
           slot_types: [MLIR.Type.t()],
-          value_slots: %{MLIR.Value.t() => non_neg_integer()},
+          value_slots: %{Value.t() => non_neg_integer()},
           safepoints: [safepoint_entry()]
         }
-
   @type safepoint_matcher() ::
           Operation.t()
           | String.t()
           | atom()
           | {String.Chars.t(), String.Chars.t()}
           | (Operation.t() -> as_boolean(term()))
-
   @type safepoint_spec() :: safepoint_matcher() | [safepoint_matcher()]
-
   @doc "Computes live-across-safepoint SSA values inside `func_op` and assigns conflict-free frame slots."
   @spec analyze(Operation.t(), safepoint_spec(), keyword()) :: analysis_result()
   def analyze(%Operation{} = func_op, safepoints, opts \\ []) when is_list(opts) do
@@ -39,17 +34,12 @@ defmodule Beaver.MLIR.Safepoint do
   end
 
   @doc """
-  Lowers `func_op` in-place into a resumable coroutine / state-machine CFG.
-
-  Options:
-    * `:safepoints` - safepoint op name, list of op names, or `[Operation.t()]` (default `["coro.suspend"]`).
-    * `:state_arg` - entry argument index holding resume state (`nil` emits `"coro.state"`, default `0`).
-    * `:frame_arg` - optional entry argument index of type `!llvm.ptr`. When set, spills and reloads are
-      materialized directly as `llvm.getelementptr` + `llvm.store` / `llvm.load` without unregistered ops.
-    * `:slot_stride` - `:auto` (default, ABI-aligned cumulative offsets via `DataLayout`) or fixed positive
-      byte stride per frame slot (e.g. `8` or `24`).
-    * `:save_op` / `:load_op` - custom placeholder op names when `:frame_arg` is `nil`.
-    * `:return_frame_bytes` - when `true`, returns `{:ok, func_op, frame_bytes}` instead of `{:ok, func_op}`.
+  Lowers func_op in place to a resumable CFG. `:safepoints` accepts op names, @callee selectors, predicates,
+  operations, or mixed lists (default `["coro.suspend"]`). `:state_arg` is the resume argument index (0);
+  nil emits a coro.state placeholder. `:frame_arg` optionally supplies a !llvm.ptr argument for native frame
+  GEP/store/load; otherwise `:save_op`/`:load_op` select placeholders (coro.save/coro.load).
+  `:slot_stride` is :auto for ABI-aligned offsets or a fixed positive byte stride.
+  `:return_frame_bytes` adds the frame size to the success tuple (default false).
   """
   @spec lower_resumable(Operation.t(), keyword()) ::
           {:ok, Operation.t()} | {:ok, Operation.t(), non_neg_integer()} | {:error, term()}
@@ -96,13 +86,12 @@ defmodule Beaver.MLIR.Safepoint do
   def bounded_leaf?(%Operation{} = func_op, opts \\ []) when is_list(opts) do
     poll_specs = op_specs(opts, :poll_ops, :poll, "coro.poll")
     suspend_specs = op_specs(opts, :suspend_ops, :safepoints, "coro.suspend")
-
     loop_ops = Keyword.get(opts, :loop_ops, ["scf.while", "scf.for"]) |> List.wrap()
     cost_attr = Keyword.get(opts, :cost_attr, "cost") |> to_string()
     max_work = Keyword.get(opts, :max_work, 32)
 
-    with [region] <- func_op |> Beaver.Walker.regions() |> Enum.to_list(),
-         blocks when blocks != [] <- region |> Beaver.Walker.blocks() |> Enum.to_list(),
+    with [region] <- func_op |> Walker.regions() |> Enum.to_list(),
+         blocks when blocks != [] <- region |> Walker.blocks() |> Enum.to_list(),
          true <- acyclic_cfg?(blocks),
          [] <- resolve_ops(func_op, loop_ops),
          [] <- resolve_ops(func_op, suspend_specs) do
@@ -121,24 +110,20 @@ defmodule Beaver.MLIR.Safepoint do
     do: opts |> Keyword.get(primary, Keyword.get(opts, fallback, [default])) |> List.wrap()
 
   defp acyclic_cfg?(blocks) do
-    graph = :digraph.new([:private])
-
-    try do
+    Native.with_resource(:digraph.new([:private]), &:digraph.delete/1, fn graph ->
       indexed = Enum.with_index(blocks)
       for {_, index} <- indexed, do: :digraph.add_vertex(graph, index)
 
       for {block, index} <- indexed,
-          term = MLIR.Block.terminator(block),
+          term = Block.terminator(block),
           term != nil,
-          successor <- Beaver.Walker.successors(term),
-          target = Enum.find_index(blocks, &MLIR.Block.equal?(&1, successor)),
+          successor <- Walker.successors(term),
+          target = Enum.find_index(blocks, &Block.equal?(&1, successor)),
           target != nil,
           do: :digraph.add_edge(graph, index, target)
 
       :digraph_utils.is_acyclic(graph)
-    after
-      :digraph.delete(graph)
-    end
+    end)
   end
 
   @doc """
@@ -149,9 +134,7 @@ defmodule Beaver.MLIR.Safepoint do
   """
   @spec bundle_leaf!(MLIR.Module.t() | Operation.t(), keyword() | Operation.t() | String.Chars.t(), keyword()) :: map()
   def bundle_leaf!(func_or_module, sym_or_opts \\ [], opts \\ [])
-
   def bundle_leaf!(%Operation{} = func_op, opts, []) when is_list(opts), do: do_bundle_leaf!(func_op, opts)
-
   def bundle_leaf!(_module_or_op, %Operation{} = func_op, opts) when is_list(opts), do: do_bundle_leaf!(func_op, opts)
 
   def bundle_leaf!(module_or_op, sym_name, opts) when is_list(opts) do
@@ -160,7 +143,7 @@ defmodule Beaver.MLIR.Safepoint do
 
     func_op =
       Operation.with_symbol_table(root_op, fn st ->
-        found = MLIR.SymbolTable.lookup(st, clean_sym)
+        found = SymbolTable.lookup(st, clean_sym)
         if MLIR.null?(found), do: raise(ArgumentError, "function @#{clean_sym} not found in symbol table")
         found
       end)
@@ -171,7 +154,6 @@ defmodule Beaver.MLIR.Safepoint do
   defp do_bundle_leaf!(%Operation{} = func_op, opts) do
     poll_specs = op_specs(opts, :poll_ops, :poll, "coro.poll")
     suspend_specs = op_specs(opts, :suspend_ops, :safepoints, "coro.suspend")
-
     eligible? = bounded_leaf?(func_op, opts)
 
     if Keyword.get(opts, :require_leaf, false) and not eligible? do
@@ -208,7 +190,7 @@ defmodule Beaver.MLIR.Safepoint do
 
   defp create_folded_leaf_clone!(%Operation{} = func_op, poll_names, opts) do
     ctx = MLIR.context(func_op)
-    orig_sym = func_op["sym_name"] |> MLIR.to_string() |> String.trim("\"")
+    orig_sym = Attribute.value(func_op["sym_name"])
 
     leaf_sym =
       Keyword.get_lazy(opts, :leaf_name, fn -> orig_sym <> "_leaf" end) |> to_string() |> String.trim_leading("@")
@@ -219,7 +201,7 @@ defmodule Beaver.MLIR.Safepoint do
 
       nil ->
         clone = Operation.clone(func_op)
-        Operation.put_attribute(clone, :sym_name, MLIR.Attribute.string(leaf_sym, ctx: ctx))
+        Operation.put_attribute(clone, :sym_name, Attribute.string(leaf_sym, ctx: ctx))
         fold_fn = Keyword.get(opts, :fold_poll)
 
         IRRewriter.with_rewriter(ctx, fn rw ->
@@ -231,30 +213,25 @@ defmodule Beaver.MLIR.Safepoint do
     end
   end
 
-  defp lookup_existing_leaf(func_op, leaf_sym) do
-    case Operation.enclosing_symbol_table(func_op) do
-      %Operation{} = sym_op -> Operation.with_symbol_table(sym_op, &lookup_non_null_symbol(&1, leaf_sym))
-      nil -> nil
+  defp lookup_existing_leaf(func, sym) do
+    if root = Operation.enclosing_symbol_table(func) do
+      Operation.with_symbol_table(root, &lookup_leaf(&1, sym))
     end
   end
 
-  defp lookup_non_null_symbol(st, sym) do
-    found = MLIR.SymbolTable.lookup(st, sym)
-    if MLIR.null?(found), do: nil, else: found
+  defp lookup_leaf(st, sym) do
+    op = SymbolTable.lookup(st, sym)
+    unless MLIR.null?(op), do: op
   end
 
-  defp insert_clone_after_if_attached(rw, func_op, clone) do
-    if Operation.block(func_op) do
-      RewriterBase.with_insertion_point(rw, {:after, func_op}, fn -> RewriterBase.insert(rw, clone) end)
-    end
+  defp insert_clone_after_if_attached(rw, func, clone) do
+    if Operation.block(func),
+      do: RewriterBase.with_insertion_point(rw, {:after, func}, fn -> RewriterBase.insert(rw, clone) end)
   end
 
-  defp apply_poll_folding!(rw, clone, poll_names, fold_fn) when is_function(fold_fn, 2) do
-    Enum.each(resolve_ops(clone, poll_names), &fold_fn.(rw, &1))
-  end
-
-  defp apply_poll_folding!(rw, clone, poll_names, _fold_fn) do
-    Enum.each(resolve_ops(clone, poll_names), &fold_poll_op!(rw, clone, &1))
+  defp apply_poll_folding!(rw, clone, specs, callback) do
+    fold = if is_function(callback, 2), do: callback, else: &fold_poll_op!(&1, clone, &2)
+    Enum.each(resolve_ops(clone, specs), &fold.(rw, &1))
   end
 
   defp fold_poll_op!(rw, enclosing_func, poll_op) do
@@ -265,11 +242,11 @@ defmodule Beaver.MLIR.Safepoint do
         RewriterBase.erase_op(rw, poll_op)
 
       [res] ->
-        res_type = MLIR.Value.type(res)
+        res_type = Value.type(res)
         const_op = if Operation.name(enclosing_func) == "llvm.func", do: "llvm.mlir.constant", else: "arith.constant"
 
         RewriterBase.with_insertion_point(rw, {:before, poll_op}, fn ->
-          zero_attr = MLIR.Attribute.integer(res_type, 0)
+          zero_attr = Attribute.integer(res_type, 0)
           false_val = RewriterBase.emit(rw, poll_op, const_op, [value: zero_attr], res_type)
           RewriterBase.replace_op(rw, poll_op, false_val)
         end)
@@ -280,13 +257,12 @@ defmodule Beaver.MLIR.Safepoint do
     end
   end
 
-  defp poll_op_cost(%Operation{} = op, cost_attr) do
-    attr_int_cost(Operation.attribute(op, cost_attr)) || operand_const_cost(op) || 1
-  end
+  defp poll_op_cost(%Operation{} = op, cost_attr),
+    do: attr_int_cost(Operation.attribute(op, cost_attr)) || operand_const_cost(op) || 1
 
   defp operand_const_cost(%Operation{} = op) do
     with %MLIR.Value{} = val <- Enum.at(Operation.operands(op), 0),
-         {:ok, def_op} <- MLIR.Value.owner(val),
+         {:ok, def_op} <- Value.owner(val),
          true <- Operation.name(def_op) in ["arith.constant", "llvm.mlir.constant"] do
       attr_int_cost(Operation.attribute(def_op, "value"))
     else
@@ -297,8 +273,8 @@ defmodule Beaver.MLIR.Safepoint do
   defp attr_int_cost(nil), do: nil
 
   defp attr_int_cost(%MLIR.Attribute{} = attr) do
-    if MLIR.Attribute.integer?(attr) do
-      val = MLIR.Attribute.value(attr)
+    if Attribute.integer?(attr) do
+      val = Attribute.value(attr)
       if is_integer(val) and val >= 0, do: val, else: nil
     else
       parse_non_neg_int(MLIR.to_string(attr))
@@ -315,37 +291,28 @@ defmodule Beaver.MLIR.Safepoint do
   defp normalize_optional_index!(nil, _key), do: -1
   defp normalize_optional_index!(idx, _key) when is_integer(idx) and idx >= 0, do: idx
   defp normalize_optional_index!(other, key), do: raise(ArgumentError, "invalid #{inspect(key)}: #{inspect(other)}")
-
   defp normalize_slot_stride!(:auto), do: 0
-  defp normalize_slot_stride!(0), do: 0
-  defp normalize_slot_stride!(n) when is_integer(n) and n > 0, do: n
+  defp normalize_slot_stride!(n) when is_integer(n) and n >= 0, do: n
   defp normalize_slot_stride!(other), do: raise(ArgumentError, "invalid :slot_stride: #{inspect(other)}")
-
   @doc false
   def resolve_ops(%Operation{} = _func_op, []), do: []
-  def resolve_ops(%Operation{} = _func_op, [%Operation{} | _] = ops), do: ops
 
   def resolve_ops(%Operation{} = func_op, specs) when is_list(specs) do
     {explicit_ops, matchers} = Enum.split_with(specs, &match?(%Operation{}, &1))
+    preds = Enum.map(matchers, &spec_predicate!/1)
 
     matched =
-      if matchers == [] do
-        []
-      else
-        preds = Enum.map(matchers, &spec_predicate!/1)
-        Beaver.Walker.find_ops(func_op, fn op -> Enum.any?(preds, & &1.(op)) end, exclude_root: true)
-      end
+      if preds == [],
+        do: [],
+        else: Walker.find_ops(func_op, fn op -> Enum.any?(preds, & &1.(op)) end, exclude_root: true)
 
     explicit_ops ++ matched
   end
 
   def resolve_ops(%Operation{} = func_op, spec), do: resolve_ops(func_op, [spec])
-
   defp spec_predicate!(fun) when is_function(fun, 1), do: fn op -> if(fun.(op), do: true, else: false) end
 
-  defp spec_predicate!("@" <> callee) when callee != "" do
-    fn op -> op_callee_symbol(op) == callee end
-  end
+  defp spec_predicate!("@" <> callee) when callee != "", do: fn op -> op_callee_symbol(op) == callee end
 
   defp spec_predicate!({op_name, callee}) do
     expected_op = to_string(op_name)
@@ -361,16 +328,12 @@ defmodule Beaver.MLIR.Safepoint do
   defp spec_predicate!(other), do: raise(ArgumentError, "invalid safepoint operation spec: #{inspect(other)}")
 
   defp op_callee_symbol(%Operation{} = op) do
-    case Operation.attribute(op, "callee") do
-      %MLIR.Attribute{} = attr -> extract_callee_attr(attr)
-      nil -> nil
-    end
-  end
+    attr = Operation.attribute(op, "callee")
 
-  defp extract_callee_attr(attr) do
     cond do
-      MLIR.Attribute.flat_symbol_ref?(attr) -> MLIR.Attribute.value(attr)
-      MLIR.Attribute.string?(attr) -> attr |> MLIR.Attribute.value() |> String.trim_leading("@")
+      is_nil(attr) -> nil
+      Attribute.flat_symbol_ref?(attr) -> Attribute.value(attr)
+      Attribute.string?(attr) -> attr |> Attribute.value() |> String.trim_leading("@")
       true -> nil
     end
   end

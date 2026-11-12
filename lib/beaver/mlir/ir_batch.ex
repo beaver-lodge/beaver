@@ -7,7 +7,6 @@ defmodule Beaver.MLIR.IRBatch do
 
   @shorthand_types Map.new(~w(i1 i8 i16 i32 i64 i128 index f16 bf16 f32 f64 none)a, &{&1, to_string(&1)})
                    |> Map.put(:ptr, "!llvm.ptr")
-
   def read(operations, opts \\ []) do
     opts = Keyword.put_new(opts, :strategy, :auto)
     names = Keyword.get(opts, :attributes, []) |> Enum.map(&to_string/1)
@@ -79,17 +78,6 @@ defmodule Beaver.MLIR.IRBatch do
           end)
 
         submit_build(ctx, block.ref, position, encoded_specs, verify_root_ref, opts)
-    end
-  end
-
-  @doc "Builds a batch of operations in a single NIF submission, returning `{operations, results}` or raising."
-  def build!(target, specs, opts \\ []) do
-    case build(target, specs, opts) do
-      {:ok, ops, results, _diagnostics} ->
-        {ops, results}
-
-      {:error, diagnostics} ->
-        raise ArgumentError, MLIR.Diagnostic.format(diagnostics, "IRBatch.build! verification failed")
     end
   end
 
@@ -173,17 +161,6 @@ defmodule Beaver.MLIR.IRBatch do
       else: {:error, diagnostics}
   end
 
-  @doc "Builds a function via `build_function/3`, returning the created `MLIR.Operation` (or `{op, details}`) or raising."
-  def build_function!(target, func_spec, opts \\ []) do
-    case build_function(target, func_spec, opts) do
-      {:ok, result, _diagnostics} ->
-        result
-
-      {:error, diagnostics} ->
-        raise ArgumentError, MLIR.Diagnostic.format(diagnostics, "IRBatch.build_function! verification failed")
-    end
-  end
-
   @doc """
   Creates a new `MLIR.Module` in `ctx` and populates it with `func_specs` using `build_function/3`. Verifies the
   resulting module once at the end by default (`verify: true`).
@@ -217,17 +194,18 @@ defmodule Beaver.MLIR.IRBatch do
     end
   end
 
-  @doc "Builds and verifies an `MLIR.Module` from `func_specs`, raising on failure."
-  @spec build_module!(MLIR.Context.t(), [map() | keyword()], keyword()) :: MLIR.Module.t()
-  def build_module!(%MLIR.Context{} = ctx, func_specs, opts \\ []) do
-    case build_module(ctx, func_specs, opts) do
-      {:ok, module, _diagnostics} ->
-        module
-
-      {:error, diagnostics} ->
-        raise ArgumentError, MLIR.Diagnostic.format(diagnostics, "IRBatch.build_module! verification failed")
-    end
+  # Keep diagnostics and raising behavior identical across all three builder surfaces.
+  for name <- [:build, :build_function, :build_module] do
+    @doc "Calls `#{name}/3`, returning its result or raising with MLIR diagnostics."
+    def unquote(:"#{name}!")(target, spec, opts \\ []),
+      do: unwrap_build!(unquote(name)(target, spec, opts), unquote(name))
   end
+
+  defp unwrap_build!({:ok, ops, results, _diagnostics}, _name), do: {ops, results}
+  defp unwrap_build!({:ok, result, _diagnostics}, _name), do: result
+
+  defp unwrap_build!({:error, diagnostics}, name),
+    do: raise(ArgumentError, MLIR.Diagnostic.format(diagnostics, "IRBatch.#{name}! verification failed"))
 
   defp normalize_func_spec!(%{} = map), do: map
   defp normalize_func_spec!(kw) when is_list(kw), do: Map.new(kw)
@@ -235,9 +213,8 @@ defmodule Beaver.MLIR.IRBatch do
   defp normalize_func_spec!({kind, name, inputs, results}),
     do: %{kind: kind, name: name, inputs: inputs, results: results}
 
-  defp normalize_func_spec!({kind, name, inputs, results, extra}) when is_list(extra) or is_map(extra) do
-    extra |> Map.new() |> Map.merge(%{kind: kind, name: name, inputs: inputs, results: results})
-  end
+  defp normalize_func_spec!({kind, name, inputs, results, extra}) when is_list(extra) or is_map(extra),
+    do: extra |> Map.new() |> Map.merge(%{kind: kind, name: name, inputs: inputs, results: results})
 
   defp normalize_func_spec!(other),
     do: raise(ArgumentError, "invalid function specification for IRBatch.build_function: #{inspect(other)}")
@@ -245,9 +222,8 @@ defmodule Beaver.MLIR.IRBatch do
   defp resolve_container_block!(%MLIR.Block{} = block), do: block
   defp resolve_container_block!(%MLIR.Module{} = module), do: MLIR.Module.body(module)
 
-  defp resolve_container_block!(%MLIR.Operation{} = op) do
-    MLIR.Module.body(op) || raise(ArgumentError, "target operation does not have an entry block")
-  end
+  defp resolve_container_block!(%MLIR.Operation{} = op),
+    do: MLIR.Module.body(op) || raise(ArgumentError, "target operation does not have an entry block")
 
   defp resolve_container_block!(other),
     do: raise(ArgumentError, "invalid build_function target: #{inspect(other)}")
@@ -256,12 +232,10 @@ defmodule Beaver.MLIR.IRBatch do
     do: MLIR.context(op)
 
   defp resolve_container_context!(_target, block, opts), do: resolve_build_context!(block, :end, [], opts)
-
   defp resolve_func_op_name!(:func), do: "func.func"
   defp resolve_func_op_name!(:llvm), do: "llvm.func"
   defp resolve_func_op_name!(name) when is_binary(name) and byte_size(name) > 0, do: name
   defp resolve_func_op_name!(other), do: raise(ArgumentError, "invalid function :kind #{inspect(other)}")
-
   defp default_return_op("llvm.func"), do: "llvm.return"
   defp default_return_op(_), do: "func.return"
 
@@ -335,7 +309,6 @@ defmodule Beaver.MLIR.IRBatch do
 
   defp resolve_mlir_type(%MLIR.Type{} = t, _ctx), do: t
   defp resolve_mlir_type(s, ctx) when is_binary(s), do: MLIR.Type.get(s, ctx: ctx)
-
   defp type_spec_to_string(%MLIR.Type{} = t, _ctx), do: MLIR.to_string(t)
   defp type_spec_to_string(s, _ctx) when is_binary(s), do: s
 
@@ -431,9 +404,8 @@ defmodule Beaver.MLIR.IRBatch do
     %{name: "cf.br", operands: args, successors: [blk]}
   end
 
-  defp expand_cfg_statement!({:br, target, args}, blocks, by_name, _return_op) when is_list(args) do
-    %{name: "cf.br", operands: args, successors: [lookup_cfg_block!(target, blocks, by_name)]}
-  end
+  defp expand_cfg_statement!({:br, target, args}, blocks, by_name, _return_op) when is_list(args),
+    do: %{name: "cf.br", operands: args, successors: [lookup_cfg_block!(target, blocks, by_name)]}
 
   defp expand_cfg_statement!({:cond_br, cond_ref, true_dest, false_dest}, blocks, by_name, _return_op) do
     {t_blk, t_args} = normalize_branch_dest!(true_dest, blocks, by_name)
@@ -516,7 +488,6 @@ defmodule Beaver.MLIR.IRBatch do
     do: {lookup_cfg_block!(dest, blocks, by_name), args}
 
   defp normalize_branch_dest!(dest, blocks, by_name), do: {lookup_cfg_block!(dest, blocks, by_name), []}
-
   defp lookup_cfg_block!(%MLIR.Block{} = blk, _blocks, _by_name), do: blk
 
   defp lookup_cfg_block!(name, blocks, by_name) do
@@ -529,7 +500,6 @@ defmodule Beaver.MLIR.IRBatch do
   defp encode_verify_root(nil), do: nil
   defp encode_verify_root(false), do: nil
   defp encode_verify_root(root), do: MLIR.Operation.from_module(root).ref
-
   defp resolve_build_target!(%MLIR.Block{} = block, pos) when pos in [:end, :start], do: {block, pos}
 
   defp resolve_build_target!(%MLIR.Block{} = block, {rel, %MLIR.Operation{ref: op_ref}})
@@ -611,7 +581,6 @@ defmodule Beaver.MLIR.IRBatch do
   end
 
   defp encode_operand_ref!(%MLIR.Value{ref: ref}, _bindings), do: {0, 0, ref}
-
   defp encode_operand_ref!({:op, op_idx}, _bindings) when is_integer(op_idx) and op_idx >= 0, do: {1, op_idx, 0}
 
   defp encode_operand_ref!({:result, op_idx, res_idx}, _bindings)
@@ -664,11 +633,9 @@ defmodule Beaver.MLIR.IRBatch do
   defp normalize_type_spec!(a) when is_map_key(@shorthand_types, a), do: Map.fetch!(@shorthand_types, a)
   defp normalize_type_spec!(s) when is_binary(s) and byte_size(s) > 0, do: s
   defp normalize_type_spec!(other), do: raise(ArgumentError, "unsupported type specification: #{inspect(other)}")
-
   defp normalize_type_string!(t), do: type_spec_to_string(normalize_type_spec!(t), nil)
   defp encode_type_term!(%MLIR.Type{ref: ref}), do: ref
   defp encode_type_term!(t), do: normalize_type_spec!(t)
-
   defp encode_attribute_pair!({attr_name, value}), do: {to_string(attr_name), encode_attribute_value!(value)}
 
   defp encode_attribute_pair!(other),
@@ -681,9 +648,7 @@ defmodule Beaver.MLIR.IRBatch do
   defp encode_attribute_value!({:unit}), do: :unit
   defp encode_attribute_value!({tag, n}) when tag in [:i8, :i16, :i32, :i64, :index] and is_integer(n), do: {tag, n}
   defp encode_attribute_value!({:int, w, n}) when is_integer(w) and w > 0 and is_integer(n), do: {:int, w, n}
-
   defp encode_attribute_value!({tag, v}) when tag in [:bool, :i1] and (is_boolean(v) or v in [0, 1]), do: {tag, v}
-
   defp encode_attribute_value!({tag, x}) when tag in [:f32, :f64] and is_number(x), do: {tag, x * 1.0}
   defp encode_attribute_value!({:string, s}) when is_binary(s), do: {:string, s}
 
