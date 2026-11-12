@@ -1,14 +1,13 @@
 defmodule Beaver.Execution.Profile do
   @moduledoc """
-  Bounded, opt-in execution costs shared by passes, verification, rewrites and
-  IR batches. Pass `profile: profile` inside `capture/1` to attribute nested work.
+  Bounded, opt-in execution costs shared by passes, verification, rewrites and IR batches. Pass `profile: profile`
+  inside `capture/1` to attribute nested work.
 
-  Phase durations are inclusive. Native callback wait is summed across threads
-  and may exceed wall time; it must not be subtracted from wall time as CPU time.
-  Uninstrumented execution does not allocate a receipt or read profiling clocks.
-  Queue time covers Beaver's executor; dirty-scheduler queue time is not sampled.
-  Completion delivery includes result packaging and the BEAM caller's wakeup.
-  CPU time and peak RSS describe the whole VM process, including concurrent work.
+  Phase durations are inclusive. Native callback wait is summed across threads and may exceed wall time; it must not
+  be subtracted from wall time as CPU time. Uninstrumented execution does not allocate a receipt or read profiling
+  clocks. Queue time covers Beaver's executor; dirty-scheduler queue time is not sampled. Completion delivery
+  includes result packaging and the BEAM caller's wakeup. CPU time and peak RSS describe the whole VM process,
+  including concurrent work.
   """
   defstruct [:table]
   @type t :: %__MODULE__{table: :ets.tid()}

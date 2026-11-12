@@ -1,8 +1,7 @@
 defmodule Beaver.MLIR.Safepoint do
   @moduledoc """
-  Native safepoint liveness analysis, conflict-free frame slot coloring,
-  resumable CFG state-machine lowering (with optional native LLVM frame-pointer
-  materialization), and bounded-leaf fast-path cloning.
+  Native safepoint liveness analysis, conflict-free frame slot coloring, resumable CFG state-machine lowering (with
+  optional native LLVM frame-pointer materialization), and bounded-leaf fast-path cloning.
   """
 
   alias Beaver.{MLIR, Native}
@@ -64,9 +63,7 @@ defmodule Beaver.MLIR.Safepoint do
           {state_arg, frame_arg, slot_stride}
         )
 
-      if Keyword.get(opts, :return_frame_bytes, false),
-        do: {:ok, func_op, frame_bytes},
-        else: {:ok, func_op}
+      if Keyword.get(opts, :return_frame_bytes, false), do: {:ok, func_op, frame_bytes}, else: {:ok, func_op}
     rescue
       e -> {:error, e}
     end
@@ -83,20 +80,13 @@ defmodule Beaver.MLIR.Safepoint do
   end
 
   @doc """
-  Returns `true` when `func_op` has an acyclic CFG (no block back-edges and no `scf.while`/`scf.for`
-  loops), zero non-poll suspend operations, and total poll cost `<= :max_work` (default `32`).
+  Returns `true` when `func_op` has an acyclic CFG (no block back-edges and no `scf.while`/`scf.for` loops), zero
+  non-poll suspend operations, and total poll cost `<= :max_work` (default `32`).
   """
   @spec bounded_leaf?(Operation.t(), keyword()) :: boolean()
   def bounded_leaf?(%Operation{} = func_op, opts \\ []) when is_list(opts) do
-    poll_names =
-      Keyword.get_lazy(opts, :poll_ops, fn -> Keyword.get(opts, :poll, ["coro.poll"]) end)
-      |> List.wrap()
-      |> Enum.map(&to_string/1)
-
-    suspend_names =
-      Keyword.get_lazy(opts, :suspend_ops, fn -> Keyword.get(opts, :safepoints, ["coro.suspend"]) end)
-      |> List.wrap()
-      |> Enum.map(&to_string/1)
+    poll_names = op_names(opts, :poll_ops, :poll, "coro.poll")
+    suspend_names = op_names(opts, :suspend_ops, :safepoints, "coro.suspend")
 
     loop_ops = Keyword.get(opts, :loop_ops, ["scf.while", "scf.for"]) |> List.wrap() |> Enum.map(&to_string/1)
     cost_attr = Keyword.get(opts, :cost_attr, "cost") |> to_string()
@@ -118,79 +108,42 @@ defmodule Beaver.MLIR.Safepoint do
     end
   end
 
+  defp op_names(opts, primary, fallback, default),
+    do: opts |> Keyword.get(primary, Keyword.get(opts, fallback, [default])) |> List.wrap() |> Enum.map(&to_string/1)
+
   defp acyclic_cfg?(blocks) do
-    adj =
-      blocks
-      |> Enum.with_index()
-      |> Map.new(fn {blk, idx} -> {idx, block_successor_indices(blk, blocks)} end)
+    graph = :digraph.new([:private])
 
-    {_colors, cyclic?} =
-      Enum.reduce(0..(length(blocks) - 1), {%{}, false}, fn start, {colors, cyc} ->
-        if cyc or Map.has_key?(colors, start),
-          do: {colors, cyc},
-          else: dfs_cycle(start, adj, colors)
-      end)
+    try do
+      indexed = Enum.with_index(blocks)
+      for {_, index} <- indexed, do: :digraph.add_vertex(graph, index)
 
-    not cyclic?
-  end
+      for {block, index} <- indexed,
+          term = MLIR.Block.terminator(block),
+          term != nil,
+          successor <- Beaver.Walker.successors(term),
+          target = Enum.find_index(blocks, &MLIR.Block.equal?(&1, successor)),
+          target != nil,
+          do: :digraph.add_edge(graph, index, target)
 
-  defp block_successor_indices(blk, blocks) do
-    case MLIR.Block.terminator(blk) do
-      nil ->
-        []
-
-      term ->
-        term
-        |> Beaver.Walker.successors()
-        |> Enum.flat_map(&find_block_indices(blocks, &1))
+      :digraph_utils.is_acyclic(graph)
+    after
+      :digraph.delete(graph)
     end
-  end
-
-  defp find_block_indices(blocks, succ) do
-    case Enum.find_index(blocks, &MLIR.Block.equal?(&1, succ)) do
-      nil -> []
-      idx -> [idx]
-    end
-  end
-
-  defp dfs_cycle(node, adj, colors) do
-    colors = Map.put(colors, node, :gray)
-
-    {colors, cyclic?} =
-      Enum.reduce_while(Map.get(adj, node, []), {colors, false}, fn succ, {c, _} ->
-        visit_successor(succ, adj, c)
-      end)
-
-    {Map.put(colors, node, :black), cyclic?}
-  end
-
-  defp visit_successor(succ, adj, colors) do
-    case Map.get(colors, succ) do
-      :gray -> {:halt, {colors, true}}
-      :black -> {:cont, {colors, false}}
-      nil -> continue_dfs(succ, adj, colors)
-    end
-  end
-
-  defp continue_dfs(succ, adj, colors) do
-    {next_colors, cyc?} = dfs_cycle(succ, adj, colors)
-    if cyc?, do: {:halt, {next_colors, true}}, else: {:cont, {next_colors, false}}
   end
 
   @doc """
-  Optionally clones a bounded-leaf fast-path sibling (`<sym>_leaf` with poll safepoints folded away)
-  and optionally lowers `func_op` in-place via `lower_resumable!/2` (`lower_resumable: true` by default).
+  Optionally clones a bounded-leaf fast-path sibling (`<sym>_leaf` with poll safepoints folded away) and optionally
+  lowers `func_op` in-place via `lower_resumable!/2` (`lower_resumable: true` by default).
 
   Accepts `(func_op, opts)`, `(module_or_container, func_op, opts)`, or `(module_or_container, sym_name, opts)`.
   """
   @spec bundle_leaf!(MLIR.Module.t() | Operation.t(), keyword() | Operation.t() | String.Chars.t(), keyword()) :: map()
   def bundle_leaf!(func_or_module, sym_or_opts \\ [], opts \\ [])
 
-  def bundle_leaf!(%Operation{} = func_op, opts, []) when is_list(opts),
-    do: do_bundle_leaf!(func_op, opts)
+  def bundle_leaf!(%Operation{} = func_op, opts, []) when is_list(opts), do: do_bundle_leaf!(func_op, opts)
 
-  def bundle_leaf!(_module_or_op, %Operation{} = func_op, opts) when is_list(opts),
-    do: do_bundle_leaf!(func_op, opts)
+  def bundle_leaf!(_module_or_op, %Operation{} = func_op, opts) when is_list(opts), do: do_bundle_leaf!(func_op, opts)
 
   def bundle_leaf!(module_or_op, sym_name, opts) when is_list(opts) do
     root_op = Operation.from_module(module_or_op)
@@ -207,15 +160,8 @@ defmodule Beaver.MLIR.Safepoint do
   end
 
   defp do_bundle_leaf!(%Operation{} = func_op, opts) do
-    poll_names =
-      Keyword.get_lazy(opts, :poll_ops, fn -> Keyword.get(opts, :poll, ["coro.poll"]) end)
-      |> List.wrap()
-      |> Enum.map(&to_string/1)
-
-    suspend_names =
-      Keyword.get_lazy(opts, :suspend_ops, fn -> Keyword.get(opts, :safepoints, ["coro.suspend"]) end)
-      |> List.wrap()
-      |> Enum.map(&to_string/1)
+    poll_names = op_names(opts, :poll_ops, :poll, "coro.poll")
+    suspend_names = op_names(opts, :suspend_ops, :safepoints, "coro.suspend")
 
     eligible? = bounded_leaf?(func_op, opts)
 
@@ -223,12 +169,7 @@ defmodule Beaver.MLIR.Safepoint do
       raise ArgumentError, "function is not a bounded leaf"
     end
 
-    {leaf_op, leaf_sym} =
-      if eligible? do
-        create_folded_leaf_clone!(func_op, poll_names, opts)
-      else
-        {nil, nil}
-      end
+    {leaf_op, leaf_sym} = if eligible?, do: create_folded_leaf_clone!(func_op, poll_names, opts), else: {nil, nil}
 
     {lowered_op, frame_bytes} =
       if Keyword.get(opts, :lower_resumable, true) do
@@ -236,18 +177,9 @@ defmodule Beaver.MLIR.Safepoint do
 
         lower_opts =
           opts
-          |> Keyword.drop([
-            :poll_ops,
-            :poll,
-            :suspend_ops,
-            :loop_ops,
-            :cost_attr,
-            :max_work,
-            :leaf_name,
-            :fold_poll,
-            :lower_resumable,
-            :require_leaf
-          ])
+          |> Keyword.drop(
+            ~w(poll_ops poll suspend_ops loop_ops cost_attr max_work leaf_name fold_poll lower_resumable require_leaf)a
+          )
           |> Keyword.put_new(:safepoints, default_sps)
           |> Keyword.put(:return_frame_bytes, true)
 
@@ -304,9 +236,7 @@ defmodule Beaver.MLIR.Safepoint do
 
   defp insert_clone_after_if_attached(rw, func_op, clone) do
     if Operation.block(func_op) do
-      RewriterBase.with_insertion_point(rw, {:after, func_op}, fn ->
-        RewriterBase.insert(rw, clone)
-      end)
+      RewriterBase.with_insertion_point(rw, {:after, func_op}, fn -> RewriterBase.insert(rw, clone) end)
     end
   end
 

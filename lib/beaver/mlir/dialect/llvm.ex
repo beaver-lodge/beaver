@@ -5,9 +5,8 @@ defmodule Beaver.MLIR.Dialect.LLVM do
   @moduledoc """
   Operations and ABI-oriented builders for the MLIR LLVM dialect.
 
-  The raw generated operation functions remain available. These helpers cover
-  contextual LLVM types, enum attributes, symbols, and common function/global/
-  call shapes that otherwise require textual assembly details.
+  The raw generated operation functions remain available. These helpers cover contextual LLVM types, enum
+  attributes, symbols, and common function/global/ call shapes that otherwise require textual assembly details.
   """
 
   alias Beaver.MLIR
@@ -74,12 +73,10 @@ defmodule Beaver.MLIR.Dialect.LLVM do
   @doc """
   Build an LLVM function type.
 
-  LLVM functions have zero or one result. Set `vararg: true` to append `...`
-  to the parameter list.
+  LLVM functions have zero or one result. Set `vararg: true` to append `...` to the parameter list.
   """
   def function_type(params, results, opts \\ []) when is_list(params) and is_list(results) do
-    if length(results) > 1,
-      do: raise(ArgumentError, "LLVM function types support at most one result")
+    if length(results) > 1, do: raise(ArgumentError, "LLVM function types support at most one result")
 
     contextual_type(opts, fn ctx ->
       params = Enum.map(params, &render_type(&1, ctx))
@@ -114,19 +111,15 @@ defmodule Beaver.MLIR.Dialect.LLVM do
   @doc """
   Build an LLVM `DICompileUnit` attribute.
 
-  `:source_language_dialect` is optional and defaults to no dialect.
-  Languages and dialects accept their DWARF integer values. The common `:c`,
-  `:simt`, and `:tile` spellings are also accepted.
+  `:source_language_dialect` is optional and defaults to no dialect. Languages and dialects accept their DWARF
+  integer values. The common `:c`, `:simt`, and `:tile` spellings are also accepted.
   """
   def di_compile_unit(opts) when is_list(opts) do
     ctx = Keyword.fetch!(opts, :ctx)
     source_language = debug_enum(Keyword.fetch!(opts, :source_language), @debug_languages)
-
     dialect = opts[:source_language_dialect]
     source_language_dialect = if is_nil(dialect), do: 0, else: debug_enum(dialect, @debug_language_dialects)
-
     id = Keyword.get_lazy(opts, :id, fn -> CAPI.mlirDistinctAttrCreate(Attribute.unit(ctx: ctx)) end)
-
     rec_id = Keyword.get_lazy(opts, :rec_id, fn -> CAPI.mlirDistinctAttrCreate(Attribute.unit(ctx: ctx)) end)
 
     file =
@@ -139,13 +132,10 @@ defmodule Beaver.MLIR.Dialect.LLVM do
       end)
 
     producer = Attribute.string(Keyword.get(opts, :producer, ""), ctx: ctx)
-
     split_debug_filename = Attribute.string(Keyword.get(opts, :split_debug_filename, ""), ctx: ctx)
-
     imported_entities = Keyword.get(opts, :imported_entities, [])
     imported_array = Beaver.Native.array(imported_entities, Attribute)
     emission_kind = debug_enum(Keyword.get(opts, :emission_kind, :full), @debug_emission_kinds)
-
     name_table_kind = debug_enum(Keyword.get(opts, :name_table_kind, :default), @debug_name_table_kinds)
 
     CAPI.mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect(
@@ -167,13 +157,10 @@ defmodule Beaver.MLIR.Dialect.LLVM do
     )
   end
 
-  @doc """
-  Define an `llvm.func` using the same symbol macro shape as `Func.func`.
-  """
+  @doc "Define an `llvm.func` using the same symbol macro shape as `Func.func`."
   defmacro func(call, opts) do
     quote do
       require Beaver.MLIR.Dialect.Func
-
       Beaver.MLIR.Dialect.Func.func_like(unquote(call), Beaver.MLIR.Dialect.LLVM.func(), unquote(opts))
     end
   end
@@ -181,9 +168,8 @@ defmodule Beaver.MLIR.Dialect.LLVM do
   @doc """
   Build an inline-initialized `llvm.mlir.global`.
 
-  Required options are `:sym_name` and `:type`. Optional options include
-  `:value`, `:constant`, `:linkage`, `:alignment`, and `:address_space`.
-  Linkage atoms are accepted directly.
+  Required options are `:sym_name` and `:type`. Optional options include `:value`, `:constant`, `:linkage`,
+  `:alignment`, and `:address_space`. Linkage atoms are accepted directly.
   """
   def global(%Beaver.SSA{arguments: arguments, ctx: ctx} = ssa) do
     opts = Keyword.new(arguments)

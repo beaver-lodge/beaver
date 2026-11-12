@@ -5,9 +5,7 @@ defmodule Beaver.MLIR.Dialect.MemRef do
   alias Beaver.MLIR.Attribute
   alias Beaver.MLIR.Dialect
 
-  @moduledoc """
-  This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect.
-  """
+  @moduledoc "This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect."
 
   use Beaver.MLIR.Dialect, dialect: "memref", ops: Dialect.Registry.ops("memref")
 
@@ -18,8 +16,7 @@ defmodule Beaver.MLIR.Dialect.MemRef do
   ## Special arguments
   - `global(binary(), {[:i | :f], [8 | 16 | 32 | 64 | 128]})`: To to serialize a binary to MLIR. By default, it will be a `memref<[byte size]*i8>`.
   """
-  def global(%Beaver.SSA{arguments: [txt | arguments]} = ssa)
-      when is_binary(txt) do
+  def global(%Beaver.SSA{arguments: [txt | arguments]} = ssa) when is_binary(txt) do
     {t, width} = {:i, 8}
     value = Attribute.dense_elements(txt, {t, width})
     sym_name = :erlang.md5(txt) |> Base.encode16(case: :lower)
@@ -36,15 +33,13 @@ defmodule Beaver.MLIR.Dialect.MemRef do
   def global(%Beaver.SSA{} = ssa), do: Beaver.SSA.eval(%Beaver.SSA{ssa | op: @global})
 
   def layout(%Type{} = memref_type) do
-    if not Type.memref?(memref_type),
-      do: raise(ArgumentError, "only ranked memref has layout")
+    if not Type.memref?(memref_type), do: raise(ArgumentError, "only ranked memref has layout")
 
     CAPI.mlirMemRefTypeGetLayout(memref_type)
   end
 
   def strides_and_offset(%Type{ref: ref} = memref_type) do
-    if not Type.memref?(memref_type),
-      do: raise(ArgumentError, "only ranked memref has strides and offset")
+    if not Type.memref?(memref_type), do: raise(ArgumentError, "only ranked memref has strides and offset")
 
     {strides, offset} = CAPI.beaver_raw_memref_type_get_strides_and_offset(ref)
     {Enum.map(strides, &MLIR.ShapedType.cast_dynamic_magic_number(&1, :stride)), offset}
@@ -62,8 +57,7 @@ defmodule Beaver.MLIR.Dialect.MemRef do
   end
 
   def affine_map(%Type{} = memref_type) do
-    if not Type.memref?(memref_type),
-      do: raise(ArgumentError, "only ranked memref has affine map")
+    if not Type.memref?(memref_type), do: raise(ArgumentError, "only ranked memref has affine map")
 
     CAPI.mlirMemRefTypeGetAffineMap(memref_type)
   end

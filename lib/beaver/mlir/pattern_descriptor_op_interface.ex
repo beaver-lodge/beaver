@@ -1,12 +1,10 @@
 defmodule Beaver.MLIR.PatternDescriptorOpInterface do
   @moduledoc """
-  Implements Transform dialect's `PatternDescriptorOpInterface` for dynamic
-  operations.
+  Implements Transform dialect's `PatternDescriptorOpInterface` for dynamic operations.
 
-  The callback receives a borrowed `Beaver.MLIR.RewritePatternSet` and adds
-  Beaver rewrite patterns to it. An optional state-aware callback also receives
-  a borrowed `Beaver.MLIR.TransformState`. Borrowed handles must not escape the
-  callback.
+  The callback receives a borrowed `Beaver.MLIR.RewritePatternSet` and adds Beaver rewrite patterns to it. An
+  optional state-aware callback also receives a borrowed `Beaver.MLIR.TransformState`. Borrowed handles must not
+  escape the callback.
   """
 
   alias Beaver.MLIR

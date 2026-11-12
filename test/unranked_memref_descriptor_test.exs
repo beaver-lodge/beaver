@@ -30,9 +30,7 @@ defmodule UnrankedMemRefDescriptorTest do
         opaque_ptr = d |> Beaver.Native.opaque_ptr()
 
         TestingUnrankedMemRefABI.init(ctx, use_enif_alloc: unquote(use_enif_alloc))
-        |> tap(fn %ENIFSupport{engine: e} ->
-          MLIR.ExecutionEngine.invoke!(e, "assign_meta", [opaque_ptr])
-        end)
+        |> tap(fn %ENIFSupport{engine: e} -> MLIR.ExecutionEngine.invoke!(e, "assign_meta", [opaque_ptr]) end)
 
         assert 2 = UnrankedMemRefDescriptor.rank(d)
         assert 0 = UnrankedMemRefDescriptor.offset(d)

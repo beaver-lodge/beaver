@@ -22,7 +22,6 @@ defmodule OpTest do
     assert MLIR.equal?(attr, old_attr)
     assert MLIR.equal?(op, const)
     assert const |> MLIR.to_string() =~ attr_str1
-
     # check deferred attribute
     old_attr = const[:value]
 
@@ -32,7 +31,6 @@ defmodule OpTest do
     assert MLIR.equal?(attr, old_attr)
     assert MLIR.equal?(op, const)
     assert const |> MLIR.to_string() =~ attr_str2
-
     # check popping
     old_attr = const[:value]
     {popped, op} = pop_in(const[:value])

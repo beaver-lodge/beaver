@@ -2,9 +2,7 @@ alias Beaver.MLIR.CAPI
 alias Beaver.Deferred
 
 defmodule Beaver.MLIR.AffineMap do
-  @moduledoc """
-  This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
-  """
+  @moduledoc "This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}."
   alias Beaver.MLIR
 
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
@@ -29,6 +27,5 @@ defmodule Beaver.MLIR.AffineMap do
 
   def dim(index, opts \\ []), do: Deferred.from_opts(opts, &CAPI.mlirAffineDimExprGet(&1, index))
 
-  def symbol(index, opts \\ []),
-    do: Deferred.from_opts(opts, &CAPI.mlirAffineSymbolExprGet(&1, index))
+  def symbol(index, opts \\ []), do: Deferred.from_opts(opts, &CAPI.mlirAffineSymbolExprGet(&1, index))
 end

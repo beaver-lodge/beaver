@@ -13,14 +13,10 @@ defmodule DeduplicateTransposePass do
   alias Beaver.MLIR.Attribute
 
   def extract_perms(op) do
-    if "tosa.transpose" == Beaver.MLIR.Operation.name(op) do
-      {:ok, Beaver.Walker.attributes(op)["perms"]}
-    end
+    if "tosa.transpose" == Beaver.MLIR.Operation.name(op), do: {:ok, Beaver.Walker.attributes(op)["perms"]}
   end
 
-  def redundant?(%Attribute{} = attr1, %Attribute{} = attr2) do
-    MLIR.equal?(attr1, attr2)
-  end
+  def redundant?(%Attribute{} = attr1, %Attribute{} = attr2), do: MLIR.equal?(attr1, attr2)
 
   defp operations_in_order(operation) do
     {_, operations} =
@@ -40,11 +36,7 @@ defmodule DeduplicateTransposePass do
          {:ok, transpose_perm_attr} <- extract_perms(operation),
          {:ok, transpose_input_perm_attr} <- extract_perms(transpose_input_op),
          true <- redundant?(transpose_perm_attr, transpose_input_perm_attr) do
-      MLIR.RewriterBase.replace_op(
-        rewriter,
-        operation,
-        Beaver.Walker.operands(transpose_input_op)[0]
-      )
+      MLIR.RewriterBase.replace_op(rewriter, operation, Beaver.Walker.operands(transpose_input_op)[0])
     else
       _ -> :ok
     end

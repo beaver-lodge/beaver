@@ -2,12 +2,11 @@ defmodule Beaver.Wasm.Binary do
   @moduledoc """
   A packaged WebAssembly binary with its imports/exports manifest.
 
-  This is the WASM analogue of the `gpu.binary` packaging: the compiled
-  binary bytes plus the host-boundary facts (`imports`/`exports`) that a
-  runtime or an experiment receipt needs, without re-reading the LLVM IR.
+  This is the WASM analogue of the `gpu.binary` packaging: the compiled binary bytes plus the host-boundary facts
+  (`imports`/`exports`) that a runtime or an experiment receipt needs, without re-reading the LLVM IR.
 
-  The manifest is parsed directly from the wasm binary's import/export
-  sections, so it reflects what the binary actually declares.
+  The manifest is parsed directly from the wasm binary's import/export sections, so it reflects what the binary
+  actually declares.
   """
 
   import Bitwise
@@ -31,7 +30,6 @@ defmodule Beaver.Wasm.Binary do
   @spec parse(binary()) :: t()
   def parse(@magic <> <<version::little-32, rest::binary>>) when version != 0 do
     {imports, exports} = parse_sections(rest, [], [])
-
     %Binary{bytes: @magic <> <<version::little-32, rest::binary>>, imports: imports, exports: exports}
   end
 
@@ -64,9 +62,7 @@ defmodule Beaver.Wasm.Binary do
     {module, rest} = take_name(binary)
     {name, rest} = take_name(rest)
     <<kind, rest::binary>> = rest
-
     entry = %{module: module, name: name, kind: import_kind(kind)}
-
     # skip the kind-specific index (function/table/memory/global type index)
     {_index, rest} = take_uleb(rest)
     parse_import_entries(rest, count - 1, [entry | acc])
@@ -92,7 +88,6 @@ defmodule Beaver.Wasm.Binary do
     {name, rest} = take_name(binary)
     <<kind, rest::binary>> = rest
     {index, rest} = take_uleb(rest)
-
     entry = %{name: name, kind: import_kind(kind), index: index}
     parse_export_entries(rest, count - 1, [entry | acc])
   end
@@ -108,7 +103,6 @@ defmodule Beaver.Wasm.Binary do
 
   defp decode_uleb(<<byte, rest::binary>>, acc, shift) do
     value = acc ||| (byte &&& 0x7F) <<< shift
-
     if (byte &&& 0x80) == 0, do: {value, rest}, else: decode_uleb(rest, value, shift + 7)
   end
 end

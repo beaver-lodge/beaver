@@ -5,9 +5,8 @@ defmodule Beaver.MLIR.Location do
   @moduledoc """
   Constructors and safe inspection helpers for MLIR locations.
 
-  Locations belong to a context and carry source ranges, names, call sites or
-  fused provenance. `fused/2` accepts locations, operations and values. A fused
-  location without metadata may canonicalize to its only child; use
+  Locations belong to a context and carry source ranges, names, call sites or fused provenance. `fused/2` accepts
+  locations, operations and values. A fused location without metadata may canonicalize to its only child; use
   `with_metadata/3` to retain metadata even for a single source.
   """
   alias Beaver.Deferred
@@ -60,13 +59,10 @@ defmodule Beaver.MLIR.Location do
     name = Keyword.fetch!(opts, :name)
     line = Keyword.fetch!(opts, :line)
     column = Keyword.get(opts, :column) || 0
-
     Deferred.from_opts(opts, &CAPI.mlirLocationFileLineColGet(&1, StringRef.create(name), line, column))
   end
 
-  @doc """
-  Creates a source range with all coordinates required, preventing silent truncation.
-  """
+  @doc "Creates a source range with all coordinates required, preventing silent truncation."
   @spec file_range(file_range_opts()) :: Deferred.contextual(t())
   def file_range(opts) when is_list(opts) do
     name = Keyword.fetch!(opts, :name)
@@ -86,7 +82,6 @@ defmodule Beaver.MLIR.Location do
     name = env |> Map.get(:file, "nofile") |> to_string()
     line = Map.get(env, :line)
     line = if is_integer(line), do: line, else: 0
-
     file(opts |> Keyword.put(:name, name) |> Keyword.put(:line, line))
   end
 
@@ -95,8 +90,8 @@ defmodule Beaver.MLIR.Location do
   def unknown(opts \\ []), do: Deferred.from_opts(opts, &CAPI.mlirLocationUnknownGet/1)
 
   @doc """
-  Creates a named location with an unknown child, or retains the provenance of
-  an operation, value or location supplied as the second argument.
+  Creates a named location with an unknown child, or retains the provenance of an operation, value or location
+  supplied as the second argument.
   """
   @spec named(String.Chars.t(), Deferred.opts()) :: Deferred.contextual(t())
   def named(name, opts) when is_list(opts) do
@@ -108,24 +103,19 @@ defmodule Beaver.MLIR.Location do
   @spec named(String.Chars.t(), source(), Deferred.opts()) :: Deferred.contextual(t())
   def named(name, child, opts \\ []) do
     opts = infer_context(opts, [child])
-
     Deferred.from_opts(opts, fn ctx -> CAPI.mlirLocationNameGet(ctx, StringRef.create(name), resolve(child, ctx)) end)
   end
 
-  @doc """
-  Creates a call site from callee and caller locations, operations, values or deferred equivalents.
-  """
+  @doc "Creates a call site from callee and caller locations, operations, values or deferred equivalents."
   @spec call_site(source(), source(), Deferred.opts()) :: Deferred.contextual(t())
   def call_site(callee, caller, opts \\ []) do
     opts = infer_context(opts, [callee, caller])
-
     Deferred.from_opts(opts, fn ctx -> CAPI.mlirLocationCallSiteGet(resolve(callee, ctx), resolve(caller, ctx)) end)
   end
 
   @doc """
-  Fuses locations, operations, values or deferred equivalents with optional
-  `:metadata`. MLIR removes unknown and duplicate children; without metadata,
-  a single remaining child may be returned directly.
+  Fuses locations, operations, values or deferred equivalents with optional `:metadata`. MLIR removes unknown and
+  duplicate children; without metadata, a single remaining child may be returned directly.
   """
   @spec fused([source()], keyword()) :: Deferred.contextual(t())
   def fused(sources, opts \\ []) when is_list(sources) do
@@ -135,14 +125,11 @@ defmodule Beaver.MLIR.Location do
     Deferred.from_opts(opts, fn ctx ->
       locations = Enum.map(sources, &resolve(&1, ctx))
       metadata = resolve_metadata(metadata, ctx)
-
       CAPI.mlirLocationFusedGet(ctx, length(locations), Native.array(locations, __MODULE__), metadata)
     end)
   end
 
-  @doc """
-  Attaches metadata while retaining source provenance; delegates to `fused/2`.
-  """
+  @doc "Attaches metadata while retaining source provenance; delegates to `fused/2`."
   @spec with_metadata(source() | [source()], Attribute.t() | Deferred.attribute(), keyword()) ::
           Deferred.contextual(t())
   def with_metadata(sources, metadata, opts \\ []),
@@ -164,7 +151,6 @@ defmodule Beaver.MLIR.Location do
   @spec resolve(source(), Context.t()) :: t()
   def resolve(source, %Context{} = ctx) do
     location = source |> Deferred.resolve(ctx) |> of()
-
     Context.ensure_same!(location, ctx)
   end
 
@@ -242,8 +228,7 @@ defmodule Beaver.MLIR.Location do
   @doc "Converts a location attribute back to a location."
   @spec from_attribute(Attribute.t()) :: t()
   def from_attribute(%Attribute{} = attribute) do
-    unless Attribute.location?(attribute),
-      do: raise(ArgumentError, "expected an MLIR location attribute")
+    unless Attribute.location?(attribute), do: raise(ArgumentError, "expected an MLIR location attribute")
 
     CAPI.mlirLocationFromAttribute(attribute)
   end

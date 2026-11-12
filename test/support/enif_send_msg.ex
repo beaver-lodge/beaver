@@ -20,8 +20,7 @@ defmodule ENIFSendMsg do
           region do
             block _(env >>> env_t, pid_term >>> term_t, msg >>> term_t) do
               pid_ptr =
-                MemRef.alloca(operand_segment_sizes: :infer) >>>
-                  Type.memref!([1], pid_t, memory_space: generic_space)
+                MemRef.alloca(operand_segment_sizes: :infer) >>> Type.memref!([1], pid_t, memory_space: generic_space)
 
               pid = Ptr.to_ptr(pid_ptr) >>> ptr_t
               null_env = Ptr.constant(value: Ptr.null(type: ptr_t)) >>> ptr_t

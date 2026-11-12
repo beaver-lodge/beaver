@@ -2,12 +2,11 @@ defmodule Beaver.Triton do
   @moduledoc """
   Registers Triton's core dialects and passes in a Beaver MLIR context.
 
-  Once registered, a context can parse and inspect Triton IR (`tt`, `ttgir`,
-  `ttng`, `ttinstrument`, `gluon` dialects), and Triton passes can be driven
-  by name through `Beaver.Composer` pipelines.
+  Once registered, a context can parse and inspect Triton IR (`tt`, `ttgir`, `ttng`, `ttinstrument`, `gluon`
+  dialects), and Triton passes can be driven by name through `Beaver.Composer` pipelines.
 
-  Requires a Beaver native build linked against the Triton core prebuilt
-  (build with `BEAVER_TRITON_PREBUILT_DIR` set); otherwise the calls raise.
+  Requires a Beaver native build linked against the Triton core prebuilt (build with `BEAVER_TRITON_PREBUILT_DIR`
+  set); otherwise the calls raise.
   """
 
   alias Beaver.MLIR
@@ -36,9 +35,7 @@ defmodule Beaver.Triton do
     end
   end
 
-  @doc """
-  Registers Triton passes and dialects, then loads the dialects on `context`.
-  """
+  @doc "Registers Triton passes and dialects, then loads the dialects on `context`."
   @spec register(MLIR.Context.t()) :: :ok
   def register(%MLIR.Context{} = ctx) do
     register_passes()
@@ -75,27 +72,23 @@ defmodule Beaver.Triton do
   @doc """
   Lowers a TTIR module to LLVM IR through the full NVIDIA Triton pipeline.
 
-  This mirrors Triton's `make_ttgir` + `make_llir` pass chains for a CUDA
-  target. Running `convert-triton-gpu-to-llvm` alone is not sufficient for
-  real kernels: shared-memory allocation, warp-group allocation, SCF-to-CF,
-  warp-specialize lowering, and NVGPU lowering must run first, otherwise
-  kernels with layout conversions either fail verification or crash the
-  process.
+  This mirrors Triton's `make_ttgir` + `make_llir` pass chains for a CUDA target. Running
+  `convert-triton-gpu-to-llvm` alone is not sufficient for real kernels: shared-memory allocation, warp-group
+  allocation, SCF-to-CF, warp-specialize lowering, and NVGPU lowering must run first, otherwise kernels with layout
+  conversions either fail verification or crash the process.
 
   Requires a context with Triton dialects registered (`register/1`).
   """
   @spec compile_to_llvm(MLIR.Module.t(), keyword()) :: MLIR.Module.t()
-  def compile_to_llvm(%MLIR.Module{} = module, opts \\ []),
-    do: opts |> PipelinePlan.build() |> execute(module)
+  def compile_to_llvm(%MLIR.Module{} = module, opts \\ []), do: opts |> PipelinePlan.build() |> execute(module)
 
   @doc """
   Lowers a Triton module one pass at a time and returns an auditable prefix trace.
 
-  Each pass boundary is verified.  Trace records contain only pass identity,
-  rendered options, phase, and a digest of generic MLIR; they do not retain IR.
+  Each pass boundary is verified. Trace records contain only pass identity, rendered options, phase, and a digest of
+  generic MLIR; they do not retain IR.
   """
-  @spec compile_to_llvm_with_trace(MLIR.Module.t(), keyword()) ::
-          {MLIR.Module.t(), [map()]}
+  @spec compile_to_llvm_with_trace(MLIR.Module.t(), keyword()) :: {MLIR.Module.t(), [map()]}
   def compile_to_llvm_with_trace(%MLIR.Module{} = module, opts \\ []) do
     plan = PipelinePlan.build(opts)
     execute_with_trace(plan, module)
@@ -119,9 +112,7 @@ defmodule Beaver.Triton do
     left_record = Enum.at(left, index)
     right_record = Enum.at(right, index)
 
-    if left_record == right_record,
-      do: false,
-      else: {:ok, %{index: index, left: left_record, right: right_record}}
+    if left_record == right_record, do: false, else: {:ok, %{index: index, left: left_record, right: right_record}}
   end
 
   defp execute(%PipelinePlan{} = plan, module) do

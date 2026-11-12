@@ -4,16 +4,13 @@ defmodule Beaver.MLIR.ExternalInterface do
   @moduledoc """
   Owns callback-backed MLIR external interface models.
 
-  Every attachment has a dedicated BEAM process. Native MLIR work invokes the
-  callbacks from a context worker and waits through Kinda's callback runtime;
-  the BEAM scheduler running the callback never executes native MLIR work that
-  waits for itself. The external model is owned by the MLIR context. Destroying
-  the context releases the native callback state and stops the attachment
-  process.
+  Every attachment has a dedicated BEAM process. Native MLIR work invokes the callbacks from a context worker and
+  waits through Kinda's callback runtime; the BEAM scheduler running the callback never executes native MLIR work
+  that waits for itself. The external model is owned by the MLIR context. Destroying the context releases the native
+  callback state and stops the attachment process.
 
-  Normally attachments are declared with `Beaver.Slang.defop/2`. The interface
-  modules also expose `attach/4` for dynamic operation definitions that are not
-  written with Slang.
+  Normally attachments are declared with `Beaver.Slang.defop/2`. The interface modules also expose `attach/4` for
+  dynamic operation definitions that are not written with Slang.
   """
 
   use GenServer
@@ -77,11 +74,9 @@ defmodule Beaver.MLIR.ExternalInterface do
   end
 
   @doc false
-  @spec attach_all(Context.t(), String.t(), [{String.t(), keyword()}], keyword()) ::
-          [Attachment.t()]
+  @spec attach_all(Context.t(), String.t(), [{String.t(), keyword()}], keyword()) :: [Attachment.t()]
   def attach_all(%Context{} = ctx, dialect, declarations, opts \\ []) do
-    for {operation, interfaces} <- declarations,
-        {interface, implementation} <- interfaces do
+    for {operation, interfaces} <- declarations, {interface, implementation} <- interfaces do
       operation_name = "#{dialect}.#{operation}"
 
       modules = %{
@@ -183,9 +178,7 @@ defmodule Beaver.MLIR.ExternalInterface do
         else: normalized
 
     reply =
-      if invoke == :invoke,
-        do: quote(do: &CAPI.beaver_raw_callback_reply/2),
-        else: quote(do: &unquote(reply)(&1, &2))
+      if invoke == :invoke, do: quote(do: &CAPI.beaver_raw_callback_reply/2), else: quote(do: &unquote(reply)(&1, &2))
 
     defp dispatch({unquote(name), token, unquote(callback), _id, unquote_splicing(args)}) do
       unquote(args) = Enum.map(unquote(args), &native/1)

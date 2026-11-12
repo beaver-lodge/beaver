@@ -47,18 +47,13 @@ defmodule EnifTest do
       invoker = &Beaver.ENIF.invoke(e, "alloc_bin_and_copy", [&1])
       assert txt == invoker.(txt)
 
-      assert_raise ErlangError, "Erlang error: \"not a binary\"", fn ->
-        invoker.(1)
-      end
+      assert_raise ErlangError, "Erlang error: \"not a binary\"", fn -> invoker.(1) end
     end)
     |> ENIFSupport.destroy()
   end
 
   test "enif send message", %{ctx: ctx} do
-    source =
-      ENIFSendMsg.create(ctx)
-      |> Beaver.ENIF.declare_external_functions()
-      |> MLIR.verify!()
+    source = ENIFSendMsg.create(ctx) |> Beaver.ENIF.declare_external_functions() |> MLIR.verify!()
 
     source_ir = MLIR.to_string(source)
     assert source_ir =~ "ptr.to_ptr"

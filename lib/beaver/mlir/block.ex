@@ -2,15 +2,12 @@ alias Beaver.MLIR.{CAPI, Location, Type}
 alias Beaver.{Deferred, Native}
 
 defmodule Beaver.MLIR.Block do
-  @moduledoc """
-  This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
-  """
+  @moduledoc "This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}."
   alias Beaver.MLIR
 
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
 
-  defp do_add_args!(block, ctx, default_loc, {t, loc})
-       when is_struct(t, Deferred) or is_struct(loc, Deferred) do
+  defp do_add_args!(block, ctx, default_loc, {t, loc}) when is_struct(t, Deferred) or is_struct(loc, Deferred) do
     loc = if loc, do: Deferred.resolve(loc, ctx), else: default_loc
     CAPI.mlirBlockAddArgument(block, Deferred.resolve(t, ctx), loc)
   end
@@ -33,15 +30,12 @@ defmodule Beaver.MLIR.Block do
     CAPI.mlirBlockAddArgument(block, t, loc)
   end
 
-  defp do_add_args!(block, ctx, default_loc, t),
-    do: do_add_args!(block, ctx, default_loc, {t, default_loc})
+  defp do_add_args!(block, ctx, default_loc, t), do: do_add_args!(block, ctx, default_loc, {t, default_loc})
 
   @type arg_type :: Type.t() | String.t()
   @type arg :: {arg_type(), Location.t()} | arg_type()
   @spec add_args!(__MODULE__.t(), list(arg), Keyword.t()) :: [MLIR.Value.t()]
-  @doc """
-  Adds arguments to `block` and returns their `MLIR.Value` handles.
-  """
+  @doc "Adds arguments to `block` and returns their `MLIR.Value` handles."
   def add_args!(block, args, opts \\ []) when is_list(args) do
     if args == [] do
       []
@@ -65,9 +59,7 @@ defmodule Beaver.MLIR.Block do
     val
   end
 
-  @doc """
-  Adds `{name, type}` named arguments to `block` and returns a `%{name => MLIR.Value.t()}` map.
-  """
+  @doc "Adds `{name, type}` named arguments to `block` and returns a `%{name => MLIR.Value.t()}` map."
   @spec add_named_args!(t(), [{atom() | String.t(), arg()}], keyword()) :: %{
           optional(atom() | String.t()) => MLIR.Value.t()
         }
@@ -142,14 +134,12 @@ defmodule Beaver.MLIR.Block do
     len = length(args)
     args = args |> Native.array(Type)
     locs = locs |> Native.array(Location)
-
     CAPI.mlirBlockCreate(len, args, locs)
   end
 
   @doc "Returns `true` if two `MLIR.Block` handles refer to the same underlying block."
   @spec equal?(t(), t()) :: boolean()
-  def equal?(%__MODULE__{} = a, %__MODULE__{} = b),
-    do: CAPI.mlirBlockEqual(a, b) |> Native.to_term()
+  def equal?(%__MODULE__{} = a, %__MODULE__{} = b), do: CAPI.mlirBlockEqual(a, b) |> Native.to_term()
 
   defdelegate destroy(blk), to: CAPI, as: :mlirBlockDestroy
   defdelegate append(blk, op), to: CAPI, as: :mlirBlockAppendOwnedOperation

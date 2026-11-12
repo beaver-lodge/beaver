@@ -2,24 +2,17 @@ alias Beaver.MLIR.CAPI
 alias Beaver.Native
 
 defmodule Beaver.Native.OpaquePtr do
-  @moduledoc """
-  This module defines functions working with opaque pointer, usually a `void*` in C.
-  """
+  @moduledoc "This module defines functions working with opaque pointer, usually a `void*` in C."
   import CAPI
 
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
 
-  @doc """
-  read the N bytes starting from the pointer and returns an Erlang binary
-  """
+  @doc "read the N bytes starting from the pointer and returns an Erlang binary"
   def to_binary(%__MODULE__{ref: ref}, len), do: beaver_raw_read_opaque_ptr(ref, len)
 
-  @doc """
-  read the N bytes starting from the pointer and return a resource
-  """
+  @doc "read the N bytes starting from the pointer and return a resource"
   def to_resource(mod, %__MODULE__{ref: ptr_ref}, offset \\ 0) do
-    {ref, size} =
-      apply(CAPI.Raw, Module.concat(mod, :make_from_opaque_ptr), [ptr_ref, offset]) |> Native.normalize()
+    {ref, size} = apply(CAPI.Raw, Module.concat(mod, :make_from_opaque_ptr), [ptr_ref, offset]) |> Native.normalize()
 
     {ref, size}
   end

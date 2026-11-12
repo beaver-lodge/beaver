@@ -26,16 +26,14 @@ defmodule StringRefTest do
     test "collect string ref", %{ctx: ctx} do
       {:ok, txt} =
         Beaver.Printer.run(fn cb, ud ->
-          MLIR.Location.file(name: "1", line: 2, column: 3, ctx: ctx)
-          |> MLIR.CAPI.mlirLocationPrint(cb, ud)
+          MLIR.Location.file(name: "1", line: 2, column: 3, ctx: ctx) |> MLIR.CAPI.mlirLocationPrint(cb, ud)
         end)
 
       assert ~s{loc("1":2:3)} == txt
 
       {attr, "1 : i64"} =
         Beaver.Printer.run(fn cb, ud ->
-          MLIR.Attribute.get("1", ctx: ctx)
-          |> tap(&MLIR.CAPI.mlirAttributePrint(&1, cb, ud))
+          MLIR.Attribute.get("1", ctx: ctx) |> tap(&MLIR.CAPI.mlirAttributePrint(&1, cb, ud))
         end)
 
       refute MLIR.null?(attr)

@@ -15,8 +15,7 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
   test "collects single and multiple InferType results", %{ctx: ctx} do
     with_args(ctx, ["i32", "i32"], fn operands ->
       for {operation, count} <- [{"arith.addi", 1}, {"arith.mului_extended", 2}] do
-        assert {:ok, types} =
-                 InferType.return_types(operation: operation, context: ctx, operands: operands)
+        assert {:ok, types} = InferType.return_types(operation: operation, context: ctx, operands: operands)
 
         assert Enum.map(types, &MLIR.to_string/1) == List.duplicate("i32", count)
       end
@@ -24,8 +23,7 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
   end
 
   test "returns diagnostics when inference fails", %{ctx: ctx} do
-    assert {:error, diagnostics} =
-             InferType.return_types(operation: "not.registered", context: ctx)
+    assert {:error, diagnostics} = InferType.return_types(operation: "not.registered", context: ctx)
 
     assert diagnostics != []
     assert MLIR.Diagnostic.format(diagnostics) =~ "failed to infer operation return types"
@@ -34,19 +32,8 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
   test "collects ranked dynamic and unranked shaped components", %{ctx: ctx} do
     for {type, shape} <- [{"tensor<2x?xf32>", [2, :dynamic]}, {"tensor<*xf32>", :unranked}] do
       with_args(ctx, [type], fn [input] ->
-        assert {:ok,
-                [
-                  %InferShapedType.Component{
-                    shape: ^shape,
-                    element_type: element_type,
-                    encoding: nil
-                  }
-                ]} =
-                 InferShapedType.return_components(
-                   operation: "tosa.equal",
-                   context: ctx,
-                   operands: [input, input]
-                 )
+        assert {:ok, [%InferShapedType.Component{shape: ^shape, element_type: element_type, encoding: nil}]} =
+                 InferShapedType.return_components(operation: "tosa.equal", context: ctx, operands: [input, input])
 
         assert MLIR.to_string(element_type) == "i1"
       end)
@@ -59,18 +46,11 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
     end
   end
 
-  test "infers from owned property storage without constructing or mutating an operation", %{
-    ctx: ctx
-  } do
+  test "infers from owned property storage without constructing or mutating an operation", %{ctx: ctx} do
     properties = MLIR.Attribute.get("{value = 7 : i32}", ctx: ctx)
 
     for _ <- 1..20 do
-      assert {:ok, [type]} =
-               InferType.return_types(
-                 operation: "arith.constant",
-                 context: ctx,
-                 properties: properties
-               )
+      assert {:ok, [type]} = InferType.return_types(operation: "arith.constant", context: ctx, properties: properties)
 
       assert MLIR.to_string(type) == "i32"
     end
@@ -86,8 +66,7 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
 
     assert MLIR.Diagnostic.format(diagnostics) =~ "expected DictionaryAttr"
 
-    assert {:error, _} =
-             InferType.return_types(operation: "func.func", context: ctx, properties: properties)
+    assert {:error, _} = InferType.return_types(operation: "func.func", context: ctx, properties: properties)
   end
 
   test "rejects inference attributes from another context", %{ctx: ctx} do
@@ -138,13 +117,7 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
     regions = Enum.to_list(Beaver.Walker.regions(branch))
     before = MLIR.to_string(module)
 
-    assert {:ok, [type]} =
-             InferType.return_types(
-               operation: "scf.if",
-               context: ctx,
-               operands: [cond],
-               regions: regions
-             )
+    assert {:ok, [type]} = InferType.return_types(operation: "scf.if", context: ctx, operands: [cond], regions: regions)
 
     assert MLIR.to_string(type) == "i32"
     assert MLIR.to_string(module) == before

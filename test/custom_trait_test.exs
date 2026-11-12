@@ -7,20 +7,16 @@ defmodule CustomTraitTest do
   @moduletag :smoke
 
   test "Slang attaches custom traits with a shared identity", %{ctx: ctx} do
-    assert CustomTraitSlang
-           |> then(&Beaver.Slang.load(ctx, &1))
-           |> MLIR.LogicalResult.success?()
+    assert CustomTraitSlang |> then(&Beaver.Slang.load(ctx, &1)) |> MLIR.LogicalResult.success?()
 
     assert MLIR.Trait.has?(ctx, "custom_trait_test.valid", CustomTraitSlang.Validity)
     assert MLIR.Trait.has?(ctx, "custom_trait_test.also_valid", CustomTraitSlang.Validity)
-
     valid = module_with(ctx, "custom_trait_test.valid")
     assert {:ok, ^valid} = MLIR.verify(valid)
   end
 
   test "ordinary verifier failures become MLIR diagnostics", %{ctx: ctx} do
     Beaver.Slang.load(ctx, CustomTraitSlang)
-
     assert {:error, diagnostics} = verify_with(ctx, "custom_trait_test.invalid")
     rendered = MLIR.Diagnostic.format(diagnostics)
     assert rendered =~ "CustomTraitSlang.Validity"
@@ -29,7 +25,6 @@ defmodule CustomTraitTest do
 
   test "region verifier exceptions become MLIR diagnostics", %{ctx: ctx} do
     Beaver.Slang.load(ctx, CustomTraitSlang)
-
     assert {:error, diagnostics} = verify_with(ctx, "custom_trait_test.invalid_regions")
     rendered = MLIR.Diagnostic.format(diagnostics)
     assert rendered =~ "CustomTraitSlang.RegionValidity"
@@ -39,13 +34,10 @@ defmodule CustomTraitTest do
   test "custom TypeIDs and callback ownership are isolated by context" do
     ctx1 = MLIR.Context.create()
     ctx2 = MLIR.Context.create()
-
     Beaver.Slang.load(ctx1, CustomTraitSlang)
     Beaver.Slang.load(ctx2, CustomTraitSlang)
-
     id1 = MLIR.Trait.type_id(ctx1, CustomTraitSlang.Validity)
     id2 = MLIR.Trait.type_id(ctx2, CustomTraitSlang.Validity)
-
     refute MLIR.CAPI.mlirTypeIDEqual(id1, id2) |> Beaver.Native.to_term()
 
     attachment =
@@ -75,8 +67,7 @@ defmodule CustomTraitTest do
 
     assert {:error, diagnostics} = verify_with(ctx, "custom_trait_test.valid")
 
-    assert MLIR.Diagnostic.format(diagnostics) =~
-             "dynamic trait callback timed out or its owner is unavailable"
+    assert MLIR.Diagnostic.format(diagnostics) =~ "dynamic trait callback timed out or its owner is unavailable"
   end
 
   test "a stopped callback owner fails verification safely", %{ctx: ctx} do
@@ -93,20 +84,14 @@ defmodule CustomTraitTest do
     monitor = Process.monitor(attachment.pid)
     Process.exit(attachment.pid, :kill)
     assert_receive {:DOWN, ^monitor, :process, _, :killed}, 1_000
-
     assert {:error, diagnostics} = verify_with(ctx, "custom_trait_test.valid")
 
-    assert MLIR.Diagnostic.format(diagnostics) =~
-             "dynamic trait callback timed out or its owner is unavailable"
+    assert MLIR.Diagnostic.format(diagnostics) =~ "dynamic trait callback timed out or its owner is unavailable"
   end
 
-  defp module_with(ctx, operation_name) do
-    ctx |> operation_module(operation_name) |> MLIR.verify!()
-  end
+  defp module_with(ctx, operation_name), do: ctx |> operation_module(operation_name) |> MLIR.verify!()
 
-  defp verify_with(ctx, operation_name) do
-    ctx |> operation_module(operation_name) |> MLIR.verify()
-  end
+  defp verify_with(ctx, operation_name), do: ctx |> operation_module(operation_name) |> MLIR.verify()
 
   defp operation_module(ctx, operation_name) do
     mlir ctx: ctx do

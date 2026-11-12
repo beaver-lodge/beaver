@@ -37,15 +37,12 @@ defmodule Beaver.MLIR.MemoryEffects do
           | Attribute.t()
   @type effect_spec() :: effect() | {effect(), target()} | {effect(), target(), keyword()}
 
-  @callback memory_effects(Operation.t()) ::
-              :pure | [effect_spec()] | {:ok, [effect_spec()]}
+  @callback memory_effects(Operation.t()) :: :pure | [effect_spec()] | {:ok, [effect_spec()]}
 
   @doc "Attaches a callback-backed memory effects interface model."
-  @spec attach(MLIR.Context.t(), String.t(), module() | function(), keyword()) ::
-          MLIR.ExternalInterface.Attachment.t()
+  @spec attach(MLIR.Context.t(), String.t(), module() | function(), keyword()) :: MLIR.ExternalInterface.Attachment.t()
   def attach(ctx, op_name, implementation, opts \\ []) do
     callback = callback!(implementation)
-
     MLIR.ExternalInterface.attach(ctx, op_name, :memory_effects, %{get_effects: callback}, opts)
   end
 
@@ -57,15 +54,14 @@ defmodule Beaver.MLIR.MemoryEffects do
     &implementation.memory_effects/1
   end
 
-  def callback!(callback) when is_function(callback, 1) or is_function(callback, 2),
-    do: callback
+  def callback!(callback) when is_function(callback, 1) or is_function(callback, 2), do: callback
 
   def callback!(other),
     do: raise(ArgumentError, "invalid memory effects implementation: #{inspect(other)}")
 
   @doc """
-  Returns declarative effects, each including `:parameters`, `:stage`,
-  `:effect_on_full_region` and `:resource`, without retaining callback-scoped handles.
+  Returns declarative effects, each including `:parameters`, `:stage`, `:effect_on_full_region` and `:resource`,
+  without retaining callback-scoped handles.
   """
   @spec get(Operation.t(), keyword()) :: [effect_spec()]
   def get(%Operation{} = op, opts \\ []) do
@@ -117,8 +113,7 @@ defmodule Beaver.MLIR.MemoryEffects do
     do: append_one(effects, op, {effect, nil, []})
 
   defp append_one(effects, op, {effect, target})
-       when effect in [:allocate, :free, :read, :write],
-       do: append_one(effects, op, {effect, target, []})
+       when effect in [:allocate, :free, :read, :write], do: append_one(effects, op, {effect, target, []})
 
   defp append_one(effects, op, {effect, target, opts})
        when effect in [:allocate, :free, :read, :write] and is_list(opts) do
@@ -128,19 +123,16 @@ defmodule Beaver.MLIR.MemoryEffects do
     full_region = Keyword.get(opts, :effect_on_full_region, false)
     resource = Keyword.get_lazy(opts, :resource, &CAPI.mlirSideEffectsDefaultResourceGet/0)
 
-    unless is_struct(parameters, Attribute),
-      do: raise(ArgumentError, ":parameters must be an MLIR attribute")
+    unless is_struct(parameters, Attribute), do: raise(ArgumentError, ":parameters must be an MLIR attribute")
 
     unless is_integer(stage), do: raise(ArgumentError, ":stage must be an integer")
 
-    unless is_boolean(full_region),
-      do: raise(ArgumentError, ":effect_on_full_region must be a boolean")
+    unless is_boolean(full_region), do: raise(ArgumentError, ":effect_on_full_region must be a boolean")
 
     unless is_struct(resource, MLIR.SideEffectResource),
       do: raise(ArgumentError, ":resource must be an MLIR side effect resource")
 
-    instance =
-      create_instance(effect, normalize_target(op, target), parameters, stage, full_region, resource)
+    instance = create_instance(effect, normalize_target(op, target), parameters, stage, full_region, resource)
 
     try do
       CAPI.beaverMemoryEffectInstancesListAppend(effects, instance)
@@ -186,8 +178,7 @@ defmodule Beaver.MLIR.MemoryEffects do
   defp normalize_target(op, {:operand, index}) when is_integer(index) and index >= 0,
     do: CAPI.mlirOperationGetOpOperand(op, index)
 
-  defp normalize_target(op, {:result, index}) when is_integer(index) and index >= 0,
-    do: Operation.result(op, index)
+  defp normalize_target(op, {:result, index}) when is_integer(index) and index >= 0, do: Operation.result(op, index)
 
   defp normalize_target(_operation, {tag, %kind{} = value})
        when {tag, kind} in [{:operand, OpOperand}, {:result, Value}, {:block_argument, Value}, {:symbol, Attribute}],
@@ -213,8 +204,7 @@ defmodule Beaver.MLIR.MemoryEffects do
         CAPI.mlirMemoryEffectInstanceCreateForBlockArgument(effect, value, parameters, stage, full_region, resource)
 
       true ->
-        raise ArgumentError,
-              "memory effect value target is neither an op result nor block argument"
+        raise ArgumentError, "memory effect value target is neither an op result nor block argument"
     end
   end
 

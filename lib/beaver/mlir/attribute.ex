@@ -2,9 +2,7 @@ alias Beaver.MLIR.{Attribute, CAPI, NamedAttribute, StringRef, Type}
 alias Beaver.{Deferred, Native}
 
 defmodule Beaver.MLIR.Attribute do
-  @moduledoc """
-  This module defines functions parsing and creating attributes in MLIR.
-  """
+  @moduledoc "This module defines functions parsing and creating attributes in MLIR."
   import CAPI
   @behaviour Access
 
@@ -28,7 +26,6 @@ defmodule Beaver.MLIR.Attribute do
 
     Deferred.from_opts(opts, fn ctx ->
       {attr, diagnostics} = mlirAttributeParseGetWithDiagnostics(ctx, ctx, attr)
-
       if MLIR.null?(attr), do: raise_with_diagnostics(attr_str, diagnostics), else: attr
     end)
   end
@@ -90,8 +87,7 @@ defmodule Beaver.MLIR.Attribute do
 
     cond do
       Type.opaque?(element_type) or string_elements?(elements) ->
-        strings =
-          elements |> Enum.map(&StringRef.create/1) |> Native.array(StringRef, mut: true)
+        strings = elements |> Enum.map(&StringRef.create/1) |> Native.array(StringRef, mut: true)
 
         mlirDenseElementsAttrStringGet(shaped_type, num_elements, strings)
 
@@ -101,7 +97,6 @@ defmodule Beaver.MLIR.Attribute do
 
       MLIR.equal?(element_type, Type.i1()) ->
         elements = truthy_elements(elements)
-
         mlirDenseElementsAttrBoolGet(shaped_type, num_elements, Native.array(elements, Native.CInt))
 
       Type.integer?(element_type) ->
@@ -121,54 +116,43 @@ defmodule Beaver.MLIR.Attribute do
 
   def dense_elements(elements_or_value, shaped_type \\ {:i, 8}, opts \\ [])
 
-  def dense_elements(elements, {t, width}, opts)
-      when is_binary(elements) and t in [:i, :f] and is_integer(width) do
-    Deferred.from_opts(
-      opts,
-      fn ctx ->
-        et = apply(Type, t, [width, [ctx: ctx]])
-        str = StringRef.create(elements)
+  def dense_elements(elements, {t, width}, opts) when is_binary(elements) and t in [:i, :f] and is_integer(width) do
+    Deferred.from_opts(opts, fn ctx ->
+      et = apply(Type, t, [width, [ctx: ctx]])
+      str = StringRef.create(elements)
 
-        Type.ranked_tensor!([byte_size(elements)], et)
-        |> mlirDenseElementsAttrRawBufferGet(StringRef.length(str), StringRef.data(str) |> Native.Array.as_opaque())
-      end
-    )
+      Type.ranked_tensor!([byte_size(elements)], et)
+      |> mlirDenseElementsAttrRawBufferGet(StringRef.length(str), StringRef.data(str) |> Native.Array.as_opaque())
+    end)
   end
 
   def dense_elements(elements_or_value, shaped_type, opts) when is_list(elements_or_value) do
-    Deferred.from_opts(
-      opts,
-      fn ctx ->
-        shaped_type =
-          case Deferred.resolve(shaped_type, ctx) do
-            {:ok, %Type{} = t} -> t
-            %Type{} = t -> t
-          end
-
-        elements = elements_or_value |> Enum.map(&Deferred.resolve(&1, ctx))
-        num_elements = length(elements)
-
-        shaped_type_num_elements = beaverShapedTypeGetNumElements(shaped_type) |> Native.to_term()
-
-        if shaped_type_num_elements != num_elements and num_elements != 1 do
-          raise ArgumentError,
-                "number of elements #{num_elements} does not match shaped type #{shaped_type_num_elements}"
+    Deferred.from_opts(opts, fn ctx ->
+      shaped_type =
+        case Deferred.resolve(shaped_type, ctx) do
+          {:ok, %Type{} = t} -> t
+          %Type{} = t -> t
         end
 
-        dense_elements_get(shaped_type, num_elements, elements)
+      elements = elements_or_value |> Enum.map(&Deferred.resolve(&1, ctx))
+      num_elements = length(elements)
+      shaped_type_num_elements = beaverShapedTypeGetNumElements(shaped_type) |> Native.to_term()
+
+      if shaped_type_num_elements != num_elements and num_elements != 1 do
+        raise ArgumentError,
+              "number of elements #{num_elements} does not match shaped type #{shaped_type_num_elements}"
       end
-    )
+
+      dense_elements_get(shaped_type, num_elements, elements)
+    end)
   end
 
   def dense_elements(value, shaped_type, opts) do
-    Deferred.from_opts(
-      opts,
-      fn ctx ->
-        value = Deferred.resolve(value, ctx)
-        shaped_type = Deferred.resolve(shaped_type, ctx)
-        dense_elements_splat_get(shaped_type, value, ctx)
-      end
-    )
+    Deferred.from_opts(opts, fn ctx ->
+      value = Deferred.resolve(value, ctx)
+      shaped_type = Deferred.resolve(shaped_type, ctx)
+      dense_elements_splat_get(shaped_type, value, ctx)
+    end)
   end
 
   def array(elements, opts \\ []) when is_list(elements) do
@@ -237,18 +221,15 @@ defmodule Beaver.MLIR.Attribute do
     do: composite(t, &Type.float?/1, &mlirFloatAttrDoubleGet(MLIR.context(&1), &1, value))
 
   def bool(value, opts \\ []) do
-    Deferred.from_opts(
-      opts,
-      fn ctx ->
-        value =
-          case value do
-            true -> 1
-            false -> 0
-          end
+    Deferred.from_opts(opts, fn ctx ->
+      value =
+        case value do
+          true -> 1
+          false -> 0
+        end
 
-        mlirBoolAttrGet(ctx, value)
-      end
-    )
+      mlirBoolAttrGet(ctx, value)
+    end)
   end
 
   def affine_map(%Deferred{} = map), do: Deferred.defer(&affine_map(Deferred.resolve(map, &1)))
@@ -259,7 +240,6 @@ defmodule Beaver.MLIR.Attribute do
 
   def flat_symbol_ref(symbol, opts \\ []) do
     symbol = StringRef.create(symbol)
-
     Deferred.from_opts(opts, &mlirFlatSymbolRefAttrGet(&1, symbol))
   end
 
@@ -291,9 +271,7 @@ defmodule Beaver.MLIR.Attribute do
         CAPI.__info__(:functions) |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
     helper_name = type_name |> Macro.underscore()
 
-    @doc """
-    calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is #{type_name} attribute
-    """
+    @doc "calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is #{type_name} attribute"
     def unquote(:"#{helper_name}?")(%__MODULE__{} = attr),
       do: unquote(f)(attr) |> Native.to_term()
   end
@@ -310,15 +288,12 @@ defmodule Beaver.MLIR.Attribute do
 
   @impl Access
   def pop(attr, key) when is_index_or_name(key) do
-    if Attribute.dense_elements?(attr),
-      do: raise(ArgumentError, "cannot pop from dense elements attribute")
+    if Attribute.dense_elements?(attr), do: raise(ArgumentError, "cannot pop from dense elements attribute")
 
     __MODULE__.Accessor.new(attr) |> __MODULE__.Accessor.pop(attr, key)
   end
 
-  @doc """
-  Get the value of the attribute. The return type depends on the attribute type:
-  """
+  @doc "Get the value of the attribute. The return type depends on the attribute type:"
   def value(%__MODULE__{} = attribute) do
     cond do
       type?(attribute) -> mlirTypeAttrGetValue(attribute)

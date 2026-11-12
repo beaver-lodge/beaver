@@ -6,9 +6,7 @@ defmodule Beaver.Changeset do
   alias Beaver.MLIR
   require Logger
 
-  @doc """
-  Changeset of entities to create an operation.
-  """
+  @doc "Changeset of entities to create an operation."
   @type t() :: %__MODULE__{
           operands: list(),
           results: list(),
@@ -44,25 +42,20 @@ defmodule Beaver.Changeset do
 
   @spec add_argument(t(), argument()) :: t()
 
-  @doc """
-  Add an ODS argument to changeset.
-  """
+  @doc "Add an ODS argument to changeset."
 
   def add_argument(%__MODULE__{context: nil, location: %Location{} = loc} = changeset, argument),
     do: add_argument(%__MODULE__{changeset | context: MLIR.context(loc)}, argument)
 
   def add_argument(%__MODULE__{} = changeset, argument) when is_list(argument) do
-    for arg <- argument, reduce: changeset do
-      changeset -> add_argument(changeset, arg)
-    end
+    for arg <- argument, [reduce: changeset], do: (changeset -> add_argument(changeset, arg))
   end
 
   def add_argument(%__MODULE__{context: ctx} = changeset, {tag, %Deferred{} = deferred})
       when is_atom(tag), do: add_argument(changeset, {tag, Deferred.resolve(deferred, ctx)})
 
   # f should return regions
-  def add_argument(%__MODULE__{} = changeset, f) when is_function(f, 0),
-    do: add_argument(changeset, f.())
+  def add_argument(%__MODULE__{} = changeset, f) when is_function(f, 0), do: add_argument(changeset, f.())
 
   # If the context is not set, we extract it from the argument
   def add_argument(%__MODULE__{context: nil} = changeset, %{} = argument),
@@ -79,7 +72,6 @@ defmodule Beaver.Changeset do
         {%Block{} = successor_block, block_args}
       ) do
     block_args = Enum.map(block_args, &Deferred.resolve(&1, ctx))
-
     %__MODULE__{changeset | successors: successors ++ [successor_block], operands: operands ++ block_args}
   end
 
@@ -159,9 +151,7 @@ defmodule Beaver.Changeset do
     do: add_result(%__MODULE__{changeset | context: MLIR.context(loc)}, argument)
 
   def add_result(%__MODULE__{} = changeset, argument) when is_list(argument) do
-    for arg <- argument, reduce: changeset do
-      changeset -> add_result(changeset, arg)
-    end
+    for arg <- argument, [reduce: changeset], do: (changeset -> add_result(changeset, arg))
   end
 
   def add_result(%__MODULE__{context: ctx} = changeset, %Deferred{} = deferred),
@@ -270,8 +260,7 @@ defmodule Beaver.Changeset do
 
   defp operand_groups(operands, dump) do
     for %{"name" => name, "kind" => kind} <- dump["operands"] || [] do
-      values =
-        for {key, values} <- operands, compare_tag(key, name), value <- List.wrap(values), do: value
+      values = for {key, values} <- operands, compare_tag(key, name), value <- List.wrap(values), do: value
 
       if values == [] and kind == "Single",
         do: Logger.warning("Single operand '#{name}' not set when creating operation #{dump["name"]}")

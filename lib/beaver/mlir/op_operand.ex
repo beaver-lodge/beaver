@@ -1,7 +1,5 @@
 defmodule Beaver.MLIR.OpOperand do
-  @moduledoc """
-  This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
-  """
+  @moduledoc "This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}."
   use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
 
   alias Beaver.MLIR
@@ -17,6 +15,5 @@ defmodule Beaver.MLIR.OpOperand do
 
   @doc "Returns the operand position within the owner operation."
   @spec operand_number(t()) :: non_neg_integer()
-  def operand_number(op_operand),
-    do: op_operand |> CAPI.mlirOpOperandGetOperandNumber() |> Beaver.Native.to_term()
+  def operand_number(op_operand), do: op_operand |> CAPI.mlirOpOperandGetOperandNumber() |> Beaver.Native.to_term()
 end

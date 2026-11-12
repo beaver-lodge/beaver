@@ -46,9 +46,7 @@ defmodule Beaver.MLIR.CAPI.Raw do
       _ ->
         nif_file = String.to_charlist(base)
         dylib = "#{base}.dylib"
-
         if File.exists?(dylib), do: dylib |> Path.basename() |> File.ln_s("#{base}.so")
-
         nif_file
     end
   end
@@ -57,7 +55,6 @@ defmodule Beaver.MLIR.CAPI.Raw do
     path = System.get_env("PATH") || ""
     sep = if match?({:win32, _}, :os.type()), do: ";", else: ":"
 
-    unless path |> String.split(sep) |> Enum.any?(&(&1 == dir)),
-      do: System.put_env("PATH", dir <> sep <> path)
+    unless path |> String.split(sep) |> Enum.any?(&(&1 == dir)), do: System.put_env("PATH", dir <> sep <> path)
   end
 end

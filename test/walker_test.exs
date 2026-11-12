@@ -17,16 +17,11 @@ defmodule WalkerTest do
     a = Beaver.Walker.arguments(b1)[0]
     assert %MLIR.OpOperand{} = Beaver.Walker.uses(a)[0]
 
-    for walker <- [
-          Beaver.Walker.blocks(r0),
-          Beaver.Walker.operations(b0),
-          Beaver.Walker.arguments(b1)
-        ] do
+    for walker <- [Beaver.Walker.blocks(r0), Beaver.Walker.operations(b0), Beaver.Walker.arguments(b1)] do
       items = Enum.to_list(walker)
       assert Enum.zip(walker, items) |> Enum.all?(fn {a, b} -> MLIR.equal?(a, b) end)
       assert length(Enum.slice(walker, 0, 2)) == min(2, length(items))
       assert Enum.reduce_while(walker, 0, fn _, n -> {:halt, n + 1} end) == 1
-
       reducer = fn item, acc -> {:suspend, [item | acc]} end
       assert {:suspended, [], resume} = Enumerable.reduce(walker, {:suspend, []}, reducer)
       assert {:suspended, [first], resume} = resume.({:cont, []})

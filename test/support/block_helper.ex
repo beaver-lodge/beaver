@@ -19,11 +19,8 @@ defmodule BlockHelper do
             end
 
             case action do
-              :append ->
-                MLIR.Region.append(Beaver.Env.region(), b)
-
-              :insert ->
-                MLIR.Region.insert(Beaver.Env.region(), 1, b)
+              :append -> MLIR.Region.append(Beaver.Env.region(), b)
+              :insert -> MLIR.Region.insert(Beaver.Env.region(), 1, b)
             end
           end
         end

@@ -13,12 +13,9 @@ defmodule ContextTransientScopeTest do
   end
 
   test "always ends a scope after a callback failure", %{ctx: ctx} do
-    assert_raise RuntimeError, "boom", fn ->
-      MLIR.Context.with_transient_scope(ctx, fn _ctx -> raise "boom" end)
-    end
+    assert_raise RuntimeError, "boom", fn -> MLIR.Context.with_transient_scope(ctx, fn _ctx -> raise "boom" end) end
 
-    assert :reentered ==
-             MLIR.Context.with_transient_scope(ctx, fn _ctx -> :reentered end)
+    assert :reentered == MLIR.Context.with_transient_scope(ctx, fn _ctx -> :reentered end)
   end
 
   test "collects stale non-owning wrappers safely after a scope ends", %{ctx: ctx} do
@@ -28,10 +25,7 @@ defmodule ContextTransientScopeTest do
       spawn_monitor(fn ->
         stale_wrappers =
           MLIR.Context.with_transient_scope(ctx, fn scoped_ctx ->
-            types =
-              Enum.map([8, 16, 32], fn bitwidth ->
-                MLIR.Type.integer(bitwidth, ctx: scoped_ctx)
-              end)
+            types = Enum.map([8, 16, 32], fn bitwidth -> MLIR.Type.integer(bitwidth, ctx: scoped_ctx) end)
 
             attributes = Enum.map(types, &MLIR.Attribute.type/1)
 
@@ -47,8 +41,7 @@ defmodule ContextTransientScopeTest do
     assert_receive {:transient_wrappers_collected, ^pid, 6}, 5_000
     assert_receive {:DOWN, ^monitor, :process, ^pid, :normal}, 5_000
 
-    assert :reentered ==
-             MLIR.Context.with_transient_scope(ctx, fn _ctx -> :reentered end)
+    assert :reentered == MLIR.Context.with_transient_scope(ctx, fn _ctx -> :reentered end)
   end
 
   test "rejects concurrent use of the same context", %{ctx: ctx} do
@@ -68,11 +61,9 @@ defmodule ContextTransientScopeTest do
       MLIR.Context.with_transient_scope(ctx, fn _ctx -> :ok end)
     end
 
-    assert_raise ArgumentError,
-                 ~r/cannot destroy a context with an active transient scope/,
-                 fn ->
-                   MLIR.Context.destroy(ctx)
-                 end
+    assert_raise ArgumentError, ~r/cannot destroy a context with an active transient scope/, fn ->
+      MLIR.Context.destroy(ctx)
+    end
 
     send(task.pid, :leave)
     assert Task.await(task) == :ok

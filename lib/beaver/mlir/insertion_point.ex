@@ -1,16 +1,12 @@
 alias Beaver.MLIR.{Block, Operation, RewriterBase}
 
 defmodule Beaver.MLIR.InsertionPoint do
-  @moduledoc """
-  Functions to work with insertion point in Beaver DSL environment.
-  """
+  @moduledoc "Functions to work with insertion point in Beaver DSL environment."
   alias Beaver.MLIR
 
   @type t() :: Block.t() | MLIR.PatternRewriter.t() | RewriterBase.t()
 
-  @doc """
-  Convert insertion point to block if possible.
-  """
+  @doc "Convert insertion point to block if possible."
   @spec to_block(t()) :: Block.t() | nil
   def to_block(%Block{} = blk), do: blk
 
@@ -20,11 +16,8 @@ defmodule Beaver.MLIR.InsertionPoint do
 
   def to_block(_), do: nil
 
-  @doc """
-  Insert operation at the given insertion point.
-  """
-  def insert_operation(%Block{} = block, %Operation{} = op),
-    do: Block.append(block, op)
+  @doc "Insert operation at the given insertion point."
+  def insert_operation(%Block{} = block, %Operation{} = op), do: Block.append(block, op)
 
   def insert_operation(%RewriterBase{} = base, %Operation{} = op), do: RewriterBase.insert(base, op)
 

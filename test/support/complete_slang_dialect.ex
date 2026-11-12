@@ -7,10 +7,7 @@ defmodule CompleteSlang do
   end
 
   defconstraint direction_value do
-    any_of([
-      Beaver.MLIR.Attribute.string("left"),
-      Beaver.MLIR.Attribute.string("right")
-    ])
+    any_of([Beaver.MLIR.Attribute.string("left"), Beaver.MLIR.Attribute.string("right")])
   end
 
   deftype box(element = ^integer_like)
@@ -22,13 +19,9 @@ defmodule CompleteSlang do
   defop(consume_token(value = base(token())))
   defop produce_integer(), results: [value: ^integer_like]
 
-  defop sequence(head = any(), tail = variadic(any()), fallback = optional(any())),
-    results: [value: optional(any())]
+  defop sequence(head = any(), tail = variadic(any()), fallback = optional(any())), results: [value: optional(any())]
 
-  defop named_io(single(any())),
-    operand_names: [:input],
-    results: [single(any())],
-    result_names: [:output]
+  defop named_io(single(any())), operand_names: [:input], results: [single(any())], result_names: [:output]
 
   defop scope(),
     attributes: [label: base("#builtin.string")],

@@ -1,16 +1,13 @@
 defmodule Beaver.Wasm do
   @moduledoc """
-  WebAssembly packaging for MLIR modules — the WASM analogue of the
-  `gpu.binary` packaging.
+  WebAssembly packaging for MLIR modules — the WASM analogue of the `gpu.binary` packaging.
 
-  `package_binary!/2` lowers a module to LLVM IR using the standard
-  arith/scf/cf-to-llvm passes, translates it in-process,
-  compiles it to a wasm binary with the Zig wasm32 target, and returns a
-  `Beaver.Wasm.Binary` carrying the bytes plus the imports/exports manifest
-  parsed from the binary.
+  `package_binary!/2` lowers a module to LLVM IR using the standard arith/scf/cf-to-llvm passes, translates it
+  in-process, compiles it to a wasm binary with the Zig wasm32 target, and returns a `Beaver.Wasm.Binary` carrying
+  the bytes plus the imports/exports manifest parsed from the binary.
 
-  Lower custom dialects before calling this function. The manifest names
-  the WASI/import surface that a runtime must provide to execute the binary.
+  Lower custom dialects before calling this function. The manifest names the WASI/import surface that a runtime must
+  provide to execute the binary.
   """
 
   import Beaver.MLIR.Conversion
@@ -24,10 +21,9 @@ defmodule Beaver.Wasm do
 
   Options:
 
-    * `:target` — wasm target triple (default `"wasm32-wasi"`)
-    * `:entry` — symbol to export (default `"main"`)
-    * `:opt` — Zig optimization flag (default `"-O2"`)
-    * `:nostdlib` — compile without libc/WASI imports (default `true`)
+  * `:target` — wasm target triple (default `"wasm32-wasi"`) * `:entry` — symbol to export (default `"main"`) *
+  `:opt` — Zig optimization flag (default `"-O2"`) * `:nostdlib` — compile without libc/WASI imports (default
+  `true`)
   """
   @spec package_binary!(MLIR.Module.t(), keyword()) :: Beaver.Wasm.Binary.t()
   def package_binary!(%MLIR.Module{} = module, opts \\ []) do
@@ -35,10 +31,8 @@ defmodule Beaver.Wasm do
     entry = Keyword.get(opts, :entry, "main")
     opt = Keyword.get(opts, :opt, "-O2")
     nostdlib = Keyword.get(opts, :nostdlib, true)
-
     llvm_ir = to_llvm_ir!(module)
     bytes = compile!(llvm_ir, target, entry, opt, nostdlib)
-
     %{Beaver.Wasm.Binary.parse(bytes) | target: target}
   end
 
@@ -57,7 +51,6 @@ defmodule Beaver.Wasm do
   defp compile!(llvm_ir, target, entry, opt, nostdlib) do
     ll_path = tmp_path(".ll")
     wasm_path = tmp_path(".wasm")
-
     File.write!(ll_path, llvm_ir)
 
     args =
@@ -66,7 +59,6 @@ defmodule Beaver.Wasm do
         ["-Wl,--no-entry", "-Wl,--export=#{entry}", "-o", wasm_path, ll_path]
 
     run_tool!(zig(), args)
-
     bytes = File.read!(wasm_path)
     cleanup([ll_path, wasm_path])
     bytes
@@ -76,9 +68,7 @@ defmodule Beaver.Wasm do
 
   defp run_tool!(executable, args) do
     {output, status} = System.cmd(executable, args, stderr_to_stdout: true)
-
     unless status == 0, do: raise("#{executable} failed (#{status}): #{String.slice(output, -1000, 1000)}")
-
     :ok
   end
 

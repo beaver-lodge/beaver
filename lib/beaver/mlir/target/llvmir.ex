@@ -1,70 +1,56 @@
 defmodule Beaver.MLIR.Target.LLVMIR do
-  @moduledoc """
-  Safe export of fully lowered MLIR modules to textual LLVM IR, native AOT
-  object code, concurrent per-function object shards, lazy content-addressed
-  multi-unit compilation, and shared library linking.
-  """
-
-  alias Beaver.MLIR
+  @moduledoc "MLIR export, native AOT compilation, concurrent cached units and atomic shared-library linking."
+  alias Beaver.{Composer, MLIR, Native, Slang, Walker}
+  alias MLIR.{CAPI, Context, Diagnostic, Module, Operation}
   import Bitwise
 
-  @spec translate(MLIR.Module.t()) :: {:ok, binary()} | {:error, MLIR.diagnostics()}
-  def translate(%MLIR.Module{} = module) do
-    module |> MLIR.context() |> MLIR.Context.register_translations()
+  @compile_keys ~w(triple cpu features opt_level pic format)a
+  @native_metrics %{translate_ns: 0, opt_ns: 0, codegen_ns: 0}
+  @unit_metrics Map.merge(@native_metrics, %{emit_ns: 0, lower_ns: 0})
 
-    module
-    |> MLIR.Operation.from_module()
-    |> then(&MLIR.CAPI.beaver_raw_translate_module_to_llvm_ir(&1.ref))
-    |> Beaver.Native.check!()
-    |> case do
-      {llvm_ir, _diagnostics} when is_binary(llvm_ir) -> {:ok, llvm_ir}
-      {:error, diagnostics} when is_list(diagnostics) -> {:error, diagnostics}
+  @spec translate(Module.t()) :: {:ok, binary()} | {:error, MLIR.diagnostics()}
+  def translate(%Module{} = module) do
+    Context.register_translations(MLIR.context(module))
+
+    case CAPI.beaver_raw_translate_module_to_llvm_ir(Operation.from_module(module).ref) |> Native.check!() do
+      {ir, _} when is_binary(ir) -> {:ok, ir}
+      {:error, diagnostics} -> {:error, diagnostics}
     end
   end
 
-  @spec translate!(MLIR.Module.t()) :: binary()
-  def translate!(%MLIR.Module{} = module) do
+  @spec translate!(Module.t()) :: binary()
+  def translate!(module) do
     case translate(module) do
-      {:ok, llvm_ir} ->
-        llvm_ir
-
-      {:error, diagnostics} ->
-        raise ArgumentError, MLIR.Diagnostic.format(diagnostics, "failed to translate module to LLVM IR")
+      {:ok, ir} -> ir
+      {:error, ds} -> raise ArgumentError, Diagnostic.format(ds, "failed to translate module to LLVM IR")
     end
   end
 
-  @doc "Returns the host machine's default LLVM target triple, CPU name, and feature string."
+  @doc "Returns the LLVM host triple, CPU name and feature string."
   @spec host_target() :: %{triple: binary(), cpu: binary(), features: binary()}
-  def host_target() do
-    {triple, cpu, features} = MLIR.CAPI.beaver_raw_llvm_host_target()
+  def host_target do
+    {triple, cpu, features} = CAPI.beaver_raw_llvm_host_target()
     %{triple: triple, cpu: cpu, features: features}
   end
 
-  @doc "Returns a normalized `<arch>-<os>` platform identifier for the host target (e.g. `\"aarch64-macos\"`)."
+  @doc "Returns the normalized host platform, e.g. `aarch64-macos`."
   @spec host_platform() :: String.t()
-  def host_platform() do
-    %{triple: triple} = host_target()
+  def host_platform do
+    triple = host_target().triple
     parts = String.split(triple, "-")
-    arch = normalize_arch(List.first(parts) || "unknown")
-    os = detect_os(triple, parts)
+    arch = hd(parts)
+    arch = %{"arm64" => "aarch64", "amd64" => "x86_64"}[arch] || arch
+
+    os =
+      Enum.find_value(
+        [{"macos", ~w(darwin macosx)}, {"linux", ["linux"]}, {"windows", ~w(windows msvc)}, {"freebsd", ["freebsd"]}],
+        fn {os, names} -> if String.contains?(triple, names), do: os end
+      ) || Enum.at(parts, 2) || "unknown"
+
     "#{arch}-#{os}"
   end
 
-  defp normalize_arch(arch) when arch in ["arm64", "aarch64"], do: "aarch64"
-  defp normalize_arch(arch) when arch in ["x86_64", "amd64"], do: "x86_64"
-  defp normalize_arch(arch), do: arch
-
-  defp detect_os(triple, parts) do
-    cond do
-      String.contains?(triple, ["darwin", "macosx"]) -> "macos"
-      String.contains?(triple, "linux") -> "linux"
-      String.contains?(triple, ["windows", "msvc"]) -> "windows"
-      String.contains?(triple, "freebsd") -> "freebsd"
-      true -> Enum.at(parts, 2) || "unknown"
-    end
-  end
-
-  @doc "Returns the host shared library file extension (`\".dylib\"`, `\".so\"`, or `\".dll\"`)."
+  @doc "Returns `.dylib`, `.dll` or `.so` for the host OS."
   @spec shared_library_extension() :: String.t()
   def shared_library_extension do
     case :os.type() do
@@ -74,565 +60,393 @@ defmodule Beaver.MLIR.Target.LLVMIR do
     end
   end
 
-  @doc "Returns a deterministic target configuration descriptor suitable for content-addressed cache keys."
+  @doc "Returns a deterministic descriptor of target, optimization, PIC and output-format settings."
   @spec target_descriptor(keyword()) :: String.t()
-  def target_descriptor(opts \\ []) when is_list(opts) do
+  def target_descriptor(opts \\ []) do
     host = host_target()
-    triple = non_empty(Keyword.get(opts, :triple, ""), host.triple)
-    cpu = non_empty(Keyword.get(opts, :cpu, ""), host.cpu)
-    features = non_empty(Keyword.get(opts, :features, ""), host.features)
-    opt_level = Keyword.get(opts, :opt_level, 2)
-    pic = Keyword.get(opts, :pic, true)
-    format = Keyword.get(opts, :format, :object)
-    "triple=#{triple}\ncpu=#{cpu}\nfeatures=#{features}\nopt=#{opt_level}\npic=#{pic}\nformat=#{format}\n"
-  end
 
-  @doc "Compiles an MLIR module (or textual LLVM IR string) to native object code or target assembly in-process."
-  @spec compile_object(MLIR.Module.t() | MLIR.Operation.t() | binary(), keyword()) ::
-          {:ok, binary()} | {:ok, binary(), map()} | {:error, binary()}
-  def compile_object(module_or_llvm_ir, opts \\ []) when is_list(opts) do
-    {triple, cpu, features, opt_level, flags, return_metrics} = parse_compile_opts!(opts)
-    {module_ref, llvm_ir_arg} = resolve_compile_source!(module_or_llvm_ir)
-
-    case MLIR.CAPI.beaver_raw_compile_to_object(module_ref, llvm_ir_arg, triple, cpu, features, opt_level, flags) do
-      {:ok, binary, {translate_ns, opt_ns, codegen_ns}} ->
-        if return_metrics,
-          do: {:ok, binary, %{translate_ns: translate_ns, opt_ns: opt_ns, codegen_ns: codegen_ns}},
-          else: {:ok, binary}
-
-      {:error, message} ->
-        {:error, message}
-    end
-  end
-
-  @doc "Compiles an MLIR module or textual LLVM IR string to object code, raising on failure."
-  @spec compile_object!(MLIR.Module.t() | MLIR.Operation.t() | binary(), keyword()) :: binary()
-  def compile_object!(module_or_llvm_ir, opts \\ []) do
-    case compile_object(module_or_llvm_ir, Keyword.delete(opts, :return_metrics)) do
-      {:ok, object} -> object
-      {:error, message} -> raise ArgumentError, "failed to compile to object: #{message}"
-    end
-  end
-
-  @doc "Partitions a lowered MLIR module into per-function compilation units and compiles them concurrently."
-  @spec compile_functions(MLIR.Module.t(), keyword()) :: {:ok, [map()]} | {:error, term()}
-  def compile_functions(%MLIR.Module{} = module, opts \\ []) when is_list(opts) do
-    module |> MLIR.context() |> MLIR.Context.register_translations()
-    root_op = MLIR.Operation.from_module(module)
-    func_names = Keyword.get_lazy(opts, :functions, fn -> defined_function_names(module) end)
-    cache_dir = Keyword.get(opts, :cache_dir)
-    if cache_dir, do: File.mkdir_p!(cache_dir)
-
-    compile_opts =
-      opts
-      |> Keyword.take([:triple, :cpu, :features, :opt_level, :pic, :format])
-      |> Keyword.put(:return_metrics, true)
-
-    max_concurrency = Keyword.get(opts, :max_concurrency, System.schedulers_online())
-
-    with {:ok, shards} <- extract_shards(root_op, func_names, shard_key_prefix(compile_opts)) do
-      compile_shards_concurrently(shards, cache_dir, compile_opts, max_concurrency)
-    end
-  end
-
-  @doc "Compiles all defined functions in `module` into per-function object shards, raising on failure."
-  @spec compile_functions!(MLIR.Module.t(), keyword()) :: [map()]
-  def compile_functions!(%MLIR.Module{} = module, opts \\ []) do
-    case compile_functions(module, opts) do
-      {:ok, shards} -> shards
-      {:error, reason} -> raise ArgumentError, "failed to compile module functions: #{inspect(reason)}"
-    end
-  end
-
-  @doc """
-  Compiles lazy compilation units concurrently with two-level content-addressed caching.
-
-  Each unit may be `%{id: id, key: key, source: fun_or_ir, metadata: map()}` or `{id, key, fun_or_ir}`,
-  where `source` is a 0-arity `(-> binary() | MLIR.Module.t())` callback, a 1-arity
-  `(MLIR.Context.t() -> binary() | MLIR.Module.t())` callback, or an eager binary/module.
-
-  On a verified cache hit under `:cache_dir` (`<cache_dir>/objects/<key>/<key>.o` + `manifest.json`),
-  `source` is never invoked and no `MLIR.Context` is created.
-  """
-  @spec compile_units([map() | tuple()], keyword()) :: {:ok, [map()]} | {:error, term()}
-  def compile_units(units, opts \\ []) when is_list(units) and is_list(opts) do
-    normalized = Enum.map(units, &normalize_unit!/1)
-    cache_dir = Keyword.get(opts, :cache_dir)
-    if cache_dir, do: File.mkdir_p!(Path.join(cache_dir, "objects"))
-    max_concurrency = Keyword.get(opts, :max_concurrency, System.schedulers_online())
-
-    normalized
-    |> Task.async_stream(&compile_one_unit(&1, cache_dir, opts),
-      max_concurrency: max_concurrency,
-      timeout: :infinity
-    )
-    |> Enum.reduce_while({:ok, []}, fn
-      {:ok, {:ok, item}}, {:ok, acc} -> {:cont, {:ok, [item | acc]}}
-      {:ok, {:error, err}}, _ -> {:halt, {:error, err}}
-      {:exit, reason}, _ -> {:halt, {:error, reason}}
-    end)
-    |> case do
-      {:ok, reversed} -> {:ok, Enum.reverse(reversed)}
-      error -> error
-    end
-  end
-
-  @doc "Compiles lazy compilation units via `compile_units/2`, raising on failure."
-  @spec compile_units!([map() | tuple()], keyword()) :: [map()]
-  def compile_units!(units, opts \\ []) do
-    case compile_units(units, opts) do
-      {:ok, compiled} -> compiled
-      {:error, reason} -> raise ArgumentError, "failed to compile units: #{inspect(reason)}"
-    end
-  end
-
-  @doc """
-  Links object files (or unit maps returned by `compile_units/2` / `compile_functions/2`)
-  into a shared library at `output_path` atomically.
-
-  Options:
-    * `:cc` - explicit C compiler/driver executable path.
-    * `:ldflags` - extra linker/driver flags (`[String.t()]`, default `[]`).
-    * `:libs` - extra library paths or `-l...` flags (`[String.t()]`, default `[]`).
-    * `:undefined_lookup` - on macOS, passes `-undefined dynamic_lookup` when `true` (default `true`).
-  """
-  @spec link_shared([Path.t() | map()], Path.t(), keyword()) :: {:ok, Path.t()} | {:error, binary()}
-  def link_shared(object_inputs, output_path, opts \\ [])
-      when is_list(object_inputs) and is_binary(output_path) and is_list(opts) do
-    if object_inputs == [], do: raise(ArgumentError, "link_shared requires at least one object input")
-    expanded_out = Path.expand(output_path)
-    out_dir = Path.dirname(expanded_out)
-    File.mkdir_p!(out_dir)
-
-    cc = resolve_c_compiler!(opts)
-    {obj_paths, temp_objs} = materialize_object_inputs!(object_inputs, out_dir)
-    tmp_out = unique_temp_path(expanded_out)
-
-    shared_flags = platform_shared_flags(Keyword.get(opts, :undefined_lookup, true))
-    ldflags = Keyword.get(opts, :ldflags, [])
-    libs = Keyword.get(opts, :libs, [])
-    args = shared_flags ++ obj_paths ++ ldflags ++ libs ++ ["-o", tmp_out]
-
-    try do
-      case System.cmd(cc, args, stderr_to_stdout: true) do
-        {_out, 0} ->
-          File.rename!(tmp_out, expanded_out)
-          {:ok, expanded_out}
-
-        {err_output, code} ->
-          _ = File.rm(tmp_out)
-          {:error, "linker #{cc} exited with status #{code}: #{String.trim(err_output)}"}
+    target =
+      for k <- ~w(triple cpu features)a do
+        v = Keyword.get(opts, k, "")
+        "#{k}=#{if v == "", do: host[k], else: v}\n"
       end
-    after
-      Enum.each(temp_objs, &File.rm/1)
+
+    IO.iodata_to_binary(
+      target ++
+        [
+          "opt=#{Keyword.get(opts, :opt_level, 2)}\npic=#{Keyword.get(opts, :pic, true)}\nformat=#{Keyword.get(opts, :format, :object)}\n"
+        ]
+    )
+  end
+
+  @doc "Compiles MLIR or textual LLVM IR to an object (or `format: :assembly`), optionally returning timing metrics."
+  @spec compile_object(Module.t() | Operation.t() | binary(), keyword()) ::
+          {:ok, binary()} | {:ok, binary(), map()} | {:error, binary()}
+  def compile_object(source, opts \\ []) do
+    {triple, cpu, features, level, flags, metrics?} = compile_options!(opts)
+    {module, ir} = compile_source!(source)
+
+    case CAPI.beaver_raw_compile_to_object(module, ir, triple, cpu, features, level, flags) do
+      {:ok, bytes, {translate, optimize, codegen}} ->
+        metrics = %{translate_ns: translate, opt_ns: optimize, codegen_ns: codegen}
+        if metrics?, do: {:ok, bytes, metrics}, else: {:ok, bytes}
+
+      error ->
+        error
     end
   end
 
-  @doc "Links `object_inputs` into a shared library at `output_path`, raising on failure."
-  @spec link_shared!([Path.t() | map()], Path.t(), keyword()) :: Path.t()
-  def link_shared!(object_inputs, output_path, opts \\ []) do
-    case link_shared(object_inputs, output_path, opts) do
-      {:ok, path} -> path
-      {:error, reason} -> raise ArgumentError, "failed to link shared library: #{reason}"
-    end
-  end
+  @doc "Compiles an object, raising on failure."
+  @spec compile_object!(Module.t() | Operation.t() | binary(), keyword()) :: binary()
+  def compile_object!(source, opts \\ []),
+    do: unwrap!(compile_object(source, Keyword.delete(opts, :return_metrics)), "compile to object")
 
-  @doc "Compile textual LLVM IR to NVPTX assembly in-process."
+  @doc "Compiles textual LLVM IR to NVPTX assembly in-process."
   @spec compile_to_ptx(binary(), keyword()) :: {:ok, binary()} | {:error, binary()}
-  def compile_to_ptx(llvm_ir, opts \\ []) when is_binary(llvm_ir) and is_list(opts) do
+  def compile_to_ptx(ir, opts \\ []) when is_binary(ir) do
     cpu = Keyword.get(opts, :cpu, "sm_80")
     features = Keyword.get(opts, :features, "")
     unless is_binary(cpu) and is_binary(features), do: raise(ArgumentError, ":cpu and :features must be strings")
-    MLIR.CAPI.beaver_raw_compile_llvm_ir_to_ptx(llvm_ir, cpu, features)
+    CAPI.beaver_raw_compile_llvm_ir_to_ptx(ir, cpu, features)
   end
 
   @spec compile_to_ptx!(binary(), keyword()) :: binary()
-  def compile_to_ptx!(llvm_ir, opts \\ []) do
-    case compile_to_ptx(llvm_ir, opts) do
-      {:ok, ptx} -> ptx
-      {:error, message} -> raise ArgumentError, "failed to compile LLVM IR to PTX: #{message}"
+  def compile_to_ptx!(ir, opts \\ []), do: unwrap!(compile_to_ptx(ir, opts), "compile LLVM IR to PTX")
+
+  @doc "Partitions a lowered module into concurrent, optionally cached per-function object shards."
+  @spec compile_functions(Module.t(), keyword()) :: {:ok, [map()]} | {:error, term()}
+  def compile_functions(%Module{} = module, opts \\ []) do
+    Context.register_translations(MLIR.context(module))
+    root = Operation.from_module(module)
+    names = Keyword.get_lazy(opts, :functions, fn -> defined_functions(module) end)
+    cache = opts[:cache_dir]
+    if cache, do: File.mkdir_p!(cache)
+    options = Keyword.take(opts, @compile_keys) |> Keyword.put(:return_metrics, true)
+    prefix = ["beaver-aot-v1" | Enum.map(~w(triple cpu features)a, &Keyword.get(opts, &1, ""))]
+
+    prefix =
+      prefix ++ Enum.map([opt_level: 2, pic: true, format: :object], fn {k, v} -> "#{Keyword.get(opts, k, v)}" end)
+
+    with {:ok, shards} <-
+           gather(
+             Stream.map(Enum.with_index(names), fn {name, index} ->
+               extract_shard(root, name |> to_string() |> String.trim_leading("@"), index == 0, prefix)
+             end)
+           ) do
+      concurrent(shards, &compile_shard(&1, cache, options), opts)
     end
   end
 
-  defp non_empty("", fallback), do: fallback
-  defp non_empty(val, _fallback), do: val
+  @spec compile_functions!(Module.t(), keyword()) :: [map()]
+  def compile_functions!(module, opts \\ []),
+    do: unwrap!(compile_functions(module, opts), "compile module functions", true)
 
-  defp normalize_unit!({id, key, source}),
-    do: normalize_unit!(%{id: id, key: key, source: source, metadata: %{}})
+  @doc """
+  Compiles `{id, key, source}` or `%{id: id, key: key, source: source, metadata: map}` units concurrently. Sources
+  can be eager MLIR modules/text, LLVM IR, or callbacks of arity 0 or 1 (receiving an owned context). Verified hits
+  at `<cache_dir>/objects/<key>/<key>.o` plus `manifest.json` skip both source and context creation. `:input`
+  selects `:mlir`, `:llvm_ir` or `:auto`; `:lower` and `:passes` run before code generation. `:context_opts`,
+  `:dialects`, `:max_concurrency` and the `compile_object/2` options are forwarded.
+  """
+  @spec compile_units([map() | tuple()], keyword()) :: {:ok, [map()]} | {:error, term()}
+  def compile_units(units, opts \\ []) do
+    units = Enum.map(units, &unit!/1)
+    if opts[:cache_dir], do: File.mkdir_p!(Path.join(opts[:cache_dir], "objects"))
+    concurrent(units, &compile_unit(&1, opts), opts)
+  end
 
-  defp normalize_unit!(%{} = map) do
-    id = Map.fetch!(map, :id)
-    key = Map.fetch!(map, :key) |> to_string()
-    source = Map.fetch!(map, :source)
-    metadata = Map.get(map, :metadata, %{})
+  @spec compile_units!([map() | tuple()], keyword()) :: [map()]
+  def compile_units!(units, opts \\ []), do: unwrap!(compile_units(units, opts), "compile units", true)
+
+  defp unit!({id, key, source}), do: unit!(%{id: id, key: key, source: source})
+
+  defp unit!(%{id: id, key: key, source: source} = unit) do
+    key = to_string(key)
 
     if key == "" or String.contains?(key, ["/", "\\", ".."]),
       do: raise(ArgumentError, "invalid unit cache key: #{inspect(key)}")
 
+    metadata = Map.get(unit, :metadata, %{})
     unless is_map(metadata), do: raise(ArgumentError, "unit :metadata must be a map")
     %{id: id, key: key, source: source, metadata: metadata}
   end
 
-  defp normalize_unit!(other),
-    do: raise(ArgumentError, "invalid compilation unit specification: #{inspect(other)}")
+  defp unit!(other), do: raise(ArgumentError, "invalid compilation unit specification: #{inspect(other)}")
 
-  defp compile_one_unit(%{id: id, key: key, source: source, metadata: metadata}, cache_dir, opts) do
-    ext = if Keyword.get(opts, :format, :object) == :assembly, do: ".s", else: ".o"
-    unit_dir = if cache_dir, do: Path.join([cache_dir, "objects", key]), else: nil
-    obj_path = if unit_dir, do: Path.join(unit_dir, key <> ext), else: nil
-    manifest_path = if unit_dir, do: Path.join(unit_dir, "manifest.json"), else: nil
+  defp compile_unit(unit, opts) do
+    ext = if opts[:format] == :assembly, do: ".s", else: ".o"
+    dir = if opts[:cache_dir], do: Path.join([opts[:cache_dir], "objects", unit.key])
+    path = if dir, do: Path.join(dir, unit.key <> ext)
+    manifest = if dir, do: Path.join(dir, "manifest.json")
+    base = Map.take(unit, [:id, :key, :metadata]) |> Map.put(:path, path)
 
-    case try_read_unit_cache(obj_path, manifest_path) do
-      {:hit, object, sha256, cached_meta} ->
-        {:ok,
-         %{
-           id: id,
-           key: key,
-           path: obj_path,
-           object: object,
-           sha256: sha256,
-           cached?: true,
-           metadata: Map.merge(cached_meta, metadata),
-           metrics: %{emit_ns: 0, lower_ns: 0, translate_ns: 0, opt_ns: 0, codegen_ns: 0}
-         }}
-
-      :miss ->
-        build_and_cache_unit(id, key, source, metadata, obj_path, manifest_path, opts)
+    case read_unit_cache(path, manifest) do
+      {:ok, bytes, metadata} -> unit_result(base, bytes, true, @unit_metrics, Map.merge(metadata, unit.metadata))
+      :miss -> build_unit(unit, base, manifest, opts)
     end
   end
 
-  defp try_read_unit_cache(nil, _manifest_path), do: :miss
+  defp read_unit_cache(nil, _), do: :miss
 
-  defp try_read_unit_cache(obj_path, manifest_path) do
-    with true <- File.regular?(obj_path) and File.regular?(manifest_path),
-         {:ok, object} <- File.read(obj_path),
-         {:ok, manifest_bin} <- File.read(manifest_path),
-         manifest when is_map(manifest) <- safe_json_decode(manifest_bin),
-         sha256 <- sha256_hex(object),
-         true <- manifest["sha256"] == sha256 do
-      {:hit, object, sha256, Map.get(manifest, "metadata", %{})}
+  defp read_unit_cache(path, manifest) do
+    with {:ok, bytes} <- File.read(path),
+         {:ok, json} <- File.read(manifest),
+         {:ok, %{"sha256" => digest} = data} <- JSON.decode(json),
+         true <- digest == sha256(bytes),
+         metadata when is_map(metadata) <- Map.get(data, "metadata", %{}) do
+      {:ok, bytes, metadata}
     else
       _ -> :miss
     end
   end
 
-  defp safe_json_decode(bin) do
-    JSON.decode!(bin)
-  rescue
-    _ -> nil
-  end
+  defp build_unit(unit, base, manifest, opts) do
+    case produce(unit.source, opts) do
+      {:ok, bytes, metrics} ->
+        if base.path do
+          write_atomic!(base.path, bytes)
 
-  defp build_and_cache_unit(id, key, source, metadata, obj_path, manifest_path, opts) do
-    compile_opts =
-      opts
-      |> Keyword.take([:triple, :cpu, :features, :opt_level, :pic, :format])
-      |> Keyword.put(:return_metrics, true)
+          data = %{
+            id: to_string(unit.id),
+            key: unit.key,
+            sha256: sha256(bytes),
+            size_bytes: byte_size(bytes),
+            metadata: unit.metadata
+          }
 
-    case produce_unit_object(source, compile_opts, opts) do
-      {:ok, object, full_metrics} ->
-        sha256 = sha256_hex(object)
-        persist_unit_cache(id, key, object, sha256, metadata, obj_path, manifest_path)
+          write_atomic!(manifest, JSON.encode!(data))
+        end
 
-        {:ok,
-         %{
-           id: id,
-           key: key,
-           path: obj_path,
-           object: object,
-           sha256: sha256,
-           cached?: false,
-           metadata: metadata,
-           metrics: full_metrics
-         }}
+        unit_result(base, bytes, false, metrics, unit.metadata)
 
       {:error, reason} ->
-        {:error, {id, reason}}
+        {:error, {unit.id, reason}}
     end
   rescue
-    e -> {:error, {id, Exception.message(e)}}
+    e -> {:error, {unit.id, Exception.message(e)}}
   end
 
-  defp produce_unit_object(source, compile_opts, opts) when is_function(source, 1) do
-    with_unit_context(opts, fn ctx ->
-      {produced, emit_ns} = measure_ns(fn -> source.(ctx) end)
-      lower_and_codegen_in_ctx(produced, ctx, emit_ns, compile_opts, opts)
+  defp unit_result(base, bytes, cached?, metrics, metadata),
+    do:
+      {:ok,
+       Map.merge(base, %{object: bytes, sha256: sha256(bytes), cached?: cached?, metrics: metrics, metadata: metadata})}
+
+  defp produce(source, opts) when is_function(source, 1) do
+    with_context(opts, fn ctx ->
+      {value, elapsed} = measure(fn -> source.(ctx) end)
+      codegen(value, ctx, elapsed, opts)
     end)
   end
 
-  defp produce_unit_object(source, compile_opts, opts) when is_function(source, 0) do
-    {produced, emit_ns} = measure_ns(source)
-    lower_and_codegen_value(produced, emit_ns, compile_opts, opts)
+  defp produce(source, opts) when is_function(source, 0) do
+    {value, elapsed} = measure(source)
+    codegen(value, nil, elapsed, opts)
   end
 
-  defp produce_unit_object(source, compile_opts, opts),
-    do: lower_and_codegen_value(source, 0, compile_opts, opts)
+  defp produce(source, opts), do: codegen(source, nil, 0, opts)
 
-  defp persist_unit_cache(_id, _key, _object, _sha256, _metadata, nil, _manifest_path), do: :ok
-  defp persist_unit_cache(_id, _key, _object, _sha256, _metadata, _obj_path, nil), do: :ok
-
-  defp persist_unit_cache(id, key, object, sha256, metadata, obj_path, manifest_path) do
-    write_atomic!(obj_path, object)
-
-    manifest = %{
-      "id" => to_string(id),
-      "key" => key,
-      "sha256" => sha256,
-      "size_bytes" => byte_size(object),
-      "metadata" => metadata
-    }
-
-    write_atomic!(manifest_path, JSON.encode!(manifest))
-  end
-
-  defp lower_and_codegen_value(%MLIR.Module{} = mod, emit_ns, compile_opts, opts) do
-    ctx = MLIR.context(mod)
-    lower_and_codegen_module(mod, ctx, false, emit_ns, compile_opts, opts)
-  end
-
-  defp lower_and_codegen_value(text, emit_ns, compile_opts, opts) when is_binary(text) do
-    input_kind = Keyword.get(opts, :input, :auto)
-
-    is_mlir? =
-      case input_kind do
-        :mlir -> true
-        :llvm_ir -> false
-        :auto -> mlir_text?(text) or Keyword.has_key?(opts, :lower) or Keyword.has_key?(opts, :passes)
-      end
-
-    if is_mlir? do
-      with_unit_context(opts, fn ctx ->
-        mod = MLIR.Module.create!(text, ctx: ctx)
-        lower_and_codegen_module(mod, ctx, true, emit_ns, compile_opts, opts)
-      end)
-    else
-      case compile_object(text, compile_opts) do
-        {:ok, obj, m} -> {:ok, obj, Map.merge(%{emit_ns: emit_ns, lower_ns: 0}, m)}
-        error -> error
-      end
-    end
-  end
-
-  defp lower_and_codegen_in_ctx(%MLIR.Module{} = mod, ctx, emit_ns, compile_opts, opts),
-    do: lower_and_codegen_module(mod, ctx, true, emit_ns, compile_opts, opts)
-
-  defp lower_and_codegen_in_ctx(text, ctx, emit_ns, compile_opts, opts) when is_binary(text) do
-    if Keyword.get(opts, :input, :auto) == :llvm_ir and not Keyword.has_key?(opts, :lower) and
-         not Keyword.has_key?(opts, :passes) do
-      case compile_object(text, compile_opts) do
-        {:ok, obj, m} -> {:ok, obj, Map.merge(%{emit_ns: emit_ns, lower_ns: 0}, m)}
-        error -> error
-      end
-    else
-      mod = MLIR.Module.create!(text, ctx: ctx)
-      lower_and_codegen_module(mod, ctx, true, emit_ns, compile_opts, opts)
-    end
-  end
-
-  defp lower_and_codegen_module(mod, ctx, destroy_mod?, emit_ns, compile_opts, opts) do
+  # A module returned by a context callback is owned; eager modules and zero-arity callback results are borrowed.
+  defp codegen(%Module{} = module, ctx, emit_ns, opts) do
     try do
-      {lowered, lower_ns} = measure_ns(fn -> run_unit_lowering(mod, ctx, opts) end)
-
-      case compile_object(lowered, compile_opts) do
-        {:ok, obj, m} -> {:ok, obj, Map.merge(%{emit_ns: emit_ns, lower_ns: lower_ns}, m)}
-        error -> error
-      end
+      {lowered, lower_ns} = measure(fn -> lower(module, ctx || MLIR.context(module), opts) end)
+      compile_with_metrics(lowered, %{emit_ns: emit_ns, lower_ns: lower_ns}, opts)
     after
-      if destroy_mod?, do: MLIR.Module.destroy(mod)
+      if ctx, do: Module.destroy(module)
     end
   end
 
-  defp run_unit_lowering(mod, ctx, opts) do
-    mod
-    |> apply_lower_callback(ctx, Keyword.get(opts, :lower))
-    |> apply_unit_passes(Keyword.get(opts, :passes, []))
-  end
-
-  defp apply_lower_callback(mod, _ctx, nil), do: mod
-  defp apply_lower_callback(mod, _ctx, fun) when is_function(fun, 1), do: fun.(mod)
-  defp apply_lower_callback(mod, ctx, fun) when is_function(fun, 2), do: fun.(mod, ctx)
-
-  defp apply_unit_passes(mod, []), do: mod
-
-  defp apply_unit_passes(mod, passes) when is_list(passes) do
-    passes
-    |> Enum.reduce(Beaver.Composer.new(mod), &Beaver.Composer.append(&2, &1))
-    |> Beaver.Composer.run!()
-  end
-
-  defp with_unit_context(opts, fun) do
-    ctx_opts = Keyword.get(opts, :context_opts, [])
-    dialects = Keyword.get(opts, :dialects, [])
-
-    MLIR.Context.with_context(ctx_opts, fn ctx ->
-      Enum.each(dialects, &Beaver.Slang.load(ctx, &1))
-      fun.(ctx)
-    end)
-  end
-
-  defp mlir_text?(text) do
-    trimmed = String.trim_leading(text)
-    String.starts_with?(trimmed, "module") or String.starts_with?(trimmed, "\"builtin.module\"")
-  end
-
-  defp measure_ns(fun) do
-    t0 = System.monotonic_time(:nanosecond)
-    res = fun.()
-    {res, System.monotonic_time(:nanosecond) - t0}
-  end
-
-  defp sha256_hex(iodata), do: :crypto.hash(:sha256, iodata) |> Base.encode16(case: :lower)
-
-  defp resolve_c_compiler!(opts) do
-    candidates = [
-      Keyword.get(opts, :cc),
-      System.get_env("CC"),
-      System.find_executable("cc"),
-      System.find_executable("clang"),
-      System.find_executable("gcc")
-    ]
-
-    Enum.find(candidates, &(is_binary(&1) and &1 != "")) ||
-      raise(ArgumentError, "unable to locate a C compiler driver (:cc, $CC, cc, clang, or gcc)")
-  end
-
-  defp platform_shared_flags(undefined_lookup?) do
-    case :os.type() do
-      {:unix, :darwin} ->
-        if undefined_lookup?,
-          do: ["-dynamiclib", "-undefined", "dynamic_lookup"],
-          else: ["-dynamiclib"]
-
-      _ ->
-        ["-shared"]
+  defp codegen(text, ctx, emit_ns, opts) when is_binary(text) do
+    if mlir_source?(text, ctx, opts) do
+      if ctx,
+        do: codegen(Module.create!(text, ctx: ctx), ctx, emit_ns, opts),
+        else: with_context(opts, &codegen(Module.create!(text, ctx: &1), &1, emit_ns, opts))
+    else
+      compile_with_metrics(text, %{emit_ns: emit_ns, lower_ns: 0}, opts)
     end
   end
 
-  defp materialize_object_inputs!(inputs, out_dir) do
-    Enum.reduce(inputs, {[], []}, fn
-      path, {paths, temps} when is_binary(path) ->
-        {[Path.expand(path) | paths], temps}
-
-      %{path: path}, {paths, temps} when is_binary(path) ->
-        {[Path.expand(path) | paths], temps}
-
-      %{object: bytes}, {paths, temps} when is_binary(bytes) ->
-        tmp = unique_temp_path(Path.join(out_dir, "unit.o"))
-        File.write!(tmp, bytes)
-        {[tmp | paths], [tmp | temps]}
-
-      other, _acc ->
-        raise ArgumentError, "unsupported link_shared input: #{inspect(other)}"
-    end)
-    |> then(fn {paths, temps} -> {Enum.reverse(paths), temps} end)
+  defp mlir_source?(text, nil, opts) do
+    case Keyword.get(opts, :input, :auto) do
+      :mlir -> true
+      :llvm_ir -> false
+      :auto -> String.starts_with?(String.trim_leading(text), ["module", "\"builtin.module\""]) or lowering?(opts)
+    end
   end
 
-  defp unique_temp_path(base_path),
-    do: "#{base_path}.tmp-#{System.pid()}-#{System.unique_integer([:positive])}"
+  defp mlir_source?(_, _, opts), do: Keyword.get(opts, :input, :auto) != :llvm_ir or lowering?(opts)
+  defp lowering?(opts), do: Keyword.has_key?(opts, :lower) or Keyword.has_key?(opts, :passes)
 
-  defp write_atomic!(path, bytes) do
-    path |> Path.dirname() |> File.mkdir_p!()
-    tmp = unique_temp_path(path)
-    File.write!(tmp, bytes)
-    File.rename!(tmp, path)
-  end
-
-  defp parse_compile_opts!(opts) do
-    triple = Keyword.get(opts, :triple, "")
-    cpu = Keyword.get(opts, :cpu, "")
-    features = Keyword.get(opts, :features, "")
-    opt_level = Keyword.get(opts, :opt_level, 2)
-    pic = Keyword.get(opts, :pic, true)
-    return_metrics = Keyword.get(opts, :return_metrics, false)
-
-    unless is_binary(triple) and is_binary(cpu) and is_binary(features),
-      do: raise(ArgumentError, ":triple, :cpu, and :features must be strings")
-
-    unless opt_level in 0..3 and is_boolean(pic),
-      do: raise(ArgumentError, "invalid :opt_level or :pic option")
-
-    emit_asm = parse_format!(Keyword.get(opts, :format, :object))
-    flags = if(pic, do: 1, else: 0) ||| if(emit_asm, do: 2, else: 0)
-    {triple, cpu, features, opt_level, flags, return_metrics}
-  end
-
-  defp parse_format!(:object), do: false
-  defp parse_format!(:assembly), do: true
-  defp parse_format!(other), do: raise(ArgumentError, ":format must be :object or :assembly, got: #{inspect(other)}")
-
-  defp resolve_compile_source!(%MLIR.Module{} = mod) do
-    mod |> MLIR.context() |> MLIR.Context.register_translations()
-    {MLIR.Operation.from_module(mod).ref, nil}
-  end
-
-  defp resolve_compile_source!(%MLIR.Operation{} = op) do
-    op |> MLIR.context() |> MLIR.Context.register_translations()
-    {op.ref, nil}
-  end
-
-  defp resolve_compile_source!(llvm_ir) when is_binary(llvm_ir), do: {nil, llvm_ir}
-
-  defp resolve_compile_source!(other),
-    do: raise(ArgumentError, "expected MLIR.Module, MLIR.Operation, or LLVM IR binary, got: #{inspect(other)}")
-
-  defp shard_key_prefix(opts) do
-    [
-      "beaver-aot-v1",
-      Keyword.get(opts, :triple, ""),
-      Keyword.get(opts, :cpu, ""),
-      Keyword.get(opts, :features, ""),
-      "#{Keyword.get(opts, :opt_level, 2)}",
-      "#{Keyword.get(opts, :pic, true)}",
-      "#{Keyword.get(opts, :format, :object)}"
-    ]
-  end
-
-  defp extract_shards(root_op, func_names, key_prefix) do
-    func_names
-    |> Enum.with_index()
-    |> Enum.reduce_while({:ok, []}, fn {name, index}, {:ok, acc} ->
-      case extract_one_shard(root_op, to_string(name) |> String.trim_leading("@"), index == 0, key_prefix) do
-        {:ok, shard} -> {:cont, {:ok, [shard | acc]}}
-        {:error, reason} -> {:halt, {:error, reason}}
-      end
-    end)
-    |> case do
-      {:ok, reversed} -> {:ok, Enum.reverse(reversed)}
+  defp compile_with_metrics(source, metrics, opts) do
+    case compile_object(source, Keyword.put(Keyword.take(opts, @compile_keys), :return_metrics, true)) do
+      {:ok, bytes, native} -> {:ok, bytes, Map.merge(metrics, native)}
       error -> error
     end
   end
 
-  defp extract_one_shard(root_op, name_str, keep_globals, key_prefix) do
-    case MLIR.CAPI.beaver_raw_extract_function_module(root_op.ref, name_str, keep_globals) do
+  defp lower(module, ctx, opts) do
+    module =
+      case opts[:lower] do
+        nil -> module
+        f when is_function(f, 1) -> f.(module)
+        f when is_function(f, 2) -> f.(module, ctx)
+      end
+
+    case Keyword.get(opts, :passes, []) do
+      [] -> module
+      passes -> Enum.reduce(passes, Composer.new(module), &Composer.append(&2, &1)) |> Composer.run!()
+    end
+  end
+
+  defp with_context(opts, fun) do
+    Context.with_context(Keyword.get(opts, :context_opts, []), fn ctx ->
+      Enum.each(Keyword.get(opts, :dialects, []), &Slang.load(ctx, &1))
+      fun.(ctx)
+    end)
+  end
+
+  @doc """
+  Atomically links file paths or compiled unit/shard maps into `output_path`. Options: `:cc` (compiler driver),
+  `:ldflags`, `:libs`, and `:undefined_lookup` (macOS, default true).
+  """
+  @spec link_shared([Path.t() | map()], Path.t(), keyword()) :: {:ok, Path.t()} | {:error, binary()}
+  def link_shared(inputs, output, opts \\ []) do
+    if inputs == [], do: raise(ArgumentError, "link_shared requires at least one object input")
+    output = Path.expand(output)
+    dir = Path.dirname(output)
+    File.mkdir_p!(dir)
+
+    cc =
+      Enum.find(
+        [opts[:cc], System.get_env("CC") | Enum.map(~w(cc clang gcc), &System.find_executable/1)],
+        &(is_binary(&1) and &1 != "")
+      ) || raise(ArgumentError, "unable to locate a C compiler driver (:cc, $CC, cc, clang, or gcc)")
+
+    {paths, temps} = Enum.map_reduce(inputs, [], &object_path(&1, &2, dir))
+    tmp = temp_path(output)
+
+    flags =
+      if :os.type() == {:unix, :darwin},
+        do:
+          ["-dynamiclib"] ++
+            if(Keyword.get(opts, :undefined_lookup, true), do: ["-undefined", "dynamic_lookup"], else: []),
+        else: ["-shared"]
+
+    try do
+      args = flags ++ paths ++ Keyword.get(opts, :ldflags, []) ++ Keyword.get(opts, :libs, []) ++ ["-o", tmp]
+
+      case System.cmd(cc, args, stderr_to_stdout: true) do
+        {_, 0} ->
+          File.rename!(tmp, output)
+          {:ok, output}
+
+        {message, code} ->
+          {:error, "linker #{cc} exited with status #{code}: #{String.trim(message)}"}
+      end
+    after
+      Enum.each([tmp | temps], &File.rm/1)
+    end
+  end
+
+  @spec link_shared!([Path.t() | map()], Path.t(), keyword()) :: Path.t()
+  def link_shared!(inputs, output, opts \\ []), do: unwrap!(link_shared(inputs, output, opts), "link shared library")
+  defp object_path(%{path: path}, temps, dir) when is_binary(path), do: object_path(path, temps, dir)
+  defp object_path(path, temps, _) when is_binary(path), do: {Path.expand(path), temps}
+
+  defp object_path(%{object: bytes}, temps, dir) when is_binary(bytes) do
+    path = temp_path(Path.join(dir, "unit.o"))
+    File.write!(path, bytes)
+    {path, [path | temps]}
+  end
+
+  defp object_path(other, _, _), do: raise(ArgumentError, "unsupported link_shared input: #{inspect(other)}")
+
+  defp compile_options!(opts) do
+    [triple, cpu, features] = Enum.map(~w(triple cpu features)a, &Keyword.get(opts, &1, ""))
+    level = Keyword.get(opts, :opt_level, 2)
+    pic = Keyword.get(opts, :pic, true)
+
+    unless Enum.all?([triple, cpu, features], &is_binary/1),
+      do: raise(ArgumentError, ":triple, :cpu, and :features must be strings")
+
+    unless level in 0..3 and is_boolean(pic), do: raise(ArgumentError, "invalid :opt_level or :pic option")
+    format = Keyword.get(opts, :format, :object)
+
+    unless format in [:object, :assembly],
+      do: raise(ArgumentError, ":format must be :object or :assembly, got: #{inspect(format)}")
+
+    {triple, cpu, features, level, if(pic, do: 1, else: 0) ||| if(format == :assembly, do: 2, else: 0),
+     opts[:return_metrics]}
+  end
+
+  defp compile_source!(%Module{} = module), do: compile_source!(Operation.from_module(module))
+
+  defp compile_source!(%Operation{} = op) do
+    Context.register_translations(MLIR.context(op))
+    {op.ref, nil}
+  end
+
+  defp compile_source!(text) when is_binary(text), do: {nil, text}
+
+  defp compile_source!(other),
+    do: raise(ArgumentError, "expected MLIR.Module, MLIR.Operation, or LLVM IR binary, got: #{inspect(other)}")
+
+  defp extract_shard(root, name, globals?, prefix) do
+    case CAPI.beaver_raw_extract_function_module(root.ref, name, globals?) do
       nil ->
-        {:error, "function #{name_str} not found or is external"}
+        {:error, "function #{name} not found or is external"}
 
-      raw_mod ->
-        shard_mod = Beaver.Native.check!(raw_mod)
-        Beaver.Native.with_resource(shard_mod, &MLIR.Module.destroy/1, &translate_shard(&1, name_str, key_prefix))
+      raw ->
+        Module.with_module(Native.check!(raw), &translate_shard(&1, name, prefix))
     end
   end
 
-  defp translate_shard(shard_mod, name_str, key_prefix) do
-    case translate(shard_mod) do
-      {:ok, llvm_ir} ->
-        digest = sha256_hex([key_prefix, llvm_ir])
-        {:ok, {name_str, llvm_ir, digest}}
-
-      {:error, diagnostics} ->
-        {:error, MLIR.Diagnostic.format(diagnostics, "failed to translate function #{name_str}")}
+  defp translate_shard(module, name, prefix) do
+    case translate(module) do
+      {:ok, ir} -> {:ok, {name, ir, sha256([prefix, ir])}}
+      {:error, ds} -> {:error, Diagnostic.format(ds, "failed to translate function #{name}")}
     end
   end
 
-  defp compile_shards_concurrently(shards, cache_dir, compile_opts, max_concurrency) do
-    shards
-    |> Task.async_stream(&compile_one_shard(&1, cache_dir, compile_opts),
-      max_concurrency: max_concurrency,
+  defp compile_shard({name, ir, digest}, cache, opts) do
+    path = if cache, do: Path.join(cache, digest <> ".o")
+    hit? = path && File.regular?(path)
+    result = if hit?, do: {:ok, File.read!(path), @native_metrics}, else: compile_object(ir, opts)
+
+    case result do
+      {:ok, bytes, metrics} ->
+        if path && not hit?, do: write_atomic!(path, bytes)
+        {:ok, %{name: name, object: bytes, digest: digest, cached?: !!hit?, metrics: metrics}}
+
+      {:error, reason} ->
+        {:error, {name, reason}}
+    end
+  end
+
+  defp defined_functions(module) do
+    for op <- Walker.operations(Module.body(module)),
+        Operation.name(op) in ~w(llvm.func func.func),
+        Enum.any?(Walker.regions(op), &Enum.any?(Walker.blocks(&1))),
+        attr = op["sym_name"],
+        not MLIR.null?(attr),
+        do: attr |> MLIR.to_string() |> String.trim("\"")
+  end
+
+  defp concurrent(items, fun, opts) do
+    Task.async_stream(items, fun,
+      max_concurrency: Keyword.get(opts, :max_concurrency, System.schedulers_online()),
       timeout: :infinity
     )
-    |> Enum.reduce_while({:ok, []}, fn
-      {:ok, {:ok, item}}, {:ok, acc} -> {:cont, {:ok, [item | acc]}}
-      {:ok, {:error, err}}, _ -> {:halt, {:error, err}}
-      {:exit, reason}, _ -> {:halt, {:error, reason}}
+    |> Stream.map(fn
+      {:ok, result} -> result
+      {:exit, reason} -> {:error, reason}
+    end)
+    |> gather()
+  end
+
+  defp gather(results) do
+    Enum.reduce_while(results, {:ok, []}, fn
+      {:ok, item}, {:ok, acc} -> {:cont, {:ok, [item | acc]}}
+      {:error, _} = error, _ -> {:halt, error}
     end)
     |> case do
       {:ok, items} -> {:ok, Enum.reverse(items)}
@@ -640,49 +454,25 @@ defmodule Beaver.MLIR.Target.LLVMIR do
     end
   end
 
-  defp compile_one_shard({name_str, llvm_ir, digest}, cache_dir, compile_opts) do
-    cache_path = if cache_dir, do: Path.join(cache_dir, digest <> ".o"), else: nil
+  defp unwrap!(result, label, inspect? \\ false)
+  defp unwrap!({:ok, value}, _label, _inspect?), do: value
 
-    if cache_path && File.regular?(cache_path) do
-      {:ok,
-       %{
-         name: name_str,
-         object: File.read!(cache_path),
-         digest: digest,
-         cached?: true,
-         metrics: %{translate_ns: 0, opt_ns: 0, codegen_ns: 0}
-       }}
-    else
-      compile_and_cache_shard(name_str, llvm_ir, digest, cache_path, compile_opts)
-    end
+  defp unwrap!({:error, reason}, label, inspect?),
+    do: raise(ArgumentError, "failed to #{label}: #{if inspect?, do: inspect(reason), else: reason}")
+
+  defp measure(fun) do
+    start = System.monotonic_time(:nanosecond)
+    value = fun.()
+    {value, System.monotonic_time(:nanosecond) - start}
   end
 
-  defp compile_and_cache_shard(name_str, llvm_ir, digest, cache_path, compile_opts) do
-    case compile_object(llvm_ir, compile_opts) do
-      {:ok, object, metrics} ->
-        if cache_path, do: write_atomic!(cache_path, object)
-        {:ok, %{name: name_str, object: object, digest: digest, cached?: false, metrics: metrics}}
+  defp sha256(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
+  defp temp_path(path), do: "#{path}.tmp-#{System.pid()}-#{System.unique_integer([:positive])}"
 
-      {:error, reason} ->
-        {:error, {name_str, reason}}
-    end
-  end
-
-  defp defined_function_names(%MLIR.Module{} = module) do
-    module
-    |> MLIR.Module.body()
-    |> Beaver.Walker.operations()
-    |> Enum.flat_map(&function_symbol_if_defined/1)
-  end
-
-  defp function_symbol_if_defined(op) do
-    has_blocks = op |> Beaver.Walker.regions() |> Enum.any?(&Enum.any?(Beaver.Walker.blocks(&1)))
-    sym_attr = op["sym_name"]
-
-    if MLIR.Operation.name(op) in ["llvm.func", "func.func"] and has_blocks and not MLIR.null?(sym_attr) do
-      [sym_attr |> MLIR.to_string() |> String.trim("\"")]
-    else
-      []
-    end
+  defp write_atomic!(path, bytes) do
+    File.mkdir_p!(Path.dirname(path))
+    tmp = temp_path(path)
+    File.write!(tmp, bytes)
+    File.rename!(tmp, path)
   end
 end

@@ -2,13 +2,11 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
   @moduledoc """
   Pure, auditable pass plans for Beaver's NVIDIA Triton lowering.
 
-  `:legacy` preserves Beaver's historical lowering and remains the default.
-  `:pinned_nvidia_sm100` freezes the historical `make_ttgir` order for CUDA
-  capabilities 100 and newer, with upstream pass replacements recorded in its
+  `:legacy` preserves Beaver's historical lowering and remains the default. `:pinned_nvidia_sm100` freezes the
+  historical `make_ttgir` order for CUDA capabilities 100 and newer, with upstream pass replacements recorded in its
   provenance. The profile remains opt-in until downstream GPU qualification.
 
-  This module contains data only.  In particular, it never imports or parses
-  Triton's Python compiler at runtime.
+  This module contains data only. In particular, it never imports or parses Triton's Python compiler at runtime.
   """
 
   @schema "beaver.triton.pipeline-plan.v1"

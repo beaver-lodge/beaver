@@ -16,8 +16,7 @@ defmodule Beaver.MLIR.Operation.State do
     do: %Changeset{changeset | location: Location.unknown(ctx: ctx)}
 
   defp prepare(%Changeset{location: %kind{} = loc, context: %MLIR.Context{} = ctx} = changeset)
-       when kind in [Deferred, Location],
-       do: %Changeset{changeset | location: Deferred.resolve(loc, ctx)}
+       when kind in [Deferred, Location], do: %Changeset{changeset | location: Deferred.resolve(loc, ctx)}
 
   defp add_attributes(state, []), do: state
 
@@ -36,7 +35,6 @@ defmodule Beaver.MLIR.Operation.State do
           end
 
         if MLIR.null?(attr), do: raise("attribute can't be null, #{inspect({k, v})}")
-
         CAPI.mlirNamedAttributeGet(CAPI.mlirIdentifierGet(ctx, StringRef.create(Atom.to_string(k))), attr)
       end
 

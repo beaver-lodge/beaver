@@ -20,7 +20,6 @@ defmodule Beaver.MLIR.CAPI.KindaTest do
 
   test "array f64" do
     %Native.Array{ref: ref} = Native.array([1.0, 2.0, 3.0], Native.F64)
-
     assert is_reference(ref)
   end
 
@@ -31,7 +30,6 @@ defmodule Beaver.MLIR.CAPI.KindaTest do
 
   test "empty array mlir type" do
     %Native.Array{ref: ref} = Native.array([], Beaver.MLIR.Type)
-
     assert is_reference(ref)
   end
 end

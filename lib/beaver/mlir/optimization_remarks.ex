@@ -1,10 +1,9 @@
 defmodule Beaver.MLIR.OptimizationRemarks do
   @moduledoc """
-  Optimization explanations emitted by MLIR passes. `attach/2` sends copied JSON
-  messages to the calling process, tagged with the returned reference. `drain/1`
-  decodes pending messages; finalize the engine to flush `policy: :final` remarks.
-  The context owns the callback and releases it on finalization or destruction.
-  Attach/finalize only while no other thread is using the context.
+  Optimization explanations emitted by MLIR passes. `attach/2` sends copied JSON messages to the calling process,
+  tagged with the returned reference. `drain/1` decodes pending messages; finalize the engine to flush `policy:
+  :final` remarks. The context owns the callback and releases it on finalization or destruction. Attach/finalize
+  only while no other thread is using the context.
   """
   alias Beaver.MLIR.{CAPI, Context, Location, StringRef}
   alias Beaver.Native

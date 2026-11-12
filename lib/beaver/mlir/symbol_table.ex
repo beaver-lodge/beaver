@@ -3,15 +3,13 @@ alias Beaver.MLIR.CAPI
 defmodule Beaver.MLIR.SymbolTable do
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
 
-  @moduledoc """
-  This module provides utilities for MLIR symbol table.
-  """
+  @moduledoc "This module provides utilities for MLIR symbol table."
   alias Beaver.MLIR
   import CAPI
 
   @doc """
-  Creates a new symbol table and attaches it to the given operation.
-  The operation is expected to have the `SymbolTable` trait.
+  Creates a new symbol table and attaches it to the given operation. The operation is expected to have the
+  `SymbolTable` trait.
   """
   defdelegate create(operation), to: CAPI, as: :mlirSymbolTableCreate
 
@@ -78,13 +76,10 @@ defmodule Beaver.MLIR.SymbolTable do
   defdelegate insert(symbol_table, operation), to: CAPI, as: :mlirSymbolTableInsert
 
   @doc "Looks up a symbol with the given name in the symbol table."
-  def lookup(symbol_table, name),
-    do: mlirSymbolTableLookup(symbol_table, MLIR.StringRef.create(name))
+  def lookup(symbol_table, name), do: mlirSymbolTableLookup(symbol_table, MLIR.StringRef.create(name))
 
   @doc "Replaces all uses of a symbol with another symbol."
-  defdelegate replace_all_symbol_uses(old_symbol, new_symbol, from),
-    to: CAPI,
-    as: :mlirSymbolTableReplaceAllSymbolUses
+  defdelegate replace_all_symbol_uses(old_symbol, new_symbol, from), to: CAPI, as: :mlirSymbolTableReplaceAllSymbolUses
 
   @doc """
   Looks up or creates an external function/symbol declaration in `module_or_op`'s enclosing symbol table.
@@ -101,8 +96,7 @@ defmodule Beaver.MLIR.SymbolTable do
           String.Chars.t(),
           MLIR.Type.t() | Beaver.Deferred.t() | String.t(),
           keyword()
-        ) ::
-          MLIR.Operation.t()
+        ) :: MLIR.Operation.t()
   def ensure_declaration!(module_or_op, sym_name, function_type, opts \\ []) do
     op = MLIR.Operation.from_module(module_or_op)
     root_op = MLIR.Operation.enclosing_symbol_table(op) || op

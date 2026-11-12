@@ -2,9 +2,8 @@ alias Beaver.Native
 
 defmodule Beaver.MLIR.Value do
   @moduledoc """
-  MLIR SSA values: block arguments or operation results. Conditional use
-  replacement traverses uses on a worker and dispatches predicates to the
-  calling BEAM process through `Kinda.CallbackRuntime`.
+  MLIR SSA values: block arguments or operation results. Conditional use replacement traverses uses on a worker and
+  dispatches predicates to the calling BEAM process through `Kinda.CallbackRuntime`.
   """
   alias Beaver.MLIR.CAPI
   alias Beaver.MLIR
@@ -15,8 +14,7 @@ defmodule Beaver.MLIR.Value do
   def argument?(%__MODULE__{} = value), do: CAPI.mlirValueIsABlockArgument(value) |> Native.to_term()
 
   @doc "Returns whether the value is an operation result."
-  def result?(%__MODULE__{} = value),
-    do: CAPI.mlirValueIsAOpResult(value) |> Native.to_term()
+  def result?(%__MODULE__{} = value), do: CAPI.mlirValueIsAOpResult(value) |> Native.to_term()
 
   @doc "Returns the defining operation, or an error for a block argument."
   def owner(%__MODULE__{} = value),
@@ -37,24 +35,22 @@ defmodule Beaver.MLIR.Value do
   defdelegate location(value), to: CAPI, as: :mlirValueGetLocation
 
   @doc """
-  Sets a block argument's location and returns the value. Operation results
-  inherit their operation's location and cannot be set independently.
+  Sets a block argument's location and returns the value. Operation results inherit their operation's location and
+  cannot be set independently.
   """
   @spec set_location(t(), MLIR.Location.source()) :: t()
   def set_location(%__MODULE__{} = value, loc) do
     unless argument?(value), do: raise(ArgumentError, "only block argument locations can be set")
-
     loc = MLIR.Location.resolve(loc, MLIR.context(value))
     :ok = CAPI.mlirBlockArgumentSetLocation(value, loc)
     value
   end
 
   @doc """
-  Replaces uses whose `MLIR.OpOperand` predicate returns `true` on the calling
-  BEAM process. Native traversal waits outside the scheduler through Kinda's
-  callback runtime. Both values must share a context with thread-safe locking.
-  Exceptions are re-raised with their stacktrace after traversal stops;
-  replacements already accepted remain applied.
+  Replaces uses whose `MLIR.OpOperand` predicate returns `true` on the calling BEAM process. Native traversal waits
+  outside the scheduler through Kinda's callback runtime. Both values must share a context with thread-safe locking.
+  Exceptions are re-raised with their stacktrace after traversal stops; replacements already accepted remain
+  applied.
   """
   @spec replace_uses_with_if(t(), t(), (MLIR.OpOperand.t() -> boolean())) :: :ok
   def replace_uses_with_if(%__MODULE__{} = from, %__MODULE__{ref: replacement}, predicate)

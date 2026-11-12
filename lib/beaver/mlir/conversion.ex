@@ -56,8 +56,7 @@ defmodule Beaver.MLIR.Conversion.Callbacks do
 
   defp legality(other), do: raise(ArgumentError, "invalid dynamic legality result: #{inspect(other)}")
 
-  defguardp handle_result(value, module, many)
-            when (many and is_list(value)) or (not many and is_struct(value, module))
+  defguardp handle_result(value, module, many) when (many and is_list(value)) or (not many and is_struct(value, module))
 
   for {name, module, many, label, list_label} <- [
         {:converted_type, Type, false, "type conversion", nil},
@@ -65,8 +64,7 @@ defmodule Beaver.MLIR.Conversion.Callbacks do
         {:materialized, Value, false, "materialization", nil},
         {:materialized_values, Value, true, "1:N materialization", "1:N target materialization"}
       ] do
-    defp unquote(name)({:ok, value}) when handle_result(value, unquote(module), unquote(many)),
-      do: unquote(name)(value)
+    defp unquote(name)({:ok, value}) when handle_result(value, unquote(module), unquote(many)), do: unquote(name)(value)
 
     defp unquote(name)(value) when handle_result(value, unquote(module), unquote(many)) do
       if unquote(many), do: validate_list!(value, unquote(module), unquote(list_label))
@@ -132,11 +130,9 @@ defmodule Beaver.MLIR.Conversion do
 
   For a declarative, inspectable, and reusable pipeline, see `Beaver.MLIR.Conversion.Plan`.
 
-  `apply/5` runs full or partial conversion outside BEAM scheduler threads and
-  services callback-backed targets, type converters, and conversion patterns
-  in the calling process. Mutable pattern sets are frozen and cleaned up
-  automatically. See the [dialect conversion guide](dialect-conversion.html)
-  for a complete Slang-to-LLVM example.
+  `apply/5` runs full or partial conversion outside BEAM scheduler threads and services callback-backed targets,
+  type converters, and conversion patterns in the calling process. Mutable pattern sets are frozen and cleaned up
+  automatically. See the [dialect conversion guide](dialect-conversion.html) for a complete Slang-to-LLVM example.
   """
 
   use Beaver.ComposerGenerator, prefix: "mlirCreateConversion"
@@ -173,9 +169,7 @@ defmodule Beaver.MLIR.Conversion do
             "#{prefix}; callback raised:\n" <> Exception.format(kind, reason, stacktrace)
         end
 
-      if error.diagnostics == [],
-        do: details,
-        else: MLIR.Diagnostic.format(error.diagnostics, details)
+      if error.diagnostics == [], do: details, else: MLIR.Diagnostic.format(error.diagnostics, details)
     end
   end
 
@@ -215,9 +209,8 @@ defmodule Beaver.MLIR.Conversion do
   @doc """
   Runs one conversion with bounded callback and native-worker profiling.
 
-  Returns the ordinary conversion result together with a machine-readable
-  `Beaver.MLIR.Conversion.Profile` receipt. Profiling is opt-in so normal
-  conversion keeps its existing callback path and measurement overhead.
+  Returns the ordinary conversion result together with a machine-readable `Beaver.MLIR.Conversion.Profile` receipt.
+  Profiling is opt-in so normal conversion keeps its existing callback path and measurement overhead.
   """
   @spec profile(
           mode(),
@@ -226,8 +219,7 @@ defmodule Beaver.MLIR.Conversion do
           RewritePatternSet.t() | MLIR.FrozenRewritePatternSet.t(),
           keyword()
         ) :: {result(), Beaver.MLIR.Conversion.Profile.receipt()}
-  def profile(mode, ir, target, patterns, opts \\ []),
-    do: run(mode, ir, target, patterns, opts, true)
+  def profile(mode, ir, target, patterns, opts \\ []), do: run(mode, ir, target, patterns, opts, true)
 
   defp run(mode, ir, %ConversionTarget{} = target, %kind{} = patterns, opts, profile?)
        when mode in [:full, :partial, :analysis] and kind in [RewritePatternSet, MLIR.FrozenRewritePatternSet] do
@@ -273,19 +265,15 @@ defmodule Beaver.MLIR.Conversion do
   end
 
   defp conversion_options!(opts) do
-    unless Keyword.keyword?(opts),
-      do: raise(ArgumentError, "conversion options must be a keyword list")
+    unless Keyword.keyword?(opts), do: raise(ArgumentError, "conversion options must be a keyword list")
 
     unsupported =
       Keyword.keys(opts) -- [:timeout, :folding_mode, :build_materializations, :profile, :report, :analysis_session]
 
     if unsupported != [], do: raise(ArgumentError, "unsupported conversion options: #{inspect(unsupported)}")
-
     folding_mode = folding_mode!(Keyword.get(opts, :folding_mode))
     materializations = materializations!(Keyword.get(opts, :build_materializations))
-
     timeout_ms = Beaver.Execution.callback_timeout!(opts)
-
     report? = Keyword.get(opts, :report, false)
     unless is_boolean(report?), do: raise(ArgumentError, ":report must be boolean")
     {folding_mode, materializations, timeout_ms, opts[:profile], report?}

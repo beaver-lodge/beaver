@@ -20,12 +20,7 @@ defmodule LivebookTest do
 
   # Notebooks that print output should assert their expected output here so
   # regressions in the printed IR or the demonstrated pipeline are caught.
-  @expected_output %{
-    "your-first-beaver-compiler.livemd" => [
-      "func.func @some_func",
-      "llvm.func @some_func"
-    ]
-  }
+  @expected_output %{"your-first-beaver-compiler.livemd" => ["func.func @some_func", "llvm.func @some_func"]}
 
   test "every guide notebook executes top-to-bottom" do
     livemds = Path.wildcard(Path.join(@guides, "*.livemd"))
@@ -36,17 +31,11 @@ defmodule LivebookTest do
       cells = extract_cells(livemd)
       assert cells != [], "#{name}: no Elixir code cells found"
 
-      code =
-        cells
-        |> Enum.reject(&mix_install?/1)
-        |> Enum.join("\n\n")
+      code = cells |> Enum.reject(&mix_install?/1) |> Enum.join("\n\n")
 
       assert code != "", "#{name}: only Mix.install cells, nothing to execute"
 
-      output =
-        capture_io(fn ->
-          Code.eval_string(code)
-        end)
+      output = capture_io(fn -> Code.eval_string(code) end)
 
       for expected <- Map.get(@expected_output, name, []) do
         assert output =~ expected,
@@ -56,11 +45,8 @@ defmodule LivebookTest do
   end
 
   defp extract_cells(livemd) do
-    Regex.scan(~r/```elixir[^\n]*\n(.*?)\n```/s, File.read!(livemd), capture: :all_but_first)
-    |> Enum.map(&hd/1)
+    Regex.scan(~r/```elixir[^\n]*\n(.*?)\n```/s, File.read!(livemd), capture: :all_but_first) |> Enum.map(&hd/1)
   end
 
-  defp mix_install?(cell) do
-    cell |> String.trim() |> String.starts_with?("Mix.install")
-  end
+  defp mix_install?(cell), do: cell |> String.trim() |> String.starts_with?("Mix.install")
 end

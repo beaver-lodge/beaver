@@ -5,13 +5,11 @@ defmodule Beaver.MLIR.Trait do
   @moduledoc """
   Attaches and queries traits on dynamically defined MLIR operations.
 
-  Trait registration belongs to an `MLIR.Context`. Attaching an already
-  present trait is a no-op, so a dynamic dialect's runtime extensions may be
-  installed more than once in the same context.
+  Trait registration belongs to an `MLIR.Context`. Attaching an already present trait is a no-op, so a dynamic
+  dialect's runtime extensions may be installed more than once in the same context.
 
-  Custom traits use a stable TypeID per identity and context. Their verifier
-  callbacks run in a dedicated BEAM process and receive a borrowed operation
-  that is valid only until the callback returns. The target operation must
+  Custom traits use a stable TypeID per identity and context. Their verifier callbacks run in a dedicated BEAM
+  process and receive a borrowed operation that is valid only until the callback returns. The target operation must
   already be registered by an extensible dialect.
   """
 
@@ -90,9 +88,7 @@ defmodule Beaver.MLIR.Trait do
   def release_context(%Context{ref: context_ref}) do
     if Process.whereis(@context_registry) do
       entries = Registry.lookup(@context_registry, context_ref)
-
       MLIR.ExternalInterface.release_context(%Context{ref: context_ref}, @context_registry)
-
       entries |> Enum.filter(&(elem(&1, 1) == :definition)) |> Enum.each(fn {pid, _kind} -> stop_definition(pid) end)
     end
 
@@ -109,7 +105,6 @@ defmodule Beaver.MLIR.Trait do
   def normalize!(traits) when is_list(traits) do
     traits = Enum.uniq(traits)
     unsupported = Enum.reject(traits, &(builtin?(&1) or custom_declaration?(&1)))
-
     if unsupported != [], do: raise(ArgumentError, "unsupported Slang traits: #{inspect(unsupported)}")
 
     if :terminator in traits and :no_terminator in traits,
@@ -122,17 +117,14 @@ defmodule Beaver.MLIR.Trait do
 
   @doc "Attaches a trait to a registered dynamic operation."
   @spec attach(Context.t(), String.t(), declaration()) :: :ok | Attachment.t()
-  def attach(%Context{} = ctx, op_name, trait)
-      when is_binary(op_name) and is_atom(trait) do
+  def attach(%Context{} = ctx, op_name, trait) when is_binary(op_name) and is_atom(trait) do
     if has?(ctx, op_name, trait) do
       :ok
     else
       {create, _type_id} = definition!(trait)
       dynamic_trait = apply(CAPI, create, [])
       operation_name_ref = StringRef.create(op_name)
-
       attached? = CAPI.mlirDynamicOpTraitAttach(dynamic_trait, operation_name_ref, ctx) |> Native.to_term()
-
       # mlirDynamicOpTraitAttach consumes the trait on both success and
       # failure. A false result can be an idempotent concurrent attachment, so
       # inspect the registered operation again without destroying the pointer.
@@ -146,12 +138,10 @@ defmodule Beaver.MLIR.Trait do
     do: attach_custom(ctx, op_name, identity, callbacks)
 
   @doc "Attaches a callback-backed custom trait to a dynamic operation."
-  @spec attach_custom(Context.t(), String.t(), identity(), keyword(), keyword()) ::
-          :ok | Attachment.t()
+  @spec attach_custom(Context.t(), String.t(), identity(), keyword(), keyword()) :: :ok | Attachment.t()
   def attach_custom(ctx, op_name, identity, callbacks, opts \\ []) do
     callbacks = normalize_callbacks!(callbacks)
     timeout_ms = Beaver.Execution.callback_timeout!(opts)
-
     type_id = type_id(ctx, identity)
 
     if has_type_id?(ctx, op_name, type_id) do
@@ -190,15 +180,12 @@ defmodule Beaver.MLIR.Trait do
   end
 
   @doc "Checks whether a registered operation name has a trait."
-  @spec has?(Context.t(), String.t() | StringRef.t(), builtin() | identity()) ::
-          boolean()
-  def has?(%Context{} = ctx, op_name, trait),
-    do: has_type_id?(ctx, op_name, type_id(ctx, trait))
+  @spec has?(Context.t(), String.t() | StringRef.t(), builtin() | identity()) :: boolean()
+  def has?(%Context{} = ctx, op_name, trait), do: has_type_id?(ctx, op_name, type_id(ctx, trait))
 
   @doc "Checks whether an operation has a trait."
   @spec has?(Operation.t(), builtin() | identity()) :: boolean()
-  def has?(%Operation{} = op, trait),
-    do: has?(MLIR.context(op), Operation.name(op), trait)
+  def has?(%Operation{} = op, trait), do: has?(MLIR.context(op), Operation.name(op), trait)
 
   @doc "Returns the TypeID used by a trait in a context."
   def type_id(%Context{} = ctx, trait),
@@ -239,8 +226,7 @@ defmodule Beaver.MLIR.Trait do
   end
 
   defp normalize_callbacks!(callbacks) when is_list(callbacks) do
-    unless Keyword.keyword?(callbacks),
-      do: raise(ArgumentError, "custom trait callbacks must be a keyword list")
+    unless Keyword.keyword?(callbacks), do: raise(ArgumentError, "custom trait callbacks must be a keyword list")
 
     callbacks = Keyword.validate!(callbacks, @custom_callback_keys)
 

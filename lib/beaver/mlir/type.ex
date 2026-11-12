@@ -3,9 +3,8 @@ alias Beaver.{Deferred, Native}
 
 defmodule Beaver.MLIR.Type do
   @moduledoc """
-  MLIR type parsing and construction, including integers, floats, index/none,
-  tensors, vectors, memrefs and function types. Constructors accept a context
-  in `:ctx` or return a deferred value; checked composite constructors return
+  MLIR type parsing and construction, including integers, floats, index/none, tensors, vectors, memrefs and function
+  types. Constructors accept a context in `:ctx` or return a deferred value; checked composite constructors return
   `{:ok, type}` or `{:error, diagnostics}`, with eager bang variants.
   """
   alias Beaver.MLIR
@@ -13,14 +12,10 @@ defmodule Beaver.MLIR.Type do
 
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
 
-  def get(string, opts \\ [])
-
-  def get(string, opts) when is_binary(string) do
+  def get(string, opts \\ []) when is_binary(string) do
     Deferred.from_opts(opts, fn ctx ->
       t = mlirTypeParseGet(ctx, StringRef.create(string))
-
       if MLIR.null?(t), do: raise("fail to parse type: #{string}")
-
       t
     end)
   end
@@ -32,11 +27,9 @@ defmodule Beaver.MLIR.Type do
     num_results = length(results)
 
     Deferred.from_opts(opts, fn ctx ->
-      inputs =
-        inputs |> Enum.map(&Deferred.resolve(&1, ctx)) |> Native.array(__MODULE__)
+      inputs = inputs |> Enum.map(&Deferred.resolve(&1, ctx)) |> Native.array(__MODULE__)
 
       results = results |> Enum.map(&Deferred.resolve(&1, ctx)) |> Native.array(__MODULE__)
-
       mlirFunctionTypeGet(ctx, num_inputs, inputs, num_results, results)
     end)
   end
@@ -154,9 +147,7 @@ defmodule Beaver.MLIR.Type do
   def tuple(elements, opts \\ []) when is_list(elements) do
     Deferred.from_opts(opts, fn ctx ->
       num_elements = length(elements)
-
       elements = elements |> Enum.map(&Deferred.resolve(&1, ctx)) |> Native.array(__MODULE__)
-
       mlirTupleTypeGet(ctx, num_elements, elements)
     end)
   end
@@ -175,16 +166,13 @@ defmodule Beaver.MLIR.Type do
   def integer(bitwidth, opts \\ [signed: false]) do
     signed = Keyword.get(opts, :signed)
 
-    Deferred.from_opts(
-      opts,
-      fn ctx ->
-        case signed do
-          nil -> mlirIntegerTypeGet(ctx, bitwidth)
-          true -> mlirIntegerTypeSignedGet(ctx, bitwidth)
-          false -> mlirIntegerTypeUnsignedGet(ctx, bitwidth)
-        end
+    Deferred.from_opts(opts, fn ctx ->
+      case signed do
+        nil -> mlirIntegerTypeGet(ctx, bitwidth)
+        true -> mlirIntegerTypeSignedGet(ctx, bitwidth)
+        false -> mlirIntegerTypeUnsignedGet(ctx, bitwidth)
       end
-    )
+    end)
   end
 
   defdelegate i(bitwidth, opts \\ []), to: __MODULE__, as: :integer
@@ -207,14 +195,10 @@ defmodule Beaver.MLIR.Type do
 
   for {f, "mlirTypeIsA" <> type_name, 1} <-
         CAPI.__info__(:functions) |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
-    type_name =
-      type_name |> String.replace(~r"Type$", "")
+    type_name = type_name |> String.replace(~r"Type$", "")
 
-    @doc """
-    calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is #{type_name} type.
-    """
-    helper_name =
-      type_name |> Macro.underscore() |> String.replace("mem_ref", "memref")
+    @doc "calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is #{type_name} type."
+    helper_name = type_name |> Macro.underscore() |> String.replace("mem_ref", "memref")
 
     def unquote(:"#{helper_name}?")(%__MODULE__{} = t),
       do: unquote(f)(t) |> Native.to_term()
@@ -223,9 +207,7 @@ defmodule Beaver.MLIR.Type do
   for sign_type <- ~w{signless signed unsigned} do
     f = :"mlirIntegerTypeIs#{Macro.camelize(sign_type)}"
 
-    @doc """
-    calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is a #{sign_type} integer.
-    """
+    @doc "calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is a #{sign_type} integer."
 
     def unquote(:"#{sign_type}?")(%__MODULE__{} = type),
       do: unquote(f)(type) |> Native.to_term()
@@ -238,22 +220,16 @@ defmodule Beaver.MLIR.Type do
           String.ends_with?(type_name, "TypeGet") and not String.contains?(type_name, "Complex") and
             not String.contains?(type_name, "UnrankedTensor")
         end) do
-    type_name =
-      type_name |> String.trim_trailing("TypeGet")
+    type_name = type_name |> String.trim_trailing("TypeGet")
 
-    @doc """
-    calls `Beaver.MLIR.CAPI.#{f}/1` to get #{type_name} type
-    """
-    helper_name =
-      type_name |> Macro.underscore() |> String.replace("mem_ref", "memref")
+    @doc "calls `Beaver.MLIR.CAPI.#{f}/1` to get #{type_name} type"
+    helper_name = type_name |> Macro.underscore() |> String.replace("mem_ref", "memref")
 
     def unquote(:"#{helper_name}")(opts \\ []),
       do: Deferred.from_opts(opts, &unquote(f)(&1))
   end
 
-  @doc """
-  get the width of the int or float type
-  """
+  @doc "get the width of the int or float type"
   def width(%__MODULE__{} = type) do
     cond do
       integer?(type) -> mlirIntegerTypeGetWidth(type)

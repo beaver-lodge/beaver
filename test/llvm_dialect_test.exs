@@ -15,23 +15,18 @@ defmodule LLVMDialectTest do
     assert to_string(LLVM.pointer(3, ctx: ctx)) == "!llvm.ptr<3>"
     assert to_string(LLVM.array(Type.i8(), 4, ctx: ctx)) == "!llvm.array<4 x i8>"
 
-    assert to_string(LLVM.struct([Type.i32(), Type.f64()], packed: true, ctx: ctx)) ==
-             "!llvm.struct<packed (i32, f64)>"
+    assert to_string(LLVM.struct([Type.i32(), Type.f64()], packed: true, ctx: ctx)) == "!llvm.struct<packed (i32, f64)>"
 
-    assert to_string(LLVM.function_type([Type.i32()], [Type.i32()], ctx: ctx)) ==
-             "!llvm.func<i32 (i32)>"
+    assert to_string(LLVM.function_type([Type.i32()], [Type.i32()], ctx: ctx)) == "!llvm.func<i32 (i32)>"
 
-    assert to_string(LLVM.function_type([Type.i32()], [], vararg: true, ctx: ctx)) ==
-             "!llvm.func<void (i32, ...)>"
+    assert to_string(LLVM.function_type([Type.i32()], [], vararg: true, ctx: ctx)) == "!llvm.func<void (i32, ...)>"
   end
 
   test "builds validated ABI enum attributes", %{ctx: ctx} do
     assert to_string(LLVM.linkage(:internal, ctx: ctx)) == "#llvm.linkage<internal>"
     assert to_string(LLVM.calling_convention(:fast, ctx: ctx)) == "#llvm.cconv<fastcc>"
 
-    assert_raise ArgumentError, ~r/unsupported LLVM linkage/, fn ->
-      apply(LLVM, :linkage, [:local, [ctx: ctx]])
-    end
+    assert_raise ArgumentError, ~r/unsupported LLVM linkage/, fn -> apply(LLVM, :linkage, [:local, [ctx: ctx]]) end
   end
 
   test "defines, calls, and verifies an LLVM function", %{ctx: ctx} do
@@ -87,16 +82,8 @@ defmodule LLVMDialectTest do
     assert to_string(module) =~ "alignment = 4"
   end
 
-  test "builds compatible DICompileUnit attributes with an optional source language dialect", %{
-    ctx: ctx
-  } do
-    legacy =
-      LLVM.di_compile_unit(
-        ctx: ctx,
-        source_language: :c,
-        filename: "legacy.c",
-        producer: "Beaver"
-      )
+  test "builds compatible DICompileUnit attributes with an optional source language dialect", %{ctx: ctx} do
+    legacy = LLVM.di_compile_unit(ctx: ctx, source_language: :c, filename: "legacy.c", producer: "Beaver")
 
     assert to_string(legacy) =~ "sourceLanguage = DW_LANG_C"
     refute to_string(legacy) =~ "sourceLanguageDialect"
@@ -110,7 +97,6 @@ defmodule LLVMDialectTest do
     ]
 
     printed = LLVM.di_compile_unit(dialect_opts) |> to_string()
-
     assert printed =~ "DW_LANG_C"
     assert printed =~ "DW_LLVM_LANG_DIALECT_tile"
   end

@@ -1,7 +1,5 @@
 defmodule Beaver.Pattern.Native.Program do
-  @moduledoc """
-  A callback-free rewrite and dialect-conversion program executed natively in C++.
-  """
+  @moduledoc "A callback-free rewrite and dialect-conversion program executed natively in C++."
   alias Beaver.MLIR
   import Bitwise
 
@@ -41,8 +39,7 @@ defmodule Beaver.Pattern.Native.Program do
   defp check({kind, types}) when kind in [:operand_types, :result_types],
     do: type_checks(if(kind == :operand_types, do: 3, else: 4), types)
 
-  defp check({:same_operands, pairs}),
-    do: Enum.map(pairs, fn {a, b} -> {5, index!(a), nil, index!(b)} end)
+  defp check({:same_operands, pairs}), do: Enum.map(pairs, fn {a, b} -> {5, index!(a), nil, index!(b)} end)
 
   defp check(_), do: []
 
@@ -71,7 +68,6 @@ defmodule Beaver.Pattern.Native.Program do
         encode_convert_fn_flag!(Keyword.get(opts, :convert_function_type, false))
 
     attr_edits = Enum.map(Keyword.get(opts, :attributes, []), &encode_replace_attr!/1)
-
     result_edits = encode_replace_results!(Keyword.get(opts, :result_types, :preserve))
     [{3, operand_mode, target_op, flags}] ++ operand_edits ++ copy_edits ++ attr_edits ++ result_edits
   end
@@ -87,9 +83,7 @@ defmodule Beaver.Pattern.Native.Program do
     unless is_list(params), do: raise(ArgumentError, ":c_abi_call :params must be a list")
     stack_save = bool_flag(opts, :stack_save, true, 1)
 
-    decl_flags =
-      bool_flag(opts, :ensure_declaration, true, 1) |||
-        bool_flag(opts, :verify_declaration, false, 2)
+    decl_flags = bool_flag(opts, :ensure_declaration, true, 1) ||| bool_flag(opts, :verify_declaration, false, 2)
 
     callee = encode_callee(Keyword.get(opts, :callee))
     {ret_type_ref, ret_type_edits} = encode_c_abi_return!(Keyword.get(opts, :return_type))
@@ -119,8 +113,7 @@ defmodule Beaver.Pattern.Native.Program do
   defp encode_copy_attrs!(false), do: {0, []}
   defp encode_copy_attrs!(copy_all) when copy_all in [true, :all], do: {2, []}
 
-  defp encode_copy_attrs!({:except, names}) when is_list(names),
-    do: {8, Enum.map(names, &{13, 0, to_string(&1), nil})}
+  defp encode_copy_attrs!({:except, names}) when is_list(names), do: {8, Enum.map(names, &{13, 0, to_string(&1), nil})}
 
   defp encode_copy_attrs!(names) when is_list(names), do: {0, Enum.map(names, &{6, 0, to_string(&1), nil})}
 

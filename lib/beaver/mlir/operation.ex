@@ -86,9 +86,8 @@ defmodule Beaver.MLIR.Operation do
   @doc """
   Copies attributes from `src` to `dst`, returning `dst`.
 
-  Options:
-    * `:only` - list of attribute names (atoms or strings) to include.
-    * `:except` - list of attribute names (atoms or strings) to exclude.
+  Options: * `:only` - list of attribute names (atoms or strings) to include. * `:except` - list of attribute names
+  (atoms or strings) to exclude.
   """
   @spec copy_attributes(t(), t(), keyword()) :: t()
   def copy_attributes(%__MODULE__{} = src, %__MODULE__{} = dst, opts \\ []) when is_list(opts) do
@@ -110,8 +109,8 @@ defmodule Beaver.MLIR.Operation do
   def properties(%__MODULE__{} = op), do: op |> beaverOperationGetProperties() |> nil_if_null()
 
   @doc """
-  Replaces properties from their attribute representation, preserving discardable
-  attributes. Failed conversion leaves the original properties unchanged.
+  Replaces properties from their attribute representation, preserving discardable attributes. Failed conversion
+  leaves the original properties unchanged.
   """
   def put_properties(%__MODULE__{} = op, properties) do
     ctx = MLIR.context(op)
@@ -139,9 +138,8 @@ defmodule Beaver.MLIR.Operation do
   }
 
   @doc """
-  Tests structural equivalence, including locations, discardable attributes,
-  properties and commutative operand ordering unless ignored via options.
-  `ignore_commutativity: true` makes operand comparison order-sensitive,
+  Tests structural equivalence, including locations, discardable attributes, properties and commutative operand
+  ordering unless ignored via options. `ignore_commutativity: true` makes operand comparison order-sensitive,
   following MLIR's `IgnoreCommutativity` flag.
   """
   @spec equivalent?(__MODULE__.t(), __MODULE__.t(), equivalence_options()) :: boolean()
@@ -149,18 +147,16 @@ defmodule Beaver.MLIR.Operation do
     do: mlirOperationIsStructurallyEquivalent(lhs, rhs, encode_equivalence_options(opts)) |> Native.to_term()
 
   @doc """
-  Computes MLIR's structural hash using the options of `equivalent?/3`.
-  Equivalent operations have equal hashes; the converse is not guaranteed.
-  MLIR hashes external operands by identity and omits results and regions:
-  use this for bucketing before equivalence checks, not as a content digest.
+  Computes MLIR's structural hash using the options of `equivalent?/3`. Equivalent operations have equal hashes; the
+  converse is not guaranteed. MLIR hashes external operands by identity and omits results and regions: use this for
+  bucketing before equivalence checks, not as a content digest.
   """
   @spec structural_hash(__MODULE__.t(), equivalence_options()) :: non_neg_integer()
   def structural_hash(%__MODULE__{} = op, opts \\ []),
     do: beaverOperationStructuralHashValue(op, encode_equivalence_options(opts)) |> Native.to_term()
 
   defp encode_equivalence_options(opts) do
-    unless Keyword.keyword?(opts),
-      do: raise(ArgumentError, "operation equivalence options must be a keyword list")
+    unless Keyword.keyword?(opts), do: raise(ArgumentError, "operation equivalence options must be a keyword list")
 
     Enum.reduce(opts, 0, fn
       {key, enabled}, flags when is_map_key(@equivalence_flags, key) and is_boolean(enabled) ->
@@ -182,9 +178,8 @@ defmodule Beaver.MLIR.Operation do
   defp normalize_results(results), do: results
 
   @doc """
-  Evaluates SSA, returning the operation for zero results, the value for one,
-  or a list for multiple results. `{:op, types}` additionally returns the
-  operation, preserving a result list when `types` is a list.
+  Evaluates SSA, returning the operation for zero results, the value for one, or a list for multiple results. `{:op,
+  types}` additionally returns the operation, preserving a result list when `types` is a list.
   """
   def eval_ssa(%Beaver.SSA{results: types} = ssa) do
     ssa =
@@ -308,13 +303,11 @@ defmodule Beaver.MLIR.Operation do
 
   @doc "Returns the types of all SSA results produced by `op`."
   @spec result_types(t()) :: [MLIR.Type.t()]
-  def result_types(%__MODULE__{} = op),
-    do: op |> results() |> Enum.map(&MLIR.Value.type/1)
+  def result_types(%__MODULE__{} = op), do: op |> results() |> Enum.map(&MLIR.Value.type/1)
 
   @doc "Returns the types of all SSA operands consumed by `op`."
   @spec operand_types(t()) :: [MLIR.Type.t()]
-  def operand_types(%__MODULE__{} = op),
-    do: op |> operands() |> Enum.map(&MLIR.Value.type/1)
+  def operand_types(%__MODULE__{} = op), do: op |> operands() |> Enum.map(&MLIR.Value.type/1)
 
   @doc "Returns whether the operation is a terminator."
   def terminator?(%__MODULE__{} = op), do: MLIR.Trait.has?(op, :terminator)
@@ -324,6 +317,5 @@ defmodule Beaver.MLIR.Operation do
 
   def infer_type?(%__MODULE__{} = op), do: implements_interface?(op, mlirInferTypeOpInterfaceTypeID())
 
-  def infer_shaped?(%__MODULE__{} = op),
-    do: implements_interface?(op, mlirInferShapedTypeOpInterfaceTypeID())
+  def infer_shaped?(%__MODULE__{} = op), do: implements_interface?(op, mlirInferShapedTypeOpInterfaceTypeID())
 end

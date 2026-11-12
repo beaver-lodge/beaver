@@ -12,9 +12,7 @@ jit =
   |> Beaver.Composer.nested("func.func", "llvm-request-c-wrappers")
   |> Beaver.Composer.append("gpu-lower-to-nvvm-pipeline{cubin-format=fatbin}")
   |> Beaver.Composer.run!()
-  |> MLIR.ExecutionEngine.create!(
-    shared_lib_paths: Enum.map(libs, &Path.join([:code.priv_dir(:beaver), "lib", &1]))
-  )
+  |> MLIR.ExecutionEngine.create!(shared_lib_paths: Enum.map(libs, &Path.join([:code.priv_dir(:beaver), "lib", &1])))
 
 MLIR.ExecutionEngine.invoke!(jit, "main", [], nil, dirty: :cpu_bound)
 MLIR.ExecutionEngine.invoke!(jit, "main", [], nil, dirty: :io_bound)

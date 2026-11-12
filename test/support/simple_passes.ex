@@ -24,9 +24,7 @@ defmodule ErrInit do
   @moduledoc false
   use Beaver.MLIR.Pass, on: Beaver.MLIR.Dialect.Func.func()
 
-  def initialize(_ctx, nil) do
-    {:error, "new state used in cleanup"}
-  end
+  def initialize(_ctx, nil), do: {:error, "new state used in cleanup"}
 
   def destruct(state) do
     {:ok, _} = Agent.start_link(fn -> state end, name: __MODULE__)
@@ -38,9 +36,7 @@ defmodule IncorrectInitReturns do
   @moduledoc false
   use Beaver.MLIR.Pass, on: Beaver.MLIR.Dialect.Func.func()
 
-  def initialize(_ctx, nil) do
-    :some
-  end
+  def initialize(_ctx, nil), do: :some
 
   def destruct(state) do
     {:ok, _} = Agent.start_link(fn -> state end, name: __MODULE__)

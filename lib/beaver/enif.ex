@@ -40,9 +40,7 @@ defmodule Beaver.ENIF do
 
   defp wrap_mlir_t({ref, _size}) when is_reference(ref), do: %MLIR.Type{ref: ref}
 
-  @doc """
-  Insert external functions of ENIF into given MLIR block
-  """
+  @doc "Insert external functions of ENIF into given MLIR block"
   def declare_external_functions(ctx, block) do
     mlir ctx: ctx, ip: block do
       for {name, arg_types, ret_types} <- signatures(ctx) do
@@ -64,9 +62,7 @@ defmodule Beaver.ENIF do
   end
 
   @spec signatures(Context.t()) :: [Beaver.ENIF.Type.signature()]
-  @doc """
-  Retrieve the signatures of all available ENIF functions.
-  """
+  @doc "Retrieve the signatures of all available ENIF functions."
   def signatures(%Context{ref: ref}) do
     signatures = CAPI.beaver_raw_enif_signatures(ref)
 
@@ -76,9 +72,7 @@ defmodule Beaver.ENIF do
   end
 
   @spec signature(Context.t(), atom()) :: nil | Beaver.ENIF.Type.signature()
-  @doc """
-  Query the signature of an ENIF function.
-  """
+  @doc "Query the signature of an ENIF function."
   def signature(%Context{} = ctx, name) do
     for {^name, arg_types, ret_types} <- signatures(ctx) do
       {arg_types, ret_types}
@@ -107,9 +101,7 @@ defmodule Beaver.ENIF do
   for f <- CAPI.beaver_raw_enif_functions() do
     case to_string(f) do
       "enif_" <> op ->
-        @doc """
-        function call to [`#{f}`](#{@erlang_doc_enif_url}##{f})
-        """
+        @doc "function call to [`#{f}`](#{@erlang_doc_enif_url}##{f})"
         def unquote(String.to_atom(op))(ssa), do: call(unquote(f), ssa)
 
       _ ->
@@ -135,18 +127,16 @@ defmodule Beaver.ENIF do
 
   defdelegate functions(), to: CAPI, as: :beaver_raw_enif_functions
 
-  @doc """
-  Register ENIF functions in the given `Beaver.MLIR.ExecutionEngine`.
-  """
+  @doc "Register ENIF functions in the given `Beaver.MLIR.ExecutionEngine`."
   def register_symbols(%MLIR.ExecutionEngine{ref: ref} = e) do
     CAPI.beaver_raw_jit_register_enif(ref)
     e
   end
 
-  @spec invoke(MLIR.ExecutionEngine.t(), String.t(), list(), MLIR.ExecutionEngine.invoke_opts()) ::
-          term()
+  @spec invoke(MLIR.ExecutionEngine.t(), String.t(), list(), MLIR.ExecutionEngine.invoke_opts()) :: term()
   @doc """
-  Invoke a function in the given `Beaver.MLIR.ExecutionEngine` with arguments and return all have type `Beaver.ENIF.Type.term/1`.
+  Invoke a function in the given `Beaver.MLIR.ExecutionEngine` with arguments and return all have type
+  `Beaver.ENIF.Type.term/1`.
   """
   def invoke(%MLIR.ExecutionEngine{ref: ref}, function, arguments, opts \\ []) do
     case opts[:dirty] do

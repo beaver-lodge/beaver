@@ -1,9 +1,7 @@
 alias Beaver.MLIR.RewritePatternSet
 
 defmodule Beaver.ENIF.UseENIFAlloc do
-  @moduledoc """
-  Replace LLVM call ops of `malloc` and `free` with `enif_alloc` and `enif_free`.
-  """
+  @moduledoc "Replace LLVM call ops of `malloc` and `free` with `enif_alloc` and `enif_free`."
   use Beaver
   alias MLIR.Dialect.LLVM
   use MLIR.Pass, on: LLVM.func()
@@ -11,11 +9,8 @@ defmodule Beaver.ENIF.UseENIFAlloc do
 
   def initialize(ctx, nil) do
     patterns = [replace_alloc(), replace_free()]
-
     {set, pdl_mod} = RewritePatternSet.with_pdl_patterns(patterns, ctx: ctx)
-
     frozen_set = RewritePatternSet.freeze(set)
-
     {:ok, %{patterns: frozen_set, pdl_mod: pdl_mod, owning: true, ctx: ctx}}
   end
 

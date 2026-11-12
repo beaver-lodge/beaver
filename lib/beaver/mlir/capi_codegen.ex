@@ -37,8 +37,7 @@ defmodule Beaver.MLIR.CAPI.CodeGen do
   end
 
   @doc false
-  def declaration_manifest_path,
-    do: Application.app_dir(:beaver) |> Path.join("priv/capi_manifest.json")
+  def declaration_manifest_path, do: Application.app_dir(:beaver) |> Path.join("priv/capi_manifest.json")
 
   @impl Kinda.CodeGen
   def declaration_manifest, do: declaration_manifest_path() |> DeclarationManifest.load!()

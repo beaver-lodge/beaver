@@ -43,9 +43,7 @@ defmodule Beaver.MLIR.Target.LLVMIRTest do
     assert {:error, diagnostics} = LLVMIR.translate(module)
     assert diagnostics != []
 
-    assert_raise ArgumentError, ~r/failed to translate module to LLVM IR/, fn ->
-      LLVMIR.translate!(module)
-    end
+    assert_raise ArgumentError, ~r/failed to translate module to LLVM IR/, fn -> LLVMIR.translate!(module) end
   end
 
   test "can repeatedly translate the same module", %{ctx: ctx} do
@@ -67,7 +65,6 @@ defmodule Beaver.MLIR.Target.LLVMIRTest do
     assert {:ok, ptx} = LLVMIR.compile_to_ptx(llvm_ir, cpu: "sm_80")
     assert ptx =~ ".target sm_80"
     assert ptx =~ "kernel"
-
     assert {:error, message} = LLVMIR.compile_to_ptx("not LLVM IR")
     assert message != ""
   end

@@ -4,8 +4,8 @@ defmodule Beaver.MLIR.ConversionPattern do
   @moduledoc """
   Callback-backed dialect conversion patterns.
 
-  `add/5` creates a pattern and immediately transfers its ownership to the
-  rewrite pattern set, so a standalone native pattern cannot be leaked.
+  `add/5` creates a pattern and immediately transfers its ownership to the rewrite pattern set, so a standalone
+  native pattern cannot be leaked.
   """
 
   use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
@@ -33,13 +33,10 @@ defmodule Beaver.MLIR.ConversionPattern do
     end
 
     %MLIR.Context{ref: context_ref} = Keyword.get(opts, :ctx) || raise ArgumentError, "option :ctx is required"
-
     benefit = Keyword.get(opts, :benefit, 1)
     one_to_n = Keyword.get(opts, :one_to_n, false)
     timeout_ms = Beaver.Execution.callback_timeout!(opts)
-
     unless is_integer(benefit) and benefit >= 0, do: raise(ArgumentError, ":benefit must be a non-negative integer")
-
     unless is_boolean(one_to_n), do: raise(ArgumentError, ":one_to_n must be boolean")
 
     :ok =
@@ -60,8 +57,7 @@ defmodule Beaver.MLIR.ConversionPattern do
   @doc false
   @spec unwrap_callback(term()) :: {String.t() | nil, callback()}
   def unwrap_callback({@callback_envelope, root_name, callback})
-      when is_binary(root_name) and is_function(callback, 3),
-      do: {root_name, callback}
+      when is_binary(root_name) and is_function(callback, 3), do: {root_name, callback}
 
   def unwrap_callback(callback) when is_function(callback, 3), do: {nil, callback}
 end

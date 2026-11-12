@@ -12,9 +12,7 @@ defmodule Mix.Tasks.Beaver.BuildTriton do
       opts[:source] || System.get_env("TRITON_SOURCE_DIR") || Mix.raise("Triton source required")
 
     # A narrow API migration for the pinned Triton source, applied idempotently.
-    case System.cmd("git", ["-C", source, "apply", "--reverse", "--check", @patch],
-           stderr_to_stdout: true
-         ) do
+    case System.cmd("git", ["-C", source, "apply", "--reverse", "--check", @patch], stderr_to_stdout: true) do
       {_, 0} -> :ok
       _ -> Beaver.LLVM.run!("git", ["-C", source, "apply", @patch])
     end
@@ -33,9 +31,7 @@ defmodule Mix.Tasks.Beaver.BuildTriton do
 
     File.write!(
       path,
-      JSON.encode!(
-        Map.merge(metadata, %{"llvm_ref" => llvm_ref, "triton_ref" => String.trim(triton_ref)})
-      )
+      JSON.encode!(Map.merge(metadata, %{"llvm_ref" => llvm_ref, "triton_ref" => String.trim(triton_ref)}))
     )
   end
 end

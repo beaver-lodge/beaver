@@ -2,10 +2,9 @@ alias Beaver.MLIR.Context
 
 defmodule Beaver.Deferred do
   @moduledoc """
-  Context-bound MLIR construction. Builders return `%Beaver.Deferred{}` without
-  `:ctx`, or concrete entities with it. Unlike ordinary one-argument callbacks,
-  deferred values can be materialized by `resolve/2`, which also checks the
-  context ownership of concrete entities.
+  Context-bound MLIR construction. Builders return `%Beaver.Deferred{}` without `:ctx`, or concrete entities with
+  it. Unlike ordinary one-argument callbacks, deferred values can be materialized by `resolve/2`, which also checks
+  the context ownership of concrete entities.
   """
   alias Beaver.MLIR
 
@@ -25,8 +24,8 @@ defmodule Beaver.Deferred do
   def defer(resolver) when is_function(resolver, 1), do: %__MODULE__{resolver: resolver}
 
   @doc """
-  Runs `resolver` with `:ctx`, or defers it when that option is absent.
-  Explicit `ctx: nil` and other non-context values are rejected.
+  Runs `resolver` with `:ctx`, or defers it when that option is absent. Explicit `ctx: nil` and other non-context
+  values are rejected.
   """
   @spec from_opts(opts(), (context_arg() -> value)) :: contextual(value) when value: var
   def from_opts(opts, resolver) when is_list(opts) and is_function(resolver, 1) do
@@ -57,9 +56,8 @@ defmodule Beaver.Deferred do
   end
 
   @doc """
-  Resolves deferred values in `ctx` and checks ownership of concrete entities.
-  Resolver successes `{:ok, value}` are unwrapped; `{:error, reason}` raises
-  `ArgumentError`.
+  Resolves deferred values in `ctx` and checks ownership of concrete entities. Resolver successes `{:ok, value}` are
+  unwrapped; `{:error, reason}` raises `ArgumentError`.
   """
   @spec resolve(contextual(value), context_arg()) :: value when value: var
   def resolve(resolver, %Context{}) when is_function(resolver, 1),

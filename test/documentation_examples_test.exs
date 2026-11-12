@@ -16,13 +16,11 @@ defmodule DocumentationExamplesTest do
   test "blocks guide SSA DSL example", %{ctx: ctx} do
     result = Beaver.Dummy.documented_control_flow(ctx)
 
-    try do
+    MLIR.Module.with_module(result, fn _ ->
       ir = result |> MLIR.verify!() |> MLIR.to_string()
       assert ir =~ "func.func @some_func"
       assert ir =~ "cf.cond_br"
-    after
-      MLIR.Module.destroy(result)
-    end
+    end)
   end
 
   test "passes guide definition and pipeline run together" do
@@ -40,8 +38,6 @@ defmodule DocumentationExamplesTest do
   end
 
   defp run!(code, document) do
-    capture_io(fn ->
-      assert {:ok, _binding} = Code.eval_string(code, [], file: document)
-    end)
+    capture_io(fn -> assert {:ok, _binding} = Code.eval_string(code, [], file: document) end)
   end
 end

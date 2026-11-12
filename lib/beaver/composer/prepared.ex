@@ -1,8 +1,7 @@
 defmodule Beaver.Composer.Prepared do
   @moduledoc """
-  An immutable, context-bound BEAM pipeline template. Callback resolution and
-  nesting checks are reused; each run constructs, initializes and destroys its
-  own pass state and native managers. The context must outlive every run.
+  An immutable, context-bound BEAM pipeline template. Callback resolution and nesting checks are reused; each run
+  constructs, initializes and destroys its own pass state and native managers. The context must outlive every run.
   Separate runs may execute concurrently on independently owned IR.
   """
   @enforce_keys [:context, :root, :stages]

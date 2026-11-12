@@ -3,31 +3,15 @@ defmodule AllCallbacks do
   alias Beaver.MLIR
   use Beaver.MLIR.Pass, on: "func.func"
 
-  @counter %{
-    destruct: 0,
-    initialize: 0,
-    clone: 0,
-    run: 0
-  }
+  @counter %{destruct: 0, initialize: 0, clone: 0, run: 0}
   def initialize(_ctx, nil) do
-    {:ok, pid} =
-      Agent.start_link(
-        fn ->
-          %{@counter | initialize: 1}
-        end,
-        name: __MODULE__
-      )
+    {:ok, pid} = Agent.start_link(fn -> %{@counter | initialize: 1} end, name: __MODULE__)
 
     {:ok, {:init, pid}}
   end
 
   def initialize(_ctx, {:init, pid}) do
-    Agent.update(
-      pid,
-      fn state ->
-        update_in(state.initialize, &(&1 + 1))
-      end
-    )
+    Agent.update(pid, fn state -> update_in(state.initialize, &(&1 + 1)) end)
 
     {:ok, {:re_init, pid}}
   end
@@ -43,15 +27,9 @@ defmodule AllCallbacks do
     state
   end
 
-  def destruct({:clone, pid}) do
-    Agent.update(pid, fn state -> update_in(state.destruct, &(&1 + 1)) end)
-  end
+  def destruct({:clone, pid}), do: Agent.update(pid, fn state -> update_in(state.destruct, &(&1 + 1)) end)
 
-  def destruct({:init, pid}) do
-    Agent.update(pid, fn state -> update_in(state.destruct, &(&1 + 1)) end)
-  end
+  def destruct({:init, pid}), do: Agent.update(pid, fn state -> update_in(state.destruct, &(&1 + 1)) end)
 
-  def destruct({:re_init, pid}) do
-    Agent.update(pid, fn state -> update_in(state.destruct, &(&1 + 1)) end)
-  end
+  def destruct({:re_init, pid}), do: Agent.update(pid, fn state -> update_in(state.destruct, &(&1 + 1)) end)
 end

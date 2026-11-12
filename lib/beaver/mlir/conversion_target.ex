@@ -4,9 +4,8 @@ defmodule Beaver.MLIR.ConversionTarget do
   @moduledoc """
   An owning, callback-safe MLIR dialect conversion target.
 
-  Static and dynamic legality rules are composed by MLIR. Dynamic callbacks
-  run in the process that registered them while the conversion itself runs on
-  the context's native worker pool.
+  Static and dynamic legality rules are composed by MLIR. Dynamic callbacks run in the process that registered them
+  while the conversion itself runs on the context's native worker pool.
   """
 
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native, fields: [registration: nil, timeout_ms: 30_000]
@@ -24,9 +23,7 @@ defmodule Beaver.MLIR.ConversionTarget do
     end
 
     timeout_ms = Beaver.Execution.callback_timeout!(opts)
-
     {:managed_conversion_target, target_term, registration} = CAPI.beaver_raw_conversion_target_create(context_ref)
-
     %__MODULE__{ref: ref} = Beaver.Native.check!(target_term)
     %__MODULE__{ref: ref, registration: registration, timeout_ms: timeout_ms}
   end
@@ -60,17 +57,14 @@ defmodule Beaver.MLIR.ConversionTarget do
   end
 
   @spec mark_unknown_dynamically_legal(t(), legality_callback()) :: t()
-  def mark_unknown_dynamically_legal(%__MODULE__{} = target, callback)
-      when is_function(callback, 1) do
-    :ok =
-      CAPI.beaver_raw_conversion_target_mark_unknown_dynamic(target.registration, callback, target.timeout_ms)
+  def mark_unknown_dynamically_legal(%__MODULE__{} = target, callback) when is_function(callback, 1) do
+    :ok = CAPI.beaver_raw_conversion_target_mark_unknown_dynamic(target.registration, callback, target.timeout_ms)
 
     target
   end
 
   @spec destroy(t()) :: :ok
-  def destroy(%__MODULE__{registration: registration}),
-    do: CAPI.beaver_raw_conversion_target_destroy(registration)
+  def destroy(%__MODULE__{registration: registration}), do: CAPI.beaver_raw_conversion_target_destroy(registration)
 
   @spec with(Context.t(), keyword(), (t() -> result)) :: result when result: var
   def with(ctx, opts \\ [], fun) when is_function(fun, 1),

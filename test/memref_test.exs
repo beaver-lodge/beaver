@@ -5,17 +5,12 @@ defmodule MemRefTest do
   @moduletag :smoke
 
   test "dynamic stride or offset" do
-    assert Beaver.MLIR.ShapedType.dynamic_stride_or_offset?(
-             Beaver.MLIR.ShapedType.dynamic_stride_or_offset()
-           )
+    assert Beaver.MLIR.ShapedType.dynamic_stride_or_offset?(Beaver.MLIR.ShapedType.dynamic_stride_or_offset())
 
-    refute Beaver.MLIR.ShapedType.static_stride_or_offset?(
-             Beaver.MLIR.ShapedType.dynamic_stride_or_offset()
-           )
+    refute Beaver.MLIR.ShapedType.static_stride_or_offset?(Beaver.MLIR.ShapedType.dynamic_stride_or_offset())
 
     refute Beaver.MLIR.ShapedType.dynamic_stride_or_offset?(1)
     assert Beaver.MLIR.ShapedType.static_stride_or_offset?(1)
-
     assert Beaver.MLIR.ShapedType.dynamic_stride_or_offset?(:dynamic)
     refute Beaver.MLIR.ShapedType.static_stride_or_offset?(:dynamic)
   end
@@ -25,20 +20,15 @@ defmodule MemRefTest do
       ~t{memref<*xbf16>} |> Beaver.Deferred.resolve(ctx) |> MemRef.layout()
     end
 
-    assert_raise ArgumentError, "only ranked memref has layout", fn ->
-      MLIR.Type.index(ctx: ctx) |> MemRef.layout()
-    end
+    assert_raise ArgumentError, "only ranked memref has layout", fn -> MLIR.Type.index(ctx: ctx) |> MemRef.layout() end
 
     assert memref_type = ~t{memref<128xbf16>} |> Beaver.Deferred.resolve(ctx)
     assert MLIR.ShapedType.static_dim?(memref_type, 0)
     refute MLIR.ShapedType.dynamic_dim?(memref_type, 0)
     assert 128 = MLIR.ShapedType.dim_size(memref_type, 0)
-
     assert MemRef.memory_space(memref_type) == nil
-
     assert layout = MemRef.layout(memref_type)
     assert to_string(layout) == "affine_map<(d0) -> (d0)>"
-
     memref_type = ~t{memref<128x?xbf16>} |> Beaver.Deferred.resolve(ctx)
     assert :dynamic = MLIR.ShapedType.dim_size(memref_type, 1)
     assert 2 = MLIR.ShapedType.rank(memref_type)
@@ -68,15 +58,11 @@ defmodule MemRefTest do
   end
 
   test "num of elements of a shaped type", %{ctx: ctx} do
-    assert 6 =
-             ~t{memref<2x3xf32>} |> Beaver.Deferred.resolve(ctx) |> MLIR.ShapedType.num_elements()
+    assert 6 = ~t{memref<2x3xf32>} |> Beaver.Deferred.resolve(ctx) |> MLIR.ShapedType.num_elements()
 
-    assert 0 =
-             ~t{memref<0x3xf32>} |> Beaver.Deferred.resolve(ctx) |> MLIR.ShapedType.num_elements()
+    assert 0 = ~t{memref<0x3xf32>} |> Beaver.Deferred.resolve(ctx) |> MLIR.ShapedType.num_elements()
 
-    assert_raise ArgumentError, "not a shaped type", fn ->
-      MLIR.ShapedType.num_elements(MLIR.Type.index(ctx: ctx))
-    end
+    assert_raise ArgumentError, "not a shaped type", fn -> MLIR.ShapedType.num_elements(MLIR.Type.index(ctx: ctx)) end
 
     assert_raise ArgumentError, "cannot get element count of dynamic shaped type", fn ->
       ~t{memref<*xf32>} |> Beaver.Deferred.resolve(ctx) |> MLIR.ShapedType.num_elements()
@@ -93,25 +79,20 @@ defmodule MemRefTest do
     assert MLIR.equal?(memref_type, ~t{memref<?xi8>} |> Beaver.Deferred.resolve(ctx))
     memref_type_from_api = MLIR.Type.memref!([:dynamic], MLIR.Type.i8(ctx: ctx))
     assert MLIR.equal?(memref_type, memref_type_from_api)
-
     assert memref_type_strided = ~t{memref<?xi8, strided<[1]>>} |> Beaver.Deferred.resolve(ctx)
     assert {[1], 0} = MemRef.strides_and_offset(memref_type_strided)
     refute MLIR.equal?(memref_type_strided, memref_type)
 
-    assert memref_type_strided_offset =
-             ~t{memref<?xi8, strided<[1], offset: 0>>} |> Beaver.Deferred.resolve(ctx)
+    assert memref_type_strided_offset = ~t{memref<?xi8, strided<[1], offset: 0>>} |> Beaver.Deferred.resolve(ctx)
 
     assert {[1], 0} = MemRef.strides_and_offset(memref_type_strided_offset)
     assert MLIR.equal?(memref_type_strided_offset, memref_type_strided)
     refute MLIR.equal?(memref_type_strided_offset, memref_type)
 
     memref_type_strided_offset_from_api =
-      MLIR.Type.memref!([:dynamic], MLIR.Type.i8(ctx: ctx),
-        layout: MLIR.Attribute.strided_layout(0, [1], ctx: ctx)
-      )
+      MLIR.Type.memref!([:dynamic], MLIR.Type.i8(ctx: ctx), layout: MLIR.Attribute.strided_layout(0, [1], ctx: ctx))
 
     assert MLIR.equal?(memref_type_strided_offset, memref_type_strided_offset_from_api)
-
     memref_type_strided = ~t{memref<16xi8, strided<[2]>>} |> Beaver.Deferred.resolve(ctx)
     assert 16 = memref_type_strided |> MLIR.ShapedType.num_elements()
   end

@@ -17,31 +17,21 @@ defmodule TraitTest do
       end
 
     refute MLIR.Operation.terminator?(MLIR.Operation.from_module(m))
-
     ops = MLIR.Module.body(m) |> Beaver.Walker.operations()
     assert MLIR.Operation.terminator?(ops[0])
     assert MLIR.Trait.has?(ops[0], :terminator)
   end
 
   test "attaches and queries built-in dynamic traits idempotently", %{ctx: ctx} do
-    assert CompleteSlang
-           |> then(&Beaver.Slang.load(ctx, &1))
-           |> MLIR.LogicalResult.success?()
+    assert CompleteSlang |> then(&Beaver.Slang.load(ctx, &1)) |> MLIR.LogicalResult.success?()
 
     assert MLIR.Trait.has?(ctx, "complete_slang.yield", :terminator)
     assert MLIR.Trait.has?(ctx, "complete_slang.scope", :isolated_from_above)
     assert MLIR.Trait.has?(ctx, "complete_slang.scope", :no_terminator)
 
-    assert CompleteSlang
-           |> then(&Beaver.Slang.load(ctx, &1))
-           |> MLIR.LogicalResult.success?()
+    assert CompleteSlang |> then(&Beaver.Slang.load(ctx, &1)) |> MLIR.LogicalResult.success?()
 
-    assert :ok =
-             MLIR.Trait.attach_all(
-               ctx,
-               CompleteSlang.__slang_dialect_name__(),
-               CompleteSlang.__slang_traits__()
-             )
+    assert :ok = MLIR.Trait.attach_all(ctx, CompleteSlang.__slang_dialect_name__(), CompleteSlang.__slang_traits__())
 
     assert :ok = MLIR.Trait.attach(ctx, "complete_slang.yield", :terminator)
   end
@@ -53,8 +43,6 @@ defmodule TraitTest do
       MLIR.Trait.normalize!([:terminator, :no_terminator])
     end
 
-    assert_raise ArgumentError, ~r/unsupported Slang traits/, fn ->
-      MLIR.Trait.normalize!([:unknown])
-    end
+    assert_raise ArgumentError, ~r/unsupported Slang traits/, fn -> MLIR.Trait.normalize!([:unknown]) end
   end
 end

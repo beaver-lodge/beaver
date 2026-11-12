@@ -50,9 +50,7 @@ defmodule Beaver.MLIR.Transform.Schedule do
   defp source_bytes(%Operation{} = op) do
     case enclosing_module(op) do
       nil ->
-        text =
-          "module attributes {transform.with_named_sequence} {\n" <>
-            MLIR.to_string(op, generic: false) <> "\n}"
+        text = "module attributes {transform.with_named_sequence} {\n" <> MLIR.to_string(op, generic: false) <> "\n}"
 
         {:ok, text}
 

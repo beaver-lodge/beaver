@@ -27,9 +27,7 @@ defmodule Beaver.MLIR.ODS.Dump do
     :ok
   end
 
-  @doc """
-  Lookup an operation by name (e.g. "affine.for").
-  """
+  @doc "Lookup an operation by name (e.g. \"affine.for\")."
   def lookup(op) do
     case Map.fetch(operations(), op) do
       {:ok, found} -> {:ok, found}
@@ -104,17 +102,11 @@ defmodule Beaver.MLIR.ODS.Dump do
 
   def gen_doc(%{"name" => name} = op) do
     summary = op["summary"]
-
     description = op["description"]
-
     description = Regex.replace(~r{\(\.\./(.+?)\.md}, description, "(https://mlir.llvm.org/docs/\\1")
-
     description = Regex.replace(~r{\(\.\./(.+?)\/\#}, description, "(https://mlir.llvm.org/docs/\\1")
-
     description = Regex.replace(~r{\((.+?)\.md}, description, "(https://mlir.llvm.org/docs/Dialects/\\1")
-
     description = description |> String.replace("(Builtin/#", "(https://mlir.llvm.org/docs/Dialects/Builtin/#")
-
     summary = if summary != "", do: " - #{summary}", else: ""
 
     description =
@@ -133,10 +125,7 @@ defmodule Beaver.MLIR.ODS.Dump do
 
     #{result_type_inference}
     """ <>
-      gen_if_exist(op, "attributes") <>
-      gen_if_exist(op, "operands") <>
-      gen_if_exist(op, "results") <>
-      description
+      gen_if_exist(op, "attributes") <> gen_if_exist(op, "operands") <> gen_if_exist(op, "results") <> description
   end
 
   def gen_doc(op) do

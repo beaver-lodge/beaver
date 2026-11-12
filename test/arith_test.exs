@@ -13,8 +13,7 @@ defmodule ArithTest do
         for p <- [:eq, :ne, :slt, :sle, :sgt, :sge, :ult, :ule, :ugt, :uge] do
           Func.func _(
                       function_type: Type.function([Type.i32(), Type.i32()], []),
-                      sym_name:
-                        Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                      sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
                     ) do
             region do
               block _(a >>> Type.i32(), b >>> Type.i32()) do
@@ -36,15 +35,11 @@ defmodule ArithTest do
         module do
           Func.func _(
                       function_type: Type.function([Type.i32(), Type.i32()], []),
-                      sym_name:
-                        Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                      sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
                     ) do
             region do
               block _(a >>> Type.i32(), b >>> Type.i32()) do
-                Arith.cmpi(a, b,
-                  predicate: Arith.operator_to_predicate(unquote(p), unquote(signed))
-                ) >>>
-                  Type.i1()
+                Arith.cmpi(a, b, predicate: Arith.operator_to_predicate(unquote(p), unquote(signed))) >>> Type.i1()
 
                 Func.return() >>> []
               end
@@ -59,24 +54,7 @@ defmodule ArithTest do
   test "float predicates", %{ctx: ctx} do
     mlir ctx: ctx do
       module do
-        for p <- [
-              false,
-              :oeq,
-              :ogt,
-              :oge,
-              :olt,
-              :ole,
-              :one,
-              :ord,
-              :ueq,
-              :ugt,
-              :uge,
-              :ult,
-              :ule,
-              :une,
-              :uno,
-              true
-            ] do
+        for p <- [false, :oeq, :ogt, :oge, :olt, :ole, :one, :ord, :ueq, :ugt, :uge, :ult, :ule, :une, :uno, true] do
           f =
             Func.func _(
                         function_type: Type.function([Type.f32(), Type.f32()], []),

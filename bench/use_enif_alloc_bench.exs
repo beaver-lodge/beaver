@@ -90,8 +90,7 @@ defmodule EnifBench do
         plan = EnifBenchPlan.plan()
 
         jobs = %{
-          "reused PDL / per-function apply" =>
-            &each_function(&1, fn op -> UseENIFAlloc.run(op, state) end),
+          "reused PDL / per-function apply" => &each_function(&1, fn op -> UseENIFAlloc.run(op, state) end),
           "plan / materialize per module" => &MLIR.Conversion.Plan.run!(plan, &1),
           "PDL / rebuild per function" =>
             &each_function(&1, fn op ->

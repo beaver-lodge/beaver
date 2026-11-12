@@ -4,9 +4,8 @@ defmodule Beaver.MLIR.IRRewriter do
   @moduledoc """
   Owns standalone MLIR IR rewriters.
 
-  Use `with_rewriter/2` for imperative transformations outside a rewrite
-  pattern. The rewriter is always destroyed when the callback returns, raises,
-  throws, or exits.
+  Use `with_rewriter/2` for imperative transformations outside a rewrite pattern. The rewriter is always destroyed
+  when the callback returns, raises, throws, or exits.
   """
 
   alias Beaver.MLIR

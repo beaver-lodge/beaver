@@ -1,9 +1,7 @@
 alias Beaver.MLIR.{CAPI, LogicalResult, Operation, RewritePatternSet}
 
 defmodule Beaver.MLIR.Rewrite do
-  @moduledoc """
-  This module defines functions working with MLIR rewrite patterns and pattern sets.
-  """
+  @moduledoc "This module defines functions working with MLIR rewrite patterns and pattern sets."
   alias Beaver.MLIR
   require Logger
 
@@ -11,8 +9,7 @@ defmodule Beaver.MLIR.Rewrite do
   @type rewrite_ir() :: MLIR.Module.t() | Operation.t()
 
   @typedoc "Processed MLIR diagnostic tree emitted during rewrite application."
-  @type diagnostic() ::
-          {severity :: atom(), location :: String.t(), message :: String.t(), nested :: [diagnostic()]}
+  @type diagnostic() :: {severity :: atom(), location :: String.t(), message :: String.t(), nested :: [diagnostic()]}
 
   @type diagnostics() :: [diagnostic()]
 
@@ -54,8 +51,7 @@ defmodule Beaver.MLIR.Rewrite do
         fun
       )
 
-  @spec with_default_config(config_input(), (config_handle() -> result)) :: result
-        when result: var
+  @spec with_default_config(config_input(), (config_handle() -> result)) :: result when result: var
   def with_default_config(configure, fun)
       when (is_nil(configure) or is_list(configure) or is_function(configure, 1)) and
              is_function(fun, 1) do
@@ -94,8 +90,7 @@ defmodule Beaver.MLIR.Rewrite do
   def to_config_callback(callback) when is_function(callback, 1), do: callback
 
   def to_config_callback(opts) do
-    unless Keyword.keyword?(opts),
-      do: raise(ArgumentError, "rewrite config opts must be a keyword list")
+    unless Keyword.keyword?(opts), do: raise(ArgumentError, "rewrite config opts must be a keyword list")
 
     fn cfg ->
       Enum.each(opts, fn
@@ -127,22 +122,14 @@ defmodule Beaver.MLIR.Rewrite do
     end)
   end
 
-  def apply_patterns(ir, patterns, configure, opts)
-      when is_list(patterns) or is_struct(patterns, RewritePatternSet) do
-    with_patterns(
-      MLIR.context(ir),
-      patterns,
-      fn frozen ->
-        apply_patterns(ir, frozen, configure, opts)
-      end,
-      opts
-    )
+  def apply_patterns(ir, patterns, configure, opts) when is_list(patterns) or is_struct(patterns, RewritePatternSet) do
+    with_patterns(MLIR.context(ir), patterns, fn frozen -> apply_patterns(ir, frozen, configure, opts) end, opts)
   end
 
   @doc """
-  Prepares patterns once for repeated runs on independently owned IR. Native
-  programs are stateless and can run concurrently. Callback-backed frozen sets
-  retain their callback owner's state; prepare a fresh set for isolated state.
+  Prepares patterns once for repeated runs on independently owned IR. Native programs are stateless and can run
+  concurrently. Callback-backed frozen sets retain their callback owner's state; prepare a fresh set for isolated
+  state.
   """
   def with_patterns(ctx, patterns, fun, opts \\ []) do
     profile = opts[:profile]
@@ -176,8 +163,6 @@ defmodule Beaver.MLIR.Rewrite do
 
     Logger.flush()
 
-    if LogicalResult.success?(result),
-      do: ir,
-      else: raise("pattern application failed to converge")
+    if LogicalResult.success?(result), do: ir, else: raise("pattern application failed to converge")
   end
 end

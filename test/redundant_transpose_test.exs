@@ -12,27 +12,16 @@ defmodule RedundantTransposeTest do
     ir =
       mlir ctx: ctx do
         module do
-          Func.func some_func(
-                      function_type:
-                        Type.function([TransposeHelper.tensor_t()], [TransposeHelper.tensor_t()])
-                    ) do
+          Func.func some_func(function_type: Type.function([TransposeHelper.tensor_t()], [TransposeHelper.tensor_t()])) do
             region do
               block _bb_entry(arg0 >>> Type.unranked_tensor(Type.f32())) do
-                t =
-                  TOSA.transpose(arg0, perms: TransposeHelper.perms_t_attr()) >>>
-                    TransposeHelper.tensor_t()
+                t = TOSA.transpose(arg0, perms: TransposeHelper.perms_t_attr()) >>> TransposeHelper.tensor_t()
 
-                t =
-                  TOSA.transpose(t, perms: TransposeHelper.perms_t_attr()) >>>
-                    TransposeHelper.tensor_t()
+                t = TOSA.transpose(t, perms: TransposeHelper.perms_t_attr()) >>> TransposeHelper.tensor_t()
 
-                t =
-                  TOSA.transpose(t, perms: TransposeHelper.perms_t_attr()) >>>
-                    TransposeHelper.tensor_t()
+                t = TOSA.transpose(t, perms: TransposeHelper.perms_t_attr()) >>> TransposeHelper.tensor_t()
 
-                t =
-                  TOSA.transpose(t, perms: TransposeHelper.perms_t_attr()) >>>
-                    TransposeHelper.tensor_t()
+                t = TOSA.transpose(t, perms: TransposeHelper.perms_t_attr()) >>> TransposeHelper.tensor_t()
 
                 Func.return(t) >>> []
               end
@@ -44,9 +33,7 @@ defmodule RedundantTransposeTest do
 
     ir_string =
       ir
-      |> Beaver.Composer.nested(Func.func(), [
-        DeduplicateTransposePass
-      ])
+      |> Beaver.Composer.nested(Func.func(), [DeduplicateTransposePass])
       |> canonicalize
       |> Beaver.Composer.run!()
       |> MLIR.to_string()

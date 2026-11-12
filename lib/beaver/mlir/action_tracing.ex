@@ -44,8 +44,8 @@ defmodule Beaver.MLIR.ActionTracing do
   def global_registrar_child_specs, do: [{Registry, keys: :duplicate, name: @registry}]
 
   @doc """
-  Attaches a session to `context`. Call `drain/1` periodically (or supply
-  `:drain_interval_ms`) to receive events, and `detach/1` when done.
+  Attaches a session to `context`. Call `drain/1` periodically (or supply `:drain_interval_ms`) to receive events,
+  and `detach/1` when done.
   """
   @spec attach(Context.t(), keyword()) :: Session.t()
   def attach(%Context{} = ctx, opts \\ []) do
@@ -72,10 +72,7 @@ defmodule Beaver.MLIR.ActionTracing do
     struct!(Session, Map.put(fields, :pid, pid))
   end
 
-  @doc """
-  Drains pending action events from the session and emits telemetry.
-  Returns the list of decoded events.
-  """
+  @doc "Drains pending action events from the session and emits telemetry. Returns the list of decoded events."
   @spec drain(Session.t() | pid()) :: [map()]
   def drain(%Session{} = session), do: drain(session.pid)
   def drain(pid) when is_pid(pid), do: GenServer.call(pid, :drain, 30_000)
@@ -91,9 +88,7 @@ defmodule Beaver.MLIR.ActionTracing do
   @impl true
   def init(state) do
     {:ok, _} = Registry.register(@registry, state.context.ref, :attachment)
-
     if state.drain_interval_ms, do: Process.send_after(self(), :drain_timer, state.drain_interval_ms)
-
     {:ok, state}
   end
 

@@ -2,9 +2,7 @@ alias Beaver.MLIR.{CAPI, Operation, RewriterBase, Value}
 alias Beaver.Native
 
 defmodule Beaver.MLIR.ConversionPatternRewriter do
-  @moduledoc """
-  A conversion-aware pattern rewriter, including 1:N operation replacement.
-  """
+  @moduledoc "A conversion-aware pattern rewriter, including 1:N operation replacement."
 
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
 
@@ -21,9 +19,8 @@ defmodule Beaver.MLIR.ConversionPatternRewriter do
   @doc """
   Replaces an operation through the conversion rewriter.
 
-  Unlike `RewriterBase.replace_op/3`, the replacement types may differ from
-  the original result types because the pattern's type converter defines the
-  legal mapping.
+  Unlike `RewriterBase.replace_op/3`, the replacement types may differ from the original result types because the
+  pattern's type converter defines the legal mapping.
   """
   def replace_op(%__MODULE__{} = rewriter, %Operation{} = op, replacement) do
     values =
@@ -41,8 +38,7 @@ defmodule Beaver.MLIR.ConversionPatternRewriter do
   end
 
   @spec replace_op_with_multiple(t(), Operation.t(), [[Value.t()]]) :: :ok
-  def replace_op_with_multiple(%__MODULE__{} = rewriter, %Operation{} = op, ranges)
-      when is_list(ranges) do
+  def replace_op_with_multiple(%__MODULE__{} = rewriter, %Operation{} = op, ranges) when is_list(ranges) do
     unless Enum.all?(ranges, fn range -> is_list(range) and Enum.all?(range, &match?(%Value{}, &1)) end),
       do: raise(ArgumentError, "1:N replacements must be lists of MLIR values")
 

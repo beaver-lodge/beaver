@@ -2,12 +2,12 @@ alias Beaver.MLIR.{ConversionTarget, RewritePatternSet, Type, TypeConverter}
 
 defmodule Beaver.MLIR.Conversion.Plan do
   @moduledoc """
-  Reusable declarations for dialect conversion: legality rules, type conversions,
-  materializations and patterns. Plans hold no native handles and work across contexts.
-  Each run creates fresh resources and destroys patterns before converters and targets.
+  Reusable declarations for dialect conversion: legality rules, type conversions, materializations and patterns.
+  Plans hold no native handles and work across contexts. Each run creates fresh resources and destroys patterns
+  before converters and targets.
 
-  `declaration/1` omits callback bodies and runtime state. Supply callback `:version`
-  metadata for reproducible declarations; absent versions are `:unversioned`.
+  `declaration/1` omits callback bodies and runtime state. Supply callback `:version` metadata for reproducible
+  declarations; absent versions are `:unversioned`.
   """
 
   alias Beaver.{MLIR, Native}
@@ -32,9 +32,8 @@ defmodule Beaver.MLIR.Conversion.Plan do
         }
 
   @doc """
-  Creates a plan with `:mode` (`:full`, `:partial` or `:analysis`), `:timeout` (default 30_000),
-  `:folding_mode` (`:never`, `:before_patterns`, `:after_patterns` or nil) and
-  `:build_materializations` (boolean or nil).
+  Creates a plan with `:mode` (`:full`, `:partial` or `:analysis`), `:timeout` (default 30_000), `:folding_mode`
+  (`:never`, `:before_patterns`, `:after_patterns` or nil) and `:build_materializations` (boolean or nil).
   """
   @spec new(keyword()) :: t()
   def new(opts \\ []) when is_list(opts) do
@@ -60,13 +59,11 @@ defmodule Beaver.MLIR.Conversion.Plan do
         {:add_illegal_dialect, :add_illegal_dialects, :dialect}
       ] do
     @spec unquote(name)(t(), String.Chars.t()) :: t()
-    def unquote(name)(%__MODULE__{} = plan, name),
-      do: append_entry(plan, {unquote(name), to_string(name)})
+    def unquote(name)(%__MODULE__{} = plan, name), do: append_entry(plan, {unquote(name), to_string(name)})
 
     @doc "Adds multiple entries via `#{name}/2`."
     @spec unquote(plural)(t(), Enumerable.t()) :: t()
-    def unquote(plural)(%__MODULE__{} = plan, names),
-      do: Enum.reduce(names, plan, &unquote(name)(&2, &1))
+    def unquote(plural)(%__MODULE__{} = plan, names), do: Enum.reduce(names, plan, &unquote(name)(&2, &1))
 
     defp entry_declaration({unquote(name), name}), do: %{unquote(field) => name, kind: unquote(name)}
   end
@@ -106,8 +103,8 @@ defmodule Beaver.MLIR.Conversion.Plan do
       ] do
     if name == :add_pattern_population do
       @doc """
-      Runs once per materialization with the mutable pattern set and converter;
-      must return `:ok`. Installed native patterns avoid per-match BEAM callbacks.
+      Runs once per materialization with the mutable pattern set and converter; must return `:ok`. Installed native
+      patterns avoid per-match BEAM callbacks.
       """
     end
 
@@ -152,12 +149,11 @@ defmodule Beaver.MLIR.Conversion.Plan do
   end
 
   @doc """
-  Populates upstream MLIR structural type conversion patterns and legality rules
-  natively in C++ without BEAM callbacks.
+  Populates upstream MLIR structural type conversion patterns and legality rules natively in C++ without BEAM
+  callbacks.
 
-  Supported domains are `:func` (function signatures, `func.call`, `func.return`,
-  `llvm.func`, `llvm.return`), `:cf` (branch operations and `cf` dialect), and
-  `:scf` (`scf.if`, `scf.for`, `scf.while`, `scf.yield`).
+  Supported domains are `:func` (function signatures, `func.call`, `func.return`, `llvm.func`, `llvm.return`), `:cf`
+  (branch operations and `cf` dialect), and `:scf` (`scf.if`, `scf.for`, `scf.while`, `scf.yield`).
   """
   @spec add_structural_type_conversions(t(), [atom()]) :: t()
   def add_structural_type_conversions(%__MODULE__{} = plan, domains \\ [:func, :cf, :scf])
@@ -195,8 +191,7 @@ defmodule Beaver.MLIR.Conversion.Plan do
   end
 
   defp validate_conversion_pattern_opts!(opts) do
-    opts =
-      validate_callback_opts!(opts, [:version, :benefit, :one_to_n, :timeout], "add_conversion_pattern")
+    opts = validate_callback_opts!(opts, [:version, :benefit, :one_to_n, :timeout], "add_conversion_pattern")
 
     validate_non_neg_int_opt!(Keyword.get(opts, :benefit, 1), :benefit)
     validate_boolean_opt!(Keyword.get(opts, :one_to_n, false), :one_to_n)
@@ -231,9 +226,7 @@ defmodule Beaver.MLIR.Conversion.Plan do
     append_entry(plan, {:add_program, program, opts})
   end
 
-  @doc """
-  Adds a callback-free C ABI aggregate call lowering pattern to the plan.
-  """
+  @doc "Adds a callback-free C ABI aggregate call lowering pattern to the plan."
   @spec add_c_abi_call_pattern(t(), String.t(), String.t(), keyword()) :: t()
   def add_c_abi_call_pattern(%__MODULE__{} = plan, root_op, target_op \\ "llvm.call", opts \\ [])
       when is_binary(root_op) and is_binary(target_op) and is_list(opts) do
@@ -243,9 +236,8 @@ defmodule Beaver.MLIR.Conversion.Plan do
   end
 
   @doc """
-  Adds PDL patterns (as a PDL MLIR text string or list of builder callbacks) to the plan.
-  When materialized, the PDL patterns are compiled to `PDLInterp` bytecode and
-  executed natively without BEAM callbacks.
+  Adds PDL patterns (as a PDL MLIR text string or list of builder callbacks) to the plan. When materialized, the PDL
+  patterns are compiled to `PDLInterp` bytecode and executed natively without BEAM callbacks.
   """
   @spec add_pdl_patterns(t(), binary() | [function()], keyword()) :: t()
   def add_pdl_patterns(%__MODULE__{} = plan, pdl_source_or_builders, opts \\ [])
@@ -255,25 +247,19 @@ defmodule Beaver.MLIR.Conversion.Plan do
   end
 
   @doc """
-  Returns configuration and declaration metadata, omitting callback bodies and
-  runtime state. Reproducibility requires explicit callback `:version` metadata.
+  Returns configuration and declaration metadata, omitting callback bodies and runtime state. Reproducibility
+  requires explicit callback `:version` metadata.
   """
   @spec declaration(t()) :: map()
   def declaration(%__MODULE__{} = plan),
     do: plan |> Map.from_struct() |> Map.update!(:entries, &Enum.map(&1, fn entry -> entry_declaration(entry) end))
 
-  @doc """
-  Executes on a module or operation with fresh, scoped native resources.
-  Returns `MLIR.Conversion.result()`.
-  """
+  @doc "Executes on a module or operation with fresh, scoped native resources. Returns `MLIR.Conversion.result()`."
   @spec run(t(), MLIR.Conversion.conversion_ir()) :: MLIR.Conversion.result()
   def run(%__MODULE__{} = plan, ir), do: execute(plan, ir, false)
 
-  @doc """
-  Returns `{run_result, receipt}` with bounded conversion callback profiling.
-  """
-  @spec profile(t(), MLIR.Conversion.conversion_ir()) ::
-          {MLIR.Conversion.result(), MLIR.Conversion.Profile.receipt()}
+  @doc "Returns `{run_result, receipt}` with bounded conversion callback profiling."
+  @spec profile(t(), MLIR.Conversion.conversion_ir()) :: {MLIR.Conversion.result(), MLIR.Conversion.Profile.receipt()}
   def profile(%__MODULE__{} = plan, ir), do: execute(plan, ir, true)
 
   @doc "Runs with explicit mutation and legalization reporting."
@@ -284,11 +270,9 @@ defmodule Beaver.MLIR.Conversion.Plan do
 
   defp execute(plan, ir, profile?) do
     context = MLIR.context(ir)
-
     target_opts = if plan.timeout, do: [timeout: plan.timeout], else: []
 
-    opts =
-      Map.take(plan, [:timeout, :folding_mode, :build_materializations]) |> Enum.reject(fn {_, v} -> is_nil(v) end)
+    opts = Map.take(plan, [:timeout, :folding_mode, :build_materializations]) |> Enum.reject(fn {_, v} -> is_nil(v) end)
 
     function =
       case profile? do
@@ -301,16 +285,13 @@ defmodule Beaver.MLIR.Conversion.Plan do
       TypeConverter.with(target_opts, fn converter ->
         patterns = RewritePatternSet.create(context)
         populate_or_destroy!(plan.entries, context, target, converter, patterns, plan.timeout)
-
         # Conversion owns the frozen set once submitted, including worker failure.
         apply(MLIR.Conversion, function, [plan.mode, ir, target, patterns, opts])
       end)
     end)
   end
 
-  @doc """
-  Executes the conversion plan on the given IR, returning the converted IR or raising `MLIR.Conversion.Error`.
-  """
+  @doc "Executes the conversion plan on the given IR, returning the converted IR or raising `MLIR.Conversion.Error`."
   @spec run!(t(), MLIR.Conversion.conversion_ir()) :: MLIR.Conversion.conversion_ir()
   def run!(%__MODULE__{} = plan, ir) do
     case run(plan, ir) do
@@ -330,9 +311,8 @@ defmodule Beaver.MLIR.Conversion.Plan do
   end
 
   @doc """
-  Executes `plan` on `ir`, optionally runs `"reconcile-unrealized-casts"` (`reconcile_casts: true`
-  by default), and verifies that no `"builtin.unrealized_conversion_cast"` operations remain
-  (unless `allow_unrealized_casts: true`).
+  Executes `plan` on `ir`, optionally runs `"reconcile-unrealized-casts"` (`reconcile_casts: true` by default), and
+  verifies that no `"builtin.unrealized_conversion_cast"` operations remain (unless `allow_unrealized_casts: true`).
   """
   @spec finish(t(), MLIR.Conversion.conversion_ir(), keyword()) ::
           {:ok, MLIR.Conversion.conversion_ir(), [term()]} | {:error, term()}
@@ -418,26 +398,20 @@ defmodule Beaver.MLIR.Conversion.Plan do
 
   defp entry_declaration({:mark_recursively_legal, name, cb, opts}) do
     base = %{kind: :mark_recursively_legal, op: name}
-
     if cb != nil, do: Map.put(base, :version, callback_version(opts)), else: base
   end
 
-  defp entry_declaration({kind, _callback, opts})
-       when kind in ~w(
+  defp entry_declaration({kind, _callback, opts}) when kind in ~w(
          mark_unknown_dynamically_legal add_conversion add_1_to_n_conversion add_source_materialization
          add_target_materialization add_1_to_n_target_materialization add_pattern_population
        )a,
-       do: %{kind: kind, version: callback_version(opts)}
+    do: %{kind: kind, version: callback_version(opts)}
 
   defp entry_declaration({:add_conversion_map, source_types, target_type}),
     do: %{kind: :add_conversion_map, source_types: source_types, target_type: target_type}
 
   defp entry_declaration({:add_conversion_map, source_types, target_type, opts}),
-    do:
-      Map.merge(
-        %{kind: :add_conversion_map, source_types: source_types, target_type: target_type},
-        Map.new(opts)
-      )
+    do: Map.merge(%{kind: :add_conversion_map, source_types: source_types, target_type: target_type}, Map.new(opts))
 
   defp entry_declaration({:add_structural_type_conversions, domains}),
     do: %{kind: :add_structural_type_conversions, domains: domains}
@@ -452,28 +426,13 @@ defmodule Beaver.MLIR.Conversion.Plan do
       version: callback_version(opts)
     }
 
-  defp entry_declaration({:add_pattern, descriptor, opts}),
-    do: %{
-      kind: :add_pattern,
-      name: descriptor.name,
-      root: descriptor.root,
-      benefit: descriptor.benefit,
-      version: callback_version(opts)
-    }
-
-  defp entry_declaration({:add_program, program, opts}),
-    do: %{
-      kind: :add_program,
-      root: program.root,
-      benefit: program.benefit,
-      version: callback_version(opts)
-    }
+  defp entry_declaration({kind, pattern, opts}) when kind in [:add_pattern, :add_program] do
+    fields = if kind == :add_pattern, do: [:name, :root, :benefit], else: [:root, :benefit]
+    Map.merge(Map.take(pattern, fields), %{kind: kind, version: callback_version(opts)})
+  end
 
   defp entry_declaration({:add_pdl_patterns, _source, opts}),
-    do: %{
-      kind: :add_pdl_patterns,
-      version: callback_version(opts)
-    }
+    do: %{kind: :add_pdl_patterns, version: callback_version(opts)}
 
   defp callback_version(opts), do: Keyword.get(opts, :version, :unversioned)
 
@@ -519,18 +478,14 @@ defmodule Beaver.MLIR.Conversion.Plan do
   defp populate_entry({:mark_unknown_dynamically_legal, callback, _opts}, %{target: target}),
     do: ConversionTarget.mark_unknown_dynamically_legal(target, callback)
 
-  defp populate_entry({kind, callback, _opts}, %{converter: converter})
-       when kind in ~w(
+  defp populate_entry({kind, callback, _opts}, %{converter: converter}) when kind in ~w(
          add_conversion add_1_to_n_conversion add_source_materialization add_target_materialization
          add_1_to_n_target_materialization
        )a,
-       do: apply(TypeConverter, kind, [converter, callback])
+    do: apply(TypeConverter, kind, [converter, callback])
 
-  defp populate_entry({:add_conversion_map, source_types, target_type}, resources) do
-    sources = Enum.map(source_types, &Type.get(&1, ctx: resources.context))
-    target = Type.get(target_type, ctx: resources.context)
-    TypeConverter.add_conversion_map(resources.converter, sources, target)
-  end
+  defp populate_entry({:add_conversion_map, sources, target}, resources),
+    do: populate_entry({:add_conversion_map, sources, target, []}, resources)
 
   defp populate_entry({:add_conversion_map, source_types, target_type, opts}, resources) do
     sources = Enum.map(source_types, &Type.get(&1, ctx: resources.context))

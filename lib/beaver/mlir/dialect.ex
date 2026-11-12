@@ -2,8 +2,8 @@ alias Beaver.MLIR.CAPI
 
 defmodule Beaver.MLIR.Dialect do
   @moduledoc """
-  This module defines macro to generate code for an MLIR dialect.
-  You might override `eval_ssa/1` function to introduce your custom op generation
+  This module defines macro to generate code for an MLIR dialect. You might override `eval_ssa/1` function to
+  introduce your custom op generation
   """
 
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
@@ -17,31 +17,23 @@ defmodule Beaver.MLIR.Dialect do
       @behaviour Beaver.MLIR.Dialect
       @doc false
       def eval_ssa(%Beaver.SSA{evaluator: evaluator} = ssa), do: evaluator.(ssa)
-
       defoverridable eval_ssa: 1
-
       dialect_module_name = dialect |> Beaver.MLIR.Dialect.Registry.normalize_dialect_name()
 
       func_names =
         for op <- ops do
           func_name = Beaver.MLIR.Dialect.Registry.normalize_op_name(op)
           full_name = Enum.join([dialect, op], ".")
-
           @file "#{full_name}.ex"
           @doc (case(Beaver.MLIR.ODS.Dump.lookup(full_name)) do
                   {:ok, found} -> Beaver.MLIR.ODS.Dump.gen_doc(found)
                   _ -> "`#{full_name}`"
                 end)
-
           def unquote(func_name)(%Beaver.SSA{} = ssa), do: eval_ssa(%Beaver.SSA{ssa | op: unquote(full_name)})
 
-          @doc """
-          Return op name `#{full_name}` as a bitstring.
-          """
+          @doc "Return op name `#{full_name}` as a bitstring."
           def unquote(func_name)(), do: unquote(full_name)
-
           defoverridable [{func_name, 1}]
-
           func_name
         end
 
@@ -68,19 +60,15 @@ defmodule Beaver.MLIR.Dialect do
   @doc """
   Return the dialect handle for the given dialect name.
 
-  Note that no every dialect has a handle function defined in the C API.
-  In that case, `nil` is returned.
+  Note that no every dialect has a handle function defined in the C API. In that case, `nil` is returned.
   """
   def handler(dialect) do
     f = :"mlirGetDialectHandle__#{dialect}__"
-
     if {f, 0} in CAPI.__info__(:functions), do: apply(CAPI, f, []), else: nil
   end
 
   for d <- Beaver.MLIR.Dialect.Registry.dialects() do
-    @doc """
-    Return the dialect name `#{d}` as a bitstring.
-    """
+    @doc "Return the dialect name `#{d}` as a bitstring."
     def unquote(String.to_atom(d))(), do: unquote(d)
   end
 end

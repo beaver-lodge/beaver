@@ -111,16 +111,13 @@ defmodule PtrTest do
       pointer_argument = Beaver.Native.USize.make(address)
       value = Beaver.Native.I64.make(42)
       result = Beaver.Native.I64.make(0)
-
       MLIR.ExecutionEngine.invoke!(engine, "ptr_load_store", [pointer_argument, value], result)
       assert Beaver.Native.to_term(storage) == 42
       assert Beaver.Native.to_term(result) == 42
-
       offset = Beaver.Native.I64.make(24)
       distance = Beaver.Native.I64.make(0)
       MLIR.ExecutionEngine.invoke!(engine, "ptr_distance", [pointer_argument, offset], distance)
       assert Beaver.Native.to_term(distance) == 24
-
       constant_distance = Beaver.Native.I64.make(0)
       MLIR.ExecutionEngine.invoke!(engine, "constant_distance", [], constant_distance)
       assert Beaver.Native.to_term(constant_distance) == 16

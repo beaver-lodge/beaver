@@ -38,10 +38,7 @@ defmodule WasmSSADialectTest do
     module =
       mlir ctx: ctx do
         module do
-          WasmSSA.func f(
-                         functionType: Type.function([], [Type.i32()]),
-                         sym_name: MLIR.Attribute.string("f")
-                       ) do
+          WasmSSA.func f(functionType: Type.function([], [Type.i32()]), sym_name: MLIR.Attribute.string("f")) do
             region do
               block _() do
                 c = WasmSSA.const(value: MLIR.Attribute.integer(Type.i32(), 10)) >>> Type.i32()

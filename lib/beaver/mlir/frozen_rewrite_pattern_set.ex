@@ -1,7 +1,5 @@
 defmodule Beaver.MLIR.FrozenRewritePatternSet do
-  @moduledoc """
-  This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
-  """
+  @moduledoc "This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}."
   use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
   alias Beaver.MLIR
   defdelegate destroy(set), to: MLIR.CAPI, as: :mlirFrozenRewritePatternSetDestroy

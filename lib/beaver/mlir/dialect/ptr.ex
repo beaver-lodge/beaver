@@ -42,8 +42,8 @@ defmodule Beaver.MLIR.Dialect.Ptr do
   @doc """
   Return a `!ptr.ptr` type.
 
-  The default is `#ptr.generic_space`. Pass either an address-space number or
-  `{:llvm, address_space}` to make the LLVM address space explicit.
+  The default is `#ptr.generic_space`. Pass either an address-space number or `{:llvm, address_space}` to make the
+  LLVM address space explicit.
   """
   @spec type(keyword()) :: Deferred.type()
   def type(opts \\ []) do

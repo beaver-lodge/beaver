@@ -2,9 +2,7 @@ alias Beaver.MLIR.CAPI
 alias Beaver.Native
 
 defmodule Beaver.MLIR.RewritePattern do
-  @moduledoc """
-  This module defines functions working with MLIR Rewrite Patterns.
-  """
+  @moduledoc "This module defines functions working with MLIR Rewrite Patterns."
   alias Beaver.MLIR
   alias Beaver.MLIR.CallbackServer
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native, fields: [owner: nil]
@@ -40,9 +38,7 @@ defmodule Beaver.MLIR.RewritePattern do
     ctx = opts[:ctx] || raise ArgumentError, "option :ctx is required"
     construct = opts[:construct] || (&Beaver.FallbackPattern.construct/1)
     destruct = opts[:destruct] || (&Beaver.FallbackPattern.destruct/1)
-
     match_and_rewrite = opts[:match_and_rewrite] || (&Beaver.FallbackPattern.match_and_rewrite/4)
-
     callbacks = %{construct: construct, destruct: destruct, matchAndRewrite: match_and_rewrite}
 
     CallbackServer.create(__MODULE__, callbacks, init_state, fn owner ->

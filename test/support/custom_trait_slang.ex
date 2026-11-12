@@ -11,11 +11,7 @@ defmodule CustomTraitSlang do
   use Beaver.Slang, name: "custom_trait_test"
 
   def verify(operation) do
-    if Beaver.MLIR.Operation.name(operation) == "custom_trait_test.invalid" do
-      {:error, :invalid_operation}
-    else
-      :ok
-    end
+    if Beaver.MLIR.Operation.name(operation) == "custom_trait_test.invalid", do: {:error, :invalid_operation}, else: :ok
   end
 
   def verify_regions(operation) do
@@ -26,17 +22,11 @@ defmodule CustomTraitSlang do
     end
   end
 
-  defop valid(),
-    traits: [{CustomTraitSlang.Validity, verify: &__MODULE__.verify/1}]
+  defop valid(), traits: [{CustomTraitSlang.Validity, verify: &__MODULE__.verify/1}]
 
-  defop also_valid(),
-    traits: [{CustomTraitSlang.Validity, verify: &__MODULE__.verify/1}]
+  defop also_valid(), traits: [{CustomTraitSlang.Validity, verify: &__MODULE__.verify/1}]
 
-  defop invalid(),
-    traits: [{CustomTraitSlang.Validity, verify: &__MODULE__.verify/1}]
+  defop invalid(), traits: [{CustomTraitSlang.Validity, verify: &__MODULE__.verify/1}]
 
-  defop invalid_regions(),
-    traits: [
-      {CustomTraitSlang.RegionValidity, verify_regions: &__MODULE__.verify_regions/1}
-    ]
+  defop invalid_regions(), traits: [{CustomTraitSlang.RegionValidity, verify_regions: &__MODULE__.verify_regions/1}]
 end

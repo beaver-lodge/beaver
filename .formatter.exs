@@ -16,6 +16,7 @@ locals_without_parens = [
 
 # Used by "mix format"
 [
+  line_length: 120,
   locals_without_parens: locals_without_parens,
   inputs: ["{mix,.formatter}.exs", "{config,test,scripts,bench,profile}/**/*.{ex,exs}"],
   subdirectories: ["lib", "native"],

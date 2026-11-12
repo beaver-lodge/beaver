@@ -2,9 +2,7 @@ defmodule Beaver.MLIR.Region do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
 
-  @moduledoc """
-  This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}.
-  """
+  @moduledoc "This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}."
   use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
 
   def under(region, f) when is_function(f, 0) do

@@ -18,9 +18,7 @@ defmodule StructuredComputeTest do
           Func.func slice(function_type: Type.function([~t{tensor<8xf32>}], [~t{tensor<4xf32>}])) do
             region do
               block _entry(source >>> ~t{tensor<8xf32>}) do
-                result =
-                  Tensor.extract_slice_(source, Tensor.slice([2], [4], [1])) >>>
-                    ~t{tensor<4xf32>}
+                result = Tensor.extract_slice_(source, Tensor.slice([2], [4], [1])) >>> ~t{tensor<4xf32>}
 
                 Func.return(result) >>> []
               end
@@ -46,11 +44,8 @@ defmodule StructuredComputeTest do
                 padding = Arith.constant(value: Attribute.float(Type.f32(), 0.0)) >>> Type.f32()
 
                 _vector =
-                  Vector.transfer_read_(source, padding,
-                    indices: [index],
-                    permutation_map: map,
-                    in_bounds: [true]
-                  ) >>> ~t{vector<4xf32>}
+                  Vector.transfer_read_(source, padding, indices: [index], permutation_map: map, in_bounds: [true]) >>>
+                    ~t{vector<4xf32>}
 
                 Func.return() >>> []
               end
@@ -93,7 +88,6 @@ defmodule StructuredComputeTest do
 
     MLIR.verify!(module)
     assert to_string(module) =~ "linalg.generic"
-
     assert ^module = Linalg.lower_to_llvm!(module)
     MLIR.verify!(module)
     assert to_string(module) =~ "llvm.func @add"

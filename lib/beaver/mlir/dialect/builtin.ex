@@ -1,13 +1,12 @@
 defmodule Beaver.MLIR.Dialect.Builtin do
-  @moduledoc """
-  This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect.
-  """
+  @moduledoc "This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect."
   use Beaver.MLIR.Dialect,
     dialect: "builtin",
     ops: Beaver.MLIR.Dialect.Registry.ops("builtin") |> Enum.reject(fn x -> x in ~w{module} end)
 
   @doc """
-  Macro to create a module and insert ops into its body. Beaver.region/1 shouldn't be called because module's one-block region will be created.
+  Macro to create a module and insert ops into its body. Beaver.region/1 shouldn't be called because module's
+  one-block region will be created.
   """
   defmacro module(attrs \\ [], do: body) do
     {ip_cache, ip_restore} = Beaver.parent_scope_ip_caching(__CALLER__)
@@ -22,9 +21,7 @@ defmodule Beaver.MLIR.Dialect.Builtin do
 
       for {name, attr} <- unquote(attrs) do
         name = name |> Beaver.MLIR.StringRef.create()
-
         attr = Beaver.Deferred.resolve(attr, ctx)
-
         module |> Beaver.MLIR.CAPI.mlirModuleGetOperation() |> Beaver.MLIR.Operation.put_attribute(name, attr)
       end
 

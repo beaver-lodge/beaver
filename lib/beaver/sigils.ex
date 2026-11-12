@@ -1,9 +1,7 @@
 alias Beaver.MLIR.Attribute
 
 defmodule Beaver.Sigils do
-  @moduledoc """
-  Sigils return explicit `Beaver.Deferred` values that parse MLIR elements in a context.
-  """
+  @moduledoc "Sigils return explicit `Beaver.Deferred` values that parse MLIR elements in a context."
   alias Beaver.MLIR
 
   @doc """

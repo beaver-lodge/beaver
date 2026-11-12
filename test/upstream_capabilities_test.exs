@@ -28,13 +28,9 @@ defmodule UpstreamCapabilitiesTest do
       Context.destroy(ctx)
     end
 
-    assert_raise ArgumentError, ~r/requires thread_safe/, fn ->
-      Context.create(thread_safe: false)
-    end
+    assert_raise ArgumentError, ~r/requires thread_safe/, fn -> Context.create(thread_safe: false) end
 
-    assert_raise ArgumentError, ~r/thread_pool/, fn ->
-      Context.create(threading: false, thread_pool: :application)
-    end
+    assert_raise ArgumentError, ~r/thread_pool/, fn -> Context.create(threading: false, thread_pool: :application) end
   end
 
   for bits <- [32, 64] do
@@ -72,8 +68,7 @@ defmodule UpstreamCapabilitiesTest do
   test "explicit index-bitwidth wins, and no layout defaults to 64", %{ctx: ctx} do
     for {layout, options} <- [
           {"", ""},
-          {"attributes {dlti.dl_spec = #dlti.dl_spec<#dlti.dl_entry<index, 32>>}",
-           "{index-bitwidth=64}"}
+          {"attributes {dlti.dl_spec = #dlti.dl_spec<#dlti.dl_entry<index, 32>>}", "{index-bitwidth=64}"}
         ] do
       module =
         MLIR.Module.create!(
@@ -88,11 +83,7 @@ defmodule UpstreamCapabilitiesTest do
           ctx: ctx
         )
 
-      ir =
-        module
-        |> Composer.append("convert-index-to-llvm#{options}")
-        |> Composer.run!()
-        |> MLIR.to_string()
+      ir = module |> Composer.append("convert-index-to-llvm#{options}") |> Composer.run!() |> MLIR.to_string()
 
       assert ir =~ "index to i64"
       refute ir =~ "index to i32"
@@ -110,9 +101,7 @@ defmodule UpstreamCapabilitiesTest do
     refute Enum.any?(load["attributes"] || [], &(&1["name"] == "alignment"))
   end
 
-  test "properties preserve native values and discardable attrs through text and bytecode", %{
-    ctx: ctx
-  } do
+  test "properties preserve native values and discardable attrs through text and bytecode", %{ctx: ctx} do
     module =
       MLIR.Module.create!(
         """
@@ -130,43 +119,29 @@ defmodule UpstreamCapabilitiesTest do
     properties = load |> Operation.properties() |> MLIR.to_string()
     assert properties =~ "alignment = [8]"
 
-    updated =
-      properties
-      |> String.replace("alignment = [8]", "alignment = [16]")
-      |> Attribute.get(ctx: ctx)
+    updated = properties |> String.replace("alignment = [8]", "alignment = [16]") |> Attribute.get(ctx: ctx)
 
     assert {:ok, ^load} = Operation.put_properties(load, updated)
     assert Operation.properties(load) |> MLIR.to_string() =~ "alignment = [16]"
     assert Operation.discardable_attribute(load, "test.note") |> MLIR.to_string() == ~s("keep")
-
     before = MLIR.to_string(load, generic: true)
 
-    invalid =
-      properties
-      |> String.replace("alignment = [8]", ~s(alignment = "invalid"))
-      |> Attribute.get(ctx: ctx)
+    invalid = properties |> String.replace("alignment = [8]", ~s(alignment = "invalid")) |> Attribute.get(ctx: ctx)
 
     assert {:error, [_ | _]} = Operation.put_properties(load, invalid)
     assert MLIR.to_string(load, generic: true) == before
 
-    for text <- [
-          MLIR.to_string(module),
-          MLIR.to_string(module, generic: true),
-          MLIR.Bytecode.write!(module)
-        ] do
+    for text <- [MLIR.to_string(module), MLIR.to_string(module, generic: true), MLIR.Bytecode.write!(module)] do
       roundtrip = MLIR.Module.create!(text, ctx: ctx) |> MLIR.verify!()
       restored = operation_named(roundtrip, "ptr.load")
       assert MLIR.equal?(Operation.properties(restored), Operation.properties(load))
 
-      assert Operation.discardable_attribute(restored, "test.note") |> MLIR.to_string() ==
-               ~s("keep")
+      assert Operation.discardable_attribute(restored, "test.note") |> MLIR.to_string() == ~s("keep")
     end
   end
 
   @tag :static_memory_planner
-  test "best-fit arena reuses disjoint lifetimes and keeps overlapping buffers separate", %{
-    ctx: ctx
-  } do
+  test "best-fit arena reuses disjoint lifetimes and keeps overlapping buffers separate", %{ctx: ctx} do
     for {overlap, bytes} <- [{false, 16}, {true, 32}] do
       release = "memref.dealloc %a : memref<4xf32>"
 
@@ -195,11 +170,7 @@ defmodule UpstreamCapabilitiesTest do
 
   @tag :static_memory_planner
   test "caller-owned arena needs no allocation and invalid arenas report diagnostics", %{ctx: ctx} do
-    for {args, succeeds} <- [
-          {"%arena: memref<32xi8>", true},
-          {"%arena: memref<8xi8>", false},
-          {"", false}
-        ] do
+    for {args, succeeds} <- [{"%arena: memref<32xi8>", true}, {"%arena: memref<8xi8>", false}, {"", false}] do
       module =
         MLIR.Module.create!(
           """
@@ -226,9 +197,7 @@ defmodule UpstreamCapabilitiesTest do
   end
 
   @tag :static_memory_planner
-  test "shared deallocs and unsupported layouts and elements retain their original releases", %{
-    ctx: ctx
-  } do
+  test "shared deallocs and unsupported layouts and elements retain their original releases", %{ctx: ctx} do
     module =
       MLIR.Module.create!(
         """
@@ -252,14 +221,11 @@ defmodule UpstreamCapabilitiesTest do
 
     before = MLIR.to_string(module)
 
-    assert module |> Bufferization.static_memory_plan() |> Composer.run!() |> MLIR.to_string() ==
-             before
+    assert module |> Bufferization.static_memory_plan() |> Composer.run!() |> MLIR.to_string() == before
   end
 
   @tag :static_memory_planner
-  test "arena is released on every return path and unsafe packed element sizes are rejected", %{
-    ctx: ctx
-  } do
+  test "arena is released on every return path and unsafe packed element sizes are rejected", %{ctx: ctx} do
     module =
       MLIR.Module.create!(
         """

@@ -53,40 +53,33 @@ defmodule Beaver.MLIR.Triton.PipelineProfileTest do
     plan = Beaver.Triton.pipeline_plan(target: "cuda:120", num_warps: 8)
     module = MLIR.Module.create!(@load_store, ctx: ctx)
 
-    try do
-      module =
-        module |> Beaver.Composer.append(hd(plan.passes).pipeline) |> Beaver.Composer.run!()
+    MLIR.Module.with_module(module, fn _ ->
+      module = module |> Beaver.Composer.append(hd(plan.passes).pipeline) |> Beaver.Composer.run!()
 
       operation = MLIR.Operation.from_module(module)
       assert {:ok, target} = MLIR.Operation.fetch(operation, "ttg.target")
       assert MLIR.Attribute.value(target) == "cuda:120"
       assert {:ok, warps} = MLIR.Operation.fetch(operation, "ttg.num-warps")
       assert MLIR.Attribute.value(warps) == 8
-    after
-      MLIR.Module.destroy(module)
-    end
+    end)
   end
 
   @tag skip: !@enabled
   test "executes and deterministically traces the pinned sm_100+ profile" do
     {first_module, first_trace} = compile_with_trace(@load_store)
     first_text = MLIR.to_string(first_module, generic: true)
-
     assert first_text =~ "llvm.func"
     refute first_text =~ "tt.dot"
     refute first_text =~ "mma.sync"
-
     {second_module, second_trace} = compile_with_trace(@load_store)
 
-    assert Enum.map(first_trace, &Map.drop(&1, [:plan_digest])) ==
-             Enum.map(second_trace, &Map.drop(&1, [:plan_digest]))
+    assert Enum.map(first_trace, &Map.drop(&1, [:plan_digest])) == Enum.map(second_trace, &Map.drop(&1, [:plan_digest]))
 
     assert length(first_trace) == 58
     assert Enum.all?(first_trace, &(byte_size(&1.ir_sha256) == 64))
     assert Enum.map(first_trace, & &1.index) == Enum.to_list(0..57)
     assert hd(first_trace).id == :convert_to_ttgpu
     assert List.last(first_trace).id == :llir_canonicalize
-
     MLIR.Module.destroy(first_module)
     MLIR.Module.destroy(second_module)
   end
@@ -96,11 +89,9 @@ defmodule Beaver.MLIR.Triton.PipelineProfileTest do
     {default_module, default_trace} = compile_with_trace(@load_store, [])
     {legacy_module, legacy_trace} = compile_with_trace(@load_store, pipeline_profile: :legacy)
 
-    assert MLIR.to_string(default_module, generic: true) ==
-             MLIR.to_string(legacy_module, generic: true)
+    assert MLIR.to_string(default_module, generic: true) == MLIR.to_string(legacy_module, generic: true)
 
     assert default_trace == legacy_trace
-
     {pinned_module, pinned_trace} = compile_with_trace(@load_store)
 
     assert {:ok, %{index: index, left: left, right: right}} =
@@ -108,7 +99,6 @@ defmodule Beaver.MLIR.Triton.PipelineProfileTest do
 
     assert index >= 0
     assert left != right
-
     for module <- [default_module, legacy_module, pinned_module], do: MLIR.Module.destroy(module)
   end
 
@@ -120,20 +110,16 @@ defmodule Beaver.MLIR.Triton.PipelineProfileTest do
       plan = Beaver.Triton.pipeline_plan(target: "cuda:#{capability}", from_ttgir: true)
 
       {allocation, [membar | lowering]} =
-        plan.passes
-        |> Enum.filter(&(&1.phase == :llir))
-        |> Enum.split_while(&(&1.id != :shared_memory_barriers))
+        plan.passes |> Enum.filter(&(&1.phase == :llir)) |> Enum.split_while(&(&1.id != :shared_memory_barriers))
 
       source = String.replace(@shared_load, "__TARGET__", "cuda:#{capability}")
       module = MLIR.Module.create!(source, ctx: ctx)
 
-      try do
+      MLIR.Module.with_module(module, fn _ ->
         run_passes(module, allocation)
         refute MLIR.to_string(module) =~ "ttg.barrier"
-
         run_passes(module, [membar])
         assert MLIR.to_string(module) =~ "ttg.barrier local"
-
         run_passes(module, lowering)
 
         ptx =
@@ -142,17 +128,12 @@ defmodule Beaver.MLIR.Triton.PipelineProfileTest do
           |> MLIR.Target.LLVMIR.compile_to_ptx!(cpu: "sm_#{capability}")
 
         assert ptx =~ "bar.sync"
-      after
-        MLIR.Module.destroy(module)
-      end
+      end)
     end
   end
 
   defp run_passes(module, passes) do
-    passes
-    |> Enum.reduce(module, &Beaver.Composer.append(&2, &1.pipeline))
-    |> Beaver.Composer.run!()
-    |> MLIR.verify!()
+    passes |> Enum.reduce(module, &Beaver.Composer.append(&2, &1.pipeline)) |> Beaver.Composer.run!() |> MLIR.verify!()
   end
 
   defp compile_with_trace(source, opts \\ :pinned) do

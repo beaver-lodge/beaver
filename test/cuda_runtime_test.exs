@@ -9,48 +9,32 @@ defmodule CUDARuntimeTest do
 
   test "launch a kernel from gpu.binary with the Zig runner", %{ctx: ctx} do
     if CUDA.available?() do
-      module =
-        File.read!("test/gpu-to-cubin.mlir")
-        |> MLIR.Module.create!(ctx: ctx)
+      module = File.read!("test/gpu-to-cubin.mlir") |> MLIR.Module.create!(ctx: ctx)
 
       target = GPU.nvvm_target_attribute(chip: "sm_80", ctx: ctx)
 
-      {:ok, cuda_module} =
-        module
-        |> GPU.package_binary!(target, format: :isa)
-        |> CUDA.load_gpu_binary()
+      {:ok, cuda_module} = module |> GPU.package_binary!(target, format: :isa) |> CUDA.load_gpu_binary()
 
       {:ok, function} = CUDA.module_get_function(cuda_module, "other_func_kernel")
-
       n = 32
       {:ok, device_ptr} = CUDA.mem_alloc(n * 4)
-
       scalar = 42.0
 
       :ok =
-        CUDA.launch_kernel(
-          function,
-          {1, 1, 1},
-          {n, 1, 1},
-          [
-            {:f32, scalar},
-            {:ptr, device_ptr},
-            {:ptr, device_ptr},
-            {:i64, 0},
-            {:i64, n},
-            {:i64, 1}
-          ]
-        )
+        CUDA.launch_kernel(function, {1, 1, 1}, {n, 1, 1}, [
+          {:f32, scalar},
+          {:ptr, device_ptr},
+          {:ptr, device_ptr},
+          {:i64, 0},
+          {:i64, n},
+          {:i64, 1}
+        ])
 
       {:ok, data} = CUDA.memcpy_dtoh(device_ptr, n * 4)
 
-      floats =
-        for <<f::float-32-little <- data>> do
-          f
-        end
+      floats = for <<f::float-32-little <- data>>, do: f
 
       assert Enum.all?(floats, &(&1 == scalar))
-
       :ok = CUDA.mem_free(device_ptr)
       :ok = CUDA.module_unload(cuda_module)
     else
@@ -64,7 +48,6 @@ defmodule CUDARuntimeTest do
     if CUDA.available?() do
       assert {:ok, count} = CUDA.device_count()
       assert count > 0
-
       assert {:ok, {major, minor}} = CUDA.device_compute_capability(0)
       assert is_integer(major) and major > 0
       assert is_integer(minor) and minor >= 0

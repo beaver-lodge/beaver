@@ -72,44 +72,29 @@ defmodule DogfoodTest do
   """
 
   test "dogfood: Slang -> native rewrite -> conversion plan -> transform schedule -> bytecode",
-       %{
-         ctx: ctx
-       } do
+       %{ctx: ctx} do
     assert Beaver.Slang.load(ctx, DogfoodDialect) |> MLIR.LogicalResult.success?()
-
     module = MLIR.Module.create!(@source, ctx: ctx)
-
     # 1. #485: native matcher rewrites dogfood.square without hand-written
     #    Walker unpacking and without generating wrapper source.
     MLIR.Rewrite.apply_patterns!(module, [DogfoodNativePatterns.square_to_mul()])
-
     rewritten = MLIR.to_string(module)
     refute rewritten =~ "dogfood.square"
     assert rewritten =~ "arith.muli"
-
     # 2. #486: a scoped Conversion Plan lowers dogfood.inc, reusing the same
     #    native matcher as its conversion pattern frontend.
     plan =
-      Plan.new(
-        mode: :full,
-        folding_mode: :after_patterns,
-        build_materializations: true,
-        timeout: 5_000
-      )
-      |> Plan.add_legal_dialect("builtin")
-      |> Plan.add_legal_dialect("func")
-      |> Plan.add_legal_dialect("arith")
+      Plan.new(mode: :full, folding_mode: :after_patterns, build_materializations: true, timeout: 5000)
+      |> Plan.add_legal_dialects(~w(builtin func arith))
       |> Plan.add_illegal_dialect("dogfood")
       |> Plan.add_conversion(fn type -> type end, version: "1.0")
       |> Plan.add_pattern(DogfoodNativePatterns.inc_to_add1())
 
     assert {:ok, ^module, _diagnostics} = Plan.run(plan, module)
-
     lowered = MLIR.to_string(module)
     refute lowered =~ "dogfood.inc"
     assert lowered =~ "arith.addi"
     MLIR.verify!(module)
-
     # The same plan declaration is reusable in a fresh MLIR context.
     ctx2 = MLIR.Context.create()
     assert Beaver.Slang.load(ctx2, DogfoodDialect) |> MLIR.LogicalResult.success?()
@@ -118,7 +103,6 @@ defmodule DogfoodTest do
     assert {:ok, _module2, _diagnostics} = Plan.run(plan, module2)
     refute MLIR.to_string(module2) =~ "dogfood"
     MLIR.Context.destroy(ctx2)
-
     # Compose the retained native primitives directly, then serialize the result.
     schedule = """
     module attributes {transform.with_named_sequence} {

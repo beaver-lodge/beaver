@@ -34,7 +34,6 @@ defmodule BufferizationTest do
 
   test "runs bufferization and preserves structured diagnostics", %{ctx: ctx} do
     module = MLIR.Module.create!(@tensor_module, ctx: ctx)
-
     assert {:ok, ^module, diagnostics} = Bufferization.one_shot(module)
     assert is_list(diagnostics)
     MLIR.verify!(module)
@@ -44,7 +43,6 @@ defmodule BufferizationTest do
 
   test "optionally appends ownership-based deallocation", %{ctx: ctx} do
     module = MLIR.Module.create!(@tensor_module, ctx: ctx)
-
     assert ^module = Bufferization.one_shot!(module, deallocate: true)
     MLIR.verify!(module)
     assert to_string(module) =~ "memref.dealloc"

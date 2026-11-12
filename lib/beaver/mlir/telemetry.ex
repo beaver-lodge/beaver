@@ -5,7 +5,6 @@ defmodule Beaver.MLIR.Telemetry do
 
   def emit(event_suffix, measurements, metadata, opts \\ []) do
     event = @prefix ++ event_suffix
-
     if function_exported?(:telemetry, :execute, 3), do: apply(:telemetry, :execute, [event, measurements, metadata])
 
     case Keyword.get(opts, :telemetry) do

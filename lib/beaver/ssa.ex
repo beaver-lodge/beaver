@@ -2,12 +2,13 @@ alias Beaver.MLIR.Location
 
 defmodule Beaver.SSA do
   @moduledoc """
-  Storing MLIR IR structure with a Elixir struct. Macros like `Beaver.mlir/1` will generate SSA structs defined by this module.
+  Storing MLIR IR structure with a Elixir struct. Macros like `Beaver.mlir/1` will generate SSA structs defined by
+  this module.
 
-  Semantically a SSA has no concept of "current block" or "current context". These are only needed when creating an operation.
-  Therefore SSA syntax in Beaver can be used in both IR-generating and PDL-generating.
-  To be more specific, the macro system in Beaver will use an SSA and its surrounding environment to construct a operation changeset,
-  and then create an operation from it by calling MLIR CAPI.
+  Semantically a SSA has no concept of "current block" or "current context". These are only needed when creating an
+  operation. Therefore SSA syntax in Beaver can be used in both IR-generating and PDL-generating. To be more
+  specific, the macro system in Beaver will use an SSA and its surrounding environment to construct a operation
+  changeset, and then create an operation from it by calling MLIR CAPI.
   """
   alias Beaver.Changeset
   alias Beaver.MLIR
@@ -16,8 +17,7 @@ defmodule Beaver.SSA do
   @type op_result_entry() :: {:op, Changeset.result() | [Changeset.result()]}
   @type result_entry() :: Changeset.result() | :infer | op_result_entry()
   @type filler_fun() :: (-> term())
-  @type insertion_point() ::
-          MLIR.Block.t() | MLIR.PatternRewriter.t() | MLIR.RewriterBase.t() | nil
+  @type insertion_point() :: MLIR.Block.t() | MLIR.PatternRewriter.t() | MLIR.RewriterBase.t() | nil
   @type evaluator() :: (t() -> term())
 
   @type t() :: %__MODULE__{
@@ -30,14 +30,7 @@ defmodule Beaver.SSA do
           loc: Location.t() | nil,
           evaluator: evaluator() | nil
         }
-  defstruct op: nil,
-            arguments: [],
-            results: [],
-            filler: nil,
-            ip: nil,
-            ctx: nil,
-            loc: nil,
-            evaluator: nil
+  defstruct op: nil, arguments: [], results: [], filler: nil, ip: nil, ctx: nil, loc: nil, evaluator: nil
 
   def put_arguments(%__MODULE__{arguments: arguments} = ssa, additional_arguments) when is_list(additional_arguments),
     do: %__MODULE__{ssa | arguments: arguments ++ additional_arguments}

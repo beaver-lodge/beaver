@@ -97,13 +97,11 @@ defmodule Beaver.MLIR.TransformOpInterface do
 
   @doc "Casts a borrowed transform rewriter to the normal rewriter base."
   @spec rewriter_base(MLIR.TransformRewriter.t()) :: MLIR.RewriterBase.t()
-  def rewriter_base(%MLIR.TransformRewriter{} = rewriter),
-    do: CAPI.mlirTransformRewriterAsBase(rewriter)
+  def rewriter_base(%MLIR.TransformRewriter{} = rewriter), do: CAPI.mlirTransformRewriterAsBase(rewriter)
 
   @doc false
   def set_results(%MLIR.TransformResults{} = results, %Operation{} = op, mappings) do
     mappings |> Enum.each(fn {result, mapping} -> set_result(results, result_value(op, result), mapping) end)
-
     :ok
   end
 

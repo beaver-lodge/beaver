@@ -4,9 +4,8 @@ defmodule Beaver.MLIR.Bytecode do
   @moduledoc """
   Reads and writes versioned MLIR bytecode.
 
-  `:desired_emit_version` asks MLIR to emit a specific bytecode version. MLIR
-  returns an error instead of silently emitting another version when the
-  requested version cannot be honored.
+  `:desired_emit_version` asks MLIR to emit a specific bytecode version. MLIR returns an error instead of silently
+  emitting another version when the requested version cannot be honored.
   """
 
   alias Beaver.MLIR

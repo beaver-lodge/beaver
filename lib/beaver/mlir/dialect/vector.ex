@@ -9,8 +9,7 @@ defmodule Beaver.MLIR.Dialect.Vector do
 
   @doc "Build the boolean array attribute used by vector transfer bounds."
   def in_bounds(bounds, opts \\ []) when is_list(bounds) do
-    unless Enum.all?(bounds, &is_boolean/1),
-      do: raise(ArgumentError, "vector in_bounds entries must be booleans")
+    unless Enum.all?(bounds, &is_boolean/1), do: raise(ArgumentError, "vector in_bounds entries must be booleans")
 
     Beaver.Deferred.from_opts(opts, fn ctx ->
       bounds |> Enum.map(&Attribute.bool(&1, ctx: ctx)) |> Attribute.array(ctx: ctx)

@@ -1,9 +1,7 @@
 alias Beaver.MLIR.Context
 
 defmodule Beaver.MLIR.Dialect.Registry do
-  @moduledoc """
-  This module defines functions to query MLIR dialect registry.
-  """
+  @moduledoc "This module defines functions to query MLIR dialect registry."
 
   alias Beaver.MLIR.CAPI
 
@@ -40,7 +38,6 @@ defmodule Beaver.MLIR.Dialect.Registry do
   defp unwrap_ctx_then(opts, cb) do
     if ctx = opts[:ctx] do
       %Context{ref: ref} = ctx
-
       cb.(ref)
     else
       ctx = %Context{ref: ref} = Context.create()
@@ -64,9 +61,7 @@ defmodule Beaver.MLIR.Dialect.Registry do
     |> then(&Enum.sort/1)
   end
 
-  @doc """
-  Get dialects registered
-  """
+  @doc "Get dialects registered"
   def dialects(opts \\ []) do
     unwrap_ctx_then(opts, fn ref -> CAPI.beaver_raw_registered_dialects(ref) |> Enum.uniq() |> Enum.sort() end)
   end

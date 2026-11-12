@@ -1,7 +1,5 @@
 defmodule DebugTest do
-  @moduledoc """
-  Test the debug configurations of MLIR.
-  """
+  @moduledoc "Test the debug configurations of MLIR."
   use Beaver.Case, async: true
   use Beaver
   doctest Beaver.MLIR.Debug
@@ -44,7 +42,6 @@ defmodule DebugTest do
 
   test "printing with debug_info does not attach DI scopes by itself", %{ctx: ctx} do
     text = ctx |> add_module() |> to_llvm() |> MLIR.to_string(debug_info: true)
-
     # Locations point at this test file, but no subprogram scopes yet.
     assert text =~ "debug_test.exs"
     refute text =~ "llvm.di_subprogram"
@@ -53,16 +50,11 @@ defmodule DebugTest do
 
   test "attach_llvm_scopes! adds DI subprogram scopes for every llvm.func", %{ctx: ctx} do
     text =
-      ctx
-      |> add_module()
-      |> to_llvm()
-      |> Beaver.MLIR.Debug.attach_llvm_scopes!()
-      |> MLIR.to_string(debug_info: true)
+      ctx |> add_module() |> to_llvm() |> Beaver.MLIR.Debug.attach_llvm_scopes!() |> MLIR.to_string(debug_info: true)
 
     assert text =~ ~s{#llvm.di_file<"debug_test.exs" in}
     assert text =~ "#llvm.di_compile_unit<"
     assert text =~ "#llvm.di_subprogram<"
-
     n_funcs = length(Regex.scan(~r/llvm\.func @/, text))
     n_scopes = length(Regex.scan(~r/loc\(fused<#di_subprogram/, text))
     assert n_funcs > 0

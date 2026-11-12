@@ -1,9 +1,8 @@
 defmodule Beaver.MLIR.DataLayout do
   @moduledoc """
-  Queries the closest MLIR data layout at an operation, using an AnalysisSession
-  cache. Sizes retain both their known minimum and whether they are scalable.
-  Layout changes, including changes to enclosing operations, require session
-  invalidation. Index and pointer widths come from MLIR, never the host VM.
+  Queries the closest MLIR data layout at an operation, using an AnalysisSession cache. Sizes retain both their
+  known minimum and whether they are scalable. Layout changes, including changes to enclosing operations, require
+  session invalidation. Index and pointer widths come from MLIR, never the host VM.
   """
   alias Beaver.MLIR.{AnalysisSession, Operation}
 
