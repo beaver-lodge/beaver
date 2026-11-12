@@ -179,5 +179,5 @@ jobs:
       - name: Standalone Zig build
         if: matrix.elixir == '1.20.3'
         run: |
-          git clean -fdx
+          git -c core.longpaths=true clean -fdx
           zig build --verbose
