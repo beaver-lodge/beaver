@@ -284,7 +284,7 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
     defer beam.allocator.free(blocks);
 
     const count = try beam.get_list_length(env, args[2]);
-    if (count > 65536) return error.BatchTooLarge;
+    if (count > 1048576) return error.BatchTooLarge;
 
     const verify_root = if (beam.is_nil2(env, args[3])) m.Operation.T{ .ptr = null } else try operation(env, ctx, args[3]);
     const binding = if (verify_root.ptr != null) c.beaverExecutionBindOperation(verify_root) else null;
@@ -472,4 +472,29 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
         beam.make_term_list(env, res_list_terms),
     };
     return beam.make_tuple(env, &out);
+}
+
+const SymListCtx = struct {
+    env: beam.env,
+    list: std.ArrayListUnmanaged(beam.term) = .empty,
+    oom: bool = false,
+};
+
+fn appendSymCallback(sr: m.StringRef.T, user_data: ?*anyopaque) callconv(.c) void {
+    const ctx_ptr: *SymListCtx = @ptrCast(@alignCast(user_data.?));
+    if (ctx_ptr.oom) return;
+    const slice = if (sr.length == 0) "" else sr.data[0..@intCast(sr.length)];
+    ctx_ptr.list.append(beam.allocator, beam.make_slice(ctx_ptr.env, slice)) catch {
+        ctx_ptr.oom = true;
+    };
+}
+
+pub fn referencedSymbols(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
+    const args = try tuple(env, arguments, 1);
+    const root = try operation(env, ctx, args[0]);
+    var cb_ctx = SymListCtx{ .env = env };
+    defer cb_ctx.list.deinit(beam.allocator);
+    c.beaverSymbolTableWalkReferencedSymbols(root, appendSymCallback, &cb_ctx);
+    if (cb_ctx.oom) return error.OutOfMemory;
+    return beam.make_term_list(env, cb_ctx.list.items);
 }

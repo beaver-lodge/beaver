@@ -48,6 +48,13 @@ defmodule Beaver.MLIR.Module do
 
   defdelegate from_operation(op), to: CAPI, as: :mlirModuleFromOperation
 
+  @doc """
+  Selectively clones referenced (or explicitly requested) symbol definitions and their transitive symbol
+  dependencies from `source` into `target`, returning `target`. See `Beaver.MLIR.SymbolTable.import_symbols!/3`.
+  """
+  @spec import_symbols!(t() | Operation.t(), t() | Operation.t(), keyword()) :: t() | Operation.t()
+  defdelegate import_symbols!(target, source, opts \\ []), to: MLIR.SymbolTable
+
   @doc "Creates an empty `MLIR.Module` from a `Location` or keyword options (`[ctx: ctx, location: loc]`)."
   def empty(opts \\ [])
 

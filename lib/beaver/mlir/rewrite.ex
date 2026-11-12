@@ -37,6 +37,7 @@ defmodule Beaver.MLIR.Rewrite do
   @type pattern_entry() ::
           Beaver.Pattern.Native.Descriptor.t()
           | Beaver.Pattern.Native.Program.t()
+          | {:pdl, MLIR.Module.t() | Operation.t() | binary() | [function()]}
           | {root_name :: term(), match_and_rewrite() | Beaver.Pattern.Native.Descriptor.t()}
 
   @type pattern_list() :: [pattern_entry()]
@@ -72,6 +73,9 @@ defmodule Beaver.MLIR.Rewrite do
       Enum.each(patterns, fn
         %kind{} = descriptor when kind in [Beaver.Pattern.Native.Program, Beaver.Pattern.Native.Descriptor] ->
           RewritePatternSet.add(set, descriptor, ctx: ctx)
+
+        {:pdl, pdl} ->
+          RewritePatternSet.add_pdl(set, pdl, ctx: ctx)
 
         {root, match_and_rewrite} ->
           RewritePatternSet.add(set, root, match_and_rewrite, ctx: ctx)

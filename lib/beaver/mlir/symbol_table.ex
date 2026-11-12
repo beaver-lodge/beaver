@@ -157,4 +157,134 @@ defmodule Beaver.MLIR.SymbolTable do
     insert(sym_table, decl)
     decl
   end
+
+  @doc """
+  Selectively clones referenced (or explicitly requested) symbol definitions and their transitive symbol
+  dependencies from `source` into `target`, returning `target`.
+
+  If `target` contains a bodyless forward declaration for a symbol that `source` defines with a body, the forward
+  declaration is replaced with the cloned definition. Existing definitions in `target` are preserved.
+
+  Options:
+    * `:symbols` - `:referenced` (default, scans `target` for symbol references) or a list of symbol names.
+    * `:visibility` - `:private` (default), `:public`, `:nested`, or `:preserve`.
+    * `:verify_type` - when `true`, verifies `function_type` compatibility against existing declarations/definitions.
+  """
+  @spec import_symbols!(
+          MLIR.Module.t() | MLIR.Operation.t(),
+          MLIR.Module.t() | MLIR.Operation.t(),
+          keyword()
+        ) :: MLIR.Module.t() | MLIR.Operation.t()
+  def import_symbols!(target, source, opts \\ []) when is_list(opts) do
+    dst_root = symbol_root!(target)
+    src_root = symbol_root!(source)
+
+    unless MLIR.equal?(MLIR.context(dst_root), MLIR.context(src_root)) do
+      raise ArgumentError, "import_symbols! requires target and source to share the same MLIR.Context"
+    end
+
+    seeds = initial_import_symbols!(dst_root, Keyword.get(opts, :symbols, :referenced))
+    vis = Keyword.get(opts, :visibility, :private)
+    verify? = Keyword.get(opts, :verify_type, false)
+
+    Beaver.Native.with_resource(create(dst_root), &destroy/1, fn dst_st ->
+      Beaver.Native.with_resource(create(src_root), &destroy/1, fn src_st ->
+        import_worklist!(dst_st, src_st, seeds, MapSet.new(), vis, verify?)
+      end)
+    end)
+
+    target
+  end
+
+  @doc "Returns all unique flat symbol names referenced by attributes of operations inside `module_or_op`."
+  @spec referenced_symbols(MLIR.Module.t() | MLIR.Operation.t()) :: [String.t()]
+  def referenced_symbols(module_or_op) do
+    root = MLIR.Operation.from_module(module_or_op)
+    Beaver.Execution.run(MLIR.context(root), :referenced_symbols, {root.ref}, strategy: :auto)
+  end
+
+  defp symbol_root!(module_or_op) do
+    op = MLIR.Operation.from_module(module_or_op)
+    MLIR.Operation.enclosing_symbol_table(op) || op
+  end
+
+  defp initial_import_symbols!(dst_root, :referenced), do: referenced_symbols(dst_root)
+
+  defp initial_import_symbols!(_dst_root, list) when is_list(list),
+    do: Enum.map(list, &(to_string(&1) |> String.trim_leading("@")))
+
+  defp initial_import_symbols!(_dst_root, other),
+    do: raise(ArgumentError, "invalid :symbols option for import_symbols!: #{inspect(other)}")
+
+  defp import_worklist!(_dst_st, _src_st, [], _visited, _vis, _verify?), do: :ok
+
+  defp import_worklist!(dst_st, src_st, [sym | rest], visited, vis, verify?) do
+    if MapSet.member?(visited, sym) do
+      import_worklist!(dst_st, src_st, rest, visited, vis, verify?)
+    else
+      deps = maybe_import_symbol!(dst_st, src_st, sym, vis, verify?)
+      import_worklist!(dst_st, src_st, deps ++ rest, MapSet.put(visited, sym), vis, verify?)
+    end
+  end
+
+  defp maybe_import_symbol!(dst_st, src_st, sym, vis, verify?) do
+    src = lookup(src_st, sym)
+
+    if MLIR.null?(src) do
+      []
+    else
+      merge_symbol!(dst_st, sym, src, lookup(dst_st, sym), vis, verify?)
+    end
+  end
+
+  defp merge_symbol!(dst_st, sym, src, dst, vis, verify?) do
+    src_def? = symbol_definition?(src)
+
+    cond do
+      MLIR.null?(dst) ->
+        clone_symbol_into!(dst_st, src, src_def?, vis)
+        if src_def?, do: referenced_symbols(src), else: []
+
+      symbol_definition?(dst) ->
+        if verify?, do: verify_compatible_symbol!(dst, sym, src)
+        []
+
+      src_def? ->
+        if verify?, do: verify_compatible_symbol!(dst, sym, src)
+        erase(dst_st, dst)
+        clone_symbol_into!(dst_st, src, true, vis)
+        referenced_symbols(src)
+
+      true ->
+        if verify?, do: verify_compatible_symbol!(dst, sym, src)
+        []
+    end
+  end
+
+  defp clone_symbol_into!(dst_st, src, true, vis) when vis != :preserve do
+    cloned = MLIR.Operation.clone(src)
+    set_visibility(cloned, vis)
+    insert(dst_st, cloned)
+  end
+
+  defp clone_symbol_into!(dst_st, src, _src_def?, _vis) do
+    insert(dst_st, MLIR.Operation.clone(src))
+  end
+
+  defp symbol_definition?(%MLIR.Operation{} = op) do
+    regions = op |> Beaver.Walker.regions() |> Enum.to_list()
+
+    regions == [] or Enum.any?(regions, &(MLIR.Region.first_block(&1) != nil)) or
+      MLIR.Operation.attribute(op, "value") != nil
+  end
+
+  defp verify_compatible_symbol!(dst, sym, src) do
+    case src["function_type"] do
+      %MLIR.Attribute{} = src_type_attr ->
+        verify_existing_type!(dst, sym, MLIR.Attribute.value(src_type_attr))
+
+      nil ->
+        :ok
+    end
+  end
 end

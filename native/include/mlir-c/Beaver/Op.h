@@ -65,6 +65,8 @@ MLIR_CAPI_EXPORTED MlirStringRef beaverSymbolTableGetDefaultVisibilityAttributeN
 MLIR_CAPI_EXPORTED MlirBeaverSymbolVisibility beaverSymbolTableGetSymbolVisibility(MlirOperation symbol);
 MLIR_CAPI_EXPORTED void beaverSymbolTableSetSymbolVisibility(MlirOperation symbol,
                                                              MlirBeaverSymbolVisibility visibility);
+MLIR_CAPI_EXPORTED void beaverSymbolTableWalkReferencedSymbols(MlirOperation root, MlirStringCallback callback,
+                                                               void *userData);
 
 /// Enumerates attached inherent attributes, including attributes stored in an
 /// operation's properties. These fill the enumeration gap in MLIR's C API.

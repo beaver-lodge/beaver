@@ -21,8 +21,17 @@ defmodule Beaver.MLIR.Safepoint do
           safepoints: [safepoint_entry()]
         }
 
+  @type safepoint_matcher() ::
+          Operation.t()
+          | String.t()
+          | atom()
+          | {String.Chars.t(), String.Chars.t()}
+          | (Operation.t() -> as_boolean(term()))
+
+  @type safepoint_spec() :: safepoint_matcher() | [safepoint_matcher()]
+
   @doc "Computes live-across-safepoint SSA values inside `func_op` and assigns conflict-free frame slots."
-  @spec analyze(Operation.t(), [Operation.t() | String.t()] | String.t(), keyword()) :: analysis_result()
+  @spec analyze(Operation.t(), safepoint_spec(), keyword()) :: analysis_result()
   def analyze(%Operation{} = func_op, safepoints, opts \\ []) when is_list(opts) do
     exclude_entry_args = Keyword.get(opts, :exclude_entry_args, false)
     ops = resolve_ops(func_op, safepoints)
@@ -85,10 +94,10 @@ defmodule Beaver.MLIR.Safepoint do
   """
   @spec bounded_leaf?(Operation.t(), keyword()) :: boolean()
   def bounded_leaf?(%Operation{} = func_op, opts \\ []) when is_list(opts) do
-    poll_names = op_names(opts, :poll_ops, :poll, "coro.poll")
-    suspend_names = op_names(opts, :suspend_ops, :safepoints, "coro.suspend")
+    poll_specs = op_specs(opts, :poll_ops, :poll, "coro.poll")
+    suspend_specs = op_specs(opts, :suspend_ops, :safepoints, "coro.suspend")
 
-    loop_ops = Keyword.get(opts, :loop_ops, ["scf.while", "scf.for"]) |> List.wrap() |> Enum.map(&to_string/1)
+    loop_ops = Keyword.get(opts, :loop_ops, ["scf.while", "scf.for"]) |> List.wrap()
     cost_attr = Keyword.get(opts, :cost_attr, "cost") |> to_string()
     max_work = Keyword.get(opts, :max_work, 32)
 
@@ -96,10 +105,10 @@ defmodule Beaver.MLIR.Safepoint do
          blocks when blocks != [] <- region |> Beaver.Walker.blocks() |> Enum.to_list(),
          true <- acyclic_cfg?(blocks),
          [] <- resolve_ops(func_op, loop_ops),
-         [] <- resolve_ops(func_op, suspend_names) do
+         [] <- resolve_ops(func_op, suspend_specs) do
       total_cost =
         func_op
-        |> resolve_ops(poll_names)
+        |> resolve_ops(poll_specs)
         |> Enum.reduce(0, fn poll_op, acc -> acc + poll_op_cost(poll_op, cost_attr) end)
 
       total_cost <= max_work
@@ -108,8 +117,8 @@ defmodule Beaver.MLIR.Safepoint do
     end
   end
 
-  defp op_names(opts, primary, fallback, default),
-    do: opts |> Keyword.get(primary, Keyword.get(opts, fallback, [default])) |> List.wrap() |> Enum.map(&to_string/1)
+  defp op_specs(opts, primary, fallback, default),
+    do: opts |> Keyword.get(primary, Keyword.get(opts, fallback, [default])) |> List.wrap()
 
   defp acyclic_cfg?(blocks) do
     graph = :digraph.new([:private])
@@ -160,8 +169,8 @@ defmodule Beaver.MLIR.Safepoint do
   end
 
   defp do_bundle_leaf!(%Operation{} = func_op, opts) do
-    poll_names = op_names(opts, :poll_ops, :poll, "coro.poll")
-    suspend_names = op_names(opts, :suspend_ops, :safepoints, "coro.suspend")
+    poll_specs = op_specs(opts, :poll_ops, :poll, "coro.poll")
+    suspend_specs = op_specs(opts, :suspend_ops, :safepoints, "coro.suspend")
 
     eligible? = bounded_leaf?(func_op, opts)
 
@@ -169,11 +178,11 @@ defmodule Beaver.MLIR.Safepoint do
       raise ArgumentError, "function is not a bounded leaf"
     end
 
-    {leaf_op, leaf_sym} = if eligible?, do: create_folded_leaf_clone!(func_op, poll_names, opts), else: {nil, nil}
+    {leaf_op, leaf_sym} = if eligible?, do: create_folded_leaf_clone!(func_op, poll_specs, opts), else: {nil, nil}
 
     {lowered_op, frame_bytes} =
       if Keyword.get(opts, :lower_resumable, true) do
-        default_sps = Enum.uniq(poll_names ++ suspend_names)
+        default_sps = Enum.uniq(poll_specs ++ suspend_specs)
 
         lower_opts =
           opts
@@ -272,17 +281,34 @@ defmodule Beaver.MLIR.Safepoint do
   end
 
   defp poll_op_cost(%Operation{} = op, cost_attr) do
-    case Operation.attribute(op, cost_attr) do
-      nil ->
-        1
+    attr_int_cost(Operation.attribute(op, cost_attr)) || operand_const_cost(op) || 1
+  end
 
-      attr ->
-        text = MLIR.to_string(attr)
+  defp operand_const_cost(%Operation{} = op) do
+    with %MLIR.Value{} = val <- Enum.at(Operation.operands(op), 0),
+         {:ok, def_op} <- MLIR.Value.owner(val),
+         true <- Operation.name(def_op) in ["arith.constant", "llvm.mlir.constant"] do
+      attr_int_cost(Operation.attribute(def_op, "value"))
+    else
+      _ -> nil
+    end
+  end
 
-        case Integer.parse(text) do
-          {n, _} when n >= 0 -> n
-          _ -> 1
-        end
+  defp attr_int_cost(nil), do: nil
+
+  defp attr_int_cost(%MLIR.Attribute{} = attr) do
+    if MLIR.Attribute.integer?(attr) do
+      val = MLIR.Attribute.value(attr)
+      if is_integer(val) and val >= 0, do: val, else: nil
+    else
+      parse_non_neg_int(MLIR.to_string(attr))
+    end
+  end
+
+  defp parse_non_neg_int(text) do
+    case Integer.parse(text) do
+      {n, _} when n >= 0 -> n
+      _ -> nil
     end
   end
 
@@ -296,14 +322,58 @@ defmodule Beaver.MLIR.Safepoint do
   defp normalize_slot_stride!(other), do: raise(ArgumentError, "invalid :slot_stride: #{inspect(other)}")
 
   @doc false
-  def resolve_ops(%Operation{} = func_op, op_name) when is_binary(op_name),
-    do: Beaver.Walker.find_ops(func_op, op_name, exclude_root: true)
-
-  def resolve_ops(%Operation{} = _func_op, [%Operation{} | _] = ops), do: ops
   def resolve_ops(%Operation{} = _func_op, []), do: []
+  def resolve_ops(%Operation{} = _func_op, [%Operation{} | _] = ops), do: ops
 
-  def resolve_ops(%Operation{} = func_op, names) when is_list(names),
-    do: Beaver.Walker.find_ops(func_op, names, exclude_root: true)
+  def resolve_ops(%Operation{} = func_op, specs) when is_list(specs) do
+    {explicit_ops, matchers} = Enum.split_with(specs, &match?(%Operation{}, &1))
+
+    matched =
+      if matchers == [] do
+        []
+      else
+        preds = Enum.map(matchers, &spec_predicate!/1)
+        Beaver.Walker.find_ops(func_op, fn op -> Enum.any?(preds, & &1.(op)) end, exclude_root: true)
+      end
+
+    explicit_ops ++ matched
+  end
+
+  def resolve_ops(%Operation{} = func_op, spec), do: resolve_ops(func_op, [spec])
+
+  defp spec_predicate!(fun) when is_function(fun, 1), do: fn op -> if(fun.(op), do: true, else: false) end
+
+  defp spec_predicate!("@" <> callee) when callee != "" do
+    fn op -> op_callee_symbol(op) == callee end
+  end
+
+  defp spec_predicate!({op_name, callee}) do
+    expected_op = to_string(op_name)
+    expected_callee = callee |> to_string() |> String.trim_leading("@")
+    fn op -> Operation.name(op) == expected_op and op_callee_symbol(op) == expected_callee end
+  end
+
+  defp spec_predicate!(op_name) when is_binary(op_name) or is_atom(op_name) do
+    expected_op = to_string(op_name)
+    fn op -> Operation.name(op) == expected_op end
+  end
+
+  defp spec_predicate!(other), do: raise(ArgumentError, "invalid safepoint operation spec: #{inspect(other)}")
+
+  defp op_callee_symbol(%Operation{} = op) do
+    case Operation.attribute(op, "callee") do
+      %MLIR.Attribute{} = attr -> extract_callee_attr(attr)
+      nil -> nil
+    end
+  end
+
+  defp extract_callee_attr(attr) do
+    cond do
+      MLIR.Attribute.flat_symbol_ref?(attr) -> MLIR.Attribute.value(attr)
+      MLIR.Attribute.string?(attr) -> attr |> MLIR.Attribute.value() |> String.trim_leading("@")
+      true -> nil
+    end
+  end
 
   @doc false
   def decode({slot_count, raw_slot_types, raw_value_slots, raw_entries}) do

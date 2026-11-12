@@ -56,7 +56,7 @@ defmodule Beaver.MLIR.IRBatch do
     if valid, do: {:ok, root, diagnostics}, else: {:error, diagnostics}
   end
 
-  @doc "Builds and inserts a batch of up to 65,536 operations into `target` in a single NIF submission."
+  @doc "Builds and inserts a batch of up to 1,048,576 operations into `target` in a single NIF submission."
   def build(target, specs, opts \\ []) when is_list(specs) and is_list(opts) do
     opts = Keyword.put_new(opts, :strategy, :auto)
     {block, position} = resolve_build_target!(target, Keyword.get(opts, :position, :end))

@@ -13,6 +13,7 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/IR/SymbolTable.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/Config/llvm-config.h"
 #include "llvm/Support/DynamicLibrary.h"
@@ -229,6 +230,48 @@ MLIR_CAPI_EXPORTED void beaverSymbolTableSetSymbolVisibility(MlirOperation symbo
     llvm_unreachable("unknown Beaver symbol visibility");
 
   SymbolTable::setSymbolVisibility(unwrap(symbol), static_cast<SymbolTable::Visibility>(visibility));
+}
+
+static void collectAttrSymbols(Attribute attr, llvm::SetVector<llvm::StringRef> &seen) {
+  if (!attr)
+    return;
+  attr.walk([&](Attribute nested) {
+    if (auto symRef = llvm::dyn_cast<SymbolRefAttr>(nested))
+      seen.insert(symRef.getRootReference().getValue());
+  });
+}
+
+MLIR_CAPI_EXPORTED void beaverSymbolTableWalkReferencedSymbols(MlirOperation root, MlirStringCallback callback,
+                                                               void *userData) {
+  Operation *op = unwrap(root);
+  if (!op)
+    return;
+  llvm::SetVector<llvm::StringRef> seen;
+  bool usedFastPath = op->getNumRegions() > 0;
+  if (usedFastPath) {
+    for (Region &region : op->getRegions()) {
+      if (auto uses = SymbolTable::getSymbolUses(&region)) {
+        for (const SymbolTable::SymbolUse &use : *uses)
+          seen.insert(use.getSymbolRef().getRootReference().getValue());
+      } else {
+        usedFastPath = false;
+        break;
+      }
+    }
+  }
+  if (!usedFastPath) {
+    seen.clear();
+    op->walk([&](Operation *child) {
+      if (child == op && op->getNumRegions() > 0)
+        return;
+      for (NamedAttribute na : collectInherentAttributes(child))
+        collectAttrSymbols(na.getValue(), seen);
+      for (NamedAttribute na : child->getDiscardableAttrDictionary())
+        collectAttrSymbols(na.getValue(), seen);
+    });
+  }
+  for (llvm::StringRef sym : seen)
+    callback(wrap(sym), userData);
 }
 
 MLIR_CAPI_EXPORTED bool beaverOperationHasInherentAttributeByName(MlirOperation operation, MlirStringRef name) {

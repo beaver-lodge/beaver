@@ -623,6 +623,17 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
       return false;
     }
     tempBr->erase();
+    if (!sp->use_empty() && sp->getNumResults() == 1 && isa<IntegerType>(sp->getResult(0).getType())) {
+      OpBuilder resumeBuilder = OpBuilder::atBlockBegin(resumeBlocks[i]);
+      Type rType = sp->getResult(0).getType();
+      Value zero = isLLVMFunc
+                       ? Value(LLVM::ConstantOp::create(resumeBuilder, loc, rType,
+                                                        resumeBuilder.getIntegerAttr(rType, 0))
+                                   .getRes())
+                       : Value(arith::ConstantOp::create(resumeBuilder, loc, rType,
+                                                         resumeBuilder.getIntegerAttr(rType, 0)));
+      sp->getResult(0).replaceAllUsesWith(zero);
+    }
     if (sp->use_empty()) sp->erase();
   }
 

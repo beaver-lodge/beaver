@@ -848,6 +848,178 @@ defmodule Beaver.SluiceDrivenRefactoringTest do
     end
   end
 
+  describe "8. Dialect-free @symbol Safepoint, PDL specialization, and Module.import_symbols!" do
+    test "Safepoint supports @callee symbol matchers and constant operand poll cost", %{ctx: ctx} do
+      ir = ~S"""
+      module {
+        func.func private @beam.poll(i64) -> i1
+        func.func private @beam.suspend(i32) -> ()
+
+        func.func @leaf_fn(%state: i64, %frame: !llvm.ptr, %x: i64) -> i64 {
+          %c6 = arith.constant 6 : i64
+          %stop = func.call @beam.poll(%c6) : (i64) -> i1
+          %dbl = arith.addi %x, %x : i64
+          cf.cond_br %stop, ^yield, ^done
+        ^yield:
+          %zero = arith.constant 0 : i64
+          return %zero : i64
+        ^done:
+          return %dbl : i64
+        }
+
+        func.func @heavy_fn(%state: i64, %frame: !llvm.ptr, %x: i64) -> i64 {
+          %c40 = arith.constant 40 : i64
+          %stop = func.call @beam.poll(%c40) : (i64) -> i1
+          return %x : i64
+        }
+
+        func.func @suspending_fn(%state: i64, %frame: !llvm.ptr, %x: i64) -> i64 {
+          %c1 = arith.constant 1 : i32
+          func.call @beam.suspend(%c1) : (i32) -> ()
+          return %x : i64
+        }
+      }
+      """
+
+      Module.with_module(ctx, ir, fn mod ->
+        [leaf_fn, heavy_fn, suspending_fn] =
+          mod
+          |> Walker.find_ops("func.func")
+          |> Enum.filter(fn op ->
+            MLIR.Attribute.value(op["sym_name"]) in ["leaf_fn", "heavy_fn", "suspending_fn"]
+          end)
+
+        assert Safepoint.bounded_leaf?(leaf_fn,
+                 poll_ops: ["@beam.poll"],
+                 suspend_ops: [{"func.call", "@beam.suspend"}],
+                 max_work: 16
+               )
+
+        refute Safepoint.bounded_leaf?(leaf_fn,
+                 poll_ops: ["@beam.poll"],
+                 suspend_ops: ["@beam.suspend"],
+                 max_work: 4
+               )
+
+        refute Safepoint.bounded_leaf?(heavy_fn,
+                 poll_ops: ["@beam.poll"],
+                 suspend_ops: ["@beam.suspend"],
+                 max_work: 32
+               )
+
+        refute Safepoint.bounded_leaf?(suspending_fn,
+                 poll_ops: ["@beam.poll"],
+                 suspend_ops: [{"func.call", "@beam.suspend"}],
+                 max_work: 32
+               )
+
+        analysis = Safepoint.analyze(leaf_fn, ["@beam.poll"], exclude_entry_args: true)
+        assert length(analysis.safepoints) == 1
+
+        bundled =
+          Safepoint.bundle_leaf!(mod, "leaf_fn",
+            poll_ops: ["@beam.poll"],
+            suspend_ops: ["@beam.suspend"],
+            state_arg: 0,
+            frame_arg: 1,
+            max_work: 16
+          )
+
+        assert bundled.bounded_leaf?
+        assert bundled.leaf_symbol == "leaf_fn_leaf"
+        assert MLIR.verify!(mod)
+
+        leaf_text = MLIR.to_string(bundled.leaf_function)
+        refute leaf_text =~ "@beam.poll"
+        assert leaf_text =~ "arith.constant false"
+      end)
+    end
+
+    test "PDL specialization + Module.import_symbols! + inline/sccp eliminates boxing and unused templates", %{
+      ctx: ctx
+    } do
+      templates_ir = ~S"""
+      module {
+        func.func private @beam.make_pair(%tag: i64, %val: i64) -> !llvm.struct<(i64, i64)> {
+          %u0 = llvm.mlir.undef : !llvm.struct<(i64, i64)>
+          %s0 = llvm.insertvalue %tag, %u0[0] : !llvm.struct<(i64, i64)>
+          %s1 = llvm.insertvalue %val, %s0[1] : !llvm.struct<(i64, i64)>
+          return %s1 : !llvm.struct<(i64, i64)>
+        }
+
+        func.func private @beam.box_int(%v: i64) -> !llvm.struct<(i64, i64)> {
+          %c1 = arith.constant 1 : i64
+          %res = func.call @beam.make_pair(%c1, %v) : (i64, i64) -> !llvm.struct<(i64, i64)>
+          return %res : !llvm.struct<(i64, i64)>
+        }
+
+        func.func private @beam.unbox_int(%t: !llvm.struct<(i64, i64)>) -> i64 {
+          %v = llvm.extractvalue %t[1] : !llvm.struct<(i64, i64)>
+          return %v : i64
+        }
+
+        func.func private @beam.unused_helper(%x: i64) -> i64 {
+          return %x : i64
+        }
+      }
+      """
+
+      pdl_ir = ~S"""
+      module {
+        pdl.pattern @unbox_box_int : benefit(2) {
+          %v = pdl.operand
+          %box_ty = pdl.type
+          %i64_ty = pdl.type : i64
+          %box_sym = pdl.attribute = @beam.box_int
+          %unbox_sym = pdl.attribute = @beam.unbox_int
+          %box = pdl.operation "func.call"(%v : !pdl.value) {"callee" = %box_sym} -> (%box_ty : !pdl.type)
+          %boxed = pdl.result 0 of %box
+          %unbox = pdl.operation "func.call"(%boxed : !pdl.value) {"callee" = %unbox_sym} -> (%i64_ty : !pdl.type)
+          pdl.rewrite %unbox {
+            pdl.replace %unbox with (%v : !pdl.value)
+          }
+        }
+      }
+      """
+
+      user_ir = ~S"""
+      module {
+        func.func private @beam.box_int(i64) -> !llvm.struct<(i64, i64)>
+        func.func private @beam.unbox_int(!llvm.struct<(i64, i64)>) -> i64
+
+        func.func @compute(%x: i64) -> !llvm.struct<(i64, i64)> {
+          %b0 = func.call @beam.box_int(%x) : (i64) -> !llvm.struct<(i64, i64)>
+          %u0 = func.call @beam.unbox_int(%b0) : (!llvm.struct<(i64, i64)>) -> i64
+          %sum = arith.addi %u0, %x : i64
+          %out = func.call @beam.box_int(%sum) : (i64) -> !llvm.struct<(i64, i64)>
+          return %out : !llvm.struct<(i64, i64)>
+        }
+      }
+      """
+
+      Module.with_module(ctx, templates_ir, fn tmpl_mod ->
+        Module.with_module(ctx, user_ir, fn user_mod ->
+          Beaver.MLIR.Rewrite.apply_patterns!(user_mod, [{:pdl, pdl_ir}])
+          after_pdl = MLIR.to_string(user_mod)
+          refute after_pdl =~ "func.call @beam.unbox_int"
+
+          Module.import_symbols!(user_mod, tmpl_mod, verify_type: true)
+          imported_text = MLIR.to_string(user_mod)
+          assert imported_text =~ "func.func private @beam.make_pair("
+          refute imported_text =~ "@beam.unused_helper"
+          assert MLIR.verify!(user_mod)
+
+          ~w(inline sccp canonicalize cse symbol-dce)
+          |> Enum.reduce(user_mod, &Composer.append(&2, &1))
+          |> Composer.run!()
+
+          final_text = MLIR.to_string(user_mod)
+          assert_text(final_text, ["arith.addi", "llvm.insertvalue"], ["@beam.box_int", "@beam.make_pair", "func.call"])
+        end)
+      end)
+    end
+  end
+
   defp operation(name, bind, operands, results \\ [:i64], attrs \\ []),
     do: %{name: name, bind: bind, operands: operands, results: results, attributes: attrs}
 
