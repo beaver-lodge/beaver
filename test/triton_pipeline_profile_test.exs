@@ -1,8 +1,6 @@
 defmodule Beaver.MLIR.Triton.PipelineProfileTest do
   use Beaver.Case, async: true
 
-  alias Beaver.MLIR
-
   @moduletag :triton
   @enabled System.get_env("BEAVER_TRITON_PREBUILT_DIR") != nil
 

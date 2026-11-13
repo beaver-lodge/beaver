@@ -1,10 +1,7 @@
 defmodule ArithTest do
   use Beaver.Case, async: true
-  use Beaver
-  alias Beaver.MLIR
   alias Beaver.MLIR.Type
   alias Beaver.MLIR.Dialect.{Func, Arith}
-  require Func
   @moduletag :smoke
 
   test "int predicates", %{ctx: ctx} do
@@ -32,18 +29,14 @@ defmodule ArithTest do
   for p <- [:!=, :==, :>, :>=, :<, :<=], signed <- [true, false] do
     test "int operator #{p}, signed: #{signed}", %{ctx: ctx} do
       mlir ctx: ctx do
-        module do
-          Func.func _(
-                      function_type: Type.function([Type.i32(), Type.i32()], []),
-                      sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
-                    ) do
-            region do
-              block _(a >>> Type.i32(), b >>> Type.i32()) do
-                Arith.cmpi(a, b, predicate: Arith.operator_to_predicate(unquote(p), unquote(signed))) >>> Type.i1()
+        function_module _(
+                          function_type: Type.function([Type.i32(), Type.i32()], []),
+                          sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                        ) do
+          block _(a >>> Type.i32(), b >>> Type.i32()) do
+            Arith.cmpi(a, b, predicate: Arith.operator_to_predicate(unquote(p), unquote(signed))) >>> Type.i1()
 
-                Func.return() >>> []
-              end
-            end
+            Func.return() >>> []
           end
         end
       end

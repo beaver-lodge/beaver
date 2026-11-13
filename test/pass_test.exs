@@ -1,8 +1,6 @@
 defmodule PassTest do
   use Beaver.Case, async: true
-  use Beaver
   alias Beaver.MLIR.Dialect.{Func, Arith}
-  require Func
   import MLIR.Transform
 
   defp example_ir(ctx) do

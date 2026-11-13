@@ -1,7 +1,6 @@
 defmodule BufferizationTest do
   use Beaver.Case, async: true
 
-  alias Beaver.MLIR
   alias Beaver.MLIR.Dialect.Bufferization
 
   @moduletag :smoke

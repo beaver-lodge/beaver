@@ -1,6 +1,5 @@
 defmodule Beaver.MLIR.ConversionResultTest do
   use Beaver.Case, async: true
-  alias Beaver.MLIR
   alias MLIR.Conversion.{Plan, Result}
 
   defp with_module(ctx, source \\ ~s[module { "report.drop"() : () -> () "report.keep"() : () -> () }], fun) do

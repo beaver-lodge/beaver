@@ -2,7 +2,6 @@ defmodule Beaver.DeferredTest do
   use Beaver.Case, async: true
 
   alias Beaver.Deferred
-  alias Beaver.MLIR
 
   test "builders distinguish deferred values from ordinary callbacks", %{ctx: ctx} do
     assert %Deferred{} = deferred = MLIR.Type.i32()

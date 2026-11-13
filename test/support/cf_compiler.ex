@@ -34,9 +34,7 @@ defmodule MutCompiler do
     {mlir, acc}
   end
 
-  # found {:base_lr, [line: 89], nil} unmatched, so we add this match to extract MLIR Value
   defp gen_mlir({_var_name, _line, nil} = ast, acc) do
-    # {ast, acc}
     case fetch_var(acc, ast) do
       {:ok, found} ->
         {found, acc}
@@ -59,21 +57,13 @@ defmodule MutCompiler do
         end
       end
 
-    true_branch =
-      mlir ctx: ctx do
-        block do
-          {mlir, acc} = gen_mlir(do_block_ast, update_block(acc, Beaver.Env.block()))
-
-          CF.br({bb_next, [mlir]}) >>> []
-        end
-      end
-
-    false_branch =
-      mlir ctx: ctx do
-        block do
-          {mlir, acc} = gen_mlir(else_block_ast, update_block(acc, Beaver.Env.block()))
-
-          CF.br({bb_next, [mlir]}) >>> []
+    [true_branch, false_branch] =
+      for branch <- [do_block_ast, else_block_ast] do
+        mlir ctx: ctx do
+          block do
+            {mlir, _acc} = gen_mlir(branch, update_block(acc, Beaver.Env.block()))
+            CF.br({bb_next, [mlir]}) >>> []
+          end
         end
       end
 
@@ -95,42 +85,23 @@ defmodule MutCompiler do
     {mlir, put_var(acc, ast, mlir)}
   end
 
-  # in real world, this should be merged with the gen_mlir for :+
-  defp gen_mlir({:<, _, [left, right]}, %Acc{block: block, ctx: ctx} = acc) do
+  defp gen_mlir({op, _, [left, right]}, %Acc{block: block, ctx: ctx} = acc) when op in [:<, :*] do
     {left = %MLIR.Value{}, acc} = gen_mlir(left, acc)
     {right = %MLIR.Value{}, acc} = gen_mlir(right, acc)
 
-    less =
+    value =
       mlir ip: block, ctx: ctx do
-        Arith.cmpf(left, right, predicate: Arith.cmp_f_predicate(:olt)) >>> Type.i1()
+        if op == :<,
+          do: Arith.cmpf(left, right, predicate: Arith.cmp_f_predicate(:olt)) >>> Type.i1(),
+          else: Arith.mulf(left, right) >>> Type.f32()
       end
 
-    {less, acc}
+    {value, acc}
   end
 
-  # after adding this, you should see this kind of IR printed
-  # %0 = arith.mulf %arg2, %arg1 : f32
-  defp gen_mlir({:*, _line, [left, right]}, %Acc{block: block, ctx: ctx} = acc) do
-    {left = %MLIR.Value{}, acc} = gen_mlir(left, acc)
-    {right = %MLIR.Value{}, acc} = gen_mlir(right, acc)
-    # we only work with float 32 for now
-    add =
-      mlir ip: block, ctx: ctx do
-        Arith.mulf(left, right) >>> Type.f32()
-      end
-
-    {add, acc}
-  end
-
-  # at some point you should see logging of node not supported for MLIR CAPI Value,
-  # let's add the match to disable this kind of logging
   defp gen_mlir(%MLIR.Value{} = mlir, acc), do: {mlir, acc}
 
-  # you might want to print the node not matched
-  defp gen_mlir(ast, acc) do
-    # IO.inspect(ast, label: "node not matched")
-    {ast, acc}
-  end
+  defp gen_mlir(ast, acc), do: {ast, acc}
 
   def gen_func(call, block) do
     {name, _args} = Macro.decompose_call(call)

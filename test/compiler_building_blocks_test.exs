@@ -2,7 +2,7 @@ defmodule Beaver.CompilerBuildingBlocksTest do
   use Beaver.Case, async: true
   alias Beaver.{Composer, MLIR, Native}
   alias Beaver.MLIR.{Attribute, CABI, Context, ExecutionEngine, IRBatch, Module, Operation, SymbolTable}
-  alias Beaver.MLIR.IRBatch.Builder
+  alias Beaver.MLIR.IRBatch.{Builder, Expressions}
   alias Beaver.MLIR.Template.Library
   alias Beaver.Pattern.PDL
 
@@ -75,6 +75,30 @@ defmodule Beaver.CompilerBuildingBlocksTest do
     finalize = fn module -> Module.with_module(ctx, source, &Module.import_symbols!(module, &1)) end
     module = IRBatch.build_module!(ctx, [run_spec(ctx, b, [])], finalize: finalize)
     Native.with_resource(module, &Module.destroy/1, &with_jit(&1, fn jit -> assert invoke(jit, []) == -1 end))
+  end
+
+  test "expression libraries infer shared declarations across batches and reject inconsistent calls", %{ctx: ctx} do
+    alias IRBatch.Expressions, as: E
+    specs = for i <- 1..300, do: E.forward("f#{i}", "external", [:i64], :i64)
+    specs = specs ++ E.memory_accessors("read", "write", :i64)
+    body = E.source(specs)
+
+    Module.with_module(ctx, "module {" <> body <> "}", fn module ->
+      signatures = SymbolTable.function_signatures(module)
+      assert map_size(signatures) == 303
+      assert signatures["external"] == {["i64"], ["i64"]}
+      assert signatures["write"] == {["!llvm.ptr", "i64", "i64"], []}
+    end)
+
+    bad = E.forward("bad", "external", [:i32], :i64)
+    assert_raise ArgumentError, fn -> E.source([hd(specs), bad]) end
+  end
+
+  test "wide negative constants remain signed when compared", %{ctx: ctx} do
+    negative = Expressions.int(-9_223_372_036_854_775_808, :i128)
+    value = Expressions.cast("extui", Expressions.cmp(:slt, negative, Expressions.int(0, :i128)), :i64)
+    spec = Expressions.function("run", [], :i64, value) |> Map.put(:attributes, "llvm.emit_c_interface": :unit)
+    Module.with_module(IRBatch.build_module!(ctx, [spec]), &with_jit(&1, fn jit -> assert invoke(jit, []) == 1 end))
   end
 
   test "template revisions cache portable data while each use owns independent IR", %{ctx: ctx} do
@@ -228,10 +252,7 @@ defmodule Beaver.CompilerBuildingBlocksTest do
     end
   end
 
-  defp rename_rule(from, to) do
-    {from,
-     "pdl.pattern @rename_#{from} : benefit(1) { %x = pdl.operand %t = pdl.type : i64 %src = pdl.attribute = @#{from} %dst = pdl.attribute = @#{to} %call = pdl.operation \"func.call\"(%x : !pdl.value) {\"callee\" = %src} -> (%t : !pdl.type) pdl.rewrite %call { %next = pdl.operation \"func.call\"(%x : !pdl.value) {\"callee\" = %dst} -> (%t : !pdl.type) pdl.replace %call with %next } }\n"}
-  end
+  defp rename_rule(from, to), do: PDL.Source.retarget("rename_#{from}", from, to, ["i64"])
 
   defp run_spec(ctx, b, inputs) do
     %{name: "run", inputs: inputs, results: [:i64], blocks: Builder.finish(b)}

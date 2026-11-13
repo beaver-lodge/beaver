@@ -1,7 +1,6 @@
 defmodule Beaver.BttDrivenRefactoringTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR.{Attribute, Context, Conversion, Operation, Target}
-  alias Beaver.MLIR
   alias Beaver.MLIR.{AnalysisSession, CAPI, ExecutionEngine, IRBatch, Safepoint, SymbolTable, Type, TypeConverter}
   alias Conversion.Plan
   alias Target.LLVMIR

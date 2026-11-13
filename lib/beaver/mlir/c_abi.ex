@@ -1,6 +1,8 @@
 defmodule Beaver.MLIR.CABI do
   @moduledoc "C ABI parameter conventions shared by native call lowering and value-wrapper templates."
-  alias Beaver.{MLIR, MLIR.Template}
+  alias Beaver.MLIR
+  alias MLIR.IRBatch.{Builder, Expressions}
+  import Expressions
 
   @doc "Normalizes a parameter to `{direction, type, options}`; aggregate inputs are passed by address."
   def parameter!(:in), do: {:in, nil, []}
@@ -27,78 +29,42 @@ defmodule Beaver.MLIR.CABI do
   Parameters require explicit types. Options: `:return_type` (void), `:stack_save` (true).
   Output slots are zero-initialized unless their parameter specifies `zero_init: false`.
   """
-  def wrapper_source(name, callee, params, opts \\ []) do
-    name = Template.check_symbol!(name)
-    callee = Template.check_symbol!(callee)
+  def wrapper_source(name, callee, params, opts \\ []), do: source([wrapper_spec(name, callee, params, opts)]) <> "\n"
+
+  @doc "Builds a context-independent wrapper specification for inclusion in a larger IRBatch module."
+  def wrapper_spec(name, callee, params, opts \\ []) do
+    for symbol <- [name, callee], do: MLIR.Template.check_symbol!(symbol)
+    name = name |> to_string() |> String.trim_leading("@")
+    callee = callee |> to_string() |> String.trim_leading("@")
     indexed = Enum.with_index(Enum.map(params, &parameter!/1))
     {_, results} = value_signature(params, opts[:return_type])
-    raw_results = return_types(opts[:return_type])
-    raw_types = for {{kind, type, _}, _} <- indexed, do: if(kind == :in, do: type_string(type), else: "!llvm.ptr")
-    inputs = for {{kind, type, _}, i} <- indexed, kind != :out, do: "%in#{i}: #{type_string(type)}"
-    {setup, restore} = stack_scope(indexed, opts)
+    inputs = for {{kind, type, _}, i} <- indexed, kind != :out, do: {"in#{i}", type_string(type)}
 
-    IO.iodata_to_binary([
-      "func.func private #{callee}(#{Enum.join(raw_types, ", ")}) -> #{return_type(raw_results)}\n\n",
-      "func.func private #{name}(#{Enum.join(inputs, ", ")}) -> (#{Enum.join(results, ", ")}) {\n",
-      setup,
-      Enum.map(indexed, &allocate/1),
-      call_source(callee, indexed, raw_types, raw_results),
-      load_outputs(indexed),
-      restore,
-      return_source(indexed, raw_results, results),
-      "}\n"
-    ])
+    function(name, inputs, results, fn b ->
+      save? = Keyword.get(opts, :stack_save, true) and Enum.any?(indexed, fn {{kind, _, _}, _} -> kind != :in end)
+      {sp, b} = if save?, do: Builder.emit(b, val("llvm.intr.stacksave", [], :ptr)), else: {nil, b}
+      {args, b} = Enum.map_reduce(indexed, b, &allocate/2)
+      {result, b} = Builder.emit(b, call(callee, args, return_types(opts[:return_type])))
+
+      outputs =
+        for {{{:out, type, _}, _}, ptr} <- Enum.zip(indexed, args), do: val("llvm.load", [ptr], type_string(type))
+
+      {outputs, b} = Builder.emit(b, outputs)
+      b = if save?, do: Builder.operation(b, "llvm.intr.stackrestore", [sp], [], [], nil), else: b
+      ret(b, List.wrap(result) ++ outputs)
+    end)
   end
 
-  defp stack_scope(indexed, opts) do
-    uses_stack? = Enum.any?(indexed, fn {{kind, _, _}, _} -> kind != :in end)
-    save? = uses_stack? and Keyword.get(opts, :stack_save, true)
+  defp allocate({{:in, _, _}, i}, b), do: {"in#{i}", b}
 
-    setup = [
-      if(save?, do: "  %sp = \"llvm.intr.stacksave\"() : () -> !llvm.ptr\n", else: ""),
-      if(uses_stack?, do: "  %one = llvm.mlir.constant(1 : i64) : i64\n", else: "")
-    ]
-
-    restore = if save?, do: "  \"llvm.intr.stackrestore\"(%sp) : (!llvm.ptr) -> ()\n", else: ""
-    {setup, restore}
-  end
-
-  defp allocate({{:in, _, _}, _}), do: ""
-
-  defp allocate({{kind, type, opts}, i}) do
+  defp allocate({{kind, type, opts}, i}, b) do
     type = type_string(type)
-    "  #{pointer(kind, i)} = llvm.alloca %one x #{type} : (i64) -> !llvm.ptr\n" <> initialize(kind, type, i, opts)
+    one = val("llvm.mlir.constant", [], :i64, value: {:i64, 1})
+    {ptr, b} = Builder.emit(b, val("llvm.alloca", [one], :ptr, elem_type: {:type, type}))
+    value = if kind == :aggregate, do: "in#{i}", else: val("llvm.mlir.zero", [], type)
+    {ptr, if(kind == :aggregate or opts[:zero_init], do: store(b, ptr, value), else: b)}
   end
 
-  defp initialize(:aggregate, type, i, _), do: "  llvm.store %in#{i}, %agg#{i} : #{type}, !llvm.ptr\n"
-
-  defp initialize(:out, type, i, opts) do
-    if opts[:zero_init],
-      do: "  %outz#{i} = llvm.mlir.zero : #{type}\n  llvm.store %outz#{i}, %outp#{i} : #{type}, !llvm.ptr\n",
-      else: ""
-  end
-
-  defp call_source(callee, indexed, types, results) do
-    args = for {{kind, _, _}, i} <- indexed, do: if(kind == :in, do: "%in#{i}", else: pointer(kind, i))
-    assignment = if results == [], do: "", else: "%st = "
-
-    "  #{assignment}func.call #{callee}(#{Enum.join(args, ", ")}) : (#{Enum.join(types, ", ")}) -> #{return_type(results)}\n"
-  end
-
-  defp return_type([]), do: "()"
-  defp return_type([type]), do: type
-
-  defp load_outputs(indexed) do
-    for {{:out, type, _}, i} <- indexed, do: "  %outv#{i} = llvm.load %outp#{i} : !llvm.ptr -> #{type_string(type)}\n"
-  end
-
-  defp return_source(indexed, raw_results, results) do
-    values = if(raw_results == [], do: [], else: ["%st"]) ++ for({{:out, _, _}, i} <- indexed, do: "%outv#{i}")
-    if values == [], do: "  return\n", else: "  return #{Enum.join(values, ", ")} : #{Enum.join(results, ", ")}\n"
-  end
-
-  defp pointer(:aggregate, i), do: "%agg#{i}"
-  defp pointer(:out, i), do: "%outp#{i}"
   defp return_types(type) when type in [nil, :none, :void], do: []
   defp return_types(type), do: [type_string(type)]
   defp type_string(%MLIR.Type{} = type), do: MLIR.to_string(type)

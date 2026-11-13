@@ -2,7 +2,6 @@ defmodule Beaver.MLIR.LocationTest do
   use Beaver.Case, async: true
 
   alias Beaver.Changeset
-  alias Beaver.MLIR
   alias Beaver.MLIR.Location
 
   test "constructs and safely inspects source ranges", %{ctx: ctx} do

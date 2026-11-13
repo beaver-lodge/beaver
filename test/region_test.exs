@@ -1,10 +1,7 @@
 defmodule RegionTest do
   use Beaver.Case, async: true
-  use Beaver
-  alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Dialect.{Func, Arith, CF}
-  require Func
   @moduletag :smoke
 
   test "multiple regions", %{ctx: ctx} do

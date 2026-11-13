@@ -32,12 +32,9 @@ defmodule Beaver.Slang do
       @before_compile Beaver.Slang
       import Beaver.Slang, only: :macros
       @__slang_dialect_name__ unquote(name)
-      Module.register_attribute(__MODULE__, :__slang__operation__, accumulate: true)
-      Module.register_attribute(__MODULE__, :__slang__creator__, accumulate: true)
-      Module.register_attribute(__MODULE__, :__slang__type__, accumulate: true)
-      Module.register_attribute(__MODULE__, :__slang__trait__, accumulate: true)
-      Module.register_attribute(__MODULE__, :__slang__interface__, accumulate: true)
-      Module.register_attribute(__MODULE__, :__slang__op_meta__, accumulate: true)
+      for kind <- ~w(operation creator type trait interface op_meta) do
+        Module.register_attribute(__MODULE__, String.to_atom("__slang__#{kind}__"), accumulate: true)
+      end
     end
   end
 
@@ -240,9 +237,7 @@ defmodule Beaver.Slang do
 
   @doc false
   def constraint_location(opts, ctx), do: opts[:loc] || source_location(opts, ctx)
-
   defp get_slang_arg_ast(i), do: {"slang_internal_arg#{i}" |> String.to_atom(), [], nil}
-
   defp constraint_binding({name, _, ctx} = ast, _) when is_atom(name) and is_atom(ctx), do: {nil, ast}
   defp constraint_binding({:=, _, [var, _]} = ast, _), do: {ast, var}
 
@@ -269,7 +264,6 @@ defmodule Beaver.Slang do
     do: declaration_name(value, index, prefix)
 
   defp declaration_name({name, _, ctx}, _index, _prefix) when is_atom(name) and is_atom(ctx), do: Atom.to_string(name)
-
   defp declaration_name(_ast, index, prefix), do: "#{prefix}_#{index + 1}"
 
   defp normalize_names!(asts, nil, prefix) do
@@ -369,30 +363,16 @@ defmodule Beaver.Slang do
     do: raise(ArgumentError, "operation attributes must be a keyword list, got: #{Macro.to_string(attributes)}")
 
   defp normalize_region_descriptor(:any), do: %{args: nil, size: nil}
-
   defp normalize_region_descriptor({:sized, size}) when is_integer(size) and size > 0, do: %{args: nil, size: size}
 
   defp normalize_region_descriptor({:region, opts}) when is_list(opts) do
     opts = Keyword.validate!(opts, [:args, :size])
 
-    args =
-      case Keyword.get(opts, :args) do
-        nil -> nil
-        args -> List.wrap(args)
-      end
+    args = if is_nil(opts[:args]), do: nil, else: List.wrap(opts[:args])
+    size = opts[:size]
 
-    size =
-      case Keyword.get(opts, :size) do
-        nil ->
-          nil
-
-        size when is_integer(size) and size > 0 ->
-          size
-
-        size ->
-          raise ArgumentError,
-                "expected region size to be a positive integer, got: #{inspect(size)}"
-      end
+    unless is_nil(size) or (is_integer(size) and size > 0),
+      do: raise(ArgumentError, "expected region size to be a positive integer, got: #{inspect(size)}")
 
     %{args: args, size: size}
   end
@@ -445,18 +425,8 @@ defmodule Beaver.Slang do
     {argument_names, result_names, attribute_names, region_names} =
       uniquify_declaration_names(argument_names, result_names, attribute_names, region_names)
 
-    input_constrains =
-      args
-      |> Macro.postwalk(&transform_defop_pins/1)
-      |> Enum.with_index()
-      |> Enum.map(fn {ast, i} -> elem(constraint_binding(ast, i), 0) end)
-
-    {attribute_constraints, attribute_vars} =
-      attribute_values
-      |> Macro.postwalk(&transform_defop_pins/1)
-      |> Enum.with_index(length(args))
-      |> Enum.map(fn {ast, i} -> constraint_binding(ast, i) end)
-      |> Enum.unzip()
+    {input_constrains, _} = constraint_bindings(args, 0)
+    {attribute_constraints, attribute_vars} = constraint_bindings(attribute_values, length(args))
 
     creator_opts =
       opts
@@ -520,6 +490,14 @@ defmodule Beaver.Slang do
         )
       end
     end
+  end
+
+  defp constraint_bindings(values, offset) do
+    values
+    |> Macro.postwalk(&transform_defop_pins/1)
+    |> Enum.with_index(offset)
+    |> Enum.map(fn {ast, i} -> constraint_binding(ast, i) end)
+    |> Enum.unzip()
   end
 
   @doc false
@@ -592,18 +570,19 @@ defmodule Beaver.Slang do
 
     results = Keyword.get(block, :results, block[:do])
 
-    gen_creator(:operation, :operands, call, results,
-      return_op: :results,
-      need_variadicity: true,
-      argument_names: block[:operand_names],
-      result_names: block[:result_names],
-      attributes: block[:attributes],
-      regions: block[:regions],
-      traits: block[:traits],
-      interfaces: block[:interfaces],
-      layer: block[:layer],
-      metadata: block[:metadata],
-      source: %{file: __CALLER__.file, line: __CALLER__.line}
+    options = Keyword.take(block, ~w(result_names attributes regions traits interfaces layer metadata)a)
+
+    gen_creator(
+      :operation,
+      :operands,
+      call,
+      results,
+      [
+        return_op: :results,
+        need_variadicity: true,
+        argument_names: block[:operand_names],
+        source: %{file: __CALLER__.file, line: __CALLER__.line}
+      ] ++ options
     )
   end
 
@@ -686,7 +665,6 @@ defmodule Beaver.Slang do
 
   @doc false
   def create_base({:parametric, symbol, _values, _element}, opts), do: create_base({:base_ref, symbol}, opts)
-
   def create_base(name, opts) when is_binary(name), do: create_base({:base_name, Attribute.string(name)}, opts)
 
   def create_base({key, value}, opts) when key in [:base_ref, :base_name] do
@@ -744,17 +722,12 @@ defmodule Beaver.Slang do
 
   @doc false
   def create_parametric({:parametric, symbol, values, _}, opts) do
-    base_type = symbol
-
-    Deferred.from_opts(
-      opts,
-      fn ctx ->
-        mlir ctx: ctx, ip: Deferred.fetch_insertion_point(opts) do
-          loc = constraint_location(opts, ctx)
-          IRDL.parametric([loc | values], base_type: base_type) >>> ~t{!irdl.attribute}
-        end
+    Deferred.from_opts(opts, fn ctx ->
+      mlir ctx: ctx, ip: Deferred.fetch_insertion_point(opts) do
+        loc = constraint_location(opts, ctx)
+        IRDL.parametric([loc | values], base_type: symbol) >>> ~t{!irdl.attribute}
       end
-    )
+    end)
   end
 
   @doc false
@@ -808,19 +781,11 @@ defmodule Beaver.Slang do
   `mod`'s canonicalized IRDL schema, traits, and interface keys.
   """
   @spec schema_digest(module()) :: String.t()
-  def schema_digest(mod) when is_atom(mod) do
-    cache_key = {__MODULE__, :schema_digest, mod, mod.__info__(:md5)}
-
-    case :persistent_term.get(cache_key, nil) do
-      digest when is_binary(digest) ->
-        digest
-
-      nil ->
-        digest = compute_schema_digest(mod)
-        :persistent_term.put(cache_key, digest)
-        digest
-    end
-  end
+  def schema_digest(mod) when is_atom(mod),
+    do:
+      Beaver.Build.ArtifactCache.fetch_revision(__MODULE__, mod, mod.__info__(:md5), fn ->
+        compute_schema_digest(mod)
+      end)
 
   defp compute_schema_digest(mod) do
     ir_text =
@@ -878,7 +843,6 @@ defmodule Beaver.Slang do
   end
 
   defp parse_layer_rule(rule), do: {MapSet.new(rule), MapSet.new()}
-
   defp optional_map_set({:ok, list}), do: MapSet.new(list)
   defp optional_map_set(:error), do: nil
 
@@ -943,20 +907,16 @@ defmodule Beaver.Slang do
     merged = Keyword.merge(shared_opts, op_opts)
 
     case {shared_opts[:metadata], op_opts[:metadata]} do
-      {nil, _} ->
-        merged
-
-      {_, nil} ->
-        merged
-
-      {s_meta, o_meta} ->
+      {s_meta, o_meta} when not is_nil(s_meta) and not is_nil(o_meta) ->
         Keyword.put(merged, :metadata, quote(do: Map.merge(Map.new(unquote(s_meta)), Map.new(unquote(o_meta)))))
+
+      _ ->
+        merged
     end
   end
 
   defp maybe_put_kw(kw, _key, nil), do: kw
   defp maybe_put_kw(kw, key, val), do: Keyword.put(kw, key, val)
-
   defp unpack_table_op!({:{}, _, fields}), do: unpack_table_op!(List.to_tuple(fields))
   defp unpack_table_op!({:%{}, _, kvs}), do: unpack_table_op!(kvs)
 
@@ -1000,20 +960,12 @@ defmodule Beaver.Slang do
     do: expand_table_constraint({:pin, pin})
 
   defp expand_table_constraint({:pin, pin}) when is_atom(pin), do: {:^, [], [{pin, [], nil}]}
-
   defp expand_table_constraint({:type, str}) when is_binary(str), do: quote(do: Beaver.MLIR.Type.get(unquote(str)))
 
   defp expand_table_constraint(str) when is_binary(str) do
-    cond do
-      String.starts_with?(str, "#") and not String.contains?(str, "<") ->
-        quote(do: Beaver.Slang.base(unquote(str)))
-
-      String.starts_with?(str, "!") and not String.contains?(str, "<") ->
-        quote(do: Beaver.Slang.base(unquote(str)))
-
-      true ->
-        quote(do: Beaver.MLIR.Type.get(unquote(str)))
-    end
+    if String.starts_with?(str, ["#", "!"]) and not String.contains?(str, "<"),
+      do: quote(do: Beaver.Slang.base(unquote(str))),
+      else: quote(do: Beaver.MLIR.Type.get(unquote(str)))
   end
 
   defp expand_table_constraint({tag, inner}) when tag in [:variadic, :optional, :single] do

@@ -1,8 +1,5 @@
 defmodule CustomTraitTest do
   use Beaver.Case, async: true
-  use Beaver
-
-  alias Beaver.MLIR
 
   @moduletag :smoke
 

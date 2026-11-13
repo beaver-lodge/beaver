@@ -1,5 +1,8 @@
 defmodule ExternalInterfaceSlang do
   @moduledoc false
+  alias Beaver.MLIR.{Attribute, CAPI, MemoryEffects, Operation, PatternRewriter, RewriterBase, RewritePatternSet}
+  alias Beaver.MLIR.{TransformOpInterface}
+
   use Beaver.Slang, name: "external_interface_test"
 
   def pure_effects(_operation), do: :pure
@@ -11,63 +14,42 @@ defmodule ExternalInterfaceSlang do
   def fail_apply(_operation, _rewriter, _results, _state), do: raise("expected callback failure")
 
   def forward_effects(operation, effects) do
-    operand = Beaver.MLIR.CAPI.mlirOperationGetOpOperand(operation, 0)
-    result = Beaver.MLIR.Operation.result(operation, 0)
-    Beaver.MLIR.MemoryEffects.only_reads_handle(effects, operand)
-    Beaver.MLIR.MemoryEffects.produces_handle(effects, result)
-    Beaver.MLIR.MemoryEffects.only_reads_payload(effects)
+    operand = CAPI.mlirOperationGetOpOperand(operation, 0)
+    result = Operation.result(operation, 0)
+    MemoryEffects.only_reads_handle(effects, operand)
+    MemoryEffects.produces_handle(effects, result)
+    MemoryEffects.only_reads_payload(effects)
   end
 
   def mark_effects(operation, effects) do
-    operand = Beaver.MLIR.CAPI.mlirOperationGetOpOperand(operation, 0)
-    Beaver.MLIR.MemoryEffects.only_reads_handle(effects, operand)
-    Beaver.MLIR.MemoryEffects.modifies_payload(effects)
+    operand = CAPI.mlirOperationGetOpOperand(operation, 0)
+    MemoryEffects.only_reads_handle(effects, operand)
+    MemoryEffects.modifies_payload(effects)
   end
 
   def forward_apply(operation, _rewriter, _results, state) do
-    handle = Beaver.MLIR.CAPI.mlirOperationGetOperand(operation, 0)
+    handle = CAPI.mlirOperationGetOperand(operation, 0)
 
-    payload = state |> Beaver.MLIR.TransformOpInterface.payload_ops(handle) |> Enum.flat_map(&payload_functions/1)
+    payload = state |> TransformOpInterface.payload_ops(handle) |> Enum.flat_map(&payload_functions/1)
 
     {:ok, %{0 => {:ops, payload}}}
   end
 
-  defp payload_functions(root) do
-    {_, matches} = Beaver.Walker.prewalk(root, [], &collect_payload_function/2)
-    Enum.reverse(matches)
-  end
-
-  defp collect_payload_function(%Beaver.MLIR.Operation{} = operation, acc) do
-    acc = if Beaver.MLIR.Operation.name(operation) == "func.func", do: [operation | acc], else: acc
-
-    {operation, acc}
-  end
-
-  defp collect_payload_function(element, acc), do: {element, acc}
+  defp payload_functions(root), do: Beaver.Walker.find_ops(root, "func.func")
 
   def mark_apply(operation, rewriter, _results, state) do
-    handle = Beaver.MLIR.CAPI.mlirOperationGetOperand(operation, 0)
-    base = Beaver.MLIR.TransformOpInterface.rewriter_base(rewriter)
+    handle = CAPI.mlirOperationGetOperand(operation, 0)
+    base = TransformOpInterface.rewriter_base(rewriter)
 
     state
-    |> Beaver.MLIR.TransformOpInterface.payload_ops(handle)
-    |> Enum.each(fn payload ->
-      Beaver.MLIR.RewriterBase.start_op_modification(base, payload)
-
-      Beaver.MLIR.Operation.put_discardable_attribute(
-        payload,
-        "external_interface_test.marked",
-        Beaver.MLIR.Attribute.unit(ctx: Beaver.MLIR.context(payload))
-      )
-
-      Beaver.MLIR.RewriterBase.finalize_op_modification(base, payload)
-    end)
+    |> TransformOpInterface.payload_ops(handle)
+    |> Enum.each(&mark(base, &1, "marked"))
 
     :ok
   end
 
   def populate_patterns(operation, patterns) do
-    Beaver.MLIR.RewritePatternSet.add(
+    RewritePatternSet.add(
       patterns,
       "func.return",
       &__MODULE__.mark_return/4,
@@ -81,18 +63,22 @@ defmodule ExternalInterfaceSlang do
     if operation["external_interface_test.pattern_applied"] do
       {:error, state}
     else
-      base = Beaver.MLIR.PatternRewriter.as_base(rewriter)
-      Beaver.MLIR.RewriterBase.start_op_modification(base, operation)
-
-      Beaver.MLIR.Operation.put_discardable_attribute(
-        operation,
-        "external_interface_test.pattern_applied",
-        Beaver.MLIR.Attribute.unit(ctx: Beaver.MLIR.context(operation))
-      )
-
-      Beaver.MLIR.RewriterBase.finalize_op_modification(base, operation)
+      base = PatternRewriter.as_base(rewriter)
+      mark(base, operation, "pattern_applied")
       {:ok, state}
     end
+  end
+
+  defp mark(base, operation, name) do
+    RewriterBase.start_op_modification(base, operation)
+
+    Operation.put_discardable_attribute(
+      operation,
+      "external_interface_test." <> name,
+      Attribute.unit(ctx: Beaver.MLIR.context(operation))
+    )
+
+    RewriterBase.finalize_op_modification(base, operation)
   end
 
   defop pure(),

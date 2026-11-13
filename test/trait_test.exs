@@ -1,6 +1,5 @@
 defmodule TraitTest do
   use Beaver.Case, async: true
-  use Beaver
   alias Beaver.MLIR.Dialect.Func
   @moduletag :smoke
 

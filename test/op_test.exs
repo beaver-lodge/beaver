@@ -1,8 +1,5 @@
 defmodule OpTest do
   use Beaver.Case, async: true
-  use Beaver
-
-  alias Beaver.MLIR
 
   test "get_and_update", %{ctx: ctx} do
     const =

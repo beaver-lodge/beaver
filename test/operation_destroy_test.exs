@@ -1,8 +1,6 @@
 defmodule OperationDestroyTest do
   use Beaver.Case, async: true
 
-  alias Beaver.MLIR
-
   test "iteratively destroys deeply nested operation trees", %{ctx: ctx} do
     depth = 128
 

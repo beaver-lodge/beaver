@@ -1,8 +1,6 @@
 defmodule FixedPointPassTest do
   use Beaver.Case, async: true
 
-  alias Beaver.MLIR
-
   test "declares deterministic fail-closed fixed-point pipelines" do
     fixed_point =
       MLIR.Transform.composite_fixed_point(name: "Canonical closure", pipeline: ["canonicalize"], max_iterations: 7)

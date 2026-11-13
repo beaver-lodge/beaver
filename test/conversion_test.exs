@@ -1,22 +1,9 @@
 defmodule Beaver.MLIR.ConversionTest do
   use Beaver.Case, async: true
 
-  alias Beaver.MLIR.{
-    Context,
-    Conversion,
-    ConversionPattern,
-    ConversionPatternRewriter,
-    ConversionTarget,
-    LogicalResult,
-    Operation,
-    RewritePatternSet,
-    Type,
-    TypeConverter
-  }
+  alias Beaver.MLIR.{Context, Conversion, ConversionPattern, ConversionPatternRewriter, ConversionTarget}
+  alias Beaver.MLIR.{LogicalResult, Operation, RewritePatternSet, Type, TypeConverter}
 
-  use Beaver
-
-  alias Beaver.MLIR
   import Beaver.ConversionHelpers
 
   test "lowers a Slang dialect with per-instance legality and a 1:N type conversion", %{ctx: ctx} do

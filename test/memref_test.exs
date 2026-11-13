@@ -1,6 +1,5 @@
 defmodule MemRefTest do
   use Beaver.Case, async: true
-  use Beaver
   alias Beaver.MLIR.Dialect.MemRef
   @moduletag :smoke
 
@@ -70,7 +69,6 @@ defmodule MemRefTest do
   end
 
   test "memref<?xi8>", %{ctx: ctx} do
-    import Beaver.Sigils
     assert memref_type = ~t{memref<?xi8>} |> Beaver.Deferred.resolve(ctx)
     assert 1 = MLIR.ShapedType.rank(memref_type)
     assert :dynamic = MLIR.ShapedType.dim_size(memref_type, 0)

@@ -13,13 +13,8 @@ defmodule Beaver.MLIR.IRBatch do
   def read([first | _] = operations, opts) do
     names = Enum.map(Keyword.get(opts, :attributes, []), &to_string/1)
 
-    records =
-      Execution.run(
-        MLIR.context(first),
-        :snapshot,
-        {Enum.map(operations, & &1.ref), names},
-        Keyword.put_new(opts, :strategy, :auto)
-      )
+    payload = {Enum.map(operations, & &1.ref), names}
+    records = Execution.run(MLIR.context(first), :snapshot, payload, Keyword.put_new(opts, :strategy, :auto))
 
     Enum.map(records, fn {op, name, operands, results, operand_types, result_types, attributes} ->
       %{
@@ -110,27 +105,13 @@ defmodule Beaver.MLIR.IRBatch do
     initial = Map.new(Map.get(spec, :bindings, []))
     {encoded_specs, final_bindings} = encode_cfg_blocks!(plan, blocks, return_op, loc, initial)
 
-    verify_target =
-      case Keyword.get(opts, :verify, false) do
-        true -> func_op
-        other -> other
-      end
+    verify = if opts[:verify] == true, do: func_op, else: opts[:verify]
+    refs = Enum.map(plan, & &1.block.ref)
 
-    verify_root_ref = encode_verify_root(verify_target)
-
-    case submit_build(ctx, Enum.map(plan, & &1.block.ref), :blocks, encoded_specs, verify_root_ref, opts) do
-      {:ok, ops, results, diagnostics} ->
-        result =
-          if opts[:return_details] do
-            {func_op, %{operations: ops, results: results, blocks: blocks, bindings: final_bindings}}
-          else
-            func_op
-          end
-
-        {:ok, result, diagnostics}
-
-      error ->
-        error
+    with {:ok, ops, results, diagnostics} <-
+           submit_build(ctx, refs, :blocks, encoded_specs, encode_verify_root(verify), opts) do
+      details = %{operations: ops, results: results, blocks: blocks, bindings: final_bindings}
+      {:ok, if(opts[:return_details], do: {func_op, details}, else: func_op), diagnostics}
     end
   end
 
@@ -234,11 +215,8 @@ defmodule Beaver.MLIR.IRBatch do
 
     attrs =
       if Map.get(spec, :include_function_type, name in ["func.func", "llvm.func"]) do
-        Keyword.put(
-          attrs,
-          :function_type,
-          MLIR.Attribute.type(build_function_type!(ctx, name, inputs, results, spec[:function_type]))
-        )
+        type = build_function_type!(ctx, name, inputs, results, spec[:function_type])
+        Keyword.put(attrs, :function_type, MLIR.Attribute.type(type))
       else
         attrs
       end
@@ -392,15 +370,8 @@ defmodule Beaver.MLIR.IRBatch do
       case_operand_segments: {:dense_i32, Enum.map(arguments, &length/1)}
     ]
 
-    attrs =
-      if values == [],
-        do: attrs,
-        else:
-          Keyword.put(
-            attrs,
-            :case_values,
-            {:parse, "dense<[#{Enum.join(values, ", ")}]> : vector<#{length(values)}x#{flag_type_str}>"}
-          )
+    case_values = "dense<[#{Enum.join(values, ", ")}]> : vector<#{length(values)}x#{flag_type_str}>"
+    attrs = if values == [], do: attrs, else: Keyword.put(attrs, :case_values, {:parse, case_values})
 
     %{
       name: "cf.switch",

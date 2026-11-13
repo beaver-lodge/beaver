@@ -1,11 +1,8 @@
 defmodule IRDLTest do
   use Beaver.Case, async: true
-  alias Beaver.MLIR
   @moduletag :smoke
 
   test "gen irdl", %{ctx: ctx} do
-    import Beaver.Sigils
-
     m =
       sigil_m(
         "irdl.dialect @cmath {\n  irdl.type @complex {\n    %0 = irdl.is f32\n    %1 = irdl.is f64\n    %2 = irdl.any_of(%0, %1)\n    irdl.parameters(elem: %2)\n  }\n  irdl.operation @norm {\n    %0 = irdl.any\n    %1 = irdl.parametric @cmath::@complex<%0>\n    irdl.operands(complex: %1)\n    irdl.results(norm: %0)\n  }\n   irdl.operation @mul {\n    %0 = irdl.is f32\n    %1 = irdl.is f64\n    %2 = irdl.any_of(%0, %1)\n    %3 = irdl.parametric @cmath::@complex<%2>\n    irdl.operands(lhs: %3, rhs: %3)\n    irdl.results(res: %3)\n  }\n}\n",
@@ -22,7 +19,6 @@ defmodule IRDLTest do
   end
 
   test "cmath dialect", %{ctx: ctx} do
-    use Beaver
     alias Beaver.MLIR.Type
     CMath.__slang_dialect__(ctx) |> MLIR.verify!()
     Beaver.Slang.load(ctx, CMath)
@@ -35,7 +31,6 @@ defmodule IRDLTest do
   end
 
   test "var dialect", %{ctx: ctx} do
-    use Beaver
     TestVariadic.__slang_dialect__(ctx) |> MLIR.verify!()
   end
 

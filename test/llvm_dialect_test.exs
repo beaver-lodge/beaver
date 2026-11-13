@@ -1,8 +1,6 @@
 defmodule LLVMDialectTest do
   use Beaver.Case, async: true
-  use Beaver
 
-  alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Dialect.LLVM
 

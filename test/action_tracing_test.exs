@@ -1,8 +1,6 @@
 defmodule ActionTracingTest do
   use Beaver.Case, async: true
 
-  alias Beaver.MLIR
-
   defmodule TelemetryHandler do
     def handle_event(_event, measurements, metadata, %{parent: parent}) do
       send(parent, {:action_stop, measurements, metadata})

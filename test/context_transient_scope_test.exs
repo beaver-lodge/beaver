@@ -1,8 +1,6 @@
 defmodule ContextTransientScopeTest do
   use Beaver.Case, async: true
 
-  alias Beaver.MLIR
-
   test "creates IR in a transient context scope", %{ctx: ctx} do
     assert :ok ==
              MLIR.Context.with_transient_scope(ctx, fn scoped_ctx ->

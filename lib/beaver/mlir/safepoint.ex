@@ -95,12 +95,7 @@ defmodule Beaver.MLIR.Safepoint do
          true <- acyclic_cfg?(blocks),
          [] <- resolve_ops(func_op, loop_ops),
          [] <- resolve_ops(func_op, suspend_specs) do
-      total_cost =
-        func_op
-        |> resolve_ops(poll_specs)
-        |> Enum.reduce(0, fn poll_op, acc -> acc + poll_op_cost(poll_op, cost_attr) end)
-
-      total_cost <= max_work
+      Enum.reduce(resolve_ops(func_op, poll_specs), 0, &(&2 + poll_op_cost(&1, cost_attr))) <= max_work
     else
       _ -> false
     end
@@ -156,25 +151,14 @@ defmodule Beaver.MLIR.Safepoint do
     suspend_specs = op_specs(opts, :suspend_ops, :safepoints, "coro.suspend")
     eligible? = bounded_leaf?(func_op, opts)
 
-    if Keyword.get(opts, :require_leaf, false) and not eligible? do
-      raise ArgumentError, "function is not a bounded leaf"
-    end
+    if opts[:require_leaf] && not eligible?, do: raise(ArgumentError, "function is not a bounded leaf")
 
     {leaf_op, leaf_sym} = if eligible?, do: create_folded_leaf_clone!(func_op, poll_specs, opts), else: {nil, nil}
 
     {lowered_op, frame_bytes} =
       if Keyword.get(opts, :lower_resumable, true) do
-        default_sps = Enum.uniq(poll_specs ++ suspend_specs)
-
-        lower_opts =
-          opts
-          |> Keyword.drop(
-            ~w(poll_ops poll suspend_ops loop_ops cost_attr max_work leaf_name fold_poll lower_resumable require_leaf)a
-          )
-          |> Keyword.put_new(:safepoints, default_sps)
-          |> Keyword.put(:return_frame_bytes, true)
-
-        lower_resumable!(func_op, lower_opts)
+        lower_opts = Keyword.put_new(opts, :safepoints, Enum.uniq(poll_specs ++ suspend_specs))
+        lower_resumable!(func_op, Keyword.put(lower_opts, :return_frame_bytes, true))
       else
         {func_op, 0}
       end
@@ -195,22 +179,24 @@ defmodule Beaver.MLIR.Safepoint do
     leaf_sym =
       Keyword.get_lazy(opts, :leaf_name, fn -> orig_sym <> "_leaf" end) |> to_string() |> String.trim_leading("@")
 
-    case lookup_existing_leaf(func_op, leaf_sym) do
-      %Operation{} = existing ->
-        {existing, leaf_sym}
+    leaf = lookup_existing_leaf(func_op, leaf_sym) || clone_leaf!(func_op, leaf_sym, poll_names, opts, ctx)
+    {leaf, leaf_sym}
+  end
 
-      nil ->
-        clone = Operation.clone(func_op)
-        Operation.put_attribute(clone, :sym_name, Attribute.string(leaf_sym, ctx: ctx))
-        fold_fn = Keyword.get(opts, :fold_poll)
+  defp clone_leaf!(func, name, polls, opts, ctx) do
+    clone = Operation.clone(func)
+    Operation.put_attribute(clone, :sym_name, Attribute.string(name, ctx: ctx))
+    callback = opts[:fold_poll]
+    fold = if is_function(callback, 2), do: callback, else: &fold_poll_op!(&1, clone, &2)
 
-        IRRewriter.with_rewriter(ctx, fn rw ->
-          insert_clone_after_if_attached(rw, func_op, clone)
-          apply_poll_folding!(rw, clone, poll_names, fold_fn)
-        end)
+    IRRewriter.with_rewriter(ctx, fn rw ->
+      insert = fn -> RewriterBase.insert(rw, clone) end
+      if Operation.block(func), do: RewriterBase.with_insertion_point(rw, {:after, func}, insert)
 
-        {clone, leaf_sym}
-    end
+      Enum.each(resolve_ops(clone, polls), &fold.(rw, &1))
+    end)
+
+    clone
   end
 
   defp lookup_existing_leaf(func, sym) do
@@ -224,20 +210,8 @@ defmodule Beaver.MLIR.Safepoint do
     unless MLIR.null?(op), do: op
   end
 
-  defp insert_clone_after_if_attached(rw, func, clone) do
-    if Operation.block(func),
-      do: RewriterBase.with_insertion_point(rw, {:after, func}, fn -> RewriterBase.insert(rw, clone) end)
-  end
-
-  defp apply_poll_folding!(rw, clone, specs, callback) do
-    fold = if is_function(callback, 2), do: callback, else: &fold_poll_op!(&1, clone, &2)
-    Enum.each(resolve_ops(clone, specs), &fold.(rw, &1))
-  end
-
   defp fold_poll_op!(rw, enclosing_func, poll_op) do
-    results = poll_op |> Operation.results() |> Enum.to_list()
-
-    case results do
+    case Enum.to_list(Operation.results(poll_op)) do
       [] ->
         RewriterBase.erase_op(rw, poll_op)
 
@@ -311,7 +285,6 @@ defmodule Beaver.MLIR.Safepoint do
 
   def resolve_ops(%Operation{} = func_op, spec), do: resolve_ops(func_op, [spec])
   defp spec_predicate!(fun) when is_function(fun, 1), do: fn op -> if(fun.(op), do: true, else: false) end
-
   defp spec_predicate!("@" <> callee) when callee != "", do: fn op -> op_callee_symbol(op) == callee end
 
   defp spec_predicate!({op_name, callee}) do

@@ -1,22 +1,8 @@
 defmodule AnalysisAndRewriteUtilitiesTest do
   use Beaver.Case, async: true
 
-  alias Beaver.MLIR.{
-    Attribute,
-    Block,
-    DominanceInfo,
-    IRMapping,
-    IRRewriter,
-    Location,
-    OpOperand,
-    Operation,
-    PostDominanceInfo,
-    RewriterBase,
-    Type,
-    Value
-  }
-
-  alias Beaver.MLIR
+  alias Beaver.MLIR.{Attribute, Block, DominanceInfo, IRMapping, IRRewriter, Location, OpOperand, Operation}
+  alias Beaver.MLIR.{PostDominanceInfo, RewriterBase, Type, Value}
 
   defp control_flow_module(ctx) do
     "module {\n  func.func @branch(%cond: i1, %arg: i32) -> i32 {\n    cf.cond_br %cond, ^left, ^right\n  ^left:\n    %left_value = arith.addi %arg, %arg : i32\n    cf.br ^merge(%left_value : i32)\n  ^right:\n    %right_value = arith.subi %arg, %arg : i32\n    cf.br ^merge(%right_value : i32)\n  ^merge(%result: i32):\n    return %result : i32\n  ^unreachable:\n    return %arg : i32\n  }\n}\n"

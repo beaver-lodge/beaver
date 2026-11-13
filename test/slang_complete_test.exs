@@ -1,6 +1,5 @@
 defmodule SlangCompleteTest do
   use Beaver.Case, async: true
-  alias Beaver.MLIR
   @moduletag :smoke
   @valid_module "module {\n  \"complete_slang.scope\"() ({\n  ^bb0:\n  }) {label = \"ok\"} : () -> ()\n}\n"
   test "emits a complete, named IRDL schema", %{ctx: ctx} do

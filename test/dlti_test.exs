@@ -1,8 +1,6 @@
 defmodule DLTITest do
   use Beaver.Case, async: true
-  use Beaver
 
-  alias Beaver.MLIR
   alias Beaver.MLIR.Dialect.DLTI
 
   @moduletag :smoke

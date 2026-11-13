@@ -1,16 +1,13 @@
 defmodule NativePatternTest do
   use Beaver.Case, async: true
-  use Beaver
 
   import ExUnit.CaptureLog
 
   alias Beaver.MLIR.Dialect.{Arith, Func}
   alias Beaver.Pattern.Native
   require Native
-  require Func
 
   defmodule TestNativePatterns do
-    use Beaver
     use Beaver.Pattern.Native
 
     alias Beaver.MLIR.Dialect.Arith
@@ -109,16 +106,12 @@ defmodule NativePatternTest do
 
   defp create_add_ir(ctx, lhs, rhs) do
     mlir ctx: ctx do
-      module do
-        Func.func test_func(function_type: Type.function([], [Type.i64()])) do
-          region do
-            block do
-              lhs = Arith.constant(value: Attribute.integer(Type.i64(), lhs)) >>> Type.i64()
-              rhs = Arith.constant(value: Attribute.integer(Type.i64(), rhs)) >>> Type.i64()
-              result = Arith.addi(lhs, rhs) >>> Type.i64()
-              Func.return(result) >>> []
-            end
-          end
+      function_module test_func(function_type: Type.function([], [Type.i64()])) do
+        block do
+          lhs = Arith.constant(value: Attribute.integer(Type.i64(), lhs)) >>> Type.i64()
+          rhs = Arith.constant(value: Attribute.integer(Type.i64(), rhs)) >>> Type.i64()
+          result = Arith.addi(lhs, rhs) >>> Type.i64()
+          Func.return(result) >>> []
         end
       end
     end

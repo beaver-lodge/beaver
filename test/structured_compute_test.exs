@@ -1,12 +1,9 @@
 defmodule StructuredComputeTest do
   use Beaver.Case, async: true
-  use Beaver
 
-  alias Beaver.MLIR
   alias Beaver.MLIR.{AffineMap, Attribute, Type}
   alias Beaver.MLIR.Dialect.{Arith, Func, Linalg, Tensor, Vector}
 
-  require Func
   require Linalg
 
   @moduletag :smoke
@@ -14,15 +11,11 @@ defmodule StructuredComputeTest do
   test "builds tensor slices from mixed static and dynamic entries", %{ctx: ctx} do
     module =
       mlir ctx: ctx do
-        module do
-          Func.func slice(function_type: Type.function([~t{tensor<8xf32>}], [~t{tensor<4xf32>}])) do
-            region do
-              block _entry(source >>> ~t{tensor<8xf32>}) do
-                result = Tensor.extract_slice_(source, Tensor.slice([2], [4], [1])) >>> ~t{tensor<4xf32>}
+        function_module slice(function_type: Type.function([~t{tensor<8xf32>}], [~t{tensor<4xf32>}])) do
+          block _entry(source >>> ~t{tensor<8xf32>}) do
+            result = Tensor.extract_slice_(source, Tensor.slice([2], [4], [1])) >>> ~t{tensor<4xf32>}
 
-                Func.return(result) >>> []
-              end
-            end
+            Func.return(result) >>> []
           end
         end
       end
@@ -36,20 +29,16 @@ defmodule StructuredComputeTest do
 
     module =
       mlir ctx: ctx do
-        module do
-          Func.func read(function_type: Type.function([~t{memref<8xf32>}], [])) do
-            region do
-              block _entry(source >>> ~t{memref<8xf32>}) do
-                index = Arith.constant(value: Attribute.index(0)) >>> Type.index()
-                padding = Arith.constant(value: Attribute.float(Type.f32(), 0.0)) >>> Type.f32()
+        function_module read(function_type: Type.function([~t{memref<8xf32>}], [])) do
+          block _entry(source >>> ~t{memref<8xf32>}) do
+            index = Arith.constant(value: Attribute.index(0)) >>> Type.index()
+            padding = Arith.constant(value: Attribute.float(Type.f32(), 0.0)) >>> Type.f32()
 
-                _vector =
-                  Vector.transfer_read_(source, padding, indices: [index], permutation_map: map, in_bounds: [true]) >>>
-                    ~t{vector<4xf32>}
+            _vector =
+              Vector.transfer_read_(source, padding, indices: [index], permutation_map: map, in_bounds: [true]) >>>
+                ~t{vector<4xf32>}
 
-                Func.return() >>> []
-              end
-            end
+            Func.return() >>> []
           end
         end
       end
@@ -65,23 +54,19 @@ defmodule StructuredComputeTest do
 
     module =
       mlir ctx: ctx do
-        module do
-          Func.func add(function_type: Type.function([tensor_type, tensor_type], [tensor_type])) do
-            region do
-              block _entry(lhs >>> tensor_type, rhs >>> tensor_type) do
-                init = Tensor.empty() >>> tensor_type
+        function_module add(function_type: Type.function([tensor_type, tensor_type], [tensor_type])) do
+          block _entry(lhs >>> tensor_type, rhs >>> tensor_type) do
+            init = Tensor.empty() >>> tensor_type
 
-                result =
-                  Linalg.generic inputs: [lhs, rhs],
-                                 outputs: [init],
-                                 indexing_maps: [identity, identity, identity],
-                                 iterators: [:parallel] do
-                    fn [left, right], [_out] -> Arith.addf(left, right) >>> Type.f32() end
-                  end
-
-                Func.return(result) >>> []
+            result =
+              Linalg.generic inputs: [lhs, rhs],
+                             outputs: [init],
+                             indexing_maps: [identity, identity, identity],
+                             iterators: [:parallel] do
+                fn [left, right], [_out] -> Arith.addf(left, right) >>> Type.f32() end
               end
-            end
+
+            Func.return(result) >>> []
           end
         end
       end

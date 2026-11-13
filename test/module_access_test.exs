@@ -1,6 +1,5 @@
 defmodule ModuleAccessTest do
   use Beaver.Case, async: true
-  alias Beaver.MLIR
 
   @source "module {\n  func.func @test_func() -> i32 {\n    %0 = arith.constant 42 : i32\n    return %0 : i32\n  }\n}\n"
 

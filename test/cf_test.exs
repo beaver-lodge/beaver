@@ -1,7 +1,5 @@
 defmodule CfTest do
   use Beaver.Case, async: true
-  use Beaver
-  alias Beaver.MLIR
   @moduletag :smoke
 
   test "cf with mutation", %{ctx: ctx} do

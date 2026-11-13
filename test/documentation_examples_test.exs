@@ -2,7 +2,6 @@ defmodule DocumentationExamplesTest do
   use Beaver.Case, async: true
 
   import ExUnit.CaptureIO
-  alias Beaver.MLIR
   alias Beaver.Test.DocumentationExample
 
   @moduletag :smoke

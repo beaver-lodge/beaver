@@ -1,7 +1,6 @@
 defmodule ExternalInterfaceTest do
   use Beaver.Case, async: true
   import ExUnit.CaptureLog
-  alias Beaver.MLIR
   @moduletag :smoke
   test "Slang attaches all four external interface models", %{ctx: ctx} do
     interfaces = ExternalInterfaceSlang.__slang_interfaces__()

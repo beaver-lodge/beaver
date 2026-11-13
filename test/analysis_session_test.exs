@@ -1,6 +1,5 @@
 defmodule Beaver.MLIR.AnalysisSessionTest do
   use Beaver.Case, async: true
-  alias Beaver.MLIR
   alias MLIR.{AnalysisSession, DataLayout, Operation, Type}
 
   setup %{ctx: ctx} do

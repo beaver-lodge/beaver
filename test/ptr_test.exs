@@ -1,10 +1,7 @@
 defmodule PtrTest do
   use Beaver.Case, async: true
-  use Beaver
 
-  alias Beaver.MLIR
   alias MLIR.Dialect.{Func, Ptr}
-  require Func
 
   @moduletag :smoke
 
@@ -33,15 +30,11 @@ defmodule PtrTest do
 
     module =
       mlir ctx: ctx do
-        module do
-          Func.func constants(function_type: Type.function([], [ptr_type, ptr_type])) do
-            region do
-              block _() do
-                null = Ptr.constant(value: Ptr.null(type: ptr_type)) >>> :infer
-                address = Ptr.constant(value: Ptr.address(0x1000, type: ptr_type)) >>> :infer
-                Func.return(null, address) >>> []
-              end
-            end
+        function_module constants(function_type: Type.function([], [ptr_type, ptr_type])) do
+          block _() do
+            null = Ptr.constant(value: Ptr.null(type: ptr_type)) >>> :infer
+            address = Ptr.constant(value: Ptr.address(0x1000, type: ptr_type)) >>> :infer
+            Func.return(null, address) >>> []
           end
         end
       end

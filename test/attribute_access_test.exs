@@ -1,7 +1,6 @@
 defmodule AttributeAccessTest do
   @moduledoc "Test the Access behavior implementation for MLIR attributes."
   use Beaver.Case, async: true
-  alias Beaver.MLIR
   alias MLIR.Type
 
   test "arrays", %{ctx: ctx} do

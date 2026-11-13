@@ -1,7 +1,6 @@
 defmodule Beaver.MLIR.Transform.ScheduleTest do
   use Beaver.Case, async: true
 
-  alias Beaver.MLIR
   alias MLIR.Transform.Schedule
 
   @payload "module {\n  func.func @fold_me() -> i32 {\n    %zero = arith.constant 0 : i32\n    %one = arith.constant 1 : i32\n    %sum = arith.addi %one, %zero : i32\n    return %sum : i32\n  }\n}\n"

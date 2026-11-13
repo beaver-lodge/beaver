@@ -1,7 +1,6 @@
 defmodule Beaver.MLIR.Target.LLVMIRTest do
   use Beaver.Case, async: true
 
-  alias Beaver.MLIR
   alias Beaver.MLIR.Target.LLVMIR
 
   @moduletag :smoke

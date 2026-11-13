@@ -1,6 +1,5 @@
 defmodule DebugOutputTest do
   use Beaver.Case, async: true
-  use Beaver
 
   @moduletag :stderr
   @moduletag :smoke

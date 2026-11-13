@@ -1,10 +1,8 @@
 defmodule RewritePatternTest do
   use Beaver.Case, async: true
-  use Beaver
   alias Beaver.MLIR.Dialect.{Func, Arith}
   alias Beaver.MLIR.{CAPI, Rewrite, RewritePatternSet}
   alias Beaver.Native
-  require Func
 
   defmodule FailedToConvergeRewritePattern do
     use Beaver.MLIR.RewritePattern
@@ -25,15 +23,11 @@ defmodule RewritePatternTest do
 
   defp example_ir(ctx) do
     mlir ctx: ctx do
-      module do
-        Func.func const(function_type: Type.function([], [Type.i64(), Type.i64()])) do
-          region do
-            block do
-              v0 = Arith.constant(value: Attribute.integer(Type.i64(), 1)) >>> Type.i64()
-              v1 = Arith.constant(value: Attribute.integer(Type.i64(), 3)) >>> Type.i64()
-              Func.return(v0, v1) >>> []
-            end
-          end
+      function_module const(function_type: Type.function([], [Type.i64(), Type.i64()])) do
+        block do
+          v0 = Arith.constant(value: Attribute.integer(Type.i64(), 1)) >>> Type.i64()
+          v1 = Arith.constant(value: Attribute.integer(Type.i64(), 3)) >>> Type.i64()
+          Func.return(v0, v1) >>> []
         end
       end
     end

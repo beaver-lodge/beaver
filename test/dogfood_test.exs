@@ -56,7 +56,6 @@ end
 defmodule DogfoodTest do
   use Beaver.Case, async: true
 
-  alias Beaver.MLIR
   alias MLIR.Conversion.Plan
   alias MLIR.DogfoodDialect
   alias MLIR.DogfoodNativePatterns

@@ -3,8 +3,6 @@ defmodule EntityTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR.{Attribute, FunctionType, Identifier, ShapedType, Type}
   alias Beaver.Deferred
-  alias Beaver.MLIR
-  import Beaver.Sigils
   doctest Beaver
   doctest Beaver.Sigils
   doctest Beaver.MLIR.Type

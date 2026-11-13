@@ -1,10 +1,8 @@
 defmodule E2ETest do
   use Beaver.Case, async: true
-  alias Beaver.MLIR
   @moduletag :smoke
 
   describe "e2e compilation and JIT invocation" do
-    import Beaver.Sigils
     import MLIR.{Transform, Conversion}
 
     def make_jit(ctx) do

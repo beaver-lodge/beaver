@@ -1,7 +1,6 @@
 defmodule Beaver.MLIR.InferTypeCollectorsTest do
   use Beaver.Case, async: true
 
-  alias Beaver.MLIR
   alias Beaver.MLIR.{InferShapedType, InferType}
 
   @moduletag :smoke

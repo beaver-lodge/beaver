@@ -14,19 +14,9 @@ defmodule Beaver.MLIR.RewritePatternSet do
   `true`, dump each created pattern for debugging.
   """
   def with_pdl_patterns(patterns, opts \\ []) do
-    ctx = opts[:ctx] || raise("context is required in opts")
-    pattern_module = MLIR.Location.from_env(__ENV__, ctx: ctx) |> MLIR.Module.empty()
-    block = Beaver.MLIR.Module.body(pattern_module)
-
-    for p <- patterns do
-      p = p.(ctx, block)
-      if opts[:debug], do: p |> MLIR.dump!()
-    end
-
-    MLIR.verify!(pattern_module)
-    |> CAPI.mlirPDLPatternModuleFromModule()
-    |> CAPI.mlirRewritePatternSetFromPDLPatternModule()
-    |> then(&{&1, pattern_module})
+    pattern_module = build_pdl_module(patterns, opts)
+    pdl = CAPI.mlirPDLPatternModuleFromModule(pattern_module)
+    {CAPI.mlirRewritePatternSetFromPDLPatternModule(pdl), pattern_module}
   end
 
   @doc """
@@ -114,14 +104,8 @@ defmodule Beaver.MLIR.RewritePatternSet do
   @spec add_pdl(t(), MLIR.Module.t() | MLIR.Operation.t() | binary() | [function()], keyword()) :: t()
   def add_pdl(set, pdl, opts \\ [])
 
-  def add_pdl(%__MODULE__{} = set, %MLIR.Module{} = pdl_module, _opts) do
-    op = MLIR.Operation.from_module(pdl_module)
-    :ok = CAPI.beaver_raw_pdl_pattern_add(set.ref, op.ref)
-    set
-  end
-
-  def add_pdl(%__MODULE__{} = set, %MLIR.Operation{} = pdl_op, _opts) do
-    :ok = CAPI.beaver_raw_pdl_pattern_add(set.ref, pdl_op.ref)
+  def add_pdl(%__MODULE__{} = set, %kind{} = module, _opts) when kind in [MLIR.Module, MLIR.Operation] do
+    :ok = CAPI.beaver_raw_pdl_pattern_add(set.ref, MLIR.Operation.from_module(module).ref)
     set
   end
 
@@ -134,21 +118,26 @@ defmodule Beaver.MLIR.RewritePatternSet do
   end
 
   def add_pdl(%__MODULE__{} = set, patterns, opts) when is_list(patterns) do
-    ctx = Keyword.get(opts, :ctx) || raise ArgumentError, "option :ctx is required when building PDL patterns"
-    pattern_module = MLIR.Location.from_env(__ENV__, ctx: ctx) |> MLIR.Module.empty()
+    Beaver.Native.with_resource(build_pdl_module(patterns, opts), &MLIR.Module.destroy/1, &add_pdl(set, &1, opts))
+  end
+
+  defp build_pdl_module(patterns, opts) do
+    ctx = opts[:ctx] || raise ArgumentError, "option :ctx is required when building PDL patterns"
+    module = MLIR.Location.from_env(__ENV__, ctx: ctx) |> MLIR.Module.empty()
 
     try do
-      block = MLIR.Module.body(pattern_module)
+      block = MLIR.Module.body(module)
 
-      for p <- patterns do
-        op = p.(ctx, block)
+      for build <- patterns do
+        op = build.(ctx, block)
         if opts[:debug], do: MLIR.dump!(op)
       end
 
-      MLIR.verify!(pattern_module)
-      add_pdl(set, pattern_module, opts)
-    after
-      MLIR.Module.destroy(pattern_module)
+      MLIR.verify!(module)
+    catch
+      kind, reason ->
+        MLIR.Module.destroy(module)
+        :erlang.raise(kind, reason, __STACKTRACE__)
     end
   end
 

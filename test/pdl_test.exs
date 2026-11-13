@@ -1,7 +1,5 @@
 defmodule PDLTest do
   use Beaver.Case, async: true
-  use Beaver
-  alias Beaver.MLIR
   import MLIR.CAPI
   import MLIR.Transform
 
@@ -47,52 +45,17 @@ defmodule PDLTest do
 
     {mlir, acc} = pattern_module |> Beaver.Walker.traverse([], inspector, inspector)
 
-    assert acc == [
-             "builtin.module",
-             MLIR.Region,
-             MLIR.Block,
-             "builtin.module",
-             MLIR.Region,
-             MLIR.Block,
-             "pdl_interp.func",
-             MLIR.Region,
-             MLIR.Block,
-             "pdl_interp.finalize",
-             "pdl_interp.finalize",
-             "pdl_interp.erase",
-             "pdl_interp.erase",
-             "pdl_interp.create_operation",
-             "pdl_interp.create_operation",
-             MLIR.Block,
-             MLIR.Region,
-             "pdl_interp.func",
-             MLIR.Block,
-             MLIR.Region,
-             "builtin.module",
-             "pdl_interp.func",
-             MLIR.Region,
-             MLIR.Block,
-             "pdl_interp.finalize",
-             "pdl_interp.finalize",
-             MLIR.Block,
-             MLIR.Block,
-             "pdl_interp.record_match",
-             "pdl_interp.record_match",
-             MLIR.Block,
-             MLIR.Block,
-             "pdl_interp.are_equal",
-             "pdl_interp.are_equal",
-             "pdl_interp.get_attribute",
-             "pdl_interp.get_attribute",
-             "pdl_interp.create_attribute",
-             "pdl_interp.create_attribute",
-             MLIR.Block,
-             MLIR.Region,
-             "pdl_interp.func",
-             MLIR.Block,
-             MLIR.Region,
-             "builtin.module"
-           ]
+    expected = ~w(
+      builtin.module Region Block builtin.module Region Block pdl_interp.func Region Block
+      pdl_interp.finalize pdl_interp.finalize pdl_interp.erase pdl_interp.erase
+      pdl_interp.create_operation pdl_interp.create_operation Block Region pdl_interp.func Block Region
+      builtin.module pdl_interp.func Region Block pdl_interp.finalize pdl_interp.finalize Block Block
+      pdl_interp.record_match pdl_interp.record_match Block Block pdl_interp.are_equal
+      pdl_interp.are_equal pdl_interp.get_attribute pdl_interp.get_attribute pdl_interp.create_attribute
+      pdl_interp.create_attribute Block Region pdl_interp.func Block Region builtin.module
+    )
+    expected = Enum.map(expected, fn name -> %{"Region" => MLIR.Region, "Block" => MLIR.Block}[name] || name end)
+    assert acc == expected
 
     assert MLIR.equal?(mlir, MLIR.Operation.from_module(pattern_module))
     ir_module = MLIR.Module.create!(@apply_rewrite_op_ir, ctx: ctx)

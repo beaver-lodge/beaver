@@ -1,7 +1,5 @@
 defmodule MlirTest do
   use Beaver.Case, async: true
-  use Beaver
-  alias Beaver.MLIR
   import Beaver.MLIR.CAPI
 
   @moduletag :smoke

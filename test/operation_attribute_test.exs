@@ -1,7 +1,6 @@
 defmodule OperationAttributeTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR.{Attribute, Bytecode, Context, LogicalResult, Operation}
-  alias Beaver.MLIR
 
   test "keeps inherent properties and discardable metadata on separate paths", %{ctx: ctx} do
     module = MLIR.Module.create!("module { func.func @example() { return } }", ctx: ctx)

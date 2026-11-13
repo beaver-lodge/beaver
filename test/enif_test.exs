@@ -1,5 +1,4 @@
 defmodule EnifTest do
-  use Beaver
   use Beaver.Case, async: true
 
   @moduletag :smoke
