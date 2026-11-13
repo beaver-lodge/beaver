@@ -19,13 +19,11 @@ defmodule Beaver.Build.ArtifactCache do
   @doc "Maps JSON inputs through a revisioned analysis cache and returns the number of newly built entries."
   def map_json!(items, directory, revision, ready?, build) do
     Enum.map_reduce(items, 0, fn item, count ->
-      generate = fn -> build.(item) end
-
       if ready?.(item) do
         {item, count}
       else
         path = Path.join(directory, digest([revision, JSON.encode!(item)]))
-        {value, hit?} = fetch_json!(path <> ".json", path <> ".sha256", generate)
+        {value, hit?} = fetch_json!(path <> ".json", path <> ".sha256", build, [item])
         {value, count + if(hit?, do: 0, else: 1)}
       end
     end)
@@ -64,13 +62,11 @@ defmodule Beaver.Build.ArtifactCache do
 
   def read_json!(path, checksum), do: path |> read_verified!(File.read!(checksum)) |> JSON.decode!()
 
-  def fetch_json!(path, checksum, build) when is_function(build, 0) do
+  def fetch_json!(path, checksum, build, args \\ []) when is_function(build, length(args)) do
     if File.regular?(path) and File.regular?(checksum) do
       {read_json!(path, checksum), true}
     else
-      value = build.()
-      write_json!(path, checksum, value)
-      {value, false}
+      {write_json!(path, checksum, apply(build, args)), false}
     end
   end
 

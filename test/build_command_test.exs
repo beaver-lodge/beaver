@@ -3,21 +3,20 @@ defmodule Beaver.BuildCommandTest do
   alias Beaver.Build.Command
 
   test "the service returns complete reports, correlation IDs and explicit request options" do
+    report = %{backend: "llvm", entries: [["entry/0", "entry/0", 0, 0]], compilation: [%{codegen_ns: 12}]}
+
     build = fn source, out, opts ->
       assert {source, out} == {"guest.json", "image"}
       assert opts[:backend] == "llvm"
       assert opts[:profile] == :dev
       assert opts[:max_concurrency] == 2
-      %{backend: "llvm", entries: [["entry/0", "entry/0", 0, 0]], compilation: [%{codegen_ns: 12}]}
+      report
     end
 
     request = JSON.encode!(%{id: 7, source: "guest.json", out: "image", backend: "llvm", profile: "dev", jobs: 2})
 
-    assert %{
-             "id" => 7,
-             "ok" => %{"entries" => [["entry/0", "entry/0", 0, 0]], "compilation" => [%{"codegen_ns" => 12}]}
-           } =
-             Command.reply(request, build, backend: :llvm) |> JSON.decode!()
+    assert Command.reply(request, build, backend: :llvm) |> JSON.decode!() ==
+             JSON.decode!(JSON.encode!(%{id: 7, ok: report}))
   end
 
   test "malformed and failed requests do not stop subsequent requests or change the resident backend" do

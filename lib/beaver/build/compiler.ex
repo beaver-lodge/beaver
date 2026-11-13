@@ -9,10 +9,7 @@ defmodule Beaver.Build.Compiler do
   alias Beaver.MLIR.{ExecutionEngine, Target.LLVMIR, Template}
   @object_options ~w(triple cpu features opt_level pic format)a
   @aot_options [:functions, :cache_dir, :max_concurrency | @object_options]
-  @metrics Enum.zip(
-             ~w(emit lower translate parse optimize codegen),
-             ~w(emit_ns lower_ns translate_ns parse_ns opt_ns codegen_ns)a
-           )
+  @metrics ~w(emit lower translate parse opt codegen)a
   defdelegate sha256(data), to: ArtifactCache, as: :digest
   defdelegate platform(), to: LLVMIR, as: :host_platform
 
@@ -162,16 +159,19 @@ defmodule Beaver.Build.Compiler do
     metrics = unit.metrics || %{}
 
     phases =
-      Map.new(@metrics, fn {name, key} ->
-        {name <> "_ms", Map.get(metrics, key, Map.get(metrics, to_string(key), 0)) / 1.0e6}
-      end)
+      for phase <- @metrics, into: %{"peak_rss_bytes" => 0} do
+        key = :"#{phase}_ns"
+
+        {"#{if phase == :opt, do: :optimize, else: phase}_ms",
+         Map.get(metrics, key, Map.get(metrics, "#{key}", 0)) / 1.0e6}
+      end
 
     %{
       "key" => unit.key,
       "cache_hit" => unit.cached?,
       "elapsed_ms" => elapsed,
       "object_bytes" => byte_size(unit.object),
-      "build" => Map.put(phases, "peak_rss_bytes", 0)
+      "build" => phases
     }
   end
 

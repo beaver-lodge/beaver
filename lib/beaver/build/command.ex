@@ -25,12 +25,10 @@ defmodule Beaver.Build.Command do
   end
 
   def serve(build, opts, source_alias, io \\ :stdio) do
-    for line <- IO.stream(io, :line),
-        request = String.trim(line),
-        request != "",
-        do: IO.puts(io, reply(request, build, opts, source_alias))
-
-    :ok
+    Enum.each(IO.stream(io, :line), fn line ->
+      request = String.trim(line)
+      if request != "", do: IO.puts(io, reply(request, build, opts, source_alias))
+    end)
   end
 
   @doc "Processes one request without changing process IO or environment."
