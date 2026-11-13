@@ -289,9 +289,7 @@ defmodule Beaver.SluiceDrivenRefactoringTest do
           sym: {:sym, "id_fn"}
         )
 
-      Module.with_module(mod, fn _ ->
-        assert MLIR.verify!(mod)
-      end)
+      Module.with_module(mod, fn _ -> assert MLIR.verify!(mod) end)
 
       assert_raise ArgumentError, ~r/invalid control character in MLIR symbol/, fn ->
         Template.check_symbol!("bad\nsymbol")
@@ -663,9 +661,7 @@ defmodule Beaver.SluiceDrivenRefactoringTest do
         [leaf_fn, heavy_fn, suspending_fn] =
           mod
           |> Walker.find_ops("func.func")
-          |> Enum.filter(fn op ->
-            MLIR.Attribute.value(op["sym_name"]) in ["leaf_fn", "heavy_fn", "suspending_fn"]
-          end)
+          |> Enum.filter(fn op -> MLIR.Attribute.value(op["sym_name"]) in ["leaf_fn", "heavy_fn", "suspending_fn"] end)
 
         for {func, limit, suspend, expected} <- [
               {leaf_fn, 16, {"func.call", "@beam.suspend"}, true},

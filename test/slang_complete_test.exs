@@ -44,8 +44,7 @@ defmodule SlangCompleteTest do
     assert @valid_module |> MLIR.Module.create!(ctx: ctx) |> MLIR.verify?()
 
     assert_raise ArgumentError, ~r/expected base attribute 'builtin.string'/, fn ->
-      ~S[module { "complete_slang.scope"() ({ ^bb0: }) {label = 42 : i32} : () -> () }]
-      |> MLIR.Module.create!(ctx: ctx)
+      ~S[module { "complete_slang.scope"() ({ ^bb0: }) {label = 42 : i32} : () -> () }] |> MLIR.Module.create!(ctx: ctx)
     end
   end
 

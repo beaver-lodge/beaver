@@ -29,13 +29,11 @@ defmodule PtrTest do
     ptr_type = Ptr.type()
 
     module =
-      mlir ctx: ctx do
-        function_module constants(function_type: Type.function([], [ptr_type, ptr_type])) do
-          block _() do
-            null = Ptr.constant(value: Ptr.null(type: ptr_type)) >>> :infer
-            address = Ptr.constant(value: Ptr.address(0x1000, type: ptr_type)) >>> :infer
-            Func.return(null, address) >>> []
-          end
+      function_module ctx, constants(function_type: Type.function([], [ptr_type, ptr_type])) do
+        block _() do
+          null = Ptr.constant(value: Ptr.null(type: ptr_type)) >>> :infer
+          address = Ptr.constant(value: Ptr.address(0x1000, type: ptr_type)) >>> :infer
+          Func.return(null, address) >>> []
         end
       end
       |> MLIR.verify!()

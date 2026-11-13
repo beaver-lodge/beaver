@@ -37,7 +37,8 @@ defmodule Beaver.MLIR.IRBatch.Spec do
       def normalize_function(raw, expand \\ &expand_default/2),
         do: Beaver.MLIR.IRBatch.Spec.normalize(raw, type: &spec_type/1, expand: expand, attribute_aliases: [:at])
 
-      defp expand_default(step, _) do
+      @doc "Expands a declared shortcut, retaining unknown operations for native IRBatch validation."
+      def expand_default(step, _) do
         case expand_declared_operation(step) do
           :unknown -> [step]
           operations -> operations
@@ -62,9 +63,7 @@ defmodule Beaver.MLIR.IRBatch.Spec do
     spec = Map.put(spec, :attributes, attributes)
 
     spec =
-      spec
-      |> map_present(:inputs, &arguments(&1, type))
-      |> map_present(:results, &Enum.map(List.wrap(&1), type))
+      spec |> map_present(:inputs, &arguments(&1, type)) |> map_present(:results, &Enum.map(List.wrap(&1), type))
 
     normalize_body(spec, type, expand, opts)
   end

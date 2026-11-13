@@ -8,6 +8,55 @@ defmodule Beaver.MLIR.Template.Library do
   @enforce_keys [:bytecode, :signatures, :digest]
   defstruct [:bytecode, :signatures, :digest]
 
+  @doc """
+  Defines a provider over named `kind_source/0` callbacks. `:libraries` maps kinds to import visibility;
+  `:templates` selects `(symbol, kind)` roots and `:signatures` selects declared symbols.
+  `:dependencies` lists generator modules whose revisions invalidate cached bytecode.
+  """
+  defmacro __using__(opts) do
+    libraries = Keyword.fetch!(opts, :libraries)
+    select = Keyword.fetch!(opts, :templates)
+    signatures = Keyword.fetch!(opts, :signatures)
+
+    quote do
+      @template_dependencies [__MODULE__ | unquote(opts[:dependencies] || [])]
+      defp library(kind) do
+        revision = Enum.map(@template_dependencies, & &1.__info__(:md5))
+        unquote(__MODULE__).fetch({__MODULE__, kind}, revision, fn -> apply(__MODULE__, :"#{kind}_source", []) end)
+      end
+
+      def declaration_signatures,
+        do: Map.filter(library(:inline).signatures, fn {name, _} -> unquote(signatures).(name) end)
+
+      def with_declarations(source),
+        do: unquote(__MODULE__).with_declarations(%{signatures: declaration_signatures()}, source)
+
+      def ensure_declarations!(module) do
+        symbols = Enum.filter(Beaver.MLIR.SymbolTable.referenced_symbols(module), unquote(signatures))
+        unquote(__MODULE__).declare!(library(:inline), module, symbols: symbols, visibility: :private)
+      end
+
+      unquote_splicing(
+        for {kind, visibility} <- libraries do
+          quote do
+            def unquote(:"with_#{kind}_module")(ctx, fun),
+              do: unquote(__MODULE__).with_module(library(unquote(kind)), ctx, fun)
+
+            def unquote(:"import_#{kind}!")(module, opts \\ []) do
+              defaults = [
+                visibility: unquote(visibility),
+                verify_type: true,
+                select: fn name -> unquote(select).(name, unquote(kind)) end
+              ]
+
+              unquote(__MODULE__).import!(library(unquote(kind)), module, Keyword.merge(defaults, opts))
+            end
+          end
+        end
+      )
+    end
+  end
+
   def new(source) when is_binary(source) do
     Context.with_context(fn ctx ->
       Module.with_module(ctx, source, fn module ->

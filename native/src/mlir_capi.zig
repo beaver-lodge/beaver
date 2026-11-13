@@ -27,7 +27,6 @@ pub const USize = NativeKind(usize, "USize");
 pub const OpaqueArray = NativeKind(?*const anyopaque, "OpaqueArray");
 pub const StringArray = NativeKind([*c][*c]const u8, "StringArray");
 pub const ElixirNameSpacePrefix = "Elixir.Beaver.MLIR.";
-
 fn MLIRKind(comptime n: []const u8) type {
     return kinda.ResourceKind(@field(c, "Mlir" ++ n), ElixirNameSpacePrefix ++ n);
 }
@@ -106,7 +105,6 @@ pub const TypeConverter1ToNConversionCallback = MLIRKind("TypeConverter1ToNConve
 pub const TypeConverterConversionResults = MLIRKind("TypeConverterConversionResults");
 pub const TypeConverterSourceMaterializationCallback = MLIRKind("TypeConverterSourceMaterializationCallback");
 pub const TypeConverterTargetMaterializationCallback = MLIRKind("TypeConverterTargetMaterializationCallback");
-
 pub const ExternalPass = MLIRKind("ExternalPass");
 pub const ExternalPassCallbacks = MLIRKind("ExternalPassCallbacks");
 pub const OpPassManager = MLIRKind("OpPassManager");
@@ -163,7 +161,6 @@ pub const resourceSlots = blk: {
     tuple = tuple ++ &reply_token_slots;
     break :blk tuple;
 };
-
 pub fn open_all(env: beam.env) void {
     inline for (allKinds) |k| {
         k.open_all(env);
@@ -172,7 +169,6 @@ pub fn open_all(env: beam.env) void {
         kinda.aliasKind(pair[0], pair[1]);
     }
 }
-
 const EntriesT = [allKinds.len * kinda.numOfNIFsPerKind]e.ErlNifFunc;
 pub const EntriesOfKinds = getEntries();
 fn getEntries() EntriesT {

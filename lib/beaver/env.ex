@@ -32,18 +32,14 @@ defmodule Beaver.Env do
       end
     else
       # NOTE: will not raise error if region is not found, because macro mlir/2 doesn't work with region
-      quote do
-        Beaver.not_found(__ENV__)
-      end
+      quote(do: Beaver.not_found(__ENV__))
     end
   end
 
   @doc "Return insertion point in the DSL environment"
   defmacro ip() do
     if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_ip, nil}) do
-      quote do
-        Kernel.var!(beaver_internal_env_ip)
-      end
+      quote(do: Kernel.var!(beaver_internal_env_ip))
     else
       raise CompileError, Beaver.Env.compile_err_msg("insertion point", __CALLER__)
     end
@@ -51,9 +47,7 @@ defmodule Beaver.Env do
 
   @doc "Return block in the DSL environment"
   defmacro block() do
-    quote do
-      Beaver.Env.block_from_insertion_point(Beaver.Env.ip(), __ENV__)
-    end
+    quote(do: Beaver.Env.block_from_insertion_point(Beaver.Env.ip(), __ENV__))
   end
 
   @doc false

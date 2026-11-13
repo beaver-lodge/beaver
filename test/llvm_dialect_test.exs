@@ -29,27 +29,26 @@ defmodule LLVMDialectTest do
 
   test "defines, calls, and verifies an LLVM function", %{ctx: ctx} do
     module =
-      mlir ctx: ctx do
-        module do
-          LLVM.func identity(
-                      function_type: LLVM.function_type([Type.i32()], [Type.i32()]),
-                      linkage: LLVM.linkage(:internal),
-                      CConv: LLVM.calling_convention(:c)
-                    ) do
-            region do
+      module_ir ctx do
+        LLVM.func identity(
+                    function_type: LLVM.function_type([Type.i32()], [Type.i32()]),
+                    linkage: LLVM.linkage(:internal),
+                    CConv: LLVM.calling_convention(:c)
+                  ) do
+          region(
+            do:
               block _entry(arg >>> Type.i32()) do
                 LLVM.return(arg) >>> []
               end
-            end
-          end
+          )
+        end
 
-          LLVM.func caller(function_type: LLVM.function_type([], [Type.i32()])) do
-            region do
-              block do
-                value = LLVM.mlir_constant(value: Attribute.integer(Type.i32(), 7)) >>> Type.i32()
-                result = LLVM.call_(value, callee: :identity) >>> Type.i32()
-                LLVM.return(result) >>> []
-              end
+        LLVM.func caller(function_type: LLVM.function_type([], [Type.i32()])) do
+          region do
+            block do
+              value = LLVM.mlir_constant(value: Attribute.integer(Type.i32(), 7)) >>> Type.i32()
+              result = LLVM.call_(value, callee: :identity) >>> Type.i32()
+              LLVM.return(result) >>> []
             end
           end
         end
@@ -62,17 +61,15 @@ defmodule LLVMDialectTest do
 
   test "builds an inline initialized global", %{ctx: ctx} do
     module =
-      mlir ctx: ctx do
-        module do
-          LLVM.global(
-            sym_name: :answer,
-            type: Type.i32(),
-            value: Attribute.integer(Type.i32(), 42),
-            constant: true,
-            linkage: :internal,
-            alignment: 4
-          ) >>> []
-        end
+      module_ir ctx do
+        LLVM.global(
+          sym_name: :answer,
+          type: Type.i32(),
+          value: Attribute.integer(Type.i32(), 42),
+          constant: true,
+          linkage: :internal,
+          alignment: 4
+        ) >>> []
       end
 
     MLIR.verify!(module)

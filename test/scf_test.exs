@@ -10,18 +10,16 @@ defmodule SCFTest do
 
   test "builds if regions and yields branch results", %{ctx: ctx} do
     module =
-      mlir ctx: ctx do
-        function_module choose(function_type: Type.function([Type.i1()], [Type.i32()])) do
-          block _entry(condition >>> Type.i1()) do
-            value =
-              SCF.if_ condition, result_types: [Type.i32()] do
-                Arith.constant(value: Attribute.integer(Type.i32(), 1)) >>> Type.i32()
-              else
-                Arith.constant(value: Attribute.integer(Type.i32(), 2)) >>> Type.i32()
-              end
+      function_module ctx, choose(function_type: Type.function([Type.i1()], [Type.i32()])) do
+        block _entry(condition >>> Type.i1()) do
+          value =
+            SCF.if_ condition, result_types: [Type.i32()] do
+              Arith.constant(value: Attribute.integer(Type.i32(), 1)) >>> Type.i32()
+            else
+              Arith.constant(value: Attribute.integer(Type.i32(), 2)) >>> Type.i32()
+            end
 
-            Func.return(value) >>> []
-          end
+          Func.return(value) >>> []
         end
       end
 
@@ -32,21 +30,19 @@ defmodule SCFTest do
 
   test "builds for with loop-carried values", %{ctx: ctx} do
     module =
-      mlir ctx: ctx do
-        function_module sum(function_type: Type.function([], [Type.index()])) do
-          block do
-            lower = Arith.constant(value: Attribute.index(0)) >>> Type.index()
-            upper = Arith.constant(value: Attribute.index(4)) >>> Type.index()
-            step = Arith.constant(value: Attribute.index(1)) >>> Type.index()
-            initial = Arith.constant(value: Attribute.index(0)) >>> Type.index()
+      function_module ctx, sum(function_type: Type.function([], [Type.index()])) do
+        block do
+          lower = Arith.constant(value: Attribute.index(0)) >>> Type.index()
+          upper = Arith.constant(value: Attribute.index(4)) >>> Type.index()
+          step = Arith.constant(value: Attribute.index(1)) >>> Type.index()
+          initial = Arith.constant(value: Attribute.index(0)) >>> Type.index()
 
-            sum =
-              SCF.for_ lower, upper, step, iter_args: [initial] do
-                fn iv, [acc] -> Arith.addi(acc, iv) >>> Type.index() end
-              end
+          sum =
+            SCF.for_ lower, upper, step, iter_args: [initial] do
+              fn iv, [acc] -> Arith.addi(acc, iv) >>> Type.index() end
+            end
 
-            Func.return(sum) >>> []
-          end
+          Func.return(sum) >>> []
         end
       end
 

@@ -9,13 +9,11 @@ const string_ref = @import("string_ref.zig");
 const callback_names = .{ "construct", "destruct", "matchAndRewrite" };
 const RuntimeDispatcher = kinda.callback_runtime.Dispatcher(callback_names);
 const callback_args = @import("callback_args.zig");
-
 const PatternState = struct {
     dispatcher: *RuntimeDispatcher,
     operands: isize,
     results: isize,
     attributes: []mlir_capi.StringRef.T,
-
     fn init(env: beam.env, owner: beam.pid, filter: beam.term) !*@This() {
         const dispatcher = try RuntimeDispatcher.initWithOptions(owner, callback_args.fixedOptions(RuntimeDispatcher, 30_000));
         errdefer dispatcher.deinit();
@@ -43,13 +41,11 @@ const PatternState = struct {
         };
         return this;
     }
-
     pub fn deinit(this: *@This()) void {
         beam.allocator.free(this.attributes);
         this.dispatcher.deinit();
         beam.allocator.destroy(this);
     }
-
     fn matches(this: *@This(), operation: mlir_capi.Operation.T) bool {
         if (this.operands >= 0 and c.mlirOperationGetNumOperands(operation) != this.operands) return false;
         if (this.results >= 0 and c.mlirOperationGetNumResults(operation) != this.results) return false;
@@ -59,7 +55,6 @@ const PatternState = struct {
         return true;
     }
 };
-
 const CallbackDispatcher = struct {
     const Lifecycle = callback_args.Lifecycle(PatternState, "a rewrite pattern");
     const construct = Lifecycle.construct;
@@ -71,7 +66,6 @@ const CallbackDispatcher = struct {
         return if (response.success) c.beaverLogicalResultSuccess() else c.beaverLogicalResultFailure();
     }
 };
-
 pub fn create(env: beam.env, ctx: mlir_capi.Context.T, arguments: beam.term) !beam.term {
     const args = try @import("execution.zig").tuple(env, arguments, 4);
     const root = try string_ref.get_binary_as_string_ref(env, args[0]);

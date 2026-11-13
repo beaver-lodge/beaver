@@ -29,9 +29,7 @@
 
 using namespace mlir;
 using namespace mlir::triton;
-
 namespace {
-
 void registerTritonConversionInterfaces(DialectRegistry &registry) {
   LLVM::registerInlinerInterface(registry);
   ub::registerConvertUBToLLVMInterface(registry);
@@ -40,9 +38,7 @@ void registerTritonConversionInterfaces(DialectRegistry &registry) {
   cf::registerConvertControlFlowToLLVMInterface(registry);
   arith::registerConvertArithToLLVMInterface(registry);
 }
-
 } // namespace
-
 MLIR_CAPI_EXPORTED bool beaverContextRegisterTritonDialects(MlirContext context) {
   DialectRegistry registry;
   mlir::registerAllDialects(registry);
@@ -54,7 +50,6 @@ MLIR_CAPI_EXPORTED bool beaverContextRegisterTritonDialects(MlirContext context)
   ctx->loadAllAvailableDialects();
   return true;
 }
-
 MLIR_CAPI_EXPORTED bool beaverRegisterTritonPasses() {
   registerTritonPasses();
   triton::gpu::registerTritonGPUPasses();
@@ -77,7 +72,6 @@ MLIR_CAPI_EXPORTED bool beaverRegisterTritonPasses() {
 #else
 
 MLIR_CAPI_EXPORTED bool beaverContextRegisterTritonDialects(MlirContext context) { return false; }
-
 MLIR_CAPI_EXPORTED bool beaverRegisterTritonPasses() { return false; }
 
 #endif

@@ -1,65 +1,37 @@
 #ifndef MLIR_C_BEAVER_CAPI_POLICY_H
 #define MLIR_C_BEAVER_CAPI_POLICY_H
-
-// Compile-time markers that describe how Beaver exposes MLIR C API functions
-// to BEAM. Both Zig's translated-C namespace and the Elixir manifest extractor
-// consume these declarations.
+// Compile-time markers that describe how Beaver exposes MLIR C API functions to BEAM. Both Zig's translated-C namespace
+// and the Elixir manifest extractor consume these declarations.
 typedef enum {
   // Tracing sessions have managed resources and a collecting drain adapter.
-  BeaverCapiPolicyExclude__beaverAnalysisCreate,
-  BeaverCapiPolicyExclude__beaverLLVMGetHostTarget,
-  BeaverCapiPolicyExclude__beaverCompileToObject,
-  BeaverCapiPolicyExclude__beaverExtractFunctionModule,
-  BeaverCapiPolicyExclude__beaverAnalyzeSafepoints,
-  BeaverCapiPolicyExclude__beaverLowerResumableCFG,
-  BeaverCapiPolicyExclude__beaverAnalysisDestroy,
-  BeaverCapiPolicyExclude__beaverAnalysisInvalidate,
-  BeaverCapiPolicyExclude__beaverAnalysisGeneration,
-  BeaverCapiPolicyExclude__beaverAnalysisCached,
-  BeaverCapiPolicyExclude__beaverAnalysisQuery,
-  BeaverCapiPolicyExclude__beaverAnalysisLayout,
-  BeaverCapiPolicyExclude__beaverInferReturnTypes,
-  BeaverCapiPolicyExclude__beaverInferReturnComponents,
-  BeaverCapiPolicyExclude__beaverConversionRun,
-  BeaverCapiPolicyExclude__mlirBeaverActionTracingAttach,
-  BeaverCapiPolicyExclude__mlirBeaverActionTracingDrain,
-  BeaverCapiPolicyExclude__mlirBeaverActionTracingDetach,
+  BeaverCapiPolicyExclude__beaverAnalysisCreate, BeaverCapiPolicyExclude__beaverLLVMGetHostTarget,
+  BeaverCapiPolicyExclude__beaverCompileToObject, BeaverCapiPolicyExclude__beaverExtractFunctionModule,
+  BeaverCapiPolicyExclude__beaverAnalyzeSafepoints, BeaverCapiPolicyExclude__beaverLowerResumableCFG,
+  BeaverCapiPolicyExclude__beaverAnalysisDestroy, BeaverCapiPolicyExclude__beaverAnalysisInvalidate,
+  BeaverCapiPolicyExclude__beaverAnalysisGeneration, BeaverCapiPolicyExclude__beaverAnalysisCached,
+  BeaverCapiPolicyExclude__beaverAnalysisQuery, BeaverCapiPolicyExclude__beaverAnalysisLayout,
+  BeaverCapiPolicyExclude__beaverInferReturnTypes, BeaverCapiPolicyExclude__beaverInferReturnComponents,
+  BeaverCapiPolicyExclude__beaverConversionRun, BeaverCapiPolicyExclude__mlirBeaverActionTracingAttach,
+  BeaverCapiPolicyExclude__mlirBeaverActionTracingDrain, BeaverCapiPolicyExclude__mlirBeaverActionTracingDetach,
   // Internal execution state is thread-affine and only used by native adapters.
-  BeaverCapiPolicyExclude__beaverExecutionMeasureBegin,
-  BeaverCapiPolicyExclude__beaverExecutionMeasureEnd,
-  BeaverCapiPolicyExclude__beaverExecutionCallbackBegin,
-  BeaverCapiPolicyExclude__beaverExecutionCallbackEnd,
-  BeaverCapiPolicyExclude__beaverExecutionClock,
-  BeaverCapiPolicyExclude__beaverExecutionBindOperation,
-  BeaverCapiPolicyExclude__beaverExecutionUnbindOperation,
-  BeaverCapiPolicyExclude__beaverExecutionEnterOperation,
-  BeaverCapiPolicyExclude__beaverExecutionLeaveOperation,
-  BeaverCapiPolicyExclude__beaverExecutionMarkCallbacks,
-  BeaverCapiPolicyExclude__beaverExecutionHasCallbacks,
-  BeaverCapiPolicyExclude__beaverExecutorSnapshot,
-  BeaverCapiPolicyExclude__beaverExecutorReleaseContext,
-  BeaverCapiPolicyExclude__beaverModuleCreateParseTracked,
-  BeaverCapiPolicyExclude__beaverOperationVerify,
-  BeaverCapiPolicyExclude__beaverPassManagerTrackExecution,
-  BeaverCapiPolicyDiagnostics__mlirAttributeParseGet,
-  BeaverCapiPolicyDiagnostics__mlirOperationVerify,
-  BeaverCapiPolicyDiagnostics__mlirTypeParseGet,
-  BeaverCapiPolicyDiagnostics__mlirModuleCreateParse,
-  BeaverCapiPolicyDiagnostics__mlirExecutionEngineCreate,
-  BeaverCapiPolicyDiagnostics__mlirTransformApplyNamedSequence,
+  BeaverCapiPolicyExclude__beaverExecutionMeasureBegin, BeaverCapiPolicyExclude__beaverExecutionMeasureEnd,
+  BeaverCapiPolicyExclude__beaverExecutionCallbackBegin, BeaverCapiPolicyExclude__beaverExecutionCallbackEnd,
+  BeaverCapiPolicyExclude__beaverExecutionClock, BeaverCapiPolicyExclude__beaverExecutionBindOperation,
+  BeaverCapiPolicyExclude__beaverExecutionUnbindOperation, BeaverCapiPolicyExclude__beaverExecutionEnterOperation,
+  BeaverCapiPolicyExclude__beaverExecutionLeaveOperation, BeaverCapiPolicyExclude__beaverExecutionMarkCallbacks,
+  BeaverCapiPolicyExclude__beaverExecutionHasCallbacks, BeaverCapiPolicyExclude__beaverExecutorSnapshot,
+  BeaverCapiPolicyExclude__beaverExecutorReleaseContext, BeaverCapiPolicyExclude__beaverModuleCreateParseTracked,
+  BeaverCapiPolicyExclude__beaverOperationVerify, BeaverCapiPolicyExclude__beaverPassManagerTrackExecution,
+  BeaverCapiPolicyDiagnostics__mlirAttributeParseGet, BeaverCapiPolicyDiagnostics__mlirOperationVerify,
+  BeaverCapiPolicyDiagnostics__mlirTypeParseGet, BeaverCapiPolicyDiagnostics__mlirModuleCreateParse,
+  BeaverCapiPolicyDiagnostics__mlirExecutionEngineCreate, BeaverCapiPolicyDiagnostics__mlirTransformApplyNamedSequence,
   BeaverCapiPolicyDiagnostics__beaverOperationSetProperties,
-
   BeaverCapiPolicyDirtyCPUAndIO__mlirExecutionEngineInvokePacked,
   BeaverCapiPolicyDirtyCPUAndIO__beaverOperationDestroyIterative,
-
-  // MlirLogicalResult is a one-byte struct returned by value. Keep Zig out of
-  // its ABI entirely: the public MLIR names are backed by external C++
-  // wrappers instead of translated-C inline functions.
-  BeaverCapiPolicyNIFAlias__mlirLogicalResultSuccess,
-  BeaverCapiPolicyNIFAlias__mlirLogicalResultFailure,
-  BeaverCapiPolicyNIFAlias__mlirLogicalResultIsSuccess,
-  BeaverCapiPolicyNIFAlias__mlirLogicalResultIsFailure,
-
+  // MlirLogicalResult is a one-byte struct returned by value. Keep Zig out of its ABI entirely: the public MLIR names
+  // are backed by external C++ wrappers instead of translated-C inline functions.
+  BeaverCapiPolicyNIFAlias__mlirLogicalResultSuccess, BeaverCapiPolicyNIFAlias__mlirLogicalResultFailure,
+  BeaverCapiPolicyNIFAlias__mlirLogicalResultIsSuccess, BeaverCapiPolicyNIFAlias__mlirLogicalResultIsFailure,
   BeaverCapiPolicyManualAdapter__mlirInferShapedTypeOpInterfaceInferReturnTypes,
   BeaverCapiPolicyManualAdapter__mlirInferTypeOpInterfaceInferReturnTypes,
   BeaverCapiPolicyManualAdapter__mlirTransformStateForEachParam,
@@ -69,9 +41,7 @@ typedef enum {
   BeaverCapiPolicyManualAdapter__beaverTranslateModuleToLLVMIRText,
   BeaverCapiPolicyManualAdapter__beaverCompileLLVMIRToPTX,
   BeaverCapiPolicyManualAdapter__beaverContextEnableOptimizationRemarks,
-
   BeaverCapiPolicyManualRuntime__mlirValueReplaceUsesWithIf,
-
   BeaverCapiPolicyCallbackRuntime__mlirTypeConverterAddConversion,
   BeaverCapiPolicyCallbackRuntime__mlirTypeConverterAdd1ToNConversion,
   BeaverCapiPolicyCallbackRuntime__mlirTypeConverterAddSourceMaterialization,
@@ -87,14 +57,9 @@ typedef enum {
   BeaverCapiPolicyCallbackRuntime__mlirPatternDescriptorOpInterfaceAttachFallbackModel,
   BeaverCapiPolicyCallbackRuntime__mlirTransformOpInterfaceAttachFallbackModel,
   BeaverCapiPolicyCallbackRuntime__mlirDynamicOpTraitCreate,
-
   // The BEAM bridge owns MemoryEffects collectors and callback lifetimes.
-  BeaverCapiPolicyExclude__mlirMemoryEffectInstancesListAppend,
-  BeaverCapiPolicyExclude__mlirTransformOnlyReadsHandle,
-  BeaverCapiPolicyExclude__mlirTransformConsumesHandle,
-  BeaverCapiPolicyExclude__mlirTransformProducesHandle,
-  BeaverCapiPolicyExclude__mlirTransformModifiesPayload,
-  BeaverCapiPolicyExclude__mlirTransformOnlyReadsPayload,
+  BeaverCapiPolicyExclude__mlirMemoryEffectInstancesListAppend, BeaverCapiPolicyExclude__mlirTransformOnlyReadsHandle,
+  BeaverCapiPolicyExclude__mlirTransformConsumesHandle, BeaverCapiPolicyExclude__mlirTransformProducesHandle,
+  BeaverCapiPolicyExclude__mlirTransformModifiesPayload, BeaverCapiPolicyExclude__mlirTransformOnlyReadsPayload,
 } BeaverCapiPolicyMarker;
-
 #endif // MLIR_C_BEAVER_CAPI_POLICY_H

@@ -18,7 +18,6 @@ defmodule Beaver.DeferredTest do
 
   test "explicit invalid contexts fail at the builder boundary" do
     assert_raise ArgumentError, "expected :ctx to be an MLIR context, got: nil", fn -> MLIR.Type.i32(ctx: nil) end
-
     assert_raise ArgumentError, "expected an MLIR context, got: nil", fn -> Deferred.resolve(MLIR.Type.i32(), nil) end
   end
 
@@ -27,7 +26,6 @@ defmodule Beaver.DeferredTest do
 
     try do
       type = MLIR.Type.i32(ctx: ctx)
-
       assert_raise ArgumentError, "type belongs to a different MLIR context", fn -> Deferred.resolve(type, other) end
 
       assert_raise ArgumentError, "type belongs to a different MLIR context", fn ->

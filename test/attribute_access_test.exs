@@ -8,9 +8,7 @@ defmodule AttributeAccessTest do
     array = &MLIR.Attribute.array(Enum.map(&1, integer), ctx: ctx)
     arr = array.(0..5)
     for i <- [-100, 100], do: assert(is_nil(arr[i]))
-
     for {i, value} <- [{0, 0}, {5, 5}, {-1, 5}, {-2, 4}], do: assert(MLIR.equal?(integer.(value), arr[i]))
-
     {v, remaining} = Access.pop(arr, 3)
     assert MLIR.equal?(integer.(3), v)
     assert MLIR.equal?(array.([0, 1, 2, 4, 5]), remaining)

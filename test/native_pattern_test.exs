@@ -105,14 +105,12 @@ defmodule NativePatternTest do
   end
 
   defp create_add_ir(ctx, lhs, rhs) do
-    mlir ctx: ctx do
-      function_module test_func(function_type: Type.function([], [Type.i64()])) do
-        block do
-          lhs = Arith.constant(value: Attribute.integer(Type.i64(), lhs)) >>> Type.i64()
-          rhs = Arith.constant(value: Attribute.integer(Type.i64(), rhs)) >>> Type.i64()
-          result = Arith.addi(lhs, rhs) >>> Type.i64()
-          Func.return(result) >>> []
-        end
+    function_module ctx, test_func(function_type: Type.function([], [Type.i64()])) do
+      block do
+        lhs = Arith.constant(value: Attribute.integer(Type.i64(), lhs)) >>> Type.i64()
+        rhs = Arith.constant(value: Attribute.integer(Type.i64(), rhs)) >>> Type.i64()
+        result = Arith.addi(lhs, rhs) >>> Type.i64()
+        Func.return(result) >>> []
       end
     end
     |> MLIR.verify!()
@@ -138,11 +136,12 @@ defmodule NativePatternTest do
 
   test "invalid declarations fail while the macro is expanded" do
     missing_root =
-      quote do
-        Native.defrewrite broken(operation, rewriter, state) do
-          {operation, rewriter, state}
-        end
-      end
+      quote(
+        do:
+          Native.defrewrite broken(operation, rewriter, state) do
+            {operation, rewriter, state}
+          end
+      )
 
     assert_raise ArgumentError, ~r/requires the :root option/, fn -> Macro.expand_once(missing_root, __ENV__) end
 
@@ -158,11 +157,12 @@ defmodule NativePatternTest do
     end
 
     destructured_argument =
-      quote do
-        Native.defrewrite broken(operation, rewriter, {_pid, _count}), root: "arith.addi" do
-          :no_match
-        end
-      end
+      quote(
+        do:
+          Native.defrewrite broken(operation, rewriter, {_pid, _count}), root: "arith.addi" do
+            :no_match
+          end
+      )
 
     assert_raise ArgumentError, ~r/callback arguments must be variables/, fn ->
       Macro.expand_once(destructured_argument, __ENV__)

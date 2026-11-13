@@ -19,7 +19,6 @@ defmodule ActionTracingTest do
       |> MLIR.Module.create!(ctx: ctx)
 
     module |> Beaver.Composer.append("canonicalize") |> Beaver.Composer.run!()
-
     events = MLIR.ActionTracing.drain(session)
     tags = events |> Enum.map(& &1["tag"]) |> Enum.uniq()
     assert "pass-execution" in tags
@@ -42,7 +41,6 @@ defmodule ActionTracingTest do
 
   test "filtering accepts JSON-sensitive strings before a matching tag", %{ctx: ctx} do
     session = MLIR.ActionTracing.attach(ctx, tags: ["quoted \"tag\" with \\ and\nnewline", "pass-execution"])
-
     module = MLIR.Module.create!("module {}", ctx: ctx)
     module |> Beaver.Composer.append("canonicalize") |> Beaver.Composer.run!()
     events = MLIR.ActionTracing.drain(session)

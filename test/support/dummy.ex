@@ -48,10 +48,7 @@ defmodule Beaver.Dummy do
   def documented_control_flow(ctx) do
     mlir ctx: ctx do
       module do
-        unquote(
-          Beaver.Test.DocumentationExample.read!("guides/blocks.md", "control-flow")
-          |> Code.string_to_quoted!()
-        )
+        unquote(Beaver.Test.DocumentationExample.read!("guides/blocks.md", "control-flow") |> Code.string_to_quoted!())
       end
     end
   end

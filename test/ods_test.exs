@@ -56,15 +56,14 @@ defmodule ODSDumpTest do
   test "tagged and untagged operands mixed", %{ctx: ctx} do
     mlir ctx: ctx do
       assert_raise ArgumentError, ~r"Cannot mix tagged and untagged operands", fn ->
-        mlir ctx: ctx do
-          function_module _(
-                            function_type: Type.function([Type.i32(), Type.i32()], []),
-                            sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
-                          ) do
-            block _(a >>> Type.i32(), b >>> Type.i32()) do
-              Arith.addi(a, rhs: b) >>> Type.i32()
-              Func.return() >>> []
-            end
+        function_module ctx,
+                        _(
+                          function_type: Type.function([Type.i32(), Type.i32()], []),
+                          sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                        ) do
+          block _(a >>> Type.i32(), b >>> Type.i32()) do
+            Arith.addi(a, rhs: b) >>> Type.i32()
+            Func.return() >>> []
           end
         end
       end
@@ -77,15 +76,14 @@ defmodule ODSDumpTest do
     mlir ctx: ctx do
       logs =
         capture_log(fn ->
-          mlir ctx: ctx do
-            function_module _(
-                              function_type: Type.function([Type.i32(), Type.i32()], []),
-                              sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
-                            ) do
-              block _(_a >>> Type.i32(), b >>> Type.i32()) do
-                Arith.addi(rhs: b) >>> Type.i32()
-                Func.return() >>> []
-              end
+          function_module ctx,
+                          _(
+                            function_type: Type.function([Type.i32(), Type.i32()], []),
+                            sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                          ) do
+            block _(_a >>> Type.i32(), b >>> Type.i32()) do
+              Arith.addi(rhs: b) >>> Type.i32()
+              Func.return() >>> []
             end
           end
         end)

@@ -22,13 +22,11 @@ defmodule RewritePatternTest do
   end
 
   defp example_ir(ctx) do
-    mlir ctx: ctx do
-      function_module const(function_type: Type.function([], [Type.i64(), Type.i64()])) do
-        block do
-          v0 = Arith.constant(value: Attribute.integer(Type.i64(), 1)) >>> Type.i64()
-          v1 = Arith.constant(value: Attribute.integer(Type.i64(), 3)) >>> Type.i64()
-          Func.return(v0, v1) >>> []
-        end
+    function_module ctx, const(function_type: Type.function([], [Type.i64(), Type.i64()])) do
+      block do
+        v0 = Arith.constant(value: Attribute.integer(Type.i64(), 1)) >>> Type.i64()
+        v1 = Arith.constant(value: Attribute.integer(Type.i64(), 3)) >>> Type.i64()
+        Func.return(v0, v1) >>> []
       end
     end
     |> MLIR.verify!()

@@ -5,13 +5,10 @@ const kinda = @import("kinda");
 const e = kinda.erl_nif;
 const beam = kinda.beam;
 const result = kinda.result;
-
 extern fn free(ptr: mlir_capi.OpaquePtr.T) void;
-
 fn get_null(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
     return try mlir_capi.OpaquePtr.resource.make(env, null);
 }
-
 fn deallocate(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const Error = error{NullPointer};
     const ptr: mlir_capi.OpaquePtr.T = try mlir_capi.OpaquePtr.resource.fetch(env, args[0]);
@@ -22,7 +19,6 @@ fn deallocate(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
         return Error.NullPointer;
     }
 }
-
 fn read_opaque_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const ptr = try mlir_capi.OpaquePtr.resource.fetch(env, args[0]);
     const len = try mlir_capi.USize.resource.fetch(env, args[1]);
@@ -31,5 +27,4 @@ fn read_opaque_ptr(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.ter
     const slice = @as(mlir_capi.U8.Array.T, @ptrCast(ptr))[0..len];
     return beam.make_slice(env, slice);
 }
-
 pub const nifs = .{ result.nif("beaver_raw_get_null_ptr", 0, get_null).entry, result.nif("beaver_raw_deallocate_opaque_ptr", 1, deallocate).entry, result.nif("beaver_raw_read_opaque_ptr", 2, read_opaque_ptr).entry };

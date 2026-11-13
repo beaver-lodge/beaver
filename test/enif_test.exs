@@ -21,11 +21,9 @@ defmodule EnifTest do
   end
 
   test "binary serialize", %{ctx: ctx} do
-    mlir ctx: ctx do
-      module do
-        b = Beaver.MLIR.Dialect.MemRef.global("hello") >>> :infer
-        assert to_string(b) =~ "dense<[104, 101, 108, 108, 111]>"
-      end
+    module_ir ctx do
+      b = Beaver.MLIR.Dialect.MemRef.global("hello") >>> :infer
+      assert to_string(b) =~ "dense<[104, 101, 108, 108, 111]>"
     end
     |> MLIR.verify!()
   end
@@ -45,7 +43,6 @@ defmodule EnifTest do
     |> tap(fn %ENIFSupport{engine: e} ->
       invoker = &Beaver.ENIF.invoke(e, "alloc_bin_and_copy", [&1])
       assert txt == invoker.(txt)
-
       assert_raise ErlangError, "Erlang error: \"not a binary\"", fn -> invoker.(1) end
     end)
     |> ENIFSupport.destroy()
@@ -53,7 +50,6 @@ defmodule EnifTest do
 
   test "enif send message", %{ctx: ctx} do
     source = ENIFSendMsg.create(ctx) |> Beaver.ENIF.declare_external_functions() |> MLIR.verify!()
-
     source_ir = MLIR.to_string(source)
     assert source_ir =~ "ptr.to_ptr"
     assert source_ir =~ "ptr.constant #ptr.null"

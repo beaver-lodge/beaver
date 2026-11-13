@@ -27,7 +27,6 @@ defmodule Beaver.IRBatchSpecTest do
 
     normalized = Language.normalize_function(name: "pairs", body: [{:pair, {:a, :b}, :x, :y}])
     assert [%{name: "func.call", results: [:i64, :i64]}] = normalized.body
-
     assert :unknown = Language.expand_declared_operation({:pair, :a, :x})
     assert_raise ArgumentError, fn -> Spec.normalize(%{body: [], blocks: []}) end
   end
@@ -52,9 +51,7 @@ defmodule Beaver.IRBatchSpecTest do
           end)
         end
 
-        block :default do
-          terminate({:return, [:x]})
-        end
+        block(:default, do: terminate({:return, [:x]}))
       end
 
     assert builder == :untouched
@@ -68,13 +65,9 @@ defmodule Beaver.IRBatchSpecTest do
         quote(
           do:
             CFG.cfg Builder.new() do
-              block :same do
-                terminate({:return, []})
-              end
+              block(:same, do: terminate({:return, []}))
 
-              block :same do
-                terminate({:return, []})
-              end
+              block(:same, do: terminate({:return, []}))
             end
         ),
         __ENV__

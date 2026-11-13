@@ -9,7 +9,6 @@ const callback_names = .{ "construct", "destruct", "initialize", "clone", "run" 
 const RuntimeDispatcher = kinda.callback_runtime.Dispatcher(callback_names);
 const string_ref = @import("string_ref.zig");
 const callback_args = @import("callback_args.zig");
-
 threadlocal var typeIDAllocator: ?mlir_capi.TypeIDAllocator.T = null;
 const CallbackDispatcher = struct {
     const Lifecycle = callback_args.Lifecycle(RuntimeDispatcher, "a pass");
@@ -49,7 +48,6 @@ const CallbackDispatcher = struct {
         }
     }
 };
-
 pub fn create(env: beam.env, arguments: beam.term) !beam.term {
     const args = try @import("execution.zig").tuple(env, arguments, 5);
     var owner: beam.pid = undefined;
@@ -71,7 +69,6 @@ pub fn create(env: beam.env, arguments: beam.term) !beam.term {
         dispatcher,
     });
 }
-
 var mutex: std.Io.Mutex = .init;
 var all_passes_registered = false;
 pub fn register_all_passes() void {

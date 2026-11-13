@@ -40,9 +40,7 @@ defmodule Beaver.Pattern.PDL do
 
     next =
       Enum.with_index(entries)
-      |> Enum.reduce(selected, fn {entry, i}, acc ->
-        if matches?(entry, symbols), do: MapSet.put(acc, i), else: acc
-      end)
+      |> Enum.reduce(selected, fn {entry, i}, acc -> if matches?(entry, symbols), do: MapSet.put(acc, i), else: acc end)
 
     if next == selected do
       module

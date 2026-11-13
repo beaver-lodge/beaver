@@ -39,10 +39,8 @@ defmodule OpTest do
     alias MLIR.Dialect.MemRef
 
     assert_raise ArgumentError, ~r{Invalid argument.+:not_supported}s, fn ->
-      mlir ctx: ctx do
-        module do
-          MemRef.global(:not_supported) >>> []
-        end
+      module_ir ctx do
+        MemRef.global(:not_supported) >>> []
       end
     end
   end
@@ -52,12 +50,10 @@ defmodule OpTest do
     operation_name = "testing.dynamic"
 
     module =
-      mlir ctx: ctx do
-        module do
-          value = ~o/#{operation_name}/.(label: ~a/producer/s) >>> ~t{i32}
-          ~o/#{operation_name}/.(value, label: ~a/consumer/s) >>> []
-          ~o/testing.marker/ >>> []
-        end
+      module_ir ctx do
+        value = ~o/#{operation_name}/.(label: ~a/producer/s) >>> ~t{i32}
+        ~o/#{operation_name}/.(value, label: ~a/consumer/s) >>> []
+        ~o/testing.marker/ >>> []
       end
 
     assert Enum.map(Beaver.Walker.operations(MLIR.Module.body(module)), &MLIR.Operation.name/1) ==

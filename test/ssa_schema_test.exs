@@ -1,6 +1,6 @@
 defmodule Beaver.SSASchemaTest do
   use ExUnit.Case, async: true
-  alias Beaver.SSA.BlockSharing
+  alias Beaver.SSA.{BlockSharing, Flow, Scalar}
 
   defmodule Graph do
     use Beaver.SSA.Schema,
@@ -61,6 +61,31 @@ defmodule Beaver.SSASchemaTest do
     assert BlockSharing.run(unwind, Graph, options()) == unwind
     metadata = %{original | blocks: [entry, Map.put(first, :effect, :before), Map.put(second, :effect, :after)]}
     assert BlockSharing.run(metadata, Graph, Keyword.put(options(), :sort_key, fn _ -> :collision end)) == metadata
+  end
+
+  test "unknown opcodes remain unknown while named nil and integer operations carry facts" do
+    vocabulary = %{"nil" => nil, "integer" => :integer}
+    assert Scalar.instruction("external", [], 1, vocabulary) == [:any]
+    assert Scalar.instruction("nil", [], 1, vocabulary) == [nil]
+    assert Scalar.instruction(%{"integer" => 0}, [], 1, vocabulary) == [{:integer, 0, 0}]
+    assert Scalar.infer("add", [{:integer, 2, 3}, {:integer, 5, 7}]) == {:integer, 7, 10}
+  end
+
+  test "graph cleanup and allocation preserve observable effects with atom-keyed schemas" do
+    %{blocks: [entry, first, second]} = fixture()
+    entry = %{entry | parameters: [8], exit: %{jump: %{block: 1, arguments: [8]}}}
+    dead = %{op: 99, inputs: [], outputs: [9]}
+    first = %{first | instructions: [dead | first.instructions]}
+    original = %{blocks: [entry, first, second], values: 10}
+    blocks = Flow.dead_code(original.blocks, Graph, &(&1.op != :trace))
+    compact = Flow.prune(%{original | blocks: blocks}, Graph)
+    assert compact.values == 5 and length(compact.blocks) == 2
+    allocated = Flow.allocate(compact, Graph, 32)
+    assert allocated["frame_size"] > 0
+    assert length(allocated["layout"]) == compact.values
+
+    for input <- [-8, 0, 11],
+        do: assert(execute(original.blocks, 0, [input], []) == execute(allocated.blocks, 0, [input], []))
   end
 
   defp options do

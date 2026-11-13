@@ -4,18 +4,15 @@ const e = kinda.erl_nif;
 const prelude = @import("prelude.zig");
 const c = prelude.c;
 const mlir = @import("mlir_capi.zig");
-
 const Receiver = struct {
     env: beam.env,
     reference: beam.term,
     pid: e.ErlNifPid,
-
     fn destroy(data: ?*anyopaque) callconv(.c) void {
         const self: *Receiver = @ptrCast(@alignCast(data.?));
         e.enif_free_env(self.env);
         beam.allocator.destroy(self);
     }
-
     fn send(json: c.MlirStringRef, data: ?*anyopaque) callconv(.c) void {
         const self: *Receiver = @ptrCast(@alignCast(data.?));
         const env = e.enif_alloc_env() orelse return;
@@ -29,7 +26,6 @@ const Receiver = struct {
         _ = e.enif_send(null, &self.pid, env, message);
     }
 };
-
 pub fn optimization_remarks_attach(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const ctx = try mlir.Context.resource.fetch(env, args[0]);
     const filters = try @import("string_ref.zig").get_binary_as_string_ref(env, args[2]);
@@ -44,5 +40,4 @@ pub fn optimization_remarks_attach(env: beam.env, _: c_int, args: [*c]const beam
     receiver.* = .{ .env = owned_env, .reference = e.enif_make_copy(owned_env, args[1]), .pid = pid };
     return beam.make(bool, env, c.beaverContextEnableOptimizationRemarks(ctx, filters, final_policy, Receiver.send, receiver, Receiver.destroy));
 }
-
 pub const nifs = .{prelude.beaverRawNIF(@This(), "optimization_remarks_attach", 4)};

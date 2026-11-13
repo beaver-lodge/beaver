@@ -7,9 +7,7 @@ MLIR_CAPI_EXPORTED void beaverSetGlobalDebugTypes(const MlirStringRef *types, in
   // Convert MlirStringRef array to array of C strings
   std::vector<const char *> cstrings;
   cstrings.reserve(n);
-  for (intptr_t i = 0; i < n; ++i) {
-    cstrings.push_back(beaverStringRefGetData(types[i]));
-  }
+  for (intptr_t i = 0; i < n; ++i) { cstrings.push_back(beaverStringRefGetData(types[i])); }
 
   // Call the underlying MLIR function
   mlirSetGlobalDebugTypes(cstrings.data(), n);

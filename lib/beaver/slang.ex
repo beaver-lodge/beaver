@@ -90,9 +90,12 @@ defmodule Beaver.Slang do
 
   defp introspection_lookup_ast(dialect, lookup) do
     if map_size(lookup) == 0 do
-      quote do
-        defp __slang_info__(_name), do: {nil, %{}}
-      end
+      quote(
+        do:
+          defp __slang_info__(_name) do
+            {nil, %{}}
+          end
+      )
     else
       quote do
         defp __slang_info__(name) do
@@ -104,26 +107,20 @@ defmodule Beaver.Slang do
   end
 
   defp creator_env do
-    quote do
-      [ip: Beaver.Env.block(), ctx: Beaver.Env.context(), loc: Kernel.var!(slang_internal_source_loc)]
-    end
+    quote(do: [ip: Beaver.Env.block(), ctx: Beaver.Env.context(), loc: Kernel.var!(slang_internal_source_loc)])
   end
 
   @doc false
   defp transform_defop_pins({:^, _line1, [{name, _line2, ctx}]}) when is_atom(name) and is_atom(ctx) do
     alias_name = get_alias_name(name)
 
-    quote do
-      unquote(alias_name)(unquote(creator_env()))
-    end
+    quote(do: unquote(alias_name)(unquote(creator_env())))
   end
 
   defp transform_defop_pins({:=, _line0, [_var, {:=, _line1, _right2}]} = ast), do: ast
   # only leaf assignment should be transformed
   defp transform_defop_pins({:=, _line0, [var, right]}) do
-    quote do
-      unquote(var) = Beaver.Slang.create_constraint(unquote(right), unquote(creator_env()))
-    end
+    quote(do: unquote(var) = Beaver.Slang.create_constraint(unquote(right), unquote(creator_env())))
   end
 
   defp transform_defop_pins(ast), do: ast
@@ -248,9 +245,7 @@ defmodule Beaver.Slang do
     var = get_slang_arg_ast(index)
 
     binding =
-      quote do
-        unquote(var) = Beaver.Slang.create_constraint(unquote(ast), unquote(creator_env()))
-      end
+      quote(do: unquote(var) = Beaver.Slang.create_constraint(unquote(ast), unquote(creator_env())))
 
     {binding, var}
   end
@@ -459,9 +454,7 @@ defmodule Beaver.Slang do
 
       unquote_splicing(
         for {key, values} <- [__slang__trait__: traits, __slang__interface__: interfaces], values != [] do
-          quote do
-            Module.put_attribute(__MODULE__, unquote(key), {unquote(name), unquote(values)})
-          end
+          quote(do: Module.put_attribute(__MODULE__, unquote(key), {unquote(name), unquote(values)}))
         end
       )
 
@@ -683,9 +676,7 @@ defmodule Beaver.Slang do
   Base names use upstream IRDL spelling such as `"!builtin.integer"` or `"#builtin.string"`.
   """
   defmacro base(base) do
-    quote do
-      Beaver.Slang.create_base(unquote(base), unquote(creator_env()))
-    end
+    quote(do: Beaver.Slang.create_base(unquote(base), unquote(creator_env())))
   end
 
   @doc "Marks an operand or result constraint as variadic."
@@ -714,9 +705,7 @@ defmodule Beaver.Slang do
     quote do
       use Beaver
 
-      mlir do
-        Beaver.MLIR.Dialect.IRDL.any(Kernel.var!(slang_internal_source_loc)) >>> ~t{!irdl.attribute}
-      end
+      mlir(do: Beaver.MLIR.Dialect.IRDL.any(Kernel.var!(slang_internal_source_loc)) >>> ~t{!irdl.attribute})
     end
   end
 
@@ -898,9 +887,7 @@ defmodule Beaver.Slang do
       |> maybe_put_kw(:result_names, explicit_res_names)
       |> maybe_put_kw(:attributes, if(attr_asts == [], do: merged_opts[:attributes], else: attr_asts))
 
-    quote do
-      Beaver.Slang.defop(unquote(call_ast), unquote(defop_opts))
-    end
+    quote(do: Beaver.Slang.defop(unquote(call_ast), unquote(defop_opts)))
   end
 
   defp merge_table_op_opts(shared_opts, op_opts) do

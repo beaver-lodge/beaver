@@ -281,9 +281,7 @@ defmodule Beaver.Pattern.Native do
     native_module = __MODULE__
 
     normalized_body =
-      quote do
-        unquote(native_module).invoke_body(fn -> unquote(body) end, unquote(state), unquote(name))
-      end
+      quote(do: unquote(native_module).invoke_body(fn -> unquote(body) end, unquote(state), unquote(name)))
 
     attributes_matched = build_attributes_match(operation, state, attribute_pairs, normalized_body)
 

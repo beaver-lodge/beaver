@@ -7,13 +7,10 @@ defmodule DLTITest do
 
   test "builds and attaches a semantic data layout", %{ctx: ctx} do
     module =
-      mlir ctx: ctx do
-        module do
-        end
+      module_ir ctx do
       end
 
     spec = DLTI.data_layout(endianness: :little, mangling_mode: "elf", ctx: ctx)
-
     assert to_string(spec) =~ ~s("dlti.endianness" = "little")
     assert to_string(spec) =~ ~s("dlti.mangling_mode" = "elf")
     assert ^module = DLTI.attach(module, spec)
@@ -23,15 +20,12 @@ defmodule DLTITest do
 
   test "supports type keys and explicit attribute values", %{ctx: ctx} do
     entry = DLTI.entry(MLIR.Type.i32(), MLIR.Attribute.integer(MLIR.Type.i64(), 32), ctx: ctx)
-
     assert to_string(entry) == "#dlti.dl_entry<i32, 32 : i64>"
   end
 
   test "builds and attaches a target system spec", %{ctx: ctx} do
     module =
-      mlir ctx: ctx do
-        module do
-        end
+      module_ir ctx do
       end
 
     target =

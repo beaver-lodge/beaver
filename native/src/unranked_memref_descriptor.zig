@@ -18,7 +18,6 @@ pub const UnrankedMemRefDescriptor = extern struct {
     pub const resource_name = "Beaver.MLIR.UnrankedMemRefDescriptor";
     const kind = kinda.ResourceKind(@This(), mlir_capi.ElixirNameSpacePrefix ++ "UnrankedMemRefDescriptor");
     const resource = kind.resource;
-
     pub fn init(rank: i64) !@This() {
         const self = @This(){ .rank = rank, .descriptor = undefined };
         return self;
@@ -37,7 +36,6 @@ pub fn unranked_memref_descriptor_get_rank(env: beam.env, _: c_int, args: [*c]co
     const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
     return beam.make_i64(env, d.rank);
 }
-
 fn RankedField(comptime name: []const u8) type {
     return struct {
         fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
@@ -56,11 +54,9 @@ fn RankedField(comptime name: []const u8) type {
         }
     };
 }
-
 pub const unranked_memref_descriptor_get_offset = RankedField("offset").nif;
 pub const unranked_memref_descriptor_get_sizes = RankedField("sizes").nif;
 pub const unranked_memref_descriptor_get_strides = RankedField("strides").nif;
-
 fn Deallocator(free: anytype) type {
     return struct {
         fn nif(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
@@ -79,7 +75,6 @@ fn Deallocator(free: anytype) type {
         }
     };
 }
-
 pub const unranked_memref_descriptor_deallocate_with_c = Deallocator(std.c.free).nif;
 pub const unranked_memref_descriptor_deallocate_with_enif = Deallocator(e.enif_free).nif;
 

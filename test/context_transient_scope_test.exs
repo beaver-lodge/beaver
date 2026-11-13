@@ -12,7 +12,6 @@ defmodule ContextTransientScopeTest do
 
   test "always ends a scope after a callback failure", %{ctx: ctx} do
     assert_raise RuntimeError, "boom", fn -> MLIR.Context.with_transient_scope(ctx, fn _ctx -> raise "boom" end) end
-
     assert :reentered == MLIR.Context.with_transient_scope(ctx, fn _ctx -> :reentered end)
   end
 
@@ -24,7 +23,6 @@ defmodule ContextTransientScopeTest do
         stale_wrappers =
           MLIR.Context.with_transient_scope(ctx, fn scoped_ctx ->
             types = Enum.map([8, 16, 32], fn bitwidth -> MLIR.Type.integer(bitwidth, ctx: scoped_ctx) end)
-
             attributes = Enum.map(types, &MLIR.Attribute.type/1)
 
             types
@@ -38,7 +36,6 @@ defmodule ContextTransientScopeTest do
 
     assert_receive {:transient_wrappers_collected, ^pid, 6}, 5_000
     assert_receive {:DOWN, ^monitor, :process, ^pid, :normal}, 5_000
-
     assert :reentered == MLIR.Context.with_transient_scope(ctx, fn _ctx -> :reentered end)
   end
 

@@ -25,9 +25,7 @@ defmodule FixedPointPassTest do
     end
 
     assert_raise ArgumentError, ":on_convergence_failure must be :warn, :error, or :silent", fn ->
-      apply(MLIR.Transform, :composite_fixed_point, [
-        [pipeline: ["canonicalize"], on_convergence_failure: :continue]
-      ])
+      apply(MLIR.Transform, :composite_fixed_point, [[pipeline: ["canonicalize"], on_convergence_failure: :continue]])
     end
   end
 
@@ -72,7 +70,6 @@ defmodule FixedPointPassTest do
 
     assert {:error, diagnostics} = Beaver.Composer.run(composer)
     assert MLIR.Diagnostic.format(diagnostics) =~ ~r/Toggle.*didn't converge.*2 iterations/s
-
     assert MLIR.Operation.discardable_attribute(MLIR.Operation.from_module(module), "test.after_fixed_point") == nil
   end
 end

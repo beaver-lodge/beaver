@@ -9,10 +9,8 @@ defmodule TraitTest do
     assert MLIR.Context.terminator?(ctx, "cf.br")
 
     m =
-      mlir ctx: ctx do
-        module do
-          Func.return() >>> []
-        end
+      module_ir ctx do
+        Func.return() >>> []
       end
 
     refute MLIR.Operation.terminator?(MLIR.Operation.from_module(m))

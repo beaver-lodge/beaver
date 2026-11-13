@@ -41,20 +41,13 @@ defmodule ExternalInterfaceSlang do
     handle = CAPI.mlirOperationGetOperand(operation, 0)
     base = TransformOpInterface.rewriter_base(rewriter)
 
-    state
-    |> TransformOpInterface.payload_ops(handle)
-    |> Enum.each(&mark(base, &1, "marked"))
+    state |> TransformOpInterface.payload_ops(handle) |> Enum.each(&mark(base, &1, "marked"))
 
     :ok
   end
 
   def populate_patterns(operation, patterns) do
-    RewritePatternSet.add(
-      patterns,
-      "func.return",
-      &__MODULE__.mark_return/4,
-      ctx: Beaver.MLIR.context(operation)
-    )
+    RewritePatternSet.add(patterns, "func.return", &__MODULE__.mark_return/4, ctx: Beaver.MLIR.context(operation))
 
     :ok
   end

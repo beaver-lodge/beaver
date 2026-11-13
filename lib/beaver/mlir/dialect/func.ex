@@ -4,9 +4,7 @@ defmodule Beaver.MLIR.Dialect.Func do
 
   @doc "Syntax sugar for `Func.func` SSA expression. No need to specify result types."
   defmacro func(call, opts) do
-    quote do
-      Beaver.MLIR.Dialect.Func.func_like(unquote(call), Beaver.MLIR.Dialect.Func.func(), unquote(opts))
-    end
+    quote(do: Beaver.MLIR.Dialect.Func.func_like(unquote(call), Beaver.MLIR.Dialect.Func.func(), unquote(opts)))
   end
 
   @doc "Syntax sugar for `Func.func` alike SSA expression. No need to specify result types."

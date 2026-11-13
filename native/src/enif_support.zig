@@ -6,7 +6,6 @@ const kinda = @import("kinda");
 const result = kinda.result;
 const e = kinda.erl_nif;
 const beam = kinda.beam;
-
 const Invocation = struct {
     arg_terms: []beam.term = undefined,
     res_term: beam.term = undefined,
@@ -34,7 +33,6 @@ const Invocation = struct {
         return c.mlirExecutionEngineInvokePacked(jit, c.mlirStringRefCreate(name.data, name.size), &self.packed_args[0]);
     }
 };
-
 fn beaver_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const Error = error{JITFunctionCallFailure};
     const jit: mlir_capi.ExecutionEngine.T = try mlir_capi.ExecutionEngine.resource.fetch(env, args[0]);
@@ -45,9 +43,7 @@ fn beaver_raw_jit_invoke_with_terms(env: beam.env, _: c_int, args: [*c]const bea
     if (c.beaverLogicalResultIsFailure(invocation.invoke(jit, name, env))) return Error.JITFunctionCallFailure;
     return invocation.res_term;
 }
-
 const enif_function_names = @import("enif_list.zig").functions ++ rt.exported;
-
 fn register_jit_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const u8, comptime f: anytype) void {
     const name_str_ref = c.MlirStringRef{ .data = name.ptr, .length = name.len };
     c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @ptrCast(@constCast(&f)));
@@ -69,7 +65,6 @@ fn jit_realloc(ptr: ?*anyopaque, size: usize) callconv(.c) ?*anyopaque {
 fn jit_calloc(num: usize, size: usize) callconv(.c) ?*anyopaque {
     return std.c.calloc(num, size);
 }
-
 fn beaver_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const jit = try mlir_capi.ExecutionEngine.resource.fetch(env, args[0]);
     inline for (enif_function_names) |name| {
@@ -86,14 +81,12 @@ fn beaver_raw_jit_register_enif(env: beam.env, _: c_int, args: [*c]const beam.te
     }
     return beam.make_ok(env);
 }
-
 fn parse_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, t: []const u8) !beam.term {
     return try mlir_capi.Type.resource.make(env, c.mlirTypeParseGet(ctx, c.MlirStringRef{
         .data = t.ptr,
         .length = t.len,
     }));
 }
-
 fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
     if (t == rt.BinaryMemRefDescriptor) return parse_mlir_type(env, ctx, rt.BinaryMemRefType);
     if (t == beam.binary) return parse_mlir_type(env, ctx, rt.BinaryStructLLVMType);
@@ -110,12 +103,10 @@ fn enif_mlir_type(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !be
     };
     return mlir_capi.Type.resource.make(env, mlir_type);
 }
-
 fn dump_type_info(env: beam.env, ctx: mlir_capi.Context.T, comptime t: type) !beam.term {
     var terms = [_]beam.term{ try enif_mlir_type(env, ctx, t), try beam.make(i64, env, @sizeOf(t)) };
     return beam.make_tuple(env, &terms);
 }
-
 fn beaver_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
     var signatures: [enif_function_names.len]beam.term = undefined;
@@ -141,13 +132,11 @@ fn beaver_raw_enif_signatures(env: beam.env, _: c_int, args: [*c]const beam.term
     }
     return beam.make_term_list(env, &signatures);
 }
-
 fn beaver_raw_enif_functions(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
     var names: [enif_function_names.len]beam.term = undefined;
     inline for (enif_function_names, 0..) |name, i| names[i] = beam.make_atom(env, name);
     return beam.make_term_list(env, &names);
 }
-
 fn beaver_raw_mlir_type_of_enif_obj(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const Error = error{MLIRTypeForEnifObjNotFound};
     const ctx = try mlir_capi.Context.resource.fetch(env, args[0]);
@@ -160,7 +149,6 @@ fn beaver_raw_mlir_type_of_enif_obj(env: beam.env, _: c_int, args: [*c]const bea
     }
     return Error.MLIRTypeForEnifObjNotFound;
 }
-
 pub const nifs = .{
     result.nif_with_flags("beaver_raw_jit_invoke_with_terms", 3, beaver_raw_jit_invoke_with_terms, e.ERL_NIF_DIRTY_JOB_CPU_BOUND).entry,
     result.nif_with_flags("beaver_raw_jit_invoke_with_terms_cpu_bound", 3, beaver_raw_jit_invoke_with_terms, e.ERL_NIF_DIRTY_JOB_CPU_BOUND).entry,

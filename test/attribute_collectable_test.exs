@@ -14,11 +14,7 @@ defmodule AttributeCollectableTest do
     end
   end
 
-  for {native, values} <- [
-        {Native.I32, [1, 2, 3]},
-        {Native.F32, [1.0, 2.0, 3.0]},
-        {Native.Bool, [true, false, true]}
-      ] do
+  for {native, values} <- [{Native.I32, [1, 2, 3]}, {Native.F32, [1.0, 2.0, 3.0]}, {Native.Bool, [true, false, true]}] do
     test "dense array #{native}", %{ctx: ctx} do
       values = unquote(values)
       build = &Attribute.dense_array(&1, unquote(native), ctx: ctx)

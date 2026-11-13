@@ -91,9 +91,7 @@ defmodule Beaver.MLIR.Triton.PipelineProfileTest do
         run_passes(module, lowering)
 
         ptx =
-          module
-          |> MLIR.Target.LLVMIR.translate!()
-          |> MLIR.Target.LLVMIR.compile_to_ptx!(cpu: "sm_#{capability}")
+          module |> MLIR.Target.LLVMIR.translate!() |> MLIR.Target.LLVMIR.compile_to_ptx!(cpu: "sm_#{capability}")
 
         assert ptx =~ "bar.sync"
       end)

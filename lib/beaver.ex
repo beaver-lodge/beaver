@@ -48,11 +48,12 @@ defmodule Beaver do
   block.
   """
   defmacro mlir(do: dsl_block) do
-    quote do
-      Beaver.mlir [] do
-        unquote(dsl_block)
-      end
-    end
+    quote(
+      do:
+        Beaver.mlir [] do
+          unquote(dsl_block)
+        end
+    )
   end
 
   @doc """
@@ -114,9 +115,7 @@ defmodule Beaver do
   # transform ast of a call into block argument bindings to variables
   defp arguments_variables(args) do
     for {{var, _type}, index} <- Enum.with_index(args) do
-      quote do
-        unquote(var) = Beaver.Env.block() |> Block.get_arg!(unquote(index))
-      end
+      quote(do: unquote(var) = Beaver.Env.block() |> Block.get_arg!(unquote(index)))
     end
   end
 
@@ -127,9 +126,7 @@ defmodule Beaver do
         {type, quote(do: MLIR.Location.from_env(__ENV__, ctx: Beaver.Env.context()))}
       end
 
-    quote do
-      tap(&Block.add_args!(&1, unquote(arg_loc_pairs), ctx: Beaver.Env.context()))
-    end
+    quote(do: tap(&Block.add_args!(&1, unquote(arg_loc_pairs), ctx: Beaver.Env.context())))
   end
 
   @doc false
@@ -165,9 +162,7 @@ defmodule Beaver do
     suppress_warning = quote(do: _ = Kernel.var!(beaver_internal_env_ip))
 
     if Macro.Env.has_var?(caller, {:beaver_internal_env_ip, nil}) do
-      {quote do
-         beaver_internal_parent_scope_ip = Kernel.var!(beaver_internal_env_ip)
-       end,
+      {quote(do: beaver_internal_parent_scope_ip = Kernel.var!(beaver_internal_env_ip)),
        quote do
          Kernel.var!(beaver_internal_env_ip) = beaver_internal_parent_scope_ip
          unquote(suppress_warning)
@@ -188,11 +183,12 @@ defmodule Beaver do
   The block can be used to call CAPI.
   """
   defmacro block(do: body) do
-    quote do
-      block _() do
-        unquote(body)
-      end
-    end
+    quote(
+      do:
+        block _() do
+          unquote(body)
+        end
+    )
   end
 
   @doc """
@@ -243,13 +239,9 @@ defmodule Beaver do
   defmacro region(do: body) do
     regions =
       if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_regions, nil}) do
-        quote do
-          Kernel.var!(beaver_internal_env_regions)
-        end
+        quote(do: Kernel.var!(beaver_internal_env_regions))
       else
-        quote do
-          Kernel.var!(beaver_internal_env_regions) = []
-        end
+        quote(do: Kernel.var!(beaver_internal_env_regions) = [])
       end
 
     quote do

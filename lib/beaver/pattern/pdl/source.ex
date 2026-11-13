@@ -43,6 +43,48 @@ defmodule Beaver.Pattern.PDL.Source do
          "}\n}\n"
        ])}
 
+  @doc """
+  Builds a rule from `{results, operation, operands, types, attributes}` steps and replacement values.
+  Result/operand names are symbolic; string types are concrete and atom types are shared wildcards.
+  The last match operation is the root. Constants, types and free operands are declared once.
+  """
+  def pattern(name, callee, benefit, match, rewrite, replacements) when match != [] do
+    steps = match ++ rewrite
+    types = Enum.flat_map(steps, &elem(&1, 3)) |> Enum.uniq() |> Enum.with_index(&{&1, "t#{&2}"})
+    attrs = Enum.flat_map(steps, &Keyword.values(elem(&1, 4))) |> Enum.uniq() |> Enum.with_index(&{&1, "a#{&2}"})
+    bound = Enum.flat_map(match, &List.wrap(elem(&1, 0)))
+    operands = Enum.flat_map(match, &elem(&1, 2)) |> Enum.uniq() |> Enum.reject(&(&1 in bound))
+
+    declarations =
+      declarations(
+        operands,
+        Enum.map(types, fn {t, n} -> {n, if(is_binary(t), do: t)} end),
+        Enum.map(attrs, fn {v, n} -> {n, v} end)
+      )
+
+    render = &pattern_steps(&1, &2, Map.new(types), Map.new(attrs))
+    root = "match#{length(match) - 1}"
+
+    rule(name, callee, benefit, [declarations, render.(match, "match")], root, [
+      render.(rewrite, "rewrite"),
+      replace_values(root, replacements)
+    ])
+  end
+
+  defp pattern_steps(steps, prefix, types, attrs) do
+    Enum.with_index(steps, fn {results, op, operands, result_types, attributes}, i ->
+      results = List.wrap(results)
+      unless length(results) == length(result_types), do: raise(ArgumentError, "PDL result/type count mismatch")
+      name = "#{prefix}#{i}"
+      attributes = Enum.map(attributes, fn {k, v} -> {k, Map.fetch!(attrs, v)} end)
+
+      [
+        operation(name, op, operands, Enum.map(result_types, &Map.fetch!(types, &1)), attributes),
+        Enum.with_index(results, fn result, index -> "%#{result} = pdl.result #{index} of %#{name}\n" end)
+      ]
+    end)
+  end
+
   @doc "Retargets a call with any operand list and explicit result types; returns a rule entry for PDL.new/1."
   def retarget(name, from, to, results, benefit \\ 1) do
     types = Enum.with_index(results, &{"t#{&2}", &1})

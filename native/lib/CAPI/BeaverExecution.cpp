@@ -35,7 +35,6 @@ static uint64_t now() {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now().time_since_epoch()).count();
 }
 uint64_t beaverExecutionClock() { return now(); }
-
 namespace beaver {
 struct Metrics {
   std::atomic<uint64_t> callbacks{0}, callbackNs{0};
@@ -55,9 +54,8 @@ Execution currentExecution() { return current; }
 ExecutionScope::ExecutionScope(Execution execution) : previous(std::move(current)) { current = std::move(execution); }
 ExecutionScope::~ExecutionScope() { current = std::move(previous); }
 
-// Admission limits runnable root jobs. A root waiting for BEAM lends its slot
-// to queued work, so nested callbacks cannot exhaust a fixed-size pool. MLIR
-// children inherit the ticket and lend the root's slot at most once.
+// Admission limits runnable root jobs. A root waiting for BEAM lends its slot to queued work, so nested callbacks
+// cannot exhaust a fixed-size pool. MLIR children inherit the ticket and lend the root's slot at most once.
 class Executor {
   struct Worker {
     std::thread thread;
@@ -70,7 +68,6 @@ class Executor {
   unsigned capacity, idleMs, live = 0, running = 0, active = 0, resuming = 0;
   unsigned peakRunning = 0, peakThreads = 0;
   bool closing = false;
-
   bool available() const { return !queue.empty() && running < capacity && resuming == 0; }
   void provision() {
     if (!available()) return;
@@ -111,7 +108,6 @@ class Executor {
     --live;
     entry->finished = true;
   }
-
 public:
   Executor(unsigned capacity, unsigned idleMs) : capacity(capacity), idleMs(idleMs) {}
   ~Executor() {
@@ -169,8 +165,8 @@ public:
   }
   bool finish() {
     std::unique_lock<std::mutex> lock(mutex);
-    // A result may reach BEAM just before the worker retires its bookkeeping.
-    // Do not mistake that tiny completion window for outstanding user work.
+    // A result may reach BEAM just before the worker retires its bookkeeping. Do not mistake that tiny completion
+    // window for outstanding user work.
     return ready.wait_for(lock, std::chrono::milliseconds(10), [this] { return active == 0 && queue.empty(); });
   }
   void snapshot(uint64_t *out) {
@@ -191,7 +187,6 @@ static Executor &executor(ContextExecution &entry) {
   return *entry.executor;
 }
 } // namespace beaver
-
 bool beaverContextAddWork(MlirContext context, void (*task)(void *), void *arg) {
   if (!beaverContextIsThreadSafeLockingEnabled(context)) return false;
   std::lock_guard<std::mutex> lock(beaver::contextsMutex);
@@ -218,8 +213,8 @@ bool beaverExecutorReleaseContext(MlirContext context) {
     if (it == beaver::contexts.end()) return true;
     retired = it->second.executor;
   }
-  // Neither draining bookkeeping nor joining threads holds the context registry
-  // lock: an unrelated context (or a nested submission) must keep progressing.
+  // Neither draining bookkeeping nor joining threads holds the context registry lock: an unrelated context (or a nested
+  // submission) must keep progressing.
   if (retired && !retired->finish()) return false;
   {
     std::lock_guard<std::mutex> lock(beaver::contextsMutex);
@@ -276,9 +271,8 @@ void beaverExecutionCallbackEnd(uint64_t start) {
   }
 }
 
-// LLVM-owned or caller-provided pools cannot inherit our thread-local state.
-// Recover the owning execution from the callback's operation in those pools.
-// Nested submissions on the same IR temporarily shadow the suspended caller.
+// LLVM-owned or caller-provided pools cannot inherit our thread-local state. Recover the owning execution from the
+// callback's operation in those pools. Nested submissions on the same IR temporarily shadow the suspended caller.
 namespace {
 struct OperationBinding {
   mlir::Operation *op;
@@ -319,19 +313,16 @@ void *beaverExecutionEnterOperation(MlirOperation operation) {
   return nullptr;
 }
 void beaverExecutionLeaveOperation(void *scope) { delete static_cast<beaver::ExecutionScope *>(scope); }
-
 namespace {
 std::mutex instrumentationsMutex;
 std::unordered_set<mlir::PassManager *> instrumentedManagers;
 thread_local std::vector<std::unique_ptr<beaver::ExecutionScope>> passScopes;
 
-// An adaptor can clone nested passes on an LLVM-owned worker before invoking
-// an external pass's run callback. Propagate ownership across the whole native
-// pass, including lifecycle callbacks and verification, without retaining run
-// state in a reusable pass manager.
+// An adaptor can clone nested passes on an LLVM-owned worker before invoking an external pass's run callback. Propagate
+// ownership across the whole native pass, including lifecycle callbacks and verification, without retaining run state
+// in a reusable pass manager.
 class ExecutionInstrumentation final : public mlir::PassInstrumentation {
   mlir::PassManager *manager;
-
 public:
   explicit ExecutionInstrumentation(mlir::PassManager *manager) : manager(manager) {}
   ~ExecutionInstrumentation() override {
@@ -347,7 +338,6 @@ public:
   void runAfterPassFailed(mlir::Pass *, mlir::Operation *) override { passScopes.pop_back(); }
 };
 } // namespace
-
 void beaverPassManagerTrackExecution(MlirPassManager passManager) {
   auto *manager = unwrap(passManager);
   if (!manager->getContext()->isMultithreadingEnabled()) return;
@@ -355,14 +345,12 @@ void beaverPassManagerTrackExecution(MlirPassManager passManager) {
   if (instrumentedManagers.insert(manager).second)
     manager->addInstrumentation(std::make_unique<ExecutionInstrumentation>(manager));
 }
-
 bool beaverOperationVerify(MlirOperation operation, bool recursive) {
   return mlir::succeeded(mlir::verify(unwrap(operation), recursive));
 }
-
 MlirModule beaverModuleCreateParseTracked(MlirContext context, MlirStringRef source) {
-  // Establish ownership before the post-parse verifier fans out into an
-  // LLVM-owned pool. Parsing and verification retain their ordinary semantics.
+  // Establish ownership before the post-parse verifier fans out into an LLVM-owned pool. Parsing and verification
+  // retain their ordinary semantics.
   auto module = mlir::parseSourceString<mlir::ModuleOp>(unwrap(source), mlir::ParserConfig(unwrap(context), false));
   if (!module) return {nullptr};
   auto *binding = beaverExecutionBindOperation(wrap(module->getOperation()));
@@ -408,7 +396,6 @@ struct DeclarativeProgram {
   };
   std::vector<Check> checks;
   std::vector<Edit> edits;
-
   static std::shared_ptr<DeclarativeProgram> create(mlir::MLIRContext *context, const BeaverConstraint *constraints,
                                                     size_t n, const BeaverEdit *actions, size_t m) {
     auto prog = std::make_shared<DeclarativeProgram>();
@@ -446,7 +433,6 @@ struct DeclarativeProgram {
     }
     return prog;
   }
-
   mlir::LogicalResult matchAndRewrite(mlir::Operation *op, mlir::ValueRange operands,
                                       const mlir::TypeConverter *converter, mlir::PatternRewriter &rewriter,
                                       mlir::ConversionPatternRewriter *convRewriter) const {
@@ -493,9 +479,7 @@ struct DeclarativeProgram {
       rewriter.eraseOp(op);
     } else if (first.kind == 3) {
       llvm::SmallVector<mlir::Value> newOperands;
-      if (first.index == -1) {
-        newOperands.append(operands.begin(), operands.end());
-      } else {
+      if (first.index == -1) { newOperands.append(operands.begin(), operands.end()); } else {
         for (size_t i = 1; i < edits.size(); ++i) {
           if (edits[i].kind == 4) {
             if (edits[i].index < 0 || static_cast<size_t>(edits[i].index) >= operands.size()) return mlir::failure();
@@ -530,9 +514,7 @@ struct DeclarativeProgram {
             newAttrs.set(edits[i].name, mlir::FlatSymbolRefAttr::get(op->getContext(), strAttr.getValue().ltrim('@')));
           } else if (auto symAttr = llvm::dyn_cast_or_null<mlir::FlatSymbolRefAttr>(src)) {
             newAttrs.set(edits[i].name, symAttr);
-          } else {
-            return mlir::failure();
-          }
+          } else { return mlir::failure(); }
         }
       }
       if (first.other & 4) {
@@ -554,18 +536,13 @@ struct DeclarativeProgram {
           auto *fnCtx = op->getContext();
           if (first.name == "llvm.func") {
             mlir::Type llvmRet;
-            if (convResults.empty()) {
-              llvmRet = mlir::LLVM::LLVMVoidType::get(fnCtx);
-            } else if (convResults.size() == 1) {
+            if (convResults.empty()) { llvmRet = mlir::LLVM::LLVMVoidType::get(fnCtx); } else if (convResults.size() == 1) {
               llvmRet = convResults[0];
-            } else {
-              llvmRet = mlir::LLVM::LLVMStructType::getLiteral(fnCtx, convResults);
-            }
+            } else { llvmRet = mlir::LLVM::LLVMStructType::getLiteral(fnCtx, convResults); }
             return mlir::LLVM::LLVMFunctionType::get(llvmRet, convInputs, false);
           }
           return mlir::FunctionType::get(fnCtx, convInputs, convResults);
         };
-
         mlir::Type newFnType;
         auto typeAttr = op->getAttrOfType<mlir::TypeAttr>("function_type");
         if (!(first.other & 16) && typeAttr) {
@@ -590,9 +567,7 @@ struct DeclarativeProgram {
           newFnType = buildTargetFnType(inferredInputs, inferredResults);
           if (!newFnType) return mlir::failure();
         }
-        if (newFnType) {
-          newAttrs.set("function_type", mlir::TypeAttr::get(newFnType));
-        }
+        if (newFnType) { newAttrs.set("function_type", mlir::TypeAttr::get(newFnType)); }
       }
       llvm::SmallVector<mlir::Type> resultTypes;
       bool hasExplicitResults = false;
@@ -614,9 +589,7 @@ struct DeclarativeProgram {
       }
       mlir::OperationState state(op->getLoc(), first.name, newOperands, resultTypes, newAttrs.getAttrs());
       bool moveRegions = (first.other & 1) != 0;
-      if (moveRegions) {
-        for (unsigned r = 0; r < op->getNumRegions(); ++r) state.addRegion();
-      }
+      if (moveRegions) { for (unsigned r = 0; r < op->getNumRegions(); ++r) state.addRegion(); }
       mlir::Operation *newOp = rewriter.create(state);
       if (moveRegions) {
         for (unsigned r = 0; r < op->getNumRegions(); ++r) {
@@ -627,22 +600,16 @@ struct DeclarativeProgram {
           }
         }
       }
-      if (newOp->getNumResults() == op->getNumResults()) {
-        rewriter.replaceOp(op, newOp->getResults());
-      } else if (op->use_empty()) {
+      if (newOp->getNumResults() == op->getNumResults()) { rewriter.replaceOp(op, newOp->getResults()); } else if (op->use_empty()) {
         rewriter.eraseOp(op);
-      } else {
-        return mlir::failure();
-      }
+      } else { return mlir::failure(); }
     } else if (first.kind == 8) {
       auto *ctx = op->getContext();
       auto loc = op->getLoc();
       auto ptrType = mlir::LLVM::LLVMPointerType::get(ctx);
       auto i64Type = mlir::IntegerType::get(ctx, 64);
       bool usesStack = false;
-      for (size_t i = 1; i < edits.size(); ++i) {
-        if (edits[i].kind == 10 || edits[i].kind == 11) usesStack = true;
-      }
+      for (size_t i = 1; i < edits.size(); ++i) { if (edits[i].kind == 10 || edits[i].kind == 11) usesStack = true; }
       mlir::Value savedStack;
       mlir::Value one;
       if (usesStack) {
@@ -702,9 +669,7 @@ struct DeclarativeProgram {
             if ((first.other & 2) != 0) {
               mlir::Type expType = expectedFnType();
               auto existingAttr = existingSym->getAttrOfType<mlir::TypeAttr>("function_type");
-              if (expType && (!existingAttr || existingAttr.getValue() != expType)) {
-                return mlir::failure();
-              }
+              if (expType && (!existingAttr || existingAttr.getValue() != expType)) { return mlir::failure(); }
             }
           } else if ((first.other & 1) != 0) {
             mlir::OpBuilder::InsertionGuard guard(rewriter);
@@ -748,13 +713,9 @@ struct DeclarativeProgram {
         restoreState.addOperands(savedStack);
         rewriter.create(restoreState);
       }
-      if (op->getNumResults() == 0) {
-        rewriter.eraseOp(op);
-      } else if (results.size() == op->getNumResults()) {
+      if (op->getNumResults() == 0) { rewriter.eraseOp(op); } else if (results.size() == op->getNumResults()) {
         rewriter.replaceOp(op, results);
-      } else {
-        return mlir::failure();
-      }
+      } else { return mlir::failure(); }
     } else {
       bool changed = false;
       for (const auto &edit : edits) {
@@ -766,17 +727,13 @@ struct DeclarativeProgram {
         changed |= previous != edit.attr;
       }
       if (!changed) return mlir::failure();
-      rewriter.modifyOpInPlace(op, [&] {
-        for (const auto &edit : edits) op->setAttr(edit.name, edit.attr);
-      });
+      rewriter.modifyOpInPlace(op, [&] { for (const auto &edit : edits) op->setAttr(edit.name, edit.attr); });
     }
     return mlir::success();
   }
 };
-
 class DeclarativePattern final : public mlir::RewritePattern {
   std::shared_ptr<DeclarativeProgram> program;
-
 public:
   DeclarativePattern(llvm::StringRef root, unsigned benefit, mlir::MLIRContext *context,
                      std::shared_ptr<DeclarativeProgram> program)
@@ -788,10 +745,8 @@ public:
     return program->matchAndRewrite(op, op->getOperands(), nullptr, rewriter, nullptr);
   }
 };
-
 class DeclarativeConversionPattern final : public mlir::ConversionPattern {
   std::shared_ptr<DeclarativeProgram> program;
-
 public:
   DeclarativeConversionPattern(const mlir::TypeConverter &converter, llvm::StringRef root, unsigned benefit,
                                mlir::MLIRContext *context, std::shared_ptr<DeclarativeProgram> program)
@@ -804,14 +759,12 @@ public:
     return program->matchAndRewrite(op, operands, getTypeConverter(), rewriter, &rewriter);
   }
 };
-
 class NoopPass final : public mlir::PassWrapper<NoopPass, mlir::OperationPass<>> {
 public:
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(NoopPass)
   void runOnOperation() override {} // Deliberately retains normal per-pass verification.
 };
 } // namespace
-
 extern "C" MLIR_CAPI_EXPORTED bool beaverDeclarativePatternAdd(MlirRewritePatternSet set, MlirContext context,
                                                                MlirTypeConverter typeConverter, MlirStringRef root,
                                                                unsigned benefit, const BeaverConstraint *constraints,
@@ -821,12 +774,9 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverDeclarativePatternAdd(MlirRewritePatter
   if (typeConverter.ptr) {
     unwrap(set)->add<DeclarativeConversionPattern>(*unwrap(typeConverter), unwrap(root), benefit, unwrap(context),
                                                    std::move(prog));
-  } else {
-    unwrap(set)->add<DeclarativePattern>(unwrap(root), benefit, unwrap(context), std::move(prog));
-  }
+  } else { unwrap(set)->add<DeclarativePattern>(unwrap(root), benefit, unwrap(context), std::move(prog)); }
   return true;
 }
-
 extern "C" MLIR_CAPI_EXPORTED bool beaverRewritePatternSetAddPDL(MlirRewritePatternSet set, MlirOperation pdlModuleOp) {
   if (!set.ptr || !pdlModuleOp.ptr) return false;
   auto moduleOp = llvm::dyn_cast<mlir::ModuleOp>(unwrap(pdlModuleOp));
@@ -837,5 +787,4 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverRewritePatternSetAddPDL(MlirRewritePatt
   unwrap(set)->add(std::move(pdlPattern));
   return true;
 }
-
 extern "C" MLIR_CAPI_EXPORTED MlirPass beaverCreateNoopPass() { return wrap(new NoopPass); }

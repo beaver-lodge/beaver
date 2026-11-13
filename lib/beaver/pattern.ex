@@ -13,11 +13,12 @@ defmodule Beaver.Pattern do
       benefit = Keyword.fetch!(opts, :benefit) |> then(&Attribute.integer(Type.i16(), &1))
 
       PDL.pattern benefit: benefit, sym_name: Attribute.string(name) do
-        region do
-          block _() do
-            cb.(Beaver.Env.block())
-          end
-        end
+        region(
+          do:
+            block _() do
+              cb.(Beaver.Env.block())
+            end
+        )
       end >>> []
     end
     |> MLIR.verify!()
@@ -45,43 +46,23 @@ defmodule Beaver.Pattern do
   end
 
   defmacro attribute() do
-    quote do
-      mlir do
-        Beaver.MLIR.Dialect.PDL.attribute() >>> ~t{!pdl.attribute}
-      end
-    end
+    quote(do: mlir(do: Beaver.MLIR.Dialect.PDL.attribute() >>> ~t{!pdl.attribute}))
   end
 
   defmacro attribute(a) do
-    quote do
-      mlir do
-        Beaver.MLIR.Dialect.PDL.attribute(value: unquote(a)) >>> ~t{!pdl.attribute}
-      end
-    end
+    quote(do: mlir(do: Beaver.MLIR.Dialect.PDL.attribute(value: unquote(a)) >>> ~t{!pdl.attribute}))
   end
 
   defmacro type() do
-    quote do
-      mlir do
-        Beaver.MLIR.Dialect.PDL.type() >>> ~t{!pdl.type}
-      end
-    end
+    quote(do: mlir(do: Beaver.MLIR.Dialect.PDL.type() >>> ~t{!pdl.type}))
   end
 
   defmacro type(t) do
-    quote do
-      mlir do
-        Beaver.MLIR.Dialect.PDL.type(constantType: unquote(t)) >>> ~t{!pdl.type}
-      end
-    end
+    quote(do: mlir(do: Beaver.MLIR.Dialect.PDL.type(constantType: unquote(t)) >>> ~t{!pdl.type}))
   end
 
   defmacro value() do
-    quote do
-      mlir do
-        Beaver.MLIR.Dialect.PDL.operand() >>> ~t{!pdl.value}
-      end
-    end
+    quote(do: mlir(do: Beaver.MLIR.Dialect.PDL.operand() >>> ~t{!pdl.value}))
   end
 
   defmacro rewrite(root, do: block) do
@@ -90,11 +71,12 @@ defmodule Beaver.Pattern do
     quote do
       mlir do
         Beaver.MLIR.Dialect.PDL.rewrite root: unquote(root), operand_segment_sizes: :infer do
-          region do
-            block _rewrite_block() do
-              unquote(rewrite_block_ast)
-            end
-          end
+          region(
+            do:
+              block _rewrite_block() do
+                unquote(rewrite_block_ast)
+              end
+          )
         end >>> []
       end
     end

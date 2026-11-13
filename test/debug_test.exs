@@ -10,15 +10,14 @@ defmodule DebugTest do
   import Beaver.MLIR.Transform
 
   defp add_module(ctx) do
-    mlir ctx: ctx do
-      function_module add(
-                        function_type: Type.function([Type.i32(), Type.i32()], [Type.i32()]),
-                        sym_name: MLIR.Attribute.string("add")
-                      ) do
-        block _(a >>> Type.i32(), b >>> Type.i32()) do
-          r = Arith.addi(a, b) >>> Type.i32()
-          Func.return(r) >>> []
-        end
+    function_module ctx,
+                    add(
+                      function_type: Type.function([Type.i32(), Type.i32()], [Type.i32()]),
+                      sym_name: MLIR.Attribute.string("add")
+                    ) do
+      block _(a >>> Type.i32(), b >>> Type.i32()) do
+        r = Arith.addi(a, b) >>> Type.i32()
+        Func.return(r) >>> []
       end
     end
   end

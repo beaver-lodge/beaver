@@ -8,7 +8,6 @@ const m = @import("mlir_capi.zig");
 const string_ref = @import("string_ref.zig");
 const tuple = @import("execution.zig").tuple;
 const Range = @import("callback_args.zig").Range;
-
 const SafepointCollector = struct {
     env: beam.env,
     slot_count: usize = 0,
@@ -17,7 +16,6 @@ const SafepointCollector = struct {
     initialized: bool = false,
     entries: std.array_list.Managed(beam.term) = .init(beam.allocator),
     failed: bool = false,
-
     fn collect(
         total_slots: usize,
         slot_types_ptr: [*c]const m.Type.T,
@@ -45,7 +43,6 @@ const SafepointCollector = struct {
             self.failed = true;
         };
     }
-
     fn append(self: *@This(), data: anytype) !void {
         const env = self.env;
         if (!self.initialized) {
@@ -72,7 +69,6 @@ const SafepointCollector = struct {
         };
         try self.entries.append(beam.make_tuple(env, &entry));
     }
-
     fn finish(self: *@This()) !beam.term {
         if (self.failed or !self.initialized) return error.InvalidSafepointAnalysis;
         var out = [_]beam.term{
@@ -84,18 +80,15 @@ const SafepointCollector = struct {
         return beam.make_tuple(self.env, &out);
     }
 };
-
 fn decodeSafepointOps(env: beam.env, list_term: beam.term) ![]m.Operation.T {
     return Range(m.Operation).decode(env, list_term, beam.allocator);
 }
-
 const Session = struct {
     handle: ?*anyopaque,
     context: m.Context.T,
     owner: beam.pid,
     mutation_depth: u32 = 0,
     mutex: @import("mutex.zig").Mutex = .{},
-
     fn releaseHandle(self: *@This()) void {
         if (self.handle) |handle| c.beaverAnalysisDestroy(handle);
         self.handle = null;
@@ -114,7 +107,6 @@ const Session = struct {
     }
 };
 const Resource = kinda.RawResourceType(Session, "Beaver.MLIR.AnalysisSession", kinda.resourceDestructor(Session, Session.destroy));
-
 pub fn analysis_create(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const root = try m.Operation.resource.fetch(env, args[0]);
     if (root.ptr == null) return error.NullAnalysisRoot;
@@ -137,7 +129,6 @@ pub fn analysis_invalidate(env: beam.env, _: c_int, args: [*c]const beam.term) !
     c.beaverAnalysisInvalidate(handle, try beam.get(c_uint, env, args[1]));
     return beam.make_u64(env, c.beaverAnalysisGeneration(handle));
 }
-
 pub fn analysis_mutation(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const begin = try beam.get_bool(env, args[1]);
     const session = try Session.acquire(env, args[0], try beam.self(env));
@@ -152,7 +143,6 @@ pub fn analysis_mutation(env: beam.env, _: c_int, args: [*c]const beam.term) !be
     c.beaverAnalysisInvalidate(handle, 0);
     return beam.make_ok(env);
 }
-
 pub fn query(env: beam.env, context: m.Context.T, args_term: beam.term, caller: beam.pid) !beam.term {
     const args = try tuple(env, args_term, 2);
     const session = try Session.acquire(env, args[0], caller);
@@ -194,7 +184,6 @@ pub fn query(env: beam.env, context: m.Context.T, args_term: beam.term, caller: 
 pub fn safepoint_analyze(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     return analyzeSafepoints(env, null, try m.Operation.resource.fetch(env, args[0]), args[1], try beam.get_bool(env, args[2]));
 }
-
 fn analyzeSafepoints(env: beam.env, session: ?*anyopaque, op: m.Operation.T, points: beam.term, exclude_entry: bool) !beam.term {
     const ops = try decodeSafepointOps(env, points);
     defer beam.allocator.free(ops);
@@ -204,7 +193,6 @@ fn analyzeSafepoints(env: beam.env, session: ?*anyopaque, op: m.Operation.T, poi
         return error.InvalidSafepointAnalysis;
     return collector.finish();
 }
-
 pub fn safepoint_lower_resumable(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const func_op = try m.Operation.resource.fetch(env, args[0]);
     const sp_ops = try decodeSafepointOps(env, args[1]);
@@ -223,7 +211,6 @@ pub fn safepoint_lower_resumable(env: beam.env, _: c_int, args: [*c]const beam.t
     }
     return if (tuple_mode) beam.make_ok_term(env, beam.make_u64(env, frame_bytes)) else beam.make_ok(env);
 }
-
 pub fn open(env: beam.env) void {
     Resource.open(env);
 }

@@ -14,7 +14,6 @@ defmodule Beaver.MLIR.ConversionTest do
       |> MLIR.Module.create!(ctx: ctx)
 
     [first, second | _] = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.to_list()
-
     replacements = [Operation.result(first, 0), Operation.result(second, 0)]
     owner = self()
 
@@ -99,7 +98,6 @@ defmodule Beaver.MLIR.ConversionTest do
           assert {:ok, ^module, []} = result
         else
           assert {:error, %Conversion.Error{mode: :full, diagnostics: diagnostics} = error} = result
-
           assert diagnostics != []
           assert Exception.message(error) =~ "foo.unknown"
         end
@@ -112,20 +110,14 @@ defmodule Beaver.MLIR.ConversionTest do
 
   test "profiling returns bounded native and BEAM callback aggregates", %{ctx: ctx} do
     module = unknown_module(ctx, "foo.profiled")
-
     target = legal_builtin_target(ctx) |> ConversionTarget.add_dynamically_legal_op("foo.profiled", fn _ -> :legal end)
-
     patterns = RewritePatternSet.create(ctx)
-
     assert {{:ok, ^module, []}, receipt} = Conversion.profile(:full, module, target, patterns, timeout: 1_000)
-
     assert receipt["schema_version"] == 2
     assert receipt["status"] == "ok"
     assert receipt["duration_ns"] >= receipt["native"]["duration_ns"]
     assert receipt["native"]["duration_ns"] > 0
-
     assert receipt["native"]["callback_wait_sum_ns"] >= receipt["native"]["callback_wait_max_ns"]
-
     assert receipt["native"]["target_lock_wait_ns"] <= receipt["native"]["duration_ns"]
     assert receipt["native"]["unattributed_residual_ns"] <= receipt["native"]["duration_ns"]
     assert receipt["process_cpu_time_ns"] >= 0
@@ -182,9 +174,7 @@ defmodule Beaver.MLIR.ConversionTest do
       i32 = Type.i32(ctx: ctx)
       i64 = Type.i64(ctx: ctx)
       f32 = Type.f32(ctx: ctx)
-
       converter = TypeConverter.create() |> TypeConverter.add_conversion_map([i32], i64)
-
       assert {:ok, converted} = TypeConverter.convert(converter, i32)
       assert MLIR.equal?(converted, i64)
       assert {:ok, unchanged} = TypeConverter.convert(converter, f32)
@@ -377,10 +367,8 @@ defmodule Beaver.MLIR.ConversionTest do
   defp unknown_module(ctx, name \\ "foo.unknown") do
     Context.allow_unregistered_dialects(ctx)
 
-    mlir ctx: ctx do
-      module do
-        ~o/#{name}/ >>> []
-      end
+    module_ir ctx do
+      ~o/#{name}/ >>> []
     end
     |> MLIR.verify!()
   end

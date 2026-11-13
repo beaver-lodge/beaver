@@ -39,9 +39,7 @@ defmodule Beaver.MLIR.Dialect.Linalg do
 
     block_args =
       Enum.zip_with(input_vars ++ output_vars, inputs ++ outputs, fn variable, shaped ->
-        quote do
-          unquote(variable) >>> Beaver.MLIR.Dialect.Linalg.block_argument_type(unquote(shaped))
-        end
+        quote(do: unquote(variable) >>> Beaver.MLIR.Dialect.Linalg.block_argument_type(unquote(shaped)))
       end)
 
     block_call = {:_linalg_body, [], block_args}

@@ -22,7 +22,6 @@ defmodule MlirTest do
 
   test "call wrapped apis", %{ctx: ctx} do
     location = mlirLocationFileLineColGet(ctx, MLIR.StringRef.create(__DIR__), 1, 2)
-
     _module = mlirModuleCreateEmpty(location)
 
     module =
@@ -34,9 +33,7 @@ defmodule MlirTest do
     _operation = mlirModuleGetOperation(module)
     _ret_str = MLIR.StringRef.create("func.return")
     changeset = %Beaver.Changeset{name: "func.return", location: location}
-
     for _i <- 0..200, do: changeset |> MLIR.Operation.State.create() |> Beaver.Native.ptr() |> mlirOperationCreate()
-
     i64_t = mlirTypeParseGet(ctx, MLIR.StringRef.create("i64"))
     # create func body entry block
     func_body_arg_types = [i64_t]
@@ -112,9 +109,7 @@ defmodule MlirTest do
     pm = mlirPassManagerCreate(ctx)
     mlirPassManagerAddOwnedPass(pm, mlirCreateTransformsCSEPass())
     success = mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(module))
-
     assert success |> beaverLogicalResultIsSuccess() |> Beaver.Native.to_term()
-
     mlirPassManagerDestroy(pm)
     mlirModuleDestroy(module)
   end
@@ -223,9 +218,7 @@ defmodule MlirTest do
   test "affine expr and map", %{ctx: ctx} do
     affine_dim_expr = mlirAffineDimExprGet(ctx, 0)
     affine_symbol_expr = mlirAffineSymbolExprGet(ctx, 1)
-
     exprs = Beaver.Native.array([affine_dim_expr, affine_symbol_expr], MLIR.AffineExpr, mut: true)
-
     map = mlirAffineMapGet(ctx, 3, 3, 2, exprs)
     txt = "(d0, d1, d2)[s0, s1, s2] -> (d0, s1)"
     assert map |> MLIR.to_string() == txt

@@ -30,7 +30,6 @@ defmodule Beaver.CompilerBuildingBlocksTest do
 
     b = b |> Builder.start_block(:default) |> Builder.end_block({:return, [zero]})
     assert b.data == %{language: :test}
-
     spec = run_spec(ctx, b, x: :i64, selector: :i32)
 
     Native.with_resource(IRBatch.build_module!(ctx, [spec]), &Module.destroy/1, fn module ->
@@ -71,7 +70,6 @@ defmodule Beaver.CompilerBuildingBlocksTest do
     next = Builder.expression(:call, ["next", [ptr], [:i64]])
     difference = Builder.expression(:binary, ["subi", [next, next], :i64])
     b = Builder.end_block(b, {:return, [difference]})
-
     finalize = fn module -> Module.with_module(ctx, source, &Module.import_symbols!(module, &1)) end
     module = IRBatch.build_module!(ctx, [run_spec(ctx, b, [])], finalize: finalize)
     Native.with_resource(module, &Module.destroy/1, &with_jit(&1, fn jit -> assert invoke(jit, []) == -1 end))
@@ -253,6 +251,60 @@ defmodule Beaver.CompilerBuildingBlocksTest do
   end
 
   defp rename_rule(from, to), do: PDL.Source.retarget("rename_#{from}", from, to, ["i64"])
+
+  test "structured PDL retains result order and rejects mismatched result types", %{ctx: ctx} do
+    match = [{[:a, :b], "func.call", [:x, :y], ["i64", "i64"], [callee: "@pair"]}]
+    rule = PDL.Source.pattern("swap", "pair", 1, match, [], [:y, :x])
+
+    source =
+      "func.func private @pair(i64, i64) -> (i64, i64)\nfunc.func @run(%x: i64, %y: i64) -> i64 attributes {llvm.emit_c_interface} { %a, %b = func.call @pair(%x, %y) : (i64, i64) -> (i64, i64) %r = arith.subi %a, %b : i64 return %r : i64 }"
+
+    Module.with_module(ctx, source, fn module ->
+      PDL.new([rule]) |> PDL.apply!(module)
+      assert SymbolTable.referenced_symbols(MLIR.verify!(module)) == []
+      with_jit(module, fn jit -> assert invoke(jit, [Native.I64.make(17), Native.I64.make(3)]) == -14 end)
+    end)
+
+    bad = [{[:a, :b], "func.call", [:x], ["i64"], [callee: "@pair"]}]
+
+    assert_raise ArgumentError, "PDL result/type count mismatch", fn ->
+      PDL.Source.pattern("bad", "pair", 1, bad, [], [:a])
+    end
+  end
+
+  @tag :tmp_dir
+  test "header bindings retain aggregate pointers, output slots and namespace validation", %{tmp_dir: dir} do
+    alias CABI.Provider
+    header = Path.join(dir, "api.h")
+    File.write!(header, "int demo_echo(uint64_t n, Payload value, uint64_t *out);\n")
+
+    spec =
+      Provider.read!(
+        header: header,
+        c_return: "int",
+        c_prefix: "demo_",
+        return_type: "i32",
+        types: %{"uint64_t" => "i64"},
+        parameters: %{"Payload" => {:aggregate, "i64"}, "uint64_t *" => {:out, "i64"}},
+        aggregates: ["Payload"],
+        raw_prefix: "raw.",
+        value_prefix: "value.",
+        namespace_prefix: "host_",
+        prelude: "",
+        export: "EXPORT",
+        invalid: "INVALID"
+      )
+
+    assert Provider.functions(spec) == ["echo"]
+    assert Provider.argument_types(spec, "echo") == ["i64", "!llvm.ptr", "!llvm.ptr"]
+    assert Provider.value_signature(spec, "echo") == {["i64", "i64"], ["i32", "i64"]}
+    assert Provider.bindings(spec, "one", ["echo"]) == %{"host_one_echo" => ["host_one_echo", "demo_echo"]}
+    adapter = Provider.adapter_source(spec, "one")
+    assert adapter =~ "const Payload * a1" and adapter =~ "if (!a1) return INVALID;"
+    assert adapter =~ "return demo_echo(a0, *a1, a2)"
+    assert_raise ArgumentError, fn -> Provider.adapter_source(spec, "bad-namespace") end
+    assert_raise FunctionClauseError, fn -> Provider.raw_symbol(spec, "missing") end
+  end
 
   defp run_spec(ctx, b, inputs) do
     %{name: "run", inputs: inputs, results: [:i64], blocks: Builder.finish(b)}

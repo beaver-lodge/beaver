@@ -91,9 +91,7 @@ defmodule Beaver.SSA do
 
   # block arguments
   defp do_transform({:>>>, _, [var = {_var_name, _, nil}, type]}, _evaluator) do
-    quote do
-      {unquote(var), unquote(type)}
-    end
+    quote(do: {unquote(var), unquote(type)})
   end
 
   # with do block
@@ -110,9 +108,7 @@ defmodule Beaver.SSA do
 
   # op creation
   defp do_transform({:>>>, _line, [{call, line, _args}, _results]} = ast, evaluator) do
-    quote do
-      unquote(construct_ssa(ast, evaluator)) |> unquote({call, line, []})
-    end
+    quote(do: unquote(construct_ssa(ast, evaluator)) |> unquote({call, line, []}))
   end
 
   defp do_transform(ast, _evaluator), do: ast

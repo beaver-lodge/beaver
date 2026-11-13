@@ -30,9 +30,7 @@ defmodule Beaver.SSA.BlockSharing do
     initial = {:array.from_list(blocks), length(blocks), function[fields.function[:values]]}
     {blocks, _, values} = Enum.reduce(groups, initial, &rewrite_group(&1, &2, schema, opts))
 
-    function
-    |> Map.put(fields.function[:blocks], :array.to_list(blocks))
-    |> Map.put(fields.function[:values], values)
+    function |> Map.put(fields.function[:blocks], :array.to_list(blocks)) |> Map.put(fields.function[:values], values)
   end
 
   defp rewrite_group({template, members}, {blocks, target, values}, schema, opts) do
@@ -67,9 +65,7 @@ defmodule Beaver.SSA.BlockSharing do
       seeds = Enum.flat_map(literals, &schema.instruction_defs/1)
 
       arguments =
-        schema.block_uses(block)
-        |> Enum.reject(&MapSet.member?(produced, &1))
-        |> then(&Enum.uniq(seeds ++ &1))
+        schema.block_uses(block) |> Enum.reject(&MapSet.member?(produced, &1)) |> then(&Enum.uniq(seeds ++ &1))
 
       if length(arguments) <= Keyword.fetch!(opts, :max_arguments) and
            length(instructions) >= Keyword.get(opts, :min_instructions, 1) do

@@ -15,7 +15,6 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
     with_args(ctx, ["i32", "i32"], fn operands ->
       for {operation, count} <- [{"arith.addi", 1}, {"arith.mului_extended", 2}] do
         assert {:ok, types} = InferType.return_types(operation: operation, context: ctx, operands: operands)
-
         assert Enum.map(types, &MLIR.to_string/1) == List.duplicate("i32", count)
       end
     end)
@@ -23,7 +22,6 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
 
   test "returns diagnostics when inference fails", %{ctx: ctx} do
     assert {:error, diagnostics} = InferType.return_types(operation: "not.registered", context: ctx)
-
     assert diagnostics != []
     assert MLIR.Diagnostic.format(diagnostics) =~ "failed to infer operation return types"
   end
@@ -50,7 +48,6 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
 
     for _ <- 1..20 do
       assert {:ok, [type]} = InferType.return_types(operation: "arith.constant", context: ctx, properties: properties)
-
       assert MLIR.to_string(type) == "i32"
     end
 
@@ -64,7 +61,6 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
              )
 
     assert MLIR.Diagnostic.format(diagnostics) =~ "expected DictionaryAttr"
-
     assert {:error, _} = InferType.return_types(operation: "func.func", context: ctx, properties: properties)
   end
 
@@ -100,9 +96,7 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
     branch = block |> Beaver.Walker.operations() |> Enum.at(0)
     regions = Enum.to_list(Beaver.Walker.regions(branch))
     before = MLIR.to_string(module)
-
     assert {:ok, [type]} = InferType.return_types(operation: "scf.if", context: ctx, operands: [cond], regions: regions)
-
     assert MLIR.to_string(type) == "i32"
     assert MLIR.to_string(module) == before
     MLIR.verify!(module)

@@ -8,7 +8,7 @@ defmodule Beaver.Case do
       use Beaver
       alias Beaver.MLIR
       require Beaver.MLIR.Dialect.Func
-      import Beaver.Case, only: [function_module: 2]
+      import Beaver.Case, only: [function_module: 2, function_module: 3, module_ir: 2]
 
       setup do
         ctx = MLIR.Context.create(unquote(options))
@@ -16,6 +16,28 @@ defmodule Beaver.Case do
         %{ctx: ctx}
       end
     end
+  end
+
+  defmacro module_ir(ctx, do: body) do
+    quote(
+      do:
+        mlir ctx: unquote(ctx) do
+          module do
+            unquote(body)
+          end
+        end
+    )
+  end
+
+  defmacro function_module(ctx, signature, do: body) do
+    quote(
+      do:
+        mlir ctx: unquote(ctx) do
+          function_module unquote(signature) do
+            unquote(body)
+          end
+        end
+    )
   end
 
   @doc "Wraps the caller's block DSL in a module, func.func and region, retaining its enclosing mlir environment."
@@ -27,9 +49,7 @@ defmodule Beaver.Case do
 
       module do
         Beaver.MLIR.Dialect.Func.func unquote(signature) do
-          region do
-            unquote(body)
-          end
+          region(do: unquote(body))
         end
       end
     end

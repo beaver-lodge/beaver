@@ -76,9 +76,7 @@ defmodule Beaver.MLIR.Dialect.SCF do
     block_args =
       [quote(do: unquote(iv) >>> Beaver.MLIR.Type.index())] ++
         Enum.zip_with(carried, iter_args, fn variable, initial ->
-          quote do
-            unquote(variable) >>> Beaver.MLIR.Value.type(unquote(initial))
-          end
+          quote(do: unquote(variable) >>> Beaver.MLIR.Value.type(unquote(initial)))
         end)
 
     block_call = {:_scf_for_body, [], block_args}
@@ -103,12 +101,14 @@ defmodule Beaver.MLIR.Dialect.SCF do
   end
 
   defp branch_region(body) do
-    quote do
-      region do
-        block do
-          Beaver.MLIR.Dialect.SCF.yield(unquote(body)) >>> []
-        end
-      end
-    end
+    quote(
+      do:
+        region(
+          do:
+            block do
+              Beaver.MLIR.Dialect.SCF.yield(unquote(body)) >>> []
+            end
+        )
+    )
   end
 end

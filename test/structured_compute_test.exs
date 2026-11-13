@@ -10,13 +10,11 @@ defmodule StructuredComputeTest do
 
   test "builds tensor slices from mixed static and dynamic entries", %{ctx: ctx} do
     module =
-      mlir ctx: ctx do
-        function_module slice(function_type: Type.function([~t{tensor<8xf32>}], [~t{tensor<4xf32>}])) do
-          block _entry(source >>> ~t{tensor<8xf32>}) do
-            result = Tensor.extract_slice_(source, Tensor.slice([2], [4], [1])) >>> ~t{tensor<4xf32>}
+      function_module ctx, slice(function_type: Type.function([~t{tensor<8xf32>}], [~t{tensor<4xf32>}])) do
+        block _entry(source >>> ~t{tensor<8xf32>}) do
+          result = Tensor.extract_slice_(source, Tensor.slice([2], [4], [1])) >>> ~t{tensor<4xf32>}
 
-            Func.return(result) >>> []
-          end
+          Func.return(result) >>> []
         end
       end
 
@@ -28,18 +26,16 @@ defmodule StructuredComputeTest do
     map = AffineMap.create(1, 0, [AffineMap.dim(0)])
 
     module =
-      mlir ctx: ctx do
-        function_module read(function_type: Type.function([~t{memref<8xf32>}], [])) do
-          block _entry(source >>> ~t{memref<8xf32>}) do
-            index = Arith.constant(value: Attribute.index(0)) >>> Type.index()
-            padding = Arith.constant(value: Attribute.float(Type.f32(), 0.0)) >>> Type.f32()
+      function_module ctx, read(function_type: Type.function([~t{memref<8xf32>}], [])) do
+        block _entry(source >>> ~t{memref<8xf32>}) do
+          index = Arith.constant(value: Attribute.index(0)) >>> Type.index()
+          padding = Arith.constant(value: Attribute.float(Type.f32(), 0.0)) >>> Type.f32()
 
-            _vector =
-              Vector.transfer_read_(source, padding, indices: [index], permutation_map: map, in_bounds: [true]) >>>
-                ~t{vector<4xf32>}
+          _vector =
+            Vector.transfer_read_(source, padding, indices: [index], permutation_map: map, in_bounds: [true]) >>>
+              ~t{vector<4xf32>}
 
-            Func.return() >>> []
-          end
+          Func.return() >>> []
         end
       end
 
@@ -53,21 +49,19 @@ defmodule StructuredComputeTest do
     identity = AffineMap.create(1, 0, [AffineMap.dim(0)])
 
     module =
-      mlir ctx: ctx do
-        function_module add(function_type: Type.function([tensor_type, tensor_type], [tensor_type])) do
-          block _entry(lhs >>> tensor_type, rhs >>> tensor_type) do
-            init = Tensor.empty() >>> tensor_type
+      function_module ctx, add(function_type: Type.function([tensor_type, tensor_type], [tensor_type])) do
+        block _entry(lhs >>> tensor_type, rhs >>> tensor_type) do
+          init = Tensor.empty() >>> tensor_type
 
-            result =
-              Linalg.generic inputs: [lhs, rhs],
-                             outputs: [init],
-                             indexing_maps: [identity, identity, identity],
-                             iterators: [:parallel] do
-                fn [left, right], [_out] -> Arith.addf(left, right) >>> Type.f32() end
-              end
+          result =
+            Linalg.generic inputs: [lhs, rhs],
+                           outputs: [init],
+                           indexing_maps: [identity, identity, identity],
+                           iterators: [:parallel] do
+              fn [left, right], [_out] -> Arith.addf(left, right) >>> Type.f32() end
+            end
 
-            Func.return(result) >>> []
-          end
+          Func.return(result) >>> []
         end
       end
 

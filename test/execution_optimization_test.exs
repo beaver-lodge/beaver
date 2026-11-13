@@ -313,10 +313,7 @@ defmodule ExecutionOptimizationTest do
     other = context()
 
     assert_raise ArgumentError, ~r/ContextMismatch/, fn ->
-      IRBatch.update(ir, [
-        {:attribute, op, :local, note},
-        {:attribute, op, :foreign, MLIR.Attribute.unit(ctx: other)}
-      ])
+      IRBatch.update(ir, [{:attribute, op, :local, note}, {:attribute, op, :foreign, MLIR.Attribute.unit(ctx: other)}])
     end
 
     assert :error = Operation.fetch(op, "local")

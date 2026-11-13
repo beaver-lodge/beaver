@@ -32,7 +32,6 @@ defmodule Beaver.BuildPlanTest do
     assert_received :analyzed
     assert Plan.run!(plan).results.publish == {42, true}
     refute_received :analyzed
-
     File.write!(path, "corrupt")
     assert_raise ArgumentError, ~r/cache digest mismatch/, fn -> Plan.run!(plan) end
     refute_received :analyzed
@@ -59,7 +58,6 @@ defmodule Beaver.BuildPlanTest do
     assert File.read!(path) == File.read!(destination)
     assert_raise ArgumentError, fn -> ArtifactCache.copy_verified!(path, destination, "wrong") end
     assert JSON.decode!(File.read!(destination)) == %{"valid" => true}
-
     assert_raise File.RenameError, fn -> ArtifactCache.write_atomic!(directory, "cannot replace directory") end
     assert Path.wildcard(directory <> ".tmp-*") == []
   end

@@ -6,7 +6,6 @@
 #include "mlir-c/Remarks.h"
 
 using namespace mlir;
-
 namespace {
 struct Receiver {
   MlirStringCallback callback;
@@ -37,7 +36,6 @@ static llvm::StringRef field(const llvm::json::Object &object, llvm::StringRef n
   return object.getString(name).value_or("");
 }
 } // namespace
-
 MLIR_CAPI_EXPORTED bool beaverContextEnableOptimizationRemarks(
     MlirContext context, MlirStringRef filters, bool finalPolicy,
     MlirStringCallback callback, void *userData, void (*deleteUserData)(void *)) {
@@ -56,15 +54,12 @@ MLIR_CAPI_EXPORTED bool beaverContextEnableOptimizationRemarks(
       context, categories, finalPolicy ? MlirRemarkPolicyFinal : MlirRemarkPolicyAll,
       report, receiver.release(), [](void *data) { delete static_cast<Receiver *>(data); }, false));
 }
-
 MLIR_CAPI_EXPORTED void beaverContextFinalizeOptimizationRemarks(MlirContext context) {
   mlirContextFinalizeOptimizationRemarks(context);
 }
-
 MLIR_CAPI_EXPORTED bool beaverContextHasOptimizationRemarks(MlirContext context) {
   return mlirContextHasRemarkEngine(context);
 }
-
 MLIR_CAPI_EXPORTED bool beaverEmitOptimizationRemark(MlirLocation location, MlirStringRef payload) {
   auto parsed = llvm::json::parse(unwrap(payload));
   if (!parsed) { llvm::consumeError(parsed.takeError()); return false; }

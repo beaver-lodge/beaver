@@ -31,9 +31,7 @@ defmodule EntityTest do
           do: assert_same(ctx, Type.integer(width, opts), Type.get("i#{width}"))
 
       assert_same(ctx, Type.complex(Type.f32()), Type.get("complex<f32>"))
-
       assert Type.unranked_tensor!(Type.complex(Type.f32(ctx: ctx))) |> to_string() == "tensor<*xcomplex<f32>>"
-
       assert_same(ctx, Type.unranked_tensor!(Type.f32(ctx: ctx)), ~t{tensor<*xf32>} |> Deferred.resolve(ctx))
 
       for {shape, text} <- [{[], "tensor<f32>"}, {[1, 2], "tensor<1x2xf32>"}, {[1, :dynamic, 2], "tensor<1x?x2xf32>"}] do
@@ -47,7 +45,6 @@ defmodule EntityTest do
 
   test "function type", %{ctx: ctx} do
     func_type = Type.function([Type.i32(ctx: ctx), Type.f32(ctx: ctx)], [Type.f64(ctx: ctx)]) |> Deferred.resolve(ctx)
-
     assert func_type |> to_string() =~ ~r"i32.+f32.+f64"
     assert 2 = FunctionType.num_inputs(func_type)
     assert MLIR.equal?(FunctionType.input(func_type, 0), Type.i32(ctx: ctx))
@@ -82,11 +79,8 @@ defmodule EntityTest do
     test "generate", %{ctx: ctx} do
       deferred = Attribute.type(Type.f32())
       eager = Deferred.resolve(deferred, ctx)
-
       for {a, b} <- [{eager, eager}, {deferred, eager}, {eager, deferred}], do: assert(MLIR.equal?(a, b))
-
       assert Attribute.integer(Type.i(32), 1) |> Deferred.resolve(ctx) |> to_string() == "1 : i32"
-
       assert_same(ctx, Attribute.integer(Type.i(32), 0), ~a{0}i32)
       assert_same(ctx, Attribute.float(Type.f(32), 0.0), ~a{0.0}f32)
 
@@ -107,7 +101,6 @@ defmodule EntityTest do
              |> to_string() == "(tensor<1x2x3x4xi32>) -> i32"
 
       assert_same(ctx, Attribute.type(Type.function([Type.i(32)], [Type.i(32)])), ~a"(i32) -> (i32)")
-
       vec2xi32 = Type.vector!([2], Type.i(32, ctx: ctx))
       assert MLIR.to_string(vec2xi32) == "vector<2xi32>"
       i0attr = Attribute.integer(Type.i(32), 0)
@@ -143,7 +136,6 @@ defmodule EntityTest do
 
     test "null" do
       null = Attribute.null()
-
       assert_raise RuntimeError, "Attribute is null", fn -> null |> MLIR.dump!() end
     end
 
@@ -164,11 +156,8 @@ defmodule EntityTest do
 
     test "strided_layout", %{ctx: ctx} do
       strided_attr = Attribute.strided_layout(ShapedType.dynamic_stride_or_offset(), [1], ctx: ctx)
-
       assert not MLIR.null?(strided_attr)
-
       strided_attr = Attribute.strided_layout(1, [1, 2, 3]) |> Deferred.resolve(ctx)
-
       assert not MLIR.null?(strided_attr)
     end
   end

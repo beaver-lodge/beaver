@@ -7,13 +7,11 @@ const c = @import("prelude.zig").c;
 const m = @import("mlir_capi.zig");
 const string_ref = @import("string_ref.zig");
 const tuple = @import("execution.zig").tuple;
-
 fn operation(env: beam.env, ctx: m.Context.T, term: beam.term) !m.Operation.T {
     const op = try m.Operation.resource.fetch(env, term);
     if (op.ptr == null or !c.mlirContextEqual(ctx, c.mlirOperationGetContext(op))) return error.ContextMismatch;
     return op;
 }
-
 fn values(env: beam.env, op: m.Operation.T, comptime operands: bool, comptime types: bool) !beam.term {
     const count: usize = @intCast(if (operands) c.mlirOperationGetNumOperands(op) else c.mlirOperationGetNumResults(op));
     const terms = try beam.allocator.alloc(beam.term, count);
@@ -24,7 +22,6 @@ fn values(env: beam.env, op: m.Operation.T, comptime operands: bool, comptime ty
     }
     return beam.make_term_list(env, terms);
 }
-
 pub fn snapshot(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
     const args = try tuple(env, arguments, 2);
     const count = try beam.get_list_length(env, args[0]);
@@ -55,7 +52,6 @@ pub fn snapshot(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.ter
     }
     return beam.make_term_list(env, records);
 }
-
 const Edit = struct {
     op: m.Operation.T,
     name: m.StringRef.T = .{ .data = null, .length = 0 },
@@ -63,7 +59,6 @@ const Edit = struct {
     operand: m.Value.T = .{ .ptr = null },
     index: isize = -1,
 };
-
 pub fn update(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
     const args = try tuple(env, arguments, 3);
     const root = try operation(env, ctx, args[0]);
@@ -107,14 +102,12 @@ pub fn update(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term 
     const verify = e.enif_is_identical(args[2], beam.make_atom(env, "true")) != 0;
     return beam.make_bool(env, !verify or c.mlirOperationVerify(root));
 }
-
 const OperandRef = struct {
     kind: protocol.OperandKind,
     index_a: usize = 0,
     index_b: usize = 0,
     value: m.Value.T = .{ .ptr = null },
 };
-
 const BuildSpec = struct {
     block_idx: usize,
     name: m.StringRef.T,
@@ -125,7 +118,6 @@ const BuildSpec = struct {
     successors: []m.Block.T,
     num_regions: usize,
 };
-
 fn decodeType(env: beam.env, ctx: m.Context.T, term: beam.term) !m.Type.T {
     if (string_ref.get_binary_as_string_ref(env, term)) |sr| {
         if (sr.length == 0) return error.InvalidBatchType;
@@ -138,16 +130,13 @@ fn decodeType(env: beam.env, ctx: m.Context.T, term: beam.term) !m.Type.T {
         return t;
     }
 }
-
 const AttributeTag = enum { unit, i8, i16, i32, i64, index, bool, i1, f32, f64, string, symbol, flat_symbol, type, dense_i32, dense_i64, parse, int };
-
 fn attributeTag(env: beam.env, term: beam.term) !AttributeTag {
     inline for (@typeInfo(AttributeTag).@"enum".fields) |field| {
         if (e.enif_is_identical(term, beam.make_atom(env, field.name)) != 0) return @field(AttributeTag, field.name);
     }
     return error.InvalidBatchAttribute;
 }
-
 fn decodeAttribute(env: beam.env, ctx: m.Context.T, term: beam.term) !m.Attribute.T {
     inline for (.{ "unit", "true", "false" }, 0..) |atom, i| {
         if (e.enif_is_identical(term, beam.make_atom(env, atom)) != 0)
@@ -206,20 +195,17 @@ fn decodeAttribute(env: beam.env, ctx: m.Context.T, term: beam.term) !m.Attribut
         return attr;
     }
 }
-
 fn parseAttribute(ctx: m.Context.T, source: m.StringRef.T) !m.Attribute.T {
     if (source.length == 0) return error.InvalidBatchAttribute;
     const parsed = c.mlirAttributeParseGet(ctx, source);
     if (parsed.ptr == null) return error.InvalidBatchAttribute;
     return parsed;
 }
-
 pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
     var memory = std.heap.ArenaAllocator.init(beam.allocator);
     defer memory.deinit();
     const allocator = memory.allocator();
     const args = try tuple(env, arguments, 4);
-
     var insert_mode: u8 = 0; // 0 = end, 1 = start, 2 = before, 3 = after, 4 = multi-block end
     var anchor_op: m.Operation.T = .{ .ptr = null };
     var blocks: []m.Block.T = undefined;
@@ -233,7 +219,6 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
         if (single_block.ptr == null) return error.InvalidBatchBlock;
         blocks = try allocator.alloc(m.Block.T, 1);
         blocks[0] = single_block;
-
         if (e.enif_is_identical(args[1], beam.make_atom(env, "end")) != 0) {
             insert_mode = 0;
         } else if (e.enif_is_identical(args[1], beam.make_atom(env, "start")) != 0) {
@@ -249,14 +234,11 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
             } else return error.InvalidInsertionPosition;
         }
     }
-
     const count = try beam.get_list_length(env, args[2]);
     if (count > 1048576) return error.BatchTooLarge;
-
     const verify_root = if (beam.is_nil2(env, args[3])) m.Operation.T{ .ptr = null } else try operation(env, ctx, args[3]);
     const binding = if (verify_root.ptr != null) c.beaverExecutionBindOperation(verify_root) else null;
     defer c.beaverExecutionUnbindOperation(binding);
-
     const specs = try allocator.alloc(BuildSpec, count);
     var rest = args[2];
     for (specs, 0..) |*spec, i| {
@@ -265,15 +247,12 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
         const block_idx = if (fields.optional("block")) |value| try beam.get(usize, env, value) else 0;
         if (block_idx >= blocks.len) return error.InvalidBatchBlock;
         const num_block_args: usize = @intCast(c.mlirBlockGetNumArguments(blocks[block_idx]));
-
         const name = try string_ref.get_binary_as_string_ref(env, fields.get("name"));
         if (name.length == 0) return error.EmptyOperationName;
         const loc = try m.Location.resource.fetch(env, fields.get("location"));
         if (loc.ptr == null or !c.mlirContextEqual(ctx, c.mlirLocationGetContext(loc))) return error.ContextMismatch;
-
         const op_len = try beam.get_list_length(env, fields.get("operands"));
         const op_refs = try allocator.alloc(OperandRef, op_len);
-
         var op_rest = fields.get("operands");
         for (op_refs) |*op_ref| {
             const o_fields = try protocol.Operand.decode(env, try beam.get_head_and_iter(env, &op_rest));
@@ -305,18 +284,14 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
                 },
             }
         }
-
         const res_len = try beam.get_list_length(env, fields.get("result_types"));
         const res_types = try allocator.alloc(m.Type.T, res_len);
-
         var res_rest = fields.get("result_types");
         for (res_types) |*rt| {
             rt.* = try decodeType(env, ctx, try beam.get_head_and_iter(env, &res_rest));
         }
-
         const attr_len = try beam.get_list_length(env, fields.get("attributes"));
         const attrs = try allocator.alloc(c.MlirNamedAttribute, attr_len);
-
         var attr_rest = fields.get("attributes");
         for (attrs) |*na| {
             const a_fields = try tuple(env, try beam.get_head_and_iter(env, &attr_rest), 2);
@@ -324,10 +299,8 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
             const a_val = try decodeAttribute(env, ctx, a_fields[1]);
             na.* = c.mlirNamedAttributeGet(c.mlirIdentifierGet(ctx, a_name), a_val);
         }
-
         const succs = try @import("callback_args.zig").Range(m.Block).decode(env, fields.get("successors"), allocator);
         for (succs) |block| if (block.ptr == null) return error.InvalidBatchSuccessor;
-
         const num_regions = try beam.get(usize, env, fields.get("regions"));
         spec.* = .{
             .block_idx = block_idx,
@@ -340,13 +313,9 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
             .num_regions = num_regions,
         };
     }
-
     const created_ops = try allocator.alloc(m.Operation.T, count);
-
     const op_terms = try allocator.alloc(beam.term, count);
-
     const res_list_terms = try allocator.alloc(beam.term, count);
-
     var prev_inserted: m.Operation.T = anchor_op;
     for (specs, 0..) |spec, i| {
         const spec_block = blocks[spec.block_idx];
@@ -360,7 +329,6 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
                 .cfg_block_arg => c.mlirBlockGetArgument(blocks[op_ref.index_a], @intCast(op_ref.index_b)),
             };
         }
-
         var state = c.mlirOperationStateGet(spec.name, spec.loc);
         inline for (.{ "Operands", "Results", "Attributes", "Successors" }, .{ resolved_operands, spec.result_types, spec.attributes, spec.successors }) |kind, items| {
             if (items.len > 0) @field(c, "mlirOperationStateAdd" ++ kind)(&state, @intCast(items.len), items.ptr);
@@ -371,7 +339,6 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
             for (regions) |*r| r.* = c.mlirRegionCreate();
             c.mlirOperationStateAddOwnedRegions(&state, @intCast(regions.len), regions.ptr);
         }
-
         const created = c.beaverOperationCreate(state);
         if (created.ptr == null) return error.OperationCreationFailed;
         switch (insert_mode) {
@@ -391,12 +358,10 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
             },
             else => unreachable,
         }
-
         created_ops[i] = created;
         op_terms[i] = try m.Operation.resource.make_kind(env, created);
         res_list_terms[i] = try values(env, created, false, false);
     }
-
     const valid = verify_root.ptr == null or c.mlirOperationVerify(verify_root);
     var out = [_]beam.term{
         beam.make_bool(env, valid),
@@ -405,13 +370,11 @@ pub fn build(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
     };
     return beam.make_tuple(env, &out);
 }
-
 const SymListCtx = struct {
     env: beam.env,
     list: std.ArrayListUnmanaged(beam.term) = .empty,
     oom: bool = false,
 };
-
 fn appendSymCallback(sr: m.StringRef.T, user_data: ?*anyopaque) callconv(.c) void {
     const ctx_ptr: *SymListCtx = @ptrCast(@alignCast(user_data.?));
     if (ctx_ptr.oom) return;
@@ -420,7 +383,6 @@ fn appendSymCallback(sr: m.StringRef.T, user_data: ?*anyopaque) callconv(.c) voi
         ctx_ptr.oom = true;
     };
 }
-
 pub fn referencedSymbols(env: beam.env, ctx: m.Context.T, arguments: beam.term) !beam.term {
     const args = try tuple(env, arguments, 1);
     const root = try operation(env, ctx, args[0]);
