@@ -1,10 +1,7 @@
 defmodule Beaver.MLIR.Target.LLVMIRTest do
   use Beaver.Case, async: true
-
   alias Beaver.MLIR.Target.LLVMIR
-
   @moduletag :smoke
-
   test "exports an LLVM dialect module as LLVM IR text", %{ctx: ctx} do
     module =
       "module {\n  llvm.func @answer() -> i32 {\n    %answer = llvm.mlir.constant(42 : i32) : i32\n    llvm.return %answer : i32\n  }\n}\n"
@@ -23,7 +20,6 @@ defmodule Beaver.MLIR.Target.LLVMIRTest do
 
     assert {:error, diagnostics} = LLVMIR.translate(module)
     assert diagnostics != []
-
     assert_raise ArgumentError, ~r/failed to translate module to LLVM IR/, fn -> LLVMIR.translate!(module) end
   end
 

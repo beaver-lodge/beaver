@@ -1,7 +1,6 @@
 defmodule IRDLTest do
   use Beaver.Case, async: true
   @moduletag :smoke
-
   test "gen irdl", %{ctx: ctx} do
     m =
       sigil_m(
@@ -12,7 +11,6 @@ defmodule IRDLTest do
       |> MLIR.verify!()
 
     assert m |> Beaver.MLIR.CAPI.mlirLoadIRDLDialects() |> Beaver.MLIR.LogicalResult.success?()
-
     found = MapSet.new(MLIR.Dialect.Registry.ops("cmath", ctx: ctx))
     expected = MapSet.new(["mul", "norm"])
     assert MapSet.equal?(found, expected)
@@ -24,9 +22,7 @@ defmodule IRDLTest do
     Beaver.Slang.load(ctx, CMath)
     CMath.IRExample.get(ctx)
     CMath.IRExample.gen(ctx)
-
     assert not (CMath.some_attr(Type.f32()) |> Beaver.Deferred.resolve(ctx) |> MLIR.null?())
-
     assert not (MLIR.CAPI.mlirContextGetOrLoadDialect(ctx, MLIR.StringRef.create("cmath")) |> MLIR.null?())
   end
 
@@ -36,7 +32,6 @@ defmodule IRDLTest do
 
   test "region dialect", %{ctx: ctx} do
     dialect = TestRegion.__slang_dialect__(ctx) |> MLIR.verify!()
-
     rendered = MLIR.to_string(dialect)
     assert rendered =~ "irdl.region()"
     assert rendered =~ "irdl.region(%"

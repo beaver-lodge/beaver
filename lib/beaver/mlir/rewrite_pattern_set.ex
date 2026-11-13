@@ -4,7 +4,6 @@ defmodule Beaver.MLIR.RewritePatternSet do
   @moduledoc "This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}."
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
   alias Beaver.MLIR
-
   defdelegate create(context), to: CAPI, as: :mlirRewritePatternSetCreate
 
   @doc """
@@ -74,14 +73,12 @@ defmodule Beaver.MLIR.RewritePatternSet do
 
   @spec add(t(), term(), module() | function() | Beaver.Pattern.Native.Descriptor.t()) :: t()
   def add(%__MODULE__{} = set, root_name, pattern), do: add(set, root_name, pattern, [])
-
   @spec add(t(), term(), module() | function() | Beaver.Pattern.Native.Descriptor.t(), keyword()) :: t()
   def add(%__MODULE__{} = set, root_name, %Beaver.Pattern.Native.Descriptor{} = descriptor, opts)
       when is_list(opts), do: add(set, descriptor, Keyword.put(opts, :root, root_name))
 
   def add(%__MODULE__{} = set, root_name, module, opts) when is_atom(module) and is_list(opts) do
     opts = if function_exported?(module, :construct, 1), do: put_in(opts, [:construct], &module.construct/1), else: opts
-
     opts = if function_exported?(module, :destruct, 1), do: put_in(opts, [:destruct], &module.destruct/1), else: opts
     opts = put_in(opts, [:match_and_rewrite], &module.match_and_rewrite/4)
     MLIR.RewritePattern.create(root_name, opts) |> then(&add(set, &1))
@@ -146,7 +143,6 @@ defmodule Beaver.MLIR.RewritePatternSet do
     do: MLIR.ConversionPattern.add(set, root_name, converter, match_and_rewrite, opts)
 
   defdelegate destroy(set), to: CAPI, as: :mlirRewritePatternSetDestroy
-
   @doc "Destroys a pattern set on the callback executor."
   def threaded_destroy(ctx, %kind{ref: ref}) when kind in [__MODULE__, MLIR.FrozenRewritePatternSet] do
     name = if kind == __MODULE__, do: :RewritePatternSet, else: :FrozenRewritePatternSet

@@ -3,10 +3,8 @@ alias Beaver.Deferred
 
 defmodule Beaver.MLIR.Dialect.Linalg do
   @moduledoc "Operations and structured-compute builders for the MLIR Linalg dialect."
-
   alias Beaver.MLIR
   alias Beaver.MLIR.Dialect.Bufferization
-
   use Beaver.MLIR.Dialect, dialect: "linalg", ops: Beaver.MLIR.Dialect.Registry.ops("linalg")
 
   @doc """
@@ -93,7 +91,6 @@ defmodule Beaver.MLIR.Dialect.Linalg do
 
   @doc false
   def result_types(outputs), do: outputs |> Enum.map(&MLIR.Value.type/1) |> Enum.filter(&MLIR.Type.tensor?/1)
-
   @doc "Build a Linalg → Bufferization → LLVM lowering composer."
   def llvm_pipeline(operation_or_module, opts \\ []) do
     bufferization_opts =

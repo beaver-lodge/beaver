@@ -4,7 +4,6 @@ defmodule Beaver.MLIR.Transform.Schedule do
   @moduledoc false
   alias Beaver.MLIR
   alias Beaver.MLIR.Transform
-
   @doc false
   def load(input, %Context{} = ctx, prepare \\ &{:ok, &1}) do
     with {:ok, bytes} <- source_bytes(input), {:ok, module} <- parse_module(bytes, ctx) do
@@ -43,7 +42,6 @@ defmodule Beaver.MLIR.Transform.Schedule do
   end
 
   defp source_bytes({format, bytes}) when format in [:text, :bytecode] and is_binary(bytes), do: {:ok, bytes}
-
   defp source_bytes(bytes) when is_binary(bytes), do: {:ok, bytes}
   defp source_bytes(%MLIR.Module{} = module), do: {:ok, MLIR.Bytecode.write!(module)}
 
@@ -51,7 +49,6 @@ defmodule Beaver.MLIR.Transform.Schedule do
     case enclosing_module(op) do
       nil ->
         text = "module attributes {transform.with_named_sequence} {\n" <> MLIR.to_string(op, generic: false) <> "\n}"
-
         {:ok, text}
 
       module_operation ->

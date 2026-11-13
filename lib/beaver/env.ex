@@ -6,7 +6,6 @@ defmodule Beaver.Env do
   __MODULE__/0, __CALLER__/0 of Elixir special forms.
   """
   alias Beaver.MLIR
-
   @doc "Return context in the DSL environment"
   defmacro context() do
     if Macro.Env.has_var?(__CALLER__, {:beaver_internal_env_ctx, nil}) do

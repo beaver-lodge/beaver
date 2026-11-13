@@ -4,7 +4,6 @@ defmodule Beaver.Build.ArtifactCache do
   Incomplete entries are misses; complete entries with bad digests raise. Temporary files are cleaned on failure.
   Publish referenced artifacts before their manifest; renaming a group of files is not a filesystem transaction.
   """
-
   @doc "Caches portable data by owner/key and revision; callers include every generator dependency."
   def fetch_revision(owner, key, revision, build) do
     key = {owner, key}
@@ -17,7 +16,6 @@ defmodule Beaver.Build.ArtifactCache do
   end
 
   def digest(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
-
   @doc "Maps JSON inputs through a revisioned analysis cache and returns the number of newly built entries."
   def map_json!(items, directory, revision, ready?, build) do
     Enum.map_reduce(items, 0, fn item, count ->

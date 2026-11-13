@@ -1,19 +1,14 @@
 defmodule Beaver.MLIR.CAPI.Raw do
   @moduledoc false
-
   use Kinda.CodeGen, with: Beaver.MLIR.CAPI.CodeGen, root: Beaver.MLIR.CAPI, codec: Beaver.Native, surface: :raw
-
   @external_resource Beaver.MLIR.CAPI.CodeGen.declaration_manifest_path()
-
   for {name, arity} <- Beaver.MLIR.CAPI.Handwritten.functions() do
     args = Macro.generate_arguments(arity, __MODULE__)
-
     @doc false
     def unquote(name)(unquote_splicing(args)), do: :erlang.nif_error(:not_loaded)
   end
 
   @on_load :load_nif
-
   def load_nif do
     nif_file = nif_path()
 
@@ -54,7 +49,6 @@ defmodule Beaver.MLIR.CAPI.Raw do
   defp add_dll_search_path(dir) do
     path = System.get_env("PATH") || ""
     sep = if match?({:win32, _}, :os.type()), do: ";", else: ":"
-
     unless path |> String.split(sep) |> Enum.any?(&(&1 == dir)), do: System.put_env("PATH", dir <> sep <> path)
   end
 end

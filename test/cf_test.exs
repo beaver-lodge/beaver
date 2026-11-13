@@ -1,7 +1,6 @@
 defmodule CfTest do
   use Beaver.Case, async: true
   @moduletag :smoke
-
   test "cf with mutation", %{ctx: ctx} do
     import MutCompiler
 

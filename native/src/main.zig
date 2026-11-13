@@ -4,7 +4,6 @@ const beam = kinda.beam;
 const mlir_capi = @import("mlir_capi.zig");
 const builtin = @import("builtin");
 const NifFunc = e.ErlNifFunc;
-
 // NIF tables exported by the partitioned native libraries. Each partition is
 // compiled as its own library so editing one domain does not force the
 // comptime-heavy CAPI registry to be regenerated. The tables are concatenated
@@ -15,7 +14,6 @@ extern const callback_bridge_nifs: [0]NifFunc;
 extern const callback_bridge_nifs_len: usize;
 extern const cuda_runner_nifs: [0]NifFunc;
 extern const cuda_runner_nifs_len: usize;
-
 // Registration hooks exported by the partitioned native libraries.
 extern fn core_register_all_passes() void;
 extern fn core_open_all(env: beam.env) void;

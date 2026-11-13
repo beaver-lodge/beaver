@@ -4,7 +4,6 @@ const beam = kinda.beam;
 const m = @import("mlir_capi.zig");
 const c = @import("prelude.zig").c;
 const callback_args = @import("callback_args.zig");
-
 // Encode while the callback owns its borrowed data; no copied shapes or second
 // native result representation are needed after inference returns.
 const Collector = struct {

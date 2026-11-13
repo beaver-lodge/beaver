@@ -1,6 +1,5 @@
 defmodule Beaver.DeferredTest do
   use Beaver.Case, async: true
-
   alias Beaver.Deferred
 
   test "builders distinguish deferred values from ordinary callbacks", %{ctx: ctx} do

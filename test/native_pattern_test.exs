@@ -1,15 +1,12 @@
 defmodule NativePatternTest do
   use Beaver.Case, async: true
-
   import ExUnit.CaptureLog
-
   alias Beaver.MLIR.Dialect.{Arith, Func}
   alias Beaver.Pattern.Native
   require Native
 
   defmodule TestNativePatterns do
     use Beaver.Pattern.Native
-
     alias Beaver.MLIR.Dialect.Arith
 
     defrewrite fold_const_add(operation, rewriter, _state),
@@ -32,7 +29,6 @@ defmodule NativePatternTest do
 
         mlir ctx: ctx, ip: base do
           replacement = Arith.constant(value: Attribute.integer(Type.i64(), lhs_value + rhs_value)) >>> Type.i64()
-
           MLIR.RewriterBase.replace_op(base, operation, [replacement])
         end
 
@@ -55,7 +51,6 @@ defmodule NativePatternTest do
 
         mlir ctx: ctx, ip: base do
           replacement = Arith.constant(value: Attribute.integer(Type.i64(), 999)) >>> Type.i64()
-
           MLIR.RewriterBase.replace_op(base, operation, [replacement])
         end
 
@@ -100,7 +95,6 @@ defmodule NativePatternTest do
 
   defmodule StateTracker do
     def construct(state), do: state
-
     def destruct({test_pid, final_state}), do: send(test_pid, {:destruct_state, final_state})
   end
 
@@ -178,7 +172,6 @@ defmodule NativePatternTest do
     )
 
     assert_constant(ir, 30)
-
     MLIR.verify!(ir)
   end
 
@@ -246,7 +239,6 @@ defmodule NativePatternTest do
       )
 
     MLIR.Rewrite.apply_patterns!(ir, [descriptor], enable_folding: false, enable_constant_cse: false)
-
     assert_received {:rewriter_usable_in_callback, callback_pid}
     refute callback_pid == self()
     assert_received {:probe_destruct, 1}
@@ -266,11 +258,8 @@ defmodule NativePatternTest do
     ir = create_add_ir(ctx, 7, 8)
     set = MLIR.RewritePatternSet.create(ctx)
     MLIR.RewritePatternSet.add(set, TestNativePatterns.fold_const_add(), ctx: ctx)
-
     MLIR.Rewrite.apply_patterns!(ir, set, enable_folding: false, enable_constant_cse: false)
-
     assert_constant(ir, 15)
-
     MLIR.verify!(ir)
   end
 

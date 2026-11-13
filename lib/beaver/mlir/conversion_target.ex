@@ -7,14 +7,10 @@ defmodule Beaver.MLIR.ConversionTarget do
   Static and dynamic legality rules are composed by MLIR. Dynamic callbacks run in the process that registered them
   while the conversion itself runs on the context's native worker pool.
   """
-
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native, fields: [registration: nil, timeout_ms: 30_000]
-
   alias Beaver.MLIR
-
   @type legality() :: :legal | :illegal | :no_opinion | boolean()
   @type legality_callback() :: (MLIR.Operation.t() -> legality())
-
   @spec create(Context.t(), keyword()) :: t()
   def create(%Context{ref: context_ref}, opts \\ []) do
     case Keyword.keys(opts) -- [:timeout] do
@@ -59,13 +55,11 @@ defmodule Beaver.MLIR.ConversionTarget do
   @spec mark_unknown_dynamically_legal(t(), legality_callback()) :: t()
   def mark_unknown_dynamically_legal(%__MODULE__{} = target, callback) when is_function(callback, 1) do
     :ok = CAPI.beaver_raw_conversion_target_mark_unknown_dynamic(target.registration, callback, target.timeout_ms)
-
     target
   end
 
   @spec destroy(t()) :: :ok
   def destroy(%__MODULE__{registration: registration}), do: CAPI.beaver_raw_conversion_target_destroy(registration)
-
   @spec with(Context.t(), keyword(), (t() -> result)) :: result when result: var
   def with(ctx, opts \\ [], fun) when is_function(fun, 1),
     do: Beaver.Native.with_resource(create(ctx, opts), &destroy/1, fun)

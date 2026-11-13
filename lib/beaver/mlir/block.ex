@@ -4,7 +4,6 @@ alias Beaver.{Deferred, Native}
 defmodule Beaver.MLIR.Block do
   @moduledoc "This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}."
   alias Beaver.MLIR
-
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
 
   defp do_add_args!(block, ctx, default_loc, {type, loc}) do
@@ -17,7 +16,6 @@ defmodule Beaver.MLIR.Block do
   end
 
   defp do_add_args!(block, ctx, default_loc, type), do: do_add_args!(block, ctx, default_loc, {type, default_loc})
-
   @type arg_type :: Type.t() | String.t()
   @type arg :: {arg_type(), Location.t()} | arg_type()
   @spec add_args!(__MODULE__.t(), list(arg), Keyword.t()) :: [MLIR.Value.t()]
@@ -72,11 +70,9 @@ defmodule Beaver.MLIR.Block do
   end
 
   def get_arg!(%__MODULE__{} = block, index), do: CAPI.mlirBlockGetArgument(block, index)
-
   @doc "Returns all block arguments as a list of `MLIR.Value` handles."
   @spec arguments(t()) :: [MLIR.Value.t()]
   def arguments(%__MODULE__{} = block), do: Beaver.Walker.arguments(block) |> Enum.to_list()
-
   @doc "Returns an enumerable of operations inside `block`."
   @spec operations(t()) :: Enumerable.t()
   def operations(%__MODULE__{} = block), do: Beaver.Walker.operations(block)
@@ -119,7 +115,6 @@ defmodule Beaver.MLIR.Block do
   @doc "Returns `true` if two `MLIR.Block` handles refer to the same underlying block."
   @spec equal?(t(), t()) :: boolean()
   def equal?(%__MODULE__{} = a, %__MODULE__{} = b), do: CAPI.mlirBlockEqual(a, b) |> Native.to_term()
-
   defdelegate destroy(blk), to: CAPI, as: :mlirBlockDestroy
   defdelegate append(blk, op), to: CAPI, as: :mlirBlockAppendOwnedOperation
 end

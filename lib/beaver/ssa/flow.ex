@@ -33,7 +33,6 @@ defmodule Beaver.SSA.Flow do
     target = fields.edge[:target]
     exit = fields.block[:exit]
     unwind = fields.block[:unwind]
-
     p2 = fn d, l, {x, q} -> {x, as(l, d, true), q} end
     uf = fn f, c, k, v, w -> then(Beaver.SSA.Scalar.join(ag(f, k), v, w), &{as(f, k, &1), c or &1 != ag(f, k)}) end
     fi = fn i, s -> Enum.zip_reduce(i[ko], infer.(i, elem(s, 0)), s, fn v, l, {x, d} -> uf.(x, d, v, l, false) end) end
@@ -63,7 +62,6 @@ defmodule Beaver.SSA.Flow do
 
   defp selected_edges(:unknown, exit, schema), do: schema.edges(exit)
   defp selected_edges({_, edge}, _, _), do: List.wrap(edge)
-
   @doc "Drops unreachable blocks and renumbers block and value identifiers in original order."
   def prune(function, schema) do
     fields = schema.schema()
@@ -78,15 +76,12 @@ defmodule Beaver.SSA.Flow do
     kept = Enum.map(reachable, &elem(blocks, &1))
     indices = Map.new(Enum.zip(reachable, 0..999_999))
     values = Map.new(Enum.zip(Enum.flat_map(kept, &schema.block_defs/1), 0..999_999))
-
     reindex = fn edge -> Map.update!(edge, fields.edge[:target], &indices[&1]) end
 
     blocks =
       for block <- kept do
         block = schema.map_block_values(block, &Map.fetch!(values, &1))
-
         block = Map.update!(block, fields.block[:exit], &schema.map_edges(&1, reindex))
-
         if key = fields.block[:unwind], do: Map.put(block, key, indices[block[key]]), else: block
       end
 

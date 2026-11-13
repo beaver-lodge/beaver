@@ -9,20 +9,16 @@ defmodule Beaver.MLIR.Conversion.Plan do
   `declaration/1` omits callback bodies and runtime state. Supply callback `:version` metadata for reproducible
   declarations; absent versions are `:unversioned`.
   """
-
   alias Beaver.{MLIR, Native}
   alias Beaver.Pattern.Native.{Descriptor, Program}
   import Bitwise
-
   defstruct mode: :full, timeout: 30_000, folding_mode: nil, build_materializations: nil, entries: []
-
   @type mode() :: :full | :partial | :analysis
   @type option() ::
           {:mode, mode()}
           | {:timeout, non_neg_integer() | nil}
           | {:folding_mode, :never | :before_patterns | :after_patterns | nil}
           | {:build_materializations, boolean() | nil}
-
   @type t() :: %__MODULE__{
           mode: mode(),
           timeout: non_neg_integer() | nil,
@@ -30,7 +26,6 @@ defmodule Beaver.MLIR.Conversion.Plan do
           build_materializations: boolean() | nil,
           entries: [term()]
         }
-
   @doc """
   Creates a plan with `:mode` (`:full`, `:partial` or `:analysis`), `:timeout` (default 30_000), `:folding_mode`
   (`:never`, `:before_patterns`, `:after_patterns` or nil) and `:build_materializations` (boolean or nil).
@@ -60,11 +55,9 @@ defmodule Beaver.MLIR.Conversion.Plan do
       ] do
     @spec unquote(name)(t(), String.Chars.t()) :: t()
     def unquote(name)(%__MODULE__{} = plan, name), do: append_entry(plan, {unquote(name), to_string(name)})
-
     @doc "Adds multiple entries via `#{name}/2`."
     @spec unquote(plural)(t(), Enumerable.t()) :: t()
     def unquote(plural)(%__MODULE__{} = plan, names), do: Enum.reduce(names, plan, &unquote(name)(&2, &1))
-
     defp entry_declaration({unquote(name), name}), do: %{unquote(field) => name, kind: unquote(name)}
   end
 
@@ -174,7 +167,6 @@ defmodule Beaver.MLIR.Conversion.Plan do
              MLIR.ConversionPatternRewriter.t(),
              TypeConverter.t() ->
                term())
-
   @spec add_conversion_pattern(t(), String.Chars.t() | [String.Chars.t()], conversion_callback(), keyword()) :: t()
   def add_conversion_pattern(plan, root_or_roots, callback, opts \\ [])
 
@@ -192,7 +184,6 @@ defmodule Beaver.MLIR.Conversion.Plan do
 
   defp validate_conversion_pattern_opts!(opts) do
     opts = validate_callback_opts!(opts, [:version, :benefit, :one_to_n, :timeout], "add_conversion_pattern")
-
     validate_non_neg_int_opt!(Keyword.get(opts, :benefit, 1), :benefit)
     validate_boolean_opt!(Keyword.get(opts, :one_to_n, false), :one_to_n)
     validate_optional_timeout!(Keyword.get(opts, :timeout))
@@ -206,7 +197,6 @@ defmodule Beaver.MLIR.Conversion.Plan do
 
   defp validate_boolean_opt!(v, _key) when is_boolean(v), do: :ok
   defp validate_boolean_opt!(v, key), do: raise(ArgumentError, "#{inspect(key)} must be boolean, got: #{inspect(v)}")
-
   defp validate_optional_timeout!(nil), do: :ok
   defp validate_optional_timeout!(v) when is_integer(v) and v >= 0, do: :ok
 
@@ -257,21 +247,17 @@ defmodule Beaver.MLIR.Conversion.Plan do
   @doc "Executes on a module or operation with fresh, scoped native resources. Returns `MLIR.Conversion.result()`."
   @spec run(t(), MLIR.Conversion.conversion_ir()) :: MLIR.Conversion.result()
   def run(%__MODULE__{} = plan, ir), do: execute(plan, ir, false)
-
   @doc "Returns `{run_result, receipt}` with bounded conversion callback profiling."
   @spec profile(t(), MLIR.Conversion.conversion_ir()) :: {MLIR.Conversion.result(), MLIR.Conversion.Profile.receipt()}
   def profile(%__MODULE__{} = plan, ir), do: execute(plan, ir, true)
-
   @doc "Runs with explicit mutation and legalization reporting."
   def report(%__MODULE__{} = plan, ir), do: execute(plan, ir, :report)
-
   @doc "Runs legalization analysis without committing IR changes."
   def analyze(%__MODULE__{} = plan, ir), do: report(%{plan | mode: :analysis}, ir)
 
   defp execute(plan, ir, profile?) do
     context = MLIR.context(ir)
     target_opts = if plan.timeout, do: [timeout: plan.timeout], else: []
-
     opts = Map.take(plan, [:timeout, :folding_mode, :build_materializations]) |> Enum.reject(fn {_, v} -> is_nil(v) end)
 
     function =
@@ -378,9 +364,7 @@ defmodule Beaver.MLIR.Conversion.Plan do
     do: raise(ArgumentError, ":timeout must be a non-negative integer or nil, got: #{inspect(timeout)}")
 
   defp validate_folding_mode!(mode) when mode in [nil, :never, :before_patterns, :after_patterns], do: mode
-
   defp validate_folding_mode!(mode), do: raise(ArgumentError, "unsupported conversion folding mode: #{inspect(mode)}")
-
   defp validate_build_materializations!(value) when is_boolean(value) or is_nil(value), do: value
 
   defp validate_build_materializations!(value),

@@ -12,7 +12,6 @@ defmodule Beaver.MLIR.Trait do
   process and receive a borrowed operation that is valid only until the callback returns. The target operation must
   already be registered by an extensible dialect.
   """
-
   alias Beaver.MLIR
   alias Kinda.CallbackRuntime
 
@@ -33,9 +32,7 @@ defmodule Beaver.MLIR.Trait do
   defmodule DefinitionServer do
     @moduledoc false
     use GenServer
-
     alias Beaver.MLIR
-
     @impl true
     def init({context_ref, context_registry}) do
       {:ok, _} = Registry.register(context_registry, context_ref, :definition)
@@ -70,16 +67,13 @@ defmodule Beaver.MLIR.Trait do
       {:mlirDynamicOpTraitIsIsolatedFromAboveCreate, :mlirDynamicOpTraitIsIsolatedFromAboveGetTypeID},
     no_terminator: {:mlirDynamicOpTraitNoTerminatorCreate, :mlirDynamicOpTraitNoTerminatorGetTypeID}
   }
-
   @definition_registry __MODULE__.DefinitionRegistry
   @context_registry __MODULE__.ContextRegistry
   @custom_callback_keys [:verify, :verify_regions]
-
   @type builtin :: :terminator | :isolated_from_above | :no_terminator
   @type identity :: module() | atom()
   @type custom :: {identity(), keyword()}
   @type declaration :: builtin() | custom()
-
   @doc false
   def global_registrar_child_specs,
     do: [{Registry, keys: :unique, name: @definition_registry}, {Registry, keys: :duplicate, name: @context_registry}]
@@ -98,7 +92,6 @@ defmodule Beaver.MLIR.Trait do
   @doc "Returns the built-in dynamic traits supported by MLIR."
   @spec builtins() :: [builtin()]
   def builtins, do: Map.keys(@traits)
-
   @doc false
   def normalize!(nil), do: []
 
@@ -114,7 +107,6 @@ defmodule Beaver.MLIR.Trait do
   end
 
   def normalize!(traits), do: raise(ArgumentError, "expected a list of Slang traits, got: #{inspect(traits)}")
-
   @doc "Attaches a trait to a registered dynamic operation."
   @spec attach(Context.t(), String.t(), declaration()) :: :ok | Attachment.t()
   def attach(%Context{} = ctx, op_name, trait) when is_binary(op_name) and is_atom(trait) do
@@ -182,11 +174,9 @@ defmodule Beaver.MLIR.Trait do
   @doc "Checks whether a registered operation name has a trait."
   @spec has?(Context.t(), String.t() | StringRef.t(), builtin() | identity()) :: boolean()
   def has?(%Context{} = ctx, op_name, trait), do: has_type_id?(ctx, op_name, type_id(ctx, trait))
-
   @doc "Checks whether an operation has a trait."
   @spec has?(Operation.t(), builtin() | identity()) :: boolean()
   def has?(%Operation{} = op, trait), do: has?(MLIR.context(op), Operation.name(op), trait)
-
   @doc "Returns the TypeID used by a trait in a context."
   def type_id(%Context{} = ctx, trait),
     do: if(builtin?(trait), do: type_id(trait), else: ctx |> definition_server() |> GenServer.call({:type_id, trait}))
@@ -213,7 +203,6 @@ defmodule Beaver.MLIR.Trait do
   end
 
   defp dispatch(_message, _identity), do: :unhandled
-
   defp normalize_verification_result(result) when result in [:ok, true], do: {:ok, :ok}
   defp normalize_verification_result({:ok, _value}), do: {:ok, :ok}
   defp normalize_verification_result(result) when result in [:error, false], do: {:error, result}
@@ -227,7 +216,6 @@ defmodule Beaver.MLIR.Trait do
 
   defp normalize_callbacks!(callbacks) when is_list(callbacks) do
     unless Keyword.keyword?(callbacks), do: raise(ArgumentError, "custom trait callbacks must be a keyword list")
-
     callbacks = Keyword.validate!(callbacks, @custom_callback_keys)
 
     if Enum.all?(@custom_callback_keys, &is_nil(callbacks[&1])),

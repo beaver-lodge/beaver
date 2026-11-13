@@ -17,10 +17,8 @@ end
 
 defmodule Beaver.MLIR.ConversionPlanTest do
   use Beaver.Case, async: true
-
   alias Beaver.MLIR.{Attribute, Context, Conversion, ConversionPatternRewriter, LogicalResult, Operation}
   alias Beaver.MLIR.{RewriterBase, Type, Value}
-
   alias Conversion.Plan
   alias Beaver.MLIR.ConversionPlanNativePatterns
   import Beaver.ConversionHelpers

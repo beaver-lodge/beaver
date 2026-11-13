@@ -6,14 +6,12 @@ defmodule Beaver.MLIR.Module do
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
   @behaviour Access
-
   @doc "Create a MLIR module by parsing string."
   def create(str, opts \\ []) when is_binary(str) do
     Deferred.from_opts(
       opts,
       fn ctx ->
         {module, diagnostics} = Beaver.Execution.run(ctx, :parse, {MLIR.StringRef.create(str).ref})
-
         if MLIR.null?(module), do: {:error, diagnostics}, else: {:ok, module}
       end
     )
@@ -30,9 +28,7 @@ defmodule Beaver.MLIR.Module do
   end
 
   use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
-
   defdelegate destroy(module), to: CAPI, as: :mlirModuleDestroy
-
   @doc "Gets the body block of `module` (or a single-region container `Operation`)."
   def body(%__MODULE__{} = module), do: CAPI.mlirModuleGetBody(module)
 
@@ -54,10 +50,8 @@ defmodule Beaver.MLIR.Module do
   """
   @spec import_symbols!(t() | Operation.t(), t() | Operation.t(), keyword()) :: t() | Operation.t()
   defdelegate import_symbols!(target, source, opts \\ []), to: MLIR.SymbolTable
-
   @doc "Creates an empty `MLIR.Module` from a `Location` or keyword options (`[ctx: ctx, location: loc]`)."
   def empty(opts \\ [])
-
   def empty(%MLIR.Location{} = location), do: CAPI.mlirModuleCreateEmpty(location)
 
   def empty(opts) when is_list(opts) do
@@ -78,7 +72,6 @@ defmodule Beaver.MLIR.Module do
     do: Beaver.Native.with_resource(empty(ctx: ctx), &destroy/1, fun)
 
   def with_module(source, fun) when is_function(fun, 1), do: with_module(source, [], fun)
-
   @spec with_module(MLIR.Context.t() | binary() | t(), binary() | keyword(), (t() -> result)) :: result when result: var
   def with_module(%MLIR.Context{} = ctx, str, fun) when is_binary(str) and is_function(fun, 1),
     do: Beaver.Native.with_resource(create!(str, ctx: ctx), &destroy/1, fun)
@@ -91,11 +84,9 @@ defmodule Beaver.MLIR.Module do
 
   @impl Access
   def fetch(module, attribute), do: Operation.fetch(Operation.from_module(module), attribute)
-
   @impl Access
   def get_and_update(module, attribute, function) do
     {attr, _} = Operation.get_and_update(Operation.from_module(module), attribute, function)
-
     {attr, module}
   end
 

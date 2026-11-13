@@ -4,11 +4,8 @@ defmodule Beaver.MLIR.Dialect.MemRef do
   use Beaver
   alias Beaver.MLIR.Attribute
   alias Beaver.MLIR.Dialect
-
   @moduledoc "This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect."
-
   use Beaver.MLIR.Dialect, dialect: "memref", ops: Dialect.Registry.ops("memref")
-
   @global "memref.global"
   @doc """
   Create a global.
@@ -34,13 +31,11 @@ defmodule Beaver.MLIR.Dialect.MemRef do
 
   def layout(%Type{} = memref_type) do
     if not Type.memref?(memref_type), do: raise(ArgumentError, "only ranked memref has layout")
-
     CAPI.mlirMemRefTypeGetLayout(memref_type)
   end
 
   def strides_and_offset(%Type{ref: ref} = memref_type) do
     if not Type.memref?(memref_type), do: raise(ArgumentError, "only ranked memref has strides and offset")
-
     {strides, offset} = CAPI.beaver_raw_memref_type_get_strides_and_offset(ref)
     {Enum.map(strides, &MLIR.ShapedType.cast_dynamic_magic_number(&1, :stride)), offset}
   end
@@ -58,7 +53,6 @@ defmodule Beaver.MLIR.Dialect.MemRef do
 
   def affine_map(%Type{} = memref_type) do
     if not Type.memref?(memref_type), do: raise(ArgumentError, "only ranked memref has affine map")
-
     CAPI.mlirMemRefTypeGetAffineMap(memref_type)
   end
 end

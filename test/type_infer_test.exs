@@ -2,7 +2,6 @@ defmodule TypeInferTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR.Dialect.{Func, Arith}
   @moduletag :smoke
-
   test "type infer", %{ctx: ctx} do
     module_ir ctx do
       width = 8

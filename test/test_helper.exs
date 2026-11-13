@@ -5,8 +5,6 @@ exclude = [
 ]
 
 exclude = if System.get_env("BEAVER_TRITON_PREBUILT_DIR") == nil, do: exclude ++ [:triton], else: exclude
-
 ExUnit.configure(exclude: exclude)
-
 IO.puts("OS PID: #{System.pid()}")
 ExUnit.start()

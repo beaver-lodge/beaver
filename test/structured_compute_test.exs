@@ -1,19 +1,14 @@
 defmodule StructuredComputeTest do
   use Beaver.Case, async: true
-
   alias Beaver.MLIR.{AffineMap, Attribute, Type}
   alias Beaver.MLIR.Dialect.{Arith, Func, Linalg, Tensor, Vector}
-
   require Linalg
-
   @moduletag :smoke
-
   test "builds tensor slices from mixed static and dynamic entries", %{ctx: ctx} do
     module =
       function_module ctx, slice(function_type: Type.function([~t{tensor<8xf32>}], [~t{tensor<4xf32>}])) do
         block _entry(source >>> ~t{tensor<8xf32>}) do
           result = Tensor.extract_slice_(source, Tensor.slice([2], [4], [1])) >>> ~t{tensor<4xf32>}
-
           Func.return(result) >>> []
         end
       end

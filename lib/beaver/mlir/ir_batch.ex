@@ -4,15 +4,12 @@ defmodule Beaver.MLIR.IRBatch do
   submission per batch.
   """
   alias Beaver.{Execution, MLIR, Native}
-
   @shorthand_types Beaver.MLIR.IRBatch.Spec.types()
-
   def read(operations, opts \\ [])
   def read([], _opts), do: []
 
   def read([first | _] = operations, opts) do
     names = Enum.map(Keyword.get(opts, :attributes, []), &to_string/1)
-
     payload = {Enum.map(operations, & &1.ref), names}
     records = Execution.run(MLIR.context(first), :snapshot, payload, Keyword.put_new(opts, :strategy, :auto))
 
@@ -101,10 +98,8 @@ defmodule Beaver.MLIR.IRBatch do
     block_specs = normalize_function_blocks!(spec, input_names, input_types)
     plan = create_cfg_blocks!(region, block_specs, ctx, loc)
     blocks = Map.new(plan, &{&1.name, &1.block})
-
     initial = Map.new(Map.get(spec, :bindings, []))
     {encoded_specs, final_bindings} = encode_cfg_blocks!(plan, blocks, return_op, loc, initial)
-
     verify = if opts[:verify] == true, do: func_op, else: opts[:verify]
     refs = Enum.map(plan, & &1.block.ref)
 
@@ -142,7 +137,6 @@ defmodule Beaver.MLIR.IRBatch do
     try do
       Enum.each(func_specs, fn func_spec -> {:ok, _fn_op, _} = build_function(module, func_spec, per_fn_opts) end)
       if finalize = opts[:finalize], do: finalize.(module)
-
       verified = if Keyword.get(opts, :verify, true), do: MLIR.verify(module), else: {:ok, module}
 
       case verified do

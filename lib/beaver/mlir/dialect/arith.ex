@@ -3,9 +3,7 @@ defmodule Beaver.MLIR.Dialect.Arith do
   alias Beaver.MLIR
   alias Beaver.MLIR.Dialect
   import Beaver.Sigils
-
   use Dialect, dialect: "arith", ops: Dialect.Registry.ops("arith")
-
   @constant "arith.constant"
   def constant(%Beaver.SSA{arguments: [true], evaluator: evaluator} = ssa),
     do: evaluator.(%Beaver.SSA{ssa | op: @constant, arguments: [value: ~a{true}]})
@@ -41,7 +39,6 @@ defmodule Beaver.MLIR.Dialect.Arith do
   defp operator_to_type(:>=, signed), do: :"#{if signed, do: :s, else: :u}ge"
   defp operator_to_type(:<, signed), do: :"#{if signed, do: :s, else: :u}lt"
   defp operator_to_type(:<=, signed), do: :"#{if signed, do: :s, else: :u}le"
-
   def operator_to_predicate(operator, signed \\ true)
 
   def operator_to_predicate(operator, signed) when operator in @compare_operators,

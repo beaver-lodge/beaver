@@ -1,9 +1,7 @@
 defmodule DebugOutputTest do
   use Beaver.Case, async: true
-
   @moduletag :stderr
   @moduletag :smoke
-
   def ir(ctx) do
     sigil_m(
       "" <>

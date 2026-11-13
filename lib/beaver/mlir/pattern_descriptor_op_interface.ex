@@ -6,14 +6,11 @@ defmodule Beaver.MLIR.PatternDescriptorOpInterface do
   optional state-aware callback also receives a borrowed `Beaver.MLIR.TransformState`. Borrowed handles must not
   escape the callback.
   """
-
   alias Beaver.MLIR
-
   @callback populate_patterns(MLIR.Operation.t(), MLIR.RewritePatternSet.t()) :: any()
   @callback populate_patterns_with_state(MLIR.Operation.t(), MLIR.RewritePatternSet.t(), MLIR.TransformState.t()) ::
               any()
   @optional_callbacks populate_patterns_with_state: 3
-
   @doc "Attaches a callback-backed pattern descriptor interface model."
   @spec attach(MLIR.Context.t(), String.t(), module() | keyword() | map(), keyword()) ::
           MLIR.ExternalInterface.Attachment.t()

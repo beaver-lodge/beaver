@@ -8,15 +8,11 @@ defmodule Beaver.MLIR.Conversion.Profile do
   receipt retains one aggregate per callback kind and conversion-pattern root, never one record per callback
   invocation.
   """
-
   alias Beaver.MLIR
-
   @schema_version 2
   @memory_sample_interval 256
-
   @type receipt() :: map()
   @type state() :: map()
-
   @doc false
   @spec start(MLIR.Conversion.mode(), MLIR.Conversion.conversion_ir()) :: state()
   def start(mode, ir),
@@ -169,10 +165,8 @@ defmodule Beaver.MLIR.Conversion.Profile do
   defp status({:ok, %MLIR.Conversion.Result{}}), do: "ok"
   defp status({:ok, _ir, _diagnostics}), do: "ok"
   defp status({:error, _error}), do: "error"
-
   defp reductions, do: self() |> Process.info(:reductions) |> elem(1)
   defp process_memory_bytes, do: self() |> Process.info(:memory) |> elem(1)
-
   defp monotonic_ns, do: CAPI.beaver_raw_execution_clock()
   defp elapsed_ns(started_at), do: max(monotonic_ns() - started_at, 0)
 end

@@ -2,13 +2,10 @@ defmodule OptimizationRemarksTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR.{Context, Location, OptimizationRemarks}
   @moduletag :optimization_remarks
-
   test "copies payloads, filters categories, and preserves unrelated messages", %{ctx: ctx} do
     ref = OptimizationRemarks.attach(ctx, filters: [passed: "beaver"])
     loc = Location.unknown(ctx: ctx)
-
     assert OptimizationRemarks.emit(loc, :passed, "fold", args: [value: "你好\0quoted\""], function: "work")
-
     refute OptimizationRemarks.emit(loc, :missed, "filtered")
     refute OptimizationRemarks.emit(loc, :passed, "filtered", category: "other")
     send(self(), :unrelated)
@@ -38,7 +35,6 @@ defmodule OptimizationRemarksTest do
 
   test "failed attachment preserves the original engine and releases the rejected receiver", %{ctx: ctx} do
     assert_raise ArgumentError, ~r/cannot enable/, fn -> OptimizationRemarks.attach(ctx, filters: [all: "["]) end
-
     refute OptimizationRemarks.enabled?(ctx)
     ref = OptimizationRemarks.attach(ctx)
     assert_raise ArgumentError, ~r/cannot enable/, fn -> OptimizationRemarks.attach(ctx) end
@@ -57,7 +53,6 @@ defmodule OptimizationRemarksTest do
     |> Enum.each(fn {:ok, true} -> :ok end)
 
     OptimizationRemarks.finalize(ctx)
-
     assert OptimizationRemarks.drain(ref) |> Enum.map(& &1["name"]) |> Enum.uniq() |> length() == 100
   end
 

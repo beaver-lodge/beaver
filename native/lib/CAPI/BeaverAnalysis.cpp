@@ -25,7 +25,6 @@
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/JSON.h"
-
 using namespace mlir;
 namespace {
 struct Session {
@@ -175,7 +174,6 @@ MlirLogicalResult beaverInferReturnComponents(INFER_ARGS, MlirShapedTypeComponen
   return infer<true>(name, ctx, loc, nv, vs, attrs, props, nr, rs, cb, data);
 }
 #undef INFER_ARGS
-
 MlirLogicalResult beaverConversionRun(unsigned mode, MlirOperation root,
     MlirConversionTarget target, MlirFrozenRewritePatternSet patterns,
     MlirConversionConfig config, MlirStringCallback report, void *data) {
@@ -458,7 +456,6 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
     return LLVM::GEPOp::create(builder, loc, ptrType, i8Type, framePtr, ArrayRef<LLVM::GEPArg>{dynIdx})
         .getRes();
   };
-
   // 1. Insert save operations immediately before each safepoint.
   for (size_t i = 0; i < numSafepoints; ++i) {
     Operation *sp = sps[i];
@@ -481,7 +478,6 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
       }
     }
   }
-
   // 2. Split each safepoint block right after the safepoint op, keeping a temporary branch from preBlock to resumeBlock
   // so dominance reflects the linear order.
   SmallVector<Block *> preBlocks(numSafepoints);
@@ -495,7 +491,6 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
     OpBuilder builder = OpBuilder::atBlockEnd(preBlock);
     cf::BranchOp::create(builder, sp->getLoc(), resumeBlock);
   }
-
   // 3. Insert reload operations at the start of each resumeBlock and rewrite dominated uses from the deepest safepoint
   // back to the first.
   DominanceInfo splitDom(func);
@@ -535,7 +530,6 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
       });
     }
   }
-
   // 4. Replace the temporary branch + safepoint in each preBlock with a suspend return.
   bool isLLVMFunc = isa<LLVM::LLVMFuncOp>(func);
   SmallVector<Type> funcResTypes;
@@ -579,7 +573,6 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
     }
     if (sp->use_empty()) sp->erase();
   }
-
   // 5. Create entry dispatch block with cf.switch jumping to originalEntry or resumeBlocks.
   Block *originalEntry = &body.front();
   Block *dispatchBlock = new Block();

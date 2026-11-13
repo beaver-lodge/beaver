@@ -117,7 +117,6 @@ defmodule Beaver.MLIR.Context do
     after
       MLIR.Trait.release_context(ctx)
       MLIR.ExternalInterface.release_context(ctx)
-
       if ctx.thread_pool_owner, do: MLIR.ThreadPool.checkin(ctx.thread_pool_owner, ctx.thread_pool_lease)
     end
   end
@@ -125,7 +124,6 @@ defmodule Beaver.MLIR.Context do
   @doc "Creates an `MLIR.Context` with `opts`, runs `fun.(ctx)`, and always destroys the context afterward."
   @spec with_context((t() -> result)) :: result when result: var
   def with_context(fun) when is_function(fun, 1), do: with_context([], fun)
-
   @spec with_context([context_option()], (t() -> result)) :: result when result: var
   def with_context(opts, fun) when is_list(opts) and is_function(fun, 1),
     do: Native.with_resource(create(opts), &destroy/1, fun)
@@ -168,7 +166,6 @@ defmodule Beaver.MLIR.Context do
     MLIR.Type,
     MLIR.Value
   ]
-
   @doc "Returns whether two handles refer to the same MLIR context."
   @spec same?(t(), t()) :: boolean()
   def same?(%__MODULE__{} = left, %__MODULE__{} = right), do: MLIR.equal?(left, right)
@@ -204,7 +201,6 @@ defmodule Beaver.MLIR.Context do
       do: raise(ArgumentError, ":threading and :thread_safe must be booleans")
 
     if threading and not thread_safe, do: raise(ArgumentError, "threading: true requires thread_safe: true")
-
     {threading, thread_safe}
   end
 

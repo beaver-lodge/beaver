@@ -18,7 +18,6 @@ defmodule Beaver.MLIR.TransformOpInterface do
   Use `payload_ops/2`, `payload_values/2`, and `params/2` to inspect mappings,
   and `rewriter_base/1` to use the normal rewriter API.
   """
-
   alias Beaver.MLIR
 
   @type result_mapping() ::
@@ -27,19 +26,16 @@ defmodule Beaver.MLIR.TransformOpInterface do
               {:ops, [Operation.t()]} | {:values, [Value.t()]} | {:params, [Attribute.t()]}
           }
           | keyword()
-
   @type apply_result() ::
           :ok
           | {:ok, result_mapping() | nil}
           | :silenceable_failure
           | :definite_failure
           | {:error, :silenceable | :definite}
-
   @callback apply(Operation.t(), MLIR.TransformRewriter.t(), MLIR.TransformResults.t(), MLIR.TransformState.t()) ::
               apply_result()
   @callback allows_repeated_handle_operands?(Operation.t()) :: boolean()
   @optional_callbacks allows_repeated_handle_operands?: 1
-
   @doc "Attaches a callback-backed transform operation interface model."
   @spec attach(MLIR.Context.t(), String.t(), module() | keyword() | map(), keyword()) ::
           MLIR.ExternalInterface.Attachment.t()
@@ -79,7 +75,6 @@ defmodule Beaver.MLIR.TransformOpInterface do
   end
 
   def callbacks!(other), do: raise(ArgumentError, "invalid transform interface implementation: #{inspect(other)}")
-
   @doc "Returns payload operations mapped to a transform handle."
   @spec payload_ops(MLIR.TransformState.t(), Value.t()) :: [Operation.t()]
   def payload_ops(%MLIR.TransformState{} = state, %Value{} = handle),
@@ -98,7 +93,6 @@ defmodule Beaver.MLIR.TransformOpInterface do
   @doc "Casts a borrowed transform rewriter to the normal rewriter base."
   @spec rewriter_base(MLIR.TransformRewriter.t()) :: MLIR.RewriterBase.t()
   def rewriter_base(%MLIR.TransformRewriter{} = rewriter), do: CAPI.mlirTransformRewriterAsBase(rewriter)
-
   @doc false
   def set_results(%MLIR.TransformResults{} = results, %Operation{} = op, mappings) do
     mappings |> Enum.each(fn {result, mapping} -> set_result(results, result_value(op, result), mapping) end)
@@ -106,9 +100,7 @@ defmodule Beaver.MLIR.TransformOpInterface do
   end
 
   defp result_value(op, index) when is_integer(index) and index >= 0, do: Operation.result(op, index)
-
   defp result_value(_operation, %Value{} = value), do: value
-
   defp result_value(_operation, other), do: raise(ArgumentError, "invalid transform result key: #{inspect(other)}")
 
   defp set_result(results, result, {:ops, operations}) when is_list(operations),

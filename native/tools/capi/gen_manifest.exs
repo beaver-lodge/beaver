@@ -1,6 +1,5 @@
 defmodule Beaver.CAPI.ManifestGenerator do
   @moduledoc false
-
   @policy_markers [
     {"BeaverCapiPolicyDiagnostics__", "diagnostics"},
     {"BeaverCapiPolicyDirtyCPUAndIO__", "dirty_cpu_io"},
@@ -10,7 +9,6 @@ defmodule Beaver.CAPI.ManifestGenerator do
     {"BeaverCapiPolicyManualRuntime__", "manual_runtime"},
     {"BeaverCapiPolicyExclude__", "exclude"}
   ]
-
   @bridge_defaults %{
     "runtime" => "native_collector",
     "scheduler" => "normal",
@@ -56,7 +54,6 @@ defmodule Beaver.CAPI.ManifestGenerator do
                       {source, policy}
                     end
                   )
-
   @runtime_specs [
     {"mlirDynamicOpTraitCreate", "dynamic_trait_attach",
      ~w(context operation_name type_id verify_callback verify_regions_callback timeout_ms)},
@@ -92,7 +89,6 @@ defmodule Beaver.CAPI.ManifestGenerator do
                           @runtime_specs,
                           fn {source, name, params} -> {source, %{name: "beaver_raw_" <> name, params: params}} end
                         )
-
   def run(argv) do
     {opts, _, _} =
       OptionParser.parse(argv, strict: [declaration: :string, callback_bridge: :string, ast: :string])
@@ -105,9 +101,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
       |> decode_json!()
 
     policy = policy_from_ast(ast)
-
     functions = ast |> collect_functions() |> Enum.filter(&candidate?/1) |> Enum.sort_by(& &1.name)
-
     write_json!(Keyword.fetch!(opts, :declaration), declaration_manifest(functions, policy))
     write_json!(Keyword.fetch!(opts, :callback_bridge), callback_bridge_manifest(functions, policy))
   end
@@ -129,7 +123,6 @@ defmodule Beaver.CAPI.ManifestGenerator do
     do: [name | collect_enum_constants(Map.get(node, "inner", []))]
 
   defp collect_enum_constants(%{} = node), do: collect_enum_constants(Map.get(node, "inner", []))
-
   defp collect_enum_constants(_node), do: []
 
   defp decode_policy_marker(marker) do
@@ -325,9 +318,7 @@ defmodule Beaver.CAPI.ManifestGenerator do
 
   defp collect_functions(%{} = node), do: collect_functions(Map.get(node, "inner", []))
   defp collect_functions(_node), do: []
-
   defp ctype(nil), do: nil
-
   defp ctype(%{} = type), do: type |> then(&(Map.get(&1, "desugaredQualType") || Map.get(&1, "qualType"))) |> ctype()
 
   defp ctype(type) when is_binary(type) do
@@ -420,7 +411,6 @@ defmodule Beaver.CAPI.ManifestGenerator do
   end
 
   defp normalize_doc(text), do: text |> String.replace(~r/[ \t]+/, " ") |> String.trim()
-
   defp decode_json!(json), do: JSON.decode!(json)
 
   defp write_json!(path, data) do

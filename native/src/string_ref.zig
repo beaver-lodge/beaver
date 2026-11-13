@@ -34,7 +34,6 @@ pub fn PrinterNIF(comptime ResourceKind: type, comptime print_fn: anytype) type 
         }
     };
 }
-
 // collect multiple MLIR StringRef and join them as a single erlang binary
 pub const Printer = struct {
     pub const ResourceKind = kinda.ResourceKind(@This(), "Elixir.Beaver.Printer");
@@ -77,7 +76,6 @@ pub const Printer = struct {
 fn string_ref_to_binary(env: beam.env, s: mlir_capi.StringRef.T) beam.term {
     return beam.make_slice(env, s.data[0..s.length]);
 }
-
 // collect multiple MLIR StringRef as a list of erlang binary
 pub const StringRefCollector = struct {
     const Container = std.array_list.Managed(beam.term);
@@ -100,7 +98,6 @@ pub const StringRefCollector = struct {
 fn beaver_raw_string_ref_to_binary(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     return string_ref_to_binary(env, try mlir_capi.StringRef.resource.fetch(env, args[0]));
 }
-
 // memory layout {StringRef, real_binary, null}
 fn beaver_raw_get_string_ref(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const Error = error{ ResAllocFailure, NotBinary };

@@ -129,7 +129,6 @@ pub const TransformOptions = MLIRKind("TransformOptions");
 pub const LLVMThreadPool = MLIRKind2("MlirLlvmThreadPool", "LLVMThreadPool");
 pub const OperationState = MLIRKind2("MlirOperationState", "Operation.State");
 pub const allKinds = .{ Pass, LogicalResult, StringRef, Context, Location, ISize, Attribute, OpaquePtr, ShapedTypeComponentsCallback, TypeID, TypesCallback, Bool, Operation, IntegerSet, AffineExpr, StringCallback, DialectHandle, CInt, AffineMap, SparseTensorLevelType, F64, Type, I32, I64, CUInt, DialectRegistry, DiagnosticHandlerID, DiagnosticHandler, DiagnosticHandlerDeleteUserData, Diagnostic, DiagnosticSeverity, F32, U64, U32, U16, I16, U8, I8, USize, UnmanagedDenseResourceElementsAttrGetDeleteCallback, OpaqueArray, StringArray, NamedAttribute, PassManager, RewritePattern, RewritePatternSet, RewritePatternCallbacks, ConversionTarget, ConversionPattern, ConversionPatternRewriter, TypeConverter, ConversionConfig, Region, Module, ExecutionEngine, GenericCallback, ExternalPassConstruct, ExternalPassRun, Identifier, OperationState, SymbolTable, Value, Block, Dialect, ExternalPass, ExternalPassCallbacks, OpPassManager, AffineMapCompressUnusedSymbolsPopulateResult, SymbolTableWalkSymbolTablesCallback, OpOperand, AsmState, OperationWalkCallback, WalkOrder, BytecodeWriterConfig, OpPrintingFlags, LLVMRawFdOStream, LLVMThreadPool, TypeIDAllocator, DynamicOpTrait, DynamicOpTraitCallbacks, DynamicTypeDefinition, DynamicAttrDefinition, MemoryEffectInstancesList, TransformResults, TransformRewriter, TransformState, TransformOpInterfaceCallbacks, PatternDescriptorOpInterfaceCallbacks, TransformOptions, RewriterBase, FrozenRewritePatternSet, PDLPatternModule, GreedyRewriteDriverConfig, string_ref.Printer.ResourceKind, LinalgContractionDimensions, LinalgConvolutionDimensions, PDLValue, PDLResultList, PDLRewriteFunction, PatternRewriter, ConditionallySpeculatableOpInterfaceCallbacks, DominanceInfo, IRMapping, MemoryEffect, MemoryEffectInstance, OpOperandReplaceFilterCallback, PostDominanceInfo, RewriterBaseInsertPoint, SideEffectResource, TypeConverter1ToNConversionCallback, TypeConverter1ToNTargetMaterializationCallback, TypeConverterConversionResults, TypeConverterSourceMaterializationCallback, TypeConverterTargetMaterializationCallback };
-
 /// Kinds that share ERTS resource types with another kind. The alias target
 /// opens the slot; the alias kind only copies the handle so terms made through
 /// either name fetch the same native data.
@@ -140,7 +139,6 @@ const kindAliases = .{
     .{ DiagnosticHandlerID, U64 },
     .{ SparseTensorLevelType, U64 },
 };
-
 /// Every resource slot opened by this module, in a stable name order, plus
 /// the shared internal kinds and the callback reply token. The core partition
 /// publishes these handles by name for the leaf partitions; each partition

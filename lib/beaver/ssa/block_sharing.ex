@@ -4,7 +4,6 @@ defmodule Beaver.SSA.BlockSharing do
   Entry blocks and escaping definitions are excluded. Complete normalized structures determine equality,
   preserving opaque metadata and instruction order; literals remain in the original predecessors.
   """
-
   def run(function, schema, opts) do
     fields = schema.schema()
     blocks = Map.fetch!(function, fields.function[:blocks])
@@ -29,7 +28,6 @@ defmodule Beaver.SSA.BlockSharing do
 
     initial = {:array.from_list(blocks), length(blocks), function[fields.function[:values]]}
     {blocks, _, values} = Enum.reduce(groups, initial, &rewrite_group(&1, &2, schema, opts))
-
     function |> Map.put(fields.function[:blocks], :array.to_list(blocks)) |> Map.put(fields.function[:values], values)
   end
 

@@ -1,5 +1,4 @@
 #include "mlir-c/Beaver/LLVMIR.h"
-
 #include "llvm-c/Core.h"
 #include "llvm-c/Error.h"
 #include "llvm-c/IRReader.h"
@@ -13,12 +12,10 @@
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
-
 #include <chrono>
 #include <cstring>
 #include <mutex>
 #include <string>
-
 namespace {
 using Clock = std::chrono::steady_clock;
 uint64_t nowNs() {

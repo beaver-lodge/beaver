@@ -7,10 +7,8 @@ defmodule Beaver.MLIR.Transform do
   modules, nested operations, text or bytecode. Transform handles never escape execution; expensive checks (enabled
   by default) diagnose use-after-consume errors.
   """
-
   alias __MODULE__.{Schedule, Prepared}
   alias Beaver.MLIR
-
   use Beaver.ComposerGenerator, prefix: "mlirCreateTransforms"
   use Beaver.ComposerGenerator, prefix: "mlirCreateLinalg"
   use Beaver.ComposerGenerator, prefix: "mlirCreateGPU"
@@ -20,10 +18,8 @@ defmodule Beaver.MLIR.Transform do
     A pipeline repeated until its IR fingerprint converges. This declaration owns no native resources;
     `Beaver.Composer` materializes it in the target context.
     """
-
     @enforce_keys [:name, :pipeline, :max_iterations, :on_convergence_failure]
     defstruct [:name, :pipeline, :max_iterations, :on_convergence_failure]
-
     @type failure_action :: :warn | :error | :silent
     @type t :: %__MODULE__{
             name: String.t(),
@@ -55,7 +51,6 @@ defmodule Beaver.MLIR.Transform do
 
   defp validate_fixed_point_options!(opts) do
     unless Keyword.keyword?(opts), do: raise(ArgumentError, "fixed-point options must be a keyword list")
-
     supported = [:name, :pipeline, :max_iterations, :on_convergence_failure]
 
     case Keyword.keys(opts) -- supported do
@@ -84,23 +79,18 @@ defmodule Beaver.MLIR.Transform do
 
   defmodule Result do
     @moduledoc "The result of successfully applying a named transform sequence."
-
     @enforce_keys [:payload, :sequence, :diagnostics]
     defstruct [:payload, :sequence, :diagnostics]
-
     @type t() :: %__MODULE__{payload: MLIR.Module.t() | Operation.t(), sequence: String.t(), diagnostics: [term()]}
   end
 
   defmodule Error do
     @moduledoc "A structured Transform dialect parsing, resolution, or execution failure."
-
     defexception [:kind, :reason, diagnostics: [], sequence: nil]
 
     @type kind() ::
             :invalid_schedule | :silenceable_failure | :definite_failure | :evaluation_failure | :constraint_failure
-
     @type t() :: %__MODULE__{kind: kind(), reason: term(), diagnostics: [term()], sequence: String.t() | nil}
-
     @impl true
     def message(%__MODULE__{} = error) do
       prefix =
@@ -114,20 +104,17 @@ defmodule Beaver.MLIR.Transform do
 
       prefix = if error.sequence, do: prefix <> " (#{error.sequence})", else: prefix
       details = if is_nil(error.reason), do: prefix, else: prefix <> ": " <> inspect(error.reason)
-
       if error.diagnostics == [], do: details, else: MLIR.Diagnostic.format(error.diagnostics, details)
     end
   end
 
   @type schedule_input() ::
           Prepared.t() | MLIR.Module.t() | Operation.t() | binary() | {:text, binary()} | {:bytecode, binary()}
-
   @type execution_option() ::
           {:sequence, String.t()}
           | {:expensive_checks, boolean()}
           | {:enforce_single_top_level_transform_op, boolean()}
           | {:analysis_session, MLIR.AnalysisSession.t()}
-
   @doc """
   Applies a named sequence (default `__transform_main`) to an operation or module. Expensive handle checks and
   single-top-level-transform enforcement both default to `true` and can be configured independently.
@@ -199,7 +186,6 @@ defmodule Beaver.MLIR.Transform do
 
   @doc "Alias for `apply_named_sequence/3`."
   def execute(payload, schedule, opts \\ []), do: apply_named_sequence(payload, schedule, opts)
-
   @doc "Alias for `apply_named_sequence!/3`."
   def execute!(payload, schedule, opts \\ []), do: apply_named_sequence!(payload, schedule, opts)
 
@@ -259,7 +245,6 @@ defmodule Beaver.MLIR.Transform do
 
   defp validate_execution_options(opts) do
     unless Keyword.keyword?(opts), do: raise(ArgumentError, "transform execution options must be a keyword list")
-
     supported = [:sequence, :expensive_checks, :enforce_single_top_level_transform_op, :analysis_session]
     unsupported = Keyword.keys(opts) -- supported
     if unsupported != [], do: raise(ArgumentError, "unsupported transform execution options: #{inspect(unsupported)}")

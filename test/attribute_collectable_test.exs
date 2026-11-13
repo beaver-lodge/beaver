@@ -29,9 +29,7 @@ defmodule AttributeCollectableTest do
   test "dictionaries", %{ctx: ctx} do
     empty = Attribute.dictionary([], ctx: ctx)
     integer = Attribute.integer(Type.i32(ctx: ctx), 1)
-
     created = Enum.into([{"key", 1}], empty, fn {k, _} -> NamedAttribute.get(k, integer, ctx: ctx) end)
-
     assert Enum.count(created) == 1
     assert MLIR.equal?(integer, created["key"])
   end

@@ -13,7 +13,6 @@ defmodule Beaver.Build.Plan do
 
   @doc "Returns the dependency graph without executable callbacks."
   def describe(%__MODULE__{stages: stages}), do: Enum.map(stages, &Map.take(&1, [:name, :dependencies]))
-
   @doc "Runs a plan and publishes a selected stage's JSON report with total and per-stage milliseconds."
   def report!(plan, path, stage \\ :publish) do
     start = System.monotonic_time(:nanosecond)

@@ -3,7 +3,6 @@ defmodule Beaver.MLIR.CABI do
   alias Beaver.MLIR
   alias MLIR.IRBatch.{Builder, Expressions}
   import Expressions
-
   @doc "Normalizes a parameter to `{direction, type, options}`; aggregate inputs are passed by address."
   def parameter!(:in), do: {:in, nil, []}
   def parameter!({:in, type}), do: {:in, type, []}
@@ -15,7 +14,6 @@ defmodule Beaver.MLIR.CABI do
     do: {:out, type, Keyword.put_new(opts, :zero_init, true)}
 
   def parameter!(other), do: raise(ArgumentError, "invalid :c_abi_call parameter spec: #{inspect(other)}")
-
   @doc "Returns textual value-level input and result types, with the C return value preceding output parameters."
   def value_signature(params, return_type \\ nil) do
     params = Enum.map(params, &parameter!/1)
@@ -30,7 +28,6 @@ defmodule Beaver.MLIR.CABI do
   Output slots are zero-initialized unless their parameter specifies `zero_init: false`.
   """
   def wrapper_source(name, callee, params, opts \\ []), do: source([wrapper_spec(name, callee, params, opts)]) <> "\n"
-
   @doc "Builds a context-independent wrapper specification for inclusion in a larger IRBatch module."
   def wrapper_spec(name, callee, params, opts \\ []) do
     for symbol <- [name, callee], do: MLIR.Template.check_symbol!(symbol)

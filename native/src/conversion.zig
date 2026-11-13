@@ -136,7 +136,6 @@ const LegalityState = struct {
         );
     }
 };
-
 // Targets and converters share the same serialized lifetime. Pattern-owned
 // references keep converters alive; explicit close still rejects active users.
 fn Registration(comptime Kind: type, comptime Callback: type, comptime name: []const u8, comptime tag: []const u8) type {

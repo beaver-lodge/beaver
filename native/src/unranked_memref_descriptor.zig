@@ -6,10 +6,8 @@ const kinda = @import("kinda");
 const memref = @import("memref.zig");
 const e = kinda.erl_nif;
 const beam = kinda.beam;
-
 // Dispatch over supported ranks, including scalar memrefs.
 const supported_ranks = .{ 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10 };
-
 // Simple Unranked MemRef descriptor
 pub const UnrankedMemRefDescriptor = extern struct {
     rank: i64,
@@ -23,14 +21,12 @@ pub const UnrankedMemRefDescriptor = extern struct {
         return self;
     }
 };
-
 // NIF: Create empty unranked memref
 pub fn unranked_memref_descriptor_empty(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const rank: i64 = try beam.get(i64, env, args[0]);
     const d = try UnrankedMemRefDescriptor.init(rank);
     return UnrankedMemRefDescriptor.resource.make(env, d);
 }
-
 // NIF: Get rank
 pub fn unranked_memref_descriptor_get_rank(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const d = try UnrankedMemRefDescriptor.resource.fetch(env, args[0]);
@@ -77,7 +73,6 @@ fn Deallocator(free: anytype) type {
 }
 pub const unranked_memref_descriptor_deallocate_with_c = Deallocator(std.c.free).nif;
 pub const unranked_memref_descriptor_deallocate_with_enif = Deallocator(e.enif_free).nif;
-
 // Export the NIFs
 pub const nifs = .{
     prelude.beaverRawNIF(@This(), "unranked_memref_descriptor_empty", 1),
@@ -88,7 +83,6 @@ pub const nifs = .{
     prelude.beaverRawNIF(@This(), "unranked_memref_descriptor_deallocate_with_c", 1),
     prelude.beaverRawNIF(@This(), "unranked_memref_descriptor_deallocate_with_enif", 1),
 } ++ UnrankedMemRefDescriptor.kind.nifs;
-
 // Resource type registration
 pub fn open_all(env: beam.env) void {
     UnrankedMemRefDescriptor.kind.open_all(env);

@@ -7,7 +7,6 @@
 #include "mlir/Dialect/Utils/ReshapeOpsUtils.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "mlir/IR/ExtensibleDialect.h"
-
 using namespace mlir;
 MLIR_CAPI_EXPORTED MlirAttribute beaverIRDLVariadicityArrayAttrGet(MlirContext context, intptr_t size,
                                                                    const int32_t *values) {

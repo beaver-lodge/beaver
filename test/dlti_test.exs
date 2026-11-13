@@ -1,10 +1,7 @@
 defmodule DLTITest do
   use Beaver.Case, async: true
-
   alias Beaver.MLIR.Dialect.DLTI
-
   @moduletag :smoke
-
   test "builds and attaches a semantic data layout", %{ctx: ctx} do
     module =
       module_ir ctx do

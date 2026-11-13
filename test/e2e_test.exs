@@ -1,7 +1,6 @@
 defmodule E2ETest do
   use Beaver.Case, async: true
   @moduletag :smoke
-
   describe "e2e compilation and JIT invocation" do
     import MLIR.{Transform, Conversion}
 

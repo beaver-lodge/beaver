@@ -73,14 +73,12 @@ defmodule Beaver.MLIR.Template.Library do
     do: Beaver.Build.ArtifactCache.fetch_revision(__MODULE__, key, revision, fn -> new(source.()) end)
 
   def with_module(%__MODULE__{} = library, ctx, fun), do: Module.with_module(ctx, library.bytecode, fun)
-
   @doc "Imports selected roots and their dependencies; optional `:select` filters explicit or referenced roots."
   def import!(library, target, opts \\ []) do
     {select, opts} = Keyword.pop(opts, :select)
     symbols = Keyword.get(opts, :symbols, :referenced)
     symbols = if symbols == :referenced, do: SymbolTable.referenced_symbols(target), else: symbols
     symbols = if select, do: Enum.filter(symbols, select), else: symbols
-
     opts = Keyword.put(opts, :symbols, symbols)
 
     if symbols == [],

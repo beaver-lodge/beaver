@@ -4,9 +4,7 @@ defmodule Beaver.Dummy do
   alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Dialect.{Func, Arith, CF}
   require Func
-
   @external_resource Path.expand("../../guides/blocks.md", __DIR__)
-
   defp put_func(ctx, block) do
     mlir ctx: ctx, ip: block do
       Func.func some_func(

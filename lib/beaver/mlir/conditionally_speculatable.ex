@@ -7,13 +7,9 @@ defmodule Beaver.MLIR.ConditionallySpeculatable do
   A dedicated attachment process owns the callback mailbox. Queries execute on the MLIR context worker pool, so no
   BEAM scheduler blocks while native MLIR waits for the callback result. The process is released with the context.
   """
-
   alias Beaver.MLIR
-
   @type speculatability :: :not_speculatable | :speculatable | :recursively_speculatable
-
   @callback speculatability(Operation.t()) :: speculatability()
-
   @spec attach(
           MLIR.Context.t(),
           String.t(),
@@ -35,9 +31,7 @@ defmodule Beaver.MLIR.ConditionallySpeculatable do
   end
 
   def callback!(callback) when is_function(callback, 1), do: callback
-
   def callback!(other), do: raise(ArgumentError, "invalid ConditionallySpeculatable implementation: #{inspect(other)}")
-
   @spec query(Operation.t(), keyword()) :: speculatability()
   def query(%Operation{} = op, opts \\ []) do
     Beaver.Execution.run(MLIR.context(op), :speculatability, {op.ref},

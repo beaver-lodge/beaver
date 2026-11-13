@@ -15,7 +15,6 @@
 #include "llvm/Support/VirtualFileSystem.h"
 #include "llvm/TableGen/Parser.h"
 #include <map>
-
 using namespace mlir;
 namespace parser {
 using llvm::json::Array;
@@ -109,24 +108,20 @@ LogicalResult parseTdInclude(StringRef filename, llvm::SourceMgr &parserSrcMgr,
   llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> includeBuffer =
       parserSrcMgr.OpenIncludeFile(filename.str(), includedFile);
   if (!includeBuffer) return emitError({}, "could not open file '" + filename + "'");
-
   // Setup the source manager for parsing the tablegen file.
   llvm::SourceMgr tdSrcMgr;
   tdSrcMgr.AddNewSourceBuffer(std::move(*includeBuffer), SMLoc());
   tdSrcMgr.setIncludeDirs(parserSrcMgr.getIncludeDirs());
   tdSrcMgr.setVirtualFileSystem(llvm::vfs::getRealFileSystem());
-
   // Set the diagnostic handler for the tablegen source manager.
   tdSrcMgr.setDiagHandler( [](const llvm::SMDiagnostic &diag, void *rawHandlerContext) {
         const std::string *filenamePtr = static_cast<const std::string *>(rawHandlerContext);
         llvm::errs() << llvm::formatv("error while processing include file `{0}`: {1}\n",
                                       filenamePtr ? *filenamePtr : "<unknown>", diag.getMessage());
       }, &filename);
-
   // Parse the tablegen file.
   llvm::RecordKeeper tdRecords;
   if (llvm::TableGenParseFile(tdSrcMgr, tdRecords)) return failure();
-
   // Process the parsed records.
   processTdIncludeRecords(tdRecords);
   return success();
@@ -159,7 +154,6 @@ int main(int argc, char **argv) {
   std::string outputStr;
   llvm::raw_string_ostream outputStrOS(outputStr);
   parser::printODSContext(outputStrOS);
-
   // Write the output.
   bool shouldWriteOutput = true;
   if (writeIfChanged) {
@@ -168,7 +162,6 @@ int main(int argc, char **argv) {
     if (auto existingOrErr = llvm::MemoryBuffer::getFile(outputFilename, /*IsText=*/true))
       if (std::move(existingOrErr.get())->getBuffer() == outputStr) shouldWriteOutput = false;
   }
-
   // Populate the output file if necessary.
   if (shouldWriteOutput) {
     std::string errorMessage;

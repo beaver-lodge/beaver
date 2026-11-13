@@ -3,7 +3,6 @@ const kinda = @import("kinda");
 const e = kinda.erl_nif;
 const mlir_capi = @import("mlir_capi.zig");
 extern fn core_resource_type_by_name(name: [*:0]const u8) ?*anyopaque;
-
 /// Copies the resource type handles opened by the core partition into this
 /// partition's kind instances. Resource type handles cannot be reopened during
 /// the same NIF load, so every partition that fetches or creates kind terms

@@ -1,7 +1,6 @@
 defmodule StringRefTest do
   use Beaver.Case, async: true
   @moduletag :smoke
-
   test "StringRef" do
     for _ <- 1..1_000 do
       s = "hello world"

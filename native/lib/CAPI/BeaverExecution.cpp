@@ -29,7 +29,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
 using Clock = std::chrono::steady_clock;
 static uint64_t now() {
   return std::chrono::duration_cast<std::chrono::nanoseconds>(Clock::now().time_since_epoch()).count();
@@ -53,7 +52,6 @@ static thread_local Execution current;
 Execution currentExecution() { return current; }
 ExecutionScope::ExecutionScope(Execution execution) : previous(std::move(current)) { current = std::move(execution); }
 ExecutionScope::~ExecutionScope() { current = std::move(previous); }
-
 // Admission limits runnable root jobs. A root waiting for BEAM lends its slot to queued work, so nested callbacks
 // cannot exhaust a fixed-size pool. MLIR children inherit the ticket and lend the root's slot at most once.
 class Executor {
@@ -270,7 +268,6 @@ void beaverExecutionCallbackEnd(uint64_t start) {
     if (state->ticket) state->ticket->executor->endCallback(*state->ticket);
   }
 }
-
 // LLVM-owned or caller-provided pools cannot inherit our thread-local state. Recover the owning execution from the
 // callback's operation in those pools. Nested submissions on the same IR temporarily shadow the suspended caller.
 namespace {
@@ -317,7 +314,6 @@ namespace {
 std::mutex instrumentationsMutex;
 std::unordered_set<mlir::PassManager *> instrumentedManagers;
 thread_local std::vector<std::unique_ptr<beaver::ExecutionScope>> passScopes;
-
 // An adaptor can clone nested passes on an LLVM-owned worker before invoking an external pass's run callback. Propagate
 // ownership across the whole native pass, including lifecycle callbacks and verification, without retaining run state
 // in a reusable pass manager.
@@ -359,7 +355,6 @@ MlirModule beaverModuleCreateParseTracked(MlirContext context, MlirStringRef sou
   if (mlir::failed(valid)) return {nullptr};
   return {module.release().getOperation()};
 }
-
 // A callback-free declarative rewrite and dialect conversion engine.
 struct BeaverConstraint {
   int kind;

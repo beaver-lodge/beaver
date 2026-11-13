@@ -2,13 +2,10 @@ defmodule ExternalInterfaceSlang do
   @moduledoc false
   alias Beaver.MLIR.{Attribute, CAPI, MemoryEffects, Operation, PatternRewriter, RewriterBase, RewritePatternSet}
   alias Beaver.MLIR.{TransformOpInterface}
-
   use Beaver.Slang, name: "external_interface_test"
-
   def pure_effects(_operation), do: :pure
   def write_effects(_operation), do: [:write]
   def speculatability(_operation), do: :speculatable
-
   def transform_apply(_operation, _rewriter, _results, _state), do: :ok
   def repeated_handles?(_operation), do: true
   def fail_apply(_operation, _rewriter, _results, _state), do: raise("expected callback failure")
@@ -29,9 +26,7 @@ defmodule ExternalInterfaceSlang do
 
   def forward_apply(operation, _rewriter, _results, state) do
     handle = CAPI.mlirOperationGetOperand(operation, 0)
-
     payload = state |> TransformOpInterface.payload_ops(handle) |> Enum.flat_map(&payload_functions/1)
-
     {:ok, %{0 => {:ops, payload}}}
   end
 
@@ -40,15 +35,12 @@ defmodule ExternalInterfaceSlang do
   def mark_apply(operation, rewriter, _results, state) do
     handle = CAPI.mlirOperationGetOperand(operation, 0)
     base = TransformOpInterface.rewriter_base(rewriter)
-
     state |> TransformOpInterface.payload_ops(handle) |> Enum.each(&mark(base, &1, "marked"))
-
     :ok
   end
 
   def populate_patterns(operation, patterns) do
     RewritePatternSet.add(patterns, "func.return", &__MODULE__.mark_return/4, ctx: Beaver.MLIR.context(operation))
-
     :ok
   end
 
@@ -81,7 +73,6 @@ defmodule ExternalInterfaceSlang do
     ]
 
   defop write(), interfaces: [memory_effects: &__MODULE__.write_effects/1]
-
   defop detached()
 
   defop transform(),

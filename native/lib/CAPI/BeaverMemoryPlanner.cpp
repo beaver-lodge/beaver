@@ -6,7 +6,6 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Pass/PassManager.h"
 #include "llvm/ADT/SmallPtrSet.h"
-
 using namespace mlir;
 namespace {
 // The upstream planner does not free allocated arenas or check argument size. Keep planning upstream; supply these

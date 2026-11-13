@@ -39,7 +39,6 @@ defmodule Beaver.MLIR.IRBatch.CFG do
   end
 
   defp expand({:step, _, [callback]}, builder), do: quote(do: unquote(builder) = unquote(callback).(unquote(builder)))
-
   defp expand({:=, _, _} = assignment, _), do: assignment
   defp expand(other, _), do: raise(ArgumentError, "unsupported CFG statement: #{Macro.to_string(other)}")
 

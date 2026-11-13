@@ -6,13 +6,10 @@ defmodule Beaver.MLIR.Template do
   `{:ident, id}`, `{:string, text}`, integers, booleans, `MLIR` entities, or `{:raw, fragment}`), rejecting unbound
   keys and unsafe identifier characters before MLIR parsing.
   """
-
   alias Beaver.MLIR
-
   @placeholder_regex ~r/\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/
   @bare_ident_regex ~r/\A[a-zA-Z_$][a-zA-Z0-9_$.$-]*\z/
   @ssa_ident_regex ~r/\A[a-zA-Z0-9_$][a-zA-Z0-9_$.$-]*\z/
-
   @doc "Validates and formats an MLIR flat symbol token (`@name`)."
   @spec check_symbol!(String.Chars.t()) :: String.t()
   def check_symbol!(name) do
@@ -36,11 +33,9 @@ defmodule Beaver.MLIR.Template do
   @doc "Validates and formats an MLIR SSA value identifier (`%name`)."
   @spec check_ssa!(String.Chars.t()) :: String.t()
   def check_ssa!(name), do: check_identifier!(name, "%", @ssa_ident_regex, "SSA identifier")
-
   @doc "Validates and formats an MLIR block label (`^name`)."
   @spec check_block!(String.Chars.t()) :: String.t()
   def check_block!(name), do: check_identifier!(name, "^", @ssa_ident_regex, "block label")
-
   @doc "Validates a bare MLIR identifier (without prefix)."
   @spec check_ident!(String.Chars.t()) :: String.t()
   def check_ident!(name), do: check_identifier!(name, "", @bare_ident_regex, "bare identifier")

@@ -1,6 +1,5 @@
 defmodule WasmPackagingTest do
   use Beaver.Case, async: true
-
   alias Beaver.Wasm
   alias MLIR.Dialect.{Func, Arith}
   alias MLIR.Type
@@ -28,7 +27,6 @@ defmodule WasmPackagingTest do
 
   test "parses the imports manifest (WASI imports without -nostdlib)", %{ctx: ctx} do
     binary = add_module(ctx) |> Wasm.package_binary!(entry: "add", nostdlib: false)
-
     assert Enum.any?(binary.imports, &(&1.module == "wasi_snapshot_preview1" and &1.kind == :func))
   end
 

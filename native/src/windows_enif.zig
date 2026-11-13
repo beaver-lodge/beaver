@@ -89,7 +89,6 @@ export fn enif_snprintf(buffer: [*c]u8, size: usize, format: [*c]const u8) c_int
 export fn enif_set_option(env: ?*e.ErlNifEnv, opt: e.ErlNifOption) c_int {
     return e.WinDynNifCallbacks.enif_set_option.?(env, opt);
 }
-
 // The MSVC emulator keeps 64-bit signedness distinct from c_long, so these
 // are real callbacks there. On LP64 ABIs they alias the long variants and
 // translate-c emits aliases instead, so the callbacks table has no fields.

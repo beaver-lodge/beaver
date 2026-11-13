@@ -3,7 +3,6 @@ defmodule BlockTest do
   alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Dialect.{Func, Arith, CF}
   @moduletag :smoke
-
   test "block usage after defining", %{ctx: ctx} do
     function_module ctx, some_func(function_type: Type.function([], [Type.i32()])) do
       block do

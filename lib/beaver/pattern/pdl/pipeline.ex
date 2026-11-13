@@ -9,7 +9,6 @@ defmodule Beaver.Pattern.PDL.Pipeline do
   alias Beaver.Pattern.PDL
   @dissolve ~w(inline sccp canonicalize cse symbol-dce)
   @cleanup ~w(sccp canonicalize cse symbol-dce)
-
   @doc "Defines a lowering facade over a rule supplier, runtime provider, template provider and policy."
   defmacro __using__(opts) do
     runtime = Keyword.fetch!(opts, :runtime)
@@ -91,10 +90,8 @@ defmodule Beaver.Pattern.PDL.Pipeline do
     %{layers: layers, runtime_namespace: ns} = declaration(rules, runtime, opts, policy)
     refs = SymbolTable.referenced_symbols(module)
     {selected, declarations} = selection!(module, refs, runtime, ns, layers, opts, policy)
-
     active? = active?(refs, layers, policy)
     {module, refs, changed?} = if active?, do: specialize(rules, templates, module, refs), else: {module, refs, false}
-
     imports = imports(refs, layers, selected, runtime, policy)
     if imports != [], do: templates.import_inline!(module, symbols: imports)
 
@@ -122,7 +119,6 @@ defmodule Beaver.Pattern.PDL.Pipeline do
 
     declarations = for f <- selected, do: {runtime.symbol(f, ns), runtime.function_type(f)}
     SymbolTable.check_declarations!(module, declarations)
-
     {selected, declarations}
   end
 

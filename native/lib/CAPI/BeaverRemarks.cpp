@@ -4,7 +4,6 @@
 #include "llvm/Support/JSON.h"
 #include "llvm/Support/Regex.h"
 #include "mlir-c/Remarks.h"
-
 using namespace mlir;
 namespace {
 struct Receiver {

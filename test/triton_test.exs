@@ -1,13 +1,9 @@
 defmodule TritonTest do
   use Beaver.Case, async: true
-
   @moduletag :triton
-
   @enabled System.get_env("BEAVER_TRITON_PREBUILT_DIR") != nil
-
   setup_all do
     if @enabled, do: Beaver.Triton.register_passes()
-
     :ok
   end
 
@@ -56,9 +52,7 @@ defmodule TritonTest do
       |> MLIR.Module.create!(ctx: ctx)
 
     lowered = Beaver.Triton.compile_to_llvm(module, target: "cuda:90")
-
     ptx = lowered |> Beaver.MLIR.Target.LLVMIR.translate!() |> Beaver.MLIR.Target.LLVMIR.compile_to_ptx!(cpu: "sm_90")
-
     assert ptx =~ ".visible .entry addptr"
     assert ptx =~ ".visible .entry increment"
     assert ptx =~ "ld.global"

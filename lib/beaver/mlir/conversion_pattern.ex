@@ -7,16 +7,11 @@ defmodule Beaver.MLIR.ConversionPattern do
   `add/5` creates a pattern and immediately transfers its ownership to the rewrite pattern set, so a standalone
   native pattern cannot be leaked.
   """
-
   use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Beaver.Native
-
   alias Beaver.MLIR
-
   @callback_envelope :beaver_conversion_pattern_callback
-
   @type callback() :: (MLIR.Operation.t(), [MLIR.Value.t()] | [[MLIR.Value.t()]], MLIR.ConversionPatternRewriter.t() ->
                          :ok | :no_match | {:error, term()})
-
   @spec add(RewritePatternSet.t(), String.Chars.t(), MLIR.TypeConverter.t(), callback(), keyword()) ::
           RewritePatternSet.t()
   def add(

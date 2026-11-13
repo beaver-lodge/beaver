@@ -12,11 +12,8 @@ defmodule Beaver.MLIR.Location do
   alias Beaver.Deferred
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
-
   use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Native
-
   @type source() :: t() | Operation.t() | Value.t() | Deferred.contextual(t() | Operation.t() | Value.t())
-
   @type file_opts() :: [
           name: String.t(),
           line: non_neg_integer(),
@@ -41,7 +38,6 @@ defmodule Beaver.MLIR.Location do
           end_column: non_neg_integer()
         }
   @type kind() :: :unknown | :file_range | :name | :call_site | :fused | :other
-
   @doc """
   Creates a file, line, and column location.
 
@@ -140,7 +136,6 @@ defmodule Beaver.MLIR.Location do
   def of(%__MODULE__{} = loc), do: loc
   def of(%Operation{} = op), do: Operation.location(op)
   def of(%Value{} = value), do: Value.location(value)
-
   def of(%Deferred{} = deferred), do: Deferred.defer(fn ctx -> deferred |> Deferred.resolve(ctx) |> of() end)
 
   def of(other) do
@@ -224,12 +219,10 @@ defmodule Beaver.MLIR.Location do
   @doc "Returns the location as its underlying location attribute."
   @spec attribute(t()) :: Attribute.t()
   def attribute(%__MODULE__{} = loc), do: CAPI.mlirLocationGetAttribute(loc)
-
   @doc "Converts a location attribute back to a location."
   @spec from_attribute(Attribute.t()) :: t()
   def from_attribute(%Attribute{} = attribute) do
     unless Attribute.location?(attribute), do: raise(ArgumentError, "expected an MLIR location attribute")
-
     CAPI.mlirLocationFromAttribute(attribute)
   end
 
@@ -263,6 +256,5 @@ defmodule Beaver.MLIR.Location do
   end
 
   defp context_of(%module{} = entity) when module in [__MODULE__, Operation, Value, Attribute], do: MLIR.context(entity)
-
   defp context_of(_other), do: nil
 end

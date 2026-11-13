@@ -8,7 +8,6 @@ defmodule Beaver.MLIR.SymbolTable do
   import CAPI
   @type visibility :: :public | :private | :nested
   @visibilities [:public, :private, :nested]
-
   @doc "Creates a symbol table for an operation with the SymbolTable trait."
   defdelegate create(operation), to: CAPI, as: :mlirSymbolTableCreate
   @doc "Destroys the given symbol table."

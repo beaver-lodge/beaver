@@ -29,7 +29,6 @@ defmodule UpstreamCapabilitiesTest do
     end
 
     assert_raise ArgumentError, ~r/requires thread_safe/, fn -> Context.create(thread_safe: false) end
-
     assert_raise ArgumentError, ~r/thread_pool/, fn -> Context.create(threading: false, thread_pool: :application) end
   end
 
@@ -66,7 +65,6 @@ defmodule UpstreamCapabilitiesTest do
         |> MLIR.Module.create!(ctx: ctx)
 
       ir = module |> Composer.append("convert-index-to-llvm#{options}") |> Composer.run!() |> MLIR.to_string()
-
       assert ir =~ "index to i64"
       refute ir =~ "index to i32"
     end
@@ -91,16 +89,12 @@ defmodule UpstreamCapabilitiesTest do
     load = operation_named(module, "ptr.load")
     properties = load |> Operation.properties() |> MLIR.to_string()
     assert properties =~ "alignment = [8]"
-
     updated = properties |> String.replace("alignment = [8]", "alignment = [16]") |> Attribute.get(ctx: ctx)
-
     assert {:ok, ^load} = Operation.put_properties(load, updated)
     assert Operation.properties(load) |> MLIR.to_string() =~ "alignment = [16]"
     assert Operation.discardable_attribute(load, "test.note") |> MLIR.to_string() == ~s("keep")
     before = MLIR.to_string(load, generic: true)
-
     invalid = properties |> String.replace("alignment = [8]", ~s(alignment = "invalid")) |> Attribute.get(ctx: ctx)
-
     assert {:error, [_ | _]} = Operation.put_properties(load, invalid)
     assert MLIR.to_string(load, generic: true) == before
 
@@ -108,7 +102,6 @@ defmodule UpstreamCapabilitiesTest do
       roundtrip = MLIR.Module.create!(text, ctx: ctx) |> MLIR.verify!()
       restored = operation_named(roundtrip, "ptr.load")
       assert MLIR.equal?(Operation.properties(restored), Operation.properties(load))
-
       assert Operation.discardable_attribute(restored, "test.note") |> MLIR.to_string() == ~s("keep")
     end
   end
@@ -160,7 +153,6 @@ defmodule UpstreamCapabilitiesTest do
       |> MLIR.Module.create!(ctx: ctx)
 
     before = MLIR.to_string(module)
-
     assert module |> Bufferization.static_memory_plan() |> Composer.run!() |> MLIR.to_string() == before
   end
 

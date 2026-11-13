@@ -4,7 +4,6 @@ defmodule Beaver.MLIR.ConversionResultTest do
 
   defp with_module(ctx, source \\ ~s[module { "report.drop"() : () -> () "report.keep"() : () -> () }], fun) do
     MLIR.Context.allow_unregistered_dialects(ctx)
-
     Beaver.Native.with_resource(MLIR.Module.create!(source, ctx: ctx), &MLIR.Module.destroy/1, fun)
   end
 

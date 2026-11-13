@@ -1,6 +1,5 @@
 defmodule AnalysisAndRewriteUtilitiesTest do
   use Beaver.Case, async: true
-
   alias Beaver.MLIR.{Attribute, Block, DominanceInfo, IRMapping, IRRewriter, Location, OpOperand, Operation}
   alias Beaver.MLIR.{PostDominanceInfo, RewriterBase, Type, Value}
 

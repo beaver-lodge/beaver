@@ -6,9 +6,7 @@ defmodule Beaver.MLIR.Dialect.GPU do
   alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Block, Operation, StringRef}
   alias Beaver.MLIR.Dialect
-
   @moduledoc "This module defines functions for Ops in #{__MODULE__ |> Module.split() |> List.last()} dialect."
-
   use Beaver.MLIR.Dialect, dialect: "gpu", ops: Dialect.Registry.ops("gpu")
 
   @doc """
@@ -27,9 +25,7 @@ defmodule Beaver.MLIR.Dialect.GPU do
     :"gpu.container_module"
   """
   def container_module_attribute_name, do: CAPI.beaverGetContainerModuleAttrName() |> to_string() |> String.to_atom()
-
   @object_formats %{offload: 1, assembly: 2, binary: 3, fatbin: 4}
-
   @doc """
   Builds a `gpu.binary` module with an NVVM or ROCDL target attribute. `object` passes directly to the native
   builder without MLIR string escaping. Formats are `:offload`, `:assembly`, `:binary` and `:fatbin` (default).
@@ -88,7 +84,6 @@ defmodule Beaver.MLIR.Dialect.GPU do
 
     if Keyword.has_key?(opts, :arch) or Keyword.has_key?(opts, :wavesize) do
       arch = Keyword.get(opts, :arch, Keyword.get(opts, :chip, "gfx900"))
-
       Deferred.from_opts(opts, fn ctx -> target |> Deferred.resolve(ctx) |> configure_rocdl_target(arch, wavesize) end)
     else
       target
@@ -139,7 +134,6 @@ defmodule Beaver.MLIR.Dialect.GPU do
 
           try do
             objects = Enum.to_list(binary["objects"]) ++ Enum.to_list(next["objects"])
-
             Operation.put_attribute(binary, "objects", Attribute.array(objects, ctx: ctx))
           after
             Operation.destroy(next)

@@ -13,14 +13,11 @@ defmodule MutCompiler do
   # 3. use the var in acc
   defp fetch_var(%Acc{vars: vars}, {var_name, _line, nil}) do
     found = Map.get(vars, var_name)
-
     if is_nil(found), do: :not_found, else: {:ok, found}
   end
 
   defp put_var(%Acc{vars: vars} = acc, {var_name, _line, nil}, var), do: %Acc{acc | vars: Map.put(vars, var_name, var)}
-
   defp update_block(%Acc{block: _old} = acc, block), do: %Acc{acc | block: block}
-
   # 1. starts with "root", the return expression
   defp gen_mlir({:return, _line, [arg]}, %Acc{block: block, ctx: ctx} = acc) do
     # we expect it to be a MLIR Value
@@ -74,7 +71,6 @@ defmodule MutCompiler do
     Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, true_branch)
     Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, false_branch)
     Beaver.MLIR.CAPI.mlirRegionAppendOwnedBlock(region, bb_next)
-
     {arg, update_block(acc, bb_next)}
   end
 
@@ -100,12 +96,10 @@ defmodule MutCompiler do
   end
 
   defp gen_mlir(%MLIR.Value{} = mlir, acc), do: {mlir, acc}
-
   defp gen_mlir(ast, acc), do: {ast, acc}
 
   def gen_func(call, block) do
     {name, _args} = Macro.decompose_call(call)
-
     ctx = MLIR.Context.create()
 
     mlir ctx: ctx do
@@ -170,14 +164,11 @@ defmodule MutCompiler do
 
   def get_func(ir, func) do
     llvm_ir = lower(ir)
-
     jit = MLIR.ExecutionEngine.create!(llvm_ir)
 
     fn total_iters, factor, base_lr, step ->
       return = Beaver.Native.F32.make(0.9999)
-
       arguments = [total_iters, factor, base_lr, step] |> Enum.map(&Beaver.Native.F32.make/1)
-
       MLIR.ExecutionEngine.invoke!(jit, func, arguments, return) |> Beaver.Native.to_term()
     end
   end

@@ -3,7 +3,6 @@ defmodule ArithTest do
   alias Beaver.MLIR.Type
   alias Beaver.MLIR.Dialect.{Func, Arith}
   @moduletag :smoke
-
   test "int predicates", %{ctx: ctx} do
     mlir ctx: ctx do
       module do

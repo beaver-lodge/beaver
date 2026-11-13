@@ -74,7 +74,6 @@ MLIR_CAPI_EXPORTED void beaverOperationDestroyIterative(MlirOperation operation)
   for (Operation *current : operations) current->dropAllUses();
   for (Block *block : blocks)
     for (BlockArgument argument : block->getArguments()) argument.dropAllUses();
-
   // Pre-order collection guarantees that reverse order destroys every nested operation before its parent. Each native
   // destructor therefore sees only empty nested blocks and has bounded recursion depth.
   for (auto iterator = operations.rbegin(); iterator != operations.rend(); ++iterator) {
@@ -100,7 +99,6 @@ static llvm::SmallVector<NamedAttribute> collectInherentAttributes(Operation *op
 }
 static std::mutex transientScopeMutex;
 static std::unordered_set<MLIRContext *> transientScopeContexts;
-
 /// A reusable pool with a nominal MLIR parallelism limit and elastic workers. MLIR uses `getMaxConcurrency()` to bound
 /// ordinary parallel algorithms. The pool itself may grow past that number when active work synchronously waits for
 /// BEAM callbacks which start nested MLIR work on the same shared pool.

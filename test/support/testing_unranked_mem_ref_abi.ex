@@ -5,7 +5,6 @@ defmodule TestingUnrankedMemRefABI do
   alias MLIR.Type
   require Func
   use ENIFSupport
-
   @impl ENIFSupport
   def create(ctx) do
     elem_type = Type.i32(ctx: ctx)

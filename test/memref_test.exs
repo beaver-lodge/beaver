@@ -2,12 +2,9 @@ defmodule MemRefTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR.Dialect.MemRef
   @moduletag :smoke
-
   test "dynamic stride or offset" do
     assert Beaver.MLIR.ShapedType.dynamic_stride_or_offset?(Beaver.MLIR.ShapedType.dynamic_stride_or_offset())
-
     refute Beaver.MLIR.ShapedType.static_stride_or_offset?(Beaver.MLIR.ShapedType.dynamic_stride_or_offset())
-
     refute Beaver.MLIR.ShapedType.dynamic_stride_or_offset?(1)
     assert Beaver.MLIR.ShapedType.static_stride_or_offset?(1)
     assert Beaver.MLIR.ShapedType.dynamic_stride_or_offset?(:dynamic)
@@ -20,7 +17,6 @@ defmodule MemRefTest do
     end
 
     assert_raise ArgumentError, "only ranked memref has layout", fn -> MLIR.Type.index(ctx: ctx) |> MemRef.layout() end
-
     assert memref_type = ~t{memref<128xbf16>} |> Beaver.Deferred.resolve(ctx)
     assert MLIR.ShapedType.static_dim?(memref_type, 0)
     refute MLIR.ShapedType.dynamic_dim?(memref_type, 0)
@@ -58,9 +54,7 @@ defmodule MemRefTest do
 
   test "num of elements of a shaped type", %{ctx: ctx} do
     assert 6 = ~t{memref<2x3xf32>} |> Beaver.Deferred.resolve(ctx) |> MLIR.ShapedType.num_elements()
-
     assert 0 = ~t{memref<0x3xf32>} |> Beaver.Deferred.resolve(ctx) |> MLIR.ShapedType.num_elements()
-
     assert_raise ArgumentError, "not a shaped type", fn -> MLIR.ShapedType.num_elements(MLIR.Type.index(ctx: ctx)) end
 
     assert_raise ArgumentError, "cannot get element count of dynamic shaped type", fn ->
@@ -80,9 +74,7 @@ defmodule MemRefTest do
     assert memref_type_strided = ~t{memref<?xi8, strided<[1]>>} |> Beaver.Deferred.resolve(ctx)
     assert {[1], 0} = MemRef.strides_and_offset(memref_type_strided)
     refute MLIR.equal?(memref_type_strided, memref_type)
-
     assert memref_type_strided_offset = ~t{memref<?xi8, strided<[1], offset: 0>>} |> Beaver.Deferred.resolve(ctx)
-
     assert {[1], 0} = MemRef.strides_and_offset(memref_type_strided_offset)
     assert MLIR.equal?(memref_type_strided_offset, memref_type_strided)
     refute MLIR.equal?(memref_type_strided_offset, memref_type)

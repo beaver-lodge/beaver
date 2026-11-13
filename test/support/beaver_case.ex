@@ -1,6 +1,5 @@
 defmodule Beaver.Case do
   @moduledoc "Test case for beaver tests, with a MLIR context created and destroy automatically."
-
   use ExUnit.CaseTemplate
 
   using options do

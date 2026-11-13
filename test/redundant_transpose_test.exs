@@ -13,13 +13,9 @@ defmodule RedundantTransposeTest do
                         ) do
           block _bb_entry(arg0 >>> Type.unranked_tensor(Type.f32())) do
             t = TOSA.transpose(arg0, perms: TransposeHelper.perms_t_attr()) >>> TransposeHelper.tensor_t()
-
             t = TOSA.transpose(t, perms: TransposeHelper.perms_t_attr()) >>> TransposeHelper.tensor_t()
-
             t = TOSA.transpose(t, perms: TransposeHelper.perms_t_attr()) >>> TransposeHelper.tensor_t()
-
             t = TOSA.transpose(t, perms: TransposeHelper.perms_t_attr()) >>> TransposeHelper.tensor_t()
-
             Func.return(t) >>> []
           end
         end

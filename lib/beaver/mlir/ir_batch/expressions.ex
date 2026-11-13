@@ -37,7 +37,6 @@ defmodule Beaver.MLIR.IRBatch.Expressions do
       MLIR.Module.with_module(MLIR.IRBatch.build_module!(ctx, specs, verify: false), fn module ->
         calls = Beaver.Walker.find_ops(module, "func.call") |> Enum.chunk_every(256)
         calls = Enum.flat_map(calls, &MLIR.IRBatch.read(&1, attributes: [:callee]))
-
         signatures = Enum.map(calls, &signature/1)
         MLIR.SymbolTable.ensure_declarations!(module, declarations ++ signatures)
         MLIR.verify!(module)
@@ -113,12 +112,10 @@ defmodule Beaver.MLIR.IRBatch.Expressions do
   defp binary_results(op, x, y, _) when is_atom(op), do: [cmp(op, x, y)]
   defp binary_results("div_rem", x, y, _), do: [arith("divsi", x, y), arith("remsi", x, y)]
   defp binary_results(op, x, y, _), do: [arith(op, x, y)]
-
   @doc "A bounded UTF-8 decoder returning `{codepoint, bits_consumed, valid}`; checks length before each load."
   def utf8_decoder(name) do
     function(name, [byte: :i64, addr: :ptr, rem: :i64], [:i64, :i64, :i1], fn b ->
       b = B.end_block(b, {:cond_br, cmp(:ule, :byte, int(127)), {:ok, [:byte, int(8), int(1, :i1)]}, "m2"})
-
       widths = [{2, 194, 223, 31, 128}, {3, 224, 239, 15, 2048}, {4, 240, 244, 7, 65_536}]
       b = Enum.reduce(widths, b, &utf8_width/2)
 
@@ -145,7 +142,6 @@ defmodule Beaver.MLIR.IRBatch.Expressions do
       end)
 
     {cp, b} = B.emit(b, cp)
-
     allowed = utf8_allowed(width, cp)
 
     B.end_block(

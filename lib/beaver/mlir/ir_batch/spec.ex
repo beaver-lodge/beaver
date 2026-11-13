@@ -4,7 +4,6 @@ defmodule Beaver.MLIR.IRBatch.Spec do
   `use Spec, types: [...], calls: [{shortcut, symbol, arity, results}]` generates aliases and call expansion.
   Custom expansion callbacks handle literals or variable arity; symbolic names are never mapped as types.
   """
-
   @types Map.new(~w(i1 i8 i16 i32 i64 i128 index f16 bf16 f32 f64 none)a, &{&1, to_string(&1)})
          |> Map.put(:ptr, "!llvm.ptr")
   @doc "Builtin shorthand types shared by deferred changesets and batch specifications."
@@ -98,7 +97,6 @@ defmodule Beaver.MLIR.IRBatch.Spec do
     do: extra |> Map.new() |> Map.merge(%{kind: kind, name: name, inputs: inputs, results: results})
 
   def function(other), do: raise(ArgumentError, "invalid function specification: #{inspect(other)}")
-
   def block(%{} = spec), do: spec
   def block(spec) when is_list(spec), do: Map.new(spec)
   def block({name, body}), do: %{name: name, body: body}

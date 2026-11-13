@@ -1,9 +1,7 @@
 defmodule MlirTest do
   use Beaver.Case, async: true
   import Beaver.MLIR.CAPI
-
   @moduletag :smoke
-
   test "IRDL variadicity arrays preserve enum values and reject invalid input", %{ctx: ctx} do
     for {values, expected} <- [{[], []}, {[0, 1, 2], ~w(single optional variadic)}] do
       data = Beaver.Native.array(values, Beaver.Native.I32)
@@ -168,7 +166,6 @@ defmodule MlirTest do
   end
 
   defmacro some_constrain(_t), do: true
-
   defmacro has_one_use(_v), do: true
 
   def lower_to_llvm(ctx, module) do
@@ -176,9 +173,7 @@ defmodule MlirTest do
     mlirPassManagerAddOwnedPass(pm, mlirCreateConversionConvertFuncToLLVMPass())
     mlirPassManagerAddOwnedPass(pm, mlirCreateConversionArithToLLVMConversionPass())
     status = mlirPassManagerRunOnOp(pm, module)
-
     if not MLIR.LogicalResult.success?(status), do: raise("Unexpected failure running pass pipeline")
-
     mlirPassManagerDestroy(pm)
     module
   end

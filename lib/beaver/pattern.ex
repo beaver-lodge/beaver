@@ -6,7 +6,6 @@ defmodule Beaver.Pattern do
   use Beaver
   alias Beaver.MLIR.Dialect.PDL
   alias Beaver.MLIR.{Attribute, Type}
-
   @doc false
   def insert_pat(cb, ctx, block, name, opts) do
     mlir ctx: ctx, ip: block do
@@ -146,7 +145,6 @@ defmodule Beaver.Pattern do
       when is_list(attributes) do
     mlir ip: block, ctx: ctx do
       results = results |> Enum.map(&gen_pdl(block, changeset, &1))
-
       attribute_names = for {k, _} <- attributes, do: k |> Atom.to_string() |> MLIR.Attribute.string()
 
       attributes =

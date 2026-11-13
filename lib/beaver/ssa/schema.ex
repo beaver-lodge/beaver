@@ -4,7 +4,6 @@ defmodule Beaver.SSA.Schema do
   Exit variants generate traversal clauses; unknown exits have no values or edges. Opaque metadata and literals
   are preserved. Language policy, including effects, unwind and safepoints, remains with the caller.
   """
-
   defmacro __using__(opts) do
     quote bind_quoted: [opts: opts] do
       @graph_schema Map.new(opts)
@@ -71,13 +70,11 @@ defmodule Beaver.SSA.Schema do
   def values(node, paths), do: Enum.flat_map(paths, &read(node, &1))
   @doc false
   def map_values(node, paths, fun), do: Enum.reduce(paths, node, &update(&2, &1, fun))
-
   @doc false
   def read(value, []), do: [value]
   def read(values, [:each | rest]), do: Enum.flat_map(values, &read(&1, rest))
   def read(values, [index | rest]) when is_integer(index), do: read(Enum.fetch!(values, index), rest)
   def read(map, [key | rest]), do: read(Map.fetch!(map, key), rest)
-
   @doc false
   def update(value, [], fun), do: fun.(value)
   def update(values, [:each | rest], fun), do: Enum.map(values, &update(&1, rest, fun))

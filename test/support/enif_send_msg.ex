@@ -5,7 +5,6 @@ defmodule ENIFSendMsg do
   alias MLIR.Dialect.{Func, Ptr, MemRef}
   require Func
   use ENIFSupport
-
   @impl ENIFSupport
   def create(ctx) do
     mlir ctx: ctx do
@@ -24,7 +23,6 @@ defmodule ENIFSendMsg do
 
               pid = Ptr.to_ptr(pid_ptr) >>> ptr_t
               null_env = Ptr.constant(value: Ptr.null(type: ptr_t)) >>> ptr_t
-
               ENIF.get_local_pid(env, pid_term, pid) >>> :infer
               ENIF.send(env, pid, null_env, msg) >>> :infer
               Func.return(msg) >>> []

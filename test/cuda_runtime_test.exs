@@ -2,9 +2,7 @@ defmodule CUDARuntimeTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR.CUDA
   alias Beaver.MLIR.Dialect.GPU
-
   @moduletag :cuda_runtime
-
   test "launch a kernel from gpu.binary with the Zig runner", %{ctx: ctx} do
     if CUDA.available?() do
       module = File.read!("test/gpu-to-cubin.mlir") |> MLIR.Module.create!(ctx: ctx)

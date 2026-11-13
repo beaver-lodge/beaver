@@ -7,7 +7,6 @@
 #include "mlir/IR/Action.h"
 #include "mlir/IR/Unit.h"
 #include "llvm/Support/JSON.h"
-
 #include <algorithm>
 #include <chrono>
 #include <functional>
@@ -15,15 +14,12 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
-
 using namespace mlir;
-
 //===----------------------------------------------------------------------===//
 // Action Tracing
 //===----------------------------------------------------------------------===//
 using namespace mlir::tracing;
 namespace {
-
 /// Render a location as a compact string without full IR text.
 static std::string printLocation(Location loc) {
   std::string buffer;
@@ -32,7 +28,6 @@ static std::string printLocation(Location loc) {
   os.flush();
   return buffer;
 }
-
 /// Serialize one IR unit into a compact JSON object without materializing full IR text.
 static llvm::json::Object serializeIRUnit(const IRUnit &unit) {
   if (isa<Operation *>(unit)) {
@@ -48,7 +43,6 @@ static llvm::json::Object serializeIRUnit(const IRUnit &unit) {
   }
   return llvm::json::Object{{"kind", "unknown"}};
 }
-
 /// Serialize the IR units associated with an action.
 static llvm::json::Array serializeIRUnits(ArrayRef<IRUnit> units) {
   llvm::json::Array result;

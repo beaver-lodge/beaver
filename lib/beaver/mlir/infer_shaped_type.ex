@@ -6,7 +6,6 @@ defmodule Beaver.MLIR.InferShapedType do
   optional encoding attributes remain owned by the request context. Operation properties use the same scoped,
   attribute-based conversion as `Beaver.MLIR.InferType`.
   """
-
   alias Beaver.MLIR
   alias Beaver.MLIR.Inference.Request
 
@@ -23,7 +22,6 @@ defmodule Beaver.MLIR.InferShapedType do
   end
 
   @type request :: map() | keyword()
-
   @spec return_components(request()) :: {:ok, [Component.t()]} | {:error, MLIR.diagnostics()}
   def return_components(request),
     do: Request.infer(request, :beaver_raw_infer_return_type_components, &normalize_component/1)
@@ -36,6 +34,5 @@ defmodule Beaver.MLIR.InferShapedType do
     }
 
   defp normalize_shape(:unranked), do: :unranked
-
   defp normalize_shape(shape), do: Enum.map(shape, &MLIR.ShapedType.cast_dynamic_magic_number(&1, :size))
 end

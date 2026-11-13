@@ -2,10 +2,8 @@ defmodule DebugTest do
   @moduledoc "Test the debug configurations of MLIR."
   use Beaver.Case, async: true
   doctest Beaver.MLIR.Debug
-
   alias MLIR.Dialect.{Arith, Func}
   alias MLIR.Type
-
   import Beaver.MLIR.Conversion
   import Beaver.MLIR.Transform
 

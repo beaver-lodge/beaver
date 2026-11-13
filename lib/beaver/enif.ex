@@ -32,14 +32,11 @@ defmodule Beaver.ENIF do
   - `make_new_binary_as_memref/1`: #{@make_new_binary_as_memref}
   - `inspect_binary_as_memref/1`: #{@inspect_binary_as_memref}
   """
-
   use Beaver
   require Beaver.MLIR.Dialect.Func
   alias Beaver.MLIR.Dialect.Func
   alias MLIR.{Type, Attribute}
-
   defp wrap_mlir_t({ref, _size}) when is_reference(ref), do: %MLIR.Type{ref: ref}
-
   @doc "Insert external functions of ENIF into given MLIR block"
   def declare_external_functions(ctx, block) do
     mlir ctx: ctx, ip: block do
@@ -126,7 +123,6 @@ defmodule Beaver.ENIF do
   end
 
   defdelegate functions(), to: CAPI, as: :beaver_raw_enif_functions
-
   @doc "Register ENIF functions in the given `Beaver.MLIR.ExecutionEngine`."
   def register_symbols(%MLIR.ExecutionEngine{ref: ref} = e) do
     CAPI.beaver_raw_jit_register_enif(ref)

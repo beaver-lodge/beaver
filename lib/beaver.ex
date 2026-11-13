@@ -32,7 +32,6 @@ defmodule Beaver do
   deferred values keep contextual construction distinct from ordinary
   callbacks. For more information, see `Beaver.Deferred`.
   """
-
   defmacro __using__(_) do
     quote do
       import Beaver
@@ -105,7 +104,6 @@ defmodule Beaver do
       alias Beaver.MLIR.{Type, Attribute, ODS}
       import Beaver.Sigils
       import Beaver.MLIR.Dialect.Builtin
-
       unquote(ctx_ast)
       unquote(ip_ast)
       unquote(dsl_block_ast)
@@ -131,13 +129,11 @@ defmodule Beaver do
 
   @doc false
   def not_found(%Macro.Env{} = env), do: {:not_found, [file: env.file, line: env.line]}
-
   @doc false
   def append_block_to_region(%Region{} = region, %Block{} = block),
     do: MLIR.CAPI.mlirRegionAppendOwnedBlock(region, block)
 
   def append_block_to_region(_region, _block), do: :ok
-
   @doc false
   def assert_no_dangling_blocks([]), do: :ok
 
@@ -213,7 +209,6 @@ defmodule Beaver do
 
       Beaver.append_block_to_region(Beaver.Env.region(), Beaver.Env.block())
       unquote(dangling_block_removal(b_name, __CALLER__))
-
       unquote_splicing(arguments_variables(args))
       unquote(body)
       # op uses are across blocks, so op within a block can't use an API like Region.under
@@ -257,7 +252,6 @@ defmodule Beaver do
       end)
 
       Kernel.var!(beaver_internal_env_regions) = Kernel.var!(beaver_internal_env_regions) ++ [region]
-
       Kernel.var!(beaver_internal_env_regions)
     end
   end

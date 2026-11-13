@@ -1,10 +1,7 @@
 defmodule Beaver.MLIR.InferTypeCollectorsTest do
   use Beaver.Case, async: true
-
   alias Beaver.MLIR.{InferShapedType, InferType}
-
   @moduletag :smoke
-
   defp with_args(ctx, types, fun) do
     Beaver.Native.with_resource(MLIR.Block.create(), &MLIR.Block.destroy/1, fn block ->
       fun.(MLIR.Block.add_args!(block, types, ctx: ctx))

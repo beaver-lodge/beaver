@@ -44,11 +44,9 @@ end
 defmodule Beaver.SluiceDrivenRefactoringTest do
   use Beaver.Case, async: true
   alias Beaver.{Changeset, Composer, MLIR, Native}
-
   alias Beaver.MLIR.{Block, Context, ExecutionEngine, Identifier, IRBatch}
   alias Beaver.MLIR.{Location, Module, Operation, Region, RewriterBase}
   alias Beaver.MLIR.{Safepoint, SymbolTable, Template, Type, TypeConverter}
-
   alias Beaver.MLIR.ConversionPatternRewriter, as: CPR
   alias Beaver.MLIR.Conversion.Plan
   alias Beaver.MLIR.Target.LLVMIR
@@ -617,11 +615,9 @@ defmodule Beaver.SluiceDrivenRefactoringTest do
       digest = Dialect.__slang_schema_digest__()
       assert String.starts_with?(digest, "sha256:") and byte_size(digest) == 71
       assert Slang.schema_digest(Dialect) == digest
-
       qualified = &Enum.map(&1, fn name -> "sluice_slang." <> name end)
       assert Dialect.__slang_operations__() == qualified.(~w(box_int add widen const_int halt))
       assert Dialect.__slang_operations__(:core) == qualified.(~w(add widen const_int))
-
       assert Dialect.__slang_operations__(:frontend) == ["sluice_slang.box_int"]
       assert Dialect.__slang_operations__(:exit) == ["sluice_slang.halt"]
       assert Dialect.__slang_layer__("box_int") == :frontend
@@ -674,7 +670,6 @@ defmodule Beaver.SluiceDrivenRefactoringTest do
         end
 
         [poll] = Safepoint.resolve_ops(leaf_fn, "@beam.poll")
-
         [explicit, matched] = Safepoint.resolve_ops(leaf_fn, [poll, fn op -> Operation.name(op) == "arith.addi" end])
         assert MLIR.equal?(explicit, poll) and Operation.name(matched) == "arith.addi"
         analysis = Safepoint.analyze(leaf_fn, ["@beam.poll"], exclude_entry_args: true)

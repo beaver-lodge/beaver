@@ -8,15 +8,12 @@ defmodule Beaver.Triton do
   Requires a Beaver native build linked against the Triton core prebuilt (build with `BEAVER_TRITON_PREBUILT_DIR`
   set); otherwise the calls raise.
   """
-
   alias Beaver.MLIR
   alias Beaver.MLIR.Triton.PipelinePlan
 
   defmodule PipelineError do
     @moduledoc "Typed failure raised while executing an auditable Triton pipeline plan."
-
     defexception [:domain, :pass_id, :pass_index, :message]
-
     @impl Exception
     def exception(opts) do
       domain = Keyword.fetch!(opts, :domain)
@@ -97,7 +94,6 @@ defmodule Beaver.Triton do
   @doc "Returns the pure lowering plan selected by the same options as `compile_to_llvm/2`."
   @spec pipeline_plan(keyword()) :: PipelinePlan.t()
   def pipeline_plan(opts \\ []), do: PipelinePlan.build(opts)
-
   @doc "Finds the first different pass or prefix digest in two traces."
   @spec first_trace_divergence([map()], [map()]) :: :none | {:ok, map()}
   def first_trace_divergence(left, right) when is_list(left) and is_list(right) do
@@ -111,7 +107,6 @@ defmodule Beaver.Triton do
   defp trace_divergence_at(left, right, index) do
     left_record = Enum.at(left, index)
     right_record = Enum.at(right, index)
-
     if left_record == right_record, do: false, else: {:ok, %{index: index, left: left_record, right: right_record}}
   end
 

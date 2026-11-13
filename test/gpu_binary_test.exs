@@ -31,9 +31,7 @@ defmodule GPUBinaryTest do
       @tag packaging: {backend, chip, second, kind}
       test "#{backend} packages #{kind} GPU modules", %{ctx: ctx, packaging: spec} do
         {backend, chip, second, kind} = spec
-
         source = if kind == :standalone, do: standalone("foo", ""), else: File.read!("test/gpu-to-cubin.mlir")
-
         chips = if kind == :multiple, do: [chip, second], else: [chip]
         targets = Enum.map(chips, &target(backend, &1, ctx))
         targets = if kind == :multiple, do: targets, else: hd(targets)
@@ -103,7 +101,6 @@ defmodule GPUBinaryTest do
   @tag :rocdl_target_info
   test "ROCDL compiles each target using its own wave size", %{ctx: ctx} do
     targets = for wave <- [32, 64], do: GPU.rocdl_target_attribute(arch: "gfx1100", wavesize: wave, ctx: ctx)
-
     [wave32, wave64] = package_objects(ctx, targets)
     assert wave32 =~ ".amdhsa_wavefront_size32 1"
     assert wave64 =~ ".amdhsa_wavefront_size32 0"
@@ -112,7 +109,6 @@ defmodule GPUBinaryTest do
   @tag :rocdl_target_info
   test "ROCDL target-ID modifiers reach LLVM module flags and assembly", %{ctx: ctx} do
     [assembly] = package_objects(ctx, GPU.rocdl_target_attribute(arch: "gfx942:xnack+:sramecc-", ctx: ctx))
-
     assert assembly =~ "gfx942:sramecc-:xnack+"
   end
 

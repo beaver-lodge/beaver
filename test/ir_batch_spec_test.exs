@@ -66,7 +66,6 @@ defmodule Beaver.IRBatchSpecTest do
           do:
             CFG.cfg Builder.new() do
               block(:same, do: terminate({:return, []}))
-
               block(:same, do: terminate({:return, []}))
             end
         ),

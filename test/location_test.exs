@@ -1,6 +1,5 @@
 defmodule Beaver.MLIR.LocationTest do
   use Beaver.Case, async: true
-
   alias Beaver.Changeset
   alias Beaver.MLIR.Location
 

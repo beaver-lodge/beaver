@@ -48,7 +48,6 @@ fn register_jit_symbol(jit: mlir_capi.ExecutionEngine.T, comptime name: []const 
     const name_str_ref = c.MlirStringRef{ .data = name.ptr, .length = name.len };
     c.mlirExecutionEngineRegisterSymbol(jit, name_str_ref, @ptrCast(@constCast(&f)));
 }
-
 // Route JIT allocation calls through the same C runtime std.c.free uses for
 // deallocation. On Windows the JIT would otherwise resolve `malloc` from
 // whichever loaded module exports it first, which may back a different heap

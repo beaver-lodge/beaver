@@ -7,12 +7,9 @@ defmodule Beaver.MLIR.Bytecode do
   `:desired_emit_version` asks MLIR to emit a specific bytecode version. MLIR returns an error instead of silently
   emitting another version when the requested version cannot be honored.
   """
-
   alias Beaver.MLIR
   import MLIR.CAPI
-
   @type write_option :: {:desired_emit_version, integer() | nil}
-
   @spec write(MLIR.Module.t() | Operation.t(), [write_option()]) ::
           {:ok, binary()} | {:error, :unsupported_bytecode_version}
   def write(module_or_operation, opts \\ []) do
@@ -51,7 +48,6 @@ defmodule Beaver.MLIR.Bytecode do
 
   @spec read(binary(), keyword()) :: {:ok, MLIR.Module.t()} | {:error, MLIR.diagnostics()}
   defdelegate read(bytecode, opts \\ []), to: MLIR.Module, as: :create
-
   @spec read!(binary(), keyword()) :: MLIR.Module.t()
   defdelegate read!(bytecode, opts \\ []), to: MLIR.Module, as: :create!
 end

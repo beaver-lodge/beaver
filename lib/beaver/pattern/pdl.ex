@@ -31,7 +31,6 @@ defmodule Beaver.Pattern.PDL do
   def applicable?(rules, symbols), do: Enum.any?(rules.entries, &matches?(&1, symbols))
   defp matches?({:all, _}, _), do: true
   defp matches?({roots, _}, symbols), do: Enum.any?(roots, &(&1 in symbols))
-
   @doc "Applies relevant rules, including rules enabled by symbols introduced during rewriting. Returns module."
   def apply!(%__MODULE__{} = rules, module), do: rewrite(rules.entries, module, MapSet.new())
 

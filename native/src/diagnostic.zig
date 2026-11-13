@@ -7,7 +7,6 @@ const beam = kinda.beam;
 const result = @import("kinda").result;
 const mutex = @import("mutex.zig");
 const PrinterNIF = @import("string_ref.zig").PrinterNIF;
-
 // collect diagnostic as {severity, loc, message, nested_notes}
 const DiagnosticAggregator = struct {
     const Container = std.array_list.Managed(beam.term);

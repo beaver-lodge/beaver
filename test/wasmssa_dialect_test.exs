@@ -1,8 +1,6 @@
 defmodule WasmSSADialectTest do
   use Beaver.Case, async: true
-
   require Beaver.MLIR.Dialect.WasmSSA
-
   alias Beaver.MLIR.Dialect.WasmSSA
   alias MLIR.Type
 

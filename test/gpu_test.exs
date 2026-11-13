@@ -2,9 +2,7 @@ defmodule GPUTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR.Dialect.GPU
   doctest Beaver.MLIR.Dialect.GPU
-
   @moduletag :cuda
-
   test "fatbin", %{ctx: ctx} do
     # trap sigchld when running ptxas to generate fatbin
     System.trap_signal(:sigchld, fn -> :ok end)

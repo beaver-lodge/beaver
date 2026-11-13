@@ -48,7 +48,6 @@ pub fn open_all(env: beam.env) void {
 pub fn register_all_passes() void {
     pass.register_all_passes();
 }
-
 /// Returns the resource type handle opened by this partition for a resource
 /// name. The leaf partitions call this during `nif_load` instead of reopening
 /// the same resource types: opening the same name twice within one load

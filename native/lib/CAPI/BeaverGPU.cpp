@@ -4,7 +4,6 @@
 #include "mlir/Dialect/GPU/IR/GPUDialect.h"
 #include "mlir/Dialect/LLVMIR/ROCDLDialect.h"
 #include "mlir/Dialect/LLVMIR/ROCDLTargetInfo.h"
-
 using namespace mlir;
 MLIR_CAPI_EXPORTED MlirStringRef beaverROCDLTargetAttrGetArch(MlirAttribute attribute) {
   auto target = cast<ROCDL::ROCDLTargetAttr>(unwrap(attribute));

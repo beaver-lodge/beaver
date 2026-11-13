@@ -1,11 +1,8 @@
 defmodule Beaver.MLIR.CAPI.ManifestTest do
   use ExUnit.Case, async: true
-
   alias Beaver.MLIR.CAPI
   alias Kinda.CodeGen.{DeclarationManifest, DeclarationSurfaces}
-
   @moduletag :smoke
-
   setup_all do
     manifest = CAPI.CodeGen.declaration_manifest()
     declarations = DeclarationManifest.nif_decls(manifest)
@@ -32,9 +29,7 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
     assert MapSet.size(expected) > 2_000
     assert MapSet.subset?(expected, raw)
     assert MapSet.subset?(expected, public)
-
     resolved_declarations = CAPI.__kinda_declaration_surfaces__() |> DeclarationSurfaces.nif_decls()
-
     generated = Enum.find(resolved_declarations, &(&1.wrapper_name == :mlirContextCreate))
     assert generated.nif_name != generated.wrapper_name
     refute MapSet.member?(raw, {generated.nif_name, arity(generated)})
@@ -44,9 +39,7 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
   test "declaration manifest preserves signature and wrapper policy metadata", data do
     %{declarations: declarations, by_name: by_name, signatures: signatures} = data
     assert Enum.any?(declarations, &(is_binary(&1.doc) and &1.doc != ""))
-
     assert Enum.any?(declarations, &Enum.any?(&1.param_ctypes || [], fn ctype -> ctype != nil end))
-
     assert Enum.any?(declarations, &(&1.return_ctype != nil))
 
     for dirty <- [:dirty_cpu, :dirty_io] do
@@ -61,7 +54,6 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
     assert function_exported?(CAPI.Raw, :beaver_raw_peak_rss, 0)
     assert function_exported?(CAPI.Raw, :beaver_raw_process_cpu_time, 0)
     assert function_exported?(CAPI.Raw, :beaver_raw_type_converter_add_conversion_map, 4)
-
     signature_entry = Map.fetch!(signatures, "mlirLLVMDICompileUnitAttrGetWithSourceLanguageDialect")
 
     assert Enum.at(get_in(signature_entry, ["function", "param_ctypes"]), 5) == %{
@@ -96,25 +88,18 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
 
   test "callback-heavy declarations remain in the callback bridge manifest", data do
     priv_dir = :beaver |> :code.priv_dir() |> List.to_string()
-
     callback_manifest = priv_dir |> Path.join("capi_callback_bridge.json") |> File.read!() |> JSON.decode!()
-
     assert callback_manifest["version"] == 2
     callback_entries = Map.fetch!(callback_manifest, "entries")
     assert callback_entries != []
-
     assert Enum.any?(callback_entries, &(get_in(&1, ["function", "name"]) == "mlirValueReplaceUsesWithIf"))
-
     entries_by_runtime = Enum.group_by(callback_entries, &get_in(&1, ["callback_bridge", "runtime"]))
-
     runtime_entries = Map.fetch!(entries_by_runtime, "dispatcher")
     collector_entries = Map.fetch!(entries_by_runtime, "native_collector")
     manual_runtime_entries = Map.fetch!(entries_by_runtime, "manual_async_callback")
     pending_entries = Map.get(entries_by_runtime, "pending", [])
     assert [remark_entry] = Map.fetch!(entries_by_runtime, "native_notification")
-
     assert get_in(remark_entry, ["callback_bridge", "wrapper_name"]) == "beaver_raw_optimization_remarks_attach"
-
     assert get_in(remark_entry, ["callback_bridge", "lifetime"]) == "remark_engine"
     assert get_in(remark_entry, ["callback_bridge", "owner"]) == "context"
 
@@ -157,7 +142,6 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
     }
 
     by_name = Map.new(collector_entries, &{get_in(&1, ["function", "name"]), &1["callback_bridge"]})
-
     assert Enum.sort(Map.keys(by_name)) == Enum.sort(Enum.map(collectors, &elem(&1, 0)))
     assert map_size(by_name) == length(collector_entries)
 
@@ -170,7 +154,6 @@ defmodule Beaver.MLIR.CAPI.ManifestTest do
       assert bridge["owner"] == "caller"
       assert bridge["destructor"] == destructor
       assert bridge["lifetime"] == lifetime
-
       if policy == :handles, do: assert(bridge["facets"] == ["native_collector", "context_owned_handles"])
     end
 

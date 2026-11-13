@@ -11,17 +11,12 @@ defmodule LivebookTest do
   Notebooks that rely on interactive cells (e.g. `Kino`) or network access are
   not suitable for this test.
   """
-
   use ExUnit.Case, async: true
-
   import ExUnit.CaptureIO
-
   @guides Path.expand("../guides", __DIR__)
-
   # Notebooks that print output should assert their expected output here so
   # regressions in the printed IR or the demonstrated pipeline are caught.
   @expected_output %{"your-first-beaver-compiler.livemd" => ["func.func @some_func", "llvm.func @some_func"]}
-
   test "every guide notebook executes top-to-bottom" do
     livemds = Path.wildcard(Path.join(@guides, "*.livemd"))
     assert livemds != [], "no .livemd guides found under #{@guides}"
@@ -30,11 +25,8 @@ defmodule LivebookTest do
       name = Path.basename(livemd)
       cells = extract_cells(livemd)
       assert cells != [], "#{name}: no Elixir code cells found"
-
       code = cells |> Enum.reject(&mix_install?/1) |> Enum.join("\n\n")
-
       assert code != "", "#{name}: only Mix.install cells, nothing to execute"
-
       output = capture_io(fn -> Code.eval_string(code) end)
 
       for expected <- Map.get(@expected_output, name, []) do

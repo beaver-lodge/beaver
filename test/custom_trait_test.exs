@@ -1,8 +1,6 @@
 defmodule CustomTraitTest do
   use Beaver.Case, async: true
-
   @moduletag :smoke
-
   test "Slang attaches custom traits with a shared identity", %{ctx: ctx} do
     assert CustomTraitSlang |> then(&Beaver.Slang.load(ctx, &1)) |> MLIR.LogicalResult.success?()
     assert MLIR.Trait.has?(ctx, "custom_trait_test.valid", CustomTraitSlang.Validity)
@@ -84,7 +82,6 @@ defmodule CustomTraitTest do
   end
 
   defp module_with(ctx, operation_name), do: ctx |> operation_module(operation_name) |> MLIR.verify!()
-
   defp verify_with(ctx, operation_name), do: ctx |> operation_module(operation_name) |> MLIR.verify()
 
   defp operation_module(ctx, operation_name) do

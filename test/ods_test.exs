@@ -2,11 +2,9 @@ defmodule ODSDumpTest do
   alias Beaver.MLIR.Type
   alias Beaver.MLIR.Dialect.{Func, Arith, MemRef}
   use Beaver.Case, async: true
-
   @moduletag :smoke
   test "lookup" do
     assert {:ok, %{"attributes" => _, "operands" => _, "results" => _}} = MLIR.ODS.Dump.lookup("affine.for")
-
     assert {:error, "failed to find ODS dump of \"???\""} = MLIR.ODS.Dump.lookup("???")
   end
 
@@ -19,9 +17,7 @@ defmodule ODSDumpTest do
     assert {:ok, scf_for} = MLIR.ODS.Dump.lookup("scf.for")
     assert scf_for["regions"] == [%{"name" => "region", "variadic" => false}]
     assert is_list(scf_for["builders"])
-
     first_builder_parameters = scf_for["builders"] |> List.first() |> Map.fetch!("parameters")
-
     assert Enum.any?(first_builder_parameters, &(&1["name"] == "lowerBound" and &1["cpp_type"] == "Value"))
   end
 
@@ -101,7 +97,6 @@ defmodule ODSDumpTest do
           a = Arith.constant(value: Attribute.integer(Type.i32(), 1)) >>> :infer
           b = Arith.constant(value: Attribute.integer(Type.i32(), 2)) >>> :infer
           UndefinedDialect.foo(lhs: a, rhs: b, operand_segment_sizes: :infer) >>> Type.i32()
-
           UndefinedDialect.foo(rhs: [a], lhs: [a, b], operand_segment_sizes: :infer) >>> Type.i32()
         end
 
@@ -136,7 +131,6 @@ defmodule ODSDumpTest do
                       ) do
         block _() do
           MemRef.alloca(operand_segment_sizes: :infer) >>> Type.memref!([1], Type.i32(ctx: ctx))
-
           Func.return() >>> []
         end
       end

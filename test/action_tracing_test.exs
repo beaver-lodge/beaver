@@ -10,7 +10,6 @@ defmodule ActionTracingTest do
   end
 
   @moduletag :smoke
-
   test "pass execution emits structured action events", %{ctx: ctx} do
     session = MLIR.ActionTracing.attach(ctx, drain_interval_ms: nil)
 

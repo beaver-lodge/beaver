@@ -12,14 +12,12 @@ defmodule Beaver.SSA do
   """
   alias Beaver.Changeset
   alias Beaver.MLIR
-
   @type argument_entry() :: Changeset.argument()
   @type op_result_entry() :: {:op, Changeset.result() | [Changeset.result()]}
   @type result_entry() :: Changeset.result() | :infer | op_result_entry()
   @type filler_fun() :: (-> term())
   @type insertion_point() :: MLIR.Block.t() | MLIR.PatternRewriter.t() | MLIR.RewriterBase.t() | nil
   @type evaluator() :: (t() -> term())
-
   @type t() :: %__MODULE__{
           op: String.t() | nil,
           arguments: [argument_entry()],
@@ -45,15 +43,10 @@ defmodule Beaver.SSA do
     do: %__MODULE__{ssa | results: results ++ additional_results}
 
   def put_results(%__MODULE__{} = ssa, :infer = infer), do: %__MODULE__{ssa | results: infer}
-
   def put_location(%__MODULE__{} = ssa, %Location{} = loc), do: %__MODULE__{ssa | loc: loc}
-
   def put_filler(%__MODULE__{} = ssa, filler) when is_function(filler, 0), do: %__MODULE__{ssa | filler: filler}
-
   def put_ip(%__MODULE__{} = ssa, ip), do: %__MODULE__{ssa | ip: ip}
-
   def put_ctx(%__MODULE__{} = ssa, %MLIR.Context{} = ctx), do: %__MODULE__{ssa | ctx: ctx}
-
   # construct ssa by injecting MLIR context and block in the environment
   defp construct_ssa({:>>>, _line, [{_call, line, args}, results]}, evaluator) do
     quote do
@@ -112,10 +105,7 @@ defmodule Beaver.SSA do
   end
 
   defp do_transform(ast, _evaluator), do: ast
-
   def prewalk(ast, evaluator) when is_function(evaluator, 1), do: Macro.prewalk(ast, &do_transform(&1, evaluator))
-
   def postwalk(ast, evaluator) when is_function(evaluator, 1), do: Macro.postwalk(ast, &do_transform(&1, evaluator))
-
   def eval(%__MODULE__{evaluator: evaluator} = ssa), do: evaluator.(ssa)
 end

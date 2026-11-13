@@ -15,15 +15,12 @@ for {module, prefix, verb} <- [
     alias Beaver.MLIR.CAPI
     use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Native
     @type analyzed_ir() :: MLIR.Module.t() | Operation.t()
-
     @doc "Creates an owned analysis for an operation or module."
     @spec create(analyzed_ir()) :: t()
     def create(ir), do: ir |> Operation.from_module() |> CAPI.unquote(:"mlir#{prefix}Create")()
-
     @doc "Destroys an owned analysis."
     @spec destroy(t()) :: :ok
     defdelegate destroy(info), to: CAPI, as: :"mlir#{prefix}Destroy"
-
     @doc "Runs `fun` with a new analysis and always destroys it."
     @spec with_info(analyzed_ir(), (t() -> result)) :: result when result: var
     def with_info(ir, fun) when is_function(fun, 1), do: Native.with_resource(create(ir), &destroy/1, fun)

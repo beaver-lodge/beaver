@@ -3,13 +3,9 @@ alias Beaver.Native
 
 defmodule Beaver.MLIR.ConversionPatternRewriter do
   @moduledoc "A conversion-aware pattern rewriter, including 1:N operation replacement."
-
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
-
   alias Beaver.MLIR
-
   defdelegate as_pattern_rewriter(rewriter), to: CAPI, as: :mlirConversionPatternRewriterAsPatternRewriter
-
   def as_base(%__MODULE__{} = rewriter), do: rewriter |> as_pattern_rewriter() |> MLIR.PatternRewriter.as_base()
 
   defdelegate convert_region_types(rewriter, region, converter),

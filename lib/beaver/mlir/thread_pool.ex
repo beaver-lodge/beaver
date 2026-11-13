@@ -14,16 +14,11 @@ defmodule Beaver.MLIR.ThreadPool do
   An explicit owner can be selected with `thread_pool: owner`, or a raw `Beaver.MLIR.LLVMThreadPool` can be supplied
   when its lifetime is managed by the caller.
   """
-
   use GenServer
-
   alias Beaver.MLIR
-
   @default_name __MODULE__
-
   @spec default_name() :: module()
   def default_name, do: @default_name
-
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts \\ []) do
     {name, opts} = Keyword.pop(opts, :name)
@@ -41,7 +36,6 @@ defmodule Beaver.MLIR.ThreadPool do
 
   @spec checkout(GenServer.server()) :: {MLIR.LLVMThreadPool.t(), reference()} | {:error, :closing}
   def checkout(owner \\ @default_name), do: GenServer.call(owner, :checkout)
-
   @spec checkin(GenServer.server(), reference()) :: :ok
   def checkin(owner \\ @default_name, lease) do
     GenServer.cast(owner, {:checkin, lease})
@@ -51,15 +45,12 @@ defmodule Beaver.MLIR.ThreadPool do
 
   @spec pool(GenServer.server()) :: MLIR.LLVMThreadPool.t()
   def pool(owner \\ @default_name), do: GenServer.call(owner, :pool)
-
   @doc "Create a caller-owned native pool for use with `MLIR.Context.create/1`."
   @spec create() :: MLIR.LLVMThreadPool.t()
   def create, do: CAPI.mlirLlvmThreadPoolCreate()
-
   @doc "Destroy a caller-owned native pool after all attached contexts are gone."
   @spec destroy(MLIR.LLVMThreadPool.t()) :: :ok
   defdelegate destroy(pool), to: CAPI, as: :mlirLlvmThreadPoolDestroy
-
   @spec max_concurrency(GenServer.server() | MLIR.LLVMThreadPool.t()) :: non_neg_integer()
   def max_concurrency(owner \\ @default_name)
 
@@ -67,11 +58,9 @@ defmodule Beaver.MLIR.ThreadPool do
     do: CAPI.mlirLlvmThreadPoolGetMaxConcurrency(pool) |> Beaver.Native.to_term()
 
   def max_concurrency(owner), do: owner |> pool() |> max_concurrency()
-
   @doc "Closes the owner. Returns `:deferred` if attached contexts still hold leases."
   @spec close(GenServer.server()) :: :ok | :deferred
   def close(owner \\ @default_name), do: GenServer.call(owner, :close)
-
   @impl GenServer
   def init(opts) do
     concurrency = Keyword.get(opts, :concurrency, System.schedulers_online())
@@ -85,7 +74,6 @@ defmodule Beaver.MLIR.ThreadPool do
 
   @impl GenServer
   def handle_call(:pool, _from, state), do: {:reply, state.pool, state}
-
   def handle_call(:checkout, _from, %{closing?: true} = state), do: {:reply, {:error, :closing}, state}
 
   def handle_call(:checkout, _from, state) do
@@ -100,7 +88,6 @@ defmodule Beaver.MLIR.ThreadPool do
   @impl GenServer
   def handle_cast({:checkin, lease}, state) do
     state = %{state | leases: MapSet.delete(state.leases, lease)}
-
     if state.closing? and MapSet.size(state.leases) == 0, do: {:stop, :normal, state}, else: {:noreply, state}
   end
 

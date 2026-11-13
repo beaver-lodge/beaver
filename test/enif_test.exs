@@ -1,6 +1,5 @@
 defmodule EnifTest do
   use Beaver.Case, async: true
-
   @moduletag :smoke
   test "populate enif functions", %{ctx: ctx} do
     %ENIFSupport{engine: e} = s = AddENIF.init(ctx)

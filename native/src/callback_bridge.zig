@@ -161,7 +161,6 @@ fn allocateState(comptime State: type, comptime callbacks: anytype, comptime req
     state.* = .{ .dispatcher = dispatcher };
     return state;
 }
-
 // Every fallback transfers the allocation reference to MLIR and returns a
 // separate BEAM reference. Only the state-aware descriptor hook is nullable.
 fn Fallback(comptime State: type, comptime callbacks: anytype, comptime Attach: anytype, comptime methods: anytype) type {
@@ -189,7 +188,6 @@ fn attachDynamicTrait(environment: beam.env, _: c_int, args: [*c]const beam.term
     const operation_name = try string_ref.get_binary_as_string_ref(environment, args[1]);
     const type_id = try mlir_capi.TypeID.resource.fetch(environment, args[2]);
     const state = try allocateState(DynamicTraitState, .{ "verify", "verify_regions" }, 0, environment, args[3..6]);
-
     // Add the BEAM-term reference before handing the allocation reference to
     // MLIR. A failed insertion destroys the trait synchronously; the term then
     // keeps the state alive until this NIF returns and its environment clears.

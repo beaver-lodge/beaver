@@ -150,9 +150,7 @@ defmodule Beaver.MLIR.Safepoint do
     poll_specs = op_specs(opts, :poll_ops, :poll, "coro.poll")
     suspend_specs = op_specs(opts, :suspend_ops, :safepoints, "coro.suspend")
     eligible? = bounded_leaf?(func_op, opts)
-
     if opts[:require_leaf] && not eligible?, do: raise(ArgumentError, "function is not a bounded leaf")
-
     {leaf_op, leaf_sym} = if eligible?, do: create_folded_leaf_clone!(func_op, poll_specs, opts), else: {nil, nil}
 
     {lowered_op, frame_bytes} =
@@ -192,7 +190,6 @@ defmodule Beaver.MLIR.Safepoint do
     IRRewriter.with_rewriter(ctx, fn rw ->
       insert = fn -> RewriterBase.insert(rw, clone) end
       if Operation.block(func), do: RewriterBase.with_insertion_point(rw, {:after, func}, insert)
-
       Enum.each(resolve_ops(clone, polls), &fold.(rw, &1))
     end)
 

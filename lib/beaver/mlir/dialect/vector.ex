@@ -2,11 +2,8 @@ alias Beaver.MLIR.Attribute
 
 defmodule Beaver.MLIR.Dialect.Vector do
   @moduledoc "Operations and transfer helpers for the MLIR Vector dialect."
-
   alias Beaver.MLIR
-
   use Beaver.MLIR.Dialect, dialect: "vector", ops: Beaver.MLIR.Dialect.Registry.ops("vector")
-
   @doc "Build the boolean array attribute used by vector transfer bounds."
   def in_bounds(bounds, opts \\ []) when is_list(bounds) do
     unless Enum.all?(bounds, &is_boolean/1), do: raise(ArgumentError, "vector in_bounds entries must be booleans")

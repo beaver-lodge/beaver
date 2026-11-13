@@ -8,7 +8,6 @@ pub fn fixedOptions(comptime Dispatcher: type, timeout_ms: ?u64) Dispatcher.Opti
     if (@hasField(Dispatcher.Options, "ownership")) options.ownership = .fixed;
     return options;
 }
-
 /// Encodes context-owned handles in a fresh message environment, then transfers
 /// that environment to the dispatcher. Failed encodings release it here.
 pub fn invoke(dispatcher: anytype, comptime name: []const u8, comptime Kinds: anytype, values: anytype) !kinda.callback_runtime.Response {
@@ -34,7 +33,6 @@ pub fn invokeTerms(dispatcher: anytype, comptime name: []const u8, environment: 
     defer c.beaverExecutionCallbackEnd(start);
     return dispatcher.invoke(name, environment, terms);
 }
-
 /// Pass and pattern lifecycle hooks use the same fixed owner protocol.
 pub fn Lifecycle(comptime State: type, comptime label: []const u8) type {
     return struct {

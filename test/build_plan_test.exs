@@ -1,7 +1,6 @@
 defmodule Beaver.BuildPlanTest do
   use ExUnit.Case, async: true
   alias Beaver.Build.{ArtifactCache, Plan}
-
   @tag :tmp_dir
   test "plans expose dependencies, cache verified results and stop on failed stages", %{tmp_dir: directory} do
     path = Path.join(directory, "analysis.json")

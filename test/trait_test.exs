@@ -2,7 +2,6 @@ defmodule TraitTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR.Dialect.Func
   @moduletag :smoke
-
   test "terminator?", %{ctx: ctx} do
     assert MLIR.Context.terminator?(ctx, "func.return")
     assert MLIR.Context.terminator?(ctx, "gpu.return")
@@ -21,15 +20,11 @@ defmodule TraitTest do
 
   test "attaches and queries built-in dynamic traits idempotently", %{ctx: ctx} do
     assert CompleteSlang |> then(&Beaver.Slang.load(ctx, &1)) |> MLIR.LogicalResult.success?()
-
     assert MLIR.Trait.has?(ctx, "complete_slang.yield", :terminator)
     assert MLIR.Trait.has?(ctx, "complete_slang.scope", :isolated_from_above)
     assert MLIR.Trait.has?(ctx, "complete_slang.scope", :no_terminator)
-
     assert CompleteSlang |> then(&Beaver.Slang.load(ctx, &1)) |> MLIR.LogicalResult.success?()
-
     assert :ok = MLIR.Trait.attach_all(ctx, CompleteSlang.__slang_dialect_name__(), CompleteSlang.__slang_traits__())
-
     assert :ok = MLIR.Trait.attach(ctx, "complete_slang.yield", :terminator)
   end
 

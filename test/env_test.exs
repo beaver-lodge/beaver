@@ -4,7 +4,6 @@ defmodule EnvTest do
   test "MLIR.__BLOCK__", %{ctx: ctx} do
     function_module ctx, some_func(function_type: Type.function([], [Type.i(32)])) do
       %MLIR.Region{} = Beaver.Env.region()
-
       block(do: %MLIR.Block{} = Beaver.Env.block())
     end
   end

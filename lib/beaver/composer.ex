@@ -4,15 +4,12 @@ defmodule Beaver.Composer do
   import Beaver.MLIR.CAPI
   alias Beaver.MLIR
   require Logger
-
   @moduledoc "This module provide functions to compose and run passes."
   defstruct passes: [], op: nil, ctx: nil
   @type operation :: MLIR.Module.t() | Operation.t()
   @type t :: %__MODULE__{passes: list(any()), op: operation}
-
   def new(ctx: ctx), do: %__MODULE__{ctx: ctx}
   def new(%__MODULE__{} = composer), do: composer
-
   def new(op), do: %__MODULE__{op: op}
 
   def append(%op_or_mod{} = composer_or_op, pass) when op_or_mod in [MLIR.Module, Operation],
@@ -72,7 +69,6 @@ defmodule Beaver.Composer do
 
   defp add_pipeline(%MLIR.OpPassManager{} = pm, pipeline_str) when is_binary(pipeline_str) do
     {res, err} = Beaver.Printer.run(&mlirOpPassManagerAddPipeline(pm, StringRef.create(pipeline_str), &1, &2))
-
     if not MLIR.LogicalResult.success?(res), do: raise("Unexpected failure parsing pipeline: #{pipeline_str}, #{err}")
     pm
   end
@@ -81,7 +77,6 @@ defmodule Beaver.Composer do
     do: pm |> mlirPassManagerGetAsOpPassManager() |> add_pipeline(pipeline_str)
 
   # nested pm
-
   defp add_pass(pm, {op_name, passes}, ctx) when is_binary(op_name) and is_list(passes) do
     npm =
       case pm do
@@ -93,11 +88,8 @@ defmodule Beaver.Composer do
   end
 
   defp add_pass(pm, pipeline_str, _ctx) when is_binary(pipeline_str), do: add_pipeline(pm, pipeline_str)
-
   defp add_pass(%MLIR.OpPassManager{} = pm, pass, ctx), do: mlirOpPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
-
   defp add_pass(%MLIR.PassManager{} = pm, pass, ctx), do: mlirPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
-
   defp encode_convergence_failure_action(:warn), do: 0
   defp encode_convergence_failure_action(:error), do: 1
   defp encode_convergence_failure_action(:silent), do: 2
@@ -124,7 +116,6 @@ defmodule Beaver.Composer do
   end
 
   @run_default_opts [debug: false, print: false, timing: false, verifier: true]
-
   @type run_option ::
           {:debug, boolean()}
           | {:print, boolean()}
@@ -137,9 +128,7 @@ defmodule Beaver.Composer do
   @type composer :: __MODULE__.t()
   @spec run!(composer) :: operation
   @spec run!(composer, [run_option]) :: operation
-
   def run!(composer, opts \\ @run_default_opts), do: unwrap_result!(run(composer, opts))
-
   @doc false
   def unwrap_result!({:ok, op, []}), do: op
 
@@ -153,7 +142,6 @@ defmodule Beaver.Composer do
 
   @spec run(composer) :: run_result
   @spec run(composer, [run_option]) :: run_result
-
   @doc """
   Run the passes on the operation.
 
@@ -178,7 +166,6 @@ defmodule Beaver.Composer do
     case Keyword.get(opts, :execution, :native) do
       :native ->
         if opts[:verifier] == :pipeline, do: raise(ArgumentError, "verifier: :pipeline requires execution: :beam")
-
         run_native(composer, opts)
 
       :beam ->
@@ -229,7 +216,6 @@ defmodule Beaver.Composer do
   end
 
   def init(composer, opts \\ @run_default_opts), do: init(composer, opts, "builtin.module")
-
   @doc false
   def init(%__MODULE__{} = composer, opts, anchor) do
     timing = Keyword.get(opts, :timing)

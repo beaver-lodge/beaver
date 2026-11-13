@@ -18,7 +18,6 @@ const prelude = @import("prelude.zig");
 const mutex = @import("mutex.zig");
 const CudaResult = c_int;
 const CuDevice = *anyopaque;
-
 /// Encodes an opaque pointer (CUDA module/function/device handles) as a BEAM
 /// unsigned 64-bit integer. `beam.make(usize, ...)` is unsuitable here because
 /// it routes through `enif_make_int`, which truncates to 32 bits on 64-bit
@@ -61,7 +60,6 @@ const CudaDriver = struct {
     /// Retained primary context, mirroring the C++ runner's `ScopedContext`.
     primary_ctx: ?*anyopaque,
 };
-
 /// Candidate names/locations for the CUDA driver shared library. `dlopen`
 /// searches the loader path for bare names; absolute paths cover WSL and
 /// toolkit installs where the loader path is not configured.
@@ -116,13 +114,11 @@ fn cuResultError(env: beam.env, name: []const u8, result: CudaResult) beam.term 
         "CUDA call failed";
     return beam.make_error_binary(env, msg);
 }
-
 /// Returns `true` when a CUDA driver is loadable and initializable.
 pub fn cuda_available(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
     const d = loadDriver() orelse return beam.make_bool(env, false);
     return beam.make_bool(env, d.init_result == 0);
 }
-
 /// Returns `{:ok, count}` with the number of CUDA devices, or `{:error, reason}`.
 fn cuda_device_count(d: *const CudaDriver, env: beam.env, _: [*c]const beam.term) !beam.term {
     var count: c_int = 0;
@@ -130,7 +126,6 @@ fn cuda_device_count(d: *const CudaDriver, env: beam.env, _: [*c]const beam.term
     if (result != 0) return cuResultError(env, "cuDeviceGetCount", result);
     return beam.make_ok_term(env, try beam.make(i32, env, @intCast(count)));
 }
-
 /// Returns `{:ok, name}` for the device at `ordinal`, or `{:error, reason}`.
 fn cuda_device_name(d: *const CudaDriver, env: beam.env, args: [*c]const beam.term) !beam.term {
     const ordinal = try beam.get_i32(env, args[0]);
@@ -143,7 +138,6 @@ fn cuda_device_name(d: *const CudaDriver, env: beam.env, args: [*c]const beam.te
     const name_len = std.mem.indexOfScalar(u8, &name_buf, 0) orelse name_buf.len;
     return beam.make_ok_binary(env, name_buf[0..name_len]);
 }
-
 /// Returns `{:ok, {major, minor}}` with the compute capability of the device
 /// at `ordinal`, or `{:error, reason}`.
 fn cuda_device_compute_capability(d: *const CudaDriver, env: beam.env, args: [*c]const beam.term) !beam.term {
@@ -160,7 +154,6 @@ fn cuda_device_compute_capability(d: *const CudaDriver, env: beam.env, args: [*c
     }
     return beam.make_ok_term(env, beam.make_tuple(env, &terms));
 }
-
 /// Common driver admission; only device-memory/module operations bind a context.
 fn cudaNIF(comptime name: []const u8, comptime arity: usize, comptime context: bool) e.ErlNifFunc {
     const operation = @field(@This(), name);
@@ -182,13 +175,11 @@ fn cudaNIF(comptime name: []const u8, comptime arity: usize, comptime context: b
 fn status(env: beam.env, name: []const u8, result: CudaResult) beam.term {
     return if (result == 0) beam.make_ok(env) else cuResultError(env, name, result);
 }
-
 /// Loads PTX assembly text into a CUDA module. The Elixir side extracts the
 /// assembly from the `gpu.binary` produced by `GPU.package_binary!/3`.
 /// Returns `{:ok, module_handle}`.
 fn cuda_module_load(d: *const CudaDriver, env: beam.env, args: [*c]const beam.term) !beam.term {
     const ptx_bin = try beam.get_binary(env, args[0]);
-
     // cuModuleLoadData expects NUL-terminated data for PTX text.
     const ptx = std.heap.page_allocator.dupeZ(u8, ptx_bin.data[0..ptx_bin.size]) catch
         return beam.make_error_binary(env, "out of memory");
@@ -198,7 +189,6 @@ fn cuda_module_load(d: *const CudaDriver, env: beam.env, args: [*c]const beam.te
     if (result != 0) return cuResultError(env, "cuModuleLoadData", result);
     return beam.make_ok_term(env, make_ptr(env, @intFromPtr(cu_module.?)));
 }
-
 /// Returns `{:ok, function_handle}` for the kernel `name` in `module_handle`.
 fn cuda_module_get_function(d: *const CudaDriver, env: beam.env, args: [*c]const beam.term) !beam.term {
     const module_ptr = try beam.get_u64(env, args[0]);
@@ -211,7 +201,6 @@ fn cuda_module_get_function(d: *const CudaDriver, env: beam.env, args: [*c]const
     if (result != 0) return cuResultError(env, "cuModuleGetFunction", result);
     return beam.make_ok_term(env, make_ptr(env, @intFromPtr(function.?)));
 }
-
 /// Sets a CUDA function attribute, e.g. the dynamic shared memory size in
 /// bytes (`CU_FUNC_ATTRIBUTE_MAX_DYNAMIC_SHARED_SIZE_BYTES = 8`).
 fn cuda_func_set_attribute(d: *const CudaDriver, env: beam.env, args: [*c]const beam.term) !beam.term {
@@ -220,13 +209,11 @@ fn cuda_func_set_attribute(d: *const CudaDriver, env: beam.env, args: [*c]const 
     const value = try beam.get_i32(env, args[2]);
     return status(env, "cuFuncSetAttribute", d.cuFuncSetAttribute(@ptrFromInt(function_ptr), attribute, value));
 }
-
 /// Unloads a CUDA module handle.
 fn cuda_module_unload(d: *const CudaDriver, env: beam.env, args: [*c]const beam.term) !beam.term {
     const module_ptr = try beam.get_u64(env, args[0]);
     return status(env, "cuModuleUnload", d.cuModuleUnload(@ptrFromInt(module_ptr)));
 }
-
 /// Returns `{:ok, device_ptr}` for a device allocation of `size` bytes.
 fn cuda_mem_alloc(d: *const CudaDriver, env: beam.env, args: [*c]const beam.term) !beam.term {
     const size = try beam.get_u64(env, args[0]);
@@ -235,25 +222,21 @@ fn cuda_mem_alloc(d: *const CudaDriver, env: beam.env, args: [*c]const beam.term
     if (result != 0) return cuResultError(env, "cuMemAlloc", result);
     return beam.make_ok_term(env, make_ptr(env, ptr));
 }
-
 /// Frees a device allocation.
 fn cuda_mem_free(d: *const CudaDriver, env: beam.env, args: [*c]const beam.term) !beam.term {
     const ptr = try beam.get_u64(env, args[0]);
     return status(env, "cuMemFree", d.cuMemFree(ptr));
 }
-
 /// Blocks until all previously queued work on the current context completes.
 fn cuda_synchronize(d: *const CudaDriver, env: beam.env, _: [*c]const beam.term) !beam.term {
     return status(env, "cuCtxSynchronize", d.cuCtxSynchronize());
 }
-
 /// Copies host `data` into device memory at `device_ptr`.
 fn cuda_memcpy_htod(d: *const CudaDriver, env: beam.env, args: [*c]const beam.term) !beam.term {
     const dst = try beam.get_u64(env, args[0]);
     const data = try beam.get_binary(env, args[1]);
     return status(env, "cuMemcpy", d.cuMemcpy(dst, @intFromPtr(data.data), data.size));
 }
-
 /// Copies `size` bytes from device memory at `device_ptr` into a host binary.
 fn cuda_memcpy_dtoh(d: *const CudaDriver, env: beam.env, args: [*c]const beam.term) !beam.term {
     const src = try beam.get_u64(env, args[0]);
@@ -265,7 +248,6 @@ fn cuda_memcpy_dtoh(d: *const CudaDriver, env: beam.env, args: [*c]const beam.te
     if (result != 0) return cuResultError(env, "cuMemcpy", result);
     return beam.make_ok_term(env, beam.make_slice(env, buffer));
 }
-
 /// Default-stream device copy, with no intermediate host allocation.
 fn cuda_memcpy_dtod(d: *const CudaDriver, env: beam.env, args: [*c]const beam.term) !beam.term {
     const dst = try beam.get_u64(env, args[0]);
@@ -278,7 +260,6 @@ fn cuda_memcpy_dtod(d: *const CudaDriver, env: beam.env, args: [*c]const beam.te
         return beam.make_error_binary(env, "overlapping device copy ranges");
     return status(env, "cuMemcpyDtoD", d.cuMemcpy(dst, src, size));
 }
-
 /// Launches a kernel.
 ///
 /// `args` is a binary of kernel parameters packed in 8-byte slots (the Elixir

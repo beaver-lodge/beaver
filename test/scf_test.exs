@@ -1,13 +1,9 @@
 defmodule SCFTest do
   use Beaver.Case, async: true
-
   alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Dialect.{Arith, Func, SCF}
-
   require SCF
-
   @moduletag :smoke
-
   test "builds if regions and yields branch results", %{ctx: ctx} do
     module =
       function_module ctx, choose(function_type: Type.function([Type.i1()], [Type.i32()])) do

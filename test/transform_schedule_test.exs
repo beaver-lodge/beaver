@@ -1,14 +1,10 @@
 defmodule Beaver.MLIR.Transform.ScheduleTest do
   use Beaver.Case, async: true
-
   alias MLIR.Transform.Schedule
 
   @payload "module {\n  func.func @fold_me() -> i32 {\n    %zero = arith.constant 0 : i32\n    %one = arith.constant 1 : i32\n    %sum = arith.addi %one, %zero : i32\n    return %sum : i32\n  }\n}\n"
-
   @canonicalize_schedule "module attributes {transform.with_named_sequence} {\n  transform.named_sequence @__transform_main(%root: !transform.any_op) {\n    transform.apply_patterns to %root {\n      transform.apply_patterns.canonicalization\n    } : !transform.any_op\n    transform.yield\n  }\n}\n"
-
   @tune_schedule "module attributes {transform.with_named_sequence} {\n  transform.named_sequence @__transform_main(%root: !transform.any_op) {\n    %tile = transform.tune.knob<\"tile\"> options = [8, 16] -> !transform.any_param\n    transform.tune.alternatives<\"vectorize\"> {\n      transform.yield\n    }, {\n      transform.yield\n    }\n    transform.yield\n  }\n}\n"
-
   defp ir(ctx, source \\ @payload) do
     module = MLIR.Module.create!(source, ctx: ctx)
     on_exit(fn -> MLIR.Module.destroy(module) end)
@@ -44,7 +40,6 @@ defmodule Beaver.MLIR.Transform.ScheduleTest do
 
         MLIR.AnalysisSession.with(payload, fn session ->
           assert {:ok, %MLIR.Transform.Result{}} = MLIR.Transform.execute(payload, prepared, analysis_session: session)
-
           refute MLIR.to_string(payload) =~ "arith.addi"
           assert %{generation: 2, cached: []} = MLIR.AnalysisSession.stats(session)
         end)
@@ -62,9 +57,7 @@ defmodule Beaver.MLIR.Transform.ScheduleTest do
 
     assert :ok = MLIR.Transform.close(prepared)
     payload = ir(ctx)
-
     assert {:error, %MLIR.Transform.Error{reason: reason}} = MLIR.Transform.execute(payload, prepared)
-
     assert reason =~ "ClosedPreparedTransform"
   end
 
@@ -72,15 +65,12 @@ defmodule Beaver.MLIR.Transform.ScheduleTest do
     assert MLIR.to_string(MLIR.Transform.any_op_type(ctx: ctx)) == "!transform.any_op"
     assert MLIR.to_string(MLIR.Transform.any_value_type(ctx: ctx)) == "!transform.any_value"
     assert MLIR.to_string(MLIR.Transform.any_param_type(ctx: ctx)) == "!transform.any_param"
-
     assert MLIR.to_string(MLIR.Transform.operation_type("func.func", ctx: ctx)) == "!transform.op<\"func.func\">"
-
     assert MLIR.to_string(MLIR.Transform.param_type(MLIR.Type.i64(ctx: ctx))) == "!transform.param<i64>"
   end
 
   test "execution errors keep portable diagnostics and distinct failure classes", %{ctx: ctx} do
     payload = ir(ctx)
-
     assert {:error, %MLIR.Transform.Error{kind: :invalid_schedule}} = MLIR.Transform.execute(payload, "not mlir")
 
     silenceable =
@@ -103,7 +93,6 @@ defmodule Beaver.MLIR.Transform.ScheduleTest do
     payload = ir(ctx)
     assert {:ok, %MLIR.Transform.Result{}} = MLIR.Transform.execute(payload, {:text, selected})
     bytecode = MLIR.Bytecode.write!(schedule)
-
     assert {:ok, %MLIR.Transform.Result{}} = MLIR.Transform.execute(payload, {:bytecode, bytecode})
   end
 end
