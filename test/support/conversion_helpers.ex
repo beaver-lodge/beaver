@@ -9,14 +9,12 @@ defmodule Beaver.ConversionHelpers do
     one_to_n: ~S[module { %a = arith.constant 1 : i32 "foo.sink"(%a) : (i32) -> () }]
   }
   def materialization_module(ctx, kind), do: MLIR.Module.create!(Map.fetch!(@sources, kind), ctx: ctx)
-
   # The raw conversion API and Plan must exercise the same callbacks and IR.
   def materialization_fixture(ctx, kind) do
     owner = self()
     module = materialization_module(ctx, kind)
     i32 = Type.i32(ctx: ctx)
     i64 = Type.i64(ctx: ctx)
-
     convert = conversion_callback(kind, owner, i32, i64)
     materialize = materialization_callback(kind, owner)
     rewrite = rewrite_callback(kind, owner, module, i64)

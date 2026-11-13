@@ -5,10 +5,8 @@ defmodule Beaver.MLIR.Attribute do
   @moduledoc "This module defines functions parsing and creating attributes in MLIR."
   import CAPI
   @behaviour Access
-
   alias Beaver.MLIR
   import Beaver.Sigils
-
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
 
   defp raise_with_diagnostics(attr_str, diagnostics) do
@@ -62,7 +60,6 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   defp attr_elements?(elements), do: Enum.all?(elements, &match?(%Attribute{}, &1)) and not Enum.empty?(elements)
-
   @doc false
   def integer_storage(element_type) do
     width = Type.width(element_type)
@@ -88,7 +85,6 @@ defmodule Beaver.MLIR.Attribute do
     cond do
       Type.opaque?(element_type) or string_elements?(elements) ->
         strings = elements |> Enum.map(&StringRef.create/1) |> Native.array(StringRef, mut: true)
-
         mlirDenseElementsAttrStringGet(shaped_type, num_elements, strings)
 
       attr_elements?(elements) ->
@@ -203,9 +199,7 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   def string(str, opts \\ []), do: Deferred.from_opts(opts, &mlirStringAttrGet(&1, StringRef.create(str)))
-
   def type(%Deferred{} = type), do: Deferred.defer(&type(Deferred.resolve(type, &1)))
-
   def type(%Type{} = t), do: mlirTypeAttrGet(t)
 
   defp composite(%Type{} = t, validate, get) when is_function(validate, 1) and is_function(get, 1),
@@ -233,9 +227,7 @@ defmodule Beaver.MLIR.Attribute do
   end
 
   def affine_map(%Deferred{} = map), do: Deferred.defer(&affine_map(Deferred.resolve(map, &1)))
-
   def affine_map(%MLIR.AffineMap{} = map), do: mlirAffineMapAttrGet(map)
-
   def unit(opts \\ []), do: Deferred.from_opts(opts, &mlirUnitAttrGet(&1))
 
   def flat_symbol_ref(symbol, opts \\ []) do
@@ -270,14 +262,12 @@ defmodule Beaver.MLIR.Attribute do
   for {f, "mlirAttributeIsA" <> type_name, 1} <-
         CAPI.__info__(:functions) |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
     helper_name = type_name |> Macro.underscore()
-
     @doc "calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is #{type_name} attribute"
     def unquote(:"#{helper_name}?")(%__MODULE__{} = attr),
       do: unquote(f)(attr) |> Native.to_term()
   end
 
   defguardp is_index_or_name(key) when is_integer(key) or is_binary(key) or is_atom(key)
-
   @impl Access
   def fetch(attr, key) when is_index_or_name(key),
     do: __MODULE__.Accessor.new(attr) |> __MODULE__.Accessor.fetch(attr, key)
@@ -289,7 +279,6 @@ defmodule Beaver.MLIR.Attribute do
   @impl Access
   def pop(attr, key) when is_index_or_name(key) do
     if Attribute.dense_elements?(attr), do: raise(ArgumentError, "cannot pop from dense elements attribute")
-
     __MODULE__.Accessor.new(attr) |> __MODULE__.Accessor.pop(attr, key)
   end
 

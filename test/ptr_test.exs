@@ -1,63 +1,8 @@
 defmodule PtrTest do
   use Beaver.Case, async: true
-  use Beaver
-
-  alias Beaver.MLIR
   alias MLIR.Dialect.{Func, Ptr}
-  require Func
-
   @moduletag :smoke
-
-  @llvm_ptr_module """
-  module {
-    llvm.func @ptr_load_store(%ptr: !ptr.ptr<#llvm.address_space<0>>, %value: i64) -> i64 {
-      ptr.store %value, %ptr : i64, !ptr.ptr<#llvm.address_space<0>>
-      %loaded = ptr.load %ptr : !ptr.ptr<#llvm.address_space<0>> -> i64
-      llvm.return %loaded : i64
-    }
-
-    llvm.func @_mlir_ciface_ptr_load_store(%ptr: !ptr.ptr<#llvm.address_space<0>>, %value: i64) -> i64 attributes {llvm.emit_c_interface} {
-      %result = llvm.call @ptr_load_store(%ptr, %value) : (!ptr.ptr<#llvm.address_space<0>>, i64) -> i64
-      llvm.return %result : i64
-    }
-
-    llvm.func @ptr_distance(%ptr: !ptr.ptr<#llvm.address_space<0>>, %offset: i64) -> i64 {
-      %next = ptr.ptr_add %ptr, %offset : !ptr.ptr<#llvm.address_space<0>>, i64
-      %distance = ptr.ptr_diff %next, %ptr : !ptr.ptr<#llvm.address_space<0>> -> i64
-      llvm.return %distance : i64
-    }
-
-    llvm.func @_mlir_ciface_ptr_distance(%ptr: !ptr.ptr<#llvm.address_space<0>>, %offset: i64) -> i64 attributes {llvm.emit_c_interface} {
-      %result = llvm.call @ptr_distance(%ptr, %offset) : (!ptr.ptr<#llvm.address_space<0>>, i64) -> i64
-      llvm.return %result : i64
-    }
-
-    llvm.func @constant_distance() -> i64 {
-      %null = ptr.constant #ptr.null : !ptr.ptr<#llvm.address_space<0>>
-      %address = ptr.constant #ptr.address<0x10> : !ptr.ptr<#llvm.address_space<0>>
-      %distance = ptr.ptr_diff %address, %null : !ptr.ptr<#llvm.address_space<0>> -> i64
-      llvm.return %distance : i64
-    }
-
-    llvm.func @_mlir_ciface_constant_distance() -> i64 attributes {llvm.emit_c_interface} {
-      %result = llvm.call @constant_distance() : () -> i64
-      llvm.return %result : i64
-    }
-
-    llvm.func @vector_memory(
-        %ptr: !ptr.ptr<#llvm.address_space<3>>,
-        %ptrs: vector<4x!ptr.ptr<#llvm.address_space<3>>>,
-        %mask: vector<4xi1>,
-        %value: vector<4xf32>) -> vector<4xf32> {
-      %loaded = ptr.masked_load %ptr, %mask, %value alignment = 4 : !ptr.ptr<#llvm.address_space<3>> -> vector<4xf32>
-      ptr.masked_store %loaded, %ptr, %mask alignment = 4 : vector<4xf32>, !ptr.ptr<#llvm.address_space<3>>
-      %gathered = ptr.gather %ptrs, %mask, %value alignment = 4 : vector<4x!ptr.ptr<#llvm.address_space<3>>> -> vector<4xf32>
-      ptr.scatter %gathered, %ptrs, %mask alignment = 4 : vector<4xf32>, vector<4x!ptr.ptr<#llvm.address_space<3>>>
-      llvm.return %gathered : vector<4xf32>
-    }
-  }
-  """
-
+  @llvm_ptr_module "module {\n  llvm.func @ptr_load_store(%ptr: !ptr.ptr<#llvm.address_space<0>>, %value: i64) -> i64 {\n    ptr.store %value, %ptr : i64, !ptr.ptr<#llvm.address_space<0>>\n    %loaded = ptr.load %ptr : !ptr.ptr<#llvm.address_space<0>> -> i64\n    llvm.return %loaded : i64\n  }\n\n  llvm.func @_mlir_ciface_ptr_load_store(%ptr: !ptr.ptr<#llvm.address_space<0>>, %value: i64) -> i64 attributes {llvm.emit_c_interface} {\n    %result = llvm.call @ptr_load_store(%ptr, %value) : (!ptr.ptr<#llvm.address_space<0>>, i64) -> i64\n    llvm.return %result : i64\n  }\n\n  llvm.func @ptr_distance(%ptr: !ptr.ptr<#llvm.address_space<0>>, %offset: i64) -> i64 {\n    %next = ptr.ptr_add %ptr, %offset : !ptr.ptr<#llvm.address_space<0>>, i64\n    %distance = ptr.ptr_diff %next, %ptr : !ptr.ptr<#llvm.address_space<0>> -> i64\n    llvm.return %distance : i64\n  }\n\n  llvm.func @_mlir_ciface_ptr_distance(%ptr: !ptr.ptr<#llvm.address_space<0>>, %offset: i64) -> i64 attributes {llvm.emit_c_interface} {\n    %result = llvm.call @ptr_distance(%ptr, %offset) : (!ptr.ptr<#llvm.address_space<0>>, i64) -> i64\n    llvm.return %result : i64\n  }\n\n  llvm.func @constant_distance() -> i64 {\n    %null = ptr.constant #ptr.null : !ptr.ptr<#llvm.address_space<0>>\n    %address = ptr.constant #ptr.address<0x10> : !ptr.ptr<#llvm.address_space<0>>\n    %distance = ptr.ptr_diff %address, %null : !ptr.ptr<#llvm.address_space<0>> -> i64\n    llvm.return %distance : i64\n  }\n\n  llvm.func @_mlir_ciface_constant_distance() -> i64 attributes {llvm.emit_c_interface} {\n    %result = llvm.call @constant_distance() : () -> i64\n    llvm.return %result : i64\n  }\n\n  llvm.func @vector_memory(\n      %ptr: !ptr.ptr<#llvm.address_space<3>>,\n      %ptrs: vector<4x!ptr.ptr<#llvm.address_space<3>>>,\n      %mask: vector<4xi1>,\n      %value: vector<4xf32>) -> vector<4xf32> {\n    %loaded = ptr.masked_load %ptr, %mask, %value alignment = 4 : !ptr.ptr<#llvm.address_space<3>> -> vector<4xf32>\n    ptr.masked_store %loaded, %ptr, %mask alignment = 4 : vector<4xf32>, !ptr.ptr<#llvm.address_space<3>>\n    %gathered = ptr.gather %ptrs, %mask, %value alignment = 4 : vector<4x!ptr.ptr<#llvm.address_space<3>>> -> vector<4xf32>\n    ptr.scatter %gathered, %ptrs, %mask alignment = 4 : vector<4xf32>, vector<4x!ptr.ptr<#llvm.address_space<3>>>\n    llvm.return %gathered : vector<4xf32>\n  }\n}\n"
   test "constructs Ptr types and typed constants", %{ctx: ctx} do
     assert Ptr.generic_space(ctx: ctx) |> MLIR.to_string() == "#ptr.generic_space"
     assert Ptr.llvm_address_space(3, ctx: ctx) |> MLIR.to_string() == "#llvm.address_space<3>"
@@ -80,17 +25,11 @@ defmodule PtrTest do
     ptr_type = Ptr.type()
 
     module =
-      mlir ctx: ctx do
-        module do
-          Func.func constants(function_type: Type.function([], [ptr_type, ptr_type])) do
-            region do
-              block _() do
-                null = Ptr.constant(value: Ptr.null(type: ptr_type)) >>> :infer
-                address = Ptr.constant(value: Ptr.address(0x1000, type: ptr_type)) >>> :infer
-                Func.return(null, address) >>> []
-              end
-            end
-          end
+      function_module ctx, constants(function_type: Type.function([], [ptr_type, ptr_type])) do
+        block _() do
+          null = Ptr.constant(value: Ptr.null(type: ptr_type)) >>> :infer
+          address = Ptr.constant(value: Ptr.address(0x1000, type: ptr_type)) >>> :infer
+          Func.return(null, address) >>> []
         end
       end
       |> MLIR.verify!()

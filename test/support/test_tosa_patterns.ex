@@ -2,7 +2,7 @@ defmodule TestTOSAPatterns do
   @moduledoc false
   use Beaver
   alias Beaver.MLIR
-  alias MLIR.Type
+  alias MLIR.{Attribute, Type}
   alias MLIR.Dialect.{Func, TOSA}
   require Func
 
@@ -17,12 +17,8 @@ defmodule TestTOSAPatterns do
                       )
                   ) do
           region do
-            block _entry(
-                    a >>> Type.ranked_tensor([1, 3], Type.f32()),
-                    b >>> Type.ranked_tensor([2, 1], Type.f32())
-                  ) do
+            block _entry(a >>> Type.ranked_tensor([1, 3], Type.f32()), b >>> Type.ranked_tensor([2, 1], Type.f32())) do
               res = TOSA.add(a, b, one: Attribute.integer(Type.i32(), 1)) >>> Type.ranked_tensor([2, 3], Type.f32())
-
               res1 = TOSA.add(res, b) >>> Type.ranked_tensor([2, 3], Type.f32())
               Func.return(res1) >>> []
             end
@@ -66,47 +62,27 @@ defmodule TestTOSAPatterns do
     end
   end
 
-  defpat replace_multi_add_op1() do
-    one = attribute()
-    ty = Type.ranked_tensor([2, 3], Type.f32())
-    a = value()
-    b = value()
-    res = TOSA.add(a, b, one: one) >>> ty
-    {op, _t} = TOSA.add(res, b) >>> {:op, ty}
+  for variant <- 1..3 do
+    definition =
+      quote do
+        defpat unquote(:"replace_multi_add_op#{variant}")() do
+          one = if unquote(variant) == 1, do: attribute(), else: Attribute.integer(Type.i32(), 1)
+          concrete = Type.ranked_tensor([2, 3], Type.f32())
+          types = if unquote(variant) == 1, do: concrete, else: [concrete]
+          a = value()
+          b = value()
+          res = TOSA.add(a, b, one: one) >>> types
+          ty = if unquote(variant) == 2, do: type(), else: types
+          {op, _t} = TOSA.add(res, b) >>> {:op, ty}
 
-    rewrite op do
-      {r, _} = TOSA.sub(a, b) >>> {:op, ty}
-      replace(op, with: r)
-    end
-  end
+          rewrite op do
+            replacement_type = if unquote(variant) == 3, do: ty, else: {:op, ty}
+            result = TOSA.sub(a, b) >>> replacement_type
+            replace(op, with: if(is_tuple(result), do: elem(result, 0), else: result))
+          end
+        end
+      end
 
-  defpat replace_multi_add_op2() do
-    one = Attribute.integer(Type.i32(), 1)
-    types = [Type.ranked_tensor([2, 3], Type.f32())]
-    a = value()
-    b = value()
-
-    res = TOSA.add(a, b, one: one) >>> types
-    ty = type()
-    {op, _t} = TOSA.add(res, b) >>> {:op, ty}
-
-    rewrite op do
-      {r, _} = TOSA.sub(a, b) >>> {:op, ty}
-      replace(op, with: r)
-    end
-  end
-
-  defpat replace_multi_add_op3() do
-    one = Attribute.integer(Type.i32(), 1)
-    types = [Type.ranked_tensor([2, 3], Type.f32())]
-    a = value()
-    b = value()
-    res = TOSA.add(a, b, one: one) >>> types
-    {op, _t} = TOSA.add(res, b) >>> {:op, types}
-
-    rewrite op do
-      r = TOSA.sub(a, b) >>> types
-      replace(op, with: r)
-    end
+    Code.eval_quoted(definition, [], __ENV__)
   end
 end

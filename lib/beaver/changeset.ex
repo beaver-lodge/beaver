@@ -5,7 +5,6 @@ defmodule Beaver.Changeset do
   alias Beaver.Deferred
   alias Beaver.MLIR
   require Logger
-
   @doc "Changeset of entities to create an operation."
   @type t() :: %__MODULE__{
           operands: list(),
@@ -36,14 +35,10 @@ defmodule Beaver.Changeset do
   @type branching_argument() :: Block.t() | {Block.t(), [Value.t()]}
   @type region_argument() :: Region.t() | (-> [Region.t()])
   @type loc_argument() :: Location.t() | {:loc, Location.t()}
-
   @type argument() ::
           operand_argument() | attribute_argument() | branching_argument() | region_argument() | loc_argument()
-
   @spec add_argument(t(), argument()) :: t()
-
   @doc "Add an ODS argument to changeset."
-
   def add_argument(%__MODULE__{context: nil, location: %Location{} = loc} = changeset, argument),
     do: add_argument(%__MODULE__{changeset | context: MLIR.context(loc)}, argument)
 
@@ -56,7 +51,6 @@ defmodule Beaver.Changeset do
 
   # f should return regions
   def add_argument(%__MODULE__{} = changeset, f) when is_function(f, 0), do: add_argument(changeset, f.())
-
   # If the context is not set, we extract it from the argument
   def add_argument(%__MODULE__{context: nil} = changeset, %{} = argument),
     do: add_argument(%__MODULE__{changeset | context: MLIR.context(argument)}, argument)
@@ -126,27 +120,11 @@ defmodule Beaver.Changeset do
     """
   end
 
-  @shorthand_types %{
-    i1: "i1",
-    i8: "i8",
-    i16: "i16",
-    i32: "i32",
-    i64: "i64",
-    i128: "i128",
-    index: "index",
-    f16: "f16",
-    bf16: "bf16",
-    f32: "f32",
-    f64: "f64",
-    ptr: "!llvm.ptr",
-    none: "none"
-  }
-
+  @shorthand_types Beaver.MLIR.IRBatch.Spec.types()
   @type deferred_type() :: {:parametric, term(), term(), term()}
   @type type() :: Type.t() | String.t() | atom() | deferred_type() | [Type.t() | String.t() | atom() | deferred_type()]
   @type result() :: :infer | type() | Deferred.contextual(type())
   @spec add_result(t(), result()) :: t()
-
   def add_result(%__MODULE__{context: nil, location: %Location{} = loc} = changeset, argument),
     do: add_result(%__MODULE__{changeset | context: MLIR.context(loc)}, argument)
 

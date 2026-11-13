@@ -16,19 +16,14 @@ defmodule Beaver.MLIR.Dialect.Ptr do
   `null/1` and `address/2` return typed attributes suitable for
   `ptr.constant`.
   """
-
   alias Beaver.Deferred
   alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Dialect, Type}
-
   use Dialect, dialect: "ptr", ops: Dialect.Registry.ops("ptr")
-
   @type memory_space :: :generic | non_neg_integer() | {:llvm, non_neg_integer()} | Deferred.attribute()
-
   @doc "Return the upstream Ptr generic-memory-space attribute."
   @spec generic_space(keyword()) :: Deferred.attribute()
   def generic_space(opts \\ []), do: Attribute.get("#ptr.generic_space", opts)
-
   @doc "Return an LLVM address-space attribute for a non-negative address-space number."
   @spec llvm_address_space(non_neg_integer(), keyword()) :: Deferred.attribute()
   def llvm_address_space(address_space, opts \\ [])
@@ -58,11 +53,9 @@ defmodule Beaver.MLIR.Dialect.Ptr do
   @doc "Return a typed `#ptr.null` attribute for `ptr.constant`."
   @spec null(keyword()) :: Deferred.attribute()
   def null(opts \\ []), do: constant_attribute("#ptr.null", opts)
-
   @doc "Return a typed `#ptr.address` attribute for `ptr.constant`."
   @spec address(non_neg_integer(), keyword()) :: Deferred.attribute()
   def address(value, opts \\ [])
-
   def address(value, opts) when is_integer(value) and value >= 0, do: constant_attribute("#ptr.address<#{value}>", opts)
 
   def address(value, _opts),
@@ -79,7 +72,6 @@ defmodule Beaver.MLIR.Dialect.Ptr do
   end
 
   defp materialize_memory_space(:generic, ctx), do: generic_space(ctx: ctx)
-
   defp materialize_memory_space({:llvm, address_space}, ctx), do: llvm_address_space(address_space, ctx: ctx)
 
   defp materialize_memory_space(address_space, ctx) when is_integer(address_space),

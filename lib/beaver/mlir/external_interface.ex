@@ -12,11 +12,8 @@ defmodule Beaver.MLIR.ExternalInterface do
   Normally attachments are declared with `Beaver.Slang.defop/2`. The interface modules also expose `attach/4` for
   dynamic operation definitions that are not written with Slang.
   """
-
   use GenServer
-
   require Logger
-
   alias Beaver.MLIR
   alias Kinda.CallbackRuntime
 
@@ -24,17 +21,13 @@ defmodule Beaver.MLIR.ExternalInterface do
     @moduledoc "A live callback-backed external interface attachment."
     @enforce_keys [:pid, :id, :interface, :operation_name]
     defstruct [:pid, :id, :interface, :operation_name]
-
     @type t() :: %__MODULE__{pid: pid(), id: term(), interface: atom(), operation_name: String.t()}
   end
 
   @type interface() :: :memory_effects | :conditionally_speculatable | :transform_op | :pattern_descriptor
-
   @registry __MODULE__.Registry
-
   @doc false
   def global_registrar_child_specs, do: [{Registry, keys: :duplicate, name: @registry}]
-
   @doc false
   def release_context(%Context{ref: context_ref}, registry \\ @registry) do
     if Process.whereis(registry) do
@@ -219,11 +212,8 @@ defmodule Beaver.MLIR.ExternalInterface do
   end
 
   defp normalize_transform_result(:silenceable_failure, _operation, _results), do: {:ok, :silenceable_failure}
-
   defp normalize_transform_result({:error, :silenceable}, _operation, _results), do: {:ok, :silenceable_failure}
-
   defp normalize_transform_result(:definite_failure, _operation, _results), do: {:ok, :definite_failure}
-
   defp normalize_transform_result({:error, :definite}, _operation, _results), do: {:ok, :definite_failure}
 
   defp normalize_transform_result(other, _operation, _results),
@@ -231,9 +221,7 @@ defmodule Beaver.MLIR.ExternalInterface do
 
   defp normalize_boolean({:ok, value}), do: normalize_boolean(value)
   defp normalize_boolean(value) when is_boolean(value), do: value
-
   defp normalize_boolean(other), do: raise(ArgumentError, "callback must return a boolean, got: #{inspect(other)}")
-
   defp normalize_void_result({:error, _reason} = error), do: error
   defp normalize_void_result(_value), do: {:ok, :ok}
 
@@ -276,11 +264,8 @@ defmodule Beaver.MLIR.ExternalInterface do
   end
 
   defp native(value), do: Beaver.Native.check!(value)
-
   @doc false
   def callback_failure({:error, reason}), do: {:error, reason}
-
   def callback_failure({:exception, _kind, _reason, _stacktrace} = exception), do: exception
-
   def callback_failure(_outcome), do: nil
 end

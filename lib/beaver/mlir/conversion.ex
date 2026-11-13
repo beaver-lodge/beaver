@@ -2,10 +2,8 @@ alias Beaver.MLIR.{CAPI, ConversionTarget, Operation, RewritePatternSet, Type, V
 
 defmodule Beaver.MLIR.Conversion.Callbacks do
   @moduledoc false
-
   alias Beaver.MLIR
   alias Kinda.CallbackRuntime
-
   # Keep the exact native message shapes while sharing argument decoding and
   # exception capture. Pattern registrations additionally carry a root name.
   @callbacks [
@@ -48,14 +46,11 @@ defmodule Beaver.MLIR.Conversion.Callbacks do
   defp native(nil), do: nil
   defp native(values) when is_list(values), do: Enum.map(values, &native/1)
   defp native(value), do: Beaver.Native.check!(value)
-
   defp legality(value) when value in [:legal, true], do: {:ok, :legal}
   defp legality(value) when value in [:illegal, false], do: {:ok, :illegal}
   defp legality(:no_opinion), do: {:ok, :no_opinion}
   defp legality({:error, _reason} = error), do: error
-
   defp legality(other), do: raise(ArgumentError, "invalid dynamic legality result: #{inspect(other)}")
-
   defguardp handle_result(value, module, many) when (many and is_list(value)) or (not many and is_struct(value, module))
 
   for {name, module, many, label, list_label} <- [
@@ -84,7 +79,6 @@ defmodule Beaver.MLIR.Conversion.Callbacks do
   defp pattern_result({:ok, _state}), do: {:ok, :match}
   defp pattern_result(value) when value in [:no_match, false], do: {:ok, :no_match}
   defp pattern_result({:error, _reason} = error), do: error
-
   defp pattern_result(other), do: raise(ArgumentError, "invalid conversion pattern result: #{inspect(other)}")
 
   defp validate_list!(values, module, label) do
@@ -120,7 +114,6 @@ defmodule Beaver.MLIR.Conversion.Callbacks do
   end
 
   defp reply_pattern(token, {:ok, :match}), do: CAPI.beaver_raw_callback_reply(token, true)
-
   defp reply_pattern(token, _no_match_or_failure), do: CAPI.beaver_raw_callback_reply(token, false)
 end
 
@@ -134,9 +127,7 @@ defmodule Beaver.MLIR.Conversion do
   type converters, and conversion patterns in the calling process. Mutable pattern sets are frozen and cleaned up
   automatically. See the [dialect conversion guide](dialect-conversion.html) for a complete Slang-to-LLVM example.
   """
-
   use Beaver.ComposerGenerator, prefix: "mlirCreateConversion"
-
   require Logger
   require MLIR.Conversion.Callbacks
   alias Beaver.MLIR
@@ -152,7 +143,6 @@ defmodule Beaver.MLIR.Conversion do
             callback_failure: term(),
             reason: term()
           }
-
     @impl true
     def message(%__MODULE__{} = error) do
       prefix = "#{error.mode} dialect conversion failed"
@@ -176,7 +166,6 @@ defmodule Beaver.MLIR.Conversion do
   @type mode() :: :full | :partial | :analysis
   @type conversion_ir() :: MLIR.Module.t() | Operation.t()
   @type result() :: {:ok, conversion_ir(), [term()]} | {:ok, MLIR.Conversion.Result.t()} | {:error, Error.t()}
-
   @spec apply(
           mode(),
           conversion_ir(),
@@ -283,9 +272,7 @@ defmodule Beaver.MLIR.Conversion do
   defp folding_mode!(:never), do: 0
   defp folding_mode!(:before_patterns), do: 1
   defp folding_mode!(:after_patterns), do: 2
-
   defp folding_mode!(mode), do: raise(ArgumentError, "unsupported conversion folding mode: #{inspect(mode)}")
-
   defp materializations!(nil), do: -1
   defp materializations!(false), do: 0
   defp materializations!(true), do: 1

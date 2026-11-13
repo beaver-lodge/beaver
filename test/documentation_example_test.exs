@@ -1,17 +1,13 @@
 defmodule DocumentationExampleTest do
   use ExUnit.Case, async: true
-
   alias Beaver.Test.DocumentationExample
-
   @moduletag :smoke
-
   @examples [
     {"README.md", "quickstart"},
     {"guides/blocks.md", "control-flow"},
     {"guides/passes-and-patterns.md", "pass-definition"},
     {"guides/passes-and-patterns.md", "pass-pipeline"}
   ]
-
   for {document, marker} <- @examples do
     test "#{document}:#{marker} is present and valid Elixir syntax" do
       code = DocumentationExample.read!(unquote(document), unquote(marker))
@@ -41,7 +37,6 @@ defmodule DocumentationExampleTest do
   test "rejects missing and duplicate markers", %{tmp_dir: tmp_dir} do
     path = Path.join(tmp_dir, "examples.md")
     File.write!(path, example("repeated", ":ok") <> "\n<!-- beaver:test:repeated -->\n")
-
     assert_raise ArgumentError, ~r/missing beaver:test:absent/, fn -> DocumentationExample.read!(path, "absent") end
 
     assert_raise ArgumentError, ~r/duplicate beaver:test:repeated/, fn ->

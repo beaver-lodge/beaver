@@ -20,18 +20,15 @@ pub fn nifDirtyIO(comptime name: []const u8, comptime nif_name: ?[]const u8) e.E
     const exported_name = if (nif_name) |v| v else name;
     return kinda.NIFFunc(allKinds, c, name, .{ .flags = e.ERL_NIF_DIRTY_JOB_IO_BOUND, .nif_name = exported_name.ptr });
 }
-
 const result = @import("kinda").result;
 pub fn beaverRawNIF(worker: anytype, comptime field_name: []const u8, comptime arity: usize) e.ErlNifFunc {
     return result.nif("beaver_raw_" ++ field_name, arity, @field(worker, field_name)).entry;
 }
-
 pub fn beaverRawNIFDirtyCPU(worker: anytype, comptime field_name: []const u8, comptime arity: usize) e.ErlNifFunc {
     var entry = beaverRawNIF(worker, field_name, arity);
     entry.flags = e.ERL_NIF_DIRTY_JOB_CPU_BOUND;
     return entry;
 }
-
 pub fn beaverRawNIFDirtyIO(worker: anytype, comptime field_name: []const u8, comptime arity: usize) e.ErlNifFunc {
     var entry = beaverRawNIF(worker, field_name, arity);
     entry.flags = e.ERL_NIF_DIRTY_JOB_IO_BOUND;

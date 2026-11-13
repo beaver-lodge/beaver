@@ -74,6 +74,22 @@ fn createNativeModule(
     });
     module.addImport("kinda", kinda_module);
     module.addImport("c_api", capi_module);
+    const schema_source = @embedFile("lib/beaver/mlir/ir_batch/protocol.json");
+    const Schema = struct {
+        version: u32,
+        operation_fields: []const []const u8,
+        operation_required: usize,
+        operand_fields: []const []const u8,
+        operand_kinds: []const []const u8,
+    };
+    const schema = std.json.parseFromSlice(Schema, b.allocator, schema_source, .{}) catch @panic("invalid IRBatch protocol");
+    const protocol = b.addOptions();
+    inline for (@typeInfo(Schema).@"struct".fields) |field| {
+        protocol.addOption(field.type, field.name, @field(schema.value, field.name));
+    }
+    protocol.addOption([]const u8, "source", schema_source);
+    module.addOptions("ir_batch_protocol", protocol);
+
     module.addIncludePath(.{ .cwd_relative = "native/include" });
     // add these to get ZLS working properly
     module.addIncludePath(.{ .cwd_relative = mlir_include_dir });

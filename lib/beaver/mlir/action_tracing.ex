@@ -16,13 +16,9 @@ defmodule Beaver.MLIR.ActionTracing do
 
   Sessions detach automatically when their context is destroyed.
   """
-
   use GenServer
-
   alias Beaver.MLIR
-
   @registry __MODULE__.Registry
-
   defmodule Session do
     @moduledoc "A live context-scoped action tracing session."
     @enforce_keys [:pid, :context]
@@ -76,15 +72,12 @@ defmodule Beaver.MLIR.ActionTracing do
   @spec drain(Session.t() | pid()) :: [map()]
   def drain(%Session{} = session), do: drain(session.pid)
   def drain(pid) when is_pid(pid), do: GenServer.call(pid, :drain, 30_000)
-
   @doc "Detaches and releases the tracing session."
   @spec detach(Session.t() | pid()) :: :ok
   def detach(%Session{} = session), do: detach(session.pid)
   def detach(pid) when is_pid(pid), do: GenServer.call(pid, :detach, 5_000)
-
   @doc false
   def release_context(ctx), do: MLIR.ExternalInterface.release_context(ctx, @registry)
-
   @impl true
   def init(state) do
     {:ok, _} = Registry.register(@registry, state.context.ref, :attachment)
@@ -113,9 +106,7 @@ defmodule Beaver.MLIR.ActionTracing do
   end
 
   defp schedule_drain(%{drain_interval_ms: nil}), do: :ok
-
   defp schedule_drain(%{drain_interval_ms: ms}), do: Process.send_after(self(), :drain_timer, ms)
-
   defp drain_raw_events(state), do: state.session |> CAPI.beaver_raw_action_tracing_drain() |> JSON.decode!()
 
   defp detach_session(state) do
@@ -154,7 +145,6 @@ defmodule Beaver.MLIR.ActionTracing do
        when is_integer(after_ns) and is_integer(before_ns), do: max(after_ns - before_ns, 0)
 
   defp duration(_event, _start), do: nil
-
   defp normalize_strings!(nil, _name), do: nil
 
   defp normalize_strings!(strings, name) when is_list(strings) do
@@ -172,7 +162,6 @@ defmodule Beaver.MLIR.ActionTracing do
   end
 
   defp normalize_count_map!(other, name), do: raise(ArgumentError, "invalid #{name}: #{inspect(other)}")
-
   defp normalize_metadata!(metadata) when is_map(metadata), do: metadata
 
   defp normalize_metadata!(other),

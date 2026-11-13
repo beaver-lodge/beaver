@@ -1,13 +1,10 @@
 alias Beaver.Native
-
 alias Beaver.MLIR
-
 alias Beaver.MLIR.{Value, Operation, OpOperand, Region, Module, Attribute, Block, NamedAttribute, Identifier}
 
 defmodule Beaver.Walker do
   alias Beaver.MLIR.CAPI
   @behaviour Access
-
   @moduledoc """
   Enumerable and Access views over MLIR operations, values, attributes, regions and blocks. For example,
   `operands(op)[0]` reads an operand and `attributes(op)[:name]` reads an attribute.
@@ -33,7 +30,6 @@ defmodule Beaver.Walker do
           this: element() | non_neg_integer() | nil,
           num: non_neg_integer() | nil
         }
-
   container_keys = [:container, :element_module]
   index_func_keys = [:get_num, :get_element]
   iter_keys = [:this, :num]
@@ -133,7 +129,6 @@ defmodule Beaver.Walker do
 
   defp native_integer(value) when is_integer(value), do: value
   defp native_integer(value), do: Native.to_term(value)
-
   @doc "Returns an enumerable of the arguments of an `Block.t()`"
   @spec arguments(Block.t()) :: Enumerable.t()
   def arguments(%Block{} = block),
@@ -159,7 +154,6 @@ defmodule Beaver.Walker do
 
   defp element_null?(%OpOperand{} = operand), do: CAPI.mlirOpOperandIsNull(operand) |> Native.to_term()
   defp element_null?(element), do: MLIR.null?(element)
-
   @impl Access
   def fetch(%__MODULE__{element_module: kind} = walker, key)
       when kind in [NamedAttribute, {Identifier, Attribute}] do
@@ -181,15 +175,11 @@ defmodule Beaver.Walker do
 
   defp attribute_pair(%NamedAttribute{} = entry), do: named_attribute_tuple(entry)
   defp attribute_pair({%Identifier{}, %Attribute{}} = entry), do: entry
-
   @impl Access
   def get_and_update(_data, _key, _function), do: raise("get_and_update not supported")
-
   @impl Access
   def pop(_data, _key), do: raise("pop not supported")
-
   @type mlir() :: container() | element()
-
   @doc """
   Traverses operations, regions and blocks like `Macro.traverse/4`. `pre` runs before children and `post` after
   them; keep mutation outside the traversal.
@@ -251,22 +241,18 @@ defmodule Beaver.Walker do
   @doc "Performs a depth-first, pre-order traversal of a MLIR structure."
   @spec prewalk(mlir(), (mlir() -> mlir())) :: mlir()
   def prewalk(ast, fun) when is_function(fun, 1), do: elem(prewalk(ast, nil, fn x, nil -> {fun.(x), nil} end), 0)
-
   @doc "Performs a depth-first, pre-order traversal using an accumulator."
   @spec prewalk(mlir(), any, (mlir(), any -> {mlir(), any})) :: {mlir(), any}
   def prewalk(ast, acc, fun) when is_function(fun, 2), do: traverse(ast, acc, fun, fn x, a -> {x, a} end)
-
   @doc "Performs a depth-first, post-order traversal of a MLIR structure."
   @spec postwalk(mlir(), (mlir() -> mlir())) :: mlir()
   def postwalk(ast, fun) when is_function(fun, 1), do: elem(postwalk(ast, nil, fn x, nil -> {fun.(x), nil} end), 0)
-
   @doc "Performs a depth-first, post-order traversal using an accumulator."
   @spec postwalk(mlir(), any, (mlir(), any -> {mlir(), any})) :: {mlir(), any}
   def postwalk(ast, acc, fun) when is_function(fun, 2), do: traverse(ast, acc, fn x, a -> {x, a} end, fun)
 
   @type op_matcher() ::
           :all | String.t() | atom() | [String.Chars.t()] | MapSet.t() | (Operation.t() -> as_boolean(term()))
-
   @doc """
   Finds operations inside `root` (`MLIR.Module`, `MLIR.Operation`, `MLIR.Region`, or `MLIR.Block`)
   in pre-order without traversing operands, results, attributes, or successors.
@@ -295,7 +281,6 @@ defmodule Beaver.Walker do
 
   defp build_op_predicate!(:all), do: fn _op -> true end
   defp build_op_predicate!(fun) when is_function(fun, 1), do: fn op -> if(fun.(op), do: true, else: false) end
-
   defp build_op_predicate!(names) when is_binary(names) or is_atom(names), do: build_op_predicate!([names])
 
   defp build_op_predicate!(names) when is_list(names) or is_struct(names, MapSet) do
@@ -328,7 +313,6 @@ defmodule Beaver.Walker do
     end
 
     def count(%Beaver.Walker{}), do: {:error, __MODULE__}
-
     @spec member?(Beaver.Walker.t(), Beaver.Walker.element()) :: {:ok, boolean()} | {:error, module()}
     def member?(%Beaver.Walker{element_module: element_module} = walker, %element_module{} = element),
       do: {:ok, Enum.any?(walker, &MLIR.equal?(&1, element))}
@@ -349,12 +333,9 @@ defmodule Beaver.Walker do
       do: fn start, length, step -> for pos <- start..(start + length - 1)//step, do: get_element.(container, pos) end
 
     @spec reduce(Beaver.Walker.t(), Enumerable.acc(), Enumerable.reducer()) :: Enumerable.result()
-
     # Do nothing special receiving :halt or :suspend
     def reduce(_walker, {:halt, acc}, _fun), do: {:halted, acc}
-
     def reduce(walker, {:suspend, acc}, fun), do: {:suspended, acc, &reduce(walker, &1, fun)}
-
     def reduce(%Beaver.Walker{this: nil} = walker, {:cont, acc}, fun), do: reduce(initialize(walker), {:cont, acc}, fun)
 
     def reduce(walker, {:cont, acc}, fun) do
@@ -391,9 +372,7 @@ defmodule Beaver.Walker do
     end
 
     defp expect_element!(%module{} = element, module), do: element
-
     defp expect_element!(%module{}, expected), do: raise("Expected element module #{expected}, got #{module}")
-
     defp expect_element!({%module_a{}, %module_b{}} = element, {module_a, module_b}), do: element
 
     defp expect_element!({%module_a{}, %module_b{}}, expected),

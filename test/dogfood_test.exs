@@ -1,9 +1,7 @@
 defmodule Beaver.MLIR.DogfoodDialect do
   @moduledoc false
   use Beaver.Slang, name: "dogfood"
-
   alias Beaver.MLIR.Type
-
   defop square(value = Type.i32()), do: [Type.i32()]
   defop inc(value = Type.i32()), do: [Type.i32()]
 end
@@ -12,7 +10,6 @@ defmodule Beaver.MLIR.DogfoodNativePatterns do
   @moduledoc false
   use Beaver
   use Beaver.Pattern.Native
-
   alias Beaver.MLIR
   alias Beaver.MLIR.Dialect.Arith
   alias Beaver.MLIR.Type
@@ -55,22 +52,11 @@ end
 
 defmodule DogfoodTest do
   use Beaver.Case, async: true
-
-  alias Beaver.MLIR
   alias MLIR.Conversion.Plan
   alias MLIR.DogfoodDialect
   alias MLIR.DogfoodNativePatterns
 
-  @source """
-  module {
-    func.func @kernel(%arg0: i32, %arg1: i32) -> (i32, i32) {
-      %0 = "dogfood.square"(%arg0) : (i32) -> i32
-      %1 = "dogfood.inc"(%arg1) : (i32) -> i32
-      return %0, %1 : i32, i32
-    }
-  }
-  """
-
+  @source "module {\n  func.func @kernel(%arg0: i32, %arg1: i32) -> (i32, i32) {\n    %0 = \"dogfood.square\"(%arg0) : (i32) -> i32\n    %1 = \"dogfood.inc\"(%arg1) : (i32) -> i32\n    return %0, %1 : i32, i32\n  }\n}\n"
   test "dogfood: Slang -> native rewrite -> conversion plan -> transform schedule -> bytecode",
        %{ctx: ctx} do
     assert Beaver.Slang.load(ctx, DogfoodDialect) |> MLIR.LogicalResult.success?()
@@ -104,16 +90,8 @@ defmodule DogfoodTest do
     refute MLIR.to_string(module2) =~ "dogfood"
     MLIR.Context.destroy(ctx2)
     # Compose the retained native primitives directly, then serialize the result.
-    schedule = """
-    module attributes {transform.with_named_sequence} {
-      transform.named_sequence @__transform_main(%root: !transform.any_op) {
-        transform.apply_patterns to %root {
-          transform.apply_patterns.canonicalization
-        } : !transform.any_op
-        transform.yield
-      }
-    }
-    """
+    schedule =
+      "module attributes {transform.with_named_sequence} {\n  transform.named_sequence @__transform_main(%root: !transform.any_op) {\n    transform.apply_patterns to %root {\n      transform.apply_patterns.canonicalization\n    } : !transform.any_op\n    transform.yield\n  }\n}\n"
 
     assert {:ok, _} = MLIR.Transform.apply_named_sequence(module, schedule)
     bytecode = MLIR.Bytecode.write!(module)

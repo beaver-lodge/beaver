@@ -6,19 +6,16 @@ const beam = kinda.beam;
 const result = kinda.result;
 pub const c = @import("prelude.zig").c;
 const mem = @import("std").mem;
-
 pub fn get_binary_as_string_ref(env: beam.env, term: beam.term) !mlir_capi.StringRef.T {
     const bin = try beam.get_binary(env, term);
     return c.mlirStringRefCreate(bin.data, bin.size);
 }
-
 const print_nif_prefix = "beaver_raw_to_string_";
 pub const TextBuffer = std.array_list.Managed(u8);
 pub fn collectStringRef(s: mlir_capi.StringRef.T, user_data: ?*anyopaque) callconv(.c) void {
     const buffer: *TextBuffer = @ptrCast(@alignCast(user_data orelse return));
     buffer.appendSlice(s.data[0..s.length]) catch @panic("failed to collect MLIR text");
 }
-
 pub fn PrinterNIF(comptime ResourceKind: type, comptime print_fn: anytype) type {
     return struct {
         pub fn print_make(env: beam.env, entity: ResourceKind.T) !beam.term {
@@ -37,7 +34,6 @@ pub fn PrinterNIF(comptime ResourceKind: type, comptime print_fn: anytype) type 
         }
     };
 }
-
 // collect multiple MLIR StringRef and join them as a single erlang binary
 pub const Printer = struct {
     pub const ResourceKind = kinda.ResourceKind(@This(), "Elixir.Beaver.Printer");
@@ -77,11 +73,9 @@ pub const Printer = struct {
         result.nif("beaver_raw_string_printer_flush", 1, flush).entry,
     };
 };
-
 fn string_ref_to_binary(env: beam.env, s: mlir_capi.StringRef.T) beam.term {
     return beam.make_slice(env, s.data[0..s.length]);
 }
-
 // collect multiple MLIR StringRef as a list of erlang binary
 pub const StringRefCollector = struct {
     const Container = std.array_list.Managed(beam.term);
@@ -101,11 +95,9 @@ pub const StringRefCollector = struct {
         return beam.make_term_list(this.env, this.container.items);
     }
 };
-
 fn beaver_raw_string_ref_to_binary(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     return string_ref_to_binary(env, try mlir_capi.StringRef.resource.fetch(env, args[0]));
 }
-
 // memory layout {StringRef, real_binary, null}
 fn beaver_raw_get_string_ref(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const Error = error{ ResAllocFailure, NotBinary };
@@ -123,7 +115,6 @@ fn beaver_raw_get_string_ref(env: beam.env, _: c_int, args: [*c]const beam.term)
     dptr[bin.size] = '\x00';
     return e.enif_make_resource(env, ptr);
 }
-
 pub const nifs = .{
     result.nif("beaver_raw_get_string_ref", 1, beaver_raw_get_string_ref).entry,
     result.nif(print_nif_prefix ++ "StringRef", 1, beaver_raw_string_ref_to_binary).entry,

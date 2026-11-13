@@ -16,27 +16,20 @@ defmodule Beaver.MLIR.IRMapping do
         |> MLIR.IRMapping.lookup(old_result)
       end)
   """
-
   alias Beaver.MLIR
   alias Beaver.MLIR.CAPI
-
   use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Native
-
   @type entity() :: Value.t() | Block.t() | Operation.t()
   @type rewriter() :: MLIR.RewriterBase.t() | MLIR.PatternRewriter.t()
-
   @doc "Creates an empty owned IR mapping."
   @spec create() :: t()
   def create, do: CAPI.mlirIRMappingCreate()
-
   @doc "Destroys an owned IR mapping."
   @spec destroy(t()) :: :ok
   defdelegate destroy(mapping), to: CAPI, as: :mlirIRMappingDestroy
-
   @doc "Runs `fun` with a new mapping and always destroys it."
   @spec with_mapping((t() -> result)) :: result when result: var
   def with_mapping(fun) when is_function(fun, 1), do: Beaver.Native.with_resource(create(), &destroy/1, fun)
-
   @entity_kinds [Value, Block, Operation]
   for kind <- @entity_kinds, verb <- ~w(Map LookupOrNull LookupOrDefault Contains Erase) do
     defp mapping_function(unquote(kind), unquote(verb)),
@@ -82,7 +75,6 @@ defmodule Beaver.MLIR.IRMapping do
   @doc "Clones `operation` as a detached caller-owned operation and updates `mapping`."
   @spec clone(t(), Operation.t()) :: Operation.t()
   def clone(%__MODULE__{} = mapping, %Operation{} = op), do: CAPI.mlirOperationCloneWithMapping(op, mapping)
-
   @doc "Clones and inserts `operation` through `rewriter`, updating `mapping`."
   @spec clone(t(), Operation.t(), rewriter()) :: Operation.t()
   def clone(%__MODULE__{} = mapping, %Operation{} = op, %MLIR.PatternRewriter{} = rewriter),

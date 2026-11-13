@@ -1,6 +1,5 @@
 defmodule DialectRegistryTest do
   use ExUnit.Case, async: true
-
   alias Beaver.MLIR.Dialect
 
   test "dialect name helpers" do
@@ -70,9 +69,7 @@ defmodule DialectRegistryTest do
       |> MapSet.new()
 
     optional = [{"amx", "AMX"}, {"x86", "X86"}, {"x86vector", "X86Vector"}] |> MapSet.new()
-
     assert MapSet.difference(required, registered) == MapSet.new([])
-
     assert registered |> MapSet.difference(required) |> MapSet.difference(optional) == MapSet.new([])
   end
 

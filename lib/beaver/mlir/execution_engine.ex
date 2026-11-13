@@ -6,16 +6,11 @@ defmodule Beaver.MLIR.ExecutionEngine do
   alias Beaver.MLIR
   alias Beaver.Composer
   import CAPI
-
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
-
   @doc "Create a MLIR JIT engine for a module and check if successful. Usually this module should be of LLVM dialect."
   def create!(composer_or_op, opts \\ [])
-
   def create!(%Composer{} = composer_or_op, opts), do: Composer.run!(composer_or_op) |> create!(opts)
-
   @type dirty :: nil | :io_bound | :cpu_bound
-
   @type opt_level :: 0 | 1 | 2 | 3
   @type shared_lib_path :: String.t()
   @type object_dump :: boolean()
@@ -86,13 +81,10 @@ defmodule Beaver.MLIR.ExecutionEngine do
   If not already initialized, this will be called implicitly when first invocation happens.
   """
   def init(jit), do: tap(jit, &CAPI.mlirExecutionEngineInitialize/1)
-
   defdelegate destroy(jit), to: CAPI, as: :mlirExecutionEngineDestroy
-
   @doc "Creates an `ExecutionEngine`, runs `fun.(jit)`, and always destroys the engine afterward."
   @spec with_jit(Composer.t() | MLIR.Module.t(), (t() -> result)) :: result when result: var
   def with_jit(composer_or_module, fun) when is_function(fun, 1), do: with_jit(composer_or_module, [], fun)
-
   @spec with_jit(Composer.t() | MLIR.Module.t(), opts(), (t() -> result)) :: result when result: var
   def with_jit(composer_or_module, opts, fun) when is_list(opts) and is_function(fun, 1),
     do: Native.with_resource(create!(composer_or_module, opts), &destroy/1, fun)

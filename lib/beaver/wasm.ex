@@ -9,10 +9,8 @@ defmodule Beaver.Wasm do
   Lower custom dialects before calling this function. The manifest names the WASI/import surface that a runtime must
   provide to execute the binary.
   """
-
   import Beaver.MLIR.Conversion
   import Beaver.MLIR.Transform
-
   alias Beaver.MLIR
   alias Beaver.MLIR.Target.LLVMIR
 
@@ -73,6 +71,5 @@ defmodule Beaver.Wasm do
   end
 
   defp tmp_path(suffix), do: Path.join(System.tmp_dir!(), "beaver_wasm_#{System.unique_integer([:positive])}#{suffix}")
-
   defp cleanup(paths), do: Enum.each(paths, &File.rm/1)
 end

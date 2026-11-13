@@ -5,7 +5,6 @@ const c = @import("prelude.zig").c;
 const m = @import("mlir_capi.zig");
 const tuple = @import("execution.zig").tuple;
 const string_ref = @import("string_ref.zig");
-
 const Constraint = extern struct {
     kind: c_int,
     index: isize,
@@ -26,19 +25,16 @@ const Edit = extern struct {
 };
 extern fn beaverDeclarativePatternAdd(m.RewritePatternSet.T, m.Context.T, m.TypeConverter.T, m.StringRef.T, c_uint, [*]const Constraint, usize, [*]const Edit, usize) bool;
 extern fn beaverRewritePatternSetAddPDL(m.RewritePatternSet.T, m.Operation.T) bool;
-
 fn attribute(env: beam.env, ctx: m.Context.T, term: beam.term) !m.Attribute.T {
     const attr = try m.Attribute.resource.fetch(env, term);
     if (attr.ptr == null or !c.mlirContextEqual(ctx, c.mlirAttributeGetContext(attr))) return error.ContextMismatch;
     return attr;
 }
-
 fn fetchType(env: beam.env, ctx: m.Context.T, term: beam.term) !m.Type.T {
     const t = try m.Type.resource.fetch(env, term);
     if (t.ptr == null or !c.mlirContextEqual(ctx, c.mlirTypeGetContext(t))) return error.ContextMismatch;
     return t;
 }
-
 pub fn declarative_pattern_add(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const set = try m.RewritePatternSet.resource.fetch(env, args[0]);
     var ctx: m.Context.T = .{ .ptr = null };
@@ -176,14 +172,12 @@ pub fn declarative_pattern_add(env: beam.env, _: c_int, args: [*c]const beam.ter
     }
     return beam.make_ok(env);
 }
-
 pub fn pdl_pattern_add(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const set = try m.RewritePatternSet.resource.fetch(env, args[0]);
     const op = try m.Operation.resource.fetch(env, args[1]);
     if (!beaverRewritePatternSetAddPDL(set, op)) return error.InvalidPDLPatternModule;
     return beam.make_ok(env);
 }
-
 pub const nifs = .{
     @import("prelude.zig").beaverRawNIF(@This(), "declarative_pattern_add", 6),
     @import("prelude.zig").beaverRawNIF(@This(), "pdl_pattern_add", 2),

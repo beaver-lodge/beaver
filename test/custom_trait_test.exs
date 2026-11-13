@@ -1,14 +1,8 @@
 defmodule CustomTraitTest do
   use Beaver.Case, async: true
-  use Beaver
-
-  alias Beaver.MLIR
-
   @moduletag :smoke
-
   test "Slang attaches custom traits with a shared identity", %{ctx: ctx} do
     assert CustomTraitSlang |> then(&Beaver.Slang.load(ctx, &1)) |> MLIR.LogicalResult.success?()
-
     assert MLIR.Trait.has?(ctx, "custom_trait_test.valid", CustomTraitSlang.Validity)
     assert MLIR.Trait.has?(ctx, "custom_trait_test.also_valid", CustomTraitSlang.Validity)
     valid = module_with(ctx, "custom_trait_test.valid")
@@ -66,7 +60,6 @@ defmodule CustomTraitTest do
     )
 
     assert {:error, diagnostics} = verify_with(ctx, "custom_trait_test.valid")
-
     assert MLIR.Diagnostic.format(diagnostics) =~ "dynamic trait callback timed out or its owner is unavailable"
   end
 
@@ -85,19 +78,15 @@ defmodule CustomTraitTest do
     Process.exit(attachment.pid, :kill)
     assert_receive {:DOWN, ^monitor, :process, _, :killed}, 1_000
     assert {:error, diagnostics} = verify_with(ctx, "custom_trait_test.valid")
-
     assert MLIR.Diagnostic.format(diagnostics) =~ "dynamic trait callback timed out or its owner is unavailable"
   end
 
   defp module_with(ctx, operation_name), do: ctx |> operation_module(operation_name) |> MLIR.verify!()
-
   defp verify_with(ctx, operation_name), do: ctx |> operation_module(operation_name) |> MLIR.verify()
 
   defp operation_module(ctx, operation_name) do
-    mlir ctx: ctx do
-      module do
-        ~o/#{operation_name}/ >>> []
-      end
+    module_ir ctx do
+      ~o/#{operation_name}/ >>> []
     end
   end
 end

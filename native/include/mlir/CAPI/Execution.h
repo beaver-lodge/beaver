@@ -1,7 +1,6 @@
 #ifndef BEAVER_EXECUTION_H
 #define BEAVER_EXECUTION_H
 #include <memory>
-
 namespace beaver {
 struct ExecutionState;
 using Execution = std::shared_ptr<ExecutionState>;
@@ -10,7 +9,6 @@ class ExecutionScope {
 public:
   explicit ExecutionScope(Execution execution);
   ~ExecutionScope();
-
 private:
   Execution previous;
 };

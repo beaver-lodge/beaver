@@ -5,26 +5,21 @@ defmodule Beaver.MLIR.Dialect.Bufferization do
   The pipeline helpers validate and render pass options, preserve diagnostics through `Beaver.Composer`, and
   optionally append MLIR's ownership-based deallocation pipeline.
   """
-
   use Beaver.MLIR.Dialect, dialect: "bufferization", ops: Beaver.MLIR.Dialect.Registry.ops("bufferization")
-
   @boolean_options ~w(
     allow_return_allocs_from_loops allow_unknown_ops bufferize_function_boundaries check_parallel_regions
     copy_before_write must_infer_memory_space use_encoding_for_memory_space
   )a
-
   @scalar_options ~w(analysis_heuristic buffer_alignment)a
   @list_options ~w(dialect_filter no_analysis_func_filter)a
   @layout_options ~w(function_boundary_type_conversion unknown_type_conversion)a
   @control_options ~w(boundary_layout deallocate private_function_dynamic_ownership run)a
   @supported_options @boolean_options ++ @scalar_options ++ @list_options ++ @layout_options ++ @control_options
-
   @layout_values %{
     identity: "identity-layout-map",
     fully_dynamic: "fully-dynamic-layout-map",
     infer: "infer-layout-map"
   }
-
   @doc "Return a validated One-Shot Bufferize pass pipeline fragment."
   def one_shot_pipeline(opts \\ []) when is_list(opts) do
     validate_options!(opts)
@@ -139,8 +134,6 @@ defmodule Beaver.MLIR.Dialect.Bufferization do
     do: "analysis-heuristic=#{value |> to_string() |> String.replace("_", "-")}"
 
   defp render_option({:buffer_alignment, value}) when is_integer(value) and value > 0, do: "buffer-alignment=#{value}"
-
   defp render_option({name, value}), do: raise(ArgumentError, "invalid bufferization option #{name}: #{inspect(value)}")
-
   defp pass_name(name), do: name |> to_string() |> String.replace("_", "-")
 end

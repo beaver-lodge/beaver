@@ -6,12 +6,10 @@
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/Pass/PassManager.h"
 #include "llvm/ADT/SmallPtrSet.h"
-
 using namespace mlir;
-
 namespace {
-// The upstream planner does not free allocated arenas or check argument size.
-// Keep planning upstream; supply these ownership/bounds checks at the boundary.
+// The upstream planner does not free allocated arenas or check argument size. Keep planning upstream; supply these
+// ownership/bounds checks at the boundary.
 struct StaticMemoryPlan : PassWrapper<StaticMemoryPlan, OperationPass<func::FuncOp>> {
   MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(StaticMemoryPlan)
   StaticMemoryPlan(bool callerArena, bool bestFit) : callerArena(callerArena), bestFit(bestFit) {}
@@ -75,7 +73,6 @@ struct StaticMemoryPlan : PassWrapper<StaticMemoryPlan, OperationPass<func::Func
   bool callerArena, bestFit;
 };
 } // namespace
-
 MLIR_CAPI_EXPORTED MlirPass beaverCreateStaticMemoryPlannerPass(bool callerArena, bool bestFit) {
   return wrap(new StaticMemoryPlan(callerArena, bestFit));
 }

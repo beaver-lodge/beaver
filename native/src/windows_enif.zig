@@ -2,7 +2,6 @@
 // Derive each forwarding signature from OTP instead of duplicating its ABI.
 const e = @import("kinda").erl_nif;
 export var WinDynNifCallbacks: e.TWinDynNifCallbacks = .{};
-
 fn Forward(comptime name: []const u8) type {
     const Pointer = @typeInfo(@FieldType(e.TWinDynNifCallbacks, name)).optional.child;
     const signature = @typeInfo(@typeInfo(Pointer).pointer.child).@"fn";
@@ -56,7 +55,6 @@ fn Forward(comptime name: []const u8) type {
         else => @compileError("unsupported OTP callback arity: " ++ name),
     };
 }
-
 comptime {
     @setEvalBranchQuota(10000);
     for (@typeInfo(e.TWinDynNifCallbacks).@"struct".fields) |field| {
@@ -68,7 +66,6 @@ comptime {
         if (!signature.is_var_args) @export(&Forward(field.name).call, .{ .name = field.name });
     }
 }
-
 comptime {
     if (!@hasField(e.TWinDynNifCallbacks, "enif_get_int64")) {
         @export(&enif_get_int64, .{ .name = "enif_get_int64" });
@@ -77,27 +74,21 @@ comptime {
         @export(&enif_make_uint64, .{ .name = "enif_make_uint64" });
     }
 }
-
 export fn enif_make_tuple(env: ?*e.ErlNifEnv, cnt: c_uint, t1: e.ERL_NIF_TERM, t2: e.ERL_NIF_TERM) e.ERL_NIF_TERM {
     return e.WinDynNifCallbacks.enif_make_tuple.?(env, cnt, t1, t2);
 }
-
 export fn enif_make_list(env: ?*e.ErlNifEnv, cnt: c_uint) e.ERL_NIF_TERM {
     return e.WinDynNifCallbacks.enif_make_list.?(env, cnt);
 }
-
 export fn enif_fprintf(filep: ?*e.FILE, format: [*c]const u8) c_int {
     return e.WinDynNifCallbacks.enif_fprintf.?(filep, format);
 }
-
 export fn enif_snprintf(buffer: [*c]u8, size: usize, format: [*c]const u8) c_int {
     return e.WinDynNifCallbacks.enif_snprintf.?(buffer, size, format);
 }
-
 export fn enif_set_option(env: ?*e.ErlNifEnv, opt: e.ErlNifOption) c_int {
     return e.WinDynNifCallbacks.enif_set_option.?(env, opt);
 }
-
 // The MSVC emulator keeps 64-bit signedness distinct from c_long, so these
 // are real callbacks there. On LP64 ABIs they alias the long variants and
 // translate-c emits aliases instead, so the callbacks table has no fields.
@@ -107,21 +98,18 @@ fn enif_get_int64(env: ?*e.ErlNifEnv, term: e.ERL_NIF_TERM, ip: [*c]e.ErlNifSInt
     else
         e.enif_get_long(env, term, @ptrCast(ip));
 }
-
 fn enif_get_uint64(env: ?*e.ErlNifEnv, term: e.ERL_NIF_TERM, ip: [*c]e.ErlNifUInt64) callconv(.c) c_int {
     return if (@hasField(e.TWinDynNifCallbacks, "enif_get_uint64"))
         e.WinDynNifCallbacks.enif_get_uint64.?(env, term, ip)
     else
         e.enif_get_ulong(env, term, @ptrCast(ip));
 }
-
 fn enif_make_int64(env: ?*e.ErlNifEnv, value: e.ErlNifSInt64) callconv(.c) e.ERL_NIF_TERM {
     return if (@hasField(e.TWinDynNifCallbacks, "enif_make_int64"))
         e.WinDynNifCallbacks.enif_make_int64.?(env, value)
     else
         e.enif_make_long(env, @intCast(value));
 }
-
 fn enif_make_uint64(env: ?*e.ErlNifEnv, value: e.ErlNifUInt64) callconv(.c) e.ERL_NIF_TERM {
     return if (@hasField(e.TWinDynNifCallbacks, "enif_make_uint64"))
         e.WinDynNifCallbacks.enif_make_uint64.?(env, value)

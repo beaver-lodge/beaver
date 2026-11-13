@@ -23,7 +23,6 @@ end
 defmodule ErrInit do
   @moduledoc false
   use Beaver.MLIR.Pass, on: Beaver.MLIR.Dialect.Func.func()
-
   def initialize(_ctx, nil), do: {:error, "new state used in cleanup"}
 
   def destruct(state) do
@@ -35,7 +34,6 @@ end
 defmodule IncorrectInitReturns do
   @moduledoc false
   use Beaver.MLIR.Pass, on: Beaver.MLIR.Dialect.Func.func()
-
   def initialize(_ctx, nil), do: :some
 
   def destruct(state) do

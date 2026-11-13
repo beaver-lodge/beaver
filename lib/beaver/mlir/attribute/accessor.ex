@@ -9,12 +9,10 @@ defmodule Beaver.MLIR.Attribute.Accessor do
 
   defp normalize_key(index, num_elements) when is_integer(index) do
     index = if index < 0, do: num_elements + index, else: index
-
     if index >= 0 and index < num_elements, do: {:ok, index}, else: :error
   end
 
   defp normalize_key(name, _num_elements), do: {:ok, name}
-
   defp to_index(key, _, _) when is_integer(key), do: key
 
   defp to_index(key, elements, ctx) when is_binary(key) or is_atom(key) do
@@ -49,7 +47,6 @@ defmodule Beaver.MLIR.Attribute.Accessor do
   end
 
   def pop(accessor, attr, key), do: get_and_update(accessor, attr, key, fn _ -> :pop end)
-
   defp cast_null_attr(a), do: if(MLIR.null?(a), do: :error, else: {:ok, a})
 
   def fetch(%__MODULE__{get_num_element: get_num_element, get_element: get_element}, attr, key) do
@@ -115,7 +112,6 @@ defmodule Beaver.MLIR.Attribute.Accessor do
     {:f32, "F32", Native.F32},
     {:f64, "F64", Native.F64}
   ]
-
   defp try_dense_array(attr) do
     Enum.find_value(@dense_array_types, fn {name, suffix, type} ->
       if apply(Attribute, :"dense_#{name}_array?", [attr]),

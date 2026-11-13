@@ -8,9 +8,7 @@ defmodule Beaver.MLIR.OptimizationRemarks do
   alias Beaver.MLIR.{CAPI, Context, Location, StringRef}
   alias Beaver.Native
   @kinds %{passed: 1, missed: 2, failure: 3, analysis: 4}
-
   def enabled?(%Context{} = ctx), do: CAPI.beaverContextHasOptimizationRemarks(ctx) |> Native.to_term()
-
   @doc "Enables remarks; filters use LLVM regular expressions on category names."
   def attach(%Context{} = ctx, opts \\ []) do
     opts = Keyword.validate!(opts, policy: :all, filters: [all: ".*"])
@@ -33,7 +31,6 @@ defmodule Beaver.MLIR.OptimizationRemarks do
 
   @doc "Finalizes the engine, reporting postponed remarks and releasing the callback."
   def finalize(%Context{} = ctx), do: CAPI.beaverContextFinalizeOptimizationRemarks(ctx)
-
   @doc "Returns already-delivered remarks for this reference in emission order."
   def drain(ref) when is_reference(ref), do: drain(ref, [])
 

@@ -8,12 +8,10 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
 
   This module contains data only. In particular, it never imports or parses Triton's Python compiler at runtime.
   """
-
   @schema "beaver.triton.pipeline-plan.v1"
   @default_target "cuda:80"
   @default_num_warps 4
   @default_num_stages 3
-
   @pinned_provenance %{
     triton_identity: "7d0817d08273d205",
     source_path: "third_party/nvidia/backend/compiler.py",
@@ -21,10 +19,8 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
     source_sha256: "d2b6c6b79146143fa56107133ddceec6369812d29e74cb362a7d400476765be8",
     pass_replacements: %{"triton-nvidia-gpu-plan-cta" => "triton-nvidia-gpu-assign-cga-layouts"}
   }
-
   @enforce_keys ~w(schema profile target capability num_warps num_stages provenance passes)a
   defstruct @enforce_keys
-
   @type profile :: :legacy | :pinned_nvidia_sm100
   @type phase :: :ttgir | :llir
   @type pass :: %{id: atom(), phase: phase(), pipeline: String.t()}
@@ -38,11 +34,9 @@ defmodule Beaver.MLIR.Triton.PipelinePlan do
           provenance: map() | nil,
           passes: [pass()]
         }
-
   @doc "Returns the immutable provenance attached to the pinned profile."
   @spec pinned_provenance() :: map()
   def pinned_provenance, do: @pinned_provenance
-
   @doc "Builds a deterministic lowering plan without touching MLIR state."
   @spec build(keyword()) :: t()
   def build(opts \\ []) when is_list(opts) do

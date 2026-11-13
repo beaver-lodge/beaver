@@ -2,11 +2,9 @@ defmodule Beaver.Pattern.Native.Program do
   @moduledoc "A callback-free rewrite and dialect-conversion program executed natively in C++."
   alias Beaver.MLIR
   import Bitwise
-
   @enforce_keys [:root, :checks, :edits]
   defstruct [:root, :checks, :edits, benefit: 1]
   @type t :: %__MODULE__{root: String.t(), checks: list(), edits: list(), benefit: non_neg_integer()}
-
   def new(root, opts) when is_binary(root) and byte_size(root) > 0 do
     allowed = [:operands, :results, :attributes, :operand_types, :result_types, :same_operands, :rewrite, :benefit]
 
@@ -40,7 +38,6 @@ defmodule Beaver.Pattern.Native.Program do
     do: type_checks(if(kind == :operand_types, do: 3, else: 4), types)
 
   defp check({:same_operands, pairs}), do: Enum.map(pairs, fn {a, b} -> {5, index!(a), nil, index!(b)} end)
-
   defp check(_), do: []
 
   defp edit({:attributes, [_ | _] = attrs}) do
@@ -82,9 +79,7 @@ defmodule Beaver.Pattern.Native.Program do
     params = Keyword.get(opts, :params, [])
     unless is_list(params), do: raise(ArgumentError, ":c_abi_call :params must be a list")
     stack_save = bool_flag(opts, :stack_save, true, 1)
-
     decl_flags = bool_flag(opts, :ensure_declaration, true, 1) ||| bool_flag(opts, :verify_declaration, false, 2)
-
     callee = encode_callee(Keyword.get(opts, :callee))
     {ret_type_ref, ret_type_edits} = encode_c_abi_return!(Keyword.get(opts, :return_type))
     param_edits = Enum.map(params, &encode_c_abi_param!/1)
@@ -99,7 +94,6 @@ defmodule Beaver.Pattern.Native.Program do
   end
 
   defp bool_flag(opts, key, default, bit), do: if(Keyword.get(opts, key, default), do: bit, else: 0)
-
   defp encode_replace_operands!(:all), do: {-1, []}
   defp encode_replace_operands!(indices) when is_list(indices), do: {0, Enum.map(indices, &{4, index!(&1), nil, nil})}
 
@@ -109,12 +103,9 @@ defmodule Beaver.Pattern.Native.Program do
   defp encode_regions_flag!(:none), do: 0
   defp encode_regions_flag!(:move), do: 1
   defp encode_regions_flag!(other), do: raise(ArgumentError, "invalid :replace_op :regions option: #{inspect(other)}")
-
   defp encode_copy_attrs!(false), do: {0, []}
   defp encode_copy_attrs!(copy_all) when copy_all in [true, :all], do: {2, []}
-
   defp encode_copy_attrs!({:except, names}) when is_list(names), do: {8, Enum.map(names, &{13, 0, to_string(&1), nil})}
-
   defp encode_copy_attrs!(names) when is_list(names), do: {0, Enum.map(names, &{6, 0, to_string(&1), nil})}
 
   defp encode_copy_attrs!(other),
@@ -133,7 +124,6 @@ defmodule Beaver.Pattern.Native.Program do
   end
 
   defp encode_replace_attr!({name, value}), do: {5, 0, to_string(name), attr_value!(value)}
-
   defp encode_replace_results!(:preserve), do: []
   defp encode_replace_results!([]), do: [{7, -1, nil, nil}]
   defp encode_replace_results!(types) when is_list(types), do: Enum.map(types, &{7, 0, nil, type_value!(&1)})
@@ -143,22 +133,19 @@ defmodule Beaver.Pattern.Native.Program do
 
   defp encode_callee(nil), do: nil
   defp encode_callee(other), do: to_string(other) |> String.trim_leading("@")
-
   defp encode_c_abi_return!(v) when v in [nil, :void, :none], do: {nil, []}
   defp encode_c_abi_return!(%MLIR.Type{ref: ref}), do: {ref, []}
   defp encode_c_abi_return!(s) when is_binary(s), do: {nil, [{12, 0, nil, s}]}
   defp encode_c_abi_return!(other), do: raise(ArgumentError, "invalid :c_abi_call :return_type: #{inspect(other)}")
 
-  defp encode_c_abi_param!(:in), do: {9, 0, nil, nil}
-  defp encode_c_abi_param!({:in, _type}), do: {9, 0, nil, nil}
-  defp encode_c_abi_param!(dir) when dir in [:in_ptr, :aggregate], do: {10, 0, nil, nil}
-  defp encode_c_abi_param!({dir, type}) when dir in [:in_ptr, :aggregate], do: {10, 0, nil, type_value!(type)}
-  defp encode_c_abi_param!({dir, type}) when dir in [:out, :out_ptr], do: {11, 1, nil, type_value!(type)}
-
-  defp encode_c_abi_param!({dir, type, param_opts}) when dir in [:out, :out_ptr] and is_list(param_opts),
-    do: {11, bool_flag(param_opts, :zero_init, true, 1), nil, type_value!(type)}
-
-  defp encode_c_abi_param!(other), do: raise(ArgumentError, "invalid :c_abi_call parameter spec: #{inspect(other)}")
+  defp encode_c_abi_param!(param) do
+    case MLIR.CABI.parameter!(param) do
+      {:in, _, _} -> {9, 0, nil, nil}
+      {:aggregate, nil, _} -> {10, 0, nil, nil}
+      {:aggregate, type, _} -> {10, 0, nil, type_value!(type)}
+      {:out, type, opts} -> {11, bool_flag(opts, :zero_init, true, 1), nil, type_value!(type)}
+    end
+  end
 
   defp type_checks(kind, types),
     do: Enum.map(types, fn {index, type} -> {kind, index!(index), nil, type_value!(type)} end)
@@ -172,7 +159,6 @@ defmodule Beaver.Pattern.Native.Program do
   defp type_value!(%MLIR.Type{ref: ref}), do: ref
   defp type_value!(s) when is_binary(s) and byte_size(s) > 0, do: s
   defp type_value!(other), do: raise(ArgumentError, "expected MLIR.Type or non-empty string, got: #{inspect(other)}")
-
   defp index!(n) when is_integer(n) and n >= 0, do: n
   defp index!(_), do: raise(ArgumentError, "pattern counts and indices must be non-negative integers")
 end

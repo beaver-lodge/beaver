@@ -7,7 +7,6 @@ defmodule Beaver.MLIR.CUDA do
   The Zig runner loads `libcuda` dynamically, without linking NVIDIA libraries, and reports unavailable drivers
   gracefully. Compilation remains separate; see `Beaver.MLIR.Dialect.GPU.package_binary!/3` for PTX/cubin packaging.
   """
-
   alias Beaver.MLIR
   alias Beaver.MLIR.Dialect.GPU
 
@@ -25,7 +24,6 @@ defmodule Beaver.MLIR.CUDA do
   """
   @spec device_count() :: {:ok, non_neg_integer()} | {:error, String.t()}
   def device_count, do: CAPI.beaver_raw_cuda_device_count()
-
   @doc "Returns `{:ok, name}` for the device at `ordinal`, or `{:error, reason}`."
   @spec device_name(integer()) :: {:ok, String.t()} | {:error, String.t()}
   def device_name(ordinal), do: CAPI.beaver_raw_cuda_device_name(ordinal)
@@ -69,11 +67,9 @@ defmodule Beaver.MLIR.CUDA do
   @doc "Unloads a CUDA module handle."
   @spec module_unload(non_neg_integer()) :: :ok | {:error, String.t()}
   def module_unload(module_handle), do: CAPI.beaver_raw_cuda_module_unload(module_handle)
-
   @doc "Allocates `size` bytes of device memory. Returns `{:ok, device_ptr}`."
   @spec mem_alloc(non_neg_integer()) :: {:ok, non_neg_integer()} | {:error, String.t()}
   def mem_alloc(size), do: CAPI.beaver_raw_cuda_mem_alloc(size)
-
   @doc "Frees a device allocation."
   @spec mem_free(non_neg_integer()) :: :ok | {:error, String.t()}
   def mem_free(device_ptr), do: CAPI.beaver_raw_cuda_mem_free(device_ptr)
@@ -85,11 +81,9 @@ defmodule Beaver.MLIR.CUDA do
   """
   @spec synchronize() :: :ok | {:error, String.t()}
   def synchronize, do: CAPI.beaver_raw_cuda_synchronize()
-
   @doc "Copies host `data` into device memory at `device_ptr`."
   @spec memcpy_htod(non_neg_integer(), binary()) :: :ok | {:error, String.t()}
   def memcpy_htod(device_ptr, data), do: CAPI.beaver_raw_cuda_memcpy_htod(device_ptr, data)
-
   @doc "Copies `size` bytes from device memory at `device_ptr` into a host binary."
   @spec memcpy_dtoh(non_neg_integer(), non_neg_integer()) :: {:ok, binary()} | {:error, String.t()}
   def memcpy_dtoh(device_ptr, size), do: CAPI.beaver_raw_cuda_memcpy_dtoh(device_ptr, size)

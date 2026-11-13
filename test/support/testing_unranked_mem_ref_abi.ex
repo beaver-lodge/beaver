@@ -5,7 +5,6 @@ defmodule TestingUnrankedMemRefABI do
   alias MLIR.Type
   require Func
   use ENIFSupport
-
   @impl ENIFSupport
   def create(ctx) do
     elem_type = Type.i32(ctx: ctx)
@@ -20,11 +19,12 @@ defmodule TestingUnrankedMemRefABI do
               m = MemRef.alloc(operand_segment_sizes: :infer) >>> Type.memref!([2, 3], elem_type)
 
               Linalg.fill inputs: v, outputs: m, operand_segment_sizes: :infer do
-                region do
-                  block _(in_arg >>> elem_type, _ >>> elem_type) do
-                    Linalg.yield(in_arg) >>> []
-                  end
-                end
+                region(
+                  do:
+                    block _(in_arg >>> elem_type, _ >>> elem_type) do
+                      Linalg.yield(in_arg) >>> []
+                    end
+                )
               end >>> []
 
               u = MemRef.cast(m) >>> unranked_memref_t

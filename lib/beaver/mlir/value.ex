@@ -8,14 +8,10 @@ defmodule Beaver.MLIR.Value do
   alias Beaver.MLIR.CAPI
   alias Beaver.MLIR
   alias Kinda.CallbackRuntime
-
   use Kinda.ResourceKind, raw_module: Beaver.MLIR.CAPI.Raw, codec: Native
-
   def argument?(%__MODULE__{} = value), do: CAPI.mlirValueIsABlockArgument(value) |> Native.to_term()
-
   @doc "Returns whether the value is an operation result."
   def result?(%__MODULE__{} = value), do: CAPI.mlirValueIsAOpResult(value) |> Native.to_term()
-
   @doc "Returns the defining operation, or an error for a block argument."
   def owner(%__MODULE__{} = value),
     do: if(result?(value), do: {:ok, CAPI.mlirOpResultGetOwner(value)}, else: {:error, "not a result"})
@@ -30,7 +26,6 @@ defmodule Beaver.MLIR.Value do
 
   @doc "Returns the value's type."
   defdelegate type(value), to: CAPI, as: :mlirValueGetType
-
   @doc "Returns the source location carried by this value."
   defdelegate location(value), to: CAPI, as: :mlirValueGetLocation
 
@@ -98,7 +93,6 @@ defmodule Beaver.MLIR.Value do
 
   defp callback_exception({:exception, _kind, _reason, _stacktrace} = exception), do: exception
   defp callback_exception(_outcome), do: nil
-
   defp finish_conditional_replacement(nil), do: :ok
 
   defp finish_conditional_replacement({:exception, kind, reason, stacktrace}),

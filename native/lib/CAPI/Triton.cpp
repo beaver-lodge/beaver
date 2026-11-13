@@ -1,5 +1,4 @@
 #include "mlir-c/Beaver/Triton.h"
-
 #include "mlir/CAPI/IR.h"
 #include "mlir/Dialect/LLVMIR/Transforms/InlinerInterfaceImpl.h"
 #include "mlir/InitAllDialects.h"
@@ -9,7 +8,6 @@
 #include "mlir/Conversion/NVVMToLLVM/NVVMToLLVM.h"
 #include "mlir/Conversion/UBToLLVM/UBToLLVM.h"
 #include "llvm/Support/ErrorHandling.h"
-
 #ifdef BEAVER_ENABLE_TRITON
 #include "triton/Dialect/Gluon/IR/Dialect.h"
 #include "triton/Dialect/Gluon/Transforms/Passes.h"
@@ -26,12 +24,9 @@
 #include "triton/Target/LLVMIR/Passes.h"
 #include "nvidia/include/NVGPUToLLVM/Passes.h"
 #include "nvidia/include/TritonNVIDIAGPUToLLVM/Passes.h"
-
 using namespace mlir;
 using namespace mlir::triton;
-
 namespace {
-
 void registerTritonConversionInterfaces(DialectRegistry &registry) {
   LLVM::registerInlinerInterface(registry);
   ub::registerConvertUBToLLVMInterface(registry);
@@ -40,9 +35,7 @@ void registerTritonConversionInterfaces(DialectRegistry &registry) {
   cf::registerConvertControlFlowToLLVMInterface(registry);
   arith::registerConvertArithToLLVMInterface(registry);
 }
-
 } // namespace
-
 MLIR_CAPI_EXPORTED bool beaverContextRegisterTritonDialects(MlirContext context) {
   DialectRegistry registry;
   mlir::registerAllDialects(registry);
@@ -54,7 +47,6 @@ MLIR_CAPI_EXPORTED bool beaverContextRegisterTritonDialects(MlirContext context)
   ctx->loadAllAvailableDialects();
   return true;
 }
-
 MLIR_CAPI_EXPORTED bool beaverRegisterTritonPasses() {
   registerTritonPasses();
   triton::gpu::registerTritonGPUPasses();
@@ -73,11 +65,7 @@ MLIR_CAPI_EXPORTED bool beaverRegisterTritonPasses() {
   mlir::registerLLVMDILocalVariable();
   return true;
 }
-
 #else
-
 MLIR_CAPI_EXPORTED bool beaverContextRegisterTritonDialects(MlirContext context) { return false; }
-
 MLIR_CAPI_EXPORTED bool beaverRegisterTritonPasses() { return false; }
-
 #endif

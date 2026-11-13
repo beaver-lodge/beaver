@@ -1,31 +1,21 @@
 defmodule DebugTest do
   @moduledoc "Test the debug configurations of MLIR."
   use Beaver.Case, async: true
-  use Beaver
   doctest Beaver.MLIR.Debug
-
-  alias Beaver.MLIR
   alias MLIR.Dialect.{Arith, Func}
   alias MLIR.Type
-  require Func
-
   import Beaver.MLIR.Conversion
   import Beaver.MLIR.Transform
 
   defp add_module(ctx) do
-    mlir ctx: ctx do
-      module do
-        Func.func add(
-                    function_type: Type.function([Type.i32(), Type.i32()], [Type.i32()]),
-                    sym_name: MLIR.Attribute.string("add")
-                  ) do
-          region do
-            block _(a >>> Type.i32(), b >>> Type.i32()) do
-              r = Arith.addi(a, b) >>> Type.i32()
-              Func.return(r) >>> []
-            end
-          end
-        end
+    function_module ctx,
+                    add(
+                      function_type: Type.function([Type.i32(), Type.i32()], [Type.i32()]),
+                      sym_name: MLIR.Attribute.string("add")
+                    ) do
+      block _(a >>> Type.i32(), b >>> Type.i32()) do
+        r = Arith.addi(a, b) >>> Type.i32()
+        Func.return(r) >>> []
       end
     end
   end

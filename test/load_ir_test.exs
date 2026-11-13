@@ -1,7 +1,5 @@
 defmodule LoadIRTest do
   use Beaver.Case, async: true
-  alias Beaver.MLIR
-  import Beaver.Sigils
   @example "test/fixtures/br_example.mlir"
   test "example from upstream with br", %{ctx: ctx} do
     content = File.read!(@example)

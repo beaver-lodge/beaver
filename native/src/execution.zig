@@ -7,7 +7,6 @@ const c = prelude.c;
 const m = @import("mlir_capi.zig");
 const diagnostic = @import("diagnostic.zig");
 const batch = @import("ir_batch.zig");
-
 fn clock() i64 {
     return @intCast(c.beaverExecutionClock());
 }
@@ -20,8 +19,7 @@ pub fn tuple(env: beam.env, term: beam.term, count: usize) ![]const beam.term {
     if (e.enif_get_tuple(env, term, &n, &terms) == 0 or n != count) return error.InvalidExecutionArguments;
     return terms[0..count];
 }
-
-const Command = enum { transform, analysis, verify, pass, rewrite, snapshot, update, build, parse, create_pass, create_pattern, destroy, speculatability, memory_effects, replace_uses, conversion, convert_type };
+const Command = enum { batch_schema, transform, analysis, verify, pass, rewrite, snapshot, update, build, referenced_symbols, parse, create_pass, create_pattern, destroy, speculatability, memory_effects, replace_uses, conversion, convert_type };
 const Work = struct {
     context: m.Context.T,
     command: Command,
@@ -32,7 +30,6 @@ const Work = struct {
     id: beam.term = undefined,
     submitted: i64 = 0,
     setup_ns: i64 = 0,
-
     fn init(env: beam.env, args: [*c]const beam.term) !Work {
         const command = inline for (@typeInfo(Command).@"enum".fields) |field| {
             if (atom(env, args[1], field.name)) break @field(Command, field.name);
@@ -61,6 +58,7 @@ const Work = struct {
     fn execute(self: Work) !beam.term {
         const env = self.env;
         switch (self.command) {
+            .batch_schema => return beam.make_slice(env, @import("batch_protocol.zig").schema.source),
             .transform => return @import("prepared_transform.zig").apply(env, self.context, self.arguments, self.recipient),
             .analysis => return @import("analysis.zig").query(env, self.context, self.arguments, self.recipient),
             .conversion => return @import("conversion.zig").convert(env, self.context, self.arguments, self.profile),
@@ -113,6 +111,7 @@ const Work = struct {
             .snapshot => return batch.snapshot(env, self.context, self.arguments),
             .update => return diagnostic.call_with_diagnostics(env, self.context, batch.update, .{ env, self.context, self.arguments }),
             .build => return diagnostic.call_with_diagnostics(env, self.context, batch.build, .{ env, self.context, self.arguments }),
+            .referenced_symbols => return batch.referencedSymbols(env, self.context, self.arguments),
         }
     }
     fn result(self: Work) beam.term {
@@ -147,7 +146,6 @@ const Work = struct {
         _ = beam.send_advanced(null, self.recipient, output, beam.make_tuple(output, &reply));
     }
 };
-
 pub fn execution_worker(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     var work = try Work.init(env, args);
     const start = if (work.profile) clock() else 0;
@@ -171,23 +169,20 @@ pub fn execution_worker(env: beam.env, _: c_int, args: [*c]const beam.term) !bea
     }
     return id;
 }
-
 pub fn execution_dirty(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const work = try Work.init(env, args);
     switch (work.command) {
-        .verify, .snapshot, .update, .build => {},
+        .verify, .snapshot, .update, .build, .referenced_symbols, .batch_schema => {},
         else => return error.DirtyExecutionRequiresCallbackFreeCommand,
     }
     if (c.beaverExecutionHasCallbacks(work.context)) return error.CallbackContextRequiresWorker;
     return work.result();
 }
-
 pub fn execution_auto(env: beam.env, n: c_int, args: [*c]const beam.term) !beam.term {
     const ctx = try m.Context.resource.fetch(env, args[0]);
     if (c.beaverExecutionHasCallbacks(ctx)) return execution_worker(env, n, args);
     return e.enif_schedule_nif(env, "beaver_verify", e.ERL_NIF_DIRTY_JOB_CPU_BOUND, prelude.beaverRawNIFDirtyCPU(@This(), "execution_dirty", 4).fptr, n, args);
 }
-
 pub fn executor_snapshot(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     const ctx = try m.Context.resource.fetch(env, args[0]);
     var values: [7]u64 = undefined;
@@ -196,19 +191,15 @@ pub fn executor_snapshot(env: beam.env, _: c_int, args: [*c]const beam.term) !be
     for (values, 0..) |value, i| terms[i] = e.enif_make_uint64(env, value);
     return beam.make_tuple(env, &terms);
 }
-
 pub fn executor_release(env: beam.env, _: c_int, args: [*c]const beam.term) !beam.term {
     return beam.make_bool(env, c.beaverExecutorReleaseContext(try m.Context.resource.fetch(env, args[0])));
 }
-
 pub fn execution_build_mode(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
     return beam.make_atom(env, @tagName(@import("builtin").mode));
 }
-
 pub fn execution_clock(env: beam.env, _: c_int, _: [*c]const beam.term) !beam.term {
     return e.enif_make_uint64(env, c.beaverExecutionClock());
 }
-
 pub const nifs = .{
     prelude.beaverRawNIF(@This(), "execution_worker", 4),
     prelude.beaverRawNIFDirtyCPU(@This(), "execution_dirty", 4),

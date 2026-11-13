@@ -1,27 +1,15 @@
 defmodule ExternalInterfaceTest do
   use Beaver.Case, async: true
-
   import ExUnit.CaptureLog
-
-  alias Beaver.MLIR
-
   @moduletag :smoke
-
   test "Slang attaches all four external interface models", %{ctx: ctx} do
     interfaces = ExternalInterfaceSlang.__slang_interfaces__()
-
     assert Enum.map(interfaces, &elem(&1, 0)) == ["pure", "write", "transform", "forward", "mark", "fail", "patterns"]
-
     assert Keyword.keys(interfaces |> hd() |> elem(1)) == [:memory_effects, :conditionally_speculatable]
-
     assert ExternalInterfaceSlang |> then(&Beaver.Slang.load(ctx, &1)) |> MLIR.LogicalResult.success?()
-
     assert implements?(ctx, "external_interface_test.pure", :mlirMemoryEffectsOpInterfaceTypeID)
-
     assert implements?(ctx, "external_interface_test.pure", :mlirConditionallySpeculatableOpInterfaceTypeID)
-
     assert implements?(ctx, "external_interface_test.transform", :mlirTransformOpInterfaceTypeID)
-
     assert implements?(ctx, "external_interface_test.transform", :mlirPatternDescriptorOpInterfaceTypeID)
   end
 
@@ -29,19 +17,11 @@ defmodule ExternalInterfaceTest do
     Beaver.Slang.load(ctx, ExternalInterfaceSlang)
 
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module {
-          "external_interface_test.pure"() : () -> ()
-          "external_interface_test.write"() : () -> ()
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  \"external_interface_test.pure\"() : () -> ()\n  \"external_interface_test.write\"() : () -> ()\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
       |> MLIR.verify!()
 
     module |> Beaver.Composer.append(MLIR.Transform.canonicalize()) |> Beaver.Composer.run!()
-
     rendered = MLIR.to_string(module, generic: true)
     refute rendered =~ "external_interface_test.pure"
     assert rendered =~ "external_interface_test.write"
@@ -51,18 +31,9 @@ defmodule ExternalInterfaceTest do
     Beaver.Slang.load(ctx, ExternalInterfaceSlang)
 
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module {
-          "external_interface_test.write"() : () -> ()
-          func.func @read(%buffer: memref<4xi32>, %index: index) -> i32 {
-            %value = memref.load %buffer[%index] : memref<4xi32>
-            return %value : i32
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      ("module {\n  \"external_interface_test.write\"() : () -> ()\n" <>
+         "  func.func @read(%buffer: memref<4xi32>, %index: index) -> i32 {\n    %value = memref.load %buffer[%index] : memref<4xi32>\n    return %value : i32\n  }\n}\n")
+      |> MLIR.Module.create!(ctx: ctx)
       |> MLIR.verify!()
 
     operations =
@@ -82,9 +53,7 @@ defmodule ExternalInterfaceTest do
     assert %MLIR.Attribute{} = write_opts[:parameters]
     assert MLIR.null?(write_opts[:parameters])
     assert %MLIR.SideEffectResource{} = write_opts[:resource]
-
     assert [{:read, {:operand, %MLIR.OpOperand{}}, load_opts}] = MLIR.MemoryEffects.get(load)
-
     assert load_opts[:stage] == 0
     refute load_opts[:effect_on_full_region]
     assert %MLIR.SideEffectResource{} = load_opts[:resource]
@@ -93,7 +62,6 @@ defmodule ExternalInterfaceTest do
   test "rejects querying an operation without MemoryEffectsOpInterface", %{ctx: ctx} do
     MLIR.Context.allow_unregistered_dialects(ctx)
     module = MLIR.Module.create!(~S[module { "test.unknown"() : () -> () }], ctx: ctx)
-
     operation = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.at(0)
 
     assert_raise ArgumentError, ~r/does not implement MemoryEffectsOpInterface/, fn ->
@@ -103,19 +71,14 @@ defmodule ExternalInterfaceTest do
 
   test "speculatability callbacks are serviced by their attachment process", %{ctx: ctx} do
     Beaver.Slang.load(ctx, ExternalInterfaceSlang)
-
     module = MLIR.Module.create!(~S[module { "external_interface_test.pure"() : () -> () }], ctx: ctx)
-
     operation = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.at(0)
-
     assert MLIR.ConditionallySpeculatable.query(operation) == :speculatable
   end
 
   test "destroying a context releases its attachment process" do
     ctx = MLIR.Context.create()
-
     attachment = MLIR.MemoryEffects.attach(ctx, "builtin.module", fn _operation -> :pure end)
-
     monitor = Process.monitor(attachment.pid)
     assert Process.alive?(attachment.pid)
     MLIR.Context.destroy(ctx)
@@ -124,17 +87,12 @@ defmodule ExternalInterfaceTest do
 
   test "the native model outlives an attachment process that exits abnormally", %{ctx: ctx} do
     Beaver.Slang.load(ctx, ExternalInterfaceSlang)
-
     module = MLIR.Module.create!(~S[module { "external_interface_test.detached"() : () -> () }], ctx: ctx)
-
     attachment = MLIR.MemoryEffects.attach(ctx, "external_interface_test.detached", fn _operation -> :pure end)
-
     monitor = Process.monitor(attachment.pid)
     Process.exit(attachment.pid, :kill)
     assert_receive {:DOWN, ^monitor, :process, _, :killed}, 1_000
-
     module |> Beaver.Composer.append(MLIR.Transform.canonicalize()) |> Beaver.Composer.run!()
-
     assert MLIR.to_string(module, generic: true) =~ "external_interface_test.detached"
   end
 
@@ -142,32 +100,11 @@ defmodule ExternalInterfaceTest do
     Beaver.Slang.load(ctx, ExternalInterfaceSlang)
 
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module {
-          func.func @payload() {
-            %0 = arith.constant 1 : i32
-            return
-          }
-          module attributes {transform.with_named_sequence} {
-            transform.named_sequence @__transform_main(%arg0: !transform.any_op) {
-              %0 = "external_interface_test.forward"(%arg0) : (!transform.any_op) -> !transform.any_op
-              "external_interface_test.mark"(%0) : (!transform.any_op) -> ()
-              transform.apply_patterns to %0 {
-                "external_interface_test.patterns"() : () -> ()
-              } : !transform.any_op
-              transform.yield
-            }
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  func.func @payload() {\n    %0 = arith.constant 1 : i32\n    return\n  }\n  module attributes {transform.with_named_sequence} {\n    transform.named_sequence @__transform_main(%arg0: !transform.any_op) {\n      %0 = \"external_interface_test.forward\"(%arg0) : (!transform.any_op) -> !transform.any_op\n      \"external_interface_test.mark\"(%0) : (!transform.any_op) -> ()\n      transform.apply_patterns to %0 {\n        \"external_interface_test.patterns\"() : () -> ()\n      } : !transform.any_op\n      transform.yield\n    }\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     module = MLIR.verify!(module)
-
     module |> Beaver.Composer.append("transform-interpreter") |> Beaver.Composer.run!()
-
     rendered = MLIR.to_string(module, generic: true)
     assert rendered =~ "external_interface_test.marked"
     assert rendered =~ "external_interface_test.pattern_applied"
@@ -177,22 +114,8 @@ defmodule ExternalInterfaceTest do
     Beaver.Slang.load(ctx, ExternalInterfaceSlang)
 
     module =
-      MLIR.Module.create!(
-        ~S"""
-        module {
-          func.func @payload() {
-            return
-          }
-          module attributes {transform.with_named_sequence} {
-            transform.named_sequence @__transform_main(%arg0: !transform.any_op) {
-              "external_interface_test.fail"(%arg0) : (!transform.any_op) -> ()
-              transform.yield
-            }
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  func.func @payload() {\n    return\n  }\n  module attributes {transform.with_named_sequence} {\n    transform.named_sequence @__transform_main(%arg0: !transform.any_op) {\n      \"external_interface_test.fail\"(%arg0) : (!transform.any_op) -> ()\n      transform.yield\n    }\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     log =
       capture_log(fn ->

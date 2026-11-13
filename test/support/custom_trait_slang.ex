@@ -23,10 +23,7 @@ defmodule CustomTraitSlang do
   end
 
   defop valid(), traits: [{CustomTraitSlang.Validity, verify: &__MODULE__.verify/1}]
-
   defop also_valid(), traits: [{CustomTraitSlang.Validity, verify: &__MODULE__.verify/1}]
-
   defop invalid(), traits: [{CustomTraitSlang.Validity, verify: &__MODULE__.verify/1}]
-
   defop invalid_regions(), traits: [{CustomTraitSlang.RegionValidity, verify_regions: &__MODULE__.verify_regions/1}]
 end

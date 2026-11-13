@@ -5,9 +5,7 @@ defmodule Beaver.MLIR.Dialect do
   This module defines macro to generate code for an MLIR dialect. You might override `eval_ssa/1` function to
   introduce your custom op generation
   """
-
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
-
   @callback eval_ssa(Beaver.SSA.t()) :: any()
   defmacro __using__(opts) do
     dialect = Keyword.fetch!(opts, :dialect)
@@ -30,7 +28,6 @@ defmodule Beaver.MLIR.Dialect do
                   _ -> "`#{full_name}`"
                 end)
           def unquote(func_name)(%Beaver.SSA{} = ssa), do: eval_ssa(%Beaver.SSA{ssa | op: unquote(full_name)})
-
           @doc "Return op name `#{full_name}` as a bitstring."
           def unquote(func_name)(), do: unquote(full_name)
           defoverridable [{func_name, 1}]
@@ -48,7 +45,6 @@ defmodule Beaver.MLIR.Dialect do
          alias Beaver.MLIR.Dialect
          module_name = d |> Dialect.Registry.normalize_dialect_name()
          module_name = Module.concat([Beaver.MLIR.Dialect, module_name])
-
          ops = Dialect.Registry.ops(d)
 
          defmodule module_name do

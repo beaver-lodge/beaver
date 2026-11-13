@@ -1,11 +1,7 @@
 defmodule MlirTest do
   use Beaver.Case, async: true
-  use Beaver
-  alias Beaver.MLIR
   import Beaver.MLIR.CAPI
-
   @moduletag :smoke
-
   test "IRDL variadicity arrays preserve enum values and reject invalid input", %{ctx: ctx} do
     for {values, expected} <- [{[], []}, {[0, 1, 2], ~w(single optional variadic)}] do
       data = Beaver.Native.array(values, Beaver.Native.I32)
@@ -24,24 +20,18 @@ defmodule MlirTest do
 
   test "call wrapped apis", %{ctx: ctx} do
     location = mlirLocationFileLineColGet(ctx, MLIR.StringRef.create(__DIR__), 1, 2)
-
     _module = mlirModuleCreateEmpty(location)
 
     module =
-      MLIR.Module.create!(
-        """
-        func.func private @printNewline()
-        func.func private @printI64(i64)
-        """,
-        ctx: ctx
-      )
+      ("" <>
+         "func.func private @printNewline()\n" <>
+         "func.func private @printI64(i64)\n")
+      |> MLIR.Module.create!(ctx: ctx)
 
     _operation = mlirModuleGetOperation(module)
     _ret_str = MLIR.StringRef.create("func.return")
     changeset = %Beaver.Changeset{name: "func.return", location: location}
-
     for _i <- 0..200, do: changeset |> MLIR.Operation.State.create() |> Beaver.Native.ptr() |> mlirOperationCreate()
-
     i64_t = mlirTypeParseGet(ctx, MLIR.StringRef.create("i64"))
     # create func body entry block
     func_body_arg_types = [i64_t]
@@ -96,24 +86,17 @@ defmodule MlirTest do
 
   def create_adder_module(ctx) do
     MLIR.Module.create(
-      """
-      func.func @foo(%arg0 : i32) -> i32 {
-        %res = arith.addi %arg0, %arg0 : i32
-        return %res : i32
-      }
-      """,
+      "" <>
+        "func.func @foo(%arg0 : i32) -> i32 {\n  %res = arith.addi %arg0, %arg0 : i32\n  return %res : i32\n}\n",
       ctx: ctx
     )
   end
 
   def create_redundant_transpose_module(ctx) do
-    MLIR.Module.create("""
-    func.func @test_transpose(%arg0: tensor<1x2x3xi32>) -> () {
-      %1 = "tosa.transpose"(%arg0) {perms = array<i32: 1, 2, 0>} : (tensor<1x2x3xi32>) -> (tensor<2x3x1xi32>)
-      %3 = "tosa.transpose"(%1) {perms = array<i32: 2, 0, 1>} : (tensor<2x3x1xi32>) -> (tensor<1x2x3xi32>)
-      return
-    }
-    """)
+    MLIR.Module.create(
+      "" <>
+        "func.func @test_transpose(%arg0: tensor<1x2x3xi32>) -> () {\n  %1 = \"tosa.transpose\"(%arg0) {perms = array<i32: 1, 2, 0>} : (tensor<1x2x3xi32>) -> (tensor<2x3x1xi32>)\n  %3 = \"tosa.transpose\"(%1) {perms = array<i32: 2, 0, 1>} : (tensor<2x3x1xi32>) -> (tensor<1x2x3xi32>)\n  return\n}\n"
+    )
     |> Beaver.Deferred.resolve(ctx)
   end
 
@@ -124,9 +107,7 @@ defmodule MlirTest do
     pm = mlirPassManagerCreate(ctx)
     mlirPassManagerAddOwnedPass(pm, mlirCreateTransformsCSEPass())
     success = mlirPassManagerRunOnOp(pm, MLIR.Operation.from_module(module))
-
     assert success |> beaverLogicalResultIsSuccess() |> Beaver.Native.to_term()
-
     mlirPassManagerDestroy(pm)
     mlirModuleDestroy(module)
   end
@@ -185,7 +166,6 @@ defmodule MlirTest do
   end
 
   defmacro some_constrain(_t), do: true
-
   defmacro has_one_use(_v), do: true
 
   def lower_to_llvm(ctx, module) do
@@ -193,22 +173,14 @@ defmodule MlirTest do
     mlirPassManagerAddOwnedPass(pm, mlirCreateConversionConvertFuncToLLVMPass())
     mlirPassManagerAddOwnedPass(pm, mlirCreateConversionArithToLLVMConversionPass())
     status = mlirPassManagerRunOnOp(pm, module)
-
     if not MLIR.LogicalResult.success?(status), do: raise("Unexpected failure running pass pipeline")
-
     mlirPassManagerDestroy(pm)
     module
   end
 
   test "basic jit", %{ctx: ctx} do
-    module_str = """
-    module {
-      func.func @add(%arg0 : i32) -> i32 attributes { llvm.emit_c_interface } {
-        %res = arith.addi %arg0, %arg0 : i32
-        return %res : i32
-      }
-    }
-    """
+    module_str =
+      "module {\n  func.func @add(%arg0 : i32) -> i32 attributes { llvm.emit_c_interface } {\n    %res = arith.addi %arg0, %arg0 : i32\n    return %res : i32\n  }\n}\n"
 
     {:ok, module} = MLIR.Module.create(module_str, ctx: ctx)
     MLIR.verify!(module)
@@ -241,9 +213,7 @@ defmodule MlirTest do
   test "affine expr and map", %{ctx: ctx} do
     affine_dim_expr = mlirAffineDimExprGet(ctx, 0)
     affine_symbol_expr = mlirAffineSymbolExprGet(ctx, 1)
-
     exprs = Beaver.Native.array([affine_dim_expr, affine_symbol_expr], MLIR.AffineExpr, mut: true)
-
     map = mlirAffineMapGet(ctx, 3, 3, 2, exprs)
     txt = "(d0, d1, d2)[s0, s1, s2] -> (d0, s1)"
     assert map |> MLIR.to_string() == txt

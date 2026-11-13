@@ -7,7 +7,6 @@ const beam = kinda.beam;
 const result = @import("kinda").result;
 const mutex = @import("mutex.zig");
 const PrinterNIF = @import("string_ref.zig").PrinterNIF;
-
 // collect diagnostic as {severity, loc, message, nested_notes}
 const DiagnosticAggregator = struct {
     const Container = std.array_list.Managed(beam.term);
@@ -19,7 +18,6 @@ const DiagnosticAggregator = struct {
         const severity = c.mlirDiagnosticGetSeverity(diagnostic);
         const location = try mlir_capi.Location.resource.make(env, c.mlirDiagnosticGetLocation(diagnostic));
         const note = try PrinterNIF(mlir_capi.Diagnostic, c.mlirDiagnosticPrint).print_make(env, diagnostic);
-
         const num_notes: usize = @intCast(c.mlirDiagnosticGetNumNotes(diagnostic));
         var nested_notes: []beam.term = try beam.allocator.alloc(beam.term, num_notes);
         defer beam.allocator.free(nested_notes);
@@ -41,11 +39,9 @@ const DiagnosticAggregator = struct {
     fn to_list(this: *@This(), destination_env: beam.env) !beam.term {
         this.mutex.lock();
         defer this.mutex.unlock();
-
         return e.enif_make_copy(destination_env, beam.make_term_list(this.env, this.container.items));
     }
 };
-
 pub fn call_with_diagnostics(env: beam.env, ctx: mlir_capi.Context.T, f: anytype, args: anytype) !beam.term {
     const diagnostic_env = e.enif_alloc_env() orelse return error.FailedToAllocateDiagnosticEnvironment;
     defer e.enif_free_env(diagnostic_env);
@@ -58,7 +54,6 @@ pub fn call_with_diagnostics(env: beam.env, ctx: mlir_capi.Context.T, f: anytype
     var reply = [_]beam.term{ try @call(.auto, f, args), try collector.to_list(env) };
     return beam.make_tuple(env, &reply);
 }
-
 pub fn WithDiagnosticsNIF(comptime name: anytype) e.ErlNifFunc {
     const bang = kinda.BangFunc(@import("prelude.zig").allKinds, c, name);
     const nifSuffix = "WithDiagnostics";
@@ -75,5 +70,4 @@ pub fn WithDiagnosticsNIF(comptime name: anytype) e.ErlNifFunc {
         e.ERL_NIF_DIRTY_JOB_CPU_BOUND,
     ).entry;
 }
-
 pub const nifs = .{};

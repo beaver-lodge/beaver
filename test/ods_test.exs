@@ -1,15 +1,10 @@
 defmodule ODSDumpTest do
-  use Beaver
-  alias Beaver.MLIR
   alias Beaver.MLIR.Type
   alias Beaver.MLIR.Dialect.{Func, Arith, MemRef}
-  require Func
   use Beaver.Case, async: true
-
   @moduletag :smoke
   test "lookup" do
     assert {:ok, %{"attributes" => _, "operands" => _, "results" => _}} = MLIR.ODS.Dump.lookup("affine.for")
-
     assert {:error, "failed to find ODS dump of \"???\""} = MLIR.ODS.Dump.lookup("???")
   end
 
@@ -22,9 +17,7 @@ defmodule ODSDumpTest do
     assert {:ok, scf_for} = MLIR.ODS.Dump.lookup("scf.for")
     assert scf_for["regions"] == [%{"name" => "region", "variadic" => false}]
     assert is_list(scf_for["builders"])
-
     first_builder_parameters = scf_for["builders"] |> List.first() |> Map.fetch!("parameters")
-
     assert Enum.any?(first_builder_parameters, &(&1["name"] == "lowerBound" and &1["cpp_type"] == "Value"))
   end
 
@@ -43,17 +36,13 @@ defmodule ODSDumpTest do
 
   test "tagged operands", %{ctx: ctx} do
     mlir ctx: ctx do
-      module do
-        Func.func _(
-                    function_type: Type.function([Type.i32(), Type.i32()], []),
-                    sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
-                  ) do
-          region do
-            block _(a >>> Type.i32(), b >>> Type.i32()) do
-              Arith.addi(lhs: a, rhs: b) >>> Type.i32()
-              Func.return() >>> []
-            end
-          end
+      function_module _(
+                        function_type: Type.function([Type.i32(), Type.i32()], []),
+                        sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                      ) do
+        block _(a >>> Type.i32(), b >>> Type.i32()) do
+          Arith.addi(lhs: a, rhs: b) >>> Type.i32()
+          Func.return() >>> []
         end
       end
       |> MLIR.verify!()
@@ -63,19 +52,14 @@ defmodule ODSDumpTest do
   test "tagged and untagged operands mixed", %{ctx: ctx} do
     mlir ctx: ctx do
       assert_raise ArgumentError, ~r"Cannot mix tagged and untagged operands", fn ->
-        mlir ctx: ctx do
-          module do
-            Func.func _(
-                        function_type: Type.function([Type.i32(), Type.i32()], []),
-                        sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
-                      ) do
-              region do
-                block _(a >>> Type.i32(), b >>> Type.i32()) do
-                  Arith.addi(a, rhs: b) >>> Type.i32()
-                  Func.return() >>> []
-                end
-              end
-            end
+        function_module ctx,
+                        _(
+                          function_type: Type.function([Type.i32(), Type.i32()], []),
+                          sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                        ) do
+          block _(a >>> Type.i32(), b >>> Type.i32()) do
+            Arith.addi(a, rhs: b) >>> Type.i32()
+            Func.return() >>> []
           end
         end
       end
@@ -88,19 +72,14 @@ defmodule ODSDumpTest do
     mlir ctx: ctx do
       logs =
         capture_log(fn ->
-          mlir ctx: ctx do
-            module do
-              Func.func _(
-                          function_type: Type.function([Type.i32(), Type.i32()], []),
-                          sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
-                        ) do
-                region do
-                  block _(_a >>> Type.i32(), b >>> Type.i32()) do
-                    Arith.addi(rhs: b) >>> Type.i32()
-                    Func.return() >>> []
-                  end
-                end
-              end
+          function_module ctx,
+                          _(
+                            function_type: Type.function([Type.i32(), Type.i32()], []),
+                            sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                          ) do
+            block _(_a >>> Type.i32(), b >>> Type.i32()) do
+              Arith.addi(rhs: b) >>> Type.i32()
+              Func.return() >>> []
             end
           end
         end)
@@ -118,7 +97,6 @@ defmodule ODSDumpTest do
           a = Arith.constant(value: Attribute.integer(Type.i32(), 1)) >>> :infer
           b = Arith.constant(value: Attribute.integer(Type.i32(), 2)) >>> :infer
           UndefinedDialect.foo(lhs: a, rhs: b, operand_segment_sizes: :infer) >>> Type.i32()
-
           UndefinedDialect.foo(rhs: [a], lhs: [a, b], operand_segment_sizes: :infer) >>> Type.i32()
         end
 
@@ -132,17 +110,13 @@ defmodule ODSDumpTest do
 
   test "segment_sizes infer in non-generating usage", %{ctx: ctx} do
     mlir ctx: ctx do
-      module do
-        Func.func _(
-                    function_type: Type.function([Type.i32(), Type.i32()], []),
-                    sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
-                  ) do
-          region do
-            block _(a >>> Type.i32(), b >>> Type.i32()) do
-              Arith.addi(lhs: a, rhs: b) >>> Type.i32()
-              Func.return() >>> []
-            end
-          end
+      function_module _(
+                        function_type: Type.function([Type.i32(), Type.i32()], []),
+                        sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                      ) do
+        block _(a >>> Type.i32(), b >>> Type.i32()) do
+          Arith.addi(lhs: a, rhs: b) >>> Type.i32()
+          Func.return() >>> []
         end
       end
       |> MLIR.verify!()
@@ -151,18 +125,13 @@ defmodule ODSDumpTest do
 
   test "all-zero segment_sizes", %{ctx: ctx} do
     mlir ctx: ctx do
-      module do
-        Func.func _(
-                    function_type: Type.function([], []),
-                    sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
-                  ) do
-          region do
-            block _() do
-              MemRef.alloca(operand_segment_sizes: :infer) >>> Type.memref!([1], Type.i32(ctx: ctx))
-
-              Func.return() >>> []
-            end
-          end
+      function_module _(
+                        function_type: Type.function([], []),
+                        sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
+                      ) do
+        block _() do
+          MemRef.alloca(operand_segment_sizes: :infer) >>> Type.memref!([1], Type.i32(ctx: ctx))
+          Func.return() >>> []
         end
       end
       |> MLIR.verify!()

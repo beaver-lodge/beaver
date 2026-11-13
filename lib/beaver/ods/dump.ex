@@ -18,9 +18,7 @@ defmodule Beaver.MLIR.ODS.Dump do
   """
   @cache_key {__MODULE__, :operations}
   @external_resource Application.app_dir(:beaver, "priv/generated/ods_dump.json")
-
   @on_load :clear_cache
-
   @doc false
   def clear_cache do
     :persistent_term.erase(@cache_key)
@@ -99,7 +97,6 @@ defmodule Beaver.MLIR.ODS.Dump do
   end
 
   @doc false
-
   def gen_doc(%{"name" => name} = op) do
     summary = op["summary"]
     description = op["description"]

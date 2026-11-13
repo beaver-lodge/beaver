@@ -4,29 +4,17 @@ defmodule Beaver.MLIR.ShapedType do
   @moduledoc "This module provides utilities for MLIR shaped types."
   alias Beaver.MLIR
   import MLIR.CAPI
-
   def dynamic_stride_or_offset?(:dynamic), do: true
-
   def dynamic_stride_or_offset?(dim), do: mlirShapedTypeIsDynamicStrideOrOffset(dim) |> Native.to_term()
-
   def static_stride_or_offset?(:dynamic), do: false
-
   def static_stride_or_offset?(dim), do: mlirShapedTypeIsStaticStrideOrOffset(dim) |> Native.to_term()
-
   def dynamic_stride_or_offset(), do: mlirShapedTypeGetDynamicStrideOrOffset() |> Native.to_term()
-
   def dynamic_size(), do: mlirShapedTypeGetDynamicSize() |> Native.to_term()
-
   def dynamic_size?(:dynamic), do: true
-
   def dynamic_size?(size), do: mlirShapedTypeIsDynamicSize(size) |> Native.to_term()
-
   def static_size?(:dynamic), do: false
-
   def static_size?(size), do: mlirShapedTypeIsStaticSize(size) |> Native.to_term()
-
   def dynamic_dim?(type, dim), do: mlirShapedTypeIsDynamicDim(type, dim) |> Native.to_term()
-
   def static_dim?(type, dim), do: mlirShapedTypeIsStaticDim(type, dim) |> Native.to_term()
 
   def dim_size(type, dim),
@@ -51,9 +39,7 @@ defmodule Beaver.MLIR.ShapedType do
   def to_dynamic_magic_number(:dynamic, :size), do: dynamic_size()
   def to_dynamic_magic_number(:dynamic, :offset), do: dynamic_stride_or_offset()
   def to_dynamic_magic_number(:dynamic, :stride), do: dynamic_stride_or_offset()
-
   def to_dynamic_magic_number(size, _), do: size
-
   @doc false
   def cast_dynamic_magic_number(:dynamic, _), do: :dynamic
 

@@ -13,7 +13,6 @@ defmodule Beaver.MLIR.RewriterBase do
               defdelegate unquote(:"#{helper_name}")(unquote_splicing(args)), to: CAPI, as: f
               {helper_name, arity}
             end)
-
   @extra_helpers for {name, arities} <- [
                        replace: 3..3,
                        replace_op: 3..3,
@@ -30,7 +29,6 @@ defmodule Beaver.MLIR.RewriterBase do
                      do: {name, arity}
   @doc false
   def helpers, do: @extra_helpers ++ @helpers
-
   @doc false
   def polymorphic_helper_names, do: [:emit_op, :emit_results, :emit, :scf_if, :pack_struct, :unpack_struct]
 
@@ -45,7 +43,6 @@ defmodule Beaver.MLIR.RewriterBase do
   end
 
   @doc "Syntactic sugar for `replace_all_uses_with/3` and `replace_all_op_uses_with_operation/3`."
-
   def replace(%__MODULE__{} = rewriter, %Value{} = from, %Value{} = to), do: replace_all_uses_with(rewriter, from, to)
 
   def replace(%__MODULE__{} = rewriter, %Operation{} = from, %Operation{} = to),
@@ -79,7 +76,6 @@ defmodule Beaver.MLIR.RewriterBase do
           | {:after_value, Value.t()}
           | {:start, Block.t()}
           | {:end, Block.t()}
-
   @doc """
   Runs `fun` and restores the current insertion point afterward.
 
@@ -130,10 +126,8 @@ defmodule Beaver.MLIR.RewriterBase do
 
   @typedoc "Any rewriter handle convertible to `Beaver.MLIR.RewriterBase`."
   @type rewriter_like() :: t() | MLIR.PatternRewriter.t() | MLIR.ConversionPatternRewriter.t()
-
   @typedoc "Context and location anchor for operation emission."
   @type anchor() :: Operation.t() | MLIR.Location.t() | {MLIR.Context.t(), MLIR.Location.t()}
-
   @doc """
   Creates an operation via `Beaver.Changeset`, inserts it at `rewriter`'s current insertion point, and returns the
   created `MLIR.Operation`.
@@ -188,9 +182,7 @@ defmodule Beaver.MLIR.RewriterBase do
       when is_function(then_fn) and (is_nil(else_fn) or is_function(else_fn)) do
     base = to_base(rewriter)
     res_list = List.wrap(result_types)
-
     if res_list != [] and is_nil(else_fn), do: raise(ArgumentError, "scf_if with results requires an else_fn")
-
     then_region = MLIR.Region.create()
     else_region = MLIR.Region.create()
     if_op = emit_op(base, anchor, "scf.if", [cond_val, then_region, else_region], res_list)
@@ -269,7 +261,6 @@ defmodule Beaver.MLIR.RewriterBase do
 
     if is_nil(MLIR.Block.terminator(blk)) do
       yield_vals = ret |> List.wrap() |> Enum.filter(&match?(%Value{}, &1))
-
       with_insertion_point(base, {:end, blk}, fn -> emit_op(base, anchor, "scf.yield", yield_vals, []) end)
     end
   end
@@ -277,12 +268,10 @@ defmodule Beaver.MLIR.RewriterBase do
   defp to_base(%__MODULE__{} = base), do: base
   defp to_base(%MLIR.PatternRewriter{} = rw), do: MLIR.PatternRewriter.as_base(rw)
   defp to_base(%MLIR.ConversionPatternRewriter{} = rw), do: MLIR.ConversionPatternRewriter.as_base(rw)
-
   defp resolve_anchor!(%Operation{} = op), do: {MLIR.context(op), Operation.location(op)}
   defp resolve_anchor!(%MLIR.Location{} = loc), do: {MLIR.context(loc), loc}
   defp resolve_anchor!({%MLIR.Context{} = ctx, %MLIR.Location{} = loc}), do: {ctx, loc}
   defp resolve_anchor!(other), do: raise(ArgumentError, "invalid rewriter anchor: #{inspect(other)}")
-
   defp add_changeset_results(changeset, :infer), do: Beaver.Changeset.add_result(changeset, :infer)
 
   defp add_changeset_results(changeset, types),

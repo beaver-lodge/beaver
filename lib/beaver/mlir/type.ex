@@ -9,7 +9,6 @@ defmodule Beaver.MLIR.Type do
   """
   alias Beaver.MLIR
   import CAPI
-
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
 
   def get(string, opts \\ []) when is_binary(string) do
@@ -28,7 +27,6 @@ defmodule Beaver.MLIR.Type do
 
     Deferred.from_opts(opts, fn ctx ->
       inputs = inputs |> Enum.map(&Deferred.resolve(&1, ctx)) |> Native.array(__MODULE__)
-
       results = results |> Enum.map(&Deferred.resolve(&1, ctx)) |> Native.array(__MODULE__)
       mlirFunctionTypeGet(ctx, num_inputs, inputs, num_results, results)
     end)
@@ -124,7 +122,6 @@ defmodule Beaver.MLIR.Type do
   end
 
   defp composite_attribute(opts, key, ctx), do: (opts[key] || mlirAttributeGetNull()) |> Deferred.resolve(ctx)
-
   def complex(%Deferred{} = element_type), do: Deferred.defer(&complex(Deferred.resolve(element_type, &1)))
   def complex(%__MODULE__{} = element_type), do: mlirComplexTypeGet(element_type)
 
@@ -196,7 +193,6 @@ defmodule Beaver.MLIR.Type do
   for {f, "mlirTypeIsA" <> type_name, 1} <-
         CAPI.__info__(:functions) |> Enum.map(fn {f, a} -> {f, Atom.to_string(f), a} end) do
     type_name = type_name |> String.replace(~r"Type$", "")
-
     @doc "calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is #{type_name} type."
     helper_name = type_name |> Macro.underscore() |> String.replace("mem_ref", "memref")
 
@@ -206,9 +202,7 @@ defmodule Beaver.MLIR.Type do
 
   for sign_type <- ~w{signless signed unsigned} do
     f = :"mlirIntegerTypeIs#{Macro.camelize(sign_type)}"
-
     @doc "calls `Beaver.MLIR.CAPI.#{f}/1` to check if it is a #{sign_type} integer."
-
     def unquote(:"#{sign_type}?")(%__MODULE__{} = type),
       do: unquote(f)(type) |> Native.to_term()
   end
@@ -221,7 +215,6 @@ defmodule Beaver.MLIR.Type do
             not String.contains?(type_name, "UnrankedTensor")
         end) do
     type_name = type_name |> String.trim_trailing("TypeGet")
-
     @doc "calls `Beaver.MLIR.CAPI.#{f}/1` to get #{type_name} type"
     helper_name = type_name |> Macro.underscore() |> String.replace("mem_ref", "memref")
 

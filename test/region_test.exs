@@ -1,43 +1,37 @@
 defmodule RegionTest do
   use Beaver.Case, async: true
-  use Beaver
-  alias Beaver.MLIR
   alias Beaver.MLIR.{Attribute, Type}
   alias Beaver.MLIR.Dialect.{Func, Arith, CF}
-  require Func
   @moduletag :smoke
-
   test "multiple regions", %{ctx: ctx} do
     op =
-      mlir ctx: ctx do
-        module do
-          Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
-            region do
-              block do
-                v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-                cond0 = Arith.constant(true) >>> Type.i(1)
-                CF.cond_br(cond0, Beaver.Env.block(bb1), {Beaver.Env.block(bb2), [v0]}) >>> []
-              end
-
-              block bb1() do
-                v1 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-                _add = Arith.addi(v0, v0) >>> Type.i(32)
-                CF.br({Beaver.Env.block(bb2), [v1]}) >>> []
-              end
-
-              block bb2(arg >>> Type.i(32)) do
-                v2 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-                add = Arith.addi(arg, v2) >>> Type.i(32)
-                Func.return(add) >>> []
-              end
+      module_ir ctx do
+        Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+          region do
+            block do
+              v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+              cond0 = Arith.constant(true) >>> Type.i(1)
+              CF.cond_br(cond0, Beaver.Env.block(bb1), {Beaver.Env.block(bb2), [v0]}) >>> []
             end
 
-            region do
-              block _bb1() do
-                v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-                _v1 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-                _add = Arith.addi(v0, v0) >>> Type.i(32)
-              end
+            block bb1() do
+              v1 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+              _add = Arith.addi(v0, v0) >>> Type.i(32)
+              CF.br({Beaver.Env.block(bb2), [v1]}) >>> []
+            end
+
+            block bb2(arg >>> Type.i(32)) do
+              v2 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+              add = Arith.addi(arg, v2) >>> Type.i(32)
+              Func.return(add) >>> []
+            end
+          end
+
+          region do
+            block _bb1() do
+              v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+              _v1 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+              _add = Arith.addi(v0, v0) >>> Type.i(32)
             end
           end
         end
@@ -59,17 +53,11 @@ defmodule RegionTest do
   end
 
   test "module region not accessible by env macro", %{ctx: ctx} do
-    mlir ctx: ctx do
-      module do
-        assert {:not_found, [file: __ENV__.file, line: __ENV__.line]} == Beaver.Env.region()
+    module_ir ctx do
+      assert {:not_found, [file: __ENV__.file, line: __ENV__.line]} == Beaver.Env.region()
 
-        Func.func some_func(function_type: Type.function([], [])) do
-          region do
-            block do
-              Func.return() >>> []
-            end
-          end
-        end
+      Func.func some_func(function_type: Type.function([], [])) do
+        region(do: block(do: Func.return() >>> []))
       end
     end
     |> MLIR.verify!()
@@ -87,28 +75,31 @@ defmodule RegionTest do
               condition = Arith.cmpi(i, i, predicate: Arith.cmp_i_predicate(:ne)) >>> Type.i1()
 
               Beaver.MLIR.Dialect.SCF.while [] do
-                region do
-                  block _() do
-                    SCF.condition(condition) >>> []
-                  end
-                end
+                region(
+                  do:
+                    block _() do
+                      SCF.condition(condition) >>> []
+                    end
+                )
 
                 region do
                   block _() do
                     SCF.if condition do
-                      region do
-                        block _true() do
-                          SCF.yield() >>> []
-                        end
-                      end
+                      region(
+                        do:
+                          block _true() do
+                            SCF.yield() >>> []
+                          end
+                      )
 
                       assert beaver_internal_env_regions |> Enum.count() == 1
 
-                      region do
-                        block _false() do
-                          SCF.yield() >>> []
-                        end
-                      end
+                      region(
+                        do:
+                          block _false() do
+                            SCF.yield() >>> []
+                          end
+                      )
                     end >>> []
 
                     assert beaver_internal_env_regions |> Enum.count() == 1

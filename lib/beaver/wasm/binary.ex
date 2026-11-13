@@ -8,20 +8,13 @@ defmodule Beaver.Wasm.Binary do
   The manifest is parsed directly from the wasm binary's import/export sections, so it reflects what the binary
   actually declares.
   """
-
   import Bitwise
-
   alias Beaver.Wasm.Binary
-
   @magic <<0x00, 0x61, 0x73, 0x6D>>
-
   @type import :: %{module: String.t(), name: String.t(), kind: atom()}
   @type export :: %{name: String.t(), kind: atom(), index: non_neg_integer()}
-
   defstruct [:bytes, :target, :imports, :exports]
-
   @type t :: %__MODULE__{bytes: binary(), target: String.t() | nil, imports: [import()], exports: [export()]}
-
   @doc """
   Parses the wasm binary header and the import/export sections.
 
@@ -34,7 +27,6 @@ defmodule Beaver.Wasm.Binary do
   end
 
   def parse(_other), do: raise(ArgumentError, "not a WebAssembly binary (missing \\0asm magic)")
-
   defp parse_sections(<<>>, imports, exports), do: {Enum.reverse(imports), Enum.reverse(exports)}
 
   defp parse_sections(<<id, rest::binary>>, imports, exports) do
@@ -73,7 +65,6 @@ defmodule Beaver.Wasm.Binary do
   defp import_kind(2), do: :memory
   defp import_kind(3), do: :global
   defp import_kind(other), do: {:unknown, other}
-
   # --- exports (section 7) ---
   defp parse_exports(<<0, _::binary>>, acc), do: Enum.reverse(acc)
 

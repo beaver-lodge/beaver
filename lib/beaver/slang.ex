@@ -22,7 +22,6 @@ defmodule Beaver.Slang do
   IRDL module, while `load/2` verifies and registers that module before attaching traits. See the [Slang
   guide](slang.html) for a complete dialect and the supported syntax.
   """
-
   @doc "Registers the dialect declarations and imports the Slang macros."
   defmacro __using__(opts) do
     name = opts |> Keyword.fetch!(:name)
@@ -32,12 +31,9 @@ defmodule Beaver.Slang do
       @before_compile Beaver.Slang
       import Beaver.Slang, only: :macros
       @__slang_dialect_name__ unquote(name)
-      Module.register_attribute(__MODULE__, :__slang__operation__, accumulate: true)
-      Module.register_attribute(__MODULE__, :__slang__creator__, accumulate: true)
-      Module.register_attribute(__MODULE__, :__slang__type__, accumulate: true)
-      Module.register_attribute(__MODULE__, :__slang__trait__, accumulate: true)
-      Module.register_attribute(__MODULE__, :__slang__interface__, accumulate: true)
-      Module.register_attribute(__MODULE__, :__slang__op_meta__, accumulate: true)
+      for kind <- ~w(operation creator type trait interface op_meta) do
+        Module.register_attribute(__MODULE__, String.to_atom("__slang__#{kind}__"), accumulate: true)
+      end
     end
   end
 
@@ -69,7 +65,6 @@ defmodule Beaver.Slang do
     full_names = Enum.map(ops, &(dialect <> "." <> &1))
     layers = metadata |> Enum.map(&elem(&1, 1)) |> Enum.reject(&is_nil/1) |> Enum.uniq()
     lookup = Map.new(metadata, fn {name, layer, meta} -> {name, {layer, meta}} end)
-
     info = introspection_lookup_ast(dialect, lookup)
 
     quote do
@@ -93,9 +88,12 @@ defmodule Beaver.Slang do
 
   defp introspection_lookup_ast(dialect, lookup) do
     if map_size(lookup) == 0 do
-      quote do
-        defp __slang_info__(_name), do: {nil, %{}}
-      end
+      quote(
+        do:
+          defp __slang_info__(_name) do
+            {nil, %{}}
+          end
+      )
     else
       quote do
         defp __slang_info__(name) do
@@ -107,30 +105,22 @@ defmodule Beaver.Slang do
   end
 
   defp creator_env do
-    quote do
-      [ip: Beaver.Env.block(), ctx: Beaver.Env.context(), loc: Kernel.var!(slang_internal_source_loc)]
-    end
+    quote(do: [ip: Beaver.Env.block(), ctx: Beaver.Env.context(), loc: Kernel.var!(slang_internal_source_loc)])
   end
 
   @doc false
   defp transform_defop_pins({:^, _line1, [{name, _line2, ctx}]}) when is_atom(name) and is_atom(ctx) do
     alias_name = get_alias_name(name)
-
-    quote do
-      unquote(alias_name)(unquote(creator_env()))
-    end
+    quote(do: unquote(alias_name)(unquote(creator_env())))
   end
 
   defp transform_defop_pins({:=, _line0, [_var, {:=, _line1, _right2}]} = ast), do: ast
   # only leaf assignment should be transformed
   defp transform_defop_pins({:=, _line0, [var, right]}) do
-    quote do
-      unquote(var) = Beaver.Slang.create_constraint(unquote(right), unquote(creator_env()))
-    end
+    quote(do: unquote(var) = Beaver.Slang.create_constraint(unquote(right), unquote(creator_env())))
   end
 
   defp transform_defop_pins(ast), do: ast
-
   @doc false
   def create_constraint({variadic_tag, v}, opts) when variadic_tag in @variadic_tags,
     do: {variadic_tag, create_constraint(v, opts)}
@@ -240,9 +230,7 @@ defmodule Beaver.Slang do
 
   @doc false
   def constraint_location(opts, ctx), do: opts[:loc] || source_location(opts, ctx)
-
   defp get_slang_arg_ast(i), do: {"slang_internal_arg#{i}" |> String.to_atom(), [], nil}
-
   defp constraint_binding({name, _, ctx} = ast, _) when is_atom(name) and is_atom(ctx), do: {nil, ast}
   defp constraint_binding({:=, _, [var, _]} = ast, _), do: {ast, var}
 
@@ -253,9 +241,7 @@ defmodule Beaver.Slang do
     var = get_slang_arg_ast(index)
 
     binding =
-      quote do
-        unquote(var) = Beaver.Slang.create_constraint(unquote(ast), unquote(creator_env()))
-      end
+      quote(do: unquote(var) = Beaver.Slang.create_constraint(unquote(ast), unquote(creator_env())))
 
     {binding, var}
   end
@@ -269,7 +255,6 @@ defmodule Beaver.Slang do
     do: declaration_name(value, index, prefix)
 
   defp declaration_name({name, _, ctx}, _index, _prefix) when is_atom(name) and is_atom(ctx), do: Atom.to_string(name)
-
   defp declaration_name(_ast, index, prefix), do: "#{prefix}_#{index + 1}"
 
   defp normalize_names!(asts, nil, prefix) do
@@ -312,7 +297,6 @@ defmodule Beaver.Slang do
 
   defp available_name(name, used, suffix) do
     candidate = if suffix == 1, do: name, else: "#{name}_#{suffix}"
-
     if MapSet.member?(used, candidate), do: available_name(name, used, suffix + 1), else: candidate
   end
 
@@ -369,37 +353,21 @@ defmodule Beaver.Slang do
     do: raise(ArgumentError, "operation attributes must be a keyword list, got: #{Macro.to_string(attributes)}")
 
   defp normalize_region_descriptor(:any), do: %{args: nil, size: nil}
-
   defp normalize_region_descriptor({:sized, size}) when is_integer(size) and size > 0, do: %{args: nil, size: size}
 
   defp normalize_region_descriptor({:region, opts}) when is_list(opts) do
     opts = Keyword.validate!(opts, [:args, :size])
+    args = if is_nil(opts[:args]), do: nil, else: List.wrap(opts[:args])
+    size = opts[:size]
 
-    args =
-      case Keyword.get(opts, :args) do
-        nil -> nil
-        args -> List.wrap(args)
-      end
-
-    size =
-      case Keyword.get(opts, :size) do
-        nil ->
-          nil
-
-        size when is_integer(size) and size > 0 ->
-          size
-
-        size ->
-          raise ArgumentError,
-                "expected region size to be a positive integer, got: #{inspect(size)}"
-      end
+    unless is_nil(size) or (is_integer(size) and size > 0),
+      do: raise(ArgumentError, "expected region size to be a positive integer, got: #{inspect(size)}")
 
     %{args: args, size: size}
   end
 
   defp build_region_arguments(%{args: args, size: size}, block, ctx, loc) do
     constrained_args? = not is_nil(args)
-
     args = for arg <- args || [], do: create_constraint(arg, ip: block, ctx: ctx, loc: loc)
 
     attrs =
@@ -428,7 +396,6 @@ defmodule Beaver.Slang do
 
   @doc false
   def gen_region(regions, block, ctx, loc), do: regions |> List.wrap() |> Enum.map(&do_gen_region(&1, block, ctx, loc))
-
   @doc false
   defp gen_creator(op, args_op, call, do_block, opts) do
     {name, args} = call |> Macro.decompose_call()
@@ -445,18 +412,8 @@ defmodule Beaver.Slang do
     {argument_names, result_names, attribute_names, region_names} =
       uniquify_declaration_names(argument_names, result_names, attribute_names, region_names)
 
-    input_constrains =
-      args
-      |> Macro.postwalk(&transform_defop_pins/1)
-      |> Enum.with_index()
-      |> Enum.map(fn {ast, i} -> elem(constraint_binding(ast, i), 0) end)
-
-    {attribute_constraints, attribute_vars} =
-      attribute_values
-      |> Macro.postwalk(&transform_defop_pins/1)
-      |> Enum.with_index(length(args))
-      |> Enum.map(fn {ast, i} -> constraint_binding(ast, i) end)
-      |> Enum.unzip()
+    {input_constrains, _} = constraint_bindings(args, 0)
+    {attribute_constraints, attribute_vars} = constraint_bindings(attribute_values, length(args))
 
     creator_opts =
       opts
@@ -489,9 +446,7 @@ defmodule Beaver.Slang do
 
       unquote_splicing(
         for {key, values} <- [__slang__trait__: traits, __slang__interface__: interfaces], values != [] do
-          quote do
-            Module.put_attribute(__MODULE__, unquote(key), {unquote(name), unquote(values)})
-          end
+          quote(do: Module.put_attribute(__MODULE__, unquote(key), {unquote(name), unquote(values)}))
         end
       )
 
@@ -522,6 +477,14 @@ defmodule Beaver.Slang do
     end
   end
 
+  defp constraint_bindings(values, offset) do
+    values
+    |> Macro.postwalk(&transform_defop_pins/1)
+    |> Enum.with_index(offset)
+    |> Enum.map(fn {ast, i} -> constraint_binding(ast, i) end)
+    |> Enum.unzip()
+  end
+
   @doc false
   def create_constrained_element(element, dialect, name, params, opts \\ []) do
     Deferred.from_opts(opts, fn ctx ->
@@ -547,7 +510,6 @@ defmodule Beaver.Slang do
 
   defp gen_create_element_creator(element, call, opts, caller) do
     {name, args} = call |> Macro.decompose_call()
-
     opts = Keyword.validate!(opts, [:parameter_names])
     source = %{file: caller.file, line: caller.line}
 
@@ -575,10 +537,8 @@ defmodule Beaver.Slang do
 
   @doc "Defines a type in the dialect."
   defmacro deftype(call, opts \\ []), do: gen_create_element_creator(:type, call, opts, __CALLER__)
-
   @doc "Defines an attribute in the dialect."
   defmacro defattr(call, opts \\ []), do: gen_create_element_creator(:attribute, call, opts, __CALLER__)
-
   @doc "Defines an operation and generates its creator function."
   defmacro defop(call, block \\ nil) do
     block =
@@ -591,19 +551,19 @@ defmodule Beaver.Slang do
       do: raise(ArgumentError, "defop accepts either a do block or :results, not both")
 
     results = Keyword.get(block, :results, block[:do])
+    options = Keyword.take(block, ~w(result_names attributes regions traits interfaces layer metadata)a)
 
-    gen_creator(:operation, :operands, call, results,
-      return_op: :results,
-      need_variadicity: true,
-      argument_names: block[:operand_names],
-      result_names: block[:result_names],
-      attributes: block[:attributes],
-      regions: block[:regions],
-      traits: block[:traits],
-      interfaces: block[:interfaces],
-      layer: block[:layer],
-      metadata: block[:metadata],
-      source: %{file: __CALLER__.file, line: __CALLER__.line}
+    gen_creator(
+      :operation,
+      :operands,
+      call,
+      results,
+      [
+        return_op: :results,
+        need_variadicity: true,
+        argument_names: block[:operand_names],
+        source: %{file: __CALLER__.file, line: __CALLER__.line}
+      ] ++ options
     )
   end
 
@@ -644,7 +604,6 @@ defmodule Beaver.Slang do
 
         mlir ctx: opts[:ctx], ip: Deferred.fetch_insertion_point(opts) do
           Kernel.var!(slang_internal_source_loc) = Beaver.Slang.constraint_location(opts, Beaver.Env.context())
-
           unquote(block[:do]) |> Beaver.Slang.create_parametric(unquote(creator_env()))
         end
       end
@@ -664,10 +623,8 @@ defmodule Beaver.Slang do
   `defalias` is retained as a concise spelling of `defconstraint`.
   """
   defmacro defalias(call, block), do: gen_constraint(call, block)
-
   @doc "Generates an `irdl.any_of` constraint."
   defmacro any_of(types), do: combine_constraints(:any_of, types)
-
   @doc "Generates an `irdl.all_of` constraint."
   defmacro all_of(types), do: combine_constraints(:all_of, types)
 
@@ -686,14 +643,12 @@ defmodule Beaver.Slang do
 
   @doc false
   def create_base({:parametric, symbol, _values, _element}, opts), do: create_base({:base_ref, symbol}, opts)
-
   def create_base(name, opts) when is_binary(name), do: create_base({:base_name, Attribute.string(name)}, opts)
 
   def create_base({key, value}, opts) when key in [:base_ref, :base_name] do
     Deferred.from_opts(opts, fn ctx ->
       mlir ctx: ctx, ip: Deferred.fetch_insertion_point(opts) do
         loc = constraint_location(opts, ctx)
-
         IRDL.base([loc, {key, Deferred.resolve(value, ctx)}]) >>> ~t{!irdl.attribute}
       end
     end)
@@ -705,20 +660,15 @@ defmodule Beaver.Slang do
   Base names use upstream IRDL spelling such as `"!builtin.integer"` or `"#builtin.string"`.
   """
   defmacro base(base) do
-    quote do
-      Beaver.Slang.create_base(unquote(base), unquote(creator_env()))
-    end
+    quote(do: Beaver.Slang.create_base(unquote(base), unquote(creator_env())))
   end
 
   @doc "Marks an operand or result constraint as variadic."
   defmacro variadic(constraint), do: quote(do: {:variadic, unquote(constraint)})
-
   @doc "Marks an operand or result constraint as optional."
   defmacro optional(constraint), do: quote(do: {:optional, unquote(constraint)})
-
   @doc "Marks an operand or result constraint as a required singleton."
   defmacro single(constraint), do: quote(do: {:single, unquote(constraint)})
-
   @doc "Generates an `irdl.is` constraint, typically for a type."
   defmacro is(type) do
     quote do
@@ -735,31 +685,22 @@ defmodule Beaver.Slang do
   defmacro any() do
     quote do
       use Beaver
-
-      mlir do
-        Beaver.MLIR.Dialect.IRDL.any(Kernel.var!(slang_internal_source_loc)) >>> ~t{!irdl.attribute}
-      end
+      mlir(do: Beaver.MLIR.Dialect.IRDL.any(Kernel.var!(slang_internal_source_loc)) >>> ~t{!irdl.attribute})
     end
   end
 
   @doc false
   def create_parametric({:parametric, symbol, values, _}, opts) do
-    base_type = symbol
-
-    Deferred.from_opts(
-      opts,
-      fn ctx ->
-        mlir ctx: ctx, ip: Deferred.fetch_insertion_point(opts) do
-          loc = constraint_location(opts, ctx)
-          IRDL.parametric([loc | values], base_type: base_type) >>> ~t{!irdl.attribute}
-        end
+    Deferred.from_opts(opts, fn ctx ->
+      mlir ctx: ctx, ip: Deferred.fetch_insertion_point(opts) do
+        loc = constraint_location(opts, ctx)
+        IRDL.parametric([loc | values], base_type: symbol) >>> ~t{!irdl.attribute}
       end
-    )
+    end)
   end
 
   @doc false
   def create_parametric(v, _opts), do: v
-
   @doc false
   def create_dialect(name, creators, opts) do
     Deferred.from_opts(opts, fn ctx ->
@@ -781,12 +722,10 @@ defmodule Beaver.Slang do
   end
 
   @external_interfaces ~w(memory_effects conditionally_speculatable transform_op pattern_descriptor)a
-
   defp normalize_interfaces!(nil), do: []
 
   defp normalize_interfaces!(interfaces) when is_list(interfaces) do
     unless Keyword.keyword?(interfaces), do: raise(ArgumentError, ":interfaces must be a keyword list")
-
     unsupported = Keyword.keys(interfaces) -- @external_interfaces
     if unsupported != [], do: raise(ArgumentError, "unsupported Slang interfaces: #{inspect(unsupported)}")
     interfaces
@@ -808,19 +747,11 @@ defmodule Beaver.Slang do
   `mod`'s canonicalized IRDL schema, traits, and interface keys.
   """
   @spec schema_digest(module()) :: String.t()
-  def schema_digest(mod) when is_atom(mod) do
-    cache_key = {__MODULE__, :schema_digest, mod, mod.__info__(:md5)}
-
-    case :persistent_term.get(cache_key, nil) do
-      digest when is_binary(digest) ->
-        digest
-
-      nil ->
-        digest = compute_schema_digest(mod)
-        :persistent_term.put(cache_key, digest)
-        digest
-    end
-  end
+  def schema_digest(mod) when is_atom(mod),
+    do:
+      Beaver.Build.ArtifactCache.fetch_revision(__MODULE__, mod, mod.__info__(:md5), fn ->
+        compute_schema_digest(mod)
+      end)
 
   defp compute_schema_digest(mod) do
     ir_text =
@@ -878,14 +809,12 @@ defmodule Beaver.Slang do
   end
 
   defp parse_layer_rule(rule), do: {MapSet.new(rule), MapSet.new()}
-
   defp optional_map_set({:ok, list}), do: MapSet.new(list)
   defp optional_map_set(:error), do: nil
 
   defp layer_violation(dialect_mod, op, allow_set, forbid_set) do
     op_name = MLIR.Operation.name(op)
     layer = dialect_mod.__slang_layer__(op_name)
-
     if layer_allowed?(layer, allow_set, forbid_set), do: [], else: [%{operation: op_name, layer: layer}]
   end
 
@@ -934,29 +863,23 @@ defmodule Beaver.Slang do
       |> maybe_put_kw(:result_names, explicit_res_names)
       |> maybe_put_kw(:attributes, if(attr_asts == [], do: merged_opts[:attributes], else: attr_asts))
 
-    quote do
-      Beaver.Slang.defop(unquote(call_ast), unquote(defop_opts))
-    end
+    quote(do: Beaver.Slang.defop(unquote(call_ast), unquote(defop_opts)))
   end
 
   defp merge_table_op_opts(shared_opts, op_opts) do
     merged = Keyword.merge(shared_opts, op_opts)
 
     case {shared_opts[:metadata], op_opts[:metadata]} do
-      {nil, _} ->
-        merged
-
-      {_, nil} ->
-        merged
-
-      {s_meta, o_meta} ->
+      {s_meta, o_meta} when not is_nil(s_meta) and not is_nil(o_meta) ->
         Keyword.put(merged, :metadata, quote(do: Map.merge(Map.new(unquote(s_meta)), Map.new(unquote(o_meta)))))
+
+      _ ->
+        merged
     end
   end
 
   defp maybe_put_kw(kw, _key, nil), do: kw
   defp maybe_put_kw(kw, key, val), do: Keyword.put(kw, key, val)
-
   defp unpack_table_op!({:{}, _, fields}), do: unpack_table_op!(List.to_tuple(fields))
   defp unpack_table_op!({:%{}, _, kvs}), do: unpack_table_op!(kvs)
 
@@ -982,7 +905,6 @@ defmodule Beaver.Slang do
   defp expand_table_items!(items, explicit_names) when is_list(items) do
     if items != [] and named_value_keyword?(items) do
       if explicit_names, do: raise(ArgumentError, "cannot combine named defops items with explicit *_names option")
-
       names = Enum.map(items, fn {k, _} -> to_string(k) end)
       asts = Enum.map(items, fn {_, spec} -> expand_table_constraint(spec) end)
       {asts, names}
@@ -1000,20 +922,12 @@ defmodule Beaver.Slang do
     do: expand_table_constraint({:pin, pin})
 
   defp expand_table_constraint({:pin, pin}) when is_atom(pin), do: {:^, [], [{pin, [], nil}]}
-
   defp expand_table_constraint({:type, str}) when is_binary(str), do: quote(do: Beaver.MLIR.Type.get(unquote(str)))
 
   defp expand_table_constraint(str) when is_binary(str) do
-    cond do
-      String.starts_with?(str, "#") and not String.contains?(str, "<") ->
-        quote(do: Beaver.Slang.base(unquote(str)))
-
-      String.starts_with?(str, "!") and not String.contains?(str, "<") ->
-        quote(do: Beaver.Slang.base(unquote(str)))
-
-      true ->
-        quote(do: Beaver.MLIR.Type.get(unquote(str)))
-    end
+    if String.starts_with?(str, ["#", "!"]) and not String.contains?(str, "<"),
+      do: quote(do: Beaver.Slang.base(unquote(str))),
+      else: quote(do: Beaver.MLIR.Type.get(unquote(str)))
   end
 
   defp expand_table_constraint({tag, inner}) when tag in [:variadic, :optional, :single] do

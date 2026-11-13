@@ -3,9 +3,7 @@ const e = kinda.erl_nif;
 const beam = kinda.beam;
 const mlir_capi = @import("mlir_capi.zig");
 const builtin = @import("builtin");
-
 const NifFunc = e.ErlNifFunc;
-
 // NIF tables exported by the partitioned native libraries. Each partition is
 // compiled as its own library so editing one domain does not force the
 // comptime-heavy CAPI registry to be regenerated. The tables are concatenated
@@ -16,24 +14,20 @@ extern const callback_bridge_nifs: [0]NifFunc;
 extern const callback_bridge_nifs_len: usize;
 extern const cuda_runner_nifs: [0]NifFunc;
 extern const cuda_runner_nifs_len: usize;
-
 // Registration hooks exported by the partitioned native libraries.
 extern fn core_register_all_passes() void;
 extern fn core_open_all(env: beam.env) void;
 extern fn callback_bridge_open(env: beam.env) void;
 extern fn cuda_runner_open(env: beam.env) void;
-
 const max_nifs = 4096;
 var assembled_nifs: [max_nifs]NifFunc = undefined;
 var assembled_len: usize = 0;
-
 fn appendNifs(table: [*]const NifFunc, len: usize, index: *usize) void {
     for (table[0..len]) |nif_entry| {
         assembled_nifs[index.*] = nif_entry;
         index.* += 1;
     }
 }
-
 fn assembleNifs() []NifFunc {
     const total =
         core_nifs_len +
@@ -47,7 +41,6 @@ fn assembleNifs() []NifFunc {
     assembled_len = index;
     return assembled_nifs[0..assembled_len];
 }
-
 export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     core_register_all_passes();
     core_open_all(env);
@@ -55,13 +48,10 @@ export fn nif_load(env: beam.env, _: [*c]?*anyopaque, _: beam.term) c_int {
     if (builtin.os.tag == .linux) cuda_runner_open(env);
     return 0;
 }
-
 export fn nif_upgrade(env: beam.env, priv_data: [*c]?*anyopaque, _: [*c]?*anyopaque, load_info: beam.term) c_int {
     return nif_load(env, priv_data, load_info);
 }
-
 export fn nif_unload(_: beam.env, _: ?*anyopaque) void {}
-
 const entry_exports = kinda.DynamicEntryExports(.{
     .name = mlir_capi.root_module,
     .nifs_provider = assembleNifs,
@@ -71,7 +61,6 @@ const entry_exports = kinda.DynamicEntryExports(.{
     .unload = nif_unload,
     .min_erts = "erts-13.0",
 });
-
 comptime {
     _ = entry_exports;
 }

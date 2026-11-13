@@ -14,13 +14,10 @@ defmodule CompleteSlang do
   deftype token()
   deftype named_parameters(any()), parameter_names: [:item]
   defattr direction(value = ^direction_value)
-
   defop(consume(value = any()))
   defop(consume_token(value = base(token())))
   defop produce_integer(), results: [value: ^integer_like]
-
   defop sequence(head = any(), tail = variadic(any()), fallback = optional(any())), results: [value: optional(any())]
-
   defop named_io(single(any())), operand_names: [:input], results: [single(any())], result_names: [:output]
 
   defop scope(),

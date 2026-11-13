@@ -1,44 +1,11 @@
 defmodule AnalysisAndRewriteUtilitiesTest do
   use Beaver.Case, async: true
-
-  alias Beaver.MLIR.{
-    Attribute,
-    Block,
-    DominanceInfo,
-    IRMapping,
-    IRRewriter,
-    Location,
-    OpOperand,
-    Operation,
-    PostDominanceInfo,
-    RewriterBase,
-    Type,
-    Value
-  }
-
-  alias Beaver.MLIR
+  alias Beaver.MLIR.{Attribute, Block, DominanceInfo, IRMapping, IRRewriter, Location, OpOperand, Operation}
+  alias Beaver.MLIR.{PostDominanceInfo, RewriterBase, Type, Value}
 
   defp control_flow_module(ctx) do
-    MLIR.Module.create!(
-      """
-      module {
-        func.func @branch(%cond: i1, %arg: i32) -> i32 {
-          cf.cond_br %cond, ^left, ^right
-        ^left:
-          %left_value = arith.addi %arg, %arg : i32
-          cf.br ^merge(%left_value : i32)
-        ^right:
-          %right_value = arith.subi %arg, %arg : i32
-          cf.br ^merge(%right_value : i32)
-        ^merge(%result: i32):
-          return %result : i32
-        ^unreachable:
-          return %arg : i32
-        }
-      }
-      """,
-      ctx: ctx
-    )
+    "module {\n  func.func @branch(%cond: i1, %arg: i32) -> i32 {\n    cf.cond_br %cond, ^left, ^right\n  ^left:\n    %left_value = arith.addi %arg, %arg : i32\n    cf.br ^merge(%left_value : i32)\n  ^right:\n    %right_value = arith.subi %arg, %arg : i32\n    cf.br ^merge(%right_value : i32)\n  ^merge(%result: i32):\n    return %result : i32\n  ^unreachable:\n    return %arg : i32\n  }\n}\n"
+    |> MLIR.Module.create!(ctx: ctx)
   end
 
   defp func_and_blocks(module) do
@@ -67,9 +34,7 @@ defmodule AnalysisAndRewriteUtilitiesTest do
                assert DominanceInfo.value_dominates?(info, left_value, left_branch)
                assert DominanceInfo.value_properly_dominates?(info, left_value, left_branch)
                refute DominanceInfo.value_dominates?(info, left_value, merge_return)
-
                assert MLIR.equal?(entry, DominanceInfo.nearest_common_dominator(info, left, right))
-
                assert DominanceInfo.reachable_from_entry?(info, merge)
                refute DominanceInfo.reachable_from_entry?(info, unreachable)
                assert ^info = DominanceInfo.invalidate(info)
@@ -155,7 +120,6 @@ defmodule AnalysisAndRewriteUtilitiesTest do
       tag = Attribute.integer(Type.i32(ctx: ctx), 1)
       :ok = Operation.put_discardable_attribute(clone, "test.tag", tag)
       refute Operation.equivalent?(func, clone, ignore_locations: true)
-
       assert Operation.equivalent?(func, clone, ignore_locations: true, ignore_discardable_attributes: true)
 
       assert Operation.structural_hash(func, ignore_locations: true, ignore_discardable_attributes: true) ==
@@ -172,20 +136,8 @@ defmodule AnalysisAndRewriteUtilitiesTest do
 
   test "structural equivalence exposes properties and commutativity flags", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        """
-        module {
-          func.func @operations(%lhs: i32, %rhs: i32) {
-            %0 = arith.addi %lhs, %rhs : i32
-            %1 = arith.addi %rhs, %lhs : i32
-            %2 = arith.constant 1 : i32
-            %3 = arith.constant 2 : i32
-            return
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  func.func @operations(%lhs: i32, %rhs: i32) {\n    %0 = arith.addi %lhs, %rhs : i32\n    %1 = arith.addi %rhs, %lhs : i32\n    %2 = arith.constant 1 : i32\n    %3 = arith.constant 2 : i32\n    return\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     MLIR.Module.with_module(module, fn _ ->
       {func, _blocks} = func_and_blocks(module)
@@ -200,9 +152,7 @@ defmodule AnalysisAndRewriteUtilitiesTest do
         |> Enum.to_list()
 
       assert Operation.equivalent?(add, reversed_add, ignore_locations: true)
-
       refute Operation.equivalent?(add, reversed_add, ignore_locations: true, ignore_commutativity: true)
-
       refute Operation.equivalent?(one, two, ignore_locations: true)
       assert Operation.equivalent?(one, two, ignore_locations: true, ignore_properties: true)
     end)
@@ -210,29 +160,14 @@ defmodule AnalysisAndRewriteUtilitiesTest do
 
   test "conditional use replacement dispatches a safe Elixir predicate", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        """
-        module {
-          func.func @replace_selected_use(%arg: i32) -> i32 {
-            %replacement = arith.constant 7 : i32
-            %selected = arith.addi %arg, %replacement : i32
-            %kept = arith.subi %arg, %selected : i32
-            return %kept : i32
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  func.func @replace_selected_use(%arg: i32) -> i32 {\n    %replacement = arith.constant 7 : i32\n    %selected = arith.addi %arg, %replacement : i32\n    %kept = arith.subi %arg, %selected : i32\n    return %kept : i32\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     MLIR.Module.with_module(module, fn _ ->
       {func, _blocks} = func_and_blocks(module)
-
       block = func |> Beaver.Walker.regions() |> Enum.fetch!(0) |> Beaver.Walker.blocks() |> Enum.fetch!(0)
-
       argument = Block.get_arg!(block, 0)
-
       [replacement, selected, kept, _return] = block |> Beaver.Walker.operations() |> Enum.to_list()
-
       replacement_value = Operation.result(replacement, 0)
       caller = self()
 
@@ -268,27 +203,14 @@ defmodule AnalysisAndRewriteUtilitiesTest do
   end
 
   defp constants_module(ctx) do
-    MLIR.Module.create!(
-      """
-      module {
-        func.func @constants() -> i32 {
-          %0 = arith.constant 1 : i32
-          %1 = arith.constant 2 : i32
-          return %1 : i32
-        }
-      }
-      """,
-      ctx: ctx
-    )
+    "module {\n  func.func @constants() -> i32 {\n    %0 = arith.constant 1 : i32\n    %1 = arith.constant 2 : i32\n    return %1 : i32\n  }\n}\n"
+    |> MLIR.Module.create!(ctx: ctx)
   end
 
   test "scoped insertion points restore on return and exception", %{ctx: ctx} do
     module = constants_module(ctx)
-
     {func, _blocks} = func_and_blocks(module)
-
     block = func |> Beaver.Walker.regions() |> Enum.fetch!(0) |> Beaver.Walker.blocks() |> Enum.fetch!(0)
-
     [first, second, _return] = Enum.to_list(Beaver.Walker.operations(block))
 
     MLIR.Module.with_module(module, fn _ ->
@@ -314,7 +236,6 @@ defmodule AnalysisAndRewriteUtilitiesTest do
 
   test "saved insertion point round-trips through block creation and insertion", %{ctx: ctx} do
     module = constants_module(ctx)
-
     {_func, [block | _]} = func_and_blocks(module)
     [first | _] = Enum.to_list(Beaver.Walker.operations(block))
 

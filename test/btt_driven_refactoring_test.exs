@@ -1,11 +1,7 @@
 defmodule Beaver.BttDrivenRefactoringTest do
   use Beaver.Case, async: true
   alias Beaver.MLIR.{Attribute, Context, Conversion, Operation, Target}
-
-  alias Beaver.MLIR
-
   alias Beaver.MLIR.{AnalysisSession, CAPI, ExecutionEngine, IRBatch, Safepoint, SymbolTable, Type, TypeConverter}
-
   alias Conversion.Plan
   alias Target.LLVMIR
   alias Beaver.Pattern.Native.Program
@@ -41,15 +37,8 @@ defmodule Beaver.BttDrivenRefactoringTest do
         |> Plan.add_pattern(func_convert, version: "1.0")
         |> Plan.add_pattern(ret_convert, version: "1.0")
 
-      ir = ~S"""
-      module {
-        "custom.func"() ({
-        ^bb0(%arg0: i32, %arg1: i32):
-          %0 = "custom.rsub"(%arg0, %arg1) {tag = "keep_me"} : (i32, i32) -> i32
-          "custom.return"(%0) : (i32) -> ()
-        }) {sym_name = "compute", function_type = (i32, i32) -> i32} : () -> ()
-      }
-      """
+      ir =
+        "module {\n  \"custom.func\"() ({\n  ^bb0(%arg0: i32, %arg1: i32):\n    %0 = \"custom.rsub\"(%arg0, %arg1) {tag = \"keep_me\"} : (i32, i32) -> i32\n    \"custom.return\"(%0) : (i32) -> ()\n  }) {sym_name = \"compute\", function_type = (i32, i32) -> i32} : () -> ()\n}\n"
 
       Beaver.MLIR.Module.with_module(ir, [ctx: ctx], fn module ->
         assert {{:ok, ^module, []}, receipt} = Plan.profile(plan, module)
@@ -64,20 +53,8 @@ defmodule Beaver.BttDrivenRefactoringTest do
     end
 
     test "PDL patterns compile to PDLInterp and compose inside RewritePatternSet and Conversion.Plan across contexts" do
-      pdl_source = ~S"""
-      module {
-        pdl.pattern @rewrite_custom_mul : benefit(1) {
-          %t = pdl.type
-          %lhs = pdl.operand : %t
-          %rhs = pdl.operand : %t
-          %op = pdl.operation "pdl_test.mul"(%lhs, %rhs : !pdl.value, !pdl.value) -> (%t : !pdl.type)
-          pdl.rewrite %op {
-            %new_op = pdl.operation "arith.muli"(%lhs, %rhs : !pdl.value, !pdl.value) -> (%t : !pdl.type)
-            pdl.replace %op with %new_op
-          }
-        }
-      }
-      """
+      pdl_source =
+        "module {\n  pdl.pattern @rewrite_custom_mul : benefit(1) {\n    %t = pdl.type\n    %lhs = pdl.operand : %t\n    %rhs = pdl.operand : %t\n    %op = pdl.operation \"pdl_test.mul\"(%lhs, %rhs : !pdl.value, !pdl.value) -> (%t : !pdl.type)\n    pdl.rewrite %op {\n      %new_op = pdl.operation \"arith.muli\"(%lhs, %rhs : !pdl.value, !pdl.value) -> (%t : !pdl.type)\n      pdl.replace %op with %new_op\n    }\n  }\n}\n"
 
       plan =
         Plan.new(mode: :full)
@@ -85,14 +62,8 @@ defmodule Beaver.BttDrivenRefactoringTest do
         |> Plan.add_illegal_dialect("pdl_test")
         |> Plan.add_pdl_patterns(pdl_source, version: "1.0")
 
-      ir = ~S"""
-      module {
-        func.func @mul(%a: i32, %b: i32) -> i32 {
-          %0 = "pdl_test.mul"(%a, %b) : (i32, i32) -> i32
-          return %0 : i32
-        }
-      }
-      """
+      ir =
+        "module {\n  func.func @mul(%a: i32, %b: i32) -> i32 {\n    %0 = \"pdl_test.mul\"(%a, %b) : (i32, i32) -> i32\n    return %0 : i32\n  }\n}\n"
 
       for _run <- 1..2 do
         Context.with_context(fn fresh_ctx ->
@@ -138,23 +109,9 @@ defmodule Beaver.BttDrivenRefactoringTest do
         |> Plan.add_structural_type_conversions([:func, :cf, :scf])
         |> Plan.add_pattern(Program.new("custom.Wrap", rewrite: {:operand, 0}), version: "1.0")
 
-      ir = ~S"""
-      module {
-        func.func private @helper(i32) -> i32
-        func.func @branch_and_if(%cond: i1, %x: i32) -> i32 {
-          %0 = scf.if %cond -> (i32) {
-            %wrapped = "custom.Wrap"(%x) : (i32) -> i32
-            scf.yield %wrapped : i32
-          } else {
-            %called = func.call @helper(%x) : (i32) -> i32
-            scf.yield %called : i32
-          }
-          cf.br ^bb1(%0 : i32)
-        ^bb1(%merged: i32):
-          return %merged : i32
-        }
-      }
-      """
+      ir =
+        "module {\n  func.func private @helper(i32) -> i32\n" <>
+          "  func.func @branch_and_if(%cond: i1, %x: i32) -> i32 {\n    %0 = scf.if %cond -> (i32) {\n      %wrapped = \"custom.Wrap\"(%x) : (i32) -> i32\n      scf.yield %wrapped : i32\n    } else {\n      %called = func.call @helper(%x) : (i32) -> i32\n      scf.yield %called : i32\n    }\n    cf.br ^bb1(%0 : i32)\n  ^bb1(%merged: i32):\n    return %merged : i32\n  }\n}\n"
 
       Beaver.MLIR.Module.with_module(ir, [ctx: ctx], fn module ->
         assert {{:ok, ^module, []}, receipt} = Plan.profile(plan, module)
@@ -183,18 +140,11 @@ defmodule Beaver.BttDrivenRefactoringTest do
       target = LLVMIR.host_target()
       assert is_binary(target.triple) and byte_size(target.triple) > 0 and is_binary(target.cpu)
 
-      ir = ~S"""
-      module {
-        llvm.func @add_i64(%a: i64, %b: i64) -> i64 {
-          %sum = llvm.add %a, %b : i64
-          llvm.return %sum : i64
-        }
-      }
-      """
+      ir =
+        "module {\n  llvm.func @add_i64(%a: i64, %b: i64) -> i64 {\n    %sum = llvm.add %a, %b : i64\n    llvm.return %sum : i64\n  }\n}\n"
 
       Beaver.MLIR.Module.with_module(ir, [ctx: ctx], fn module ->
         assert {:ok, obj_bytes, metrics} = LLVMIR.compile_object(module, opt_level: 2, return_metrics: true)
-
         assert byte_size(obj_bytes) > 64 and metrics.translate_ns > 0 and metrics.codegen_ns > 0
         assert {:ok, asm_text} = LLVMIR.compile_object(module, format: :assembly, opt_level: 1)
         assert asm_text =~ "add_i64"
@@ -203,22 +153,8 @@ defmodule Beaver.BttDrivenRefactoringTest do
 
     @tag :tmp_dir
     test "compile_functions shards and caches objects", %{ctx: ctx, tmp_dir: tmp_dir} do
-      ir = ~S"""
-      module {
-        llvm.mlir.global external @shared_bias(10 : i64) : i64
-        llvm.func @double(%x: i64) -> i64 {
-          %two = llvm.mlir.constant(2 : i64) : i64
-          %r = llvm.mul %x, %two : i64
-          llvm.return %r : i64
-        }
-        llvm.func @double_plus_one(%x: i64) -> i64 {
-          %d = llvm.call @double(%x) : (i64) -> i64
-          %one = llvm.mlir.constant(1 : i64) : i64
-          %r = llvm.add %d, %one : i64
-          llvm.return %r : i64
-        }
-      }
-      """
+      ir =
+        "module {\n  llvm.mlir.global external @shared_bias(10 : i64) : i64\n  llvm.func @double(%x: i64) -> i64 {\n    %two = llvm.mlir.constant(2 : i64) : i64\n    %r = llvm.mul %x, %two : i64\n    llvm.return %r : i64\n  }\n  llvm.func @double_plus_one(%x: i64) -> i64 {\n    %d = llvm.call @double(%x) : (i64) -> i64\n    %one = llvm.mlir.constant(1 : i64) : i64\n    %r = llvm.add %d, %one : i64\n    llvm.return %r : i64\n  }\n}\n"
 
       Beaver.MLIR.Module.with_module(ir, [ctx: ctx], fn module ->
         shards1 = LLVMIR.compile_functions!(module, cache_dir: tmp_dir, opt_level: 2)
@@ -234,19 +170,12 @@ defmodule Beaver.BttDrivenRefactoringTest do
 
   describe "ir_batch" do
     test "builds basic block in one submission", %{ctx: ctx} do
-      ir = ~S"""
-      module {
-        func.func @batch_target(%x: i32, %y: i32) -> i32 {
-          return %x : i32
-        }
-      }
-      """
+      ir =
+        "module {\n  func.func @batch_target(%x: i32, %y: i32) -> i32 {\n    return %x : i32\n  }\n}\n"
 
       Beaver.MLIR.Module.with_module(ir, [ctx: ctx], fn module ->
         func = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.at(0)
-
         block = func |> Beaver.Walker.regions() |> Enum.at(0) |> Beaver.Walker.blocks() |> Enum.at(0)
-
         [old_ret] = Enum.to_list(Beaver.Walker.operations(block))
         i32 = Type.i32(ctx: ctx)
 
@@ -285,23 +214,15 @@ defmodule Beaver.BttDrivenRefactoringTest do
           version: "1.0"
         )
 
-      ir = ~S"""
-      module {
-        llvm.func @caller(%rt: i64, %lhs: i64, %rhs: i64) -> i64 {
-          %status, %out = "btt.value_add"(%rt, %lhs, %rhs) : (i64, i64, i64) -> (i32, i64)
-          llvm.return %out : i64
-        }
-      }
-      """
+      ir =
+        "module {\n  llvm.func @caller(%rt: i64, %lhs: i64, %rhs: i64) -> i64 {\n    %status, %out = \"btt.value_add\"(%rt, %lhs, %rhs) : (i64, i64, i64) -> (i32, i64)\n    llvm.return %out : i64\n  }\n}\n"
 
       Beaver.MLIR.Module.with_module(ir, [ctx: ctx], fn module ->
         assert {{:ok, ^module, []}, receipt} = Plan.profile(plan, module)
         assert receipt["beam"]["callback_count"] == 0
         assert MLIR.verify!(module)
         ir_text = MLIR.to_string(module)
-
         assert ir_text =~ "llvm.func @btt_c_value_add(i64, !llvm.ptr, !llvm.ptr, !llvm.ptr) -> i32"
-
         assert ir_text =~ "llvm.intr.stacksave" and ir_text =~ "llvm.alloca" and ir_text =~ "llvm.store"
 
         assert ir_text =~ "llvm.call @btt_c_value_add" and ir_text =~ "llvm.load" and
@@ -313,15 +234,8 @@ defmodule Beaver.BttDrivenRefactoringTest do
 
     @tag :tmp_dir
     test "binds aliased native symbols", %{ctx: ctx, tmp_dir: tmp_dir} do
-      lib_ir = ~S"""
-      module {
-        llvm.func @native_impl_run(%x: i32) -> i32 {
-          %ten = llvm.mlir.constant(10 : i32) : i32
-          %res = llvm.add %x, %ten : i32
-          llvm.return %res : i32
-        }
-      }
-      """
+      lib_ir =
+        "module {\n  llvm.func @native_impl_run(%x: i32) -> i32 {\n    %ten = llvm.mlir.constant(10 : i32) : i32\n    %res = llvm.add %x, %ten : i32\n    llvm.return %res : i32\n  }\n}\n"
 
       obj_path = Path.join(tmp_dir, "impl.o")
       dylib_path = Path.join(tmp_dir, "libimpl.dylib")
@@ -332,15 +246,9 @@ defmodule Beaver.BttDrivenRefactoringTest do
 
       {_, 0} = System.cmd("cc", ["-shared", "-o", dylib_path, obj_path])
 
-      caller_ir = ~S"""
-      module {
-        func.func private @aliased_kernel(i32) -> i32
-        func.func @entry(%x: i32) -> i32 attributes {llvm.emit_c_interface} {
-          %r = func.call @aliased_kernel(%x) : (i32) -> i32
-          return %r : i32
-        }
-      }
-      """
+      caller_ir =
+        "module {\n  func.func private @aliased_kernel(i32) -> i32\n" <>
+          "  func.func @entry(%x: i32) -> i32 attributes {llvm.emit_c_interface} {\n    %r = func.call @aliased_kernel(%x) : (i32) -> i32\n    return %r : i32\n  }\n}\n"
 
       caller_module =
         MLIR.Module.create!(caller_ir, ctx: ctx)
@@ -349,7 +257,6 @@ defmodule Beaver.BttDrivenRefactoringTest do
 
       Beaver.MLIR.Module.with_module(caller_module, fn caller_module ->
         assert ExecutionEngine.lookup_library_symbol(dylib_path, "nonexistent_symbol") == :error
-
         jit = ExecutionEngine.create!(caller_module, symbols: %{"aliased_kernel" => {dylib_path, "native_impl_run"}})
 
         Beaver.Native.with_resource(jit, &ExecutionEngine.destroy/1, fn jit ->
@@ -366,20 +273,8 @@ defmodule Beaver.BttDrivenRefactoringTest do
     test "analyzes liveness and lowers resumable CFG", %{ctx: ctx} do
       Context.allow_unregistered_dialects(ctx)
 
-      ir = ~S"""
-      module {
-        func.func @coro(%state: i32, %input: i64) -> i32 {
-          %c1 = arith.constant 1 : i64
-          %v1 = arith.addi %input, %c1 : i64
-          "coro.suspend"() : () -> ()
-          %c2 = arith.constant 2 : i64
-          %v2 = arith.muli %v1, %c2 : i64
-          "coro.suspend"() : () -> ()
-          %done = arith.trunci %v2 : i64 to i32
-          return %done : i32
-        }
-      }
-      """
+      ir =
+        "module {\n  func.func @coro(%state: i32, %input: i64) -> i32 {\n    %c1 = arith.constant 1 : i64\n    %v1 = arith.addi %input, %c1 : i64\n    \"coro.suspend\"() : () -> ()\n    %c2 = arith.constant 2 : i64\n    %v2 = arith.muli %v1, %c2 : i64\n    \"coro.suspend\"() : () -> ()\n    %done = arith.trunci %v2 : i64 to i32\n    return %done : i32\n  }\n}\n"
 
       Beaver.MLIR.Module.with_module(ir, [ctx: ctx], fn module ->
         func_op = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.at(0)
@@ -393,12 +288,9 @@ defmodule Beaver.BttDrivenRefactoringTest do
         end)
 
         assert ^func_op = Safepoint.lower_resumable!(func_op, safepoints: ["coro.suspend"], state_arg: 0)
-
         assert MLIR.verify!(module)
         lowered_ir = MLIR.to_string(module)
-
         assert lowered_ir =~ "cf.switch" and lowered_ir =~ "coro.save" and lowered_ir =~ "coro.load"
-
         refute lowered_ir =~ "coro.suspend"
       end)
     end

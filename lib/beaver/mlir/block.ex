@@ -4,34 +4,18 @@ alias Beaver.{Deferred, Native}
 defmodule Beaver.MLIR.Block do
   @moduledoc "This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}."
   alias Beaver.MLIR
-
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
 
-  defp do_add_args!(block, ctx, default_loc, {t, loc}) when is_struct(t, Deferred) or is_struct(loc, Deferred) do
-    loc = if loc, do: Deferred.resolve(loc, ctx), else: default_loc
-    CAPI.mlirBlockAddArgument(block, Deferred.resolve(t, ctx), loc)
+  defp do_add_args!(block, ctx, default_loc, {type, loc}) do
+    loc = if is_struct(type, Deferred) and is_nil(loc), do: default_loc, else: Deferred.resolve(loc, ctx)
+
+    type =
+      if is_binary(type), do: CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create(type)), else: Deferred.resolve(type, ctx)
+
+    CAPI.mlirBlockAddArgument(block, type, loc)
   end
 
-  defp do_add_args!(block, ctx, _default_loc, {t = %Type{}, loc}) do
-    t = Deferred.resolve(t, ctx)
-    loc = Deferred.resolve(loc, ctx)
-    CAPI.mlirBlockAddArgument(block, t, loc)
-  end
-
-  defp do_add_args!(block, ctx, _default_loc, {t = {:parametric, _, _, _f}, loc}) do
-    t = Deferred.resolve(t, ctx)
-    loc = Deferred.resolve(loc, ctx)
-    CAPI.mlirBlockAddArgument(block, t, loc)
-  end
-
-  defp do_add_args!(block, ctx, _default_loc, {t, loc}) when is_binary(t) do
-    t = CAPI.mlirTypeParseGet(ctx, MLIR.StringRef.create(t))
-    loc = Deferred.resolve(loc, ctx)
-    CAPI.mlirBlockAddArgument(block, t, loc)
-  end
-
-  defp do_add_args!(block, ctx, default_loc, t), do: do_add_args!(block, ctx, default_loc, {t, default_loc})
-
+  defp do_add_args!(block, ctx, default_loc, type), do: do_add_args!(block, ctx, default_loc, {type, default_loc})
   @type arg_type :: Type.t() | String.t()
   @type arg :: {arg_type(), Location.t()} | arg_type()
   @spec add_args!(__MODULE__.t(), list(arg), Keyword.t()) :: [MLIR.Value.t()]
@@ -79,42 +63,33 @@ defmodule Beaver.MLIR.Block do
           {_, l = %Location{}} -> MLIR.context(l)
           _ -> nil
         end) ||
-        case parent_operation(block) do
-          %MLIR.Operation{} = op -> MLIR.context(op)
-          nil -> nil
-        end
+        then(parent_operation(block), &(&1 && MLIR.context(&1)))
 
     if !ctx, do: raise("Requires MLIR Context to add arguments. Otherwise, use types or locations already created.")
     ctx
   end
 
   def get_arg!(%__MODULE__{} = block, index), do: CAPI.mlirBlockGetArgument(block, index)
-
   @doc "Returns all block arguments as a list of `MLIR.Value` handles."
   @spec arguments(t()) :: [MLIR.Value.t()]
   def arguments(%__MODULE__{} = block), do: Beaver.Walker.arguments(block) |> Enum.to_list()
-
   @doc "Returns an enumerable of operations inside `block`."
   @spec operations(t()) :: Enumerable.t()
   def operations(%__MODULE__{} = block), do: Beaver.Walker.operations(block)
 
-  @doc "Returns the first operation in `block`, or `nil` if empty."
-  @spec first_operation(t()) :: MLIR.Operation.t() | nil
-  def first_operation(%__MODULE__{} = block), do: block |> CAPI.mlirBlockGetFirstOperation() |> nil_if_null()
-
-  @doc "Returns the terminator operation of `block`, or `nil` if absent."
-  @spec terminator(t()) :: MLIR.Operation.t() | nil
-  def terminator(%__MODULE__{} = block), do: block |> CAPI.mlirBlockGetTerminator() |> nil_if_null()
-
-  @doc "Returns the parent operation owning `block`, or `nil` if detached."
-  @spec parent_operation(t()) :: MLIR.Operation.t() | nil
-  def parent_operation(%__MODULE__{} = block), do: block |> CAPI.mlirBlockGetParentOperation() |> nil_if_null()
-
-  @doc "Returns the parent region containing `block`, or `nil` if detached."
-  @spec parent_region(t()) :: MLIR.Region.t() | nil
-  def parent_region(%__MODULE__{} = block), do: block |> CAPI.mlirBlockGetParentRegion() |> nil_if_null()
-
-  defp nil_if_null(entity), do: if(MLIR.null?(entity), do: nil, else: entity)
+  for {name, suffix, type, doc} <- [
+        {:first_operation, "FirstOperation", MLIR.Operation, "first operation, or nil if empty"},
+        {:terminator, "Terminator", MLIR.Operation, "terminator, or nil if absent"},
+        {:parent_operation, "ParentOperation", MLIR.Operation, "parent operation, or nil if detached"},
+        {:parent_region, "ParentRegion", MLIR.Region, "parent region, or nil if detached"}
+      ] do
+    @doc "Returns the block's #{doc}."
+    @spec unquote(name)(t()) :: unquote(type).t() | nil
+    def unquote(name)(%__MODULE__{} = block) do
+      entity = CAPI.unquote(:"mlirBlockGet#{suffix}")(block)
+      unless MLIR.null?(entity), do: entity
+    end
+  end
 
   def create(arg_loc_pairs \\ []) when is_list(arg_loc_pairs) do
     {args, locs} = Enum.unzip(arg_loc_pairs)
@@ -140,7 +115,6 @@ defmodule Beaver.MLIR.Block do
   @doc "Returns `true` if two `MLIR.Block` handles refer to the same underlying block."
   @spec equal?(t(), t()) :: boolean()
   def equal?(%__MODULE__{} = a, %__MODULE__{} = b), do: CAPI.mlirBlockEqual(a, b) |> Native.to_term()
-
   defdelegate destroy(blk), to: CAPI, as: :mlirBlockDestroy
   defdelegate append(blk, op), to: CAPI, as: :mlirBlockAppendOwnedOperation
 end

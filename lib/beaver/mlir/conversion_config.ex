@@ -2,11 +2,8 @@ alias Beaver.MLIR.CAPI
 
 defmodule Beaver.MLIR.ConversionConfig do
   @moduledoc "An owning high-level wrapper for MLIR dialect conversion configuration."
-
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
-
   @folding_modes %{never: 0, before_patterns: 1, after_patterns: 2}
-
   @spec create(keyword()) :: t()
   def create(opts \\ []) do
     config = CAPI.mlirConversionConfigCreate()
@@ -40,7 +37,6 @@ defmodule Beaver.MLIR.ConversionConfig do
 
   @spec destroy(t()) :: :ok
   defdelegate destroy(config), to: CAPI, as: :mlirConversionConfigDestroy
-
   @spec with(keyword(), (t() -> result)) :: result when result: var
   def with(opts \\ [], fun) when is_function(fun, 1), do: Beaver.Native.with_resource(create(opts), &destroy/1, fun)
 end

@@ -1,8 +1,6 @@
 defmodule Beaver.Test.DocumentationExample do
   @moduledoc false
-
   @root Path.expand("../..", __DIR__)
-
   def read!(document, marker) when is_binary(document) and is_binary(marker) do
     path = Path.expand(document, @root)
     markdown = File.read!(path)

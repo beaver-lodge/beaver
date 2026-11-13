@@ -8,13 +8,10 @@ defmodule Beaver.MLIR.Dialect.LLVM do
   The raw generated operation functions remain available. These helpers cover contextual LLVM types, enum
   attributes, symbols, and common function/global/ call shapes that otherwise require textual assembly details.
   """
-
   alias Beaver.MLIR
-
   use Beaver.MLIR.Dialect, dialect: "llvm", ops: Beaver.MLIR.Dialect.Registry.ops("llvm")
 
   @linkages ~w(external available_externally linkonce linkonce_odr weak weak_odr appending internal private extern_weak common)a
-
   @calling_conventions %{
     c: "ccc",
     fast: "fastcc",
@@ -37,12 +34,10 @@ defmodule Beaver.MLIR.Dialect.LLVM do
     aarch64_sve_vector: "aarch64_sve_vectorcallcc",
     wasm_emscripten_invoke: "wasm_emscripten_invokecc"
   }
-
   @debug_languages %{c: 0x0002}
   @debug_language_dialects %{simt: 0x01, tile: 0x02}
   @debug_emission_kinds %{none: 0, full: 1, line_tables_only: 2, debug_directives_only: 3}
   @debug_name_table_kinds %{default: 0, gnu: 1, none: 2, apple: 3}
-
   @doc "Build an opaque LLVM pointer type for an address space."
   def pointer, do: pointer(0, [])
   def pointer(opts) when is_list(opts), do: pointer(0, opts)
@@ -228,14 +223,10 @@ defmodule Beaver.MLIR.Dialect.LLVM do
 
   defp normalize_linkage(%Attribute{} = linkage, _ctx), do: linkage
   defp normalize_linkage(linkage, ctx) when is_atom(linkage), do: linkage(linkage, ctx: ctx)
-
   defp maybe_attribute(arguments, _name, nil), do: arguments
   defp maybe_attribute(arguments, name, value), do: arguments ++ [{name, value}]
-
   defp maybe_unit(arguments, _name, false, _ctx), do: arguments
-
   defp maybe_unit(arguments, name, true, ctx), do: arguments ++ [{name, Attribute.unit(ctx: ctx)}]
-
   defp maybe_i64(arguments, _name, nil, _ctx), do: arguments
 
   defp maybe_i64(arguments, name, value, ctx) when is_integer(value) and value > 0,

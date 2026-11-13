@@ -4,7 +4,6 @@ defmodule Beaver.MLIR.RewritePatternSet do
   @moduledoc "This module defines functions working with MLIR #{__MODULE__ |> Module.split() |> List.last()}."
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Beaver.Native
   alias Beaver.MLIR
-
   defdelegate create(context), to: CAPI, as: :mlirRewritePatternSetCreate
 
   @doc """
@@ -14,19 +13,9 @@ defmodule Beaver.MLIR.RewritePatternSet do
   `true`, dump each created pattern for debugging.
   """
   def with_pdl_patterns(patterns, opts \\ []) do
-    ctx = opts[:ctx] || raise("context is required in opts")
-    pattern_module = MLIR.Location.from_env(__ENV__, ctx: ctx) |> MLIR.Module.empty()
-    block = Beaver.MLIR.Module.body(pattern_module)
-
-    for p <- patterns do
-      p = p.(ctx, block)
-      if opts[:debug], do: p |> MLIR.dump!()
-    end
-
-    MLIR.verify!(pattern_module)
-    |> CAPI.mlirPDLPatternModuleFromModule()
-    |> CAPI.mlirRewritePatternSetFromPDLPatternModule()
-    |> then(&{&1, pattern_module})
+    pattern_module = build_pdl_module(patterns, opts)
+    pdl = CAPI.mlirPDLPatternModuleFromModule(pattern_module)
+    {CAPI.mlirRewritePatternSetFromPDLPatternModule(pdl), pattern_module}
   end
 
   @doc """
@@ -84,14 +73,12 @@ defmodule Beaver.MLIR.RewritePatternSet do
 
   @spec add(t(), term(), module() | function() | Beaver.Pattern.Native.Descriptor.t()) :: t()
   def add(%__MODULE__{} = set, root_name, pattern), do: add(set, root_name, pattern, [])
-
   @spec add(t(), term(), module() | function() | Beaver.Pattern.Native.Descriptor.t(), keyword()) :: t()
   def add(%__MODULE__{} = set, root_name, %Beaver.Pattern.Native.Descriptor{} = descriptor, opts)
       when is_list(opts), do: add(set, descriptor, Keyword.put(opts, :root, root_name))
 
   def add(%__MODULE__{} = set, root_name, module, opts) when is_atom(module) and is_list(opts) do
     opts = if function_exported?(module, :construct, 1), do: put_in(opts, [:construct], &module.construct/1), else: opts
-
     opts = if function_exported?(module, :destruct, 1), do: put_in(opts, [:destruct], &module.destruct/1), else: opts
     opts = put_in(opts, [:match_and_rewrite], &module.match_and_rewrite/4)
     MLIR.RewritePattern.create(root_name, opts) |> then(&add(set, &1))
@@ -114,14 +101,8 @@ defmodule Beaver.MLIR.RewritePatternSet do
   @spec add_pdl(t(), MLIR.Module.t() | MLIR.Operation.t() | binary() | [function()], keyword()) :: t()
   def add_pdl(set, pdl, opts \\ [])
 
-  def add_pdl(%__MODULE__{} = set, %MLIR.Module{} = pdl_module, _opts) do
-    op = MLIR.Operation.from_module(pdl_module)
-    :ok = CAPI.beaver_raw_pdl_pattern_add(set.ref, op.ref)
-    set
-  end
-
-  def add_pdl(%__MODULE__{} = set, %MLIR.Operation{} = pdl_op, _opts) do
-    :ok = CAPI.beaver_raw_pdl_pattern_add(set.ref, pdl_op.ref)
+  def add_pdl(%__MODULE__{} = set, %kind{} = module, _opts) when kind in [MLIR.Module, MLIR.Operation] do
+    :ok = CAPI.beaver_raw_pdl_pattern_add(set.ref, MLIR.Operation.from_module(module).ref)
     set
   end
 
@@ -134,21 +115,26 @@ defmodule Beaver.MLIR.RewritePatternSet do
   end
 
   def add_pdl(%__MODULE__{} = set, patterns, opts) when is_list(patterns) do
-    ctx = Keyword.get(opts, :ctx) || raise ArgumentError, "option :ctx is required when building PDL patterns"
-    pattern_module = MLIR.Location.from_env(__ENV__, ctx: ctx) |> MLIR.Module.empty()
+    Beaver.Native.with_resource(build_pdl_module(patterns, opts), &MLIR.Module.destroy/1, &add_pdl(set, &1, opts))
+  end
+
+  defp build_pdl_module(patterns, opts) do
+    ctx = opts[:ctx] || raise ArgumentError, "option :ctx is required when building PDL patterns"
+    module = MLIR.Location.from_env(__ENV__, ctx: ctx) |> MLIR.Module.empty()
 
     try do
-      block = MLIR.Module.body(pattern_module)
+      block = MLIR.Module.body(module)
 
-      for p <- patterns do
-        op = p.(ctx, block)
+      for build <- patterns do
+        op = build.(ctx, block)
         if opts[:debug], do: MLIR.dump!(op)
       end
 
-      MLIR.verify!(pattern_module)
-      add_pdl(set, pattern_module, opts)
-    after
-      MLIR.Module.destroy(pattern_module)
+      MLIR.verify!(module)
+    catch
+      kind, reason ->
+        MLIR.Module.destroy(module)
+        :erlang.raise(kind, reason, __STACKTRACE__)
     end
   end
 
@@ -157,7 +143,6 @@ defmodule Beaver.MLIR.RewritePatternSet do
     do: MLIR.ConversionPattern.add(set, root_name, converter, match_and_rewrite, opts)
 
   defdelegate destroy(set), to: CAPI, as: :mlirRewritePatternSetDestroy
-
   @doc "Destroys a pattern set on the callback executor."
   def threaded_destroy(ctx, %kind{ref: ref}) when kind in [__MODULE__, MLIR.FrozenRewritePatternSet] do
     name = if kind == __MODULE__, do: :RewritePatternSet, else: :FrozenRewritePatternSet

@@ -7,7 +7,6 @@ defmodule Beaver.MLIR.RewritePattern do
   alias Beaver.MLIR.CallbackServer
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native, fields: [owner: nil]
   @type state() :: any()
-
   @callback construct(state :: state()) :: state()
   @callback destruct(state :: state()) :: any()
   @callback match_and_rewrite(
@@ -16,9 +15,7 @@ defmodule Beaver.MLIR.RewritePattern do
               rewriter :: MLIR.PatternRewriter.t(),
               state :: state()
             ) :: {:ok, state()} | {:error, state()}
-
   @optional_callbacks construct: 1, destruct: 1
-
   defmacro __using__(_opts) do
     quote do
       @behaviour Beaver.MLIR.RewritePattern

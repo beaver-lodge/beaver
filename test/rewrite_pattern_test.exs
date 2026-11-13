@@ -1,14 +1,11 @@
 defmodule RewritePatternTest do
   use Beaver.Case, async: true
-  use Beaver
   alias Beaver.MLIR.Dialect.{Func, Arith}
   alias Beaver.MLIR.{CAPI, Rewrite, RewritePatternSet}
   alias Beaver.Native
-  require Func
 
   defmodule FailedToConvergeRewritePattern do
     use Beaver.MLIR.RewritePattern
-
     def construct(:init_state), do: [:init_state]
 
     def destruct(state) do
@@ -24,17 +21,11 @@ defmodule RewritePatternTest do
   end
 
   defp example_ir(ctx) do
-    mlir ctx: ctx do
-      module do
-        Func.func const(function_type: Type.function([], [Type.i64(), Type.i64()])) do
-          region do
-            block do
-              v0 = Arith.constant(value: Attribute.integer(Type.i64(), 1)) >>> Type.i64()
-              v1 = Arith.constant(value: Attribute.integer(Type.i64(), 3)) >>> Type.i64()
-              Func.return(v0, v1) >>> []
-            end
-          end
-        end
+    function_module ctx, const(function_type: Type.function([], [Type.i64(), Type.i64()])) do
+      block do
+        v0 = Arith.constant(value: Attribute.integer(Type.i64(), 1)) >>> Type.i64()
+        v1 = Arith.constant(value: Attribute.integer(Type.i64(), 3)) >>> Type.i64()
+        Func.return(v0, v1) >>> []
       end
     end
     |> MLIR.verify!()
@@ -63,9 +54,7 @@ defmodule RewritePatternTest do
              )
 
     RewritePatternSet.add(set, pat)
-
     RewritePatternSet.add(set, Arith.constant(), FailedToConvergeRewritePattern, ctx: ctx, init_state: :init_state)
-
     assert frozen_set = %MLIR.FrozenRewritePatternSet{} = RewritePatternSet.freeze(set)
 
     assert_raise RuntimeError, "pattern application failed to converge", fn ->
@@ -126,7 +115,6 @@ defmodule RewritePatternTest do
 
   test "rewrite pattern apply", %{ctx: ctx} do
     ir = example_ir(ctx)
-
     Rewrite.apply_patterns!(ir, patterns())
 
     ops =
@@ -206,9 +194,7 @@ defmodule RewritePatternTest do
 
   test "rewrite pattern apply returns diagnostics for list-based patterns", %{ctx: ctx} do
     ir = example_ir(ctx)
-
     {result, diagnostics} = Rewrite.apply_patterns(ir, patterns(), nil)
-
     assert MLIR.LogicalResult.success?(result)
     assert diagnostics == []
     MLIR.verify!(ir)

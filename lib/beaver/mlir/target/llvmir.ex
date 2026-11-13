@@ -3,11 +3,9 @@ defmodule Beaver.MLIR.Target.LLVMIR do
   alias Beaver.{Composer, MLIR, Native, Slang, Walker}
   alias MLIR.{CAPI, Context, Diagnostic, Module, Operation}
   import Bitwise
-
   @compile_keys ~w(triple cpu features opt_level pic format)a
   @native_metrics %{translate_ns: 0, opt_ns: 0, codegen_ns: 0}
   @unit_metrics Map.merge(@native_metrics, %{emit_ns: 0, lower_ns: 0})
-
   @spec translate(Module.t()) :: {:ok, binary()} | {:error, MLIR.diagnostics()}
   def translate(%Module{} = module) do
     Context.register_translations(MLIR.context(module))
@@ -112,7 +110,6 @@ defmodule Beaver.MLIR.Target.LLVMIR do
 
   @spec compile_to_ptx!(binary(), keyword()) :: binary()
   def compile_to_ptx!(ir, opts \\ []), do: unwrap!(compile_to_ptx(ir, opts), "compile LLVM IR to PTX")
-
   @doc "Partitions a lowered module into concurrent, optionally cached per-function object shards."
   @spec compile_functions(Module.t(), keyword()) :: {:ok, [map()]} | {:error, term()}
   def compile_functions(%Module{} = module, opts \\ []) do
@@ -157,7 +154,6 @@ defmodule Beaver.MLIR.Target.LLVMIR do
 
   @spec compile_units!([map() | tuple()], keyword()) :: [map()]
   def compile_units!(units, opts \\ []), do: unwrap!(compile_units(units, opts), "compile units", true)
-
   defp unit!({id, key, source}), do: unit!(%{id: id, key: key, source: source})
 
   defp unit!(%{id: id, key: key, source: source} = unit) do
@@ -244,7 +240,6 @@ defmodule Beaver.MLIR.Target.LLVMIR do
   end
 
   defp produce(source, opts), do: codegen(source, nil, 0, opts)
-
   # A module returned by a context callback is owned; eager modules and zero-arity callback results are borrowed.
   defp codegen(%Module{} = module, ctx, emit_ns, opts) do
     try do
@@ -466,13 +461,7 @@ defmodule Beaver.MLIR.Target.LLVMIR do
     {value, System.monotonic_time(:nanosecond) - start}
   end
 
-  defp sha256(bytes), do: :crypto.hash(:sha256, bytes) |> Base.encode16(case: :lower)
+  defp sha256(bytes), do: Beaver.Build.ArtifactCache.digest(bytes)
   defp temp_path(path), do: "#{path}.tmp-#{System.pid()}-#{System.unique_integer([:positive])}"
-
-  defp write_atomic!(path, bytes) do
-    File.mkdir_p!(Path.dirname(path))
-    tmp = temp_path(path)
-    File.write!(tmp, bytes)
-    File.rename!(tmp, path)
-  end
+  defp write_atomic!(path, bytes), do: Beaver.Build.ArtifactCache.write_atomic!(path, bytes)
 end

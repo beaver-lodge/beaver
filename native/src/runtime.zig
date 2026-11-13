@@ -2,7 +2,6 @@ const kinda = @import("kinda");
 const e = kinda.erl_nif;
 const beam = kinda.beam;
 const mlir_capi = @import("mlir_capi.zig");
-
 const debug_print = @import("std").debug.print;
 pub fn print_i32(i: i32) callconv(.c) void {
     debug_print("{}", .{i});
@@ -34,11 +33,9 @@ pub fn print_comma() callconv(.c) void {
 pub fn print_newline() callconv(.c) void {
     debug_print("\n", .{});
 }
-
 pub const BinaryMemRefDescriptor = @import("memref.zig").RankedMemRefDescriptor(1);
 pub const BinaryMemRefType = "memref<?xi8>";
 pub const BinaryStructLLVMType = "!llvm.struct<(i64, ptr)>";
-
 // `__decl__` function are added due to the change of function signature during MemRef-to-LLVM translation
 pub fn make_new_binary_as_memref(d: *BinaryMemRefDescriptor, env: beam.env, size: usize, term_ptr: [*c]beam.term) callconv(.c) void {
     const ptr = e.enif_make_new_binary(env, size, term_ptr);

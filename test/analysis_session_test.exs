@@ -1,22 +1,11 @@
 defmodule Beaver.MLIR.AnalysisSessionTest do
   use Beaver.Case, async: true
-  alias Beaver.MLIR
   alias MLIR.{AnalysisSession, DataLayout, Operation, Type}
 
   setup %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        """
-        module {
-          func.func @compute(%x: i32) -> i32 {
-            %a = arith.addi %x, %x : i32
-            %b = arith.muli %a, %x : i32
-            return %b : i32
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  func.func @compute(%x: i32) -> i32 {\n    %a = arith.addi %x, %x : i32\n    %b = arith.muli %a, %x : i32\n    return %b : i32\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     on_exit(fn -> MLIR.Module.destroy(module) end)
     func = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.at(0)
@@ -39,9 +28,7 @@ defmodule Beaver.MLIR.AnalysisSessionTest do
                ])
 
       assert %{generation: 0, results: [true]} = AnalysisSession.query(session, [{:dominates, add, mul}])
-
       assert {:ok, _, _} = MLIR.IRBatch.update(module, [{:operand, mul, 0, arg}], analysis_session: session)
-
       assert %{generation: 2, cached: []} = AnalysisSession.stats(session)
       assert AnalysisSession.dead_after?(session, value, add)
     end)
@@ -61,17 +48,13 @@ defmodule Beaver.MLIR.AnalysisSessionTest do
       assert_raise RuntimeError, "mutation failed", fn ->
         AnalysisSession.mutate(session, fn ->
           assert_raise ArgumentError, ~r/AnalysisMutationInProgress/, fn -> AnalysisSession.stats(session) end
-
           assert_raise Kinda.CallError, ~r/AnalysisMutationInProgress/, fn -> AnalysisSession.close(session) end
-
           raise "mutation failed"
         end)
       end
 
       assert %{generation: 3, cached: []} = AnalysisSession.stats(session)
-
       module |> Beaver.Composer.append("canonicalize") |> Beaver.Composer.run!(analysis_session: session)
-
       assert %{generation: 5, cached: []} = AnalysisSession.stats(session)
     end)
   end
@@ -86,15 +69,12 @@ defmodule Beaver.MLIR.AnalysisSessionTest do
       for {kind, generation} <- [mutable: 2, frozen: 4] do
         assert AnalysisSession.dominates?(session, add, mul)
         marker = MLIR.Attribute.string(Atom.to_string(kind), ctx: ctx)
-
         program = Beaver.Pattern.Native.Program.new("arith.muli", rewrite: {:attributes, marker: marker})
-
         set = MLIR.RewritePatternSet.create(ctx) |> MLIR.RewritePatternSet.add(program, ctx: ctx)
         set = if kind == :frozen, do: MLIR.RewritePatternSet.freeze(set), else: set
 
         try do
           assert {:ok, ^module} = MLIR.apply_(module, set, analysis_session: session, enable_folding: false)
-
           assert MLIR.equal?(mul[:marker], marker)
           assert %{generation: ^generation, cached: []} = AnalysisSession.stats(session)
         after
@@ -120,23 +100,14 @@ defmodule Beaver.MLIR.AnalysisSessionTest do
 
     assert :ok = AnalysisSession.close(session)
     assert :ok = AnalysisSession.close(session)
-
     assert_raise ArgumentError, ~r/ClosedAnalysisSession/, fn -> AnalysisSession.stats(session) end
-
     MLIR.Module.destroy(other)
   end
 
   test "DataLayout caches scoped index widths and retains scalable sizes", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        """
-        module {
-          module @narrow attributes {dlti.dl_spec = #dlti.dl_spec<#dlti.dl_entry<index, 32>>} {}
-          module @wide attributes {dlti.dl_spec = #dlti.dl_spec<#dlti.dl_entry<index, 64>>} {}
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  module @narrow attributes {dlti.dl_spec = #dlti.dl_spec<#dlti.dl_entry<index, 32>>} {}\n  module @wide attributes {dlti.dl_spec = #dlti.dl_spec<#dlti.dl_entry<index, 64>>} {}\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     [narrow, wide] = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.to_list()
 

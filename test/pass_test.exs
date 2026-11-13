@@ -1,23 +1,19 @@
 defmodule PassTest do
   use Beaver.Case, async: true
-  use Beaver
   alias Beaver.MLIR.Dialect.{Func, Arith}
-  require Func
   import MLIR.Transform
 
   defp example_ir(ctx) do
-    mlir ctx: ctx do
-      module do
-        Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
-          region do
-            block do
-              v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
-              Func.return(v0) >>> []
-            end
+    module_ir ctx do
+      Func.func some_func(function_type: Type.function([], [Type.i(32)])) do
+        region do
+          block do
+            v0 = Arith.constant(value: Attribute.integer(Type.i(32), 0)) >>> Type.i(32)
+            Func.return(v0) >>> []
           end
         end
-        |> MLIR.verify!()
       end
+      |> MLIR.verify!()
     end
     |> MLIR.verify!()
   end
@@ -75,7 +71,6 @@ defmodule PassTest do
     |> Beaver.Composer.run!()
 
     assert %{run: ^n, clone: clone, initialize: 1, destruct: destruct} = Agent.get(AllCallbacks, & &1, :infinity)
-
     assert clone + 1 == destruct
     assert :ok = Agent.stop(AllCallbacks)
   end
@@ -83,20 +78,14 @@ defmodule PassTest do
   test "run pm multiple times", %{ctx: ctx} do
     n = 100
     op = Beaver.Dummy.gigantic(ctx, n)
-
     composer = Beaver.Composer.new(ctx: ctx) |> Beaver.Composer.nested(Func.func(), AllCallbacks) |> canonicalize()
-
     pm = Beaver.Composer.init(composer)
     assert {:ok, []} = MLIR.PassManager.run(pm, op)
-
     assert %{run: ^n, clone: clone0, initialize: 1, destruct: 0} = Agent.get(AllCallbacks, & &1, :infinity)
-
     assert {:ok, []} = MLIR.PassManager.run(pm, op)
     assert :ok = MLIR.PassManager.destroy(pm)
     n2 = n * 2
-
     assert %{run: ^n2, clone: clone, initialize: 1, destruct: destruct} = Agent.get(AllCallbacks, & &1, :infinity)
-
     assert clone0 == clone
     assert clone + 1 == destruct
     assert :ok = Agent.stop(AllCallbacks)
@@ -104,14 +93,10 @@ defmodule PassTest do
 
   test "run init with err", %{ctx: ctx} do
     op = Beaver.Dummy.gigantic(ctx, 10)
-
     composer = Beaver.Composer.new(ctx: ctx) |> Beaver.Composer.nested(Func.func(), ErrInit) |> canonicalize()
-
     pm = Beaver.Composer.init(composer, verifier: true)
     {:error, diagnostics} = MLIR.PassManager.run(pm, op)
-
     assert MLIR.Diagnostic.format(diagnostics) =~ "Fail to initialize a pass implemented in Elixir"
-
     assert :ok = MLIR.PassManager.destroy(pm)
     assert "new state used in cleanup" = Agent.get(ErrInit, fn s -> s end)
     assert :ok = Agent.stop(ErrInit)
@@ -125,9 +110,7 @@ defmodule PassTest do
 
     pm = Beaver.Composer.init(composer, verifier: true)
     {:error, diagnostics} = MLIR.PassManager.run(pm, op)
-
     assert MLIR.Diagnostic.format(diagnostics) =~ "Fail to initialize a pass implemented in Elixir"
-
     assert :ok = MLIR.PassManager.destroy(pm)
     assert nil == Agent.get(IncorrectInitReturns, fn s -> s end)
     assert :ok = Agent.stop(IncorrectInitReturns)

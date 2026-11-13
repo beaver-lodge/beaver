@@ -9,16 +9,12 @@ defmodule Beaver.MLIR.TypeConverter do
   Conversion callbacks may return one type (1:1), multiple types (1:N), an empty list (type erasure), `:declined`,
   or `{:error, reason}`.
   """
-
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native, fields: [registration: nil, timeout_ms: 30_000]
-
   alias Beaver.MLIR
-
   @type conversion_result() :: Type.t() | {:ok, Type.t()} | :declined | {:error, term()}
   @type one_to_n_result() :: [Type.t()] | {:ok, [Type.t()]} | :declined | {:error, term()}
   @type materialization_result() :: Value.t() | {:ok, Value.t()} | :declined | {:error, term()}
   @type one_to_n_materialization_result() :: [Value.t()] | {:ok, [Value.t()]} | :declined | {:error, term()}
-
   @callbacks [
     {:conversion, :add_conversion, quote(do: (Type.t() -> conversion_result())), 1},
     {:one_to_n, :add_1_to_n_conversion, quote(do: (Type.t() -> one_to_n_result())), 1},
@@ -32,9 +28,7 @@ defmodule Beaver.MLIR.TypeConverter do
               one_to_n_materialization_result())
      ), 5}
   ]
-
   @callback_options for {key, add, _, _} <- @callbacks, do: {key, add}
-
   @spec create(keyword()) :: t()
   def create(opts \\ []) when is_list(opts) do
     allowed = [:timeout | Keyword.keys(@callback_options)]
@@ -148,14 +142,11 @@ defmodule Beaver.MLIR.TypeConverter do
   end
 
   defp finish_conversion(_result, {:exception, kind, reason, stacktrace}), do: :erlang.raise(kind, reason, stacktrace)
-
   defp finish_conversion(_result, {:error, reason}), do: {:error, reason}
   defp finish_conversion(nil, nil), do: {:error, :conversion_failed}
   defp finish_conversion(result, nil), do: {:ok, Native.check!(result)}
-
   @spec destroy(t()) :: :ok
   def destroy(%__MODULE__{registration: registration}), do: CAPI.beaver_raw_type_converter_destroy(registration)
-
   @spec with(keyword(), (t() -> result)) :: result when result: var
   def with(opts \\ [], fun) when is_function(fun, 1), do: Beaver.Native.with_resource(create(opts), &destroy/1, fun)
 end

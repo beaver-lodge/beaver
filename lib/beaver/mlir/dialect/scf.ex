@@ -5,7 +5,6 @@ defmodule Beaver.MLIR.Dialect.SCF do
   The generated operation functions remain available. `if_/2` and `for_/5` add a small Elixir-shaped layer that owns
   the mechanical region, block argument, result, and `scf.yield` construction.
   """
-
   use Beaver.MLIR.Dialect, dialect: "scf", ops: Beaver.MLIR.Dialect.Registry.ops("scf")
 
   @doc """
@@ -26,7 +25,6 @@ defmodule Beaver.MLIR.Dialect.SCF do
   An else branch is required when the operation has results.
   """
   defmacro if_(condition, branches), do: build_if(condition, [], branches)
-
   defmacro if_(condition, opts, branches), do: build_if(condition, opts, branches)
 
   defp build_if(condition, opts, branches) do
@@ -76,9 +74,7 @@ defmodule Beaver.MLIR.Dialect.SCF do
     block_args =
       [quote(do: unquote(iv) >>> Beaver.MLIR.Type.index())] ++
         Enum.zip_with(carried, iter_args, fn variable, initial ->
-          quote do
-            unquote(variable) >>> Beaver.MLIR.Value.type(unquote(initial))
-          end
+          quote(do: unquote(variable) >>> Beaver.MLIR.Value.type(unquote(initial)))
         end)
 
     block_call = {:_scf_for_body, [], block_args}
@@ -103,12 +99,14 @@ defmodule Beaver.MLIR.Dialect.SCF do
   end
 
   defp branch_region(body) do
-    quote do
-      region do
-        block do
-          Beaver.MLIR.Dialect.SCF.yield(unquote(body)) >>> []
-        end
-      end
-    end
+    quote(
+      do:
+        region(
+          do:
+            block do
+              Beaver.MLIR.Dialect.SCF.yield(unquote(body)) >>> []
+            end
+        )
+    )
   end
 end

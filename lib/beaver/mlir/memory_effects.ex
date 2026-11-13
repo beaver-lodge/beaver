@@ -21,9 +21,7 @@ defmodule Beaver.MLIR.MemoryEffects do
   Prefer declarative specifications; callback exceptions emit diagnostics and
   add a conservative unknown write effect.
   """
-
   alias Beaver.MLIR
-
   @type effect() :: :allocate | :free | :read | :write
   @type target() ::
           nil
@@ -36,9 +34,7 @@ defmodule Beaver.MLIR.MemoryEffects do
           | Value.t()
           | Attribute.t()
   @type effect_spec() :: effect() | {effect(), target()} | {effect(), target(), keyword()}
-
   @callback memory_effects(Operation.t()) :: :pure | [effect_spec()] | {:ok, [effect_spec()]}
-
   @doc "Attaches a callback-backed memory effects interface model."
   @spec attach(MLIR.Context.t(), String.t(), module() | function(), keyword()) :: MLIR.ExternalInterface.Attachment.t()
   def attach(ctx, op_name, implementation, opts \\ []) do
@@ -122,11 +118,8 @@ defmodule Beaver.MLIR.MemoryEffects do
     stage = Keyword.get(opts, :stage, 0)
     full_region = Keyword.get(opts, :effect_on_full_region, false)
     resource = Keyword.get_lazy(opts, :resource, &CAPI.mlirSideEffectsDefaultResourceGet/0)
-
     unless is_struct(parameters, Attribute), do: raise(ArgumentError, ":parameters must be an MLIR attribute")
-
     unless is_integer(stage), do: raise(ArgumentError, ":stage must be an integer")
-
     unless is_boolean(full_region), do: raise(ArgumentError, ":effect_on_full_region must be a boolean")
 
     unless is_struct(resource, MLIR.SideEffectResource),
@@ -172,7 +165,6 @@ defmodule Beaver.MLIR.MemoryEffects do
     do: if(Value.result?(value), do: {:result, value}, else: {:block_argument, value})
 
   defp decode_target(:symbol, %Attribute{} = symbol), do: {:symbol, symbol}
-
   defp normalize_target(_operation, target) when target in [nil, :operation], do: nil
 
   defp normalize_target(op, {:operand, index}) when is_integer(index) and index >= 0,

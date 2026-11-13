@@ -8,7 +8,6 @@ defmodule Beaver.MLIR.Operation do
   alias Beaver.Changeset
   import CAPI
   @behaviour Access
-
   use Kinda.ResourceKind, raw_module: CAPI.Raw, codec: Native
 
   def create(%Beaver.SSA{} = ssa) do
@@ -23,17 +22,11 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def create(%Changeset{} = c), do: c |> State.create() |> create
-
   def create(%State{} = state), do: beaverOperationCreate(state)
-
   def results(%__MODULE__{} = op), do: Beaver.Walker.results(op)
-
   def results({:deferred, {_func_name, _arguments}} = deferred), do: deferred
-
   def name(%__MODULE__{} = op), do: mlirOperationGetName(op) |> mlirIdentifierStr() |> MLIR.to_string()
-
   defdelegate location(op), to: CAPI, as: :mlirOperationGetLocation
-
   @doc "Sets an operation's location and returns the operation."
   @spec set_location(__MODULE__.t(), Location.source()) :: __MODULE__.t()
   def set_location(%__MODULE__{} = op, loc) do
@@ -45,19 +38,15 @@ defmodule Beaver.MLIR.Operation do
   defdelegate parent(op), to: CAPI, as: :mlirOperationGetParentOperation
   defdelegate destroy(op), to: CAPI, as: :mlirOperationDestroy
   defdelegate clone(op), to: CAPI, as: :mlirOperationClone
-
   @doc "Returns the block containing `op`, or `nil` if `op` is detached."
   @spec block(t()) :: MLIR.Block.t() | nil
   def block(%__MODULE__{} = op), do: op |> mlirOperationGetBlock() |> nil_if_null()
-
   @doc "Returns the parent operation of `op`, or `nil` if `op` is top-level."
   @spec parent_op(t()) :: t() | nil
   def parent_op(%__MODULE__{} = op), do: op |> mlirOperationGetParentOperation() |> nil_if_null()
-
   @doc "Returns the next operation in the same block, or `nil` at the end of the block."
   @spec next_in_block(t()) :: t() | nil
   def next_in_block(%__MODULE__{} = op), do: op |> mlirOperationGetNextInBlock() |> nil_if_null()
-
   @doc "Returns the top-most ancestor operation containing `op` (or `op` itself if top-level)."
   @spec root(t()) :: t()
   def root(%__MODULE__{} = op) do
@@ -120,23 +109,19 @@ defmodule Beaver.MLIR.Operation do
   end
 
   defdelegate result(op, pos), to: CAPI, as: :mlirOperationGetResult
-
   @typedoc "Options shared by structural equivalence and structural hashing."
   @type equivalence_option() ::
           {:ignore_locations, boolean()}
           | {:ignore_discardable_attributes, boolean()}
           | {:ignore_properties, boolean()}
           | {:ignore_commutativity, boolean()}
-
   @type equivalence_options() :: [equivalence_option()]
-
   @equivalence_flags %{
     ignore_locations: 1,
     ignore_discardable_attributes: 2,
     ignore_properties: 4,
     ignore_commutativity: 8
   }
-
   @doc """
   Tests structural equivalence, including locations, discardable attributes, properties and commutative operand
   ordering unless ignored via options. `ignore_commutativity: true` makes operand comparison order-sensitive,
@@ -171,9 +156,7 @@ defmodule Beaver.MLIR.Operation do
   end
 
   def from_module(%MLIR.Module{} = module), do: mlirModuleGetOperation(module)
-
   def from_module(%__MODULE__{} = op), do: op
-
   defp normalize_results([result]), do: result
   defp normalize_results(results), do: results
 
@@ -300,15 +283,12 @@ defmodule Beaver.MLIR.Operation do
 
   @doc "Returns an enumerable of all SSA operands consumed by `op`."
   defdelegate operands(op), to: Beaver.Walker
-
   @doc "Returns the types of all SSA results produced by `op`."
   @spec result_types(t()) :: [MLIR.Type.t()]
   def result_types(%__MODULE__{} = op), do: op |> results() |> Enum.map(&MLIR.Value.type/1)
-
   @doc "Returns the types of all SSA operands consumed by `op`."
   @spec operand_types(t()) :: [MLIR.Type.t()]
   def operand_types(%__MODULE__{} = op), do: op |> operands() |> Enum.map(&MLIR.Value.type/1)
-
   @doc "Returns whether the operation is a terminator."
   def terminator?(%__MODULE__{} = op), do: MLIR.Trait.has?(op, :terminator)
 
@@ -316,6 +296,5 @@ defmodule Beaver.MLIR.Operation do
     do: mlirOperationImplementsInterface(op, interface_id) |> Native.to_term()
 
   def infer_type?(%__MODULE__{} = op), do: implements_interface?(op, mlirInferTypeOpInterfaceTypeID())
-
   def infer_shaped?(%__MODULE__{} = op), do: implements_interface?(op, mlirInferShapedTypeOpInterfaceTypeID())
 end

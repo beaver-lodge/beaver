@@ -14,11 +14,7 @@ defmodule AttributeCollectableTest do
     end
   end
 
-  for {native, values} <- [
-        {Native.I32, [1, 2, 3]},
-        {Native.F32, [1.0, 2.0, 3.0]},
-        {Native.Bool, [true, false, true]}
-      ] do
+  for {native, values} <- [{Native.I32, [1, 2, 3]}, {Native.F32, [1.0, 2.0, 3.0]}, {Native.Bool, [true, false, true]}] do
     test "dense array #{native}", %{ctx: ctx} do
       values = unquote(values)
       build = &Attribute.dense_array(&1, unquote(native), ctx: ctx)
@@ -33,9 +29,7 @@ defmodule AttributeCollectableTest do
   test "dictionaries", %{ctx: ctx} do
     empty = Attribute.dictionary([], ctx: ctx)
     integer = Attribute.integer(Type.i32(ctx: ctx), 1)
-
     created = Enum.into([{"key", 1}], empty, fn {k, _} -> NamedAttribute.get(k, integer, ctx: ctx) end)
-
     assert Enum.count(created) == 1
     assert MLIR.equal?(integer, created["key"])
   end

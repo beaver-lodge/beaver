@@ -1,11 +1,8 @@
 defmodule SymbolTableTest do
   use Beaver.Case, async: true
   @moduletag :smoke
-  alias Beaver.MLIR
-
   test "accesses semantic symbol visibility", %{ctx: ctx} do
     module = MLIR.Module.create!("module { func.func private @example() { return } }", ctx: ctx)
-
     symbol = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.fetch!(0)
     assert MLIR.SymbolTable.default_visibility_attribute_name() == :sym_visibility
     assert MLIR.SymbolTable.visibility(symbol) == :private

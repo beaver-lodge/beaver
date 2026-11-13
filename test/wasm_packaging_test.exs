@@ -1,27 +1,18 @@
 defmodule WasmPackagingTest do
-  use Beaver
   use Beaver.Case, async: true
-
-  alias Beaver.MLIR
   alias Beaver.Wasm
   alias MLIR.Dialect.{Func, Arith}
   alias MLIR.Type
-  require Func
 
   defp add_module(ctx) do
-    mlir ctx: ctx do
-      module do
-        Func.func add(
-                    function_type: Type.function([Type.i32(), Type.i32()], [Type.i32()]),
-                    sym_name: MLIR.Attribute.string("add")
-                  ) do
-          region do
-            block _(a >>> Type.i32(), b >>> Type.i32()) do
-              r = Arith.addi(a, b) >>> Type.i32()
-              Func.return(r) >>> []
-            end
-          end
-        end
+    function_module ctx,
+                    add(
+                      function_type: Type.function([Type.i32(), Type.i32()], [Type.i32()]),
+                      sym_name: MLIR.Attribute.string("add")
+                    ) do
+      block _(a >>> Type.i32(), b >>> Type.i32()) do
+        r = Arith.addi(a, b) >>> Type.i32()
+        Func.return(r) >>> []
       end
     end
   end
@@ -36,7 +27,6 @@ defmodule WasmPackagingTest do
 
   test "parses the imports manifest (WASI imports without -nostdlib)", %{ctx: ctx} do
     binary = add_module(ctx) |> Wasm.package_binary!(entry: "add", nostdlib: false)
-
     assert Enum.any?(binary.imports, &(&1.module == "wasi_snapshot_preview1" and &1.kind == :func))
   end
 

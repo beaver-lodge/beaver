@@ -55,7 +55,6 @@ defmodule ExecutionOptimizationTest do
 
   defp context(opts \\ []) do
     defaults = [threading: false, thread_safe: true, callback_executor: [max_concurrency: 1, idle_timeout_ms: 25]]
-
     ctx = Context.create(Keyword.merge(defaults, opts))
     on_exit(fn -> Context.destroy(ctx) end)
     ctx
@@ -79,7 +78,6 @@ defmodule ExecutionOptimizationTest do
   end
 
   defp function(ir), do: ir |> MLIR.Module.body() |> Walker.operations() |> Enum.at(0)
-
   defp operations(ir), do: ir |> function() |> MLIR.Dialect.Func.entry_block() |> Walker.operations() |> Enum.to_list()
 
   defp concurrently(inputs, fun) do
@@ -87,7 +85,6 @@ defmodule ExecutionOptimizationTest do
   end
 
   defp nested(ir, pass), do: Composer.nested(ir, "func.func", pass)
-
   defp attr(op, name, value), do: CAPI.mlirOperationSetAttributeByName(op, MLIR.StringRef.create(name), value)
 
   defp break_signature(ir),
@@ -103,7 +100,6 @@ defmodule ExecutionOptimizationTest do
 
     for strategy <- [:worker, :dirty, :auto] do
       assert {{:ok, ^ir}, receipt} = Profile.capture(&MLIR.verify(ir, strategy: strategy, profile: &1))
-
       costs = receipt.native["verify/#{if strategy == :auto, do: :dirty, else: strategy}"]
       assert receipt.phases.verify.count == costs.count and costs.count == 1
       assert costs.callback_count == 0 and costs.duration_ns > 0
@@ -133,7 +129,6 @@ defmodule ExecutionOptimizationTest do
     ir = ir(ctx, "module { \"custom_trait_test.valid\"() : () -> () }")
     assert {{:ok, ^ir}, receipt} = Profile.capture(&MLIR.verify(ir, strategy: :auto, profile: &1))
     assert receipt.native["verify/worker"].callback_count > 0
-
     assert_raise Kinda.CallError, ~r/CallbackContextRequiresWorker/, fn -> MLIR.verify(ir, strategy: :dirty) end
   end
 
@@ -142,7 +137,6 @@ defmodule ExecutionOptimizationTest do
 
     Native.with_resource(MLIR.ConversionTarget.create(ctx), &MLIR.ConversionTarget.destroy/1, fn target ->
       for name <- ["builtin", "arith"], do: MLIR.ConversionTarget.add_legal_dialect(target, name)
-
       MLIR.ConversionTarget.add_legal_op(target, "func.return")
       MLIR.ConversionTarget.add_dynamically_legal_op(target, "func.func", fn _ -> :legal end)
 
@@ -178,7 +172,6 @@ defmodule ExecutionOptimizationTest do
 
   test "prepared pipelines isolate state across concurrent runs", %{ctx: ctx} do
     plan = Composer.new(ctx: ctx) |> Composer.nested("func.func", [Lifecycle, "canonicalize"]) |> Composer.prepare()
-
     inputs = for _ <- 1..8, do: ir(ctx)
 
     concurrently(inputs, fn ir ->
@@ -208,9 +201,7 @@ defmodule ExecutionOptimizationTest do
 
   test "BEAM failures stop later stages and clean initialized and cloned state", %{ctx: ctx} do
     ir = functions(ctx)
-
     assert {:error, diagnostics} = nested(ir, [Failing, Lifecycle]) |> Composer.run(execution: :beam)
-
     assert MLIR.Diagnostic.format(diagnostics) =~ "beam pass failed"
 
     for message <- [{:failed_destruct, :cloned}, {:failed_destruct, :initialized}, {:destruct, 0}],
@@ -226,7 +217,6 @@ defmodule ExecutionOptimizationTest do
 
     for execution <- [:beam, :native] do
       assert {:error, diagnostics} = functions(ctx) |> nested(pass) |> Composer.run(execution: execution)
-
       assert MLIR.Diagnostic.format(diagnostics) =~ "redefinition of symbol"
     end
   end
@@ -282,9 +272,7 @@ defmodule ExecutionOptimizationTest do
     [op, ret] = operations(ir)
     [snapshot] = IRBatch.read([op], attributes: [:note])
     assert snapshot.name == "arith.ori" and snapshot.attributes == %{"note" => nil}
-
     assert Enum.zip(snapshot.operands, Walker.operands(op)) |> Enum.all?(fn {a, b} -> MLIR.equal?(a, b) end)
-
     assert length(snapshot.result_types) == 1
     note = MLIR.Attribute.string("batched", ctx: ctx)
 
@@ -313,10 +301,7 @@ defmodule ExecutionOptimizationTest do
     other = context()
 
     assert_raise ArgumentError, ~r/ContextMismatch/, fn ->
-      IRBatch.update(ir, [
-        {:attribute, op, :local, note},
-        {:attribute, op, :foreign, MLIR.Attribute.unit(ctx: other)}
-      ])
+      IRBatch.update(ir, [{:attribute, op, :local, note}, {:attribute, op, :foreign, MLIR.Attribute.unit(ctx: other)}])
     end
 
     assert :error = Operation.fetch(op, "local")
@@ -336,7 +321,6 @@ defmodule ExecutionOptimizationTest do
       )
 
     {{result, []}, receipt} = Rewrite.profile(first, [program], enable_folding: false)
-
     assert MLIR.LogicalResult.success?(result) and receipt.native["rewrite/worker"].callback_count == 0
 
     callback =
@@ -365,9 +349,7 @@ defmodule ExecutionOptimizationTest do
   test "property edits converge and frozen native programs can run concurrently", %{ctx: ctx} do
     old = MLIR.Attribute.flat_symbol_ref("malloc", ctx: ctx)
     new = MLIR.Attribute.flat_symbol_ref("enif_alloc", ctx: ctx)
-
     program = Program.new("llvm.call", attributes: [callee: old], rewrite: {:attributes, [callee: new]})
-
     inputs = for _ <- 1..6, do: ir(ctx, @alloc)
 
     Rewrite.with_patterns(ctx, [program], fn frozen ->
@@ -384,7 +366,6 @@ defmodule ExecutionOptimizationTest do
     inputs =
       for execution <- [:native, :beam] do
         ir = ir(ctx, @alloc)
-
         Composer.nested(ir, "llvm.func", Beaver.ENIF.UseENIFAlloc) |> Composer.run!(execution: execution)
 
         for symbol <- ["enif_alloc", "enif_free"],
@@ -532,7 +513,6 @@ defmodule ExecutionOptimizationTest do
 
     assert Enum.any?(1..100, fn _ ->
              Process.sleep(10)
-
              match?(%{threads: 0, running: 0, queued: 0, peak_running: 1}, Context.executor_stats(ctx))
            end)
   end

@@ -1,11 +1,7 @@
 defmodule Beaver.MLIR.InferTypeCollectorsTest do
   use Beaver.Case, async: true
-
-  alias Beaver.MLIR
   alias Beaver.MLIR.{InferShapedType, InferType}
-
   @moduletag :smoke
-
   defp with_args(ctx, types, fun) do
     Beaver.Native.with_resource(MLIR.Block.create(), &MLIR.Block.destroy/1, fn block ->
       fun.(MLIR.Block.add_args!(block, types, ctx: ctx))
@@ -16,7 +12,6 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
     with_args(ctx, ["i32", "i32"], fn operands ->
       for {operation, count} <- [{"arith.addi", 1}, {"arith.mului_extended", 2}] do
         assert {:ok, types} = InferType.return_types(operation: operation, context: ctx, operands: operands)
-
         assert Enum.map(types, &MLIR.to_string/1) == List.duplicate("i32", count)
       end
     end)
@@ -24,7 +19,6 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
 
   test "returns diagnostics when inference fails", %{ctx: ctx} do
     assert {:error, diagnostics} = InferType.return_types(operation: "not.registered", context: ctx)
-
     assert diagnostics != []
     assert MLIR.Diagnostic.format(diagnostics) =~ "failed to infer operation return types"
   end
@@ -51,7 +45,6 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
 
     for _ <- 1..20 do
       assert {:ok, [type]} = InferType.return_types(operation: "arith.constant", context: ctx, properties: properties)
-
       assert MLIR.to_string(type) == "i32"
     end
 
@@ -65,7 +58,6 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
              )
 
     assert MLIR.Diagnostic.format(diagnostics) =~ "expected DictionaryAttr"
-
     assert {:error, _} = InferType.return_types(operation: "func.func", context: ctx, properties: properties)
   end
 
@@ -82,23 +74,8 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
 
   test "shaped inference uses properties and borrows regions without consuming them", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        """
-        module {
-          func.func @infer(%input: tensor<2x3xf32>, %cond: i1) -> i32 {
-            %result = scf.if %cond -> (i32) {
-              %a = arith.constant 1 : i32
-              scf.yield %a : i32
-            } else {
-              %b = arith.constant 2 : i32
-              scf.yield %b : i32
-            }
-            return %result : i32
-          }
-        }
-        """,
-        ctx: ctx
-      )
+      "module {\n  func.func @infer(%input: tensor<2x3xf32>, %cond: i1) -> i32 {\n    %result = scf.if %cond -> (i32) {\n      %a = arith.constant 1 : i32\n      scf.yield %a : i32\n    } else {\n      %b = arith.constant 2 : i32\n      scf.yield %b : i32\n    }\n    return %result : i32\n  }\n}\n"
+      |> MLIR.Module.create!(ctx: ctx)
 
     func = module |> MLIR.Module.body() |> Beaver.Walker.operations() |> Enum.at(0)
     block = func |> Beaver.Walker.regions() |> Enum.at(0) |> Beaver.Walker.blocks() |> Enum.at(0)
@@ -116,9 +93,7 @@ defmodule Beaver.MLIR.InferTypeCollectorsTest do
     branch = block |> Beaver.Walker.operations() |> Enum.at(0)
     regions = Enum.to_list(Beaver.Walker.regions(branch))
     before = MLIR.to_string(module)
-
     assert {:ok, [type]} = InferType.return_types(operation: "scf.if", context: ctx, operands: [cond], regions: regions)
-
     assert MLIR.to_string(type) == "i32"
     assert MLIR.to_string(module) == before
     MLIR.verify!(module)

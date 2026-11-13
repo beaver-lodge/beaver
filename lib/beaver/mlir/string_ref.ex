@@ -18,16 +18,11 @@ defmodule Beaver.MLIR.StringRef do
   > A `StringRef` created in Elixir is not a reference to the BEAM binary as argument. Instead, a copy is made. In other words, excessively creating `StringRef` using this function can lead to memory leak.
   """
   def create(value) when is_binary(value), do: %__MODULE__{ref: CAPI.beaver_raw_get_string_ref(value)}
-
   def create(%__MODULE__{} = sr), do: sr
-
   def create(%MLIR.Identifier{} = id), do: id |> MLIR.CAPI.mlirIdentifierStr()
-
   def create(value), do: value |> Kernel.to_string() |> create()
-
   @doc "Get the length of the StringRef as Erlang integer."
   def length(%__MODULE__{} = str), do: CAPI.beaverStringRefGetLength(str) |> Native.to_term()
-
   @doc "Get the data of the StringRef as an array pointer of unsigned 8-bit integers."
   def data(%__MODULE__{} = str),
     do: CAPI.beaverStringRefGetData(str) |> then(&%Native.Array{ref: &1, element_kind: Native.U8})

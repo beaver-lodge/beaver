@@ -1,10 +1,6 @@
 defmodule WasmSSADialectTest do
-  use Beaver
   use Beaver.Case, async: true
-
   require Beaver.MLIR.Dialect.WasmSSA
-
-  alias Beaver.MLIR
   alias Beaver.MLIR.Dialect.WasmSSA
   alias MLIR.Type
 
@@ -19,15 +15,13 @@ defmodule WasmSSADialectTest do
 
   test "parses wasmssa text", %{ctx: ctx} do
     module =
-      MLIR.Module.create!(
-        """
-        wasmssa.func @f() -> i32 {
-          %0 = wasmssa.const 10 : i32
-          wasmssa.return %0 : i32
-        }
-        """,
-        ctx: ctx
-      )
+      """
+      wasmssa.func @f() -> i32 {
+        %0 = wasmssa.const 10 : i32
+        wasmssa.return %0 : i32
+      }
+      """
+      |> MLIR.Module.create!(ctx: ctx)
 
     text = MLIR.to_string(module)
     assert text =~ "wasmssa.func @f() -> i32"
@@ -36,14 +30,12 @@ defmodule WasmSSADialectTest do
 
   test "constructs wasmssa ops from the DSL", %{ctx: ctx} do
     module =
-      mlir ctx: ctx do
-        module do
-          WasmSSA.func f(functionType: Type.function([], [Type.i32()]), sym_name: MLIR.Attribute.string("f")) do
-            region do
-              block _() do
-                c = WasmSSA.const(value: MLIR.Attribute.integer(Type.i32(), 10)) >>> Type.i32()
-                WasmSSA.return(c) >>> []
-              end
+      module_ir ctx do
+        WasmSSA.func f(functionType: Type.function([], [Type.i32()]), sym_name: MLIR.Attribute.string("f")) do
+          region do
+            block _() do
+              c = WasmSSA.const(value: MLIR.Attribute.integer(Type.i32(), 10)) >>> Type.i32()
+              WasmSSA.return(c) >>> []
             end
           end
         end

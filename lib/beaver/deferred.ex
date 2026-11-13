@@ -7,10 +7,8 @@ defmodule Beaver.Deferred do
   the context ownership of concrete entities.
   """
   alias Beaver.MLIR
-
   @enforce_keys [:resolver]
   defstruct [:resolver]
-
   @type context_arg() :: Context.t()
   @opaque t(value) :: %__MODULE__{resolver: (context_arg() -> value)}
   @type contextual(value) :: value | t(value)
@@ -18,7 +16,6 @@ defmodule Beaver.Deferred do
   @type type :: contextual(MLIR.Type.t())
   @type operation :: contextual(MLIR.Operation.t())
   @type attribute :: contextual(MLIR.Attribute.t())
-
   @doc "Wraps a context resolver as an explicit deferred value."
   @spec defer((context_arg() -> value)) :: t(value) when value: var
   def defer(resolver) when is_function(resolver, 1), do: %__MODULE__{resolver: resolver}
@@ -64,15 +61,10 @@ defmodule Beaver.Deferred do
     do: raise(ArgumentError, "bare context resolvers are not deferred values; wrap the function with defer/1")
 
   def resolve(value, %Context{} = ctx), do: value |> do_resolve(ctx) |> Context.ensure_same!(ctx)
-
   def resolve(_value, invalid), do: raise(ArgumentError, "expected an MLIR context, got: #{inspect(invalid)}")
-
   defp do_resolve({:parametric, _, _, deferred}, ctx), do: do_resolve(deferred, ctx)
-
   defp do_resolve(%__MODULE__{resolver: resolver}, ctx), do: resolver.(ctx) |> unwrap() |> do_resolve(ctx)
-
   defp do_resolve(entity, _ctx), do: entity
-
   defp unwrap({:ok, value}), do: value
 
   defp unwrap({:error, reason}) do

@@ -1,12 +1,8 @@
 defmodule DocumentationExamplesTest do
   use Beaver.Case, async: true
-
   import ExUnit.CaptureIO
-  alias Beaver.MLIR
   alias Beaver.Test.DocumentationExample
-
   @moduletag :smoke
-
   test "README quickstart runs as written, including context and module cleanup" do
     output = DocumentationExample.read!("README.md", "quickstart") |> run!("README.md")
     assert output =~ "module"

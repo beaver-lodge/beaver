@@ -25,7 +25,6 @@
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallBitVector.h"
 #include "llvm/Support/JSON.h"
-
 using namespace mlir;
 namespace {
 struct Session {
@@ -69,8 +68,7 @@ unsigned beaverAnalysisCached(void *session) {
       unsigned(bool(am.getCachedAnalysis<Liveness>())) << 2 |
       unsigned(bool(am.getCachedAnalysis<DataLayoutAnalysis>())) << 3;
 }
-int beaverAnalysisQuery(void *session, unsigned kind, MlirOperation lhs,
-                        MlirOperation rhs, MlirValue value) {
+int beaverAnalysisQuery(void *session, unsigned kind, MlirOperation lhs, MlirOperation rhs, MlirValue value) {
   auto &s = *static_cast<Session *>(session);
   auto *a = unwrap(lhs);
   auto *b = unwrap(rhs);
@@ -105,7 +103,6 @@ bool beaverAnalysisLayout(void *session, MlirOperation scope, MlirType type, uin
   out[8] = layout.getTypeIndexBitwidth(t).value_or(0);
   return true;
 }
-
 namespace {
 template <bool Shaped, typename Callback>
 MlirLogicalResult infer(MlirStringRef name, MlirContext context, MlirLocation location,
@@ -177,7 +174,6 @@ MlirLogicalResult beaverInferReturnComponents(INFER_ARGS, MlirShapedTypeComponen
   return infer<true>(name, ctx, loc, nv, vs, attrs, props, nr, rs, cb, data);
 }
 #undef INFER_ARGS
-
 MlirLogicalResult beaverConversionRun(unsigned mode, MlirOperation root,
     MlirConversionTarget target, MlirFrozenRewritePatternSet patterns,
     MlirConversionConfig config, MlirStringCallback report, void *data) {
@@ -189,8 +185,8 @@ MlirLogicalResult beaverConversionRun(unsigned mode, MlirOperation root,
     void notifyBlockInserted(Block *, Region *, Region::iterator) override { changed = true; }
     void notifyBlockErased(Block *) override { changed = true; }
   } changes;
-  // Snapshot identities before conversion. Reports never expose handles that
-  // a successful rewrite may have erased, or dereference rolled-back new ops.
+  // Snapshot identities before conversion. Reports never expose handles that a successful rewrite may have erased, or
+  // dereference rolled-back new ops.
   struct Identity { Operation *op; std::string name, location; };
   SmallVector<Identity> original;
   if (report) unwrap(root)->walk<WalkOrder::PreOrder>([&](Operation *op) {
@@ -225,26 +221,21 @@ MlirLogicalResult beaverConversionRun(unsigned mode, MlirOperation root,
   }
   return wrap(result);
 }
-
 extern "C" MLIR_CAPI_EXPORTED MlirType beaverConvertCompositeType(
     MlirType type, const MlirType *sources, size_t numSources, MlirType target) {
   if (!type.ptr || !target.ptr || numSources == 0) return type;
   AttrTypeReplacer replacer;
   Type targetType = unwrap(target);
   replacer.addReplacement([sources, numSources, targetType](Type t) -> std::optional<Type> {
-    for (size_t i = 0; i < numSources; ++i) {
-      if (t == unwrap(sources[i])) return targetType;
-    }
+    for (size_t i = 0; i < numSources; ++i) { if (t == unwrap(sources[i])) return targetType; }
     return std::nullopt;
   });
   return wrap(replacer.replace(unwrap(type)));
 }
-
 namespace {
 struct FuncRegionSignatureConversion : public OpConversionPattern<func::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
-  LogicalResult matchAndRewrite(func::FuncOp op, OpAdaptor,
-                                ConversionPatternRewriter &rewriter) const override {
+  LogicalResult matchAndRewrite(func::FuncOp op, OpAdaptor, ConversionPatternRewriter &rewriter) const override {
     FunctionType type = op.getFunctionType();
     TypeConverter::SignatureConversion result(type.getNumInputs());
     if (failed(getTypeConverter()->convertSignatureArgs(type.getInputs(), result)))
@@ -263,15 +254,12 @@ struct FuncRegionSignatureConversion : public OpConversionPattern<func::FuncOp> 
   }
 };
 } // namespace
-
 extern "C" MLIR_CAPI_EXPORTED void beaverPopulateStructuralTypeConversions(
-    MlirConversionTarget target, MlirRewritePatternSet patterns,
-    MlirTypeConverter typeConverter, unsigned domainMask) {
+    MlirConversionTarget target, MlirRewritePatternSet patterns, MlirTypeConverter typeConverter, unsigned domainMask) {
   ConversionTarget &convTarget = *unwrap(target);
   RewritePatternSet &patternSet = *unwrap(patterns);
   TypeConverter *tcPtr = unwrap(typeConverter);
   TypeConverter &tc = *tcPtr;
-
   if (domainMask & 1) {
     patternSet.add<FuncRegionSignatureConversion>(tc, patternSet.getContext(), 2);
     populateAnyFunctionOpInterfaceTypeConversionPattern(patternSet, tc);
@@ -291,11 +279,8 @@ extern "C" MLIR_CAPI_EXPORTED void beaverPopulateStructuralTypeConversions(
     populateBranchOpInterfaceTypeConversionPattern(patternSet, tc);
     cf::populateCFStructuralTypeConversionsAndLegality(tc, patternSet, convTarget);
   }
-  if (domainMask & 4) {
-    scf::populateSCFStructuralTypeConversionsAndLegality(tc, patternSet, convTarget);
-  }
+  if (domainMask & 4) { scf::populateSCFStructuralTypeConversionsAndLegality(tc, patternSet, convTarget); }
 }
-
 namespace {
 struct SafepointColoring {
   SmallVector<Type> slotTypes;
@@ -304,16 +289,12 @@ struct SafepointColoring {
   SmallVector<SmallVector<Value>> liveAt;
   SmallVector<SmallVector<size_t>> slotsAt;
 };
-
 bool computeSafepointColoring(Operation *func, ArrayRef<Operation *> safepoints,
                               DominanceInfo &domInfo, Liveness &liveness,
                               bool excludeEntryArgs, SafepointColoring &out) {
   if (!func || func->getNumRegions() == 0 || func->getRegion(0).empty()) return false;
   Block *entryBlock = &func->getRegion(0).front();
-  for (Operation *sp : safepoints) {
-    if (!sp || !func->isProperAncestor(sp)) return false;
-  }
-
+  for (Operation *sp : safepoints) { if (!sp || !func->isProperAncestor(sp)) return false; }
   SmallVector<Value> candidates;
   func->walk<WalkOrder::PreOrder>([&](Operation *op) {
     if (op == func) {
@@ -327,34 +308,25 @@ bool computeSafepointColoring(Operation *func, ArrayRef<Operation *> safepoints,
     }
     for (Value res : op->getResults()) candidates.push_back(res);
     for (Region &region : op->getRegions()) {
-      for (Block &block : region) {
-        for (BlockArgument arg : block.getArguments()) candidates.push_back(arg);
-      }
+      for (Block &block : region) { for (BlockArgument arg : block.getArguments()) candidates.push_back(arg); }
     }
   });
-
   size_t numSp = safepoints.size();
   out.liveAt.resize(numSp);
   out.slotsAt.resize(numSp);
   SmallVector<llvm::SmallBitVector> slotBusy;
-
   for (Value v : candidates) {
     llvm::SmallBitVector liveMask(numSp, false);
     for (size_t i = 0; i < numSp; ++i) {
       Operation *sp = safepoints[i];
       bool dominates = false;
-      if (Operation *defOp = v.getDefiningOp()) {
-        dominates = (defOp != sp) && domInfo.properlyDominates(defOp, sp);
-      } else {
+      if (Operation *defOp = v.getDefiningOp()) { dominates = (defOp != sp) && domInfo.properlyDominates(defOp, sp); } else {
         Block *defBlock = cast<BlockArgument>(v).getOwner();
         dominates = domInfo.dominates(defBlock, sp->getBlock());
       }
-      if (dominates && !liveness.isDeadAfter(v, sp)) {
-        liveMask.set(i);
-      }
+      if (dominates && !liveness.isDeadAfter(v, sp)) { liveMask.set(i); }
     }
     if (!liveMask.any()) continue;
-
     size_t assignedSlot = SIZE_MAX;
     for (size_t s = 0; s < out.slotTypes.size(); ++s) {
       if (out.slotTypes[s] == v.getType() && !slotBusy[s].anyCommon(liveMask)) {
@@ -380,23 +352,13 @@ bool computeSafepointColoring(Operation *func, ArrayRef<Operation *> safepoints,
   return true;
 }
 } // namespace
-
-using BeaverSafepointCallback = void (*)(size_t totalSlots, const MlirType *slotTypes,
-                                         size_t numColoredValues, const MlirValue *coloredValues,
-                                         const size_t *valueSlots, size_t safepointIndex,
-                                         MlirOperation safepointOp, size_t numLive,
-                                         const MlirValue *liveValues, const size_t *liveSlots,
-                                         void *userData);
-
 extern "C" MLIR_CAPI_EXPORTED bool beaverAnalyzeSafepoints(
     void *session, MlirOperation funcOp, const MlirOperation *safepointOps,
-    size_t numSafepoints, bool excludeEntryArgs, BeaverSafepointCallback callback,
-    void *userData) {
+    size_t numSafepoints, bool excludeEntryArgs, BeaverSafepointCallback callback, void *userData) {
   Operation *func = unwrap(funcOp);
   if (!func || !callback) return false;
   SmallVector<Operation *> sps;
   for (size_t i = 0; i < numSafepoints; ++i) sps.push_back(unwrap(safepointOps[i]));
-
   SafepointColoring coloring;
   if (session) {
     auto &s = *static_cast<Session *>(session);
@@ -410,29 +372,23 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverAnalyzeSafepoints(
     Liveness live(func);
     if (!computeSafepointColoring(func, sps, dom, live, excludeEntryArgs, coloring)) return false;
   }
-
   SmallVector<MlirType> wrappedSlotTypes;
   for (Type t : coloring.slotTypes) wrappedSlotTypes.push_back(wrap(t));
   SmallVector<MlirValue> wrappedColoredValues;
   for (Value v : coloring.coloredValues) wrappedColoredValues.push_back(wrap(v));
-
   if (numSafepoints == 0) {
     callback(0, nullptr, 0, nullptr, nullptr, SIZE_MAX, {nullptr}, 0, nullptr, nullptr, userData);
     return true;
   }
-
   for (size_t i = 0; i < numSafepoints; ++i) {
     SmallVector<MlirValue> wrappedLive;
     for (Value v : coloring.liveAt[i]) wrappedLive.push_back(wrap(v));
-    callback(wrappedSlotTypes.size(), wrappedSlotTypes.data(),
-             wrappedColoredValues.size(), wrappedColoredValues.data(),
+    callback(wrappedSlotTypes.size(), wrappedSlotTypes.data(), wrappedColoredValues.size(), wrappedColoredValues.data(),
              coloring.coloredValueSlots.data(), i, safepointOps[i],
-             wrappedLive.size(), wrappedLive.data(), coloring.slotsAt[i].data(),
-             userData);
+             wrappedLive.size(), wrappedLive.data(), coloring.slotsAt[i].data(), userData);
   }
   return true;
 }
-
 extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
     MlirOperation funcOp, const MlirOperation *safepointOps, size_t numSafepoints,
     MlirStringRef saveOpName, MlirStringRef loadOpName, intptr_t stateArgIndex,
@@ -442,24 +398,20 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
   if (!func || func->getNumRegions() == 0 || func->getRegion(0).empty()) return false;
   if (slotStrideBytes < 0) return false;
   if (numSafepoints == 0) return true;
-
   SmallVector<Operation *> sps;
   for (size_t i = 0; i < numSafepoints; ++i) {
     Operation *sp = unwrap(safepointOps[i]);
     if (!sp || !func->isProperAncestor(sp)) return false;
     sps.push_back(sp);
   }
-
   DominanceInfo initialDom(func);
   Liveness initialLiveness(func);
   SafepointColoring coloring;
   if (!computeSafepointColoring(func, sps, initialDom, initialLiveness, true, coloring))
     return false;
-
   Location funcLoc = func->getLoc();
   Region &body = func->getRegion(0);
   Block *initialEntry = &body.front();
-
   bool useFramePtr = frameArgIndex >= 0;
   Value framePtr;
   SmallVector<uint64_t> slotByteOffsets(coloring.slotTypes.size(), 0);
@@ -467,7 +419,6 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
     if (static_cast<size_t>(frameArgIndex) >= initialEntry->getNumArguments()) return false;
     framePtr = initialEntry->getArgument(frameArgIndex);
     if (!isa<LLVM::LLVMPointerType>(framePtr.getType())) return false;
-
     DataLayout dl = DataLayout::closest(func);
     uint64_t runningOffset = 0;
     for (size_t s = 0; s < coloring.slotTypes.size(); ++s) {
@@ -490,7 +441,6 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
     }
     if (outFrameBytes) *outFrameBytes = runningOffset;
   }
-
   auto buildSlotPtr = [&](OpBuilder &builder, Location loc, size_t slotIdx) -> Value {
     uint64_t offset = slotByteOffsets[slotIdx];
     if (offset == 0) return framePtr;
@@ -501,14 +451,11 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
                                  ArrayRef<LLVM::GEPArg>{static_cast<int32_t>(offset)})
           .getRes();
     }
-    Value dynIdx = LLVM::ConstantOp::create(builder, loc, builder.getI64Type(),
-                                            builder.getI64IntegerAttr(offset))
+    Value dynIdx = LLVM::ConstantOp::create(builder, loc, builder.getI64Type(), builder.getI64IntegerAttr(offset))
                        .getRes();
-    return LLVM::GEPOp::create(builder, loc, ptrType, i8Type, framePtr,
-                               ArrayRef<LLVM::GEPArg>{dynIdx})
+    return LLVM::GEPOp::create(builder, loc, ptrType, i8Type, framePtr, ArrayRef<LLVM::GEPArg>{dynIdx})
         .getRes();
   };
-
   // 1. Insert save operations immediately before each safepoint.
   for (size_t i = 0; i < numSafepoints; ++i) {
     Operation *sp = sps[i];
@@ -531,9 +478,8 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
       }
     }
   }
-
-  // 2. Split each safepoint block right after the safepoint op, keeping a temporary
-  //    branch from preBlock to resumeBlock so dominance reflects the linear order.
+  // 2. Split each safepoint block right after the safepoint op, keeping a temporary branch from preBlock to resumeBlock
+  // so dominance reflects the linear order.
   SmallVector<Block *> preBlocks(numSafepoints);
   SmallVector<Block *> resumeBlocks(numSafepoints);
   for (size_t i = 0; i < numSafepoints; ++i) {
@@ -545,9 +491,8 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
     OpBuilder builder = OpBuilder::atBlockEnd(preBlock);
     cf::BranchOp::create(builder, sp->getLoc(), resumeBlock);
   }
-
-  // 3. Insert reload operations at the start of each resumeBlock and rewrite
-  //    dominated uses from the deepest safepoint back to the first.
+  // 3. Insert reload operations at the start of each resumeBlock and rewrite dominated uses from the deepest safepoint
+  // back to the first.
   DominanceInfo splitDom(func);
   SmallVector<SmallVector<Value>> reloadedAt(numSafepoints);
   for (size_t i = 0; i < numSafepoints; ++i) {
@@ -560,9 +505,7 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
         Type loadType = origType.isIndex() ? Type(builder.getI64Type()) : origType;
         Value slotPtr = buildSlotPtr(builder, loc, coloring.slotsAt[i][k]);
         Value loaded = LLVM::LoadOp::create(builder, loc, loadType, slotPtr).getRes();
-        if (origType.isIndex()) {
-          loaded = arith::IndexCastOp::create(builder, loc, origType, loaded);
-        }
+        if (origType.isIndex()) { loaded = arith::IndexCastOp::create(builder, loc, origType, loaded); }
         reloadedAt[i].push_back(loaded);
       } else {
         OperationState loadState(loc, unwrap(loadOpName));
@@ -574,7 +517,6 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
       }
     }
   }
-
   for (size_t rev = numSafepoints; rev > 0; --rev) {
     size_t i = rev - 1;
     Block *resumeBlock = resumeBlocks[i];
@@ -588,13 +530,10 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
       });
     }
   }
-
   // 4. Replace the temporary branch + safepoint in each preBlock with a suspend return.
   bool isLLVMFunc = isa<LLVM::LLVMFuncOp>(func);
   SmallVector<Type> funcResTypes;
-  if (auto fnOp = dyn_cast<FunctionOpInterface>(func)) {
-    llvm::append_range(funcResTypes, fnOp.getResultTypes());
-  }
+  if (auto fnOp = dyn_cast<FunctionOpInterface>(func)) { llvm::append_range(funcResTypes, fnOp.getResultTypes()); }
   for (size_t i = 0; i < numSafepoints; ++i) {
     Operation *sp = sps[i];
     Location loc = sp->getLoc();
@@ -619,13 +558,21 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
         LLVM::ReturnOp::create(builder, loc, ValueRange{});
       else
         func::ReturnOp::create(builder, loc);
-    } else {
-      return false;
-    }
+    } else { return false; }
     tempBr->erase();
+    if (!sp->use_empty() && sp->getNumResults() == 1 && isa<IntegerType>(sp->getResult(0).getType())) {
+      OpBuilder resumeBuilder = OpBuilder::atBlockBegin(resumeBlocks[i]);
+      Type rType = sp->getResult(0).getType();
+      Value zero = isLLVMFunc
+                       ? Value(LLVM::ConstantOp::create(resumeBuilder, loc, rType,
+                                                        resumeBuilder.getIntegerAttr(rType, 0))
+                                   .getRes())
+                       : Value(arith::ConstantOp::create(resumeBuilder, loc, rType,
+                                                         resumeBuilder.getIntegerAttr(rType, 0)));
+      sp->getResult(0).replaceAllUsesWith(zero);
+    }
     if (sp->use_empty()) sp->erase();
   }
-
   // 5. Create entry dispatch block with cf.switch jumping to originalEntry or resumeBlocks.
   Block *originalEntry = &body.front();
   Block *dispatchBlock = new Block();
@@ -634,10 +581,7 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
     BlockArgument newArg = dispatchBlock->addArgument(arg.getType(), arg.getLoc());
     arg.replaceAllUsesWith(newArg);
   }
-  while (originalEntry->getNumArguments() > 0) {
-    originalEntry->eraseArgument(0);
-  }
-
+  while (originalEntry->getNumArguments() > 0) { originalEntry->eraseArgument(0); }
   OpBuilder entryBuilder = OpBuilder::atBlockBegin(dispatchBlock);
   Value stateValue;
   if (stateArgIndex >= 0 && static_cast<size_t>(stateArgIndex) < dispatchBlock->getNumArguments()) {
@@ -650,10 +594,8 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
     stateOp.addTypes(entryBuilder.getI32Type());
     stateValue = entryBuilder.create(stateOp)->getResult(0);
   }
-
   IntegerType switchIntType = dyn_cast<IntegerType>(stateValue.getType());
   if (!switchIntType) return false;
-
   SmallVector<APInt> caseValues;
   SmallVector<Block *> caseDestinations;
   SmallVector<ValueRange> caseOperands;

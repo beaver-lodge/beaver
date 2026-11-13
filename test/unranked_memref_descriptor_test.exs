@@ -1,7 +1,5 @@
 defmodule UnrankedMemRefDescriptorTest do
   use Beaver.Case, async: true
-  use Beaver
-
   alias Beaver.MLIR.UnrankedMemRefDescriptor
 
   test "UnrankedMemRefDescriptor creation" do

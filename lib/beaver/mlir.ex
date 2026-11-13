@@ -39,7 +39,6 @@ defmodule Beaver.MLIR do
   - `Beaver.MLIR.***`: APIs related to lifecycle, including creating and destroying MLIR entities.
   - `Beaver.MLIR`: APIs like `Beaver.MLIR.dump!/1` or `Beaver.MLIR.null?/1`. These are standard features generally expected in any MLIR tools.
   """
-
   defp extract_entity_name(m) do
     ["Beaver", "MLIR", entity_name] = m |> Module.split()
     entity_name
@@ -102,7 +101,6 @@ defmodule Beaver.MLIR do
           | SymbolTable.t()
           | Dialect.t()
           | ExecutionEngine.t()
-
   @doc """
   Check if an MLIR entity is null.
 
@@ -132,7 +130,6 @@ defmodule Beaver.MLIR do
           | PassManager.t()
           | Module.t()
           | Identifier.t()
-
   @type dump_opts :: [generic: boolean()]
   @type print_opts :: [
           generic: boolean(),
@@ -150,7 +147,6 @@ defmodule Beaver.MLIR do
   it's not possible to capture the output in Elixir. If you need to capture the output, use `to_string/1` instead.
   """
   def dump(mlir, opts \\ [])
-
   def dump(%Beaver.MLIR.Module{} = mlir, opts), do: mlirModuleGetOperation(mlir) |> dump(opts)
 
   def dump(%Operation{} = mlir, opts) do
@@ -175,7 +171,6 @@ defmodule Beaver.MLIR do
   end
 
   @spec to_string(printable() | Deferred.contextual(printable()), print_opts()) :: null_safe_result(String.t())
-
   @doc """
   Print MLIR element or StringRef as Elixir binary string.
 
@@ -186,7 +181,6 @@ defmodule Beaver.MLIR do
   Pass `debug_info: true` to include location and debug information (for example the `#llvm.di_subprogram`
   attributes attached by `Beaver.MLIR.Debug`) in the printed output. The output remains valid, parseable MLIR text.
   """
-
   def to_string(mlir, opts \\ [])
 
   def to_string(%Operation{ref: ref}, opts) do
@@ -232,9 +226,7 @@ defmodule Beaver.MLIR do
   end
 
   def to_string(%Beaver.MLIR.Module{} = module, opts), do: module |> Operation.from_module() |> to_string(opts)
-
   def to_string(%PassManager{} = pm, _opts), do: pm |> mlirPassManagerGetAsOpPassManager() |> __MODULE__.to_string()
-
   def to_string(%Deferred{} = deferred, opts), do: Deferred.resolve(deferred, Deferred.context(opts)) |> to_string(opts)
 
   def to_string(%m{} = entity, _opts) do
@@ -248,7 +240,6 @@ defmodule Beaver.MLIR do
   @type verify_result(t) :: {:ok, t} | :null | {:error, diagnostics()}
   @type verify_summary() :: boolean()
   @type rewrite_pattern_input() :: Rewrite.pattern_list() | MLIR.FrozenRewritePatternSet.t() | RewritePatternSet.t()
-
   @type apply_option() ::
           {:debug, boolean()}
           | {:ctx, Deferred.context_arg()}
@@ -257,7 +248,6 @@ defmodule Beaver.MLIR do
   @type apply_opts() :: [apply_option()] | Rewrite.config_callback() | nil
   @type apply_error() :: String.t()
   @type apply_outcome(t) :: {:ok, t} | {:error, apply_error()}
-
   @spec verify!(verifiable()) :: verifiable()
   def verify!(op) do
     case verify(op) do
@@ -299,7 +289,6 @@ defmodule Beaver.MLIR do
 
   @spec verify?(verifiable()) :: verify_summary()
   def verify?(op), do: match?({:ok, _}, verify(op))
-
   @apply_default_opts [debug: false]
   @doc """
   Apply patterns on a container (region, operation, module). It returns the container if it succeeds otherwise it

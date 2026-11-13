@@ -27,9 +27,7 @@ defmodule Beaver.MLIR.CallbackBridgeRuntimeTest do
     declined = MLIR.TypeConverter.create(conversion: fn _ -> :declined end, timeout: 1_000)
     assert {:error, :conversion_failed} = MLIR.TypeConverter.convert(declined, source)
     assert :ok = MLIR.TypeConverter.destroy(declined)
-
     failed = MLIR.TypeConverter.create(conversion: fn _ -> {:error, :unsupported} end, timeout: 1_000)
-
     assert {:error, :unsupported} = MLIR.TypeConverter.convert(failed, source)
     assert :ok = MLIR.TypeConverter.destroy(failed)
   end
@@ -49,9 +47,7 @@ defmodule Beaver.MLIR.CallbackBridgeRuntimeTest do
 
     module = MLIR.Module.create!("module {}", ctx: ctx)
     operation = MLIR.Operation.from_module(module)
-
     assert :recursively_speculatable = MLIR.ConditionallySpeculatable.query(operation, timeout: 1_000)
-
     assert_receive {:speculated, callback_operation}
     assert MLIR.equal?(callback_operation, operation)
     MLIR.Module.destroy(module)

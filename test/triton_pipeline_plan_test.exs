@@ -1,6 +1,5 @@
 defmodule Beaver.MLIR.Triton.PipelinePlanTest do
   use ExUnit.Case, async: true
-
   alias Beaver.MLIR.Triton.PipelinePlan
 
   @pinned_ids [
@@ -63,10 +62,8 @@ defmodule Beaver.MLIR.Triton.PipelinePlanTest do
     :convert_nvvm_to_llvm,
     :llir_canonicalize
   ]
-
   test "freezes the pinned sm_100+ order and provenance" do
     plan = PipelinePlan.build(target: "cuda:120", num_warps: 8, pipeline_profile: :pinned_nvidia_sm100)
-
     assert plan.schema == "beaver.triton.pipeline-plan.v1"
     assert plan.profile == :pinned_nvidia_sm100
     assert plan.capability == 120
@@ -87,12 +84,9 @@ defmodule Beaver.MLIR.Triton.PipelinePlanTest do
   test "num_stages has exactly three owning pass entries" do
     for stages <- 1..3 do
       plan = PipelinePlan.build(target: "cuda:120", pipeline_profile: :pinned_nvidia_sm100, num_stages: stages)
-
       owners = Enum.filter(plan.passes, fn pass -> pass.id in [:assign_latencies, :warp_specialize, :pipeline] end)
-
       assert length(owners) == 3
       assert Enum.all?(owners, &String.contains?(&1.pipeline, "num-stages=#{stages}"))
-
       refute Enum.any?(plan.passes -- owners, fn pass -> String.contains?(pass.pipeline, "num-stages=") end)
     end
   end
