@@ -9,14 +9,28 @@ defmodule Beaver.Build.Compiler do
   alias Beaver.MLIR.{ExecutionEngine, Target.LLVMIR, Template}
   @object_options ~w(triple cpu features opt_level pic format)a
   @aot_options [:functions, :cache_dir, :max_concurrency | @object_options]
+  @metrics Enum.zip(
+             ~w(emit lower translate parse optimize codegen),
+             ~w(emit_ns lower_ns translate_ns parse_ns opt_ns codegen_ns)a
+           )
   defdelegate sha256(data), to: ArtifactCache, as: :digest
   defdelegate platform(), to: LLVMIR, as: :host_platform
 
   defmacro __using__(opts) do
+    wrappers =
+      for name <- ~w(compile_functions! compile_object! lower_to_llvm! jit! compile_mlir_unit! cached_object!)a do
+        args = Macro.generate_arguments(if(name == :cached_object!, do: 3, else: 1), __MODULE__)
+
+        quote do
+          def unquote(name)(unquote_splicing(args), opts \\ []),
+            do: Beaver.Build.Compiler.unquote(name)(@compiler, unquote_splicing(args), opts)
+        end
+      end
+
     quote do
-      @compiler_config Map.new(unquote(opts))
-      @compiler_config Map.update!(@compiler_config, :generators, &[unquote(__MODULE__) | &1])
-      @compiler_image @compiler_config.image
+      @compiler Map.new(unquote(opts))
+      @compiler Map.update!(@compiler, :generators, &[unquote(__MODULE__) | &1])
+      @compiler_image @compiler.image
       defdelegate sha256(data), to: unquote(__MODULE__)
       defdelegate platform(), to: unquote(__MODULE__)
       defdelegate target_descriptor(), to: unquote(__MODULE__)
@@ -24,31 +38,15 @@ defmodule Beaver.Build.Compiler do
       defdelegate image_plan(source, output, opts \\ []), to: @compiler_image, as: :plan
       defdelegate link_shared!(objects, directory, symbol, opts \\ []), to: unquote(__MODULE__)
 
-      def compiler_identity(profile \\ @compiler_config.default_profile),
-        do: unquote(__MODULE__).compiler_identity(@compiler_config, profile)
+      def compiler_identity(profile \\ @compiler.default_profile),
+        do: unquote(__MODULE__).compiler_identity(@compiler, profile)
 
       def compile_ssa_program!(ssa, opts \\ []) do
-        config = Map.put(@compiler_config, :leaf_dependencies, &leaf_dependencies/2)
+        config = Map.put(@compiler, :leaf_dependencies, &leaf_dependencies/2)
         unquote(__MODULE__).compile_ssa_program!(config, ssa, opts)
       end
 
-      unquote_splicing(
-        for {name, arity} <- [
-              compile_functions!: 1,
-              compile_object!: 1,
-              lower_to_llvm!: 1,
-              jit!: 1,
-              compile_mlir_unit!: 1,
-              cached_object!: 3
-            ] do
-          args = Macro.generate_arguments(arity, __MODULE__)
-
-          quote do
-            def unquote(name)(unquote_splicing(args), opts \\ []),
-              do: unquote(__MODULE__).unquote(name)(@compiler_config, unquote_splicing(args), opts)
-          end
-        end
-      )
+      unquote_splicing(wrappers)
     end
   end
 
@@ -101,29 +99,20 @@ defmodule Beaver.Build.Compiler do
 
   def compile_mlir_unit!(config, source, opts \\ []) do
     start = now()
-
-    [unit] =
-      LLVMIR.compile_units!(
-        [{"unit", "unit", config.templates.with_declarations(source)}],
-        unit_options(config, nil, opts)
-      )
-
+    unit = compile_unit!(config, nil, "unit", config.templates.with_declarations(source), opts)
     metrics = Map.take(unit.metrics, ~w(translate_ns opt_ns codegen_ns)a)
     {unit.object, Map.put(metrics, :lower_ns, now() - start)}
   end
 
   def cached_object!(config, cache, key, source, opts \\ []) do
     start = now()
-    [unit] = LLVMIR.compile_units!([{key, key, source}], unit_options(config, cache, opts))
+    unit = compile_unit!(config, cache, key, source, opts)
     %{path: unit.path, report: unit_report(unit, elapsed(start))}
   end
 
   def link_shared!(objects, directory, symbol, opts \\ []) do
-    LLVMIR.link_shared!(
-      objects,
-      Path.join(directory, symbol <> LLVMIR.shared_library_extension()),
-      Keyword.take(opts, [:cc, :ldflags, :libs, :undefined_lookup])
-    )
+    path = Path.join(directory, symbol <> LLVMIR.shared_library_extension())
+    LLVMIR.link_shared!(objects, path, Keyword.take(opts, [:cc, :ldflags, :libs, :undefined_lookup]))
   end
 
   def compile_ssa_program!(config, ssa, opts \\ []) when is_map(ssa) do
@@ -141,21 +130,18 @@ defmodule Beaver.Build.Compiler do
       Enum.zip_with(functions, base_keys, &if(config.analysis.bounded_leaf?(&1), do: "#{config.unit_prefix}#{&2}_leaf"))
 
     leaf_table = List.to_tuple(leaves)
-    dependencies = Enum.map(functions, &config.leaf_dependencies.(&1, leaf_table))
-
-    dependent_key = fn [function, dependencies, base] ->
-      if dependencies == [], do: base, else: key.({function, dependencies})
-    end
-
-    keys = Enum.zip_with([functions, dependencies, base_keys], dependent_key)
-    names = Enum.map(keys, &"#{config.unit_prefix}#{&1}")
 
     units =
-      Enum.zip_with([functions, keys, names, dependencies], fn [function, digest, name, dependencies] ->
+      Enum.zip_with(functions, base_keys, fn function, base ->
+        dependencies = config.leaf_dependencies.(function, leaf_table)
+        digest = if dependencies == [], do: base, else: key.({function, dependencies})
+        name = config.unit_prefix <> digest
         symbols = Enum.map(dependencies, &elem(&1, 1))
         {function["identity"], digest, &config.builder.build_unit_module!(&1, function, name, leaves, symbols)}
       end)
 
+    keys = Enum.map(units, &elem(&1, 1))
+    names = Enum.map(keys, &(config.unit_prefix <> &1))
     dispatch = {"dispatch", key.({symbol, keys}), &config.builder.build_dispatch_module!(&1, symbol, names, leaves)}
     options = Keyword.put_new(opts, :max_concurrency, System.schedulers_online())
     compiled = LLVMIR.compile_units!(units ++ [dispatch], unit_options(config, cache, options))
@@ -175,29 +161,23 @@ defmodule Beaver.Build.Compiler do
   defp unit_report(unit, elapsed) do
     metrics = unit.metrics || %{}
 
-    fields = [
-      emit_ms: :emit_ns,
-      lower_ms: :lower_ns,
-      translate_ms: :translate_ns,
-      parse_ms: :parse_ns,
-      optimize_ms: :opt_ns,
-      codegen_ms: :codegen_ns
-    ]
-
     phases =
-      for {name, key} <- fields,
-          into: %{},
-          do: {to_string(name), Map.get(metrics, key, Map.get(metrics, to_string(key), 0)) / 1.0e6}
-
-    build = Map.put(phases, "peak_rss_bytes", 0)
+      Map.new(@metrics, fn {name, key} ->
+        {name <> "_ms", Map.get(metrics, key, Map.get(metrics, to_string(key), 0)) / 1.0e6}
+      end)
 
     %{
       "key" => unit.key,
       "cache_hit" => unit.cached?,
       "elapsed_ms" => elapsed,
       "object_bytes" => byte_size(unit.object),
-      "build" => build
+      "build" => Map.put(phases, "peak_rss_bytes", 0)
     }
+  end
+
+  defp compile_unit!(config, cache, key, source, opts) do
+    [unit] = LLVMIR.compile_units!([{key, key, source}], unit_options(config, cache, opts))
+    unit
   end
 
   defp unit_options(config, cache, opts),

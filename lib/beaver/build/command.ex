@@ -1,9 +1,5 @@
 defmodule Beaver.Build.Command do
-  @moduledoc """
-  Build commands and a JSONL request/reply service. Each request returns `{"ok": report}` or
-  `{"error": message}`; an optional `id` is echoed. Diagnostics belong on stderr.
-  A resident service keeps its configured backend, while failures leave it available for the next request.
-  """
+  @moduledoc "JSONL build reports with request IDs, recoverable errors and a fixed resident backend; diagnostics use stderr."
   @switches [cache_dir: :string, native_cache_dir: :string, jobs: :integer, backend: :string, profile: :string]
   defmacro __using__(opts) do
     quote do
@@ -12,9 +8,7 @@ defmodule Beaver.Build.Command do
 
       def main([source, output | rest]) do
         options = unquote(__MODULE__).options(rest, unquote(opts[:defaults] || []))
-        report = build!(source, output, options)
-        IO.puts(JSON.encode!(report))
-        report
+        build!(source, output, options) |> tap(&IO.puts(JSON.encode!(&1)))
       end
 
       def main(_), do: raise(ArgumentError, unquote(Keyword.fetch!(opts, :usage)))
@@ -43,9 +37,7 @@ defmodule Beaver.Build.Command do
   def reply(line, build, opts \\ [], source_alias \\ "source") do
     request = JSON.decode!(line)
     unless is_map(request), do: raise(ArgumentError, "expected a build request object")
-    response = execute(request, build, opts, source_alias)
-    response = if Map.has_key?(request, "id"), do: Map.put(response, "id", request["id"]), else: response
-    JSON.encode!(response)
+    request |> Map.take(["id"]) |> Map.merge(execute(request, build, opts, source_alias)) |> JSON.encode!()
   rescue
     error -> JSON.encode!(%{error: Exception.message(error)})
   end
