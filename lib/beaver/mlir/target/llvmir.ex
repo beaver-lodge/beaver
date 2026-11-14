@@ -116,9 +116,7 @@ defmodule Beaver.MLIR.Target.LLVMIR do
     Context.register_translations(MLIR.context(module))
     root = Operation.from_module(module)
     names = Keyword.get_lazy(opts, :functions, fn -> defined_functions(module) end)
-    cache = opts[:cache_dir]
-    if cache, do: File.mkdir_p!(cache)
-    options = Keyword.take(opts, @compile_keys) |> Keyword.put(:return_metrics, true)
+    options = Keyword.take(opts, [:cache_dir, :max_concurrency | @compile_keys]) |> Keyword.put(:input, :llvm_ir)
     prefix = ["beaver-aot-v1" | Enum.map(~w(triple cpu features)a, &Keyword.get(opts, &1, ""))]
 
     prefix =
@@ -129,8 +127,15 @@ defmodule Beaver.MLIR.Target.LLVMIR do
              Stream.map(Enum.with_index(names), fn {name, index} ->
                extract_shard(root, name |> to_string() |> String.trim_leading("@"), index == 0, prefix)
              end)
-           ) do
-      concurrent(shards, &compile_shard(&1, cache, options), opts)
+           ),
+         {:ok, compiled} <- compile_units(shards, options) do
+      results =
+        for unit <- compiled do
+          Map.take(unit, [:object, :cached?])
+          |> Map.merge(%{name: unit.id, digest: unit.key, metrics: Map.take(unit.metrics, Map.keys(@native_metrics))})
+        end
+
+      {:ok, results}
     end
   end
 
@@ -397,23 +402,8 @@ defmodule Beaver.MLIR.Target.LLVMIR do
 
   defp translate_shard(module, name, prefix) do
     case translate(module) do
-      {:ok, ir} -> {:ok, {name, ir, sha256([prefix, ir])}}
+      {:ok, ir} -> {:ok, {name, sha256([prefix, ir]), ir}}
       {:error, ds} -> {:error, Diagnostic.format(ds, "failed to translate function #{name}")}
-    end
-  end
-
-  defp compile_shard({name, ir, digest}, cache, opts) do
-    path = if cache, do: Path.join(cache, digest <> ".o")
-    hit? = path && File.regular?(path)
-    result = if hit?, do: {:ok, File.read!(path), @native_metrics}, else: compile_object(ir, opts)
-
-    case result do
-      {:ok, bytes, metrics} ->
-        if path && not hit?, do: write_atomic!(path, bytes)
-        {:ok, %{name: name, object: bytes, digest: digest, cached?: !!hit?, metrics: metrics}}
-
-      {:error, reason} ->
-        {:error, {name, reason}}
     end
   end
 

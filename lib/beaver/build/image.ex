@@ -5,13 +5,9 @@ defmodule Beaver.Build.Image do
   def plan(source, output, opts, policy) do
     Plan.new()
     |> Plan.stage(:read, [], fn _ -> read(source, opts, policy) end)
-    |> Plan.stage(:analyze, [:read], fn %{read: input} -> analyze(input, policy) end)
-    |> Plan.stage(:compile, [:read, :analyze], fn %{read: input, analyze: analysis} ->
-      compile(input, analysis, opts, policy)
-    end)
-    |> Plan.stage(:link, [:read, :compile], fn %{read: input, compile: reports} ->
-      link(input, reports, opts, policy)
-    end)
+    |> Plan.stage(:analyze, [:read], &analyze(&1.read, policy))
+    |> Plan.stage(:compile, [:read, :analyze], &compile(&1.read, &1.analyze, opts, policy))
+    |> Plan.stage(:link, [:read, :compile], &link(&1.read, &1.compile, opts, policy))
     |> Plan.stage(:publish, [:read, :analyze, :compile, :link], &publish(&1, output, policy))
   end
 
@@ -22,7 +18,7 @@ defmodule Beaver.Build.Image do
     cache = opts[:cache_dir] || System.get_env(policy.cache_env) || Path.expand("tmp/image-cache")
     compiler = opts[:compiler_id] || policy.compiler_id.(opts[:profile] || :balanced)
     source_digest = ArtifactCache.digest(JSON.encode!(programs))
-    metadata = policy.metadata.()
+    metadata = if is_function(policy.metadata, 1), do: policy.metadata.(programs), else: policy.metadata.()
     key = ArtifactCache.digest(JSON.encode!([metadata["version"], source_digest, compiler, backend]))
     directory = Path.join([cache, "images", key])
     bundle = ArtifactCache.bundle(directory, policy.manifest, policy.checksum)

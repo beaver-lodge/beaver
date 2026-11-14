@@ -7,9 +7,9 @@ defmodule Beaver.BuildPlanTest do
     checksum = path <> ".sha256"
     owner = self()
 
-    build = fn ->
+    build = fn value ->
       send(owner, :analyzed)
-      %{"answer" => 42}
+      %{"answer" => value * 2}
     end
 
     plan =
@@ -18,7 +18,7 @@ defmodule Beaver.BuildPlanTest do
         assert deps == %{}
         21
       end)
-      |> Plan.stage(:analyze, [:read], fn %{read: 21} -> ArtifactCache.fetch_json!(path, checksum, build) end)
+      |> Plan.stage(:analyze, [:read], fn %{read: 21} -> ArtifactCache.fetch_json!(path, checksum, build, [21]) end)
       |> Plan.stage(:publish, [:analyze], fn %{analyze: {value, hit?}} -> {value["answer"], hit?} end)
 
     assert Plan.describe(plan) == [

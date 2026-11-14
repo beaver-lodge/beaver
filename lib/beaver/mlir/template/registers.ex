@@ -41,28 +41,24 @@ defmodule Beaver.MLIR.Template.Registers do
   defp view_inputs(abi), do: [input: abi.term, cache: :ptr, ctx: :ptr, table: :ptr, args: :ptr, outputs: :ptr]
   defp fun(abi, name, inputs, results, body), do: function(abi.prefix <> name, inputs, results, body)
   defp reg(abi, name, args, types \\ nil), do: call(abi.prefix <> name, args, types || abi.term)
+  defp box(abi, kind, value), do: reg(abi, "box_#{kind}", [value])
   defp field(value, index), do: val("llvm.extractvalue", [value], :i64, position: {:dense_i64, [index]})
   defp tag(abi, value), do: arith("andi", field(value, 0), int(abi.tag_mask))
 
-  defp pack(abi, words),
-    do:
-      Enum.with_index(words)
-      |> Enum.reduce(val("llvm.mlir.undef", [], abi.term), fn {v, i}, s ->
-        val("llvm.insertvalue", [s, v], abi.term, position: {:dense_i64, [i]})
-      end)
+  defp pack(abi, words) do
+    Enum.reduce(Enum.with_index(words), val("llvm.mlir.undef", [], abi.term), fn {v, i}, s ->
+      val("llvm.insertvalue", [s, v], abi.term, position: {:dense_i64, [i]})
+    end)
+  end
 
   defp core_specs(abi) do
+    intrinsic = call("#{abi.runtime_prefix}_intrinsic_call", [:state, :index, :args, :outputs], :i32)
+
     simple = [
       fun(abi, "box", [tag: :i64, bits: :i64, aux: :i64], abi.term, pack(abi, [:tag, :bits, :aux])),
       fun(abi, "term_tag", [t: abi.term], :i64, tag(abi, :t)),
       fun(abi, "suspend", [s: :i32], :i32, :s),
-      fun(
-        abi,
-        "intrinsic",
-        [state: :ptr, index: :i64, args: :ptr, outputs: :ptr],
-        :i32,
-        call("#{abi.runtime_prefix}_intrinsic_call", [:state, :index, :args, :outputs], :i32)
-      ),
+      fun(abi, "intrinsic", [state: :ptr, index: :i64, args: :ptr, outputs: :ptr], :i32, intrinsic),
       fun(abi, "binary_cursor", [bin: abi.term, delta: :i64], abi.term, fn b ->
         {w0, b} = B.emit(b, field(:bin, 0))
 
@@ -73,49 +69,20 @@ defmodule Beaver.MLIR.Template.Registers do
             int(0)
           )
 
-        ret(
-          b,
-          pack(abi, [
-            arith(
-              "ori",
-              arith("shli", arith("addi", offset, :delta), int(abi.cursor_shift)),
-              int(abi.tags.cursor)
-            ),
-            field(:bin, 1),
-            field(:bin, 2)
-          ])
-        )
+        advanced = arith("shli", arith("addi", offset, :delta), int(abi.cursor_shift))
+        cursor = arith("ori", advanced, int(abi.tags.cursor))
+        ret(b, pack(abi, [cursor, field(:bin, 1), field(:bin, 2)]))
       end),
-      fun(
-        abi,
-        "scalar_neg",
-        [a: abi.term],
-        abi.term,
-        reg(abi, "scalar_sub", [reg(abi, "box_int", [int(0)]), :a])
-      ),
-      fun(
-        abi,
-        "try_int_neg",
-        [a: abi.term],
-        [abi.term, :i1],
-        reg(abi, "try_int_sub", [reg(abi, "box_int", [int(0)]), :a], [abi.term, :i1])
-      ),
       fun(abi, "try_predicate", [v: abi.term, expected_tag: :i64], [abi.term, :i1], [
-        reg(abi, "box_bool_i1", [cmp(:eq, field(:v, 0), :expected_tag)]),
+        box(abi, :bool_i1, cmp(:eq, field(:v, 0), :expected_tag)),
         cmp(:ule, arith("subi", field(:v, 0), int(abi.tags.integer)), int(abi.tags.float - abi.tags.integer))
       ]),
       fun(abi, "truth", [v: abi.term], abi.term, fn b ->
         {t, b} = B.emit(b, tag(abi, :v))
 
-        falsy =
-          arith(
-            "ori",
-            all([cmp(:eq, t, int(abi.tags.boolean)), cmp(:eq, field(:v, 1), int(0))]),
-            cmp(:eq, t, int(abi.tags.nil)),
-            :i1
-          )
-
-        ret(b, reg(abi, "box_bool_i1", [arith("xori", falsy, int(1, :i1), :i1)]))
+        false? = all([cmp(:eq, t, int(abi.tags.boolean)), cmp(:eq, field(:v, 1), int(0))])
+        falsy = arith("ori", false?, cmp(:eq, t, int(abi.tags.nil)), :i1)
+        ret(b, box(abi, :bool_i1, arith("xori", falsy, int(1, :i1), :i1)))
       end),
       fun(abi, "load_byte_at", [base_i64: :i64, off: :i64], [:i64, :ptr], fn b ->
         {ptr, b} = B.emit(b, gep(val("llvm.inttoptr", [:base_i64], :ptr), :off, :i8))
@@ -147,15 +114,16 @@ defmodule Beaver.MLIR.Template.Registers do
           ] do
         check = cmp(:eq, tag(abi, :v), int(expected))
         check = if condition, do: all([check, cmp(condition, field(:v, 1), int(0))]), else: check
-        fun(abi, "shape_#{name}", [v: abi.term], abi.term, reg(abi, "box_bool_i1", [check]))
+        fun(abi, "shape_#{name}", [v: abi.term], abi.term, box(abi, :bool_i1, check))
       end
 
-    memory =
-      Enum.flat_map([{"slot", abi.term}, {"word", :i64}], fn {name, type} ->
-        memory_accessors("#{abi.prefix}load_#{name}", "#{abi.prefix}store_#{name}", type)
-      end)
+    negations =
+      for {prefix, types} <- [{"scalar", [abi.term]}, {"try_int", [abi.term, :i1]}] do
+        body = reg(abi, "#{prefix}_sub", [box(abi, :int, int(0)), :a], types)
+        fun(abi, "#{prefix}_neg", [a: abi.term], types, body)
+      end
 
-    simple ++ boxes ++ fields ++ shapes ++ memory
+    simple ++ negations ++ boxes ++ fields ++ shapes
   end
 
   defp byte_spec(abi) do
@@ -178,9 +146,9 @@ defmodule Beaver.MLIR.Template.Registers do
       address = arith("addi", field(view, 1), offset)
       byte = cast("extui", val("llvm.load", [val("llvm.inttoptr", [address], :ptr)], :i8), :i64)
 
-      branches(b, valid, [reg(abi, "box_int", [byte]), reg(abi, "box_bool", [int(1)])], [
-        reg(abi, "box_int", [int(0)]),
-        reg(abi, "box_bool", [int(0)])
+      branches(b, valid, [box(abi, :int, byte), box(abi, :bool, int(1))], [
+        box(abi, :int, int(0)),
+        box(abi, :bool, int(0))
       ])
     end)
   end
@@ -230,7 +198,7 @@ defmodule Beaver.MLIR.Template.Registers do
 
     {values, safe, b} = signed_binary(b, recipe.operation, x, y, recipe.checked?)
     {ok, b} = if recipe.checked?, do: B.emit(b, all([ints, safe])), else: {nil, b}
-    fast = Enum.map(values, &reg(abi, if(recipe.family == :cmp, do: "box_bool_i1", else: "box_int"), [&1]))
+    fast = Enum.map(values, &box(abi, if(recipe.family == :cmp, do: :bool_i1, else: :int), &1))
     valid = if recipe.try?, do: [ok], else: []
     if recipe.fallback?, do: math_fallback(abi, recipe, b, {x, y}, {fast, ok, valid}), else: ret(b, fast ++ valid)
   end
@@ -241,15 +209,12 @@ defmodule Beaver.MLIR.Template.Registers do
         do: "#{abi.runtime_prefix}_cmp_slow_" <> String.replace_prefix(recipe.name, "cmp_", ""),
         else: "#{abi.runtime_prefix}_int_slow_#{recipe.name}"
 
+    args = if recipe.unboxed?, do: [box(abi, :int, x), box(abi, :int, y)], else: [:a, :b]
+
     slow =
       if recipe.try?,
-        do: List.duplicate(reg(abi, "box_int", [int(0)]), length(recipe.types)),
-        else:
-          call(
-            slow_name,
-            if(recipe.unboxed?, do: [reg(abi, "box_int", [x]), reg(abi, "box_int", [y])], else: [:a, :b]),
-            recipe.types
-          )
+        do: List.duplicate(box(abi, :int, int(0)), length(recipe.types)),
+        else: call(slow_name, args, recipe.types)
 
     b = B.end_block(b, {:cond_br, ok, :yes, :no}) |> B.start_block(:yes) |> ret(fast ++ valid) |> B.start_block(:no)
     {slow, b} = B.emit(b, slow)
@@ -284,16 +249,13 @@ defmodule Beaver.MLIR.Template.Registers do
           i <- indices,
           do: fun(abi, "state_#{type}_#{i}", [state: :ptr], type, state_load(abi, i, type))
 
-    reads ++
-      for i <- [4, 5, 6, 9],
-          do:
-            fun(
-              abi,
-              "set_state_i64_#{i}",
-              [state: :ptr, val: :i64],
-              [],
-              &ret(store(&1, state_ptr(abi, i), :val), [])
-            )
+    writes =
+      for i <- [4, 5, 6, 9] do
+        body = &ret(store(&1, state_ptr(abi, i), :val), [])
+        fun(abi, "set_state_i64_#{i}", [state: :ptr, val: :i64], [], body)
+      end
+
+    reads ++ writes
   end
 
   def runtime_source(abi) do
@@ -307,11 +269,8 @@ defmodule Beaver.MLIR.Template.Registers do
           "llvm.passthrough": {:parse, if(name == "cold", do: ~s(["noinline", "cold"]), else: ~s(["noinline"]))}
         ]
 
-        Map.put(
-          fun(abi, "#{abi.runtime_prefix}_#{name}", @runtime_inputs, :i32, indirect(callee, args)),
-          :attributes,
-          attrs
-        )
+        spec = fun(abi, "#{abi.runtime_prefix}_#{name}", @runtime_inputs, :i32, indirect(callee, args))
+        Map.put(spec, :attributes, attrs)
       end
 
     "module {\n" <> source(specs) <> "\n}"
@@ -327,12 +286,8 @@ defmodule Beaver.MLIR.Template.Registers do
 
       {status, b} = B.emit(b, host(abi.services.checkpoint))
 
-      b =
-        store(
-          b,
-          gep(:ckpt, int(0), :i64),
-          select(cmp(:ugt, fuel, int(abi.quantum)), arith("subi", fuel, int(abi.quantum)), int(0))
-        )
+      checkpoint = select(cmp(:ugt, fuel, int(abi.quantum)), arith("subi", fuel, int(abi.quantum)), int(0))
+      b = store(b, gep(:ckpt, int(0), :i64), checkpoint)
 
       b =
         B.end_block(b, {:cond_br, cmp(:eq, status, int(0, :i32)), :go, :stop})
@@ -341,10 +296,6 @@ defmodule Beaver.MLIR.Template.Registers do
 
       ret(B.start_block(b, :stop), int(0, :i1))
     end)
-  end
-
-  defp view_specs(abi) do
-    for checked? <- [false, true], do: view_spec(abi, checked?)
   end
 
   defp view_spec(abi, checked?) do
@@ -380,14 +331,8 @@ defmodule Beaver.MLIR.Template.Registers do
       b = next(b, :join, [m0, m1, m2], :join, j0: :i64, j1: :i64, j2: :i64)
       {offset, b} = B.emit(b, select(cursor, arith("shrui", w0, int(abi.cursor_shift)), int(0)))
 
-      ret(
-        b,
-        pack(abi, [
-          cast("extui", all([cmp(:ule, offset, :j2), cmp(:eq, :j0, int(1))]), :i64),
-          arith("addi", :j1, offset),
-          arith("subi", :j2, offset)
-        ])
-      )
+      valid = cast("extui", all([cmp(:ule, offset, :j2), cmp(:eq, :j0, int(1))]), :i64)
+      ret(b, pack(abi, [valid, arith("addi", :j1, offset), arith("subi", :j2, offset)]))
     end)
   end
 
@@ -397,7 +342,7 @@ defmodule Beaver.MLIR.Template.Registers do
 
     fun(abi, "try_binary", inputs, [abi.term, abi.term, abi.term, :i1], fn b ->
       {empty, b} = B.emit(b, reg(abi, "box_empty", []))
-      {[yes, no], b} = B.emit(b, [reg(abi, "box_bool", [int(1)]), reg(abi, "box_bool", [int(0)])])
+      {[yes, no], b} = B.emit(b, [box(abi, :bool, int(1)), box(abi, :bool, int(0))])
       child = arith("ori", cmp(:eq, :op, int(4, :i32)), cmp(:eq, :op, int(5, :i32)), :i1)
       b = B.end_block(b, {:cond_br, child, :child, :position}) |> B.start_block(:child)
       args = Keyword.keys(view_inputs(abi))
@@ -421,20 +366,17 @@ defmodule Beaver.MLIR.Template.Registers do
 
       b = B.guard(b, valid, :fast, :bad)
 
-      arms =
-        Enum.with_index(~w(shape shape load size load child_result load load load tail load)a, fn name, i ->
-          {i, name}
-        end)
+      arms = Enum.with_index(~w(shape shape load size load child_result load load load tail load)a, &{&2, &1})
 
       b = B.switch(b, :op, :i32, :bad, arms)
 
       results = [
         shape: [yes],
-        size: [reg(abi, "box_int", [size])],
+        size: [box(abi, :int, size)],
         child_result: [reg(abi, "binary_cursor", [:input, int(1)])],
         tail: [
           reg(abi, "binary_cursor", [:input, offset]),
-          reg(abi, "box_int", [arith("shli", size, int(3))]),
+          box(abi, :int, arith("shli", size, int(3))),
           yes
         ]
       ]
@@ -442,26 +384,23 @@ defmodule Beaver.MLIR.Template.Registers do
       b = Enum.reduce(results, b, fn {name, values}, b -> binary_return(B.start_block(b, name), values, empty) end)
       {[byte, ptr], b} = B.emit(B.start_block(b, :load), reg(abi, "load_byte_at", [address, offset], [:i64, :ptr]))
       b = B.switch(b, :op, :i32, :number, [{2, :expected}, {6, :byte}, {8, :integer}, {10, :utf8}])
-      number = reg(abi, "box_int", [byte])
+      number = box(abi, :int, byte)
 
       results = [
-        expected: [reg(abi, "box_bool_i1", [cmp(:eq, byte, :expected)])],
+        expected: [box(abi, :bool_i1, cmp(:eq, byte, :expected))],
         number: [number],
         byte: [number, yes],
-        integer: [number, reg(abi, "box_int", [arith("addi", at, int(8))]), yes]
+        integer: [number, box(abi, :int, arith("addi", at, int(8))), yes]
       ]
 
       b = Enum.reduce(results, b, fn {name, values}, b -> binary_return(B.start_block(b, name), values, empty) end)
 
-      {[cp, used, valid], b} =
-        B.emit(
-          B.start_block(b, :utf8),
-          reg(abi, "utf8_decode", [byte, ptr, arith("subi", size, offset)], [:i64, :i64, :i1])
-        )
+      decode = reg(abi, "utf8_decode", [byte, ptr, arith("subi", size, offset)], [:i64, :i64, :i1])
+      {[cp, used, valid], b} = B.emit(B.start_block(b, :utf8), decode)
 
       b =
         B.guard(b, valid, :decoded, :bad)
-        |> binary_return([reg(abi, "box_int", [cp]), reg(abi, "box_int", [arith("addi", at, used)]), yes], empty)
+        |> binary_return([box(abi, :int, cp), box(abi, :int, arith("addi", at, used)), yes], empty)
 
       b = B.start_block(b, :bad) |> B.end_block({:cond_br, cmp(:ule, :op, int(2, :i32)), :false_shape, :bad_byte})
       b = binary_return(B.start_block(b, :false_shape), [no], empty)
@@ -469,7 +408,7 @@ defmodule Beaver.MLIR.Template.Registers do
       b =
         B.start_block(b, :bad_byte) |> B.end_block({:cond_br, cmp(:eq, :op, int(6, :i32)), :false_byte, :fallback})
 
-      b = binary_return(B.start_block(b, :false_byte), [reg(abi, "box_int", [int(0)]), no], empty)
+      b = binary_return(B.start_block(b, :false_byte), [box(abi, :int, int(0)), no], empty)
       ret(B.start_block(b, :fallback), [empty, empty, empty, int(0, :i1)])
     end)
   end
@@ -478,26 +417,30 @@ defmodule Beaver.MLIR.Template.Registers do
     do: ret(b, values ++ List.duplicate(empty, 3 - length(values)) ++ [int(1, :i1)])
 
   def inline_source(abi) do
+    helpers = for arity <- 0..4, do: {"helper_#{arity}", ["i64", "i64"] ++ List.duplicate(abi.term, arity), 1}
+    shapes = for kind <- abi.heap_shapes, do: {"shape_#{kind}", [abi.term, "i64"], 1}
+
+    bits = [
+      bits_start: {0, 1},
+      bits_finish: {2, 1},
+      read_bits_2: {2, 3},
+      read_bits_3: {3, 3},
+      append_bits_3: {3, 2},
+      append_bits_4: {4, 2}
+    ]
+
+    bits = for {name, {ins, outs}} <- bits, do: {to_string(name), List.duplicate(abi.term, ins), outs}
+
     forwards =
-      for(
-        arity <- 0..4,
-        do:
-          {"helper_#{arity}", "#{abi.runtime_prefix}_guest_helper_#{arity}",
-           ["i64", "i64"] ++ List.duplicate(abi.term, arity), 1}
-      ) ++
-        for(
-          kind <- abi.heap_shapes,
-          do: {"shape_#{kind}", "#{abi.runtime_prefix}_shape_#{kind}", [abi.term, "i64"], 1}
-        ) ++
-        for {name, {ins, outs}} <- [
-              bits_start: {0, 1},
-              bits_finish: {2, 1},
-              read_bits_2: {2, 3},
-              read_bits_3: {3, 3},
-              append_bits_3: {3, 2},
-              append_bits_4: {4, 2}
-            ],
-            do: {to_string(name), "#{abi.runtime_prefix}_#{name}", List.duplicate(abi.term, ins), outs}
+      for {name, types, count} <- helpers ++ shapes ++ bits do
+        callee = if String.starts_with?(name, "helper_"), do: "guest_" <> name, else: name
+        forward(abi.prefix <> name, "#{abi.runtime_prefix}_#{callee}", types, List.duplicate(abi.term, count))
+      end
+
+    memory =
+      Enum.flat_map([{"slot", abi.term}, {"word", :i64}], fn {name, type} ->
+        memory_accessors("#{abi.prefix}load_#{name}", "#{abi.prefix}store_#{name}", type)
+      end)
 
     runtime = {~w(!llvm.ptr i64 i64 !llvm.ptr !llvm.ptr), ["i32"]}
 
@@ -518,19 +461,11 @@ defmodule Beaver.MLIR.Template.Registers do
             )
 
     specs =
-      Enum.flat_map(
-        [
-          fn -> core_specs(abi) end,
-          fn -> math_specs(abi) end,
-          fn -> state_specs(abi) end,
-          fn -> view_specs(abi) end
-        ],
-        & &1.()
-      ) ++
-        [budget_spec(abi), utf8_decoder("#{abi.prefix}utf8_decode"), binary_spec(abi)] ++
-        Enum.map(forwards, fn {name, callee, types, count} ->
-          forward(abi.prefix <> name, callee, types, List.duplicate(abi.term, count))
-        end)
+      core_specs(abi) ++
+        math_specs(abi) ++
+        state_specs(abi) ++
+        Enum.map([false, true], &view_spec(abi, &1)) ++
+        [budget_spec(abi), utf8_decoder("#{abi.prefix}utf8_decode"), binary_spec(abi)] ++ memory ++ forwards
 
     IO.iodata_to_binary(["module {\n", source(specs ++ wrappers, declarations), "}\n"])
   end

@@ -163,6 +163,11 @@ defmodule Beaver.BttDrivenRefactoringTest do
         shards2 = LLVMIR.compile_functions!(module, cache_dir: tmp_dir, opt_level: 2)
         assert Enum.all?(shards2, & &1.cached?)
         assert Enum.map(shards1, & &1.digest) == Enum.map(shards2, & &1.digest)
+        [object | _] = Path.wildcard(Path.join(tmp_dir, "objects/*/*.o"))
+        File.write!(object, "corrupt")
+        recovered = LLVMIR.compile_functions!(module, cache_dir: tmp_dir, opt_level: 2)
+        assert Enum.count(recovered, & &1.cached?) == 1
+        assert Enum.map(recovered, & &1.object) == Enum.map(shards1, & &1.object)
         File.rm_rf!(tmp_dir)
       end)
     end
