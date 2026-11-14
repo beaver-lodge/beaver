@@ -86,6 +86,10 @@ MLIR context. See [context ownership](guides/architecture.md#context-ownership).
   [core API migration](guides/core-api-migration.md),
   [API reference](https://hexdocs.pm/beaver).
 
+## Related projects
+
+[Kinda](https://github.com/beaver-lodge/kinda) supplies the Zig/Elixir binding framework used by Beaver. [Sluice](https://github.com/batata-lang/sluice) builds a Batata compiler provider on Beaver. The [Batata Compiler organization](https://github.com/batata-lang) groups frontend, compiler, ABI and runtime work; Beaver remains a general MLIR toolkit.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for development, testing, and release
