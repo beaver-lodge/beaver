@@ -20,6 +20,9 @@ MLIR_CAPI_EXPORTED size_t beaverStringRefGetLength(MlirStringRef string_ref);
 // Normalize MLIR's platform-sized structural hash to a width that can be represented safely by the BEAM NIF codec on
 // both 32-bit and 64-bit hosts.
 MLIR_CAPI_EXPORTED uint64_t beaverOperationStructuralHashValue(MlirOperation op, uint32_t flags);
+// Identity keys for analysis tables; valid only while the referenced IR remains alive.
+MLIR_CAPI_EXPORTED uint64_t beaverValueIdentity(MlirValue value);
+MLIR_CAPI_EXPORTED uint64_t beaverBlockIdentity(MlirBlock block);
 // Destroys a detached operation tree without recursively descending through nested regions. This keeps deeply nested
 // generated IR from overflowing the native stack during diagnostic cleanup.
 MLIR_CAPI_EXPORTED void beaverOperationDestroyIterative(MlirOperation operation);

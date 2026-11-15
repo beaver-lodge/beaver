@@ -25,7 +25,7 @@ defmodule Beaver.SSA.Scalar do
   defp fact(nil, _, _, _), do: nil
   defp fact(_, _, _, _), do: :any
   defp shape("boolean", {:boolean, _}), do: true
-  defp shape(k, {:boolean, b}) when k in ~w(true false) and is_boolean(b), do: b == (k == "true")
+  defp shape(k, {:boolean, b}) when k in ~w(true false), do: if(is_boolean(b), do: b == (k == "true"))
   defp shape(k, x), do: if(x != :any, do: k == "nil" and is_nil(x))
   defp jf(a, b, c, d, w), do: {:integer, ((w and c < a) && @lo) || min(a, c), ((w and d > b) && bnot(@lo)) || max(b, d)}
   defp join_f(a, b, _) when a == :bottom or b == :bottom or a == b, do: if(a == :bottom, do: b, else: a)

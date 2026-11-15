@@ -73,23 +73,13 @@ defmodule Beaver.Composer do
     pm
   end
 
-  defp add_pipeline(%MLIR.PassManager{} = pm, pipeline_str) when is_binary(pipeline_str),
-    do: pm |> mlirPassManagerGetAsOpPassManager() |> add_pipeline(pipeline_str)
-
-  # nested pm
   defp add_pass(pm, {op_name, passes}, ctx) when is_binary(op_name) and is_list(passes) do
-    npm =
-      case pm do
-        %MLIR.PassManager{} -> mlirPassManagerGetNestedUnder(pm, StringRef.create(op_name))
-        %MLIR.OpPassManager{} -> mlirOpPassManagerGetNestedUnder(pm, StringRef.create(op_name))
-      end
-
+    npm = mlirOpPassManagerGetNestedUnder(pm, StringRef.create(op_name))
     for pass <- passes, do: add_pass(npm, pass, ctx)
   end
 
   defp add_pass(pm, pipeline_str, _ctx) when is_binary(pipeline_str), do: add_pipeline(pm, pipeline_str)
   defp add_pass(%MLIR.OpPassManager{} = pm, pass, ctx), do: mlirOpPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
-  defp add_pass(%MLIR.PassManager{} = pm, pass, ctx), do: mlirPassManagerAddOwnedPass(pm, create_pass(pass, ctx))
   defp encode_convergence_failure_action(:warn), do: 0
   defp encode_convergence_failure_action(:error), do: 1
   defp encode_convergence_failure_action(:silent), do: 2
@@ -99,7 +89,8 @@ defmodule Beaver.Composer do
     pm = mlirPassManagerCreateOnOperation(ctx, StringRef.create(anchor))
 
     try do
-      for pass <- passes, do: add_pass(pm, pass, ctx)
+      root = mlirPassManagerGetAsOpPassManager(pm)
+      for pass <- passes, do: add_pass(root, pass, ctx)
       pm
     catch
       kind, reason ->
@@ -197,7 +188,12 @@ defmodule Beaver.Composer do
 
   defp run_native(%__MODULE__{op: op} = composer, opts) do
     print = Keyword.get(opts, :print)
-    pm = Beaver.Execution.Profile.measure(opts[:profile], :prepare, fn -> init(composer, opts) end)
+
+    pm =
+      Beaver.Execution.Profile.measure(opts[:profile], :prepare, fn ->
+        init(composer, opts, Operation.name(Operation.from_module(op)))
+      end)
+
     # Local-scope printing does not require changing the shared context's
     # threading configuration (which also changes its locking mode).
     if print, do: MLIR.PassManager.enable_ir_printing(pm)
@@ -225,11 +221,7 @@ defmodule Beaver.Composer do
     if timing, do: pm |> mlirPassManagerEnableTiming()
     :ok = MLIR.PassManager.enable_verifier(pm, verifier)
 
-    if debug do
-      txt = pm |> MLIR.to_string()
-      txt = "[pass pipeline] " <> txt
-      txt |> Logger.info()
-    end
+    if debug, do: Logger.info("[pass pipeline] " <> MLIR.to_string(pm))
 
     pm
   end

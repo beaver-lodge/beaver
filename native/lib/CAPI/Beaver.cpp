@@ -29,6 +29,8 @@
 #include <unordered_set>
 #include <vector>
 using namespace mlir;
+MLIR_CAPI_EXPORTED uint64_t beaverValueIdentity(MlirValue value) { return reinterpret_cast<uintptr_t>(value.ptr); }
+MLIR_CAPI_EXPORTED uint64_t beaverBlockIdentity(MlirBlock block) { return reinterpret_cast<uintptr_t>(block.ptr); }
 MLIR_CAPI_EXPORTED bool beaverContextIsMultithreadingEnabled(MlirContext context) {
   return unwrap(context)->isMultithreadingEnabled();
 }

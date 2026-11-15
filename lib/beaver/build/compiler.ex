@@ -134,11 +134,11 @@ defmodule Beaver.Build.Compiler do
         digest = if dependencies == [], do: base, else: key.({function, dependencies})
         name = config.unit_prefix <> digest
         symbols = Enum.map(dependencies, &elem(&1, 1))
+        function = Map.put(function, "leaf_symbol", config.unit_prefix <> base <> "_leaf")
         {function["identity"], digest, &config.builder.build_unit_module!(&1, function, name, leaves, symbols)}
       end)
 
-    keys = Enum.map(units, &elem(&1, 1))
-    names = Enum.map(keys, &(config.unit_prefix <> &1))
+    {names, keys} = Enum.unzip(Enum.map(units, fn {_, key, _} -> {config.unit_prefix <> key, key} end))
     dispatch = {"dispatch", key.({symbol, keys}), &config.builder.build_dispatch_module!(&1, symbol, names, leaves)}
     options = Keyword.put_new(opts, :max_concurrency, System.schedulers_online())
     compiled = LLVMIR.compile_units!(units ++ [dispatch], unit_options(config, cache, options))
@@ -150,6 +150,11 @@ defmodule Beaver.Build.Compiler do
       target: target_descriptor(),
       profile: to_string(profile),
       elapsed_ms: elapsed(start),
+      analysis:
+        if(function_exported?(config.analysis, :compilation_summary, 1),
+          do: Enum.map(functions, &{&1["identity"], config.analysis.compilation_summary(&1)}) |> Map.new(),
+          else: %{}
+        ),
       units: Enum.map(compiled, &[&1.id, unit_report(&1, 0.0)]),
       objects: compiled |> Enum.map(& &1.path) |> Enum.uniq()
     }

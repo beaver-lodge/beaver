@@ -27,7 +27,9 @@ defmodule Beaver.MLIR.Template.Registers do
 
       use Beaver.MLIR.Template.Library,
         libraries: [inline: :private, runtime: :preserve],
-        dependencies: [unquote(__MODULE__), @registers.runtime, CABI, CABI.Provider, Builder, Expressions, IRBatch],
+        dependencies:
+          [unquote(__MODULE__), @registers.runtime, CABI, CABI.Provider, Builder, Expressions, IRBatch] ++
+            List.wrap(@registers[:extra_templates]),
         signatures: &signature_symbol?/1,
         templates: &template_symbol?/2
 
@@ -51,6 +53,14 @@ defmodule Beaver.MLIR.Template.Registers do
     end)
   end
 
+  defp cursor_offset(abi, value),
+    do:
+      select(
+        cmp(:eq, tag(abi, value), int(abi.tags.cursor)),
+        arith("shrui", field(value, 0), int(abi.cursor_shift)),
+        int(0)
+      )
+
   defp core_specs(abi) do
     intrinsic = call("#{abi.runtime_prefix}_intrinsic_call", [:state, :index, :args, :outputs], :i32)
 
@@ -60,14 +70,7 @@ defmodule Beaver.MLIR.Template.Registers do
       fun(abi, "suspend", [s: :i32], :i32, :s),
       fun(abi, "intrinsic", [state: :ptr, index: :i64, args: :ptr, outputs: :ptr], :i32, intrinsic),
       fun(abi, "binary_cursor", [bin: abi.term, delta: :i64], abi.term, fn b ->
-        {w0, b} = B.emit(b, field(:bin, 0))
-
-        offset =
-          select(
-            cmp(:eq, arith("andi", w0, int(abi.tag_mask)), int(abi.tags.cursor)),
-            arith("shrui", w0, int(abi.cursor_shift)),
-            int(0)
-          )
+        {offset, b} = B.emit(b, cursor_offset(abi, :bin))
 
         advanced = arith("shli", arith("addi", offset, :delta), int(abi.cursor_shift))
         cursor = arith("ori", advanced, int(abi.tags.cursor))
@@ -84,11 +87,19 @@ defmodule Beaver.MLIR.Template.Registers do
         falsy = arith("ori", false?, cmp(:eq, t, int(abi.tags.nil)), :i1)
         ret(b, box(abi, :bool_i1, arith("xori", falsy, int(1, :i1), :i1)))
       end),
+      fun(abi, "byte", [bin: abi.term], [abi.term, abi.term], fn b ->
+        {offset, b} = B.emit(b, cursor_offset(abi, :bin))
+        {view, b} = B.emit(b, call("#{abi.runtime_prefix}_binary_view", [:bin], abi.term))
+        valid = all([cmp(:ne, field(view, 0), int(0)), cmp(:ult, offset, field(view, 2))])
+        b = B.guard(b, valid, :load, :empty)
+        {[byte, _], b} = B.emit(b, reg(abi, "load_byte_at", [field(view, 1), offset], [:i64, :ptr]))
+        b = ret(b, [box(abi, :int, byte), box(abi, :bool, int(1))])
+        ret(B.start_block(b, :empty), [box(abi, :int, int(0)), box(abi, :bool, int(0))])
+      end),
       fun(abi, "load_byte_at", [base_i64: :i64, off: :i64], [:i64, :ptr], fn b ->
         {ptr, b} = B.emit(b, gep(val("llvm.inttoptr", [:base_i64], :ptr), :off, :i8))
         ret(b, [cast("extui", val("llvm.load", [ptr], :i8), :i64), ptr])
-      end),
-      byte_spec(abi)
+      end)
     ]
 
     boxes =
@@ -124,33 +135,6 @@ defmodule Beaver.MLIR.Template.Registers do
       end
 
     simple ++ negations ++ boxes ++ fields ++ shapes
-  end
-
-  defp byte_spec(abi) do
-    fun(abi, "byte", [bin: abi.term], [abi.term, abi.term], fn b ->
-      {w0, b} = B.emit(b, field(:bin, 0))
-      {t, b} = B.emit(b, arith("andi", w0, int(abi.tag_mask)))
-
-      {offset, b} =
-        B.emit(b, select(cmp(:eq, t, int(abi.tags.cursor)), arith("shrui", w0, int(abi.cursor_shift)), int(0)))
-
-      {view, b} = B.emit(b, call("#{abi.runtime_prefix}_binary_view", [:bin], abi.term))
-
-      valid =
-        all([
-          arith("ori", cmp(:eq, t, int(abi.tags.heap)), cmp(:eq, t, int(abi.tags.cursor)), :i1),
-          cmp(:ne, field(view, 0), int(0)),
-          cmp(:ult, offset, field(view, 2))
-        ])
-
-      address = arith("addi", field(view, 1), offset)
-      byte = cast("extui", val("llvm.load", [val("llvm.inttoptr", [address], :ptr)], :i8), :i64)
-
-      branches(b, valid, [box(abi, :int, byte), box(abi, :bool, int(1))], [
-        box(abi, :int, int(0)),
-        box(abi, :bool, int(0))
-      ])
-    end)
   end
 
   defp math_specs(abi) do
@@ -467,6 +451,7 @@ defmodule Beaver.MLIR.Template.Registers do
         Enum.map([false, true], &view_spec(abi, &1)) ++
         [budget_spec(abi), utf8_decoder("#{abi.prefix}utf8_decode"), binary_spec(abi)] ++ memory ++ forwards
 
-    IO.iodata_to_binary(["module {\n", source(specs ++ wrappers, declarations), "}\n"])
+    extra = if provider = Map.get(abi, :extra_templates), do: provider.specs(abi), else: []
+    IO.iodata_to_binary(["module {\n", source(specs ++ extra ++ wrappers, declarations), "}\n"])
   end
 end

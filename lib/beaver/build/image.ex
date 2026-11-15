@@ -69,7 +69,7 @@ defmodule Beaver.Build.Image do
           "compiler" => input.compiler,
           "source" => input.source,
           "artifact" => artifact,
-          "programs" => analysis.programs
+          "programs" => Map.get(policy, :export, &Function.identity/1).(analysis.programs)
         })
 
     artifacts = if name = artifact["library"], do: [{name, artifact["sha256"]}], else: []
