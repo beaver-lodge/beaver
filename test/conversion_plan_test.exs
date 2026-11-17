@@ -23,6 +23,48 @@ defmodule Beaver.MLIR.ConversionPlanTest do
   alias Beaver.MLIR.ConversionPlanNativePatterns
   import Beaver.ConversionHelpers
 
+  test "1:N conversion preserves switch case and default operand groups", %{ctx: ctx} do
+    source = "!llvm.struct<(i64, f32)>"
+    pair = Type.get(source, ctx: ctx)
+    fields = [Type.i64(ctx: ctx), Type.f32(ctx: ctx)]
+
+    module =
+      MLIR.Module.create!(
+        """
+        module {
+          func.func private @bounce(%p: #{source}) -> #{source} {
+            return %p : #{source}
+          }
+          func.func @route(%flag: i32, %pair: #{source}) -> #{source} {
+            %called = call @bounce(%pair) : (#{source}) -> #{source}
+            cf.switch %flag : i32, [default: ^default(%called : #{source}), 0: ^zero(%pair, %called : #{source}, #{source})]
+          ^default(%a: #{source}):
+            return %a : #{source}
+          ^zero(%b: #{source}, %c: #{source}):
+            return %c : #{source}
+          }
+        }
+        """,
+        ctx: ctx
+      )
+
+    MLIR.Module.with_module(module, fn module ->
+      Plan.new()
+      |> Plan.add_legal_dialects(~w(builtin llvm arith))
+      |> Plan.add_1_to_n_conversion(fn t -> if MLIR.equal?(t, pair), do: fields, else: [t] end,
+        version: "switch-fields"
+      )
+      |> Plan.add_structural_type_conversions([:func, :cf])
+      |> Plan.run!(module)
+
+      MLIR.verify!(module)
+      text = MLIR.to_string(module)
+      assert text =~ "i32, %arg1: i64, %arg2: f32"
+      assert text =~ "i64, f32, i64, f32"
+      refute text =~ "!llvm.struct"
+    end)
+  end
+
   test "lowers a Slang dialect using Plan and reuses the Plan across fresh MLIR contexts" do
     plan =
       Plan.new(mode: :full, folding_mode: :after_patterns, build_materializations: true, timeout: 5000)

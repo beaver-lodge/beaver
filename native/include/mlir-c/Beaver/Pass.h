@@ -12,6 +12,8 @@ extern "C" {
 MLIR_CAPI_EXPORTED MlirPass beaverCreateNoopPass(void);
 MLIR_CAPI_EXPORTED void beaverPassManagerTrackExecution(MlirPassManager passManager);
 MLIR_CAPI_EXPORTED MlirPass beaverCreateStaticMemoryPlannerPass(bool callerArena, bool bestFit);
+/// Hoists speculatable, memory-effect-free operations from natural CFG loops.
+MLIR_CAPI_EXPORTED MlirPass beaverCreateCFGLoopInvariantCodeMotionPass(void);
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetArgument(MlirPass pass);
 MLIR_CAPI_EXPORTED MlirStringRef beaverPassGetName(MlirPass pass);
 /// Builds a structured inner pipeline without requiring callers to serialize MLIR's textual pass-pipeline grammar.

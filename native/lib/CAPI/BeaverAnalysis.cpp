@@ -1,8 +1,11 @@
 #include "mlir-c/Beaver/Analysis.h"
+#include "mlir-c/Beaver/Pass.h"
 #include "mlir/CAPI/IR.h"
+#include "mlir/CAPI/Pass.h"
 #include "mlir/CAPI/Rewrite.h"
 #include "mlir/CAPI/Support.h"
 #include "mlir/Analysis/Liveness.h"
+#include "mlir/Analysis/CFGLoopInfo.h"
 #include "mlir/Analysis/DataLayoutAnalysis.h"
 #include "mlir/Dialect/Arith/IR/Arith.h"
 #include "mlir/Dialect/ControlFlow/IR/ControlFlowOps.h"
@@ -20,13 +23,65 @@
 #include "mlir/Interfaces/DataLayoutInterfaces.h"
 #include "mlir/Interfaces/FunctionInterfaces.h"
 #include "mlir/Interfaces/InferTypeOpInterface.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/Pass/AnalysisManager.h"
+#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/ADT/ScopeExit.h"
 #include "llvm/ADT/SmallBitVector.h"
+#include "llvm/ADT/SetVector.h"
 #include "llvm/Support/JSON.h"
 using namespace mlir;
 namespace {
+struct CFGLoopInvariantCodeMotion : PassWrapper<CFGLoopInvariantCodeMotion, OperationPass<func::FuncOp>> {
+  MLIR_DEFINE_EXPLICIT_INTERNAL_INLINE_TYPE_ID(CFGLoopInvariantCodeMotion)
+  StringRef getArgument() const override { return "beaver-cfg-licm"; }
+  void getDependentDialects(DialectRegistry &registry) const override { registry.insert<cf::ControlFlowDialect>(); }
+  void runOnOperation() override {
+    auto func = getOperation();
+    if (func.isExternal() || func.getBody().hasOneBlock()) return;
+    DominanceInfo dominance(func);
+    CFGLoopInfo loops(dominance.getDomTree(&func.getBody()));
+    auto order = loops.getLoopsInPreorder();
+    for (CFGLoop *loop : llvm::reverse(order)) {
+      Block *header = loop->getHeader(), *preheader = loop->getLoopPreheader();
+      if (!preheader) {
+        if (header->isEntryBlock()) {
+          preheader = new Block();
+          for (BlockArgument arg : header->getArguments()) preheader->addArgument(arg.getType(), arg.getLoc());
+          func.getBody().getBlocks().push_front(preheader);
+        } else {
+          preheader = new Block();
+          for (BlockArgument arg : header->getArguments()) preheader->addArgument(arg.getType(), arg.getLoc());
+          func.getBody().getBlocks().insert(header->getIterator(), preheader);
+          for (BlockOperand &use : llvm::make_early_inc_range(header->getUses()))
+            if (!loop->contains(use.getOwner()->getBlock())) use.set(preheader);
+        }
+        OpBuilder builder(preheader, preheader->end());
+        cf::BranchOp::create(builder, func.getLoc(), header, preheader->getArguments());
+        if (CFGLoop *parent = loop->getParentLoop()) parent->addBasicBlockToLoop(preheader, loops);
+        dominance.invalidate();
+      }
+      SmallVector<Operation *, 32> queue;
+      DenseSet<Operation *> queued;
+      for (Block *block : loop->getBlocks())
+        for (Operation &op : *block)
+          if (queued.insert(&op).second) queue.push_back(&op);
+      for (size_t idx = 0; idx < queue.size(); ++idx) {
+        Operation *op = queue[idx];
+        queued.erase(op);
+        if (!loop->contains(op->getBlock()) || op->getNumRegions() || op->hasTrait<OpTrait::IsTerminator>() || !isPure(op))
+          continue;
+        if (!llvm::all_of(op->getOperands(), [&](Value v) {
+              return !loop->contains(v.getParentBlock()) && dominance.dominates(v, preheader->getTerminator());
+            })) continue;
+        op->moveBefore(preheader->getTerminator());
+        for (Operation *user : op->getUsers())
+          if (loop->contains(user->getBlock()) && queued.insert(user).second) queue.push_back(user);
+      }
+    }
+  }
+};
 struct Session {
   Operation *root;
   ModuleAnalysisManager analyses;
@@ -47,6 +102,7 @@ bool hasLayout(Type type, DenseSet<Type> &visiting) {
   return type.isIntOrIndexOrFloat() || isa<DataLayoutTypeInterface>(type);
 }
 }
+MlirPass beaverCreateCFGLoopInvariantCodeMotionPass() { return wrap(new CFGLoopInvariantCodeMotion()); }
 void *beaverAnalysisCreate(MlirOperation root) { return new Session(unwrap(root)); }
 void beaverAnalysisDestroy(void *session) { delete static_cast<Session *>(session); }
 void beaverAnalysisInvalidate(void *session, unsigned preserved) {
@@ -233,6 +289,40 @@ extern "C" MLIR_CAPI_EXPORTED MlirType beaverConvertCompositeType(
   return wrap(replacer.replace(unwrap(type)));
 }
 namespace {
+struct SwitchTypeConversion : public OpConversionPattern<cf::SwitchOp> {
+  using OpConversionPattern::OpConversionPattern;
+  LogicalResult matchAndRewrite(cf::SwitchOp op, OneToNOpAdaptor adaptor,
+                                ConversionPatternRewriter &rewriter) const override {
+    if (adaptor.getFlag().size() != 1) return failure();
+    auto flatten = [](auto ranges) {
+      SmallVector<Value> values;
+      for (ValueRange range : ranges) llvm::append_range(values, range);
+      return values;
+    };
+    auto convertDest = [&](Block *block, ValueRange expected) -> FailureOr<Block *> {
+      if (block->isEntryBlock() || block->getArgumentTypes() == expected.getTypes()) return block;
+      auto conv = getTypeConverter()->convertBlockSignature(block);
+      if (!conv || expected.getTypes() != conv->getConvertedTypes()) return failure();
+      return rewriter.applySignatureConversion(block, *conv, getTypeConverter());
+    };
+    auto defaults = flatten(adaptor.getDefaultOperands());
+    auto defaultDest = convertDest(op.getDefaultDestination(), defaults);
+    if (failed(defaultDest)) return failure();
+    SmallVector<SmallVector<Value>> cases;
+    SmallVector<Block *> caseDests;
+    for (auto [dest, ranges] : llvm::zip(op.getCaseDestinations(), adaptor.getCaseOperands())) {
+      cases.push_back(flatten(ranges));
+      auto converted = convertDest(dest, cases.back());
+      if (failed(converted)) return failure();
+      caseDests.push_back(*converted);
+    }
+    SmallVector<ValueRange> operands;
+    for (auto &values : cases) operands.push_back(values);
+    rewriter.replaceOpWithNewOp<cf::SwitchOp>(op, adaptor.getFlag().front(), *defaultDest,
+                                            defaults, op.getCaseValuesAttr(), caseDests, operands);
+    return success();
+  }
+};
 struct FuncRegionSignatureConversion : public OpConversionPattern<func::FuncOp> {
   using OpConversionPattern::OpConversionPattern;
   LogicalResult matchAndRewrite(func::FuncOp op, OpAdaptor, ConversionPatternRewriter &rewriter) const override {
@@ -276,6 +366,7 @@ extern "C" MLIR_CAPI_EXPORTED void beaverPopulateStructuralTypeConversions(
     convTarget.addDynamicallyLegalOp<LLVM::ReturnOp>([tcPtr](LLVM::ReturnOp op) { return tcPtr->isLegal(op); });
   }
   if (domainMask & 2) {
+    patternSet.add<SwitchTypeConversion>(tc, patternSet.getContext(), 2);
     populateBranchOpInterfaceTypeConversionPattern(patternSet, tc);
     cf::populateCFStructuralTypeConversionsAndLegality(tc, patternSet, convTarget);
   }

@@ -14,6 +14,48 @@ defmodule AnalysisAndRewriteUtilitiesTest do
     {func, Enum.to_list(Beaver.Walker.blocks(region))}
   end
 
+  test "CFG LICM merges loop entries and preserves conditional failures and memory effects", %{ctx: ctx} do
+    module =
+      MLIR.Module.create!(
+        """
+        module {
+          func.func @loop(%choose: i1, %run: i1, %x: i64, %divisor: i64, %ptr: !llvm.ptr) -> i64 {
+            cf.cond_br %choose, ^left, ^right
+          ^left:
+            cf.br ^header(%x : i64)
+          ^right:
+            cf.br ^header(%divisor : i64)
+          ^header(%value: i64):
+            cf.cond_br %run, ^body, ^done
+          ^body:
+            %invariant = arith.muli %x, %x : i64
+            %chained = arith.addi %invariant, %x : i64
+            %quotient = arith.divsi %chained, %divisor : i64
+            llvm.store %quotient, %ptr : i64, !llvm.ptr
+            cf.br ^header(%quotient : i64)
+          ^done:
+            return %value : i64
+          }
+        }
+        """,
+        ctx: ctx
+      )
+
+    {func, [_, _, _, header, body, _]} = func_and_blocks(module)
+    [product, chained, quotient, store, _] = Enum.to_list(Beaver.Walker.operations(body))
+    func |> Beaver.Composer.append(MLIR.CAPI.beaverCreateCFGLoopInvariantCodeMotionPass()) |> Beaver.Composer.run!()
+    MLIR.verify!(module)
+    preheader = Operation.block(product)
+    assert MLIR.equal?(Operation.block(chained), preheader)
+    refute MLIR.equal?(preheader, body)
+    assert MLIR.equal?(Operation.block(quotient), body)
+    assert MLIR.equal?(Operation.block(store), body)
+    assert MLIR.equal?(Block.terminator(preheader) |> Beaver.Walker.successors() |> Enum.at(0), header)
+    DominanceInfo.with_info(func, fn info -> assert DominanceInfo.dominates?(info, preheader, header) end)
+    assert length(elem(func_and_blocks(module), 1)) == 7
+    MLIR.Module.destroy(module)
+  end
+
   test "analysis identities survive handle rereads and function passes use their own anchor", %{ctx: ctx} do
     module = control_flow_module(ctx)
     {func, [entry | _]} = func_and_blocks(module)
