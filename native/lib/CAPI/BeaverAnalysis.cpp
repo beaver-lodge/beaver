@@ -547,67 +547,42 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
     return LLVM::GEPOp::create(builder, loc, ptrType, i8Type, framePtr, ArrayRef<LLVM::GEPArg>{dynIdx})
         .getRes();
   };
-  // 1. Insert save operations immediately before each safepoint.
-  for (size_t i = 0; i < numSafepoints; ++i) {
-    Operation *sp = sps[i];
-    OpBuilder builder(sp);
-    Location loc = sp->getLoc();
-    for (size_t k = 0; k < coloring.liveAt[i].size(); ++k) {
-      if (useFramePtr) {
-        Value liveVal = coloring.liveAt[i][k];
-        if (liveVal.getType().isIndex()) {
-          liveVal = arith::IndexCastOp::create(builder, loc, builder.getI64Type(), liveVal);
-        }
-        Value slotPtr = buildSlotPtr(builder, loc, coloring.slotsAt[i][k]);
-        LLVM::StoreOp::create(builder, loc, liveVal, slotPtr);
-      } else {
-        OperationState saveState(loc, unwrap(saveOpName));
-        saveState.addOperands(coloring.liveAt[i][k]);
-        saveState.addAttribute("slot", builder.getI64IntegerAttr(coloring.slotsAt[i][k]));
-        saveState.addAttribute("safepoint", builder.getI64IntegerAttr(i + 1));
-        builder.create(saveState);
-      }
-    }
-  }
-  // 2. Split each safepoint block right after the safepoint op, keeping a temporary branch from preBlock to resumeBlock
-  // so dominance reflects the linear order.
-  SmallVector<Block *> preBlocks(numSafepoints);
-  SmallVector<Block *> resumeBlocks(numSafepoints);
-  for (size_t i = 0; i < numSafepoints; ++i) {
-    Operation *sp = sps[i];
-    Block *preBlock = sp->getBlock();
-    Block *resumeBlock = preBlock->splitBlock(std::next(Block::iterator(sp)));
-    preBlocks[i] = preBlock;
-    resumeBlocks[i] = resumeBlock;
-    OpBuilder builder = OpBuilder::atBlockEnd(preBlock);
-    cf::BranchOp::create(builder, sp->getLoc(), resumeBlock);
-  }
-  // 3. Insert reload operations at the start of each resumeBlock and rewrite dominated uses from the deepest safepoint
-  // back to the first.
-  DominanceInfo splitDom(func);
+  // Split with temporary branches so dominance still describes linear execution.
+  // Each live value uses the same slot and storage type for save and reload.
+  SmallVector<Block *> resumeBlocks;
   SmallVector<SmallVector<Value>> reloadedAt(numSafepoints);
-  for (size_t i = 0; i < numSafepoints; ++i) {
-    OpBuilder builder = OpBuilder::atBlockBegin(resumeBlocks[i]);
-    Location loc = sps[i]->getLoc();
-    for (size_t k = 0; k < coloring.liveAt[i].size(); ++k) {
-      Value origVal = coloring.liveAt[i][k];
+  for (auto [i, sp] : llvm::enumerate(sps)) {
+    Location loc = sp->getLoc();
+    Block *preBlock = sp->getBlock();
+    Block *resume = preBlock->splitBlock(std::next(Block::iterator(sp)));
+    resumeBlocks.push_back(resume);
+    OpBuilder save(sp), load = OpBuilder::atBlockBegin(resume);
+    for (auto [value, slot] : llvm::zip(coloring.liveAt[i], coloring.slotsAt[i])) {
+      Type type = value.getType();
+      Value loaded;
       if (useFramePtr) {
-        Type origType = origVal.getType();
-        Type loadType = origType.isIndex() ? Type(builder.getI64Type()) : origType;
-        Value slotPtr = buildSlotPtr(builder, loc, coloring.slotsAt[i][k]);
-        Value loaded = LLVM::LoadOp::create(builder, loc, loadType, slotPtr).getRes();
-        if (origType.isIndex()) { loaded = arith::IndexCastOp::create(builder, loc, origType, loaded); }
-        reloadedAt[i].push_back(loaded);
+        Type storage = type.isIndex() ? save.getI64Type() : type;
+        Value stored = type.isIndex() ? arith::IndexCastOp::create(save, loc, storage, value) : value;
+        LLVM::StoreOp::create(save, loc, stored, buildSlotPtr(save, loc, slot));
+        loaded = LLVM::LoadOp::create(load, loc, storage, buildSlotPtr(load, loc, slot));
+        if (type.isIndex()) loaded = arith::IndexCastOp::create(load, loc, type, loaded);
       } else {
-        OperationState loadState(loc, unwrap(loadOpName));
-        loadState.addTypes(origVal.getType());
-        loadState.addAttribute("slot", builder.getI64IntegerAttr(coloring.slotsAt[i][k]));
-        loadState.addAttribute("safepoint", builder.getI64IntegerAttr(i + 1));
-        Operation *loadOp = builder.create(loadState);
-        reloadedAt[i].push_back(loadOp->getResult(0));
+        OperationState storeState(loc, unwrap(saveOpName)), loadState(loc, unwrap(loadOpName));
+        for (auto *state : {&storeState, &loadState}) {
+          state->addAttribute("slot", save.getI64IntegerAttr(slot));
+          state->addAttribute("safepoint", save.getI64IntegerAttr(i + 1));
+        }
+        storeState.addOperands(value);
+        save.create(storeState);
+        loadState.addTypes(type);
+        loaded = load.create(loadState)->getResult(0);
       }
+      reloadedAt[i].push_back(loaded);
     }
+    save.setInsertionPointToEnd(preBlock);
+    cf::BranchOp::create(save, loc, resume);
   }
+  DominanceInfo splitDom(func);
   for (size_t rev = numSafepoints; rev > 0; --rev) {
     size_t i = rev - 1;
     Block *resumeBlock = resumeBlocks[i];
@@ -621,50 +596,35 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
       });
     }
   }
-  // 4. Replace the temporary branch + safepoint in each preBlock with a suspend return.
+  // Replace each temporary branch and safepoint with a suspend return.
   bool isLLVMFunc = isa<LLVM::LLVMFuncOp>(func);
   SmallVector<Type> funcResTypes;
   if (auto fnOp = dyn_cast<FunctionOpInterface>(func)) { llvm::append_range(funcResTypes, fnOp.getResultTypes()); }
   for (size_t i = 0; i < numSafepoints; ++i) {
     Operation *sp = sps[i];
     Location loc = sp->getLoc();
-    Operation *tempBr = preBlocks[i]->getTerminator();
+    Operation *tempBr = sp->getBlock()->getTerminator();
     OpBuilder builder(tempBr);
-    if (funcResTypes.size() == 1 && isa<IntegerType, IndexType>(funcResTypes[0])) {
-      Type retType = funcResTypes[0];
-      if (isLLVMFunc) {
-        Value stateVal =
-            LLVM::ConstantOp::create(builder, loc, retType, builder.getIntegerAttr(retType, i + 1)).getRes();
-        LLVM::ReturnOp::create(builder, loc, ValueRange{stateVal});
-      } else {
-        Attribute stateAttr = retType.isIndex()
-                                  ? static_cast<Attribute>(builder.getIndexAttr(i + 1))
-                                  : static_cast<Attribute>(builder.getIntegerAttr(retType, i + 1));
-        Value stateVal = arith::ConstantOp::create(builder, loc, retType, cast<TypedAttr>(stateAttr));
-        func::ReturnOp::create(builder, loc, ValueRange{stateVal});
-      }
-    } else if (funcResTypes.empty() ||
-               (funcResTypes.size() == 1 && isa<LLVM::LLVMVoidType>(funcResTypes[0]))) {
-      if (isLLVMFunc)
-        LLVM::ReturnOp::create(builder, loc, ValueRange{});
-      else
-        func::ReturnOp::create(builder, loc);
-    } else { return false; }
+    auto constant = [&](OpBuilder &b, Type type, int64_t value) -> Value {
+      auto attr = b.getIntegerAttr(type, value);
+      return isLLVMFunc ? Value(LLVM::ConstantOp::create(b, loc, type, attr))
+                        : Value(arith::ConstantOp::create(b, loc, type, attr));
+    };
+    SmallVector<Value> results;
+    if (funcResTypes.size() == 1 && isa<IntegerType, IndexType>(funcResTypes[0]))
+      results.push_back(constant(builder, funcResTypes[0], i + 1));
+    else if (!funcResTypes.empty() &&
+             !(funcResTypes.size() == 1 && isa<LLVM::LLVMVoidType>(funcResTypes[0]))) return false;
+    if (isLLVMFunc) LLVM::ReturnOp::create(builder, loc, results);
+    else func::ReturnOp::create(builder, loc, results);
     tempBr->erase();
     if (!sp->use_empty() && sp->getNumResults() == 1 && isa<IntegerType>(sp->getResult(0).getType())) {
       OpBuilder resumeBuilder = OpBuilder::atBlockBegin(resumeBlocks[i]);
-      Type rType = sp->getResult(0).getType();
-      Value zero = isLLVMFunc
-                       ? Value(LLVM::ConstantOp::create(resumeBuilder, loc, rType,
-                                                        resumeBuilder.getIntegerAttr(rType, 0))
-                                   .getRes())
-                       : Value(arith::ConstantOp::create(resumeBuilder, loc, rType,
-                                                         resumeBuilder.getIntegerAttr(rType, 0)));
-      sp->getResult(0).replaceAllUsesWith(zero);
+      sp->getResult(0).replaceAllUsesWith(constant(resumeBuilder, sp->getResult(0).getType(), 0));
     }
     if (sp->use_empty()) sp->erase();
   }
-  // 5. Create entry dispatch block with cf.switch jumping to originalEntry or resumeBlocks.
+  // Dispatch entry to the original body or a resume block.
   Block *originalEntry = &body.front();
   Block *dispatchBlock = new Block();
   body.getBlocks().insert(body.begin(), dispatchBlock);
@@ -688,14 +648,12 @@ extern "C" MLIR_CAPI_EXPORTED bool beaverLowerResumableCFG(
   IntegerType switchIntType = dyn_cast<IntegerType>(stateValue.getType());
   if (!switchIntType) return false;
   SmallVector<APInt> caseValues;
-  SmallVector<Block *> caseDestinations;
   SmallVector<ValueRange> caseOperands;
   for (size_t i = 0; i < numSafepoints; ++i) {
     caseValues.push_back(APInt(switchIntType.getWidth(), i + 1));
-    caseDestinations.push_back(resumeBlocks[i]);
     caseOperands.push_back(ValueRange{});
   }
   cf::SwitchOp::create(entryBuilder, funcLoc, stateValue, originalEntry, ValueRange{},
-                       caseValues, caseDestinations, caseOperands);
+                       caseValues, resumeBlocks, caseOperands);
   return true;
 }

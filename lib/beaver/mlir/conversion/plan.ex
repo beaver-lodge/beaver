@@ -186,7 +186,7 @@ defmodule Beaver.MLIR.Conversion.Plan do
     opts = validate_callback_opts!(opts, [:version, :benefit, :one_to_n, :timeout], "add_conversion_pattern")
     validate_non_neg_int_opt!(Keyword.get(opts, :benefit, 1), :benefit)
     validate_boolean_opt!(Keyword.get(opts, :one_to_n, false), :one_to_n)
-    validate_optional_timeout!(Keyword.get(opts, :timeout))
+    validate_plan_timeout!(Keyword.get(opts, :timeout))
     opts
   end
 
@@ -197,23 +197,13 @@ defmodule Beaver.MLIR.Conversion.Plan do
 
   defp validate_boolean_opt!(v, _key) when is_boolean(v), do: :ok
   defp validate_boolean_opt!(v, key), do: raise(ArgumentError, "#{inspect(key)} must be boolean, got: #{inspect(v)}")
-  defp validate_optional_timeout!(nil), do: :ok
-  defp validate_optional_timeout!(v) when is_integer(v) and v >= 0, do: :ok
-
-  defp validate_optional_timeout!(v),
-    do: raise(ArgumentError, ":timeout must be a non-negative integer or nil, got: #{inspect(v)}")
 
   @spec add_pattern(t(), Descriptor.t() | Program.t(), keyword()) :: t()
   def add_pattern(plan, pattern, opts \\ [])
 
-  def add_pattern(%__MODULE__{} = plan, %Descriptor{} = descriptor, opts) do
-    opts = validate_callback_opts!(opts, [:version], "add_pattern")
-    append_entry(plan, {:add_pattern, descriptor, opts})
-  end
-
-  def add_pattern(%__MODULE__{} = plan, %Program{} = program, opts) do
-    opts = validate_callback_opts!(opts, [:version], "add_pattern")
-    append_entry(plan, {:add_program, program, opts})
+  for {type, kind} <- [{Descriptor, :add_pattern}, {Program, :add_program}] do
+    def add_pattern(%__MODULE__{} = plan, %unquote(type){} = pattern, opts),
+      do: append_entry(plan, {unquote(kind), pattern, validate_callback_opts!(opts, [:version], "add_pattern")})
   end
 
   @doc "Adds a callback-free C ABI aggregate call lowering pattern to the plan."
@@ -422,13 +412,7 @@ defmodule Beaver.MLIR.Conversion.Plan do
 
   defp populate_or_destroy!(entries, ctx, target, converter, patterns, timeout) do
     has_type_conversions =
-      Enum.any?(entries, fn
-        {:add_conversion, _, _} -> true
-        {:add_1_to_n_conversion, _, _} -> true
-        {:add_conversion_map, _, _} -> true
-        {:add_conversion_map, _, _, _} -> true
-        _ -> false
-      end)
+      Enum.any?(entries, &(elem(&1, 0) in [:add_conversion, :add_1_to_n_conversion, :add_conversion_map]))
 
     if not has_type_conversions do
       i1 = Type.i1(ctx: ctx)

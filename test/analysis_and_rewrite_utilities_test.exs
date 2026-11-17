@@ -56,19 +56,6 @@ defmodule AnalysisAndRewriteUtilitiesTest do
     MLIR.Module.destroy(module)
   end
 
-  test "analysis identities survive handle rereads and function passes use their own anchor", %{ctx: ctx} do
-    module = control_flow_module(ctx)
-    {func, [entry | _]} = func_and_blocks(module)
-    arg = Block.get_arg!(entry, 0)
-
-    assert MLIR.CAPI.beaverValueIdentity(arg) |> Beaver.Native.to_term() ==
-             Block.get_arg!(entry, 0) |> MLIR.CAPI.beaverValueIdentity() |> Beaver.Native.to_term()
-
-    func |> Beaver.Composer.append("canonicalize,cse") |> Beaver.Composer.run!()
-    MLIR.verify!(module)
-    MLIR.Module.destroy(module)
-  end
-
   test "dominance supports block, operation, and value queries", %{ctx: ctx} do
     module = control_flow_module(ctx)
     {func, [entry, left, right, merge, unreachable]} = func_and_blocks(module)
@@ -77,6 +64,10 @@ defmodule AnalysisAndRewriteUtilitiesTest do
     [right_sub, _right_branch] = Enum.to_list(Beaver.Walker.operations(right))
     [merge_return] = Enum.to_list(Beaver.Walker.operations(merge))
     left_value = Operation.result(left_add, 0)
+    arg = Block.get_arg!(entry, 0)
+
+    assert MLIR.CAPI.beaverValueIdentity(arg) |> Beaver.Native.to_term() ==
+             Block.get_arg!(entry, 0) |> MLIR.CAPI.beaverValueIdentity() |> Beaver.Native.to_term()
 
     assert :checked ==
              DominanceInfo.with_info(func, fn info ->
@@ -97,6 +88,8 @@ defmodule AnalysisAndRewriteUtilitiesTest do
                :checked
              end)
 
+    func |> Beaver.Composer.append("canonicalize,cse") |> Beaver.Composer.run!()
+    MLIR.verify!(module)
     MLIR.Module.destroy(module)
   end
 

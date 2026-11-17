@@ -7,6 +7,19 @@ defmodule Beaver.MLIR.Attribute.Accessor do
   import CAPI
   defstruct [:get_num_element, :get_element, :getter]
 
+  defp accessor(count, get, build) do
+    %__MODULE__{
+      get_num_element: &Native.to_term(count.(&1)),
+      get_element: &element(get.(&1, &2)),
+      getter: build
+    }
+  end
+
+  defp element(%kind{} = value) when kind in [Attribute, NamedAttribute], do: value
+  defp element(%MLIR.StringRef{} = string), do: MLIR.to_string(string)
+  defp element(:dynamic), do: :dynamic
+  defp element(value), do: Native.to_term(value)
+
   defp normalize_key(index, num_elements) when is_integer(index) do
     index = if index < 0, do: num_elements + index, else: index
     if index >= 0 and index < num_elements, do: {:ok, index}, else: :error
@@ -50,57 +63,26 @@ defmodule Beaver.MLIR.Attribute.Accessor do
   defp cast_null_attr(a), do: if(MLIR.null?(a), do: :error, else: {:ok, a})
 
   def fetch(%__MODULE__{get_num_element: get_num_element, get_element: get_element}, attr, key) do
-    num_elements = get_num_element.(attr)
-
-    case normalize_key(key, num_elements) do
-      {:ok, key} ->
-        case get_element.(attr, key) do
-          %m{} = a when m in [Attribute, NamedAttribute] -> cast_null_attr(a)
-          v when is_integer(v) or is_float(v) or is_binary(v) or is_boolean(v) -> {:ok, v}
-          :dynamic -> {:ok, :dynamic}
-        end
-
-      _ ->
-        :error
+    with {:ok, key} <- normalize_key(key, get_num_element.(attr)) do
+      case get_element.(attr, key) do
+        %m{} = a when m in [Attribute, NamedAttribute] -> cast_null_attr(a)
+        v when is_integer(v) or is_float(v) or is_binary(v) or is_boolean(v) or v == :dynamic -> {:ok, v}
+      end
     end
-  end
-
-  defp wrap_postprocessing(%__MODULE__{get_num_element: count, get_element: get} = accessor) do
-    %{
-      accessor
-      | get_num_element: &Native.to_term(count.(&1)),
-        get_element: fn attr, key ->
-          case get.(attr, key) do
-            %kind{} = value when kind in [Attribute, NamedAttribute] -> value
-            %MLIR.StringRef{} = string -> MLIR.to_string(string)
-            :dynamic -> :dynamic
-            value -> Native.to_term(value)
-          end
-        end
-    }
   end
 
   defp dense_element_getter(element_type, attr, pos) do
-    cond do
-      MLIR.equal?(element_type, Type.i1()) ->
-        mlirDenseElementsAttrGetBoolValue(attr, pos)
+    suffix =
+      cond do
+        MLIR.equal?(element_type, Type.i1()) -> "Bool"
+        Type.integer?(element_type) -> elem(Attribute.integer_storage(element_type), 0)
+        MLIR.equal?(element_type, Type.index()) -> "Index"
+        MLIR.equal?(element_type, Type.f32()) -> "Float"
+        MLIR.equal?(element_type, Type.f64()) -> "Double"
+        true -> "String"
+      end
 
-      Type.integer?(element_type) ->
-        {suffix, _kind} = Attribute.integer_storage(element_type)
-        apply(CAPI, :"mlirDenseElementsAttrGet#{suffix}Value", [attr, pos])
-
-      MLIR.equal?(element_type, Type.index()) ->
-        mlirDenseElementsAttrGetIndexValue(attr, pos)
-
-      MLIR.equal?(element_type, Type.f32()) ->
-        mlirDenseElementsAttrGetFloatValue(attr, pos)
-
-      MLIR.equal?(element_type, Type.f64()) ->
-        mlirDenseElementsAttrGetDoubleValue(attr, pos)
-
-      true ->
-        mlirDenseElementsAttrGetStringValue(attr, pos)
-    end
+    apply(CAPI, :"mlirDenseElementsAttrGet#{suffix}Value", [attr, pos])
   end
 
   @dense_array_types [
@@ -115,35 +97,32 @@ defmodule Beaver.MLIR.Attribute.Accessor do
   defp try_dense_array(attr) do
     Enum.find_value(@dense_array_types, fn {name, suffix, type} ->
       if apply(Attribute, :"dense_#{name}_array?", [attr]),
-        do: %__MODULE__{
-          get_num_element: &mlirDenseArrayGetNumElements/1,
-          get_element: &apply(CAPI, :"mlirDense#{suffix}ArrayGetElement", [&1, &2]),
-          getter: &Attribute.dense_array(&1, type, &2)
-        }
+        do:
+          accessor(
+            &mlirDenseArrayGetNumElements/1,
+            &apply(CAPI, :"mlirDense#{suffix}ArrayGetElement", [&1, &2]),
+            &Attribute.dense_array(&1, type, &2)
+          )
     end)
   end
 
   def new(attr) do
     cond do
       Attribute.array?(attr) ->
-        %__MODULE__{
-          get_num_element: &mlirArrayAttrGetNumElements/1,
-          get_element: &mlirArrayAttrGetElement/2,
-          getter: &Attribute.array/2
-        }
+        accessor(&mlirArrayAttrGetNumElements/1, &mlirArrayAttrGetElement/2, &Attribute.array/2)
 
       Attribute.dictionary?(attr) ->
-        %__MODULE__{
-          get_num_element: &mlirDictionaryAttrGetNumElements/1,
-          get_element: fn
+        accessor(
+          &mlirDictionaryAttrGetNumElements/1,
+          fn
             attr, pos when is_integer(pos) ->
               mlirDictionaryAttrGetElement(attr, pos)
 
             attr, name when is_bitstring(name) or is_atom(name) ->
               mlirDictionaryAttrGetElementByName(attr, MLIR.StringRef.create(name))
           end,
-          getter: &Attribute.dictionary/2
-        }
+          &Attribute.dictionary/2
+        )
 
       da = try_dense_array(attr) ->
         da
@@ -152,27 +131,26 @@ defmodule Beaver.MLIR.Attribute.Accessor do
         shaped_type = beaverDenseElementsAttrGetType(attr)
         element_type = Type.element_type(shaped_type)
 
-        %__MODULE__{
-          get_num_element: &beaverShapedTypeGetNumElements(beaverDenseElementsAttrGetType(&1)),
-          get_element: &dense_element_getter(element_type, &1, &2),
-          getter: &Attribute.dense_elements(&1, shaped_type, &2)
-        }
+        accessor(
+          &beaverShapedTypeGetNumElements(beaverDenseElementsAttrGetType(&1)),
+          &dense_element_getter(element_type, &1, &2),
+          &Attribute.dense_elements(&1, shaped_type, &2)
+        )
 
       Attribute.strided_layout?(attr) ->
         offset = mlirStridedLayoutAttrGetOffset(attr) |> MLIR.ShapedType.cast_dynamic_magic_number(:offset)
 
-        %__MODULE__{
-          get_num_element: &mlirStridedLayoutAttrGetNumStrides/1,
-          get_element: fn
+        accessor(
+          &mlirStridedLayoutAttrGetNumStrides/1,
+          fn
             _, :offset -> offset
             attr, pos -> mlirStridedLayoutAttrGetStride(attr, pos) |> MLIR.ShapedType.cast_dynamic_magic_number(:stride)
           end,
-          getter: &Attribute.strided_layout(offset, &1, &2)
-        }
+          &Attribute.strided_layout(offset, &1, &2)
+        )
 
       true ->
         raise ArgumentError, "not a container attribute"
     end
-    |> wrap_postprocessing()
   end
 end

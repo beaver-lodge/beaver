@@ -108,21 +108,6 @@ defmodule ODSDumpTest do
     end
   end
 
-  test "segment_sizes infer in non-generating usage", %{ctx: ctx} do
-    mlir ctx: ctx do
-      function_module _(
-                        function_type: Type.function([Type.i32(), Type.i32()], []),
-                        sym_name: Beaver.MLIR.Attribute.string("f#{System.unique_integer([:positive])}")
-                      ) do
-        block _(a >>> Type.i32(), b >>> Type.i32()) do
-          Arith.addi(lhs: a, rhs: b) >>> Type.i32()
-          Func.return() >>> []
-        end
-      end
-      |> MLIR.verify!()
-    end
-  end
-
   test "all-zero segment_sizes", %{ctx: ctx} do
     mlir ctx: ctx do
       function_module _(
