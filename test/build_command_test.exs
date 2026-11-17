@@ -55,5 +55,11 @@ defmodule Beaver.BuildCommandTest do
 
     for {args, error} <- cases, do: assert_raise(error, fn -> Command.options(args) end)
     assert Command.options(["--jobs", "3"], backend: "llvm") == [max_concurrency: 3, backend: "llvm"]
+    switches = [optimizations: :string, without: :string]
+    opts = Command.options(["--optimizations", "all", "--without", "fold"], [], switches)
+    assert opts == [optimizations: "all", without: "fold"]
+    req = JSON.encode!(%{source: "guest", out: "out", optimizations: "none"})
+    response = Command.reply(req, fn _, _, options -> Map.new(options) end, opts, "source", switches) |> JSON.decode!()
+    assert response["ok"] == %{"optimizations" => "none", "without" => "fold"}
   end
 end

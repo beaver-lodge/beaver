@@ -12,6 +12,7 @@
 #include "mlir/Transforms/CompositePass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
+#include "mlir/Transforms/RegionUtils.h"
 #include "mlir/IR/SymbolTable.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/SmallVector.h"
@@ -31,6 +32,11 @@
 using namespace mlir;
 MLIR_CAPI_EXPORTED uint64_t beaverValueIdentity(MlirValue value) { return reinterpret_cast<uintptr_t>(value.ptr); }
 MLIR_CAPI_EXPORTED uint64_t beaverBlockIdentity(MlirBlock block) { return reinterpret_cast<uintptr_t>(block.ptr); }
+MLIR_CAPI_EXPORTED uint64_t beaverOperationIdentity(MlirOperation op) { return reinterpret_cast<uintptr_t>(op.ptr); }
+MLIR_CAPI_EXPORTED void beaverRegionEraseUnreachableBlocks(MlirRegion region) {
+  IRRewriter rewriter(unwrap(region)->getContext());
+  (void)eraseUnreachableBlocks(rewriter, *unwrap(region));
+}
 MLIR_CAPI_EXPORTED bool beaverContextIsMultithreadingEnabled(MlirContext context) {
   return unwrap(context)->isMultithreadingEnabled();
 }

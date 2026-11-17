@@ -23,6 +23,8 @@ MLIR_CAPI_EXPORTED uint64_t beaverOperationStructuralHashValue(MlirOperation op,
 // Identity keys for analysis tables; valid only while the referenced IR remains alive.
 MLIR_CAPI_EXPORTED uint64_t beaverValueIdentity(MlirValue value);
 MLIR_CAPI_EXPORTED uint64_t beaverBlockIdentity(MlirBlock block);
+MLIR_CAPI_EXPORTED uint64_t beaverOperationIdentity(MlirOperation op);
+MLIR_CAPI_EXPORTED void beaverRegionEraseUnreachableBlocks(MlirRegion region);
 // Destroys a detached operation tree without recursively descending through nested regions. This keeps deeply nested
 // generated IR from overflowing the native stack during diagnostic cleanup.
 MLIR_CAPI_EXPORTED void beaverOperationDestroyIterative(MlirOperation operation);

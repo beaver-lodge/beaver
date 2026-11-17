@@ -3,44 +3,52 @@ defmodule Beaver.Build.Command do
   @switches [cache_dir: :string, native_cache_dir: :string, jobs: :integer, backend: :string, profile: :string]
   defmacro __using__(opts) do
     quote do
+      @command_switches unquote(opts[:switches] || [])
       def main(["--serve" | rest]),
-        do: serve!(unquote(__MODULE__).options(rest, unquote(opts[:defaults] || [])))
+        do: serve!(unquote(__MODULE__).options(rest, unquote(opts[:defaults] || []), @command_switches))
 
       def main([source, output | rest]) do
-        options = unquote(__MODULE__).options(rest, unquote(opts[:defaults] || []))
+        options = unquote(__MODULE__).options(rest, unquote(opts[:defaults] || []), @command_switches)
         build!(source, output, options) |> tap(&IO.puts(JSON.encode!(&1)))
       end
 
       def main(_), do: raise(ArgumentError, unquote(Keyword.fetch!(opts, :usage)))
 
       def serve!(opts \\ []),
-        do: unquote(__MODULE__).serve(&build!/3, opts, unquote(Keyword.get(opts, :source_alias, "source")))
+        do:
+          unquote(__MODULE__).serve(
+            &build!/3,
+            opts,
+            unquote(Keyword.get(opts, :source_alias, "source")),
+            :stdio,
+            @command_switches
+          )
     end
   end
 
-  def options(args, defaults \\ []) do
-    {opts, rest} = OptionParser.parse!(args, strict: @switches)
+  def options(args, defaults \\ [], switches \\ []) do
+    {opts, rest} = OptionParser.parse!(args, strict: @switches ++ switches)
     if rest != [], do: raise(ArgumentError, "unexpected build arguments: #{inspect(rest)}")
     normalize(Keyword.merge(defaults, opts))
   end
 
-  def serve(build, opts, source_alias, io \\ :stdio) do
+  def serve(build, opts, source_alias, io \\ :stdio, switches \\ []) do
     Enum.each(IO.stream(io, :line), fn line ->
       request = String.trim(line)
-      if request != "", do: IO.puts(io, reply(request, build, opts, source_alias))
+      if request != "", do: IO.puts(io, reply(request, build, opts, source_alias, switches))
     end)
   end
 
   @doc "Processes one request without changing process IO or environment."
-  def reply(line, build, opts \\ [], source_alias \\ "source") do
+  def reply(line, build, opts \\ [], source_alias \\ "source", switches \\ []) do
     request = JSON.decode!(line)
     unless is_map(request), do: raise(ArgumentError, "expected a build request object")
-    request |> Map.take(["id"]) |> Map.merge(execute(request, build, opts, source_alias)) |> JSON.encode!()
+    request |> Map.take(["id"]) |> Map.merge(execute(request, build, opts, source_alias, switches)) |> JSON.encode!()
   rescue
     error -> JSON.encode!(%{error: Exception.message(error)})
   end
 
-  defp execute(request, build, opts, source_alias) do
+  defp execute(request, build, opts, source_alias, switches) do
     source = request[source_alias] || Map.fetch!(request, "source")
     output = Map.fetch!(request, "out")
     unless is_binary(source) and is_binary(output), do: raise(ArgumentError, "source and out must be paths")
@@ -49,7 +57,9 @@ defmodule Beaver.Build.Command do
     if backend && opts[:backend] && backend != to_string(opts[:backend]),
       do: raise(ArgumentError, "driver backend mismatch")
 
-    request_opts = for {key, _} <- @switches, Map.has_key?(request, to_string(key)), do: {key, request[to_string(key)]}
+    request_opts =
+      for {key, _} <- @switches ++ switches, Map.has_key?(request, to_string(key)), do: {key, request[to_string(key)]}
+
     %{ok: build.(source, output, normalize(Keyword.merge(opts, request_opts)))}
   rescue
     error -> %{error: Exception.message(error)}
